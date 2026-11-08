@@ -402,16 +402,10 @@ const CASES: &[Case] = &[
         args: &[],
     }, // supplied entry 231
     Case {
-        raw: "opaque-operation/Stage1/日本語/00001234: done, but its earlier version couldn't be kept: opaque-detail/Stage1/日本語/00001234",
+        raw: "Push: done, but its earlier version couldn't be kept: opaque-detail/Stage1/日本語/00001234",
         id: "repo-workflows-status-rewrite-retention",
         args: &[
-            (
-                "operation",
-                Sample::Text(
-                    "opaque-operation/Stage1/日本語/00001234",
-                    "opaque-operation/Stage1/日本語/00001234",
-                ),
-            ),
+            ("operation", Sample::Text("Push", "Pushen")),
             (
                 "detail",
                 Sample::Text(
@@ -1965,7 +1959,7 @@ const CASES: &[Case] = &[
         args: &[],
     }, // supplied entry 88
     Case {
-        raw: "Published pull requests: pull request",
+        raw: "Published pull requests: opaque-parts-join-1/Stage1/日本語/00001234",
         id: "repo-workflows-stack-summary-7f75368f",
         args: &[
             ("noun", Sample::Text("pull request", "Pull Request")),
@@ -1984,7 +1978,7 @@ const CASES: &[Case] = &[
         args: &[],
     }, // supplied entry 225
     Case {
-        raw: "Put opaque-branch/Stage1/日本語/00001234 back at opaque-branch/Stage1/日本語/00001234",
+        raw: "Put opaque-branch/Stage1/日本語/00001234 back at opaque-crate-repo-short-commit-1/Stage1/日本語/00001234",
         id: "repo-workflows-timeline-put-branch-back-94acd0c3",
         args: &[
             (
@@ -2032,7 +2026,7 @@ const CASES: &[Case] = &[
     }, // supplied entry 345
     Case {
         raw: "Cherry-pick",
-        id: "repo-workflows-agent-plan-4c49fdb6",
+        id: "interaction-operation-cherry-pick",
         args: &[],
     }, // supplied entry 1
     Case {
@@ -2156,7 +2150,7 @@ const CASES: &[Case] = &[
         ],
     }, // supplied entry 190
     Case {
-        raw: "Push, and Push more",
+        raw: "Push, and 1234 more",
         id: "repo-workflows-timeline-outside-label-d1d10f56",
         args: &[
             ("first", Sample::Text("Push", "Pushen")),
@@ -2169,7 +2163,7 @@ const CASES: &[Case] = &[
         args: &[],
     }, // supplied entry 266
     Case {
-        raw: "Push: done. Push (receipt in the timeline, Ctrl+Shift+Z)",
+        raw: "Push: done. Final files identical, authors kept, messages kept (receipt in the timeline, Ctrl+Shift+Z)",
         id: "repo-workflows-timeline-show-receipt-e172bf9c",
         args: &[
             ("label", Sample::Text("Push", "Pushen")),
@@ -2214,7 +2208,7 @@ const CASES: &[Case] = &[
         args: &[],
     }, // supplied entry 41
     Case {
-        raw: "Push refused: Push",
+        raw: "Push refused: opaque-out-trim-1/Stage1/日本語/00001234",
         id: "repo-workflows-push-push-op-ended-79357f2e",
         args: &[
             ("label", Sample::Text("Push", "Pushen")),
@@ -2455,7 +2449,7 @@ const CASES: &[Case] = &[
     }, // supplied entry 300
     Case {
         raw: "Revert",
-        id: "repo-workflows-agent-plan-0026c505",
+        id: "interaction-operation-revert",
         args: &[],
     }, // supplied entry 2
     Case {
@@ -2476,7 +2470,7 @@ const CASES: &[Case] = &[
     }, // supplied entry 4
     Case {
         raw: "Commit",
-        id: "repo-workflows-agent-commit-82a9c46f",
+        id: "interaction-operation-commit",
         args: &[],
     }, // supplied entry 7
     Case {
@@ -2486,7 +2480,7 @@ const CASES: &[Case] = &[
     }, // supplied entry 142
     Case {
         raw: "Rebase",
-        id: "repo-workflows-timeline-describe-reflog-9eb5b275",
+        id: "interaction-operation-rebase",
         args: &[],
     }, // supplied entry 260
     Case {
@@ -2513,12 +2507,12 @@ const CASES: &[Case] = &[
     }, // supplied entry 272
     Case {
         raw: "Amend",
-        id: "repo-workflows-agent-commit-4475f515",
+        id: "interaction-operation-amend",
         args: &[],
     }, // supplied entry 6
     Case {
         raw: "Stash",
-        id: "repo-workflows-agent-stash-38bdfeaa",
+        id: "interaction-operation-stash",
         args: &[],
     }, // supplied entry 11
     Case {
@@ -2548,12 +2542,12 @@ const CASES: &[Case] = &[
     }, // supplied entry 288
     Case {
         raw: "Push",
-        id: "repo-workflows-agent-push-731ce7ed",
+        id: "interaction-operation-push",
         args: &[],
     }, // supplied entry 17
     Case {
         raw: "Pull",
-        id: "repo-workflows-timeline-describe-reflog-b66d0441",
+        id: "interaction-operation-pull",
         args: &[],
     }, // supplied entry 265
     Case {
@@ -2577,17 +2571,12 @@ const CASES: &[Case] = &[
         args: &[("label", Sample::Text("Push", "Pushen"))],
     }, // supplied entry 281
     Case {
-        raw: "opaque-operation/Stage1/日本語/00001234 (here only)",
+        raw: "Push (here only)",
         id: "repo-workflows-operation-here-only",
-        args: &[(
-            "operation",
-            Sample::Text(
-                "opaque-operation/Stage1/日本語/00001234",
-                "opaque-operation/Stage1/日本語/00001234",
-            ),
-        )],
+        args: &[("operation", Sample::Text("Push", "Pushen"))],
     }, // supplied entry 339
 ];
+
 #[test]
 fn workflow_finite_contracts_initialize_all_patterns_and_render_named_types_in_both_locales() {
     assert_eq!(CASES.len(), TEMPLATES.len());

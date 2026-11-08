@@ -703,6 +703,7 @@ pub(crate) fn display_operation(label: &str) -> String {
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum PaintFamily {
+    CoreLines,
     Review,
     Workflow,
     Legacy,
@@ -722,6 +723,8 @@ impl Painted {
 }
 fn known_operation(label: &str, depth: usize) -> Option<Painted> {
     operation_display_inner(label, depth, PaintFamily::Review)
+        .or_else(|| workflow::shared_fixed(label).map(Painted::Known))
+        .or_else(|| operation_template(label, depth, PaintFamily::CoreLines))
         .or_else(|| operation_display_inner(label, depth, PaintFamily::Workflow))
         .or_else(|| operation_display_inner(label, depth, PaintFamily::Legacy))
 }
@@ -1025,7 +1028,11 @@ fn operation_template(label: &str, depth: usize, family: PaintFamily) -> Option<
             } else {
                 PaintFamily::Legacy
             };
-            if family != source_family {
+            if family == PaintFamily::CoreLines {
+                if template.id != "repo-core-0164" {
+                    continue;
+                }
+            } else if family != source_family {
                 continue;
             }
             let Some(captures) = template.pattern.captures(label) else {
@@ -1071,9 +1078,7 @@ fn operation_template(label: &str, depth: usize, family: PaintFamily) -> Option<
                 .is_some_and(|(name, _)| matches!(*name, "label" | "verb" | "Push"))
             {
                 let inner = captures.get(1).map_or("", |v| v.as_str());
-                if crate::i18n::language() == crate::i18n::Language::German
-                    && operation_display(inner, depth + 1) == inner
-                {
+                if !matches!(known_operation(inner, depth + 1), Some(Painted::Known(_))) {
                     continue;
                 }
             }

@@ -1566,6 +1566,8 @@ pub(super) enum Adapter {
 
 pub(super) fn adapter(id: &str, name: &str) -> Option<Adapter> {
     match (id, name) {
+        ("repo-workflows-operation-here-only", "operation")
+        | ("repo-workflows-status-rewrite-retention", "operation") => Some(Adapter::Operation),
         ("repo-workflows-agent-agent-op-done-16d1e9b2", "label") => Some(Adapter::Operation),
         ("repo-workflows-agents-send-to-agent-4e9f0022", "label") => Some(Adapter::Operation),
         ("repo-workflows-bisect-bisect-step-done-8336fbfe", "label") => Some(Adapter::Operation),
@@ -1803,6 +1805,9 @@ pub(super) fn receipt(raw: &str) -> Option<String> {
                 }
             }
             if clause.ends_with(" dropped") || clause.ends_with(" more signed") {
+                if signature_replaced {
+                    return None;
+                }
                 continue;
             }
         }
@@ -1883,3 +1888,46 @@ pub(super) fn receipt(raw: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests;
+
+pub(super) fn shared_fixed(raw: &str) -> Option<String> {
+    match raw {
+        "Fetch" => Some(crate::operation_labels::display(raw)),
+        "Pull" => Some(crate::operation_labels::display(raw)),
+        "Push" => Some(crate::operation_labels::display(raw)),
+        "Commit" => Some(crate::operation_labels::display(raw)),
+        "Amend" => Some(crate::operation_labels::display(raw)),
+        "Stage" => Some(crate::operation_labels::display(raw)),
+        "Stage all" => Some(crate::operation_labels::display(raw)),
+        "Unstage" => Some(crate::operation_labels::display(raw)),
+        "Unstage all" => Some(crate::operation_labels::display(raw)),
+        "Discard" => Some(crate::operation_labels::display(raw)),
+        "Stash" => Some(crate::operation_labels::display(raw)),
+        "Pop stash" => Some(crate::operation_labels::display(raw)),
+        "Apply stash" => Some(crate::operation_labels::display(raw)),
+        "Drop stash" => Some(crate::operation_labels::display(raw)),
+        "Set identity" => Some(crate::operation_labels::display(raw)),
+        "Use the profile's author" => Some(crate::operation_labels::display(raw)),
+        "Mark resolved" => Some(crate::operation_labels::display(raw)),
+        "Reload" => Some(crate::operation_labels::display(raw)),
+        "Sync" => Some(crate::operation_labels::display(raw)),
+        "Push for review" => Some(crate::operation_labels::display(raw)),
+        "Push, skipping hooks" => Some(crate::operation_labels::display(raw)),
+        "Apply patch" => Some(crate::operation_labels::display(raw)),
+        "Cherry-pick" => Some(crate::operation_labels::display(raw)),
+        "Revert" => Some(crate::operation_labels::display(raw)),
+        "Rebase" => Some(crate::operation_labels::display(raw)),
+        "Merge" => Some(crate::operation_labels::display(raw)),
+        "DVC: Pull" => Some(crate::operation_labels::display(raw)),
+        "Abort merge" => Some(crate::operation_labels::display(raw)),
+        "Abort rebase" => Some(crate::operation_labels::display(raw)),
+        "Abort cherry-pick" => Some(crate::operation_labels::display(raw)),
+        "Abort revert" => Some(crate::operation_labels::display(raw)),
+        "Abort am" => Some(crate::operation_labels::display(raw)),
+        "Continue merge" => Some(crate::operation_labels::display(raw)),
+        "Continue rebase" => Some(crate::operation_labels::display(raw)),
+        "Continue cherry-pick" => Some(crate::operation_labels::display(raw)),
+        "Continue revert" => Some(crate::operation_labels::display(raw)),
+        "Continue am" => Some(crate::operation_labels::display(raw)),
+        _ => None,
+    }
+}
