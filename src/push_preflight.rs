@@ -79,6 +79,7 @@ pub(crate) struct Plan {
     tracking_ref: Option<String>,
     lfs_config: Vec<(String, String)>,
     receive_pack: String,
+    selection: Option<git::repository_tools::routes::PreparedPush>,
 }
 
 fn read(repo: &Path, args: &[&str], active: &dyn Fn() -> bool) -> Result<String, String> {
@@ -907,6 +908,7 @@ pub(crate) fn scan(
         tracking_ref,
         lfs_config,
         receive_pack,
+        selection: None,
     };
     check_active(repo, &plan, active)?;
     if !plan.deleting
@@ -973,6 +975,40 @@ pub(crate) fn display_path(path: &str) -> String {
 }
 
 impl Plan {
+    pub(crate) fn selection(&self) -> Option<&git::repository_tools::routes::PreparedPush> {
+        self.selection.as_ref()
+    }
+
+    /// A sidebar/dependency choice can constrain a root checklist, never approve
+    /// it. Keep the original endpoint and lease across rechecks and echo/retry.
+    pub(crate) fn retain_selection(
+        &mut self,
+        selected: git::repository_tools::routes::PreparedPush,
+    ) -> Result<(), String> {
+        self.matches_selection(&selected.route)?;
+        self.selection = Some(selected);
+        Ok(())
+    }
+
+    fn matches_selection(
+        &self,
+        selected: &git::repository_tools::routes::PushRoute,
+    ) -> Result<(), String> {
+        if self.deleting
+            || self.remote != selected.remote
+            || self.destination != selected.destination
+            || self.push_oid != selected.commit
+            || self.head != selected.commit
+            || self.urls != selected.urls
+            || selected
+                .lease
+                .as_deref()
+                .is_some_and(|lease| self.base.as_deref() != Some(lease))
+        {
+            return Err("The selected push endpoint, commit or advertised lease changed. Fetch the exact target if needed, then reopen the original push action; nothing was sent.".into());
+        }
+        Ok(())
+    }
     pub(crate) fn is_current_branch(&self) -> bool {
         !self.deleting && self.branch == self.checkout && self.branch.starts_with("refs/heads/")
     }
@@ -1208,6 +1244,9 @@ fn check_active(repo: &Path, plan: &Plan, active: &dyn Fn() -> bool) -> Result<(
 }
 
 pub(crate) fn push_args(plan: &Plan) -> Result<Vec<String>, String> {
+    if let Some(selected) = &plan.selection {
+        plan.matches_selection(&selected.route)?;
+    }
     if (plan.force || plan.deleting) && plan.base.is_none() {
         return Err(
             "Fetch this exact target before force pushing: no remote lease was inspected.".into(),
@@ -1437,5 +1476,87 @@ mod internals_route_recording {
         ] {
             assert_eq!(saved_branch_spec(branch, saved, implicit), None);
         }
+    }
+}
+
+#[cfg(test)]
+pub(crate) mod selected_continuation_recording {
+    use super::*;
+    use git::repository_tools::routes::{PreparedPush, PushRoute};
+
+    pub(crate) fn plan(route: &PushRoute) -> Plan {
+        Plan {
+            branch: format!("refs/heads/{}", route.branch),
+            remote: route.remote.clone(),
+            destination: route.destination.clone(),
+            head: route.commit.clone(),
+            base: route.lease.clone(),
+            commits: Vec::new(),
+            findings: Vec::new(),
+            targets: route.urls.iter().map(|u| target_label(u)).collect(),
+            expected_name: String::new(),
+            expected_email: String::new(),
+            expected_accounts: BTreeMap::new(),
+            profile: UserProfile::default(),
+            force: route.lease.is_some(),
+            deleting: false,
+            tracking: false,
+            lfs_objects: BTreeSet::new(),
+            skip_hooks: false,
+            push_oid: route.commit.clone(),
+            original: route.operations(),
+            urls: route.urls.clone(),
+            checkout: "refs/heads/other-checkout".into(),
+            checkout_oid: "c".repeat(40),
+            config: String::new(),
+            config_before_push: String::new(),
+            local_refs: BTreeMap::new(),
+            extras: Vec::new(),
+            tracking_ref: None,
+            lfs_config: Vec::new(),
+            receive_pack: String::new(),
+            selection: None,
+        }
+    }
+
+    #[test]
+    fn changed_endpoint_oid_destination_or_lease_cannot_enter_the_selected_checklist()
+    -> Result<(), String> {
+        let route = PushRoute {
+            branch: "topic".into(),
+            commit: "a".repeat(40),
+            remote: "publish-host".into(),
+            destination: "refs/heads/release".into(),
+            urls: vec!["https://publish.invalid/team/repo".into()],
+            lease: Some("b".repeat(40)),
+        };
+        let selected = PreparedPush {
+            snapshot: git::repository_tools::guard::Snapshot::recording(),
+            route: route.clone(),
+        };
+        let mut original = plan(&route);
+        original.retain_selection(selected.clone())?;
+        assert_eq!(original.selection().map(|s| &s.route), Some(&route));
+        assert_eq!(original.again(), route.operations());
+        assert!(push_args(&original)?.contains(&format!(
+            "--force-with-lease=refs/heads/release:{}",
+            "b".repeat(40)
+        )));
+        for change in 0..5 {
+            let mut changed = plan(&route);
+            match change {
+                0 => changed.urls = vec!["https://foreign.invalid/repo".into()],
+                1 => changed.push_oid = "d".repeat(40),
+                2 => changed.destination = "refs/heads/other".into(),
+                3 => changed.remote = "pull-host".into(),
+                _ => changed.base = Some("e".repeat(40)),
+            }
+            assert!(changed.retain_selection(selected.clone()).is_err());
+            assert!(changed.selection().is_none());
+        }
+        // A mutable UI plan also cannot substitute another lease after review.
+        original.base = Some("f".repeat(40));
+        assert!(push_args(&original).is_err());
+        Ok(())
     }
 }

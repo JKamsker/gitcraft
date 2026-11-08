@@ -4,6 +4,7 @@ mod dependencies;
 use crate::git::repository_tools::dependencies as dependency;
 mod submodule_conflict;
 use crate::git::repository_tools::submodule_conflict as subconflict;
+mod push_continuation;
 mod routes;
 use crate::git::repository_tools::routes as routing;
 mod publication;
@@ -113,12 +114,7 @@ impl RepoTab {
                 return;
             }
             Act::ForceConfirmed(plan) => {
-                self.repository_tool_mutation(
-                    "Force push to confirmed push route",
-                    true,
-                    ctx,
-                    move |runner| routing::force(runner, &plan),
-                );
+                self.prepare_branch_review(None, Some(*plan), ctx);
                 return;
             }
             Act::SaveRoutes(browser, name) => {
@@ -131,12 +127,7 @@ impl RepoTab {
                 return;
             }
             Act::PushBranch(name, oid) => {
-                self.repository_tool_mutation(
-                    "Push branch via its push route",
-                    true,
-                    ctx,
-                    move |runner| routing::push_branch(runner, &name, &oid),
-                );
+                self.prepare_branch_review(Some((name, oid)), None, ctx);
                 return;
             }
             Act::SaveGroup(manager) => {
@@ -716,7 +707,7 @@ impl RepoTab {
         };
         let id = state.id;
         let label = if publish {
-            "Publish dependencies, then parent"
+            "Publish dependencies before parent review"
         } else {
             "Check submodule publication dependencies"
         };
@@ -726,6 +717,10 @@ impl RepoTab {
         self.last_op = None;
         self.timeline_op_started(false, super::Refresh::All);
         let repo = self.path.clone();
+        let expected_path = repo.clone();
+        let profile = crate::settings::Settings::get(ctx).profile();
+        let context = crate::connections::current();
+        let generation = self.https_generation;
         let credentials = self.credentials.clone();
         self.then_or(
             ctx,
@@ -738,12 +733,17 @@ impl RepoTab {
                     credentials: credentials.as_ref(),
                 };
                 if publish {
-                    dependency::publish(&runner, plan)
+                    dependency::publish_children(&runner, plan)
                 } else {
                     dependency::check(&runner, plan)
                 }
             },
             move |tab, result, ctx| {
+                let parent = if publish {
+                    result.as_ref().ok().and_then(push_continuation::parent_continuation)
+                } else {
+                    None
+                };
                 let outcome = result.as_ref().map_err(Clone::clone).and_then(|p| {
                     if p.parent_result.as_ref().is_some_and(Result::is_err) {
                         Err("Parent publication stopped; inspect per-repository outcomes".into())
@@ -771,6 +771,18 @@ impl RepoTab {
                         }
                         Err(e) => tab.status = Some((e, true)),
                     }
+                }
+                if let Some(parent) = parent
+                    && matches!(&tab.dialog, Some(Dialog::RepositoryTools(state)) if state.id == id)
+                {
+                    if tab.path != expected_path || crate::settings::Settings::get(ctx).profile() != profile
+                        || crate::connections::current() != context || tab.connection_context != context
+                        || tab.https_generation != generation
+                    {
+                        tab.status = Some(("Dependencies finished, but the parent repository, profile or sign-in changed. Prepare its push again.".into(), true));
+                        return;
+                    }
+                    tab.review_prepared_push(parent, ctx);
                 }
             },
         );

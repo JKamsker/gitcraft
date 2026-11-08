@@ -3,6 +3,8 @@ use super::{
     remote_config::{set_values, values},
 };
 use std::path::Path;
+mod reviewed;
+pub(crate) use reviewed::{PreparedPush, PushRoute};
 #[derive(Clone, Debug)]
 pub(crate) struct Route {
     pub remote: String,
@@ -265,12 +267,12 @@ pub(crate) fn rewrite_plain_push(
     ]);
     Ok(Some(rewritten))
 }
-pub(crate) fn push_branch(
-    runner: &Runner<'_>,
+pub(crate) fn prepare_push(
+    repo: &Path,
     branch: &str,
     expected: &str,
-) -> Result<String, String> {
-    let browser = read(runner.repo, branch)?;
+) -> Result<PreparedPush, String> {
+    let browser = read(repo, branch)?;
     let b = browser
         .branches
         .iter()
@@ -282,25 +284,26 @@ pub(crate) fn push_branch(
     if !browser.remotes.contains(&b.push.remote) {
         return Err("Choose a push route first".into());
     }
-    browser.snapshot.check(runner.repo)?;
+    browser.snapshot.check(repo)?;
     let urls = text(
-        runner.repo,
+        repo,
         &["remote", "get-url", "--push", "--all", "--", &b.push.remote],
     )?;
-    browser.snapshot.check(runner.repo)?;
-    let mut output = String::new();
+    browser.snapshot.check(repo)?;
     for url in urls.lines() {
         super::remote_config::validate_url(url)?;
-        browser.snapshot.check_publication(runner.repo)?;
-        output.push_str(&runner.endpoint(
-            runner.repo,
-            url,
-            &b.push.remote,
-            &["push", "--porcelain", "--recurse-submodules=check", "--"],
-            &[&format!("{}:refs/heads/{}", b.oid, b.push.branch)],
-        )?);
     }
-    Ok(output)
+    Ok(PreparedPush {
+        snapshot: browser.snapshot,
+        route: PushRoute {
+            branch: branch.into(),
+            commit: expected.into(),
+            remote: b.push.remote.clone(),
+            destination: format!("refs/heads/{}", b.push.branch),
+            urls: urls.lines().map(str::to_owned).collect(),
+            lease: None,
+        },
+    })
 }
 #[cfg(test)]
 mod tests {

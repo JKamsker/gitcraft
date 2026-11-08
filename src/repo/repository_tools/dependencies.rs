@@ -96,7 +96,7 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
                 ui.separator();
                 match result {
                     Ok(s) => {
-                        ui.label(format!("Parent published: {}", git::redact(s, None)));
+                        ui.label(format!("Parent: {}", git::redact(s, None)));
                     }
                     Err(e) => {
                         ui.colored_label(
@@ -122,7 +122,7 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
     if ui
         .add_enabled(
             p.checked && p.dependencies.iter().all(|n| n.problem.is_none()) && state.acknowledged,
-            egui::Button::new("Push dependencies, then parent"),
+            egui::Button::new("Publish dependencies, then review parent"),
         )
         .clicked()
     {

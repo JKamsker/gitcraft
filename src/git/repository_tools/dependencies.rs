@@ -531,7 +531,9 @@ fn check_inner(runner: &Runner<'_>, mut plan: Plan) -> Result<Plan, String> {
     plan.parent_result = None;
     Ok(plan)
 }
-pub(crate) fn publish(runner: &Runner<'_>, plan: Plan) -> Result<Plan, String> {
+/// Publish children only. The UI must hand the parent to root's reviewed push
+/// continuation; this worker never authorizes or sends a parent push.
+pub(crate) fn publish_children(runner: &Runner<'_>, plan: Plan) -> Result<Plan, String> {
     crate::tasks::with_cancellation(runner.control.cancellation(), || {
         publish_inner(runner, plan)
     })
@@ -542,60 +544,116 @@ fn publish_inner(runner: &Runner<'_>, mut plan: Plan) -> Result<Plan, String> {
         return Err("Check every dependency and resolve its problem before publishing".into());
     }
     plan.snapshot.check_publication(runner.repo)?;
-    plan.dependencies
-        .sort_by_key(|n| std::cmp::Reverse(n.path.matches('/').count()));
-    let mut failed = false;
-    for node in &mut plan.dependencies {
-        if failed {
-            node.result = Some(Err("Not pushed: an earlier dependency failed".into()));
-            continue;
-        }
-        let outcome = (|| {
-            node.snapshot
-                .as_ref()
-                .ok_or("Submodule snapshot missing")?
-                .check_publication(&node.repo)?;
+    let failed = publish_in_order(&mut plan.dependencies, |node| {
+        node.snapshot
+            .as_ref()
+            .ok_or("Submodule snapshot missing")?
+            .check_publication(&node.repo)?;
+        if !reachable(runner, node, &budget)? {
+            text(
+                &node.repo,
+                &["check-ref-format", &format!("refs/heads/{}", node.target)],
+            )?;
+            runner.endpoint(
+                &node.repo,
+                &node.push_url,
+                &node.remote,
+                &["push", "--porcelain", "--"],
+                &[&format!("{}:refs/heads/{}", node.source, node.target)],
+            )?;
             if !reachable(runner, node, &budget)? {
-                text(
-                    &node.repo,
-                    &["check-ref-format", &format!("refs/heads/{}", node.target)],
-                )?;
-                runner.endpoint(
-                    &node.repo,
-                    &node.push_url,
-                    &node.remote,
-                    &["push", "--porcelain", "--"],
-                    &[&format!("{}:refs/heads/{}", node.source, node.target)],
-                )?;
-                if !reachable(runner, node, &budget)? {
-                    return Err("Push succeeded, but the required commits are still unreachable from the named fetch URL. Parent publication stopped.".into());
-                }
+                return Err("Push succeeded, but the required commits are still unreachable from the named fetch URL. Parent publication stopped.".into());
             }
-            Ok(format!(
-                "Required commits are published on {} ({})",
-                node.remote,
-                crate::git::redact(&node.fetch_url, None)
-            ))
-        })();
-        failed = outcome.is_err();
-        node.result = Some(outcome);
-    }
+        }
+        Ok(format!(
+            "Required commits are published on {} ({})",
+            node.remote,
+            crate::git::redact(&node.fetch_url, None)
+        ))
+    });
     plan.parent_result = Some(if failed {
         Err("Parent not pushed because a submodule dependency failed".into())
     } else {
         plan.snapshot.check_publication(runner.repo)?;
-        runner.endpoint(
-            runner.repo,
-            &plan.parent_url,
-            &plan.parent_remote,
-            &["push", "--porcelain", "--recurse-submodules=check", "--"],
-            &[&format!(
-                "{}:refs/heads/{}",
-                plan.commit, plan.parent_branch
-            )],
-        )
+        Ok("Dependencies published; parent awaits push preflight and outgoing review".into())
     });
     Ok(plan)
+}
+
+fn publish_in_order(
+    dependencies: &mut [Dependency],
+    mut publish: impl FnMut(&Dependency) -> Result<String, String>,
+) -> bool {
+    dependencies.sort_by_key(|n| std::cmp::Reverse(n.path.matches('/').count()));
+    let mut failed = false;
+    for node in dependencies {
+        let outcome = if failed {
+            Err("Not pushed: an earlier dependency failed".into())
+        } else {
+            publish(node)
+        };
+        failed |= outcome.is_err();
+        node.result = Some(outcome);
+    }
+    failed
+}
+
+#[cfg(test)]
+mod parent_continuation_recording {
+    use super::*;
+
+    fn node(path: &str) -> Dependency {
+        Dependency {
+            path: path.into(),
+            repo: PathBuf::from(format!("/recorded/{path}")),
+            required: BTreeSet::new(),
+            remotes: vec!["child-host".into()],
+            remote: "child-host".into(),
+            fetch_url: "https://child.invalid/repo".into(),
+            push_url: "https://child.invalid/repo".into(),
+            source: "a".repeat(40),
+            target: "child-release".into(),
+            published: false,
+            snapshot: None,
+            problem: None,
+            result: None,
+        }
+    }
+
+    #[test]
+    fn children_are_deepest_first_and_failure_never_reaches_parent_dispatch() {
+        for fail in [false, true] {
+            let mut children = vec![node("child"), node("child/nested")];
+            let mut sent = Vec::new();
+            let failed = publish_in_order(&mut children, |child| {
+                sent.push(child.path.clone());
+                assert_eq!(child.remote, "child-host");
+                assert_eq!(child.target, "child-release");
+                if fail {
+                    Err("recorded child refusal".into())
+                } else {
+                    Ok("published".into())
+                }
+            });
+            assert_eq!(failed, fail);
+            if fail {
+                assert_eq!(sent, ["child/nested"]);
+                assert!(
+                    children
+                        .iter()
+                        .all(|n| n.result.as_ref().is_some_and(Result::is_err))
+                );
+            } else {
+                assert_eq!(sent, ["child/nested", "child"]);
+                assert!(
+                    children
+                        .iter()
+                        .all(|n| n.result.as_ref().is_some_and(Result::is_ok))
+                );
+            }
+            assert!(!sent.iter().any(|name| name == "parent"));
+        }
+    }
 }
 #[cfg(test)]
 mod tests {
@@ -666,7 +724,7 @@ mod tests {
             ],
         )?;
         let wrong = check(&runner, read(parent.path())?)?;
-        let stopped = publish(&runner, wrong)?;
+        let stopped = publish_children(&runner, wrong)?;
         assert!(matches!(stopped.parent_result, Some(Err(_))));
         assert!(matches!(stopped.dependencies[0].result, Some(Err(_))));
         assert_eq!(
@@ -690,7 +748,13 @@ mod tests {
             crate::git::run(Some(&bare), &["rev-parse", "refs/heads/main"])?.trim(),
             initial
         );
-        let result = publish(&runner, p.clone())?;
+        let result = publish_children(&runner, p.clone())?;
+        // A successful child phase still cannot publish the parent. The UI must
+        // obtain root preflight/echo approval in a separate continuation.
+        assert_eq!(
+            crate::git::run(Some(&bare), &["rev-parse", "refs/heads/main"])?.trim(),
+            initial
+        );
         assert!(
             matches!(result.parent_result, Some(Ok(_))),
             "{:?}",
@@ -707,7 +771,7 @@ mod tests {
             required
         );
         parent.commit("changed afterwards", &[])?;
-        assert!(publish(&runner, p).is_err());
+        assert!(publish_children(&runner, p).is_err());
         Ok(())
     }
 }

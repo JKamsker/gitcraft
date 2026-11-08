@@ -16,6 +16,17 @@ pub(super) fn text(repo: &Path, args: &[&str]) -> Result<String, String> {
         .map_err(|_| "Repository metadata is not UTF-8".into())
 }
 impl Snapshot {
+    #[cfg(test)]
+    pub(crate) fn recording() -> Self {
+        Self {
+            identity: "/recorded/repository".into(),
+            refs: String::new(),
+            config: String::new(),
+            worktrees: String::new(),
+            status: String::new(),
+            profile: None,
+        }
+    }
     pub(crate) fn capture(repo: &Path) -> Result<Self, String> {
         Ok(Self {
             identity: text(repo, &["rev-parse", "--absolute-git-dir"])?,
