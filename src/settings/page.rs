@@ -489,8 +489,12 @@ mod merge_regressions {
         for language in ["en-US", "de", "en-US"] {
             crate::i18n::set_language(language);
             h.run();
-            h.get_by_label(super::super::labels::display(Page::General.title()))
-                .click();
+            let picker = h.get_by_role(egui::accesskit::Role::ComboBox);
+            assert_eq!(
+                picker.accesskit_node().data().value(),
+                Some(super::super::labels::display(Page::General.title()))
+            );
+            picker.click();
             h.run();
             h.get_by_label(super::super::labels::display(Page::Appearance.title()))
                 .click();
