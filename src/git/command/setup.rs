@@ -258,6 +258,23 @@ fn transport_command(source: &str, local: bool, executable: &Path) -> Result<Clo
     Ok(CloneCommand { command, workspace })
 }
 
+/// Keep canonical filesystem identities in receipts, but pass Git its native path
+/// spelling. Git for Windows treats `\\?\C:\...` as an invalid path (and can
+/// mistake the embedded colon for an SSH transport); UNC paths need `//server/...`.
+pub(crate) fn setup_path(path: &Path) -> String {
+    #[cfg(windows)]
+    {
+        let text = path.to_string_lossy().replace('\\', "/");
+        if let Some(rest) = text.strip_prefix("//?/UNC/") {
+            format!("//{rest}")
+        } else {
+            text.strip_prefix("//?/").unwrap_or(&text).to_owned()
+        }
+    }
+    #[cfg(not(windows))]
+    path.to_string_lossy().into_owned()
+}
+
 fn clone_command(
     parent: &Path,
     source: &str,
@@ -272,6 +289,12 @@ fn clone_command(
         )
         .into());
     }
+    #[cfg(windows)]
+    let source_path = local.then(|| setup_path(Path::new(source)));
+    #[cfg(windows)]
+    let source = source_path.as_deref().unwrap_or(source);
+    #[cfg(windows)]
+    let destination = setup_path(destination);
     let mut prepared = transport_command(source, local, executable)?;
     prepared
         .command

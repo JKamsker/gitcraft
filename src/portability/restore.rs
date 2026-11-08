@@ -353,6 +353,7 @@ pub(crate) fn restore(
                     return Err("Worktree destination root was replaced".into());
                 }
                 let path = root.join(&w.name);
+                let git_path = git::setup_path(&path);
                 let already_added = if let Some(gitfile) = r.worktrees.get(&w.name) {
                     let metadata = std::fs::symlink_metadata(&path).map_err(|e| e.to_string())?;
                     if !metadata.is_dir()
@@ -381,21 +382,13 @@ pub(crate) fn restore(
                             if from.starts_with("refs/heads/") {
                                 git::setup_run(
                                     repo,
-                                    &["worktree", "add", "--", &path.to_string_lossy(), branch],
+                                    &["worktree", "add", "--", &git_path, branch],
                                     active,
                                 )?;
                             } else {
                                 git::setup_run(
                                     repo,
-                                    &[
-                                        "worktree",
-                                        "add",
-                                        "-b",
-                                        branch,
-                                        "--",
-                                        &path.to_string_lossy(),
-                                        &from,
-                                    ],
+                                    &["worktree", "add", "-b", branch, "--", &git_path, &from],
                                     active,
                                 )?;
                             }
@@ -419,14 +412,7 @@ pub(crate) fn restore(
                             })?;
                             git::setup_run(
                                 repo,
-                                &[
-                                    "worktree",
-                                    "add",
-                                    "--detach",
-                                    "--",
-                                    &path.to_string_lossy(),
-                                    &w.commit,
-                                ],
+                                &["worktree", "add", "--detach", "--", &git_path, &w.commit],
                                 active,
                             )?;
                         }
@@ -439,11 +425,7 @@ pub(crate) fn restore(
                     let list =
                         git::setup_run(repo, &["worktree", "list", "--porcelain", "-z"], active)?;
                     if !worktree_is_locked(&list, &path)? {
-                        git::setup_run(
-                            repo,
-                            &["worktree", "lock", "--", &path.to_string_lossy()],
-                            active,
-                        )?;
+                        git::setup_run(repo, &["worktree", "lock", "--", &git_path], active)?;
                     }
                 }
             }

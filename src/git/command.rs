@@ -69,7 +69,7 @@ pub(crate) use credential_policy::*;
 pub(crate) use endpoints::*;
 mod setup;
 pub(crate) use connection::*;
-pub(crate) use setup::{setup_clone, setup_fetch, setup_run};
+pub(crate) use setup::{setup_clone, setup_fetch, setup_path, setup_run};
 mod watched;
 pub use watched::{CANCELLED, OpControl, run_watched, run_watched_recorded};
 
@@ -2408,6 +2408,31 @@ fn reviewed_refusal(bytes: &[u8], source: &str, destination: &str) -> Option<Str
 mod reviewed_push_tests {
     use super::*;
     /// Production builder only: selected programs are fixed strings and never run.
+    #[cfg(windows)]
+    #[test]
+    fn recording_reviewed_push_policy_preserves_counted_alias_and_exact_subcommand()
+    -> Result<(), String> {
+        let url = "https://fixture.invalid/team/repo.git";
+        let creds = Credentials::for_url(url, "alice".into(), "DUMMY_ONLY".into())?;
+        let result = reviewed_push_extra(
+            Path::new("C:/recorded/repo"),
+            &["push"],
+            PushTarget {
+                address: url,
+                alias: "gitcraft-preflight-fixture",
+                original_remote: "origin",
+                skip_hooks: false,
+                lfs_config: &[],
+                lfs_objects: &[],
+                receive_pack: "",
+            },
+            "C:/recorded/hooks".into(),
+            Some(&creds),
+        );
+        assert!(result.is_err_and(|e| e.contains("native/MSYS transport identity boundary")));
+        Ok(())
+    }
+    #[cfg(unix)]
     #[test]
     fn recording_reviewed_push_policy_preserves_counted_alias_and_exact_subcommand()
     -> Result<(), String> {
@@ -3089,6 +3114,28 @@ pub(in crate::git) fn repository_endpoint(
 #[cfg(test)]
 mod repository_endpoint_recording {
     use super::*;
+    #[cfg(windows)]
+    #[test]
+    fn reviewed_endpoint_and_account_survive_normalization_without_reinterpretation()
+    -> Result<(), String> {
+        let repo = Path::new("C:/recorded/repo");
+        let url = "https://host-a.invalid/team/repo";
+        let creds = Credentials::for_url(url, "alice".into(), "DUMMY_A_TOKEN".into())?;
+        let result = repository_endpoint_extra(repo, url, "origin", Some(&creds), &["push"]);
+        assert!(result.is_err_and(|e| e.contains("native/MSYS transport identity boundary")));
+        // An account scoped to another host needs no transient credential transport.
+        let (extra, _) = repository_endpoint_extra(
+            repo,
+            "https://host-b.invalid/team/repo",
+            "origin",
+            Some(&creds),
+            &["push"],
+        )?;
+        assert!(extra.owned_pre.is_empty());
+        assert!(!extra.env.iter().any(|(k, _)| k.starts_with("GITCRAFT_")));
+        Ok(())
+    }
+    #[cfg(unix)]
     #[test]
     fn reviewed_endpoint_and_account_survive_normalization_without_reinterpretation()
     -> Result<(), String> {
@@ -3161,6 +3208,41 @@ mod repository_endpoint_recording {
 #[cfg(test)]
 mod internals_merge_recording {
     use super::*;
+    #[cfg(windows)]
+    #[test]
+    fn root_unset_and_profile_precede_both_pinned_transport_environments() -> Result<(), String> {
+        let url = "https://fixture.invalid/team/repo";
+        let repo = Path::new("C:/recorded/repo");
+        let creds = Credentials::for_url(url, "alice".into(), "DUMMY_MERGE".into())?;
+        let context = crate::connections::Context {
+            git_config: Some("C:/recorded/initiating-profile".into()),
+            ..Default::default()
+        };
+        context.run(|| {
+            let internals = repository_endpoint_extra(repo, url, "origin", Some(&creds), &["push"]);
+            assert!(
+                internals.is_err_and(|e| e.contains("native/MSYS transport identity boundary"))
+            );
+            let reviewed = reviewed_push_extra(
+                repo,
+                &["push"],
+                PushTarget {
+                    address: url,
+                    alias: "reviewed-fixture",
+                    original_remote: "origin",
+                    skip_hooks: false,
+                    lfs_config: &[],
+                    lfs_objects: &[],
+                    receive_pack: "",
+                },
+                "C:/recorded/hooks".into(),
+                Some(&creds),
+            );
+            assert!(reviewed.is_err_and(|e| e.contains("native/MSYS transport identity boundary")));
+        });
+        Ok(())
+    }
+    #[cfg(unix)]
     #[test]
     fn root_unset_and_profile_precede_both_pinned_transport_environments() -> Result<(), String> {
         let url = "https://fixture.invalid/team/repo";
