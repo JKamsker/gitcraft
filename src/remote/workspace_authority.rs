@@ -32,24 +32,29 @@ impl WorkspaceAuthority {
             .file_name()
             .and_then(|s| s.to_str())
             .ok_or("invalid workspace owner record name")?;
-        let prefix = format!(
-            "{}-{}-",
-            self.generation,
-            match self.mode {
-                FenceMode::Dispatch => "dispatch",
-                FenceMode::Mutation => "mutation",
-            }
-        );
-        let nonce = name
-            .strip_prefix(&prefix)
-            .and_then(|s| s.strip_suffix(".owner"))
-            .ok_or("owner record generation/kind mismatch")?;
-        if !hex(nonce, 32) || !hex(&self.generation, 64) {
-            return Err("invalid workspace owner nonce/generation".into());
-        }
+        validate_record_name(name, &self.generation, self.mode)?;
         Ok(name)
     }
 }
+fn validate_record_name(name: &str, generation: &str, mode: FenceMode) -> Result<(), String> {
+    let prefix = format!(
+        "{}-{}-",
+        generation,
+        match mode {
+            FenceMode::Dispatch => "dispatch",
+            FenceMode::Mutation => "mutation",
+        }
+    );
+    let nonce = name
+        .strip_prefix(&prefix)
+        .and_then(|s| s.strip_suffix(".owner"))
+        .ok_or("owner record generation/kind mismatch")?;
+    if !hex(nonce, 32) || !hex(generation, 64) {
+        return Err("invalid workspace owner nonce/generation".into());
+    }
+    Ok(())
+}
+
 fn hex(value: &str, n: usize) -> bool {
     value.len() == n
         && value
@@ -90,16 +95,10 @@ pub(crate) fn bound_endpoint(name: &str, bytes: &[u8], anchor: &str) -> Result<V
         return Err("oversized workspace owner".into());
     }
     let envelope: Envelope = serde_json::from_slice(bytes).map_err(|e| e.to_string())?;
-    let expected = WorkspaceAuthority {
-        root: "/synthetic".into(),
-        anchor: anchor.into(),
-        generation: envelope.generation.clone(),
-        mode: envelope.kind,
-    };
     if envelope.v != 3 || envelope.anchor != anchor {
         return Err("workspace owner anchor/version mismatch".into());
     }
-    expected.record_name(&expected.root.join(name))?;
+    validate_record_name(name, &envelope.generation, envelope.kind)?;
     serde_json::to_vec(&envelope.endpoint).map_err(|e| e.to_string())
 }
 /// Preserve legacy raw v1/v2 records; v3 binding remains in the durable original bytes.

@@ -187,13 +187,14 @@ pub(super) fn setup() -> String {
 }
 
 pub(super) fn request(req: &Request, nonce: &str, record: Option<&str>) -> Result<String, String> {
-    request_with_authority(req, nonce, record, None)
+    request_with_authority(req, nonce, record, None, false)
 }
 fn request_with_authority(
     req: &Request,
     nonce: &str,
     record: Option<&str>,
     workspace: Option<&super::workspace_authority::WorkspaceAuthority>,
+    cleanup: bool,
 ) -> Result<String, String> {
     use base64::Engine;
     if !hex(nonce, 1, 96) {
@@ -213,6 +214,7 @@ fn request_with_authority(
         "milliseconds": ms as u64,
         "record": record,
         "workspace": workspace,
+        "cleanup": cleanup,
     });
     Ok(format!(
         "{}\n",
@@ -227,15 +229,16 @@ pub(super) fn streaming(
     nonce: &str,
     record: Option<&str>,
 ) -> Result<String, String> {
-    streaming_with_authority(req, nonce, record, None)
+    streaming_with_authority(req, nonce, record, None, false)
 }
 pub(super) fn streaming_with_authority(
     req: &Request,
     nonce: &str,
     record: Option<&str>,
     workspace: Option<&super::workspace_authority::WorkspaceAuthority>,
+    cleanup: bool,
 ) -> Result<String, String> {
-    let data = request_with_authority(req, nonce, record, workspace)?;
+    let data = request_with_authority(req, nonce, record, workspace, cleanup)?;
     let launch = launcher("stream", "\"$T/request\"");
     Ok(format!(
         "{{\numask 077\nT=$(mktemp -d /tmp/gitcraft-launch.XXXXXXXXXX) || exit 125\ncat >\"$T/request\" <<'GITCRAFT_REQUEST_V1'\n{data}GITCRAFT_REQUEST_V1\n{launch}\n}}\n"

@@ -238,6 +238,126 @@ def retire(owner, pin=PinnedDirectory):
     # An empty private directory is retained: pathname rmdir cannot atomically
     # prove it still names the held directory. Never delete a substituted entry.
 
+# External proof cache and completed-cleanup manifest, compatible with the native ledger.
+import hashlib
+MAX_OWNERS=4096
+MAX_PROOF=9<<10
+MAX_MANIFEST=40<<20
+MAX_EVIDENCE=64<<20
+def ledger_binding(name,data,anchor):
+    if len(data)>2048: raise ValueError('oversized workspace owner')
+    value=json.loads(data)
+    if set(value)!={'v','anchor','generation','kind','endpoint'} or value['v']!=3 or value['anchor']!=anchor:
+        raise ValueError('workspace owner binding mismatch')
+    if not HEX.fullmatch(value['generation']) or value['kind'] not in ('dispatch','mutation') or not re.fullmatch(value['generation']+'-'+value['kind']+r'-[0-9a-f]{32}\.owner',name):
+        raise ValueError('workspace record name/generation mismatch')
+    return endpoint(value['endpoint'])
+def ledger_decode(proof,anchor):
+    if set(proof)!={'name','record','receipt'} or len(proof['record'])>2732 or len(proof['receipt'])>5464:
+        raise ValueError('invalid bounded ledger proof')
+    record=base64.b64decode(proof['record'],validate=True); data=base64.b64decode(proof['receipt'],validate=True)
+    owner=ledger_binding(proof['name'],record,anchor); checked_receipt(owner,data)
+    return dict(name=proof['name'],record=record,receipt=data,owner=owner,present=False)
+def ledger_proof(entry):
+    return dict(name=entry['name'],record=base64.b64encode(entry['record']).decode(),receipt=base64.b64encode(entry['receipt']).decode())
+def ledger_merge(entries,entry):
+    old=entries.get(entry['name'])
+    if old is not None:
+        if old['record']!=entry['record'] or old['receipt']!=entry['receipt']: raise ValueError('ledger evidence changed')
+    else: entries[entry['name']]=entry
+    if len(entries)>MAX_OWNERS: raise ValueError('workspace recovery exceeds 4096 owners')
+def retire_proven(owner,data):
+    checked_receipt(owner,data)
+    try: directory=PinnedDirectory(owner['path'])
+    except FileNotFoundError: return
+    with directory:
+        for name in ('input','control','terminal'): directory.unlink(name)
+class RecoveryLedger:
+    def __init__(self,locks,record,controller,deadline):
+        self.locks=locks; self.grant=locks.grant; self.controller=controller; self.deadline=deadline
+        self.own=os.path.basename(record); self.entries={}; self.manifests=[]; self.budget=MAX_EVIDENCE
+        names=set()
+        with os.scandir(locks.root) as listing:
+            for item in listing:
+                names.add(item.name)
+                if len(names)>MAX_OWNERS*3+3: raise ValueError('workspace inventory bound; evidence retained')
+        for name in names:
+            if name not in WORKSPACE_NAMES and not name.endswith(('.owner','.owner.proof','.owner.cleaned')): raise ValueError('unknown external ledger evidence')
+        if self.own not in names: raise ValueError('cleanup owner not indexed')
+        for name in sorted(n for n in names if n.endswith('.cleaned')):
+            data=self.read(name,MAX_MANIFEST); value=json.loads(data)
+            if set(value)!={'v','anchor','generation','owner','entries'} or value['v']!=1 or value['anchor']!=self.grant['anchor'] or value['owner']+'.cleaned'!=name or not HEX.fullmatch(value['generation']) or not re.fullmatch(value['generation']+r'-mutation-[0-9a-f]{32}\.owner',value['owner']) or len(value['entries'])>MAX_OWNERS: raise ValueError('invalid cleaned manifest')
+            for proof in value['entries']: ledger_merge(self.entries,ledger_decode(proof,self.grant['anchor']))
+            self.manifests.append((name,data))
+        for name in sorted(n for n in names if n.endswith('.owner') and n!=self.own):
+            record=self.read(name,2048); owner=ledger_binding(name,record,self.grant['anchor'])
+            old=self.entries.get(name)
+            if old:
+                if old['record']!=record: raise ValueError('owner changed after cleaned proof')
+                old['present']=True
+            else: self.entries[name]=dict(name=name,record=record,receipt=b'',owner=owner,present=True)
+        if len(self.entries)>MAX_OWNERS: raise ValueError('workspace recovery exceeds 4096 owners')
+        for name in sorted(n for n in names if n.endswith('.proof')):
+            proof=json.loads(self.read(name,MAX_PROOF))
+            if proof['name']+'.proof'!=name: raise ValueError('proof filename mismatch')
+            entry=ledger_decode(proof,self.grant['anchor']); old=self.entries.get(entry['name'])
+            if old is None or old['record']!=entry['record'] or (old['receipt'] and old['receipt']!=entry['receipt']): raise ValueError('orphan or changed proof without completed manifest')
+            old['receipt']=entry['receipt']
+        self.verify()
+        # Inventory validation is complete before issuing any stop operation.
+        for entry in self.entries.values():
+            self.active()
+            if not entry['receipt']:
+                entry['receipt']=encode(control(entry['owner']))
+                self.publish(entry['name']+'.proof',encode(ledger_proof(entry)),MAX_PROOF)
+        self.verify()
+    def active(self): workspace_wait(self.controller,self.deadline)
+    def raw_read(self,name,limit):
+        fd=WorkspaceLocks.open_file(name,os.O_RDONLY,self.locks.directory.fd)
+        with os.fdopen(fd,'rb') as f: data=f.read(limit+1)
+        if len(data)>limit: raise ValueError('ledger evidence exceeds bound')
+        return data
+    def read(self,name,limit):
+        self.active(); data=self.raw_read(name,min(limit,self.budget)); self.budget-=len(data); return data
+    def publish(self,name,data,limit):
+        if len(data)>limit: raise ValueError('ledger publication exceeds bound')
+        self.locks.verify();fd=WorkspaceLocks.open_file(name,os.O_WRONLY|os.O_CREAT|os.O_EXCL,self.locks.directory.fd)
+        with os.fdopen(fd,'wb') as f: f.write(data); f.flush(); os.fsync(f.fileno())
+    def verify(self):
+        self.locks.verify()
+        for entry in self.entries.values():
+            try: current=self.raw_read(entry['name'],2048)
+            except FileNotFoundError: current=None
+            if (entry['present'] and current!=entry['record']) or (not entry['present'] and current is not None): raise ValueError('owner record changed during recovery')
+    def remove(self,name,expected,limit):
+        if self.raw_read(name,limit)!=expected: raise ValueError('ledger entry changed before pruning')
+        os.unlink(name,dir_fd=self.locks.directory.fd)
+    def shell_proof(self):
+        generations=sorted({self.grant['generation']}|{name[:64] for name in self.entries})
+        records=[entry for _,entry in sorted(self.entries.items()) if entry['present']]
+        lines=['G '+str(len(generations))]+generations+['R '+str(len(records))]
+        for entry in records: lines.extend((entry['name'],entry['record'].hex()))
+        return ('\n'.join(lines)+'\n').encode()
+    def complete(self):
+        self.active(); self.verify()
+        data=encode(dict(v=1,anchor=self.grant['anchor'],generation=self.grant['generation'],owner=self.own,entries=[ledger_proof(e) for _,e in sorted(self.entries.items())]))
+        manifest=self.own+'.cleaned'; self.publish(manifest,data,MAX_MANIFEST)
+        for entry in self.entries.values(): self.active(); retire_proven(entry['owner'],entry['receipt'])
+        for entry in self.entries.values():
+            self.active()
+            if entry['present']: self.remove(entry['name'],entry['record'],2048)
+            name=entry['name']+'.proof'
+            try: cache=self.raw_read(name,MAX_PROOF)
+            except FileNotFoundError: continue
+            proof=ledger_decode(json.loads(cache),self.grant['anchor'])
+            if any(proof[k]!=entry[k] for k in ('name','record','receipt')): raise ValueError('proof changed before pruning')
+            self.remove(name,cache,MAX_PROOF)
+        for name,old in self.manifests: self.remove(name,old,MAX_MANIFEST)
+        self.remove(manifest,data,MAX_MANIFEST)
+        digest=hashlib.sha256()
+        for name,entry in sorted(self.entries.items()): digest.update(name.encode()+b'\0'+entry['record']+b'\0')
+        return encode(dict(v=1,state='cleaned',anchor=self.grant['anchor'],generation=self.grant['generation'],records=len(self.entries),records_sha256=digest.hexdigest()))
+
 def finish_owned(anchor, established, ops=os, pause=time.sleep):
     failure = None
     try:
@@ -315,9 +435,11 @@ class Handshake:
 
 def run(req, controller, stream=False):
     locks=None
+    if req.get('cleanup') and (not req.get('workspace') or req['workspace'].get('mode')!='mutation'): raise ValueError('cleanup requires full mutation fence')
     if req.get('workspace'):
         if not stream or not req.get('record'): raise ValueError('workspace operations require durable standalone ownership')
-        locks=WorkspaceLocks.fence(req['workspace'],controller,time.monotonic()+req['milliseconds']/1000)
+        req['_workspace_deadline']=time.monotonic()+req['milliseconds']/1000
+        locks=WorkspaceLocks.fence(req['workspace'],controller,req['_workspace_deadline'])
     try: return run_inner(req,controller,stream,locks)
     finally:
         if locks is not None: locks.close()
@@ -383,7 +505,8 @@ def run_inner(req, controller, stream=False, locks=None):
         output = [bytearray(), bytearray()]
         forward = Forwarder() if stream else None
         delivery = True
-        deadline = time.monotonic() + duration
+        ledger = None
+        deadline = req.get('_workspace_deadline',time.monotonic()+duration)
         # Ignore hangup in the supervisor; EOF/deadline uses the same owned stop/reap path.
         signal.signal(signal.SIGHUP, signal.SIG_IGN)
         try:
@@ -404,6 +527,9 @@ def run_inner(req, controller, stream=False, locks=None):
                 if req['workspace']['mode']=='dispatch': locks.close()
             elif req.get('record'):
                 atomic(req['record'], encode(owner), exclusive=True)
+            if req.get('cleanup'):
+                ledger=RecoveryLedger(locks,req['record'],controller,deadline)
+                f.seek(0); f.truncate(); f.write(ledger.shell_proof()); f.flush(); f.seek(0)
             hello = ('O1 {nonce} {path} {token}\n'.format(**owner)).encode()
             os.set_blocking(1, False); os.set_blocking(2, False)
             handshake = Handshake(b'__GITCRAFT_OWNER__ ' + hello if stream else hello,
@@ -453,7 +579,7 @@ def run_inner(req, controller, stream=False, locks=None):
                         if not chunk: selector.unregister(key.fd); continue
                         if len(output[which]) + len(chunk) > MAX: stopped = True; delivery = False
                         output[which].extend(chunk[:max(0, MAX - len(output[which]))])
-                        if forward and not forward.add(which, chunk): stopped = True; delivery = False
+                        if forward and (which!=0 or not req.get('cleanup')) and not forward.add(which, chunk): stopped = True; delivery = False
                 if gate_w is not None:
                     state = handshake.step(stopped, time.monotonic,
                         lambda data: os.write(2 if stream else 1, data),
@@ -479,10 +605,20 @@ def run_inner(req, controller, stream=False, locks=None):
                     room = max(0, MAX - len(output[index]))
                     if len(chunk) > room: delivery = False
                     output[index].extend(chunk[:room])
-                    if forward and not forward.add(index, chunk): delivery = False
+                    if forward and (index!=0 or not req.get('cleanup')) and not forward.add(index, chunk): delivery = False
                 if not eof: delivery = False
                 os.close(fd)
             os.close(status_r)
+            if ledger is not None and code==0 and delivery:
+                try:
+                    proof=ledger.complete(); output[0]=bytearray(proof)
+                    if forward and not forward.add(0,proof): delivery=False
+                except BaseException as error:
+                    code=125; delivery=False
+                    message=('cleanup partial; external ledger retained: '+str(error)).encode()[:8192]
+                    output[1].extend(message)
+                    if forward: forward.add(1,message)
+                end=time.monotonic()+.3
             # Final forwarding has a finite drain; an unread controller cannot hold ownership.
             if forward:
                 while time.monotonic() < end and any(forward.pending):

@@ -5,7 +5,7 @@ use POSIX qw(setsid _exit);
 use IO::Socket::UNIX;
 use IO::Select;
 use JSON::PP;
-use MIME::Base64 qw(decode_base64);
+use MIME::Base64 qw(decode_base64 encode_base64);
 use Fcntl qw(O_RDONLY O_WRONLY O_RDWR O_CREAT O_EXCL O_NOFOLLOW O_DIRECTORY O_NONBLOCK S_ISDIR S_ISREG F_GETFD F_SETFD FD_CLOEXEC LOCK_EX LOCK_NB LOCK_UN);
 use Time::HiRes qw(time sleep);
 use Errno qw(ESRCH EAGAIN EWOULDBLOCK);
@@ -51,6 +51,10 @@ sub terminal {
     my $bytes = ''; my $n=read($f, $bytes, 2049); close($f);
     die 'receipt read failed' unless defined($n);
     die 'oversized receipt' if length($bytes) > 2048;
+    return checked_terminal($o,$bytes);
+}
+sub checked_terminal {
+    my ($o,$bytes)=@_;die 'oversized terminal proof' if length($bytes)>2048;
     my $v = $JSON->decode($bytes);
     die 'invalid receipt' unless ref($v) eq 'HASH' && join(',',sort keys %$v) eq 'code,complete,nonce,path,state,token,v';
     for my $k (keys %$o) { die 'unconfirmed receipt' unless $v->{$k} eq $o->{$k}; }
@@ -73,8 +77,8 @@ sub control {
 }
 sub cloexec { my $fd = fcntl($_[0], F_GETFD, 0); defined($fd) && fcntl($_[0], F_SETFD, $fd|FD_CLOEXEC) or die 'close-on-exec failed'; }
 sub pinned_directory {
-    my ($path,$body)=@_;
-    sysopen(my $dir,$path,O_RDONLY|O_DIRECTORY|O_NOFOLLOW) or die 'endpoint directory unavailable';
+    my ($path,$body,$missing)=@_;my $dir;
+    if (!sysopen($dir,$path,O_RDONLY|O_DIRECTORY|O_NOFOLLOW)) {return 0 if $missing && $!{ENOENT};die 'endpoint directory unavailable';}
     my @info=stat($dir);
     die 'endpoint directory is not private' unless @info && S_ISDIR($info[2]) && $info[4] == $> && ($info[2]&0777)==0700;
     sysopen(my $saved,'.',O_RDONLY|O_DIRECTORY|O_NOFOLLOW) or die 'cannot retain current directory';
@@ -83,7 +87,7 @@ sub pinned_directory {
     my $ok=eval {$body->();1;}; my $error=$@;
     chdir($saved) or die 'cannot restore current directory';
     close($saved); close($dir);
-    die $error unless $ok;
+    die $error unless $ok;return 1;
 }
 sub retire {
     my ($owner,$ops)=@_; identity($owner);
@@ -104,8 +108,8 @@ sub workspace_id {my ($f)=@_;my @s=stat($f);die 'workspace identity unavailable'
 sub workspace_namespace {my ($want,$have)=@_;die 'workspace namespace replaced' unless @$want==4 && join("\n",@$want) eq join("\n",@$have);}
 sub workspace_grant {my ($a,$g,$actual_a,$actual_g)=@_;die 'stale workspace generation; no mutation authorized' unless $a eq $actual_a && "$g\n" eq $actual_g;}
 sub workspace_open {
-    my ($name,$flags)=@_;
-    sysopen(my $f,$name,$flags|O_NOFOLLOW|O_NONBLOCK,0600) or die "workspace open failed: $!";
+    my ($name,$flags,$optional)=@_;my $f;
+    if (!sysopen($f,$name,$flags|O_NOFOLLOW|O_NONBLOCK,0600)) {return undef if $optional && $!{ENOENT};die "workspace open failed: $!";}
     cloexec($f);my @s=stat($f);
     die 'workspace file is not private single-link regular file' unless @s && S_ISREG($s[2]) && $s[4]==$> && !($s[2]&0077) && $s[3]==1;
     return $f;
@@ -203,6 +207,100 @@ sub claim_workspace {
     die $error unless $ok || $error eq "workspace controller lost\n" || $error eq "workspace lease expired\n";
 }
 
+# External ledger format matches native/Python. All disk evidence is bounded and private.
+use Digest::SHA qw(sha256_hex);
+my $LEDGER_MAX_OWNERS=4096;my $LEDGER_MAX_PROOF=9<<10;my $LEDGER_MAX_MANIFEST=40<<20;my $LEDGER_MAX_EVIDENCE=64<<20;
+sub ledger_binding {
+    my ($name,$bytes,$anchor)=@_;die 'oversized workspace owner' if length($bytes)>2048;
+    my $v=$JSON->decode($bytes);die 'invalid bound workspace record' unless ref($v) eq 'HASH' && join(',',sort keys %$v) eq 'anchor,endpoint,generation,kind,v' && $v->{v}==3 && $v->{anchor} eq $anchor && $v->{generation}=~/\A[0-9a-f]{64}\z/ && $v->{kind}=~/\A(?:dispatch|mutation)\z/;
+    die 'record generation/name mismatch' unless $name =~ /\A\Q$v->{generation}-$v->{kind}-\E[0-9a-f]{32}\.owner\z/;
+    return identity($v->{endpoint});
+}
+sub ledger_decode {
+    my ($p,$anchor)=@_;die 'invalid bounded proof' unless ref($p) eq 'HASH' && join(',',sort keys %$p) eq 'name,receipt,record' && length($p->{record})<=2732 && length($p->{receipt})<=5464;
+    for my $k ('record','receipt') {die 'invalid proof base64' unless $p->{$k}=~/\A(?:[A-Za-z0-9+\/]{4})*(?:[A-Za-z0-9+\/]{2}==|[A-Za-z0-9+\/]{3}=)?\z/;}
+    my $record=decode_base64($p->{record});my $receipt=decode_base64($p->{receipt});my $owner=ledger_binding($p->{name},$record,$anchor);checked_terminal($owner,$receipt);
+    return {name=>$p->{name},record=>$record,receipt=>$receipt,owner=>$owner,present=>0};
+}
+sub ledger_proof {my ($e)=@_;return {name=>$e->{name},record=>encode_base64($e->{record},''),receipt=>encode_base64($e->{receipt},'')};}
+sub ledger_merge {
+    my ($entries,$e)=@_;my $old=$entries->{$e->{name}};
+    if ($old) {die 'changed ledger evidence' unless $old->{record} eq $e->{record} && $old->{receipt} eq $e->{receipt};}
+    else {$entries->{$e->{name}}=$e;}
+    die 'workspace exceeds 4096 recovered owners' if keys(%$entries)>$LEDGER_MAX_OWNERS;
+}
+sub ledger_raw_read {
+    my ($p,$name,$limit,$optional)=@_;
+    return workspace_relative($p->{locks},sub {my $f=workspace_open($name,O_RDONLY,$optional);return undef unless $f;my $data=workspace_read($f,$limit);close($f) or die 'ledger close failed';return $data;});
+}
+sub ledger_active {my ($p)=@_;workspace_wait($p->{controller},$p->{deadline});}
+sub ledger_read {
+    my ($p,$name,$limit)=@_;ledger_active($p);$limit=$p->{budget} if $p->{budget}<$limit;my $data=ledger_raw_read($p,$name,$limit);$p->{budget}-=length($data);return $data;
+}
+sub ledger_publish {
+    my ($p,$name,$bytes,$limit)=@_;die 'ledger publication bound' if length($bytes)>$limit;
+    workspace_verify($p->{locks});workspace_relative($p->{locks},sub {atomic($name,$bytes,1);});
+}
+sub ledger_verify {
+    my ($p)=@_;workspace_verify($p->{locks});
+    for my $e (values %{$p->{entries}}) {my $current=ledger_raw_read($p,$e->{name},2048,1);die 'owner set changed during recovery' if ($e->{present} && (!defined($current) || $current ne $e->{record})) || (!$e->{present} && defined($current));}
+}
+sub ledger_remove {
+    my ($p,$name,$expected,$limit)=@_;die 'ledger entry changed before pruning' unless ledger_raw_read($p,$name,$limit) eq $expected;
+    workspace_relative($p->{locks},sub {unlink($name) or die 'ledger removal failed';});
+}
+sub ledger_retire_proven {
+    my ($owner,$proof)=@_;checked_terminal($owner,$proof);
+    retire($owner,{pin=>sub {pinned_directory($_[0],$_[1],1);},receipt=>sub {checked_terminal($owner,$proof);},unlink=>sub {my $ok=unlink($_[0]);die 'proven retirement unlink failed' if !$ok && !$!{ENOENT};}});
+}
+sub ledger_prepare {
+    my ($locks,$record,$controller,$deadline)=@_;(my $own=$record)=~s{.*/}{};
+    my $p={locks=>$locks,grant=>$locks->{grant},controller=>$controller,deadline=>$deadline,own=>$own,entries=>{},manifests=>[],budget=>$LEDGER_MAX_EVIDENCE};
+    opendir(my $dir,$locks->{root}) or die 'ledger inventory unavailable';my %names;
+    while (defined(my $name=readdir($dir))) {next if $name eq '.' || $name eq '..';$names{$name}=1;die 'workspace inventory bound; preserved' if keys(%names)>$LEDGER_MAX_OWNERS*3+3;}
+    closedir($dir) or die 'ledger inventory close failed';
+    for my $name (keys %names) {die 'unknown external ledger evidence' unless $name=~/\A(?:primary|fence|generation)\z/ || $name=~/\.owner(?:\.proof|\.cleaned)?\z/;}
+    die 'cleanup owner not indexed' unless $names{$own};
+    for my $name (sort grep {/\.cleaned\z/} keys %names) {
+        my $data=ledger_read($p,$name,$LEDGER_MAX_MANIFEST);my $m=$JSON->decode($data);
+        die 'invalid cleaned manifest' unless ref($m) eq 'HASH' && join(',',sort keys %$m) eq 'anchor,entries,generation,owner,v' && $m->{v}==1 && $m->{anchor} eq $p->{grant}{anchor} && "$m->{owner}.cleaned" eq $name && $m->{generation}=~/\A[0-9a-f]{64}\z/ && $m->{owner}=~/\A\Q$m->{generation}-mutation-\E[0-9a-f]{32}\.owner\z/ && ref($m->{entries}) eq 'ARRAY' && @{$m->{entries}}<=$LEDGER_MAX_OWNERS;
+        ledger_merge($p->{entries},ledger_decode($_,$p->{grant}{anchor})) for @{$m->{entries}};push @{$p->{manifests}},[$name,$data];
+    }
+    for my $name (sort grep {/\.owner\z/ && $_ ne $own} keys %names) {
+        my $record=ledger_read($p,$name,2048);my $owner=ledger_binding($name,$record,$p->{grant}{anchor});my $old=$p->{entries}{$name};
+        if ($old) {die 'owner changed after cleaned proof' unless $old->{record} eq $record;$old->{present}=1;}
+        else {$p->{entries}{$name}={name=>$name,record=>$record,receipt=>'',owner=>$owner,present=>1};}
+    }
+    die 'workspace exceeds 4096 recovered owners' if keys(%{$p->{entries}})>$LEDGER_MAX_OWNERS;
+    for my $name (sort grep {/\.proof\z/} keys %names) {
+        my $proof=$JSON->decode(ledger_read($p,$name,$LEDGER_MAX_PROOF));die 'proof name mismatch' unless "$proof->{name}.proof" eq $name;
+        my $e=ledger_decode($proof,$p->{grant}{anchor});my $old=$p->{entries}{$e->{name}};
+        die 'orphan or changed proof without cleaned manifest' unless $old && $old->{record} eq $e->{record} && (!$old->{receipt} || $old->{receipt} eq $e->{receipt});$old->{receipt}=$e->{receipt};
+    }
+    ledger_verify($p);
+    for my $e (values %{$p->{entries}}) {ledger_active($p);if (!length($e->{receipt})) {$e->{receipt}=encode(control($e->{owner}));ledger_publish($p,"$e->{name}.proof",encode(ledger_proof($e)),$LEDGER_MAX_PROOF);}}
+    ledger_verify($p);return $p;
+}
+sub ledger_shell_proof {
+    my ($p)=@_;my %generations=($p->{grant}{generation}=>1);$generations{substr($_,0,64)}=1 for keys %{$p->{entries}};
+    my @generations=sort keys %generations;my @records=grep {$p->{entries}{$_}{present}} sort keys %{$p->{entries}};
+    my @lines=('G '.@generations,@generations,'R '.@records);for my $name (@records) {push @lines,$name,unpack('H*',$p->{entries}{$name}{record});}return join("\n",@lines)."\n";
+}
+sub ledger_complete {
+    my ($p)=@_;ledger_active($p);ledger_verify($p);
+    my $data=encode({v=>1,anchor=>$p->{grant}{anchor},generation=>$p->{grant}{generation},owner=>$p->{own},entries=>[map {ledger_proof($p->{entries}{$_})} sort keys %{$p->{entries}}]});
+    my $manifest="$p->{own}.cleaned";ledger_publish($p,$manifest,$data,$LEDGER_MAX_MANIFEST);
+    for my $e (values %{$p->{entries}}) {ledger_active($p);ledger_retire_proven($e->{owner},$e->{receipt});}
+    for my $e (values %{$p->{entries}}) {
+        ledger_active($p);ledger_remove($p,$e->{name},$e->{record},2048) if $e->{present};my $name="$e->{name}.proof";
+        my $cache=ledger_raw_read($p,$name,$LEDGER_MAX_PROOF,1);next unless defined($cache);my $proof=ledger_decode($JSON->decode($cache),$p->{grant}{anchor});
+        die 'proof changed before pruning' unless $proof->{name} eq $e->{name} && $proof->{record} eq $e->{record} && $proof->{receipt} eq $e->{receipt};ledger_remove($p,$name,$cache,$LEDGER_MAX_PROOF);
+    }
+    ledger_remove($p,$_->[0],$_->[1],$LEDGER_MAX_MANIFEST) for @{$p->{manifests}};ledger_remove($p,$manifest,$data,$LEDGER_MAX_MANIFEST);
+    my $digest=Digest::SHA->new(256);for my $name (sort keys %{$p->{entries}}) {$digest->add($name,"\0",$p->{entries}{$name}{record},"\0");}
+    return encode({v=>1,state=>'cleaned',anchor=>$p->{grant}{anchor},generation=>$p->{grant}{generation},records=>scalar(keys %{$p->{entries}}),records_sha256=>$digest->hexdigest});
+}
+
 sub finish_owned {
     my ($anchor, $established, $ops) = @_;
     $ops //= {
@@ -269,9 +367,11 @@ sub handshake_step {
 }
 sub run {
     my ($req,$controller,$stream)=@_;my $locks;
+    die 'cleanup requires full mutation fence' if $req->{cleanup} && (!$req->{workspace} || $req->{workspace}{mode} ne 'mutation');
     if ($req->{workspace}) {
         die 'workspace operations require durable standalone ownership' unless $stream && $req->{record};
-        $locks=workspace_fence($req->{workspace},$controller,workspace_now()+$req->{milliseconds}/1000);
+        $req->{workspace_deadline}=workspace_now()+$req->{milliseconds}/1000;
+        $locks=workspace_fence($req->{workspace},$controller,$req->{workspace_deadline});
     }
     my (@result,$ok,$error);$ok=eval {@result=run_inner($req,$controller,$stream,$locks);1;};$error=$@;
     workspace_close($locks);die $error unless $ok;return @result;
@@ -320,11 +420,11 @@ sub run_inner {
         };
         _exit(125);
     }
-    close($out_w); close($err_w); close($status_w); close($gate_r); close($input);
+    close($out_w); close($err_w); close($status_w); close($gate_r);
     my @pending = ('',''); my $delivery=1;
     my $code = 125; my @output = ('',''); my %clients; my $established = 0;
     local $SIG{HUP} = 'IGNORE';
-    my $error;
+    my $error;my $ledger;
     eval {
         my $ready = IO::Select->new($status_r);
         $ready->can_read(5) or die 'anchor readiness timed out';
@@ -332,12 +432,18 @@ sub run_inner {
         $established = 1;
         if ($locks) {workspace_publish($locks,$req->{record},$o);workspace_close($locks) if $req->{workspace}{mode} eq 'dispatch';}
         elsif ($req->{record}) {atomic($req->{record}, encode($o), 1);}
+        if ($req->{cleanup}) {
+            $ledger=ledger_prepare($locks,$req->{record},$controller,$req->{workspace_deadline});
+            seek($input,0,0) && truncate($input,0) or die 'cleanup input reset failed';print $input ledger_shell_proof($ledger) or die 'cleanup proof input failed';$input->flush or die 'cleanup proof flush failed';seek($input,0,0) or die 'cleanup proof rewind failed';
+        }
+        close($input) or die 'input close failed';
         my $hello = "O1 $o->{nonce} $o->{path} $o->{token}\n";
         STDOUT->blocking(0); STDERR->blocking(0);
         my $handshake={pending=>($stream ? '__GITCRAFT_OWNER__ ' : '').$hello,until=>time()+5};
         my $select = IO::Select->new($controller,$server,$status_r,$out_r,$err_r);
         my %kind = (fileno($controller)=>'controller',fileno($server)=>'socket',fileno($status_r)=>'status',fileno($out_r)=>0,fileno($err_r)=>1);
-        my $deadline = time()+$duration; my $status = ''; my $stopped = 0;
+        my $remaining=defined($req->{workspace_deadline}) ? $req->{workspace_deadline}-workspace_now() : $duration;die 'workspace operation expired before dispatch' unless $remaining>0;
+        my $deadline = time()+$remaining; my $status = ''; my $stopped = 0;
         while (!$stopped && time() < $deadline) {
             if ($stream && !forward_flush(\@pending)) { $delivery=0; last; }
             for my $key (keys %clients) { if (time() > $clients{$key}{until}) { $select->remove($clients{$key}{handle}); close($clients{$key}{handle}); delete $clients{$key}; } }
@@ -371,7 +477,7 @@ sub run_inner {
                     if (!$n) { $select->remove($fd); next; }
                     my $room = $MAX-length($output[$which]); if (length($bytes) > $room) { $stopped=1; $delivery=0; }
                     $output[$which] .= substr($bytes,0,$room);
-                    if ($stream && !forward_add(\@pending,$which,$bytes)) { $stopped=1; $delivery=0; }
+                    if ($stream && ($which!=0 || !$req->{cleanup}) && !forward_add(\@pending,$which,$bytes)) { $stopped=1; $delivery=0; }
                 }
             }
             if ($gate_w) {
@@ -396,10 +502,15 @@ sub run_inner {
             my $n = sysread($fd,my $bytes,8192); if (defined($n) && !$n) { $eof=1; last; } last unless defined($n);
             my $room=$MAX-length($output[$index]); $delivery=0 if length($bytes)>$room;
             $output[$index] .= substr($bytes,0,$room);
-            $delivery=0 if $stream && !forward_add(\@pending,$index,$bytes);
+            $delivery=0 if $stream && ($index!=0 || !$req->{cleanup}) && !forward_add(\@pending,$index,$bytes);
         }
         $delivery=0 unless $eof;
         close($fd);
+    }
+    if ($ledger && $code==0 && $delivery) {
+        my $ok=eval {my $proof=ledger_complete($ledger);$output[0]=$proof;$delivery=0 if $stream && !forward_add(\@pending,0,$proof);1;};
+        if (!$ok) {my $message=substr("cleanup partial; external ledger retained: $@",0,8192);$code=125;$delivery=0;$output[1].=$message;forward_add(\@pending,1,$message) if $stream;}
+        $end=time()+.3;
     }
     while ($stream && time() < $end && (length($pending[0]) || length($pending[1]))) { if (!forward_flush(\@pending)) {$delivery=0; last;} sleep(.005); }
     $delivery=0 if $stream && (length($pending[0]) || length($pending[1]));
@@ -479,6 +590,15 @@ elsif ($mode eq 'stream') {
     my ($code,$out) = run($req,$controller,1); exit($code);
 }
 elsif ($mode eq 'recording') {
+    {
+        my $owner={v=>1,nonce=>'a',path=>'/tmp/gitcraft-owned-'.('b'x32),token=>'c'x64};my $g='d'x64;my $name="$g-mutation-".('e'x32).'.owner';
+        my $record=encode({v=>3,anchor=>'original',generation=>$g,kind=>'mutation',endpoint=>$owner});my $receipt=encode({%$owner,state=>'stopped',code=>0,complete=>JSON::PP::true});
+        my $proof={name=>$name,record=>encode_base64($record,''),receipt=>encode_base64($receipt,'')};my $entry=ledger_decode($proof,'original');my %entries;ledger_merge(\%entries,$entry);
+        die 'changed ledger evidence admitted' if eval {ledger_merge(\%entries,{%$entry,record=>$record.' '});1;};die 'wrong ledger anchor admitted' if eval {ledger_decode($proof,'replacement');1;};
+        my @events;my $plan={grant=>{anchor=>'original',generation=>$g},own=>"$g-mutation-".('f'x32).'.owner',entries=>{$name=>{%$entry,present=>1}},manifests=>[]};
+        {no warnings 'redefine';local *ledger_active=sub {};local *ledger_verify=sub {push @events,'verify';};local *ledger_publish=sub {push @events,'manifest';};local *ledger_remove=sub {push @events,'prune';};local *ledger_retire_proven=sub {push @events,'retire';die 'recorded refusal';};die 'retirement failure became success' if eval {ledger_complete($plan);1;};}
+        die 'retirement failure pruned evidence' unless join(',',@events) eq 'verify,manifest,retire' && $entries{$name}{record} eq $record;
+    }
     {
         my @expected=('directory','primary','fence','generation');
         for my $i (0..3) {
@@ -560,6 +680,6 @@ elsif ($mode eq 'recording') {
     my $ops = {signal=>sub {push @events, $_[0] ? 'group' : 'direct'; die 'refused' if $_[0];},pause=>sub {},reap=>sub {push @events,'reap';}};
     my $ok = eval {finish_owned(424242,1,$ops);1;};
     die 'refusal acknowledged' if $ok || join(',',@events) ne 'group,direct,reap';
-    print "14 recording-only owner gates passed\n";
+    print "15 recording-only owner gates passed\n";
 }
 else { die 'unknown owner operation'; }

@@ -528,7 +528,6 @@ fn helper(fence: &mut Option<gitcraft_os::WorkspaceFence>) -> Result<i32, String
                         && started.elapsed() < Duration::from_millis(request.milliseconds)
                 })?;
             let input = plan.shell_proof();
-            command.args(plan.generations());
             cleanup_plan = Some(plan);
             Some(input)
         } else {
@@ -551,7 +550,9 @@ fn helper(fence: &mut Option<gitcraft_os::WorkspaceFence>) -> Result<i32, String
             crate::processes::Options {
                 cancel: cancel.clone(),
                 input,
-                timeout: Some(Duration::from_millis(request.milliseconds)),
+                timeout: Some(
+                    Duration::from_millis(request.milliseconds).saturating_sub(started.elapsed()),
+                ),
                 ..Default::default()
             },
         )

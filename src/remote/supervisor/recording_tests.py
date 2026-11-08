@@ -9,6 +9,31 @@ class Recording:
     def kill(self,p,s): self.events.append(('direct',p,s))
     def waitpid(self,p,f): self.events.append(('reap',p,f)); return p,0
 class Pure(unittest.TestCase):
+    def test_ledger_binding_and_partial_retirement_keep_all_original_evidence(self):
+        owner=dict(v=1,nonce='a',path=m.ROOT+'b'*32,token='c'*64)
+        generation='d'*64;name=generation+'-mutation-'+'e'*32+'.owner'
+        record=m.encode(dict(v=3,anchor='original',generation=generation,kind='mutation',endpoint=owner))
+        receipt=m.encode(m.receipt(owner,'stopped',0))
+        proof=dict(name=name,record=m.base64.b64encode(record).decode(),receipt=m.base64.b64encode(receipt).decode())
+        entry=m.ledger_decode(proof,'original'); entries={};m.ledger_merge(entries,entry)
+        changed=dict(entry,record=record+b' ')
+        with self.assertRaises(ValueError): m.ledger_merge(entries,changed)
+        with self.assertRaises(ValueError): m.ledger_decode(proof,'replaced')
+        events=[]
+        class Synthetic(m.RecoveryLedger):
+            def __init__(self): self.grant=dict(anchor='original',generation=generation);self.own=generation+'-mutation-'+'f'*32+'.owner';self.entries={name:dict(entry,present=True)};self.manifests=[]
+            def active(self): pass
+            def verify(self): events.append('verify')
+            def publish(self,name,data,limit): events.append('manifest')
+            def remove(self,*args): events.append('prune')
+        old=m.retire_proven
+        try:
+            def refused(owner,data): events.append('retire');raise PermissionError('recorded refusal')
+            m.retire_proven=refused
+            with self.assertRaises(PermissionError): Synthetic().complete()
+            self.assertEqual(events,['verify','manifest','retire'])
+            self.assertEqual(entries[name]['record'],record)
+        finally: m.retire_proven=old
     def test_workspace_machine_fence_rejects_queued_generation_before_record_or_start(self):
         events=[]
         class Synthetic(m.WorkspaceLocks):

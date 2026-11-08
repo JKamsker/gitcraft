@@ -294,20 +294,21 @@ pub(crate) fn streaming_command_record(
     req: &Request,
     record: Option<&str>,
 ) -> Result<Streaming, String> {
-    streaming_command_authority(host, req, record, None)
+    streaming_command_authority(host, req, record, None, false)
 }
 pub(crate) fn streaming_command_authority(
     host: &Host,
     req: &Request,
     record: Option<&str>,
     workspace: Option<&super::workspace_authority::WorkspaceAuthority>,
+    cleanup: bool,
 ) -> Result<Streaming, String> {
     super::ui_guard::off_ui_thread(&req.what())?;
     let (command, attempt) = shell_command(host, false);
     let nonce = nonce();
     let input = format!(
         "{MORE_PATH}\n{}",
-        super::supervisor::streaming_with_authority(req, &nonce, record, workspace)?
+        super::supervisor::streaming_with_authority(req, &nonce, record, workspace, cleanup)?
     )
     .into_bytes();
     Ok(Streaming {

@@ -299,14 +299,18 @@ impl NativePlan {
         Ok(())
     }
     pub(super) fn shell_proof(&self) -> Vec<u8> {
-        let mut lines = Vec::new();
-        for entry in self.entries.values().filter(|e| e.present) {
+        let generations = self.generations();
+        let records: Vec<_> = self.entries.values().filter(|e| e.present).collect();
+        let mut lines = vec![format!("G {}", generations.len())];
+        lines.extend(generations);
+        lines.push(format!("R {}", records.len()));
+        for entry in records {
             lines.push(entry.name.clone());
             lines.push(entry.record.iter().map(|b| format!("{b:02x}")).collect());
         }
         format!("{}\n", lines.join("\n")).into_bytes()
     }
-    pub(super) fn generations(&self) -> Vec<String> {
+    fn generations(&self) -> Vec<String> {
         let mut generations = BTreeSet::from([self.authority.generation.clone()]);
         for name in self.entries.keys() {
             generations.insert(name[..64].to_owned());
