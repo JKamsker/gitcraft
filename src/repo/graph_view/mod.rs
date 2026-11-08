@@ -599,6 +599,7 @@ impl RepoTab {
             base_label,
             target,
             target_label,
+            captions: [None, None],
             since_fork: false,
         })
     }
@@ -822,6 +823,7 @@ mod tests {
             base_label: "main".into(),
             target: Some("head".into()),
             target_label: "feature".into(),
+            captions: [None, None],
             since_fork: true,
             data: None,
             request: 1,

@@ -318,6 +318,34 @@ pub(crate) struct Reword {
     pub fill: bool,
 }
 
+/// Transient provenance for fixed comparison captions emitted by the review UI.
+/// Raw labels remain the operation/data identity; unmarked user labels stay opaque.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum CompareCaption {
+    OriginalFix,
+    AdaptedFix,
+}
+
+impl CompareCaption {
+    fn display(self, raw: &str) -> String {
+        let (expected, id) = match self {
+            Self::OriginalFix => (
+                "Original fix",
+                "repo-workflows-review-label-original-fix-27d835",
+            ),
+            Self::AdaptedFix => (
+                "Adapted fix",
+                "repo-workflows-review-raw-adapted-fix-194525",
+            ),
+        };
+        if raw == expected {
+            crate::i18n::text(id).to_owned()
+        } else {
+            raw.to_owned()
+        }
+    }
+}
+
 /// Two points of history side by side in the right pane: a branch against another, a commit
 /// against the working tree…
 pub(crate) struct Compare {
@@ -326,6 +354,7 @@ pub(crate) struct Compare {
     /// `None`: the working tree.
     pub(super) target: Option<String>,
     pub(super) target_label: String,
+    pub(super) captions: [Option<CompareCaption>; 2],
     /// Only what the target changed since the two diverged (from their merge base), like a pull
     /// request shows it.
     pub(super) since_fork: bool,
@@ -345,18 +374,32 @@ pub(crate) struct CompareData {
 }
 
 impl Compare {
+    pub(super) fn display_base_label(&self) -> String {
+        self.captions[0].map_or_else(
+            || self.base_label.clone(),
+            |kind| kind.display(&self.base_label),
+        )
+    }
+
+    pub(super) fn display_target_label(&self) -> String {
+        self.captions[1].map_or_else(
+            || self.target_label.clone(),
+            |kind| kind.display(&self.target_label),
+        )
+    }
+
     /// How the comparison calls one of its two ends.
     pub(super) fn name_of(&self, rev: &str) -> Option<String> {
         let data = self.data.as_ref()?.as_ref().ok()?;
         if data.to.as_deref() == Some(rev) {
-            Some(self.target_label.clone())
+            Some(self.display_target_label())
         } else if data.from == rev && self.since_fork {
             Some(crate::i18n::message(
                 "repo-core-3619",
                 &[("rev", short(rev).to_string().into())],
             ))
         } else if data.from == rev {
-            Some(self.base_label.clone())
+            Some(self.display_base_label())
         } else {
             None
         }

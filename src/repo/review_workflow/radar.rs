@@ -449,13 +449,7 @@ pub(super) fn show(ui: &mut egui::Ui, s: &mut State, acts: &mut Vec<Action>) {
                             Patch::Adapted(commit) => {
                                 ui.label(crate::i18n::message("repo-workflows-review-message-explicit-adaptation-linked-commit-7b568f", &[("commit", (commit.as_str()).into())]));
                                 if ui.button(crate::i18n::text("repo-workflows-review-label-compare-adaptation-with-original-61cb5a")).clicked() {
-                                    acts.push(Action::Compare {
-                                        base: row.fix.clone(),
-                                        base_label: "Original fix".into(),
-                                        target: Some(commit.clone()),
-                                        target_label: "Adapted fix".into(),
-                                        since_fork: false,
-                                    });
+                                    acts.push(adapted_fix_comparison(&row.fix, commit));
                                 }
                             }
                             Patch::Reverted(commit) => {
@@ -648,6 +642,61 @@ mod fluent_review_tests {
         assert!(
             matches!(state.rows.as_ref().ok_or("rows")?.as_ref().map_err(|e| e.as_str())?[0].patch, Patch::Same(ref oid) if oid == "opaque-commit")
         );
+        Ok(())
+    }
+}
+
+/// Only this application-owned action supplies fixed-caption provenance.
+fn adapted_fix_comparison(original: &str, adapted: &str) -> Action {
+    Action::Compare {
+        base: original.to_owned(),
+        base_label: "Original fix".into(),
+        target: Some(adapted.to_owned()),
+        target_label: "Adapted fix".into(),
+        captions: [
+            Some(crate::repo::state::CompareCaption::OriginalFix),
+            Some(crate::repo::state::CompareCaption::AdaptedFix),
+        ],
+        since_fork: false,
+    }
+}
+
+#[cfg(test)]
+mod comparison_caption_tests {
+    use super::*;
+
+    #[test]
+    fn adaptation_action_retains_raw_payload_with_explicit_caption_provenance() -> Result<(), String>
+    {
+        for locale in ["en-US", "de"] {
+            crate::i18n::set_language(locale);
+            let action = adapted_fix_comparison("original-1234", "adapted-5678");
+            match action {
+                Action::Compare {
+                    base,
+                    base_label,
+                    target,
+                    target_label,
+                    captions,
+                    since_fork,
+                } => {
+                    assert_eq!(base, "original-1234");
+                    assert_eq!(base_label, "Original fix");
+                    assert_eq!(target.as_deref(), Some("adapted-5678"));
+                    assert_eq!(target_label, "Adapted fix");
+                    assert_eq!(
+                        captions,
+                        [
+                            Some(crate::repo::state::CompareCaption::OriginalFix),
+                            Some(crate::repo::state::CompareCaption::AdaptedFix)
+                        ]
+                    );
+                    assert!(!since_fork);
+                }
+                _ => return Err("fixed comparison action changed".into()),
+            }
+        }
+        crate::i18n::set_language("en-US");
         Ok(())
     }
 }

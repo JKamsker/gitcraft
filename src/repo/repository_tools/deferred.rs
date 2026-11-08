@@ -315,7 +315,7 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
                 ui.label(format!("Replay {} after {} onto {}",s.branch,s.old_base,s.onto));
                 if s.made&&ui.link(s.worktree.display().to_string()).clicked(){acts.push(Action::OpenWorktree(s.worktree.clone()));}
                 for p in &s.conflicts{ui.colored_label(crate::theme::Tokens::get(ui.ctx()).danger,format!("Conflict waiting: {p}"));}
-                if let Some(new)=&s.result&& ui.button(format!("Compare candidate of {}",s.branch)).clicked(){acts.push(Action::Compare{base:s.old.clone(),base_label:format!("original {}",s.branch),target:Some(new.clone()),target_label:format!("candidate {}",s.branch),since_fork:false});}
+                if let Some(new)=&s.result&& ui.button(format!("Compare candidate of {}",s.branch)).clicked(){acts.push(Action::Compare{base:s.old.clone(),base_label:format!("original {}",s.branch),target:Some(new.clone()),target_label:format!("candidate {}",s.branch),captions:[None,None],since_fork:false});}
             }
             ui.horizontal_wrapped(|ui|{
                 if !job.cancelled&&job.cursor<job.steps.len()&&ui.button("Continue / reconcile candidate worktree").clicked(){acts.push(Action::RepositoryTools(Act::ContinueDeferred(Box::new(view.clone()),job.id.clone())));}

@@ -425,6 +425,7 @@ impl RepoTab {
                 base_label: short.to_owned(),
                 target: None,
                 target_label: crate::i18n::text("repo-core-2651").to_owned(),
+                captions: [None, None],
                 since_fork: false,
             });
         }

@@ -156,6 +156,7 @@ fn item(
                 .branch
                 .clone()
                 .unwrap_or_else(|| view.worktree.name()),
+            captions: [None, None],
             since_fork: false,
         });
         if let Some(key) = view.diff_key(report, first) {
