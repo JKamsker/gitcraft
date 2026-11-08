@@ -30,10 +30,12 @@ struct Seen {
 }
 #[derive(Default)]
 pub(crate) struct State {
+    generation: u64,
     initialized: bool,
     busy: bool,
     rows: Vec<Seen>,
     error: Option<String>,
+    quarantine: Vec<String>,
     remote: String,
     path: String,
     symbol: String,
@@ -127,55 +129,218 @@ fn post(
         ))
     );
     let reference = format!("{ROOT}{:x}/{id}", md5::compute(&email));
-    save(
-        repo,
-        &reference,
-        &Card {
-            id,
-            author,
-            email,
-            path,
-            symbol,
-            message,
-            created,
-            expires: created.saturating_add(u64::from(minutes.clamp(1, 1440)) * 60),
+    let card = Card {
+        id,
+        author,
+        email,
+        path,
+        symbol,
+        message,
+        created,
+        expires: created.saturating_add(u64::from(minutes.clamp(1, 1440)) * 60),
+    };
+    validate(&card, &reference, ROOT, created)?;
+    save(repo, &reference, &card)
+}
+const CACHE_ROOT: &str = "refs/gitcraft/intent-remotes/";
+const CARD_LIMIT: usize = 8192;
+const IMPORT_LIMIT: usize = 4 * 1024 * 1024;
+#[derive(Default)]
+struct Reading {
+    rows: Vec<Seen>,
+    quarantine: Vec<String>,
+}
+fn source_roots(source: Option<&str>) -> Result<Vec<String>, String> {
+    let mut roots = vec![ROOT.to_owned()];
+    if let Some(source) = source {
+        if source.is_empty()
+            || source.len() > 64
+            || !source
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b == b'-')
+        {
+            return Err("Invalid intent cache identity".into());
+        }
+        roots.push(format!("{CACHE_ROOT}{source}/"));
+    }
+    Ok(roots)
+}
+fn validate(card: &Card, reference: &str, root: &str, at: u64) -> Result<(), String> {
+    let hex = |s: &str| s.len() == 32 && s.bytes().all(|b| b.is_ascii_hexdigit());
+    let relative = reference
+        .strip_prefix(root)
+        .ok_or("Intent is outside the selected source")?;
+    let (author, id) = relative
+        .split_once('/')
+        .ok_or("Invalid intent ref identity")?;
+    if !hex(author)
+        || !hex(id)
+        || id != card.id
+        || author != format!("{:x}", md5::compute(&card.email))
+    {
+        return Err("Intent identity does not match its source ref".into());
+    }
+    let short = |text: &str, max: usize| text.len() <= max && !text.chars().any(|c| c.is_control());
+    if card.path.is_empty()
+        || !short(&card.path, 512)
+        || card.path.starts_with('/')
+        || card.path.contains(['\\', ':'])
+        || card
+            .path
+            .trim_end_matches('/')
+            .split('/')
+            .any(|p| p.is_empty() || matches!(p, "." | "..") || p.eq_ignore_ascii_case(".git"))
+        || card.author.trim().is_empty()
+        || !short(&card.author, 128)
+        || card.email.trim().is_empty()
+        || !short(&card.email, 254)
+        || !short(&card.symbol, 256)
+        || card.message.trim().is_empty()
+        || !short(&card.message, 1024)
+    {
+        return Err("Intent fields exceed the short-note bounds or contain an unsafe path/control character".into());
+    }
+    if card.created > at.saturating_add(300)
+        || card.expires < card.created
+        || card.expires > card.created.saturating_add(86400)
+    {
+        return Err("Intent expiry must be within 24 hours of its creation".into());
+    }
+    Ok(())
+}
+fn collect_selected(
+    source: Option<&str>,
+    at: u64,
+    mut list: impl FnMut(&str) -> Result<Vec<(String, String)>, String>,
+    mut blob: impl FnMut(&str, usize) -> Result<String, String>,
+) -> Result<Reading, String> {
+    let mut reading = Reading::default();
+    let mut cards = BTreeMap::<(String, String), Seen>::new();
+    let mut bytes: usize = 0;
+    let mut rejected = 0;
+    for root in source_roots(source)? {
+        // List only this source. Foreign cache content is never parsed or deduplicated.
+        let refs = list(&root)?;
+        if refs.len() > 5000 {
+            return Err("More than 5000 refs in the selected intent source; archive old notes before loading".into());
+        }
+        for (reference, object) in refs {
+            if !reference.starts_with(&root) {
+                continue;
+            }
+            let result: Result<Seen, String> = (|| {
+                if bytes >= IMPORT_LIMIT {
+                    return Err("Selected intent metadata exceeds the 4MiB import budget".into());
+                }
+                let text = blob(&object, CARD_LIMIT.min(IMPORT_LIMIT - bytes))?;
+                bytes = bytes.saturating_add(text.len());
+                if text.len() > CARD_LIMIT || bytes > IMPORT_LIMIT {
+                    return Err("Intent exceeds the metadata import budget".into());
+                }
+                let card: Card =
+                    serde_json::from_str(&text).map_err(|e| format!("Invalid intent JSON: {e}"))?;
+                validate(&card, &reference, &root, at)?;
+                Ok(Seen {
+                    reference: reference.clone(),
+                    card,
+                    local: root == ROOT,
+                })
+            })();
+            match result {
+                Ok(seen) => {
+                    cards.insert((root.clone(), seen.reference.clone()), seen);
+                }
+                Err(error) => {
+                    rejected += 1;
+                    if reading.quarantine.len() < 32 {
+                        reading.quarantine.push(format!("{reference}: {error}"));
+                    }
+                }
+            }
+            if bytes >= IMPORT_LIMIT {
+                break;
+            }
+        }
+    }
+    if rejected > reading.quarantine.len() {
+        reading.quarantine.push(format!(
+            "{} additional invalid records omitted",
+            rejected - reading.quarantine.len()
+        ));
+    }
+    reading.rows = cards.into_values().collect();
+    Ok(reading)
+}
+fn read_selected(repo: &Path, source: Option<&str>) -> Result<Reading, String> {
+    collect_selected(
+        source,
+        now(),
+        |root| {
+            let listing = git::run(
+                Some(repo),
+                &["for-each-ref", "--format=%(objectname) %(refname)", root],
+            )?;
+            listing
+                .lines()
+                .map(|line| {
+                    let (object, reference) =
+                        line.split_once(' ').ok_or("Malformed intent ref listing")?;
+                    Ok((reference.to_owned(), object.to_owned()))
+                })
+                .collect()
+        },
+        |object, budget| {
+            let path = format!("{object}:intent.json");
+            let size = git::run(Some(repo), &["cat-file", "-s", &path])?
+                .trim()
+                .parse::<usize>()
+                .map_err(|_| "Invalid intent blob size")?;
+            if size > budget {
+                return Err(format!("Intent blob exceeds the {budget}-byte budget"));
+            }
+            git::run(Some(repo), &["cat-file", "blob", &path])
         },
     )
 }
 fn read(repo: &Path) -> Result<Vec<Seen>, String> {
-    let mut cards = BTreeMap::<String, Seen>::new();
-    for root in [ROOT, "refs/gitcraft/intent-remotes/"] {
-        let listing = git::run(Some(repo), &["for-each-ref", "--format=%(refname)", root])?;
-        if listing.lines().count() > 5000 {
-            return Err(
-                "More than 5000 shared intent refs; archive old intents before loading".into(),
-            );
+    Ok(read_selected(repo, None)?.rows)
+}
+#[cfg(test)]
+fn read_active(repo: &Path, source: Option<&str>) -> Result<Vec<Seen>, String> {
+    Ok(read_selected(repo, source)?.rows)
+}
+impl State {
+    fn selection_changed(&mut self) {
+        self.generation += 1;
+        self.synced = 0;
+        self.synced_remote = None;
+        self.cache_key = None;
+        self.rows.retain(|row| row.local);
+        self.quarantine.clear();
+    }
+    fn accept(
+        &mut self,
+        generation: u64,
+        result: Result<(Reading, Option<String>), String>,
+    ) -> bool {
+        self.busy = false;
+        if generation != self.generation {
+            return false;
         }
-        for reference in listing.lines() {
-            let text = git::run(Some(repo), &["show", &format!("{reference}:intent.json")])?;
-            let card: Card =
-                serde_json::from_str(&text).map_err(|e| format!("Invalid shared intent: {e}"))?;
-            let seen = Seen {
-                reference: reference.into(),
-                card,
-                local: root == ROOT,
-            };
-            match cards.get(&seen.card.id) {
-                Some(old) if old.local || old.card.created >= seen.card.created => {}
-                _ => {
-                    cards.insert(seen.card.id.clone(), seen);
-                }
+        match result {
+            Ok((reading, source)) => {
+                self.rows = reading.rows;
+                self.quarantine = reading.quarantine;
+                self.cache_key = source;
+                self.error = None;
+            }
+            Err(error) => {
+                self.error = Some(error);
+                self.synced = 0;
             }
         }
+        true
     }
-    Ok(cards.into_values().collect())
-}
-fn read_active(repo: &Path, source: Option<&str>) -> Result<Vec<Seen>, String> {
-    let prefix = source.map(|s| format!("refs/gitcraft/intent-remotes/{s}/"));
-    Ok(read(repo)?
-        .into_iter()
-        .filter(|c| c.local || prefix.as_ref().is_none_or(|p| c.reference.starts_with(p)))
-        .collect())
 }
 fn applies(card: &Card, path: &str, at: u64) -> bool {
     card.expires > at
@@ -193,8 +358,7 @@ impl RepoTab {
             .as_ref()
             .is_some_and(|old| !self.remotes.iter().any(|r| r == old))
         {
-            self.review_tools.intents.synced = 0;
-            self.review_tools.intents.synced_remote = None;
+            self.review_tools.intents.selection_changed();
         }
         if !self.review_tools.intents.initialized {
             self.review_tools.intents.initialized = true;
@@ -229,6 +393,8 @@ impl RepoTab {
         if matches!(act, Act::Read) {
             self.review_tools.intents.synced = 0;
         }
+        let generation = self.review_tools.intents.generation;
+        let selected_remote = self.review_tools.intents.remote.clone();
         let synced_observed = observed.clone();
         let mut active_source = self.review_tools.intents.cache_key.clone();
         self.review_tools.intents.busy = true;
@@ -301,45 +467,25 @@ impl RepoTab {
                 if let Some(target) = &target {
                     target.guard(&repo)?;
                 }
-                Ok((read_active(&repo, active_source.as_deref())?, active_source))
+                Ok((
+                    read_selected(&repo, active_source.as_deref())?,
+                    active_source,
+                ))
             },
             move |tab, result, _| {
                 let current_source = synced_observed
                     .as_ref()
                     .is_none_or(|old| tab.remotes.iter().any(|r| r == old));
                 let s = &mut tab.review_tools.intents;
-                s.busy = false;
-                if is_network
-                    && (!current_source
-                        || synced_observed.as_ref().is_some_and(|r| r.name != s.remote))
-                {
+                if generation != s.generation || selected_remote != s.remote || !current_source {
+                    s.busy = false;
                     s.synced = 0;
-                    s.error = Some(
-                        "Sharing selection changed; fetch intents for the new destination".into(),
-                    );
                     return;
                 }
-                match result {
-                    Ok((rows, source)) => {
-                        s.rows = rows;
-                        s.error = None;
-                        s.cache_key = source;
-                        if is_network {
-                            if synced_observed.as_ref().is_some_and(|r| r.name == s.remote) {
-                                s.synced = now();
-                                s.synced_remote = synced_observed;
-                            } else {
-                                s.synced = 0;
-                                s.synced_remote = None;
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        s.error = Some(e);
-                        if is_network {
-                            s.synced = 0;
-                        }
-                    }
+                let succeeded = result.is_ok();
+                if s.accept(generation, result) && is_network && succeeded {
+                    s.synced = now();
+                    s.synced_remote = synced_observed;
                 }
             },
         );
@@ -394,10 +540,7 @@ pub(super) fn show(
             }
         });
     if previous_remote != s.remote {
-        s.synced = 0;
-        s.synced_remote = None;
-        s.cache_key = None;
-        s.rows.retain(|row| row.local);
+        s.selection_changed();
     }
     ui.horizontal(|ui| {
         for (label, act) in [
@@ -417,6 +560,17 @@ pub(super) fn show(
         ui.label("Offline: cached observations only");
     } else if s.synced == 0 || now().saturating_sub(s.synced) > 120 {
         ui.label("Stale: shared refs have not been synchronized recently");
+    }
+    if !s.quarantine.is_empty() {
+        egui::CollapsingHeader::new(format!(
+            "{} invalid/oversize intent records quarantined",
+            s.quarantine.len()
+        ))
+        .show(ui, |ui| {
+            for warning in &s.quarantine {
+                ui.label(warning);
+            }
+        });
     }
     for seen in &s.rows {
         ui.group(|ui| {
@@ -462,6 +616,138 @@ pub(super) fn show(
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn card(id: &str) -> Card {
+        Card {
+            id: id.into(),
+            author: "Teammate".into(),
+            email: "team@example.test".into(),
+            path: "src".into(),
+            symbol: "token".into(),
+            message: "changing lifetime".into(),
+            created: 100,
+            expires: 200,
+        }
+    }
+    fn reference(root: &str, card: &Card) -> String {
+        format!("{root}{:x}/{}", md5::compute(&card.email), card.id)
+    }
+    #[test]
+    fn r2_pure_intent_sources_are_selected_before_parse_and_keep_same_id_separate()
+    -> Result<(), String> {
+        let card = card("0123456789abcdef0123456789abcdef");
+        let local = reference(ROOT, &card);
+        let selected = reference("refs/gitcraft/intent-remotes/selected/", &card);
+        let foreign = reference("refs/gitcraft/intent-remotes/foreign/", &card);
+        let json = serde_json::to_string(&card).map_err(|e| e.to_string())?;
+        let result = collect_selected(
+            Some("selected"),
+            150,
+            |root| {
+                assert!(!root.contains("foreign"));
+                // Even a malformed foreign row returned by a recorder cannot cross the boundary.
+                Ok(vec![
+                    (
+                        if root == ROOT {
+                            local.clone()
+                        } else {
+                            selected.clone()
+                        },
+                        "good".into(),
+                    ),
+                    (foreign.clone(), "foreign-malformed-bomb".into()),
+                ])
+            },
+            |object, _| {
+                assert_eq!(object, "good");
+                Ok(json.clone())
+            },
+        )?;
+        assert_eq!(result.rows.len(), 2);
+        assert!(result.quarantine.is_empty());
+        assert_eq!(source_roots(None)?, vec![ROOT]);
+        assert!(source_roots(Some("../foreign")).is_err());
+        Ok(())
+    }
+    #[test]
+    fn r2_pure_intent_quarantine_keeps_valid_neighbor_and_enforces_size_identity_path_expiry()
+    -> Result<(), String> {
+        let valid = card("0123456789abcdef0123456789abcdef");
+        let json = serde_json::to_string(&valid).map_err(|e| e.to_string())?;
+        let result = collect_selected(
+            None,
+            150,
+            |_| {
+                Ok(vec![
+                    (reference(ROOT, &valid), "good".into()),
+                    (format!("{ROOT}bad"), "invalid".into()),
+                    (format!("{ROOT}huge"), "huge".into()),
+                ])
+            },
+            |object, budget| {
+                assert!(budget <= CARD_LIMIT);
+                match object {
+                    "good" => Ok(json.clone()),
+                    "invalid" => Ok("{".into()),
+                    _ => Ok("x".repeat(CARD_LIMIT + 1)),
+                }
+            },
+        )?;
+        assert_eq!(result.rows.len(), 1);
+        assert_eq!(result.quarantine.len(), 2);
+        for path in [
+            "../escape",
+            "/root",
+            "C:/drive",
+            ".git/config",
+            "src/../../x",
+            "src\\x",
+            "src\nnext",
+        ] {
+            let mut bad = valid.clone();
+            bad.path = path.into();
+            assert!(
+                validate(&bad, &reference(ROOT, &valid), ROOT, 150).is_err(),
+                "{path}"
+            );
+        }
+        let mut bad = valid.clone();
+        bad.expires = bad.created + 86401;
+        assert!(validate(&bad, &reference(ROOT, &valid), ROOT, 150).is_err());
+        bad = valid.clone();
+        bad.message = "x".repeat(1025);
+        assert!(validate(&bad, &reference(ROOT, &valid), ROOT, 150).is_err());
+        bad = valid.clone();
+        bad.id = "different".into();
+        assert!(validate(&bad, &reference(ROOT, &valid), ROOT, 150).is_err());
+        Ok(())
+    }
+    #[test]
+    fn r2_pure_intent_selection_generation_rejects_read_post_and_error_completions() {
+        let mut state = State::default();
+        state.cache_key = Some("old".into());
+        let old = state.generation;
+        state.selection_changed();
+        assert!(state.cache_key.is_none());
+        assert!(!state.accept(
+            old,
+            Ok((
+                Reading {
+                    rows: vec![Seen {
+                        reference: "foreign".into(),
+                        card: card("0123456789abcdef0123456789abcdef"),
+                        local: false
+                    }],
+                    quarantine: vec![]
+                },
+                Some("old".into())
+            ))
+        ));
+        assert!(state.rows.is_empty());
+        assert!(!state.accept(old, Err("old read failure".into())));
+        assert!(state.error.is_none());
+        assert!(state.accept(state.generation, Ok((Reading::default(), None))));
+        assert!(state.cache_key.is_none());
+    }
     #[test]
     fn shared_intents_do_not_move_branches_and_expiry_never_locks() -> Result<(), String> {
         let a = git::stack::test_repo::TestRepo::new("intent-a")?;
@@ -479,7 +765,7 @@ mod tests {
             a.path().to_str().ok_or("path")?,
             "refs/gitcraft/intents/*:refs/gitcraft/intent-remotes/test/*",
         ])?;
-        let notes = read(b.path())?;
+        let notes = read_active(b.path(), Some("test"))?;
         assert_eq!(notes.len(), 1);
         assert!(applies(&notes[0].card, "src/auth.rs", now()));
         assert!(!applies(&notes[0].card, "src2/auth.rs", now()));
