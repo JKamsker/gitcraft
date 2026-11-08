@@ -639,7 +639,7 @@ fn commit_of(repo: &Path, rev: &str) -> Result<String, String> {
     .ok_or_else(|| {
         crate::i18n::message(
             "repo-workflows-agent-commit-of-8c23b76d",
-            &[("rev", (rev).clone().into())],
+            &[("rev", (rev).into())],
         )
     })
 }
@@ -705,7 +705,7 @@ fn not_in_progress(repo: &Path, what: &str) -> Result<(), String> {
                     "state-label-to-lowercase-1",
                     (state.label().to_lowercase()).clone().into(),
                 ),
-                ("what", (what).clone().into()),
+                ("what", (what).into()),
             ],
         )),
         None => Ok(()),
@@ -897,7 +897,7 @@ fn check_branch_name(repo: &Path, name: &str) -> Result<(), String> {
         .map_err(|_| {
             crate::i18n::message(
                 "repo-workflows-agent-check-branch-name-89d905bf",
-                &[("name", (name).clone().into())],
+                &[("name", (name).into())],
             )
         })
 }
@@ -913,7 +913,7 @@ fn create_branch(
     if branch_at(repo, name).is_some() {
         return Err(crate::i18n::message(
             "repo-workflows-agent-create-branch-8464d926",
-            &[("name", (name).clone().into())],
+            &[("name", (name).into())],
         ));
     }
     let at = commit_of(repo, start.unwrap_or("HEAD"))?;
@@ -941,13 +941,13 @@ fn rename_branch(repo: &Path, from: &str, to: &str) -> Result<Plan, String> {
     if branch_at(repo, from).is_none() {
         return Err(crate::i18n::message(
             "repo-workflows-agent-rename-branch-00b004f0",
-            &[("from", (from).clone().into())],
+            &[("from", (from).into())],
         ));
     }
     if branch_at(repo, to).is_some() {
         return Err(crate::i18n::message(
             "repo-workflows-agent-rename-branch-4fe447cd",
-            &[("to", (to).clone().into())],
+            &[("to", (to).into())],
         ));
     }
     Ok(Plan {
@@ -967,13 +967,13 @@ fn checkout(repo: &Path, here: &Here, branch: &str) -> Result<Plan, String> {
     if branch_at(repo, branch).is_none() {
         return Err(crate::i18n::message(
             "repo-workflows-agent-checkout-994822a7",
-            &[("branch", (branch).clone().into())],
+            &[("branch", (branch).into())],
         ));
     }
     if here.branch.as_deref() == Some(branch) {
         return Err(crate::i18n::message(
             "repo-workflows-agent-checkout-31e4be52",
-            &[("branch", (branch).clone().into())],
+            &[("branch", (branch).into())],
         ));
     }
     not_in_progress(
@@ -1123,7 +1123,7 @@ fn reset(repo: &Path, here: &Here, commit: &str, mode: ResetMode) -> Result<Plan
             "repo-workflows-agent-reset-5247bb50",
             &[
                 ("target", (target).clone().into()),
-                ("short-hash-1", (short(&hash)).clone().into()),
+                ("short-hash-1", (short(&hash)).into()),
             ],
         ));
     }
@@ -1215,13 +1215,13 @@ fn delete_branch(repo: &Path, here: &Here, name: &str, force: bool) -> Result<Pl
     let Some(target) = branch_at(repo, name) else {
         return Err(crate::i18n::message(
             "repo-workflows-agent-delete-branch-55a975e8",
-            &[("name", (name).clone().into())],
+            &[("name", (name).into())],
         ));
     };
     if here.branch.as_deref() == Some(name) {
         return Err(crate::i18n::message(
             "repo-workflows-agent-delete-branch-94d21a83",
-            &[("name", (name).clone().into())],
+            &[("name", (name).into())],
         ));
     }
     let flag = if force { "-D" } else { "-d" };

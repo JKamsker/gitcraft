@@ -498,13 +498,15 @@ impl PresentationState {
 mod execution_bridge_tests {
     use super::*;
     #[test]
-    fn execution_bridge_transfer_and_cleanup_warning_use_real_events_and_banner_state() {
+    fn execution_bridge_transfer_and_cleanup_warning_use_real_events_and_banner_state()
+    -> Result<(), String> {
         let primary = "provider; transfer cleanup: provider detail; lease release: inner";
         let cleanup =
             "cleanup); recovery evidence was retained. (repeated); transfer cleanup: $HOME {raw}";
         let mut receipt = None;
-        let raw =
-            pb::supplied_transfer(primary, Some(cleanup), &mut receipt).expect_err("transfer");
+        let raw = pb::supplied_transfer(primary, Some(cleanup), &mut receipt)
+            .err()
+            .ok_or("transfer")?;
         let mut state = PresentationState::default();
         assert!(
             matches!(state.take(pb::done_with_presentation(Outcome::Failed(raw.clone()), receipt.clone())), Event::Done(Outcome::Failed(ref value)) if value == &raw)
@@ -546,7 +548,7 @@ mod execution_bridge_tests {
             "provider; owned pack-hash.keep retained",
         ] {
             let result = pb::supplied_transfer(unknown, None, &mut receipt);
-            let raw = result.expect_err("forwarded");
+            let raw = result.err().ok_or("forwarded")?;
             assert!(receipt.is_none());
             state.take(pb::done_with_presentation(
                 Outcome::Failed(raw.clone()),
@@ -558,14 +560,15 @@ mod execution_bridge_tests {
             }
         }
         let lease = pb::close_finished(Err(primary.into()), Err(cleanup.into()), &mut receipt)
-            .expect_err("lease");
+            .err()
+            .ok_or("lease")?;
         let Event::Warning(raw_warning) = state.take(pb::cleanup_warning(
             "opaque host; )".into(),
             lease.clone(),
             receipt.clone(),
             true,
         )) else {
-            panic!("warning")
+            return Err("warning".into());
         };
         let mut paints = Vec::new();
         for locale in ["en-US", "de", "en-US"] {
@@ -597,7 +600,7 @@ mod execution_bridge_tests {
             None,
             true,
         )) else {
-            panic!("warning")
+            return Err("warning".into());
         };
         crate::i18n::set_language("de");
         assert!(
@@ -606,6 +609,8 @@ mod execution_bridge_tests {
                 .contains("provider; lease release: unknown")
         );
         crate::i18n::set_language("en-US");
+
+        Ok(())
     }
 }
 

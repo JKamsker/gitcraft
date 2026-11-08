@@ -243,10 +243,7 @@ impl RepoTab {
                 });
                 egui::CollapsingHeader::new(crate::i18n::message(
                     "repo-workflows-file_comparison-file-comparison-view-1e2e1383",
-                    &[(
-                        "state-selected-len-1",
-                        (state.selected.len()).clone().into(),
-                    )],
+                    &[("state-selected-len-1", (state.selected.len()).into())],
                 ))
                 .id_salt("file-comparison-branches")
                 .default_open(state.selected.len() < 2)
@@ -281,7 +278,7 @@ impl RepoTab {
         }
         let data = state.data.as_ref().and_then(|r| r.as_ref().ok()).cloned();
         if let Some(Err(e)) = &state.data {
-            ui.colored_label(t.danger, crate::repo::activity::display_workflow_error(&e));
+            ui.colored_label(t.danger, crate::repo::activity::display_workflow_error(e));
         }
         if let Some(data) = data {
             ui.separator();
@@ -297,7 +294,7 @@ impl RepoTab {
             match pair {
                 Ok(p) => show_pair(ui, p, &t),
                 Err(e) => {
-                    ui.colored_label(t.danger, crate::repo::activity::display_workflow_error(&e));
+                    ui.colored_label(t.danger, crate::repo::activity::display_workflow_error(e));
                 }
             }
         }
@@ -315,8 +312,8 @@ fn migration(
     ui.label(crate::i18n::message(
         "repo-workflows-file_comparison-migration-41aec147",
         &[
-            ("data-moves-len-1", (data.moves.len()).clone().into()),
-            ("data-other-changes-2", (data.other_changes).clone().into()),
+            ("data-moves-len-1", (data.moves.len()).into()),
+            ("data-other-changes-2", (data.other_changes).into()),
         ],
     ));
     if let Some(warning) = &data.warning {
@@ -357,7 +354,6 @@ fn migration(
                                     "repo-workflows-file_comparison-migration-3064d79a",
                                 )
                             })
-                            .clone()
                             .into(),
                         ),
                         (
@@ -470,7 +466,7 @@ fn matrix(
         .collect();
     ui.label(crate::i18n::message(
         "repo-workflows-file_comparison-matrix-ebfcc1d5",
-        &[("data-paths-len-1", (data.paths.len()).clone().into())],
+        &[("data-paths-len-1", (data.paths.len()).into())],
     ));
     egui::ScrollArea::both()
         .id_salt("branch_matrix")
@@ -715,10 +711,7 @@ fn boundary_button(
     };
     let label = crate::i18n::message(
         "repo-workflows-file_comparison-boundary-button-0cadc525",
-        &[
-            ("text", (text).clone().into()),
-            ("index-1-1", (index + 1).clone().into()),
-        ],
+        &[("text", (text).into()), ("index-1-1", (index + 1).into())],
     );
     let enabled = allowed
         && part.reason.is_none()

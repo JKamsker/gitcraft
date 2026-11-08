@@ -32,13 +32,13 @@ fn dynamic(raw: &str) -> Option<String> {
     if let Some(text) = raw.strip_prefix("").and_then(|s| {
         s.strip_suffix(": a fence takes no exceptions (`!`); list what is fenced instead")
     }) {
-        let rendered = (|| {
+        let rendered = {
             let pattern = text;
             Some(message(
                 "interaction-guards-fence-no-exceptions",
                 &[("pattern", pattern.into())],
             ))
-        })();
+        };
         if rendered.is_some() {
             return rendered;
         }
@@ -47,13 +47,13 @@ fn dynamic(raw: &str) -> Option<String> {
         .strip_prefix("")
         .and_then(|s| s.strip_suffix(" has a line break"))
     {
-        let rendered = (|| {
+        let rendered = {
             let entry = text;
             Some(message(
                 "interaction-guards-fence-line-break",
                 &[("entry", entry.into())],
             ))
-        })();
+        };
         if rendered.is_some() {
             return rendered;
         }
@@ -78,13 +78,13 @@ fn dynamic(raw: &str) -> Option<String> {
         .strip_prefix(".claude/settings.local.json isn't valid JSON: ")
         .and_then(|s| s.strip_suffix(""))
     {
-        let rendered = (|| {
+        let rendered = {
             let detail = text;
             Some(message(
                 "interaction-guards-fence-invalid-json",
                 &[("detail", detail.into())],
             ))
-        })();
+        };
         if rendered.is_some() {
             return rendered;
         }
@@ -93,13 +93,13 @@ fn dynamic(raw: &str) -> Option<String> {
         .strip_prefix("Could not find the worktree's git folder: ")
         .and_then(|s| s.strip_suffix(""))
     {
-        let rendered = (|| {
+        let rendered = {
             let detail = text;
             Some(message(
                 "interaction-guards-fence-git-folder",
                 &[("detail", detail.into())],
             ))
-        })();
+        };
         if rendered.is_some() {
             return rendered;
         }
@@ -108,13 +108,13 @@ fn dynamic(raw: &str) -> Option<String> {
         .strip_prefix("Could not read the agent fence: ")
         .and_then(|s| s.strip_suffix(""))
     {
-        let rendered = (|| {
+        let rendered = {
             let detail = text;
             Some(message(
                 "interaction-guards-fence-read-fence",
                 &[("detail", detail.into())],
             ))
-        })();
+        };
         if rendered.is_some() {
             return rendered;
         }
@@ -212,13 +212,13 @@ fn dynamic(raw: &str) -> Option<String> {
         .strip_prefix("Could not reach the worktree's folder: ")
         .and_then(|s| s.strip_suffix(""))
     {
-        let rendered = (|| {
+        let rendered = {
             let detail = text;
             Some(message(
                 "interaction-guards-fence-reach-error",
                 &[("detail", detail.into())],
             ))
-        })();
+        };
         if rendered.is_some() {
             return rendered;
         }
@@ -227,13 +227,13 @@ fn dynamic(raw: &str) -> Option<String> {
         .strip_prefix("Could not record the rules written: ")
         .and_then(|s| s.strip_suffix(""))
     {
-        let rendered = (|| {
+        let rendered = {
             let detail = text;
             Some(message(
                 "interaction-guards-fence-record-error",
                 &[("detail", detail.into())],
             ))
-        })();
+        };
         if rendered.is_some() {
             return rendered;
         }
@@ -242,13 +242,13 @@ fn dynamic(raw: &str) -> Option<String> {
         .strip_prefix("Could not save the agent fence: ")
         .and_then(|s| s.strip_suffix(""))
     {
-        let rendered = (|| {
+        let rendered = {
             let detail = text;
             Some(message(
                 "interaction-guards-fence-save-fence",
                 &[("detail", known_detail(detail).into())],
             ))
-        })();
+        };
         if rendered.is_some() {
             return rendered;
         }
@@ -257,13 +257,13 @@ fn dynamic(raw: &str) -> Option<String> {
         .strip_prefix("Could not save where the fence is written: ")
         .and_then(|s| s.strip_suffix(""))
     {
-        let rendered = (|| {
+        let rendered = {
             let detail = text;
             Some(message(
                 "interaction-guards-fence-save-targets",
                 &[("detail", detail.into())],
             ))
-        })();
+        };
         if rendered.is_some() {
             return rendered;
         }
@@ -318,25 +318,49 @@ impl super::check::How {
     }
 }
 
+/// `target` is exactly the supplied ref or `remote::display(worktree)` used by the producer.
+/// It may contain punctuation or text resembling an error delimiter; preserve it whole.
+pub fn check_diagnostic(raw: &str, target: &str) -> String {
+    let prefix = format!("Could not check {target} against the agent fence: ");
+    if let Some(detail) = raw.strip_prefix(&prefix) {
+        message(
+            "interaction-guards-fence-check-error",
+            &[
+                ("target", target.into()),
+                ("detail", known_detail(detail).into()),
+            ],
+        )
+    } else {
+        diagnostic(raw)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::i18n::set_language;
 
     #[test]
-    fn guard_display_fence_keeps_agent_config_and_actual_json_validation_raw() {
+    fn guard_display_fence_keeps_agent_config_and_actual_json_validation_raw() -> Result<(), String>
+    {
         use super::super::{configs, pattern::Pattern};
-        let patterns = [Pattern::parse("/src/12345").unwrap()];
+        let patterns = [Pattern::parse("/src/12345").ok_or("missing test value")?];
         let instructions = configs::agents_md("# User text 12345\n", &patterns);
         let cursor = configs::cursorignore("# User text 12345\n", &patterns);
         let rules = configs::claude_rules(&patterns[0]);
-        let json = configs::claude_settings("", &[], &rules).unwrap().unwrap();
-        let raw = configs::claude_settings("[]", &[], &rules).unwrap_err();
+        let json = configs::claude_settings("", &[], &rules)
+            .map_err(|error| format!("{error:?}"))?
+            .ok_or("missing test value")?;
+        let raw = configs::claude_settings("[]", &[], &rules)
+            .err()
+            .ok_or("expected an error")?;
         assert_eq!(raw, ".claude/settings.local.json isn't a JSON object");
-        let invalid = configs::claude_settings("{bad", &[], &rules).unwrap_err();
+        let invalid = configs::claude_settings("{bad", &[], &rules)
+            .err()
+            .ok_or("expected an error")?;
         let payload = invalid
             .strip_prefix(".claude/settings.local.json isn't valid JSON: ")
-            .unwrap();
+            .ok_or("missing test value")?;
         for locale in ["en-US", "de"] {
             set_language(locale);
             assert_eq!(
@@ -348,11 +372,15 @@ mod tests {
                 cursor
             );
             assert_eq!(
-                configs::claude_settings("", &[], &rules).unwrap().unwrap(),
+                configs::claude_settings("", &[], &rules)
+                    .map_err(|error| format!("{error:?}"))?
+                    .ok_or("missing test value")?,
                 json
             );
             assert_eq!(
-                configs::claude_settings("[]", &[], &rules).unwrap_err(),
+                configs::claude_settings("[]", &[], &rules)
+                    .err()
+                    .ok_or("expected an error")?,
                 raw
             );
             assert!(diagnostic(&invalid).ends_with(payload));
@@ -368,22 +396,7 @@ mod tests {
             assert!(json.contains("Read(/src/12345)"));
         }
         set_language("en-US");
-    }
-}
 
-/// `target` is exactly the supplied ref or `remote::display(worktree)` used by the producer.
-/// It may contain punctuation or text resembling an error delimiter; preserve it whole.
-pub fn check_diagnostic(raw: &str, target: &str) -> String {
-    let prefix = format!("Could not check {target} against the agent fence: ");
-    if let Some(detail) = raw.strip_prefix(&prefix) {
-        message(
-            "interaction-guards-fence-check-error",
-            &[
-                ("target", target.into()),
-                ("detail", known_detail(detail).into()),
-            ],
-        )
-    } else {
-        diagnostic(raw)
+        Ok(())
     }
 }

@@ -1,10 +1,11 @@
 use super::*;
 
 #[test]
-fn actual_size_guard_and_failure_combinators_retain_raw_locale_without_archive_execution() {
+fn actual_size_guard_and_failure_combinators_retain_raw_locale_without_archive_execution()
+-> Result<(), String> {
     crate::i18n::set_language("de");
     assert!(check_size(max()).is_ok());
-    let large = check_size(max() + 1).expect_err("source size guard");
+    let large = check_size(max() + 1).err().ok_or("source size guard")?;
     assert!(matches!(large, Failure::ArchiveTooBig { .. }));
     assert_eq!(
         large.raw(),
@@ -29,4 +30,6 @@ fn actual_size_guard_and_failure_combinators_retain_raw_locale_without_archive_e
         assert!(gzip.display().ends_with("a damaged archive; ; /1234.5"));
         assert_eq!(damaged.display() == damaged.raw(), locale == "en-US");
     }
+
+    Ok(())
 }

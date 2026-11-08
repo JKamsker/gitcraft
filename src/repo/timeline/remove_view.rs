@@ -101,7 +101,7 @@ fn planned(ui: &mut Ui, plan: &Plan, name: &str, idle: bool, acts: &mut Vec<Acti
     ui.label(
         RichText::new(crate::i18n::message(
             "repo-workflows-timeline-planned-464cf7b4",
-            &[("plan-removed-total-1", (plan.removed_total).clone().into())],
+            &[("plan-removed-total-1", (plan.removed_total).into())],
         ))
         .color(t.text),
     );
@@ -110,7 +110,7 @@ fn planned(ui: &mut Ui, plan: &Plan, name: &str, idle: bool, acts: &mut Vec<Acti
     ui.label(
         RichText::new(crate::i18n::message(
             "repo-workflows-timeline-planned-bc5f9685",
-            &[("plan-later-len-1", (plan.later.len()).clone().into())],
+            &[("plan-later-len-1", (plan.later.len()).into())],
         ))
         .color(t.text),
     );
@@ -176,7 +176,7 @@ fn finished(ui: &mut Ui, outcome: &Outcome, confirm: bool, idle: bool, acts: &mu
                     "repo-workflows-timeline-finished-9f36aac7",
                     &[
                         ("branch", (branch).clone().into()),
-                        ("short-tip-1", (short(tip)).clone().into()),
+                        ("short-tip-1", (short(tip)).into()),
                     ],
                 ))
                 .color(t.success),
@@ -210,7 +210,7 @@ fn finished(ui: &mut Ui, outcome: &Outcome, confirm: bool, idle: bool, acts: &mu
                 RichText::new(crate::i18n::message(
                     "repo-workflows-timeline-finished-69c5b35c",
                     &[
-                        ("short-commit-1", (short(commit)).clone().into()),
+                        ("short-commit-1", (short(commit)).into()),
                         ("summary", (summary).clone().into()),
                     ],
                 ))
@@ -248,7 +248,7 @@ fn finished(ui: &mut Ui, outcome: &Outcome, confirm: bool, idle: bool, acts: &mu
                                     .to_owned(),
                                 n => crate::i18n::message(
                                     "repo-workflows-timeline-finished-c9361f4d",
-                                    &[("n", (n).clone().into())],
+                                    &[("n", (*(n)).into())],
                                 ),
                             })
                             .clone()
@@ -333,7 +333,7 @@ fn commits(ui: &mut Ui, list: &[(String, String)], total: usize) {
         ui.label(
             RichText::new(crate::i18n::message(
                 "repo-workflows-timeline-commits-683768ab",
-                &[("total-list-len-1", (total - list.len()).clone().into())],
+                &[("total-list-len-1", (total - list.len()).into())],
             ))
             .color(t.text_faint),
         );

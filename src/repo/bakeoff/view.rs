@@ -69,7 +69,7 @@ fn header(ui: &mut Ui, view: &mut Bakeoff, t: &Tokens, act: &mut Option<BakeAct>
                     "repo-workflows-bakeoff-header-50cd264e",
                     &[(
                         "crate-repo-short-cmp-base-1",
-                        (crate::repo::short(&cmp.base)).clone().into(),
+                        (crate::repo::short(&cmp.base)).into(),
                     )],
                 ))
                 .color(t.text_dim),
@@ -315,7 +315,7 @@ fn build_cell(
                     t.danger,
                     crate::i18n::message(
                         "repo-workflows-bakeoff-build-cell-301c453c",
-                        &[("code", (code).clone().into())],
+                        &[("code", (code).into())],
                     ),
                 )
                 .on_hover_text(crate::i18n::text(
@@ -464,14 +464,14 @@ fn pick_label(view: &Bakeoff, take: &Take) -> String {
     match take {
         Take::File(n) => crate::i18n::message(
             "repo-workflows-bakeoff-pick-label-77dbc108",
-            &[("name-n-1", (name(*n)).clone().into())],
+            &[("name-n-1", (name(*n)).into())],
         ),
         Take::Hunks(list) if list.len() == 1 => {
             crate::i18n::text("repo-workflows-bakeoff-pick-label-d3d98b5d").to_owned()
         }
         Take::Hunks(list) => crate::i18n::message(
             "repo-workflows-bakeoff-pick-label-c708de81",
-            &[("list-len-1", (list.len()).clone().into())],
+            &[("list-len-1", (list.len()).into())],
         ),
     }
 }
@@ -485,20 +485,17 @@ fn hunk_label(hunk: &Hunk) -> String {
         }
         0 => crate::i18n::message(
             "repo-workflows-bakeoff-hunk-label-7647677f",
-            &[("hunk-old-start-1", (hunk.old_start).clone().into())],
+            &[("hunk-old-start-1", (hunk.old_start).into())],
         ),
         1 => crate::i18n::message(
             "repo-workflows-bakeoff-hunk-label-4d9d8a81",
-            &[("hunk-old-start-1", (hunk.old_start).clone().into())],
+            &[("hunk-old-start-1", (hunk.old_start).into())],
         ),
         n => crate::i18n::message(
             "repo-workflows-bakeoff-hunk-label-a3052fdf",
             &[
-                ("hunk-old-start-1", (hunk.old_start).clone().into()),
-                (
-                    "hunk-old-start-n-1-2",
-                    (hunk.old_start + n - 1).clone().into(),
-                ),
+                ("hunk-old-start-1", (hunk.old_start).into()),
+                ("hunk-old-start-n-1-2", (hunk.old_start + n - 1).into()),
             ],
         ),
     };
@@ -741,7 +738,7 @@ fn assemble_bar(ui: &mut Ui, view: &mut Bakeoff, t: &Tokens, act: &mut Option<Ba
         } else {
             crate::i18n::message(
                 "repo-workflows-bakeoff-assemble-bar-86fd9bbb",
-                &[("picks", (picks).clone().into())],
+                &[("picks", (picks).into())],
             )
         };
         if crate::repo::primary_button(ui, &label, ready, 130.0)

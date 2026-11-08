@@ -374,7 +374,7 @@ pub(crate) fn list_violations(found: &[Violation]) -> String {
     if found.len() > LISTED {
         out.push(crate::i18n::message(
             "repo-workflows-fence_view-list-violations-a6d5a69b",
-            &[("found-len-listed-1", (found.len() - LISTED).clone().into())],
+            &[("found-len-listed-1", (found.len() - LISTED).into())],
         ));
     }
     out.join("\n")

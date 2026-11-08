@@ -109,7 +109,7 @@ impl RepoTab {
         let tip = match self.test_lane.command() {
             Some(command) => crate::i18n::message(
                 "repo-workflows-test_lane-test-lane-header-9b3f6adb",
-                &[("command", (command).clone().into())],
+                &[("command", (command).into())],
             ),
             None => {
                 crate::i18n::text("repo-workflows-test_lane-test-lane-header-f4c5a803").to_owned()

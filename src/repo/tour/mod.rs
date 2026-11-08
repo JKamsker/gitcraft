@@ -200,14 +200,11 @@ fn contents(
             ui.label(crate::i18n::message(
                 "repo-workflows-tour-tour-view-75d74f36",
                 &[
-                    ("w-inspected-1", (w.inspected).clone().into()),
-                    ("w-merges-2", (w.merges).clone().into()),
-                    ("w-conventional-3", (w.conventional).clone().into()),
-                    (
-                        "w-signature-headers-4",
-                        (w.signature_headers).clone().into(),
-                    ),
-                    ("w-signoffs-5", (w.signoffs).clone().into()),
+                    ("w-inspected-1", (w.inspected).into()),
+                    ("w-merges-2", (w.merges).into()),
+                    ("w-conventional-3", (w.conventional).into()),
+                    ("w-signature-headers-4", (w.signature_headers).into()),
+                    ("w-signoffs-5", (w.signoffs).into()),
                 ],
             ));
             ui.label(if w.merges == 0 {
@@ -222,11 +219,8 @@ fn contents(
             ui.label(crate::i18n::message(
                 "repo-workflows-tour-tour-view-17f176ca",
                 &[
-                    (
-                        "report-branches-len-1",
-                        (report.branches.len()).clone().into(),
-                    ),
-                    ("report-tags-len-2", (report.tags.len()).clone().into()),
+                    ("report-branches-len-1", (report.branches.len()).into()),
+                    ("report-tags-len-2", (report.tags.len()).into()),
                 ],
             ));
             ui.label(crate::i18n::message(
@@ -269,14 +263,11 @@ fn contents(
                             .iter()
                             .filter(|s| s.contains("/release/"))
                             .count())
-                        .clone()
                         .into(),
                     ),
                     (
                         "report-tags-iter-filter-s-s-star-2",
-                        (report.tags.iter().filter(|s| s.starts_with('v')).count())
-                            .clone()
-                            .into(),
+                        (report.tags.iter().filter(|s| s.starts_with('v')).count()).into(),
                     ),
                 ],
             ));
@@ -290,10 +281,7 @@ fn contents(
             ));
             ui.label(crate::i18n::message(
                 "repo-workflows-tour-tour-view-e78ace8e",
-                &[(
-                    "report-recent-commits-1",
-                    (report.recent_commits).clone().into(),
-                )],
+                &[("report-recent-commits-1", (report.recent_commits).into())],
             ));
             for folder in &report.folders {
                 ui.label(format!(
@@ -307,7 +295,7 @@ fn contents(
                             &[
                                 ("n", (n).clone().into()),
                                 ("e", (e).clone().into()),
-                                ("c", (c).clone().into())
+                                ("c", (*(c)).into())
                             ]
                         ))
                         .collect::<Vec<_>>()
@@ -319,7 +307,7 @@ fn contents(
                 ui.label(crate::i18n::message(
                     "repo-workflows-tour-tour-view-6a2e97ea",
                     &[
-                        ("n", (n).clone().into()),
+                        ("n", (*(n)).into()),
                         (
                             "string-from-utf8-lossy-path-1",
                             (String::from_utf8_lossy(path)).clone().into(),

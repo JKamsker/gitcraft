@@ -323,7 +323,7 @@ pub(super) fn read_catalog_with_witness(
     path: &Path,
 ) -> Result<(Vec<Workflow>, Vec<CatalogFailure>), CatalogFailure> {
     if crate::remote::is_remote(path) {
-        return Err(CatalogFailure::Remote.into());
+        return Err(CatalogFailure::Remote);
     }
     let entries = std::fs::read_dir(path.join(".github/workflows")).map_err(|e| {
         CatalogFailure::Directory {
@@ -336,7 +336,7 @@ pub(super) fn read_catalog_with_witness(
         .collect::<Vec<_>>();
     files.sort();
     if files.len() > 256 {
-        return Err(CatalogFailure::TooMany.into());
+        return Err(CatalogFailure::TooMany);
     }
     let (mut workflows, mut errors) = (Vec::new(), Vec::new());
     for name in files {
@@ -440,9 +440,12 @@ Self::Ended => "Local operation ended without an answer (cancelled or worker fai
 mod fluent_r1_catalog_tests {
     use super::*;
     #[test]
-    fn fluent_partition_r1_local_actions_retains_typed_parser_and_opaque_yaml_details() {
+    fn fluent_partition_r1_local_actions_retains_typed_parser_and_opaque_yaml_details()
+    -> Result<(), String> {
         crate::i18n::set_language("de");
-        let cause = model::parse_with_witness("raw.yml".into(), "on: push\n".into()).unwrap_err();
+        let cause = model::parse_with_witness("raw.yml".into(), "on: push\n".into())
+            .err()
+            .ok_or("expected an error")?;
         let error = CatalogFailure::File {
             file: "raw; ;\n{$path}/1234.yml".into(),
             cause: SourceFailure::Parse(cause),
@@ -458,11 +461,22 @@ mod fluent_r1_catalog_tests {
             assert!(shown.contains("raw; ;\n{$path}/1234.yml"));
             assert_eq!(shown == raw, lang == "en-US");
             assert_eq!(state.display_result_error(&raw), shown);
-            assert_eq!(state.result.as_ref().unwrap().as_ref().unwrap_err(), &raw);
+            assert_eq!(
+                state
+                    .result
+                    .as_ref()
+                    .ok_or("missing test value")?
+                    .as_ref()
+                    .err()
+                    .ok_or("expected an error")?,
+                &raw
+            );
             assert!(state.pending.is_none());
         }
         let lookalike = model::ParseFailure::Opaque("Workflow has no jobs mapping".into());
         assert_eq!(lookalike.display(), lookalike.raw());
         crate::i18n::set_language("en-US");
+
+        Ok(())
     }
 }

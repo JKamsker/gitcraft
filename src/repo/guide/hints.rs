@@ -51,7 +51,7 @@ impl Hint {
         match self {
             Hint::CompareCommits => crate::i18n::message(
                 "repo-workflows-guide-text-414ed52e",
-                &[("cmd", (cmd).clone().into())],
+                &[("cmd", (cmd).into())],
             ),
             Hint::DoubleClickPill => crate::i18n::text("repo-workflows-guide-text-e94f4321").into(),
             Hint::SoloBranch => crate::i18n::text("repo-workflows-guide-text-aa7b18c5").into(),

@@ -62,7 +62,7 @@ pub(super) fn read(
             (
                 crate::i18n::message(
                     "repo-workflows-file_comparison-read-5e3dd301",
-                    &[("oid-8-1", (&oid[..8]).clone().into())],
+                    &[("oid-8-1", (&oid[..8]).into())],
                 ),
                 vec![oid],
             )
@@ -86,7 +86,7 @@ pub(super) fn read(
             (
                 crate::i18n::message(
                     "repo-workflows-file_comparison-read-bf031806",
-                    &[("oid-8-1", (&oid[..8]).clone().into())],
+                    &[("oid-8-1", (&oid[..8]).into())],
                 ),
                 vec![oid],
             )
@@ -322,10 +322,7 @@ pub(super) fn view(
     ui.label(&data.label);
     ui.label(crate::i18n::message(
         "repo-workflows-file_comparison-view-746eb9db",
-        &[(
-            "data-locations-len-1",
-            (data.locations.len()).clone().into(),
-        )],
+        &[("data-locations-len-1", (data.locations.len()).into())],
     ));
     for note in &data.notes {
         ui.colored_label(t.text_dim, note);
@@ -373,7 +370,7 @@ pub(super) fn view(
             block_color(t, i),
             crate::i18n::message(
                 "repo-workflows-file_comparison-view-8bb733fc",
-                &[("i-1-1", (i + 1).clone().into())],
+                &[("i-1-1", (i + 1).into())],
             ),
         );
         for (side, l) in loc.iter().enumerate() {
@@ -383,9 +380,7 @@ pub(super) fn view(
                     &[
                         (
                             "if-side-0-source-else-destinatio-1",
-                            (if side == 0 { "source" } else { "destination" })
-                                .clone()
-                                .into(),
+                            (if side == 0 { "source" } else { "destination" }).into(),
                         ),
                         ("l-label-2", (l.label()).clone().into()),
                     ],

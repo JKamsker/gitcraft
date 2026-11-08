@@ -90,7 +90,7 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
                 }
                 ui.label(crate::i18n::message(
                     "repo-workflows-repository_tools-show-d5680e1f",
-                    &[("p-prune-len-1", (p.prune.len()).clone().into())],
+                    &[("p-prune-len-1", (p.prune.len()).into())],
                 ));
                 for name in &p.prune {
                     ui.monospace(name);

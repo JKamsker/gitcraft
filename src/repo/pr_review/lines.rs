@@ -44,15 +44,12 @@ pub(super) fn suggestion_scope(start: u64, end: u64) -> String {
     if start == end {
         crate::i18n::message(
             "repo-workflows-pr_review-suggestion-scope-d3d41027",
-            &[("end", (end).clone().into())],
+            &[("end", (end).into())],
         )
     } else {
         crate::i18n::message(
             "repo-workflows-pr_review-suggestion-scope-3e80b4eb",
-            &[
-                ("start", (start).clone().into()),
-                ("end", (end).clone().into()),
-            ],
+            &[("start", (start).into()), ("end", (end).into())],
         )
     }
 }

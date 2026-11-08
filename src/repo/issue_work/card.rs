@@ -61,12 +61,12 @@ fn card(
         let tip = if folded {
             crate::i18n::message(
                 "repo-workflows-issue_work-card-5fa29511",
-                &[("what", (what).clone().into())],
+                &[("what", (what).into())],
             )
         } else {
             crate::i18n::message(
                 "repo-workflows-issue_work-card-1c245f79",
-                &[("what", (what).clone().into())],
+                &[("what", (what).into())],
             )
         };
         if icons::small_button(ui, chevron, &tip).clicked() {

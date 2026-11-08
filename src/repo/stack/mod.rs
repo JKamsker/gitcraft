@@ -96,15 +96,12 @@ fn loop_problem(branch: &str, parent: &str) -> String {
     if branch == parent {
         crate::i18n::message(
             "repo-workflows-stack-loop-problem-27b30746",
-            &[("branch", (branch).clone().into())],
+            &[("branch", (branch).into())],
         )
     } else {
         crate::i18n::message(
             "repo-workflows-stack-loop-problem-bc8dbf35",
-            &[
-                ("parent", (parent).clone().into()),
-                ("branch", (branch).clone().into()),
-            ],
+            &[("parent", (parent).into()), ("branch", (branch).into())],
         )
     }
 }
@@ -223,13 +220,13 @@ impl RepoTab {
         if parent.is_empty() {
             return Some(crate::i18n::message(
                 "repo-workflows-stack-parent-problem-61a1cff0",
-                &[("branch", (branch).clone().into())],
+                &[("branch", (branch).into())],
             ));
         }
         if !self.refs.local.iter().any(|b| b.name == parent) {
             return Some(crate::i18n::message(
                 "repo-workflows-stack-parent-problem-f7032e38",
-                &[("parent", (parent).clone().into())],
+                &[("parent", (parent).into())],
             ));
         }
         if stack::would_loop(&self.stacks.recorded, branch, parent) {
@@ -342,12 +339,13 @@ impl Stacks {
 mod fluent_r1_read_tests {
     use super::*;
     #[test]
-    fn fluent_partition_r1_stack_cached_read_error_preserves_raw_detail_and_generation() {
+    fn fluent_partition_r1_stack_cached_read_error_preserves_raw_detail_and_generation()
+    -> Result<(), String> {
         let detail = "provider; ;\nHistory worker stopped: {$x} 日本語";
         crate::i18n::set_language("de");
         let mut state = Stacks::default();
         state.remember_read_error(detail.into());
-        let raw = state.error.clone().unwrap();
+        let raw = state.error.clone().ok_or("missing test value")?;
         for lang in ["de", "en-US", "de"] {
             crate::i18n::set_language(lang);
             let shown = state.display_read_error(&raw);
@@ -359,5 +357,7 @@ mod fluent_r1_read_tests {
         crate::i18n::set_language("de");
         assert_eq!(state.display_read_error(&raw), raw);
         crate::i18n::set_language("en-US");
+
+        Ok(())
     }
 }

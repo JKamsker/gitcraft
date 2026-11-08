@@ -163,7 +163,7 @@ impl RepoTab {
                 let name = reference.strip_prefix("refs/heads/").unwrap_or(reference);
                 let text = crate::i18n::message(
                     "repo-workflows-reflog-reflog-list-31d0c09c",
-                    &[("name", (name).clone().into())],
+                    &[("name", (name).into())],
                 );
                 message(ui, &text, t.text_dim);
             }
@@ -508,7 +508,7 @@ fn scanning(ui: &mut Ui, t: &Tokens, secs: u64, acts: &mut Vec<Action>) {
         ui.label(
             egui::RichText::new(crate::i18n::message(
                 "repo-workflows-reflog-scanning-7ed409a6",
-                &[("secs", (secs).clone().into())],
+                &[("secs", (secs).into())],
             ))
             .color(t.text_dim),
         );

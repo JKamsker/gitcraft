@@ -97,7 +97,7 @@ impl CollisionView {
         } else if count > MOST {
             Some(crate::i18n::message(
                 "repo-workflows-collision_view-cannot-check-c1d9426d",
-                &[("MOST", (MOST).clone().into())],
+                &[("MOST", (MOST).into())],
             ))
         } else {
             None
@@ -274,10 +274,7 @@ fn body(ui: &mut Ui, view: &mut CollisionView, acts: &mut Vec<Action>) -> (bool,
             let done = run.done.load(Ordering::Relaxed);
             ui.label(crate::i18n::message(
                 "repo-workflows-collision_view-body-94846973",
-                &[
-                    ("done", (done).clone().into()),
-                    ("run-total-1", (run.total).clone().into()),
-                ],
+                &[("done", (done).into()), ("run-total-1", (run.total).into())],
             ));
             if ui
                 .button(crate::i18n::text(

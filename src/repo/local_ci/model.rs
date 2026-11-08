@@ -187,7 +187,7 @@ impl Workflow {
             if !w.jobs.iter().any(|s| s == j) {
                 return Err(crate::i18n::message(
                     "repo-workflows-local_ci-visit-038c0ec6",
-                    &[("j", (j).clone().into())],
+                    &[("j", (j).into())],
                 ));
             }
             stack.push(j.into());
@@ -280,7 +280,7 @@ mod fluent_model_tests {
 
 pub(super) fn parse_with_witness(file: String, source: String) -> Result<Workflow, ParseFailure> {
     if source.len() > MAX {
-        return Err(ParseFailure::TooLarge.into());
+        return Err(ParseFailure::TooLarge);
     }
     let mut parser = Parser::new(source.chars());
     let mut depth = 0usize;
@@ -290,7 +290,7 @@ pub(super) fn parse_with_witness(file: String, source: String) -> Result<Workflo
         count += 1;
         match event {
             Event::Alias(_) => {
-                return Err(ParseFailure::Aliases.into());
+                return Err(ParseFailure::Aliases);
             }
             Event::MappingStart(..) | Event::SequenceStart(..) => depth += 1,
             Event::MappingEnd | Event::SequenceEnd => depth = depth.saturating_sub(1),
@@ -298,12 +298,12 @@ pub(super) fn parse_with_witness(file: String, source: String) -> Result<Workflo
             _ => {}
         }
         if depth > 64 || count > 100_000 {
-            return Err(ParseFailure::StructureLimit.into());
+            return Err(ParseFailure::StructureLimit);
         }
     }
     let mut docs = YamlLoader::load_from_str(&source).map_err(|e| e.to_string())?;
     if docs.len() != 1 {
-        return Err(ParseFailure::Documents.into());
+        return Err(ParseFailure::Documents);
     }
     let yaml = docs.remove(0);
     let events = strings_with_witness(&yaml["on"])?;
@@ -314,10 +314,10 @@ pub(super) fn parse_with_witness(file: String, source: String) -> Result<Workflo
         .map(text)
         .collect::<Vec<_>>();
     if events.is_empty() || jobs.is_empty() {
-        return Err(ParseFailure::NoSelection.into());
+        return Err(ParseFailure::NoSelection);
     }
     if jobs.iter().any(|s| s.starts_with('-') || s.contains("${{")) {
-        return Err(ParseFailure::InvalidJob.into());
+        return Err(ParseFailure::InvalidJob);
     }
     Ok(Workflow {
         file,
@@ -334,13 +334,13 @@ fn strings_with_witness(value: &Yaml) -> Result<Vec<String>, ParseFailure> {
         Yaml::Array(a) => a.iter().map(text).collect(),
         Yaml::Hash(h) => h.keys().map(text).collect(),
         Yaml::Null | Yaml::BadValue => Vec::new(),
-        _ => return Err(ParseFailure::ExpectedNames.into()),
+        _ => return Err(ParseFailure::ExpectedNames),
     };
     if values
         .iter()
         .any(|s| s.is_empty() || s.starts_with('-') || s.contains("${{"))
     {
-        return Err(ParseFailure::DynamicNames.into());
+        return Err(ParseFailure::DynamicNames);
     }
     Ok(values)
 }

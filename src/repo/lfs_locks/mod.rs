@@ -174,7 +174,7 @@ pub(in crate::repo) fn lock_label(lock: &LfsLock, now: i64) -> String {
         Some(at) => crate::i18n::message(
             "repo-workflows-lfs_locks-lock-label-398e9b81",
             &[
-                ("who", (who).clone().into()),
+                ("who", (who).into()),
                 (
                     "git-relative-time-at-now-1",
                     (git::relative_time(at, now)).clone().into(),
@@ -183,7 +183,7 @@ pub(in crate::repo) fn lock_label(lock: &LfsLock, now: i64) -> String {
         ),
         None => crate::i18n::message(
             "repo-workflows-lfs_locks-lock-label-6329feb6",
-            &[("who", (who).clone().into())],
+            &[("who", (who).into())],
         ),
     }
 }
@@ -369,12 +369,13 @@ impl LockState {
 mod fluent_r1_read_tests {
     use super::*;
     #[test]
-    fn fluent_partition_r1_lfs_locks_cached_read_error_preserves_raw_detail_and_generation() {
+    fn fluent_partition_r1_lfs_locks_cached_read_error_preserves_raw_detail_and_generation()
+    -> Result<(), String> {
         let detail = "provider; ;\nHistory worker stopped: {$x} 日本語";
         crate::i18n::set_language("de");
         let mut state = LockState::default();
         state.remember_read_error(detail.into());
-        let raw = state.error.clone().unwrap();
+        let raw = state.error.clone().ok_or("missing test value")?;
         for lang in ["de", "en-US", "de"] {
             crate::i18n::set_language(lang);
             let shown = state.display_read_error(&raw);
@@ -386,5 +387,7 @@ mod fluent_r1_read_tests {
         crate::i18n::set_language("de");
         assert_eq!(state.display_read_error(&raw), raw);
         crate::i18n::set_language("en-US");
+
+        Ok(())
     }
 }

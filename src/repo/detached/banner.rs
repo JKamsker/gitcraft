@@ -77,7 +77,7 @@ impl RepoTab {
                 )
                 .on_hover_text(crate::i18n::message(
                     "repo-workflows-detached-detached-banner-3d7f6bc2",
-                    &[("short-head-1", (short(&head)).clone().into())],
+                    &[("short-head-1", (short(&head)).into())],
                 ));
             });
         });

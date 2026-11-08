@@ -105,7 +105,7 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
                         ("m-anchor-1", (m.anchor).clone().into()),
                         (
                             "crate-repo-short-m-base-2",
-                            (crate::repo::short(&m.base)).clone().into(),
+                            (crate::repo::short(&m.base)).into(),
                         ),
                     ],
                 ));
@@ -167,11 +167,9 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
                                 ("b-name-1", (b.name).clone().into()),
                                 (
                                     "if-b-active-active-else-inactive-2",
-                                    (if b.active { "active" } else { "inactive" })
-                                        .clone()
-                                        .into(),
+                                    (if b.active { "active" } else { "inactive" }).into(),
                                 ),
-                                ("b-owned-len-3", (b.owned.len()).clone().into()),
+                                ("b-owned-len-3", (b.owned.len()).into()),
                             ],
                         ))
                         .id_salt(("virtual-branch", &b.name))
@@ -255,7 +253,7 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
                                     if ui
                                         .button(crate::i18n::message(
                                             "repo-workflows-repository_tools-show-8bbd26a7",
-                                            &[("h-key-8-1", (&h.key[..8]).clone().into())],
+                                            &[("h-key-8-1", (&h.key[..8]).into())],
                                         ))
                                         .clicked()
                                     {
@@ -269,7 +267,7 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
                                         "repo-workflows-repository_tools-show-a253af39",
                                         &[
                                             ("h-path-1", (h.path).clone().into()),
-                                            ("h-key-8-2", (&h.key[..8]).clone().into()),
+                                            ("h-key-8-2", (&h.key[..8]).into()),
                                         ],
                                     ));
                                 }

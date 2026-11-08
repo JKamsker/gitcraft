@@ -82,7 +82,7 @@ fn commits_count(n: usize) -> String {
     } else {
         crate::i18n::message(
             "repo-workflows-dco-commits-count-4eb116dc",
-            &[("n", (n).clone().into())],
+            &[("n", (n).into())],
         )
     }
 }

@@ -125,7 +125,7 @@ fn reviewers_for(
         .ok_or_else(|| {
             crate::i18n::message(
                 "repo-workflows-owners-reviewers-for-d68c1cfb",
-                &[("base", (base).clone().into())],
+                &[("base", (base).into())],
             )
         })?;
     let Some(file) = codeowners::read(repo, &base_ref, forge, None)? else {

@@ -236,7 +236,7 @@ fn pair_row(
     let r = r.on_hover_text(crate::i18n::message(
         "repo-workflows-versions-pair-row-8c3b014d",
         &[
-            ("tip", (tip).clone().into()),
+            ("tip", (tip).into()),
             (
                 "named-pair-old-as-ref-1",
                 (named(pair.old.as_ref())).clone().into(),
@@ -245,7 +245,7 @@ fn pair_row(
                 "named-pair-new-as-ref-2",
                 (named(pair.new.as_ref())).clone().into(),
             ),
-            ("action", (action).clone().into()),
+            ("action", (action).into()),
         ],
     ));
     if r.clicked() {

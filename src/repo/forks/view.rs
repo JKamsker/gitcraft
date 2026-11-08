@@ -147,7 +147,7 @@ impl RepoTab {
                     ("info-branch-2", (info.branch).clone().into()),
                     (
                         "allow-edits-self-forge-3",
-                        (allow_edits(self.forge())).clone().into(),
+                        (allow_edits(self.forge())).into(),
                     ),
                 ],
             );
@@ -231,7 +231,7 @@ impl RepoTab {
                 idle,
                 &crate::i18n::message(
                     "repo-workflows-forks-fork-items-99b20173",
-                    &[("waiting", (waiting).clone().into())],
+                    &[("waiting", (waiting).into())],
                 ),
                 tip,
             ) {

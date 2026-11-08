@@ -101,11 +101,12 @@ mod core_guard_paint_tests {
     use crate::repo::push_preflight::core_guard_paint_tests::{frame, text};
 
     #[test]
-    fn core_guard_paint_cached_hunks_repaint_from_typed_flags_without_rescan() {
+    fn core_guard_paint_cached_hunks_repaint_from_typed_flags_without_rescan() -> Result<(), String>
+    {
         let patch = "diff --git a/tests/a.rs b/tests/a.rs\n--- a/tests/a.rs\n+++ b/tests/a.rs\n@@ -12344,1 +12344,2 @@\n #[test]\n+#[ignore]\n";
         let lines = super::super::parse(patch);
         let summaries = by_hunk_line(patch, &lines);
-        let (&line, summary) = summaries.iter().next().expect("one hunk");
+        let (&line, summary) = summaries.iter().next().ok_or("one hunk")?;
         assert_eq!(lines[line].kind, Kind::Hunk);
         let flags = summary.flags.clone();
         let raw = crate::weakened::summary(flags.iter());
@@ -151,5 +152,7 @@ mod core_guard_paint_tests {
             assert_eq!(summary.as_ref(), raw);
             assert!(summary.starts_with("Skips, disables or focuses tests:"));
         }
+
+        Ok(())
     }
 }

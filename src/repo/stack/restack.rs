@@ -349,10 +349,7 @@ fn preview_row(ui: &mut egui::Ui, t: &Tokens, p: &Preview, parent_moves: bool) {
             &[
                 ("commits-p-commits-1", (commits(p.commits)).clone().into()),
                 ("p-step-parent-2", (p.step.parent).clone().into()),
-                (
-                    "short-p-step-old-base-3",
-                    (short(&p.step.old_base)).clone().into(),
-                ),
+                ("short-p-step-old-base-3", (short(&p.step.old_base)).into()),
             ],
         )
     } else if p.step.old_base == p.new_base {
@@ -366,11 +363,8 @@ fn preview_row(ui: &mut egui::Ui, t: &Tokens, p: &Preview, parent_moves: bool) {
             &[
                 ("commits-p-commits-1", (commits(p.commits)).clone().into()),
                 ("p-step-parent-2", (p.step.parent).clone().into()),
-                (
-                    "short-p-step-old-base-3",
-                    (short(&p.step.old_base)).clone().into(),
-                ),
-                ("short-p-new-base-4", (short(&p.new_base)).clone().into()),
+                ("short-p-step-old-base-3", (short(&p.step.old_base)).into()),
+                ("short-p-new-base-4", (short(&p.new_base)).into()),
             ],
         )
     };

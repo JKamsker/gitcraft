@@ -64,7 +64,7 @@ fn folder_card(ui: &mut Ui, found: &Hooks) {
                     ui,
                     crate::i18n::message(
                         "repo-workflows-doctor-folder-card-05f75db2",
-                        &[("path", (path).clone().into())],
+                        &[("path", (path).into())],
                     ),
                 ),
                 None => dim(
@@ -104,7 +104,7 @@ fn folder_card(ui: &mut Ui, found: &Hooks) {
                     ui,
                     crate::i18n::message(
                         "repo-workflows-doctor-folder-card-605924cc",
-                        &[("n", (n).clone().into())],
+                        &[("n", (n).into())],
                     ),
                 ),
             }
@@ -116,7 +116,7 @@ fn folder_card(ui: &mut Ui, found: &Hooks) {
                         ui,
                         crate::i18n::message(
                             "repo-workflows-doctor-folder-card-5cc7fab9",
-                            &[("m-advice-1", (m.advice()).clone().into())],
+                            &[("m-advice-1", (m.advice()).into())],
                         ),
                     );
                 });
@@ -138,7 +138,7 @@ fn hooks_card(ui: &mut Ui, found: &Hooks, locked: Option<&str>, acts: &mut Vec<A
         1 => crate::i18n::text("repo-workflows-doctor-hooks-card-52f0510d").to_owned(),
         n => crate::i18n::message(
             "repo-workflows-doctor-hooks-card-d028a324",
-            &[("n", (n).clone().into())],
+            &[("n", (n).into())],
         ),
     };
     card(ui, &title, None, |ui| {
@@ -186,7 +186,7 @@ fn hook_row(ui: &mut Ui, hook: &Hook, locked: Option<&str>, acts: &mut Vec<Actio
             ui.label(
                 RichText::new(crate::i18n::message(
                     "repo-workflows-doctor-hook-row-433c4667",
-                    &[("on", (on).clone().into())],
+                    &[("on", (on).into())],
                 ))
                 .color(t.text_dim),
             );
@@ -281,7 +281,7 @@ fn output_card(ui: &mut Ui, runs: &[Run]) {
                                     "repo-workflows-doctor-output-card-109b47bc",
                                     &[(
                                         "lines-len-shown-len-1",
-                                        (lines.len() - shown.len()).clone().into(),
+                                        (lines.len() - shown.len()).into(),
                                     )],
                                 ),
                             );
@@ -300,11 +300,11 @@ fn ago(when: std::time::SystemTime) -> String {
         0..=59 => crate::i18n::text("repo-workflows-doctor-ago-7ddb44d8").to_owned(),
         60..=3599 => crate::i18n::message(
             "repo-workflows-doctor-ago-a0c430f4",
-            &[("secs-60-1", (secs / 60).clone().into())],
+            &[("secs-60-1", (secs / 60).into())],
         ),
         _ => crate::i18n::message(
             "repo-workflows-doctor-ago-4603eba2",
-            &[("secs-3600-1", (secs / 3600).clone().into())],
+            &[("secs-3600-1", (secs / 3600).into())],
         ),
     }
 }

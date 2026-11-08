@@ -312,9 +312,9 @@ fn hover(turn: &Turn) -> String {
     crate::i18n::message(
         "repo-workflows-agents-hover-0b4191eb",
         &[
-            ("turn-number-1", (turn.number).clone().into()),
+            ("turn-number-1", (turn.number).into()),
             ("when", (when).clone().into()),
-            ("prompt", (prompt).clone().into()),
+            ("prompt", (prompt).into()),
         ],
     )
 }
@@ -381,7 +381,8 @@ fn after_turn_diff(turn: &Turn) -> Action {
 mod fluent_r1_caption_tests {
     use super::*;
     #[test]
-    fn fluent_partition_r1_actual_turn_actions_keep_raw_captions_and_source_metadata() {
+    fn fluent_partition_r1_actual_turn_actions_keep_raw_captions_and_source_metadata()
+    -> Result<(), String> {
         let turn = Turn {
             number: 1234,
             parent: "refs/parent-1234".into(),
@@ -405,7 +406,7 @@ mod fluent_r1_caption_tests {
                 since_fork,
             } = action
             else {
-                panic!("actual source must compare")
+                return Err("actual source must compare".into());
             };
             assert_eq!(&base, if after { &turn.commit } else { &turn.parent });
             assert_eq!(
@@ -438,5 +439,7 @@ mod fluent_r1_caption_tests {
             }
         }
         crate::i18n::set_language("en-US");
+
+        Ok(())
     }
 }

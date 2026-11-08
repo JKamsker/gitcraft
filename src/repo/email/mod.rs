@@ -177,10 +177,7 @@ impl RepoTab {
                                 "received-snapshot-head-1",
                                 (received.snapshot.head).clone().into(),
                             ),
-                            (
-                                "received-messages-len-2",
-                                (received.messages.len()).clone().into(),
-                            ),
+                            ("received-messages-len-2", (received.messages.len()).into()),
                         ],
                     ));
                     egui::CollapsingHeader::new(crate::i18n::text(
@@ -462,7 +459,7 @@ fn messages(ui: &mut egui::Ui, messages: &[model::Message], salt: &str) {
         egui::CollapsingHeader::new(crate::i18n::message(
             "repo-workflows-email-messages-8e0d8018",
             &[
-                ("index-1-1", (index + 1).clone().into()),
+                ("index-1-1", (index + 1).into()),
                 (
                     "message-headers-lines-find-l-l-s-2",
                     (message
@@ -470,7 +467,6 @@ fn messages(ui: &mut egui::Ui, messages: &[model::Message], salt: &str) {
                         .lines()
                         .find(|l| l.starts_with("Subject:"))
                         .unwrap_or(crate::i18n::text("repo-workflows-email-messages-07ed6ccf")))
-                    .clone()
                     .into(),
                 ),
             ],

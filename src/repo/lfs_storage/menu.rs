@@ -133,7 +133,7 @@ impl RepoTab {
             } else {
                 crate::i18n::message(
                     "repo-workflows-lfs_storage-storage-menu-items-4f441605",
-                    &[("path", (path).clone().into())],
+                    &[("path", (path).into())],
                 )
             };
             let r = crate::menu_item::MenuItem::new(label)

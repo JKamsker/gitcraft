@@ -32,17 +32,17 @@ pub(super) fn size(kib: u64) -> String {
     match kib {
         0..1024 => crate::i18n::message(
             "repo-workflows-doctor-size-95886483",
-            &[("kib", (kib).clone().into())],
+            &[("kib", (kib).into())],
         ),
         1024..1_048_576 => crate::i18n::message(
             "repo-workflows-doctor-size-8333f24e",
-            &[("kib-as-f64-1024-0-1", (kib as f64 / 1024.0).clone().into())],
+            &[("kib-as-f64-1024-0-1", (kib as f64 / 1024.0).into())],
         ),
         _ => crate::i18n::message(
             "repo-workflows-doctor-size-9d2b746f",
             &[(
                 "kib-as-f64-1-048-576-0-1",
-                (kib as f64 / 1_048_576.0).clone().into(),
+                (kib as f64 / 1_048_576.0).into(),
             )],
         ),
     }
@@ -78,8 +78,8 @@ fn size_card(ui: &mut Ui, h: &Health) {
                         crate::i18n::message(
                             "repo-workflows-doctor-size-card-1f2fe3f1",
                             &[
-                                ("o-packed-1", (o.packed).clone().into()),
-                                ("o-packs-2", (o.packs).clone().into()),
+                                ("o-packed-1", (o.packed).into()),
+                                ("o-packs-2", (o.packs).into()),
                                 ("size-o-pack-kib-3", (size(o.pack_kib)).clone().into()),
                             ],
                         ),
@@ -102,7 +102,7 @@ fn size_card(ui: &mut Ui, h: &Health) {
                     RichText::new(crate::i18n::message(
                         "repo-workflows-doctor-size-card-52c9d559",
                         &[
-                            ("o-garbage-1", (o.garbage).clone().into()),
+                            ("o-garbage-1", (o.garbage).into()),
                             ("size-o-garbage-kib-2", (size(o.garbage_kib)).clone().into()),
                         ],
                     ))
@@ -124,7 +124,7 @@ fn speed_card(ui: &mut Ui, h: &Health, loading: &Loading) {
                     ui,
                     crate::i18n::message(
                         "repo-workflows-doctor-speed-card-0ad7db50",
-                        &[("took-as-millis-1", (took.as_millis()).clone().into())],
+                        &[("took-as-millis-1", (took.as_millis()).into())],
                     ),
                 );
             }
@@ -140,7 +140,7 @@ fn speed_card(ui: &mut Ui, h: &Health, loading: &Loading) {
                     .map(|d| {
                         crate::i18n::message(
                             "repo-workflows-doctor-speed-card-8636e9ce",
-                            &[("d-as-millis-1", (d.as_millis()).clone().into())],
+                            &[("d-as-millis-1", (d.as_millis()).into())],
                         )
                     })
                     .collect();
@@ -492,12 +492,12 @@ mod fluent_r1_maintenance_cache_tests {
     use super::*;
     #[test]
     fn fluent_partition_r1_actual_maintenance_selection_retains_raw_control_and_cached_command_provenance()
-     {
+    -> Result<(), String> {
         let suggestions = health::suggestions(&Health::default());
         let suggestion = suggestions
             .iter()
             .find(|s| s.title == "Scheduled maintenance")
-            .unwrap();
+            .ok_or("missing test value")?;
         let commands: Vec<_> = suggestion
             .ops
             .iter()
@@ -506,7 +506,7 @@ mod fluent_r1_maintenance_cache_tests {
         crate::i18n::set_language("de");
         let Action::Doctor(DoctorAct::Confirm(confirm)) = turn_on_action(suggestion, &commands)
         else {
-            panic!("maintenance must confirm")
+            return Err("maintenance must confirm".into());
         };
         let raw = (
             confirm.title.clone(),
@@ -535,5 +535,7 @@ mod fluent_r1_maintenance_cache_tests {
             );
         }
         crate::i18n::set_language("en-US");
+
+        Ok(())
     }
 }

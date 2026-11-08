@@ -4,7 +4,7 @@ fn label(route: &Route, direction: &str) -> String {
     if route.remote.is_empty() {
         return crate::i18n::message(
             "repo-workflows-repository_tools-label-87dc28eb",
-            &[("direction", (direction).clone().into())],
+            &[("direction", (direction).into())],
         );
     }
     let counts = route.counts.map_or(
@@ -12,14 +12,14 @@ fn label(route: &Route, direction: &str) -> String {
         |(a, b)| {
             crate::i18n::message(
                 "repo-workflows-repository_tools-label-f25a8952",
-                &[("a", (a).clone().into()), ("b", (b).clone().into())],
+                &[("a", (a).into()), ("b", (b).into())],
             )
         },
     );
     crate::i18n::message(
         "repo-workflows-repository_tools-label-137ebba9",
         &[
-            ("direction", (direction).clone().into()),
+            ("direction", (direction).into()),
             ("route-remote-1", (route.remote).clone().into()),
             ("route-branch-2", (route.branch).clone().into()),
             ("counts", (counts).clone().into()),

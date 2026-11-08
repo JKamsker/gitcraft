@@ -55,7 +55,7 @@ impl RepoTab {
                 Mark::Skip,
                 crate::i18n::message(
                     "repo-workflows-bisect-bisect-menu-items-72281c73",
-                    &[("at", (at).clone().into())],
+                    &[("at", (at).into())],
                 ),
             ),
         ] {
@@ -111,7 +111,7 @@ impl RepoTab {
                 item(
                     crate::i18n::message(
                         "repo-workflows-bisect-bisect-palette-items-011b904c",
-                        &[("at", (at).clone().into())],
+                        &[("at", (at).into())],
                     ),
                     mark(Mark::Skip),
                 ),

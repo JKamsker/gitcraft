@@ -92,7 +92,7 @@ pub(crate) fn plan(repo: &Path, entry: &Entry, now: &str) -> Result<Plan, String
                 "repo-workflows-timeline-plan-41296321",
                 &[(
                     "crate-repo-short-commit-1",
-                    (crate::repo::short(commit)).clone().into(),
+                    (crate::repo::short(commit)).into(),
                 )],
             ));
         }
@@ -212,7 +212,7 @@ pub(crate) fn replay(repo: &Path, plan: &Plan, name: &str) -> Result<Outcome, St
     if tip(&format!("refs/heads/{name}")).is_some() {
         return Err(crate::i18n::message(
             "repo-workflows-timeline-replay-5fa33495",
-            &[("name", (name).clone().into())],
+            &[("name", (name).into())],
         ));
     }
     // What was shown is what is played: commits made on the branch since would be left out.
@@ -297,7 +297,7 @@ pub(crate) fn replay(repo: &Path, plan: &Plan, name: &str) -> Result<Outcome, St
         crate::i18n::message(
             "repo-workflows-timeline-replay-e7c57ae8",
             &[
-                ("name", (name).clone().into()),
+                ("name", (name).into()),
                 ("arg", (arg).clone().into()),
                 ("e", (e).clone().into()),
             ],
@@ -333,10 +333,7 @@ pub(crate) fn discard(
     if !picking || branch != stopped_at {
         return Err(crate::i18n::message(
             "repo-workflows-timeline-discard-02af6d89",
-            &[
-                ("folder-arg", (folder_arg).clone().into()),
-                ("name", (name).clone().into()),
-            ],
+            &[("folder-arg", (folder_arg).into()), ("name", (name).into())],
         ));
     }
     git::run(

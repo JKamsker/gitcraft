@@ -235,16 +235,17 @@ impl RepoTab {
 mod fluent_r1_cache_tests {
     use super::*;
     #[test]
-    fn fluent_partition_r1_activity_cached_range_and_cancel_errors_keep_generation_and_query() {
+    fn fluent_partition_r1_activity_cached_range_and_cancel_errors_keep_generation_and_query()
+    -> Result<(), String> {
         crate::i18n::set_language("de");
         let mut state = Activity::new(Page::Calendar);
         state.from = "bad date".into();
-        state.error = Some(state.requested_range().unwrap_err());
+        state.error = Some(state.requested_range().err().ok_or("expected an error")?);
         for cancel in [false, true] {
             if cancel {
                 state.cancel();
             }
-            let raw = state.error.clone().unwrap();
+            let raw = state.error.clone().ok_or("missing test value")?;
             let generation = state.generation.load(Ordering::Relaxed);
             for lang in ["de", "en-US", "de"] {
                 crate::i18n::set_language(lang);
@@ -259,5 +260,7 @@ mod fluent_r1_cache_tests {
             }
         }
         crate::i18n::set_language("en-US");
+
+        Ok(())
     }
 }

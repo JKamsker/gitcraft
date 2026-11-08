@@ -75,7 +75,7 @@ impl RepoTab {
         if let Some((_, commit)) = &run.first_bad {
             let label = crate::i18n::message(
                 "repo-workflows-test_lane-run-status-71902fb1",
-                &[("short-commit-1", (short(commit)).clone().into())],
+                &[("short-commit-1", (short(commit)).into())],
             );
             if ui
                 .link(RichText::new(label).color(t.danger))
@@ -107,38 +107,35 @@ pub(super) fn progress_text(run: &LaneRun) -> String {
             .push(crate::i18n::text("repo-workflows-test_lane-progress-text-3142ee46").to_owned()),
         (true, Some(total)) => parts.push(crate::i18n::message(
             "repo-workflows-test_lane-progress-text-1df05863",
-            &[
-                ("done", (done).clone().into()),
-                ("total", (total).clone().into()),
-            ],
+            &[("done", (done).into()), ("total", (total).into())],
         )),
         (false, _) => parts.push(crate::i18n::message(
             "repo-workflows-test_lane-progress-text-6a3a9451",
-            &[("done", (done).clone().into())],
+            &[("done", (done).into())],
         )),
     }
     if done > 0 {
         parts.push(crate::i18n::message(
             "repo-workflows-test_lane-progress-text-939ee5d9",
-            &[("run-good-1", (run.good).clone().into())],
+            &[("run-good-1", (run.good).into())],
         ));
     }
     if run.bad > 0 {
         parts.push(crate::i18n::message(
             "repo-workflows-test_lane-progress-text-1516ec62",
-            &[("run-bad-1", (run.bad).clone().into())],
+            &[("run-bad-1", (run.bad).into())],
         ));
     }
     if run.failed > 0 {
         parts.push(crate::i18n::message(
             "repo-workflows-test_lane-progress-text-190f5f35",
-            &[("run-failed-1", (run.failed).clone().into())],
+            &[("run-failed-1", (run.failed).into())],
         ));
     }
     if run.going() && !run.running.is_empty() {
         parts.push(crate::i18n::message(
             "repo-workflows-test_lane-progress-text-030be8be",
-            &[("run-running-len-1", (run.running.len()).clone().into())],
+            &[("run-running-len-1", (run.running.len()).into())],
         ));
     }
     let stopped = matches!(&run.ended, Some(Ok(s)) if s.stopped);

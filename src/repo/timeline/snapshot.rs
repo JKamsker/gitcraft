@@ -279,7 +279,7 @@ pub(crate) fn describe(now: &RefState, target: &RefState) -> Vec<String> {
                 "repo-workflows-timeline-describe-ca9be28b",
                 &[(
                     "crate-repo-short-s-head-1",
-                    (crate::repo::short(&s.head)).clone().into(),
+                    (crate::repo::short(&s.head)).into(),
                 )],
             )
         } else {

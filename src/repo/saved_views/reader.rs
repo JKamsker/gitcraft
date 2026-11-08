@@ -184,7 +184,7 @@ fn worker_error(kind: WorkerError) -> &'static str {
 mod fluent_r1_reader_tests {
     use super::*;
     #[test]
-    fn fluent_partition_r1_saved_reader_retains_raw_result_across_de_en_de() {
+    fn fluent_partition_r1_saved_reader_retains_raw_result_across_de_en_de() -> Result<(), String> {
         crate::i18n::set_language("de");
         for kind in [
             WorkerError::Stopped,
@@ -196,13 +196,16 @@ mod fluent_r1_reader_tests {
             state.error = Some(raw.clone());
             for lang in ["de", "en-US", "de"] {
                 crate::i18n::set_language(lang);
-                let shown =
-                    crate::repo::activity::display_workflow_error(state.error.as_ref().unwrap());
+                let shown = crate::repo::activity::display_workflow_error(
+                    state.error.as_ref().ok_or("missing test value")?,
+                );
                 assert_eq!(shown == raw, lang == "en-US");
                 assert_eq!(state.error.as_ref(), Some(&raw));
                 assert!(!state.reader.busy());
             }
         }
         crate::i18n::set_language("en-US");
+
+        Ok(())
     }
 }

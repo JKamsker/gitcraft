@@ -33,9 +33,7 @@ pub(super) fn show(
             &[
                 (
                     "thread-comments-first-map-or-c-c-1",
-                    (thread.comments.first().map_or("", |c| c.author.as_str()))
-                        .clone()
-                        .into(),
+                    (thread.comments.first().map_or("", |c| c.author.as_str())).into(),
                 ),
                 ("coordinate-2", (coordinate).clone().into()),
                 (
@@ -45,7 +43,6 @@ pub(super) fn show(
                     } else {
                         ""
                     })
-                    .clone()
                     .into(),
                 ),
                 (
@@ -55,7 +52,6 @@ pub(super) fn show(
                     } else {
                         ""
                     })
-                    .clone()
                     .into(),
                 ),
             ],

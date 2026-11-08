@@ -599,7 +599,8 @@ mod execution_bridge_tests {
         form
     }
     #[test]
-    fn execution_bridge_bundle_captures_real_aggregates_through_event_form_and_paint() {
+    fn execution_bridge_bundle_captures_real_aggregates_through_event_form_and_paint()
+    -> Result<(), String> {
         let primary =
             "Contained Git failed (1): provider; quarantine cleanup failed: provider detail";
         let cleanup = "cleanup; quarantine cleanup failed: repeated); $HOME {raw}\nunknown";
@@ -612,7 +613,8 @@ mod execution_bridge_tests {
             &mut receipt,
             None,
         )
-        .expect_err("aggregate");
+        .err()
+        .ok_or("aggregate")?;
         cases.push((
             raw,
             receipt.take(),
@@ -621,10 +623,12 @@ mod execution_bridge_tests {
         let keep =
             bundle::keep_retained(primary.into(), "opaque-hash; pack-user.keep", &mut receipt);
         let raw = bundle::completed_with_presentation(Err(keep), Ok(()), true, &mut receipt, None)
-            .expect_err("keep");
+            .err()
+            .ok_or("keep")?;
         cases.push((raw, receipt.take(), "die eigene Schutzmarkierung"));
         let lease = close_finished(Err(primary.into()), Err(cleanup.into()), &mut receipt)
-            .expect_err("lease");
+            .err()
+            .ok_or("lease")?;
         for import in [false, true] {
             let raw = bundle::completed_with_presentation(
                 Ok(()),
@@ -633,7 +637,8 @@ mod execution_bridge_tests {
                 &mut None,
                 receipt.clone(),
             )
-            .expect_err("completion");
+            .err()
+            .ok_or("completion")?;
             let mut output = None;
             let result = bundle::completed_with_presentation(
                 Ok(()),
@@ -654,7 +659,8 @@ mod execution_bridge_tests {
             &mut receipt,
             None,
         )
-        .expect_err("outer");
+        .err()
+        .ok_or("outer")?;
         cases.push((
             raw,
             receipt.take(),
@@ -668,13 +674,13 @@ mod execution_bridge_tests {
                     Err(raw.clone()),
                     receipt.clone(),
                 ))
-                .expect("inert channel");
+                .map_err(|error| format!("{}: {error:?}", "inert channel"))?;
             form.receive();
             assert_eq!(form.error.as_deref(), Some(raw.as_str()));
             let mut paints = Vec::new();
             for locale in ["en-US", "de", "en-US"] {
                 crate::i18n::set_language(locale);
-                let painted = form.painted_error(form.error.as_deref().expect("raw state"));
+                let painted = form.painted_error(form.error.as_deref().ok_or("raw state")?);
                 assert!(painted.contains(primary));
                 if locale == "de" {
                     assert!(painted.contains(german), "{painted}");
@@ -689,12 +695,12 @@ mod execution_bridge_tests {
                     Err("stale unrelated".into()),
                     receipt,
                 ))
-                .expect("channel");
+                .map_err(|error| format!("{}: {error:?}", "channel"))?;
             form.receive();
             assert!(form.error_presentation.is_none());
             form.tx
                 .send(Event::Done(false, Ok(vec![])))
-                .expect("channel");
+                .map_err(|error| format!("{}: {error:?}", "channel"))?;
             form.receive();
             assert!(form.error.is_none() && form.error_presentation.is_none());
         }
@@ -720,15 +726,17 @@ mod execution_bridge_tests {
                     result.map(|()| vec![]),
                     receipt,
                 ))
-                .expect("channel");
+                .map_err(|error| format!("{}: {error:?}", "channel"))?;
             form.receive();
             for locale in ["en-US", "de", "en-US"] {
                 crate::i18n::set_language(locale);
                 assert_eq!(
-                    form.painted_error(form.error.as_deref().expect("raw")),
+                    form.painted_error(form.error.as_deref().ok_or("raw")?),
                     unknown
                 );
             }
         }
+
+        Ok(())
     }
 }

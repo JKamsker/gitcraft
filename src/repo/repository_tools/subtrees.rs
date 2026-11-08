@@ -570,10 +570,7 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
             }
             ui.label(crate::i18n::message(
                 "repo-workflows-repository_tools-show-83e94e8a",
-                &[(
-                    "p-plan-commits-len-1",
-                    (p.plan.commits.len()).clone().into(),
-                )],
+                &[("p-plan-commits-len-1", (p.plan.commits.len()).into())],
             ));
             for f in &p.plan.findings {
                 ui.label(format!(

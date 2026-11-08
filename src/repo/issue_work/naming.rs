@@ -160,7 +160,7 @@ pub(crate) fn name_problem(name: &str) -> Option<String> {
     } else if name == "HEAD" || name == "@" {
         crate::i18n::message(
             "repo-workflows-issue_work-name-problem-7b27dd13",
-            &[("name", (name).clone().into())],
+            &[("name", (name).into())],
         )
     } else if let Some(c) = bad {
         if c.is_control() {
@@ -174,7 +174,7 @@ pub(crate) fn name_problem(name: &str) -> Option<String> {
     } else if let Some(two) = ["..", "@{"].into_iter().find(|s| name.contains(s)) {
         crate::i18n::message(
             "repo-workflows-issue_work-name-problem-72447597",
-            &[("two", (two).clone().into())],
+            &[("two", (two).into())],
         )
     } else if parts().any(str::is_empty) {
         crate::i18n::text("repo-workflows-issue_work-name-problem-e2570ee3").to_owned()

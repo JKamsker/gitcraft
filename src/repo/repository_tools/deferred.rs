@@ -400,16 +400,15 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
                             ),
                         );
                     }
-                    if let Some(new) = &s.result {
-                        if ui
+                    if let Some(new) = &s.result
+                        && ui
                             .button(crate::i18n::message(
                                 "repo-workflows-repository_tools-show-19af9596",
                                 &[("s-branch-1", (s.branch).clone().into())],
                             ))
                             .clicked()
-                        {
-                            acts.push(candidate_comparison(&s.old, new, &s.branch));
-                        }
+                    {
+                        acts.push(candidate_comparison(&s.old, new, &s.branch));
                     }
                 }
                 ui.horizontal_wrapped(|ui| {
@@ -603,7 +602,8 @@ fn candidate_comparison(original: &str, candidate: &str, branch: &str) -> Action
 mod fluent_r1_caption_tests {
     use super::*;
     #[test]
-    fn fluent_partition_r1_actual_deferred_action_retains_branch_and_opaque_raw_payload() {
+    fn fluent_partition_r1_actual_deferred_action_retains_branch_and_opaque_raw_payload()
+    -> Result<(), String> {
         let branch = "candidate raw/1234;\n{$x}";
         crate::i18n::set_language("de");
         let Action::Compare {
@@ -615,7 +615,7 @@ mod fluent_r1_caption_tests {
             since_fork,
         } = candidate_comparison("raw-original", "raw-candidate", branch)
         else {
-            panic!("actual source must compare")
+            return Err("actual source must compare".into());
         };
         assert_eq!(base, "raw-original");
         assert_eq!(target.as_deref(), Some("raw-candidate"));
@@ -645,5 +645,7 @@ mod fluent_r1_caption_tests {
             assert_eq!(comparison.request, 29);
         }
         crate::i18n::set_language("en-US");
+
+        Ok(())
     }
 }

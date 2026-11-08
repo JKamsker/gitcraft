@@ -162,7 +162,7 @@ impl RepoTab {
                         "repo-workflows-surgery-rewrite-with-c60e3a40",
                         &[(
                             "tab-busy-op-as-deref-unwrap-or-d-1",
-                            (tab.busy_op.as_deref().unwrap_or_default()).clone().into(),
+                            (tab.busy_op.as_deref().unwrap_or_default()).into(),
                         )],
                     );
                     let _ = started(tab, Err(why));

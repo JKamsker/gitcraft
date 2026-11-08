@@ -183,20 +183,6 @@ pub fn is_ancestor(repo: &Path, ancestor: &str, descendant: &str) -> bool {
         .is_ok()
 }
 
-#[cfg(test)]
-mod tests {
-    use super::literal_pattern;
-
-    #[test]
-    fn a_branch_name_excludes_only_itself() {
-        assert_eq!(literal_pattern("refs/heads/feat"), "refs/heads/feat");
-        assert_eq!(
-            literal_pattern("refs/heads/a*[b]?"),
-            "refs/heads/a\\*\\[b]\\?"
-        );
-    }
-}
-
 /// Compatibility String interface; cached previews retain the typed witness instead.
 pub fn merge(repo: &Path, ours: &str, theirs: &str, version: GitVersion) -> Result<Merge, String> {
     merge_with_witness(repo, ours, theirs, version).map_err(|failure| failure.display())
@@ -222,4 +208,18 @@ pub(crate) fn unreachable_bounded(
 }
 pub fn leaving(repo: &Path, old: &str, new: &str, limit: usize) -> Result<Vec<String>, String> {
     leaving_with_witness(repo, old, new, limit).map_err(|failure| failure.display())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::literal_pattern;
+
+    #[test]
+    fn a_branch_name_excludes_only_itself() {
+        assert_eq!(literal_pattern("refs/heads/feat"), "refs/heads/feat");
+        assert_eq!(
+            literal_pattern("refs/heads/a*[b]?"),
+            "refs/heads/a\\*\\[b]\\?"
+        );
+    }
 }

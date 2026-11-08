@@ -193,7 +193,7 @@ fn pending_list(ui: &mut Ui, extras: &PrExtras, posting: bool, acts: &mut Vec<Ac
                     &[
                         ("thread-path-1", (thread.path).clone().into()),
                         ("line", (line).clone().into()),
-                        ("what", (what).clone().into()),
+                        ("what", (what).into()),
                     ],
                 )
             });

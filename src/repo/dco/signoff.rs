@@ -4,7 +4,9 @@
 use std::path::Path;
 
 use crate::git;
-use crate::repo::operations::{expect_ref, expect_ref_at, expect_symref};
+#[cfg(test)]
+use crate::repo::operations::expect_ref;
+use crate::repo::operations::{expect_ref_at, expect_symref};
 
 /// The files that say a repository asks for a DCO sign-off: the certificate itself, or the
 /// settings of the DCO app (probot/dco), whose check refuses commits without one.
@@ -224,11 +226,11 @@ pub(crate) fn plan(repo: &Path, base: &str, expected: Option<&str>) -> Result<Pl
                 ("branch", (branch).clone().into()),
                 (
                     "crate-repo-short-head-1",
-                    (crate::repo::short(&head)).clone().into(),
+                    (crate::repo::short(&head)).into(),
                 ),
                 (
                     "crate-repo-short-expected-2",
-                    (crate::repo::short(expected)).clone().into(),
+                    (crate::repo::short(expected)).into(),
                 ),
             ],
         ));
@@ -260,7 +262,7 @@ pub(crate) fn plan(repo: &Path, base: &str, expected: Option<&str>) -> Result<Pl
                 ("branch", (branch).clone().into()),
                 (
                     "crate-repo-short-merge-base-1",
-                    (crate::repo::short(&merge_base)).clone().into(),
+                    (crate::repo::short(&merge_base)).into(),
                 ),
             ],
         ));

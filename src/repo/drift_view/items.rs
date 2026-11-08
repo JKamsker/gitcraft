@@ -20,7 +20,7 @@ pub(super) fn report(ui: &mut Ui, view: &DriftView, report: &Report, acts: &mut 
             "repo-workflows-drift_view-report-3ecc0ca7",
             &[(
                 "task-lines-next-unwrap-or-defaul-1",
-                (task.lines().next().unwrap_or_default()).clone().into(),
+                (task.lines().next().unwrap_or_default()).into(),
             )],
         )
     };
@@ -41,7 +41,7 @@ fn sections(ui: &mut Ui, view: &DriftView, report: &Report, acts: &mut Vec<Actio
             "unrelated",
             &crate::i18n::message(
                 "repo-workflows-drift_view-sections-1bb434ba",
-                &[("unrelated-len-1", (unrelated.len()).clone().into())],
+                &[("unrelated-len-1", (unrelated.len()).into())],
             ),
             |ui| {
                 for folder in unrelated.iter().take(LISTED) {
@@ -69,7 +69,7 @@ fn sections(ui: &mut Ui, view: &DriftView, report: &Report, acts: &mut Vec<Actio
             "repo-workflows-drift_view-sections-14063185",
             &[(
                 "report-dependencies-len-1",
-                (report.dependencies.len()).clone().into(),
+                (report.dependencies.len()).into(),
             )],
         ),
         |ui| {
@@ -97,10 +97,7 @@ fn sections(ui: &mut Ui, view: &DriftView, report: &Report, acts: &mut Vec<Actio
         "signatures",
         &crate::i18n::message(
             "repo-workflows-drift_view-sections-a8299dbd",
-            &[(
-                "report-signatures-len-1",
-                (report.signatures.len()).clone().into(),
-            )],
+            &[("report-signatures-len-1", (report.signatures.len()).into())],
         ),
         |ui| {
             for sig in report.signatures.iter().take(LISTED) {
@@ -134,7 +131,7 @@ fn sections(ui: &mut Ui, view: &DriftView, report: &Report, acts: &mut Vec<Actio
         "files",
         &crate::i18n::message(
             "repo-workflows-drift_view-sections-619bb740",
-            &[("report-files-len-1", (report.files.len()).clone().into())],
+            &[("report-files-len-1", (report.files.len()).into())],
         ),
         |ui| {
             for file in report.files.iter().take(LISTED * 5) {

@@ -443,7 +443,7 @@ impl Finish {
                     &[
                         ("into", (into).clone().into()),
                         ("files-join-1", (files.join(", ")).clone().into()),
-                        ("or", (or).clone().into()),
+                        ("or", (or).into()),
                     ],
                 )
             })
@@ -597,7 +597,7 @@ impl Finish {
                     ("h-name-1", (h.name).clone().into()),
                     (
                         "crate-repo-short-h-head-2",
-                        (crate::repo::short(&h.head)).clone().into(),
+                        (crate::repo::short(&h.head)).into(),
                     ),
                     ("t-name-3", (t.name).clone().into()),
                 ],
@@ -608,9 +608,9 @@ impl Finish {
             &[
                 (
                     "if-c-sign-signed-else-annotated-1",
-                    (if c.sign { "signed" } else { "annotated" }).clone().into(),
+                    (if c.sign { "signed" } else { "annotated" }).into(),
                 ),
-                ("c-tag-trim-2", (c.tag.trim()).clone().into()),
+                ("c-tag-trim-2", (c.tag.trim()).into()),
                 ("self-main-name-3", (self.main.name).clone().into()),
             ],
         ));
@@ -640,7 +640,7 @@ impl Finish {
                             .clone()
                             .into(),
                     ),
-                    ("remote", (remote).clone().into()),
+                    ("remote", (remote).into()),
                 ],
             ));
         }

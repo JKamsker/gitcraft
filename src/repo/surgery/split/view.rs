@@ -250,7 +250,7 @@ fn note(t: &Tokens, editor: &SplitEditor, problem: Option<(String, bool)>) -> (S
                 "repo-workflows-surgery-note-a3a06218",
                 &[(
                     "c-trees-len-saturating-sub-1-1",
-                    (c.trees.len().saturating_sub(1)).clone().into(),
+                    (c.trees.len().saturating_sub(1)).into(),
                 )],
             ),
             t.text_dim,
@@ -299,7 +299,7 @@ fn groups(ui: &mut Ui, t: &Tokens, editor: &mut SplitEditor) {
                 )
                 .on_disabled_hover_text(crate::i18n::message(
                     "repo-workflows-surgery-groups-536f4c75",
-                    &[("MAX-GROUPS", (MAX_GROUPS).clone().into())],
+                    &[("MAX-GROUPS", (MAX_GROUPS).into())],
                 ))
                 .clicked()
             {
@@ -357,7 +357,7 @@ fn group_card(
                 } else {
                     crate::i18n::message(
                         "repo-workflows-surgery-group-card-45e7c009",
-                        &[("heir-1-1", (heir + 1).clone().into())],
+                        &[("heir-1-1", (heir + 1).into())],
                     )
                 };
                 if n > 2 && icons::small_button(ui, "x", &tip).clicked() {
@@ -441,7 +441,7 @@ fn destinations(ui: &mut Ui, t: &Tokens, editor: &mut SplitEditor) {
                     ui.label(
                         RichText::new(crate::i18n::message(
                             "repo-workflows-surgery-destinations-9e3eee5d",
-                            &[("short-editor-hash-1", (short(&editor.hash)).clone().into())],
+                            &[("short-editor-hash-1", (short(&editor.hash)).into())],
                         ))
                         .color(t.text_faint)
                         .italics(),
@@ -623,7 +623,7 @@ fn draw_row(ui: &mut Ui, t: &Tokens, editor: &SplitEditor, row: Row) -> Option<C
                 ui.label(
                     RichText::new(crate::i18n::message(
                         "repo-workflows-surgery-draw-row-f1e7c811",
-                        &[("why", (why).clone().into())],
+                        &[("why", (why).into())],
                     ))
                     .color(t.text_faint)
                     .small(),
@@ -649,7 +649,7 @@ fn draw_row(ui: &mut Ui, t: &Tokens, editor: &SplitEditor, row: Row) -> Option<C
                     "repo-workflows-surgery-draw-row-5d5aa815",
                     &[
                         ("file-path-1", (file.path).clone().into()),
-                        ("i-1-2", (i + 1).clone().into()),
+                        ("i-1-2", (i + 1).into()),
                         ("line-text-3", (line.text).clone().into()),
                     ],
                 )
@@ -741,8 +741,8 @@ fn tip(editor: &SplitEditor, f: usize, units: &[usize], name: &str) -> String {
         return crate::i18n::message(
             "repo-workflows-surgery-tip-9e1cf75b",
             &[
-                ("name", (name).clone().into()),
-                ("editor-active-1-1", (editor.active + 1).clone().into()),
+                ("name", (name).into()),
+                ("editor-active-1-1", (editor.active + 1).into()),
             ],
         );
     };
@@ -750,8 +750,8 @@ fn tip(editor: &SplitEditor, f: usize, units: &[usize], name: &str) -> String {
         return crate::i18n::message(
             "repo-workflows-surgery-tip-182c90c3",
             &[
-                ("name", (name).clone().into()),
-                ("short-editor-hash-1", (short(&editor.hash)).clone().into()),
+                ("name", (name).into()),
+                ("short-editor-hash-1", (short(&editor.hash)).into()),
             ],
         );
     }
@@ -759,17 +759,17 @@ fn tip(editor: &SplitEditor, f: usize, units: &[usize], name: &str) -> String {
         (_, Some(t)) => crate::i18n::message(
             "repo-workflows-surgery-tip-abb8d5a0",
             &[
-                ("name", (name).clone().into()),
-                ("short-t-hash-1", (short(&t.hash)).clone().into()),
+                ("name", (name).into()),
+                ("short-t-hash-1", (short(&t.hash)).into()),
             ],
         ),
         (Some(Dest::Work), None) => crate::i18n::message(
             "repo-workflows-surgery-tip-9b5f8a9f",
-            &[("name", (name).clone().into())],
+            &[("name", (name).into())],
         ),
         _ => crate::i18n::message(
             "repo-workflows-surgery-tip-4e078e93",
-            &[("name", (name).clone().into())],
+            &[("name", (name).into())],
         ),
     }
 }
@@ -814,7 +814,7 @@ fn preview_line(ui: &mut Ui, t: &Tokens, editor: &SplitEditor, look: Look, text:
             if files == 0 {
                 RichText::new(crate::i18n::message(
                     "repo-workflows-surgery-preview-line-4a4c8a43",
-                    &[("short-editor-hash-1", (short(&editor.hash)).clone().into())],
+                    &[("short-editor-hash-1", (short(&editor.hash)).into())],
                 ))
                 .color(t.text_dim)
             } else {

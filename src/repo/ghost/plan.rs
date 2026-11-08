@@ -985,30 +985,28 @@ pub(super) fn display_preview_text(raw: &str) -> String {
             &[("up-remote-1", value0.into())],
         );
     }
-    if let Some(rest) = raw.strip_prefix("").and_then(|s| s.strip_suffix(": Delete refuses unless Force (-D) is ticked, which leaves its own commits on no branch.")) {
-        if let Some((value0, value1)) = rest.split_once(" isn't merged into ") {
+    if let Some(rest) = raw.strip_prefix("").and_then(|s| s.strip_suffix(": Delete refuses unless Force (-D) is ticked, which leaves its own commits on no branch."))
+        && let Some((value0, value1)) = rest.split_once(" isn't merged into ") {
             let value1 = match value1 { "its upstream" => crate::i18n::text("repo-workflows-ghost-delete-branch-dde58e5a"), "the checked-out branch" => crate::i18n::text("repo-workflows-ghost-delete-branch-fadd1b38"), _ => return raw.to_owned() };
             return crate::i18n::message("repo-workflows-ghost-delete-branch-26d05fbc", &[("name", value0.into()), ("what", value1.into())]);
         }
-    }
-    if let Some(rest) = raw.strip_prefix("").and_then(|s| s.strip_suffix(")")) {
-        if let Some((value0, value1)) =
+    if let Some(rest) = raw.strip_prefix("").and_then(|s| s.strip_suffix(")"))
+        && let Some((value0, value1)) =
             rest.split_once(" commits to replay, too many to preview (at most ")
-        {
-            let Ok(value0) = value0.parse::<u64>() else {
-                return raw.to_owned();
-            };
-            let Ok(value1) = value1.parse::<u64>() else {
-                return raw.to_owned();
-            };
-            return crate::i18n::message(
-                "repo-workflows-ghost-rewrite-c84070ef",
-                &[
-                    ("w-picks-len-1", value0.into()),
-                    ("PICKS-LIMIT", value1.into()),
-                ],
-            );
-        }
+    {
+        let Ok(value0) = value0.parse::<u64>() else {
+            return raw.to_owned();
+        };
+        let Ok(value1) = value1.parse::<u64>() else {
+            return raw.to_owned();
+        };
+        return crate::i18n::message(
+            "repo-workflows-ghost-rewrite-c84070ef",
+            &[
+                ("w-picks-len-1", value0.into()),
+                ("PICKS-LIMIT", value1.into()),
+            ],
+        );
     }
     if let Some(rest) = raw
         .strip_prefix("Meanwhile HEAD is detached at ")
@@ -1030,33 +1028,28 @@ pub(super) fn display_preview_text(raw: &str) -> String {
             &[("self-version-1", value0.into())],
         );
     }
-    if let Some((count, rest)) = raw.split_once(' ') {
-        if let Ok(count) = count.parse::<usize>() {
-            if (count == 1 && rest == "commit is dropped: its change is already there.")
-                || (count != 1 && rest == "commits are dropped: their changes are already there.")
-            {
-                return dropped_note(count);
-            }
-        }
+    if let Some((count, rest)) = raw.split_once(' ')
+        && let Ok(count) = count.parse::<usize>()
+        && ((count == 1 && rest == "commit is dropped: its change is already there.")
+            || (count != 1 && rest == "commits are dropped: their changes are already there."))
+    {
+        return dropped_note(count);
     }
-    if let Some((branch, tail)) = raw.split_once(" and ") {
-        if !branch.chars().any(char::is_whitespace) {
-            if let Some(tracking) =
-                tail.strip_suffix(" have diverged, so a fast-forward-only pull refuses")
-            {
-                if !tracking.chars().any(char::is_whitespace) {
-                    return diverged_pull(branch, tracking, false);
-                }
-            }
-            if let Some((tracking, fetched)) =
-                tail.split_once(" have diverged, so a fast-forward-only pull refuses (only ")
-            {
-                if !tracking.chars().any(char::is_whitespace)
-                    && fetched == format!("{tracking} moves, with what it fetches)")
-                {
-                    return diverged_pull(branch, tracking, true);
-                }
-            }
+    if let Some((branch, tail)) = raw.split_once(" and ")
+        && !branch.chars().any(char::is_whitespace)
+    {
+        if let Some(tracking) =
+            tail.strip_suffix(" have diverged, so a fast-forward-only pull refuses")
+            && !tracking.chars().any(char::is_whitespace)
+        {
+            return diverged_pull(branch, tracking, false);
+        }
+        if let Some((tracking, fetched)) =
+            tail.split_once(" have diverged, so a fast-forward-only pull refuses (only ")
+            && !tracking.chars().any(char::is_whitespace)
+            && fetched == format!("{tracking} moves, with what it fetches)")
+        {
+            return diverged_pull(branch, tracking, true);
         }
     }
     if raw == "HEAD is detached: check out a branch first" {

@@ -15,13 +15,13 @@ fn dynamic(raw: &str) -> Option<String> {
         .strip_prefix("Could not read the changes to look for weakened checks: ")
         .and_then(|s| s.strip_suffix(""))
     {
-        let rendered = (|| {
+        let rendered = {
             let detail = text;
             Some(message(
                 "interaction-guards-weakened-read-error",
                 &[("detail", detail.into())],
             ))
-        })();
+        };
         if rendered.is_some() {
             return rendered;
         }
@@ -30,13 +30,13 @@ fn dynamic(raw: &str) -> Option<String> {
         .strip_prefix("Could not list the untracked files to look for weakened checks: ")
         .and_then(|s| s.strip_suffix(""))
     {
-        let rendered = (|| {
+        let rendered = {
             let detail = text;
             Some(message(
                 "interaction-guards-weakened-list-error",
                 &[("detail", detail.into())],
             ))
-        })();
+        };
         if rendered.is_some() {
             return rendered;
         }

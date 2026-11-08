@@ -76,7 +76,7 @@ impl RepoTab {
                     "repo-workflows-parallel_bisect-parallel-mark-f2395948",
                     &[
                         ("capital-verdict-word-1", display_verdict(*verdict).into()),
-                        ("how", (how).clone().into()),
+                        ("how", (how).into()),
                     ],
                 );
                 if let Some(output) = result.map(|r| last_lines(&r.output, OUTPUT_LINES))

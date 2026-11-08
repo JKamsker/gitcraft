@@ -296,7 +296,8 @@ impl RepoTab {
 mod fluent_r1_cache_tests {
     use super::*;
     #[test]
-    fn fluent_partition_r1_dossier_cached_error_summary_and_evidence_keep_raw_source() {
+    fn fluent_partition_r1_dossier_cached_error_summary_and_evidence_keep_raw_source()
+    -> Result<(), String> {
         let mut state = State::default();
         state.open = true;
         state.path = "raw: {$x}/日本語".into();
@@ -307,9 +308,21 @@ mod fluent_r1_cache_tests {
         for lang in ["de", "en-US", "de"] {
             crate::i18n::set_language(lang);
             for raw in [
-                state.error.as_ref().unwrap(),
-                state.summary.as_ref().unwrap().as_ref().unwrap_err(),
-                state.evidence.as_ref().unwrap().as_ref().unwrap_err(),
+                state.error.as_ref().ok_or("missing test value")?,
+                state
+                    .summary
+                    .as_ref()
+                    .ok_or("missing test value")?
+                    .as_ref()
+                    .err()
+                    .ok_or("expected an error")?,
+                state
+                    .evidence
+                    .as_ref()
+                    .ok_or("missing test value")?
+                    .as_ref()
+                    .err()
+                    .ok_or("expected an error")?,
             ] {
                 assert_eq!(
                     crate::repo::activity::display_workflow_error(raw) == *raw,
@@ -322,5 +335,7 @@ mod fluent_r1_cache_tests {
             assert!(!state.reader.busy());
         }
         crate::i18n::set_language("en-US");
+
+        Ok(())
     }
 }

@@ -491,7 +491,7 @@ impl State {
                 ui.label(crate::i18n::message(
                     "repo-workflows-ssh_setup-fields-0aaeaa7d",
                     &[
-                        ("account-owner-1", (account.owner()).clone().into()),
+                        ("account-owner-1", (account.owner()).into()),
                         ("self-host-2", (self.host).clone().into()),
                     ],
                 ));

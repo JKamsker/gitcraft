@@ -47,7 +47,7 @@ fn manual_card(
         1 => crate::i18n::text("repo-workflows-doctor-manual-card-f01d6b0e").to_owned(),
         n => crate::i18n::message(
             "repo-workflows-doctor-manual-card-70727cd6",
-            &[("n", (n).clone().into())],
+            &[("n", (n).into())],
         ),
     };
     card(ui, &title, None, |ui| {
@@ -63,7 +63,7 @@ fn manual_card(
             let text = if some {
                 crate::i18n::message(
                     "repo-workflows-doctor-manual-card-14faa67e",
-                    &[("ticked-len-1", (ticked.len()).clone().into())],
+                    &[("ticked-len-1", (ticked.len()).into())],
                 )
             } else {
                 crate::i18n::text("repo-workflows-doctor-manual-card-6c8cdf68").to_owned()
@@ -175,7 +175,7 @@ fn sparse_card(ui: &mut Ui, sparse: &Sparse, left_out: &[Flagged]) {
     };
     let title = crate::i18n::message(
         "repo-workflows-doctor-sparse-card-04bc71e9",
-        &[("left-out-len-1", (left_out.len()).clone().into())],
+        &[("left-out-len-1", (left_out.len()).into())],
     );
     card(ui, &title, Some(&note), |ui| {
         faint(
@@ -197,7 +197,7 @@ fn more(ui: &mut Ui, total: usize) {
         ui.label(
             RichText::new(crate::i18n::message(
                 "repo-workflows-doctor-more-683768ab",
-                &[("total-shown-1", (total - SHOWN).clone().into())],
+                &[("total-shown-1", (total - SHOWN).into())],
             ))
             .italics()
             .color(Tokens::get(ui.ctx()).text_faint),
@@ -210,7 +210,8 @@ mod fluent_r1_confirmation_tests {
     use super::*;
     use egui_kittest::{Harness, kittest::Queryable};
     #[test]
-    fn fluent_partition_r1_cached_doctor_confirmation_repaints_without_changing_label_or_argv() {
+    fn fluent_partition_r1_cached_doctor_confirmation_repaints_without_changing_label_or_argv()
+    -> Result<(), String> {
         let files: Vec<_> = (0..1234)
             .map(|i| Flagged {
                 path: format!("raw/{i}.txt"),
@@ -219,7 +220,7 @@ mod fluent_r1_confirmation_tests {
             .collect();
         crate::i18n::set_language("de");
         let Action::Doctor(DoctorAct::Confirm(confirm)) = clear(&files) else {
-            panic!("actual clear must confirm")
+            return Err("actual clear must confirm".into());
         };
         assert_eq!(confirm.label, "Clear the flags of 1234 files");
         let ops = confirm.ops.clone();
@@ -276,5 +277,7 @@ mod fluent_r1_confirmation_tests {
             [Action::Doctor(DoctorAct::Answer(true))]
         ));
         crate::i18n::set_language("en-US");
+
+        Ok(())
     }
 }

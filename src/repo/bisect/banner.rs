@@ -79,7 +79,7 @@ impl RepoTab {
                 ui.label(
                     RichText::new(crate::i18n::message(
                         "repo-workflows-bisect-where-it-is-25230d8d",
-                        &[("possible-len-1", (possible.len()).clone().into())],
+                        &[("possible-len-1", (possible.len()).into())],
                     ))
                     .color(t.text),
                 );
@@ -93,7 +93,7 @@ impl RepoTab {
                             "repo-workflows-bisect-where-it-is-683768ab",
                             &[(
                                 "possible-len-max-named-1",
-                                (possible.len() - MAX_NAMED).clone().into(),
+                                (possible.len() - MAX_NAMED).into(),
                             )],
                         ))
                         .color(t.text_dim),
@@ -170,7 +170,7 @@ impl RepoTab {
         let back = match bisect.start_branch() {
             Some(branch) => crate::i18n::message(
                 "repo-workflows-bisect-bisect-buttons-0599842f",
-                &[("branch", (branch).clone().into())],
+                &[("branch", (branch).into())],
             ),
             None => crate::i18n::text("repo-workflows-bisect-bisect-buttons-a28c79f7").to_owned(),
         };
@@ -292,8 +292,8 @@ fn waiting(ui: &mut Ui, t: &Tokens, word: &str, meaning: &str) {
     let text = crate::i18n::message(
         "repo-workflows-bisect-waiting-2d4ce59a",
         &[
-            ("word", (word).clone().into()),
-            ("meaning", (meaning).clone().into()),
+            ("word", (word).into()),
+            ("meaning", (meaning).into()),
             ("capitalised-word-1", (capitalised(word)).clone().into()),
         ],
     );
@@ -308,7 +308,7 @@ fn steps_text(steps: u32, left: usize) -> String {
         1 => crate::i18n::text("repo-workflows-bisect-steps-text-263b5d8b").to_owned(),
         n => crate::i18n::message(
             "repo-workflows-bisect-steps-text-14999716",
-            &[("n", (n).clone().into())],
+            &[("n", (n).into())],
         ),
     };
     let left = match left {
@@ -316,7 +316,7 @@ fn steps_text(steps: u32, left: usize) -> String {
         1 => crate::i18n::text("repo-workflows-bisect-steps-text-9bbc8458").to_owned(),
         n => crate::i18n::message(
             "repo-workflows-bisect-steps-text-5ccbfd65",
-            &[("n", (n).clone().into())],
+            &[("n", (n).into())],
         ),
     };
     format!("{steps} ({left})")
@@ -363,7 +363,7 @@ fn run_log(ui: &mut Ui, run: &RunLog, acts: &mut Vec<Action>) {
                     Some(c) => (
                         crate::i18n::message(
                             "repo-workflows-bisect-run-log-534a3a34",
-                            &[("c", (c).clone().into())],
+                            &[("c", (c).into())],
                         ),
                         t.warning,
                     ),

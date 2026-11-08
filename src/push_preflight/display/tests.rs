@@ -4,11 +4,17 @@ use crate::i18n::set_language;
 use std::path::Path;
 
 #[test]
-fn guard_display_push_keeps_raw_guard_and_auth_receipt_classification() {
+fn guard_display_push_keeps_raw_guard_and_auth_receipt_classification() -> Result<(), String> {
+    let reached = std::cell::Cell::new(false);
     let raw = crate::push_preflight::valid_ref(Path::new("inert"), "incomplete", &|| {
-        panic!("the incomplete-ref guard must not reach Git")
+        reached.set(true);
+        false
     })
-    .unwrap_err();
+    .err()
+    .ok_or("expected an error")?;
+    if reached.get() {
+        return Err("the incomplete-ref guard must not reach Git".into());
+    }
     let receipt =
         crate::push_preflight::remember_auth_endpoint("https://example.invalid/team/repo");
     let raw_receipt = receipt.clone();
@@ -43,6 +49,8 @@ fn guard_display_push_keeps_raw_guard_and_auth_receipt_classification() {
     );
     assert_eq!(receipt, raw_receipt);
     set_language("en-US");
+
+    Ok(())
 }
 
 #[test]
@@ -97,7 +105,7 @@ fn guard_display_push_supplied_findings_and_uncertain_recovery_keep_opaque_field
 }
 
 #[test]
-fn guard_display_authorship_preserves_source_algorithm_and_branch_counts() {
+fn guard_display_authorship_preserves_source_algorithm_and_branch_counts() -> Result<(), String> {
     use crate::authorship::{self, Source, Who, branch::Figures};
     // Actual precedence: the agent's author account takes precedence over a co-author trailer.
     let attribution = authorship::attribute(
@@ -107,7 +115,7 @@ fn guard_display_authorship_preserves_source_algorithm_and_branch_counts() {
         None,
         None,
     )
-    .unwrap();
+    .ok_or("missing test value")?;
     assert_eq!(attribution.who, Who::Agent);
     assert_eq!(attribution.source, Source::Author);
     let raw = attribution.describe();
@@ -140,7 +148,9 @@ fn guard_display_authorship_preserves_source_algorithm_and_branch_counts() {
             attribution.source.label(),
             "an agent's account as the author"
         );
-        let error = authorship::load::one(Path::new("inert"), "-12345").unwrap_err();
+        let error = authorship::load::one(Path::new("inert"), "-12345")
+            .err()
+            .ok_or("expected an error")?;
         assert_eq!(error, "-12345 is not a commit");
         assert!(authorship::display::diagnostic(&error).contains("-12345"));
     }
@@ -177,10 +187,13 @@ fn guard_display_authorship_preserves_source_algorithm_and_branch_counts() {
         }
     }
     set_language("en-US");
+
+    Ok(())
 }
 
 #[test]
-fn guard_display_drift_uses_supplied_report_without_changing_task_or_prompt() {
+fn guard_display_drift_uses_supplied_report_without_changing_task_or_prompt() -> Result<(), String>
+{
     use crate::drift::{self, Dependency, Folder, Report};
     let mut report = Report {
         files: vec!["src/12345.rs".into()],
@@ -200,7 +213,9 @@ fn guard_display_drift_uses_supplied_report_without_changing_task_or_prompt() {
     };
     let original = report.clone();
     let prompt = drift::llm::prompt("Task { $source } 12345", &report);
-    let raw = drift::measure(Path::new("inert"), "-12345", "task").unwrap_err();
+    let raw = drift::measure(Path::new("inert"), "-12345", "task")
+        .err()
+        .ok_or("expected an error")?;
     assert_eq!(raw, "-12345 is not a revision");
     for (locale, phrase, single) in [
         ("en-US", "20% formatting only", "one folder"),
@@ -234,12 +249,14 @@ fn guard_display_drift_uses_supplied_report_without_changing_task_or_prompt() {
     set_language("de");
     assert!(!report.display_headline().contains("Ordner"));
     set_language("en-US");
+
+    Ok(())
 }
 
 #[test]
-fn guard_display_fence_uses_actual_pure_validation_and_preserves_pathspecs() {
+fn guard_display_fence_uses_actual_pure_validation_and_preserves_pathspecs() -> Result<(), String> {
     use crate::fence::{self, Pattern};
-    let validation = Pattern::check("!src/12345").unwrap();
+    let validation = Pattern::check("!src/12345").ok_or("missing test value")?;
     for locale in ["en-US", "de"] {
         set_language(locale);
         let shown = fence::display::diagnostic(&validation);
@@ -258,17 +275,23 @@ fn guard_display_fence_uses_actual_pure_validation_and_preserves_pathspecs() {
         let wrapped = format!("Could not read the agent fence: {payload}");
         assert!(fence::display::diagnostic(&wrapped).contains(payload));
         assert_eq!(
-            Pattern::parse("/src/12345").unwrap().pathspecs(),
+            Pattern::parse("/src/12345")
+                .ok_or("missing test value")?
+                .pathspecs(),
             [":(glob,icase)src/12345", ":(glob,icase)src/12345/**"]
         );
     }
     set_language("en-US");
+
+    Ok(())
 }
 
 #[test]
-fn guard_display_collision_retains_raw_status_and_old_git_matching() {
+fn guard_display_collision_retains_raw_status_and_old_git_matching() -> Result<(), String> {
     use crate::collision::{self, Matrix};
-    let raw = collision::simulate(Path::new("inert"), "-12345", "refs/heads/12345").unwrap_err();
+    let raw = collision::simulate(Path::new("inert"), "-12345", "refs/heads/12345")
+        .err()
+        .ok_or("expected an error")?;
     let old_git = "The collision matrix needs git 2.38 or later (git merge-tree --write-tree)";
     let matrix = Matrix {
         with_target: vec![Err(old_git.into())],
@@ -278,7 +301,12 @@ fn guard_display_collision_retains_raw_status_and_old_git_matching() {
         set_language(locale);
         assert!(collision::display::diagnostic(&raw).contains("-12345"));
         assert_eq!(matrix.first_error(), Some(old_git));
-        assert!(matrix.first_error().unwrap().contains("needs git"));
+        assert!(
+            matrix
+                .first_error()
+                .ok_or("missing test value")?
+                .contains("needs git")
+        );
         assert!(collision::display::diagnostic(old_git).contains("git merge-tree --write-tree"));
         assert_eq!(collision::STOPPED, "Stopped");
         assert_eq!(
@@ -300,10 +328,13 @@ fn guard_display_collision_retains_raw_status_and_old_git_matching() {
         );
     }
     set_language("en-US");
+
+    Ok(())
 }
 
 #[test]
-fn guard_display_weakened_uses_actual_scan_flags_and_preserves_source_and_numeric_lexemes() {
+fn guard_display_weakened_uses_actual_scan_flags_and_preserves_source_and_numeric_lexemes()
+-> Result<(), String> {
     use crate::weakened::{self, Reason};
     let patch = "diff --git a/tests/a.rs b/tests/a.rs\n--- a/tests/a.rs\n+++ b/tests/a.rs\n@@ -12345,2 +12345,2 @@\n-assert!(result);\n-assert!(other);\n+#[ignore]\n+assert!(true);\n";
     let files = weakened::scan_patch(patch);
@@ -340,10 +371,12 @@ fn guard_display_weakened_uses_actual_scan_flags_and_preserves_source_and_numeri
         {
             assert!(flag.display_evidence().contains("0.001 → 0.01"));
         } else {
-            panic!("real tolerance scanner must supply the evidence");
+            return Err("real tolerance scanner must supply the evidence".into());
         }
     }
     set_language("en-US");
+
+    Ok(())
 }
 
 #[test]
@@ -409,7 +442,8 @@ fn guard_display_supplied_fence_target_keeps_delimiters_and_provider_payload_who
 }
 
 #[test]
-fn guard_display_actual_ci_deleted_file_snapshot_and_summary_limit_are_localized() {
+fn guard_display_actual_ci_deleted_file_snapshot_and_summary_limit_are_localized()
+-> Result<(), String> {
     use crate::weakened::{self, Reason};
     let ci = "diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml\n--- a/.github/workflows/ci.yml\n+++ b/.github/workflows/ci.yml\n@@ -1,3 +1,1 @@\n jobs:\n-  checks12345:\n-    run: check\n";
     let ci_files = weakened::scan_patch(ci);
@@ -417,7 +451,7 @@ fn guard_display_actual_ci_deleted_file_snapshot_and_summary_limit_are_localized
         .iter()
         .flat_map(|f| &f.flags)
         .find(|f| f.reason == Reason::CiRemovedJob)
-        .unwrap();
+        .ok_or("missing test value")?;
     let deleted = "diff --git a/tests/test_12345.py b/tests/test_12345.py\ndeleted file mode 100644\n--- a/tests/test_12345.py\n+++ /dev/null\n@@ -1,1 +0,0 @@\n-def test_x(): pass\n";
     let files = weakened::scan_patch(deleted);
     let snapshot = "diff --git a/output.snap b/output.snap\ndeleted file mode 100644\n--- a/output.snap\n+++ /dev/null\n@@ -1,1 +0,0 @@\n-source12345\n";
@@ -426,7 +460,7 @@ fn guard_display_actual_ci_deleted_file_snapshot_and_summary_limit_are_localized
         .iter()
         .flat_map(|f| &f.flags)
         .find(|f| f.reason == Reason::SnapshotRewrite)
-        .unwrap();
+        .ok_or("missing test value")?;
     let flags = vec![job.clone(); 7];
     for locale in ["en-US", "de"] {
         set_language(locale);
@@ -447,10 +481,13 @@ fn guard_display_actual_ci_deleted_file_snapshot_and_summary_limit_are_localized
         assert!(job.evidence.contains("the job `checks12345`"));
     }
     set_language("en-US");
+
+    Ok(())
 }
 
 #[test]
-fn guard_display_every_catalog_contract_formats_in_both_languages_without_fallback() {
+fn guard_display_every_catalog_contract_formats_in_both_languages_without_fallback()
+-> Result<(), String> {
     use fluent_bundle::{FluentArgs, FluentBundle, FluentResource};
     use std::collections::{BTreeMap, BTreeSet};
     let mut paired = Vec::new();
@@ -477,14 +514,21 @@ fn guard_display_every_catalog_contract_formats_in_both_languages_without_fallba
                     .chars()
                     .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')
                     .collect();
-                contracts.get_mut(current).unwrap().insert(name);
+                contracts
+                    .get_mut(current)
+                    .ok_or("missing test value")?
+                    .insert(name);
             }
         }
-        let mut bundle = FluentBundle::new(vec![locale.parse().unwrap()]);
+        let mut bundle =
+            FluentBundle::new(vec![locale.parse().map_err(|error| format!("{error:?}"))?]);
         bundle.set_use_isolating(false);
         bundle
-            .add_resource(FluentResource::try_new(catalog.to_owned()).unwrap())
-            .unwrap();
+            .add_resource(
+                FluentResource::try_new(catalog.to_owned())
+                    .map_err(|error| format!("{error:?}"))?,
+            )
+            .map_err(|error| format!("{error:?}"))?;
         // Direct bundles make a broken German message fail instead of using English fallback.
         for (id, names) in &contracts {
             for (number, selector) in [(1u64, "yes"), (12345u64, "no")] {
@@ -503,7 +547,11 @@ fn guard_display_every_catalog_contract_formats_in_both_languages_without_fallba
                 }
                 let mut errors = Vec::new();
                 let shown = bundle.format_pattern(
-                    bundle.get_message(id).unwrap().value().unwrap(),
+                    bundle
+                        .get_message(id)
+                        .ok_or("missing test value")?
+                        .value()
+                        .ok_or("missing test value")?,
                     Some(&args),
                     &mut errors,
                 );
@@ -514,6 +562,8 @@ fn guard_display_every_catalog_contract_formats_in_both_languages_without_fallba
         paired.push(contracts);
     }
     assert_eq!(paired[0], paired[1]);
+
+    Ok(())
 }
 
 #[test]

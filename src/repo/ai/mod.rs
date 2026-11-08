@@ -69,14 +69,14 @@ fn elapsed(since: Instant) -> String {
     if secs < 60 {
         crate::i18n::message(
             "repo-workflows-ai-elapsed-127483e6",
-            &[("secs", (secs).clone().into())],
+            &[("secs", (secs).into())],
         )
     } else {
         crate::i18n::message(
             "repo-workflows-ai-elapsed-fba4d59d",
             &[
-                ("secs-60-1", (secs / 60).clone().into()),
-                ("secs-60-2", (secs % 60).clone().into()),
+                ("secs-60-1", (secs / 60).into()),
+                ("secs-60-2", (secs % 60).into()),
             ],
         )
     }
@@ -136,7 +136,8 @@ impl AiState {
 mod fluent_r1_note_tests {
     use super::*;
     #[test]
-    fn fluent_partition_r1_ai_message_note_retains_numeric_coverage_and_raw_failure() {
+    fn fluent_partition_r1_ai_message_note_retains_numeric_coverage_and_raw_failure()
+    -> Result<(), String> {
         for note in [
             MessageNote::Empty,
             MessageNote::Coverage {
@@ -147,13 +148,13 @@ mod fluent_r1_note_tests {
             crate::i18n::set_language("de");
             let mut state = AiState::default();
             state.remember_message_note(note, true);
-            let raw = state.note.clone().unwrap().0;
+            let raw = state.note.clone().ok_or("missing test value")?.0;
             for lang in ["de", "en-US", "de"] {
                 crate::i18n::set_language(lang);
                 if lang == "de" {
                     assert_ne!(state.display_message_note(&raw), raw);
                 }
-                assert_eq!(state.note.as_ref().unwrap().0, raw);
+                assert_eq!(state.note.as_ref().ok_or("missing test value")?.0, raw);
                 assert_eq!(state.requests, 0);
                 assert!(state.writing.is_none());
             }
@@ -161,5 +162,7 @@ mod fluent_r1_note_tests {
             assert_eq!(state.display_message_note(&raw), raw);
         }
         crate::i18n::set_language("en-US");
+
+        Ok(())
     }
 }

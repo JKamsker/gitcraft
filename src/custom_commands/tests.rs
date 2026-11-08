@@ -581,7 +581,7 @@ fn commands_round_trip_through_the_settings() -> Result<(), String> {
 }
 
 #[test]
-fn german_validation_display_keeps_raw_errors_and_eligibility_stable() {
+fn german_validation_display_keeps_raw_errors_and_eligibility_stable() -> Result<(), String> {
     crate::i18n::set_language("de");
     let mut c = command("X", "echo \"$A\"");
     c.prompts = vec![
@@ -591,7 +591,7 @@ fn german_validation_display_keeps_raw_errors_and_eligibility_stable() {
         };
         2
     ];
-    let raw = c.problem().unwrap();
+    let raw = c.problem().ok_or("missing test value")?;
     assert_eq!(raw, "$A is asked for twice");
     assert_eq!(display_problem(&raw), "$A wird zweimal abgefragt");
     assert_eq!(c.problem().as_deref(), Some("$A is asked for twice"));
@@ -607,7 +607,7 @@ fn german_validation_display_keeps_raw_errors_and_eligibility_stable() {
             "„bad name“ ist kein Variablenname: Großbuchstaben, Ziffern und _, beginnend mit einem Buchstaben",
         ),
     ] {
-        let raw = variable_error(variable).unwrap();
+        let raw = variable_error(variable).ok_or("missing test value")?;
         assert_eq!(display_problem(&raw), expected);
         assert_eq!(variable_error(variable).as_deref(), Some(raw.as_str()));
     }
@@ -622,4 +622,6 @@ fn german_validation_display_keeps_raw_errors_and_eligibility_stable() {
     );
     crate::i18n::set_language("en-US");
     assert_eq!(display_problem(&raw), raw);
+
+    Ok(())
 }

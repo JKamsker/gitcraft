@@ -324,7 +324,7 @@ fn body(ui: &mut egui::Ui, view: &mut DriftView, acts: &mut Vec<Action>) -> Todo
                     ("n", (n).to_string().into()),
                     (
                         "text-lines-next-unwrap-or-defaul-1",
-                        (text.lines().next().unwrap_or_default()).clone().into(),
+                        (text.lines().next().unwrap_or_default()).into(),
                     ),
                 ],
             ),

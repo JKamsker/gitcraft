@@ -911,7 +911,8 @@ mod localization_tests {
     }
 
     #[test]
-    fn work_descriptions_keep_push_classification_raw_and_unknown_errors_opaque() {
+    fn work_descriptions_keep_push_classification_raw_and_unknown_errors_opaque()
+    -> Result<(), String> {
         crate::i18n::set_language("de");
         let item = Work::Unpushed {
             branch: "feature/日本語".into(),
@@ -934,7 +935,7 @@ mod localization_tests {
         assert!(
             other
                 .why_no_push()
-                .unwrap()
+                .ok_or("missing test value")?
                 .contains("feature/日本語 folgt origin/日本語")
         );
         assert_eq!(
@@ -969,5 +970,7 @@ mod localization_tests {
         );
         crate::i18n::set_language("en-US");
         assert_eq!(across::display_error(raw), raw);
+
+        Ok(())
     }
 }

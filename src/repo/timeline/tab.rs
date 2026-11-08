@@ -344,9 +344,7 @@ impl RepoTab {
                         &[
                             (
                                 "tab-timeline-get-id-map-or-e-e-l-1",
-                                (tab.timeline.get(id).map_or("", |e| e.label.as_str()))
-                                    .clone()
-                                    .into(),
+                                (tab.timeline.get(id).map_or("", |e| e.label.as_str())).into(),
                             ),
                             ("e", (e).clone().into()),
                         ],

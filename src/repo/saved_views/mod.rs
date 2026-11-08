@@ -307,7 +307,8 @@ impl RepoTab {
 mod fluent_r1_preset_tests {
     use super::*;
     #[test]
-    fn fluent_partition_r1_generated_preset_origin_persists_and_legacy_user_names_stay_opaque() {
+    fn fluent_partition_r1_generated_preset_origin_persists_and_legacy_user_names_stay_opaque()
+    -> Result<(), String> {
         for (name, kind) in [
             ("My unpushed work", Kind::MyUnpushed),
             ("My recent changes + dependencies", Kind::RecentAncestors),
@@ -334,8 +335,9 @@ mod fluent_r1_preset_tests {
                 generated_active: Some(preset.clone()),
                 ..Default::default()
             };
-            let encoded = serde_json::to_string(&original).unwrap();
-            let restored: Preferences = serde_json::from_str(&encoded).unwrap();
+            let encoded = serde_json::to_string(&original).map_err(|error| format!("{error:?}"))?;
+            let restored: Preferences =
+                serde_json::from_str(&encoded).map_err(|error| format!("{error:?}"))?;
             let mut first = None;
             for lang in ["de", "en-US", "de"] {
                 crate::i18n::set_language(lang);
@@ -351,25 +353,35 @@ mod fluent_r1_preset_tests {
                     assert_eq!(caption, name);
                 }
                 assert_eq!(restored.active.as_ref(), Some(&preset));
-                assert_eq!(serde_json::to_string(&restored).unwrap(), encoded);
+                assert_eq!(
+                    serde_json::to_string(&restored).map_err(|error| format!("{error:?}"))?,
+                    encoded
+                );
             }
             for custom in [name, "Meine ungepushten Änderungen", "My unpushed work"] {
                 let mut user = restored.clone();
-                user.active.as_mut().unwrap().name = custom.into();
+                user.active.as_mut().ok_or("missing test value")?.name = custom.into();
                 user.generated_active = None;
                 for lang in ["de", "en-US", "de"] {
                     crate::i18n::set_language(lang);
                     assert_eq!(user.active_caption(), custom);
                 }
-                let mut legacy = serde_json::to_value(&user).unwrap();
-                legacy.as_object_mut().unwrap().remove("generated_active");
-                let legacy: Preferences = serde_json::from_value(legacy).unwrap();
+                let mut legacy =
+                    serde_json::to_value(&user).map_err(|error| format!("{error:?}"))?;
+                legacy
+                    .as_object_mut()
+                    .ok_or("missing test value")?
+                    .remove("generated_active");
+                let legacy: Preferences =
+                    serde_json::from_value(legacy).map_err(|error| format!("{error:?}"))?;
                 assert_eq!(legacy.active_caption(), custom);
             }
             let mut mismatch = restored;
-            mismatch.active.as_mut().unwrap().days += 1;
+            mismatch.active.as_mut().ok_or("missing test value")?.days += 1;
             assert_eq!(mismatch.active_caption(), name);
         }
         crate::i18n::set_language("en-US");
+
+        Ok(())
     }
 }

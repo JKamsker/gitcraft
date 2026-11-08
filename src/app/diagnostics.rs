@@ -164,7 +164,8 @@ fn review_ui(ctx: &egui::Context) {
 mod tests {
     use super::*;
     #[test]
-    fn actual_local_review_translates_without_sending_or_rewriting_report_content() {
+    fn actual_local_review_translates_without_sending_or_rewriting_report_content()
+    -> Result<(), String> {
         use egui_kittest::{Harness, kittest::Queryable};
         crate::i18n::set_language("de");
         let fonts = std::cell::Cell::new(false);
@@ -189,10 +190,15 @@ mod tests {
         h.get_by_label("Diagnosedaten lokal prüfen");
         h.get_by_label("Geprüfte Diagnosedaten kopieren").click();
         h.run();
-        let report = h.ctx.data(|d| d.get_temp::<Review>(review_id())).unwrap();
+        let report = h
+            .ctx
+            .data(|d| d.get_temp::<Review>(review_id()))
+            .ok_or("missing test value")?;
         assert!(report.text.contains("opaque 日本語"));
         assert!(report.text.contains("(configured; value withheld)"));
         crate::i18n::set_language("en-US");
+
+        Ok(())
     }
 
     #[test]

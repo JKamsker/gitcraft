@@ -216,14 +216,11 @@ fn inline_place(path: &str, line: Option<u64>, outdated: bool, resolved: bool) -
     let place = match line {
         Some(line) => crate::i18n::message(
             "repo-workflows-pr_view-inline-place-0fd6d148",
-            &[
-                ("path", (path).clone().into()),
-                ("line", (line).clone().into()),
-            ],
+            &[("path", (path).into()), ("line", (line).into())],
         ),
         None => crate::i18n::message(
             "repo-workflows-pr_view-inline-place-31c12181",
-            &[("path", (path).clone().into())],
+            &[("path", (path).into())],
         ),
     };
     match (outdated, resolved) {
@@ -270,7 +267,7 @@ mod fluent_r1_word_tests {
     use super::*;
     #[test]
     fn fluent_partition_r1_comment_words_repaint_but_review_provider_words_remain_opaque() {
-        let review = EntryKind::Review("commented;\nprovider 日本語".into());
+        let review = EntryKind::Review("commented;\nprovider 日本語");
         for lang in ["de", "en-US", "de"] {
             crate::i18n::set_language(lang);
             assert_eq!(

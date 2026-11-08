@@ -107,10 +107,7 @@ fn json(config: &Config, tool: &str, context: &str, args: &[String]) -> Result<V
     serde_json::from_str(&raw).map_err(|e| {
         crate::i18n::message(
             "repo-workflows-devcontainer-json-edd11b13",
-            &[
-                ("tool", (tool).clone().into()),
-                ("e", (e).to_string().into()),
-            ],
+            &[("tool", (tool).into()), ("e", (e).to_string().into())],
         )
     })
 }
@@ -173,7 +170,7 @@ pub(super) fn start(config: &Config, old: Option<&Binding>) -> Result<Binding, S
     if let Some(pause) = crate::network::refused() {
         return Err(crate::i18n::message(
             "repo-workflows-devcontainer-start-87b3fed2",
-            &[("pause-why-1", (pause.why()).clone().into())],
+            &[("pause-why-1", (pause.why()).into())],
         ));
     }
     let engine = engine(config)?;

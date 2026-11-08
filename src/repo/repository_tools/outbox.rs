@@ -283,7 +283,7 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
                                 |consent| {
                                     crate::i18n::message(
                                         "repo-workflows-repository_tools-show-a2bc21d3",
-                                        &[("consent-profile-1", (consent.profile).clone().into())],
+                                        &[("consent-profile-1", (consent.profile).into())],
                                     )
                                 },
                             ),
@@ -360,7 +360,7 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
             ));
             ui.label(crate::i18n::message(
                 "repo-workflows-repository_tools-show-99256c25",
-                &[("p-consent-profile-1", (p.consent.profile).clone().into())],
+                &[("p-consent-profile-1", (p.consent.profile).into())],
             ));
             if let Some((endpoint, account, username)) = &p.consent.principal {
                 ui.label(crate::i18n::message(
@@ -380,10 +380,7 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
             }
             ui.label(crate::i18n::message(
                 "repo-workflows-repository_tools-show-9b1cea76",
-                &[(
-                    "p-plan-commits-len-1",
-                    (p.plan.commits.len()).clone().into(),
-                )],
+                &[("p-plan-commits-len-1", (p.plan.commits.len()).into())],
             ));
             egui::ScrollArea::vertical()
                 .max_height(300.0)

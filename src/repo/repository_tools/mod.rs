@@ -705,8 +705,8 @@ fn object_view(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>) {
                     "repo-workflows-repository_tools-object-view-44de072f",
                     &[
                         ("o-kind-1", (o.kind).clone().into()),
-                        ("o-size-2", (o.size).clone().into()),
-                        ("o-disk-3", (o.disk).clone().into()),
+                        ("o-size-2", (o.size).into()),
+                        ("o-disk-3", (o.disk).into()),
                     ],
                 ));
                 if let Some(base) = &o.base
@@ -732,7 +732,7 @@ fn object_view(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>) {
                 if let Some(n) = representation.loose_bytes {
                     ui.label(crate::i18n::message(
                         "repo-workflows-repository_tools-object-view-14a9c8ce",
-                        &[("n", (n).clone().into())],
+                        &[("n", (n).into())],
                     ));
                 }
                 for (i, row) in representation.chain.iter().enumerate() {
@@ -751,15 +751,14 @@ fn object_view(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>) {
                                             "repo-workflows-repository_tools-object-view-7b47361a",
                                         )
                                     })
-                                    .clone()
                                     .into(),
                                 ),
                                 ("row-oid-2", (row.oid).clone().into()),
                                 ("row-kind-3", (row.kind).clone().into()),
-                                ("row-disk-4", (row.disk).clone().into()),
-                                ("row-size-5", (row.size).clone().into()),
-                                ("row-offset-6", (row.offset).clone().into()),
-                                ("row-depth-7", (row.depth).clone().into()),
+                                ("row-disk-4", (row.disk).into()),
+                                ("row-size-5", (row.size).into()),
+                                ("row-offset-6", (row.offset).into()),
+                                ("row-depth-7", (row.depth).into()),
                             ],
                         ))
                         .clicked()
@@ -838,7 +837,7 @@ fn reftable_view(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>) {
             storage.migrates && storage.blocked.is_none() && state.acknowledged && state.compatible,
             egui::Button::new(crate::i18n::message(
                 "repo-workflows-repository_tools-reftable-view-d3ba0aeb",
-                &[("target", (target).clone().into())],
+                &[("target", (target).into())],
             )),
         )
         .clicked()
@@ -1091,7 +1090,7 @@ impl RepoTab {
                     if failed > 0 {
                         Err(crate::i18n::message(
                             "repo-workflows-repository_tools-publish-group-1f0d64fa",
-                            &[("failed", (failed).clone().into())],
+                            &[("failed", (failed).into())],
                         ))
                     } else {
                         Ok(crate::i18n::text(

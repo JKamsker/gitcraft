@@ -62,14 +62,14 @@ impl Snapshot {
                 if state.anonymize {
                     crate::i18n::message(
                         "repo-workflows-postcards-new-53bf7c37",
-                        &[("i-1-1", (i + 1).clone().into())],
+                        &[("i-1-1", (i + 1).into())],
                     )
                 } else if state.include_messages {
                     clean(&c.summary, 96)
                 } else {
                     crate::i18n::message(
                         "repo-workflows-postcards-new-53bf7c37",
-                        &[("i-1-1", (i + 1).clone().into())],
+                        &[("i-1-1", (i + 1).into())],
                     )
                 }
             })
@@ -367,13 +367,10 @@ impl RepoTab {
                     crate::i18n::message(
                         "repo-workflows-postcards-postcard-window-77a98200",
                         &[
-                            (
-                                "snapshot-messages-len-1",
-                                (snapshot.messages.len()).clone().into(),
-                            ),
+                            ("snapshot-messages-len-1", (snapshot.messages.len()).into()),
                             (
                                 "snapshot-contributors-len-2",
-                                (snapshot.contributors.len()).clone().into(),
+                                (snapshot.contributors.len()).into(),
                             ),
                         ],
                     ),

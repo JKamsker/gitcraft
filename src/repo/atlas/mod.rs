@@ -209,7 +209,7 @@ impl RepoTab {
             if let Some(error) = &view.error {
                 ui.colored_label(
                     crate::theme::Tokens::get(ctx).danger,
-                    crate::repo::activity::display_workflow_error(&error),
+                    crate::repo::activity::display_workflow_error(error),
                 );
             }
             let Some(data) = &view.data else {
@@ -312,8 +312,8 @@ impl RepoTab {
                 ui.label(crate::i18n::message(
                     "repo-workflows-atlas-atlas-window-aef428d1",
                     &[
-                        ("node-bytes-1", (node.bytes).clone().into()),
-                        ("node-changes-2", (node.changes).clone().into()),
+                        ("node-bytes-1", (node.bytes).into()),
+                        ("node-changes-2", (node.changes).into()),
                     ],
                 ));
                 if !node.contributor.is_empty() {
@@ -349,8 +349,8 @@ impl RepoTab {
                     ui.label(crate::i18n::message(
                         "repo-workflows-atlas-atlas-window-1316052d",
                         &[
-                            ("view-page-1-1", (view.page + 1).clone().into()),
-                            ("pages", (pages).clone().into()),
+                            ("view-page-1-1", (view.page + 1).into()),
+                            ("pages", (pages).into()),
                         ],
                     ));
                     if ui
@@ -423,10 +423,10 @@ impl RepoTab {
                             ("label", (label).clone().into()),
                             (
                                 "if-n-directory-folder-else-file-1",
-                                (if n.directory { "folder" } else { "file" }).clone().into(),
+                                (if n.directory { "folder" } else { "file" }).into(),
                             ),
-                            ("n-bytes-2", (n.bytes).clone().into()),
-                            ("n-changes-3", (n.changes).clone().into()),
+                            ("n-bytes-2", (n.bytes).into()),
+                            ("n-changes-3", (n.changes).into()),
                             ("n-contributor-4", n.contributor.as_ref().into()),
                             (
                                 "if-n-directory-zoom-into-folder--5",
@@ -437,7 +437,6 @@ impl RepoTab {
                                 } else {
                                     crate::i18n::text("repo-workflows-atlas-atlas-window-8d9ca065")
                                 })
-                                .clone()
                                 .into(),
                             ),
                         ],
@@ -474,8 +473,8 @@ impl RepoTab {
                     "repo-workflows-atlas-atlas-window-4b6c521c",
                     &[
                         ("label", (label).clone().into()),
-                        ("n-bytes-1", (n.bytes).clone().into()),
-                        ("n-changes-2", (n.changes).clone().into()),
+                        ("n-bytes-1", (n.bytes).into()),
+                        ("n-changes-2", (n.changes).into()),
                         (
                             "if-n-contributor-is-empty-no-cha-3",
                             (if n.contributor.is_empty() {
@@ -483,7 +482,6 @@ impl RepoTab {
                             } else {
                                 n.contributor.as_ref()
                             })
-                            .clone()
                             .into(),
                         ),
                     ],
@@ -788,13 +786,13 @@ fn invalid_range_error() -> String {
 mod fluent_r1_cache_tests {
     use super::*;
     #[test]
-    fn fluent_partition_r1_atlas_cached_validation_keeps_inputs_and_page() {
+    fn fluent_partition_r1_atlas_cached_validation_keeps_inputs_and_page() -> Result<(), String> {
         crate::i18n::set_language("de");
         let mut state = State::default();
         state.from = "raw bad date".into();
         state.through = "2026-01-01".into();
         state.error = Some(invalid_range_error());
-        let raw = state.error.clone().unwrap();
+        let raw = state.error.clone().ok_or("missing test value")?;
         state.page = 7;
         for lang in ["de", "en-US", "de"] {
             crate::i18n::set_language(lang);
@@ -808,5 +806,7 @@ mod fluent_r1_cache_tests {
             assert!(!state.reader.busy());
         }
         crate::i18n::set_language("en-US");
+
+        Ok(())
     }
 }

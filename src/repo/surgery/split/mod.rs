@@ -325,7 +325,7 @@ impl SplitEditor {
             return Some((
                 crate::i18n::message(
                     "repo-workflows-surgery-problem-552d4c58",
-                    &[("g-1-1", (g + 1).clone().into())],
+                    &[("g-1-1", (g + 1).into())],
                 ),
                 start,
             ));
@@ -334,7 +334,7 @@ impl SplitEditor {
             return Some((
                 crate::i18n::message(
                     "repo-workflows-surgery-problem-cd79fde0",
-                    &[("g-1-1", (g + 1).clone().into())],
+                    &[("g-1-1", (g + 1).into())],
                 ),
                 true,
             ));
@@ -370,10 +370,7 @@ pub(crate) fn prepare(
         let tree = git::tree_after(repo, parent, &[file]).map_err(|e| {
             crate::i18n::message(
                 "repo-workflows-surgery-prepare-1a3632ec",
-                &[
-                    ("g-1-1", (g + 1).clone().into()),
-                    ("e-2", (e).clone().into()),
-                ],
+                &[("g-1-1", (g + 1).into()), ("e-2", (e).clone().into())],
             )
         })?;
         trees.push(tree);
@@ -385,7 +382,7 @@ pub(crate) fn prepare(
         if before == after {
             return Err(crate::i18n::message(
                 "repo-workflows-surgery-prepare-9ee5bdbf",
-                &[("g-1-1", (g + 1).clone().into())],
+                &[("g-1-1", (g + 1).into())],
             ));
         }
         patches_out.push((

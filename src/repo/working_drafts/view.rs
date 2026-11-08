@@ -184,7 +184,7 @@ pub(in crate::repo) fn recovery(
     ui.label(crate::i18n::message(
         "repo-workflows-working_drafts-recovery-eb7ee658",
         &[
-            ("preview-before-len-1", (preview.before_len).clone().into()),
+            ("preview-before-len-1", (preview.before_len).into()),
             (
                 "if-preview-index-layer-staged-ve-2",
                 (if preview.index_layer {
@@ -192,10 +192,9 @@ pub(in crate::repo) fn recovery(
                 } else {
                     crate::i18n::text("repo-workflows-working_drafts-recovery-1d540f7f")
                 })
-                .clone()
                 .into(),
             ),
-            ("preview-saved-len-3", (preview.saved_len).clone().into()),
+            ("preview-saved-len-3", (preview.saved_len).into()),
         ],
     ));
     ui.label(crate::i18n::text(

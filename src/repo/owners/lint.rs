@@ -112,7 +112,7 @@ fn contents(ui: &mut Ui, view: &LintView, acts: &mut Vec<Action>) {
         1 => crate::i18n::text("repo-workflows-owners-contents-343bb384").to_owned(),
         n => crate::i18n::message(
             "repo-workflows-owners-contents-4d726f4a",
-            &[("n", (n).clone().into())],
+            &[("n", (n).into())],
         ),
     };
     ui.label(
@@ -120,7 +120,7 @@ fn contents(ui: &mut Ui, view: &LintView, acts: &mut Vec<Action>) {
             "repo-workflows-owners-contents-96978c8c",
             &[
                 ("file-path-1", (file.path).clone().into()),
-                ("file-flavor-name-2", (file.flavor.name()).clone().into()),
+                ("file-flavor-name-2", (file.flavor.name()).into()),
                 ("rules", (rules).clone().into()),
             ],
         ))
@@ -155,7 +155,7 @@ fn contents(ui: &mut Ui, view: &LintView, acts: &mut Vec<Action>) {
                 ui,
                 &crate::i18n::message(
                     "repo-workflows-owners-contents-64feb239",
-                    &[("file-problems-len-1", (file.problems.len()).clone().into())],
+                    &[("file-problems-len-1", (file.problems.len()).into())],
                 ),
             );
             if file.problems.is_empty() {
@@ -170,7 +170,7 @@ fn contents(ui: &mut Ui, view: &LintView, acts: &mut Vec<Action>) {
                     &crate::i18n::message(
                         "repo-workflows-owners-contents-8f8353f4",
                         &[
-                            ("p-line-1", (p.line).clone().into()),
+                            ("p-line-1", (p.line).into()),
                             ("p-text-2", (p.text).clone().into()),
                         ],
                     ),
@@ -225,10 +225,7 @@ fn results(ui: &mut Ui, lint: &Lint) {
         ui,
         &crate::i18n::message(
             "repo-workflows-owners-results-85d177f5",
-            &[(
-                "lint-unmatched-len-1",
-                (lint.unmatched.len()).clone().into(),
-            )],
+            &[("lint-unmatched-len-1", (lint.unmatched.len()).into())],
         ),
     );
     if lint.unmatched.is_empty() {
@@ -242,10 +239,7 @@ fn results(ui: &mut Ui, lint: &Lint) {
             ui,
             &crate::i18n::message(
                 "repo-workflows-owners-results-a6551c12",
-                &[
-                    ("n", (n).clone().into()),
-                    ("pattern", (pattern).clone().into()),
-                ],
+                &[("n", (*(n)).into()), ("pattern", (pattern).clone().into())],
             ),
             t.warning,
         );
@@ -255,8 +249,8 @@ fn results(ui: &mut Ui, lint: &Lint) {
         &crate::i18n::message(
             "repo-workflows-owners-results-a92df9d7",
             &[
-                ("lint-unowned-len-1", (lint.unowned.len()).clone().into()),
-                ("lint-files-2", (lint.files).clone().into()),
+                ("lint-unowned-len-1", (lint.unowned.len()).into()),
+                ("lint-files-2", (lint.files).into()),
             ],
         ),
     );
@@ -276,7 +270,7 @@ fn results(ui: &mut Ui, lint: &Lint) {
                 "repo-workflows-owners-results-683768ab",
                 &[(
                     "lint-unowned-len-listed-1",
-                    (lint.unowned.len() - LISTED).clone().into(),
+                    (lint.unowned.len() - LISTED).into(),
                 )],
             ),
         );

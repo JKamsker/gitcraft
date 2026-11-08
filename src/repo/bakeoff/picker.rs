@@ -56,7 +56,7 @@ impl Picker {
         ui.label(
             RichText::new(crate::i18n::message(
                 "repo-workflows-bakeoff-ui-09eb5aca",
-                &[("MIN", (MIN).clone().into()), ("MAX", (MAX).clone().into())],
+                &[("MIN", (MIN).into()), ("MAX", (MAX).into())],
             ))
             .color(t.text_dim),
         );
@@ -90,7 +90,7 @@ impl Picker {
                         ui.checkbox(on, &attempt.name).on_disabled_hover_text(
                             crate::i18n::message(
                                 "repo-workflows-bakeoff-ui-fbbc3b24",
-                                &[("MAX", (MAX).clone().into())],
+                                &[("MAX", (MAX).into())],
                             ),
                         );
                     });
@@ -126,7 +126,7 @@ impl Picker {
             )
             .on_disabled_hover_text(crate::i18n::message(
                 "repo-workflows-bakeoff-ui-ae96d29a",
-                &[("MIN", (MIN).clone().into()), ("MAX", (MAX).clone().into())],
+                &[("MIN", (MIN).into()), ("MAX", (MAX).into())],
             ))
             .clicked()
             {

@@ -201,7 +201,8 @@ mod localization_tests {
     use egui_kittest::{Harness, kittest::Queryable};
 
     #[test]
-    fn prompt_controls_translate_without_changing_template_tokens_or_default_payload() {
+    fn prompt_controls_translate_without_changing_template_tokens_or_default_payload()
+    -> Result<(), String> {
         crate::i18n::set_language("de");
         let fonts = std::cell::Cell::new(false);
         let mut h = Harness::new_ui_state(
@@ -223,12 +224,14 @@ mod localization_tests {
         assert!(h.state().contains("{diff}"));
         assert_eq!(AiTool::Custom.label(), "Eigener Befehl");
         assert_eq!(
-            serde_json::to_string(&AiTool::Custom).unwrap(),
+            serde_json::to_string(&AiTool::Custom).map_err(|error| format!("{error:?}"))?,
             "\"Custom\""
         );
         crate::i18n::set_language("en-US");
         h.step();
         h.get_by_label("Restore default");
         assert_eq!(h.state(), DEFAULT_COMMIT_PROMPT);
+
+        Ok(())
     }
 }

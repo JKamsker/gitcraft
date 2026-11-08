@@ -182,7 +182,7 @@ fn push_target(path: &Path, branch: &str, to: &str, remotes: &[String]) -> Resul
         .ok_or_else(|| {
             crate::i18n::message(
                 "repo-workflows-push-push-target-1b9119c5",
-                &[("branch", (branch).clone().into())],
+                &[("branch", (branch).into())],
             )
         })?;
     pick_target(&remote, branch, to, remotes)
@@ -199,10 +199,7 @@ pub(super) fn pick_target(
     if !remotes.iter().any(|r| r == remote) {
         return Err(crate::i18n::message(
             "repo-workflows-push-pick-target-acf19d61",
-            &[
-                ("branch", (branch).clone().into()),
-                ("remote", (remote).clone().into()),
-            ],
+            &[("branch", (branch).into()), ("remote", (remote).into())],
         ));
     }
     let name = to.strip_prefix("refs/heads/").unwrap_or(branch);

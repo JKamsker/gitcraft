@@ -34,7 +34,7 @@ pub(super) fn receipt_section(ui: &mut Ui, receipt: &Receipt) {
     }
     egui::CollapsingHeader::new(crate::i18n::message(
         "repo-workflows-timeline-receipt-section-94c37af0",
-        &[("receipt-pairs-len-1", (receipt.pairs.len()).clone().into())],
+        &[("receipt-pairs-len-1", (receipt.pairs.len()).into())],
     ))
     .id_salt(("receipt", &receipt.new_tip))
     .show(ui, |ui| {
