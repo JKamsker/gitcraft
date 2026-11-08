@@ -33,8 +33,11 @@ pub enum Then {
     },
     /// A commit, by its full hash.
     Commit(String),
-    /// A pull request, by its number.
-    PullRequest(u64),
+    /// A pull request, by its number and the matching forge remote.
+    PullRequest {
+        number: u64,
+        remote: String,
+    },
     /// No clone of a linked repository was found: offer to clone it from this URL.
     Clone(String),
     /// Two commits, by full hash, with the names they were given.

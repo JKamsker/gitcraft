@@ -93,6 +93,11 @@ pub(crate) enum Action {
     ReviewTools(super::review_workflow::ToolsAct),
     /// Show a pull request in the big area.
     OpenPr(u64),
+    /// Select a linked forge remote before opening its pull request.
+    OpenLinkedPr {
+        number: u64,
+        remote: String,
+    },
     /// Open the worktree of a pull request (proposing `branch`, at `sha`), making it first
     /// when there is none.
     OpenPrWorktree {
