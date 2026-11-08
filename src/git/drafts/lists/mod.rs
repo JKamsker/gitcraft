@@ -246,6 +246,23 @@ fn state_tree(ctx: &Context, lists: &Lists, active: &dyn Fn() -> bool) -> Result
     }
     super::tree(ctx, &tree, active)
 }
+pub(super) fn direct_update(reference: &str, new: &str, old: &str) -> String {
+    format!("option no-deref\nupdate {reference} {new} {old}\n")
+}
+pub(super) fn direct_verify(reference: &str, old: &str) -> String {
+    format!("option no-deref\nverify {reference} {old}\n")
+}
+pub(super) fn direct_ref_guard<'a>(references: impl IntoIterator<Item = &'a str>) -> String {
+    references
+        .into_iter()
+        .map(|reference| {
+            format!(
+                "git symbolic-ref -q {} >/dev/null 2>&1; code=$?; [ \"$code\" = 1 ] || exit 1; ",
+                remote::sh_quote(reference)
+            )
+        })
+        .collect()
+}
 fn publish(
     ctx: &Context,
     view: &View,
@@ -271,16 +288,15 @@ fn publish(
     let head = view.source.head.as_deref().ok_or("No initial commit")?;
     let mut tx = "start\n".to_owned();
     tx.push_str(&format!("update HEAD {} {head}\n", commit.unwrap_or(head)));
-    tx.push_str(&format!(
-        "update {} {new} {old}\nprepare\ncommit\n",
-        view.reference
-    ));
+    tx.push_str(&direct_update(&view.reference, &new, old));
+    tx.push_str("prepare\ncommit\n");
     {
         // Git locks symbolic HEAD and its referent natively. The fixed prepared hook
         // binds that referent, so a concurrent checkout cannot redirect the operation.
         let script = format!(
-            "#!/bin/sh\nif [ \"$1\" = prepared ]; then test \"$(git symbolic-ref -q HEAD)\" = {} || exit 1; fi\ncat >/dev/null\n",
-            remote::sh_quote(branch)
+            "#!/bin/sh\nif [ \"$1\" = prepared ]; then test \"$(git symbolic-ref -q HEAD)\" = {} || exit 1; {}fi\ncat >/dev/null\n",
+            remote::sh_quote(branch),
+            direct_ref_guard([view.reference.as_str()])
         );
         let path = ctx.path.join("hooks/reference-transaction");
         std::fs::write(&path, script).map_err(|e| e.to_string())?;

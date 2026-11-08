@@ -523,21 +523,21 @@ fn publish(
         }
     }
     let zero = "0".repeat(new.len());
-    let mut tx = format!(
-        "start\nupdate HEAD {head} {head}\nupdate {} {new} {}\n",
-        view.reference,
+    let mut tx = format!("start\nupdate HEAD {head} {head}\n");
+    tx.push_str(&lists::direct_update(
+        &view.reference,
+        &new,
         if view.version.is_empty() {
             &zero
         } else {
             &view.version
-        }
-    );
+        },
+    ));
     for m in moves {
-        tx.push_str(&format!(
-            "update {} {} {}\n",
-            m.reference,
-            m.new,
-            if m.old.is_empty() { &zero } else { &m.old }
+        tx.push_str(&lists::direct_update(
+            &m.reference,
+            &m.new,
+            if m.old.is_empty() { &zero } else { &m.old },
         ));
     }
     if value.mode.is_some()
@@ -546,16 +546,28 @@ fn publish(
         for b in &mode.branches {
             let reference = format!("refs/heads/{}", b.name);
             if moves.iter().all(|m| m.reference != reference) {
-                tx.push_str(&format!("verify {reference} {}\n", b.tip));
+                tx.push_str(&lists::direct_verify(&reference, &b.tip));
             }
         }
     }
     tx.push_str("prepare\ncommit\n");
     std::fs::write(ctx.path.join("expected-worktrees"), &worktrees).map_err(|e| e.to_string())?;
+    let mut direct_refs = vec![view.reference.clone()];
+    direct_refs.extend(moves.iter().map(|m| m.reference.clone()));
+    if value.mode.is_some()
+        && let Some(mode) = &view.state.mode
+    {
+        direct_refs.extend(
+            mode.branches
+                .iter()
+                .map(|b| format!("refs/heads/{}", b.name)),
+        );
+    }
     let script = format!(
-        "#!/bin/sh\nif [ \"$1\" = prepared ]; then test \"$(git symbolic-ref -q HEAD)\" = {} || exit 1; git worktree list --porcelain -z | cmp -s - {} || exit 1; fi\ncat >/dev/null\n",
+        "#!/bin/sh\nif [ \"$1\" = prepared ]; then test \"$(git symbolic-ref -q HEAD)\" = {} || exit 1; git worktree list --porcelain -z | cmp -s - {} || exit 1; {}fi\ncat >/dev/null\n",
         remote::sh_quote(branch),
-        remote::sh_quote(&remote::git_path(&ctx.path.join("expected-worktrees")))
+        remote::sh_quote(&remote::git_path(&ctx.path.join("expected-worktrees"))),
+        lists::direct_ref_guard(direct_refs.iter().map(String::as_str))
     );
     let hook = ctx.path.join("hooks/reference-transaction");
     std::fs::write(&hook, script).map_err(|e| e.to_string())?;

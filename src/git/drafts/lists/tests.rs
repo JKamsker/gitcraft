@@ -288,3 +288,49 @@ fn changelist_commit_preserves_unselected_intent_to_add_flag() -> Result<(), Str
     assert_eq!(f.git(&["diff", "--name-only"])?, "intent");
     Ok(())
 }
+
+#[test]
+fn pure_state_direct_ref_prepared_guard_covers_state_and_late_symbolic_destination() {
+    let refs = ["refs/gitcraft/changelists/work/state", "refs/heads/alpha"];
+    let script = direct_ref_guard(refs);
+    for reference in refs {
+        assert!(script.contains(&format!(
+            "git symbolic-ref -q {}",
+            remote::sh_quote(reference)
+        )));
+    }
+    assert_eq!(script.matches("[ \"$code\" = 1 ] || exit 1").count(), 2);
+    // Record the transaction protocol without dispatching Git. no-deref is a
+    // per-command option, so every state/destination update and verify needs it.
+    let old = "a".repeat(40);
+    let new = "b".repeat(40);
+    let tx = format!(
+        "start\nupdate HEAD {old} {old}\n{}{}{}prepare\ncommit\n",
+        direct_update(refs[0], &new, &old),
+        direct_update(refs[1], &new, &old),
+        direct_verify("refs/heads/beta", &old)
+    );
+    let mut direct_next = false;
+    let mut commands = Vec::new();
+    for line in tx.lines() {
+        if line == "option no-deref" {
+            direct_next = true;
+            continue;
+        }
+        if line.starts_with("update ") || line.starts_with("verify ") {
+            let reference = line.split_whitespace().nth(1).unwrap();
+            commands.push((reference, direct_next));
+            direct_next = false;
+        }
+    }
+    assert_eq!(
+        commands,
+        vec![
+            ("HEAD", false),
+            (refs[0], true),
+            (refs[1], true),
+            ("refs/heads/beta", true)
+        ]
+    );
+    assert!(!tx.contains("refs/heads/victim"));
+}
