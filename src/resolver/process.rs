@@ -1,115 +1,76 @@
-//! The agent's process, on this machine: started with its prompt on its input, its output read
-//! line by line as it comes (what it does, for the progress panel), stopped on request with
-//! everything it started (see `ai::run::stop_here`).
-
-use std::collections::VecDeque;
-use std::io::{BufRead, BufReader, Read, Write};
-use std::path::Path;
-use std::process::{Child, Stdio};
-use std::sync::{Arc, Mutex, PoisonError};
-use std::time::Duration;
-
+//! Agent execution through the application-owned process service. Its controller owns
+//! descendant containment, cancellation, pipe draining and reaping.
 use super::agent::{self, Activity, Engine};
-use crate::ai::run::{CommandLine, ended, shell_here, stop_here};
-
-/// The most activities kept.
+use crate::ai::run::{CommandLine, shell_here};
+use std::collections::VecDeque;
+use std::path::Path;
+use std::sync::{Arc, Mutex, PoisonError};
 const MAX_ACTIVITIES: usize = 300;
-/// The longest line of its output read, in bytes: one of its events (a file it read
-/// included); a longer one is skipped.
 const MAX_EVENT: usize = 4 * 1024 * 1024;
-/// The most of its error output kept, from its end.
 const MAX_STDERR: usize = 8 * 1024;
-/// How often it is checked on.
-const TICK: Duration = Duration::from_millis(200);
-/// How long its output may stay open after it ended.
-const LINGER: Duration = Duration::from_secs(3);
+const MAX_OUTPUT: usize = 64 * 1024 * 1024;
 
-/// Sends on its channel when dropped: a reader's way of saying it is done.
-struct Closed(std::sync::mpsc::Sender<()>);
-
-impl Drop for Closed {
-    fn drop(&mut self) {
-        let _ = self.0.send(());
-    }
-}
-
-/// How the process ended.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Exit {
     pub code: Option<i32>,
-    /// It was stopped on request.
+    pub safe_to_inspect: bool,
     pub stopped: bool,
-    /// The end of what it printed as errors.
     pub stderr: String,
 }
-
-/// What came of the process so far.
 #[derive(Debug, Default)]
 pub struct Feed {
     pub activities: VecDeque<Activity>,
     pub exit: Option<Exit>,
 }
-
-/// A running agent. Dropped, it is stopped.
 pub struct Running {
-    child: Arc<Mutex<Option<Child>>>,
+    cancel: crate::tasks::Cancellation,
+    worker: Mutex<Option<std::thread::JoinHandle<()>>>,
     feed: Arc<Mutex<Feed>>,
 }
-
 fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
     m.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
-/// Stops the child `held`, if it is still there, holding it the while: whoever else waits for
-/// it (the watcher, `stop_now`) goes on only once it and what it started have ended.
-fn stop_held(held: &Mutex<Option<Child>>) {
-    let mut held = lock(held);
-    if let Some(child) = held.as_mut() {
-        stop_here(child);
-        *held = None;
-    }
+#[derive(Default)]
+struct Lines {
+    line: Vec<u8>,
+    too_long: bool,
 }
-
-/// Calls `each` with each line of `out` (lossily UTF-8, without its line end), up to `max`
-/// bytes of a line kept as it comes: a longer one is skipped whole (an event cut short isn't
-/// one), so no line, ended or not, takes more memory than that.
-fn each_line(out: impl Read, max: usize, mut each: impl FnMut(&str)) {
-    let mut reader = BufReader::new(out);
-    let mut line = Vec::new();
-    let mut too_long = false;
-    loop {
-        let buf = match reader.fill_buf() {
-            Ok([]) => break,
-            Ok(buf) => buf,
-            Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
-            Err(_) => break,
-        };
-        let end = buf.iter().position(|&b| b == b'\n');
-        let part = &buf[..end.unwrap_or(buf.len())];
-        if line.len() + part.len() > max {
-            too_long = true;
-            line.clear();
-        } else if !too_long {
-            line.extend_from_slice(part);
-        }
-        let used = end.map_or(buf.len(), |at| at + 1);
-        reader.consume(used);
-        if end.is_some() {
-            if !too_long {
-                each(String::from_utf8_lossy(&line).trim_end_matches('\r'));
+impl Lines {
+    fn push(&mut self, bytes: &[u8], max: usize, mut each: impl FnMut(&str)) {
+        for part in bytes.split_inclusive(|b| *b == b'\n') {
+            let ended = part.last() == Some(&b'\n');
+            let part = if ended { &part[..part.len() - 1] } else { part };
+            if self.line.len().saturating_add(part.len()) > max {
+                self.too_long = true;
+                self.line.clear();
+            } else if !self.too_long {
+                self.line.extend_from_slice(part);
             }
-            line.clear();
-            too_long = false;
+            if ended {
+                self.finish(&mut each);
+            }
         }
     }
-    if !too_long && !line.is_empty() {
-        each(String::from_utf8_lossy(&line).trim_end_matches('\r'));
+    fn finish(&mut self, mut each: impl FnMut(&str)) {
+        if !self.too_long && !self.line.is_empty() {
+            each(String::from_utf8_lossy(&self.line).trim_end_matches('\r'));
+        }
+        self.line.clear();
+        self.too_long = false;
     }
 }
-
+fn record(feed: &Mutex<Feed>, engine: Engine, dir: &str, line: &str) {
+    let found = agent::activities(engine, line, dir);
+    let mut feed = lock(feed);
+    for activity in found {
+        if feed.activities.len() == MAX_ACTIVITIES {
+            feed.activities.pop_front();
+        }
+        feed.activities.push_back(activity);
+    }
+}
 impl Running {
-    /// Starts `command` in `dir` with `prompt` on its input; `changed` is called whenever
-    /// there is something new to show.
     pub fn start(
         engine: Engine,
         command: &CommandLine,
@@ -118,162 +79,118 @@ impl Running {
         changed: impl Fn() + Send + Sync + 'static,
     ) -> Result<Running, String> {
         let mut cmd = shell_here(command);
-        cmd.current_dir(dir)
-            .env("NO_COLOR", "1")
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
+        cmd.current_dir(dir).env("NO_COLOR", "1");
         crate::shell_path::apply(&mut cmd);
-        let mut child = cmd
-            .spawn()
-            .map_err(|e| format!("Couldn't start {}: {e}", command.program()))?;
-        if let Some(mut stdin) = child.stdin.take() {
-            std::thread::spawn(move || {
-                let _ = stdin.write_all(prompt.as_bytes());
-            });
-        }
+        let cancel = crate::tasks::Cancellation::default();
         let feed = Arc::new(Mutex::new(Feed::default()));
+        let lines = Arc::new(Mutex::new(Lines::default()));
+        let dir = dir.display().to_string();
         let changed = Arc::new(changed);
-        let dir_text = dir.display().to_string();
-        let stdout = child.stdout.take().map(|out| {
-            let (feed, changed) = (Arc::clone(&feed), Arc::clone(&changed));
-            let (done, read_all) = std::sync::mpsc::channel::<()>();
-            std::thread::spawn(move || {
-                // Told once the pipe closes, however the loop ends.
-                let _done = Closed(done);
-                each_line(out, MAX_EVENT, |line| {
-                    let found = agent::activities(engine, line, &dir_text);
-                    if found.is_empty() {
-                        return;
-                    }
-                    {
-                        let mut feed = lock(&feed);
-                        for a in found {
-                            if feed.activities.len() == MAX_ACTIVITIES {
-                                feed.activities.pop_front();
-                            }
-                            feed.activities.push_back(a);
-                        }
-                    }
-                    changed();
-                });
-            });
-            read_all
-        });
-        let stderr = child.stderr.take().map(|mut err| {
-            let (tx, rx) = std::sync::mpsc::channel::<String>();
-            std::thread::spawn(move || {
-                let mut kept = Vec::new();
-                let mut buf = [0u8; 4096];
-                while let Ok(n) = err.read(&mut buf) {
-                    if n == 0 {
-                        break;
-                    }
-                    kept.extend_from_slice(&buf[..n]);
-                    if kept.len() > MAX_STDERR * 2 {
-                        kept.drain(..kept.len() - MAX_STDERR);
-                    }
-                }
-                let from = kept.len().saturating_sub(MAX_STDERR);
-                let _ = tx.send(String::from_utf8_lossy(&kept[from..]).into_owned());
-            });
-            rx
-        });
-        let child = Arc::new(Mutex::new(Some(child)));
-        let (watched, fed) = (Arc::clone(&child), Arc::clone(&feed));
-        std::thread::spawn(move || {
-            let (code, stopped) = loop {
-                {
-                    let mut held = lock(&watched);
-                    let Some(child) = held.as_mut() else {
-                        // Stopped on request: `stop` held it until it, and what it started,
-                        // had ended.
-                        break (None, true);
-                    };
-                    // Ended, it isn't reaped yet (see `ended`): what it left running is
-                    // stopped now, while its process group is surely its own, so that nothing
-                    // of the agent's changes its folder while its work is looked at.
-                    match ended(child) {
-                        Ok(None) => {}
-                        Ok(Some(code)) => {
-                            stop_here(child);
-                            *held = None;
-                            break (code, false);
-                        }
-                        // Lost track of it: its id may be another's by now, so nothing is
-                        // signalled.
-                        Err(_) => {
-                            *held = None;
-                            break (None, false);
-                        }
-                    }
-                }
-                std::thread::sleep(TICK);
-            };
-            // What it printed last (its result) is read before it counts as ended; but
-            // something it left running may hold its output open, so not for ever.
-            let until = std::time::Instant::now() + LINGER;
-            if let Some(read_all) = stdout {
-                let _ = read_all.recv_timeout(LINGER);
-            }
-            let stderr = stderr
-                .and_then(|rx| {
-                    rx.recv_timeout(until.saturating_duration_since(std::time::Instant::now()))
-                        .ok()
-                })
-                .unwrap_or_default();
-            lock(&fed).exit = Some(Exit {
-                code,
-                stopped,
-                stderr,
-            });
-            changed();
-        });
-        Ok(Running { child, feed })
+        let errors = Arc::new(Mutex::new(Vec::<u8>::new()));
+        let tail = errors.clone();
+        let (fed, parsed, notify, cwd) =
+            (feed.clone(), lines.clone(), changed.clone(), dir.clone());
+        let options = crate::processes::Options {
+            input: Some(prompt.into_bytes()),
+            background: true,
+            cancel: cancel.clone(),
+            output_limit: MAX_OUTPUT,
+            stderr_limit: Some(MAX_STDERR),
+            stderr_filter: Some(Box::new(move |bytes| {
+                let mut tail = lock(&tail);
+                let keep = bytes.len().min(MAX_STDERR);
+                let remove = tail.len().saturating_add(keep).saturating_sub(MAX_STDERR);
+                tail.drain(..remove);
+                tail.extend_from_slice(&bytes[bytes.len() - keep..]);
+                Vec::new()
+            })),
+            stdout: Some(Box::new(move |bytes| {
+                lock(&parsed).push(bytes, MAX_EVENT, |line| record(&fed, engine, &cwd, line));
+                notify();
+            })),
+            ..Default::default()
+        };
+        let fed = feed.clone();
+        let worker = std::thread::Builder::new()
+            .name("resolver-process".into())
+            .spawn(move || {
+                let result = crate::processes::run_checked(cmd, options);
+                lock(&lines).finish(|line| record(&fed, engine, &dir, line));
+                let exit = match result {
+                    Ok(out) => Exit {
+                        code: out.stopped.is_none().then(|| out.status.code()).flatten(),
+                        safe_to_inspect: out.stop_kind
+                            != Some(crate::processes::StopKind::Uncertain),
+                        stopped: out.stop_kind == Some(crate::processes::StopKind::Cancelled),
+                        stderr: out.stopped.unwrap_or_else(|| {
+                            String::from_utf8_lossy(&lock(&errors)).into_owned()
+                        }),
+                    },
+                    Err(error) => Exit {
+                        code: None,
+                        safe_to_inspect: true,
+                        stopped: matches!(error, crate::processes::Failure::CancelledBeforeStart),
+                        stderr: error.message(),
+                    },
+                };
+                lock(&fed).exit = Some(exit);
+                changed();
+            })
+            .map_err(|e| e.to_string())?;
+        Ok(Running {
+            cancel,
+            worker: Mutex::new(Some(worker)),
+            feed,
+        })
     }
-
-    /// Stops it, and what it started, in the background. It counts as ended (see
-    /// [`Feed::exit`]) once all of it has.
     pub fn stop(&self) {
-        let child = Arc::clone(&self.child);
-        std::thread::spawn(move || stop_held(&child));
+        self.cancel.cancel();
     }
-
-    /// Stops it, and what it started, before returning: for when nothing may be left behind
-    /// (gitcraft is closing, or its folder is removed next). A stop already under way is
-    /// waited for.
     pub fn stop_now(&self) {
-        stop_held(&self.child);
+        self.stop();
+        // Holding this lock through join also waits for another stop already under way.
+        let mut worker = lock(&self.worker);
+        if let Some(worker) = worker.take() {
+            let _ = worker.join();
+        }
     }
-
-    /// One that runs nothing and has done `activities`, for drawing the card in tests.
     #[cfg(test)]
     pub fn fake(activities: Vec<Activity>) -> Running {
         Running {
-            child: Arc::new(Mutex::new(None)),
+            cancel: Default::default(),
+            worker: Mutex::new(None),
             feed: Arc::new(Mutex::new(Feed {
                 activities: activities.into(),
                 exit: None,
             })),
         }
     }
-
-    /// Runs `f` on what came of it so far.
     pub fn with_feed<T>(&self, f: impl FnOnce(&Feed) -> T) -> T {
         f(&lock(&self.feed))
     }
 }
-
 impl Drop for Running {
     fn drop(&mut self) {
         self.stop();
     }
 }
-
+#[cfg(test)]
+fn each_line(mut out: impl std::io::Read, max: usize, mut each: impl FnMut(&str)) {
+    let mut lines = Lines::default();
+    let mut buf = [0; 8192];
+    while let Ok(n) = out.read(&mut buf) {
+        if n == 0 {
+            break;
+        }
+        lines.push(&buf[..n], max, &mut each);
+    }
+    lines.finish(each);
+}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::Instant;
+    use std::io::Read;
+    use std::time::{Duration, Instant};
 
     fn wait_for(running: &Running, until: impl Fn(&Feed) -> bool) -> bool {
         let start = Instant::now();
@@ -363,7 +280,7 @@ mod tests {
         let running = Running::start(Engine::Claude, &line, &dir, String::new(), || {})?;
         running.stop();
         running.stop_now();
-        assert!(lock(&running.child).is_none());
+        assert!(lock(&running.worker).is_none());
         assert!(wait_for(&running, |f| f.exit.is_some()), "it ended");
         assert!(running.with_feed(|f| f.exit.as_ref().is_some_and(|e| e.stopped)));
         Ok(())

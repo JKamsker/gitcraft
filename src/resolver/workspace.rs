@@ -297,19 +297,20 @@ fn write(top: &Path, path: &str, bytes: Option<&[u8]>) -> Result<(), String> {
 /// Writes `bytes` to `file` whole or not at all: into a file beside it first, then put in its
 /// place, with its permissions (an executable stays one). One that fails leaves it as it was.
 fn replace(file: &Path, bytes: &[u8]) -> std::io::Result<()> {
-    use std::io::Write;
     static SEQ: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
-    let name = file
-        .file_name()
-        .map(|n| n.to_string_lossy().into_owned())
-        .unwrap_or_default();
     let n = SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-    let temp = file.with_file_name(format!(".{name}.gitcraft-{}-{n}", std::process::id()));
+    let temp = file.with_file_name(format!(".gitcraft-{}-{n}", std::process::id()));
+    replace_with_temp(file, &temp, bytes)
+}
+
+fn replace_with_temp(file: &Path, temp: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    use std::io::Write;
+    // Only an opened file belongs to us. A create_new collision must remain untouched.
+    let mut out = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(temp)?;
     let written = (|| {
-        let mut out = std::fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&temp)?;
         out.write_all(bytes)?;
         out.sync_all()?;
         drop(out);

@@ -167,7 +167,7 @@ fn a_merge_put_aside_is_resolved_brought_back_and_applied() -> Result<(), String
     assert!(
         tab.finished
             .iter()
-            .any(|(text, _)| text.contains("resolved 1 file")),
+            .any(|notice| notice.raw().0.contains("resolved 1 file")),
         "the user is told: {:?}",
         tab.finished
     );

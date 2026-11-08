@@ -316,13 +316,17 @@ impl RepoTab {
             1 => format!("{name} · The agent resolved 1 file of the {what}: bring it back"),
             n => format!("{name} · The agent resolved {n} files of the {what}: bring it back"),
         };
-        self.finished.push((text, ready == 0));
+        self.finished
+            .push(crate::repo::notice::Notice::plain((text, ready == 0)));
     }
 
     /// Brings the parked merge `id` back into the worktree, then shows the agent's work on it.
     pub(super) fn bring_back(&mut self, id: &str, ctx: &egui::Context) {
         if self.busy_op.is_some() {
-            self.status = Some(("Wait for the running operation to finish".to_owned(), true));
+            self.status = Some(crate::repo::notice::Notice::plain((
+                "Wait for the running operation to finish".to_owned(),
+                true,
+            )));
             return;
         }
         let Some(parked) = self.resolver.parked.iter().find(|p| p.id == id).cloned() else {
@@ -336,7 +340,23 @@ impl RepoTab {
                 r.id == id && matches!(r.phase, Phase::Preparing | Phase::Checking)
             });
         if settling {
-            self.status = Some(("A moment: try again in a second".to_owned(), true));
+            self.status = Some(crate::repo::notice::Notice::plain((
+                "A moment: try again in a second".to_owned(),
+                true,
+            )));
+            return;
+        }
+        // Switching cards is safe only after the other parked run is durably kept.
+        if self.resolver.run.as_ref().is_some_and(|r| {
+            r.id != id
+                && (r.parked.is_none()
+                    || !matches!(r.phase, Phase::Ready | Phase::Failed)
+                    || !r.workspace.as_ref().is_some_and(|w| w.is_kept()))
+        }) {
+            self.status = Some(crate::repo::notice::Notice::plain((
+                "Finish or dismiss the current agent run first".into(),
+                true,
+            )));
             return;
         }
         let repo = self.path.clone();
@@ -355,35 +375,54 @@ impl RepoTab {
         let parked = match back {
             Ok(p) => p,
             Err(e) => {
-                self.status = Some((format!("Not brought back: {e}"), true));
+                self.status = Some(crate::repo::notice::Notice::plain((
+                    format!("Not brought back: {e}"),
+                    true,
+                )));
                 return;
             }
         };
         self.resolver.parked.retain(|p| p.id != parked.id);
         self.resolver.parked_changed();
-        self.status = Some((format!("The {} is back, as it was", parked.what()), false));
+        self.status = Some(crate::repo::notice::Notice::plain((
+            format!("The {} is back, as it was", parked.what()),
+            false,
+        )));
         // Its changes shown, as they were: conflicted and staged files.
         self.resolver.reveal = Some((super::Reveal::Changes, Instant::now()));
         self.reload(ctx);
-        if self.resolver.run.is_none() {
-            // Its run not here (gitcraft was closed meanwhile, and it wasn't read back yet):
-            // read from what was kept with it. Another run here stays.
-            let repo = self.path.clone();
-            self.then(
-                ctx,
-                move || kept_run(&repo, &parked),
-                |tab, run, ctx| {
-                    if tab.resolver.run.is_none() && run.is_some() {
-                        tab.resolver.run = run;
-                        tab.show_brought_back(ctx);
-                    }
-                },
-            );
-            return;
-        }
         if self.resolver_owns(&parked.id) {
             self.show_brought_back(ctx);
+            return;
         }
+        let repo = self.path.clone();
+        let id = parked.id.clone();
+        self.then(
+            ctx,
+            move || kept_run(&repo, &parked),
+            move |tab, run, ctx| {
+                tab.select_restored_run(&id, run, ctx);
+            },
+        );
+    }
+
+    fn select_restored_run(&mut self, id: &str, run: Option<Run>, ctx: &egui::Context) {
+        let Some(run) = run.filter(|r| r.id == id) else {
+            return;
+        };
+        let replaceable = self.resolver.run.as_ref().is_none_or(|r| {
+            r.id == id
+                || (r.parked.is_some()
+                    && matches!(r.phase, Phase::Ready | Phase::Failed)
+                    && r.workspace.as_ref().is_some_and(|w| w.is_kept()))
+        });
+        if !replaceable {
+            return;
+        }
+        // The previous run's workspace and run.json remain with its parked merge.
+        // In particular, do not call let_go, which deletes the durable workspace.
+        self.resolver.run = Some(run);
+        self.show_brought_back(ctx);
     }
 
     /// The run of the merge just brought back: its card in sight, as for a run in place, and
@@ -406,7 +445,10 @@ impl RepoTab {
     pub(super) fn drop_parked(&mut self, id: &str, ctx: &egui::Context) {
         // Never while it is brought back (or anything else runs on the worktree).
         if self.busy_op.is_some() {
-            self.status = Some(("Wait for the running operation to finish".to_owned(), true));
+            self.status = Some(crate::repo::notice::Notice::plain((
+                "Wait for the running operation to finish".to_owned(),
+                true,
+            )));
             return;
         }
         let Some(parked) = self.resolver.parked.iter().find(|p| p.id == id).cloned() else {
@@ -416,7 +458,10 @@ impl RepoTab {
             r.id == id && matches!(r.phase, Phase::Preparing | Phase::Working | Phase::Checking)
         });
         if working {
-            self.status = Some(("Stop the agent first".to_owned(), true));
+            self.status = Some(crate::repo::notice::Notice::plain((
+                "Stop the agent first".to_owned(),
+                true,
+            )));
             return;
         }
         let repo = self.path.clone();
@@ -435,7 +480,10 @@ impl RepoTab {
         let (parked, branch) = match dropped {
             Ok(dropped) => dropped,
             Err(e) => {
-                self.status = Some((format!("Not dropped: {e}"), true));
+                self.status = Some(crate::repo::notice::Notice::plain((
+                    format!("Not dropped: {e}"),
+                    true,
+                )));
                 return;
             }
         };
@@ -447,13 +495,13 @@ impl RepoTab {
         if self.resolver_owns(&parked.id) {
             self.resolver_act(super::ResolverAct::Dismiss, ctx);
         }
-        self.status = Some((
+        self.status = Some(crate::repo::notice::Notice::plain((
             format!(
                 "The {} was dropped: its files are on {branch}",
                 parked.what()
             ),
             false,
-        ));
+        )));
         self.reload(ctx);
     }
 }
@@ -538,6 +586,90 @@ mod tests {
             p.finished
                 .as_ref()
                 .is_some_and(|f| f.ok && f.summary == "all done")
+        );
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod selection_regression_tests {
+    use super::*;
+    #[test]
+    fn done_step_file_overrides_an_id_that_names_another_file() {
+        let now = Instant::now();
+        let mut progress = Progress::default();
+        progress.apply(
+            Report::Plan {
+                steps: vec![
+                    PlannedStep {
+                        id: "untouched.txt".into(),
+                        title: "Resolve actual".into(),
+                        file: Some("actual.txt".into()),
+                    },
+                    PlannedStep {
+                        id: "fallback.txt".into(),
+                        title: "Fallback".into(),
+                        file: None,
+                    },
+                ],
+                estimate_minutes: None,
+            },
+            now,
+        );
+        for id in ["untouched.txt", "fallback.txt"] {
+            progress.apply(
+                Report::Step {
+                    id: id.into(),
+                    status: StepStatus::Done,
+                    note: None,
+                },
+                now,
+            );
+        }
+        assert_eq!(done_files(&progress), vec!["actual.txt", "fallback.txt"]);
+    }
+}
+
+#[cfg(test)]
+mod restored_run_tests {
+    use super::*;
+    #[test]
+    fn selecting_restored_id_preserves_the_other_parked_run() -> Result<(), String> {
+        let repo = crate::git::fixture::Repo::new("resolver-switch-parked")?;
+        let ctx = egui::Context::default();
+        let mut tab = RepoTab::new_deferred(repo.path().to_path_buf(), &ctx);
+        let directory = repo.path().join("saved-agent");
+        std::fs::create_dir_all(directory.join("resolved")).map_err(|e| e.to_string())?;
+        std::fs::write(
+            directory.join("workspace.json"),
+            r#"{"files":[],"sides":{}}"#,
+        )
+        .map_err(|e| e.to_string())?;
+        std::fs::write(directory.join("run.json"), "original record").map_err(|e| e.to_string())?;
+        let mut previous = super::super::look_tests::run(Phase::Ready, Instant::now());
+        previous.id = "previous".into();
+        previous.parked = Some(Parked {
+            id: "previous".into(),
+            ..Default::default()
+        });
+        previous.workspace = Some(Arc::new(Workspace::load(&directory)?));
+        tab.resolver.run = Some(previous);
+        let restored = || {
+            let mut run = super::super::look_tests::run(Phase::Ready, Instant::now());
+            run.id = "restored".into();
+            run.results.clear();
+            run
+        };
+        tab.select_restored_run("wrong-id", Some(restored()), &ctx);
+        assert_eq!(tab.resolver.run.as_ref().unwrap().id, "previous");
+        tab.select_restored_run("restored", None, &ctx);
+        assert_eq!(tab.resolver.run.as_ref().unwrap().id, "previous");
+        tab.select_restored_run("restored", Some(restored()), &ctx);
+        assert_eq!(tab.resolver.run.as_ref().unwrap().id, "restored");
+        assert!(Workspace::load(&directory).is_ok());
+        assert_eq!(
+            std::fs::read_to_string(directory.join("run.json")).unwrap(),
+            "original record"
         );
         Ok(())
     }

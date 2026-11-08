@@ -16,7 +16,10 @@ const MARK_RESOLVED: &str = "Mark resolved (agent)";
 impl RepoTab {
     pub(super) fn apply_resolved(&mut self, ctx: &egui::Context) {
         if self.busy_op.is_some() {
-            self.status = Some(("Wait for the running operation to finish".to_owned(), true));
+            self.status = Some(crate::repo::notice::Notice::plain((
+                "Wait for the running operation to finish".to_owned(),
+                true,
+            )));
             return;
         }
         let Some(run) = self
@@ -73,11 +76,11 @@ impl RepoTab {
         if written.is_empty() {
             run.phase = if left { Phase::Ready } else { Phase::Applied };
             if !left {
-                self.status = Some((
+                self.status = Some(crate::repo::notice::Notice::plain((
                     "Nothing was applied: the files changed here since the agent started"
                         .to_owned(),
                     true,
-                ));
+                )));
             }
             return;
         }
@@ -110,14 +113,14 @@ impl RepoTab {
             return;
         };
         if ed.has_draft() {
-            self.status = Some((
+            self.status = Some(crate::repo::notice::Notice::plain((
                 format!(
                     "{} has the agent's version now; its conflict editor keeps your choices, \
                      not saved: close it to keep the agent's, or save to write yours over it",
                     ed.path
                 ),
                 true,
-            ));
+            )));
         } else {
             self.queued.push(Action::CloseDiff);
         }

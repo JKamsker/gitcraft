@@ -141,17 +141,13 @@ impl ConflictEditor {
                 ui.close();
             }
             if ui
-                .button("Send to agent's terminal")
-                .on_hover_text(
-                    "Types the conflicts, each with its three sides, into the agent's terminal. \
-                     The agent then edits the file itself: close this editor then, and don't \
-                     save over its work",
-                )
+                .button(crate::i18n::text("repo-core-0712"))
+                .on_hover_text(crate::i18n::text("repo-core-0713"))
                 .clicked()
             {
                 acts.push(Action::Agent(crate::repo::agents::AgentAct::Send(
                     self.for_agent(),
-                    "the conflicts",
+                    crate::i18n::text("repo-core-0714"),
                 )));
                 ui.close();
             }

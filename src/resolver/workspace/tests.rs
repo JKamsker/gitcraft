@@ -352,3 +352,26 @@ fn a_link_the_agent_made_is_never_applied() -> Result<(), String> {
     let _ = std::fs::remove_file(&secret);
     ws.remove()
 }
+
+#[test]
+fn atomic_replacement_never_removes_an_existing_temporary_file() -> Result<(), String> {
+    let repo = Repo::new("resolver-atomic-collision")?;
+    let target = repo.path().join("target");
+    let temp = repo.path().join("occupied");
+    std::fs::write(&target, b"original").map_err(|e| e.to_string())?;
+    std::fs::write(&temp, b"someone else's file").map_err(|e| e.to_string())?;
+    assert!(replace_with_temp(&target, &temp, b"replacement").is_err());
+    assert_eq!(std::fs::read(target).unwrap(), b"original");
+    assert_eq!(std::fs::read(temp).unwrap(), b"someone else's file");
+    Ok(())
+}
+
+#[test]
+fn atomic_replacement_supports_long_file_names() -> Result<(), String> {
+    let repo = Repo::new("resolver-atomic-long-name")?;
+    let file = repo.path().join("a".repeat(240));
+    std::fs::write(&file, b"old").map_err(|e| e.to_string())?;
+    replace(&file, b"new").map_err(|e| e.to_string())?;
+    assert_eq!(std::fs::read(file).unwrap(), b"new");
+    Ok(())
+}

@@ -167,9 +167,12 @@ fn unkeepable(repo: &Path) -> Option<String> {
             "A merge in a sparse checkout can't be put aside safely: resolve it here".to_owned(),
         );
     }
-    let listed = run(repo, &["ls-files", "-v"]).ok()?;
+    let listed = match run(repo, &["ls-files", "-v", "-z"]) {
+        Ok(listed) => listed,
+        Err(e) => return Some(format!("Could not check index flags: {e}")),
+    };
     let hidden: Vec<&str> = listed
-        .lines()
+        .split('\0')
         .filter(|l| l.starts_with(|c: char| c.is_ascii_lowercase() || c == 'S'))
         .filter_map(|l| l.get(2..))
         .take(3)
@@ -248,6 +251,34 @@ fn unchanged(repo: &Path, gd: &Path, dir: &Path, snapshot: &str) -> bool {
     std::fs::read(gd.join("index")).ok() == std::fs::read(dir.join("index")).ok()
         && files.is_some()
         && files == kept
+        && raw_unchanged(repo, dir)
+}
+
+/// Filters can map distinct worktree bytes to the same tree. Check the saved bytes too.
+fn raw_unchanged(repo: &Path, dir: &Path) -> bool {
+    let Some(parked) = std::fs::read(dir.join("parked.json"))
+        .ok()
+        .and_then(|b| serde_json::from_slice::<Parked>(&b).ok())
+    else {
+        return false;
+    };
+    let Ok(paths) = run(repo, &["ls-files", "--cached", "-z"]) else {
+        return false;
+    };
+    paths
+        .split('\0')
+        .filter(|p| !p.is_empty())
+        .chain(parked.raw.iter().map(String::as_str))
+        .all(|path| {
+            let now = repo.join(path);
+            if parked.raw.iter().any(|p| p == path) {
+                crate::safe_read::read_inside(repo, path, u64::MAX - 1).is_some_and(|bytes| {
+                    std::fs::read(dir.join("raw").join(path)).is_ok_and(|kept| kept == bytes)
+                })
+            } else {
+                !std::fs::symlink_metadata(now).is_ok_and(|m| m.is_file())
+            }
+        })
 }
 
 /// Takes `dir` for a merge put aside: none is there yet, or it isn't written over.
@@ -455,6 +486,14 @@ fn raw_paths(repo: &Path, parked: &Parked, files: &[String]) -> Result<Vec<Strin
             .filter(|p| !p.is_empty() && crate::mcp::args::repo_path(p).is_ok())
             .map(str::to_owned),
     );
+    // A clean filter can hide edits even in files whose filtered tree equals HEAD.
+    paths.extend(
+        run(repo, &["ls-files", "--cached", "-z"])?
+            .split('\0')
+            .filter(|p| !p.is_empty())
+            .map(|p| crate::mcp::args::repo_path(p).map(str::to_owned))
+            .collect::<Result<Vec<_>, _>>()?,
+    );
     paths.sort_unstable();
     paths.dedup();
     Ok(paths)
@@ -497,6 +536,9 @@ pub fn blocker(repo: &Path, parked: &Parked) -> Option<String> {
              merge's files out"
                 .to_owned(),
         );
+    }
+    if let Some(why) = unkeepable(repo) {
+        return Some(why);
     }
     let dirty = run(repo, &["status", "--porcelain", "--untracked-files=no"])
         .map(|s| !s.trim().is_empty())
@@ -712,6 +754,28 @@ pub fn drop_to_branch(repo: &Path, parked: &Parked) -> Result<String, String> {
         n += 1;
     }
     run(repo, &["branch", &name, &parked.snapshot])?;
+    // A branch contains Git's filtered tree, not necessarily the original bytes.
+    // Keep the complete raw archive outside the parked-list namespace before forgetting.
+    let archive = crate::agent::repo_file(repo, &format!("parked-recovery/{}", parked.id))?;
+    reserve(&archive)?;
+    if let Err(e) = std::fs::rename(folder(repo, &parked.id)?, archive.join("parked")) {
+        let _ = std::fs::remove_dir(&archive);
+        return Err(format!(
+            "The branch {name} exists, but raw recovery could not be archived: {e}"
+        ));
+    }
+    let description = format!(
+        "Original byte-exact files and index: {}",
+        archive.join("parked").display()
+    );
+    run(
+        repo,
+        &[
+            "config",
+            &format!("branch.{name}.description"),
+            &description,
+        ],
+    )?;
     forget(repo, &parked.id);
     Ok(name)
 }

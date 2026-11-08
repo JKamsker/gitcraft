@@ -564,3 +564,80 @@ fn a_failure_once_it_is_coming_back_leaves_it_clean_and_put_aside() -> Result<()
     assert_eq!(state(&repo)?, before);
     Ok(())
 }
+
+#[test]
+fn restoration_rejects_both_hidden_index_flags() -> Result<(), String> {
+    for flag in ["--assume-unchanged", "--skip-worktree"] {
+        let repo = mid_merge(&format!("park-hidden-{flag}"))?;
+        let parked = park(repo.path(), "hidden", &["a.txt".into()])?;
+        repo.git(&["update-index", flag, "notes.txt"])?;
+        write(repo.path(), "notes.txt", "hidden user edit\n")?;
+        assert!(
+            repo.git(&["status", "--porcelain", "--untracked-files=no"])?
+                .is_empty()
+        );
+        assert!(bring_back(repo.path(), &parked).is_err());
+        assert_eq!(
+            read(repo.path(), "notes.txt").as_deref(),
+            Some("hidden user edit\n")
+        );
+        assert_eq!(list(repo.path())?, vec![parked]);
+    }
+    Ok(())
+}
+
+#[test]
+fn freshness_rejects_raw_changes_that_git_normalizes_away() -> Result<(), String> {
+    let repo = mid_merge("park-raw-freshness")?;
+    write(repo.path(), ".gitattributes", "notes.txt text eol=lf\n")?;
+    repo.git(&["add", ".gitattributes"])?;
+    let gd = git_dir(repo.path())?;
+    let dir = folder(repo.path(), "raw-freshness")?;
+    reserve(&dir)?;
+    let (_, theirs) = operation(repo.path(), &gd)?;
+    let parked = keep(
+        repo.path(),
+        &gd,
+        &dir,
+        "raw-freshness",
+        "merge",
+        &theirs,
+        &["a.txt".into()],
+    )?;
+    assert!(unchanged(repo.path(), &gd, &dir, &parked.snapshot));
+    write(repo.path(), "notes.txt", "notes, changed meanwhile\r\n")?;
+    // Same filtered tree, different user bytes: the pre-reset guard must stop.
+    let tree = trees(repo.path(), &gd.join("index"))?.1;
+    assert_eq!(
+        tree,
+        trimmed(run(
+            repo.path(),
+            &["rev-parse", &format!("{}^{{tree}}", parked.snapshot)]
+        )?)
+    );
+    assert!(!unchanged(repo.path(), &gd, &dir, &parked.snapshot));
+    Ok(())
+}
+
+#[test]
+fn dropping_to_a_branch_keeps_accessible_byte_exact_recovery() -> Result<(), String> {
+    let repo = mid_merge("park-raw-recovery")?;
+    write(repo.path(), ".gitattributes", "notes.txt text eol=lf\n")?;
+    repo.git(&["add", ".gitattributes"])?;
+    let raw = b"notes, changed meanwhile\r\n";
+    std::fs::write(repo.path().join("notes.txt"), raw).map_err(|e| e.to_string())?;
+    let parked = park(repo.path(), "raw-recovery", &["a.txt".into()])?;
+    let branch = drop_to_branch(repo.path(), &parked)?;
+    let archived = crate::agent::repo_file(repo.path(), "parked-recovery/raw-recovery/parked")?;
+    assert_eq!(std::fs::read(archived.join("raw/notes.txt")).unwrap(), raw);
+    assert!(archived.join("index").is_file());
+    assert!(archived.join("parked.json").is_file());
+    let description = repo.git(&["config", &format!("branch.{branch}.description")])?;
+    assert!(description.contains(&archived.display().to_string()));
+    assert!(list(repo.path())?.is_empty());
+    assert!(
+        repo.git(&["show", &format!("{branch}:notes.txt")])?
+            .ends_with("\n")
+    );
+    Ok(())
+}

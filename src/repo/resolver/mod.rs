@@ -310,8 +310,7 @@ fn done_files(progress: &Progress) -> Vec<String> {
         .steps
         .iter()
         .filter(|s| s.status == crate::resolver::report::StepStatus::Done)
-        .flat_map(|s| [Some(s.id.clone()), s.path.clone()])
-        .flatten()
+        .map(|s| s.path.clone().unwrap_or_else(|| s.id.clone()))
         .collect()
 }
 
@@ -514,7 +513,10 @@ impl RepoTab {
             return;
         }
         if self.busy_op.is_some() {
-            self.status = Some(("Wait for the running operation to finish".to_owned(), true));
+            self.status = Some(crate::repo::notice::Notice::plain((
+                "Wait for the running operation to finish".to_owned(),
+                true,
+            )));
             return;
         }
         // All of them: the merge is put aside meanwhile, the worktree free (one file is resolved
@@ -528,7 +530,10 @@ impl RepoTab {
                 .collect()
         });
         if files.is_empty() {
-            self.status = Some(("There is no conflicted file to resolve".to_owned(), true));
+            self.status = Some(crate::repo::notice::Notice::plain((
+                "There is no conflicted file to resolve".to_owned(),
+                true,
+            )));
             return;
         }
         let engine = Engine::from_settings(crate::settings::Settings::get(ctx).ai.tool);
@@ -588,25 +593,31 @@ impl RepoTab {
         if let Some(parked) = &parked {
             self.resolver.parked.push(parked.clone());
             self.resolver.parked_changed();
-            self.status = Some((
+            self.status = Some(crate::repo::notice::Notice::plain((
                 format!(
                     "The {} is put aside while the agent resolves it: the worktree is free",
                     parked.what()
                 ),
                 false,
-            ));
+            )));
             self.resolver.reveal = Some((Reveal::Parked(parked.id.clone()), Instant::now()));
             self.reload(ctx);
         } else if let Some(why) = not_parked {
-            self.status = Some((format!("Resolving in place: {why}"), false));
+            self.status = Some(crate::repo::notice::Notice::plain((
+                format!("Resolving in place: {why}"),
+                false,
+            )));
         }
         if !fenced.is_empty() {
             let said = self
                 .status
                 .as_ref()
-                .map(|(s, _)| format!("{s}. "))
+                .map(|notice| format!("{}. ", notice.raw().0))
                 .unwrap_or_default();
-            self.status = Some((format!("{said}{}", behind_fence(&fenced)), false));
+            self.status = Some(crate::repo::notice::Notice::plain((
+                format!("{said}{}", behind_fence(&fenced)),
+                false,
+            )));
         }
         let Some(run) = self.resolver.run.as_mut().filter(|r| r.id == id) else {
             // Dismissed meanwhile: what was made goes (a merge put aside stays, in the graph).
@@ -708,6 +719,14 @@ impl RepoTab {
             run.cost_usd = cost_usd;
         }
         run.ended = Some(Instant::now());
+        if !exit.safe_to_inspect {
+            run.phase = Phase::Failed;
+            run.error = Some(format!(
+                "Agent cleanup could not be confirmed: {}",
+                exit.stderr
+            ));
+            return;
+        }
         let failed = !exit.stopped && exit.code != Some(0) && run.progress.finished.is_none();
         if failed {
             run.error = Some(failure(run.engine, exit.code, &exit.stderr));
