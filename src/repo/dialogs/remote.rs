@@ -131,16 +131,18 @@ pub(super) fn credentials(
     ui.add_space(4.0);
     ui.label(
         RichText::new(
-            "Used only for this endpoint and account until you close the tab. This explicit sign-in bypasses stored accounts and is not automatically saved to a credential manager.",
+            "Used only for this HTTPS endpoint and account until you close the tab. Requires Git 2.46 or newer on the repository machine. Supplies the selected username/password before the first request and is not automatically saved to a credential manager.",
         )
         .color(t.text_faint)
         .small(),
     );
     ui.add_space(8.0);
     let scope = crate::git::CredentialScope::for_url(url, username.trim()).ok();
-    let valid = scope.is_some() && !password.is_empty() && !password.chars().any(char::is_control);
-    if scope.is_none() {
-        ui.label("An exact HTTP(S) endpoint is required before entering a transient sign-in. Run the operation again to resolve its destination.");
+    let valid = scope.as_ref().is_some_and(|scope| scope.is_https())
+        && !password.is_empty()
+        && !password.chars().any(char::is_control);
+    if !scope.as_ref().is_some_and(|scope| scope.is_https()) {
+        ui.label("An exact HTTPS endpoint is required for transient sign-in. Other transports can use the profile credential manager.");
     }
     buttons(ui, "Sign in", valid, enter, || {
         Action::SignIn(crate::git::Credentials {

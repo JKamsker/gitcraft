@@ -128,6 +128,9 @@ impl CredentialScope {
         // Labels are not a way to rebuild a transport URL (path is decoded).
         format!("{}://{}/{}", self.protocol, self.authority, self.path)
     }
+    pub(crate) fn is_https(&self) -> bool {
+        self.protocol == "https"
+    }
     pub fn account(&self) -> &str {
         &self.account
     }
