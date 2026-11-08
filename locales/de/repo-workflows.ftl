@@ -7453,3 +7453,38 @@ repo-workflows-test-lane-ended-display = { $stopped ->
        *[no] { "" }
     }
 
+repo-workflows-fence-confirm-body = { $branch }{ $worktree ->
+        [yes] { " (Worktree " }{ $folder })
+       *[no] { "" }
+    }{ $found ->
+        [yes] { " hat Pfade geändert, die Agenten nicht verändern dürfen:\u000A" }{ $paths }
+       *[no] { "" }
+    }{ $errors ->
+        [yes] { $found ->
+            [yes] { "\u000AAußerdem konnte der Branch nicht gegen die Agent-Grenze geprüft werden:\u000A  " }
+           *[no] { " konnte nicht gegen die Agent-Grenze geprüft werden:\u000A  " }
+        }{ $details }
+       *[no] { "" }
+    }{ "\u000A\u000ATrotzdem fortfahren?" }
+
+repo-workflows-drift-task-source = { $line }{ $task ->
+        [yes] { " (als Aufgabe verwendet)" }
+       *[no] { "" }
+    }
+
+repo-workflows-fork-rebase-preview = Baut { $local } ({ $branch } von { $owner } aus #{ $number }) auf { $onto } neu auf. Dort gibt es { $behind ->
+        [one] einen Commit, der dem Branch fehlt
+       *[other] { $behind } Commits, die dem Branch fehlen
+    }. Danach wird der Branch mit Force-Push und Lease an { $fork } (den Fork) gesendet. Der Push wird abgelehnt, wenn { $owner } dort seit dem gerade erfolgten Abruf gepusht hat.
+    
+    Bei Konflikten hält der Rebase an. Lösen Sie diese und setzen Sie den Rebase fort; gitcraft bietet anschließend den Push an. Beim Abbrechen wird nichts gepusht.
+    
+    Strg+Z stellt den vorherigen Branchstand im Fork und hier wieder her.
+
+repo-workflows-fence-violation-line = { "  " }{ $path } ({ $how ->
+        [committed] committet
+        [uncommitted] nicht committet
+        [untracked] nicht versioniert
+       *[ignored] von Git ignoriert
+    }; Grenze: { $pattern })
+

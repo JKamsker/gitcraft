@@ -7455,3 +7455,38 @@ repo-workflows-test-lane-ended-display = { $stopped ->
        *[no] { "" }
     }
 
+repo-workflows-fence-confirm-body = { $branch }{ $worktree ->
+        [yes] { " (worktree " }{ $folder })
+       *[no] { "" }
+    }{ $found ->
+        [yes] { " touched paths agents must stay out of:\u000A" }{ $paths }
+       *[no] { "" }
+    }{ $errors ->
+        [yes] { $found ->
+            [yes] { "\u000AIt also could not be checked against the agent fence:\u000A  " }
+           *[no] { " could not be checked against the agent fence:\u000A  " }
+        }{ $details }
+       *[no] { "" }
+    }{ "\u000A\u000AGo ahead all the same?" }
+
+repo-workflows-drift-task-source = { $line }{ $task ->
+        [yes] { " (used as the task)" }
+       *[no] { "" }
+    }
+
+repo-workflows-fork-rebase-preview = Rebases { $local } ({ $owner }’s branch { $branch } of #{ $number }) onto { $onto }, which has { $behind ->
+        [one] one commit it does not have
+       *[other] { $behind } commits it does not have
+    }, then force-pushes it to { $fork } (their fork) with a lease: refused if { $owner } pushed there since it was fetched a moment ago.
+    
+    If the rebase stops on conflicts, resolve them and continue it: gitcraft then offers to push it. Abort it, and nothing is pushed.
+    
+    Ctrl+Z puts the branch back as it was, on the fork and here.
+
+repo-workflows-fence-violation-line = { "  " }{ $path } ({ $how ->
+        [committed] committed
+        [uncommitted] not committed
+        [untracked] untracked
+       *[ignored] ignored by git
+    }; fence: { $pattern })
+

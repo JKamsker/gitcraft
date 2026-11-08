@@ -498,22 +498,23 @@ impl RepoTab {
 
 /// What the rebase dialog says it will do.
 fn rebase_preview(info: &ForkInfo, plan: &plan::Rebase) -> String {
-    format!(
-        "Rebases {} ({}'s branch {} of #{}) onto {}, which has {} commit{} it hasn't, then \
-         force-pushes it to {} (their fork) with a lease: refused if {} pushed there since it \
-         was fetched a moment ago.\n\nIf the rebase stops on conflicts, resolve them and \
-         continue it: gitcraft then offers to push it. Abort it, and nothing is pushed.\n\n\
-         Ctrl+Z puts the branch back as it was, on the fork and here.",
-        plan.local,
-        info.owner,
-        info.branch,
-        info.number,
-        plan.onto
-            .strip_prefix("refs/remotes/")
-            .unwrap_or(&plan.onto),
-        plan.behind,
-        if plan.behind == 1 { "" } else { "s" },
-        plan.fork,
-        info.owner,
+    crate::i18n::message(
+        "repo-workflows-fork-rebase-preview",
+        &[
+            ("local", (plan.local.as_str()).into()),
+            ("owner", (info.owner.as_str()).into()),
+            ("branch", (info.branch.as_str()).into()),
+            ("number", (info.number.to_string()).into()),
+            (
+                "onto",
+                (plan
+                    .onto
+                    .strip_prefix("refs/remotes/")
+                    .unwrap_or(&plan.onto))
+                .into(),
+            ),
+            ("behind", (plan.behind).into()),
+            ("fork", (plan.fork.as_str()).into()),
+        ],
     )
 }

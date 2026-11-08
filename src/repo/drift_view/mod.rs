@@ -333,15 +333,25 @@ fn body(ui: &mut egui::Ui, view: &mut DriftView, acts: &mut Vec<Action>) -> Todo
                 &[("n", (n).clone().into()), ("e", (e).clone().into())],
             ),
         };
-        let note = if view.task.trim().is_empty() {
-            " (used as the task)"
-        } else {
-            ""
-        };
+
         ui.label(
-            RichText::new(format!("{line}{note}"))
-                .size(12.0)
-                .color(t.text_dim),
+            RichText::new(crate::i18n::message(
+                "repo-workflows-drift-task-source",
+                &[
+                    ("line", (line.as_str()).into()),
+                    (
+                        "task",
+                        (if view.task.trim().is_empty() {
+                            "yes"
+                        } else {
+                            "no"
+                        })
+                        .into(),
+                    ),
+                ],
+            ))
+            .size(12.0)
+            .color(t.text_dim),
         );
     }
     ui.horizontal(|ui| {
