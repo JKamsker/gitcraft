@@ -162,7 +162,7 @@ fn applying_does_it_for_real_and_it_can_be_undone() -> Result<(), String> {
     let before = repo.rev("feature")?;
     let onto = repo.rev("main")?;
     act(&mut tab, &ctx, RehearseAct::Apply(RehearseKind::Rebase))?;
-    let accepted = tab.accept_rebase_for_test(&ctx, "feature", &before, &onto);
+    let accepted = tab.accept_rebase_for_test(&ctx, "feature", &before, &onto)?;
     assert_eq!(
         tab.timeline
             .entries

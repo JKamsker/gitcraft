@@ -143,7 +143,7 @@ fn enter(harness: &mut H<'_>) {
 }
 
 #[test]
-fn typing_reb_ranks_rebase_first_and_its_branch_is_picked_next() {
+fn typing_reb_ranks_rebase_first_and_its_branch_is_picked_next() -> Result<(), String> {
     let dir = repo("rebase");
     let before = git_ok(&dir, &["rev-parse", "refs/heads/main"]);
     let onto = git_ok(&dir, &["rev-parse", "refs/heads/side"]);
@@ -168,9 +168,9 @@ fn typing_reb_ranks_rebase_first_and_its_branch_is_picked_next() {
         let state = harness.state_mut();
         let active = state.active;
         let Some(Tab::Repo(tab)) = state.tabs.get_mut(active) else {
-            panic!("no repository tab");
+            return Err("no repository tab".into());
         };
-        tab.review_rebase_for_test(&egui::Context::default(), "main", &before, &onto);
+        tab.review_rebase_for_test(&egui::Context::default(), "main", &before, &onto)?;
     }
     harness.step();
     harness.get_by_label("Rebase").click();
@@ -185,6 +185,7 @@ fn typing_reb_ranks_rebase_first_and_its_branch_is_picked_next() {
     let recent = &harness.state().palette_recent;
     assert_eq!(recent.rank("rebase:side"), Some(0));
     assert_eq!(recent.rank("pick:rebase"), Some(1));
+    Ok(())
 }
 
 /// A letter typed and Enter pressed in the same frame run the best match for the whole query.

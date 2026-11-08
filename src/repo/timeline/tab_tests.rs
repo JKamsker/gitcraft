@@ -221,9 +221,11 @@ fn a_rebase_gives_its_old_tip_back_after_a_restart_and_a_gc() {
     git_ok(&dir, &["commit", "-q", "-m", "m1"]);
     git_ok(&dir, &["checkout", "-q", "feat"]);
     let mut tab = open(&dir, &ctx);
-    let onto = git::resolve(&dir, "refs/heads/main").expect("no main");
+    let onto = git_ok(&dir, &["rev-parse", "refs/heads/main"]);
     tab.apply(rebase_action(BranchRef::local("main"), "feat"), &ctx);
-    let accepted = tab.accept_rebase_for_test(&ctx, "feat", &old_tip, &onto);
+    let accepted = tab
+        .accept_rebase_for_test(&ctx, "feat", &old_tip, &onto)
+        .unwrap_or_else(|error| unreachable!("rebase confirmation: {error}"));
     act(&mut tab, &ctx, accepted);
     let entry = tab.timeline.current_entry().cloned();
     let id = entry.as_ref().map_or(0, |e| e.id);

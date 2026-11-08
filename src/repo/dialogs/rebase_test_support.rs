@@ -17,18 +17,20 @@ impl RepoTab {
         branch: &str,
         head: &str,
         onto: &str,
-    ) {
+    ) -> Result<(), String> {
         let until = Instant::now() + Duration::from_secs(30);
         loop {
             self.poll(ctx);
             match &self.dialog {
                 Some(Dialog::Confirm { preview, .. }) => match &preview.state {
                     PreviewState::Ready(_) => break,
-                    PreviewState::Failed(error) => panic!("rebase preview failed: {error}"),
+                    PreviewState::Failed(error) => {
+                        return Err(format!("rebase preview failed: {error}"));
+                    }
                     _ => {}
                 },
                 None => {}
-                _ => panic!("expected a rebase confirmation"),
+                _ => return Err("expected a rebase confirmation".into()),
             }
             assert!(
                 Instant::now() < until,
@@ -64,12 +66,11 @@ impl RepoTab {
         assert!(self.busy_op.is_none());
         assert_eq!(git::resolve(&self.path, "HEAD").as_deref(), Ok(head));
         assert_eq!(
-            git::run(Some(&self.path), &["symbolic-ref", "--short", "HEAD"])
-                .unwrap()
-                .trim(),
+            git::run(Some(&self.path), &["symbolic-ref", "--short", "HEAD"])?.trim(),
             branch
         );
-        assert!(git::status(&self.path).unwrap().in_progress.is_none());
+        assert!(git::status(&self.path)?.in_progress.is_none());
+        Ok(())
     }
 
     /// Click the production confirmation button and return exactly the action it emits.
@@ -79,8 +80,8 @@ impl RepoTab {
         branch: &str,
         head: &str,
         onto: &str,
-    ) -> Action {
-        self.review_rebase_for_test(ctx, branch, head, onto);
+    ) -> Result<Action, String> {
+        self.review_rebase_for_test(ctx, branch, head, onto)?;
         let Some(Dialog::Confirm {
             title,
             body,
@@ -100,6 +101,10 @@ impl RepoTab {
         let mut harness = egui_kittest::Harness::builder()
             .with_size([800.0, 1000.0])
             .build_ui(|ui| {
+                if ui.ctx().cumulative_pass_nr() == 0 {
+                    crate::theme::install_fonts(ui.ctx());
+                    return;
+                }
                 let outcome = confirm::confirm(
                     ui,
                     confirm::Asked {
@@ -124,6 +129,6 @@ impl RepoTab {
         harness.get_by_label(&button).click();
         harness.run();
         drop(harness);
-        accepted.expect("the reviewed rebase button emitted no action")
+        accepted.ok_or_else(|| "the reviewed rebase button emitted no action".into())
     }
 }

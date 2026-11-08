@@ -336,7 +336,7 @@ fn undoing_a_rebase_that_updated_dependent_branches_puts_them_back() -> Result<(
             .map(|e| format!("todo: Pick {} {}", e.commit.hash, e.message)),
     );
     tab.apply(Action::RunRebase, &ctx);
-    tab.review_rebase_for_test(&ctx, "ui", &before.2, &onto);
+    tab.review_rebase_for_test(&ctx, "ui", &before.2, &onto)?;
     let Some(crate::repo::Dialog::Confirm { preview, .. }) = &tab.dialog else {
         return Err("no interactive confirmation".into());
     };
@@ -350,7 +350,7 @@ fn undoing_a_rebase_that_updated_dependent_branches_puts_them_back() -> Result<(
         (repo.tip("schema")?, repo.tip("api")?, repo.tip("ui")?),
         before
     );
-    let accepted = tab.accept_rebase_for_test(&ctx, "ui", &before.2, &onto);
+    let accepted = tab.accept_rebase_for_test(&ctx, "ui", &before.2, &onto)?;
     tab.apply(accepted, &ctx);
     settle(&mut tab, &ctx, |t| t.rebase.is_none() && t.status.is_some())?;
     assert!(is_ancestor(&repo, "main", "schema") && is_ancestor(&repo, "main", "api"));

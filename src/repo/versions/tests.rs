@@ -94,7 +94,7 @@ fn a_rebase_keeps_both_versions_and_offers_to_compare_them() -> Result<(), Strin
         &ctx,
     );
     let onto = git(dir, &["rev-parse", "refs/heads/main"])?;
-    let accepted = tab.accept_rebase_for_test(&ctx, "topic", &before, &onto);
+    let accepted = tab.accept_rebase_for_test(&ctx, "topic", &before, &onto)?;
     assert!(git::rewrites(dir)?.is_empty());
     tab.apply(accepted, &ctx);
     assert!(wait(&mut tab, &ctx, |t| t.versions.fresh.is_some()));
@@ -176,7 +176,7 @@ fn a_rebase_continued_after_conflicts_is_kept_from_where_it_started() -> Result<
         &ctx,
     );
     let onto = git(dir, &["rev-parse", "refs/heads/main"])?;
-    let accepted = tab.accept_rebase_for_test(&ctx, "topic", &before, &onto);
+    let accepted = tab.accept_rebase_for_test(&ctx, "topic", &before, &onto)?;
     assert!(tab.versions.pending.is_none());
     assert!(git::rewrites(dir)?.is_empty());
     tab.apply(accepted, &ctx);
