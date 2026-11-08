@@ -293,6 +293,15 @@ fn similarity(a: &Symbol, b: &Symbol) -> f32 {
     (2 * a.intersection(&b).count()) as f32 / (a.len() + b.len()) as f32
 }
 fn choose(current: &Symbol, candidates: &[Symbol]) -> Result<Option<(Symbol, u8)>, String> {
+    let same = candidates
+        .iter()
+        .filter(|s| s.path == current.path && s.qualified == current.qualified)
+        .collect::<Vec<_>>();
+    match same.as_slice() {
+        [only] => return Ok(Some(((*only).clone(), (similarity(current, only) * 100.).round() as u8))),
+        [] => {},
+        _ => return Err("More than one function has this path and qualified name; structural identity is ambiguous.".into()),
+    }
     let mut ranked = candidates
         .iter()
         .filter_map(|s| {
@@ -307,7 +316,11 @@ fn choose(current: &Symbol, candidates: &[Symbol]) -> Result<Option<(Symbol, u8)
         .collect::<Vec<_>>();
     ranked.sort_by(|a, b| (b.1 + b.2).total_cmp(&(a.1 + a.2)));
     let Some((best, score, bonus)) = ranked.first() else {
-        return Ok(None);
+        return if candidates.is_empty() {
+            Ok(None)
+        } else {
+            Err("No unambiguous structural identity survived this transition. Body similarity alone cannot prove creation or deletion; lineage is incomplete.".into())
+        };
     };
     if ranked
         .get(1)
@@ -316,6 +329,39 @@ fn choose(current: &Symbol, candidates: &[Symbol]) -> Result<Option<(Symbol, u8)
         return Err("Two functions have similarly strong bodies; lineage is ambiguous. Open a nearer revision or choose a qualified function name.".into());
     }
     Ok(Some(((*best).clone(), (score * 100.).round() as u8)))
+}
+
+fn boundary_event(
+    raw_commit: &[u8],
+    traversable_parents: &[u8],
+) -> Result<(&'static str, bool), String> {
+    let headers = raw_commit
+        .split(|b| *b == b'\n')
+        .take_while(|line| !line.is_empty())
+        .collect::<Vec<_>>();
+    if !headers
+        .first()
+        .and_then(|line| line.strip_prefix(b"tree "))
+        .is_some_and(|tree| std::str::from_utf8(tree).is_ok_and(oid))
+    {
+        return Err("Invalid stored commit header at symbol boundary".into());
+    }
+    let mut parents = 0;
+    for line in headers {
+        if let Some(parent) = line.strip_prefix(b"parent ") {
+            if !std::str::from_utf8(parent).is_ok_and(oid) {
+                return Err("Invalid stored commit parent".into());
+            }
+            parents += 1;
+        }
+    }
+    Ok(if parents == 0 {
+        ("Created", false)
+    } else if traversable_parents.iter().all(u8::is_ascii_whitespace) {
+        ("Earlier shallow boundary (creation unproven)", true)
+    } else {
+        ("Earlier boundary (creation unproven)", true)
+    })
 }
 fn event(before: &Symbol, after: &Symbol) -> String {
     let mut events = Vec::new();
@@ -454,7 +500,7 @@ pub(crate) fn investigate(
             .collect()
     };
     let mut commits = parse_ids(&ids)?;
-    let mut notes=vec!["Body similarity and split relationships are structural heuristics; inspect the pinned source. Merge events follow the first parent; alternative branch lifetimes can be opened separately. Reads do not fetch missing objects or run repository tools.".into()];
+    let mut notes=vec!["An unambiguous same-path, qualified-name identity survives body rewrites; displayed similarity scores describe bodies, not proof of semantic equivalence. Renames and splits use structural heuristics; inspect the pinned source. Merge events follow the first parent; alternative branch lifetimes can be opened separately. Reads do not fetch missing objects or run repository tools.".into()];
     if !commits.contains(&selected) {
         tip = selected.clone();
         ids = trace.reader.run(
@@ -579,20 +625,16 @@ pub(crate) fn investigate(
             vec![],
             &[0],
         )?;
-        let root = parents.iter().all(u8::is_ascii_whitespace);
-        steps.push(trace.step(
-            &commits[at],
-            if root {
-                "Created".into()
-            } else {
-                "Earlier boundary (creation unproven)".into()
-            },
-            Some(current),
-            vec![],
-            None,
-        )?);
-        if !root {
+        let raw = trace
+            .reader
+            .run(&["cat-file", "commit", &commits[at]], vec![], &[0])?;
+        let (boundary, unproven) = boundary_event(&raw, &parents)?;
+        steps.push(trace.step(&commits[at], boundary.into(), Some(current), vec![], None)?);
+        if unproven {
             incomplete = true;
+            if boundary.contains("shallow") {
+                notes.push("The earlier commit is a shallow cut point, not the function's proven creation. Fetch history explicitly to investigate further; this view does not fetch.".into());
+            }
         }
     }
     steps.reverse();
