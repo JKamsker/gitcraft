@@ -21,6 +21,9 @@ mod practice;
 mod profiles;
 mod recent_status;
 mod remote_open;
+mod resident;
+#[cfg(not(test))]
+pub(crate) use resident::notification_body as resident_notification_body;
 mod repo_scan;
 mod setup;
 mod tab_strip;
@@ -104,6 +107,7 @@ enum Tab {
 
 pub struct App {
     windows: windows::Windows,
+    resident: crate::tray::Resident,
     git_version: Result<String, String>,
     tabs: Vec<Tab>,
     /// What is typed in the worktree switcher.
@@ -268,6 +272,7 @@ impl App {
 
         let mut app = Self {
             windows: Default::default(),
+            resident: Default::default(),
             git_version: version(),
             tabs: Vec::new(),
             switcher_query: String::new(),
@@ -785,6 +790,7 @@ impl App {
         crate::network::set_choices(self.settings.offline, self.settings.pause_on_metered);
         crate::network::start_watching(ctx);
         self.take_handoffs(ctx);
+        self.poll_resident(ctx);
         if self.git_version.is_err() {
             return;
         }

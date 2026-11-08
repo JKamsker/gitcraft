@@ -85,6 +85,10 @@ gitcraft-os = { path = "crates/gitcraft-os" }
 toml_edit = { version = "0.25.17", default-features = false, features = ["parse"] }
 yaml-rust2 = "0.13.0"
 
+[target.'cfg(any(windows, target_os = "macos"))'.dependencies]
+# Created only after opt-in, in the running native event loop.
+tray-icon = { version = "=0.26.1", default-features = false }
+
 # Reading a repository's file without following a link swapped in on the way (safe_read.rs).
 [target.'cfg(unix)'.dependencies]
 rustix = { version = "1", features = ["fs", "process"] }
@@ -104,6 +108,8 @@ windows = { version = "0.62", features = ["Networking_Connectivity"] }
 raw-window-handle = "0.6"
 
 [target.'cfg(target_os = "linux")'.dependencies]
+# Direct availability callbacks support desktops without a StatusNotifierWatcher; no GTK.
+ksni = { version = "=0.3.7", default-features = false, features = ["blocking", "async-io"] }
 # The launcher's progress: a signal on the session bus (the version notify-rust uses).
 zbus = { version = "5", default-features = false, features = ["blocking-api", "async-io"] }
 

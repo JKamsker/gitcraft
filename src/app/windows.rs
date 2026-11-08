@@ -633,6 +633,10 @@ impl App {
         show(&ctx, ViewportId::ROOT);
     }
 
+    pub(super) fn root_shown(&mut self) {
+        self.windows.root_hidden = false;
+    }
+
     pub(super) fn close_root_with_children(&mut self, ctx: &egui::Context) {
         self.root_close_request(ctx, ctx.input(|i| i.viewport().close_requested()));
     }
@@ -640,7 +644,9 @@ impl App {
     fn root_close_request(&mut self, ctx: &egui::Context, requested: bool) -> bool {
         if !self.windows.quit_requested
             && self.windows.current == ViewportId::ROOT
-            && (!self.windows.parked.is_empty() || self.window_has_dialog())
+            && (self.settings.keep_running_in_tray
+                || !self.windows.parked.is_empty()
+                || self.window_has_dialog())
             && requested
         {
             ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
@@ -1277,6 +1283,53 @@ mod tests {
         assert_eq!(drop_target(a, egui::pos2(100.0, 120.0), &strips), Some(b));
         assert_eq!(drop_target(a, egui::pos2(100.0, 300.0), &strips), None);
         assert_eq!(drop_target(a, egui::pos2(-100.0, 20.0), &strips), None);
+    }
+
+    #[test]
+    fn resident_close_hides_only_when_opted_in_and_quit_bypasses_hide() -> Result<(), String> {
+        let h = harness();
+        let ctx = h.ctx.clone();
+        let mut app = h.state().app.lock().map_err(|e| e.to_string())?;
+        assert!(!app.settings.keep_running_in_tray);
+        let output = ctx.run_logic(&egui::RawInput::default(), |ctx| {
+            assert!(!app.root_close_request(ctx, true));
+        });
+        assert!(
+            !output
+                .viewport_commands
+                .get(&ViewportId::ROOT)
+                .is_some_and(|commands| commands.contains(&egui::ViewportCommand::CancelClose))
+        );
+        app.settings.keep_running_in_tray = true;
+        let output = ctx.run_logic(&egui::RawInput::default(), |ctx| {
+            assert!(app.root_close_request(ctx, true));
+        });
+        assert!(app.windows.root_hidden);
+        assert!(
+            output.viewport_commands[&ViewportId::ROOT]
+                .contains(&egui::ViewportCommand::Visible(false))
+        );
+        let output = ctx.run_logic(&egui::RawInput::default(), |ctx| {
+            app.handle_handoff(crate::instance::Request::Focus, ctx)
+        });
+        assert!(!app.windows.root_hidden);
+        assert!(
+            output.viewport_commands[&ViewportId::ROOT]
+                .contains(&egui::ViewportCommand::Visible(true))
+        );
+        let output = ctx.run_logic(&egui::RawInput::default(), |ctx| {
+            app.launch(crate::launch::Command::Quit, Default::default(), ctx);
+            assert!(!app.root_close_request(ctx, true));
+        });
+        assert!(app.windows.quit_requested);
+        assert!(
+            output.viewport_commands[&ViewportId::ROOT].contains(&egui::ViewportCommand::Close)
+        );
+        assert!(
+            !output.viewport_commands[&ViewportId::ROOT]
+                .contains(&egui::ViewportCommand::CancelClose)
+        );
+        Ok(())
     }
 
     #[test]

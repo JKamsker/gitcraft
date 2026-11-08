@@ -58,6 +58,7 @@ pub mod standalone;
 mod svg;
 mod tab_look;
 mod tasks;
+mod tray;
 mod teleport;
 mod terminal;
 mod theme;

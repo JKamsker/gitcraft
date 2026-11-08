@@ -34,6 +34,10 @@ impl App {
     /// Starts carrying out `cmd`, its relative paths taken from `cwd`.
     pub(crate) fn launch(&mut self, cmd: Command, cwd: PathBuf, ctx: &egui::Context) {
         match cmd {
+            Command::Quit => {
+                self.quit(ctx);
+                return;
+            }
             Command::Clone => {
                 self.start_clone();
                 return;

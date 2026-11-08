@@ -29,7 +29,7 @@ impl std::ops::Deref for JobSender {
 
 /// Linked local worktrees share refs/stashes, hence one mutation key. Resolve the
 /// existing .git/commondir metadata without starting a process on the UI thread.
-pub(super) fn mutation_key(path: &std::path::Path) -> std::path::PathBuf {
+pub(crate) fn mutation_key(path: &std::path::Path) -> std::path::PathBuf {
     if crate::remote::is_remote(path) {
         return path.to_owned();
     }
@@ -430,6 +430,7 @@ impl RepoTab {
         // Background fetch.
         let minutes = Settings::get(ctx).auto_fetch_minutes;
         if minutes > 0
+            && !crate::tray::watch::owns_fetch(&self.tx.repo)
             && !self.remotes.is_empty()
             && self.busy_op.is_none()
             && super::offline::background_fetch_may_run(&self.path)

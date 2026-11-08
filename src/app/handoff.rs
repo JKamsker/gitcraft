@@ -65,7 +65,11 @@ impl App {
                 }
             }
         }
+        if self.windows.quit_requested {
+            return;
+        }
         if !self.windows.focused_elsewhere {
+            self.root_shown();
             ctx.send_viewport_cmd(egui::ViewportCommand::Visible(true));
             come_to_front(ctx);
         }

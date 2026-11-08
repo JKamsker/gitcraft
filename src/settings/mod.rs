@@ -125,6 +125,8 @@ pub struct Settings {
     pub editor: String,
     /// Desktop notifications when a long operation ends while the window is in the background.
     pub notifications: bool,
+    /// Opt-in resident coordinator; native objects and hidden state are never persisted.
+    pub keep_running_in_tray: bool,
     /// Ask GitHub on every start whether a newer release exists.
     pub check_updates: bool,
     /// Which releases: the main ones, or also a build of every change to dev.
@@ -229,6 +231,7 @@ impl Default for Settings {
             avatars: true,
             editor: "code".to_owned(),
             notifications: true,
+            keep_running_in_tray: false,
             check_updates: true,
             update_channel: Default::default(),
             download_updates: true,
@@ -488,6 +491,17 @@ impl Settings {
                             &mut self.notifications,
                             "When a long operation ends in the background",
                         );
+                    });
+                    card.row("Resident watcher", "tray background close recent repositories notifications", |ui| {
+                        ui.checkbox(&mut self.keep_running_in_tray, "Keep gitcraft running when its window closes");
+                        ui.small("Keeps recent repositories fetched and reports new reviews, failed checks and default-branch changes. Uses this profile; offline and metered policies still apply.");
+                        if self.keep_running_in_tray {
+                            match crate::tray::status() {
+                                crate::tray::Availability::Ready => { ui.small("Tray icon available. Use its Show or Quit action."); }
+                                crate::tray::Availability::Fallback(why) => { ui.small(format!("Tray unavailable: {why}. Reopen from the launcher; Quit from the tab menu or gitcraft --quit.")); }
+                                _ => { ui.small("Starting the native tray item…"); }
+                            }
+                        }
                     });
                     file_menu_rows(card);
                     card.row("Tips", "did you know hints help first time", |ui| {

@@ -115,6 +115,11 @@ fn main() -> eframe::Result {
             std::process::exit(1);
         }
     }
+    // --quit is useful without a tray host. With no existing instance there is no window
+    // or background session to create.
+    if matches!(launch, Some(gitcraft::launch::Command::Quit)) {
+        return Ok(());
+    }
     // LaunchServices delivers cold and warm gitcraft:// events through GetURL. Register
     // before constructing/running the event loop; retain until it exits. The pinned winit
     // backend does not install a GetURL handler or replace this Foundation registration.

@@ -84,6 +84,7 @@ mod line_history_tests;
 mod load;
 mod local_ci;
 mod messages;
+pub(crate) use messages::mutation_key;
 mod nav_history;
 mod navigate;
 mod navigation;

@@ -489,8 +489,7 @@ impl App {
 
     fn apply_strip_actions(&mut self, actions: StripActions, ctx: &egui::Context) {
         if actions.quit {
-            self.windows.quit_requested = true;
-            ctx.send_viewport_cmd_to(egui::ViewportId::ROOT, egui::ViewportCommand::Close);
+            self.quit(ctx);
             return;
         }
         if let Some((index, target, position)) = actions.window
