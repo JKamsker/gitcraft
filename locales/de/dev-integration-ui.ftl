@@ -142,4 +142,3 @@ dev-integration-ui-history-filters = Verlaufsfilter
 dev-integration-ui-global-history-filters = Globale Verlaufsfilter
 
 dev-integration-ui-context-menus = Kontextmenüs
-
