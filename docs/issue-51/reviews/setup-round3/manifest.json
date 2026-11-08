@@ -1,0 +1,363 @@
+{
+  "review": "setup F4/F6 R3 static",
+  "candidate": "753040fe942c9ef96cc496b61eb0174486fda366",
+  "prior_candidate": "adca6abfcf961b31f8b799ed4d32e907910d8ffb",
+  "snapshot": "/private/tmp/gitcraft-setup-review-r3-753040fe",
+  "source_sha256": {
+    "src/connections.rs": "7d12f5bfe0c9e370c68c4ed610634ec9c3216f60d9319b6f42818144eb9b325a",
+    "src/connections/tests.rs": "219e28ae0776ae869720f139ae514aa486ca64596deece8815508489fe323bcb",
+    "src/diagnostics.rs": "be5e82849b5b7159d074323d47c2b72997f47a00d74a71a72896b48de3d3eb27",
+    "src/app/diagnostics.rs": "633a2cb88e564660dc99f478bc538df93085a83ab9aec243a3a956529aacf04a",
+    "src/connection_doctor.rs": "dad61596b9964f8f31055080444b87175bc6e7dc22b9f32a977acc84cafe4d90",
+    "src/app/mod.rs": "e4ee79cde6021ee6f77ed06f2f07b4ea1fc7e9927f856b973938537ede26273e",
+    "src/repo/load.rs": "2298e04eb6c0189ef1c43ad06470de784822504a6396243050626418837628a6",
+    "src/repo/operations.rs": "6d7396df6ac533d38ce6a83857b01c15b34965bedbf83fe0c4592f370ce5badb",
+    "src/repo/https_recovery.rs": "80f5ec8e38e4d8fbd6ae8317fd1ff7afe2bca811646729519334659f8e11b3ad",
+    "src/repo/dialogs/remote.rs": "e7ca1649a46b869b29ed64671a2f515b743e9be0fa94a81420b0e883bb8b3ee6",
+    "src/git/command/endpoints.rs": "7f62b930e3f89b83cf8f969109f2af39019c2f058ded92483991549ff242ddd0",
+    "src/git/command/connection.rs": "8d98d78be4b4882b49cb9bc1337d894abbea539720ecc06aba3f5f2657fb5f38",
+    "src/git/refs.rs": "7ac2144d4309c204fdea4fa685b2f117d15003d6447c3751f76179a03ebead59",
+    "src/git/backend.rs": "ef00b1ff1dd3773433f01683ec5fd330eedc49590c5d4b8371a3f6b32683161d",
+    "src/settings/network_page.rs": "fa56ec5c618cf142590c8b72d850f403ce414dbd305075199d1f5af7c2baac99",
+    "src/git/command.rs": "e7c0ef55d5329355426b52a3adf5de50c2c833aa33ef20e1b21a3414bbf4c278"
+  },
+  "prior_static_pass_source_unchanged_checks": {
+    "src/connections.rs": true,
+    "src/connections/tests.rs": true,
+    "src/diagnostics.rs": true,
+    "src/connection_doctor.rs": true,
+    "src/app/mod.rs": true,
+    "src/settings/network_page.rs": true,
+    "src/repo/load.rs": true,
+    "app/diagnostics production before cfg(test)": true,
+    "forget_https_memory production method": true
+  },
+  "independent_runtime_tests_executed": 0,
+  "independent_programs_under_test_executed": 0,
+  "historical_writer_evidence": {
+    "gitcraft-51-setup-review-r1.md": {
+      "path": "/private/tmp/gitcraft-setup-review-r3-753040fe/review-evidence/gitcraft-51-setup-review-r1.md",
+      "sha256": "0a0243da9bc26ad185731c6685d7467d755ea82f5712b7ea6368c201229058e3"
+    },
+    "gitcraft-51-setup-review-r2.md": {
+      "path": "/private/tmp/gitcraft-setup-review-r3-753040fe/review-evidence/gitcraft-51-setup-review-r2.md",
+      "sha256": "9f1482767ebe97cb646349ce98c2e6497de94be9ba1fbbc49b6c8fc27b9b592c"
+    },
+    "gitcraft-51-setup-r3-pure-validation.json": {
+      "path": "/private/tmp/gitcraft-setup-review-r3-753040fe/review-evidence/gitcraft-51-setup-r3-pure-validation.json",
+      "sha256": "aa769ab5e86d1ad43087d76e9d6069a5dd853967a986b299a6ba51b8e9c35281"
+    },
+    "gitcraft-51-setup-r3-pure-git-command-credential_policy-tests.log": {
+      "path": "/private/tmp/gitcraft-setup-review-r3-753040fe/review-evidence/gitcraft-51-setup-r3-pure-git-command-credential_policy-tests.log",
+      "sha256": "2b6b6bcd461abee0bbe3b4e405cead41acb65f4f56ea867ee9c48f5ac4613edb"
+    },
+    "gitcraft-51-setup-r3-pure-git-credential_scope-tests.log": {
+      "path": "/private/tmp/gitcraft-setup-review-r3-753040fe/review-evidence/gitcraft-51-setup-r3-pure-git-credential_scope-tests.log",
+      "sha256": "a5592c607b7903546f0a129a77e4fd98ad264d9121670d62f11690975d7fedac"
+    },
+    "gitcraft-51-setup-r3-pure-reported_push_and_lfs_endpoint_override_fetch_guesses_without_userinfo.log": {
+      "path": "/private/tmp/gitcraft-setup-review-r3-753040fe/review-evidence/gitcraft-51-setup-r3-pure-reported_push_and_lfs_endpoint_override_fetch_guesses_without_userinfo.log",
+      "sha256": "382627c8474afcb76fcfd64494c8675fe26584c4ccfa6724190dfe7bf83f4761"
+    },
+    "gitcraft-51-setup-r3-pure-push_only_and_override_configuration_changes_invalidate_route_snapshots.log": {
+      "path": "/private/tmp/gitcraft-setup-review-r3-753040fe/review-evidence/gitcraft-51-setup-r3-pure-push_only_and_override_configuration_changes_invalidate_route_snapshots.log",
+      "sha256": "64de1df4b3b0450b912eca56f3b2a16963e3c06c3668aab10072c38ec8631d1b"
+    },
+    "gitcraft-51-setup-r3-pure-connection_or_operation_changes_discard_old_rejection_completion_and_retry.log": {
+      "path": "/private/tmp/gitcraft-setup-review-r3-753040fe/review-evidence/gitcraft-51-setup-r3-pure-connection_or_operation_changes_discard_old_rejection_completion_and_retry.log",
+      "sha256": "7404f65daf167d1f7412a6fc262b8979466f8fa2798c5a55666ebc2faa6bff08"
+    },
+    "gitcraft-51-setup-r3-pure-collecting_diagnostics_cannot_open_a_browser_before_local_review.log": {
+      "path": "/private/tmp/gitcraft-setup-review-r3-753040fe/review-evidence/gitcraft-51-setup-r3-pure-collecting_diagnostics_cannot_open_a_browser_before_local_review.log",
+      "sha256": "20317f2846f6c72e34e3df0d67eee17dc3bce0e2e212313eb46e0371ee3ba7aa"
+    },
+    "gitcraft-51-setup-r3-pure-command_values_and_invalid_enum_values_cannot_enter_an_issue_query.log": {
+      "path": "/private/tmp/gitcraft-setup-review-r3-753040fe/review-evidence/gitcraft-51-setup-r3-pure-command_values_and_invalid_enum_values_cannot_enter_an_issue_query.log",
+      "sha256": "445b9515fc0f7a521f49a9f4c4ead82c9681929e6e7cdcf743364d53464feba9"
+    },
+    "gitcraft-51-setup-r3-pure-signout_clears_nested_parked_credentials_before_a_view_is_reopened.log": {
+      "path": "/private/tmp/gitcraft-setup-review-r3-753040fe/review-evidence/gitcraft-51-setup-r3-pure-signout_clears_nested_parked_credentials_before_a_view_is_reopened.log",
+      "sha256": "e07cee05ad97428e76bb40eaebd3cceff1fbfdc2a8450223582ac0fad0995676"
+    },
+    "gitcraft-51-setup-r3-pure-successful_tls_followed_by_auth_failure_is_not_a_certificate_failure.log": {
+      "path": "/private/tmp/gitcraft-setup-review-r3-753040fe/review-evidence/gitcraft-51-setup-r3-pure-successful_tls_followed_by_auth_failure_is_not_a_certificate_failure.log",
+      "sha256": "b5ca6450247c2ea240869e4071e746583ea93378a31fa0041440d9e17ec2e81c"
+    },
+    "gitcraft-51-setup-r3-pure-later_connection_failure_preserves_earlier_tls_evidence.log": {
+      "path": "/private/tmp/gitcraft-setup-review-r3-753040fe/review-evidence/gitcraft-51-setup-r3-pure-later_connection_failure_preserves_earlier_tls_evidence.log",
+      "sha256": "e6773a57dbf92e41a852e889d2d2c8517b6afc988b2f9b59a639165d89b9f97d"
+    },
+    "gitcraft-51-setup-r3-pure-normalized_connection_commands_remove_repository_redirects_and_keep_the_selected_profile.log": {
+      "path": "/private/tmp/gitcraft-setup-review-r3-753040fe/review-evidence/gitcraft-51-setup-r3-pure-normalized_connection_commands_remove_repository_redirects_and_keep_the_selected_profile.log",
+      "sha256": "7ac7b26df67698cc7fd1a6e2db93ba20be6c1c8c52d5f7b13fb29f17f7766dd5"
+    },
+    "gitcraft-51-setup-r3-pure-clippy.log": {
+      "path": "/private/tmp/gitcraft-setup-review-r3-753040fe/review-evidence/gitcraft-51-setup-r3-pure-clippy.log",
+      "sha256": "a57bbd47d935b21d32fcdc70049cc237641a478b722b155af76333f5152a4a51"
+    }
+  },
+  "historical_writer_json": {
+    "sha": "5716ad6ec158d433ce83499b384779ac397cbb38",
+    "environment": {
+      "TMPDIR": "/private/tmp",
+      "SHELL": "/tmp/gitcraft-integration-tools/validation-shell",
+      "CARGO_BUILD_JOBS": "2"
+    },
+    "path_prefix": "/tmp/gitcraft-integration-tools",
+    "results": [
+      {
+        "filter": "git::command::credential_policy::tests::",
+        "command": [
+          "cargo",
+          "+1.95.0",
+          "test",
+          "--lib",
+          "git::command::credential_policy::tests::",
+          "--",
+          "--test-threads=2"
+        ],
+        "exit": 0,
+        "seconds": 42.53,
+        "log": "/tmp/gitcraft-51-setup-r3-pure-git-command-credential_policy-tests.log",
+        "results": [
+          "\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 41.53s",
+          "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 3318 filtered out; finished in 0.00s",
+          "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s"
+        ]
+      },
+      {
+        "filter": "git::credential_scope::tests::",
+        "command": [
+          "cargo",
+          "+1.95.0",
+          "test",
+          "--lib",
+          "git::credential_scope::tests::",
+          "--",
+          "--test-threads=2"
+        ],
+        "exit": 0,
+        "seconds": 0.24,
+        "log": "/tmp/gitcraft-51-setup-r3-pure-git-credential_scope-tests.log",
+        "results": [
+          "\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.20s",
+          "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3319 filtered out; finished in 0.00s",
+          "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s"
+        ]
+      },
+      {
+        "filter": "reported_push_and_lfs_endpoint_override_fetch_guesses_without_userinfo",
+        "command": [
+          "cargo",
+          "+1.95.0",
+          "test",
+          "--lib",
+          "reported_push_and_lfs_endpoint_override_fetch_guesses_without_userinfo",
+          "--",
+          "--test-threads=2"
+        ],
+        "exit": 0,
+        "seconds": 0.24,
+        "log": "/tmp/gitcraft-51-setup-r3-pure-reported_push_and_lfs_endpoint_override_fetch_guesses_without_userinfo.log",
+        "results": [
+          "\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.20s",
+          "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3319 filtered out; finished in 0.00s",
+          "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s"
+        ]
+      },
+      {
+        "filter": "push_only_and_override_configuration_changes_invalidate_route_snapshots",
+        "command": [
+          "cargo",
+          "+1.95.0",
+          "test",
+          "--lib",
+          "push_only_and_override_configuration_changes_invalidate_route_snapshots",
+          "--",
+          "--test-threads=2"
+        ],
+        "exit": 0,
+        "seconds": 0.23,
+        "log": "/tmp/gitcraft-51-setup-r3-pure-push_only_and_override_configuration_changes_invalidate_route_snapshots.log",
+        "results": [
+          "\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.18s",
+          "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3319 filtered out; finished in 0.00s",
+          "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s"
+        ]
+      },
+      {
+        "filter": "connection_or_operation_changes_discard_old_rejection_completion_and_retry",
+        "command": [
+          "cargo",
+          "+1.95.0",
+          "test",
+          "--lib",
+          "connection_or_operation_changes_discard_old_rejection_completion_and_retry",
+          "--",
+          "--test-threads=2"
+        ],
+        "exit": 0,
+        "seconds": 0.23,
+        "log": "/tmp/gitcraft-51-setup-r3-pure-connection_or_operation_changes_discard_old_rejection_completion_and_retry.log",
+        "results": [
+          "\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.18s",
+          "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3319 filtered out; finished in 0.00s",
+          "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s"
+        ]
+      },
+      {
+        "filter": "collecting_diagnostics_cannot_open_a_browser_before_local_review",
+        "command": [
+          "cargo",
+          "+1.95.0",
+          "test",
+          "--lib",
+          "collecting_diagnostics_cannot_open_a_browser_before_local_review",
+          "--",
+          "--test-threads=2"
+        ],
+        "exit": 0,
+        "seconds": 0.23,
+        "log": "/tmp/gitcraft-51-setup-r3-pure-collecting_diagnostics_cannot_open_a_browser_before_local_review.log",
+        "results": [
+          "\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.18s",
+          "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3319 filtered out; finished in 0.01s",
+          "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s"
+        ]
+      },
+      {
+        "filter": "command_values_and_invalid_enum_values_cannot_enter_an_issue_query",
+        "command": [
+          "cargo",
+          "+1.95.0",
+          "test",
+          "--lib",
+          "command_values_and_invalid_enum_values_cannot_enter_an_issue_query",
+          "--",
+          "--test-threads=2"
+        ],
+        "exit": 0,
+        "seconds": 0.22,
+        "log": "/tmp/gitcraft-51-setup-r3-pure-command_values_and_invalid_enum_values_cannot_enter_an_issue_query.log",
+        "results": [
+          "\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.18s",
+          "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3319 filtered out; finished in 0.00s",
+          "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s"
+        ]
+      },
+      {
+        "filter": "signout_clears_nested_parked_credentials_before_a_view_is_reopened",
+        "command": [
+          "cargo",
+          "+1.95.0",
+          "test",
+          "--lib",
+          "signout_clears_nested_parked_credentials_before_a_view_is_reopened",
+          "--",
+          "--test-threads=2"
+        ],
+        "exit": 0,
+        "seconds": 0.23,
+        "log": "/tmp/gitcraft-51-setup-r3-pure-signout_clears_nested_parked_credentials_before_a_view_is_reopened.log",
+        "results": [
+          "\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.19s",
+          "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3319 filtered out; finished in 0.00s",
+          "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s"
+        ]
+      },
+      {
+        "filter": "successful_tls_followed_by_auth_failure_is_not_a_certificate_failure",
+        "command": [
+          "cargo",
+          "+1.95.0",
+          "test",
+          "--lib",
+          "successful_tls_followed_by_auth_failure_is_not_a_certificate_failure",
+          "--",
+          "--test-threads=2"
+        ],
+        "exit": 0,
+        "seconds": 0.24,
+        "log": "/tmp/gitcraft-51-setup-r3-pure-successful_tls_followed_by_auth_failure_is_not_a_certificate_failure.log",
+        "results": [
+          "\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.20s",
+          "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3319 filtered out; finished in 0.00s",
+          "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s"
+        ]
+      },
+      {
+        "filter": "later_connection_failure_preserves_earlier_tls_evidence",
+        "command": [
+          "cargo",
+          "+1.95.0",
+          "test",
+          "--lib",
+          "later_connection_failure_preserves_earlier_tls_evidence",
+          "--",
+          "--test-threads=2"
+        ],
+        "exit": 0,
+        "seconds": 0.24,
+        "log": "/tmp/gitcraft-51-setup-r3-pure-later_connection_failure_preserves_earlier_tls_evidence.log",
+        "results": [
+          "\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.20s",
+          "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3319 filtered out; finished in 0.00s",
+          "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s"
+        ]
+      },
+      {
+        "filter": "normalized_connection_commands_remove_repository_redirects_and_keep_the_selected_profile",
+        "command": [
+          "cargo",
+          "+1.95.0",
+          "test",
+          "--lib",
+          "normalized_connection_commands_remove_repository_redirects_and_keep_the_selected_profile",
+          "--",
+          "--test-threads=2"
+        ],
+        "exit": 0,
+        "seconds": 0.26,
+        "log": "/tmp/gitcraft-51-setup-r3-pure-normalized_connection_commands_remove_repository_redirects_and_keep_the_selected_profile.log",
+        "results": [
+          "\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.20s",
+          "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3319 filtered out; finished in 0.02s",
+          "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s"
+        ]
+      },
+      {
+        "filter": "clippy",
+        "command": [
+          "cargo",
+          "+1.95.0",
+          "clippy",
+          "--all-targets",
+          "--",
+          "-D",
+          "warnings",
+          "-A",
+          "dead_code"
+        ],
+        "exit": 101,
+        "seconds": 20.87,
+        "log": "/tmp/gitcraft-51-setup-r3-pure-clippy.log",
+        "results": []
+      }
+    ]
+  },
+  "writer_evidence_commit_delta": [
+    "src/git/command.rs",
+    "src/git/command/credential_policy.rs",
+    "src/git/command/watched.rs",
+    "src/git/credential_scope.rs"
+  ],
+  "dispositions": {
+    "F1": "prior scoped STATIC PASS carried after source unchanged check",
+    "F2": "prior scoped STATIC PASS carried; diagnostics harness fixed, later-SHA author gate only",
+    "F3": "prior scoped STATIC PASS carried; shared matcher dependency not approved",
+    "F4": "FAIL: absent route proof accepted and LFS route inputs omitted",
+    "F5": "prior scoped STATIC PASS carried after source unchanged check",
+    "F6": "STATIC PASS for R2 structured endpoint parser defect; no live Git/LFS format/platform approval"
+  },
+  "restrictions": "No program under test, Git operation/helper/SSH/HTTP/runtime fixture, signals/cancel/selector, fullsuite, CI, PR, source edits or agents. Git object/archive reads only; static source and historical logs."
+}

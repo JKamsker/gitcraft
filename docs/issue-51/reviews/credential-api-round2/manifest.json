@@ -1,0 +1,171 @@
+{
+  "review": "credential-direct-api-r2",
+  "verdict": "FAIL_STATIC_PURE_RECORDING",
+  "candidate": "5716ad6ec158d433ce83499b384779ac397cbb38",
+  "initial_trace_candidate": "8855beca4b8cbd1d9ac913bfe373c0a1c521bc3a",
+  "immutable_source_method": "git show <sha>:<path>; moving checkout source not used",
+  "findings": [
+    {
+      "id": "D-R2-1",
+      "severity": "P1",
+      "status": "OPEN",
+      "summary": "redirect config enumeration differs from actual execution context and mutable config"
+    },
+    {
+      "id": "D-R2-2",
+      "severity": "P2",
+      "status": "OPEN",
+      "summary": "encoded slash-only URL path collapses into host root"
+    },
+    {
+      "id": "D-R2-3",
+      "severity": "P2",
+      "status": "OPEN",
+      "summary": "PATH re-resolution does not retain selected Git installation binding"
+    },
+    {
+      "id": "D-R2-4",
+      "severity": "P2",
+      "status": "OPEN",
+      "summary": "temporary cleanup lacks retained directory/artifact identity"
+    }
+  ],
+  "prior_dispositions": {
+    "API-R1-1": "OPEN: redirect unresolved, HTTP consumer partial static only",
+    "API-R1-2": "PARTIAL: encoded slash-only residual",
+    "API-R1-3": "RESOLVED_SCOPED_STATIC_RECORDING",
+    "clone_let_chain": "STATIC_PASS_NOT_CLIPPY_EXECUTION"
+  },
+  "executions": {
+    "rustc_1_95_standalone_adapter_compilations": 2,
+    "pure_adapter_executions": 2,
+    "actual_git_credential_fill": 0,
+    "actual_git_fixture_config_reads": 0,
+    "actual_git_fixture_setup": 0,
+    "application_test_binary_runs": 0,
+    "application_builds": 0,
+    "generated_shell_executions": 0,
+    "HTTP_or_network_auth_fixtures": 0,
+    "process_signal_timeout_cancellation_tests": 0,
+    "CI": 0,
+    "full_suite": 0
+  },
+  "recording_stubs": "connection_read returns synthetic fixed key names; at5716 remote::is_remote=false and operation_endpoints returns empty vector. No process APIs in adapters.",
+  "tool_processes_explanation": "Tool shell/read-only Git object inspection and rustc are tooling processes; actual program-under-test Git/shell/transport/process-control fixtures were not run.",
+  "stdout_logs_explanation": "Exact stdout copied from successful observed tool result; not rerun to create log.",
+  "hold": "RETAINED. No authorization for native/application/process/full-suite gates.",
+  "limits": [
+    "Unix PPID shape inferred from upstream primary Git source, not exercised",
+    "Windows local transient policy explicitly unsupported",
+    "SSH/WSL/remote native behavior unvalidated",
+    "Unpublished transport-time exact URL override proposal not accepted",
+    "Broader setup F4/F6 and downstream migration not accepted"
+  ],
+  "files": [
+    {
+      "path": "/tmp/gitcraft-51-credential-api-review-r1-manifest.json",
+      "bytes": 3858,
+      "sha256": "c7c4f35c4958ba1892cdea3ba10e45a9b66abb5b02bcdf1f1708e4954b063b3d"
+    },
+    {
+      "path": "/tmp/gitcraft-51-credential-api-review-r1.md",
+      "bytes": 14028,
+      "sha256": "b4991b816143079e65693052c1024b1001592830fca12215172dbbef53643763"
+    },
+    {
+      "path": "/tmp/gitcraft-51-credential-direct-review-r2.md",
+      "bytes": 14092,
+      "sha256": "c769fa58798e308640a4bb99eac6eefd3d01cfad7c6c9c54690727f1778b64f0"
+    },
+    {
+      "path": "/tmp/gitcraft-51-credential-policy-static-note.md",
+      "bytes": 8208,
+      "sha256": "ada4fe03eca6ce986980ef8edadc8f2e361f7ee018a8cb1276d46fa2603b99cc"
+    },
+    {
+      "path": "/tmp/gitcraft-credential-direct-r2-evidence/pure-policy",
+      "bytes": 669128,
+      "sha256": "1568aeb38e512386f9d6bfbe3e7dff5ba96688bc6d2beb697dc77a891bf490c4"
+    },
+    {
+      "path": "/tmp/gitcraft-credential-direct-r2-evidence/pure-policy-5716",
+      "bytes": 670912,
+      "sha256": "ceb3e17d42c7745b1e9e512126e85eaa1dcdfce262df66cedfb2a94f8b0a19dd"
+    },
+    {
+      "path": "/tmp/gitcraft-credential-direct-r2-evidence/pure-policy-5716.rs",
+      "bytes": 3387,
+      "sha256": "d614128be54d73d9fcfcde0ee05bb1650c73bd2243188ef57999ad980d1fa806"
+    },
+    {
+      "path": "/tmp/gitcraft-credential-direct-r2-evidence/pure-policy-5716.stdout.log",
+      "bytes": 343,
+      "sha256": "b376a2912fdfb29ca2fa5d3ddd480c74ffa676d6a12eaee7b3181f12593bef45"
+    },
+    {
+      "path": "/tmp/gitcraft-credential-direct-r2-evidence/pure-policy-8855.stdout.log",
+      "bytes": 334,
+      "sha256": "d28de380abbe0eb8ac5a07e52ddf45d94b24119ab76b31093032fd54e18bf216"
+    },
+    {
+      "path": "/tmp/gitcraft-credential-direct-r2-evidence/pure-policy.rs",
+      "bytes": 3029,
+      "sha256": "9d0c98d7892f858d27b9e815596fa895e0d91d3e47ed8634ffb1e8b74da6b136"
+    },
+    {
+      "path": "/tmp/gitcraft-credential-direct-r2-source/src/git/command/credential_policy.rs",
+      "bytes": 3525,
+      "sha256": "7e86a4f0d3756683c873837ef8926cc06f7a50135ecbbc51a10a68663ff3681a"
+    },
+    {
+      "path": "/tmp/gitcraft-credential-direct-r2-source/src/git/credential_scope.rs",
+      "bytes": 12095,
+      "sha256": "ec69c645912253adf5833c80d23997e4f71aca8b8c1bc9b4bd9392feea4192d2"
+    },
+    {
+      "path": "/tmp/gitcraft-credential-direct-r2-source-5716/src/app/clone.rs",
+      "bytes": 13554,
+      "sha256": "6a66937a872af1e3c4c178840b27c934b9e3851313d36b1a73b4379476a7ec50"
+    },
+    {
+      "path": "/tmp/gitcraft-credential-direct-r2-source-5716/src/git/command/connection.rs",
+      "bytes": 12983,
+      "sha256": "8d98d78be4b4882b49cb9bc1337d894abbea539720ecc06aba3f5f2657fb5f38"
+    },
+    {
+      "path": "/tmp/gitcraft-credential-direct-r2-source-5716/src/git/command/credential_policy.rs",
+      "bytes": 9974,
+      "sha256": "41b7508880c03baecd13a5373c3b2673b159fc7e690d09c3dcea0c76ae0016ae"
+    },
+    {
+      "path": "/tmp/gitcraft-credential-direct-r2-source-5716/src/git/command/endpoints.rs",
+      "bytes": 12028,
+      "sha256": "7f62b930e3f89b83cf8f969109f2af39019c2f058ded92483991549ff242ddd0"
+    },
+    {
+      "path": "/tmp/gitcraft-credential-direct-r2-source-5716/src/git/command/watched.rs",
+      "bytes": 24943,
+      "sha256": "ee4f9be34b2fa4dbaf848a383f14f561f9429bc2dd5cde895e6952a24c4f7993"
+    },
+    {
+      "path": "/tmp/gitcraft-credential-direct-r2-source-5716/src/git/command.rs",
+      "bytes": 56558,
+      "sha256": "bb16d40eb0d63f98afde8d4fdd81532d15ff432cf9881986590e3db877b353c2"
+    },
+    {
+      "path": "/tmp/gitcraft-credential-direct-r2-source-5716/src/git/credential_scope.rs",
+      "bytes": 12639,
+      "sha256": "64c771bf8f40725f28a5e5bedf0b7054a54399e965f88b0b8b2ce4f1273316f3"
+    },
+    {
+      "path": "/tmp/gitcraft-credential-direct-r2-source-5716/src/repo/dialogs/remote.rs",
+      "bytes": 7894,
+      "sha256": "e7ca1649a46b869b29ed64671a2f515b743e9be0fa94a81420b0e883bb8b3ee6"
+    },
+    {
+      "path": "/tmp/gitcraft-credential-direct-r2-source-5716/src/repo/operations.rs",
+      "bytes": 48138,
+      "sha256": "6d7396df6ac533d38ce6a83857b01c15b34965bedbf83fe0c4592f370ce5badb"
+    }
+  ]
+}
