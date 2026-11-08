@@ -83,6 +83,9 @@ pub(crate) struct Plan {
     lfs_config: Vec<(String, String)>,
     receive_pack: String,
     selection: Option<git::repository_tools::routes::PreparedPush>,
+    // Captured lifetime survives tab invalidation, APPROVED, reload and auth retry.
+    // Never serialized or reconstructed from a label on the current tab.
+    fork_scope: Option<crate::repo::forks::ExecutionScope>,
 }
 
 fn read(repo: &Path, args: &[&str], active: &dyn Fn() -> bool) -> Result<String, String> {
@@ -204,6 +207,90 @@ fn parse(words: &[String]) -> Result<ParsedPush, String> {
     ))
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum CapturedLease {
+    Absent,
+    Object(String),
+}
+
+/// Shorthand leases still use this destination's fetched tip. Explicit absent
+/// and object expectations constrain it and may never contradict one another.
+fn lease_requirement(
+    words: &[String],
+    destination: &str,
+    deleting: bool,
+) -> Result<Option<CapturedLease>, String> {
+    let mut captured = None;
+    for lease in words
+        .iter()
+        .take_while(|word| word.as_str() != "--")
+        .filter_map(|arg| arg.strip_prefix("--force-with-lease="))
+    {
+        let Some((reference, expected)) = lease.split_once(':') else {
+            if deleting {
+                return Err("Deletion needs an exact ref lease".into());
+            }
+            if lease != destination {
+                return Err("The push lease must name this exact ref.".into());
+            }
+            continue; // DCO's tracked shorthand keeps the fetched-tip semantics.
+        };
+        if reference != destination
+            || (deleting && expected.is_empty())
+            || (!expected.is_empty() && !valid_object_id(expected))
+        {
+            return Err(if deleting {
+                "The deletion lease must name this exact ref and object."
+            } else {
+                "The push lease must name this exact ref and object."
+            }
+            .into());
+        }
+        let requirement = if expected.is_empty() {
+            CapturedLease::Absent
+        } else {
+            CapturedLease::Object(expected.to_owned())
+        };
+        if captured.as_ref().is_some_and(|prior| prior != &requirement) {
+            return Err(
+                "The push contains contradictory explicit leases; reopen its original action."
+                    .into(),
+            );
+        }
+        captured = Some(requirement);
+    }
+    Ok(captured)
+}
+
+/// An action's explicit expectation is immutable across scan/reload/approval.
+/// Tracking data may corroborate it, never replace it with a newer object.
+fn captured_lease(
+    words: &[String],
+    destination: &str,
+    base: Option<String>,
+    deleting: bool,
+) -> Result<Option<String>, String> {
+    let Some(requirement) = lease_requirement(words, destination, deleting)? else {
+        return Ok(base);
+    };
+    let expected = match requirement {
+        CapturedLease::Absent => None,
+        CapturedLease::Object(expected) => Some(expected),
+    };
+    if base
+        .as_deref()
+        .is_some_and(|tip| Some(tip) != expected.as_deref())
+    {
+        return Err(if deleting {
+            "The fetched target differs from the deletion lease; reopen its original action."
+        } else {
+            "The fetched target differs from the captured push lease; reopen its original action."
+        }
+        .into());
+    }
+    Ok(expected)
+}
+
 fn companion_branch(op: &[String]) -> Option<&str> {
     match op {
         [command, flag, end, name]
@@ -238,14 +325,10 @@ fn saved_branch_spec(current: &str, saved: &str, implicit: bool) -> Option<Strin
         .then(|| format!("refs/heads/{current}:refs/heads/{saved}"))
 }
 
-pub(crate) fn scan(
-    repo: &Path,
-    original: Vec<Vec<String>>,
-    profile: UserProfile,
-    active: &dyn Fn() -> bool,
-) -> Result<Plan, String> {
-    let initial_config = config_stamp(repo, active)?;
-    for op in &original {
+/// The scanner's existing operation gate, also usable with supplied recording argv.
+/// Rewriting commands are deliberately excluded: only the completed tip is reviewed.
+pub(crate) fn validate_operations(original: &[Vec<String>]) -> Result<(), String> {
+    for op in original {
         if push_words(op).is_some() {
             let mut prefix = op.as_slice();
             while let [flag, value, rest @ ..] = prefix {
@@ -267,6 +350,17 @@ pub(crate) fn scan(
             );
         }
     }
+    Ok(())
+}
+
+pub(crate) fn scan(
+    repo: &Path,
+    original: Vec<Vec<String>>,
+    profile: UserProfile,
+    active: &dyn Fn() -> bool,
+) -> Result<Plan, String> {
+    let initial_config = config_stamp(repo, active)?;
+    validate_operations(&original)?;
     let pushes: Vec<_> = original.iter().filter_map(|o| push_words(o)).collect();
     if pushes.len() != 1 {
         return Err("Preview one push at a time; no push was run.".into());
@@ -549,48 +643,40 @@ pub(crate) fn scan(
                 .trim()
                 .to_owned()
                 .into();
+                // Multiple fetch mappings must all corroborate a fixed lease;
+                // a later old tracking ref must not hide an earlier refreshed tip.
+                base = captured_lease(
+                    pushes[0],
+                    &destination,
+                    base.filter(|tip| !tip.is_empty()),
+                    deleting,
+                )?;
             }
         }
     }
     base = base.filter(|b| !b.is_empty());
-    if deleting {
-        if destination.starts_with("refs/tags/") && base.is_none() {
-            base = optional(
-                repo,
-                &[
-                    "rev-parse",
-                    "--verify",
-                    "-q",
-                    "--end-of-options",
-                    &destination,
-                ],
-                active,
-            )?
-            .trim()
-            .to_owned()
-            .into();
-            base = base.filter(|oid| !oid.is_empty());
-        }
-        for lease in pushes[0]
-            .iter()
-            .filter_map(|arg| arg.strip_prefix("--force-with-lease="))
-        {
-            let (reference, expected) = lease
-                .split_once(':')
-                .ok_or("Deletion needs an exact ref lease")?;
-            if reference != destination || !valid_object_id(expected) {
-                return Err("The deletion lease must name this exact ref and object.".into());
-            }
-            if base.as_deref().is_some_and(|tip| tip != expected) {
-                return Err("The fetched target differs from the deletion lease; reopen its original action.".into());
-            }
-            base = Some(expected.to_owned());
-        }
-        if base.is_none() {
-            return Err(
-                "Fetch this exact target before deleting it; no remote tip was inspected.".into(),
-            );
-        }
+    if deleting && destination.starts_with("refs/tags/") && base.is_none() {
+        base = optional(
+            repo,
+            &[
+                "rev-parse",
+                "--verify",
+                "-q",
+                "--end-of-options",
+                &destination,
+            ],
+            active,
+        )?
+        .trim()
+        .to_owned()
+        .into();
+        base = base.filter(|oid| !oid.is_empty());
+    }
+    base = captured_lease(pushes[0], &destination, base, deleting)?;
+    if deleting && base.is_none() {
+        return Err(
+            "Fetch this exact target before deleting it; no remote tip was inspected.".into(),
+        );
     }
     if destination.starts_with("refs/for/")
         && let Some(check) = original
@@ -951,6 +1037,7 @@ pub(crate) fn scan(
         lfs_config,
         receive_pack,
         selection: None,
+        fork_scope: None,
     };
     check_active(repo, &plan, active)?;
     if !plan.deleting
@@ -1017,6 +1104,20 @@ pub(crate) fn display_path(path: &str) -> String {
 }
 
 impl Plan {
+    pub(crate) fn fork_scope(&self) -> Option<&crate::repo::forks::ExecutionScope> {
+        self.fork_scope.as_ref()
+    }
+
+    pub(crate) fn retain_fork_scope(&mut self, scope: crate::repo::forks::ExecutionScope) {
+        self.fork_scope = Some(scope);
+    }
+
+    fn check_fork_scope(&self, repo: &Path) -> Result<(), String> {
+        self.fork_scope
+            .as_ref()
+            .map_or(Ok(()), |scope| scope.check_remote(repo))
+    }
+
     pub(crate) fn selection(&self) -> Option<&git::repository_tools::routes::PreparedPush> {
         self.selection.as_ref()
     }
@@ -1253,6 +1354,7 @@ pub(crate) fn check(repo: &Path, plan: &Plan) -> Result<(), String> {
 }
 
 fn check_active(repo: &Path, plan: &Plan, active: &dyn Fn() -> bool) -> Result<(), String> {
+    plan.check_fork_scope(repo)?;
     check_selected_snapshot(plan, |snapshot| snapshot.check_publication(repo))?;
     clean_lfs_config(repo, &plan.checkout_oid, active)?;
     if read(repo, &["rev-parse", "--verify", "HEAD"], active)?.trim() != plan.checkout_oid {
@@ -1300,7 +1402,18 @@ pub(crate) fn push_args(plan: &Plan) -> Result<Vec<String>, String> {
     if let Some(selected) = &plan.selection {
         plan.matches_selection(&selected.route)?;
     }
-    if (plan.force || plan.deleting) && plan.base.is_none() {
+    let mut expected_absent = false;
+    for words in plan.original.iter().filter_map(|step| push_words(step)) {
+        expected_absent |= matches!(
+            lease_requirement(words, &plan.destination, plan.deleting)?,
+            Some(CapturedLease::Absent)
+        );
+        if captured_lease(words, &plan.destination, plan.base.clone(), plan.deleting)? != plan.base
+        {
+            return Err("The captured push lease changed; reopen its original action.".into());
+        }
+    }
+    if (plan.force || plan.deleting) && plan.base.is_none() && (!expected_absent || plan.deleting) {
         return Err(
             "Fetch this exact target before force pushing: no remote lease was inspected.".into(),
         );
@@ -1462,6 +1575,7 @@ pub(crate) fn execute_controlled_with_guard(
         args[remote_at] = opaque.clone();
         let objects: Vec<_> = plan.lfs_objects.iter().cloned().collect();
         before_publish()?;
+        plan.check_fork_scope(repo)?;
         git::push_preflight_with(
             repo,
             &args,
@@ -1636,6 +1750,7 @@ pub(crate) mod selected_continuation_recording {
             lfs_config: Vec::new(),
             receive_pack: String::new(),
             selection: None,
+            fork_scope: None,
         }
     }
 

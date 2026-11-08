@@ -6,6 +6,14 @@ use crate::i18n::message;
 /// Authentication receipts deliberately stay opaque: consume their proof before displaying.
 pub(crate) fn diagnostic(raw: &str) -> String {
     match raw {
+        "The push lease must name this exact ref."
+        | "The push lease must name this exact ref and object."
+        | "The push contains contradictory explicit leases; reopen its original action."
+        | "The fetched target differs from the captured push lease; reopen its original action."
+        | "The captured push lease changed; reopen its original action."
+        | "The reviewed fork source changed; reopen push preflight" => {
+            return crate::git::display_error(raw);
+        }
         ".gitattributes is not a regular file; resolve that before converting to LFS." => {
             return crate::i18n::text("interaction-guards-push-lfs-attributes-file").into();
         }

@@ -269,6 +269,16 @@ pub fn display_error(error: &str) -> String {
         );
     }
     let id = match error {
+        "The push lease must name this exact ref." => "dev-baseline-guard-22",
+        "The push lease must name this exact ref and object." => "dev-baseline-guard-23",
+        "The push contains contradictory explicit leases; reopen its original action." => {
+            "dev-baseline-guard-24"
+        }
+        "The fetched target differs from the captured push lease; reopen its original action." => {
+            "dev-baseline-guard-25"
+        }
+        "The captured push lease changed; reopen its original action." => "dev-baseline-guard-26",
+        "The reviewed fork source changed; reopen push preflight" => "dev-baseline-guard-27",
         "The operation on the previous primary forge finished; refresh that repository to check its result" => {
             "dev-baseline-guard-21"
         }

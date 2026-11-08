@@ -735,6 +735,20 @@ fn reviewed_operands(op: &[String]) -> Result<(&str, Option<&[String]>), String>
     }
 }
 
+/// Retrieve the immutable exact argv behind APPROVED; the private marker is
+/// still interpreted only here, with its original strict operands.
+fn reviewed_push_args(op: &[String]) -> Result<Option<Vec<String>>, String> {
+    if op
+        .first()
+        .is_none_or(|mark| mark != crate::push_preflight::APPROVED)
+    {
+        return Ok(None);
+    }
+    let (id, _) = reviewed_operands(op)?;
+    let plan = crate::push_preflight::registered(id)?;
+    crate::push_preflight::push_args(&plan).map(Some)
+}
+
 fn retain_unfinished(ops: &mut Vec<Vec<String>>, stopped: usize) {
     // The checks and opaque source owner stay with the original operation on sign-in retry.
     let mut i = 0;
@@ -932,6 +946,17 @@ pub(super) fn run_steps(
     (result, kind)
 }
 
+/// Native test harnesses must interpret NUL checkout markers through the same
+/// guarded worker as the application, without exposing internal operation kinds.
+#[cfg(test)]
+pub(crate) fn run_live_checkout(
+    path: &Path,
+    ops: &[Vec<String>],
+    creds: Option<&git::Credentials>,
+) -> Result<String, String> {
+    run_steps(path, ops, OpKind::plain(), creds).0
+}
+
 /// Runs git commands one after another, stopping at the first failure; `kind` comes back with
 /// what undoing needs, as found on disk. Also says which step it stopped at (`ops.len()` when
 /// all ran): the steps before it are done, and running the operation again (after signing in)
@@ -1071,15 +1096,39 @@ pub(super) fn run_steps_guarded(
             }
             continue;
         }
-        let prepared =
-            match super::forks::guard::prepare_push(path, op, guarded_fork, rewrite.as_ref()) {
-                Ok(prepared) => prepared,
-                Err(e) => {
-                    result = Err(e);
-                    stopped = i;
-                    break;
-                }
-            };
+        let reviewed = match reviewed_push_args(op) {
+            Ok(reviewed) => reviewed,
+            Err(e) => {
+                result = Err(e);
+                stopped = i;
+                break;
+            }
+        };
+        let capture_args = reviewed.as_deref().unwrap_or(op);
+        let prepared = match super::forks::guard::prepare_push(
+            path,
+            capture_args,
+            guarded_fork,
+            rewrite.as_ref(),
+        ) {
+            Ok(prepared) => prepared,
+            Err(e) => {
+                result = Err(e);
+                stopped = i;
+                break;
+            }
+        };
+        // The preflight sender must execute exactly the argv this evidence describes.
+        // A resolved APPROVED source that differs is stale, never silently substituted.
+        if reviewed.is_some()
+            && prepared
+                .as_ref()
+                .is_some_and(|(args, _)| args != capture_args)
+        {
+            result = Err("The reviewed fork source changed; reopen push preflight".into());
+            stopped = i;
+            break;
+        }
         let mut actual = prepared
             .as_ref()
             .map_or_else(|| op.clone(), |(args, _)| args.clone());
@@ -1225,10 +1274,8 @@ pub(super) fn run_steps_guarded(
                     break;
                 }
             }
-            if let Some((_, done)) = prepared {
-                pushed.push(done);
-            }
         }
+        super::forks::guard::completed_push(&result, prepared, &mut pushed);
         if result.is_err() {
             stopped = i;
             break;
@@ -2154,4 +2201,108 @@ mod core_guard_paint_tests {
         crate::i18n::set_language("en-US");
         Ok(())
     }
+}
+
+#[cfg(test)]
+#[test]
+fn recording_approved_fork_capture_binds_only_successful_exact_pushed_tips() -> Result<(), String> {
+    use super::forks::guard;
+    const UNBOUND: &str = "\0fork-pushed-tip";
+    let expected = "a".repeat(40);
+    let tip = "b".repeat(40);
+    let route = git::repository_tools::routes::PushRoute {
+        branch: "topic".into(),
+        commit: tip.clone(),
+        remote: "fork".into(),
+        destination: "refs/heads/topic".into(),
+        urls: vec!["https://forge.invalid/team/fork".into()],
+        lease: Some(expected.clone()),
+    };
+    let plan = crate::push_preflight::selected_continuation_recording::plan(&route);
+    let original = crate::push_preflight::push_args(&plan)?;
+    let approved = crate::push_preflight::approved_ops(plan);
+    let marker = approved.last().ok_or("missing APPROVED marker")?;
+    assert_eq!(marker[0], crate::push_preflight::APPROVED);
+    let captured = reviewed_push_args(marker)?.ok_or("missing APPROVED capture")?;
+    assert_eq!(captured, original);
+    assert!(captured.contains(&format!("--force-with-lease=refs/heads/topic:{expected}")));
+    let prepared = guard::prepare_push_with(&captured, true, None, |source| {
+        assert_eq!(source, tip);
+        Ok(tip.clone())
+    })?
+    .ok_or("reviewed fork source evidence missing")?;
+    assert_eq!(prepared.0, original);
+    for lease in [
+        "--force-with-lease=refs/heads/topic:",
+        "--force-with-lease=refs/heads/topic",
+    ] {
+        let mut unsupported_fork = captured.clone();
+        let at = unsupported_fork
+            .iter()
+            .position(|arg| arg.starts_with("--force-with-lease="))
+            .ok_or("missing fixed lease")?;
+        unsupported_fork[at] = lease.into();
+        let resolved = std::cell::Cell::new(false);
+        assert!(
+            guard::prepare_push_with(&unsupported_fork, true, None, |_| {
+                resolved.set(true);
+                Err("unexpected resolution".into())
+            })
+            .is_err()
+        );
+        assert!(
+            !resolved.get(),
+            "fork lease must remain fixed before resolving"
+        );
+    }
+    let inverse = vec![vec![
+        "push".into(),
+        format!("--force-with-lease=refs/heads/topic:{}", UNBOUND),
+        "--".into(),
+        "fork".into(),
+        format!("{expected}:refs/heads/topic"),
+    ]];
+    for result in [
+        Ok(String::new()),
+        Err("auth failure".into()),
+        Err(git::CANCELLED.into()),
+        Err("stale guard".into()),
+    ] {
+        let mut pushed = Vec::new();
+        guard::completed_push(&result, Some(prepared.clone()), &mut pushed);
+        let mut undo = inverse.clone();
+        guard::bind_leases(&mut undo, &pushed);
+        assert_eq!(pushed.len(), usize::from(result.is_ok()));
+        let lease = if result.is_ok() {
+            tip.as_str()
+        } else {
+            UNBOUND
+        };
+        assert_eq!(
+            undo[0][1],
+            format!("--force-with-lease=refs/heads/topic:{lease}")
+        );
+        // An error never turns the unresolved inverse into an executable push.
+        if result.is_err() {
+            let resolved = std::cell::Cell::new(false);
+            assert!(
+                guard::prepare_push_with(&undo[0], true, None, |_| {
+                    resolved.set(true);
+                    Err("unexpected resolution".into())
+                })
+                .is_err()
+            );
+            assert!(!resolved.get(), "invalid lease must not resolve");
+        }
+    }
+    let mut other = inverse.clone();
+    other[0][3] = "another-fork".into();
+    let mut pushed = Vec::new();
+    guard::completed_push(&Ok(String::new()), Some(prepared), &mut pushed);
+    guard::bind_leases(&mut other, &pushed);
+    assert_eq!(other[0][1], inverse[0][1]);
+    let mut malformed = marker.clone();
+    malformed.push("extra".into());
+    assert!(reviewed_push_args(&malformed).is_err());
+    Ok(())
 }

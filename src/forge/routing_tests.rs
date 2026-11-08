@@ -742,7 +742,7 @@ fn review13_creation_and_review_targets_validate_the_web_instance() -> Result<()
             (
                 "https://forge.example:4000",
                 "team/repo",
-                forge != Forge::GitLab,
+                !matches!(forge, Forge::GitLab | Forge::Azure | Forge::Bitbucket),
             ),
             ("HTTPS://FORGE.example:4000", "Team/Repo", true),
         ] {

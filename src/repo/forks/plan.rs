@@ -558,6 +558,57 @@ impl Rebase {
         strings(&["-c", "rebase.updateRefs=false", "rebase", &self.base_head])
     }
 
+    /// The guarded local stage. Its worker records Rewrite before any push preview.
+    pub(super) fn local_steps(&self) -> Vec<Vec<String>> {
+        let local = self.local_ref();
+        self.guards()
+            .into_iter()
+            .chain([
+                expect_symref("HEAD", &local),
+                expect_ref_at(&local, &self.head),
+                self.rebase(),
+            ])
+            .collect()
+    }
+
+    /// Only successful, current, worker-owned rewrites can enter push review.
+    /// Error/cancel/conflict completion keeps local undo without authorizing a send.
+    pub(super) fn reviewed_tip<'a>(
+        &self,
+        rewrite: &'a super::guard::Rewrite,
+        succeeded: bool,
+        current: bool,
+    ) -> Option<&'a str> {
+        (succeeded
+            && current
+            && !rewrite.conflicts
+            && rewrite.branch == self.local_ref()
+            && rewrite.before == self.head
+            && matches!(rewrite.tip.len(), 40 | 64)
+            && rewrite.tip.bytes().all(|b| b.is_ascii_hexdigit())
+            && rewrite.tip != self.head)
+            .then_some(rewrite.tip.as_str())
+    }
+
+    /// The separate reviewed unit changes only the fork; local undo is already
+    /// retained by the completed local stage, including if review is cancelled.
+    pub(super) fn push_pending(&self, tip: &str) -> super::PendingOp {
+        let steps = self.push_now(tip);
+        super::PendingOp {
+            label: format!("Push {} to {}", self.local, self.fork),
+            ops: steps.clone(),
+            refresh: super::Refresh::All,
+            kind: super::OpKind::Normal(
+                super::Undo::Custom {
+                    undo: self.fork_undo_steps(),
+                    redo: steps,
+                },
+                String::new(),
+            ),
+            quiet: false,
+        }
+    }
+
     /// The rebase and the push, only while the branch is where the plan saw it.
     pub(crate) fn steps(&self) -> Vec<Vec<String>> {
         let local = self.local_ref();

@@ -129,3 +129,15 @@ dev-baseline-guard-19 = Publication needs the release's push destination
 dev-baseline-guard-20 = The primary forge changed during this release; publication stopped. Local changes remain undoable. Close this release before starting one on the new forge.
 
 dev-baseline-guard-21 = The operation on the previous primary forge finished; refresh that repository to check its result
+
+dev-baseline-guard-22 = The push lease must name this exact ref.
+
+dev-baseline-guard-23 = The push lease must name this exact ref and object.
+
+dev-baseline-guard-24 = The push contains contradictory explicit leases; reopen its original action.
+
+dev-baseline-guard-25 = The fetched target differs from the captured push lease; reopen its original action.
+
+dev-baseline-guard-26 = The captured push lease changed; reopen its original action.
+
+dev-baseline-guard-27 = The reviewed fork source changed; reopen push preflight

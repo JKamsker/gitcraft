@@ -13,7 +13,7 @@ use crate::{
 };
 
 #[derive(Clone)]
-pub(in crate::repo) struct Scope {
+pub(crate) struct Scope {
     pub generation: u64,
     pub id: u64,
     pub hosting: Hosting,
@@ -118,13 +118,13 @@ impl Scope {
         }
         self.check()
     }
-    pub fn reset_rewrite(&self) {
+    pub(in crate::repo) fn reset_rewrite(&self) {
         *self.rewrite.lock().unwrap_or_else(|e| e.into_inner()) = None;
     }
-    pub fn record_rewrite(&self, rewrite: Rewrite) {
+    pub(in crate::repo) fn record_rewrite(&self, rewrite: Rewrite) {
         *self.rewrite.lock().unwrap_or_else(|e| e.into_inner()) = Some(rewrite);
     }
-    pub fn rewrite(&self) -> Option<Rewrite> {
+    pub(in crate::repo) fn rewrite(&self) -> Option<Rewrite> {
         self.rewrite
             .lock()
             .unwrap_or_else(|e| e.into_inner())
@@ -323,6 +323,7 @@ impl CheckoutReplay {
 /// explicit OID keeps undo/redo independent of remote fetch-refspec configuration.
 pub(super) const PUSHED_TIP: &str = "\0fork-pushed-tip";
 
+#[derive(Clone)]
 pub(in crate::repo) struct Pushed {
     remote: String,
     target: String,
@@ -333,6 +334,16 @@ pub(in crate::repo) fn prepare_push(
     op: &[String],
     guarded: bool,
     rewrite: Option<&Rewrite>,
+) -> Result<Option<(Vec<String>, Pushed)>, String> {
+    prepare_push_with(op, guarded, rewrite, |source| git::resolve(repo, source))
+}
+
+/// Same source/lease validation for native execution and supplied recording data.
+pub(in crate::repo) fn prepare_push_with(
+    op: &[String],
+    guarded: bool,
+    rewrite: Option<&Rewrite>,
+    resolve: impl FnOnce(&str) -> Result<String, String>,
 ) -> Result<Option<(Vec<String>, Pushed)>, String> {
     if !guarded {
         return Ok(None);
@@ -347,10 +358,10 @@ pub(in crate::repo) fn prepare_push(
     let Some(expected) = lease.strip_prefix(&format!("--force-with-lease={target}:")) else {
         return Err("Fork push requires an explicit expected commit".into());
     };
-    if expected.is_empty() || expected.contains('\0') {
+    if !matches!(expected.len(), 40 | 64) || !expected.bytes().all(|b| b.is_ascii_hexdigit()) {
         return Err("Fork push has no recorded expected commit; plan the action again".into());
     }
-    let tip = git::resolve(repo, source)?;
+    let tip = resolve(source)?;
     if let Some(rewrite) = rewrite
         && source == rewrite.branch
         && tip != rewrite.tip
@@ -392,5 +403,18 @@ pub(in crate::repo) fn bind_leases(ops: &mut [Vec<String>], pushed: &[Pushed]) {
         {
             op[lease] = format!("--force-with-lease={target}:{}", done.tip);
         }
+    }
+}
+
+/// Only a successfully completed dispatch can authorize a future inverse lease.
+pub(in crate::repo) fn completed_push(
+    result: &Result<String, String>,
+    prepared: Option<(Vec<String>, Pushed)>,
+    pushed: &mut Vec<Pushed>,
+) {
+    if result.is_ok()
+        && let Some((_, done)) = prepared
+    {
+        pushed.push(done);
     }
 }

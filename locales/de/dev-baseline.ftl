@@ -129,3 +129,15 @@ dev-baseline-guard-19 = Zum Veröffentlichen wird das Push-Ziel des Releases ben
 dev-baseline-guard-20 = Die primäre Forge wurde während dieses Releases geändert; die Veröffentlichung wurde gestoppt. Lokale Änderungen bleiben rückgängig machbar. Schließe dieses Release, bevor du eines auf der neuen Forge beginnst.
 
 dev-baseline-guard-21 = Der Vorgang auf der vorherigen primären Forge wurde beendet; aktualisiere dieses Repository, um das Ergebnis zu prüfen
+
+dev-baseline-guard-22 = Die Push-Lease muss genau diese Referenz benennen.
+
+dev-baseline-guard-23 = Die Push-Lease muss genau diese Referenz und dieses Objekt benennen.
+
+dev-baseline-guard-24 = Der Push enthält widersprüchliche explizite Leases; öffne die ursprüngliche Aktion erneut.
+
+dev-baseline-guard-25 = Das abgerufene Ziel weicht von der erfassten Push-Lease ab; öffne die ursprüngliche Aktion erneut.
+
+dev-baseline-guard-26 = Die erfasste Push-Lease wurde geändert; öffne die ursprüngliche Aktion erneut.
+
+dev-baseline-guard-27 = Die geprüfte Fork-Quelle wurde geändert; öffne die Push-Vorabprüfung erneut

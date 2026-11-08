@@ -623,3 +623,46 @@ fn guard_display_target_labels_preserve_ambiguous_paths_and_canonical_redaction(
     }
     set_language("en-US");
 }
+
+#[test]
+fn captured_push_leases_render_without_changing_raw_witnesses() {
+    let pairs = [
+        (
+            "The push lease must name this exact ref.",
+            "Die Push-Lease muss genau diese Referenz benennen.",
+        ),
+        (
+            "The push lease must name this exact ref and object.",
+            "Die Push-Lease muss genau diese Referenz und dieses Objekt benennen.",
+        ),
+        (
+            "The push contains contradictory explicit leases; reopen its original action.",
+            "Der Push enthält widersprüchliche explizite Leases; öffne die ursprüngliche Aktion erneut.",
+        ),
+        (
+            "The fetched target differs from the captured push lease; reopen its original action.",
+            "Das abgerufene Ziel weicht von der erfassten Push-Lease ab; öffne die ursprüngliche Aktion erneut.",
+        ),
+        (
+            "The captured push lease changed; reopen its original action.",
+            "Die erfasste Push-Lease wurde geändert; öffne die ursprüngliche Aktion erneut.",
+        ),
+        (
+            "The reviewed fork source changed; reopen push preflight",
+            "Die geprüfte Fork-Quelle wurde geändert; öffne die Push-Vorabprüfung erneut",
+        ),
+    ];
+    for locale in ["en-US", "de", "en-US"] {
+        set_language(locale);
+        for (raw, german) in pairs {
+            let before = raw.to_owned();
+            let expected = if locale == "de" { german } else { raw };
+            assert_eq!(diagnostic(raw), expected);
+            assert_eq!(crate::git::display_error(raw), expected);
+            assert_eq!(raw, before);
+            let unknown = format!("{raw}\nopaque provider detail: refs/heads/a:b");
+            assert_eq!(diagnostic(&unknown), unknown);
+            assert_eq!(crate::git::display_error(&unknown), unknown);
+        }
+    }
+}

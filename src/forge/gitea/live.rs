@@ -775,10 +775,7 @@ fn pull_request_from_a_fork(
         "main",
         Some(hosting),
     )?;
-    for step in &plan.steps {
-        let args: Vec<&str> = step.iter().map(String::as_str).collect();
-        git::run_with(Some(dir), &args, Some(&creds))?;
-    }
+    crate::repo::operations::run_live_checkout(dir, &plan.steps, Some(&creds))?;
     write(dir, "d.txt", "fixed by the maintainer\n")?;
     run(dir, &["commit", "-q", "-am", "fix: by the maintainer"])?;
     git::run_with(Some(dir), &["push", "-q"], Some(&creds))?;

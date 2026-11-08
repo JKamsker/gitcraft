@@ -13,6 +13,19 @@ use std::time::{Duration, Instant};
 
 impl RepoTab {
     pub(super) fn begin_push_preflight(&mut self, ops: Vec<Vec<String>>, ctx: &egui::Context) {
+        let scope = self
+            .preflight_pending
+            .as_ref()
+            .and_then(|pending| self.fork_execution_scope(&pending.label));
+        self.begin_push_preflight_bound(ops, scope, ctx);
+    }
+
+    fn begin_push_preflight_bound(
+        &mut self,
+        ops: Vec<Vec<String>>,
+        fork_scope: Option<super::forks::ExecutionScope>,
+        ctx: &egui::Context,
+    ) {
         static IDS: AtomicU64 = AtomicU64::new(1);
         let id = IDS.fetch_add(1, Ordering::Relaxed);
         let token = Arc::new(());
@@ -37,12 +50,19 @@ impl RepoTab {
             move || {
                 let began = Instant::now();
                 let result = (|| {
+                    if let Some(scope) = &fork_scope {
+                        scope.check_remote(&repo)?;
+                    }
                     if let Some(selected) = &selection {
                         selected.snapshot.check_publication(&repo)?;
                     }
                     let mut plan = check::scan(&repo, ops, profile, &|| {
                         alive.strong_count() > 0 && began.elapsed() < Duration::from_secs(120)
                     })?;
+                    if let Some(scope) = fork_scope {
+                        scope.check_remote(&repo)?;
+                        plan.retain_fork_scope(scope);
+                    }
                     if let Some(selected) = selection {
                         plan.retain_selection(selected)?;
                     }
@@ -71,7 +91,7 @@ impl RepoTab {
 
     pub(super) fn reload_preflight(&mut self, plan: Plan, ctx: &egui::Context) {
         self.preflight_selection = plan.selection().cloned();
-        self.begin_push_preflight(plan.again(), ctx);
+        self.begin_push_preflight_bound(plan.again(), plan.fork_scope().cloned(), ctx);
     }
 
     fn same_preflight_profile(&mut self, plan: &Plan, ctx: &egui::Context) -> bool {
