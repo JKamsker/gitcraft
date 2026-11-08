@@ -15,7 +15,7 @@ pub mod virtuals;
 mod working_transaction;
 
 use crate::{git, remote};
-use context::Context;
+pub(in crate::git) use context::Context;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
@@ -502,6 +502,15 @@ fn private_index_file(
             .map_err(|e| e.to_string())?;
     }
     Ok(())
+}
+
+/// Concrete read-only subtree consumer: copy the existing index and split dependency
+/// into the empty private context, using the same stat-cache checks as draft capture.
+pub(in crate::git) fn inspection_index(
+    ctx: &Context,
+    active: &dyn Fn() -> bool,
+) -> Result<(), String> {
+    cached_index(ctx, &source(ctx, active)?, active)
 }
 
 fn cached_index(ctx: &Context, state: &Source, active: &dyn Fn() -> bool) -> Result<(), String> {

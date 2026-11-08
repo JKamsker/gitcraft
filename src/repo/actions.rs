@@ -777,6 +777,11 @@ impl RepoTab {
                 Action::RepositoryTools(super::repository_tools::Act::Outbox),
             ),
             (
+                "Subtrees: register, update, inspect and publish vendored folders…".into(),
+                "Vendored source history".into(),
+                Action::RepositoryTools(super::repository_tools::Act::Subtrees(String::new())),
+            ),
+            (
                 "Shared and borrowed objects".into(),
                 "Inspect shared Git directories and donors; make a clone independent".into(),
                 Action::RepositoryTools(super::repository_tools::Act::Sharing),

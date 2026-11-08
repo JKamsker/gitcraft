@@ -4,6 +4,7 @@ mod receipts;
 pub(super) use deferred::Cache as DeferredCache;
 mod outbox;
 mod sharing;
+mod subtrees;
 mod turns;
 mod virtuals;
 use crate::git::repository_tools::sharing as borrowing;
@@ -24,6 +25,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Tool {
     StateReceipts,
+    Subtrees,
     Refs,
     Object,
     Reftable,
@@ -46,6 +48,17 @@ static REQUESTS: AtomicU64 = AtomicU64::new(1);
 
 pub(crate) enum Act {
     StateReceipts,
+    Subtrees(String),
+    SubtreeJob(
+        Box<crate::git::repository_tools::subtrees::View>,
+        subtrees::Job,
+    ),
+    SubtreePreparePush(
+        Box<crate::git::repository_tools::subtrees::View>,
+        String,
+        bool,
+    ),
+    SubtreeSend(Box<crate::git::repository_tools::subtrees::Prepared>),
     Deferred,
     IsolatedStack(Vec<crate::git::stack::restack::Preview>),
     StartDeferred(
@@ -115,6 +128,8 @@ pub(crate) enum Act {
     PublishDependencies(Box<dependency::Plan>),
 }
 enum Data {
+    Subtrees(crate::git::repository_tools::subtrees::View),
+    SubtreePush(Box<crate::git::repository_tools::subtrees::Prepared>),
     StateReceipts(Vec<crate::git::drafts::publication::Report>),
     Deferred(crate::git::drafts::deferred::View),
     DeferredStack(
@@ -153,6 +168,10 @@ pub(crate) struct State {
 }
 impl RepoTab {
     pub(super) fn repository_tools_act(&mut self, act: Act, ctx: &egui::Context) {
+        let act = match subtrees::act(self, act, ctx) {
+            Some(act) => act,
+            None => return,
+        };
         let act = match deferred::act(self, act, ctx) {
             Some(act) => act,
             None => return,
@@ -291,6 +310,8 @@ impl RepoTab {
         };
         let (query, tool) = match act {
             Act::StateReceipts => (String::new(), Tool::StateReceipts),
+            Act::Subtrees(q) => (q, Tool::Subtrees),
+            Act::SubtreeJob(..) | Act::SubtreePreparePush(..) | Act::SubtreeSend(..) => return,
             Act::Deferred => (String::new(), Tool::Deferred),
             Act::IsolatedStack(..)
             | Act::StartDeferred(..)
@@ -364,6 +385,9 @@ impl RepoTab {
             false,
             Err,
             move || match tool {
+                Tool::Subtrees => {
+                    crate::git::repository_tools::subtrees::read(&path, &query).map(Data::Subtrees)
+                }
                 Tool::StateReceipts => crate::git::drafts::publication::read(&path, &|| {
                     !crate::tasks::cancellation().is_cancelled()
                 })
@@ -430,6 +454,9 @@ impl RepoTab {
                     if let Ok(Data::Deferred(view)) = &result {
                         tab.deferred.observe(id, view);
                     }
+                    if state.tool == Tool::Subtrees {
+                        state.query.clear();
+                    }
                     state.result = Some(result);
                 }
             },
@@ -493,6 +520,10 @@ impl RepoTab {
 
 pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>) {
     ui.set_width(850.0);
+    if state.tool == Tool::Subtrees {
+        subtrees::show(ui, state, acts);
+        return;
+    }
     if state.tool == Tool::StateReceipts {
         receipts::show(ui, state, acts);
         return;

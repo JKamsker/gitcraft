@@ -342,8 +342,24 @@ impl Ownership {
             && self.link.same_at(&self.root, ".git")
     }
 }
+#[cfg(test)]
 fn owned_command(
     s: &Step,
+    binding: &DispatchBinding,
+    observed: &DispatchBinding,
+    args: &[&str],
+) -> Result<Vec<String>, String> {
+    owned_command_at(
+        &s.worktree,
+        s.root_identity.as_deref(),
+        binding,
+        observed,
+        args,
+    )
+}
+fn owned_command_at(
+    worktree: &Path,
+    root_identity: Option<&str>,
     binding: &DispatchBinding,
     observed: &DispatchBinding,
     args: &[&str],
@@ -354,16 +370,13 @@ fn owned_command(
     if binding != observed {
         return Err("Deferred metadata/link identity changed; no replay was dispatched".into());
     }
-    let pin = s
-        .root_identity
-        .as_deref()
-        .ok_or("No owned directory identity")?;
+    let pin = root_identity.ok_or("No owned directory identity")?;
     Ok([
         "-c",
         OWNED_ALIAS,
         "gitcraft-owned-replay",
         pin,
-        s.worktree.to_str().ok_or("Worktree path must be UTF-8")?,
+        worktree.to_str().ok_or("Worktree path must be UTF-8")?,
         binding
             .metadata
             .to_str()
@@ -380,9 +393,34 @@ fn owned_command(
     .collect())
 }
 fn owned_run(r: &Runner<'_>, common: &Path, s: &Step, args: &[&str]) -> Result<String, String> {
-    let ownership = owned(r.repo, common, s)?;
-    let observed = filesystem_owned(common, s)?;
-    let words = owned_command(s, &ownership.binding, &observed.binding, args)?;
+    registered_run(
+        r,
+        common,
+        &s.worktree,
+        s.root_identity
+            .as_deref()
+            .ok_or("No owned directory identity")?,
+        args,
+    )
+}
+/// Shared only with the subtree candidate consumer. The original retained-directory,
+/// Git-link and registration checks remain in one implementation.
+pub(in crate::git) fn registered_run(
+    r: &Runner<'_>,
+    common: &Path,
+    worktree: &Path,
+    identity: &str,
+    args: &[&str],
+) -> Result<String, String> {
+    let ownership = owned_at(r.repo, common, worktree, Some(identity))?;
+    let observed = filesystem_owned_at(common, worktree, Some(identity))?;
+    let words = owned_command_at(
+        worktree,
+        Some(identity),
+        &ownership.binding,
+        &observed.binding,
+        args,
+    )?;
     if !ownership.unchanged() {
         return Err(
             "Deferred metadata/link changed before dispatch; no replay was dispatched".into(),
@@ -565,13 +603,17 @@ fn root_identity(path: &Path) -> Result<String, String> {
     Err("Stable worktree directory identities are unavailable on this platform".into())
 }
 #[cfg(unix)]
-fn filesystem_owned(common: &Path, s: &Step) -> Result<Ownership, String> {
+fn filesystem_owned_at(
+    common: &Path,
+    worktree: &Path,
+    identity: Option<&str>,
+) -> Result<Ownership, String> {
     use native_files::{Directory, Snapshot};
-    if std::fs::canonicalize(&s.worktree).map_err(|e| e.to_string())? != s.worktree {
+    if std::fs::canonicalize(worktree).map_err(|e| e.to_string())? != worktree {
         return Err("Deferred worktree physical path changed".into());
     }
-    let root = Directory::open(&s.worktree).map_err(|e| e.to_string())?;
-    if s.root_identity.as_deref()
+    let root = Directory::open(worktree).map_err(|e| e.to_string())?;
+    if identity
         != Some(
             crate::git::recovery::native_file_identity(root.file())?
                 .0
@@ -593,9 +635,9 @@ fn filesystem_owned(common: &Path, s: &Step) -> Result<Ownership, String> {
     // Validate its single registration component before opening its files.
     ownership_paths(
         common,
-        &s.worktree,
+        worktree,
         &link.bytes,
-        s.worktree
+        worktree
             .join(".git")
             .to_str()
             .ok_or("Non UTF-8 worktree")?
@@ -610,7 +652,7 @@ fn filesystem_owned(common: &Path, s: &Step) -> Result<Ownership, String> {
     let common_dir = Directory::open(common).map_err(|e| e.to_string())?;
     let backlink =
         Snapshot::read(&metadata, "gitdir", 8192)?.ok_or("Candidate backlink missing")?;
-    ownership_paths(common, &s.worktree, &link.bytes, &backlink.bytes)?;
+    ownership_paths(common, worktree, &link.bytes, &backlink.bytes)?;
     let common_link = Snapshot::read(&metadata, "commondir", 8192)?
         .ok_or("Candidate common directory link missing")?;
     let common_text = std::str::from_utf8(&common_link.bytes)
@@ -643,14 +685,22 @@ fn filesystem_owned(common: &Path, s: &Step) -> Result<Ownership, String> {
     Ok(owned)
 }
 #[cfg(not(unix))]
-fn filesystem_owned(_: &Path, _: &Step) -> Result<Ownership, String> {
+fn filesystem_owned_at(_: &Path, _: &Path, _: Option<&str>) -> Result<Ownership, String> {
     Err("Deferred native descriptor ownership unavailable on this platform".into())
 }
 fn owned(repo: &Path, common: &Path, s: &Step) -> Result<Ownership, String> {
-    let ownership = filesystem_owned(common, s)?;
+    owned_at(repo, common, &s.worktree, s.root_identity.as_deref())
+}
+fn owned_at(
+    repo: &Path,
+    common: &Path,
+    worktree: &Path,
+    identity: Option<&str>,
+) -> Result<Ownership, String> {
+    let ownership = filesystem_owned_at(common, worktree, identity)?;
     let wt = git::worktree_list(repo, None)?
         .into_iter()
-        .find(|w| w.path == s.worktree)
+        .find(|w| w.path == worktree)
         .ok_or("Deferred worktree is missing or no longer registered; no replay was dispatched")?;
     if wt.branch.is_some() {
         return Err("Deferred replay worktree is attached to a branch; detach it before continuing so no original branch is rewritten".into());
@@ -662,6 +712,16 @@ fn owned(repo: &Path, common: &Path, s: &Step) -> Result<Ownership, String> {
         );
     }
     Ok(ownership)
+}
+/// Called only after an acknowledged creation at a previously absent candidate path.
+pub(in crate::git) fn registered_identity(
+    repo: &Path,
+    common: &Path,
+    worktree: &Path,
+) -> Result<String, String> {
+    let identity = root_identity(worktree)?;
+    owned_at(repo, common, worktree, Some(&identity))?;
+    Ok(identity)
 }
 fn acceptance_allowed(job: &Job, undo: bool) -> Result<(), String> {
     if job.busy {
@@ -1197,6 +1257,18 @@ pub(crate) mod tests {
             link_text: format!("gitdir: {}", metadata.display()),
         };
         let command = owned_command(s, &binding, &binding, &["rebase", "--continue"]).unwrap();
+        let shared = owned_command_at(
+            &s.worktree,
+            s.root_identity.as_deref(),
+            &binding,
+            &binding,
+            &["rebase", "--continue"],
+        )
+        .unwrap();
+        assert_eq!(
+            command, shared,
+            "concrete subtree adapter preserves the existing command contract"
+        );
         assert_eq!(command[3], "1:32");
         assert_eq!(command[4], s.worktree.to_str().unwrap());
         assert_eq!(&command[11..], ["rebase", "--continue"]);
