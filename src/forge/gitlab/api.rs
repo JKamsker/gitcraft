@@ -55,7 +55,7 @@ impl Api {
                 return Err(crate::i18n::text("backend-gitlab-request-deadline-exceeded-refresh-to-try-again-3eebb5").into());
             }
             if crate::tasks::cancellation().is_cancelled() {
-                return Err(crate::i18n::text("backend-gitlab-operation-cancelled-d11bad").into());
+                return Err("GitLab operation cancelled".into());
             }
             #[cfg(test)]
             if let Some(record) = &self.record { return record(method, endpoint, body); }

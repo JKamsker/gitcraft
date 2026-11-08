@@ -118,7 +118,7 @@ impl Api {
     ) -> Result<Value, String> {
         use std::io::Read;
         if !active() {
-            return Err(crate::i18n::text("backend-history-lookup-cancelled-9533a8").into());
+            return Err("History lookup cancelled".into());
         }
         if endpoint.starts_with(['/', '-'])
             || endpoint.contains("://")

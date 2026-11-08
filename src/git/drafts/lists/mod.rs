@@ -64,7 +64,7 @@ pub(super) fn entries(
             },
         );
         if out.len() > MAX_INDEX {
-            return Err("Tree exceeds 20000 paths".into());
+            return Err(crate::i18n::text("backend-tree-exceeds-20000-paths-68cadd").into());
         }
     }
     Ok(out)

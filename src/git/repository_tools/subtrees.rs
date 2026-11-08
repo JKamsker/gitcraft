@@ -1039,17 +1039,24 @@ fn finish(
             } else {
                 Stage::Paused
             };
-            v.state.candidates[i].notice = format!(
-                "{}\nUnmerged: {}\nCandidate status: {}\nInspect retained work. No original branch was updated and no helper is retried automatically.",
-                git::redact(
-                    &err.err().unwrap_or_else(|| crate::i18n::text(
-                        "backend-helper-left-working-changes-edf853"
-                    )
-                    .into()),
-                    None
-                ),
-                unmerged,
-                status
+            v.state.candidates[i].notice = crate::i18n::message(
+                "backend-unmerged-candidate-status-inspect-retained-work-no-original-branc-5a2435",
+                &[
+                    (
+                        "git",
+                        (git::redact(
+                            &err.err().unwrap_or_else(|| {
+                                crate::i18n::text("backend-helper-left-working-changes-edf853")
+                                    .into()
+                            }),
+                            None,
+                        ))
+                        .to_string()
+                        .into(),
+                    ),
+                    ("unmerged", (unmerged).to_string().into()),
+                    ("status", (status).to_string().into()),
+                ],
             );
             if v.state.candidates[i].notice.len() > 65536 {
                 v.state.candidates[i].notice =

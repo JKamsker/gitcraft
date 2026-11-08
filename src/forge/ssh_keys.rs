@@ -123,7 +123,7 @@ pub(crate) fn prepare(
                 .into());
             }
             if !active() {
-                return Err(crate::i18n::text("backend-account-check-cancelled-34de37").into());
+                return Err("Account check cancelled.".into());
             }
             let answer = api
                 .get("user")
@@ -182,7 +182,7 @@ fn execute(
     active: &dyn Fn() -> bool,
 ) -> Result<Value, String> {
     if !active() {
-        return Err(crate::i18n::text("backend-account-action-cancelled-13efa7").into());
+        return Err("Account action cancelled.".into());
     }
     let output = crate::processes::run(
         command,

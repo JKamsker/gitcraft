@@ -287,10 +287,10 @@ impl Scope {
 
     pub fn label(self) -> &'static str {
         match self {
-            Scope::System => "System",
-            Scope::Global => "Global",
-            Scope::Local => "Repository",
-            Scope::Worktree => "Worktree",
+            Scope::System => crate::i18n::text("backend-label-d03287ca270c"),
+            Scope::Global => crate::i18n::text("backend-label-1037688fd91e"),
+            Scope::Local => crate::i18n::text("backend-label-b37f6dba2060"),
+            Scope::Worktree => crate::i18n::text("backend-label-e543d993d108"),
             Scope::Command => crate::i18n::text("backend-command-line-c925a1"),
         }
     }

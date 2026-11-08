@@ -13,7 +13,7 @@ fn remote_read(
         return Ok(None);
     };
     if !active() {
-        return Err(crate::i18n::text("backend-object-inspection-cancelled-e67f16").into());
+        return Err("Object inspection cancelled".into());
     }
     let request = remote::Request {
         script: body(&remote::sh_path(&t.path)),
@@ -37,7 +37,7 @@ fn remote_read(
         ));
     }
     if !active() {
-        return Err(crate::i18n::text("backend-object-inspection-cancelled-e67f16").into());
+        return Err("Object inspection cancelled".into());
     }
     if out.stdout.len() > cap {
         return Err(crate::i18n::text(
@@ -70,7 +70,7 @@ pub(super) fn size(path: &Path, active: &dyn Fn() -> bool) -> Result<Option<u64>
         };
     }
     if !active() {
-        return Err(crate::i18n::text("backend-object-inspection-cancelled-e67f16").into());
+        return Err("Object inspection cancelled".into());
     }
     match std::fs::metadata(path) {
         Ok(m) if m.is_file() => Ok(Some(m.len())),
@@ -175,7 +175,7 @@ pub(crate) fn read(
         };
     }
     if !active() {
-        return Err(crate::i18n::text("backend-object-inspection-cancelled-e67f16").into());
+        return Err("Object inspection cancelled".into());
     }
     // O_NONBLOCK prevents a substituted FIFO from blocking open before fstat.
     // O_NOFOLLOW rejects symlink substitution; only a pinned regular file is read.
@@ -240,7 +240,7 @@ fn bounded_bytes(
     let mut chunk = [0u8; 8192];
     loop {
         if !active() {
-            return Err(crate::i18n::text("backend-object-inspection-cancelled-e67f16").into());
+            return Err("Object inspection cancelled".into());
         }
         let remaining = (cap + 1).saturating_sub(bytes.len()).min(chunk.len());
         if remaining == 0 {

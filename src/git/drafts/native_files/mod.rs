@@ -462,10 +462,9 @@ pub(super) fn capture_policies(
     #[cfg(unix)]
     {
         let identity = crate::git::recovery::pinned_worktree(repo, active)?;
-        let pin = identity
-            .root_pin
-            .as_ref()
-            .ok_or("Missing working directory identity")?;
+        let pin = identity.root_pin.as_ref().ok_or(crate::i18n::text(
+            "backend-missing-working-directory-identity-0b73c9",
+        ))?;
         let mut policies = Policies::new();
         for (path, expected) in contents {
             if let Some((mode, bytes)) = expected {
@@ -481,12 +480,15 @@ pub(super) fn capture_policies(
                     .ok_or(crate::i18n::text("backend-missing-parent-27f5e2"))?
                     .to_owned();
                 let dir = Directory::from_file(parent, held).map_err(|e| e.to_string())?;
-                let snapshot =
-                    Snapshot::read(&dir, &name, bytes.len())?.ok_or("Working file disappeared")?;
+                let snapshot = Snapshot::read(&dir, &name, bytes.len())?
+                    .ok_or(crate::i18n::text("backend-working-file-disappeared-c0cb63"))?;
                 if snapshot.bytes != *bytes
                     || (snapshot.policy.mode() & 0o111 != 0) != (mode == "100755")
                 {
-                    return Err(format!("{path} changed while capturing full access policy"));
+                    return Err(crate::i18n::message(
+                        "backend-path-changed-while-capturing-full-access-policy-52aab5",
+                        &[("path", (path).to_string().into())],
+                    ));
                 }
                 policies.insert(path.clone(), snapshot.policy);
             }
@@ -496,7 +498,7 @@ pub(super) fn capture_policies(
     #[cfg(not(unix))]
     {
         let _ = (contents, active);
-        Err("Native working access policy unavailable".into())
+        Err(crate::i18n::text("backend-native-working-access-policy-unavailable-355b03").into())
     }
 }
 

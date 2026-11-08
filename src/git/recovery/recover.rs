@@ -421,9 +421,7 @@ pub(crate) fn perform(
         let reader = Reader::new(repo, active);
         verify(&reader, &prepared.preview)?;
         if !reader.active() {
-            return Err(
-                crate::i18n::text("backend-recovery-cancelled-before-mutation-922fff").into(),
-            );
+            return Err("Recovery cancelled before mutation".into());
         }
         match &prepared.target {
             Target::Branch(name) => {

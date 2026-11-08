@@ -1450,7 +1450,7 @@ pub(super) fn comparison_output(
     active: &dyn Fn() -> bool,
 ) -> Result<remote::Output, String> {
     if !active() {
-        return Err(crate::i18n::text("backend-comparison-cancelled-fe0a3c").into());
+        return Err("Comparison cancelled".into());
     }
     let guarded: Vec<_> = std::iter::once("--no-lazy-fetch")
         .chain(args.iter().copied())
@@ -1491,7 +1491,7 @@ pub(super) fn comparison_output(
         .into());
     }
     if !active() {
-        return Err(crate::i18n::text("backend-comparison-cancelled-fe0a3c").into());
+        return Err("Comparison cancelled".into());
     }
     Ok(out)
 }
@@ -1501,13 +1501,13 @@ pub(super) fn comparison_remote(
     active: &dyn Fn() -> bool,
 ) -> Result<remote::Output, String> {
     if !active() {
-        return Err(crate::i18n::text("backend-comparison-cancelled-fe0a3c").into());
+        return Err("Comparison cancelled".into());
     }
     request.timeout = Some(std::time::Duration::from_secs(20));
     request.long = true;
     let out = remote::exec(host, &request)?;
     if !active() {
-        return Err(crate::i18n::text("backend-comparison-cancelled-fe0a3c").into());
+        return Err("Comparison cancelled".into());
     }
     Ok(out)
 }
@@ -1884,14 +1884,20 @@ pub(crate) fn draft_bytes(
         return Err("Read cancelled".into());
     }
     if stdout.len() > 64 << 20 || stderr.len() > 64 << 10 {
-        return Err("Read output exceeds limit".into());
+        return Err(crate::i18n::text("backend-read-output-exceeds-limit-042a31").into());
     }
     if ok.contains(&code) && stderr.is_empty() {
         Ok(stdout)
     } else {
-        Err(format!(
-            "Git command failed ({code}): {}",
-            String::from_utf8_lossy(&stderr).trim()
+        Err(crate::i18n::message(
+            "backend-git-command-failed-code-a5e2b6",
+            &[
+                ("code", (code).to_string().into()),
+                (
+                    "from_utf8_lossy",
+                    (String::from_utf8_lossy(&stderr).trim()).to_string().into(),
+                ),
+            ],
         ))
     }
 }
@@ -2003,7 +2009,7 @@ pub(super) fn recovery_output(
         return Err("Recovery cancelled".into());
     }
     if out.stdout.len() > MAX || out.stderr.len() > MAX {
-        return Err("Recovery output exceeds limit".into());
+        return Err(crate::i18n::text("backend-recovery-output-exceeds-limit-3e73fc").into());
     }
     Ok(out)
 }
@@ -2034,10 +2040,12 @@ pub(crate) fn push_preflight_with(
         lfs_objects,
         receive_pack,
     } = target;
-    let (source, destination) = args
-        .last()
-        .and_then(|s| s.split_once(':'))
-        .ok_or("Missing inspected refspec")?;
+    let (source, destination) =
+        args.last()
+            .and_then(|s| s.split_once(':'))
+            .ok_or(crate::i18n::text(
+                "backend-missing-inspected-refspec-fa73fb",
+            ))?;
     let remote_tip = args.iter().find_map(|a| {
         a.strip_prefix("--force-with-lease=")
             .and_then(|v| v.rsplit_once(':'))
@@ -2088,19 +2096,27 @@ pub(crate) fn push_preflight_with(
         &[0],
         &|| true,
     )
-    .map_err(|_| "The reviewed address could not be pinned; no push was run.")?
+    .map_err(|_| {
+        crate::i18n::text("backend-the-reviewed-address-could-not-be-pinned-no-push-was-run-8a62d8")
+    })?
     .trim_end()
         != address
     {
-        return Err("The reviewed address could not be pinned; no push was run.".into());
+        return Err(crate::i18n::text(
+            "backend-the-reviewed-address-could-not-be-pinned-no-push-was-run-8a62d8",
+        )
+        .into());
     }
     let out = execute_preflight(dir, &extra, &words, control)?;
     if out.code == Some(0) {
-        Ok("Push completed.".into())
+        Ok(crate::i18n::text("backend-push-completed-5fccd0").into())
     } else if is_auth_error(&String::from_utf8_lossy(&out.stderr)) {
-        Err("Authentication failed for the reviewed push target.".into())
+        Err(
+            crate::i18n::text("backend-authentication-failed-for-the-reviewed-push-target-75e906")
+                .into(),
+        )
     } else {
-        Err(reviewed_refusal(&out.stdout,source,destination).unwrap_or_else(||"The reviewed push was refused or failed. Fetch and reopen preflight before trying again; server diagnostics were withheld because they can contain credentials or secrets.".into()))
+        Err(reviewed_refusal(&out.stdout,source,destination).unwrap_or_else(||crate::i18n::text("backend-the-reviewed-push-was-refused-or-failed-fetch-and-reopen-prefligh-59a6f0").into()))
     }
 }
 
@@ -2171,7 +2187,10 @@ fn reviewed_push_extra(
         ("GIT_CONFIG_KEY_15", "GIT_CONFIG_VALUE_15"),
     ];
     if values.len() > VARS.len() {
-        return Err("Too many pinned transport settings; no push was run.".into());
+        return Err(crate::i18n::text(
+            "backend-too-many-pinned-transport-settings-no-push-was-run-f9ebc3",
+        )
+        .into());
     }
     let mut extra = Extra {
         pre: Vec::new(),
@@ -2277,7 +2296,9 @@ pub(crate) fn local_repair_input(
     env: &[(&'static str, String)],
 ) -> Result<std::process::Output, String> {
     if remote::is_remote(dir) {
-        return Err("Local repair expected a local repository".into());
+        return Err(
+            crate::i18n::text("backend-local-repair-expected-a-local-repository-4833dc").into(),
+        );
     }
     let mut command = local_command(Some(dir), &Extra::default(), &[]);
     for name in PREFLIGHT_REMOVE {
@@ -2308,7 +2329,9 @@ pub(crate) fn repair_host(
     input: Vec<u8>,
     env: &[(&'static str, String)],
 ) -> Result<remote::Output, String> {
-    let target = remote::parse(dir).ok_or("Expected remote repository")?;
+    let target = remote::parse(dir).ok_or(crate::i18n::text(
+        "backend-expected-remote-repository-987cc6",
+    ))?;
     let mut request = remote_request(&target, &Extra::default(), &[]);
     request.script = script.into();
     request.stdin = Some(input);
@@ -2667,7 +2690,7 @@ fn practice_command(dir: &Path) -> Command {
 }
 pub(crate) fn practice_run(dir: &Path, args: &[&str]) -> Result<String, String> {
     if remote::is_remote(dir) {
-        return Err("Practice repositories are local".into());
+        return Err(crate::i18n::text("backend-practice-repositories-are-local-7d0527").into());
     }
     let mut cmd = practice_command(dir);
     cmd.args(args);
@@ -2713,7 +2736,7 @@ pub(crate) fn onboarding_local_config(
     active: &dyn Fn() -> bool,
 ) -> Result<Option<String>, String> {
     if !["user.name", "user.email"].contains(&key) {
-        return Err("Unsupported setup configuration key".into());
+        return Err(crate::i18n::text("backend-unsupported-setup-configuration-key-c326ad").into());
     }
     if !active() {
         return Err("Export cancelled".into());
@@ -2731,15 +2754,17 @@ pub(crate) fn onboarding_local_config(
         return Ok(None);
     }
     if bytes.code != Some(0) {
-        return Err("Could not inspect local setup configuration".into());
+        return Err(crate::i18n::text(
+            "backend-could-not-inspect-local-setup-configuration-3f3361",
+        )
+        .into());
     }
-    let value = bytes
-        .stdout
-        .strip_suffix(&[0])
-        .ok_or("Invalid configuration response")?;
+    let value = bytes.stdout.strip_suffix(&[0]).ok_or(crate::i18n::text(
+        "backend-invalid-configuration-response-260489",
+    ))?;
     String::from_utf8(value.to_vec())
         .map(Some)
-        .map_err(|_| "Local configuration is not UTF-8".into())
+        .map_err(|_| crate::i18n::text("backend-local-configuration-is-not-utf-8-311338").into())
 }
 
 fn download_read_error(args: &[&str], error: String) -> String {
@@ -2755,8 +2780,9 @@ fn download_read_error(args: &[&str], error: String) -> String {
         .iter()
         .any(|text| error.to_lowercase().contains(text))
     {
-        format!(
-            "{error}\nAutomatic object downloads are disabled. In a partial clone, use Graph tools → Sparse checkout and downloads to explicitly download history objects, then retry this file/diff."
+        crate::i18n::message(
+            "backend-error-automatic-object-downloads-are-disabled-in-a-partial-clone-5cfc0a",
+            &[("detail", (error).to_string().into())],
         )
     } else {
         error

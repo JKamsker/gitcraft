@@ -141,7 +141,7 @@ pub(crate) fn read(
     let mut walk = Walk::default();
     while let Some((path, parent, ancestors)) = pending.pop() {
         if !active() {
-            return Err(crate::i18n::text("backend-object-inspection-cancelled-e67f16").into());
+            return Err("Object inspection cancelled".into());
         }
         match walk.enter(&path, parent.as_deref(), &ancestors)? {
             Visit::Cycle => {

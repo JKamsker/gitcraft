@@ -69,7 +69,7 @@ pub(super) fn bytes(
     .chain(args.iter().copied())
     .collect();
     if !active() {
-        return Err(crate::i18n::text("backend-object-inspection-cancelled-e67f16").into());
+        return Err("Object inspection cancelled".into());
     }
     let output = read(repo, &args, Vec::new(), 16 * 1024 * 1024).map_err(|e| {
         crate::i18n::message(
@@ -78,7 +78,7 @@ pub(super) fn bytes(
         )
     })?;
     if !active() {
-        return Err(crate::i18n::text("backend-object-inspection-cancelled-e67f16").into());
+        return Err("Object inspection cancelled".into());
     }
     Ok(output)
 }
@@ -139,7 +139,7 @@ fn metadata(repo: &Path, oid: &str, active: &dyn Fn() -> bool) -> Result<Option<
         4096,
     )?;
     if !active() {
-        return Err(crate::i18n::text("backend-object-inspection-cancelled-e67f16").into());
+        return Err("Object inspection cancelled".into());
     }
     let s = String::from_utf8(out)
         .map_err(|_| crate::i18n::text("backend-invalid-cat-file-metadata-cb4422"))?;
@@ -228,7 +228,7 @@ fn representations(
     let packs = files::packs(store, MAX_PACKS, active)?;
     for pack in packs {
         if !active() {
-            return Err(crate::i18n::text("backend-object-inspection-cancelled-e67f16").into());
+            return Err("Object inspection cancelled".into());
         }
         let printed = remote::git_path(&pack);
         let rows = pack_rows(&text(repo, &["verify-pack", "-v", "--", &printed], active)?)?;

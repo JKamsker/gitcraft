@@ -203,7 +203,7 @@ fn apply_mapping(
     let mut remaining = max_bytes;
     for record in records {
         if !active() {
-            return Err(crate::i18n::text("backend-analysis-cancelled-d5fe01").into());
+            return Err("Analysis cancelled".into());
         }
         let (name, email) = mapped
             .get(&(record.name.clone(), record.email.clone()))

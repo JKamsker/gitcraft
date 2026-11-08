@@ -189,7 +189,10 @@ impl RouteBinding {
         if current == self {
             Ok(())
         } else {
-            Err("The operation's effective fetch/push destinations or routing configuration changed. Run the operation again before signing in.".into())
+            Err(crate::i18n::text(
+                "backend-the-operation-s-effective-fetch-push-destinations-or-routing-conf-943acc",
+            )
+            .into())
         }
     }
 }
@@ -289,7 +292,7 @@ pub(crate) fn operation_endpoints(repo: &Path, args: &[&str]) -> Result<Vec<Stri
 
 fn literal_query<'a>(original_args: &'a [&'a str], explicit: bool) -> Result<Vec<&'a str>, String> {
     if !explicit {
-        return Err("Could not establish the operation's implicit remote destination".into());
+        return Err(crate::i18n::text("backend-literal-75b6e4c4").into());
     }
     let command = after_options(original_args);
     let mut query = original_args[..original_args.len() - command.len()].to_vec();

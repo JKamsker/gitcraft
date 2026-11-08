@@ -376,7 +376,7 @@ fn setup_process(
     timeout: Duration,
 ) -> Result<std::process::Output, String> {
     if !active() {
-        return Err(crate::i18n::text("backend-setup-operation-cancelled-cdccbd").into());
+        return Err("Setup operation cancelled".into());
     }
     let out = crate::processes::run(
         command,
@@ -389,7 +389,7 @@ fn setup_process(
     )?
     .complete()?;
     if !active() {
-        return Err(crate::i18n::text("backend-setup-operation-cancelled-cdccbd").into());
+        return Err("Setup operation cancelled".into());
     }
     Ok(out)
 }

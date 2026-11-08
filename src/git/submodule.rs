@@ -41,7 +41,7 @@ impl SubmoduleState {
                 Some(crate::i18n::text("backend-not-initialised-29451a"))
             }
             SubmoduleState::OutOfDate => Some(crate::i18n::text("backend-out-of-date-30d18d")),
-            SubmoduleState::Conflicted => Some("conflict"),
+            SubmoduleState::Conflicted => Some(crate::i18n::text("backend-label-51c0e77bda35")),
         }
     }
 }

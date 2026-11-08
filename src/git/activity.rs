@@ -94,7 +94,7 @@ pub(crate) fn summarize(
     let mut authors: BTreeMap<(String, String), AuthorTotals> = BTreeMap::new();
     for (i, c) in history.commits.iter().enumerate() {
         if !active() {
-            return Err(crate::i18n::text("backend-analysis-cancelled-d5fe01").into());
+            return Err("Analysis cancelled".into());
         }
         let day = c.day(query.clock);
         *summary.calendar.entry(day).or_default() += 1;
@@ -255,7 +255,7 @@ fn read_roots_observing(
     let mut bytes = 0;
     loop {
         if !active() {
-            return Err(crate::i18n::text("backend-analysis-cancelled-d5fe01").into());
+            return Err("Analysis cancelled".into());
         }
         let take = PAGE.min(limit.saturating_sub(history.commits.len()) + 1);
         let data = run(

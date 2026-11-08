@@ -171,7 +171,7 @@ fn build_budget(
     let mut selected = 0;
     for record in &history.commits {
         if !active() {
-            return Err(crate::i18n::text("backend-atlas-cancelled-b9165d").into());
+            return Err("Atlas cancelled".into());
         }
         let day = record.day(query.clock);
         if query.from.is_some_and(|d| day < d) || query.through.is_some_and(|d| day > d) {
@@ -227,7 +227,7 @@ fn build_budget(
     // Parents are allocated first; IDs avoid allocating transient parent prefixes.
     for id in (0..nodes.len()).rev() {
         if !active() {
-            return Err(crate::i18n::text("backend-atlas-cancelled-b9165d").into());
+            return Err("Atlas cancelled".into());
         }
         if let Some((&author, _)) = authors[id]
             .iter()
@@ -242,7 +242,7 @@ fn build_budget(
             nodes[at].changes += nodes[id].changes;
             for (author, count) in std::mem::take(&mut authors[id]) {
                 if !active() {
-                    return Err(crate::i18n::text("backend-atlas-cancelled-b9165d").into());
+                    return Err("Atlas cancelled".into());
                 }
                 add_author(&mut authors[at], author, count, &mut budget)?;
             }
@@ -286,7 +286,7 @@ fn ensure_directory(
     active: &dyn Fn() -> bool,
 ) -> Result<usize, String> {
     if !active() {
-        return Err(crate::i18n::text("backend-atlas-cancelled-b9165d").into());
+        return Err("Atlas cancelled".into());
     }
     budget.charge(0, path.len() + 1)?;
     if let Some(id) = directories.get(path) {
@@ -307,7 +307,7 @@ fn ensure_file(
     active: &dyn Fn() -> bool,
 ) -> Result<usize, String> {
     if !active() {
-        return Err(crate::i18n::text("backend-atlas-cancelled-b9165d").into());
+        return Err("Atlas cancelled".into());
     }
     budget.charge(0, path.len() + 1)?;
     if let Some(id) = paths.get(path) {

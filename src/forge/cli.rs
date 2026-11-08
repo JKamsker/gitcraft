@@ -584,7 +584,7 @@ pub(super) fn history_api(
         .into());
     }
     if !active() {
-        return Err(crate::i18n::text("backend-history-lookup-cancelled-9533a8").into());
+        return Err("History lookup cancelled".into());
     }
     let mut command = tool_command(tool);
     command
@@ -614,11 +614,9 @@ pub(super) fn history_api(
         },
     )
     .and_then(|o| o.complete())
-    .map_err(|_| {
-        crate::i18n::text("backend-bounded-forge-history-lookup-failed-or-was-cancelled-41e4a7")
-    })?;
+    .map_err(|_| "Bounded forge history lookup failed or was cancelled")?;
     if !active() {
-        return Err(crate::i18n::text("backend-history-lookup-cancelled-9533a8").into());
+        return Err("History lookup cancelled".into());
     }
     if !output.status.success() {
         return Err(crate::i18n::text(

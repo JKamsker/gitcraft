@@ -173,7 +173,10 @@ impl ProgressReader {
         let drawn = self.redrawn.take().unwrap_or_default();
         self.push_line(if rest.is_empty() { &drawn } else { &rest });
         if self.cut {
-            format!("(earlier output left out)\n{}", self.text)
+            crate::i18n::message(
+                "backend-earlier-output-left-out-bb1f03",
+                &[("text", (self.text).to_string().into())],
+            )
         } else {
             self.text
         }

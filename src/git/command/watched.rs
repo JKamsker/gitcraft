@@ -184,13 +184,7 @@ pub(in crate::git) fn run_watched_extra_recorded(
 ) -> (Result<String, String>, Recorded) {
     let started = Instant::now();
     if control.is_cancelled() {
-        let not_run = Recorded::new(
-            args,
-            None,
-            crate::i18n::text("backend-not-run-cancelled-02b0ef"),
-            creds,
-            started,
-        );
+        let not_run = Recorded::new(args, None, "Not run: cancelled", creds, started);
         return (Err(CANCELLED.to_owned()), not_run);
     }
     let _timer = crate::git::backend::CliTimer::new(args);

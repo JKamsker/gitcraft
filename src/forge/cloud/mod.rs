@@ -368,7 +368,7 @@ impl Api {
             });
         }
         if crate::tasks::cancellation().is_cancelled() {
-            return Err(crate::i18n::text("backend-provider-request-cancelled-54eb9a").into());
+            return Err("Provider request cancelled".into());
         }
         let remaining = Duration::from_secs(120).saturating_sub(self.began.elapsed());
         if remaining.is_zero() || self.expires.is_some_and(|exp| now() + 15 >= exp) {

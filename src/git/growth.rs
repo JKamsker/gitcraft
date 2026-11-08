@@ -78,7 +78,7 @@ pub(crate) fn read(repo: &Path, active: &dyn Fn() -> bool) -> Result<Growth, Str
     for frame in frames.iter().skip(1) {
         for (path, present) in &frame.changes {
             if !active() {
-                return Err(crate::i18n::text("backend-replay-cancelled-c6ccd5").into());
+                return Err("Replay cancelled".into());
             }
             if *present {
                 state.insert(path.clone());
@@ -177,14 +177,14 @@ impl Growth {
         let mut files = BTreeSet::new();
         for path in &self.baseline {
             if !active() {
-                return Err(crate::i18n::text("backend-frame-cancelled-4d6f8f").into());
+                return Err("Frame cancelled".into());
             }
             files.insert(path.as_slice());
         }
         for frame in self.frames.iter().take(cursor.saturating_add(1)).skip(1) {
             for (path, present) in &frame.changes {
                 if !active() {
-                    return Err(crate::i18n::text("backend-frame-cancelled-4d6f8f").into());
+                    return Err("Frame cancelled".into());
                 }
                 if *present {
                     files.insert(path.as_slice());

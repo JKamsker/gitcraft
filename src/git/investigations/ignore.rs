@@ -263,9 +263,7 @@ pub(crate) fn prepare(
 pub(crate) fn perform(preview: &Preview, active: &dyn Fn() -> bool) -> Result<Appended, String> {
     whitespace_patch(&Reader::new(&preview.repo, active), &preview.commit)?;
     if !active() {
-        return Err(
-            crate::i18n::text("backend-ignore-edit-cancelled-before-publication-80ba37").into(),
-        );
+        return Err("Ignore edit cancelled before publication".into());
     }
     if let Some(host) = &preview.identity.host {
         let value = remote_call(
@@ -297,7 +295,7 @@ fn snapshot(
     active: &dyn Fn() -> bool,
 ) -> Result<(Snapshot, Option<Arc<std::fs::File>>), String> {
     if !active() {
-        return Err(crate::i18n::text("backend-ignore-preparation-cancelled-a562fd").into());
+        return Err("Ignore preparation cancelled".into());
     }
     if let Some(host) = &identity.host {
         let value = remote_call(identity, host, "read", &Snapshot::missing(), None, active)?;
@@ -346,7 +344,7 @@ fn remote_call(
         .into());
     }
     if op == "read" && !active() {
-        return Err(crate::i18n::text("backend-ignore-preview-cancelled-d6374a").into());
+        return Err("Ignore preview cancelled".into());
     }
     serde_json::from_slice(&out.stdout).map_err(|_| {
         crate::i18n::text("backend-malformed-remote-ignore-file-acknowledgement-6fc30e").into()
@@ -510,9 +508,7 @@ fn local_append(
         pin,
     )?;
     if !active() {
-        return Err(
-            crate::i18n::text("backend-ignore-edit-cancelled-before-opening-012613").into(),
-        );
+        return Err("Ignore edit cancelled before opening".into());
     }
     let exists = expected.bytes.is_some();
     let flags = OFlags::CLOEXEC
@@ -547,9 +543,7 @@ fn local_append(
         pin,
     )?;
     if !active() {
-        return Err(
-            crate::i18n::text("backend-ignore-edit-cancelled-before-opening-012613").into(),
-        );
+        return Err("Ignore edit cancelled before opening".into());
     }
     let exists = expected.bytes.is_some();
     let mut options = std::fs::OpenOptions::new();

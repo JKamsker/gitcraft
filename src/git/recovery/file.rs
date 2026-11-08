@@ -257,7 +257,7 @@ pub(super) fn available(
             },
         )?;
         if !reader.active() {
-            return Err(crate::i18n::text("backend-file-preview-cancelled-1db629").into());
+            return Err("File preview cancelled".into());
         }
         if out.code == 0 && out.stdout == b"available\n" && out.stderr.is_empty() {
             Ok(())
@@ -285,9 +285,7 @@ pub(super) fn create(
     valid_path(path)?;
     let pin = pinned(identity)?;
     if bytes.len() > super::BLOB_LIMIT || !reader.active() {
-        return Err(
-            crate::i18n::text("backend-file-recovery-cancelled-or-exceeds-2-mib-2d111b").into(),
-        );
+        return Err("File recovery cancelled or exceeds 2 MiB".into());
     }
     if let Some(host) = &identity.host {
         // Direct, owned call in the mutation worker. It cannot release a queued next

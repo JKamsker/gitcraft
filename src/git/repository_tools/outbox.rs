@@ -621,7 +621,7 @@ pub(crate) fn send(
             e.receipt = git::redact(output, None);
         }
         Err(error) => {
-            e.status=Status::Paused(crate::i18n::text("backend-push-rejected-cancelled-or-outcome-uncertain-inspect-the-destinat-78d1f3").into());
+            e.status=Status::Paused("Push rejected, cancelled or outcome uncertain. Inspect the destination before queueing again.".into());
             e.receipt = git::redact(error, None);
         }
     }

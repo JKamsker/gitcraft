@@ -368,7 +368,7 @@ fn session_turns(
         String::from_utf8(ctx.source(&["rev-parse", "--show-toplevel"], vec![], &[0], active)?)
             .map_err(|_| crate::i18n::text("backend-worktree-must-be-utf-8-de53d2"))?;
     if !active() {
-        return Err(crate::i18n::text("backend-review-cancelled-519921").into());
+        return Err("Review cancelled".into());
     }
     let turns = crate::agent::checkpoint::turns(repo, top.trim_end_matches(['\r', '\n']))?;
     if turns.len() > 10000 {
@@ -557,7 +557,7 @@ pub fn review(
     active: &dyn Fn() -> bool,
 ) -> Result<Review, String> {
     if !oid_valid(parent) || !oid_valid(turn) {
-        return Err("Turn has no immutable parent".into());
+        return Err(crate::i18n::text("backend-turn-has-no-immutable-parent-3272f8").into());
     }
     let ctx = Context::new(repo, active)?;
     let (reference, old, state) = load_review(&ctx, session, active)?;

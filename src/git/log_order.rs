@@ -20,7 +20,7 @@ impl Order {
 
     pub fn label(self) -> &'static str {
         match self {
-            Order::Topo => "Topological",
+            Order::Topo => crate::i18n::text("backend-label-33842988d845"),
             Order::Date => crate::i18n::text("backend-commit-date-default-9a50c8"),
             Order::AuthorDate => crate::i18n::text("backend-author-date-1556fe"),
         }
@@ -79,11 +79,13 @@ impl LogOrder {
             return None;
         }
         let order = match self.order {
-            Order::Topo => Some("topo"),
+            Order::Topo => Some(crate::i18n::text("backend-label-5efb87c8b031")),
             Order::Date => None,
-            Order::AuthorDate => Some("author date"),
+            Order::AuthorDate => Some(crate::i18n::text("backend-label-27d7acf0ec1e")),
         };
-        let first = self.first_parent.then_some("first parent");
+        let first = self
+            .first_parent
+            .then_some(crate::i18n::text("backend-label-7d0e10c239aa"));
         Some(
             order
                 .into_iter()

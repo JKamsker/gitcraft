@@ -103,7 +103,7 @@ impl Config {
             }
         }
         if at < text.len() {
-            out.push_str("\n[output truncated]");
+            out.push_str(crate::i18n::text("backend-output-truncated-b46ce7"));
         }
         out
     }

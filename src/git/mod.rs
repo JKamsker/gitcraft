@@ -33,6 +33,7 @@ pub mod doctor;
 pub mod dry_run;
 pub(crate) mod dvc;
 pub mod errors;
+pub use errors::display_error;
 pub mod external_tool;
 pub(crate) mod file_comparison;
 mod files;

@@ -117,7 +117,7 @@ pub(super) fn parse(
     active: &dyn Fn() -> bool,
 ) -> Result<Vec<Symbol>, String> {
     if !active() {
-        return Err(crate::i18n::text("backend-symbol-parsing-cancelled-9fccaf").into());
+        return Err("Symbol parsing cancelled".into());
     }
     let mut parser = Parser::new();
     parser

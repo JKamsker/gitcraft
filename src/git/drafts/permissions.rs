@@ -131,7 +131,7 @@ try:
 finally:os.close(fd)
 "#;
     if !active() {
-        return Err(crate::i18n::text("backend-draft-permissions-cancelled-52db5c").into());
+        return Err("Draft permissions cancelled".into());
     }
     let output=git::forecast_remote(identity.host.as_ref().ok_or(crate::i18n::text("backend-missing-remote-host-584e40"))?,remote::Request {
         cwd:Some(pin.physical.clone()),script:format!("exec python3 -c {}",remote::sh_quote(script)),

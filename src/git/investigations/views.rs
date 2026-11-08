@@ -255,7 +255,7 @@ pub(crate) fn query(
             ));
         }
         if !reader.active() {
-            return Err(crate::i18n::text("backend-saved-graph-view-cancelled-754f0e").into());
+            return Err("Saved graph view cancelled".into());
         }
         Ok(Selection {
             commits,

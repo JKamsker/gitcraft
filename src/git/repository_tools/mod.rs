@@ -210,10 +210,10 @@ impl ReadBudget {
             .deadline
             .saturating_duration_since(std::time::Instant::now());
         if left.is_zero() || self.remaining.get() == 0 {
-            return Err(
-                "Repository analysis reached its time/work limit; narrow the selection and retry"
-                    .into(),
-            );
+            return Err(crate::i18n::text(
+                "backend-repository-analysis-reached-its-time-work-limit-narrow-the-select-a665b8",
+            )
+            .into());
         }
         self.remaining.set(self.remaining.get() - 1);
         Ok(left.min(std::time::Duration::from_secs(120)))

@@ -161,7 +161,9 @@ pub(crate) fn redact(text: &str) -> String {
             line
         };
         if kept + value.len() > 256 * 1024 {
-            result.push_str("[display stopped at 256 KiB]\n");
+            result.push_str(crate::i18n::text(
+                "backend-display-stopped-at-256-kib-b74fab",
+            ));
             break;
         }
         result.push_str(value);

@@ -10,7 +10,7 @@ pub(in crate::git) fn run(
     active: &dyn Fn() -> bool,
 ) -> Result<Vec<u8>, String> {
     if !active() {
-        return Err(crate::i18n::text("backend-analysis-cancelled-d5fe01").into());
+        return Err("Analysis cancelled".into());
     }
     let mut safe = vec![
         "--no-replace-objects",
@@ -62,7 +62,7 @@ pub(in crate::git) fn run(
         });
     }
     if !active() {
-        return Err(crate::i18n::text("backend-analysis-cancelled-d5fe01").into());
+        return Err("Analysis cancelled".into());
     }
     Ok(output)
 }

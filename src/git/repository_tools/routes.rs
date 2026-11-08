@@ -428,7 +428,10 @@ pub(crate) fn prepare_force(repo: &Path, branch: &str, expected: &str) -> Result
         .find(|b| b.name == branch)
         .ok_or(crate::i18n::text("backend-branch-disappeared-fb9b46"))?;
     if b.oid != expected || !browser.remotes.contains(&b.push.remote) {
-        return Err("Branch or push route changed; choose it again".into());
+        return Err(crate::i18n::text(
+            "backend-branch-or-push-route-changed-choose-it-again-10567b",
+        )
+        .into());
     }
     let urls = text(
         repo,
@@ -436,7 +439,10 @@ pub(crate) fn prepare_force(repo: &Path, branch: &str, expected: &str) -> Result
     )?;
     let urls: Vec<_> = urls.lines().collect();
     if urls.len() != 1 {
-        return Err("Force push requires exactly one push URL. Use the remote editor to choose it explicitly.".into());
+        return Err(crate::i18n::text(
+            "backend-force-push-requires-exactly-one-push-url-use-the-remote-editor-to-5a89fa",
+        )
+        .into());
     }
     super::remote_config::validate_url(urls[0])?;
     let destination = format!("refs/heads/{}", b.push.branch);
@@ -461,7 +467,9 @@ pub(crate) fn prepare_force(repo: &Path, branch: &str, expected: &str) -> Result
                 .filter(|(_, r)| *r == destination)
                 .map(|(o, _)| o.to_owned())
         })
-        .ok_or("Push branch does not exist on this destination; use an ordinary push")?;
+        .ok_or(crate::i18n::text(
+            "backend-push-branch-does-not-exist-on-this-destination-use-an-ordinary-pu-14bce0",
+        ))?;
     browser.snapshot.check(repo)?;
     Ok(Force {
         snapshot: browser.snapshot,
@@ -508,16 +516,18 @@ pub(crate) fn run_plain_push(
         return Ok(None);
     };
     if rewritten.len() != at + 3 {
-        return Err("Invalid saved branch route".into());
+        return Err(crate::i18n::text("backend-invalid-saved-branch-route-70f49f").into());
     }
     let snapshot = Snapshot::capture(repo)?;
     if rewrite_plain_push(repo, args)?.as_ref() != Some(&rewritten) {
-        return Err("Saved push route changed while preparing".into());
+        return Err(
+            crate::i18n::text("backend-saved-push-route-changed-while-preparing-b37024").into(),
+        );
     }
     let remote = &rewritten[at + 1];
-    let (source, destination) = rewritten[at + 2]
-        .split_once(':')
-        .ok_or("Invalid saved push refspec")?;
+    let (source, destination) = rewritten[at + 2].split_once(':').ok_or(crate::i18n::text(
+        "backend-invalid-saved-push-refspec-8b18c5",
+    ))?;
     let commit = text(
         repo,
         &["rev-parse", "--verify", &format!("{source}^{{commit}}")],
@@ -527,15 +537,15 @@ pub(crate) fn run_plain_push(
         &["remote", "get-url", "--push", "--all", "--", remote],
     )?;
     if urls.lines().next().is_none() {
-        return Err("Saved push route has no destination".into());
+        return Err(crate::i18n::text("backend-saved-push-route-has-no-destination-11f425").into());
     }
     snapshot.check(repo)?;
     let owned = control.is_none().then(|| crate::git::OpControl::new(|| {}));
     let runner = Runner {
         repo,
-        control: control
-            .or(owned.as_ref())
-            .ok_or("Missing operation control")?,
+        control: control.or(owned.as_ref()).ok_or(crate::i18n::text(
+            "backend-missing-operation-control-cb2167",
+        ))?,
         credentials,
     };
     let before: Vec<&str> = rewritten[..=at].iter().map(String::as_str).collect();

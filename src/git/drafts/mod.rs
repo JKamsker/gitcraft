@@ -830,7 +830,7 @@ fn read_file_limited(
     valid_path(path)?;
     let limit = limit.min(FILE_LIMIT);
     if !active() {
-        return Err(crate::i18n::text("backend-draft-cancelled-426ba2").into());
+        return Err("Draft cancelled".into());
     }
     if let Some(target) = remote::parse(&ctx.repo) {
         let script = read_script(&ctx.worktree, path, limit as u64)?;

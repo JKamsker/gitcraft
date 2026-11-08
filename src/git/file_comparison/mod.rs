@@ -57,16 +57,17 @@ impl Version {
     }
     pub fn label(&self) -> String {
         match &self.mode {
-            None => "Missing".into(),
-            Some(m) => format!(
-                "{} · {} bytes{}",
-                m,
-                self.bytes.len(),
+            None => crate::i18n::text("backend-version-missing").into(),
+            Some(mode) => crate::i18n::message(
                 if self.bytes.contains(&0) {
-                    " · binary"
+                    "backend-version-bytes-binary"
                 } else {
-                    ""
-                }
+                    "backend-version-bytes"
+                },
+                &[
+                    ("mode", mode.as_str().into()),
+                    ("count", self.bytes.len().into()),
+                ],
             ),
         }
     }
@@ -269,7 +270,11 @@ pub(crate) fn blob(
         return Ok(Version {
             mode: Some(entry.mode.clone()),
             oid: Some(entry.oid.clone()),
-            bytes: format!("Submodule commit {}\n", entry.oid).into_bytes(),
+            bytes: crate::i18n::message(
+                "backend-submodule-commit-7c6bb2",
+                &[("oid", (entry.oid).to_string().into())],
+            )
+            .into_bytes(),
             warning: None,
         });
     }
