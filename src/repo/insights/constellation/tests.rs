@@ -121,3 +121,26 @@ fn a_repository_that_isnt_there_fails_with_a_retry() {
     tab.apply(Action::Insights(InsightsAct::ToggleTable), &ctx);
     draw(&mut tab, &ctx, 1200.0);
 }
+
+/// A build's state arriving (or changing) after the constellation was drawn draws it again:
+/// what the tab has of the forge reads differently.
+#[test]
+fn an_answer_from_the_forge_changes_what_it_was_drawn_with() {
+    let ctx = egui::Context::default();
+    let mut tab = RepoTab::new_deferred("/nonexistent/constellation-forge".into(), &ctx);
+    let before = tab.constellation_forge_read();
+    assert_eq!(before, tab.constellation_forge_read());
+    let status = |state| crate::ci::Status {
+        state,
+        checks: Vec::new(),
+    };
+    tab.ci
+        .by_sha
+        .insert("abc".to_owned(), status(crate::ci::CheckState::Running));
+    let running = tab.constellation_forge_read();
+    assert_ne!(before, running);
+    tab.ci
+        .by_sha
+        .insert("abc".to_owned(), status(crate::ci::CheckState::Passed));
+    assert_ne!(running, tab.constellation_forge_read());
+}

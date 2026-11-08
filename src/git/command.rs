@@ -97,6 +97,9 @@ pub(super) fn git_cmd() -> Command {
     for (name, value) in GIT_ENV {
         cmd.env(name, value);
     }
+    if let Some((name, value)) = offline_env() {
+        cmd.env(name, value);
+    }
     for name in GIT_ENV_REMOVED {
         cmd.env_remove(name);
     }
@@ -164,22 +167,16 @@ pub fn offline<T>(work: impl FnOnce() -> T) -> T {
     work()
 }
 
-const NO_LAZY_FETCH: &str = "GIT_NO_LAZY_FETCH";
+/// What every git started on this thread gets in its environment within [`offline`].
+fn offline_env() -> Option<(&'static str, &'static str)> {
+    OFFLINE
+        .with(std::cell::Cell::get)
+        .then_some(("GIT_NO_LAZY_FETCH", "1"))
+}
 
 /// Runs git with `args` in `dir` (on whichever machine it is), `extra` before them.
 fn execute(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Result<Ran, String> {
     let _timer = super::backend::CliTimer::new(args);
-    let with_offline;
-    let extra = if OFFLINE.with(std::cell::Cell::get)
-        && !extra.env.iter().any(|(name, _)| *name == NO_LAZY_FETCH)
-    {
-        let mut more = extra.clone();
-        more.env.push((NO_LAZY_FETCH, "1".to_owned()));
-        with_offline = more;
-        &with_offline
-    } else {
-        extra
-    };
     if let Some(target) = dir.and_then(remote::parse) {
         let result = execute_there(&target, extra, args);
         if let Ok(out) = &result {
@@ -263,6 +260,7 @@ pub(super) fn remote_request(target: &Target, extra: &Extra, args: &[&str]) -> r
             .iter()
             .map(|(n, v)| ((*n).to_owned(), (*v).to_owned()))
             .chain(extra.env.iter().map(|(n, v)| ((*n).to_owned(), v.clone())))
+            .chain(offline_env().map(|(n, v)| (n.to_owned(), v.to_owned())))
             .collect(),
         unset: GIT_ENV_REMOVED.iter().map(|n| (*n).to_owned()).collect(),
         stdin: extra.stdin.clone(),

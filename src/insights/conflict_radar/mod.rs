@@ -95,7 +95,11 @@ impl PairResult {
     /// It couldn't be worked out (the merge or a read failed: a connection dropped, a lock):
     /// shown as it is, and worked out again on the next read rather than reused.
     pub fn failed(&self) -> bool {
-        self.merge.is_err() || (self.changed.is_empty() && self.partial.is_some())
+        // No merge-base: a read that failed, or histories with nothing in common (worked out
+        // again, cheaply, as the two can't be told apart).
+        self.merge.is_err()
+            || self.base.is_none()
+            || (self.changed.is_empty() && self.partial.is_some())
     }
 
     /// The files the dry-run merge leaves conflicted (none when it couldn't be done).

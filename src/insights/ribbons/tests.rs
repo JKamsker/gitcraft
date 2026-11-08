@@ -46,6 +46,38 @@ fn classes(r: &Ribbons) -> Vec<(String, String, Class, Evidence)> {
     out
 }
 
+/// range-diff names the message section in its own hunk header when the change is deep in the
+/// message, and a message's `## heading` is not a section of the patch.
+#[test]
+fn a_message_changed_deep_in_its_body_is_a_rewording() {
+    let body = |lines: &[&str]| lines.iter().map(|l| (*l).to_owned()).collect::<Vec<_>>();
+    assert!(message_changed(&body(&[
+        "@@ Commit message",
+        "     line two",
+        "-    old text",
+        "+    new text",
+        " ",
+        "  ## g (new) ##",
+        " @@",
+    ])));
+    assert!(message_changed(&body(&[
+        "@@ Commit message",
+        "     ## Summary",
+        "-    old text",
+        "+    new text",
+    ])));
+    // A patch change after the message: not the message.
+    assert!(!message_changed(&body(&[
+        "@@ Metadata",
+        "  ## Commit message ##",
+        "     same",
+        "  ## f ##",
+        "-+new line here",
+        "++new  line   here",
+    ])));
+    assert!(!message_changed(&body(&["@@ f (new)", "-+a", "++b"])));
+}
+
 #[test]
 fn exact_matches_are_observed_and_similar_ones_inferred() {
     let mut moved = pair(PairKind::Same, Some(("c", 3)), Some(("c2", 1)));

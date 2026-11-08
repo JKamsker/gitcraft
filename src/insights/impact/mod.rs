@@ -615,6 +615,15 @@ pub fn analyze(repo: &Path, range: &Range) -> Result<Impact, String> {
             let Some(hits) = found.get(&(rev.to_owned(), s.name.clone())) else {
                 continue;
             };
+            // A file whose lines grep stopped at may have more references past them.
+            let mut per_file: HashMap<&str, usize> = HashMap::new();
+            for hit in hits {
+                *per_file.entry(hit.path.as_str()).or_default() += 1;
+            }
+            if !s.refs_cut && per_file.values().any(|&n| n > MAX_REFS) {
+                s.refs_cut = true;
+                cut += 1;
+            }
             for hit in hits {
                 let own = |span: &Option<Span>| {
                     span.as_ref()
@@ -655,8 +664,10 @@ pub fn analyze(repo: &Path, range: &Range) -> Result<Impact, String> {
                     }
                 }
                 if kept == MAX_REFS {
-                    s.refs_cut = true;
-                    cut += 1;
+                    if !s.refs_cut {
+                        s.refs_cut = true;
+                        cut += 1;
+                    }
                     break;
                 }
                 kept += 1;

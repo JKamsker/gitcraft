@@ -278,6 +278,10 @@ mod tests {
         let before = objects()?;
         // Without the blobs the line counts can't be worked out: an error, not a download.
         let read = git::offline(|| read(&clone, "HEAD", 10));
+        // Nor through git's batch reads (run apart from the other commands).
+        let head = git::resolve(&clone, "HEAD")?;
+        let blobs =
+            git::offline(|| git::blobs::read(&clone, &[(head, "a.txt".to_owned())], 1 << 20));
         let after = objects()?;
         let _ = std::fs::remove_dir_all(&root);
         assert!(
@@ -286,6 +290,10 @@ mod tests {
         );
         assert_eq!(before, after, "nothing was fetched");
         assert!(read.is_err(), "{read:?}");
+        assert!(
+            !matches!(blobs, Ok(ref b) if b.iter().any(Option::is_some)),
+            "{blobs:?}"
+        );
         Ok(())
     }
 

@@ -40,12 +40,10 @@ pub(crate) struct State {
     selected: Option<usize>,
     /// A second branch picked, to compare with the first.
     other: Option<usize>,
-    /// When the tab had read the pull requests and the builds it was drawn with: once the tab
-    /// reads them again, it is drawn again.
-    forge_read: Option<ForgeRead>,
+    /// What the pull requests and the builds it was drawn with were (see
+    /// [`RepoTab::constellation_forge_read`]): once the tab's answers differ, it is drawn again.
+    forge_read: Option<u64>,
 }
-
-type ForgeRead = (Option<std::time::Instant>, Option<std::time::Instant>);
 
 /// The constellation drawn from what was read and what the forge said.
 struct Built {
@@ -183,8 +181,25 @@ impl RepoTab {
         state.forge_read = Some(forge_read);
     }
 
-    fn constellation_forge_read(&self) -> ForgeRead {
-        (self.prs_loaded, self.ci.loaded_at())
+    /// A fingerprint of the pull requests and the builds as the tab has them now (in no
+    /// particular order): it changes once an answer brings anything new.
+    fn constellation_forge_read(&self) -> u64 {
+        use std::hash::{Hash, Hasher};
+        let one = |item: &dyn Fn(&mut std::collections::hash_map::DefaultHasher)| {
+            let mut h = std::collections::hash_map::DefaultHasher::new();
+            item(&mut h);
+            h.finish()
+        };
+        let mut sum = one(&|h| {
+            (self.prs_loaded.is_some(), &self.pr_error, &self.ci.error).hash(h);
+        });
+        for p in &self.prs {
+            sum = sum.wrapping_add(one(&|h| (p.number, &p.sha, &p.branch, p.draft).hash(h)));
+        }
+        for (sha, status) in &self.ci.by_sha {
+            sum = sum.wrapping_add(one(&|h| (sha, status.state as u8).hash(h)));
+        }
+        sum
     }
 
     /// Measures the worktrees' folders in the background (those here; not those on another

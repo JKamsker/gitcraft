@@ -289,14 +289,21 @@ fn paired(pair: &Pair, patches: &HashMap<String, Patch>) -> (Class, Evidence, St
     }
 }
 
-/// Whether range-diff's `body` of a pair changes a line of its commit message section.
+/// Whether range-diff's `body` of a pair changes a line of its commit message section. A
+/// section starts at range-diff's own hunk header (`@@ Commit message`), or at the patch's
+/// section line (` ## Commit message ##`) shown as context; a message's own lines are indented,
+/// so a `## Summary` in it isn't taken for one.
 fn message_changed(body: &[String]) -> bool {
     let mut in_message = false;
     for line in body {
+        if let Some(section) = line.strip_prefix("@@") {
+            in_message = section.trim() == "Commit message";
+            continue;
+        }
         let mut chars = line.chars();
         let mark = chars.next();
         let rest = chars.as_str();
-        if rest.trim_start().starts_with("## ") {
+        if rest.starts_with(" ## ") && rest.trim_end().ends_with(" ##") {
             in_message = rest.trim() == "## Commit message ##";
         } else if in_message && matches!(mark, Some('-' | '+')) {
             return true;
