@@ -91,6 +91,33 @@ impl Evidence {
     }
 }
 
+/// Where `head` left the branch `candidates` name (a local branch, its remote counterpart…):
+/// the one it is, its tip, and the merge-base. Of the merge-bases with those that are here, the
+/// newest is taken, as a local branch behind its remote one would put the fork too early and
+/// count the base's own commits as the change's.
+pub fn fork_point(
+    repo: &std::path::Path,
+    head: &str,
+    candidates: &[String],
+) -> Option<(String, String, String)> {
+    let mut best: Option<(String, String, String)> = None;
+    for candidate in candidates {
+        let Ok(tip) = crate::git::resolve(repo, candidate) else {
+            continue;
+        };
+        let Ok(base) = crate::git::merge_base(repo, head, &tip) else {
+            continue;
+        };
+        best = match best {
+            Some(found) if found.2 == base || crate::git::is_ancestor(repo, &base, &found.2) => {
+                Some(found)
+            }
+            _ => Some((candidate.clone(), tip, base)),
+        };
+    }
+    best
+}
+
 /// `path`'s folder at most `depth` levels down (`src/repo/x.rs` at 1: `src`), or the root's
 /// files as `""`. Depth 0 groups everything together.
 pub fn folder_at(path: &str, depth: usize) -> &str {

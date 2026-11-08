@@ -84,7 +84,7 @@ pub fn resolve(repo: &Path, ask: &Ask) -> Result<Range, String> {
             .trim()
             .to_owned();
             let candidates: Vec<String> = match base {
-                Some(b) => vec![b.clone()],
+                Some(b) => vec![b.clone(), format!("origin/{b}")],
                 None => [
                     "origin/HEAD",
                     "main",
@@ -95,11 +95,8 @@ pub fn resolve(repo: &Path, ask: &Ask) -> Result<Range, String> {
                 .map(str::to_owned)
                 .to_vec(),
             };
-            let (base_name, base_tip) = candidates
-                .iter()
-                .find_map(|c| git::resolve(repo, c).ok().map(|sha| (c.clone(), sha)))
+            let (base_name, _, base) = super::fork_point(repo, &head, &candidates)
                 .ok_or("no default branch to compare with (main, master or origin/HEAD)")?;
-            let base = git::merge_base(repo, &head, &base_tip)?;
             let name = if branch.is_empty() {
                 "HEAD".to_owned()
             } else {
@@ -119,11 +116,9 @@ pub fn resolve(repo: &Path, ask: &Ask) -> Result<Range, String> {
                      impact (nothing is fetched on its own)"
                 )
             })?;
-            let base_tip = [base.clone(), format!("origin/{base}")]
-                .iter()
-                .find_map(|c| git::resolve(repo, c).ok())
-                .ok_or_else(|| format!("its base branch {base} isn't here"))?;
-            let merge_base = git::merge_base(repo, &head, &base_tip)?;
+            let (_, _, merge_base) =
+                super::fork_point(repo, &head, &[base.clone(), format!("origin/{base}")])
+                    .ok_or_else(|| format!("its base branch {base} isn't here"))?;
             Ok(Range {
                 label: format!("#{number} since it left {base}"),
                 base: merge_base,
@@ -422,6 +417,8 @@ pub fn grep(repo: &Path, rev: &str, name: &str) -> Result<Vec<Hit>, String> {
             "-I",
             "-w",
             "-F",
+            // No more lines of a file than a symbol keeps references.
+            &format!("--max-count={}", MAX_REFS + 1),
             "-e",
             name,
             rev,
@@ -512,6 +509,15 @@ pub fn analyze(repo: &Path, range: &Range) -> Result<Impact, String> {
         }
     }
     let mut read = read_files(repo, &wanted)?;
+    // Those left unread (too big) have changes in no item known: said, not hidden.
+    let unread = wanted.iter().filter(|w| !read.contains_key(*w)).count();
+    if unread > 0 {
+        partial.push(format!(
+            "{unread} versions of changed Rust files weren't read (bigger than {} MB): their \
+             changes aren't placed in items",
+            MAX_TEXT >> 20
+        ));
+    }
 
     let mut symbols = Vec::new();
     let mut rust_files = Vec::new();
@@ -636,11 +642,9 @@ pub fn analyze(repo: &Path, range: &Range) -> Result<Impact, String> {
                         in_comments += 1;
                         continue;
                     }
-                    if file
-                        .items
-                        .iter()
-                        .any(|it| it.name == s.name && it.line == hit.line)
-                    {
+                    if file.items.iter().any(|it| {
+                        it.name == s.name && it.line == hit.line && it.kind != ItemKind::Impl
+                    }) {
                         s.same_named += 1;
                         continue;
                     }

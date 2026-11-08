@@ -419,3 +419,34 @@ fn a_change_in_no_supported_language_is_unknown_and_a_missing_head_is_said() -> 
     assert_eq!(first.other.len(), 1);
     Ok(())
 }
+
+/// A local base branch behind its remote one: the change is counted from where it left the
+/// newer one, not with the base's own commits in it.
+#[test]
+fn a_stale_local_base_branch_doesnt_add_its_commits_to_the_change() -> Result<(), String> {
+    let repo = crate::git::fixture::Repo::new("impact-stale-base")?;
+    let a = repo.commit("a", &[("a.rs", Some("fn a() {}\n"))])?;
+    let b = repo.commit("b", &[("b.rs", Some("fn b() {}\n"))])?;
+    // origin/main has b; main is still at a.
+    repo.git(&["update-ref", "refs/remotes/origin/main", &b])?;
+    repo.git(&["reset", "-q", "--hard", &a])?;
+    repo.git(&["checkout", "-q", "-b", "topic", &b])?;
+    let c = repo.commit("c", &[("c.rs", Some("fn c() {}\n"))])?;
+    let pr = resolve(
+        repo.path(),
+        &Ask::Pr {
+            number: 1,
+            head: c.clone(),
+            base: "main".to_owned(),
+        },
+    )?;
+    assert_eq!(pr.base, b);
+    let branch = resolve(
+        repo.path(),
+        &Ask::Branch {
+            base: Some("main".to_owned()),
+        },
+    )?;
+    assert_eq!(branch.base, b);
+    Ok(())
+}

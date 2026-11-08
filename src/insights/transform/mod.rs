@@ -102,8 +102,12 @@ pub fn resolve(repo: &Path, ask: &Ask) -> Result<Subject, String> {
         }
         Ask::Branch { base } => {
             let head = git::resolve(repo, "HEAD")?;
-            let base_tip = git::resolve(repo, base)?;
-            let from = git::merge_base(repo, &head, &base_tip)?;
+            let mut candidates = vec![base.clone()];
+            if !base.contains('/') {
+                candidates.push(format!("origin/{base}"));
+            }
+            let (base, base_tip, from) = super::fork_point(repo, &head, &candidates)
+                .ok_or_else(|| format!("{base} isn't here, or shares no history with HEAD"))?;
             if from == head {
                 return Err(format!("HEAD has no commits of its own over {base}"));
             }
@@ -126,11 +130,8 @@ pub fn resolve(repo: &Path, ask: &Ask) -> Result<Subject, String> {
                     short(head)
                 )
             })?;
-            let (base, base_tip) = bases
-                .iter()
-                .find_map(|b| git::resolve(repo, b).ok().map(|t| (b.clone(), t)))
+            let (base, base_tip, from) = super::fork_point(repo, &tip, bases)
                 .ok_or_else(|| format!("the base branch of #{number} isn't here"))?;
-            let from = git::merge_base(repo, &tip, &base_tip)?;
             Ok(Subject {
                 base: from,
                 head: tip.clone(),
