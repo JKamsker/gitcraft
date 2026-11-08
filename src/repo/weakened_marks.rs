@@ -11,7 +11,7 @@ use egui::Ui;
 use super::DiffKey;
 use super::widgets::{FileRowResponse, RowExtra};
 use crate::theme::Tokens;
-use crate::weakened::{Area, BADGE, FileFlags, Scope};
+use crate::weakened::{Area, FileFlags, Scope};
 
 /// A scan's files that weaken the checks, by path, or why it couldn't be read.
 pub(crate) type Found = Arc<Result<HashMap<String, FileFlags>, String>>;
@@ -206,7 +206,10 @@ pub(crate) fn extra<'a>(
         .and_then(|f| f.as_ref().as_ref().ok())
         .and_then(|files| files.get(path));
     match flags {
-        Some(flags) => (RowExtra::Badged(extra, BADGE), Some(flags)),
+        Some(flags) => (
+            RowExtra::Badged(extra, crate::weakened::display::badge()),
+            Some(flags),
+        ),
         None => (*extra, None),
     }
 }
@@ -215,7 +218,7 @@ pub(crate) fn extra<'a>(
 pub(crate) fn hover(ui: &Ui, row: &FileRowResponse, flags: Option<&FileFlags>) {
     if let (Some(rect), Some(flags)) = (row.badge, flags) {
         ui.interact(rect, row.row.id.with("weakened"), egui::Sense::hover())
-            .on_hover_text(flags.summary());
+            .on_hover_text(flags.display_summary());
     }
 }
 
@@ -226,7 +229,11 @@ pub(crate) fn error_note(ui: &mut Ui, found: Option<&Found>) {
         ui.add_space(4.0);
         ui.horizontal_wrapped(|ui| {
             ui.add_space(14.0);
-            ui.label(egui::RichText::new(e).size(11.0).color(t.text_faint));
+            ui.label(
+                egui::RichText::new(crate::weakened::display::diagnostic(e))
+                    .size(11.0)
+                    .color(t.text_faint),
+            );
         });
     }
 }
@@ -335,5 +342,81 @@ mod tests {
         wait(2)?;
         let _ = std::fs::remove_dir_all(&dir);
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod core_guard_paint_tests {
+    use super::*;
+    use crate::repo::push_preflight::core_guard_paint_tests::{frame, text};
+
+    #[test]
+    fn core_guard_paint_file_badge_hover_and_errors_keep_supplied_scan_raw() {
+        let path = "tests/opaque12345.rs";
+        let flags = FileFlags {
+            path: path.into(),
+            flags: vec![crate::weakened::Flag {
+                reason: crate::weakened::Reason::SkipsTests,
+                hunk: Some(0),
+                line: Some(12345),
+                removed: false,
+                evidence: "line 12345: #[ignore] // opaque 12345".into(),
+            }],
+        };
+        let raw = flags.summary();
+        let found: Found = Arc::new(Ok(HashMap::from([(path.into(), flags.clone())])));
+        let failed: Found = Arc::new(Err("Could not read the changes to look for weakened checks: provider: opaque12345\nEXPECT raw".into()));
+        let ctx = egui::Context::default();
+        let mut at = egui::Pos2::ZERO;
+        for (locale, label, number, error) in [
+            (
+                "en-US",
+                "weakens checks",
+                "12,345",
+                "Could not read the changes",
+            ),
+            ("de", "schwächt Prüfungen ab", "12.345", "Die Änderungen"),
+        ] {
+            crate::i18n::set_language(locale);
+            let mut draw = |ui: &mut Ui| {
+                let original = RowExtra::Stats(Some(1), Some(0));
+                let (extra, shown) = extra(Some(&found), path, &original);
+                let row = super::super::widgets::file_row(ui, 'M', path, None, None, false, extra);
+                at = row.badge.expect("badge").center();
+                hover(ui, &row, shown);
+                error_note(ui, Some(&failed));
+            };
+            let _ = frame(&ctx, vec![], &mut draw);
+            // Release the closure's mutable borrow before supplying pointer coordinates.
+            let pointer = at;
+            let mut draw = |ui: &mut Ui| {
+                let original = RowExtra::Stats(Some(1), Some(0));
+                let (extra, shown) = extra(Some(&found), path, &original);
+                let row = super::super::widgets::file_row(ui, 'M', path, None, None, false, extra);
+                hover(ui, &row, shown);
+                error_note(ui, Some(&failed));
+            };
+            let events = vec![egui::Event::PointerMoved(pointer)];
+            let _ = frame(&ctx, events.clone(), &mut draw);
+            let _ = frame(&ctx, events.clone(), &mut draw);
+            let shown = text(&frame(&ctx, events, &mut draw));
+            for expected in [
+                label,
+                number,
+                "#[ignore] // opaque 12345",
+                "provider: opaque12345",
+                "EXPECT raw",
+                error,
+            ] {
+                assert!(shown.contains(expected), "missing {expected}: {shown}");
+            }
+            assert_eq!(found.as_ref().as_ref().unwrap()[path], flags);
+            assert_eq!(flags.summary(), raw);
+            assert_eq!(
+                failed.as_ref().as_ref().unwrap_err(),
+                "Could not read the changes to look for weakened checks: provider: opaque12345\nEXPECT raw"
+            );
+        }
+        crate::i18n::set_language("en-US");
     }
 }

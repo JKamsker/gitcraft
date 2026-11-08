@@ -106,7 +106,7 @@ pub(crate) fn robot(ui: &Ui, left: f32, mid: f32, a: &Attribution, id: egui::Id)
     };
     crate::icons::paint(ui, rect, "bot", 13.0, color);
     ui.interact(rect, id, egui::Sense::hover())
-        .on_hover_text(a.describe());
+        .on_hover_text(a.display_description());
     18.0
 }
 
@@ -391,5 +391,44 @@ mod tests {
         assert!(said.starts_with("agent/x: "), "{said}");
         let _ = std::fs::remove_dir_all(&dir);
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod core_guard_paint_tests {
+    use super::*;
+    use crate::repo::push_preflight::core_guard_paint_tests::{frame, text};
+
+    #[test]
+    fn core_guard_paint_robot_hover_uses_supplied_attribution_in_current_language() {
+        let attribution = Attribution {
+            who: Who::Agent,
+            agents: vec!["Agent 12345".into()],
+            source: authorship::Source::Author,
+            lines: Default::default(),
+        };
+        let before = attribution.clone();
+        let raw = attribution.describe();
+        let ctx = egui::Context::default();
+        let id = egui::Id::new("opaque-authorship-12345");
+        let mut draw = |ui: &mut Ui| {
+            ui.allocate_space(vec2(100., 60.));
+            assert_eq!(robot(ui, 20., 30., &attribution, id), 18.);
+        };
+        for (locale, expected) in [
+            ("en-US", "Agent-written"),
+            ("de", "Von einem Agenten geschrieben"),
+        ] {
+            crate::i18n::set_language(locale);
+            let pointer = vec![egui::Event::PointerMoved(pos2(28., 30.))];
+            let _ = frame(&ctx, pointer.clone(), &mut draw);
+            let _ = frame(&ctx, pointer.clone(), &mut draw);
+            let shown = text(&frame(&ctx, pointer, &mut draw));
+            assert!(shown.contains(expected), "{shown}");
+            assert!(shown.contains("Agent 12345"), "{shown}");
+            assert_eq!(attribution, before);
+            assert_eq!(attribution.describe(), raw);
+        }
+        crate::i18n::set_language("en-US");
     }
 }
