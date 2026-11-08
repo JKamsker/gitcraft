@@ -21,7 +21,7 @@ impl Snapshot {
             .unwrap_or(0)
     }
     pub fn revision(&self) -> String {
-        json!({"repository":self.repo.id,"project":self.repo.project,"number":self.pr["pullRequestId"],"sourceRepository":self.pr.pointer("/forkSource/repository/id"),"sourceBranch":self.pr["sourceRefName"],"targetBranch":self.pr["targetRefName"],"source":self.pr["lastMergeSourceCommit"],"target":self.pr["lastMergeTargetCommit"],"iteration":self.iteration_id(),"common":self.iteration["commonRefCommit"]}).to_string()
+        json!({"repository":self.repo.id,"project":self.repo.project,"number":self.pr["pullRequestId"],"sourceRepository":self.pr.pointer("/forkSource/repository/id"),"sourceBranch":self.pr["sourceRefName"],"targetBranch":self.pr["targetRefName"],"source":self.pr["lastMergeSourceCommit"],"target":self.pr["lastMergeTargetCommit"],"iteration":self.iteration_id(),"iterationTarget":self.iteration["targetRefCommit"],"common":self.iteration["commonRefCommit"]}).to_string()
     }
 }
 pub(super) fn snapshot(api: &Api, n: u64) -> Result<Snapshot, String> {
@@ -56,8 +56,7 @@ pub(super) fn snapshot(api: &Api, n: u64) -> Result<Snapshot, String> {
     if s.iteration_id() == 0
         || text(&s.iteration, "/sourceRefCommit/commitId")
             != text(&s.pr, "/lastMergeSourceCommit/commitId")
-        || text(&s.iteration, "/targetRefCommit/commitId")
-            != text(&s.pr, "/lastMergeTargetCommit/commitId")
+        || !crate::pull_request::is_oid(required(&s.pr, "/lastMergeTargetCommit/commitId")?)
     {
         return Err("Azure is still updating the PR iteration; reload before reviewing".into());
     }

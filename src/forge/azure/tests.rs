@@ -266,3 +266,34 @@ fn native_list_create_and_link_routes_are_reachable_without_external_writes() ->
     assert!(Azure.pages().is_some());
     Ok(())
 }
+
+#[test]
+fn historical_iteration_target_opens_and_current_pr_target_is_independently_bound()
+-> Result<(), String> {
+    let (api, state) = recording();
+    let old = details::read(&api, 7)?;
+    state.lock().map_err(|e| e.to_string())?.pr["lastMergeTargetCommit"]["commitId"] =
+        json!("d".repeat(40));
+    let stale = post::AzureTarget::new(api.clone(), &old).ok_or("old target")?;
+    assert!(
+        stale
+            .comment("Do not publish against previous displayed target")
+            .is_err()
+    );
+    assert!(writes(&*state.lock().map_err(|e| e.to_string())?).is_empty());
+    let shown = details::read(&api, 7)?;
+    assert_eq!(shown.head_oid, "a".repeat(40));
+    assert_eq!(shown.base_oid, "c".repeat(40));
+    let revision: Value =
+        serde_json::from_str(shown.extras.review_revision.as_deref().ok_or("revision")?)
+            .map_err(|e| e.to_string())?;
+    assert_eq!(revision["target"]["commitId"], "d".repeat(40));
+    assert_eq!(revision["iterationTarget"]["commitId"], "b".repeat(40));
+    let current = post::AzureTarget::new(api, &shown).ok_or("current target")?;
+    current.comment("Review stable current PR with historical iteration target")?;
+    state.lock().map_err(|e| e.to_string())?.iteration["targetRefCommit"]["commitId"] =
+        json!("e".repeat(40));
+    assert!(current.comment("Iteration target also changed").is_err());
+    assert_eq!(writes(&*state.lock().map_err(|e| e.to_string())?).len(), 1);
+    Ok(())
+}
