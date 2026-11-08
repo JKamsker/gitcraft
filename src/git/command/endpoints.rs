@@ -282,12 +282,15 @@ pub(crate) fn operation_endpoints(repo: &Path, args: &[&str]) -> Result<Vec<Stri
     // synthetic remote cannot resolve a literal operand. Read only rewrite
     // metadata, retaining the operation's explicit global options, then apply
     // Git's single longest-prefix substitution without starting a transport.
-    let query = literal_query(original_args);
+    let query = literal_query(original_args, explicit.is_some())?;
     let configuration = connection_read(repo, &query)?;
     Ok(vec![literal::resolve(&configuration, &remote, push)?])
 }
 
-fn literal_query<'a>(original_args: &'a [&'a str]) -> Vec<&'a str> {
+fn literal_query<'a>(original_args: &'a [&'a str], explicit: bool) -> Result<Vec<&'a str>, String> {
+    if !explicit {
+        return Err("Could not establish the operation's implicit remote destination".into());
+    }
     let command = after_options(original_args);
     let mut query = original_args[..original_args.len() - command.len()].to_vec();
     query.extend([
@@ -296,13 +299,13 @@ fn literal_query<'a>(original_args: &'a [&'a str]) -> Vec<&'a str> {
         "--get-regexp",
         r"^url\..*\.(insteadof|pushinsteadof)$",
     ]);
-    query
+    Ok(query)
 }
 #[cfg(test)]
 mod tests {
     use super::*;
     #[test]
-    fn literal_metadata_query_keeps_owned_config_without_a_transport() {
+    fn literal_metadata_query_keeps_owned_config_without_a_transport() -> Result<(), String> {
         let original = [
             "-c",
             "url.ssh://host/.pushInsteadOf=short:",
@@ -310,7 +313,7 @@ mod tests {
             "short:repo",
         ];
         assert_eq!(
-            literal_query(&original),
+            literal_query(&original, true)?,
             [
                 "-c",
                 "url.ssh://host/.pushInsteadOf=short:",
@@ -321,6 +324,12 @@ mod tests {
             ]
         );
         assert_eq!(original[2..], ["push", "short:repo"]);
+        // A missing implicit match is not a literal URL. Git may select a sole
+        // configured remote instead of the conventional origin name.
+        for operation in ["fetch", "pull", "push"] {
+            assert!(literal_query(&[operation], false).is_err());
+        }
+        Ok(())
     }
     #[test]
     fn push_only_and_override_configuration_changes_invalidate_route_snapshots() {
