@@ -346,17 +346,13 @@ mod tests {
             tab.apply(Action::Push, &ctx);
             let before = git::resolve(&remote, "refs/heads/main");
             crate::repo::push_preflight::test_support::approve(&mut tab, &ctx)?;
-            wait(&mut tab, &ctx, |t| {
-                t.busy_op.is_none() && !t.loading && !t.echo_push_pending()
-            });
+            wait(&mut tab, &ctx, |t| t.busy_op.is_none() && !t.loading);
             let failed = tab.status.clone().map(|(s, _)| s).unwrap_or_default();
             let not_pushed = git::resolve(&remote, "refs/heads/main");
             assert_eq!(not_pushed, before);
             tab.apply(Action::PushSkippingHooks, &ctx);
             crate::repo::push_preflight::test_support::approve(&mut tab, &ctx)?;
-            wait(&mut tab, &ctx, |t| {
-                t.busy_op.is_none() && !t.loading && !t.echo_push_pending()
-            });
+            wait(&mut tab, &ctx, |t| t.busy_op.is_none() && !t.loading);
             let skipped = tab.status.clone().map(|(s, _)| s).unwrap_or_default();
             let pushed = git::resolve(&remote, "refs/heads/main");
             let head = git::head(&dir);
@@ -375,9 +371,7 @@ mod tests {
             wait(&mut tab, &ctx, |t| !t.loading);
             tab.apply(Action::Push, &ctx);
             crate::repo::push_preflight::test_support::approve(&mut tab, &ctx)?;
-            wait(&mut tab, &ctx, |t| {
-                t.busy_op.is_none() && !t.loading && !t.echo_push_pending()
-            });
+            wait(&mut tab, &ctx, |t| t.busy_op.is_none() && !t.loading);
             let again = tab.status.clone().map(|(s, _)| s).unwrap_or_default();
             assert!(again.contains("pre-push hook stopped it"), "{again}");
             assert_eq!(git::resolve(&remote, "refs/heads/main"), pushed);

@@ -345,9 +345,7 @@ mod tests {
         press(&mut tab, &ctx, Command::Push);
         assert!(git::resolve(&bare, &format!("refs/heads/{branch}")).is_err());
         super::super::push_preflight::test_support::approve(&mut tab, &ctx)?;
-        wait(&mut tab, &ctx, |t| {
-            t.busy_op.is_none() && !t.loading && !t.echo_push_pending()
-        });
+        wait(&mut tab, &ctx, |t| t.busy_op.is_none() && !t.loading);
         let pushed = run(Some(&bare), &["log", "-1", "--format=%s", &branch]);
 
         // A commit made on the remote from elsewhere: fetch sees it, pull brings it in.

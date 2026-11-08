@@ -131,9 +131,7 @@ fn a_hotfix_started_from_a_tag_is_finished_pushed_undone_and_redone() -> Result<
             &ctx,
         );
         crate::repo::push_preflight::test_support::approve(&mut tab, &ctx)?;
-        wait(&mut tab, &ctx, |t| {
-            t.busy_op.is_none() && !t.loading && !t.echo_push_pending()
-        });
+        wait(&mut tab, &ctx, |t| t.busy_op.is_none() && !t.loading);
         assert!(
             tab.status.as_ref().is_some_and(|(_, failed)| !failed),
             "{:?}",
