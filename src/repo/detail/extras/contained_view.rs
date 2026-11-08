@@ -6,7 +6,6 @@ use egui::{RichText, Ui};
 use super::ExtrasCmd;
 use super::section::{self, Summary};
 use crate::git::{Containment, RefList};
-use crate::repo::widgets;
 use crate::theme::Tokens;
 
 pub(super) fn section(
@@ -63,7 +62,7 @@ fn body(ui: &mut Ui, c: &Containment) {
         (Some(describe), Some(tag)) => {
             ui.horizontal_wrapped(|ui| {
                 ui.label(RichText::new("First tag with it").color(t.text_faint));
-                widgets::chip(ui, tag, t.success)
+                name_chip(ui, tag, t.success)
                     .on_hover_text(format!("git describe --contains: {describe}"));
             });
         }
@@ -94,7 +93,7 @@ fn names(ui: &mut Ui, title: &str, list: &RefList, color: egui::Color32) {
     ui.horizontal_wrapped(|ui| {
         ui.spacing_mut().item_spacing = egui::vec2(4.0, 4.0);
         for name in &list.names {
-            widgets::chip(ui, name, color);
+            name_chip(ui, name, color);
         }
         if list.hidden() > 0 {
             ui.label(
@@ -104,6 +103,19 @@ fn names(ui: &mut Ui, title: &str, list: &RefList, color: egui::Color32) {
             );
         }
     });
+}
+
+/// A single long ref must not widen the details or reach the refresh control.
+fn name_chip(ui: &mut Ui, name: &str, color: egui::Color32) -> egui::Response {
+    egui::Frame::new()
+        .fill(color.gamma_multiply(0.13))
+        .corner_radius(8)
+        .inner_margin(egui::Margin::symmetric(6, 1))
+        .show(ui, |ui| {
+            ui.add(egui::Label::new(RichText::new(name).color(color).small()).truncate())
+                .on_hover_text(name)
+        })
+        .inner
 }
 
 #[cfg(test)]

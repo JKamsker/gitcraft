@@ -22,6 +22,14 @@ pub struct Project {
 }
 
 impl Project {
+    fn hosting(&self) -> forge::Hosting {
+        forge::Hosting {
+            forge: self.forge,
+            host: self.host.split(':').next().unwrap_or(&self.host).to_owned(),
+            path: self.path.clone(),
+            web: format!("https://{}", self.host),
+        }
+    }
     /// The repository's main project: that of `origin` (or the first remote).
     pub fn of(forge: Forge, remotes: &[Remote]) -> Option<Self> {
         let remote = remotes

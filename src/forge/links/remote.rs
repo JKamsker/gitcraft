@@ -46,8 +46,8 @@ pub fn forge_name(remote: &Remote, hosting: Option<&Hosting>) -> &'static str {
 }
 
 fn forge_of(remote: &Remote, hosting: Option<&Hosting>) -> Option<Forge> {
-    let (host, path) = forge::location(&remote.url)?;
-    if let Some(h) = hosting.filter(|h| h.host == host && h.path == path) {
+    let (host, _) = forge::location(&remote.url)?;
+    if let Some(h) = hosting.filter(|h| h.matches_git_remote(&remote.url)) {
         return Some(h.forge);
     }
     Forge::ALL

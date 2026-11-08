@@ -41,6 +41,11 @@ impl RepoTab {
                     Pick::ChangesAdded,
                 ),
                 verb(format!("Compare {current} with…"), "compare", Pick::Compare),
+                verb(
+                    format!("Rehearse merge or rebase of {current} with…"),
+                    "rehearse",
+                    Pick::Rehearse,
+                ),
             ]);
         }
         if let Some(current) = &self.refs.current
@@ -175,6 +180,10 @@ impl RepoTab {
 fn branch_action(pick: &Pick, at: BranchRef<'_>, current: &str) -> Option<Action> {
     let here = BranchRef::local(current);
     Some(match pick {
+        Pick::Rehearse => Action::Rehearse(crate::repo::rehearse::RehearseAct::Open {
+            other: at.name.to_owned(),
+            remote: at.remote,
+        }),
         Pick::Merge => merge_action(at, current),
         Pick::Rebase => rebase_action(at, current),
         Pick::InteractiveRebase => interactive_rebase_action(at),

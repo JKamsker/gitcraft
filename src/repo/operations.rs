@@ -80,6 +80,7 @@ impl RepoTab {
         // Credential Manager would otherwise open its sign-in window every few minutes while a
         // token has expired.
         let path = self.path.clone();
+        let fork_scope = self.fork_execution_scope(label);
         let label = label.to_owned();
         let creds = self.credentials.clone();
         // Ended all the same if it panics: the tab stays busy until then.
@@ -103,8 +104,15 @@ impl RepoTab {
             } else {
                 Vec::new()
             };
-            let (result, kind, stopped) =
-                run_steps_counted(&path, &ops, kind, creds.as_ref(), quiet, Some(&control));
+            let (result, kind, stopped) = run_steps_guarded(
+                &path,
+                &ops,
+                kind,
+                creds.as_ref(),
+                quiet,
+                Some(&control),
+                fork_scope.as_ref(),
+            );
             let result = match result {
                 Err(e) if control.is_cancelled() && !e.contains("CONFLICT") => {
                     Err(cancelled_message(&path, &ops, &locks_before))
@@ -482,6 +490,33 @@ pub(super) fn run_steps_counted(
     quiet: bool,
     control: Option<&Arc<git::OpControl>>,
 ) -> (Result<String, String>, OpKind, usize) {
+    run_steps_guarded(path, ops, kind, creds, quiet, control, None)
+}
+
+pub(super) fn run_steps_guarded(
+    path: &Path,
+    ops: &[Vec<String>],
+    kind: OpKind,
+    creds: Option<&git::Credentials>,
+    quiet: bool,
+    control: Option<&Arc<git::OpControl>>,
+    fork_scope: Option<&super::forks::guard::Scope>,
+) -> (Result<String, String>, OpKind, usize) {
+    if let Some(scope) = fork_scope {
+        scope.reset_rewrite();
+    }
+    let saved_label = match &kind {
+        OpKind::Undo(entry) | OpKind::Redo(entry) => Some(entry.label.as_str()),
+        OpKind::Normal(..) => None,
+    };
+    let mut checkout = match super::forks::guard::CheckoutReplay::read(ops, saved_label) {
+        Ok(checkout) => checkout,
+        Err(e) => return (Err(e), kind, 0),
+    };
+    let mut owned_refs = Vec::new();
+    let mut rewrite = None;
+    let guarded_fork = ops.iter().any(|op| super::forks::guard::is_guard(op));
+    let mut pushed = Vec::new();
     // Undoing a HEAD move resets the branch checked out now: after a checkout or a commit made
     // elsewhere since, that would throw away commits that aren't the operation's.
     let expected = match &kind {
@@ -521,6 +556,20 @@ pub(super) fn run_steps_counted(
     let mut stopped = ops.len();
     let mut tried = Vec::new();
     for (i, op) in ops.iter().enumerate() {
+        #[cfg(test)]
+        if !is_expectation(op) {
+            super::forks::before_step(op);
+        }
+        if let Err(e) = fork_scope
+            .map_or(Ok(()), |scope| scope.check_remote(path))
+            .and_then(|()| super::forks::guard::check(path, ops))
+            .and_then(|()| checkout.as_mut().map_or(Ok(()), |c| c.check(path)))
+            .and_then(|()| fork_scope.map_or(Ok(()), |scope| scope.check()))
+        {
+            result = Err(e);
+            stopped = i;
+            break;
+        }
         if is_expectation(op) {
             continue;
         }
@@ -533,7 +582,66 @@ pub(super) fn run_steps_counted(
             }
             continue;
         }
-        let args: Vec<&str> = op.iter().map(String::as_str).collect();
+        let prepared =
+            match super::forks::guard::prepare_push(path, op, guarded_fork, rewrite.as_ref()) {
+                Ok(prepared) => prepared,
+                Err(e) => {
+                    result = Err(e);
+                    stopped = i;
+                    break;
+                }
+            };
+        let mut actual = prepared
+            .as_ref()
+            .map_or_else(|| op.clone(), |(args, _)| args.clone());
+        // Recheck immediately before invoking rebase. A rejected plan never owns a rewrite.
+        let rebasing = (fork_scope.is_some() || guarded_fork)
+            && matches!(op.as_slice(), [c, config, rebase, _] if c == "-c" && config == "rebase.updateRefs=false" && rebase == "rebase");
+        let rewrite_before = if rebasing {
+            if let Err(e) = check_expected(path, ops, control) {
+                result = Err(e);
+                stopped = i;
+                break;
+            }
+            git::run(Some(path), &["symbolic-ref", "-q", "HEAD"])
+                .ok()
+                .map(|branch| (branch.trim().to_owned(), git::head(path)))
+        } else {
+            None
+        };
+        let resetting =
+            matches!(op.as_slice(), [reset, mode, _] if reset == "reset" && mode == "--keep");
+        let deleting =
+            matches!(op.as_slice(), [branch, delete, ..] if branch == "branch" && delete == "-D");
+        if guarded_fork
+            && (resetting || deleting)
+            && let Err(e) = check_local_expected(path, ops, op, control)
+        {
+            result = Err(e);
+            stopped = i;
+            break;
+        }
+        let reset_result = if resetting
+            && ops.iter().any(|step| {
+                expected_ref(step).is_some_and(|(name, _)| name.starts_with("refs/heads/"))
+            })
+            && let Ok(branch) = git::run(Some(path), &["symbolic-ref", "-q", "HEAD"])
+        {
+            match git::resolve(path, &op[2]) {
+                Ok(tip) => {
+                    actual[2] = tip.clone();
+                    Some((branch.trim().to_owned(), tip))
+                }
+                Err(e) => {
+                    result = Err(e);
+                    stopped = i;
+                    break;
+                }
+            }
+        } else {
+            None
+        };
+        let args: Vec<&str> = actual.iter().map(String::as_str).collect();
         if let Some(folder) = crate::agent::added_worktree(op)
             && let Err(e) = if control.is_some_and(|c| c.is_cancelled()) {
                 Err(git::CANCELLED.to_owned())
@@ -555,6 +663,49 @@ pub(super) fn run_steps_counted(
             }
             run_step(path, &args, creds, quiet, control)
         })();
+        if let Some((branch, before)) = rewrite_before {
+            let done = super::forks::guard::Rewrite {
+                tip: git::resolve(path, &branch).unwrap_or_default(),
+                branch,
+                before,
+                conflicts: result
+                    .as_ref()
+                    .err()
+                    .is_some_and(|e| e.contains("CONFLICT") || e.contains("could not apply")),
+            };
+            if let Some(scope) = fork_scope {
+                scope.record_rewrite(done.clone());
+            }
+            if !done.tip.is_empty() {
+                owned_refs.push((done.branch.clone(), done.tip.clone()));
+            }
+            rewrite = Some(done);
+        }
+        if result.is_ok() {
+            if let Some(done) = reset_result {
+                owned_refs.push(done);
+            }
+            if checkout.is_some()
+                && op.first().is_some_and(|s| s == "checkout")
+                && let Ok(branch) = git::run(Some(path), &["symbolic-ref", "-q", "HEAD"])
+            {
+                owned_refs.push((branch.trim().to_owned(), git::head(path)));
+            }
+            // Pin a new remote at its creating step, before marker/config/fetch/checkout.
+            if matches!(op.as_slice(), [remote, add, ..] if remote == "remote" && add == "add") {
+                result = fork_scope
+                    .map_or(Ok(()), |scope| scope.check_remote(path))
+                    .and_then(|()| checkout.as_mut().map_or(Ok(()), |c| c.check(path)))
+                    .map(|()| String::new());
+                if result.is_err() {
+                    stopped = i + 1; // remote add completed; a retry must retain its guard, not add it twice.
+                    break;
+                }
+            }
+            if let Some((_, done)) = prepared {
+                pushed.push(done);
+            }
+        }
         if result.is_err() {
             stopped = i;
             break;
@@ -582,18 +733,33 @@ pub(super) fn run_steps_counted(
             OpKind::Normal(Undo::None, before)
         }
         // The way back expects the refs where this left them.
-        OpKind::Normal(Undo::Custom { mut undo, redo }, before) if result.is_ok() => {
-            fill_expected(path, &mut undo);
+        OpKind::Normal(Undo::Custom { mut undo, mut redo }, before) if result.is_ok() => {
+            fill_expected(path, &mut undo, &owned_refs);
+            if let Some(c) = &checkout {
+                c.bind(&mut undo);
+                c.bind(&mut redo);
+            }
+            super::forks::guard::bind_leases(&mut undo, &pushed);
             OpKind::Normal(Undo::Custom { undo, redo }, before)
         }
         OpKind::Undo(mut entry) if result.is_ok() => {
-            fill_expected(path, &mut entry.redo);
+            fill_expected(path, &mut entry.redo, &owned_refs);
+            if let Some(c) = &checkout {
+                c.bind(&mut entry.undo);
+                c.bind(&mut entry.redo);
+            }
+            super::forks::guard::bind_leases(&mut entry.redo, &pushed);
             OpKind::Undo(entry)
         }
         // Redone with nothing to stash, the undo keeps expecting the stash it popped, and so
         // refuses rather than pop an older one.
         OpKind::Redo(mut entry) if result.is_ok() && !no_stash => {
-            fill_expected(path, &mut entry.undo);
+            fill_expected(path, &mut entry.undo, &owned_refs);
+            if let Some(c) = &checkout {
+                c.bind(&mut entry.undo);
+                c.bind(&mut entry.redo);
+            }
+            super::forks::guard::bind_leases(&mut entry.undo, &pushed);
             OpKind::Redo(entry)
         }
         other => other,
@@ -694,7 +860,8 @@ pub(super) fn tried_note(out: &str) -> Option<&str> {
 
 /// Whether `op` is a step that runs nothing, only checks.
 pub(super) fn is_expectation(op: &[String]) -> bool {
-    expected_ref(op).is_some()
+    super::forks::guard::is_guard(op)
+        || expected_ref(op).is_some()
         || expected_symref(op).is_some()
         || expected_tree(op).is_some()
         || matches!(op, [mark, _, _] if mark == crate::gerrit::CHECK)
@@ -777,10 +944,46 @@ fn check_expected(
     Ok(())
 }
 
-fn fill_expected(path: &Path, ops: &mut [Vec<String>]) {
+fn check_local_expected(
+    path: &Path,
+    ops: &[Vec<String>],
+    mutation: &[String],
+    control: Option<&Arc<git::OpControl>>,
+) -> Result<(), String> {
+    let reset = mutation.first().is_some_and(|s| s == "reset");
+    let names: Vec<String> = if reset {
+        git::run(Some(path), &["symbolic-ref", "-q", "HEAD"])
+            .ok()
+            .map(|s| vec![s.trim().to_owned()])
+            .unwrap_or_default()
+    } else {
+        mutation
+            .iter()
+            .skip(2)
+            .filter(|s| s.as_str() != "--")
+            .map(|name| format!("refs/heads/{name}"))
+            .collect()
+    };
+    let local: Vec<Vec<String>> = ops
+        .iter()
+        .filter(|op| {
+            expected_ref(op).is_some_and(|(name, _)| names.iter().any(|n| n == name))
+                || (reset && expected_symref(op).is_some())
+        })
+        .cloned()
+        .collect();
+    check_expected(path, &local, control)
+}
+
+// A network push may have allowed an unrelated local commit. Prefer the result this
+// worker actually produced; disk is only a fallback for refs the operation did not write.
+fn fill_expected(path: &Path, ops: &mut [Vec<String>], owned: &[(String, String)]) {
     for op in ops {
         if let Some((name, _)) = expected_ref(op) {
-            let now = git::resolve(path, name).unwrap_or_default();
+            let now = owned.iter().rev().find(|(r, _)| r == name).map_or_else(
+                || git::resolve(path, name).unwrap_or_default(),
+                |(_, tip)| tip.clone(),
+            );
             if let Some(value) = op.get_mut(2) {
                 *value = now;
             }

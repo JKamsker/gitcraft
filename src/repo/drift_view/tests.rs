@@ -56,6 +56,10 @@ fn opened_from_the_worktree_it_reads_the_task_and_measures() -> Result<(), Strin
             .as_ref()
             .is_some_and(|v| !v.hidden && v.report.is_some())
     );
+    tab.clear_forge_drift();
+    let view = tab.drift.as_ref().ok_or("drift view disappeared")?;
+    assert_eq!(view.task, "Fix the login");
+    assert!(view.issue.is_none() && view.report.is_none() && !view.busy && !view.asking);
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::remove_dir_all(dir.with_extension("wt"));
     Ok(())

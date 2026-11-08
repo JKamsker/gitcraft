@@ -8,7 +8,7 @@ use super::{gh, login, threads};
 use crate::forge::Forge;
 use crate::pr_threads::PrExtras;
 use crate::pull_request::{
-    Entry, EntryKind, PrCommit, PrDetails, at, check, items, line_entries, parse_time, repo_of_url,
+    Entry, EntryKind, PrCommit, PrDetails, at, check, items, line_entries, parse_time,
 };
 
 const FIELDS: &str = "number,title,body,state,isDraft,author,url,baseRefName,baseRefOid,\
@@ -16,14 +16,18 @@ const FIELDS: &str = "number,title,body,state,isDraft,author,url,baseRefName,bas
     mergeStateStatus,reviewDecision,labels,statusCheckRollup,commits,comments,reviews";
 
 /// Reads the pull request numbered `number` of the repository at `repo`.
-pub(super) fn details(repo: &Path, number: u64) -> Result<PrDetails, String> {
-    let details = read_details(repo, number)?;
+pub(super) fn details(
+    repo: &Path,
+    hosting: &super::Hosting,
+    number: u64,
+) -> Result<PrDetails, String> {
+    let details = read_details(repo, hosting, number)?;
     // It's read in two goes. A push in between would put the threads' line numbers on another
     // commit than the one the page takes for the pull request's, so that goes again.
     if read_in_step(&details) {
         return Ok(details);
     }
-    let details = read_details(repo, number)?;
+    let details = read_details(repo, hosting, number)?;
     if read_in_step(&details) {
         Ok(details)
     } else {
@@ -36,18 +40,23 @@ fn read_in_step(details: &PrDetails) -> bool {
     details.inline_error.is_some() || details.extras.head_oid == details.head_oid
 }
 
-fn read_details(repo: &Path, number: u64) -> Result<PrDetails, String> {
-    let view = gh(repo, &["pr", "view", &number.to_string(), "--json", FIELDS])?;
+fn read_details(repo: &Path, hosting: &super::Hosting, number: u64) -> Result<PrDetails, String> {
+    let view = gh(
+        repo,
+        hosting,
+        &["pr", "view", &number.to_string(), "--json", FIELDS],
+    )?;
     let mut details = parse_details(&view)?;
-    match repo_of_url(&details.url) {
-        Some((host, path)) => match threads::fetch(repo, &host, &path, number) {
+    if hosting.matches_pull_request(&details.url) {
+        match threads::fetch(repo, hosting, number) {
             Ok(extras) => {
                 details.timeline.extend(line_entries(&extras));
                 details.extras = extras;
             }
             Err(e) => details.inline_error = Some(e),
-        },
-        None => details.inline_error = Some("unexpected pull request URL".to_owned()),
+        }
+    } else {
+        details.inline_error = Some("unexpected pull request URL".to_owned());
     }
     details.timeline.sort_by_key(|entry| entry.at);
     Ok(details)

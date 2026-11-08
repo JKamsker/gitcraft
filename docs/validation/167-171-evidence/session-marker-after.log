@@ -1,0 +1,1 @@
+isolated_marker_child_waited: unclean=true; parent_drop_while_child_holds_fd: unclean=false; after_waited_child_exit: unclean=true; remaining=0; child_pid=42492

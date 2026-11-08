@@ -404,12 +404,28 @@ fn without_a_data_folder_nothing_is_kept_and_nothing_fails() {
 }
 
 #[test]
-fn a_run_that_did_not_close_is_noticed_once() {
+fn a_run_that_did_not_close_is_noticed_once() -> Result<(), Box<dyn std::error::Error>> {
+    const CHILD_FOLDER: &str = "GITCRAFT_TEST_UNCLOSED_SESSION_FOLDER";
+    if let Some(dir) = std::env::var_os(CHILD_FOLDER) {
+        let first = Session::start_in(Path::new(&dir));
+        assert!(!first.unclean);
+        // Leave the marker without a normal close.
+        drop(first);
+        return Ok(());
+    }
     let dir = folder("sessions");
-    let first = Session::start_in(&dir);
-    assert!(!first.unclean);
-    // The process ends without closing: the system lets go of its lock, the marker stays.
-    drop(first);
+    // Other tests can fork while a marker is locked and temporarily inherit its descriptor.
+    // Make the unclosed run in a single-test child and wait for its actual process exit, so
+    // unrelated test workers cannot keep that run's lock alive after its Session is dropped.
+    let child = std::process::Command::new(std::env::current_exe()?)
+        .args([
+            "drafts::tests::a_run_that_did_not_close_is_noticed_once",
+            "--exact",
+            "--test-threads=1",
+        ])
+        .env(CHILD_FOLDER, &dir)
+        .output()?;
+    assert!(child.status.success(), "unclosed run failed: {child:?}");
     let mut second = Session::start_in(&dir);
     assert!(second.unclean);
     second.end();
@@ -420,6 +436,7 @@ fn a_run_that_did_not_close_is_noticed_once() {
     let left = std::fs::read_dir(&dir).map(|l| l.count()).unwrap_or(1);
     assert_eq!(left, 0, "the markers of runs closed normally are gone");
     let _ = std::fs::remove_dir_all(&dir);
+    Ok(())
 }
 
 #[test]

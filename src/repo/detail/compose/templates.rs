@@ -26,8 +26,12 @@ enum Pick {
 }
 
 impl RepoTab {
-    pub(super) fn templates_button(&mut self, ui: &mut Ui) {
-        let b = icons::small_button(ui, "list", "Templates and prepare-commit-msg");
+    pub(super) fn templates_button(&mut self, ui: &mut Ui, enabled: bool) {
+        let b = ui
+            .add_enabled(enabled, |ui: &mut Ui| {
+                icons::small_button(ui, "list", "Templates and prepare-commit-msg")
+            })
+            .on_disabled_hover_text("The commits being replayed keep their own messages");
         let t = Tokens::get(ui.ctx());
         let ctx = ui.ctx().clone();
         // Read only while the menu shows, not on every frame.
@@ -41,6 +45,7 @@ impl RepoTab {
             .width(280.0)
             .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
             .show(|ui| {
+                if !enabled { ui.disable(); }
                 ui.label(RichText::new("Start from").color(t.text_faint).small());
                 let tip = "Replaces the message with the file commit.template names (Undo brings it back)";
                 if ui

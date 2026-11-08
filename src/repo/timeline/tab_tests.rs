@@ -104,8 +104,7 @@ fn operations_are_kept_across_a_restart_and_undo_still_works() {
     let base = git::head(&dir);
     let mut tab = open(&dir, &ctx);
     let made = commit(&mut tab, &ctx, "dir with space ü.txt", "Add the ü file");
-    let entry = tab.timeline.current_entry().cloned();
-    let id = entry.as_ref().map_or(0, |e| e.id);
+    let id = tab.timeline.current_entry().map_or(0, |e| e.id);
     // Its files and kept commits come in the background, then it is written.
     let found = wait(&mut tab, &ctx, |t| {
         t.timeline.get(id).is_some_and(|e| !e.files.is_empty())
@@ -114,6 +113,9 @@ fn operations_are_kept_across_a_restart_and_undo_still_works() {
     let on_disk = wait(&mut tab, &ctx, |t| {
         store::load(&t.path).is_ok_and(|s| s.entries.first().is_some_and(|e| !e.files.is_empty()))
     });
+    // Snapshot after enrichment: the worker may already finish during commit's
+    // reload, so observing its temporary "Commit" label is not deterministic.
+    let entry = tab.timeline.get(id).cloned();
     drop(tab);
 
     let mut again = open(&dir, &ctx);
@@ -130,7 +132,7 @@ fn operations_are_kept_across_a_restart_and_undo_still_works() {
     let _ = std::fs::remove_dir_all(&dir);
 
     let entry = entry.unwrap_or_else(|| unreachable!("no entry"));
-    assert_eq!(entry.label, "Commit");
+    assert_eq!(entry.label, "Commit “Add the ü file”");
     assert_eq!(entry.origin, Origin::Gitcraft);
     assert_eq!(entry.before.head, base);
     assert_eq!(entry.after.head, made);
@@ -507,4 +509,31 @@ fn staging_after_an_operation_does_not_hold_undo_back() {
     let _ = std::fs::remove_dir_all(&dir);
     assert!(settles, "{:?}", tab.timeline.awaiting);
     assert_eq!(tab.timeline.entries.len(), 1);
+}
+
+#[test]
+fn review22_restore_plan_can_checkout_feat_then_reset_to_f1()
+-> Result<(), Box<dyn std::error::Error>> {
+    let dir = repo("review22-checkout-reset");
+    let main = git::head(&dir);
+    git_ok(&dir, &["checkout", "-q", "-b", "feat"]);
+    git_ok(&dir, &["commit", "-q", "--allow-empty", "-m", "F1"]);
+    let target = super::RefState::of(&git::refs(&dir)?);
+    let f1 = git::head(&dir);
+    git_ok(&dir, &["commit", "-q", "--allow-empty", "-m", "F2"]);
+    let f2 = git::head(&dir);
+    git_ok(&dir, &["checkout", "-q", "main"]);
+    let now = super::RefState::of(&git::refs(&dir)?);
+    let steps = snapshot::restore_steps(&now, &target, &[])?;
+    assert!(steps.iter().any(|s| s == &["checkout", "feat", "--"]));
+    assert!(steps.iter().any(|s| s == &["reset", "--keep", f1.as_str()]));
+    assert_eq!(git::resolve(&dir, "feat")?, f2);
+    let result =
+        crate::repo::operations::run_steps(&dir, &steps, crate::repo::OpKind::plain(), None).0;
+    assert!(result.is_ok(), "actual timeline restore failed: {result:?}");
+    assert_eq!(git_ok(&dir, &["branch", "--show-current"]), "feat");
+    assert_eq!(git::head(&dir), f1);
+    assert_eq!(git::resolve(&dir, "main")?, main);
+    std::fs::remove_dir_all(dir)?;
+    Ok(())
 }

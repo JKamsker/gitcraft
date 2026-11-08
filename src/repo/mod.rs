@@ -48,6 +48,7 @@ mod find;
 mod fold;
 mod folding;
 mod forge_link;
+mod forge_selection;
 pub(crate) mod forks;
 mod gerrit;
 mod ghost;
@@ -55,6 +56,7 @@ mod graph_order;
 pub(crate) mod graph_view;
 mod guide;
 pub(crate) mod highlight;
+pub(crate) mod history_filter;
 mod hooks;
 mod hotfix;
 mod interaction;
@@ -194,6 +196,8 @@ pub struct RepoTab {
     graph_badge_index: graph_view::BadgeIndex,
     /// Commits as git listed them.
     history: Vec<Arc<Commit>>,
+    /// Operational lookup into raw history; display filtering must never break ancestry.
+    history_index: HashMap<String, usize>,
     /// A selected pull request's tip, including one with no local or tracking ref.
     pr_graph_head: Option<Arc<Commit>>,
     has_more: bool,
@@ -235,8 +239,13 @@ pub struct RepoTab {
     /// Its Unity project, if it has one.
     unity: unity::UnityState,
     identity: Identity,
-    /// Where `origin` is hosted, when it's on a forge gitcraft knows.
+    /// Where the selected primary forge remote is hosted.
     hosting: Option<Hosting>,
+    forge_selection: forge_selection::Selection,
+    forge_remotes: Vec<(String, Hosting)>,
+    forge_generation: u64,
+    /// The selection lifetime when the actual hosting repository last changed.
+    forge_repository_generation: u64,
     gerrit: Option<crate::gerrit::Server>,
     prs: Vec<PullRequest>,
     pr_error: Option<String>,
@@ -261,6 +270,7 @@ pub struct RepoTab {
     forks: forks::Forks,
     /// What the commits record of who wrote them.
     authorship: authorship_view::Lens,
+    history_filter: history_filter::State,
 
     selected: Option<usize>,
     /// A stash shown in the detail pane instead of a graph row.
@@ -509,6 +519,8 @@ impl RepoTab {
         let jobs = crate::tasks::Scope::default();
         let tx = messages::JobSender {
             sender,
+            forge_generation: None,
+            forge_operation: false,
             cancel: jobs.0.clone(),
             repo: messages::mutation_key(&path),
         };
@@ -533,6 +545,7 @@ impl RepoTab {
             refs: Refs::default(),
             graph_badge_index: graph_view::BadgeIndex::default(),
             history: Vec::new(),
+            history_index: HashMap::new(),
             pr_graph_head: None,
             has_more: false,
             loading_more: false,
@@ -563,6 +576,10 @@ impl RepoTab {
             unity: Default::default(),
             identity: Identity::default(),
             hosting: None,
+            forge_selection: Default::default(),
+            forge_remotes: Vec::new(),
+            forge_generation: 0,
+            forge_repository_generation: 0,
             gerrit: None,
             prs: Vec::new(),
             pr_error: None,
@@ -577,6 +594,7 @@ impl RepoTab {
             drift: None,
             forks: forks::Forks::default(),
             authorship: Default::default(),
+            history_filter: Default::default(),
             selected: None,
             stash_view: None,
             scroll_to: None,
@@ -744,7 +762,7 @@ impl RepoTab {
         self.queued.push(action);
     }
 
-    /// The forge `origin` is on.
+    /// The selected primary remote's forge.
     pub(super) fn forge(&self) -> Option<Forge> {
         self.hosting.as_ref().map(|h| h.forge)
     }

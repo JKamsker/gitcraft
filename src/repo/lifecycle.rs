@@ -156,6 +156,8 @@ impl super::RepoTab {
         self._jobs = crate::tasks::Scope::default();
         self.tx = super::messages::JobSender {
             sender,
+            forge_generation: None,
+            forge_operation: false,
             cancel: self._jobs.0.clone(),
             repo: self.path.clone(),
         };
@@ -173,6 +175,7 @@ impl super::RepoTab {
         self.resume_diff = self.diff.as_ref().map(|d| d.key.clone());
         self.pending_goto = None;
         self.history = Vec::new();
+        self.history_index.clear();
         self.commits = Vec::new();
         self.graph = crate::graph::Graph {
             rows: Vec::new(),

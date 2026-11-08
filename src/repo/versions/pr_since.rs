@@ -181,11 +181,11 @@ fn mark_seen(
 }
 
 impl RepoTab {
-    /// The repository's key among the pull requests looked at: `host/owner/repo`.
+    /// The canonical web instance and repository among the pull requests looked at.
     fn pr_repo_key(&self) -> Option<String> {
         self.hosting
             .as_ref()
-            .map(|h| format!("{}/{}", h.host, h.path))
+            .and_then(|h| h.review_repository_key())
     }
 
     /// The pull request numbered so: from its page when it is shown (which names its base),
@@ -205,7 +205,11 @@ impl RepoTab {
             head: pr.sha.clone(),
             fetch_ref: pull_ref(self.forge(), number),
             base: None,
-            remote: crate::pull_request::remote_for(&self.remotes, &pr.url).map(str::to_owned),
+            remote: self
+                .hosting
+                .as_ref()
+                .and_then(|h| crate::pull_request::remote_for(&self.remotes, &pr.url, h))
+                .map(str::to_owned),
         })
     }
 
@@ -215,7 +219,11 @@ impl RepoTab {
             head: d.head_oid.clone(),
             fetch_ref: d.head_ref.clone(),
             base: Some(d.base_oid.clone()),
-            remote: crate::pull_request::remote_for(&self.remotes, &d.url).map(str::to_owned),
+            remote: self
+                .hosting
+                .as_ref()
+                .and_then(|h| crate::pull_request::remote_for(&self.remotes, &d.url, h))
+                .map(str::to_owned),
         }
     }
 
@@ -244,7 +252,7 @@ impl RepoTab {
         }
         let pr = self.pr_head_of_details(details);
         let (path, creds) = (self.path.clone(), self.credentials.clone());
-        self.then(
+        self.forge_then(
             ctx,
             move || look(&path, &key, &pr, creds.as_ref()),
             |tab, found, _| tab.pr_looked(found),
@@ -288,7 +296,7 @@ impl RepoTab {
         // It may fetch from the forge first: say so meanwhile.
         self.status = Some((format!("Reading #{number}…"), false));
         let (path, creds) = (self.path.clone(), self.credentials.clone());
-        self.then(
+        self.forge_then(
             ctx,
             move || look(&path, &key, &pr, creds.as_ref()),
             move |tab, found, ctx| match found {
@@ -343,7 +351,7 @@ impl RepoTab {
         }
         self.versions.seen_heads.insert(number, seen.tip.clone());
         let path = self.path.clone();
-        self.then(
+        self.forge_then(
             ctx,
             move || git::mark_reviewed(&path, &key, number, &seen),
             move |tab, marked, _| tab.seen_marked(number, marked),
@@ -382,7 +390,7 @@ impl RepoTab {
         };
         self.versions.seen_heads.insert(number, pr.head.clone());
         let (path, creds) = (self.path.clone(), self.credentials.clone());
-        self.then(
+        self.forge_then(
             ctx,
             move || mark_seen(&path, &key, &pr, creds.as_ref()).map(|_| ()),
             move |tab, marked, _| tab.seen_marked(number, marked),
@@ -399,7 +407,7 @@ impl RepoTab {
         // The list holds at most 100: only a shorter one names every open pull request.
         let open: Option<Vec<u64>> =
             (self.prs.len() < 100).then(|| self.prs.iter().map(|p| p.number).collect());
-        self.then(
+        self.forge_then(
             ctx,
             move || {
                 if let Some(open) = open {

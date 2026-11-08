@@ -114,7 +114,7 @@ impl RepoTab {
         let repo = self.path.clone();
         let forge = key.1;
         let known = self.owners.file.clone();
-        self.then(
+        self.forge_then(
             ctx,
             move || {
                 std::panic::catch_unwind(|| {
@@ -162,7 +162,7 @@ impl RepoTab {
         drop(summaries);
         let paths: Vec<String> = paths.iter().map(|p| (*p).to_owned()).collect();
         let blob = file.blob.clone();
-        self.then(
+        self.forge_then(
             ctx,
             move || {
                 let (owners, unowned) =

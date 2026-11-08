@@ -77,7 +77,7 @@ impl RepoTab {
         if let Some(state) = self.work.in_progress {
             return Some(format!("A {} is in progress", state.label().to_lowercase()));
         }
-        let line = quick_edit::first_parents(&self.commits, &self.index, &self.refs.head);
+        let line = quick_edit::first_parents(&self.history, &self.history_index, &self.refs.head);
         quick_edit::refusal(Edit::Drop, &line, hash).map(str::to_owned)
     }
 

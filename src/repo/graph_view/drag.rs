@@ -157,6 +157,8 @@ mod tests {
             .enumerate()
             .map(|(i, h)| (h.clone(), i))
             .collect();
+        tab.history = tab.commits.clone();
+        tab.history_index = tab.index.clone();
         tab.refs.head = hashes[0].clone();
         tab.refs.current = Some("main".to_owned());
         tab
@@ -164,7 +166,8 @@ mod tests {
 
     /// The middle of row `i`, away from its pill.
     fn row(i: usize) -> Pos2 {
-        pos2(600.0, 26.0 + ROW_PITCH * i as f32 + ROW_H / 2.0)
+        // Filters row (18) + spacing (8), then the column header (26).
+        pos2(600.0, 52.0 + ROW_PITCH * i as f32 + ROW_H / 2.0)
     }
 
     /// Runs a frame of the graph with `events`; returns what it asked for.
