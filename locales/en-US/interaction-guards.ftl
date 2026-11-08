@@ -492,3 +492,11 @@ interaction-guards-weakened-heading = { $reason }:
 
 
 interaction-guards-fence-record = the fence's record
+
+interaction-guards-push-lfs-attributes-file = .gitattributes is not a regular file; resolve that before converting to LFS.
+
+interaction-guards-push-lfs-no-pointer = git-lfs did not produce a pointer; install git-lfs before converting history.
+
+interaction-guards-push-default-nothing = push.default=nothing: choose an explicit branch push.
+
+interaction-guards-push-lfs-filter = .lfsconfig must not pass through a content filter when reviewing endpoint configuration.

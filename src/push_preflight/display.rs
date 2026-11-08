@@ -6,6 +6,18 @@ use crate::i18n::message;
 /// Authentication receipts deliberately stay opaque: consume their proof before displaying.
 pub(crate) fn diagnostic(raw: &str) -> String {
     match raw {
+        ".gitattributes is not a regular file; resolve that before converting to LFS." => {
+            return crate::i18n::text("interaction-guards-push-lfs-attributes-file").into();
+        }
+        "git-lfs did not produce a pointer; install git-lfs before converting history." => {
+            return crate::i18n::text("interaction-guards-push-lfs-no-pointer").into();
+        }
+        "push.default=nothing: choose an explicit branch push." => {
+            return crate::i18n::text("interaction-guards-push-default-nothing").into();
+        }
+        ".lfsconfig must not pass through a content filter when reviewing endpoint configuration." => {
+            return crate::i18n::text("interaction-guards-push-lfs-filter").into();
+        }
         "The local push preview could not be completed. Fetch missing history explicitly, then try again; no push was run." =>
         {
             return crate::i18n::text("interaction-guards-push-preview-failed").into();
@@ -401,7 +413,7 @@ fn dynamic(raw: &str) -> Option<String> {
         .and_then(|s| s.strip_suffix("."))
     {
         let rendered = (|| {
-            let target = text;
+            let target = target_label_display(text);
             Some(message(
                 "interaction-guards-push-identity",
                 &[("target", target.into())],
@@ -508,7 +520,10 @@ pub(crate) fn reviewed_auth_failure() -> &'static str {
 
 /// Uses the canonical redaction helper before translating its application-owned label.
 pub(crate) fn target(url: &str) -> String {
-    let raw = super::target_label(url);
+    target_label_display(&super::target_label(url))
+}
+
+fn target_label_display(raw: &str) -> String {
     if let Some(path) = raw.strip_prefix("Local repository: ") {
         let path = if path == "[sensitive path]" {
             crate::i18n::text("interaction-guards-push-sensitive-path")
@@ -525,7 +540,7 @@ pub(crate) fn target(url: &str) -> String {
             crate::i18n::text("interaction-guards-push-sensitive-path")
         )
     } else {
-        raw
+        raw.to_owned()
     }
 }
 

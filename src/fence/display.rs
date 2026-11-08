@@ -59,25 +59,6 @@ fn dynamic(raw: &str) -> Option<String> {
         }
     }
     if let Some(text) = raw
-        .strip_prefix("Could not check ")
-        .and_then(|s| s.strip_suffix(""))
-    {
-        let rendered = (|| {
-            let (target, text) = text.split_once(" against the agent fence: ")?;
-            let detail = text;
-            Some(message(
-                "interaction-guards-fence-check-error",
-                &[
-                    ("target", target.into()),
-                    ("detail", known_detail(detail).into()),
-                ],
-            ))
-        })();
-        if rendered.is_some() {
-            return rendered;
-        }
-    }
-    if let Some(text) = raw
         .strip_prefix("")
         .and_then(|s| s.strip_suffix(" is not a revision"))
     {
@@ -144,6 +125,16 @@ fn dynamic(raw: &str) -> Option<String> {
     {
         let rendered = (|| {
             let (path, text) = text.split_once(": ")?;
+            if !matches!(
+                path,
+                ".claude/settings.local.json"
+                    | ".cursorignore"
+                    | "AGENTS.md"
+                    | "info/exclude"
+                    | "the fence's record"
+            ) {
+                return None;
+            }
             let detail = text;
             Some(message(
                 "interaction-guards-fence-read-error",
@@ -171,6 +162,16 @@ fn dynamic(raw: &str) -> Option<String> {
     {
         let rendered = (|| {
             let (path, text) = text.split_once(": ")?;
+            if !matches!(
+                path,
+                ".claude/settings.local.json"
+                    | ".cursorignore"
+                    | "AGENTS.md"
+                    | "info/exclude"
+                    | "the fence's record"
+            ) {
+                return None;
+            }
             let detail = text;
             Some(message(
                 "interaction-guards-fence-folder-error",
@@ -187,6 +188,16 @@ fn dynamic(raw: &str) -> Option<String> {
     {
         let rendered = (|| {
             let (path, text) = text.split_once(": ")?;
+            if !matches!(
+                path,
+                ".claude/settings.local.json"
+                    | ".cursorignore"
+                    | "AGENTS.md"
+                    | "info/exclude"
+                    | "the fence's record"
+            ) {
+                return None;
+            }
             let detail = text;
             Some(message(
                 "interaction-guards-fence-write-error",
@@ -357,5 +368,22 @@ mod tests {
             assert!(json.contains("Read(/src/12345)"));
         }
         set_language("en-US");
+    }
+}
+
+/// `target` is exactly the supplied ref or `remote::display(worktree)` used by the producer.
+/// It may contain punctuation or text resembling an error delimiter; preserve it whole.
+pub fn check_diagnostic(raw: &str, target: &str) -> String {
+    let prefix = format!("Could not check {target} against the agent fence: ");
+    if let Some(detail) = raw.strip_prefix(&prefix) {
+        message(
+            "interaction-guards-fence-check-error",
+            &[
+                ("target", target.into()),
+                ("detail", known_detail(detail).into()),
+            ],
+        )
+    } else {
+        diagnostic(raw)
     }
 }

@@ -492,3 +492,11 @@ interaction-guards-weakened-heading = { $reason }:
 
 
 interaction-guards-fence-record = das Sperrregelprotokoll
+
+interaction-guards-push-lfs-attributes-file = .gitattributes ist keine reguläre Datei; behebe dies vor der Konvertierung nach LFS.
+
+interaction-guards-push-lfs-no-pointer = git-lfs hat keinen Zeiger erzeugt; installiere git-lfs, bevor du die Historie konvertierst.
+
+interaction-guards-push-default-nothing = push.default=nothing: Wähle einen ausdrücklichen Branch-Push.
+
+interaction-guards-push-lfs-filter = .lfsconfig darf bei der Prüfung der Endpunktkonfiguration keinen Inhaltsfilter durchlaufen.

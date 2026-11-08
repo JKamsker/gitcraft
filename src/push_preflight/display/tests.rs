@@ -365,3 +365,81 @@ fn guard_display_unknown_diagnostics_are_opaque_in_every_family() {
     }
     set_language("en-US");
 }
+
+#[test]
+fn guard_display_supplied_fence_target_keeps_delimiters_and_provider_payload_whole() {
+    let target = "/owned/12345 against the agent fence: user/path";
+    let payload = "provider: against the agent fence: { $detail } 12345\nunknown result";
+    let raw = format!("Could not check {target} against the agent fence: {payload}");
+    for locale in ["en-US", "de"] {
+        set_language(locale);
+        let shown = crate::fence::display::check_diagnostic(&raw, target);
+        assert!(shown.contains(target) && shown.ends_with(payload));
+        // Unscoped text cannot prove where the target ends, so remains opaque.
+        assert_eq!(crate::fence::display::diagnostic(&raw), raw);
+        assert_eq!(
+            crate::fence::display::check_diagnostic(&raw, "other-target"),
+            raw
+        );
+        for unknown in [
+            "provider failed: arbitrary 12345",
+            "provider took longer than 12345 s",
+        ] {
+            assert_eq!(crate::drift::display::diagnostic(unknown), unknown);
+        }
+        assert_eq!(
+            crate::fence::display::diagnostic("Could not read user: path: provider detail"),
+            "Could not read user: path: provider detail"
+        );
+        let nested = format!(
+            "Could not check {target} against the agent fence: there is no main branch to compare with"
+        );
+        let shown = crate::fence::display::check_diagnostic(&nested, target);
+        assert!(shown.contains(target));
+        if locale == "de" {
+            assert!(!shown.contains("there is no main branch"));
+        }
+    }
+    set_language("en-US");
+}
+
+#[test]
+fn guard_display_actual_ci_deleted_file_snapshot_and_summary_limit_are_localized() {
+    use crate::weakened::{self, Reason};
+    let ci = "diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml\n--- a/.github/workflows/ci.yml\n+++ b/.github/workflows/ci.yml\n@@ -1,3 +1,1 @@\n jobs:\n-  checks12345:\n-    run: check\n";
+    let ci_files = weakened::scan_patch(ci);
+    let job = ci_files
+        .iter()
+        .flat_map(|f| &f.flags)
+        .find(|f| f.reason == Reason::CiRemovedJob)
+        .unwrap();
+    let deleted = "diff --git a/tests/test_12345.py b/tests/test_12345.py\ndeleted file mode 100644\n--- a/tests/test_12345.py\n+++ /dev/null\n@@ -1,1 +0,0 @@\n-def test_x(): pass\n";
+    let files = weakened::scan_patch(deleted);
+    let snapshot = "diff --git a/output.snap b/output.snap\ndeleted file mode 100644\n--- a/output.snap\n+++ /dev/null\n@@ -1,1 +0,0 @@\n-source12345\n";
+    let snapshots = weakened::scan_patch(snapshot);
+    let snap = snapshots
+        .iter()
+        .flat_map(|f| &f.flags)
+        .find(|f| f.reason == Reason::SnapshotRewrite)
+        .unwrap();
+    let flags = vec![job.clone(); 7];
+    for locale in ["en-US", "de"] {
+        set_language(locale);
+        let shown = job.display_evidence();
+        assert!(shown.contains("checks12345"));
+        assert!(files[0].display_summary().contains("tests/test_12345.py"));
+        assert!(snap.display_evidence().contains("output.snap"));
+        let summary = weakened::display::summary(flags.iter());
+        assert_eq!(summary.lines().count(), 7); // heading, five evidence lines, remainder
+        assert!(summary.contains(if locale == "de" {
+            "und 2 weitere"
+        } else {
+            "and 2 more"
+        }));
+        if locale == "de" {
+            assert!(shown.contains("den Job"));
+        }
+        assert!(job.evidence.contains("the job `checks12345`"));
+    }
+    set_language("en-US");
+}

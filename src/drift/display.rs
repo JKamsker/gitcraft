@@ -141,6 +141,9 @@ fn dynamic(raw: &str) -> Option<String> {
     {
         let rendered = (|| {
             let (tool, text) = text.split_once(": ")?;
+            if !matches!(tool, "claude" | "codex") {
+                return None;
+            }
             let detail = text;
             Some(message(
                 "interaction-guards-drift-run-error",
@@ -157,6 +160,9 @@ fn dynamic(raw: &str) -> Option<String> {
     {
         let rendered = (|| {
             let (tool, text) = text.split_once(": ")?;
+            if !matches!(tool, "claude" | "codex") {
+                return None;
+            }
             let detail = text;
             Some(message(
                 "interaction-guards-drift-wait-error",
@@ -170,6 +176,9 @@ fn dynamic(raw: &str) -> Option<String> {
     if let Some(text) = raw.strip_prefix("").and_then(|s| s.strip_suffix(" s")) {
         let rendered = (|| {
             let (tool, text) = text.split_once(" took longer than ")?;
+            if !matches!(tool, "claude" | "codex") {
+                return None;
+            }
             let seconds = text;
             if seconds.is_empty() || !seconds.bytes().all(|b| b.is_ascii_digit()) {
                 return None;
@@ -187,6 +196,9 @@ fn dynamic(raw: &str) -> Option<String> {
     if let Some(text) = raw.strip_prefix("").and_then(|s| s.strip_suffix("")) {
         let rendered = (|| {
             let (tool, text) = text.split_once(" failed: ")?;
+            if !matches!(tool, "claude" | "codex") {
+                return None;
+            }
             let detail = text;
             Some(message(
                 "interaction-guards-drift-tool-failed",
