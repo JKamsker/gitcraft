@@ -133,6 +133,7 @@ pub enum Dialog {
     /// Username and password / token for an HTTPS remote that asked for them.
     Credentials {
         url: String,
+        endpoints: Vec<String>,
         /// The last ones typed were refused.
         refused: bool,
         username: String,
@@ -288,6 +289,7 @@ impl Dialog {
     pub fn credentials(url: &str, refused: bool) -> Self {
         Dialog::Credentials {
             url: url.to_owned(),
+            endpoints: vec![url.to_owned()],
             refused,
             username: String::new(),
             password: String::new(),
@@ -582,11 +584,12 @@ impl RepoTab {
                 ),
                 Dialog::Credentials {
                     url,
+                    endpoints,
                     refused,
                     username,
                     password,
                     focus,
-                } => remote::credentials(ui, enter, url, *refused, username, password, focus),
+                } => remote::credentials(ui, enter, url, endpoints, *refused, username, password, focus),
                 Dialog::CreatePr {
                     noun,
                     branch,

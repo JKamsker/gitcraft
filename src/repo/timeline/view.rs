@@ -82,6 +82,7 @@ impl RepoTab {
         if self.pr_view.is_some() {
             self.close_pr();
         }
+        self.tour = None;
         self.timeline_view = Some(TimelineView {
             selected: None,
             confirm: None,

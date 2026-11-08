@@ -13,6 +13,7 @@ use crate::settings::Settings;
 
 impl RepoTab {
     pub(crate) fn apply(&mut self, action: Action, ctx: &egui::Context) {
+        self.notice_connections(ctx);
         let Some(action) = self.popout_intercept(action, ctx) else {
             return;
         };
@@ -119,6 +120,8 @@ impl RepoTab {
             Action::Reflog(act) => self.reflog_act(act, ctx),
             Action::CloseReflog => self.close_reflog(ctx),
             Action::Issue(act) => self.issue_act(act, ctx),
+            Action::OpenSshSetup => self.open_ssh_setup(ctx),
+            Action::OpenTour => self.open_tour(true, ctx),
             Action::OpenDoctor(section) => self.open_doctor(section, ctx),
             Action::CloseDoctor => self.doctor = None,
             Action::Doctor(act) => self.doctor_act(act, ctx),
@@ -421,6 +424,7 @@ impl RepoTab {
             Action::CloseAbsorb => self.absorb = None,
             Action::Stack(act) => self.stack_act(act, ctx),
             Action::SignIn(creds) => self.sign_in(creds, ctx),
+            Action::SwitchHttps(url) => self.switch_https(url, ctx),
             Action::Ignore { pattern, path } => self.ignore(&pattern, &path, ctx),
             Action::PickLines {
                 pick: diff::Pick::Revert,

@@ -323,6 +323,13 @@ impl RepoTab {
         if search.clicked() {
             acts.push(Action::ToggleSearch);
         }
+        if ui
+            .button("Tour")
+            .on_hover_text("README, workflow, contributors and setup checklist")
+            .clicked()
+        {
+            acts.push(Action::OpenTour);
+        }
         let doctor = icons::tool_button(ui, "wrench", "", true).on_hover_text(
             "Repository doctor: ignore rules, hooks, health, configuration, hidden changes",
         );
@@ -343,6 +350,10 @@ impl RepoTab {
         egui::Popup::menu(&open)
             .style(crate::theme::menu_style)
             .show(|ui| {
+                if ui.button("Set up SSH…").clicked() {
+                    acts.push(Action::OpenSshSetup);
+                    ui.close();
+                }
                 let browser = MenuItem::new("Open in browser")
                     .refused(page.is_none().then_some("No remote with a web page"))
                     .show(ui);

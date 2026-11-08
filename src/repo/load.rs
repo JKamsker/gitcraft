@@ -30,6 +30,7 @@ pub(super) struct Loaded {
     pub(super) submodules: Vec<Submodule>,
     /// It keeps files in Git LFS, and git-lfs is installed.
     pub(super) lfs: bool,
+    pub(super) practice: Option<crate::practice::Session>,
     pub(super) identity: Identity,
     /// How many commits were asked for (more exist when that many came back).
     pub(super) requested: usize,
@@ -160,6 +161,7 @@ impl RepoTab {
                     gerrit,
                     submodules,
                     lfs,
+                    practice: crate::practice::load(path),
                     identity,
                     requested: count,
                     log_from,
@@ -290,6 +292,47 @@ impl RepoTab {
             *shown = read;
         }
         newer
+    }
+
+    /// Editing transport identity invalidates credentials and account-dependent read results.
+    /// Already submitted operations keep their immutable original context.
+    pub(crate) fn notice_connections(&mut self, ctx: &egui::Context) {
+        let now = crate::connections::current();
+        if self.connection_context == now {
+            return;
+        }
+        self.connection_context = now;
+        self.invalidate_https_challenge();
+        self.credentials = None;
+        if matches!(self.dialog, Some(super::Dialog::Credentials { .. })) {
+            self.dialog = None;
+        }
+        self.prs.clear();
+        self.pr_error = None;
+        self.prs_loaded = Some(Instant::now());
+        self.forget_merged_prs();
+        self.ci.account_changed();
+        self.ci_view = None;
+        self.avatars_hinted = false;
+        self.pr_requests += 1;
+        if let Some(view) = &mut self.pr_view {
+            view.account_changed(self.pr_requests);
+        }
+        for parked in &mut self.parked {
+            parked.notice_connections(ctx);
+        }
+        if self.sleeping() {
+            return;
+        }
+        self.reload_identity(ctx);
+        if crate::network::background_may_run() {
+            self.load_prs(ctx);
+            self.refresh_ci(ctx);
+            if self.pr_view.is_some() {
+                self.load_pr(ctx);
+            }
+            self.hint_avatars(ctx);
+        }
     }
 
     /// Re-reads the submodules: the commits they should be at are in the index, which can
@@ -474,10 +517,15 @@ impl RepoTab {
             self.submodules = loaded.submodules;
         }
         self.lfs = loaded.lfs;
+        self.practice = loaded.practice;
+        self.practice_result = None;
         self.take_issue_read(loaded.issues);
         // Another project (origin pointed elsewhere): its pull requests are other ones, under
         // the same numbers, and a list asked of the old one is not to be taken in.
         let remotes_changed = loaded.remotes != self.remotes;
+        if remotes_changed {
+            self.invalidate_https_challenge();
+        }
         self.remotes = loaded.remotes;
         self.gerrit = loaded.gerrit;
         if loaded.hosting != self.hosting || remotes_changed {
@@ -629,7 +677,7 @@ impl RepoTab {
         // Freeing tens of thousands of commits (those a reload replaced), rows and index entries
         // takes a while: not on the UI thread.
         if old_rows.len() > 5000 {
-            std::thread::spawn(move || drop((old_rows, old_graph, old_index)));
+            crate::connections::spawn(move || drop((old_rows, old_graph, old_index)));
         }
     }
 
@@ -766,7 +814,7 @@ impl RepoTab {
         emails.sort();
         emails.dedup();
         let ctx = ctx.clone();
-        std::thread::spawn(move || {
+        crate::connections::spawn(move || {
             for (email, hint) in hosting.forge.provider().avatars(&repo, &hosting, &emails) {
                 crate::avatars::hint(&email, hint);
             }
@@ -810,5 +858,38 @@ mod tests {
         }
         tab.poll(&ctx);
         assert!(tab.prs.is_empty());
+    }
+}
+
+#[cfg(test)]
+mod connection_identity_tests {
+    use super::*;
+    #[test]
+    fn connection_edits_clear_tab_and_parked_credentials_before_another_action() {
+        let a = crate::connections::Context {
+            error: Some("profile a".into()),
+            ..Default::default()
+        };
+        let b = crate::connections::Context {
+            error: Some("profile b".into()),
+            ..Default::default()
+        };
+        let ctx = egui::Context::default();
+        let mut tab =
+            a.run(|| RepoTab::new_deferred("/nonexistent/context-edit-main".into(), &ctx));
+        let mut parked =
+            a.run(|| RepoTab::new_deferred("/nonexistent/context-edit-worktree".into(), &ctx));
+        let creds = git::Credentials {
+            scope: None,
+            username: "alice".into(),
+            password: "never-send-as-bob".into(),
+        };
+        tab.set_credentials(creds.clone());
+        parked.set_credentials(creds);
+        tab.parked.push(Box::new(parked));
+        b.run(|| tab.notice_connections(&ctx));
+        assert!(tab.credentials.is_none());
+        assert!(tab.parked[0].credentials.is_none());
+        assert_eq!(tab.connection_context, b);
     }
 }

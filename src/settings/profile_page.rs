@@ -109,6 +109,7 @@ pub fn badge(ui: &mut Ui, size: f32, profile: &UserProfile) {
 impl Settings {
     /// The profile in use and its own settings, or what a search matches of them.
     pub(super) fn profile_ui(&mut self, ui: &mut Ui, f: &Filter, view: &mut SettingsView) {
+        self.profile_connections_ui(ui, f);
         let t = Tokens::get(ui.ctx());
         let current = self.profile();
         let mut request = None;

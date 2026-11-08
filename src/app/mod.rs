@@ -17,10 +17,12 @@ mod my_work;
 mod os_shell;
 mod palette;
 mod panels;
+mod practice;
 mod profiles;
 mod recent_status;
 mod remote_open;
 mod repo_scan;
+mod setup;
 mod tab_strip;
 mod tabs;
 mod teleport;
@@ -118,6 +120,10 @@ pub struct App {
     error_card: Option<crate::error_card::ErrorCard>,
     was_focused: bool,
     clone_form: Option<CloneForm>,
+    practice_open: bool,
+    setup: setup::SetupWindow,
+    practice_jobs: crate::tasks::Scope,
+    practicing: Option<Receiver<Result<PathBuf, String>>>,
     /// A clone running in the background: (destination, result).
     cloning: Option<clone::Cloning>,
     /// The form of the running clone, back on screen if it needs credentials.
@@ -282,6 +288,10 @@ impl App {
             error_card: None,
             was_focused: true,
             clone_form: None,
+            practice_open: false,
+            setup: Default::default(),
+            practice_jobs: crate::tasks::Scope::default(),
+            practicing: None,
             cloning: None,
             cloning_form: None,
             pick_on_start: false,
@@ -559,6 +569,8 @@ impl App {
             || self.my_work.open
             || self.askpass_open()
             || self.palette.is_some()
+            || self.practice_open
+            || self.setup.open
             || self.manual_open
             || self.repo_scan.is_some()
             || (crate::a11y::keyboard_taken(ctx) && !home_filter::search_has_focus(ctx));
@@ -641,6 +653,8 @@ impl App {
         match self.tabs.get_mut(active) {
             Some(Tab::Repo(repo)) => {
                 repo.keys_blocked = self.palette.is_some()
+                    || self.practice_open
+                    || self.setup.open
                     || self.manual_open
                     || self.clone_form.is_some()
                     || self.remote_form.is_some()
@@ -709,6 +723,8 @@ impl eframe::App for App {
             return;
         }
         self.poll_clone(&ctx);
+        self.poll_practice(&ctx);
+        self.poll_setup(&ctx);
         self.os_shell(&ctx, frame);
         self.poll_connecting(&ctx);
         self.poll_launch(&ctx);
@@ -780,11 +796,25 @@ impl eframe::App for App {
         self.agent_card(&ctx);
         self.palette_ui(&ctx);
         self.manual_ui(&ctx);
+        self.practice_dialog(&ctx);
+        self.setup_ui(&ctx);
+        crate::glossary::hover(&ctx);
         // After the tabs are drawn, so what was typed in this frame is in.
         self.keep_drafts(&ctx, focused);
         self.repo_scan_dialog(&ctx);
         self.my_work_ui(&ctx);
         self.poll_diagnostics(&ctx);
+        for (path, url) in crate::settings::network_page::take_rejections(&ctx) {
+            for tab in &mut self.tabs {
+                if let Tab::Repo(repo) = tab {
+                    repo.forget_https_memory(&path, &url);
+                }
+            }
+        }
+        if crate::settings::network_page::take_inspection_request(&ctx) {
+            crate::settings::show_page(&ctx, crate::settings::Page::HttpsSignins);
+            self.open_settings();
+        }
         self.toast_finished(focused);
         self.toasts_ui(&ctx);
         self.dropped_files(&ctx);
@@ -979,4 +1009,9 @@ pub(crate) fn strip_verbatim(path: PathBuf) -> PathBuf {
         Some(rest) if !rest.starts_with("UNC") => PathBuf::from(rest),
         _ => path,
     }
+}
+
+/// Installs the persistent local panic log before the application window is created.
+pub fn install_panic_log() {
+    crate::diagnostics::crash::install();
 }

@@ -201,7 +201,7 @@ impl RepoTab {
         let path = self.path.clone();
         let tx = self.tx.clone();
         let wake = ctx.clone();
-        std::thread::spawn(move || {
+        crate::connections::spawn(move || {
             for spec in specs {
                 if stop.stopped() {
                     break;

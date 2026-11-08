@@ -37,6 +37,7 @@ pub struct OpControl {
     progress: Mutex<Option<Progress>>,
     /// What each git call of the operation did so far, for the activity log.
     steps: Mutex<Vec<Recorded>>,
+    auth_failure: Mutex<Option<super::AuthFailure>>,
     /// Called whenever there is news (a repaint of the window).
     notify: Box<dyn Fn() + Send + Sync>,
 }
@@ -55,6 +56,7 @@ impl OpControl {
             cancel,
             progress: Mutex::new(None),
             steps: Mutex::new(Vec::new()),
+            auth_failure: Mutex::new(None),
             notify: Box::new(notify),
         })
     }
@@ -85,6 +87,15 @@ impl OpControl {
             steps.push(step);
         }
         (self.notify)();
+    }
+
+    pub(crate) fn authentication_failed(&self, failure: super::AuthFailure) {
+        if let Ok(mut stored) = self.auth_failure.lock() {
+            *stored = Some(failure);
+        }
+    }
+    pub(crate) fn auth_failure(&self) -> Option<super::AuthFailure> {
+        self.auth_failure.lock().ok().and_then(|s| s.clone())
     }
 
     /// What the operation's git calls did, taken out (once it has ended).
@@ -192,7 +203,10 @@ pub fn run_watched_recorded(
         let rec = Recorded::new(&words, None, &e, creds, started);
         (Err(e), rec)
     };
-    let mut extra = extra_for(dir, creds, quiet);
+    let mut extra = match extra_for(dir, args, creds, quiet) {
+        Ok(extra) => extra,
+        Err(e) => return failed(e),
+    };
     extra.trace_hooks = !quiet && crate::git::hooks::wants_trace(args);
     let trace = (dir.and_then(remote::parse).is_none() && extra.trace_hooks)
         .then(crate::git::hooks::TraceFile::new)
