@@ -1,0 +1,10 @@
+{
+  "source_base": "eaa7eeb63ed0fc1d8475fb3670aae2b4eba36af6",
+  "owned_api": "src/gerrit/display.rs",
+  "foreign_seams": [
+    {"path": "src/repo/dialogs/gerrit.rs", "actual_paint": "web_warning RichText", "render": "crate::gerrit::display_error(warning)", "keep_control": "raw cached Dialog::GerritReview web_warning and Server unchanged"},
+    {"path": "src/repo/operations.rs", "producer": "check_expected -> check_stack_with callback successful log output", "requires": "retain exact same-operation log as presentation witness beside raw failure; no later query"},
+    {"path": "src/repo/messages.rs", "actual_paint": "Gerrit operation error/status after raw handling", "render": "display_stack_error(raw, same_operation_recorded_log) for dynamic stack failures; display_error(raw) for fixed Gerrit reasons", "keep_control": "raw stored error, cancellation checks, operation label, raw run_ops and sentinels"}
+  ],
+  "explicit_limits": ["foreign consumers not changed by API unit", "dynamic stack errors require successful same-invocation log witness; unknown or missing-context remains opaque", "do not infer context by parsing raw hash prefixes or rerunning Git at paint"]
+}
