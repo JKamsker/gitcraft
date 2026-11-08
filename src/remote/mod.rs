@@ -12,6 +12,7 @@ pub mod askpass;
 pub(crate) use pool::shutdown;
 mod deadline_io;
 mod discover;
+pub mod display;
 mod fs;
 pub(crate) mod native_owner;
 #[cfg(all(test, unix))]
