@@ -28,6 +28,15 @@ pub(super) struct PreparedPick {
 impl RepoTab {
     pub(crate) fn apply(&mut self, action: Action, ctx: &egui::Context) {
         self.notice_connections(ctx);
+        let action = match action {
+            Action::OpenLinkedPr { number, remote } => {
+                if !self.select_linked_forge(&remote, ctx) {
+                    return;
+                }
+                Action::OpenPr(number)
+            }
+            action => action,
+        };
         let Some(action) = self.popout_intercept(action, ctx) else {
             return;
         };
@@ -161,6 +170,7 @@ impl RepoTab {
                 }
             }
             Action::Custom(act) => self.custom_act(act, ctx),
+            Action::OpenLinkedPr { .. } => unreachable!("linked PR normalized above"),
             Action::OpenPr(number) => {
                 // It refuses while an editor takes the big area: the builds shown stay then.
                 let requests = self.pr_requests;

@@ -61,7 +61,7 @@ fn lifecycle(history: History) -> Result<(), String> {
         std::fs::read(repo.join(".git/index")).map_err(|e| e.to_string())?,
         index
     );
-    prepare(&runner, &read(repo, &key)?, &key, Kind::Update)?;
+    prepare(&runner, &read(repo, &key)?, &key, Kind::Update, false)?;
     let (view, added) = candidate_view(repo)?;
     assert_eq!(
         added.stage,
@@ -104,7 +104,7 @@ fn lifecycle(history: History) -> Result<(), String> {
     let old = original.git(&["rev-parse", "HEAD"])?;
     let old_index = std::fs::read(repo.join(".git/index")).map_err(|e| e.to_string())?;
     let old_file = std::fs::read(repo.join(&file)).map_err(|e| e.to_string())?;
-    prepare(&runner, &read(repo, &key)?, &key, Kind::Update)?;
+    prepare(&runner, &read(repo, &key)?, &key, Kind::Update, false)?;
     let (view, conflict) = candidate_view(repo)?;
     assert_eq!(
         conflict.stage,
@@ -160,7 +160,7 @@ fn lifecycle(history: History) -> Result<(), String> {
     );
 
     // The split is an exact committed folder snapshot; original checkout stays intact.
-    prepare(&runner, &read(repo, &key)?, &key, Kind::Split)?;
+    prepare(&runner, &read(repo, &key)?, &key, Kind::Split, false)?;
     let (view, split) = candidate_view(repo)?;
     assert_eq!(
         split.stage,
@@ -197,4 +197,21 @@ fn subtree_owned_squash_import_conflict_accept_and_split() -> Result<(), String>
 #[test]
 fn subtree_owned_full_history_import_conflict_accept_and_split() -> Result<(), String> {
     lifecycle(History::Full)
+}
+
+#[test]
+fn subtree_signing_default_reads_effective_config_without_the_inspection_override()
+-> Result<(), String> {
+    let fixture = Fixture::new()?;
+    let repo = fixture.path();
+    fixture.git(&["config", "commit.gpgSign", "yes"])?;
+    assert!(read(repo, "")?.sign_commits);
+    fixture.git(&["config", "commit.gpgSign", "false"])?;
+    assert!(!read(repo, "")?.sign_commits);
+    // Includes participate in the effective value too; no commit or signing key is needed.
+    fixture.write(".git/subtree-signing", b"[commit]\n\tgpgSign = true\n")?;
+    fixture.git(&["config", "--unset", "commit.gpgSign"])?;
+    fixture.git(&["config", "include.path", "subtree-signing"])?;
+    assert!(read(repo, "")?.sign_commits);
+    Ok(())
 }

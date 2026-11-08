@@ -18,6 +18,7 @@ fn candidate() -> Candidate {
         old: "b".repeat(40),
         upstream: Some("a".repeat(40)),
         kind: Kind::Update,
+        sign_commits: false,
         stage: Stage::Ready,
         worktree: PathBuf::from("/repo/.git/gitcraft-subtree-attempt-1-random/candidate"),
         identity: Some("12:34".into()),
@@ -63,7 +64,7 @@ fn subtree_pure_helper_recording_distinguishes_history_and_split() -> Result<(),
     let old = "b".repeat(40);
     let upstream = "a".repeat(40);
     assert_eq!(
-        subtree_words(&s, Kind::Update, &old, Some(&upstream), false)
+        subtree_words(&s, Kind::Update, &old, Some(&upstream), false, false)
             .map_err(|error| error.to_string())?,
         vec![
             "subtree",
@@ -74,20 +75,21 @@ fn subtree_pure_helper_recording_distinguishes_history_and_split() -> Result<(),
         ]
     );
     assert_eq!(
-        subtree_words(&s, Kind::Update, &old, Some(&upstream), true)
+        subtree_words(&s, Kind::Update, &old, Some(&upstream), true, false)
             .map_err(|error| error.to_string())?[1],
         "merge"
     );
     s.history = History::Full;
-    let full = subtree_words(&s, Kind::Update, &old, Some(&upstream), true)
+    let full = subtree_words(&s, Kind::Update, &old, Some(&upstream), true, false)
         .map_err(|error| error.to_string())?;
     assert!(!full.iter().any(|w| w == "--squash"));
     assert_eq!(full.last(), Some(&upstream));
     assert_eq!(
-        subtree_words(&s, Kind::Split, &old, None, true).map_err(|error| error.to_string())?,
+        subtree_words(&s, Kind::Split, &old, None, true, false)
+            .map_err(|error| error.to_string())?,
         vec!["subtree", "split", "--prefix=vendor/a folder", old.as_str()]
     );
-    assert!(subtree_words(&s, Kind::Update, &old, None, true).is_err());
+    assert!(subtree_words(&s, Kind::Update, &old, None, true, false).is_err());
     Ok(())
 }
 #[test]
@@ -199,6 +201,7 @@ impl View {
             branch: "refs/heads/dev".into(),
             head: "b".repeat(40),
             remotes: vec!["upstream".into()],
+            sign_commits: false,
             local: Some(Local {
                 source: "source-1".into(),
                 baseline: Some("a".repeat(40)),
@@ -242,5 +245,70 @@ fn subtree_pure_association_records_reviewed_baseline_without_changing_tree() ->
     for name in ["a:b", "refs/../victim", "a.lock", "a\nb", "a b"] {
         assert!(!branch_name(name));
     }
+    Ok(())
+}
+
+#[test]
+fn subtree_pure_signing_reaches_add_merge_split_and_retained_commit_commands() -> Result<(), String>
+{
+    let mut s = source();
+    let old = "b".repeat(40);
+    let upstream = "a".repeat(40);
+    for history in [History::Full, History::Squash] {
+        s.history = history;
+        for (kind, exists, command) in [
+            (Kind::Update, false, "add"),
+            (Kind::Update, true, "merge"),
+            (Kind::Split, true, "split"),
+        ] {
+            for sign in [false, true] {
+                let args = subtree_words(&s, kind, &old, Some(&upstream), exists, sign)?;
+                assert_eq!(args[1], command);
+                assert_eq!(args.iter().any(|arg| arg == "--gpg-sign"), sign);
+                let args: Vec<_> = args.iter().map(String::as_str).collect();
+                let dispatch = candidate_words(sign, &args);
+                assert_eq!(dispatch[0], "-c");
+                assert_eq!(
+                    dispatch[1],
+                    if sign {
+                        "commit.gpgSign=true"
+                    } else {
+                        "commit.gpgSign=false"
+                    }
+                );
+                assert_eq!(&dispatch[2..], args.as_slice());
+            }
+        }
+    }
+    // Association and conflict continuation use the same retained signing choice.
+    for command in [
+        vec!["commit-tree", "HEAD^{tree}", "-m", "association"],
+        vec!["commit", "--no-edit", "--no-verify"],
+    ] {
+        assert_eq!(
+            &candidate_words(true, &command)[..2],
+            &["-c", "commit.gpgSign=true"]
+        );
+        assert_eq!(
+            &candidate_words(false, &command)[..2],
+            &["-c", "commit.gpgSign=false"]
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn subtree_pure_signing_is_retained_and_legacy_candidates_remain_unsigned() -> Result<(), String> {
+    let mut candidate = candidate();
+    candidate.sign_commits = true;
+    let mut saved = serde_json::to_value(&candidate).map_err(|e| e.to_string())?;
+    let restored: Candidate = serde_json::from_value(saved.clone()).map_err(|e| e.to_string())?;
+    assert!(restored.sign_commits);
+    saved
+        .as_object_mut()
+        .ok_or("Expected candidate object")?
+        .remove("sign_commits");
+    let legacy: Candidate = serde_json::from_value(saved).map_err(|e| e.to_string())?;
+    assert!(!legacy.sign_commits);
     Ok(())
 }

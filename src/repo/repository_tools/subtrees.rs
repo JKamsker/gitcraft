@@ -7,7 +7,7 @@ use crate::{
 pub(crate) enum Job {
     Register(String, String, String, logic::History),
     Fetch(String),
-    Prepare(String, logic::Kind),
+    Prepare(String, logic::Kind, bool),
     Continue(String),
     Accept(String),
     Reconcile(String),
@@ -22,7 +22,9 @@ pub(super) fn act(tab: &mut RepoTab, act: Act, ctx: &egui::Context) -> Option<Ac
                     logic::register(r, &view, path, remote, branch, history)
                 }
                 Job::Fetch(id) => logic::fetch(r, &view, &id),
-                Job::Prepare(id, kind) => logic::prepare(r, &view, &id, kind),
+                Job::Prepare(id, kind, sign_commits) => {
+                    logic::prepare(r, &view, &id, kind, sign_commits)
+                }
                 Job::Continue(id) => logic::resume(r, &view, &id),
                 Job::Accept(id) => logic::accept(r, &view, &id),
                 Job::Reconcile(id) => logic::reconcile(r, &view, &id),
@@ -210,6 +212,20 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
                 ],
             ));
             ui.label(&v.helper);
+            let signing_id = egui::Id::new(("subtree-sign-commits", state.id));
+            let mut sign_commits = ui
+                .ctx()
+                .data_mut(|data| *data.get_temp_mut_or_insert_with(signing_id, || v.sign_commits));
+            if ui
+                .checkbox(
+                    &mut sign_commits,
+                    crate::i18n::text("repo-workflows-repository_tools-subtrees-sign-commits"),
+                )
+                .changed()
+            {
+                ui.ctx()
+                    .data_mut(|data| data.insert_temp(signing_id, sign_commits));
+            }
             egui::CollapsingHeader::new(crate::i18n::text(
                 "repo-workflows-repository_tools-show-43a8ef7d",
             ))
@@ -330,7 +346,11 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
                                     job(
                                         acts,
                                         v,
-                                        Job::Prepare(s.id.clone(), logic::Kind::Associate),
+                                        Job::Prepare(
+                                            s.id.clone(),
+                                            logic::Kind::Associate,
+                                            sign_commits,
+                                        ),
                                     );
                                 }
                                 if ui
@@ -342,7 +362,15 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
                                     )
                                     .clicked()
                                 {
-                                    job(acts, v, Job::Prepare(s.id.clone(), logic::Kind::Update));
+                                    job(
+                                        acts,
+                                        v,
+                                        Job::Prepare(
+                                            s.id.clone(),
+                                            logic::Kind::Update,
+                                            sign_commits,
+                                        ),
+                                    );
                                 }
                                 if ui
                                     .button(crate::i18n::text(
@@ -350,7 +378,15 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
                                     ))
                                     .clicked()
                                 {
-                                    job(acts, v, Job::Prepare(s.id.clone(), logic::Kind::Split));
+                                    job(
+                                        acts,
+                                        v,
+                                        Job::Prepare(
+                                            s.id.clone(),
+                                            logic::Kind::Split,
+                                            sign_commits,
+                                        ),
+                                    );
                                 }
                             });
                             if let Some(l) = &v.local

@@ -4809,6 +4809,8 @@ repo-workflows-repository_tools-show-1e9112fe = Registrierten Branch abrufen
 
 repo-workflows-repository_tools-show-1f711390 = Aktualisierung in eigenem Worktree vorbereiten
 
+repo-workflows-repository_tools-subtrees-sign-commits = Commits signieren
+
 repo-workflows-repository_tools-show-1f89e0a1 = Sichtbare ungeprüfte Hunks als geprüft markieren
 
 repo-workflows-repository_tools-show-1fad1933 = bereits veröffentlicht

@@ -351,15 +351,23 @@ mod tests {
             ]),
         }];
         // Cached remotes and a pull-request target make this actual resolver path purely in-memory.
-        let raw = open_link::resolve_link(&link, &clones)
-            .err()
-            .ok_or_else(|| "expected other-remote rejection".to_owned())?;
+        let resolved = open_link::resolve_link(&link, &clones)?;
+        assert_eq!(resolved.root, root);
+        assert_eq!(
+            resolved.then,
+            resolve::Then::PullRequest {
+                number: 1234,
+                remote: "upstream".into(),
+            }
+        );
+        // Previously cached diagnostics still localize even though new links now open.
+        let raw = format!(
+            "{} has o/r only as another remote than origin, whose pull requests it shows: open #1234 on the forge, or clone o/r itself",
+            root.display()
+        );
         crate::i18n::set_language("de");
         assert_eq!(message(&raw),Some("/opaque/root 日本語 hat o/r nur als zusätzliches Remote; die Pull Requests werden für origin angezeigt: Öffne #1234 auf der Forge oder klone o/r selbst".into()));
-        assert_eq!(
-            open_link::resolve_link(&link, &clones).err().as_ref(),
-            Some(&raw)
-        );
+        assert_eq!(open_link::resolve_link(&link, &clones)?, resolved);
         assert_eq!(clones[0].path, root);
         assert_eq!(link.target, link::Target::PullRequest(1234));
         let dialog =

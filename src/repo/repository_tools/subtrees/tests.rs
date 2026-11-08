@@ -106,3 +106,43 @@ fn subtree_pure_headless_split_requires_renewed_approval_and_pins_connection() -
     assert!(!selection(&context, &profile, 7, &context, &changed, 7));
     Ok(())
 }
+
+#[test]
+fn subtree_pure_headless_signing_defaults_and_toggles_reach_prepare_jobs() -> Result<(), String> {
+    for default in [false, true] {
+        for (label, kind) in [
+            ("Prepare update in own worktree", logic::Kind::Update),
+            ("Split committed folder history", logic::Kind::Split),
+            (
+                "Associate existing folder with fetched baseline",
+                logic::Kind::Associate,
+            ),
+        ] {
+            let ctx = egui::Context::default();
+            let mut view = logic::View::subtree_test_view();
+            view.sign_commits = default;
+            let mut s = state(view);
+            let mut acts = vec![];
+            let mut out = frame(&ctx, &mut s, &mut acts, vec![]);
+            let prepare = text_pos(&out, label).ok_or("prepare control")?;
+            let signing = text_pos(&out, "Sign commits").ok_or("signing control")?;
+            out.textures_delta.clear();
+            let mut out = frame(&ctx, &mut s, &mut acts, click(prepare));
+            out.textures_delta.clear();
+            assert!(acts.iter().any(|a| matches!(a,
+                Action::RepositoryTools(Act::SubtreeJob(_, Job::Prepare(_, actual_kind, sign)))
+                if *actual_kind == kind && *sign == default
+            )));
+            acts.clear();
+            let mut out = frame(&ctx, &mut s, &mut acts, click(signing));
+            out.textures_delta.clear();
+            let mut out = frame(&ctx, &mut s, &mut acts, click(prepare));
+            out.textures_delta.clear();
+            assert!(acts.iter().any(|a| matches!(a,
+                Action::RepositoryTools(Act::SubtreeJob(_, Job::Prepare(_, actual_kind, sign)))
+                if *actual_kind == kind && *sign != default
+            )));
+        }
+    }
+    Ok(())
+}

@@ -515,3 +515,20 @@ fn review12_canonical_repository_rename_preserves_pending_review_completion() {
         assert_eq!(tab.finished.len(), 1);
     }
 }
+
+#[test]
+fn linked_forge_selects_the_exact_remote_and_never_falls_back_when_blocked_or_missing() {
+    let _pause = crate::network::test_pause::set(Some(crate::network::Pause::Switch));
+    let ctx = egui::Context::default();
+    let mut tab = tab(&ctx);
+    assert!(tab.select_linked_forge("fork", &ctx));
+    assert_eq!(tab.hosting, Some(hosting("JKamsker")));
+    assert!(tab.select_linked_forge("origin", &ctx));
+    assert_eq!(tab.hosting, Some(hosting("Vancete")));
+    assert!(!tab.select_linked_forge("missing", &ctx));
+    assert_eq!(tab.hosting, Some(hosting("Vancete")));
+    tab.busy_op = Some("Create pull request".into());
+    assert!(tab.select_linked_forge("origin", &ctx));
+    assert!(!tab.select_linked_forge("fork", &ctx));
+    assert_eq!(tab.hosting, Some(hosting("Vancete")));
+}

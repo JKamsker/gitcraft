@@ -55,7 +55,7 @@ pub(crate) fn actions(then: Then) -> Vec<Action> {
             line: line as usize,
         }],
         Then::Commit(hash) => vec![Action::SelectHash(hash)],
-        Then::PullRequest(number) => vec![Action::OpenPr(number)],
+        Then::PullRequest { number, remote } => vec![Action::OpenLinkedPr { number, remote }],
         // Cloned first, by the window (see `app::launch`).
         Then::Clone(_) => Vec::new(),
         Then::Compare {
@@ -72,5 +72,23 @@ pub(crate) fn actions(then: Then) -> Vec<Action> {
             captions: [None, None],
             since_fork,
         }],
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn linked_pr_keeps_its_remote_until_the_tab_opens_it() {
+        for remote in ["origin", "upstream"] {
+            let actions = actions(Then::PullRequest {
+                number: 42,
+                remote: remote.into(),
+            });
+            assert!(
+                matches!(actions.as_slice(), [Action::OpenLinkedPr { number: 42, remote: name }] if name == remote)
+            );
+        }
     }
 }
