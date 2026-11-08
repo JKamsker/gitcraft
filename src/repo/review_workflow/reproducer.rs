@@ -597,9 +597,9 @@ mod fluent_review_tests {
     fn fluent_review_reproducer_actual_form_has_no_execution_or_approval_side_effects()
     -> Result<(), String> {
         let ctx = egui::Context::default();
-        let mut state = State {
-            request: 13,
-            case: Case {
+        let mut state = State::default();
+        state.request = 13;
+        state.case = Case {
                 base: "refs/heads/base".into(),
                 head: "refs/heads/head".into(),
                 path: "src/{opaque}.rs".into(),
@@ -608,8 +608,6 @@ mod fluent_review_tests {
                 source: "#[test] fn opaque() { assert!(true); }".into(),
                 image: "rust:1.95.0".into(),
                 approved: false,
-            },
-            ..Default::default()
         };
         let before = state.case.clone();
         let mut acts = vec![];

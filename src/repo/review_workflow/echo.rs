@@ -733,13 +733,11 @@ mod fluent_review_tests {
             source: comment.url.clone(),
             enabled: false,
         };
-        let mut state = State {
-            book: Book {
-                enabled: false,
-                comments: vec![comment],
-                rules: vec![rule],
-            },
-            ..Default::default()
+        let mut state = State::default();
+        state.book = Book {
+            enabled: false,
+            comments: vec![comment],
+            rules: vec![rule],
         };
         state.pending_push = Some(Waiting {
             continuation: None,

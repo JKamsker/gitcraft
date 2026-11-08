@@ -611,8 +611,8 @@ mod fluent_review_tests {
     fn fluent_review_radar_actual_coverage_plural_preserves_patch_evidence_and_argv()
     -> Result<(), String> {
         let ctx = egui::Context::default();
-        let mut state = State {
-            rows: Some(Ok(vec![Row {
+        let mut state = State::default();
+        state.rows = Some(Ok(vec![Row {
                 name: "fix{raw}".into(),
                 fix: "opaque-fix".into(),
                 target: "refs/heads/release".into(),
@@ -622,9 +622,7 @@ mod fluent_review_tests {
                 coverage: 1,
                 complete: false,
                 error: None,
-            }])),
-            ..Default::default()
-        };
+        }]));
         let mut acts = vec![];
         for (locale, coverage, patch) in [
             (
