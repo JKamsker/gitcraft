@@ -9,6 +9,23 @@ class Recording:
     def kill(self,p,s): self.events.append(('direct',p,s))
     def waitpid(self,p,f): self.events.append(('reap',p,f)); return p,0
 class Pure(unittest.TestCase):
+    def test_workspace_machine_fence_rejects_queued_generation_before_record_or_start(self):
+        events=[]
+        class Synthetic(m.WorkspaceLocks):
+            def __init__(self,root):
+                events.append('open'); self.anchor_id='original'; self.files=['primary','fence','generation']
+            def lock_fence(self,controller,deadline): events.append('lock-and-verify')
+            def read(self,fd,limit): return ('b'*64+'\n').encode()
+            def close(self): events.append('close-only')
+        grant=dict(root='/synthetic/ledger',anchor='original',generation='a'*64,mode='dispatch')
+        with self.assertRaises(ValueError): Synthetic.fence(grant,None,5)
+        self.assertEqual(events,['open','lock-and-verify','close-only'])
+        expected=['directory','primary','fence','generation']
+        for i in range(4):
+            replaced=expected.copy(); replaced[i]='replacement'
+            with self.assertRaises(ValueError): m.workspace_namespace(expected,replaced)
+            with self.assertRaises(ValueError): m.workspace_namespace(expected,expected[:i]+expected[i+1:])
+        with self.assertRaises(ValueError): m.workspace_grant('original','a'*64,'replaced',('a'*64+'\n').encode())
     def test_full_handshake_sink_still_allows_eof_stop_deadline_and_never_releases(self):
         for stopped, now in [(True,0),(False,5)]:
             owner=Recording(); released=[]; frame=m.Handshake(b'private-marker',5)

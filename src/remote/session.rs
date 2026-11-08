@@ -294,12 +294,20 @@ pub(crate) fn streaming_command_record(
     req: &Request,
     record: Option<&str>,
 ) -> Result<Streaming, String> {
+    streaming_command_authority(host, req, record, None)
+}
+pub(crate) fn streaming_command_authority(
+    host: &Host,
+    req: &Request,
+    record: Option<&str>,
+    workspace: Option<&super::workspace_authority::WorkspaceAuthority>,
+) -> Result<Streaming, String> {
     super::ui_guard::off_ui_thread(&req.what())?;
     let (command, attempt) = shell_command(host, false);
     let nonce = nonce();
     let input = format!(
         "{MORE_PATH}\n{}",
-        super::supervisor::streaming(req, &nonce, record)?
+        super::supervisor::streaming_with_authority(req, &nonce, record, workspace)?
     )
     .into_bytes();
     Ok(Streaming {
@@ -312,6 +320,19 @@ pub(crate) fn streaming_command_record(
         host: host.clone(),
         durable: record.is_some(),
     })
+}
+
+pub(super) fn claim_command(
+    host: &Host,
+    data: &str,
+) -> (Command, Vec<u8>, Option<Box<dyn FnOnce() + Send>>) {
+    let (command, connection) = shell_command(host, false);
+    let input = format!("{MORE_PATH}\n{}", super::supervisor::claim(data)).into_bytes();
+    (
+        command,
+        input,
+        connection.map(|c| Box::new(move || c.connected()) as Box<dyn FnOnce() + Send>),
+    )
 }
 
 pub(crate) fn stop_endpoint(

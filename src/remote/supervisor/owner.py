@@ -62,6 +62,138 @@ class PinnedDirectory:
         try: os.unlink(name, dir_fd=self.fd)
         except FileNotFoundError: pass
 
+# Stable claim identity and actual-machine generation fence. Never cleared with worktrees.
+import fcntl, select
+WORKSPACE_VERSION = 'gitcraft-workspace-anchor-v1\n'
+WORKSPACE_NAMES = ('primary', 'fence', 'generation')
+def workspace_id(info): return 'unix:{:016x}:{:016x}'.format(info.st_dev, info.st_ino)
+def workspace_namespace(expected, actual):
+    if len(expected) != 4 or actual != expected: raise ValueError('workspace lock namespace replaced; no authority')
+def workspace_grant(expected_anchor, expected_generation, actual_anchor, actual_generation):
+    if expected_anchor != actual_anchor or actual_generation != (expected_generation+'\n').encode():
+        raise ValueError('stale workspace generation; no mutation authorized')
+def workspace_wait(controller, deadline):
+    if time.monotonic() >= deadline: raise TimeoutError('workspace fence expired')
+    if select.select([controller], [], [], 0)[0]:
+        if not os.read(controller.fileno(),4096): raise EOFError('workspace controller lost')
+        raise ValueError('unexpected workspace controller input')
+class WorkspaceLocks:
+    def __init__(self, root, initialize=False):
+        if not isinstance(root,str) or not os.path.isabs(root): raise ValueError('workspace root must be absolute')
+        self.root=root; self.directory=None; self.anchor=None; self.files=[]
+        try:
+            try: self.anchor=self.open_file(root+'.anchor',os.O_RDONLY)
+            except FileNotFoundError:
+                if not initialize: raise
+                os.mkdir(root,0o700) # Existing root without anchor is never repaired.
+                self.directory=PinnedDirectory(root)
+                for n in WORKSPACE_NAMES: self.files.append(self.open_file(n,os.O_RDWR|os.O_CREAT|os.O_EXCL,self.directory.fd))
+                fcntl.flock(self.files[0],fcntl.LOCK_EX|fcntl.LOCK_NB)
+                self.ids=self.identities()
+                self.data=(WORKSPACE_VERSION+'\n'.join(self.ids)+'\n').encode()
+                fd=self.open_file(root+'.anchor',os.O_WRONLY|os.O_CREAT|os.O_EXCL)
+                with os.fdopen(fd,'wb') as f: f.write(self.data); f.flush(); os.fsync(f.fileno())
+                self.anchor=self.open_file(root+'.anchor',os.O_RDONLY)
+                self.initialized=True
+            else:
+                self.initialized=False
+                self.directory=PinnedDirectory(root)
+                for n in WORKSPACE_NAMES: self.files.append(self.open_file(n,os.O_RDWR,self.directory.fd))
+                self.ids=self.identities()
+                self.data=(WORKSPACE_VERSION+'\n'.join(self.ids)+'\n').encode()
+            self.anchor_id=workspace_id(os.fstat(self.anchor))
+            self.verify()
+        except BaseException: self.close(); raise
+    @staticmethod
+    def open_file(name,flags,at=None):
+        fd=os.open(name,flags|os.O_NOFOLLOW|os.O_CLOEXEC|os.O_NONBLOCK,0o600,dir_fd=at)
+        try:
+            info=os.fstat(fd)
+            if not stat.S_ISREG(info.st_mode) or info.st_uid!=os.geteuid() or info.st_mode&0o077 or info.st_nlink!=1:
+                raise ValueError('workspace file is not private single-link regular file')
+            return fd
+        except BaseException: os.close(fd); raise
+    @staticmethod
+    def read(fd,limit):
+        os.lseek(fd,0,os.SEEK_SET); value=os.read(fd,limit+1)
+        if len(value)>limit: raise ValueError('oversized workspace file')
+        return value
+    def identities(self): return [workspace_id(os.fstat(self.directory.fd))]+[workspace_id(os.fstat(fd)) for fd in self.files]
+    def verify(self):
+        with PinnedDirectory(self.root) as named:
+            actual=[workspace_id(os.fstat(named.fd))]
+            for n in WORKSPACE_NAMES:
+                fd=self.open_file(n,os.O_RDONLY,self.directory.fd)
+                try: actual.append(workspace_id(os.fstat(fd)))
+                finally: os.close(fd)
+        workspace_namespace(self.ids,actual)
+        fd=self.open_file(self.root+'.anchor',os.O_RDONLY)
+        try:
+            if workspace_id(os.fstat(fd))!=self.anchor_id or self.read(fd,4096)!=self.data or self.read(self.anchor,4096)!=self.data:
+                raise ValueError('workspace anchor replaced or incomplete')
+        finally: os.close(fd)
+    def lock_fence(self,controller,deadline):
+        while True:
+            workspace_wait(controller,deadline)
+            try: fcntl.flock(self.files[1],fcntl.LOCK_EX|fcntl.LOCK_NB); break
+            except BlockingIOError: time.sleep(.005)
+        self.verify()
+    @classmethod
+    def claim(cls,request,controller,deadline):
+        generation=request['generation']
+        if not isinstance(generation,str) or not HEX.fullmatch(generation): raise ValueError('invalid workspace generation')
+        value=cls(request['root'],True)
+        try:
+            if not value.initialized: fcntl.flock(value.files[0],fcntl.LOCK_EX|fcntl.LOCK_NB)
+            value.lock_fence(controller,deadline); workspace_wait(controller,deadline)
+            os.lseek(value.files[2],0,os.SEEK_SET); os.ftruncate(value.files[2],0)
+            data=(generation+'\n').encode()
+            if os.write(value.files[2],data)!=len(data): raise OSError('partial generation publication')
+            os.fsync(value.files[2]); fcntl.flock(value.files[1],fcntl.LOCK_UN)
+            return value
+        except BaseException: value.close(); raise
+    @classmethod
+    def fence(cls,grant,controller,deadline):
+        if not isinstance(grant,dict) or set(grant)!={'root','anchor','generation','mode'} or grant['mode'] not in ('dispatch','mutation') or not HEX.fullmatch(grant['generation']):
+            raise ValueError('invalid workspace grant')
+        value=cls(grant['root'])
+        try:
+            value.lock_fence(controller,deadline)
+            workspace_grant(grant['anchor'],grant['generation'],value.anchor_id,value.read(value.files[2],128))
+            try: fcntl.flock(value.files[0],fcntl.LOCK_EX|fcntl.LOCK_NB)
+            except BlockingIOError: pass
+            else: raise ValueError('workspace primary owner no longer live')
+            value.grant=grant
+            return value
+        except BaseException: value.close(); raise
+    def publish(self,path,owner):
+        grant=self.grant; name=os.path.basename(path)
+        if os.path.dirname(path)!=self.root or not re.fullmatch(grant['generation']+'-'+grant['mode']+r'-[0-9a-f]{32}\.owner',name):
+            raise ValueError('owner record generation/kind/ledger mismatch')
+        self.verify()
+        data=encode(dict(v=3,anchor=grant['anchor'],generation=grant['generation'],kind=grant['mode'],endpoint=owner))
+        if len(data)>2048: raise ValueError('oversized workspace owner')
+        fd=self.open_file(name,os.O_WRONLY|os.O_CREAT|os.O_EXCL,self.directory.fd)
+        with os.fdopen(fd,'wb') as f: f.write(data); f.flush(); os.fsync(f.fileno())
+    def close(self):
+        # Close only: explicit LOCK_UN in a forked anchor would unlock its parent's fence.
+        for fd in self.files: os.close(fd)
+        self.files=[]
+        if self.anchor is not None: os.close(self.anchor); self.anchor=None
+        if self.directory is not None: os.close(self.directory.fd); self.directory=None
+
+def claim_workspace(request,controller):
+    duration=request['milliseconds']/1000
+    if not 0<duration<=7*86400: raise ValueError('invalid workspace claim lifetime')
+    deadline=time.monotonic()+duration
+    value=WorkspaceLocks.claim(request,controller,deadline)
+    try:
+        emit(1,[b'__GITCRAFT_WORKSPACE_CLAIM__ '+encode(dict(root=request['root'],anchor=value.anchor_id,generation=request['generation']))])
+        while True:
+            workspace_wait(controller,deadline); time.sleep(.01)
+    except (EOFError,TimeoutError): return
+    finally: value.close()
+
 def checked_receipt(owner, data):
     value = json.loads(data)
     if set(value) != {'v', 'nonce', 'path', 'token', 'state', 'code', 'complete'}:
@@ -182,6 +314,15 @@ class Handshake:
         return True
 
 def run(req, controller, stream=False):
+    locks=None
+    if req.get('workspace'):
+        if not stream or not req.get('record'): raise ValueError('workspace operations require durable standalone ownership')
+        locks=WorkspaceLocks.fence(req['workspace'],controller,time.monotonic()+req['milliseconds']/1000)
+    try: return run_inner(req,controller,stream,locks)
+    finally:
+        if locks is not None: locks.close()
+
+def run_inner(req, controller, stream=False, locks=None):
     nonce = req['nonce']
     if not NONCE.fullmatch(nonce): raise ValueError('invalid request nonce')
     duration = req['milliseconds'] / 1000
@@ -206,6 +347,7 @@ def run(req, controller, stream=False):
         anchor = os.fork()
         if anchor == 0:
             try:
+                if locks is not None: locks.close()
                 sock.close()
                 controller.close()
                 os.close(out_r); os.close(err_r); os.close(status_r); os.close(gate_w)
@@ -257,7 +399,10 @@ def run(req, controller, stream=False):
             selector.register(status_r, selectors.EVENT_READ, 'status')
             selector.register(out_r, selectors.EVENT_READ, 0)
             selector.register(err_r, selectors.EVENT_READ, 1)
-            if req.get('record'):
+            if locks is not None:
+                locks.publish(req['record'],owner)
+                if req['workspace']['mode']=='dispatch': locks.close()
+            elif req.get('record'):
                 atomic(req['record'], encode(owner), exclusive=True)
             hello = ('O1 {nonce} {path} {token}\n'.format(**owner)).encode()
             os.set_blocking(1, False); os.set_blocking(2, False)
@@ -346,6 +491,7 @@ def run(req, controller, stream=False):
             if forward and any(forward.pending): delivery = False
             final = receipt(owner, 'stopped', code, delivery)
             atomic(owner['path'] + '/terminal', encode(final))
+            if locks is not None: locks.close()
             for client in clients:
                 try: emit(client.fileno(), [encode(final)], .1)
                 except OSError: pass
@@ -412,6 +558,14 @@ def main():
     if mode == 'probe':
         if not all(hasattr(os, n) for n in ('fork', 'setsid', 'killpg')): raise RuntimeError('POSIX ownership unavailable')
     elif mode == 'serve': serve()
+    elif mode == 'claim':
+        os.set_blocking(1,False); os.set_blocking(2,False)
+        controller=os.fdopen(os.dup(0),'rb',buffering=0)
+        fd=os.open(sys.argv[2],os.O_RDONLY|os.O_NOFOLLOW)
+        with os.fdopen(fd,'rb') as f: request=f.read(4097)
+        if len(request)>4096: raise ValueError('oversized claim request')
+        os.unlink(sys.argv[2]); os.rmdir(os.path.dirname(sys.argv[2]))
+        claim_workspace(json.loads(request),controller)
     elif mode == 'retire':
         retire(json.loads(sys.stdin.buffer.readline(2049)))
         print('retired', flush=True)
@@ -430,7 +584,7 @@ def main():
     else: raise ValueError('unknown owner operation')
 
 if __name__ == '__main__':
-    if len(sys.argv) > 1 and sys.argv[1] in ('serve', 'stream'):
+    if len(sys.argv) > 1 and sys.argv[1] in ('serve', 'stream', 'claim'):
         # Detach the supervisor from the local SSH/WSL/loopback transport group. It
         # survives controller/transport death, notices EOF, and publishes the receipt.
         child = os.fork()

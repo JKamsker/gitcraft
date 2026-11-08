@@ -6,7 +6,7 @@ use IO::Socket::UNIX;
 use IO::Select;
 use JSON::PP;
 use MIME::Base64 qw(decode_base64);
-use Fcntl qw(O_RDONLY O_WRONLY O_RDWR O_CREAT O_EXCL O_NOFOLLOW O_DIRECTORY O_NONBLOCK S_ISDIR S_ISREG F_GETFD F_SETFD FD_CLOEXEC);
+use Fcntl qw(O_RDONLY O_WRONLY O_RDWR O_CREAT O_EXCL O_NOFOLLOW O_DIRECTORY O_NONBLOCK S_ISDIR S_ISREG F_GETFD F_SETFD FD_CLOEXEC LOCK_EX LOCK_NB LOCK_UN);
 use Time::HiRes qw(time sleep);
 use Errno qw(ESRCH EAGAIN EWOULDBLOCK);
 use Socket qw(SOCK_STREAM);
@@ -98,6 +98,111 @@ sub retire {
     });
     # Retain the empty directory; do not rmdir a possibly substituted pathname.
 }
+# Stable external claim/fence objects; never unlink/recreate them during cleanup.
+sub workspace_now {Time::HiRes::clock_gettime(Time::HiRes::CLOCK_MONOTONIC())}
+sub workspace_id {my ($f)=@_;my @s=stat($f);die 'workspace identity unavailable' unless @s;return sprintf('unix:%016x:%016x',$s[0],$s[1]);}
+sub workspace_namespace {my ($want,$have)=@_;die 'workspace namespace replaced' unless @$want==4 && join("\n",@$want) eq join("\n",@$have);}
+sub workspace_grant {my ($a,$g,$actual_a,$actual_g)=@_;die 'stale workspace generation; no mutation authorized' unless $a eq $actual_a && "$g\n" eq $actual_g;}
+sub workspace_open {
+    my ($name,$flags)=@_;
+    sysopen(my $f,$name,$flags|O_NOFOLLOW|O_NONBLOCK,0600) or die "workspace open failed: $!";
+    cloexec($f);my @s=stat($f);
+    die 'workspace file is not private single-link regular file' unless @s && S_ISREG($s[2]) && $s[4]==$> && !($s[2]&0077) && $s[3]==1;
+    return $f;
+}
+sub workspace_read {
+    my ($f,$limit)=@_;seek($f,0,0) or die 'workspace seek failed';my $n=read($f,my $data,$limit+1);die 'workspace read failed' unless defined($n);die 'oversized workspace file' if length($data)>$limit;return $data;
+}
+sub workspace_relative {
+    my ($w,$body)=@_;
+    sysopen(my $saved,'.',O_RDONLY|O_DIRECTORY|O_NOFOLLOW) or die 'cannot retain workspace cwd';
+    chdir($w->{dir}) or die 'cannot pin workspace directory';
+    my ($result,$ok,$error);$ok=eval {$result=$body->();1;};$error=$@;
+    chdir($saved) or die 'cannot restore workspace cwd';close($saved);die $error unless $ok;return $result;
+}
+sub workspace_directory {
+    my ($root)=@_;sysopen(my $dir,$root,O_RDONLY|O_DIRECTORY|O_NOFOLLOW) or die 'workspace directory unavailable';cloexec($dir);
+    my @s=stat($dir);die 'workspace directory is not private' unless @s && S_ISDIR($s[2]) && $s[4]==$> && ($s[2]&0777)==0700;return $dir;
+}
+sub workspace_verify {
+    my ($w)=@_;my $named=workspace_directory($w->{root});my @ids=(workspace_id($named));close($named);
+    workspace_relative($w,sub {for my $name ('primary','fence','generation') {my $f=workspace_open($name,O_RDONLY);push @ids,workspace_id($f);close($f);}});
+    workspace_namespace($w->{ids},\@ids);
+    my $anchor=workspace_open("$w->{root}.anchor",O_RDONLY);
+    die 'workspace anchor replaced or incomplete' unless workspace_id($anchor) eq $w->{anchor_id} && workspace_read($anchor,4096) eq $w->{data} && workspace_read($w->{anchor},4096) eq $w->{data};close($anchor);
+}
+sub workspace_close {
+    my ($w)=@_;return unless $w;
+    # Close only. Explicit LOCK_UN in the forked anchor would unlock the parent too.
+    close($_) for @{$w->{files} // []};$w->{files}=[];
+    for my $key ('anchor','dir') {close($w->{$key}) if defined($w->{$key});delete $w->{$key};}
+}
+sub workspace_existing {
+    my ($root,$initialize)=@_;die 'workspace root must be absolute' unless defined($root) && $root =~ m{\A/};
+    my $w={root=>$root,files=>[]};my $ok=eval {
+        my $anchor;
+        if (!sysopen($anchor,"$root.anchor",O_RDONLY|O_NOFOLLOW|O_NONBLOCK)) {
+            die 'workspace anchor unavailable' unless $!{ENOENT} && $initialize;
+            mkdir($root,0700) or die 'workspace namespace already exists or cannot initialize';
+            $w->{dir}=workspace_directory($root);
+            workspace_relative($w,sub {$w->{files}=[map {workspace_open($_,O_RDWR|O_CREAT|O_EXCL)} ('primary','fence','generation')];});
+            flock($w->{files}[0],LOCK_EX|LOCK_NB) or die 'workspace initialization claim refused';
+            $w->{ids}=[workspace_id($w->{dir}),map {workspace_id($_)} @{$w->{files}}];
+            $w->{data}="gitcraft-workspace-anchor-v1\n".join("\n",@{$w->{ids}})."\n";
+            atomic("$root.anchor",$w->{data},1);$w->{anchor}=workspace_open("$root.anchor",O_RDONLY);$w->{initialized}=1;
+        } else {
+            close($anchor);$w->{anchor}=workspace_open("$root.anchor",O_RDONLY);
+            $w->{dir}=workspace_directory($root);
+            workspace_relative($w,sub {$w->{files}=[map {workspace_open($_,O_RDWR)} ('primary','fence','generation')];});
+            $w->{ids}=[workspace_id($w->{dir}),map {workspace_id($_)} @{$w->{files}}];
+            $w->{data}="gitcraft-workspace-anchor-v1\n".join("\n",@{$w->{ids}})."\n";
+        }
+        $w->{anchor_id}=workspace_id($w->{anchor});workspace_verify($w);1;
+    };my $error=$@;if (!$ok) {workspace_close($w);die $error;}return $w;
+}
+sub workspace_wait {
+    my ($controller,$deadline)=@_;die "workspace lease expired\n" if workspace_now()>=$deadline;
+    if (IO::Select->new($controller)->can_read(0)) {my $n=sysread($controller,my $byte,4096);die "workspace controller lost\n" if !defined($n) || !$n;die 'unexpected workspace controller input';}
+}
+sub workspace_lock_fence {
+    my ($w,$controller,$deadline)=@_;
+    while (1) {workspace_wait($controller,$deadline);last if flock($w->{files}[1],LOCK_EX|LOCK_NB);die 'workspace fence locking unsupported' unless $!{EAGAIN} || $!{EWOULDBLOCK};sleep(.005);}
+    workspace_verify($w);
+}
+sub workspace_claim {
+    my ($request,$controller,$deadline)=@_;die 'invalid workspace generation' unless ($request->{generation}//'') =~ /\A[0-9a-f]{64}\z/;
+    my $w=workspace_existing($request->{root},1);my $ok=eval {
+        flock($w->{files}[0],LOCK_EX|LOCK_NB) or die 'another workspace claimant owns repository' unless $w->{initialized};
+        workspace_lock_fence($w,$controller,$deadline);workspace_wait($controller,$deadline);
+        my $g=$w->{files}[2];seek($g,0,0) or die 'generation seek failed';truncate($g,0) or die 'generation truncate failed';print $g "$request->{generation}\n" or die 'generation write failed';$g->flush && $g->sync or die 'generation sync failed';
+        flock($w->{files}[1],LOCK_UN) or die 'fence release failed';1;
+    };my $error=$@;if (!$ok) {workspace_close($w);die $error;}return $w;
+}
+sub workspace_fence {
+    my ($grant,$controller,$deadline)=@_;
+    die 'invalid workspace grant' unless ref($grant) eq 'HASH' && join(',',sort keys %$grant) eq 'anchor,generation,mode,root' && ($grant->{generation}//'') =~ /\A[0-9a-f]{64}\z/ && ($grant->{mode}//'') =~ /\A(?:dispatch|mutation)\z/;
+    my $w=workspace_existing($grant->{root});my $ok=eval {
+        workspace_lock_fence($w,$controller,$deadline);
+        workspace_grant($grant->{anchor},$grant->{generation},$w->{anchor_id},workspace_read($w->{files}[2],128));
+        if (flock($w->{files}[0],LOCK_EX|LOCK_NB)) {die 'workspace primary owner no longer live';}
+        die 'workspace primary ownership unknown' unless $!{EAGAIN} || $!{EWOULDBLOCK};
+        $w->{grant}=$grant;1;
+    };my $error=$@;if (!$ok) {workspace_close($w);die $error;}return $w;
+}
+sub workspace_publish {
+    my ($w,$path,$owner)=@_;my $g=$w->{grant};my $prefix="$w->{root}/";
+    die 'owner record outside workspace ledger' unless index($path,$prefix)==0;
+    my $name=substr($path,length($prefix));die 'owner record generation/kind mismatch' unless $name =~ /\A\Q$g->{generation}-$g->{mode}-\E[0-9a-f]{32}\.owner\z/;
+    workspace_verify($w);my $data=encode({v=>3,anchor=>$g->{anchor},generation=>$g->{generation},kind=>$g->{mode},endpoint=>$owner});die 'oversized workspace owner' if length($data)>2048;
+    workspace_relative($w,sub {atomic($name,$data,1);});
+}
+sub claim_workspace {
+    my ($request,$controller)=@_;my $duration=($request->{milliseconds}//0)/1000;die 'invalid workspace lifetime' unless $duration>0 && $duration<=7*86400;
+    my $deadline=workspace_now()+$duration;my $w=workspace_claim($request,$controller,$deadline);
+    my $ok=eval {emit(\*STDOUT,['__GITCRAFT_WORKSPACE_CLAIM__ '.encode({root=>$request->{root},anchor=>$w->{anchor_id},generation=>$request->{generation}})]);while (1) {workspace_wait($controller,$deadline);sleep(.01);}1;};my $error=$@;workspace_close($w);
+    die $error unless $ok || $error eq "workspace controller lost\n" || $error eq "workspace lease expired\n";
+}
+
 sub finish_owned {
     my ($anchor, $established, $ops) = @_;
     $ops //= {
@@ -163,7 +268,16 @@ sub handshake_step {
     $release->(); $state->{released}=1; return 1;
 }
 sub run {
-    my ($req, $controller, $stream) = @_;
+    my ($req,$controller,$stream)=@_;my $locks;
+    if ($req->{workspace}) {
+        die 'workspace operations require durable standalone ownership' unless $stream && $req->{record};
+        $locks=workspace_fence($req->{workspace},$controller,workspace_now()+$req->{milliseconds}/1000);
+    }
+    my (@result,$ok,$error);$ok=eval {@result=run_inner($req,$controller,$stream,$locks);1;};$error=$@;
+    workspace_close($locks);die $error unless $ok;return @result;
+}
+sub run_inner {
+    my ($req, $controller, $stream,$locks) = @_;
     die 'invalid request nonce' unless $req->{nonce} =~ /\A[0-9a-f]{1,96}\z/;
     my $duration = $req->{milliseconds}/1000;
     die 'invalid request deadline' unless $duration > 0 && $duration <= 7*86400;
@@ -183,6 +297,7 @@ sub run {
     my $anchor = fork(); die 'anchor fork failed' unless defined($anchor);
     if (!$anchor) {
         eval {
+            workspace_close($locks);
             close($server); close($controller); close($out_r); close($err_r); close($status_r); close($gate_w);
             setsid() >= 0 or die 'anchor setsid failed';
             $SIG{TERM} = 'IGNORE';
@@ -215,7 +330,8 @@ sub run {
         $ready->can_read(5) or die 'anchor readiness timed out';
         my $answer; sysread($status_r, $answer, 6) == 6 && $answer eq "ready\n" or die 'anchor readiness failed';
         $established = 1;
-        atomic($req->{record}, encode($o), 1) if $req->{record};
+        if ($locks) {workspace_publish($locks,$req->{record},$o);workspace_close($locks) if $req->{workspace}{mode} eq 'dispatch';}
+        elsif ($req->{record}) {atomic($req->{record}, encode($o), 1);}
         my $hello = "O1 $o->{nonce} $o->{path} $o->{token}\n";
         STDOUT->blocking(0); STDERR->blocking(0);
         my $handshake={pending=>($stream ? '__GITCRAFT_OWNER__ ' : '').$hello,until=>time()+5};
@@ -288,7 +404,7 @@ sub run {
     while ($stream && time() < $end && (length($pending[0]) || length($pending[1]))) { if (!forward_flush(\@pending)) {$delivery=0; last;} sleep(.005); }
     $delivery=0 if $stream && (length($pending[0]) || length($pending[1]));
     close($status_r); close($server);
-    my $final = {%$o,state=>'stopped',code=>$code,complete=>$delivery ? JSON::PP::true : JSON::PP::false}; atomic("$o->{path}/terminal",encode($final),0);
+    my $final = {%$o,state=>'stopped',code=>$code,complete=>$delivery ? JSON::PP::true : JSON::PP::false}; atomic("$o->{path}/terminal",encode($final),0); workspace_close($locks);
     for my $client (values %clients) { eval {emit($client->{handle},[encode($final)],.1);}; close($client->{handle}); }
     die $error if $error;
     return (delivery_code($code,$delivery),\@output,$o);
@@ -339,13 +455,20 @@ sub serve {
     }
 }
 my $mode = shift(@ARGV) // '';
-if ($mode eq 'serve' || $mode eq 'stream') {
+if ($mode eq 'serve' || $mode eq 'stream' || $mode eq 'claim') {
     my $supervisor = fork(); die 'supervisor fork failed' unless defined($supervisor);
     if ($supervisor) { waitpid($supervisor,0); my $status=$?; exit(($status & 127) ? 128+($status & 127) : $status >> 8); }
     setsid() >= 0 or die 'supervisor setsid failed'; $SIG{HUP}='IGNORE';
 }
 if ($mode eq 'probe') { exit(0); }
 elsif ($mode eq 'serve') { serve(); }
+elsif ($mode eq 'claim') {
+    STDOUT->blocking(0);STDERR->blocking(0);
+    open(my $controller,'<&',\*STDIN) or die 'claim controller missing';cloexec($controller);
+    my $path=shift(@ARGV);my $f=workspace_open($path,O_RDONLY);my $data=workspace_read($f,4096);close($f);
+    unlink($path) or die 'claim request removal failed';(my $dir=$path)=~s{/[^/]+$}{};rmdir($dir) or die 'claim request directory removal failed';
+    claim_workspace($JSON->decode($data),$controller);
+}
 elsif ($mode eq 'retire') { my $line = <STDIN>; retire($JSON->decode($line)); print "retired\n"; }
 elsif ($mode eq 'control') { my $line = <STDIN>; print encode(control($JSON->decode($line))); }
 elsif ($mode eq 'stream') {
@@ -356,6 +479,26 @@ elsif ($mode eq 'stream') {
     my ($code,$out) = run($req,$controller,1); exit($code);
 }
 elsif ($mode eq 'recording') {
+    {
+        my @expected=('directory','primary','fence','generation');
+        for my $i (0..3) {
+            my @changed=@expected;$changed[$i]='replacement';
+            die 'replacement granted workspace authority' if eval {workspace_namespace(\@expected,\@changed);1;};
+            splice(@changed,$i,1);die 'missing lock granted authority' if eval {workspace_namespace(\@expected,\@changed);1;};
+        }
+        for my $actual ([original=>('b'x64)."\n"],[replaced=>('a'x64)."\n"],[original=>'partial']) {
+            die 'stale generation granted authority' if eval {workspace_grant('original','a'x64,@$actual);1;};
+        }
+        my @events;
+        { no warnings 'redefine';
+          local *workspace_existing=sub {push @events,'open';return {anchor_id=>'original',files=>[]};};
+          local *workspace_lock_fence=sub {push @events,'lock-and-verify';};
+          local *workspace_read=sub {return ('b'x64)."\n";};
+          local *workspace_close=sub {push @events,'close-only';};
+          die 'queued old generation admitted' if eval {workspace_fence({root=>'/synthetic',anchor=>'original',generation=>'a'x64,mode=>'dispatch'},undef,5);1;};
+        }
+        die 'stale machine dispatch side effects' unless join(',',@events) eq 'open,lock-and-verify,close-only';
+    }
     for my $stop (0,1) {
         my $released=0; my $frame={pending=>'private-marker',until=>5};
         my $blocked=sub {$!=EAGAIN;return undef;};
@@ -417,6 +560,6 @@ elsif ($mode eq 'recording') {
     my $ops = {signal=>sub {push @events, $_[0] ? 'group' : 'direct'; die 'refused' if $_[0];},pause=>sub {},reap=>sub {push @events,'reap';}};
     my $ok = eval {finish_owned(424242,1,$ops);1;};
     die 'refusal acknowledged' if $ok || join(',',@events) ne 'group,direct,reap';
-    print "13 recording-only owner gates passed\n";
+    print "14 recording-only owner gates passed\n";
 }
 else { die 'unknown owner operation'; }

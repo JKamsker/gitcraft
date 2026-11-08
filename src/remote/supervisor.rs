@@ -187,6 +187,14 @@ pub(super) fn setup() -> String {
 }
 
 pub(super) fn request(req: &Request, nonce: &str, record: Option<&str>) -> Result<String, String> {
+    request_with_authority(req, nonce, record, None)
+}
+fn request_with_authority(
+    req: &Request,
+    nonce: &str,
+    record: Option<&str>,
+    workspace: Option<&super::workspace_authority::WorkspaceAuthority>,
+) -> Result<String, String> {
     use base64::Engine;
     if !hex(nonce, 1, 96) {
         return Err("invalid request nonce".into());
@@ -204,6 +212,7 @@ pub(super) fn request(req: &Request, nonce: &str, record: Option<&str>) -> Resul
         "input": base64::engine::general_purpose::STANDARD.encode(req.stdin.as_deref().unwrap_or_default()),
         "milliseconds": ms as u64,
         "record": record,
+        "workspace": workspace,
     });
     Ok(format!(
         "{}\n",
@@ -218,11 +227,26 @@ pub(super) fn streaming(
     nonce: &str,
     record: Option<&str>,
 ) -> Result<String, String> {
-    let data = request(req, nonce, record)?;
+    streaming_with_authority(req, nonce, record, None)
+}
+pub(super) fn streaming_with_authority(
+    req: &Request,
+    nonce: &str,
+    record: Option<&str>,
+    workspace: Option<&super::workspace_authority::WorkspaceAuthority>,
+) -> Result<String, String> {
+    let data = request_with_authority(req, nonce, record, workspace)?;
     let launch = launcher("stream", "\"$T/request\"");
     Ok(format!(
         "{{\numask 077\nT=$(mktemp -d /tmp/gitcraft-launch.XXXXXXXXXX) || exit 125\ncat >\"$T/request\" <<'GITCRAFT_REQUEST_V1'\n{data}GITCRAFT_REQUEST_V1\n{launch}\n}}\n"
     ))
+}
+
+pub(super) fn claim(data: &str) -> String {
+    let launch = launcher("claim", "\"$T/request\"");
+    format!(
+        "{{\numask 077\nT=$(mktemp -d /tmp/gitcraft-launch.XXXXXXXXXX) || exit 125\ncat >\"$T/request\" <<'GITCRAFT_CLAIM_REQUEST_V1'\n{data}GITCRAFT_CLAIM_REQUEST_V1\n{launch}\n}}\n"
+    )
 }
 
 #[cfg(test)]

@@ -42,7 +42,8 @@ impl Frame {
                     if reply.generation != generation
                         || reply.anchor.is_empty()
                         || reply.anchor.len() > 128
-                        || !reply.root.is_absolute()
+                        || !(reply.root.is_absolute()
+                            || reply.root.to_str().is_some_and(|p| p.starts_with('/')))
                     {
                         return None;
                     }
@@ -93,6 +94,26 @@ impl Lease {
             ])
             .env("GITCRAFT_CLAIM_HELPER", "1");
         Self::start(command, input, generation, true)
+    }
+    pub(crate) fn remote(host: &super::Host, root: &str) -> Result<Self, String> {
+        let mut random = [0; 32];
+        gitcraft_os::random_bytes(&mut random).map_err(|e| e.to_string())?;
+        let generation: String = random.iter().map(|b| format!("{b:02x}")).collect();
+        let request = Request {
+            root: root.into(),
+            generation: generation.clone(),
+            milliseconds: LIFETIME.as_millis() as u64,
+        };
+        let data = format!(
+            "{}\n",
+            serde_json::to_string(&request).map_err(|e| e.to_string())?
+        );
+        let (command, input, connected) = super::session::claim_command(host, &data);
+        let lease = Self::start(command, input, generation, false)?;
+        if let Some(connected) = connected {
+            connected();
+        }
+        Ok(lease)
     }
     pub(super) fn start(
         command: Command,
