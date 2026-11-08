@@ -316,8 +316,30 @@ fn safe_dir(path: &Path) -> Result<(), String> {
 }
 // Separate argv carries one validated metadata observation. The child captures
 // directory descriptors and verifies them against retained native handles before
-// dispatch. Git uses those descriptors; neither .git nor commondir is reparsed.
-const OWNED_ALIAS: &str = r#"alias.gitcraft-owned-replay=!f() { pin=$1; path=$2; metadata=$3; mpin=$4; common=$5; cpin=$6; lpin=$7; link=$8; shift 8; token() { LC_ALL=C stat -L -c '%d:%i' "$1" 2>/dev/null || LC_ALL=C stat -L -f '%d:%i' "$1"; }; cd -P -- "$path" || exit 1; [ "$(token .)" = "$pin" ] || exit 1; exec 6<.git || exit 1; [ "$(token /dev/fd/6)" = "$lpin" ] || exit 1; [ "$(cat /dev/fd/6)" = "$link" ] || exit 1; exec 7<"$metadata" || exit 1; [ "$(token /dev/fd/7)" = "$mpin" ] || exit 1; exec 8<"$common" || exit 1; [ "$(token /dev/fd/8)" = "$cpin" ] || exit 1; GIT_COMMON_DIR=/dev/fd/8 git --no-lazy-fetch --git-dir=/dev/fd/7 --work-tree=. "$@"; }; f"#;
+// dispatch. Neither .git nor commondir is reparsed to choose dispatch operands.
+// Darwin Git cannot traverse directory-fd paths: use captured physical paths after
+// comparing them to the held identities immediately before Git. The locked,
+// retain-only lifecycle supports ordinary worktree concurrency, not forced same-user
+// administration replacement after the final check. Post-check drift is uncertain;
+// retained handles do not make Darwin path dispatch a zero-foreign-write capability.
+// BSD stat with no operand uses fstat(STDIN_FILENO); stat("/dev/fd/N")
+// observes the Darwin descriptor-filesystem entry instead of the held inode.
+// Keep platform selection compile-time and pass the already-open handle on stdin.
+macro_rules! owned_alias {
+    ($fd_stat:literal, $dispatch:literal) => {
+        concat!(r#"alias.gitcraft-owned-replay=!f() { pin=$1; path=$2; metadata=$3; mpin=$4; common=$5; cpin=$6; lpin=$7; link=$8; shift 8; token() { LC_ALL=C stat -L -c '%d:%i' "$1" 2>/dev/null || LC_ALL=C stat -L -f '%d:%i' "$1"; }; token_fd() { "#, $fd_stat, r#"; }; cd -P -- "$path" || exit 1; [ "$(token .)" = "$pin" ] || { printf "%s\n" "Owned replay root identity/content mismatch" >&2; exit 1; }; exec 6<.git || exit 1; [ "$(token_fd <&6)" = "$lpin" ] || { printf "%s\n" "Owned replay git-link identity/content mismatch" >&2; exit 1; }; [ "$(cat <&6)" = "$link" ] || { printf "%s\n" "Owned replay git-link-content identity/content mismatch" >&2; exit 1; }; exec 7<"$metadata" || exit 1; [ "$(token_fd <&7)" = "$mpin" ] || { printf "%s\n" "Owned replay metadata identity/content mismatch" >&2; exit 1; }; exec 8<"$common" || exit 1; [ "$(token_fd <&8)" = "$cpin" ] || { printf "%s\n" "Owned replay common identity/content mismatch" >&2; exit 1; }; [ "$(token "$metadata")" = "$(token_fd <&7)" ] || { printf "%s\n" "Owned replay metadata path changed before Git" >&2; exit 1; }; [ "$(token "$common")" = "$(token_fd <&8)" ] || { printf "%s\n" "Owned replay common path changed before Git" >&2; exit 1; }; "#, $dispatch, r#"; }; f"#)
+    };
+}
+#[cfg(target_os = "macos")]
+const OWNED_ALIAS: &str = owned_alias!(
+    "LC_ALL=C stat -L -f '%d:%i'",
+    r#"GIT_COMMON_DIR="$common" git --no-lazy-fetch --git-dir="$metadata" --work-tree=. "$@""#
+);
+#[cfg(not(target_os = "macos"))]
+const OWNED_ALIAS: &str = owned_alias!(
+    "LC_ALL=C stat -L -c '%d:%i' /dev/stdin",
+    r#"GIT_COMMON_DIR=/dev/fd/8 git --no-lazy-fetch --git-dir=/dev/fd/7 --work-tree=. "$@""#
+);
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct DispatchBinding {
     metadata: PathBuf,
@@ -432,7 +454,7 @@ pub(in crate::git) fn registered_run(
         &words.iter().map(String::as_str).collect::<Vec<_>>(),
     );
     if !ownership.unchanged() {
-        return Err("Deferred ownership changed during replay; retained directory/metadata descriptors were used. Inspect candidate before continuing".into());
+        return Err("Deferred ownership changed during replay; identities were checked but an operation may have run through captured physical paths. Inspect and reconcile the retained candidate before continuing".into());
     }
     result
 }
@@ -876,7 +898,19 @@ pub fn resume(r: &Runner<'_>, expected: &View, id: &str) -> Result<String, Strin
         if result.is_err() || !remaining.is_empty() || rebasing(&s.worktree)? {
             view.jobs.jobs[j].busy = false;
             view.jobs.jobs[j].notice = if remaining.is_empty() {
-                "Replay stopped. Inspect the owned worktree and continue explicitly; originals were retained".into()
+                let detail = result
+                    .as_ref()
+                    .err()
+                    .map(|error| {
+                        git::redact(error, None)
+                            .chars()
+                            .take(4000)
+                            .collect::<String>()
+                    })
+                    .unwrap_or_else(|| "Replay remains in progress".into());
+                format!(
+                    "Replay stopped: {detail}. Inspect the owned worktree and continue explicitly; originals were retained"
+                )
             } else {
                 format!(
                     "Conflicts waiting in {}. Resolve and stage them there, then Continue",
@@ -1142,7 +1176,8 @@ pub(crate) mod tests {
         }
     }
     #[test]
-    fn pure_deferred_ownership_requires_exact_repository_registration_and_backlink() {
+    fn pure_deferred_ownership_requires_exact_repository_registration_and_backlink()
+    -> Result<(), String> {
         let v = view();
         let s = &v.jobs.jobs[0].steps[0];
         let gd = v.common.join("worktrees/step-0");
@@ -1155,7 +1190,7 @@ pub(crate) mod tests {
                 gitfile.as_bytes(),
                 backlink.as_bytes()
             )
-            .unwrap(),
+            .map_err(|error| error.to_string())?,
             gd
         );
         for foreign in [
@@ -1177,6 +1212,7 @@ pub(crate) mod tests {
         assert!(
             ownership_paths(&v.common, &s.worktree, gitfile.as_bytes(), b"/other/.git\n").is_err()
         );
+        Ok(())
     }
     #[test]
     fn pure_deferred_metadata_refuses_unowned_paths_receipt_gaps_duplicate_layers_and_forward_parents()
@@ -1243,7 +1279,8 @@ pub(crate) mod tests {
         assert!(acceptance_allowed(&j, true).is_ok());
     }
     #[test]
-    fn pure_deferred_recording_enters_verified_cwd_before_git_and_keeps_paths_as_argv() {
+    fn pure_deferred_recording_enters_verified_cwd_before_git_and_keeps_paths_as_argv()
+    -> Result<(), String> {
         let mut v = view();
         let s = &mut v.jobs.jobs[0].steps[0];
         s.worktree = PathBuf::from("/private/synthetic/space ; $(not-executed)");
@@ -1256,7 +1293,8 @@ pub(crate) mod tests {
             link_identity: "2:35".into(),
             link_text: format!("gitdir: {}", metadata.display()),
         };
-        let command = owned_command(s, &binding, &binding, &["rebase", "--continue"]).unwrap();
+        let command = owned_command(s, &binding, &binding, &["rebase", "--continue"])
+            .map_err(|error| error.to_string())?;
         let shared = owned_command_at(
             &s.worktree,
             s.root_identity.as_deref(),
@@ -1264,25 +1302,26 @@ pub(crate) mod tests {
             &binding,
             &["rebase", "--continue"],
         )
-        .unwrap();
+        .map_err(|error| error.to_string())?;
         assert_eq!(
             command, shared,
             "concrete subtree adapter preserves the existing command contract"
         );
         assert_eq!(command[3], "1:32");
-        assert_eq!(command[4], s.worktree.to_str().unwrap());
+        assert_eq!(command[4], s.worktree.to_str().ok_or("expected Some")?);
         assert_eq!(&command[11..], ["rebase", "--continue"]);
         assert!(!command[1].contains("not-executed"));
         // Recording only: substitute the second observed link/registration without
         // touching a filesystem or starting Git. No mutation command is produced.
-        for field in 0..5 {
+        for field in 0..6 {
             let mut changed = binding.clone();
             match field {
                 0 => changed.link_text = "gitdir: /foreign/.git".into(),
                 1 => changed.link_identity = "9:91".into(),
                 2 => changed.metadata = "/foreign/.git".into(),
                 3 => changed.metadata_identity = "9:92".into(),
-                _ => changed.common_identity = "9:93".into(),
+                4 => changed.common_identity = "9:93".into(),
+                _ => changed.common = "/foreign/common".into(),
             }
             let mut dispatched = Vec::new();
             if let Ok(words) = owned_command(s, &binding, &changed, &["rebase", "--continue"]) {
@@ -1290,19 +1329,40 @@ pub(crate) mod tests {
             }
             assert!(dispatched.is_empty());
         }
-        let dispatch = OWNED_ALIAS.find("GIT_COMMON_DIR=/dev/fd/8 git").unwrap();
+        let dispatch = OWNED_ALIAS
+            .rfind("GIT_COMMON_DIR=")
+            .ok_or("expected dispatch")?;
         for guard in [
             "token .",
-            "token /dev/fd/6",
-            "cat /dev/fd/6",
-            "token /dev/fd/7",
-            "token /dev/fd/8",
+            "token_fd <&6",
+            "cat <&6",
+            "token_fd <&7",
+            "token_fd <&8",
+            r#"token "$metadata""#,
+            r#"token "$common""#,
         ] {
-            assert!(OWNED_ALIAS.find(guard).unwrap() < dispatch);
+            assert!(OWNED_ALIAS.find(guard).ok_or("expected Some")? < dispatch);
         }
+        #[cfg(target_os = "macos")]
+        {
+            assert!(OWNED_ALIAS.contains(r#"GIT_COMMON_DIR="$common" git --no-lazy-fetch --git-dir="$metadata" --work-tree=. "$@""#));
+            assert!(!OWNED_ALIAS.contains("--git-dir=/dev/fd/"));
+            assert!(!OWNED_ALIAS.contains("GIT_COMMON_DIR=/dev/fd/"));
+        }
+        #[cfg(not(target_os = "macos"))]
         assert!(OWNED_ALIAS.contains("--git-dir=/dev/fd/7 --work-tree=."));
-        assert!(!OWNED_ALIAS.contains("--git-dir=\"$metadata\""));
+        assert_eq!(OWNED_ALIAS.matches("exec 6<.git").count(), 1);
+        assert!(!OWNED_ALIAS.contains("cat .git"));
+        assert_eq!(
+            command[5],
+            binding.metadata.to_str().ok_or("expected metadata path")?
+        );
+        assert_eq!(
+            command[7],
+            binding.common.to_str().ok_or("expected common path")?
+        );
         assert!(!OWNED_ALIAS.contains("eval"));
+        Ok(())
     }
 }
 
