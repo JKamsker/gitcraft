@@ -151,6 +151,6 @@ pub fn compute(
 }
 
 /// [`simulate`], its error naming the branches by their names.
-fn merge(repo: &Path, a: &Branch, b: &Branch) -> Cell {
+pub fn merge(repo: &Path, a: &Branch, b: &Branch) -> Cell {
     simulate(repo, &a.git, &b.git).map_err(|e| e.replace(&a.git, &a.name).replace(&b.git, &b.name))
 }

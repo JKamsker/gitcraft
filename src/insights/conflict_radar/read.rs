@@ -5,8 +5,8 @@
 
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Mutex;
 
 use super::{
     Cache, Candidate, Hunk, MAX_PATHS, PairResult, Radar, assemble, overlap, parse_hunks, select,
@@ -217,16 +217,7 @@ fn dry_run(repo: &Path, a: &Candidate, b: &Candidate) -> collision::Cell {
         name: c.name.clone(),
         git: c.tip.clone(),
     };
-    let done = Arc::new(AtomicUsize::new(0));
-    let cancel = Arc::new(AtomicBool::new(false));
-    match collision::compute(repo, &[branch(a)], &branch(b), &done, &cancel) {
-        Ok(m) => m
-            .with_target
-            .into_iter()
-            .next()
-            .unwrap_or_else(|| Err("Not merged".to_owned())),
-        Err(e) => Err(e),
-    }
+    collision::merge(repo, &branch(a), &branch(b))
 }
 
 /// The files `tip` changed since `base` (renames as a removal and an addition), at most
