@@ -8,6 +8,7 @@ mod custom_commands;
 mod diffs;
 mod external_tools;
 mod file_menus;
+mod labels;
 mod language;
 mod layout;
 pub(crate) mod network_page;
@@ -175,17 +176,6 @@ pub struct Settings {
     pub seen_hints: std::collections::BTreeSet<String>,
 }
 
-/// What offline mode does.
-const OFFLINE_TIP: &str = "Nothing goes on the network by itself (background fetch, avatars, \
-update checks, build and pull request polling), and Fetch, Pull, Push and the like say why \
-they don't run instead of waiting for a network that isn't there.";
-
-/// What pausing on a metered connection does.
-const METERED_TIP: &str = "When the system says the connection is metered (Windows: a metered \
-or roaming network; Linux: NetworkManager), the background fetch, avatars, update checks and \
-downloads and the polling of builds and pull requests wait (a repository over SSH still \
-fetches: on that machine's network). What you ask for still runs.";
-
 impl Default for Settings {
     fn default() -> Self {
         Self {
@@ -264,10 +254,14 @@ fn id() -> egui::Id {
     egui::Id::new("gitcraft-settings")
 }
 
-/// What "Compact graph" does.
+/// What crate::i18n::text("interaction-settings-compact") does.
 pub(crate) const DEFAULT_REFS_WIDTH: f32 = 280.0;
 
 pub const COMPACT_TIP: &str = "Lanes closer together, for a narrower graph column";
+/// Localized prose; the legacy constant stays stable for source consumers during migration.
+pub fn compact_tip() -> &'static str {
+    crate::i18n::text("interaction-settings-compact-tip")
+}
 
 impl Settings {
     pub fn get(ctx: &egui::Context) -> Settings {
@@ -403,7 +397,10 @@ impl Settings {
                 match &state.found {
                     Some(found) => {
                         let what = if found.own {
-                            format!("{} (downloaded by gitcraft)", found.version)
+                            crate::i18n::message(
+                                "interaction-settings-mergiraf-version",
+                                &[("version", found.version.as_str().into())],
+                            )
                         } else {
                             found.version.clone()
                         };
@@ -411,19 +408,28 @@ impl Settings {
                     }
                     None => {
                         if ui
-                            .add_enabled(!busy, egui::Button::new("Install"))
-                            .on_hover_text(
-                                "Download the latest Mergiraf for this system from its releases \
-                                 on codeberg.org into gitcraft's folder. It stays Mergiraf's \
-                                 (GPL-3.0); gitcraft only runs it.",
+                            .add_enabled(
+                                !busy,
+                                egui::Button::new(crate::i18n::text(
+                                    "interaction-settings-install",
+                                )),
                             )
+                            .on_hover_text(crate::i18n::text(
+                                "interaction-settings-mergiraf-download",
+                            ))
                             .clicked()
                         {
                             mergiraf::install(ui.ctx());
                         }
-                        ui.hyperlink_to("Other ways", mergiraf::DOCS);
+                        ui.hyperlink_to(
+                            crate::i18n::text("interaction-settings-other-ways"),
+                            mergiraf::DOCS,
+                        );
                         if matches!(job, Job::Idle) {
-                            layout::note(ui, "Not installed");
+                            layout::note(
+                                ui,
+                                crate::i18n::text("interaction-settings-not-installed"),
+                            );
                         }
                     }
                 }
@@ -445,12 +451,12 @@ impl Settings {
         card.row("Conflict editor", "offer answer resolve", |ui| {
             ui.add_enabled(
                 state.found.is_some(),
-                egui::Checkbox::new(&mut self.mergiraf, "Offer Mergiraf's answer"),
+                egui::Checkbox::new(
+                    &mut self.mergiraf,
+                    crate::i18n::text("interaction-settings-mergiraf-offer"),
+                ),
             )
-            .on_hover_text(
-                "Mergiraf solves conflicts from the syntax of the code, in many languages. \
-                 Its answer shows in the editor; nothing is saved before you check it.",
-            );
+            .on_hover_text(crate::i18n::text("interaction-settings-mergiraf-editor"));
         });
         card.row(
             "Git merges",
@@ -460,16 +466,12 @@ impl Settings {
                 let toggle = ui
                     .add_enabled(
                         state.found.is_some() && !busy,
-                        egui::Checkbox::new(&mut in_merges, "Use it in every git merge"),
+                        egui::Checkbox::new(
+                            &mut in_merges,
+                            crate::i18n::text("interaction-settings-mergiraf-every-merge"),
+                        ),
                     )
-                    .on_hover_text(
-                        "Git merges, rebases and cherry-picks go through Mergiraf, in every \
-                     repository on this machine and in the terminal too, so fewer conflicts \
-                     are left at all (not in WSL or over SSH, where git is that machine's). \
-                     Sets merge.mergiraf in your global git config and adds a marked block to \
-                     your global attributes file (also merge.conflictStyle = diff3, if you set \
-                     none); unticking takes them out again.",
-                    );
+                    .on_hover_text(crate::i18n::text("interaction-settings-mergiraf-global"));
                 if toggle.changed() {
                     mergiraf::use_in_merges(ui.ctx(), in_merges);
                 }
@@ -501,30 +503,78 @@ impl Settings {
                     },
                 );
                 section(ui, f, "Quiet celebrations", None, |card| {
-                    card.row("After success", "first commit release tag merge sound motion", |ui| { ui.checkbox(&mut self.celebration_motion,"Short visual flourish"); ui.checkbox(&mut self.celebration_sound,"Soft celebration sound"); ui.small("Opt-in acknowledgements for a first repository commit, a tag marked as a release, or a completed merge. Motion follows the system preference."); if crate::audio::unavailable() { ui.label("Audio unavailable"); if ui.button("Retry audio").clicked() { crate::audio::retry(); } } });
+                    card.row(
+                        "After success",
+                        "first commit release tag merge sound motion",
+                        |ui| {
+                            ui.checkbox(
+                                &mut self.celebration_motion,
+                                crate::i18n::text("interaction-settings-celebration-motion"),
+                            );
+                            ui.checkbox(
+                                &mut self.celebration_sound,
+                                crate::i18n::text("interaction-settings-celebration-sound"),
+                            );
+                            ui.small(crate::i18n::text("interaction-settings-celebration-note"));
+                            if crate::audio::unavailable() {
+                                ui.label(crate::i18n::text(
+                                    "interaction-settings-audio-unavailable",
+                                ));
+                                if ui
+                                    .button(crate::i18n::text("interaction-settings-retry-audio"))
+                                    .clicked()
+                                {
+                                    crate::audio::retry();
+                                }
+                            }
+                        },
+                    );
                 });
                 section(ui, f, "Behaviour", None, |card| {
                     card.row("Worktrees", "open same tab switch", |ui| {
-                        ui.checkbox(&mut self.worktrees_in_same_tab, "Open in the same tab")
-                            .on_hover_text("The tab moves to the worktree and shows its branch, which also opens a list to switch between them. What you leave behind keeps running: terminals, operations, a half-written commit message.");
+                        ui.checkbox(
+                            &mut self.worktrees_in_same_tab,
+                            crate::i18n::text("interaction-settings-same-tab"),
+                        )
+                        .on_hover_text(crate::i18n::text("interaction-settings-same-tab-tip"));
                     });
                     card.row("Notifications", "desktop long operation background", |ui| {
                         ui.checkbox(
                             &mut self.notifications,
-                            "When a long operation ends in the background",
+                            crate::i18n::text("interaction-settings-notify-when"),
                         );
                     });
-                    card.row("Resident watcher", "tray background close recent repositories notifications", |ui| {
-                        ui.checkbox(&mut self.keep_running_in_tray, "Keep gitcraft running when its window closes");
-                        ui.small("Keeps recent repositories fetched and reports new reviews, failed checks and default-branch changes. Uses this profile; offline and metered policies still apply.");
-                        if self.keep_running_in_tray {
-                            match crate::tray::status() {
-                                crate::tray::Availability::Ready => { ui.small("Tray icon available. Use its Show or Quit action."); }
-                                crate::tray::Availability::Fallback(why) => { ui.small(format!("Tray unavailable: {why}. Reopen from the launcher; Quit from the tab menu or gitcraft --quit.")); }
-                                _ => { ui.small("Starting the native tray item…"); }
+                    card.row(
+                        "Resident watcher",
+                        "tray background close recent repositories notifications",
+                        |ui| {
+                            ui.checkbox(
+                                &mut self.keep_running_in_tray,
+                                crate::i18n::text("interaction-settings-resident"),
+                            );
+                            ui.small(crate::i18n::text("interaction-settings-resident-policy"));
+                            if self.keep_running_in_tray {
+                                match crate::tray::status() {
+                                    crate::tray::Availability::Ready => {
+                                        ui.small(crate::i18n::text(
+                                            "interaction-settings-tray-ready",
+                                        ));
+                                    }
+                                    crate::tray::Availability::Fallback(why) => {
+                                        ui.small(crate::i18n::message(
+                                            "interaction-settings-tray-fallback",
+                                            &[("why", why.as_str().into())],
+                                        ));
+                                    }
+                                    _ => {
+                                        ui.small(crate::i18n::text(
+                                            "interaction-settings-tray-starting",
+                                        ));
+                                    }
+                                }
                             }
-                        }
-                    });
+                        },
+                    );
                     file_menu_rows(card);
                     card.row("Tips", "did you know hints help first time", |ui| {
                         self.tips_ui(ui);
@@ -537,15 +587,23 @@ impl Settings {
                             "appimage desktop entry launcher",
                             |ui| {
                                 if crate::desktop_entry::installed() {
-                                    if ui.button("Remove gitcraft").clicked() {
+                                    if ui
+                                        .button(crate::i18n::text(
+                                            "interaction-settings-remove-app",
+                                        ))
+                                        .clicked()
+                                    {
                                         let _ = crate::desktop_entry::uninstall();
                                     }
-                                } else if ui.button("Add gitcraft").clicked() {
+                                } else if ui
+                                    .button(crate::i18n::text("interaction-settings-add-app"))
+                                    .clicked()
+                                {
                                     let _ = crate::desktop_entry::install(&appimage);
                                 }
                                 layout::note(
                                     ui,
-                                    "Starts this AppImage; follows it when you replace it",
+                                    crate::i18n::text("interaction-settings-appimage-note"),
                                 );
                             },
                         );
@@ -567,16 +625,18 @@ impl Settings {
                             if ui
                                 .add_enabled(
                                     !checking && !pinned,
-                                    egui::Button::new("Check for updates"),
+                                    egui::Button::new(crate::i18n::text(
+                                        "interaction-settings-check-updates",
+                                    )),
                                 )
-                                .on_hover_text(format!(
-                                    "Looks on GitHub for a newer version on the {} channel",
-                                    self.update_channel.label()
+                                .on_hover_text(crate::i18n::message(
+                                    "interaction-settings-update-channel",
+                                    &[("channel", self.update_channel.label().into())],
                                 ))
                                 .on_disabled_hover_text(if pinned {
-                                    "Pinned to this version: unpin it to look for updates"
+                                    crate::i18n::text("interaction-settings-pinned-tip")
                                 } else {
-                                    "Looking…"
+                                    crate::i18n::text("interaction-settings-looking")
                                 })
                                 .clicked()
                             {
@@ -586,15 +646,22 @@ impl Settings {
                                 UpdateCheck::NotYet => {}
                                 UpdateCheck::Checking => {
                                     ui.add(crate::spinner::Spinner::new());
-                                    layout::note(ui, "Looking…");
+                                    layout::note(
+                                        ui,
+                                        crate::i18n::text("interaction-settings-looking"),
+                                    );
                                 }
                                 UpdateCheck::UpToDate => {
-                                    layout::note(ui, "This is the newest version");
+                                    layout::note(
+                                        ui,
+                                        crate::i18n::text("interaction-settings-newest"),
+                                    );
                                 }
                                 UpdateCheck::Found(version) => {
                                     ui.label(
-                                        RichText::new(format!(
-                                            "gitcraft {version} is out: see the bar at the top"
+                                        RichText::new(crate::i18n::message(
+                                            "interaction-settings-update-found",
+                                            &[("version", version.as_str().into())],
                                         ))
                                         .color(t.success)
                                         .small(),
@@ -612,12 +679,12 @@ impl Settings {
                     card.row("New versions", "check download github restart", |ui| {
                         ui.checkbox(
                             &mut self.check_updates,
-                            "Look for a new version on GitHub on every start",
+                            crate::i18n::text("interaction-settings-updates-start"),
                         );
                         ui.add_enabled_ui(self.check_updates, |ui| {
                             ui.checkbox(
                                 &mut self.download_updates,
-                                "Download it in the background, ready to install with a restart",
+                                crate::i18n::text("interaction-settings-updates-download"),
                             );
                         });
                     });
@@ -644,7 +711,7 @@ impl Settings {
                     ui,
                     f,
                     "Theme",
-                    Some("Each profile has its own theme; the accent and corners are for all."),
+                    Some(crate::i18n::text("interaction-settings-theme-scope")),
                     |card| self.themes_ui(card, f, view),
                 );
                 section(ui, f, "Appearance", None, |card| {
@@ -673,8 +740,13 @@ impl Settings {
                     });
                     if cfg!(any(windows, target_os = "macos")) {
                         card.row("Title bar", "window frame caption native tabs", |ui| {
-                            ui.checkbox(&mut self.tabs_in_title_bar, "Tabs in the title bar")
-                                .on_hover_text("The tabs take the place of the system's title bar, as in a browser: drag the space next to them to move the window, double-click it to maximize, and the buttons to minimize, maximize and close are at the end of the strip.");
+                            ui.checkbox(
+                                &mut self.tabs_in_title_bar,
+                                crate::i18n::text("interaction-settings-tabs-title"),
+                            )
+                            .on_hover_text(crate::i18n::text(
+                                "interaction-settings-tabs-title-tip",
+                            ));
                         });
                     }
                     for button in crate::app_buttons::AppButton::ALL {
@@ -683,7 +755,7 @@ impl Settings {
                             let layout = self.button_layout.normalized();
                             let was = layout.place_of(button);
                             let mut place = was;
-                            egui::ComboBox::from_id_salt(("settings-button-place", button.label()))
+                            egui::ComboBox::from_id_salt(("settings-button-place", button))
                                 .width(layout::fit(ui, COMBO_WIDTH))
                                 .selected_text(place.label())
                                 .show_ui(ui, |ui| {
@@ -692,11 +764,9 @@ impl Settings {
                                     }
                                 })
                                 .response
-                                .on_hover_text(
-                                    "Where its button sits: in the title bar, or in the footer \
-                                     of a repository's left or right panel. Drag the button \
-                                     itself to put it anywhere along them.",
-                                );
+                                .on_hover_text(crate::i18n::text(
+                                    "interaction-settings-button-place",
+                                ));
                             if place != was {
                                 self.button_layout = layout.moved(button, place, usize::MAX);
                             }
@@ -707,37 +777,59 @@ impl Settings {
                         "Code colours",
                         "vs code vscode theme syntax highlighting colors",
                         |ui| {
-                            ui.checkbox(&mut self.vscode_colors, "Use VS Code's colour theme")
-                                .on_hover_text(
-                                    "Colours code in diffs and blame like your editor does",
-                                );
+                            ui.checkbox(
+                                &mut self.vscode_colors,
+                                crate::i18n::text("interaction-settings-vscode-use"),
+                            )
+                            .on_hover_text(crate::i18n::text("interaction-settings-vscode-tip"));
                             if self.vscode_colors {
                                 let note = match crate::vscode_theme::current() {
                                     Some(found) if found.dark == t.dark() => found.name.clone(),
-                                    Some(found) => format!(
-                                        "{} is {}: gitcraft's colours meanwhile",
-                                        found.name,
-                                        if found.dark { "dark" } else { "light" }
+                                    Some(found) => crate::i18n::message(
+                                        if found.dark {
+                                            "interaction-settings-vscode-dark"
+                                        } else {
+                                            "interaction-settings-vscode-light"
+                                        },
+                                        &[("theme", found.name.as_str().into())],
                                     ),
-                                    None => "No VS Code theme found".to_owned(),
+                                    None => {
+                                        crate::i18n::text("interaction-settings-vscode-missing")
+                                            .to_owned()
+                                    }
                                 };
                                 indented_note(ui, note);
                             }
                         },
                     );
                     card.preview(Preview::Avatars);
-                    card.row("Avatars", "github gitlab forgejo gitea forge gravatar pictures authors", |ui| {
-                        ui.checkbox(&mut self.avatars, "Load from the forge or Gravatar")
-                            .on_hover_text("On a GitHub, Forgejo or Gitea repository, its commit list says which account each author is; on GitLab, the host is asked by email. Other authors: an MD5 hash of the email goes to gravatar.com. Cached on disk.");
-                    });
+                    card.row(
+                        "Avatars",
+                        "github gitlab forgejo gitea forge gravatar pictures authors",
+                        |ui| {
+                            ui.checkbox(
+                                &mut self.avatars,
+                                crate::i18n::text("interaction-settings-avatars-load"),
+                            )
+                            .on_hover_text(crate::i18n::text("interaction-settings-avatars-tip"));
+                        },
+                    );
                 });
                 section(ui, f, "Diffs and files", None, |card| {
                     card.preview(Preview::DiffLayout);
                     card.row("Diff layout", "unified split side by side columns", |ui| {
                         ui.horizontal_wrapped(|ui| {
                             ui.spacing_mut().item_spacing.x = 18.0;
-                            ui.radio_value(&mut self.diff_split, false, "Unified");
-                            ui.radio_value(&mut self.diff_split, true, "Side by side");
+                            ui.radio_value(
+                                &mut self.diff_split,
+                                false,
+                                crate::i18n::text("interaction-settings-unified"),
+                            );
+                            ui.radio_value(
+                                &mut self.diff_split,
+                                true,
+                                crate::i18n::text("interaction-settings-side-by-side"),
+                            );
                         });
                     });
                     card.preview(Preview::DiffContext);
@@ -750,9 +842,13 @@ impl Settings {
                                 ui.radio_value(
                                     &mut self.diff_whole_file,
                                     false,
-                                    "Around the changes",
+                                    crate::i18n::text("interaction-settings-around-changes"),
                                 );
-                                ui.radio_value(&mut self.diff_whole_file, true, "The whole file");
+                                ui.radio_value(
+                                    &mut self.diff_whole_file,
+                                    true,
+                                    crate::i18n::text("interaction-settings-whole-file"),
+                                );
                             });
                         },
                     );
@@ -760,25 +856,48 @@ impl Settings {
                     card.row("Changed files", "tree folders list flat", |ui| {
                         ui.horizontal_wrapped(|ui| {
                             ui.spacing_mut().item_spacing.x = 18.0;
-                            ui.radio_value(&mut self.files_as_tree, true, "In folders");
-                            ui.radio_value(&mut self.files_as_tree, false, "One list");
+                            ui.radio_value(
+                                &mut self.files_as_tree,
+                                true,
+                                crate::i18n::text("interaction-settings-folders"),
+                            );
+                            ui.radio_value(
+                                &mut self.files_as_tree,
+                                false,
+                                crate::i18n::text("interaction-settings-one-list"),
+                            );
                         });
                     });
                 });
             }
             Page::Graph => {
                 section(ui, f, "Graph feedback", None, |card| {
-                    card.row("Explanatory motion", "fetch incoming refs scroll reduced motion", |ui| { ui.checkbox(&mut self.graph_motion,"Short ref transitions and smooth navigation"); ui.small("Respects system reduced motion. Incoming markers remain readable without animation."); });
+                    card.row(
+                        "Explanatory motion",
+                        "fetch incoming refs scroll reduced motion",
+                        |ui| {
+                            ui.checkbox(
+                                &mut self.graph_motion,
+                                crate::i18n::text("interaction-settings-ref-transitions"),
+                            );
+                            ui.small(crate::i18n::text(
+                                "interaction-settings-reduced-motion-note",
+                            ));
+                        },
+                    );
                 });
                 section(ui, f, "Commit graph", None, |card| {
                     card.row(
                         "Topology navigation",
                         "accessibility audio lanes graph parent child",
                         |ui| {
-                            ui.checkbox(&mut self.graph_lane_walk, "Walk graph topology");
+                            ui.checkbox(
+                                &mut self.graph_lane_walk,
+                                crate::i18n::text("interaction-settings-walk-topology"),
+                            );
                             ui.checkbox(
                                 &mut self.graph_sounds,
-                                "Soft sounds for merges and lane crossings",
+                                crate::i18n::text("interaction-settings-graph-sounds"),
                             );
                         },
                     );
@@ -792,6 +911,8 @@ impl Settings {
                                     crate::repo::columns::MIN_REFS_W..=2000.0,
                                 )
                                 .step_by(10.0)
+                                .custom_formatter(|value, _| crate::i18n::number(value))
+                                .custom_parser(parse_localized_number)
                                 .suffix(" px"),
                             ))
                             .changed()
@@ -799,7 +920,10 @@ impl Settings {
                             self.auto_refs_width = false;
                         }
                         let mut fit = self.fit_visible_refs();
-                        if ui.checkbox(&mut fit, "Fit visible refs").changed() {
+                        if ui
+                            .checkbox(&mut fit, crate::i18n::text("interaction-settings-fit-refs"))
+                            .changed()
+                        {
                             self.auto_refs_width = fit;
                             if fit {
                                 self.refs_width = DEFAULT_REFS_WIDTH;
@@ -816,12 +940,12 @@ impl Settings {
                                 ui.radio_value(
                                     &mut self.branch_names_keep_end,
                                     true,
-                                    "Keep end (…xyz)",
+                                    crate::i18n::text("interaction-settings-keep-end"),
                                 );
                                 ui.radio_value(
                                     &mut self.branch_names_keep_end,
                                     false,
-                                    "Keep start (xyz…)",
+                                    crate::i18n::text("interaction-settings-keep-start"),
                                 );
                             });
                         },
@@ -829,30 +953,54 @@ impl Settings {
                     card.preview(Preview::GraphColumns);
                     card.row_hint(
                         "Columns",
-                        "Or right-click the graph's header",
+                        crate::i18n::text("interaction-settings-columns-tip"),
                         "author when date hash tests show",
                         |ui| {
                             ui.horizontal_wrapped(|ui| {
                                 ui.spacing_mut().item_spacing.x = 18.0;
-                                ui.checkbox(&mut self.show_author, "Author");
-                                ui.checkbox(&mut self.show_when, "When");
-                                ui.checkbox(&mut self.show_date, "Date");
-                                ui.checkbox(&mut self.show_hash, "Hash");
-                                ui.checkbox(&mut self.show_test_lane, "Tests");
+                                ui.checkbox(
+                                    &mut self.show_author,
+                                    crate::i18n::text("interaction-settings-author"),
+                                );
+                                ui.checkbox(
+                                    &mut self.show_when,
+                                    crate::i18n::text("interaction-settings-when"),
+                                );
+                                ui.checkbox(
+                                    &mut self.show_date,
+                                    crate::i18n::text("interaction-settings-date"),
+                                );
+                                ui.checkbox(
+                                    &mut self.show_hash,
+                                    crate::i18n::text("interaction-settings-hash"),
+                                );
+                                ui.checkbox(
+                                    &mut self.show_test_lane,
+                                    crate::i18n::text("interaction-settings-tests"),
+                                );
                             });
                         },
                     );
                     card.row("Diffs", "diff split below beside graph", |ui| {
-                        ui.checkbox(&mut self.diff_beside_graph, "Show diffs below the graph")
-                            .on_hover_text("A diff of a commit or of the working tree opens below the graph instead of in its place; the button in a diff's header switches it too.");
+                        ui.checkbox(
+                            &mut self.diff_beside_graph,
+                            crate::i18n::text("interaction-settings-diff-below"),
+                        )
+                        .on_hover_text(crate::i18n::text("interaction-settings-diff-below-tip"));
                     });
                     card.preview(Preview::GraphLanes);
                     card.row("Lanes", "compact graph narrow", |ui| {
                         let mut compact = self.compact_graph;
-                        if ui.checkbox(&mut compact, "Compact graph").changed() {
+                        if ui
+                            .checkbox(
+                                &mut compact,
+                                crate::i18n::text("interaction-settings-compact"),
+                            )
+                            .changed()
+                        {
                             self.set_compact_graph(compact);
                         }
-                        indented_note(ui, COMPACT_TIP);
+                        indented_note(ui, compact_tip());
                     });
                     card.preview(Preview::LaneColors);
                     card.row(
@@ -885,25 +1033,36 @@ impl Settings {
                                 ui.add(
                                     egui::DragValue::new(&mut self.auto_fetch_minutes)
                                         .range(0..=240)
+                                        .custom_formatter(|value, _| crate::i18n::number(value))
+                                        .custom_parser(parse_localized_number)
                                         .suffix(" min"),
                                 );
-                                layout::note(ui, "0 turns it off");
+                                layout::note(
+                                    ui,
+                                    crate::i18n::text("interaction-settings-fetch-off"),
+                                );
                             });
                         },
                     );
                     card.preview(Preview::Pull);
                     card.row("Offline", "offline metered network data roaming", |ui| {
-                        ui.checkbox(&mut self.offline, "Offline mode")
-                            .on_hover_text(OFFLINE_TIP);
+                        ui.checkbox(
+                            &mut self.offline,
+                            crate::i18n::text("interaction-settings-offline"),
+                        )
+                        .on_hover_text(crate::i18n::text("interaction-settings-offline-tip"));
                         ui.checkbox(
                             &mut self.pause_on_metered,
-                            "Pause background work on a metered connection",
+                            crate::i18n::text("interaction-settings-metered"),
                         )
-                        .on_hover_text(METERED_TIP);
+                        .on_hover_text(crate::i18n::text("interaction-settings-metered-tip"));
                         if let Some(pause) = crate::network::background_paused() {
                             indented_note(
                                 ui,
-                                format!("{}: background work is paused.", pause.why()),
+                                crate::i18n::message(
+                                    "interaction-settings-network-paused",
+                                    &[("reason", pause.why().into())],
+                                ),
                             );
                         }
                     });
@@ -918,12 +1077,11 @@ impl Settings {
                             });
                     });
                     card.row("Submodules", "update recursive", |ui| {
-                        ui.checkbox(&mut self.keep_submodules, "Keep submodules up to date")
-                            .on_hover_text(
-                                "After a checkout, pull, merge or rebase in a repository with \
-                                 submodules, run git submodule update --init --recursive, so \
-                                 each one is at the commit the repository now records.",
-                            );
+                        ui.checkbox(
+                            &mut self.keep_submodules,
+                            crate::i18n::text("interaction-settings-submodules-update"),
+                        )
+                        .on_hover_text(crate::i18n::text("interaction-settings-submodules-tip"));
                     });
                     card.row(
                         "Stale branches",
@@ -933,20 +1091,21 @@ impl Settings {
                                 ui.add(
                                     egui::DragValue::new(&mut self.stale_branch_days)
                                         .range(0..=3650)
-                                        .suffix(" days"),
+                                        .custom_formatter(|value, _| crate::i18n::number(value))
+                                        .custom_parser(parse_localized_number)
+                                        .suffix(crate::i18n::text("interaction-settings-days")),
                                 )
-                                .on_hover_text(
-                                    "A local branch with no commit for this long is marked \
-                                     Stale in the sidebar and offered by Select stale or \
-                                     merged branches…",
+                                .on_hover_text(crate::i18n::text("interaction-settings-stale-tip"));
+                                layout::note(
+                                    ui,
+                                    crate::i18n::text("interaction-settings-stale-off"),
                                 );
-                                layout::note(ui, "0 marks none");
                             });
                         },
                     );
                     card.row_hint(
                         "Editor command",
-                        "Opens a folder or file",
+                        crate::i18n::text("interaction-settings-editor-hint"),
                         "code vs code subl idea open",
                         |ui| {
                             ui.add(
@@ -954,7 +1113,7 @@ impl Settings {
                                     .hint_text("code")
                                     .desired_width(layout::fit(ui, FIELD_WIDTH)),
                             )
-                            .on_hover_text("Run with a folder or file path, e.g. code, subl, idea");
+                            .on_hover_text(crate::i18n::text("interaction-settings-editor-tip"));
                         },
                     );
                 });
@@ -970,14 +1129,14 @@ impl Settings {
                     ui,
                     f,
                     "Mergiraf",
-                    Some("Solves merge conflicts from the syntax of the code."),
+                    Some(crate::i18n::text("interaction-settings-mergiraf-intro")),
                     |card| self.mergiraf_ui(card),
                 );
                 section(
                     ui,
                     f,
                     "Git file tools",
-                    Some("Use gitcraft as Git's difftool and mergetool."),
+                    Some(crate::i18n::text("interaction-settings-git-tools-intro")),
                     |card| {
                         card.row(
                             "Register gitcraft",
@@ -990,26 +1149,23 @@ impl Settings {
                     ui,
                     f,
                     "Remote machines",
-                    Some(
-                        "Repositories in WSL or over SSH run git there, with that machine's own \
-                         git config: the settings above that write this machine's global git \
-                         config, and a profile's author and signing, don't reach it.",
-                    ),
+                    Some(crate::i18n::text("interaction-settings-remote-intro")),
                     |card| {
                         card.row_hint(
                             "SSH sign-ins",
-                            "Kept with \"Remember connection\"",
+                            crate::i18n::text("interaction-settings-remember-hint"),
                             "ssh password passphrase forget saved credential keyring wsl remote",
                             |ui| {
                                 ui.horizontal_wrapped(|ui| {
                                     // The system's store can take a while (the Secret Service
                                     // is another process): not on the window's thread.
                                     if ui
-                                        .button("Forget saved sign-ins")
-                                        .on_hover_text(
-                                            "Takes every SSH password and passphrase gitcraft \
-                                             saved out of the system's credential store",
-                                        )
+                                        .button(crate::i18n::text(
+                                            "interaction-settings-forget-logins",
+                                        ))
+                                        .on_hover_text(crate::i18n::text(
+                                            "interaction-settings-forget-tip",
+                                        ))
                                         .clicked()
                                     {
                                         std::thread::spawn(crate::remote::askpass::forget_saved);
@@ -1035,7 +1191,9 @@ impl Settings {
                             .iter()
                             .find(|s| s.program == self.shell)
                             .map(|s| s.label.clone())
-                            .unwrap_or_else(|| "System default".to_owned());
+                            .unwrap_or_else(|| {
+                                crate::i18n::text("interaction-settings-system-default").to_owned()
+                            });
                         egui::ComboBox::from_id_salt("settings-shell")
                             .width(layout::fit(ui, COMBO_WIDTH))
                             .selected_text(current)
@@ -1043,7 +1201,7 @@ impl Settings {
                                 ui.selectable_value(
                                     &mut self.shell,
                                     String::new(),
-                                    "System default",
+                                    crate::i18n::text("interaction-settings-system-default"),
                                 );
                                 for s in &shells {
                                     ui.selectable_value(
@@ -1061,6 +1219,8 @@ impl Settings {
                             egui::Slider::new(&mut self.terminal_font, 9.0..=20.0)
                                 .step_by(0.5)
                                 .max_decimals(1)
+                                .custom_formatter(|value, _| crate::i18n::number(value))
+                                .custom_parser(parse_localized_number)
                                 .suffix(" pt"),
                         ));
                     });
@@ -1071,11 +1231,7 @@ impl Settings {
                     ui,
                     f,
                     "Identities",
-                    Some(
-                        "Name and email pairs you can apply to a repository from its commit box. \
-                         That sets them in the repository's own config, where they win over the \
-                         profile's author.",
-                    ),
+                    Some(crate::i18n::text("interaction-settings-identities-intro")),
                     |card| {
                         let mut remove = None;
                         for (i, p) in self.identities.iter_mut().enumerate() {
@@ -1086,12 +1242,16 @@ impl Settings {
                                     let room = ui.available_width() - 60.0;
                                     ui.add(
                                         layout::field(&mut p.label)
-                                            .hint_text("Work")
+                                            .hint_text(crate::i18n::text(
+                                                "interaction-settings-work-hint",
+                                            ))
                                             .desired_width((room * 0.2).min(110.0)),
                                     );
                                     ui.add(
                                         layout::field(&mut p.name)
-                                            .hint_text("Name")
+                                            .hint_text(crate::i18n::text(
+                                                "interaction-settings-name-hint",
+                                            ))
                                             .desired_width((room * 0.32).min(170.0)),
                                     );
                                     // The email takes what is left, the remove button at the end.
@@ -1101,7 +1261,13 @@ impl Settings {
                                             .hint_text("email@example.com")
                                             .desired_width(rest),
                                     );
-                                    if crate::icons::small_button(ui, "x", "Remove").clicked() {
+                                    if crate::icons::small_button(
+                                        ui,
+                                        "x",
+                                        crate::i18n::text("interaction-settings-remove"),
+                                    )
+                                    .clicked()
+                                    {
                                         remove = Some(i);
                                     }
                                 });
@@ -1112,11 +1278,17 @@ impl Settings {
                         }
                         card.full("add new name email user profile", |ui| {
                             ui.horizontal(|ui| {
-                                if ui.button("Add identity").clicked() {
+                                if ui
+                                    .button(crate::i18n::text("interaction-settings-add-identity"))
+                                    .clicked()
+                                {
                                     self.identities.push(SavedIdentity::default());
                                 }
                                 if self.identities.is_empty() {
-                                    layout::note(ui, "None yet");
+                                    layout::note(
+                                        ui,
+                                        crate::i18n::text("interaction-settings-none-yet"),
+                                    );
                                 }
                             });
                         });
@@ -1130,6 +1302,35 @@ impl Settings {
             }
         }
     }
+}
+
+/// Parse the editable numbers we format for the selected locale. Without the matching
+/// parser, egui would read German "2.000" as two rather than two thousand.
+fn parse_localized_number(input: &str) -> Option<f64> {
+    let (group, decimal) = match crate::i18n::language() {
+        crate::i18n::Language::English => (',', '.'),
+        crate::i18n::Language::German => ('.', ','),
+    };
+    let input = input.trim();
+    let mut parts = input.split(decimal);
+    let integer = parts.next()?;
+    let fraction = parts.next();
+    if parts.next().is_some() || fraction.is_some_and(|s| s.contains(group)) {
+        return None;
+    }
+    let unsigned = integer.strip_prefix(['-', '+']).unwrap_or(integer);
+    let groups: Vec<_> = unsigned.split(group).collect();
+    if groups.len() > 1
+        && (groups[0].is_empty() || groups[0].len() > 3 || groups[1..].iter().any(|s| s.len() != 3))
+    {
+        return None;
+    }
+    let value = input
+        .replace(group, "")
+        .replace(decimal, ".")
+        .parse::<f64>()
+        .ok()?;
+    value.is_finite().then_some(value)
 }
 
 /// Where the look for a newer version stands, as the settings page shows it.
@@ -1153,18 +1354,24 @@ fn rollback_rows(card: &mut Card, view: &mut SettingsView) {
     if let Some(version) = view.previous.clone() {
         let (button, tip) = if view.previous_is_newer {
             (
-                format!("Go forward to {version}"),
-                format!(
-                    "Restarts as gitcraft {version}, the newer version kept when you went back; \
-                     the open tabs stay, and updates are offered again."
+                crate::i18n::message(
+                    "interaction-settings-forward",
+                    &[("version", version.as_str().into())],
+                ),
+                crate::i18n::message(
+                    "interaction-settings-forward-tip",
+                    &[("version", version.as_str().into())],
                 ),
             )
         } else {
             (
-                format!("Go back to {version}"),
-                format!(
-                    "Restarts as {version}, kept by the last update; the open tabs stay. No \
-                     update is offered until you unpin it."
+                crate::i18n::message(
+                    "interaction-settings-back",
+                    &[("version", version.as_str().into())],
+                ),
+                crate::i18n::message(
+                    "interaction-settings-back-tip",
+                    &[("version", version.as_str().into())],
                 ),
             )
         };
@@ -1184,10 +1391,13 @@ fn rollback_rows(card: &mut Card, view: &mut SettingsView) {
         let pinned = view.pinned.clone();
         card.row("Pinned", "pin stay version unpin", |ui| {
             ui.horizontal_wrapped(|ui| {
-                ui.label(format!("Staying on gitcraft {pinned}"));
+                ui.label(crate::i18n::message(
+                    "interaction-settings-staying",
+                    &[("version", pinned.as_str().into())],
+                ));
                 if ui
-                    .button("Unpin")
-                    .on_hover_text("Look for new versions again, as the update settings say")
+                    .button(crate::i18n::text("interaction-settings-unpin"))
+                    .on_hover_text(crate::i18n::text("interaction-settings-unpin-tip"))
                     .clicked()
                 {
                     view.unpin = true;

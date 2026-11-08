@@ -22,8 +22,7 @@ pub(super) fn file_menu_rows(card: &mut Card) {
         menus.push(Menu {
             label: "Finder",
             keywords: "finder quick action services history blame menu files",
-            note: "History in gitcraft and Blame in gitcraft under Quick Actions in Finder's menu \
-                   of files. They may show only after you log in again.",
+            note: crate::i18n::text("interaction-settings-finder-note"),
             installed: crate::finder_actions::installed,
             install: Box::new(crate::finder_actions::install),
             uninstall: crate::finder_actions::uninstall,
@@ -33,8 +32,7 @@ pub(super) fn file_menu_rows(card: &mut Card) {
         menus.push(Menu {
             label: "Files (GNOME)",
             keywords: "nautilus files gnome scripts history blame menu",
-            note: "History in gitcraft and Blame in gitcraft under Scripts in the Files menu of \
-                   files. Dolphin has them from the .deb and .rpm packages.",
+            note: crate::i18n::text("interaction-settings-files-note"),
             installed: crate::nautilus_scripts::installed,
             install: Box::new(move || crate::nautilus_scripts::install(&program)),
             uninstall: crate::nautilus_scripts::uninstall,
@@ -48,11 +46,11 @@ pub(super) fn file_menu_rows(card: &mut Card) {
 fn menu_row(ui: &mut Ui, menu: &Menu) {
     let error_id = egui::Id::new(("settings-file-menu-error", menu.label));
     let result = if (menu.installed)() {
-        ui.button("Remove History and Blame")
+        ui.button(crate::i18n::text("interaction-settings-remove-file-menu"))
             .clicked()
             .then(|| (menu.uninstall)())
     } else {
-        ui.button("Add History and Blame")
+        ui.button(crate::i18n::text("interaction-settings-add-file-menu"))
             .clicked()
             .then(|| (menu.install)())
     };
@@ -67,9 +65,12 @@ fn menu_row(ui: &mut Ui, menu: &Menu) {
     if let Some(e) = ui.data(|d| d.get_temp::<String>(error_id)) {
         let t = Tokens::get(ui.ctx());
         ui.label(
-            RichText::new(format!("Couldn't change it: {e}"))
-                .color(t.danger)
-                .small(),
+            RichText::new(crate::i18n::message(
+                "interaction-settings-file-menu-error",
+                &[("error", e.as_str().into())],
+            ))
+            .color(t.danger)
+            .small(),
         );
     }
 }

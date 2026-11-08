@@ -17,10 +17,7 @@ impl Settings {
             Mode::Portable(dir) => (
                 dir.display().to_string(),
                 t.text_dim,
-                Some(
-                    "Settings, open tabs, profiles and their git config files, the avatar \
-                     cache, downloaded updates and Mergiraf are kept here, next to gitcraft.",
-                ),
+                Some(crate::i18n::text("interaction-settings-portable-folder")),
             ),
         };
         section(ui, f, "Portable mode", None, |card| {
@@ -41,13 +38,11 @@ impl Settings {
             |ui| {
                 ui.checkbox(
                     &mut self.portable_credential_store,
-                    "Remember SSH sign-ins in this computer's credential store",
+                    crate::i18n::text("interaction-settings-portable-credentials"),
                 );
                 indented_note(
                     ui,
-                    "Off: SSH passwords and passphrases are asked again after a restart. Those \
-                     already saved stay until you forget them (Forget saved SSH sign-ins, with \
-                     this on).",
+                    crate::i18n::text("interaction-settings-portable-credentials-note"),
                 );
             },
         );
