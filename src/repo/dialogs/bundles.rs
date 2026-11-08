@@ -222,7 +222,7 @@ impl Form {
             if let Some(error) = &self.error { ui.colored_label(t.danger, error); }
             if self.active.is_some() {
                 ui.add(crate::spinner::Spinner::new());
-                if ui.button("Stop").clicked() { if let Some(token) = &self.active { token.cancel(); } }
+                if ui.button("Stop").clicked() && let Some(token) = &self.active { token.cancel(); }
             } else if self.imported.is_empty() {
                 ui.add_enabled_ui(supported && mapping.is_ok(), |ui| {
                     ui.checkbox(&mut self.consent, "Allow private quarantine creation and contained pack verification on the repository machine");
@@ -354,7 +354,7 @@ mod tests {
 mod recording_import_ui_tests {
     use super::*;
     #[test]
-    fn confirmation_is_explicit_and_late_owned_cleanup_errors_survive_stop() {
+    fn confirmation_is_explicit_and_late_owned_cleanup_errors_survive_stop() -> Result<(), String> {
         let oid = "a".repeat(40);
         let bytes = format!("# v2 git bundle\n{oid} refs/heads/main\n\nPACK").into_bytes();
         let preview = BundlePreview {
@@ -375,7 +375,7 @@ mod recording_import_ui_tests {
             preview,
         );
         let super::super::Dialog::BundleIncoming(mut form) = dialog else {
-            panic!("wrong dialog")
+            return Err("wrong dialog".into());
         };
         assert!(!form.consent && !form.confirm && !form.verified && form.active.is_none());
         let token = form.scope.0.child();
@@ -386,13 +386,12 @@ mod recording_import_ui_tests {
                 true,
                 Err("cancelled; owned cleanup unconfirmed; ledger retained".into()),
             ))
-            .unwrap();
+            .map_err(|error| error.to_string())?;
         form.receive();
         assert!(
             form.error
                 .as_deref()
-                .unwrap()
-                .contains("owned cleanup unconfirmed")
+                .is_some_and(|error| error.contains("owned cleanup unconfirmed"))
         );
         assert!(form.active.is_none() && form.imported.is_empty() && !form.confirm);
         let ctx = egui::Context::default();
@@ -409,5 +408,6 @@ mod recording_import_ui_tests {
         output.textures_delta.clear();
         assert!(form.active.is_none(), "rendering must not submit a job");
         assert!(!form.consent && !form.confirm && !form.verified);
+        Ok(())
     }
 }
