@@ -312,7 +312,10 @@ mod fluent_approval_note_tests {
             let shown = h.state().clone().for_display();
             let painted = shown.preview.as_ref().unwrap();
             for note in &painted.notes {
-                h.get_by_label(note);
+                assert_eq!(
+                    h.get_all_by_label(note).len(),
+                    painted.notes.iter().filter(|value| *value == note).count()
+                );
             }
             assert_eq!(h.state(), &retained);
             assert_eq!(h.state().preview.as_ref(), Some(&raw));
