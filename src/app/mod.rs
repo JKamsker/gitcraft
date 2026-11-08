@@ -615,6 +615,15 @@ impl App {
             {
                 allowed.push(keymap::Command::Commit);
             }
+            if self.palette.is_none()
+                && !self.manual_open
+                && !self.window_has_dialog()
+                && !self.askpass_open()
+                && let Some(Tab::Repo(repo)) = self.tabs.get(self.active)
+                && repo.search_shortcut_exception(ctx)
+            {
+                allowed.push(keymap::Command::Search);
+            }
             Some(allowed)
         } else {
             None
@@ -679,25 +688,8 @@ impl App {
             Command::GoToTab(place) => self.go_to_tab(usize::from(place)),
             Command::LastTab => self.go_to_last_tab(),
             Command::Reload => return true,
-            // A repository tab's keys are its own.
-            Command::Fetch
-            | Command::Pull
-            | Command::Push
-            | Command::Stash
-            | Command::NewBranch
-            | Command::Terminal
-            | Command::StageAll
-            | Command::Commit
-            | Command::FocusSidebar
-            | Command::FocusGraph
-            | Command::FocusDetail
-            | Command::FileNext
-            | Command::FilePrevious
-            | Command::FileToggleStage
-            | Command::FileOpen
-            | Command::HunkStage
-            | Command::HunkUnstage
-            | Command::HunkDiscard => {}
+            // Contextual actions are delivered by their owning view.
+            _ => {}
         }
         false
     }

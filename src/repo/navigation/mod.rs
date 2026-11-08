@@ -3,7 +3,7 @@
 //! area shows is noted after each frame; going back or forward shows a place again through the
 //! same actions that opened it.
 
-use egui::{Key, PointerButton, Ui};
+use egui::{PointerButton, Ui};
 
 use super::nav_history::NavHistory;
 use super::{Action, DiffKey, RepoTab, WIP_HASH, file_view, short};
@@ -123,16 +123,21 @@ pub(super) fn record(history: &mut NavHistory<View>, view: View, jump: bool) {
     }
 }
 
-/// Alt+← or the mouse's back button (`-1`), Alt+→ or its forward button (`1`). `keys`: the
-/// keyboard is free (no text field has it), else only the mouse buttons count, as Alt+← and
-/// Alt+→ move by words in a text field.
-pub(super) fn nav_step(i: &egui::InputState, keys: bool) -> Option<i32> {
-    let alt = keys && i.modifiers.alt && !i.modifiers.command && !i.modifiers.shift;
-    if (alt && i.key_pressed(Key::ArrowLeft)) || i.pointer.button_pressed(PointerButton::Extra1) {
+/// Mouse navigation remains available while a text editor owns its keyboard shortcuts.
+pub(super) fn nav_step(i: &egui::InputState) -> Option<i32> {
+    if i.pointer.button_pressed(PointerButton::Extra1) {
         Some(-1)
-    } else if (alt && i.key_pressed(Key::ArrowRight))
-        || i.pointer.button_pressed(PointerButton::Extra2)
-    {
+    } else if i.pointer.button_pressed(PointerButton::Extra2) {
+        Some(1)
+    } else {
+        None
+    }
+}
+
+pub(super) fn keyboard_step(ctx: &egui::Context, free: bool) -> Option<i32> {
+    if free && crate::keymap::take(ctx, crate::keymap::Command::Back) {
+        Some(-1)
+    } else if free && crate::keymap::take(ctx, crate::keymap::Command::Forward) {
         Some(1)
     } else {
         None
@@ -360,8 +365,8 @@ impl RepoTab {
         if self.dialog.is_some() || self.keys_blocked {
             return;
         }
-        let keys = !ctx.egui_wants_keyboard_input();
-        if let Some(step) = ctx.input(|i| nav_step(i, keys)) {
+        let keys = !ctx.egui_wants_keyboard_input() && !crate::a11y::keyboard_taken(ctx);
+        if let Some(step) = keyboard_step(ctx, keys).or_else(|| ctx.input(nav_step)) {
             acts.push(Action::Navigate(step));
         }
     }
@@ -370,10 +375,11 @@ impl RepoTab {
     /// toolbar is full at the window's narrowest.
     pub(super) fn nav_buttons(&self, ui: &mut Ui, acts: &mut Vec<Action>) {
         let graph_shown = self.diff_beside_graph(ui.ctx());
-        for (step, icon, name, keys) in [
-            (-1, "arrow-left", "Back", "Alt+←"),
-            (1, "arrow-right", "Forward", "Alt+→"),
+        for (step, icon, name, command) in [
+            (-1, "arrow-left", "Back", crate::keymap::Command::Back),
+            (1, "arrow-right", "Forward", crate::keymap::Command::Forward),
         ] {
+            let keys = crate::keymap::label(ui.ctx(), command);
             let target = self.nav.peek(step);
             let tip = match target {
                 Some(view) => format!("{name} to {} ({keys})", view.label(graph_shown)),

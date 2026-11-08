@@ -181,15 +181,34 @@ impl RepoTab {
         if panel == Panel::Terminal || self.dialog.is_some() || ctx.egui_wants_keyboard_input() {
             return;
         }
-        let (esc, undo, redo, reload) = ctx.input(|i| {
-            let cmd = i.modifiers.command;
-            (
-                i.key_pressed(Key::Escape),
-                cmd && !i.modifiers.shift && i.key_pressed(Key::Z),
-                cmd && (i.key_pressed(Key::Y) || (i.modifiers.shift && i.key_pressed(Key::Z))),
-                i.key_pressed(Key::F5),
-            )
-        });
+        use crate::keymap::{self, Command, Scope};
+        let mut allowed = vec![
+            Command::Undo,
+            Command::Redo,
+            Command::Timeline,
+            Command::Reload,
+        ];
+        let mut scopes = vec![Scope::Window, Scope::Repository];
+        if panel == Panel::Diff && self.view_open(panel) {
+            scopes.push(Scope::Changes);
+            allowed.extend([
+                Command::NextChange,
+                Command::PreviousChange,
+                Command::NextChangeAlt,
+                Command::PreviousChangeAlt,
+            ]);
+        }
+        keymap::owner(ctx, egui::Id::new((&self.path, panel)));
+        keymap::active(ctx, scopes);
+        keymap::restrict(ctx, Some(allowed));
+        let window_commands = keymap::pressed(ctx, Scope::Window);
+        let esc = ctx.input(|i| i.key_pressed(Key::Escape));
+        let undo = keymap::take(ctx, Command::Undo);
+        let redo = keymap::take(ctx, Command::Redo);
+        let reload = window_commands.contains(&Command::Reload);
+        if keymap::take(ctx, Command::Timeline) {
+            acts.push(Action::ToggleTimeline);
+        }
         let open = self.view_open(panel);
         match panel {
             Panel::Diff if open => {
@@ -198,8 +217,8 @@ impl RepoTab {
                 } else if esc {
                     acts.push(Action::CloseDiff);
                 }
-                if let Some(delta) = ctx.input(crate::repo::layout::change_step) {
-                    acts.push(Action::DiffStep(delta));
+                for command in keymap::pressed(ctx, Scope::Changes) {
+                    acts.push(Action::Key(command));
                 }
             }
             Panel::Pr if esc && open => acts.push(Action::ClosePr),
@@ -215,6 +234,7 @@ impl RepoTab {
         if reload {
             acts.push(Action::Reload);
         }
+        keymap::which_key(ctx, |command| self.command_refusal(command));
     }
 
     /// Carries out a pop-out button, the main window's hint or a palette entry.
@@ -398,4 +418,72 @@ pub(in crate::repo) fn button(ui: &mut Ui, panel: Panel, popped: bool, acts: &mu
 /// The close button's tooltip in a view's header: a popped-out view closes with its window.
 pub(in crate::repo) fn close_tip(popped: bool, docked_tip: &'static str) -> &'static str {
     if popped { "Close (Esc)" } else { docked_tip }
+}
+
+#[cfg(test)]
+mod registry_tests {
+    use super::*;
+    use crate::keymap::{self, Command, Scope, Stroke};
+
+    #[test]
+    fn actual_child_dispatch_uses_overrides_and_cancels_unrelated_commands() {
+        let ctx = egui::Context::default();
+        let mut tab = RepoTab::new_deferred("/recorded/panel-keys".into(), &ctx);
+        tab.diff = Some(crate::repo::DiffView::new(crate::repo::DiffKey::Commit {
+            hash: "recorded".into(),
+            path: "file".into(),
+        }));
+        let mut settings = crate::settings::Settings::default();
+        settings.key_bindings.insert(
+            Command::Undo.id().into(),
+            vec![Stroke::new(Key::F8, egui::Modifiers::NONE)],
+        );
+        settings.key_bindings.insert(
+            Command::NextChange.id().into(),
+            vec![Stroke::new(Key::F9, egui::Modifiers::NONE)],
+        );
+        settings.put_for_test(&ctx);
+        for (key, expected) in [
+            (Key::F8, Some(Command::Undo)),
+            (Key::F9, Some(Command::NextChange)),
+            (Key::F5, Some(Command::Reload)),
+            (Key::F7, None),
+        ] {
+            let mut acts = Vec::new();
+            ctx.run_ui(
+                egui::RawInput {
+                    events: vec![
+                        egui::Event::Key {
+                            key,
+                            physical_key: Some(key),
+                            pressed: true,
+                            repeat: false,
+                            modifiers: egui::Modifiers::NONE,
+                        },
+                        egui::Event::Key {
+                            key,
+                            physical_key: Some(key),
+                            pressed: false,
+                            repeat: false,
+                            modifiers: egui::Modifiers::NONE,
+                        },
+                    ],
+                    ..Default::default()
+                },
+                |_| tab.popout_keys(&ctx, Panel::Diff, &mut acts),
+            )
+            .drop_without_applying_deltas();
+            match expected {
+                Some(Command::Undo) => assert!(matches!(acts.as_slice(), [Action::Undo])),
+                Some(Command::Reload) => assert!(matches!(acts.as_slice(), [Action::Reload])),
+                Some(command) => {
+                    assert!(matches!(acts.as_slice(), [Action::Key(found)] if *found == command))
+                }
+                None => assert!(acts.is_empty()),
+            }
+        }
+        // A panel cannot consume a reconfigured window or remote-operation shortcut.
+        assert!(!keymap::queued(&ctx, Command::Fetch));
+        keymap::cancel(&ctx, Scope::Window);
+    }
 }

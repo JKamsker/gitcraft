@@ -398,7 +398,6 @@ pub(crate) const SHORTCUTS: &[(&str, &[(&str, &str)])] = &[
     (
         "Keyboard navigation",
         &[
-            ("Alt+← / Alt+→", "Back / forward through recent views"),
             (
                 "Mouse back / forward",
                 "Back / forward through recent views",
@@ -420,7 +419,6 @@ pub(crate) const SHORTCUTS: &[(&str, &[(&str, &str)])] = &[
         "Graph",
         &[
             ("↑ / ↓", "Previous / next commit"),
-            ("Cmd+F", "Search commits"),
             ("Enter / Shift+Enter", "Next / previous search result"),
             ("↑ / ↓ then Tab or Enter", "Pick a search suggestion"),
             ("Cmd+click", "Compare with the selected commit"),
@@ -460,17 +458,11 @@ pub(crate) const SHORTCUTS: &[(&str, &[(&str, &str)])] = &[
                 "Pick lines of a file to link to (View file, or File in a commit's diff)",
             ),
             ("Cmd+click a file", "Pick it to stash (or unpick it)"),
-            ("F7 / Shift+F7", "Next / previous change in a diff"),
-            ("Alt+↓ / Alt+↑", "Next / previous change in a diff"),
-            ("Cmd+Z", "Undo"),
-            ("Cmd+Y", "Redo"),
-            ("Cmd+Shift+Z", "Timeline and undo tree"),
         ],
     ),
     (
         "Find in a diff, file or blame",
         &[
-            ("Cmd+F", "Find in the diff, file or blame shown"),
             (
                 "Enter / Shift+Enter",
                 "Next / previous match (while the find bar is open)",

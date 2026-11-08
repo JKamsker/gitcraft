@@ -765,10 +765,30 @@ fn view_options(
 
 /// The previous and next change buttons, laid out right to left.
 fn change_steps(ui: &mut Ui, acts: &mut Vec<Action>) {
-    if icons::small_button(ui, "arrow-down", "Next change (F7, Alt+↓)").clicked() {
+    if icons::small_button(
+        ui,
+        "arrow-down",
+        &format!(
+            "Next change ({} / {})",
+            crate::keymap::label(ui.ctx(), crate::keymap::Command::NextChange),
+            crate::keymap::label(ui.ctx(), crate::keymap::Command::NextChangeAlt)
+        ),
+    )
+    .clicked()
+    {
         acts.push(Action::DiffStep(1));
     }
-    if icons::small_button(ui, "arrow-up", "Previous change (Shift+F7, Alt+↑)").clicked() {
+    if icons::small_button(
+        ui,
+        "arrow-up",
+        &format!(
+            "Previous change ({} / {})",
+            crate::keymap::label(ui.ctx(), crate::keymap::Command::PreviousChange),
+            crate::keymap::label(ui.ctx(), crate::keymap::Command::PreviousChangeAlt)
+        ),
+    )
+    .clicked()
+    {
         acts.push(Action::DiffStep(-1));
     }
 }

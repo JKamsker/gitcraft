@@ -226,6 +226,10 @@ impl RepoTab {
             Action::CloseTerminal(i) => self.close_terminal(i),
             Action::SelectTerminal(i) => self.active_terminal = i,
             Action::ToggleSearch => self.toggle_search(),
+            Action::FocusSearch => {
+                self.search.open = true;
+                self.search.focus = true;
+            }
             Action::SearchStep(d) => self.search_step(d, ctx),
             Action::CreatePr {
                 branch,

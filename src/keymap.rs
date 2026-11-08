@@ -45,6 +45,16 @@ pub(crate) enum Command {
     HunkStage,
     HunkUnstage,
     HunkDiscard,
+    Undo,
+    Redo,
+    Timeline,
+    Search,
+    Back,
+    Forward,
+    NextChange,
+    PreviousChange,
+    NextChangeAlt,
+    PreviousChangeAlt,
 }
 
 /// Where a key works: anywhere in the window, or in a repository tab.
@@ -54,6 +64,7 @@ pub(crate) enum Scope {
     Repository,
     Files,
     Diff,
+    Changes,
 }
 
 impl Scope {
@@ -79,7 +90,13 @@ impl Command {
             | Command::Settings
             | Command::Reload
             | Command::Manual => Scope::Window,
-            Command::Fetch
+            Command::Undo
+            | Command::Redo
+            | Command::Timeline
+            | Command::Search
+            | Command::Back
+            | Command::Forward
+            | Command::Fetch
             | Command::Pull
             | Command::Push
             | Command::Stash
@@ -95,12 +112,26 @@ impl Command {
             | Command::FileToggleStage
             | Command::FileOpen => Scope::Files,
             Command::HunkStage | Command::HunkUnstage | Command::HunkDiscard => Scope::Diff,
+            Command::NextChange
+            | Command::PreviousChange
+            | Command::NextChangeAlt
+            | Command::PreviousChangeAlt => Scope::Changes,
         }
     }
 
     /// Stable IDs are persisted independently of translated labels.
     pub(crate) fn id(self) -> &'static str {
         match self {
+            Self::Undo => "undo",
+            Self::Redo => "redo",
+            Self::Timeline => "timeline",
+            Self::Search => "search",
+            Self::Back => "back",
+            Self::Forward => "forward",
+            Self::NextChange => "next_change",
+            Self::PreviousChange => "previous_change",
+            Self::NextChangeAlt => "next_change_alternate",
+            Self::PreviousChangeAlt => "previous_change_alternate",
             Self::NewTab => "new_tab",
             Self::CloseTab => "close_tab",
             Self::ReopenTab => "reopen_tab",
@@ -155,7 +186,16 @@ impl Command {
     fn repeats(self) -> bool {
         matches!(
             self,
-            Command::NextTab | Command::PreviousTab | Command::FileNext | Command::FilePrevious
+            Command::NextTab
+                | Command::PreviousTab
+                | Command::FileNext
+                | Command::FilePrevious
+                | Command::NextChange
+                | Command::PreviousChange
+                | Command::NextChangeAlt
+                | Command::PreviousChangeAlt
+                | Command::Back
+                | Command::Forward
         )
     }
 }
@@ -222,6 +262,16 @@ pub(crate) const BINDINGS: &[Binding] = &[
     bind(Command::HunkStage, NONE, Key::S),
     bind(Command::HunkUnstage, NONE, Key::U),
     bind(Command::HunkDiscard, NONE, Key::D),
+    bind(Command::Undo, CMD, Key::Z),
+    bind(Command::Redo, CMD, Key::Y),
+    bind(Command::Timeline, CMD_SHIFT, Key::Z),
+    bind(Command::Search, CMD, Key::F),
+    bind(Command::Back, Modifiers::ALT, Key::ArrowLeft),
+    bind(Command::Forward, Modifiers::ALT, Key::ArrowRight),
+    bind(Command::NextChange, NONE, Key::F7),
+    bind(Command::PreviousChange, Modifiers::SHIFT, Key::F7),
+    bind(Command::NextChangeAlt, Modifiers::ALT, Key::ArrowDown),
+    bind(Command::PreviousChangeAlt, Modifiers::ALT, Key::ArrowUp),
 ];
 
 /// The command `key` with `modifiers` held does, if any.
@@ -345,6 +395,15 @@ pub(crate) const WINDOW_ROWS: &[Row] = &[
 /// The manual's rows for a repository tab's keys. None works while a text field or the
 /// terminal has the keyboard.
 pub(crate) const REPOSITORY_ROWS: &[Row] = &[
+    row(&[Command::Undo], "Undo"),
+    row(&[Command::Redo], "Redo"),
+    row(&[Command::Timeline], "Timeline and undo tree"),
+    row(
+        &[Command::Search],
+        "Search the shown diff, file, blame or commits",
+    ),
+    row(&[Command::Back], "Back through recent views"),
+    row(&[Command::Forward], "Forward through recent views"),
     row(&[Command::FocusSidebar], "Focus the sidebar"),
     row(&[Command::FocusGraph], "Focus the graph or diff"),
     row(
@@ -368,6 +427,13 @@ pub(crate) const REPOSITORY_ROWS: &[Row] = &[
 ];
 
 pub(crate) const LOCAL_ROWS: &[Row] = &[
+    row(&[Command::NextChange], "Next change"),
+    row(&[Command::PreviousChange], "Previous change"),
+    row(&[Command::NextChangeAlt], "Next change (alternate binding)"),
+    row(
+        &[Command::PreviousChangeAlt],
+        "Previous change (alternate binding)",
+    ),
     row(&[Command::FileNext], "Next file"),
     row(&[Command::FilePrevious], "Previous file"),
     row(

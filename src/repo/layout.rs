@@ -248,16 +248,7 @@ impl RepoTab {
                     .filter(|&c| !(rewording && c == keymap::Command::Commit))
                     .map(Action::Key),
             );
-            let (esc, undo, redo, tree, find) = ctx.input(|i| {
-                (
-                    i.key_pressed(Key::Escape),
-                    i.modifiers.command && !i.modifiers.shift && i.key_pressed(Key::Z),
-                    i.modifiers.command && i.key_pressed(Key::Y),
-                    i.modifiers.command && i.modifiers.shift && i.key_pressed(Key::Z),
-                    // Not with Shift: Ctrl+Shift+F fetches.
-                    i.modifiers.command && !i.modifiers.shift && i.key_pressed(Key::F),
-                )
-            });
+            let esc = ctx.input(|i| i.key_pressed(Key::Escape));
             let diff_keys = self.diff.is_some()
                 && (self.main_keys(ctx, Panel::Diff) || self.conflict.is_some());
             if esc && self.close_drop_menu() {
@@ -317,34 +308,13 @@ impl RepoTab {
             } else if esc && self.reflog.is_some() {
                 acts.push(Action::CloseReflog);
             }
-            let diff_shown = diff_keys
-                && self.conflict.is_none()
-                && self.rebase.is_none()
-                && self.split.is_none()
-                && self.absorb.is_none();
-            if let Some(delta) = ctx.input(change_step).filter(|_| diff_shown) {
-                acts.push(Action::DiffStep(delta));
-            }
-            if undo {
-                acts.push(Action::Undo);
-            }
-            if redo {
-                acts.push(Action::Redo);
-            }
-            if tree {
-                acts.push(Action::ToggleTimeline);
-            }
-            if find {
-                self.search.open = true;
-                self.search.focus = true;
+            for command in keymap::pressed(ctx, keymap::Scope::Changes) {
+                acts.push(Action::Key(command));
             }
         } else {
             keymap::retain_allowed(ctx);
         }
-        if !free_keys
-            && self.search.open
-            && ctx.input(|i| i.modifiers.command && !i.modifiers.shift && i.key_pressed(Key::F))
-        {
+        if !free_keys && self.search.open && keymap::take(ctx, keymap::Command::Search) {
             self.search.focus = true;
         }
     }
@@ -439,19 +409,6 @@ impl RepoTab {
             settings.show_detail = show_detail;
             settings.set(&ctx);
         }
-    }
-}
-
-/// F7 or Alt+↓ for the next change of a diff (`1`), Shift+F7 or Alt+↑ for the previous one.
-pub(super) fn change_step(i: &egui::InputState) -> Option<i32> {
-    let alt = i.modifiers.alt && !i.modifiers.command;
-    if (i.key_pressed(Key::F7) && !i.modifiers.shift) || (alt && i.key_pressed(Key::ArrowDown)) {
-        Some(1)
-    } else if (i.key_pressed(Key::F7) && i.modifiers.shift) || (alt && i.key_pressed(Key::ArrowUp))
-    {
-        Some(-1)
-    } else {
-        None
     }
 }
 

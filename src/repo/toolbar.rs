@@ -74,7 +74,7 @@ impl RepoTab {
     fn history_buttons(&self, ui: &mut Ui, idle: bool, acts: &mut Vec<Action>) {
         let undo = self.timeline.current_entry();
         let undo_tip = match undo {
-            Some(e) => step_tip("Undo", e, &keymap::written("Cmd+Z")),
+            Some(e) => step_tip("Undo", e, &keymap::label(ui.ctx(), keymap::Command::Undo)),
             None => "Nothing to undo".to_owned(),
         };
         let waits = self.waits_text();
@@ -109,7 +109,7 @@ impl RepoTab {
         }
         let redo = self.timeline.redo_target();
         let redo_tip = match redo {
-            Some(e) => step_tip("Redo", e, &keymap::written("Cmd+Y")),
+            Some(e) => step_tip("Redo", e, &keymap::label(ui.ctx(), keymap::Command::Redo)),
             None => "Nothing to redo".to_owned(),
         };
         if icons::tool_button(ui, "redo-2", "", idle && redo.is_some())
@@ -124,7 +124,10 @@ impl RepoTab {
             acts.push(Action::Redo);
         }
         if icons::tool_button(ui, "history", "", true)
-            .on_hover_text("Timeline and undo tree (Ctrl+Shift+Z)")
+            .on_hover_text(format!(
+                "Timeline and undo tree ({})",
+                keymap::label(ui.ctx(), keymap::Command::Timeline)
+            ))
             .clicked()
         {
             acts.push(Action::ToggleTimeline);
@@ -301,7 +304,10 @@ impl RepoTab {
         }
         let search = icons::tool_button(ui, "search", "", true)
             .named("Search commits")
-            .on_hover_text(format!("Search commits ({})", keymap::written("Cmd+F")));
+            .on_hover_text(format!(
+                "Search commits ({})",
+                keymap::label(ui.ctx(), keymap::Command::Search)
+            ));
         if self.search.open {
             widgets::active_underline(ui, search.rect, t.accent);
         }

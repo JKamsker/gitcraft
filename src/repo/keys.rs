@@ -14,7 +14,18 @@ impl RepoTab {
     /// toolbar would say it. `None` for the window's keys, which aren't the tab's.
     pub(super) fn key_action(&self, command: Command) -> Result<Option<Action>, String> {
         if let Some(op) = &self.busy_op
-            && command != Command::Terminal
+            && !matches!(
+                command,
+                Command::Terminal
+                    | Command::Timeline
+                    | Command::Search
+                    | Command::Back
+                    | Command::Forward
+                    | Command::NextChange
+                    | Command::PreviousChange
+                    | Command::NextChangeAlt
+                    | Command::PreviousChangeAlt
+            )
         {
             return Err(format!("{op} is still running"));
         }
@@ -23,6 +34,22 @@ impl RepoTab {
             Command::Fetch | Command::Pull | Command::Push if self.remotes.is_empty() => {
                 return Err(no_remote());
             }
+            Command::Undo if self.timeline.current_entry().is_none() => {
+                return Err("Nothing to undo".into());
+            }
+            Command::Redo if self.timeline.redo_target().is_none() => {
+                return Err("Nothing to redo".into());
+            }
+            Command::Undo => Action::Undo,
+            Command::Redo => Action::Redo,
+            Command::Timeline => Action::ToggleTimeline,
+            Command::Search => Action::FocusSearch,
+            Command::Back if self.nav.peek(-1).is_none() => return Err("No previous view".into()),
+            Command::Forward if self.nav.peek(1).is_none() => return Err("No next view".into()),
+            Command::Back => Action::Navigate(-1),
+            Command::Forward => Action::Navigate(1),
+            Command::NextChange | Command::NextChangeAlt => Action::DiffStep(1),
+            Command::PreviousChange | Command::PreviousChangeAlt => Action::DiffStep(-1),
             Command::Fetch => Action::Fetch,
             Command::Pull => Action::Pull,
             Command::Push => Action::Push,

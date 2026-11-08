@@ -29,6 +29,16 @@ fn parse(combo: &str) -> Option<(Key, bool, bool, bool)> {
 }
 
 const EVERY_COMMAND: &[Command] = &[
+    Command::Undo,
+    Command::Redo,
+    Command::Timeline,
+    Command::Search,
+    Command::Back,
+    Command::Forward,
+    Command::NextChange,
+    Command::PreviousChange,
+    Command::NextChangeAlt,
+    Command::PreviousChangeAlt,
     Command::NewTab,
     Command::CloseTab,
     Command::ReopenTab,
@@ -77,16 +87,21 @@ fn no_two_bindings_share_a_key() {
 
 #[test]
 fn no_binding_takes_a_key_a_view_already_uses() {
-    let bound: HashSet<_> = BINDINGS
-        .iter()
-        .filter(|b| matches!(b.command.scope(), Scope::Window | Scope::Repository))
-        .map(normalised)
-        .collect();
     for (group, rows) in crate::manual::SHORTCUTS {
         for (keys, what) in *rows {
             for combo in keys.split(" / ") {
                 if let Some(parsed) = parse(combo) {
-                    assert!(!bound.contains(&parsed), "{combo} ({group}: {what})");
+                    // Repository commands are inactive on Home and Settings pages.
+                    let collisions: Vec<_> = BINDINGS
+                        .iter()
+                        .filter(|binding| {
+                            matches!(binding.command.scope(), Scope::Window | Scope::Repository)
+                                && normalised(binding) == parsed
+                                && (!matches!(*group, "Settings" | "Start page")
+                                    || binding.command.scope() == Scope::Window)
+                        })
+                        .collect();
+                    assert!(collisions.is_empty(), "{combo} ({group}: {what})");
                 }
             }
         }
@@ -159,7 +174,7 @@ fn extra_modifiers_make_another_key() {
     let shift = Modifiers::COMMAND | Modifiers::SHIFT;
     assert_eq!(find(Key::T, Modifiers::COMMAND), Some(Command::NewTab));
     assert_eq!(find(Key::T, shift), Some(Command::ReopenTab));
-    assert_eq!(find(Key::F, Modifiers::COMMAND), None);
+    assert_eq!(find(Key::F, Modifiers::COMMAND), Some(Command::Search));
     assert_eq!(find(Key::F, Modifiers::NONE), None);
     assert_eq!(find(Key::B, Modifiers::COMMAND | Modifiers::ALT), None);
     assert_eq!(find(Key::Tab, Modifiers::NONE), None);
@@ -268,4 +283,112 @@ fn tab_digits_go_by_their_place_on_the_keyboard() {
         [Command::Terminal]
     );
     assert!(pressed_with(vec![moved_j], Scope::Window).is_empty());
+}
+
+#[test]
+fn newly_registered_commands_share_effective_labels_manual_and_scoped_chord_dispatch() {
+    let ctx = egui::Context::default();
+    let mut settings = crate::settings::Settings::default();
+    let commands = [
+        Command::Undo,
+        Command::Redo,
+        Command::Timeline,
+        Command::Search,
+        Command::Back,
+        Command::Forward,
+        Command::NextChange,
+        Command::PreviousChange,
+        Command::NextChangeAlt,
+        Command::PreviousChangeAlt,
+    ];
+    for (index, command) in commands.into_iter().enumerate() {
+        // Distinct chords exercise the same persisted registry used by every source surface.
+        settings.key_bindings.insert(
+            command.id().into(),
+            vec![
+                Stroke::new(Key::F12, Modifiers::NONE),
+                Stroke::new(
+                    [
+                        Key::A,
+                        Key::B,
+                        Key::C,
+                        Key::D,
+                        Key::E,
+                        Key::F,
+                        Key::G,
+                        Key::H,
+                        Key::I,
+                        Key::J,
+                    ][index],
+                    Modifiers::COMMAND,
+                ),
+            ],
+        );
+    }
+    assert!(config::validate(&settings.key_bindings).is_ok());
+    settings.put_for_test(&ctx);
+    for (index, command) in commands.into_iter().enumerate() {
+        let effective = label(&ctx, command);
+        assert!(effective.starts_with("F12 → "));
+        let groups = crate::manual::shortcut_groups(&ctx);
+        assert!(
+            groups
+                .iter()
+                .flat_map(|(_, rows)| rows)
+                .any(|(keys, _)| keys == &effective)
+        );
+        for (part, (key, modifiers)) in [
+            (Key::F12, Modifiers::NONE),
+            (
+                [
+                    Key::A,
+                    Key::B,
+                    Key::C,
+                    Key::D,
+                    Key::E,
+                    Key::F,
+                    Key::G,
+                    Key::H,
+                    Key::I,
+                    Key::J,
+                ][index],
+                Modifiers::COMMAND,
+            ),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let mut got = Vec::new();
+            ctx.run_ui(
+                RawInput {
+                    time: Some(index as f64 + part as f64 * 0.1),
+                    events: vec![
+                        Event::Key {
+                            key,
+                            physical_key: Some(key),
+                            pressed: true,
+                            repeat: false,
+                            modifiers,
+                        },
+                        Event::Key {
+                            key,
+                            physical_key: Some(key),
+                            pressed: false,
+                            repeat: false,
+                            modifiers,
+                        },
+                    ],
+                    ..Default::default()
+                },
+                |_| {
+                    active(&ctx, vec![Scope::Window, Scope::Repository, Scope::Changes]);
+                    for scope in [Scope::Window, Scope::Repository, Scope::Changes] {
+                        got.extend(pressed(&ctx, scope));
+                    }
+                },
+            )
+            .drop_without_applying_deltas();
+            assert_eq!(got, if part == 0 { vec![] } else { vec![command] });
+        }
+    }
 }

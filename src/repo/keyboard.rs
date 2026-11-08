@@ -109,6 +109,15 @@ impl RepoTab {
 
     pub(crate) fn key_scopes(&self, ctx: &egui::Context) -> Vec<Scope> {
         let mut scopes = vec![Scope::Window, Scope::Repository];
+        if self.diff.is_some()
+            && self.conflict.is_none()
+            && self.rebase.is_none()
+            && self.split.is_none()
+            && self.absorb.is_none()
+            && self.main_keys(ctx, super::popout::Panel::Diff)
+        {
+            scopes.push(Scope::Changes);
+        }
         if available(self, ctx) {
             match self.keyboard.borrow().pane {
                 Some(Pane::Detail) => scopes.push(Scope::Files),

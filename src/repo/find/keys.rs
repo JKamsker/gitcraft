@@ -29,6 +29,10 @@ impl FindIn {
 }
 
 impl RepoTab {
+    pub(crate) fn search_shortcut_exception(&self, ctx: &egui::Context) -> bool {
+        self.search.open || ctx.memory(|m| m.focused()) == Some(egui::Id::new(FIELD_ID))
+    }
+
     /// What the find bar would search in the central pane now (as `layout.rs` picks the view
     /// to show); `None` for the graph and the views without lines to search.
     pub(in crate::repo) fn find_in(&self) -> Option<FindIn> {
@@ -83,10 +87,10 @@ impl RepoTab {
         if !free && !in_bar {
             return;
         }
+        if crate::keymap::take(ctx, crate::keymap::Command::Search) {
+            self.find.show();
+        }
         ctx.input_mut(|i| {
-            if i.consume_key(Modifiers::COMMAND, Key::F) {
-                self.find.show();
-            }
             if !open {
                 return;
             }
@@ -107,5 +111,67 @@ impl RepoTab {
                 self.find.close();
             }
         });
+    }
+}
+
+#[cfg(test)]
+mod registry_tests {
+    use super::*;
+    use crate::keymap::{self, Command, Scope, Stroke};
+
+    #[test]
+    fn configured_search_targets_actual_find_bar_before_commit_search() {
+        let ctx = egui::Context::default();
+        let mut tab = RepoTab::new_deferred("/recorded/find-keys".into(), &ctx);
+        tab.diff = Some(crate::repo::DiffView::new(DiffKey::Commit {
+            hash: "recorded".into(),
+            path: "file".into(),
+        }));
+        let mut settings = crate::settings::Settings::default();
+        settings.key_bindings.insert(
+            Command::Search.id().into(),
+            vec![Stroke::new(Key::F8, Modifiers::NONE)],
+        );
+        settings.put_for_test(&ctx);
+        for (key, opens) in [(Key::F8, true), (Key::F, false)] {
+            tab.find.close();
+            ctx.run_ui(
+                egui::RawInput {
+                    events: vec![
+                        egui::Event::Key {
+                            key,
+                            physical_key: Some(key),
+                            pressed: true,
+                            repeat: false,
+                            modifiers: if key == Key::F {
+                                Modifiers::COMMAND
+                            } else {
+                                Modifiers::NONE
+                            },
+                        },
+                        egui::Event::Key {
+                            key,
+                            physical_key: Some(key),
+                            pressed: false,
+                            repeat: false,
+                            modifiers: Modifiers::NONE,
+                        },
+                    ],
+                    ..Default::default()
+                },
+                |_| {
+                    keymap::active(&ctx, vec![Scope::Window, Scope::Repository]);
+                    let mut acts = Vec::new();
+                    tab.shortcuts(&ctx, &mut acts);
+                    assert!(
+                        acts.is_empty(),
+                        "find must own its command before commit search"
+                    );
+                },
+            )
+            .drop_without_applying_deltas();
+            assert_eq!(tab.find.open, opens);
+            assert!(!tab.search.open);
+        }
     }
 }

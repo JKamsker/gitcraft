@@ -10,7 +10,7 @@ use super::{
     file_view, issue_work, ops, partial_stash, pr_review, quick_edit, reflog, timeline, versions,
 };
 use crate::git::{self, InProgress};
-use crate::keymap::{Command, label, written};
+use crate::keymap::{Command, label};
 use crate::terminal::ShellSpec;
 
 /// Everything the views ask for; applied after drawing so views only borrow the state.
@@ -140,6 +140,7 @@ pub(crate) enum Action {
     CloseTerminal(usize),
     SelectTerminal(usize),
     ToggleSearch,
+    FocusSearch,
     /// Open the checklist of stale or merged branches to delete.
     SelectStaleBranches,
     SearchStep(i32),
@@ -597,11 +598,11 @@ impl RepoTab {
                 "absorb".into(),
                 Action::OpenAbsorb,
             ),
-            ("Undo".into(), written("Cmd+Z"), Action::Undo),
-            ("Redo".into(), written("Cmd+Y"), Action::Redo),
+            ("Undo".into(), label(ctx, Command::Undo), Action::Undo),
+            ("Redo".into(), label(ctx, Command::Redo), Action::Redo),
             (
                 "Timeline and undo tree".into(),
-                "Ctrl+Shift+Z".into(),
+                label(ctx, Command::Timeline),
                 Action::ToggleTimeline,
             ),
             (
@@ -621,7 +622,7 @@ impl RepoTab {
             ),
             (
                 "Search commits".into(),
-                written("Cmd+F"),
+                label(ctx, Command::Search),
                 Action::ToggleSearch,
             ),
             (
