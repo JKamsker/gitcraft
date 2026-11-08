@@ -19,6 +19,7 @@ impl Fixture {
             vec!["config", "user.name", "Test"],
             vec!["config", "user.email", "test@example.com"],
             vec!["config", "commit.gpgSign", "false"],
+            vec!["config", "core.autocrlf", "false"],
         ] {
             git::run(Some(&p), &args)?;
         }
@@ -510,7 +511,17 @@ fn pruning_an_unattached_blob_after_preview_refuses_recovery_without_creating_a_
     let preview = inspect(&f.0, &results, found, None, &|| true)?;
     let prepared = prepare(&f.0, &preview, Target::File("recovered".into()), &|| true)?;
     let object = f.0.join(".git/objects").join(&oid[..2]).join(&oid[2..]);
-    std::fs::File::open(&object)
+    let mut options = std::fs::OpenOptions::new();
+    options.read(true);
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::OpenOptionsExt;
+        // Git loose objects are read-only. Updating timestamps needs attribute
+        // access, not permission to rewrite the object contents.
+        options.access_mode(windows_sys::Win32::Storage::FileSystem::FILE_WRITE_ATTRIBUTES);
+    }
+    options
+        .open(&object)
         .and_then(|file| {
             file.set_times(
                 std::fs::FileTimes::new().set_modified(std::time::SystemTime::UNIX_EPOCH),

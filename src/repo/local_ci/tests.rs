@@ -116,21 +116,22 @@ fn selection() -> run::Selection {
 #[test]
 fn recording_command_cannot_run_other_workflows_or_lend_ambient_secrets() {
     let s = selection();
-    let args = run::arguments(
-        std::path::Path::new("/repo with spaces"),
-        std::path::Path::new("/owned private"),
-        &s,
-    )
-    .unwrap();
+    let private = std::env::temp_dir().join("owned private");
+    let args =
+        run::arguments(&std::env::temp_dir().join("repo with spaces"), &private, &s).unwrap();
     assert_eq!(args[0], "push");
     assert!(args.windows(2).any(|a| a == ["--remote-name", "fork"]));
     assert!(args.windows(2).any(|a| a == ["--job", "test"]));
-    assert!(
-        args.windows(2)
-            .any(|a| a == ["--workflows", "/owned private/workflow.yml"])
-    );
+    assert!(args.windows(2).any(|a| a
+        == [
+            "--workflows",
+            private.join("workflow.yml").to_string_lossy().as_ref()
+        ]));
     for flag in ["--env-file", "--secret-file", "--input-file", "--var-file"] {
-        assert!(args.windows(2).any(|a| a == [flag, "/owned private/empty"]));
+        assert!(
+            args.windows(2)
+                .any(|a| a == [flag, private.join("empty").to_string_lossy().as_ref()])
+        );
     }
     assert!(args.contains(&"--container-daemon-socket=-".into()));
     assert!(

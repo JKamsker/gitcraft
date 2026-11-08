@@ -242,7 +242,7 @@ pub(super) fn metadata_ready(binding: &Binding, data: &Value) -> Result<(), Stri
         if !mounts.iter().any(|m| {
             m["Type"] == "bind"
                 && m["Source"] == linked.common.to_string_lossy().as_ref()
-                && m["Destination"] == common_destination.to_string_lossy().as_ref()
+                && m["Destination"] == common_destination.to_string_lossy().replace('\\', "/")
                 && m["RW"] == true
         }) {
             return Err(
@@ -327,7 +327,7 @@ fn normalize(path: &Path) -> Result<PathBuf, String> {
 }
 fn relative(value: &str) -> Result<&str, String> {
     let value = value.trim();
-    if !clean(value) || value.contains(['\\', ':']) || Path::new(value).is_absolute() {
+    if !clean(value) || value.contains(['\\', ':']) || value.starts_with('/') {
         return Err(crate::i18n::text("repo-workflows-devcontainer-relative-fe173813").into());
     }
     Ok(value)

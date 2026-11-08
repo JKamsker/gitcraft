@@ -152,6 +152,14 @@ pub(crate) fn inspect(repo: &Path) -> Result<Sharing, String> {
             ],
         )?,
     );
+    // Plans retain canonical local paths. Windows canonicalization adds a
+    // verbatim prefix, so capture the topology in that same form before comparing it.
+    #[cfg(windows)]
+    let objects = if remote::is_remote(repo) {
+        objects
+    } else {
+        std::fs::canonicalize(objects).map_err(|e| e.to_string())?
+    };
     let topology = topology::read(repo, &objects, &|| {
         !crate::tasks::cancellation().is_cancelled()
     })?;

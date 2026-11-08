@@ -1,4 +1,23 @@
 use super::*;
+// These pure records use synthetic absolute paths without touching the filesystem.
+fn fixture_path(path: &str) -> PathBuf {
+    if cfg!(windows) {
+        PathBuf::from(format!("C:{path}"))
+    } else {
+        PathBuf::from(path)
+    }
+}
+fn fixture_records(bytes: &[u8]) -> Vec<u8> {
+    if cfg!(windows) {
+        String::from_utf8_lossy(bytes)
+            .replace("\"/", "\"C:/")
+            .replace("File: /", "File: C:/")
+            .into_bytes()
+    } else {
+        bytes.to_vec()
+    }
+}
+
 #[test]
 fn pure_prompt_timestamps_respect_offsets_fractional_seconds_and_calendar_bounds()
 -> Result<(), String> {
@@ -29,7 +48,13 @@ fn pure_prompt_claude_allowlist_keeps_prompts_summaries_edits_and_excludes_tool_
 {"type":"assistant","cwd":"/synthetic/root","timestamp":"2026-11-08T00:00:01Z","message":{"role":"assistant","content":[{"type":"thinking","thinking":"private thought"},{"type":"text","text":"changed login"},{"type":"tool_use","name":"Edit","input":{"file_path":"/synthetic/root/login.rs","old_string":"old","new_string":"new"}}]}}
 {"type":"user","cwd":"/synthetic/root","timestamp":"2026-11-08T00:00:02Z","message":{"role":"user","content":[{"type":"tool_result","content":"password=tool-output-never-shown"}]}}
 "#;
-    let (s, n) = parse::transcript(bytes, Path::new("/synthetic/root"), 0, i64::MAX, true);
+    let (s, n) = parse::transcript(
+        &fixture_records(bytes),
+        &fixture_path("/synthetic/root"),
+        0,
+        i64::MAX,
+        true,
+    );
     assert!(n.is_empty());
     assert_eq!(s.len(), 3);
     assert_eq!(s[0].kind, "Prompt");
@@ -48,7 +73,13 @@ fn pure_prompt_codex_patch_steps_never_execute_or_display_shell_arguments() {
 {"type":"response_item","timestamp":"2026-11-08T00:00:02Z","payload":{"type":"custom_tool_call","name":"apply_patch","input":"*** Begin Patch\n*** Update File: file\n@@\n-old\n+new\n*** End Patch"}}
 {"type":"response_item","timestamp":"2026-11-08T00:00:03Z","payload":{"type":"function_call","name":"exec_command","arguments":"{\"cmd\":\"password=do-not-show-or-execute\"}"}}
 "#;
-    let (s, _) = parse::transcript(bytes, Path::new("/synthetic/root"), 0, i64::MAX, true);
+    let (s, _) = parse::transcript(
+        &fixture_records(bytes),
+        &fixture_path("/synthetic/root"),
+        0,
+        i64::MAX,
+        true,
+    );
     assert_eq!(s.len(), 3);
     assert_eq!(s[1].path.as_deref(), Some("file"));
     assert_eq!(s[1].after, "new\n");
@@ -117,8 +148,8 @@ fn pure_prompt_local_records_require_both_immutable_worktree_context_and_time_wi
     let start = parse::stamp("2026-11-07T23:00:00Z").ok_or("expected Some")?;
     let end = parse::stamp("2026-11-08T00:10:00Z").ok_or("expected Some")?;
     let (s, _) = parse::records(
-        bytes,
-        Path::new("/synthetic/root"),
+        &fixture_records(bytes),
+        &fixture_path("/synthetic/root"),
         start,
         end,
         false,
@@ -161,11 +192,19 @@ fn pure_prompt_checkpoint_offset_keeps_recorded_cwd_but_does_not_attribute_earli
 {"type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"earlier prompt"}]}}
 {"type":"response_item","payload":{"type":"custom_tool_call","name":"apply_patch","input":"*** Begin Patch\n*** Update File: /recorded/agent-worktree/file\n@@\n-old\n+new\n*** End Patch"}}
 "#;
-    let (s, _) = parse::checkpoint_transcript(bytes, Path::new("/current/other-worktree"), 2);
+    let (s, _) = parse::checkpoint_transcript(
+        &fixture_records(bytes),
+        &fixture_path("/current/other-worktree"),
+        2,
+    );
     assert_eq!(s.len(), 1);
     assert_eq!(s[0].path.as_deref(), Some("file"));
     assert!(!format!("{s:?}").contains("earlier prompt"));
-    let (s, n) = parse::checkpoint_transcript(bytes, Path::new("/current/other-worktree"), 20);
+    let (s, n) = parse::checkpoint_transcript(
+        &fixture_records(bytes),
+        &fixture_path("/current/other-worktree"),
+        20,
+    );
     assert!(s.is_empty());
     assert!(!n.is_empty());
 }
@@ -203,7 +242,11 @@ fn pure_prompt_r1_compact_typeless_text_ts_patch_and_missing_origin_are_visible(
 {"v":1,"agent":"codex","type":"assistant","ts":"2026-11-08T00:00:01Z","content":[{"type":"tool_use","name":"apply_patch","input":{"patch":"*** Begin Patch\n*** Update File: /original/worktree/file\n@@\n-old\n+new\n*** End Patch"}}]}
 {"v":1,"agent":"claude-code","type":"assistant","ts":"2026-11-08T00:00:02Z","content":[{"type":"tool_use","name":"Edit","input":{"file_path":"/original/worktree/other","old_string":"before","new_string":"after"}}]}
 "#;
-    let (steps, _) = parse::checkpoint_transcript(bytes, Path::new("/different/clone"), 0);
+    let (steps, _) = parse::checkpoint_transcript(
+        &fixture_records(bytes),
+        &fixture_path("/different/clone"),
+        0,
+    );
     assert_eq!(steps.len(), 3);
     assert_eq!(steps[0].text, "repair file");
     assert_eq!(steps[0].at, parse::stamp("2026-11-08T00:00:00Z"));
@@ -222,7 +265,11 @@ fn pure_prompt_r1_delete_call_retains_validated_path_without_invented_ranges() {
     let bytes=br#"{"type":"session_meta","timestamp":"2026-11-08T00:00:00Z","payload":{"cwd":"/synthetic/root"}}
 {"type":"response_item","payload":{"type":"custom_tool_call","name":"apply_patch","input":"*** Begin Patch\n*** Delete File: file\n*** End Patch"}}
 "#;
-    let (steps, _) = parse::checkpoint_transcript(bytes, Path::new("/different/clone"), 0);
+    let (steps, _) = parse::checkpoint_transcript(
+        &fixture_records(bytes),
+        &fixture_path("/different/clone"),
+        0,
+    );
     assert_eq!(steps.len(), 1);
     assert_eq!(steps[0].path.as_deref(), Some("file"));
     assert!(steps[0].text.contains("deletion"));

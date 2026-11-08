@@ -382,11 +382,13 @@ mod tests {
     }
     #[test]
     fn external_absolute_relative_and_file_resources_are_never_resolved() -> Result<(), String> {
-        let temp = crate::git::file_comparison::Scratch::new()?;
-        let path = temp.0.join("outside.svg");
+        // Keep the outside resource on the CWD volume so the relative positive
+        // control also works when Windows puts its temp directory on another drive.
+        let cwd = std::env::current_dir().map_err(|e| e.to_string())?;
+        let temp = tempfile::tempdir_in(&cwd).map_err(|e| e.to_string())?;
+        let path = temp.path().join("outside.svg");
         std::fs::write(&path, r#"<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8"><path fill="magenta" d="M0 0h8v8H0z"/></svg>"#).map_err(|e| e.to_string())?;
         // Reading the benign outside resource would turn the otherwise transparent image magenta.
-        let cwd = std::env::current_dir().map_err(|e| e.to_string())?;
         let root = cwd.ancestors().last().ok_or("cwd root")?;
         let relative = format!(
             "{}{}",
@@ -402,8 +404,10 @@ mod tests {
         assert!(std::path::Path::new(&relative).is_file());
         for href in [
             path.to_string_lossy().into_owned(),
-            relative,
-            format!("file://{}", path.display()),
+            relative.replace('\\', "/"),
+            url::Url::from_file_path(&path)
+                .map_err(|_| "Invalid file URL")?
+                .into(),
         ] {
             let svg = format!(
                 r#"<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8"><image href="{href}" width="8" height="8"/></svg>"#
