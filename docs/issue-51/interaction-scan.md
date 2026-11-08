@@ -1,0 +1,7 @@
+Repository scan presentation
+
+Twenty paired entries cover the scan picker/dialog, progress and stopping reasons, empty results, recent-list capacity and all four whole-sentence added/existing/full result variants. Counts use locale formatting and plural selection. Known unreadable-folder envelopes are translated only at paint; path and external error detail stay opaque, and unknown errors retain the existing display fallback.
+
+The scanner, limits/skipped folders, raw worker/error messages, cancellation, result polling, paths and recent-list algorithm are unchanged. Protected blocks and original tests are recorded in interaction-scan-protected.json. Existing dispatch receives the original ScanClick/path; the UI-only result sentence is never used as operation identity.
+
+Audited checks: two supplied-state pure/headless tests exercise actual pending/result/error scan paint, original Open request, raw error retention, recent ordering/counts and four note variants; one existing pure recent-list test; five catalog tests; locked offline all-target compile. The pending spinner uses a bounded number of headless frames. No scanner start, directory traversal, App/native picker, process/Git/runtime fixtures or full suite/CI/PR execution. Immutable receipt: /tmp/gitcraft-fluent-scan-validation.json. Writer-validated pending independent review; complete Fluent and native acceptance remain separate.

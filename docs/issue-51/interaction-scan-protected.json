@@ -1,0 +1,22 @@
+{
+  "base": "b5e0b448b5d1e49563c502976e8135b17054cfc6",
+  "source": "src/app/repo_scan.rs",
+  "protected_blocks": {
+    "limits_filters_raw_unreadable": {
+      "sha256": "4c711ef1e2bf74172011c2f3e56e6d381b3fb43e3a49c2632ac85f7af7dfb141",
+      "byte_equal_after_outer_whitespace": true
+    },
+    "scanner_and_recent_algorithm": {
+      "sha256": "88ec54e347b61faa46681c1bb9d98f134c0fb69e010808682dd03b24904814c4",
+      "byte_equal_after_outer_whitespace": true
+    },
+    "messages_worker_cancel_and_path": {
+      "sha256": "6618b3b5094a10fd5ef33eff9c6b1d68bbb4f37bda52d797791f27206545c7cd",
+      "byte_equal_after_outer_whitespace": true
+    },
+    "existing_tests": {
+      "sha256": "1096326b4497d1262efb5498bb2f5a8b3e4b7565c23eb50c2ab92f454ac2139a",
+      "byte_equal_after_outer_whitespace": true
+    }
+  }
+}

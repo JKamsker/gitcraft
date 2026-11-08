@@ -1641,3 +1641,47 @@ interaction-teleport-error-hash-format = The repository on { $machine } uses { $
 interaction-teleport-error-partial = Only { $arrived } of the bundle's { $total } arrived on { $machine }.
 interaction-teleport-error-exit = exit status { $code }
 interaction-teleport-error-operation-patch = A patch is in progress here: finish or abort it first.
+interaction-scan-picker = Scan a folder for repositories
+interaction-scan-found = Repositories found
+interaction-scan-scanning = Scanning for repositories…
+interaction-scan-add = Add to the recent list
+interaction-scan-close = Close
+interaction-scan-stop = Stop
+interaction-scan-open = Open
+interaction-scan-capacity = Adds those not in it yet, as many as fit (it holds { $max })
+interaction-scan-repo-limit = Stopped after { $found } repositories: pick a folder further down to see the rest.
+interaction-scan-folder-limit = Stopped after looking in { $folders } folders: pick a folder further down to see the rest.
+interaction-scan-asked = Stopped: found { $found } so far.
+interaction-scan-progress = Looked in { $folders } folders, found { $repositories } repositories…
+interaction-scan-empty = No repositories found within { $depth } folders of this one. Hidden folders and folders like node_modules, target and build aren't looked in.
+interaction-scan-added = Added { $added ->
+        [one] 1 repository
+       *[other] { $added } repositories
+    } to the recent list
+interaction-scan-added-existing = Added { $added ->
+        [one] 1 repository
+       *[other] { $added } repositories
+    } to the recent list ({ $had } { $had ->
+        [one] was
+       *[other] were
+    } already there)
+interaction-scan-added-full = Added { $added ->
+        [one] 1 repository
+       *[other] { $added } repositories
+    } to the recent list ({ $room ->
+        [one] 1 repository
+       *[other] { $room } repositories
+    } didn't fit: it holds { $max }, remove some to make room)
+interaction-scan-added-both = Added { $added ->
+        [one] 1 repository
+       *[other] { $added } repositories
+    } to the recent list ({ $had } { $had ->
+        [one] was
+       *[other] were
+    } already there; { $room ->
+        [one] 1 repository
+       *[other] { $room } repositories
+    } didn't fit: it holds { $max }, remove some to make room)
+interaction-scan-permission = gitcraft isn't allowed to look in { $path }.
+interaction-scan-gone = { $path } isn't there any more.
+interaction-scan-read-error = Could not look in { $detail }

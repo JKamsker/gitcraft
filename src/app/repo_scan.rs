@@ -96,6 +96,27 @@ fn unreadable(dir: &Path, e: &std::io::Error) -> String {
     }
 }
 
+pub(super) fn display_error(raw: &str) -> Option<String> {
+    if let Some(path) = raw
+        .strip_prefix("gitcraft isn't allowed to look in ")
+        .and_then(|s| s.strip_suffix("."))
+    {
+        return Some(crate::i18n::message(
+            "interaction-scan-permission",
+            &[("path", path.into())],
+        ));
+    }
+    if let Some(path) = raw.strip_suffix(" isn't there any more.") {
+        return Some(crate::i18n::message(
+            "interaction-scan-gone",
+            &[("path", path.into())],
+        ));
+    }
+    raw.strip_prefix("Could not look in ").map(|detail| {
+        crate::i18n::message("interaction-scan-read-error", &[("detail", detail.into())])
+    })
+}
+
 /// The repositories in `root` and the folders under it, as far as `limits` go. Hidden folders,
 /// the [`SKIPPED`] ones and links (which could go round in circles) aren't looked in, though one
 /// of the first two that is a repository is found. Repositories inside repositories are found
@@ -199,31 +220,21 @@ pub(super) fn add_to_recent(
 
 /// What [`add_to_recent`] did, in words.
 fn added_message(added: usize, had: usize, no_room: usize) -> String {
-    let n = |k: usize| {
-        if k == 1 {
-            "1 repository".to_owned()
-        } else {
-            format!("{k} repositories")
-        }
+    let id = match (had > 0, no_room > 0) {
+        (false, false) => "interaction-scan-added",
+        (true, false) => "interaction-scan-added-existing",
+        (false, true) => "interaction-scan-added-full",
+        (true, true) => "interaction-scan-added-both",
     };
-    let mut said = format!("Added {} to the recent list", n(added));
-    let mut notes = Vec::new();
-    if had > 0 {
-        notes.push(format!(
-            "{had} {} already there",
-            if had == 1 { "was" } else { "were" }
-        ));
-    }
-    if no_room > 0 {
-        notes.push(format!(
-            "{} didn't fit: it holds {MAX_RECENT}, remove some to make room",
-            n(no_room)
-        ));
-    }
-    if !notes.is_empty() {
-        said.push_str(&format!(" ({})", notes.join("; ")));
-    }
-    said
+    crate::i18n::message(
+        id,
+        &[
+            ("added", added.into()),
+            ("had", had.into()),
+            ("room", no_room.into()),
+            ("max", MAX_RECENT.into()),
+        ],
+    )
 }
 
 /// What the scan's thread sends.
@@ -313,7 +324,7 @@ impl App {
     /// Asks for a folder and starts scanning it.
     pub(super) fn start_repo_scan(&mut self, ctx: &egui::Context) {
         if let Some(dir) = rfd::FileDialog::new()
-            .set_title("Scan a folder for repositories")
+            .set_title(crate::i18n::text("interaction-scan-picker"))
             .pick_folder()
         {
             self.repo_scan = Some(RepoScan::start(dir, ctx));
@@ -340,9 +351,9 @@ impl App {
             .show(ctx, |ui| {
                 ui.set_width(520.0);
                 let title = if done {
-                    "Repositories found"
+                    crate::i18n::text("interaction-scan-found")
                 } else {
-                    "Scanning for repositories…"
+                    crate::i18n::text("interaction-scan-scanning")
                 };
                 ui.label(RichText::new(title).font(theme::semibold(15.0)));
                 ui.label(
@@ -358,18 +369,26 @@ impl App {
                         Some(Ok(found)) => found.repos.len(),
                         _ => 0,
                     };
-                    let add =
-                        crate::repo::primary_button(ui, "Add to the recent list", count > 0, 200.0)
-                            .on_hover_text(format!(
-                                "Adds those not in it yet, as many as fit (it holds {MAX_RECENT})"
-                            ));
+                    let add = crate::repo::primary_button(
+                        ui,
+                        crate::i18n::text("interaction-scan-add"),
+                        count > 0,
+                        200.0,
+                    )
+                    .on_hover_text(crate::i18n::message(
+                        "interaction-scan-capacity",
+                        &[("max", MAX_RECENT.into())],
+                    ));
                     if add.clicked() {
                         click = Some(ScanClick::AddAll);
                     }
                     let (label, what) = if done {
-                        ("Close", ScanClick::Close)
+                        (
+                            crate::i18n::text("interaction-scan-close"),
+                            ScanClick::Close,
+                        )
                     } else {
-                        ("Stop", ScanClick::Stop)
+                        (crate::i18n::text("interaction-scan-stop"), ScanClick::Stop)
                     };
                     if ui
                         .add(egui::Button::new(label).min_size(vec2(80.0, 30.0)))
@@ -415,14 +434,16 @@ impl App {
 /// What the dialog says of how the scan ended, when it didn't look everywhere.
 fn stopped_message(stopped: Stopped, found: usize) -> String {
     match stopped {
-        Stopped::Repos => format!(
-            "Stopped after {found} repositories: pick a folder further down to see the rest."
+        Stopped::Repos => {
+            crate::i18n::message("interaction-scan-repo-limit", &[("found", found.into())])
+        }
+        Stopped::Folders => crate::i18n::message(
+            "interaction-scan-folder-limit",
+            &[("folders", LIMITS.max_dirs.into())],
         ),
-        Stopped::Folders => format!(
-            "Stopped after looking in {} folders: pick a folder further down to see the rest.",
-            LIMITS.max_dirs
-        ),
-        Stopped::Asked => format!("Stopped: found {found} so far."),
+        Stopped::Asked => {
+            crate::i18n::message("interaction-scan-asked", &[("found", found.into())])
+        }
     }
 }
 
@@ -433,15 +454,21 @@ fn scan_body(ui: &mut egui::Ui, scan: &RepoScan, t: &Tokens) -> Option<ScanClick
             ui.horizontal(|ui| {
                 ui.add(crate::spinner::Spinner::new());
                 let p = scan.progress;
-                ui.label(format!(
-                    "Looked in {} folders, found {} repositories…",
-                    p.folders, p.repos
+                ui.label(crate::i18n::message(
+                    "interaction-scan-progress",
+                    &[
+                        ("folders", p.folders.into()),
+                        ("repositories", p.repos.into()),
+                    ],
                 ));
             });
             return None;
         }
         Some(Err(e)) => {
-            ui.colored_label(t.danger, e);
+            ui.colored_label(
+                t.danger,
+                display_error(e).unwrap_or_else(|| crate::git::display_error(e)),
+            );
             return None;
         }
         Some(Ok(found)) => found,
@@ -449,11 +476,9 @@ fn scan_body(ui: &mut egui::Ui, scan: &RepoScan, t: &Tokens) -> Option<ScanClick
     if found.repos.is_empty() {
         let said = match found.stopped {
             Some(stopped) => stopped_message(stopped, 0),
-            None => format!(
-                "No repositories found within {} folders of this one. Hidden folders and folders \
-                 like node_modules, target and build aren't looked in.",
-                LIMITS.depth
-            ),
+            None => {
+                crate::i18n::message("interaction-scan-empty", &[("depth", LIMITS.depth.into())])
+            }
         };
         ui.label(said);
         return None;
@@ -465,7 +490,10 @@ fn scan_body(ui: &mut egui::Ui, scan: &RepoScan, t: &Tokens) -> Option<ScanClick
         .show(ui, |ui| {
             for repo in &found.repos {
                 ui.horizontal(|ui| {
-                    if ui.button("Open").clicked() {
+                    if ui
+                        .button(crate::i18n::text("interaction-scan-open"))
+                        .clicked()
+                    {
                         click = Some(ScanClick::Open(repo.clone()));
                     }
                     ui.vertical(|ui| {
@@ -674,6 +702,117 @@ mod tests {
         assert_eq!(
             added_message(1, 0, 0),
             "Added 1 repository to the recent list"
+        );
+    }
+}
+
+#[cfg(test)]
+mod localization_tests {
+    use super::*;
+    use egui_kittest::{Harness, kittest::Queryable};
+
+    #[test]
+    fn actual_inert_scan_progress_result_and_error_paint_preserve_original_open_request_and_state()
+    {
+        crate::i18n::set_language("de");
+        let (_, rx) = channel();
+        let scan = RepoScan {
+            root: "/opaque/root".into(),
+            rx,
+            progress: Progress {
+                folders: 2345,
+                repos: 6,
+            },
+            result: None,
+            cancel: Arc::new(AtomicBool::new(false)),
+        };
+        let fonts = std::cell::Cell::new(false);
+        let mut h = Harness::new_ui_state(
+            move |ui, state: &mut (RepoScan, Option<PathBuf>)| {
+                if !fonts.replace(true) {
+                    theme::install_fonts(ui.ctx());
+                    return;
+                }
+                if let Some(ScanClick::Open(path)) = scan_body(ui, &state.0, &Tokens::get(ui.ctx()))
+                {
+                    state.1 = Some(path);
+                }
+            },
+            (scan, None),
+        );
+        h.run_steps(3);
+        h.get_by_label("2.345 Ordner durchsucht, 6 Repositorys gefunden…");
+        let path = PathBuf::from("/opaque/repo 日本語");
+        h.state_mut().0.result = Some(Ok(Found {
+            repos: vec![path.clone()],
+            stopped: Some(Stopped::Asked),
+        }));
+        h.run();
+        h.get_by_label("Angehalten: Bisher 1 gefunden.");
+        h.get_by_label("Öffnen").click();
+        h.run();
+        assert_eq!(h.state().1, Some(path.clone()));
+        assert_eq!(
+            h.state()
+                .0
+                .result
+                .as_ref()
+                .and_then(|r| r.as_ref().ok())
+                .map(|f| f.repos.as_slice()),
+            Some([path.clone()].as_slice())
+        );
+        assert!(!h.state().0.cancel.load(Ordering::Relaxed));
+        let raw = unreadable(
+            Path::new("/opaque/日本語"),
+            &std::io::Error::from(std::io::ErrorKind::PermissionDenied),
+        );
+        assert_eq!(raw, "gitcraft isn't allowed to look in /opaque/日本語.");
+        h.state_mut().0.result = Some(Err(raw.clone()));
+        h.run();
+        h.get_by_label("gitcraft darf /opaque/日本語 nicht durchsuchen.");
+        assert_eq!(
+            h.state().0.result.as_ref().and_then(|r| r.as_ref().err()),
+            Some(&raw)
+        );
+        crate::i18n::set_language("en-US");
+        h.run();
+        h.get_by_label(&raw);
+    }
+
+    #[test]
+    fn actual_recent_add_counts_keep_order_and_format_all_notes_in_the_selected_language() {
+        crate::i18n::set_language("de");
+        let mut recent = vec![PathBuf::from("/literal/old")];
+        let found = [
+            PathBuf::from("/literal/old"),
+            PathBuf::from("/literal/new"),
+            PathBuf::from("/literal/no-room"),
+        ];
+        let counts = add_to_recent(&mut recent, &found, 2);
+        assert_eq!(counts, (1, 1, 1));
+        assert_eq!(
+            recent,
+            [PathBuf::from("/literal/old"), PathBuf::from("/literal/new")]
+        );
+        assert_eq!(
+            added_message(1, 0, 0),
+            "1 Repository zur Liste zuletzt verwendeter Repositorys hinzugefügt"
+        );
+        assert!(added_message(2, 1, 0).ends_with("(1 bereits vorhanden)"));
+        assert!(added_message(0, 0, 2).contains("2 Repositorys hatten keinen Platz"));
+        assert!(
+            added_message(counts.0, counts.1, counts.2)
+                .contains("1 bereits vorhanden; 1 Repository hatte keinen Platz")
+        );
+        assert!(added_message(1234, 0, 0).starts_with("1.234 Repositorys"));
+        assert!(stopped_message(Stopped::Folders, 0).contains("50.000"));
+        assert!(display_error("External scan diagnostic 日本語").is_none());
+        crate::i18n::set_language("en-US");
+        assert_eq!(
+            added_message(1, 1, 1),
+            format!(
+                "Added 1 repository to the recent list (1 was already there; 1 repository didn't fit: it holds {MAX_RECENT}, remove some to make room)"
+            )
         );
     }
 }

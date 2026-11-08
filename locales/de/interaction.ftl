@@ -1641,3 +1641,41 @@ interaction-teleport-error-hash-format = Das Repository am Ziel verwendet { $the
 interaction-teleport-error-partial = Am Ziel sind nur { $arrived } von { $total } des Bundles angekommen. Ziel: { $machine }.
 interaction-teleport-error-exit = Exit-Status { $code }
 interaction-teleport-error-operation-patch = Hier wird ein Patch angewendet: Schließe den Vorgang zuerst ab oder brich ihn ab.
+interaction-scan-picker = Ordner nach Repositorys durchsuchen
+interaction-scan-found = Gefundene Repositorys
+interaction-scan-scanning = Repositorys werden gesucht…
+interaction-scan-add = Zur Liste zuletzt verwendeter Repositorys hinzufügen
+interaction-scan-close = Schließen
+interaction-scan-stop = Anhalten
+interaction-scan-open = Öffnen
+interaction-scan-capacity = Fügt neue Einträge hinzu, soweit Platz ist; die Liste enthält höchstens { $max } Einträge
+interaction-scan-repo-limit = Nach { $found } Repositorys angehalten: Wähle einen tiefer liegenden Ordner aus, um den Rest zu sehen.
+interaction-scan-folder-limit = Nach dem Durchsuchen von { $folders } Ordnern angehalten: Wähle einen tiefer liegenden Ordner aus, um den Rest zu sehen.
+interaction-scan-asked = Angehalten: Bisher { $found } gefunden.
+interaction-scan-progress = { $folders } Ordner durchsucht, { $repositories } Repositorys gefunden…
+interaction-scan-empty = Keine Repositorys innerhalb von { $depth } Ordnerebenen unter diesem Ordner gefunden. Versteckte Ordner sowie Ordner wie node_modules, target und build werden nicht durchsucht.
+interaction-scan-added = { $added ->
+        [one] 1 Repository zur Liste zuletzt verwendeter Repositorys hinzugefügt
+       *[other] { $added } Repositorys zur Liste zuletzt verwendeter Repositorys hinzugefügt
+    }
+interaction-scan-added-existing = { $added ->
+        [one] 1 Repository zur Liste zuletzt verwendeter Repositorys hinzugefügt
+       *[other] { $added } Repositorys zur Liste zuletzt verwendeter Repositorys hinzugefügt
+    } ({ $had } bereits vorhanden)
+interaction-scan-added-full = { $added ->
+        [one] 1 Repository zur Liste zuletzt verwendeter Repositorys hinzugefügt
+       *[other] { $added } Repositorys zur Liste zuletzt verwendeter Repositorys hinzugefügt
+    } ({ $room ->
+        [one] 1 Repository hatte keinen Platz
+       *[other] { $room } Repositorys hatten keinen Platz
+    }: Die Liste enthält höchstens { $max } Einträge; entferne einige, um Platz zu schaffen)
+interaction-scan-added-both = { $added ->
+        [one] 1 Repository zur Liste zuletzt verwendeter Repositorys hinzugefügt
+       *[other] { $added } Repositorys zur Liste zuletzt verwendeter Repositorys hinzugefügt
+    } ({ $had } bereits vorhanden; { $room ->
+        [one] 1 Repository hatte keinen Platz
+       *[other] { $room } Repositorys hatten keinen Platz
+    }: Die Liste enthält höchstens { $max } Einträge; entferne einige, um Platz zu schaffen)
+interaction-scan-permission = gitcraft darf { $path } nicht durchsuchen.
+interaction-scan-gone = { $path } ist nicht mehr vorhanden.
+interaction-scan-read-error = Durchsuchen fehlgeschlagen: { $detail }
