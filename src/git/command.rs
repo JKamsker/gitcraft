@@ -1449,6 +1449,7 @@ fn repository_endpoint_extra(
     address: &str,
     original_remote: &str,
     credentials: Option<&Credentials>,
+    original_args: &[&str],
 ) -> Result<(Extra, String), String> {
     static SEQUENCE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     let id = SEQUENCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
@@ -1482,6 +1483,8 @@ fn repository_endpoint_extra(
     ];
     let mut extra = Extra {
         normalize_repository: true,
+        timeout: Some(std::time::Duration::from_secs(120)),
+        output_limit: Some(1 << 20),
         ..Default::default()
     };
     extra
@@ -1498,7 +1501,7 @@ fn repository_endpoint_extra(
             .as_ref()
             .is_some_and(|s| s.matches_url(address))
         {
-            let policy = credential_command_policy(Some(repo), credentials, &[])?;
+            let policy = credential_command_policy(Some(repo), credentials, original_args)?;
             extra.owned_pre.extend(policy.arguments);
             extra.env.extend(policy.environment);
         }
@@ -1515,7 +1518,8 @@ pub(in crate::git) fn repository_endpoint(
     credentials: Option<&Credentials>,
     control: &std::sync::Arc<OpControl>,
 ) -> Result<String, String> {
-    let (extra, alias) = repository_endpoint_extra(repo, address, original_remote, credentials)?;
+    let (extra, alias) =
+        repository_endpoint_extra(repo, address, original_remote, credentials, before)?;
     let words: Vec<&str> = before
         .iter()
         .copied()
@@ -1539,7 +1543,7 @@ mod repository_endpoint_recording {
         let credentials = Credentials::for_url(url, "alice".into(), "DUMMY_A_TOKEN".into())?;
         for address in [url, "https://host-b.invalid/team/repo", "origin"] {
             let (extra, alias) =
-                repository_endpoint_extra(repo, address, "origin", Some(&credentials))?;
+                repository_endpoint_extra(repo, address, "origin", Some(&credentials), &["push"])?;
             let args = ["push", "--porcelain", "--", &alias, "a:refs/heads/main"];
             let cmd = apply_command_extras(
                 Command::new("/recorded/chosen/git"),
@@ -1593,12 +1597,12 @@ mod repository_endpoint_recording {
             scope: None,
             ..credentials.clone()
         };
-        assert!(repository_endpoint_extra(repo, url, "origin", Some(&legacy)).is_err());
+        assert!(repository_endpoint_extra(repo, url, "origin", Some(&legacy), &["push"]).is_err());
         let edited = Credentials {
             username: "bob".into(),
             ..credentials
         };
-        assert!(repository_endpoint_extra(repo, url, "origin", Some(&edited)).is_err());
+        assert!(repository_endpoint_extra(repo, url, "origin", Some(&edited), &["push"]).is_err());
         Ok(())
     }
 }

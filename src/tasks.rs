@@ -44,6 +44,21 @@ pub(crate) fn cancellation() -> Cancellation {
     CURRENT.with(|slot| slot.borrow().clone().unwrap_or_default())
 }
 
+/// Run bounded repository-machine work under an explicit cancellation token.
+/// Cleanup callers use an independent token only for already-owned artifacts.
+pub(crate) fn with_cancellation<T>(cancel: Cancellation, work: impl FnOnce() -> T) -> T {
+    struct Restore(Option<Cancellation>);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            CURRENT.with(|slot| *slot.borrow_mut() = self.0.take());
+        }
+    }
+    let restore = Restore(CURRENT.with(|slot| slot.borrow_mut().replace(cancel)));
+    let value = work();
+    drop(restore);
+    value
+}
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Priority {
     Interactive,

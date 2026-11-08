@@ -286,6 +286,8 @@ fn follow_command(
     }));
     let mut options = crate::processes::Options {
         background: true,
+        timeout: extra.timeout,
+        output_limit: extra.output_limit.unwrap_or(64 << 20),
         ..Default::default()
     };
     let command = match target {
@@ -294,7 +296,7 @@ fn follow_command(
                 remote::streaming_command(&target.host, &watched_request(target, extra, args))?;
             options.input = Some(streaming.input);
             options.stdout_ready = Some(streaming.ready);
-            options.timeout = Some(remote::NETWORK_LIMIT);
+            options.timeout = extra.timeout.or(Some(remote::NETWORK_LIMIT));
             options.ready = streaming.connected;
             let (host, pid) = (target.host.clone(), Arc::clone(&remote_pid));
             options.stop_remote = Some(Box::new(move || {

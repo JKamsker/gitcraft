@@ -196,21 +196,90 @@ fn remote_tip(
             .map(|(o, _)| o.into())
     }))
 }
-fn ancestor(repo: &Path, a: &str, b: &str) -> Result<bool, String> {
-    let out = crate::git::run_captured(
+fn ancestor(
+    runner: &Runner<'_>,
+    budget: &super::ReadBudget,
+    repo: &Path,
+    a: &str,
+    b: &str,
+) -> Result<bool, String> {
+    let out = budget.read(
         repo,
         &["--no-replace-objects", "merge-base", "--is-ancestor", a, b],
-        None,
+        Some(runner.control.clone()),
     )?;
     match out.code {
         Some(0) => Ok(true),
         Some(1) => Ok(false),
-        _ => Err(out.stderr),
+        _ => Err(String::from_utf8_lossy(&out.stderr).into_owned()),
     }
 }
-/// A unique app-owned namespace prevents a remote's fetch/mirror refspecs from moving local
-/// branches. Cleanup uses exact ref names and expected OIDs, never broad selectors.
-fn advertised(runner: &Runner<'_>, node: &Dependency) -> Result<Vec<String>, String> {
+
+/// Register immutable expected names/OIDs before fetch. Finalization is independent
+/// of operation cancellation and deletes only those exact refs with expected OIDs.
+struct Advertisement {
+    namespace: String,
+    refs: BTreeMap<String, String>,
+}
+impl Advertisement {
+    fn cleanup(
+        &self,
+        mut run: impl FnMut(&[&str], Vec<u8>) -> Result<String, String>,
+    ) -> Result<(), String> {
+        let rows = run(
+            &[
+                "for-each-ref",
+                "--format=%(refname) %(objectname)",
+                &self.namespace,
+            ],
+            Vec::new(),
+        )?;
+        let mut input = String::new();
+        for row in rows.lines() {
+            let (name, oid) = row
+                .split_once(' ')
+                .ok_or("Invalid owned dependency ref record")?;
+            if self.refs.get(name).map(String::as_str) != Some(oid) {
+                return Err("Dependency ref changed or is foreign; retained for inspection".into());
+            }
+            input.push_str(&format!("delete {name} {oid}\n"));
+        }
+        if !input.is_empty() {
+            run(&["update-ref", "--stdin"], input.into_bytes())?;
+        }
+        Ok(())
+    }
+    fn finish(
+        &self,
+        fetch: Result<String, String>,
+        cleanup: Result<(), String>,
+    ) -> Result<Vec<String>, String> {
+        match (fetch, cleanup) {
+            (Ok(_), Ok(())) => Ok(self.refs.values().cloned().collect()),
+            (Err(e), Ok(())) => Err(e),
+            (fetch, Err(e)) => Err(format!(
+                "{}; owned-ref cleanup failed: {e}. Inspect retained namespace {} before retrying; no parent push was attempted",
+                fetch
+                    .err()
+                    .unwrap_or_else(|| "Dependency fetch completed".into()),
+                self.namespace
+            )),
+        }
+    }
+}
+fn advertised(
+    runner: &Runner<'_>,
+    node: &Dependency,
+    budget: &super::ReadBudget,
+) -> Result<Vec<String>, String> {
+    budget.take()?;
+    let rows = runner.endpoint(
+        &node.repo,
+        &node.fetch_url,
+        &node.remote,
+        &["ls-remote", "--refs", "--"],
+        &["refs/heads/*", "refs/tags/*"],
+    )?;
     let stamp = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_err(|e| e.to_string())?
@@ -220,6 +289,31 @@ fn advertised(runner: &Runner<'_>, node: &Dependency) -> Result<Vec<String>, Str
         std::process::id(),
         CHECKS.fetch_add(1, Ordering::Relaxed)
     );
+    let mut owned = Advertisement {
+        namespace: ns,
+        refs: BTreeMap::new(),
+    };
+    let mut specs = Vec::new();
+    for row in rows.lines() {
+        if specs.len() >= 256 {
+            return Err("More than 256 advertised dependency refs; narrow this remote before checking publication".into());
+        }
+        let (oid, name) = row
+            .split_once('\t')
+            .ok_or("Invalid dependency advertisement")?;
+        if !super::object::valid_oid(oid)
+            || !(name.starts_with("refs/heads/") || name.starts_with("refs/tags/"))
+        {
+            return Err("Invalid advertised dependency ref".into());
+        }
+        let target = format!("{}/{}", owned.namespace, specs.len());
+        specs.push(format!("+{oid}:{target}"));
+        owned.refs.insert(target, oid.into());
+    }
+    if specs.is_empty() {
+        return Ok(Vec::new());
+    }
+    // Ownership finalizer exists before the first command capable of creating refs.
     let fetch = runner.endpoint(
         &node.repo,
         &node.fetch_url,
@@ -231,38 +325,34 @@ fn advertised(runner: &Runner<'_>, node: &Dependency) -> Result<Vec<String>, Str
             "--no-write-fetch-head",
             "--",
         ],
-        &[
-            &format!("+refs/heads/*:{ns}/heads/*"),
-            &format!("+refs/tags/*:{ns}/tags/*"),
-        ],
+        &specs.iter().map(String::as_str).collect::<Vec<_>>(),
     );
-    let rows = text(
-        &node.repo,
-        &["for-each-ref", "--format=%(refname) %(objectname)", &ns],
-    )?;
-    let mut tips = Vec::new();
-    let mut cleanup_error = None;
-    for row in rows.lines() {
-        let (name, oid) = row.split_once(' ').ok_or("Invalid dependency ref record")?;
-        tips.push(oid.into());
-        if let Err(e) = runner.in_repo(&node.repo, &["update-ref", "-d", name, oid]) {
-            cleanup_error = Some(e);
-        }
-    }
-    fetch?;
-    if let Some(e) = cleanup_error {
-        return Err(format!(
-            "Could not remove owned dependency-check refs: {e}. No parent push was attempted."
-        ));
-    }
-    Ok(tips)
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
+    let cleanup = crate::tasks::with_cancellation(crate::tasks::Cancellation::default(), || {
+        owned.cleanup(|args, input| {
+            let left = deadline.saturating_duration_since(std::time::Instant::now());
+            if left.is_zero() {
+                return Err("Cleanup deadline reached".into());
+            }
+            String::from_utf8(
+                super::capture_with_timeout(&node.repo, args, input, 1 << 20, &[], None, left)?
+                    .checked(&[0])?,
+            )
+            .map_err(|_| "Invalid cleanup metadata".into())
+        })
+    });
+    owned.finish(fetch, cleanup)
 }
-fn reachable(runner: &Runner<'_>, node: &Dependency) -> Result<bool, String> {
-    let tips = advertised(runner, node)?;
+fn reachable(
+    runner: &Runner<'_>,
+    node: &Dependency,
+    budget: &super::ReadBudget,
+) -> Result<bool, String> {
+    let tips = advertised(runner, node, budget)?;
     for required in &node.required {
         let mut found = false;
         for tip in &tips {
-            if ancestor(&node.repo, required, tip)? {
+            if ancestor(runner, budget, &node.repo, required, tip)? {
                 found = true;
                 break;
             }
@@ -273,7 +363,12 @@ fn reachable(runner: &Runner<'_>, node: &Dependency) -> Result<bool, String> {
     }
     Ok(true)
 }
-fn inspect_node(runner: &Runner<'_>, node: &mut Dependency) -> Result<(), String> {
+fn inspect_node(
+    runner: &Runner<'_>,
+    node: &mut Dependency,
+    budget: &super::ReadBudget,
+) -> Result<(), String> {
+    let text = |repo: &Path, args: &[&str]| budget.text(repo, args, Some(runner.control.clone()));
     if !text(&node.repo, &["rev-parse", "--show-prefix"])?
         .trim()
         .is_empty()
@@ -300,7 +395,7 @@ fn inspect_node(runner: &Runner<'_>, node: &mut Dependency) -> Result<(), String
     node.push_url = urls[0].into();
     super::remote_config::validate_url(&node.fetch_url)?;
     super::remote_config::validate_url(&node.push_url)?;
-    node.published = reachable(runner, node)?;
+    node.published = reachable(runner, node, budget)?;
     let refs = text(
         &node.repo,
         &[
@@ -309,14 +404,18 @@ fn inspect_node(runner: &Runner<'_>, node: &mut Dependency) -> Result<(), String
             "refs/heads/",
         ],
     )?;
+    if refs.lines().count() > 256 {
+        return Err("More than 256 candidate submodule branches; narrow the remote/branch selection before checking publication".into());
+    }
     let mut source = None;
     for row in refs.lines() {
+        budget.take()?;
         let Some((oid, branch)) = row.split_once('\0') else {
             continue;
         };
         let mut all = true;
         for needed in &node.required {
-            if !ancestor(&node.repo, needed, oid)? {
+            if !ancestor(runner, budget, &node.repo, needed, oid)? {
                 all = false;
                 break;
             }
@@ -355,6 +454,7 @@ fn inspect_node(runner: &Runner<'_>, node: &mut Dependency) -> Result<(), String
     Ok(())
 }
 pub(crate) fn check(runner: &Runner<'_>, mut plan: Plan) -> Result<Plan, String> {
+    let budget = super::ReadBudget::new(2048, std::time::Duration::from_secs(300));
     plan.snapshot.check_publication(runner.repo)?;
     let tip = remote_tip(runner, runner.repo, &plan.parent_url, &plan.parent_branch)?;
     let root = outgoing_links(runner.repo, &plan.commit, tip.as_deref())?;
@@ -376,6 +476,10 @@ pub(crate) fn check(runner: &Runner<'_>, mut plan: Plan) -> Result<Plan, String>
         .collect();
     let mut index = 0;
     while index < plan.dependencies.len() {
+        budget.take()?;
+        if runner.control.is_cancelled() {
+            return Err(crate::git::CANCELLED.into());
+        }
         if plan.dependencies.len() > 128 {
             return Err(
                 "More than 128 submodule dependencies; narrow this publication before continuing"
@@ -383,11 +487,15 @@ pub(crate) fn check(runner: &Runner<'_>, mut plan: Plan) -> Result<Plan, String>
             );
         }
         let node = &mut plan.dependencies[index];
-        let outcome = inspect_node(runner, node);
+        let outcome = inspect_node(runner, node, &budget);
         node.problem = outcome.err();
         if node.problem.is_none() {
             let mut nested = BTreeMap::<String, BTreeSet<String>>::new();
             for oid in &node.required {
+                budget.take()?;
+                if runner.control.is_cancelled() {
+                    return Err(crate::git::CANCELLED.into());
+                }
                 for (p, oids) in tree_links(&node.repo, oid)? {
                     nested.entry(p).or_default().extend(oids);
                 }
@@ -418,6 +526,7 @@ pub(crate) fn check(runner: &Runner<'_>, mut plan: Plan) -> Result<Plan, String>
     Ok(plan)
 }
 pub(crate) fn publish(runner: &Runner<'_>, mut plan: Plan) -> Result<Plan, String> {
+    let budget = super::ReadBudget::new(2048, std::time::Duration::from_secs(300));
     if !plan.checked || plan.dependencies.iter().any(|n| n.problem.is_some()) {
         return Err("Check every dependency and resolve its problem before publishing".into());
     }
@@ -435,7 +544,7 @@ pub(crate) fn publish(runner: &Runner<'_>, mut plan: Plan) -> Result<Plan, Strin
                 .as_ref()
                 .ok_or("Submodule snapshot missing")?
                 .check_publication(&node.repo)?;
-            if !reachable(runner, node)? {
+            if !reachable(runner, node, &budget)? {
                 text(
                     &node.repo,
                     &["check-ref-format", &format!("refs/heads/{}", node.target)],
@@ -447,7 +556,7 @@ pub(crate) fn publish(runner: &Runner<'_>, mut plan: Plan) -> Result<Plan, Strin
                     &["push", "--porcelain", "--"],
                     &[&format!("{}:refs/heads/{}", node.source, node.target)],
                 )?;
-                if !reachable(runner, node)? {
+                if !reachable(runner, node, &budget)? {
                     return Err("Push succeeded, but the required commits are still unreachable from the named fetch URL. Parent publication stopped.".into());
                 }
             }
@@ -589,5 +698,84 @@ mod tests {
         parent.commit("changed afterwards", &[])?;
         assert!(publish(&runner, p).is_err());
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod cleanup_recording {
+    use super::*;
+    #[test]
+    fn canceled_fetch_still_cleans_exact_refs_and_retains_both_failures() {
+        let name = "refs/gitcraft/dependency-check/owned/0";
+        let oid = "a".repeat(40);
+        let owned = Advertisement {
+            namespace: "refs/gitcraft/dependency-check/owned".into(),
+            refs: [(name.into(), oid.clone())].into(),
+        };
+        let mut calls = Vec::new();
+        let cleanup = owned.cleanup(|args, input| {
+            calls.push((
+                args.iter().map(|s| s.to_string()).collect::<Vec<_>>(),
+                input,
+            ));
+            if args[0] == "for-each-ref" {
+                Ok(format!("{name} {oid}\n"))
+            } else {
+                Ok(String::new())
+            }
+        });
+        assert!(
+            owned
+                .finish(Err("cancelled after creation".into()), cleanup)
+                .unwrap_err()
+                .contains("cancelled after creation")
+        );
+        assert_eq!(calls.len(), 2);
+        assert_eq!(
+            String::from_utf8(calls[1].1.clone()).unwrap(),
+            format!("delete {name} {oid}\n")
+        );
+        let empty = owned.cleanup(|_, _| Ok(String::new()));
+        assert!(
+            owned
+                .finish(Err("cancelled before creation".into()), empty)
+                .is_err()
+        );
+        let listing = owned.cleanup(|_, _| Err("listing failure".into()));
+        let error = owned
+            .finish(Err("fetch failed".into()), listing)
+            .unwrap_err();
+        assert!(
+            error.contains("fetch failed")
+                && error.contains("listing failure")
+                && error.contains(&owned.namespace)
+        );
+        let mut deletes = 0;
+        assert!(
+            owned
+                .cleanup(|args, _| {
+                    if args[0] == "for-each-ref" {
+                        Ok(format!("{name} {}\n", "b".repeat(40)))
+                    } else {
+                        deletes += 1;
+                        Ok(String::new())
+                    }
+                })
+                .is_err()
+        );
+        assert_eq!(deletes, 0);
+        let cleanup = owned.cleanup(|args, _| {
+            if args[0] == "for-each-ref" {
+                Ok(format!("{name} {oid}\n"))
+            } else {
+                Err("delete failure".into())
+            }
+        });
+        assert!(
+            owned
+                .finish(Ok(String::new()), cleanup)
+                .unwrap_err()
+                .contains("delete failure")
+        );
     }
 }

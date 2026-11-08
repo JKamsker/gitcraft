@@ -76,6 +76,25 @@ pub(super) fn capture_with(
     env: &[(&str, String)],
     control: Option<std::sync::Arc<crate::git::OpControl>>,
 ) -> Result<ReadOutput, String> {
+    capture_with_timeout(
+        repo,
+        args,
+        input,
+        cap,
+        env,
+        control,
+        std::time::Duration::from_secs(120),
+    )
+}
+pub(super) fn capture_with_timeout(
+    repo: &std::path::Path,
+    args: &[&str],
+    input: Vec<u8>,
+    cap: usize,
+    env: &[(&str, String)],
+    control: Option<std::sync::Arc<crate::git::OpControl>>,
+    timeout: std::time::Duration,
+) -> Result<ReadOutput, String> {
     use crate::git::command;
     if control.as_ref().is_some_and(|c| c.is_cancelled()) {
         return Err(crate::git::CANCELLED.into());
@@ -85,7 +104,13 @@ pub(super) fn capture_with(
         request
             .env
             .extend(env.iter().map(|(k, v)| ((*k).into(), v.clone())));
-        let out = crate::remote::exec(&target.host, &request)?;
+        request.timeout = Some(timeout);
+        let out = match &control {
+            Some(control) => crate::tasks::with_cancellation(control.cancellation(), || {
+                crate::remote::exec(&target.host, &request)
+            }),
+            None => crate::remote::exec(&target.host, &request),
+        }?;
         if out.stdout.len() > cap {
             return Err("Repository metadata exceeds the inspection limit".into());
         }
@@ -110,7 +135,7 @@ pub(super) fn capture_with(
             input: Some(input),
             output_limit: cap,
             stderr_limit: Some(65536),
-            timeout: Some(std::time::Duration::from_secs(120)),
+            timeout: Some(timeout),
             background: true,
             ..Default::default()
         },
@@ -147,5 +172,76 @@ mod scoped_read_recording {
         assert_eq!(output(Some(129)).checked(&[0, 129]).unwrap(), b"selected");
         assert!(output(Some(128)).checked(&[0, 1]).is_err());
         assert!(output(None).checked(&[0, 1]).is_err());
+    }
+}
+
+/// One analysis budget bounds total work, rather than only each subprocess.
+pub(super) struct ReadBudget {
+    remaining: std::cell::Cell<usize>,
+    deadline: std::time::Instant,
+}
+impl ReadBudget {
+    pub fn new(commands: usize, time: std::time::Duration) -> Self {
+        Self {
+            remaining: std::cell::Cell::new(commands),
+            deadline: std::time::Instant::now() + time,
+        }
+    }
+    pub fn take(&self) -> Result<std::time::Duration, String> {
+        if crate::tasks::cancellation().is_cancelled() {
+            return Err(crate::git::CANCELLED.into());
+        }
+        let left = self
+            .deadline
+            .saturating_duration_since(std::time::Instant::now());
+        if left.is_zero() || self.remaining.get() == 0 {
+            return Err(
+                "Repository analysis reached its time/work limit; narrow the selection and retry"
+                    .into(),
+            );
+        }
+        self.remaining.set(self.remaining.get() - 1);
+        Ok(left.min(std::time::Duration::from_secs(120)))
+    }
+    pub fn read(
+        &self,
+        repo: &std::path::Path,
+        args: &[&str],
+        control: Option<std::sync::Arc<crate::git::OpControl>>,
+    ) -> Result<ReadOutput, String> {
+        capture_with_timeout(repo, args, Vec::new(), 1 << 20, &[], control, self.take()?)
+    }
+    pub fn text(
+        &self,
+        repo: &std::path::Path,
+        args: &[&str],
+        control: Option<std::sync::Arc<crate::git::OpControl>>,
+    ) -> Result<String, String> {
+        String::from_utf8(self.read(repo, args, control)?.checked(&[0])?)
+            .map_err(|_| "Repository metadata is not UTF-8".into())
+    }
+}
+#[cfg(test)]
+mod budget_pure {
+    use super::*;
+    #[test]
+    fn exhausted_work_and_elapsed_deadline_refuse_without_spawning() {
+        let budget = ReadBudget::new(1, std::time::Duration::from_secs(10));
+        assert!(budget.take().is_ok());
+        assert!(budget.take().is_err());
+        assert!(
+            ReadBudget::new(5, std::time::Duration::ZERO)
+                .take()
+                .is_err()
+        );
+        let token = crate::tasks::Cancellation::default();
+        token.cancel();
+        crate::tasks::with_cancellation(token, || {
+            assert!(crate::tasks::cancellation().is_cancelled());
+            crate::tasks::with_cancellation(crate::tasks::Cancellation::default(), || {
+                assert!(!crate::tasks::cancellation().is_cancelled())
+            });
+            assert!(crate::tasks::cancellation().is_cancelled());
+        });
     }
 }
