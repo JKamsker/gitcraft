@@ -376,13 +376,7 @@ impl RepoTab {
             return;
         };
         if let Some(state) = self.work.in_progress {
-            self.status = Some((
-                format!(
-                    "Distribute staged fixes: a {} is in progress",
-                    state.label().to_lowercase()
-                ),
-                true,
-            ));
+            self.status = Some((in_progress_status(state), true));
             return;
         }
         if self.work.staged.is_empty() {
@@ -564,5 +558,41 @@ mod tests {
         let decided: Vec<Vec<u32>> = runs.iter().map(|(_, old)| old.clone()).collect();
         assert_eq!(decided, [vec![2], vec![3, 4], vec![5]]);
         assert_eq!(runs[0].0.len(), 2);
+    }
+}
+
+/// Stored status identity; presentation labels never supply this raw operation state.
+fn in_progress_status(state: git::InProgress) -> String {
+    let identity = match state {
+        git::InProgress::Merge => "merge",
+        git::InProgress::CherryPick => "cherry-pick",
+        git::InProgress::Revert => "revert",
+        git::InProgress::Rebase => "rebase",
+        git::InProgress::Am => "patch",
+    };
+    format!("Distribute staged fixes: a {identity} is in progress")
+}
+
+#[cfg(test)]
+mod fluent_raw_operation_tests {
+    use super::*;
+    #[test]
+    fn fluent_partition_absorb_raw_in_progress_identity_and_command_are_locale_independent() {
+        for language in ["en-US", "de", "en-US"] {
+            crate::i18n::set_language(language);
+            for (state, raw, command) in [
+                (git::InProgress::Merge, "merge", "merge"),
+                (git::InProgress::CherryPick, "cherry-pick", "cherry-pick"),
+                (git::InProgress::Revert, "revert", "revert"),
+                (git::InProgress::Rebase, "rebase", "rebase"),
+                (git::InProgress::Am, "patch", "am"),
+            ] {
+                assert_eq!(
+                    in_progress_status(state),
+                    format!("Distribute staged fixes: a {raw} is in progress")
+                );
+                assert_eq!(state.command(), command);
+            }
+        }
     }
 }
