@@ -1046,3 +1046,47 @@ interaction-palette-close = Close (Esc)
 interaction-palette-copy = Copy diagnostics
 interaction-palette-collecting = Collecting…
 interaction-palette-diagnostic-hint = Copies diagnostics for local review: versions, system, graphics, git, gh, glab and tea (sign-in status, never tokens), and effective Git settings (no name or email). An issue opens only after review and your explicit choice.
+interaction-tabs-running = an operation running
+interaction-tabs-terminal = a terminal open
+interaction-tabs-message = a commit message written
+interaction-tabs-editor = an editor open
+interaction-tabs-review = a review draft
+interaction-tabs-wait = A repository is still being cloned or connected to: wait for it before switching profiles
+interaction-tabs-setup = This imported profile needs local keys and verified accounts. Open Import setup → Finish profile setup before activating it.
+interaction-tabs-profiles = PROFILES
+interaction-tabs-manage = Manage profiles…
+interaction-tabs-new = New profile
+interaction-tabs-unfinished = { $name } has { $work }: finish it, or close the tab, before switching profiles
+interaction-tabs-switched = Switched to the profile “{ $profile }”
+interaction-tabs-profile-a11y = profile { $profile }
+interaction-tabs-profile-tip = Profile: { $profile }{ $author }
+interaction-tabs-successor = { $name } still has work going on, so the tab now shows it
+interaction-tabs-home-tip = Open, create or clone a repository
+interaction-tabs-settings = Settings
+interaction-tabs-close = Close tab
+interaction-tabs-middle = Or middle-click the tab
+interaction-tabs-reopen = Reopen closed tab
+interaction-tabs-none-closed = No tab closed yet
+interaction-tabs-quit = Quit gitcraft
+interaction-tabs-tearoff = Move tab to a new window
+interaction-tabs-embedded = This backend embeds windows; native repository windows are unavailable
+interaction-tabs-teleport = Teleport to…
+interaction-tabs-teleport-tip = Carry the branch and its uncommitted work to another machine, in a new worktree
+interaction-tabs-worktree = Switch worktree
+interaction-tabs-close-worktree = Close this worktree
+interaction-tabs-close-worktree-tip = Close this worktree and go back to the main one. It stays on disk.
+interaction-tabs-move-target = Move tab to { $window }
+interaction-tabs-switch-tip = { $worktree }
+    Switch worktree
+interaction-tabs-background = { $count ->
+        [one] One worktree with work in the background
+       *[other] { $count } worktrees with work in the background
+    }
+interaction-tabs-close-name = Close the tab { $name }
+interaction-tabs-busy = busy
+interaction-tabs-new-tab = New tab
+interaction-tabs-overflow = { $count ->
+        [one] New tab, and one more tab
+       *[other] New tab, and { $count } more tabs
+    }
+interaction-tabs-main-window = Main window

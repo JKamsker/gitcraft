@@ -226,7 +226,17 @@ impl App {
             ui.scope_builder(
                 UiBuilder::new().max_rect(rect).layout(left_to_right),
                 |ui| {
-                    if icons::small_button(ui, "plus", "New tab (Ctrl+T)").clicked() {
+                    if icons::small_button(
+                        ui,
+                        "plus",
+                        &crate::keymap::tip(
+                            ui.ctx(),
+                            crate::i18n::text("interaction-tabs-new-tab"),
+                            crate::keymap::Command::NewTab,
+                        ),
+                    )
+                    .clicked()
+                    {
                         actions.add = true;
                     }
                 },
@@ -273,12 +283,20 @@ impl App {
         hidden: &[usize],
         actions: &mut StripActions,
     ) {
-        let tip = format!("New tab, and {} more tabs", hidden.len());
+        let tip = crate::i18n::message(
+            "interaction-tabs-overflow",
+            &[("count", hidden.len().into())],
+        );
         let resp = icons::small_button(ui, "chevron-down", &tip);
         egui::Popup::menu(&resp)
             .style(theme::menu_style)
             .show(|ui| {
-                if ui.button("New tab").on_hover_text("Ctrl+T").clicked() {
+                if crate::menu_item::MenuItem::new(crate::i18n::text("interaction-tabs-new-tab"))
+                    .icon("plus")
+                    .keys(crate::keymap::Command::NewTab)
+                    .show(ui)
+                    .clicked()
+                {
                     actions.add = true;
                 }
                 ui.separator();
@@ -403,13 +421,21 @@ impl App {
             .map(|(i, tab)| {
                 let active = i == self.active;
                 let (title, chip, background): (String, Option<Chip>, usize) = match tab {
-                    Tab::Home => ("New tab".to_owned(), None, 0),
+                    Tab::Home => (
+                        crate::i18n::text("interaction-tabs-new-tab").to_owned(),
+                        None,
+                        0,
+                    ),
                     Tab::Repo(r) => {
                         let label = r.label(self.settings.worktrees_in_same_tab);
                         let chip = worktree_tab::chip_for(ui, &label, MAX_CHIP_W);
                         (label.repo, chip, r.background_work().len())
                     }
-                    Tab::Settings => ("Settings".to_owned(), None, 0),
+                    Tab::Settings => (
+                        crate::i18n::text("interaction-tabs-settings").to_owned(),
+                        None,
+                        0,
+                    ),
                 };
                 let font = if active {
                     theme::medium(12.5)

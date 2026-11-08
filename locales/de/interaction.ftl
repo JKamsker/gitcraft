@@ -1046,3 +1046,47 @@ interaction-palette-close = Schließen (Esc)
 interaction-palette-copy = Diagnosedaten kopieren
 interaction-palette-collecting = Wird gesammelt…
 interaction-palette-diagnostic-hint = Kopiert Diagnosedaten zur lokalen Prüfung: Versionen, System, Grafik, git, gh, glab und tea (Anmeldestatus, niemals Tokens) sowie wirksame Git-Einstellungen (ohne Namen oder E-Mail). Ein Issue öffnet sich erst nach deiner Prüfung und ausdrücklichen Auswahl.
+interaction-tabs-running = einen laufenden Vorgang
+interaction-tabs-terminal = ein geöffnetes Terminal
+interaction-tabs-message = eine geschriebene Commit-Nachricht
+interaction-tabs-editor = einen geöffneten Editor
+interaction-tabs-review = einen Review-Entwurf
+interaction-tabs-wait = Ein Repository wird noch geklont oder verbunden: Warte, bis das abgeschlossen ist, bevor du das Profil wechselst
+interaction-tabs-setup = Dieses importierte Profil benötigt lokale Schlüssel und geprüfte Konten. Öffne „Import einrichten → Profileinrichtung abschließen“, bevor du es aktivierst.
+interaction-tabs-profiles = PROFILE
+interaction-tabs-manage = Profile verwalten…
+interaction-tabs-new = Neues Profil
+interaction-tabs-unfinished = { $name } hat { $work }: Schließe die Arbeit ab oder schließe den Tab, bevor du das Profil wechselst
+interaction-tabs-switched = Zum Profil „{ $profile }“ gewechselt
+interaction-tabs-profile-a11y = Profil { $profile }
+interaction-tabs-profile-tip = Profil: { $profile }{ $author }
+interaction-tabs-successor = In { $name } läuft noch Arbeit; der Tab zeigt sie jetzt an
+interaction-tabs-home-tip = Ein Repository öffnen, erstellen oder klonen
+interaction-tabs-settings = Einstellungen
+interaction-tabs-close = Tab schließen
+interaction-tabs-middle = Oder mit der mittleren Maustaste auf den Tab klicken
+interaction-tabs-reopen = Geschlossenen Tab wieder öffnen
+interaction-tabs-none-closed = Noch kein Tab geschlossen
+interaction-tabs-quit = gitcraft beenden
+interaction-tabs-tearoff = Tab in ein neues Fenster verschieben
+interaction-tabs-embedded = Dieses Backend bettet Fenster ein; native Repository-Fenster sind nicht verfügbar
+interaction-tabs-teleport = Teleportieren nach…
+interaction-tabs-teleport-tip = Den Branch mit seinen nicht committeten Änderungen in einen neuen Worktree auf einem anderen Rechner übertragen
+interaction-tabs-worktree = Worktree wechseln
+interaction-tabs-close-worktree = Diesen Worktree schließen
+interaction-tabs-close-worktree-tip = Diesen Worktree schließen und zum Haupt-Worktree zurückkehren. Er bleibt auf dem Datenträger.
+interaction-tabs-move-target = Tab nach { $window } verschieben
+interaction-tabs-switch-tip = { $worktree }
+    Worktree wechseln
+interaction-tabs-background = { $count ->
+        [one] Ein Worktree mit Arbeit im Hintergrund
+       *[other] { $count } Worktrees mit Arbeit im Hintergrund
+    }
+interaction-tabs-close-name = Tab { $name } schließen
+interaction-tabs-busy = beschäftigt
+interaction-tabs-new-tab = Neuer Tab
+interaction-tabs-overflow = { $count ->
+        [one] Neuer Tab und ein weiterer Tab
+       *[other] Neuer Tab und { $count } weitere Tabs
+    }
+interaction-tabs-main-window = Hauptfenster

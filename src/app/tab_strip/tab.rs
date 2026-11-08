@@ -27,9 +27,15 @@ pub(super) fn tab_ui(ui: &mut Ui, placed: Placed<'_>, env: &mut TabEnv<'_>) {
     let ctx = ui.ctx().clone();
     let active = i == env.active;
     let (tooltip, busy) = match tab {
-        Tab::Home => ("Open, create or clone a repository".to_owned(), false),
+        Tab::Home => (
+            crate::i18n::text("interaction-tabs-home-tip").to_owned(),
+            false,
+        ),
         Tab::Repo(r) => (r.path.display().to_string(), r.is_busy()),
-        Tab::Settings => ("Settings".to_owned(), false),
+        Tab::Settings => (
+            crate::i18n::text("interaction-tabs-settings").to_owned(),
+            false,
+        ),
     };
     let resp = ui.interact(rect, id, Sense::click_and_drag());
     let name = title.galley.text();
@@ -39,7 +45,10 @@ pub(super) fn tab_ui(ui: &mut Ui, placed: Placed<'_>, env: &mut TabEnv<'_>) {
         } else {
             tooltip.as_str()
         };
-        labels::with_notes(&labels::join([name, more]), &[(busy, "busy")])
+        labels::with_notes(
+            &labels::join([name, more]),
+            &[(busy, crate::i18n::text("interaction-tabs-busy"))],
+        )
     };
     widgets::a11y_selected(&resp, label, active);
     // The pointer anywhere on the tab, its close button too: `hovered` passes to the button
@@ -145,44 +154,62 @@ pub(super) fn tab_ui(ui: &mut Ui, placed: Placed<'_>, env: &mut TabEnv<'_>) {
     crate::menu_item::context(&resp)
         .style(theme::menu_style)
         .show(|ui| {
-            if MenuItem::new("Close tab").icon("x")
+            if MenuItem::new(crate::i18n::text("interaction-tabs-close"))
+                .icon("x")
                 .keys_when(Command::CloseTab, active)
                 .show(ui)
-                .on_hover_text("Or middle-click the tab")
+                .on_hover_text(crate::i18n::text("interaction-tabs-middle"))
                 .clicked()
             {
                 env.actions.close = Some(i);
             }
-            if MenuItem::new("Reopen closed tab").icon("eye")
+            if MenuItem::new(crate::i18n::text("interaction-tabs-reopen"))
+                .icon("eye")
                 .keys(Command::ReopenTab)
-                .refused((!env.can_reopen).then_some("No tab closed yet"))
+                .refused(
+                    (!env.can_reopen).then_some(crate::i18n::text("interaction-tabs-none-closed")),
+                )
                 .show(ui)
                 .clicked()
             {
                 env.actions.reopen = true;
             }
             ui.separator();
-            if MenuItem::new("Quit gitcraft").icon("x").show(ui).clicked() {
+            if MenuItem::new(crate::i18n::text("interaction-tabs-quit"))
+                .icon("x")
+                .show(ui)
+                .clicked()
+            {
                 env.actions.quit = true;
             }
             if let Tab::Repo(r) = tab {
                 ui.separator();
-                if MenuItem::new("Move tab to a new window")
+                if MenuItem::new(crate::i18n::text("interaction-tabs-tearoff"))
                     .icon("external-link")
-                    .refused((!env.can_detach).then_some("This backend embeds windows; native repository windows are unavailable"))
-                    .show(ui).clicked() {
+                    .refused(
+                        (!env.can_detach).then_some(crate::i18n::text("interaction-tabs-embedded")),
+                    )
+                    .show(ui)
+                    .clicked()
+                {
                     env.actions.window = Some((i, None, None));
                 }
                 for (target, name) in &env.windows {
-                    if MenuItem::new(format!("Move tab to {name}"))
-                        .icon("arrow-right").show(ui).clicked() {
+                    if MenuItem::new(crate::i18n::message(
+                        "interaction-tabs-move-target",
+                        &[("window", name.as_str().into())],
+                    ))
+                    .icon("arrow-right")
+                    .show(ui)
+                    .clicked()
+                    {
                         env.actions.window = Some((i, Some(*target), None));
                     }
                 }
-                if crate::menu_item::MenuItem::new("Teleport to…").icon("command").show(ui)
-                    .on_hover_text(
-                        "Carry the branch and its uncommitted work to another machine, in a new worktree",
-                    )
+                if crate::menu_item::MenuItem::new(crate::i18n::text("interaction-tabs-teleport"))
+                    .icon("command")
+                    .show(ui)
+                    .on_hover_text(crate::i18n::text("interaction-tabs-teleport-tip"))
                     .clicked()
                 {
                     env.actions.teleport = Some(r.path.clone());
@@ -218,7 +245,10 @@ fn active_chip(
     let body = chip_rect.with_max_x(chip_rect.right() - worktree_tab::CHIP_CLOSE_W);
     let c = ui.interact(body, id.with("worktree"), Sense::click());
     widgets::a11y(&c, WidgetType::Button, || {
-        labels::join(["Switch worktree", chip.full_name.as_str()])
+        labels::join([
+            crate::i18n::text("interaction-tabs-worktree"),
+            chip.full_name.as_str(),
+        ])
     });
     worktree_tab::paint_chip(ui, chip_rect, chip, true, c.hovered());
     let close_rect = Rect::from_center_size(
@@ -226,7 +256,11 @@ fn active_chip(
         vec2(18.0, 18.0),
     );
     let x = ui.interact(close_rect, id.with("close-worktree"), Sense::click());
-    widgets::a11y(&x, WidgetType::Button, "Close this worktree");
+    widgets::a11y(
+        &x,
+        WidgetType::Button,
+        crate::i18n::text("interaction-tabs-close-worktree"),
+    );
     if x.hovered() {
         ui.painter().rect_filled(close_rect, t.radius_sm, t.pressed);
     }
@@ -240,7 +274,7 @@ fn active_chip(
     if x.clicked() {
         env.actions.close_worktree = true;
     }
-    x.on_hover_text("Close this worktree and go back to the main one. It stays on disk.");
+    x.on_hover_text(crate::i18n::text("interaction-tabs-close-worktree-tip"));
     if c.clicked() {
         env.switcher_query.clear();
         *env.switcher_focus = true;
@@ -256,7 +290,10 @@ fn active_chip(
             ui.close();
         }
     });
-    c.on_hover_text(format!("{}\nSwitch worktree", chip.full_name));
+    c.on_hover_text(crate::i18n::message(
+        "interaction-tabs-switch-tip",
+        &[("worktree", chip.full_name.as_str().into())],
+    ));
 }
 
 /// The dot and count of worktrees with work in the background, at `at`.
@@ -265,14 +302,15 @@ fn badge(ui: &mut Ui, at: Pos2, background: usize, id: egui::Id, t: &Tokens) {
     ui.painter().text(
         at + vec2(5.0, 0.0),
         egui::Align2::LEFT_CENTER,
-        background.to_string(),
+        crate::i18n::number(background),
         theme::medium(10.5),
         t.text_dim,
     );
     let badge = Rect::from_center_size(at + vec2(4.0, 0.0), vec2(BADGE_W, 20.0));
     ui.interact(badge, id.with("background"), Sense::hover())
-        .on_hover_text(format!(
-            "{background} worktree(s) with work in the background"
+        .on_hover_text(crate::i18n::message(
+            "interaction-tabs-background",
+            &[("count", background.into())],
         ));
 }
 
@@ -286,7 +324,9 @@ fn close_button(
     dragging: Option<usize>,
 ) -> bool {
     let c = ui.interact(rect, tab_id.with("close"), Sense::click());
-    widgets::a11y(&c, WidgetType::Button, || format!("Close the tab {name}"));
+    widgets::a11y(&c, WidgetType::Button, || {
+        crate::i18n::message("interaction-tabs-close-name", &[("name", name.into())])
+    });
     if c.hovered() {
         ui.painter().rect_filled(rect, t.radius_sm, t.pressed);
     }
@@ -299,7 +339,48 @@ fn close_button(
     );
     let clicked = c.clicked();
     if dragging.is_none() {
-        c.on_hover_text(keymap::tip(ui.ctx(), "Close tab", Command::CloseTab));
+        c.on_hover_text(keymap::tip(
+            ui.ctx(),
+            crate::i18n::text("interaction-tabs-close"),
+            Command::CloseTab,
+        ));
     }
     clicked
+}
+
+#[cfg(test)]
+mod localization_tests {
+    use super::*;
+    use egui_kittest::{Harness, kittest::Queryable};
+
+    #[test]
+    fn actual_tab_close_is_named_in_current_language_and_keeps_control_id() {
+        crate::i18n::set_language("de");
+        let fonts = std::cell::Cell::new(false);
+        let mut h = Harness::new_ui_state(
+            move |ui, clicked: &mut bool| {
+                if !fonts.replace(true) {
+                    theme::install_fonts(ui.ctx());
+                    return;
+                }
+                let (rect, _) = ui.allocate_exact_size(vec2(28.0, 28.0), Sense::hover());
+                *clicked |= close_button(
+                    ui,
+                    rect,
+                    egui::Id::new("stable-tab"),
+                    "repo 日本語",
+                    &Tokens::get(ui.ctx()),
+                    None,
+                );
+            },
+            false,
+        );
+        h.run();
+        h.get_by_label("Tab repo 日本語 schließen").click();
+        h.run();
+        assert!(*h.state());
+        crate::i18n::set_language("en-US");
+        h.run();
+        h.get_by_label("Close the tab repo 日本語");
+    }
 }
