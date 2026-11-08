@@ -313,7 +313,7 @@ mod fluent_approval_note_tests {
             let painted = shown.preview.as_ref().unwrap();
             for note in &painted.notes {
                 assert_eq!(
-                    h.get_all_by_label(note).len(),
+                    h.get_all_by_label(note).count(),
                     painted.notes.iter().filter(|value| *value == note).count()
                 );
             }
