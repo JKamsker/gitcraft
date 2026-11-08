@@ -170,7 +170,7 @@ impl RepoTab {
         let back = match bisect.start_branch() {
             Some(branch) => crate::i18n::message(
                 "repo-workflows-bisect-bisect-buttons-0599842f",
-                &[("branch", (branch).into())],
+                &[("branch", (branch).clone().into())],
             ),
             None => crate::i18n::text("repo-workflows-bisect-bisect-buttons-a28c79f7").to_owned(),
         };
@@ -292,8 +292,8 @@ fn waiting(ui: &mut Ui, t: &Tokens, word: &str, meaning: &str) {
     let text = crate::i18n::message(
         "repo-workflows-bisect-waiting-2d4ce59a",
         &[
-            ("word", (word).into()),
-            ("meaning", (meaning).into()),
+            ("word", (word).clone().into()),
+            ("meaning", (meaning).clone().into()),
             ("capitalised-word-1", (capitalised(word)).clone().into()),
         ],
     );

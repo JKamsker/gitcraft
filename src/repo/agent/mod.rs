@@ -407,7 +407,7 @@ impl RepoTab {
                         "repo-workflows-agent-agent-op-done-16d1e9b2",
                         &[
                             ("running-agent-1", (running.agent).clone().into()),
-                            ("label", (label).into()),
+                            ("label", (label).clone().into()),
                         ],
                     ),
                     false,
@@ -421,7 +421,10 @@ impl RepoTab {
                     Outcome::Done,
                     crate::i18n::message(
                         "repo-workflows-agent-agent-op-done-79a8519c",
-                        &[("label", (label).into()), ("how", (how).into())],
+                        &[
+                            ("label", (label).clone().into()),
+                            ("how", (how).clone().into()),
+                        ],
                     ),
                 )
             }
@@ -429,7 +432,7 @@ impl RepoTab {
                 Outcome::Failed,
                 crate::i18n::message(
                     "repo-workflows-agent-agent-op-done-8336fbfe",
-                    &[("label", (label).into()), ("e", (e).clone().into())],
+                    &[("label", (label).clone().into()), ("e", (e).clone().into())],
                 ),
             ),
         };
@@ -444,7 +447,7 @@ impl RepoTab {
                 Outcome::Failed,
                 crate::i18n::message(
                     "repo-workflows-agent-agent-needs-sign-in-dc823c53",
-                    &[("label", (label).into())],
+                    &[("label", (label).clone().into())],
                 ),
             ));
         }

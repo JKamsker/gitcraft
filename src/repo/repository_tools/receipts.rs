@@ -2,10 +2,21 @@ use super::{Act, Data, State};
 use crate::repo::Action;
 
 pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>) {
-    ui.heading("State publication receipts");
-    ui.label("Exact native transaction receipts distinguish committed metadata from an uncertain acknowledgement. This inspection never rolls back files, removes locks or retries publication.");
-    ui.label("Recovery directories retain original/candidate files and full access metadata. Inspect these entries and index.lock before any manual recovery. Journals are bounded to 256 operations; archive resolved journal refs explicitly after inspecting their recovery entries.");
-    if ui.button("Reload publication receipts").clicked() {
+    ui.heading(crate::i18n::text(
+        "repo-workflows-repository_tools-show-8f8df690",
+    ));
+    ui.label(crate::i18n::text(
+        "repo-workflows-repository_tools-show-625c67be",
+    ));
+    ui.label(crate::i18n::text(
+        "repo-workflows-repository_tools-show-f41d4ab9",
+    ));
+    if ui
+        .button(crate::i18n::text(
+            "repo-workflows-repository_tools-show-7eb9930d",
+        ))
+        .clicked()
+    {
         acts.push(Action::RepositoryTools(Act::StateReceipts));
     }
     let Some(result) = &state.result else {
@@ -21,15 +32,57 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
         }
     };
     if reports.is_empty() {
-        ui.label("No recorded state publications in this worktree.");
+        ui.label(crate::i18n::text(
+            "repo-workflows-repository_tools-show-77c3b92d",
+        ));
     }
     egui::ScrollArea::both().max_height(520.0).show(ui, |ui| {
         for report in reports {
             ui.separator();
-            ui.strong(if report.committed { "Committed: exact receipt" } else { "Pending: retain and inspect" });
+            ui.strong(if report.committed {
+                crate::i18n::text("repo-workflows-repository_tools-show-ef0a338b")
+            } else {
+                crate::i18n::text("repo-workflows-repository_tools-show-9d8f0223")
+            });
             ui.monospace(&report.intent.operation);
             ui.label(&report.detail);
-            ui.monospace(format!("State: {}\nPrevious: {}\nProposed: {}\nReceipt: {}\nSource branch: {}\nExpected HEAD: {}\nRecovery entries: {}", report.intent.state_ref, report.intent.previous, report.intent.proposed, report.intent.receipt_ref, report.intent.branch.as_deref().unwrap_or("detached"), report.intent.expected_head.as_deref().unwrap_or("unborn"), report.intent.evidence));
+            ui.monospace(crate::i18n::message(
+                "repo-workflows-repository_tools-show-ea303dfe",
+                &[
+                    (
+                        "report-intent-state-ref-1",
+                        (report.intent.state_ref).clone().into(),
+                    ),
+                    (
+                        "report-intent-previous-2",
+                        (report.intent.previous).clone().into(),
+                    ),
+                    (
+                        "report-intent-proposed-3",
+                        (report.intent.proposed).clone().into(),
+                    ),
+                    (
+                        "report-intent-receipt-ref-4",
+                        (report.intent.receipt_ref).clone().into(),
+                    ),
+                    (
+                        "report-intent-branch-as-deref-un-5",
+                        (report.intent.branch.as_deref().unwrap_or("detached"))
+                            .clone()
+                            .into(),
+                    ),
+                    (
+                        "report-intent-expected-head-as-d-6",
+                        (report.intent.expected_head.as_deref().unwrap_or("unborn"))
+                            .clone()
+                            .into(),
+                    ),
+                    (
+                        "report-intent-evidence-7",
+                        (report.intent.evidence).clone().into(),
+                    ),
+                ],
+            ));
         }
     });
 }

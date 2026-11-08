@@ -30,15 +30,31 @@ pub(super) fn act(tab: &mut RepoTab, act: Act, ctx: &egui::Context) -> Option<Ac
     None
 }
 pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>) {
-    ui.heading("Named changelists");
-    ui.label("Lists own whole files and keep independent draft messages. Commit uses the reviewed raw working snapshot, creates an unsigned commit and bypasses hooks and filters. Other staged files remain staged. Shelve saves staged and working layers independently; unshelve refuses newer edits on its paths.");
-    if ui.button("Refresh lists and file snapshots").clicked() {
+    ui.heading(crate::i18n::text(
+        "repo-workflows-repository_tools-show-16f5b799",
+    ));
+    ui.label(crate::i18n::text(
+        "repo-workflows-repository_tools-show-1c0954b2",
+    ));
+    if ui
+        .button(crate::i18n::text(
+            "repo-workflows-repository_tools-show-04245473",
+        ))
+        .clicked()
+    {
         acts.push(Action::RepositoryTools(Act::Lists));
     }
     ui.horizontal(|ui| {
-        ui.label("New list:");
+        ui.label(crate::i18n::text(
+            "repo-workflows-repository_tools-show-79af8f6d",
+        ));
         ui.text_edit_singleline(&mut state.query);
-        if ui.button("Create").clicked() {
+        if ui
+            .button(crate::i18n::text(
+                "repo-workflows-repository_tools-show-4759498a",
+            ))
+            .clicked()
+        {
             if let Some(Ok(Data::Lists(v))) = &state.result {
                 acts.push(Action::RepositoryTools(Act::EditList(
                     Box::new(v.clone()),
@@ -47,7 +63,12 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
             }
         }
     });
-    if ui.button("Inspect state publication receipts").clicked() {
+    if ui
+        .button(crate::i18n::text(
+            "repo-workflows-repository_tools-show-ab27abcb",
+        ))
+        .clicked()
+    {
         acts.push(Action::RepositoryTools(Act::StateReceipts));
     }
     let Some(result) = &mut state.result else {
@@ -88,7 +109,13 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
                         ui.ctx()
                             .data_mut(|d| d.insert_temp(rename_id, name.clone()));
                     }
-                    if name != list.name && ui.button("Rename list").clicked() {
+                    if name != list.name
+                        && ui
+                            .button(crate::i18n::text(
+                                "repo-workflows-repository_tools-show-e01205cf",
+                            ))
+                            .clicked()
+                    {
                         acts.push(Action::RepositoryTools(Act::EditList(
                             Box::new(view.clone()),
                             logic::Edit::Rename(list.id.clone(), name),
@@ -102,14 +129,22 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
                     if ui
                         .add(
                             egui::TextEdit::multiline(&mut message)
-                                .hint_text("Draft commit message for this list")
+                                .hint_text(crate::i18n::text(
+                                    "repo-workflows-repository_tools-show-454ee70f",
+                                ))
                                 .desired_rows(2),
                         )
                         .changed()
                     {
                         ui.ctx().data_mut(|d| d.insert_temp(id, message.clone()));
                     }
-                    if message != list.message && ui.button("Save draft message").clicked() {
+                    if message != list.message
+                        && ui
+                            .button(crate::i18n::text(
+                                "repo-workflows-repository_tools-show-ae30be2e",
+                            ))
+                            .clicked()
+                    {
                         acts.push(Action::RepositoryTools(Act::EditList(
                             Box::new(view.clone()),
                             logic::Edit::Message(list.id.clone(), message),
@@ -117,7 +152,12 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
                     }
                     ui.horizontal(|ui| {
                         if list.shelf.is_some() {
-                            if ui.button("Unshelve this list").clicked() {
+                            if ui
+                                .button(crate::i18n::text(
+                                    "repo-workflows-repository_tools-show-92958e20",
+                                ))
+                                .clicked()
+                            {
                                 acts.push(Action::RepositoryTools(Act::ShelveList(
                                     Box::new(view.clone()),
                                     list.id.clone(),
@@ -128,7 +168,9 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
                             if ui
                                 .add_enabled(
                                     !list.paths.is_empty() && !list.message.trim().is_empty(),
-                                    egui::Button::new("Commit this list only"),
+                                    egui::Button::new(crate::i18n::text(
+                                        "repo-workflows-repository_tools-show-41a222be",
+                                    )),
                                 )
                                 .clicked()
                             {
@@ -140,7 +182,9 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
                             if ui
                                 .add_enabled(
                                     !list.paths.is_empty(),
-                                    egui::Button::new("Shelve this list only"),
+                                    egui::Button::new(crate::i18n::text(
+                                        "repo-workflows-repository_tools-show-17c47592",
+                                    )),
                                 )
                                 .clicked()
                             {
@@ -158,7 +202,9 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
                 });
             }
             ui.separator();
-            ui.label("Assign each current file to one active list (or leave it unassigned):");
+            ui.label(crate::i18n::text(
+                "repo-workflows-repository_tools-show-9aa26ad9",
+            ));
             for path in &view.paths {
                 let owner = view
                     .lists
@@ -168,9 +214,20 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
                 ui.horizontal(|ui| {
                     ui.label(path);
                     egui::ComboBox::from_id_salt(("changelist-owner", path))
-                        .selected_text(owner.map_or("Unassigned", |l| l.name.as_str()))
+                        .selected_text(owner.map_or(
+                            crate::i18n::text("repo-workflows-repository_tools-show-14d33bd0"),
+                            |l| l.name.as_str(),
+                        ))
                         .show_ui(ui, |ui| {
-                            if ui.selectable_label(owner.is_none(), "Unassigned").clicked() {
+                            if ui
+                                .selectable_label(
+                                    owner.is_none(),
+                                    crate::i18n::text(
+                                        "repo-workflows-repository_tools-show-14d33bd0",
+                                    ),
+                                )
+                                .clicked()
+                            {
                                 acts.push(Action::RepositoryTools(Act::EditList(
                                     Box::new(view.clone()),
                                     logic::Edit::Assign(String::new(), path.clone()),

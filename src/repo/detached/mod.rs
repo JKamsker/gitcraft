@@ -292,10 +292,7 @@ fn keep_steps(name: &str, head: &str) -> (String, Vec<Vec<String>>, Undo) {
     let mut undo = vec![expect_ref_at(&format!("refs/heads/{name}"), head)];
     undo.extend(ops(&[&["branch", "-D", "--", name]]));
     (
-        crate::i18n::message(
-            "repo-workflows-detached-keep-steps-d2a49cac",
-            &[("name", (name).into())],
-        ),
+        format!("Create branch {name}"),
         make.clone(),
         Undo::Custom { undo, redo: make },
     )

@@ -103,18 +103,8 @@ pub(crate) fn plan(repo: &Path, op: &WriteOp) -> Result<Plan, String> {
         WriteOp::RenameBranch { from, to } => rename_branch(repo, from, to),
         WriteOp::Checkout { branch } => checkout(repo, &here, branch),
         WriteOp::Stash { message } => stash(repo, message),
-        WriteOp::CherryPick { commit } => replay(
-            repo,
-            commit,
-            crate::i18n::text("repo-workflows-agent-plan-4c49fdb6"),
-            &["cherry-pick"],
-        ),
-        WriteOp::Revert { commit } => replay(
-            repo,
-            commit,
-            crate::i18n::text("repo-workflows-agent-plan-0026c505"),
-            &["revert", "--no-edit"],
-        ),
+        WriteOp::CherryPick { commit } => replay(repo, commit, "Cherry-pick", &["cherry-pick"]),
+        WriteOp::Revert { commit } => replay(repo, commit, "Revert", &["revert", "--no-edit"]),
         WriteOp::Reset { commit, mode } => reset(repo, &here, commit, *mode),
         WriteOp::MoveCommit { commit, up } => {
             let edit = if *up { Edit::MoveUp } else { Edit::MoveDown };
@@ -144,7 +134,7 @@ fn commit_of(repo: &Path, rev: &str) -> Result<String, String> {
     .ok_or_else(|| {
         crate::i18n::message(
             "repo-workflows-agent-commit-of-8c23b76d",
-            &[("rev", (rev).into())],
+            &[("rev", (rev).clone().into())],
         )
     })
 }
@@ -180,10 +170,7 @@ fn checked_paths(paths: &[String]) -> Result<Vec<String>, String> {
 fn paths_label(paths: &[String]) -> String {
     match paths {
         [one] => one.clone(),
-        many => crate::i18n::message(
-            "repo-workflows-agent-paths-label-26d36d06",
-            &[("many-len-1", (many.len()).clone().into())],
-        ),
+        many => format!("{} paths", many.len()),
     }
 }
 
@@ -213,7 +200,7 @@ fn not_in_progress(repo: &Path, what: &str) -> Result<(), String> {
                     "state-label-to-lowercase-1",
                     (state.label().to_lowercase()).clone().into(),
                 ),
-                ("what", (what).into()),
+                ("what", (what).clone().into()),
             ],
         )),
         None => Ok(()),
@@ -306,10 +293,7 @@ fn stage(repo: &Path, here: &Here, paths: &[String]) -> Result<Plan, String> {
         .map(str::to_owned)
         .to_vec();
     add.extend(paths.iter().cloned());
-    let label = crate::i18n::message(
-        "repo-workflows-agent-stage-3b4ddea7",
-        &[("paths-label-paths-1", (paths_label(&paths)).clone().into())],
-    );
+    let label = format!("Stage {}", paths_label(&paths));
     let conflicted = conflicted_among(repo, &paths)?;
     if !conflicted.is_empty() {
         // Staging marks them resolved, and the conflict can't be brought back after.
@@ -362,10 +346,7 @@ fn unstage(repo: &Path, here: &Here, paths: &[String]) -> Result<Plan, String> {
     }
     let step = reset_index(here, &paths);
     Ok(Plan {
-        label: crate::i18n::message(
-            "repo-workflows-agent-unstage-eb003390",
-            &[("paths-label-paths-1", (paths_label(&paths)).clone().into())],
-        ),
+        label: format!("Unstage {}", paths_label(&paths)),
         ops: vec![step.clone()],
         refresh: Refresh::Status,
         undo: Undo::Custom {
@@ -401,11 +382,7 @@ fn commit(repo: &Path, here: &Here, message: &str, amend: bool) -> Result<Plan, 
     step.extend(["-m".to_owned(), message.to_owned()]);
     // Not plain "Commit": the window takes that label for its own commit box, and would clear
     // the message the user is writing there.
-    let what = if amend {
-        crate::i18n::text("repo-workflows-agent-commit-4475f515")
-    } else {
-        crate::i18n::text("repo-workflows-agent-commit-82a9c46f")
-    };
+    let what = if amend { "Amend" } else { "Commit" };
     Ok(Plan {
         label: format!("{what} “{}”", headline(message)),
         ops: vec![step],
@@ -423,7 +400,7 @@ fn check_branch_name(repo: &Path, name: &str) -> Result<(), String> {
         .map_err(|_| {
             crate::i18n::message(
                 "repo-workflows-agent-check-branch-name-89d905bf",
-                &[("name", (name).into())],
+                &[("name", (name).clone().into())],
             )
         })
 }
@@ -439,7 +416,7 @@ fn create_branch(
     if branch_at(repo, name).is_some() {
         return Err(crate::i18n::message(
             "repo-workflows-agent-create-branch-8464d926",
-            &[("name", (name).into())],
+            &[("name", (name).clone().into())],
         ));
     }
     let at = commit_of(repo, start.unwrap_or("HEAD"))?;
@@ -450,10 +427,7 @@ fn create_branch(
     }
     .concat();
     Ok(Plan {
-        label: crate::i18n::message(
-            "repo-workflows-agent-create-branch-d2a49cac",
-            &[("name", (name).into())],
-        ),
+        label: format!("Create branch {name}"),
         ops: vec![step.clone()],
         refresh: Refresh::All,
         undo: Undo::Custom {
@@ -470,20 +444,17 @@ fn rename_branch(repo: &Path, from: &str, to: &str) -> Result<Plan, String> {
     if branch_at(repo, from).is_none() {
         return Err(crate::i18n::message(
             "repo-workflows-agent-rename-branch-00b004f0",
-            &[("from", (from).into())],
+            &[("from", (from).clone().into())],
         ));
     }
     if branch_at(repo, to).is_some() {
         return Err(crate::i18n::message(
             "repo-workflows-agent-rename-branch-4fe447cd",
-            &[("to", (to).into())],
+            &[("to", (to).clone().into())],
         ));
     }
     Ok(Plan {
-        label: crate::i18n::message(
-            "repo-workflows-agent-rename-branch-5de8c7a7",
-            &[("from", (from).into()), ("to", (to).into())],
-        ),
+        label: format!("Rename {from} to {to}"),
         ops: ops(&[&["branch", "-m", from, to]]),
         refresh: Refresh::All,
         undo: Undo::Custom {
@@ -499,13 +470,13 @@ fn checkout(repo: &Path, here: &Here, branch: &str) -> Result<Plan, String> {
     if branch_at(repo, branch).is_none() {
         return Err(crate::i18n::message(
             "repo-workflows-agent-checkout-994822a7",
-            &[("branch", (branch).into())],
+            &[("branch", (branch).clone().into())],
         ));
     }
     if here.branch.as_deref() == Some(branch) {
         return Err(crate::i18n::message(
             "repo-workflows-agent-checkout-31e4be52",
-            &[("branch", (branch).into())],
+            &[("branch", (branch).clone().into())],
         ));
     }
     not_in_progress(
@@ -524,10 +495,7 @@ fn checkout(repo: &Path, here: &Here, branch: &str) -> Result<Plan, String> {
         }
     };
     Ok(Plan {
-        label: crate::i18n::message(
-            "repo-workflows-agent-checkout-734452f6",
-            &[("branch", (branch).into())],
-        ),
+        label: format!("Checkout {branch}"),
         ops: run,
         refresh: Refresh::All,
         undo,
@@ -552,7 +520,7 @@ fn stash(repo: &Path, message: &str) -> Result<Plan, String> {
         args.extend(["-m", message]);
     }
     Ok(Plan {
-        label: crate::i18n::text("repo-workflows-agent-stash-38bdfeaa").to_owned(),
+        label: "Stash".to_owned(),
         ops: ops(&[&args]),
         refresh: Refresh::All,
         undo: Undo::Custom {
@@ -622,8 +590,8 @@ fn hard_ask(repo: &Path, here: &Here, hash: &str, target: &str) -> Ask {
         title: crate::i18n::message(
             "repo-workflows-agent-hard-ask-e720ce31",
             &[
-                ("target", (target).into()),
-                ("short-hash-1", (short(hash)).into()),
+                ("target", (target).clone().into()),
+                ("short-hash-1", (short(hash)).clone().into()),
             ],
         ),
         body: crate::i18n::message(
@@ -639,7 +607,7 @@ fn hard_ask(repo: &Path, here: &Here, hash: &str, target: &str) -> Ask {
         ),
         undo_note: crate::i18n::message(
             "repo-workflows-agent-hard-ask-8de2bf44",
-            &[("target", (target).into())],
+            &[("target", (target).clone().into())],
         ),
     }
 }
@@ -656,8 +624,8 @@ fn mixed_ask(repo: &Path, here: &Here, hash: &str, target: &str) -> Result<Optio
         title: crate::i18n::message(
             "repo-workflows-agent-mixed-ask-2c1fd48b",
             &[
-                ("target", (target).into()),
-                ("short-hash-1", (short(hash)).into()),
+                ("target", (target).clone().into()),
+                ("short-hash-1", (short(hash)).clone().into()),
             ],
         ),
         body: crate::i18n::message(
@@ -672,7 +640,7 @@ fn mixed_ask(repo: &Path, here: &Here, hash: &str, target: &str) -> Result<Optio
         ),
         undo_note: crate::i18n::message(
             "repo-workflows-agent-mixed-ask-2ddd09f5",
-            &[("target", (target).into())],
+            &[("target", (target).clone().into())],
         ),
     }))
 }
@@ -690,7 +658,7 @@ fn reset(repo: &Path, here: &Here, commit: &str, mode: ResetMode) -> Result<Plan
             "repo-workflows-agent-reset-5247bb50",
             &[
                 ("target", (target).clone().into()),
-                ("short-hash-1", (short(&hash)).into()),
+                ("short-hash-1", (short(&hash)).clone().into()),
             ],
         ));
     }
@@ -749,9 +717,9 @@ fn rewrite(repo: &Path, here: &Here, commit: &str, edit: Edit) -> Result<Plan, S
     let editor = quick_edit::plan(edit, &hash, commits)?;
     let command = editor.command(repo)?;
     let what = match edit {
-        Edit::Drop => crate::i18n::text("repo-workflows-agent-rewrite-601e2a07"),
-        Edit::MoveUp => crate::i18n::text("repo-workflows-agent-rewrite-3d1ccb79"),
-        Edit::MoveDown => crate::i18n::text("repo-workflows-agent-rewrite-2630fe5c"),
+        Edit::Drop => "Drop commit",
+        Edit::MoveUp => "Move commit up",
+        Edit::MoveDown => "Move commit down",
         Edit::Message => {
             return Err(crate::i18n::text("repo-workflows-agent-rewrite-ff973443").to_owned());
         }
@@ -759,7 +727,7 @@ fn rewrite(repo: &Path, here: &Here, commit: &str, edit: Edit) -> Result<Plan, S
     let ask = (edit == Edit::Drop).then(|| Ask {
         title: crate::i18n::message(
             "repo-workflows-agent-rewrite-fc4198eb",
-            &[("short-hash-1", (short(&hash)).into())],
+            &[("short-hash-1", (short(&hash)).clone().into())],
         ),
         body: crate::i18n::message(
             "repo-workflows-agent-drop-body",
@@ -793,13 +761,13 @@ fn delete_branch(repo: &Path, here: &Here, name: &str, force: bool) -> Result<Pl
     let Some(target) = branch_at(repo, name) else {
         return Err(crate::i18n::message(
             "repo-workflows-agent-delete-branch-55a975e8",
-            &[("name", (name).into())],
+            &[("name", (name).clone().into())],
         ));
     };
     if here.branch.as_deref() == Some(name) {
         return Err(crate::i18n::message(
             "repo-workflows-agent-delete-branch-94d21a83",
-            &[("name", (name).into())],
+            &[("name", (name).clone().into())],
         ));
     }
     let flag = if force { "-D" } else { "-d" };
@@ -810,10 +778,7 @@ fn delete_branch(repo: &Path, here: &Here, name: &str, force: bool) -> Result<Pl
     ];
 
     Ok(Plan {
-        label: crate::i18n::message(
-            "repo-workflows-agent-delete-branch-d32d800a",
-            &[("name", (name).into())],
-        ),
+        label: format!("Delete branch {name}"),
         ops: steps,
         refresh: Refresh::All,
         undo: Undo::Custom {
@@ -823,7 +788,7 @@ fn delete_branch(repo: &Path, here: &Here, name: &str, force: bool) -> Result<Pl
         ask: Some(Ask {
             title: crate::i18n::message(
                 "repo-workflows-agent-delete-branch-d32d800a",
-                &[("name", (name).into())],
+                &[("name", (name).clone().into())],
             ),
             body: crate::i18n::message(
                 "repo-workflows-agent-delete-body",
@@ -981,14 +946,7 @@ fn push(repo: &Path, here: &Here, force: bool) -> Result<Plan, String> {
     // What is sent is the branch as the card describes it: not commits made since.
     let at = local.target.clone();
     Ok(Plan {
-        label: format!(
-            "{} {branch}",
-            if force {
-                crate::i18n::text("repo-workflows-agent-push-1d502fc3")
-            } else {
-                crate::i18n::text("repo-workflows-agent-push-731ce7ed")
-            }
-        ),
+        label: format!("{} {branch}", if force { "Force push" } else { "Push" }),
         ops: vec![expect_ref_at(&format!("refs/heads/{branch}"), &at), step],
         refresh: Refresh::All,
         undo: Undo::None,

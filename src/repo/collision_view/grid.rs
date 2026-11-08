@@ -19,7 +19,7 @@ pub(super) fn results(ui: &mut Ui, m: &Matrix, order: &[Step], acts: &mut Vec<Ac
             readable(&t, t.warning),
             crate::i18n::message(
                 "repo-workflows-collision_view-results-45512235",
-                &[("e", (e).into())],
+                &[("e", (e).clone().into())],
             ),
         );
         ui.add_space(6.0);
@@ -174,7 +174,7 @@ fn cell_tip(a: &str, b: &str, cell: &Cell) -> String {
     match cell {
         Ok(pair) if pair.clean() => crate::i18n::message(
             "repo-workflows-collision_view-cell-tip-b3f28cca",
-            &[("a", (a).into()), ("b", (b).into())],
+            &[("a", (a).clone().into()), ("b", (b).clone().into())],
         ),
         Ok(pair) => {
             let n = pair.files.len();

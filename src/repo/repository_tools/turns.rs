@@ -6,13 +6,16 @@ use crate::{
 pub(super) fn act(tab: &mut RepoTab, act: Act, ctx: &egui::Context) -> Option<Act> {
     match act {
         Act::MarkTurn(review, selected) => {
-            update_marks(tab,*review,Some(selected),ctx);
+            update_marks(tab, *review, Some(selected), ctx);
         }
-        Act::FinishAggregate(review)=>{
-            update_marks(tab,*review,None,ctx);
+        Act::FinishAggregate(review) => {
+            update_marks(tab, *review, None, ctx);
         }
-        Act::PreviewInverse(review) if review.aggregate.is_some()=>{
-            tab.status=Some(("Choose one saved turn to preview its inverse".into(),true));
+        Act::PreviewInverse(review) if review.aggregate.is_some() => {
+            tab.status = Some((
+                crate::i18n::text("repo-workflows-repository_tools-act-6dc9a943").into(),
+                true,
+            ));
         }
         Act::PreviewInverse(review) => {
             let repo = tab.path.clone();
@@ -45,9 +48,12 @@ pub(super) fn act(tab: &mut RepoTab, act: Act, ctx: &egui::Context) -> Option<Ac
         Act::RevertTurn(preview) => {
             tab.repository_tool_mutation("Revert one saved turn", false, ctx, move |r| {
                 logic::inverse_apply(r.repo, &preview, &|| !r.control.is_cancelled()).map(|id| {
-                    format!(
-                        "Turn reverted. Staged contents retained. Undo from Earlier versions: {}. {}",
-                        id.draft.reference, id.evidence
+                    crate::i18n::message(
+                        "repo-workflows-repository_tools-act-b4e12052",
+                        &[
+                            ("id-draft-reference-1", (id.draft.reference).clone().into()),
+                            ("id-evidence-2", (id.evidence).clone().into()),
+                        ],
                     )
                 })
             })
@@ -99,8 +105,12 @@ fn update_marks(
     );
 }
 pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>) {
-    ui.heading("Review saved agent turn");
-    ui.label("Reviewed identical hunks stay hidden across this session's turns. Changed hunks reappear. Marks stay local. Reverting checks the inverse against current files and retains later non-overlapping changes and staged contents.");
+    ui.heading(crate::i18n::text(
+        "repo-workflows-repository_tools-show-0b22ea73",
+    ));
+    ui.label(crate::i18n::text(
+        "repo-workflows-repository_tools-show-05519c89",
+    ));
     let Some(result) = &mut state.result else {
         ui.add(crate::spinner::Spinner::new());
         return;
@@ -114,7 +124,10 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
     };
     match data {
         Data::Turn(review) => {
-            ui.checkbox(&mut state.compatible, "Show reviewed unchanged hunks");
+            ui.checkbox(
+                &mut state.compatible,
+                crate::i18n::text("repo-workflows-repository_tools-show-71ba13e6"),
+            );
             let unreviewed = review
                 .hunks
                 .iter()
@@ -122,15 +135,22 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
                 .filter(|(_, h)| !h.reviewed)
                 .map(|(i, _)| i)
                 .collect::<Vec<_>>();
-            ui.label(format!(
-                "{} hunks · {} hidden reviewed",
-                review.hunks.len(),
-                review.hunks.len() - unreviewed.len()
+            ui.label(crate::i18n::message(
+                "repo-workflows-repository_tools-show-5673c401",
+                &[
+                    ("review-hunks-len-1", (review.hunks.len()).clone().into()),
+                    (
+                        "review-hunks-len-unreviewed-len-2",
+                        (review.hunks.len() - unreviewed.len()).clone().into(),
+                    ),
+                ],
             ));
             if ui
                 .add_enabled(
                     !unreviewed.is_empty(),
-                    egui::Button::new("Mark visible unreviewed hunks reviewed"),
+                    egui::Button::new(crate::i18n::text(
+                        "repo-workflows-repository_tools-show-1f89e0a1",
+                    )),
                 )
                 .clicked()
             {
@@ -140,16 +160,41 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
                 )));
             }
             if let Some(aggregate) = &review.aggregate {
-                ui.strong("Everything since last looked · saved turns only");
-                ui.label(format!("Session {} · {} saved turn(s) · fixed base {} → endpoint {}. Later saved turns and current unsaved files are excluded.",aggregate.session,aggregate.saved_turns,review.parent,review.turn));
-                ui.label(format!(
-                    "Last-looked boundary: {}",
-                    aggregate
-                        .last_looked
-                        .as_deref()
-                        .unwrap_or("initial parent of this session")
+                ui.strong(crate::i18n::text(
+                    "repo-workflows-repository_tools-show-739ffe8f",
                 ));
-                if ui.button("Reload this fixed saved endpoint").clicked() {
+                ui.label(crate::i18n::message(
+                    "repo-workflows-repository_tools-show-181a4047",
+                    &[
+                        ("aggregate-session-1", (aggregate.session).clone().into()),
+                        (
+                            "aggregate-saved-turns-2",
+                            (aggregate.saved_turns).clone().into(),
+                        ),
+                        ("review-parent-3", (review.parent).clone().into()),
+                        ("review-turn-4", (review.turn).clone().into()),
+                    ],
+                ));
+                ui.label(crate::i18n::message(
+                    "repo-workflows-repository_tools-show-1fbe68fb",
+                    &[(
+                        "aggregate-last-looked-as-deref-u-1",
+                        (aggregate
+                            .last_looked
+                            .as_deref()
+                            .unwrap_or(crate::i18n::text(
+                                "repo-workflows-repository_tools-show-9e8617f1",
+                            )))
+                        .clone()
+                        .into(),
+                    )],
+                ));
+                if ui
+                    .button(crate::i18n::text(
+                        "repo-workflows-repository_tools-show-325b12c6",
+                    ))
+                    .clicked()
+                {
                     acts.push(Action::RepositoryTools(Act::AggregateTurn(
                         aggregate.session.clone(),
                         review.turn.clone(),
@@ -158,14 +203,14 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
                 if aggregate.last_looked.as_deref() != Some(review.turn.as_str()) {
                     ui.checkbox(
                         &mut state.acknowledged,
-                        "I reviewed this saved snapshot through the displayed endpoint",
+                        crate::i18n::text("repo-workflows-repository_tools-show-927164d1"),
                     );
                     if ui
                         .add_enabled(
                             state.acknowledged,
-                            egui::Button::new(
-                                "Mark snapshot reviewed and save last-looked boundary",
-                            ),
+                            egui::Button::new(crate::i18n::text(
+                                "repo-workflows-repository_tools-show-05f3fddc",
+                            )),
                         )
                         .clicked()
                     {
@@ -176,26 +221,61 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
                 }
             }
             if review.aggregate.is_none()
-                && ui.button("Preview reverting only this turn…").clicked()
+                && ui
+                    .button(crate::i18n::text(
+                        "repo-workflows-repository_tools-show-3e9abe63",
+                    ))
+                    .clicked()
             {
                 acts.push(Action::RepositoryTools(Act::PreviewInverse(Box::new(
                     review.clone(),
                 ))));
             }
-            egui::ScrollArea::vertical().max_height(420.0).show(ui,|ui|{
-                for (i,h) in review.hunks.iter().enumerate().filter(|(_,h)|state.compatible||!h.reviewed){
-                    ui.horizontal(|ui|{ui.label(if h.reviewed{"Reviewed"}else{"Unreviewed"});if !h.reviewed && ui.button("Mark this hunk reviewed").clicked(){acts.push(Action::RepositoryTools(Act::MarkTurn(Box::new(review.clone()),vec![i])));}});
-                    ui.monospace(h.patch.chars().take(32000).collect::<String>());
-                    if h.patch.chars().count()>32000{ui.label("Display truncated at 32000 characters; open the turn comparison for more.");}
-                }
-            });
+            egui::ScrollArea::vertical()
+                .max_height(420.0)
+                .show(ui, |ui| {
+                    for (i, h) in review
+                        .hunks
+                        .iter()
+                        .enumerate()
+                        .filter(|(_, h)| state.compatible || !h.reviewed)
+                    {
+                        ui.horizontal(|ui| {
+                            ui.label(if h.reviewed {
+                                crate::i18n::text("repo-workflows-repository_tools-show-fad6057b")
+                            } else {
+                                crate::i18n::text("repo-workflows-repository_tools-show-f5265a26")
+                            });
+                            if !h.reviewed
+                                && ui
+                                    .button(crate::i18n::text(
+                                        "repo-workflows-repository_tools-show-deee0d61",
+                                    ))
+                                    .clicked()
+                            {
+                                acts.push(Action::RepositoryTools(Act::MarkTurn(
+                                    Box::new(review.clone()),
+                                    vec![i],
+                                )));
+                            }
+                        });
+                        ui.monospace(h.patch.chars().take(32000).collect::<String>());
+                        if h.patch.chars().count() > 32000 {
+                            ui.label(crate::i18n::text(
+                                "repo-workflows-repository_tools-show-72456f4c",
+                            ));
+                        }
+                    }
+                });
         }
         Data::Inverse(p) => {
-            ui.label(format!(
-                "Inverse of {} → {} against current working files; {} affected paths",
-                p.parent,
-                p.turn,
-                p.paths.len()
+            ui.label(crate::i18n::message(
+                "repo-workflows-repository_tools-show-4f480ac9",
+                &[
+                    ("p-parent-1", (p.parent).clone().into()),
+                    ("p-turn-2", (p.turn).clone().into()),
+                    ("p-paths-len-3", (p.paths.len()).clone().into()),
+                ],
             ));
             egui::ScrollArea::vertical()
                 .max_height(360.0)
@@ -208,13 +288,20 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
                     );
                 });
             if p.patch.len() > 64000 {
-                ui.label("Preview truncated; compare this turn before accepting.");
+                ui.label(crate::i18n::text(
+                    "repo-workflows-repository_tools-show-c29574be",
+                ));
             }
-            ui.checkbox(&mut state.acknowledged,"Apply this inverse; stop on overlapping or stale edits. A safety draft will preserve the current files.");
+            ui.checkbox(
+                &mut state.acknowledged,
+                crate::i18n::text("repo-workflows-repository_tools-show-7b868cc6"),
+            );
             if ui
                 .add_enabled(
                     state.acknowledged,
-                    egui::Button::new("Revert only this turn"),
+                    egui::Button::new(crate::i18n::text(
+                        "repo-workflows-repository_tools-show-4734d197",
+                    )),
                 )
                 .clicked()
             {

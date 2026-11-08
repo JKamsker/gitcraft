@@ -176,7 +176,10 @@ fn review_ui(ui: &mut Ui, review: &mut Review) -> Option<Asked> {
                     RichText::new(crate::i18n::message(
                         "repo-workflows-ai-review-ui-3ccec26f",
                         &[
-                            ("running-tool-short-1", (running.tool.short()).into()),
+                            (
+                                "running-tool-short-1",
+                                (running.tool.short()).clone().into(),
+                            ),
                             (
                                 "elapsed-running-started-2",
                                 (elapsed(running.started)).clone().into(),

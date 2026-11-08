@@ -382,7 +382,7 @@ impl RepoTab {
                                         ("branch", (branch).clone().into()),
                                         (
                                             "crate-repo-short-commit-1",
-                                            (crate::repo::short(commit)).into(),
+                                            (crate::repo::short(commit)).clone().into(),
                                         ),
                                     ],
                                 ),
@@ -476,10 +476,7 @@ impl RepoTab {
                     }
                     let launched = tab.start_launch_tracked(
                         Launch {
-                            label: crate::i18n::message(
-                                "repo-workflows-bakeoff-build-c9238812",
-                                &[("name", (name).clone().into())],
-                            ),
+                            label: format!("build · {name}"),
                             worktree,
                             run: Some(build::script(&command, &there)),
                             ..Launch::default()

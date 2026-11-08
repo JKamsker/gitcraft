@@ -326,16 +326,10 @@ fn remove_confirm(origin: &Origin, op: Vec<String>) -> Action {
             ],
         ),
         button: crate::i18n::text("repo-workflows-doctor-remove-confirm-c3812fc4").to_owned(),
-        label: crate::i18n::message(
-            "repo-workflows-doctor-remove-confirm-b0b26eef",
-            &[
-                ("origin-key-1", (origin.key).clone().into()),
-                (
-                    "shortened-origin-shown-value-2",
-                    (shortened(origin.shown_value())).clone().into(),
-                ),
-                ("file", (file).clone().into()),
-            ],
+        label: format!(
+            "Remove {} ({}) from {file}",
+            origin.key,
+            shortened(origin.shown_value())
         ),
         ops: vec![op],
     }))
@@ -401,16 +395,11 @@ fn set_row(
         if set.clicked()
             && let Ok(op) = args
         {
-            let label = crate::i18n::message(
-                "repo-workflows-doctor-set-row-921f564b",
-                &[
-                    ("setting-key-1", (setting.key).into()),
-                    ("shortened-value-2", (shortened(&value)).clone().into()),
-                    (
-                        "scope-choice-scope-to-lowercase-3",
-                        (scope_choice(scope).to_lowercase()).clone().into(),
-                    ),
-                ],
+            let label = format!(
+                "Set {} to {} for {}",
+                setting.key,
+                shortened(&value),
+                scope_choice(scope).to_lowercase()
             );
             acts.push(Action::Doctor(match scope {
                 // Beyond this repository: asked first.
@@ -418,7 +407,7 @@ fn set_row(
                     title: crate::i18n::message(
                         "repo-workflows-doctor-set-row-a215cc6f",
                         &[
-                            ("setting-key-1", (setting.key).into()),
+                            ("setting-key-1", (setting.key).clone().into()),
                             (
                                 "scope-choice-scope-to-lowercase-2",
                                 (scope_choice(scope).to_lowercase()).clone().into(),
@@ -428,7 +417,7 @@ fn set_row(
                     body: crate::i18n::message(
                         "repo-workflows-doctor-set-row-ccc71902",
                         &[
-                            ("setting-key-1", (setting.key).into()),
+                            ("setting-key-1", (setting.key).clone().into()),
                             ("value", (value).clone().into()),
                             (
                                 "if-scope-scope-global-your-globa-2",
@@ -437,6 +426,7 @@ fn set_row(
                                 } else {
                                     crate::i18n::text("repo-workflows-doctor-set-row-cc3edd84")
                                 })
+                                .clone()
                                 .into(),
                             ),
                         ],

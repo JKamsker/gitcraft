@@ -1,7 +1,9 @@
 use super::{Act, Data, State};
 use crate::repo::Action;
 pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>) {
-    ui.heading("Submodule conflict graph");
+    ui.heading(crate::i18n::text(
+        "repo-workflows-repository_tools-show-51768487",
+    ));
     let Some(result) = &state.result else {
         ui.add(crate::spinner::Spinner::new());
         return;
@@ -14,19 +16,36 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
             return;
         }
     };
-    ui.label(format!(
-        "{} · base {} · ours {} · theirs {}",
-        c.path,
-        c.base.as_deref().unwrap_or("none"),
-        c.ours,
-        c.theirs
+    ui.label(crate::i18n::message(
+        "repo-workflows-repository_tools-show-3acc29f8",
+        &[
+            ("c-path-1", (c.path).clone().into()),
+            (
+                "c-base-as-deref-unwrap-or-none-2",
+                (c.base.as_deref().unwrap_or("none")).clone().into(),
+            ),
+            ("c-ours-3", (c.ours).clone().into()),
+            ("c-theirs-4", (c.theirs).clone().into()),
+        ],
     ));
-    ui.label("Pick an existing commit containing both sides, or open the submodule, merge there, then refresh this graph. Recording changes only the parent index.");
+    ui.label(crate::i18n::text(
+        "repo-workflows-repository_tools-show-b26a038e",
+    ));
     ui.horizontal(|ui| {
-        if ui.button("Open submodule to merge").clicked() {
+        if ui
+            .button(crate::i18n::text(
+                "repo-workflows-repository_tools-show-46aafc00",
+            ))
+            .clicked()
+        {
             acts.push(Action::OpenTab(c.child.clone()));
         }
-        if ui.button("Refresh after merge").clicked() {
+        if ui
+            .button(crate::i18n::text(
+                "repo-workflows-repository_tools-show-bbcce2f9",
+            ))
+            .clicked()
+        {
             acts.push(Action::RepositoryTools(Act::SubmoduleConflict(
                 c.path.clone(),
             )));
@@ -38,9 +57,13 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
         .show(ui, |ui| {
             ui.monospace(&c.graph);
         });
-    ui.label("Known commits containing both sides (you can also paste any full commit ID):");
+    ui.label(crate::i18n::text(
+        "repo-workflows-repository_tools-show-44e05a73",
+    ));
     if c.candidates_limited {
-        ui.label("Only the first 100 matching refs were examined. Paste a full commit ID to check another candidate.");
+        ui.label(crate::i18n::text(
+            "repo-workflows-repository_tools-show-6c892519",
+        ));
     }
     for candidate in &c.candidates {
         if ui
@@ -53,19 +76,24 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
             state.parent = candidate.oid.clone();
         }
     }
-    ui.label(format!("Submodule checkout: {}", c.head));
+    ui.label(crate::i18n::message(
+        "repo-workflows-repository_tools-show-0e95ad58",
+        &[("c-head-1", (c.head).clone().into())],
+    ));
     ui.text_edit_singleline(&mut state.parent);
     if let Some(why) = &c.recording_blocker {
         ui.label(why);
     }
     ui.checkbox(
         &mut state.acknowledged,
-        "I reviewed the selected commit and want to record this parent resolution",
+        crate::i18n::text("repo-workflows-repository_tools-show-edc5ba83"),
     );
     if ui
         .add_enabled(
             c.recording_blocker.is_none() && state.acknowledged && !state.parent.is_empty(),
-            egui::Button::new("Record chosen submodule commit in parent"),
+            egui::Button::new(crate::i18n::text(
+                "repo-workflows-repository_tools-show-b7b34c26",
+            )),
         )
         .clicked()
     {

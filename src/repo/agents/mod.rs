@@ -95,8 +95,7 @@ impl RepoTab {
                 self.agents.dialog = None;
                 self.start_launch(
                     Launch {
-                        label: crate::i18n::text("repo-workflows-agents-agent-act-8fb6d5f3")
-                            .to_owned(),
+                        label: "setup".to_owned(),
                         worktree: self.path.clone(),
                         recipe,
                         agent: None,
@@ -299,13 +298,9 @@ impl RepoTab {
                     return;
                 }
                 let launch = Launch {
-                    label: agent.as_deref().map_or_else(
-                        || {
-                            crate::i18n::text("repo-workflows-agents-after-worktree-add-8fb6d5f3")
-                                .to_owned()
-                        },
-                        tasks::agent_label,
-                    ),
+                    label: agent
+                        .as_deref()
+                        .map_or_else(|| "setup".to_owned(), tasks::agent_label),
                     worktree: made.worktree,
                     recipe,
                     agent,
@@ -329,10 +324,7 @@ impl RepoTab {
             return;
         }
         self.agents.dialog = None;
-        let label = crate::i18n::message(
-            "repo-workflows-agents-start-agent-task-d4ec2011",
-            &[("new-branch-1", (new.branch).clone().into())],
-        );
+        let label = format!("Start agent task {}", new.branch);
         let worktree = worktree_path(&self.path, &new.folder);
         let task = AgentTask {
             branch: new.branch.clone(),

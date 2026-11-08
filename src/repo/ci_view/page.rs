@@ -33,8 +33,8 @@ impl RepoTab {
             &crate::i18n::message(
                 "repo-workflows-ci_view-ci-view-ui-b431c0d7",
                 &[
-                    ("noun", (noun).into()),
-                    ("short-view-sha-1", (short(&view.sha)).into()),
+                    ("noun", (noun).clone().into()),
+                    ("short-view-sha-1", (short(&view.sha)).clone().into()),
                 ],
             ),
             popped,

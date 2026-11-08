@@ -1847,6 +1847,699 @@ repo-workflows-rehearse-rehearse-window-cae7d57b = Stoppen
 
 repo-workflows-release-close-button-7d9eb7ac = Schließen
 
+repo-workflows-repository_tools-act-08cd49af = Isolierten Vorschlag schließen
+
+repo-workflows-repository_tools-act-27cc6eb8 = Die Subtree-Vorbereitung verwendete ein vorheriges Profil oder eine andere Anmeldung. Erneut vorbereiten.
+
+repo-workflows-repository_tools-act-346c061a = Akzeptierte isolierte Wiederanwendung rückgängig machen
+
+repo-workflows-repository_tools-act-494336ed = Exakten Subtree-Split veröffentlichen
+
+repo-workflows-repository_tools-act-519202af = Die Vorbereitung verwendete ein vorheriges Profil oder eine andere Anmeldung. Bereiten Sie sie erneut vor.
+
+repo-workflows-repository_tools-act-551afaa9 = Eine Änderungsliste zurückholen
+
+repo-workflows-repository_tools-act-5bd57c48 = In isolierten Worktrees erneut anwenden
+
+repo-workflows-repository_tools-act-63403bc6 = Virtuellen Branch-Vorgang rückgängig machen
+
+repo-workflows-repository_tools-act-65d162a8 = Isolierte Wiederanwendung fortsetzen
+
+repo-workflows-repository_tools-act-6dc9a943 = Wählen Sie einen gespeicherten Durchgang für die inverse Vorschau
+
+repo-workflows-repository_tools-act-7f694b62 = Ausgangseintrag entfernen
+
+repo-workflows-repository_tools-act-88c16034 = Subtree-Vorgang
+
+repo-workflows-repository_tools-act-901dccbe = Eigentumszuordnung virtueller Branches speichern
+
+repo-workflows-repository_tools-act-a3cbb206 = Änderungsliste speichern
+
+repo-workflows-repository_tools-act-b4e12052 = Durchgang zurückgenommen. Vorgemerkte Inhalte bleiben erhalten. Rückgängig über „Frühere Versionen“: { $id-draft-reference-1 }. { $id-evidence-2 }
+
+repo-workflows-repository_tools-act-b64c091a = Isolierte Wiederanwendung akzeptieren
+
+repo-workflows-repository_tools-act-b967f21f = Exakten Push einreihen
+
+repo-workflows-repository_tools-act-bea96408 = Eine Änderungsliste ablegen
+
+repo-workflows-repository_tools-act-c08c65bd = Exakte Wiederanwendungsbelege abgleichen
+
+repo-workflows-repository_tools-act-c1eec3a9 = Eine Änderungsliste committen
+
+repo-workflows-repository_tools-act-ccd2fdda = Verbindung geändert. Öffnen Sie den Ausgang erneut.
+
+repo-workflows-repository_tools-act-ce061d46 = Materialisierung virtueller Branches ändern
+
+repo-workflows-repository_tools-act-d021ec81 = Profil oder Anmeldung des vorbereiteten Subtrees geändert. Erneut vorbereiten und freigeben.
+
+repo-workflows-repository_tools-act-d64d1e25 = Gehen Sie online und warten Sie auf den aktuellen Vorgang, bevor Sie einen Ausgangs-Push vorbereiten
+
+repo-workflows-repository_tools-act-de986fa8 = Hunks eines virtuellen Branches committen
+
+repo-workflows-repository_tools-act-e3e83f28 = Quellbranch ist aus dem geprüften Graphen verschwunden
+
+repo-workflows-repository_tools-act-fc328635 = Einen gespeicherten Durchgang zurücknehmen
+
+repo-workflows-repository_tools-deferred-badge-8daa08a5 = Konflikt wartet: { $p }
+
+repo-workflows-repository_tools-deferred-badge-a5eafc03 = Isolierte Umschreibung; ursprünglicher Branch bleibt bis zur geschützten Annahme erhalten
+
+repo-workflows-repository_tools-dependency-job-57895189 = Veröffentlichungsabhängigkeiten der Submodule prüfen
+
+repo-workflows-repository_tools-dependency-job-80d8056a = Abhängigkeitsvorgang abgeschlossen
+
+repo-workflows-repository_tools-dependency-job-96731680 = Übergeordnete Veröffentlichung gestoppt. Prüfen Sie die Ergebnisse pro Repository.
+
+repo-workflows-repository_tools-dependency-job-a7b1dc6d = Abhängigkeiten abgeschlossen, aber das übergeordnete Repository, Profil oder die Anmeldung hat sich geändert. Bereiten Sie den Push erneut vor.
+
+repo-workflows-repository_tools-dependency-job-f48f9c31 = Abhängigkeiten vor der Prüfung des übergeordneten Pushes veröffentlichen
+
+repo-workflows-repository_tools-dependency-job-f7c1dc97 = Abhängigkeitsprüfung hat Hindernisse gefunden. Prüfen Sie jedes Submodul.
+
+repo-workflows-repository_tools-force-01549c1f = Force-Push über die Push-Route
+
+repo-workflows-repository_tools-force-15d2a4c4 = Das Ziel steht derzeit auf { $p-remote-commit-1 }. Dies kann Commits anderer Mitwirkender entfernen. Exakte URL und erwarteter Zielcommit sind fixiert. Eine Lease verhindert konkurrierende Pushes.
+
+repo-workflows-repository_tools-force-1d53000c = Ich habe das Ziel geprüft und akzeptiere das Ersetzen seines Verlaufs
+
+repo-workflows-repository_tools-force-884b8ad2 = { $p-destination-1 } auf { $p-remote-2 } ({ $crate-git-redact-p-url-none-3 }) durch { $p-branch-4 } bei { $p-commit-5 } ersetzen?
+
+repo-workflows-repository_tools-force-b7f756d6 = Force-Push mit ausdrücklicher Lease
+
+repo-workflows-repository_tools-label-137ebba9 = { $direction } { $route-remote-1 }/{ $route-branch-2 } · { $counts }
+
+repo-workflows-repository_tools-label-2d5fbffb = Anzahl unbekannt (zuerst abrufen)
+
+repo-workflows-repository_tools-label-87dc28eb = { $direction }: keine Route eingerichtet
+
+repo-workflows-repository_tools-label-f25a8952 = { $a } voraus · { $b } zurück
+
+repo-workflows-repository_tools-object-view-14a9c8ce = Loses Objekt: { $n } komprimierte Bytes
+
+repo-workflows-repository_tools-object-view-3e15593a = Objekt-ID oder Dateiversion, etwa HEAD:src/main.rs. Die Prüfung lädt nie fehlende Objekte herunter. Diese Garantie erfordert Git 2.45 oder neuer.
+
+repo-workflows-repository_tools-object-view-44de072f = { $o-kind-1 } · { $o-size-2 } Bytes entpackt · { $o-disk-3 } Bytes auf Datenträger
+
+repo-workflows-repository_tools-object-view-56daa2be = Baumeinträge / verknüpfte Objekte
+
+repo-workflows-repository_tools-object-view-62a6da87 = Objekt
+
+repo-workflows-repository_tools-object-view-7b47361a = Basis
+
+repo-workflows-repository_tools-object-view-8efd32c4 = Wie ein Objekt gespeichert ist
+
+repo-workflows-repository_tools-object-view-9147a920 = { $data-format-1 } · { $data-objects-display-2 } · aufgelöst aus { $data-query-3 }
+
+repo-workflows-repository_tools-object-view-9d4281bc = Bei Deltas beschreibt die Darstellungsgröße die Delta-Anweisungen. Die entpackte Objektgröße steht oben.
+
+repo-workflows-repository_tools-object-view-b39d687c = Delta-Basis: { $base }
+
+repo-workflows-repository_tools-object-view-ddc47a7a = Git-Verzeichnis: { $data-git-dir-1 }
+    Gemeinsames Verzeichnis: { $data-common-dir-2 }
+
+repo-workflows-repository_tools-object-view-e0723a86 = Prüfen
+
+repo-workflows-repository_tools-object-view-f4de0102 = { $if-i-0-object-else-base-1 }: { $row-oid-2 } · { $row-kind-3 } · gepackt { $row-disk-4 } B · Darstellung { $row-size-5 } B · Offset { $row-offset-6 } · Tiefe { $row-depth-7 }
+
+repo-workflows-repository_tools-patch-eef91a52 = Keine Unterschiede
+
+repo-workflows-repository_tools-picker-f523255b = Bekannte Branches
+
+repo-workflows-repository_tools-prepare-branch-review-2685a3d8 = Push-Vorbereitung abgebrochen
+
+repo-workflows-repository_tools-prepare-branch-review-77a313b9 = Ungültige ausgewählte Push-Fortsetzung
+
+repo-workflows-repository_tools-prepare-branch-review-a89fdaff = Repository, Profil oder Anmeldung geändert. Wählen Sie die Push-Aktion erneut.
+
+repo-workflows-repository_tools-publish-group-1f0d64fa = Veröffentlichung unvollständig: { $failed } Ziele fehlgeschlagen. Prüfen Sie die Ergebnisse jedes Ziels.
+
+repo-workflows-repository_tools-publish-group-3cc9a2c6 = Gruppe veröffentlichen
+
+repo-workflows-repository_tools-publish-group-449d962a = Alle Ziele haben den vorbereiteten Commit veröffentlicht
+
+repo-workflows-repository_tools-refs-list-c2a1a3d6 = Objekt kopieren
+
+repo-workflows-repository_tools-refs-list-edec79bb = Objekt prüfen
+
+repo-workflows-repository_tools-reftable-view-4101df87 = { $storage-git-1 } · aktuelle Speicherung: { $storage-format-2 }
+
+repo-workflows-repository_tools-reftable-view-87ed192f = Alle anderen Schreibzugriffe sind beendet und ich habe eine Sicherung
+
+repo-workflows-repository_tools-reftable-view-891eab64 = Die Migration behält Referenzen und Reflogs bei, verweigert verknüpfte Worktrees und prüft beides anschließend. Stoppen Sie alle anderen Programme, die ins Repository schreiben. Sichern Sie das Repository vor dem Fortfahren.
+
+repo-workflows-repository_tools-reftable-view-c2782e54 = Referenzspeicherung und geführte Migration
+
+repo-workflows-repository_tools-reftable-view-d3ba0aeb = Nach { $target } migrieren und prüfen
+
+repo-workflows-repository_tools-reftable-view-ea4f0afa = Ich habe die Kompatibilität meiner installierten Werkzeuge mit dem Zielformat geprüft
+
+repo-workflows-repository_tools-reftable-view-faca3ce1 = Reftable benötigt Git 2.45 oder neuer und kompatible Drittwerkzeuge. Manche IDEs, eingebettete Git-Bibliotheken, Sicherungsprogramme und ältere Clients unterstützen nur Dateien. Prüfen Sie vor der Migration jedes Werkzeug, das auf dieses Repository zugreift. Dateien bieten die breiteste Kompatibilität.
+
+repo-workflows-repository_tools-remote-config-preview-bba0304c = Remote-Vorschau: { $e }
+
+repo-workflows-repository_tools-replacements-view-0a69dfc6 = Wirksamer Verlauf
+
+repo-workflows-repository_tools-replacements-view-1714de4d = Alte Grafts in Replace-Referenzen umwandeln
+
+repo-workflows-repository_tools-replacements-view-33ea34c6 = Betroffener Commit { $r-original-1 } → { $r-effective-2 }
+
+repo-workflows-repository_tools-replacements-view-4953f897 = Verbindung entfernen
+
+repo-workflows-repository_tools-replacements-view-4cff5861 = Ursprünglicher Verlauf (--no-replace-objects)
+
+repo-workflows-repository_tools-replacements-view-5fcfdd61 = Wirksame Eltern: { $r-parents-1 }
+
+repo-workflows-repository_tools-replacements-view-7916bff6 = Temporären Graft erstellen
+
+repo-workflows-repository_tools-replacements-view-7b8c9687 = Alte Datei info/grafts (umgewandelte Verbindungen bleiben hier sichtbar und entfernbar):
+
+repo-workflows-repository_tools-replacements-view-84da95ea = Commit:
+
+repo-workflows-repository_tools-replacements-view-9c43f2c2 = Ich habe diese lokalen Verlaufsänderungen geprüft
+
+repo-workflows-repository_tools-replacements-view-b022884c = Neuer Elterncommit:
+
+repo-workflows-repository_tools-replacements-view-e51254f0 = Importierte Verläufe verbinden: Ersetzt die Eltern dieses Commits durch einen Commit aus dem anderen Verlauf. Fügen Sie vollständige Commit-IDs ein. Zyklische Verbindungen und vorhandene Ersetzungen werden abgelehnt.
+
+repo-workflows-repository_tools-replacements-view-f5b874e5 = Replace-Referenzen und temporäre Verlaufsverbindungen
+
+repo-workflows-repository_tools-replacements-view-fcc3aff3 = Replace-Referenzen betreffen diese Commits und ihre Nachfahren. Die Verbindungen unten sind lokal und temporär. Das Entfernen der Replace-Referenz stellt den ursprünglichen Verlauf wieder her.
+
+repo-workflows-repository_tools-repository-tool-mutation-988356ee = { $busy } läuft noch
+
+repo-workflows-repository_tools-repository-tools-act-07fb4089 = Klon unabhängig machen
+
+repo-workflows-repository_tools-repository-tools-act-38bb44e4 = Aggregierter Endpunkt oder Sitzung fehlt
+
+repo-workflows-repository_tools-repository-tools-act-3c1c7a3a = Veröffentlichungsgruppe speichern
+
+repo-workflows-repository_tools-repository-tools-act-4e161156 = Remote-Konfiguration speichern
+
+repo-workflows-repository_tools-repository-tools-act-66f98362 = Submodulzeiger auflösen
+
+repo-workflows-repository_tools-repository-tools-act-69a2d9db = Replace-Referenz entfernen
+
+repo-workflows-repository_tools-repository-tools-act-82d14313 = Pull- und Push-Routen speichern
+
+repo-workflows-repository_tools-repository-tools-act-888e8b45 = Referenzspeicherung migrieren
+
+repo-workflows-repository_tools-repository-tools-act-a7b0c90c = Importierte Verläufe vorübergehend verbinden
+
+repo-workflows-repository_tools-repository-tools-act-ad133eb8 = Alte Grafts in entfernbare Replace-Referenzen umwandeln
+
+repo-workflows-repository_tools-repository-tools-act-baa3959f = Branchstand fehlt
+
+repo-workflows-repository_tools-repository-tools-act-e7cf34fe = Gespeicherter Durchgang fehlt
+
+repo-workflows-repository_tools-review-prepared-push-88d2d1a8 = Ausgewählte Route pushen
+
+repo-workflows-repository_tools-show-0256e5a0 = Rebase in isoliertem Worktree ausführen
+
+repo-workflows-repository_tools-show-03dc5c4f = Abruf-Refspecs: +source:destination; ^source schließt einen Branch oder ein Präfix aus
+
+repo-workflows-repository_tools-show-04245473 = Listen und Dateistände aktualisieren
+
+repo-workflows-repository_tools-show-05519c89 = Bereits geprüfte identische Hunks bleiben über die Durchgänge dieser Sitzung verborgen. Geänderte Hunks erscheinen erneut. Markierungen bleiben lokal. Die Rücknahme prüft die Umkehrung gegen aktuelle Dateien und behält spätere nicht überlappende Änderungen sowie vorgemerkte Inhalte.
+
+repo-workflows-repository_tools-show-057248ff = Auf mehreren Hosts veröffentlichen
+
+repo-workflows-repository_tools-show-05e1813b = Gespeicherten Kandidaten öffnen
+
+repo-workflows-repository_tools-show-05e305a1 = Ich habe andere Schreibprogramme für dieses Repository beendet und eine Sicherung erstellt
+
+repo-workflows-repository_tools-show-05f3fddc = Stand als geprüft markieren und Prüfgrenze speichern
+
+repo-workflows-repository_tools-show-06b251d5 = Gemeinsames Git-Verzeichnis: { $model-common-1 }
+
+repo-workflows-repository_tools-show-07345f3f = Diesen exakten Subtree-Split senden
+
+repo-workflows-repository_tools-show-07aa5dfe = Gemeinsame und geliehene Objekte
+
+repo-workflows-repository_tools-show-089eb3ef = Pullen von
+
+repo-workflows-repository_tools-show-0ae1bed9 = Branchentwurf speichern
+
+repo-workflows-repository_tools-show-0b22ea73 = Gespeicherten Agent-Durchgang prüfen
+
+repo-workflows-repository_tools-show-0d37e057 = Neue Basis:
+
+repo-workflows-repository_tools-show-0e95ad58 = Submodul-Checkout: { $c-head-1 }
+
+repo-workflows-repository_tools-show-107f87fc = Submodulabhängigkeiten vor dem übergeordneten Repository veröffentlichen
+
+repo-workflows-repository_tools-show-111eda2a = Nur diesen Branch committen
+
+repo-workflows-repository_tools-show-118694a9 = Abhängigkeiten veröffentlichen, dann übergeordneten Push prüfen
+
+repo-workflows-repository_tools-show-11d962b1 = Spenderverzeichnis fehlt
+
+repo-workflows-repository_tools-show-14d33bd0 = Nicht zugeordnet
+
+repo-workflows-repository_tools-show-1560b7d2 = Submodul öffnen
+
+repo-workflows-repository_tools-show-16312ab3 = Quelle lokal registrieren
+
+repo-workflows-repository_tools-show-16d60e39 = Für einen übernommenen Ordner ohne Subtree-Verlauf: Abrufen, Unterschiede prüfen und dann ausdrücklich mit der abgerufenen Basis verbinden. Die Verbindung behält jedes Ordnerbyte und erfasst Unterschiede als lokale Änderungen. Nur künftige Upstream-Änderungen werden gemergt. Akzeptieren Sie die geprüfte Verbindung vor weiteren Aktualisierungen. Bestehende Git-Subtree-Importe können direkt „Aktualisierung vorbereiten“ verwenden.
+
+repo-workflows-repository_tools-show-16f5b799 = Benannte Änderungslisten
+
+repo-workflows-repository_tools-show-17c47592 = Nur diese Liste ablegen
+
+repo-workflows-repository_tools-show-181a4047 = Sitzung { $aggregate-session-1 } · { $aggregate-saved-turns-2 } gespeicherte Durchgänge · feste Basis { $review-parent-3 } → Endpunkt { $review-turn-4 }. Spätere gespeicherte Durchgänge und aktuelle ungespeicherte Dateien sind ausgeschlossen.
+
+repo-workflows-repository_tools-show-1919101c = Diesen Stack in getrennten Worktrees erneut anwenden
+
+repo-workflows-repository_tools-show-19af9596 = Kandidaten von { $s-branch-1 } vergleichen
+
+repo-workflows-repository_tools-show-19cca4e2 = Die Prüfung ruft Heads und Tags in temporäre App-Referenzen jedes Submoduls ab. Sie prüft den benannten Abrufendpunkt samt Gitlinks im ausgehenden Verlauf. Verschachtelte Abhängigkeiten werden zuerst veröffentlicht. Diese Pushes sind nicht atomar; Fehler stoppen das übergeordnete Repository.
+
+repo-workflows-repository_tools-show-1a6e5e0d = Vorhandenen Ordner mit abgerufener Basis verbinden
+
+repo-workflows-repository_tools-show-1b5dcef8 = Eingaben seit der Vorschau geändert. Erstellen Sie vor dem Speichern eine neue Vorschau.
+
+repo-workflows-repository_tools-show-1bd5bcfa = Aktuelle Quelle: { $view-branch-1 }
+
+repo-workflows-repository_tools-show-1c0954b2 = Listen verwalten ganze Dateien und haben unabhängige Nachrichtenentwürfe. Ein Commit verwendet den geprüften rohen Arbeitsstand, bleibt unsigniert und umgeht Hooks und Filter. Andere vorgemerkte Dateien bleiben vorgemerkt. Ablegen speichert vorgemerkte und Arbeitsänderungen getrennt. Zurückholen verweigert neuere Änderungen an betroffenen Pfaden.
+
+repo-workflows-repository_tools-show-1e4f897e = Git-Verzeichnis: { $model-git-1 }
+
+repo-workflows-repository_tools-show-1e9112fe = Registrierten Branch abrufen
+
+repo-workflows-repository_tools-show-1f711390 = Aktualisierung in eigenem Worktree vorbereiten
+
+repo-workflows-repository_tools-show-1f89e0a1 = Sichtbare ungeprüfte Hunks als geprüft markieren
+
+repo-workflows-repository_tools-show-1fad1933 = bereits veröffentlicht
+
+repo-workflows-repository_tools-show-1fbe68fb = Grenze der letzten Prüfung: { $aggregate-last-looked-as-deref-u-1 }
+
+repo-workflows-repository_tools-show-202c8fbc = Einwilligung: Diesen einfachen Push online automatisch senden, sofern die Vorprüfung keine Befunde hat
+
+repo-workflows-repository_tools-show-222bd382 = Ausgewählten Versand vorbereiten …
+
+repo-workflows-repository_tools-show-2250c14b = Vorgemerkte Ordneränderungen
+
+repo-workflows-repository_tools-show-2c00ff77 = Nur fehlgeschlagene Ziele wiederholen
+
+repo-workflows-repository_tools-show-2d0adec7 = Objektspeicher: { $crate-remote-display-model-objec-1 }
+
+repo-workflows-repository_tools-show-2ddef7c7 = Subtree-Register aktualisieren
+
+repo-workflows-repository_tools-show-2e1d0813 = Ich habe diesen exakten eingereihten Commit, jeden Endpunkt und alle Vorprüfungsbefunde geprüft
+
+repo-workflows-repository_tools-show-301d9809 = Diesen Klon unabhängig machen
+
+repo-workflows-repository_tools-show-31a04bc4 = Erforderlich: { $oid }
+
+repo-workflows-repository_tools-show-325b12c6 = Diesen festen gespeicherten Endpunkt erneut laden
+
+repo-workflows-repository_tools-show-33463eb4 = Vorschlag schließen; Worktrees behalten
+
+repo-workflows-repository_tools-show-34b10b8d = Rebase von { $name }
+
+repo-workflows-repository_tools-show-36c73d64 = Exakter vorgeschlagener Branch-Patch
+
+repo-workflows-repository_tools-show-3a7402e9 = Ich habe jedes Original → Kandidat-Objekt und den Kandidaten-Diff vor Annahme oder Rücknahme geprüft
+
+repo-workflows-repository_tools-show-3acc29f8 = { $c-path-1 } · Basis { $c-base-as-deref-unwrap-or-none-2 } · unsere Seite { $c-ours-3 } · deren Seite { $c-theirs-4 }
+
+repo-workflows-repository_tools-show-3cc9a2c6 = Gruppe veröffentlichen
+
+repo-workflows-repository_tools-show-3e04e021 = Erneute Veröffentlichungsprüfung vorbereiten
+
+repo-workflows-repository_tools-show-3e9abe63 = Rücknahme nur dieses Durchgangs ansehen …
+
+repo-workflows-repository_tools-show-3f2768b0 = Geprüfte Abruf-URL: { $git-redact-n-fetch-url-none-1 } · { $if-n-published-already-published-2 }
+
+repo-workflows-repository_tools-show-41251e4b = Unversionierte Dateien (nicht in der Split-Veröffentlichung enthalten):
+
+repo-workflows-repository_tools-show-412ec52f = Geprüfte Eingaben des isolierten Restacks (Kindschichten verwenden das umgeschriebene Ergebnis ihres Vorgängers):
+
+repo-workflows-repository_tools-show-41a222be = Nur diese Liste committen
+
+repo-workflows-repository_tools-show-43a8ef7d = Bestehenden oder neuen übernommenen Ordner registrieren
+
+repo-workflows-repository_tools-show-440174a7 = Akzeptierte Schichten rückgängig machen
+
+repo-workflows-repository_tools-show-4498585c = Ergebnis: { $oid }
+
+repo-workflows-repository_tools-show-44e05a73 = Bekannte Commits mit beiden Seiten (auch vollständige Commit-ID möglich):
+
+repo-workflows-repository_tools-show-454ee70f = Commit-Nachrichtenentwurf für diese Liste
+
+repo-workflows-repository_tools-show-4601e33d = Die Annahme benötigt einen vollständig sauberen ursprünglichen Checkout einschließlich unversionierter und ignorierter Dateien sowie den exakten ursprünglichen Branch und seine OID. Lösen Sie Konflikte und merken Sie die Lösungen im Kandidaten-Worktree vor. Ungewisse Annahmen werden ohne Wiederholung abgeglichen. Kein Kandidat wird automatisch bereinigt.
+
+repo-workflows-repository_tools-show-469f9427 = Letzten virtuellen Vorgang rückgängig machen
+
+repo-workflows-repository_tools-show-46aafc00 = Submodul zum Mergen öffnen
+
+repo-workflows-repository_tools-show-4734d197 = Nur diesen Durchgang zurücknehmen
+
+repo-workflows-repository_tools-show-4759498a = Erstellen
+
+repo-workflows-repository_tools-show-4829ff52 = Quellbranch:
+
+repo-workflows-repository_tools-show-49346e37 = Exakte Quelle: { $n-source-1 } · Push-URL: { $git-redact-n-push-url-none-2 }
+
+repo-workflows-repository_tools-show-4c8748ea = Diesen exakten Commit über seine Push-Route einreihen
+
+repo-workflows-repository_tools-show-4d07d136 = Nur der gespeicherte Commit wird gesendet. Umschreibungen, Zieländerungen sowie abgelehnte oder ungewisse Sendungen halten zur Prüfung an. Nach einem Absturz ist das Ergebnis ungewiss und wird nie automatisch wiederholt. Ausgangsdaten und geschützte Commits sind lokale App-Referenzen. Spiegeln Sie diese nicht mit Push.
+
+repo-workflows-repository_tools-show-4e161156 = Remote-Konfiguration speichern
+
+repo-workflows-repository_tools-show-4f480ac9 = Umkehrung von { $p-parent-1 } → { $p-turn-2 } gegen aktuelle Arbeitsdateien; { $p-paths-len-3 } betroffene Pfade
+
+repo-workflows-repository_tools-show-507eaa08 = Original { $s-branch-1 }
+
+repo-workflows-repository_tools-show-51768487 = Submodul-Konfliktgraph
+
+repo-workflows-repository_tools-show-52b07a38 = Push-Ausgang
+
+repo-workflows-repository_tools-show-5370d2e8 = Aktuelle Hunks und ihre Eigentümer:
+
+repo-workflows-repository_tools-show-5471de9c = Exakte Annahmebelege abgleichen
+
+repo-workflows-repository_tools-show-5673c401 = { $review-hunks-len-1 } Hunks · { $review-hunks-len-unreviewed-len-2 } geprüfte verborgen
+
+repo-workflows-repository_tools-show-5d3cc263 = Alle Referenzen und Namensraumverläufe
+
+repo-workflows-repository_tools-show-5dc87aef = Getrennte Pull- und Push-Routen
+
+repo-workflows-repository_tools-show-5dcd35a3 = Jede Anzahl vergleicht diesen lokalen Branch mit der zuletzt abgerufenen Referenz der Route. Fehlende oder ausgeschlossene Tracking-Referenzen ergeben „unbekannt“. Die Änderung eines Push-Branches betrifft die gewöhnlichen Branch-Pushes von gitcraft. Git selbst verwendet weiterhin seine nativen push.default-/Refspec-Regeln.
+
+repo-workflows-repository_tools-show-5dfdfed0 = Ich habe den exakten Split, alle Zielendpunkte, das gewählte Profil und Konto sowie die Vorprüfungsbefunde geprüft
+
+repo-workflows-repository_tools-show-5e3184e8 = Vorschau bei 64000 Zeichen gekürzt.
+
+repo-workflows-repository_tools-show-5f715b70 = Hunkanzeige gekürzt. Prüfen Sie vor der Zuordnung den Datei-Diff.
+
+repo-workflows-repository_tools-show-5fa7aac5 = Bereit
+
+repo-workflows-repository_tools-show-5fb1b07d = Gruppe { $p-group-1 } · { $p-commit-2 } → refs/heads/{ $p-branch-3 }
+
+repo-workflows-repository_tools-show-616296e8 = { $s-branch-1 } nach { $s-old-base-2 } auf { $s-onto-3 } erneut anwenden
+
+repo-workflows-repository_tools-show-625c67be = Exakte native Transaktionsbelege unterscheiden bestätigte Metadaten von ungewissen Bestätigungen. Diese Prüfung setzt keine Dateien zurück, entfernt keine Sperren und wiederholt keine Veröffentlichung.
+
+repo-workflows-repository_tools-show-666eca6d = Quellremote:
+
+repo-workflows-repository_tools-show-66dfd7a6 = Kandidaten-Patch prüfen
+
+repo-workflows-repository_tools-show-67572031 = Remote: { $e-draft-name-1 } · alle Änderungen gelten nur für dieses Repository
+
+repo-workflows-repository_tools-show-6b30bed0 = Jeder Hunk gehört zu einem echten Branch. Der ausgecheckte Branch bleibt an seinem Ankercommit und Gits echter Index bleibt erhalten. Virtuelle Branch-Commits verwenden geprüfte Rohinhalte, sind unsigniert und umgehen Hooks und Filter. Geänderte Zuordnungen und überlappende Aktivierungen benötigen eine ausdrückliche Lösung. Arbeitsordneränderungen benötigen natives macOS oder Linux.
+
+repo-workflows-repository_tools-show-6bdc8428 = Kandidat noch unvollständig
+
+repo-workflows-repository_tools-show-6c1991e9 = „Unabhängig machen“ kopiert ein vollständiges Pack für Referenzen, ursprüngliche Abstammung, Reflogs und Indexeinträge, prüft es in einem getrennten Repository und entfernt dann den Alternativverweis. Spender bleiben unverändert. Die ursprünglichen Alternativmetadaten bleiben als Wiederherstellungssicherung erhalten. Die Vorbereitung ist auf 128 MiB pro Pack begrenzt. Größere Repositorys können vor einer neuen Vorbereitung git repack -a verwenden.
+
+repo-workflows-repository_tools-show-6c892519 = Nur die ersten 100 passenden Referenzen wurden geprüft. Fügen Sie eine vollständige Commit-ID für einen anderen Kandidaten ein.
+
+repo-workflows-repository_tools-show-6f2680ab = { $b-name-1 } · { $if-b-active-active-else-inactive-2 } · { $b-owned-len-3 } zugeordnete Hunks
+
+repo-workflows-repository_tools-show-71ba13e6 = Geprüfte unveränderte Hunks anzeigen
+
+repo-workflows-repository_tools-show-72353618 = Zuordnungen und Prune-Löschungen anhand der Abruf-URL ansehen
+
+repo-workflows-repository_tools-show-72456f4c = Anzeige bei 32000 Zeichen gekürzt. Öffnen Sie für mehr den Durchgangsvergleich.
+
+repo-workflows-repository_tools-show-739ffe8f = Alles seit der letzten Prüfung · nur gespeicherte Durchgänge
+
+repo-workflows-repository_tools-show-7432d850 = Lokale Änderungen prüfen
+
+repo-workflows-repository_tools-show-7790f11b = Benannte Gruppe speichern
+
+repo-workflows-repository_tools-show-77c3b92d = Keine gespeicherten Zustandsveröffentlichungen in diesem Worktree.
+
+repo-workflows-repository_tools-show-78f32476 = Ausgewählten exakten Push senden
+
+repo-workflows-repository_tools-show-798b0df6 = Zielbranch:
+
+repo-workflows-repository_tools-show-79af8f6d = Neue Liste:
+
+repo-workflows-repository_tools-show-7b868cc6 = Diese Umkehrung anwenden; bei überlappenden oder veralteten Änderungen stoppen. Ein Sicherheitsentwurf bewahrt die aktuellen Dateien.
+
+repo-workflows-repository_tools-show-7bd990ec = Kandidat { $s-branch-1 }
+
+repo-workflows-repository_tools-show-7c52fd3d = Vorschläge und Belege aktualisieren
+
+repo-workflows-repository_tools-show-7d86e238 = Konflikte, die warten können
+
+repo-workflows-repository_tools-show-7e381308 = Zusammengefasster Import
+
+repo-workflows-repository_tools-show-7eb9930d = Veröffentlichungsbelege erneut laden
+
+repo-workflows-repository_tools-show-7ffc5022 = Echter Branchstand: { $b-tip-1 }
+
+repo-workflows-repository_tools-show-80c567ae = Alte Basis (nachfolgende Commits erneut anwenden):
+
+repo-workflows-repository_tools-show-80ef5663 = Keine Vorprüfungsbefunde zu Identität, Signaturen, Nachrichten, Geheimnissen, großen Blobs oder Remote-Verlauf.
+
+repo-workflows-repository_tools-show-83e94e8a = { $p-plan-commits-len-1 } ausgehende Commits
+
+repo-workflows-repository_tools-show-8472b5d8 = Veröffentlicht: { $git-redact-output-none-1 }
+
+repo-workflows-repository_tools-show-84e9b213 = Referenzen filtern:
+
+repo-workflows-repository_tools-show-864a00e5 = Verleiht Objekte an { $borrower }
+
+repo-workflows-repository_tools-show-88db1c04 = Veröffentlichung erforderlich
+
+repo-workflows-repository_tools-show-89f4921c = Abruf-URLs (nur die erste wird abgerufen; eine pro Zeile)
+
+repo-workflows-repository_tools-show-8bb0f122 = { $c-branch-1 } bei { $c-old-2 }
+
+repo-workflows-repository_tools-show-8bbd26a7 = Veraltete Zuordnung { $h-key-8-1 } freigeben
+
+repo-workflows-repository_tools-show-8cc484e4 = Alter Eintrag: Profil- oder Kontofreigabe fehlt
+
+repo-workflows-repository_tools-show-8daa08a5 = Konflikt wartet: { $p }
+
+repo-workflows-repository_tools-show-8dd5e5cc = Verlauf der Referenz / des Präfixes (leer = alle):
+
+repo-workflows-repository_tools-show-8edc0123 = Ich habe jedes Ziel geprüft und akzeptiere eine teilweise Veröffentlichung
+
+repo-workflows-repository_tools-show-8f3b56b3 = Ich habe jedes benannte Remote, den exakten Commit und den Zielbranch geprüft
+
+repo-workflows-repository_tools-show-8f8df690 = Belege der Zustandsveröffentlichung
+
+repo-workflows-repository_tools-show-8fb60b6e = Eingeschränkte Anmeldung: { $crate-git-redact-endpoint-none-1 } · Konto { $account-2 } · Benutzername { $username-3 }
+
+repo-workflows-repository_tools-show-8fd0f155 = Anker: { $m-anchor-1 } bei { $crate-repo-short-m-base-2 }
+
+repo-workflows-repository_tools-show-8fe4dcef = Routen ändern …
+
+repo-workflows-repository_tools-show-9174163c = Isolierter Restack
+
+repo-workflows-repository_tools-show-927164d1 = Ich habe diesen gespeicherten Stand bis zum angezeigten Endpunkt geprüft
+
+repo-workflows-repository_tools-show-92958e20 = Diese Liste zurückholen
+
+repo-workflows-repository_tools-show-93fdd760 = Vollständiger Upstream-Verlauf
+
+repo-workflows-repository_tools-show-96a8a275 = Die Freigabe fixiert das gewählte Profil, Metadaten des Verbindungskontos und eine gegebenenfalls eingeschränkte temporäre Anmeldung. Ein geänderter oder fehlender älterer Nachweis benötigt erneute Freigabe. Vorbereitete Ergebnisse verfallen bei Profil- oder Anmeldungsänderungen.
+
+repo-workflows-repository_tools-show-98a12458 = Kandidaten-Worktree fortsetzen / abgleichen
+
+repo-workflows-repository_tools-show-99256c25 = Gewähltes Profil { $p-consent-profile-1 } · Metadaten des Verbindungskontos fixiert
+
+repo-workflows-repository_tools-show-99d05df7 = Committeten Ordnerverlauf abspalten
+
+repo-workflows-repository_tools-show-9aa26ad9 = Ordnen Sie jede aktuelle Datei einer aktiven Liste zu oder lassen Sie sie unzugeordnet:
+
+repo-workflows-repository_tools-show-9b1cea76 = { $p-plan-commits-len-1 } ausgehende Commits geprüft
+
+repo-workflows-repository_tools-show-9b9a8d05 = Lesen
+
+repo-workflows-repository_tools-show-9bb7e70d = Gelösten Kandidaten fortsetzen / prüfen
+
+repo-workflows-repository_tools-show-9cbacb41 = Diesen exakten Baum zugeordneter Hunks als unsignierten virtuellen Branch-Commit committen
+
+repo-workflows-repository_tools-show-9d8f0223 = Ausstehend: behalten und prüfen
+
+repo-workflows-repository_tools-show-9e153558 = Exakter Split { $p-plan-head-1 } → { $p-plan-remote-2 }/{ $p-plan-destination-3 }
+
+repo-workflows-repository_tools-show-9e8617f1 = ursprünglicher Elterncommit dieser Sitzung
+
+repo-workflows-repository_tools-show-9fbeaee4 = Push:
+
+repo-workflows-repository_tools-show-a1016f72 = Teilklon: Einige Objekte benötigen möglicherweise dessen Promisor-Remote.
+
+repo-workflows-repository_tools-show-a17b0445 = Exakter Commit { $p-plan-head-1 } → { $p-plan-remote-2 } / { $p-plan-destination-3 }
+
+repo-workflows-repository_tools-show-a23601d6 = Verwendet den contrib-Subtree-Helfer des installierten Git nur bei Vorbereiten oder Fortsetzen. Abruf und Veröffentlichung sind ausdrückliche Netzwerkaktionen. Kandidaten, App-Referenzen und Wiederherstellungsverzeichnisse bleiben lokal erhalten. Spiegeln Sie App-Referenzen nicht per Push. Nur native Unix-Checkouts; ein fehlender oder scheiternder Helfer hinterlässt einen prüfbaren Vorschlag.
+
+repo-workflows-repository_tools-show-a253af39 = Gespeichert und inaktiv: { $h-path-1 } · { $h-key-8-2 }
+
+repo-workflows-repository_tools-show-a2869e42 = Ausgang erneut lesen
+
+repo-workflows-repository_tools-show-a2bc21d3 = Freigegebenes Profil { $consent-profile-1 } · Metadaten des gewählten Kontos fixiert
+
+repo-workflows-repository_tools-show-a39608b9 = Diese Hunks deaktivieren
+
+repo-workflows-repository_tools-show-a503aa66 = Pushen nach
+
+repo-workflows-repository_tools-show-a6888267 = Letzter akzeptierter Import: { $oid }
+
+repo-workflows-repository_tools-show-a6b3283e = Ordner:
+
+repo-workflows-repository_tools-show-aa785909 = Läuft oder wurde unterbrochen: Prüfen Sie den Worktree und gleichen Sie die Belege ausdrücklich ab
+
+repo-workflows-repository_tools-show-aaac53fc = Nur die { $p-name-1 } zugeordneten Hunks gehen in diesen Branch-Commit ein. Ordner, Anker und echter Index bleiben wie geprüft.
+
+repo-workflows-repository_tools-show-ab27abcb = Belege der Zustandsveröffentlichung prüfen
+
+repo-workflows-repository_tools-show-ab31db17 = Veraltete Zuordnung: { $h-path-1 }
+
+repo-workflows-repository_tools-show-ad16979e = Committete Quelle: { $v-branch-1 } bei { $v-head-2 }
+
+repo-workflows-repository_tools-show-ae033504 = Gespeicherte Gruppen
+
+repo-workflows-repository_tools-show-ae30be2e = Nachrichtenentwurf speichern
+
+repo-workflows-repository_tools-show-aff83496 = Gruppe:
+
+repo-workflows-repository_tools-show-b0a1bb3e = Exakten Annahmebeleg abgleichen
+
+repo-workflows-repository_tools-show-b0e84ec1 = Diese Subtree-Aktualisierung akzeptieren
+
+repo-workflows-repository_tools-show-b1249b5a = Ich habe die Pull- und Push-Ziele vor dem Speichern geprüft
+
+repo-workflows-repository_tools-show-b26a038e = Wählen Sie einen vorhandenen Commit mit beiden Seiten oder öffnen Sie das Submodul, mergen Sie dort und aktualisieren Sie diesen Graphen. Das Erfassen ändert nur den übergeordneten Index.
+
+repo-workflows-repository_tools-show-b2f82ce9 = { $p-branch-1 }: { $p-expected-2 } nach { $p-old-base-3 } → { $p-onto-4 }
+
+repo-workflows-repository_tools-show-b7b34c26 = Gewählten Submodul-Commit im übergeordneten Repository erfassen
+
+repo-workflows-repository_tools-show-b85186ac = Übergeordnet: { $p-branch-1 } bei { $p-commit-2 } → { $p-parent-remote-3 }/{ $p-parent-branch-4 } ({ $git-redact-p-parent-url-none-5 })
+
+repo-workflows-repository_tools-show-b87ce680 = Pull:
+
+repo-workflows-repository_tools-show-b9cc89c6 = Die erneute Freigabe behält den URSPRÜNGLICH fixierten Commit und akzeptiert das AKTUELLE Ziel und den Quellverlauf. Prüfen Sie ein ungewisses früheres Ergebnis zuerst auf dem Remote. Automatischer Versand ist deaktiviert.
+
+repo-workflows-repository_tools-show-ba765b08 = Bereite Kandidaten akzeptieren
+
+repo-workflows-repository_tools-show-ba8a03e2 = Topologie aktualisieren und erneut vorbereiten
+
+repo-workflows-repository_tools-show-bbcce2f9 = Nach dem Merge aktualisieren
+
+repo-workflows-repository_tools-show-be1e9f5f = Diese Hunks aktivieren
+
+repo-workflows-repository_tools-show-c23fbbaa = Remote-URLs, Refspecs und Spiegelungsregeln
+
+repo-workflows-repository_tools-show-c29574be = Vorschau gekürzt. Vergleichen Sie diesen Durchgang vor der Annahme.
+
+repo-workflows-repository_tools-show-c2c3785a = Beide Routen speichern
+
+repo-workflows-repository_tools-show-c757c39b = Rebase und Restack laufen in eigenen gespeicherten, losgelösten Worktrees. Originale bleiben bis zur Annahme unverändert. Lösen Sie Konflikte im vorgeschlagenen Worktree, merken Sie das Ergebnis vor und wählen Sie „Fortsetzen“. Die Wiederanwendung ist unsigniert und überspringt Repository-Hooks. Die Annahme verwendet die geschützte native Transaktion und verweigert veränderte oder veraltete Original-Worktrees. Teilerfolge werden pro Schicht gemeldet. Rückgängig stellt jeden angenommenen Originalstand mit denselben Schutzprüfungen wieder her. Kein Worktree wird automatisch gelöscht.
+
+repo-workflows-repository_tools-show-c7879dfc = Split-Veröffentlichung prüfen
+
+repo-workflows-repository_tools-show-cb9b7596 = Nicht vorgemerkte Ordneränderungen
+
+repo-workflows-repository_tools-show-ccbcb47e = Übergeordnet: { $git-redact-s-none-1 }
+
+repo-workflows-repository_tools-show-d05d82b6 = Push-URLs (leer übernimmt Abruf-URLs; Git pusht an alle aufgeführten URLs)
+
+repo-workflows-repository_tools-show-d15b2630 = Diese Pushes sind nicht atomar. Ein erfolgreicher Host bleibt veröffentlicht, wenn ein anderer fehlschlägt. Jedes Ziel erhält den exakten angezeigten Commit. Wiederholen sendet nur an fehlgeschlagene Ziele.
+
+repo-workflows-repository_tools-show-d3197597 = Committete Ordneränderungen
+
+repo-workflows-repository_tools-show-d329d33b = Commit zugeordneter Hunks ansehen …
+
+repo-workflows-repository_tools-show-d5680e1f = Bereinigung mit diesen Zuordnungen würde { $p-prune-len-1 } lokale Referenzen löschen:
+
+repo-workflows-repository_tools-show-d5714f7d = Ich habe diesen exakten Kandidaten-Patch beziehungsweise die abgerufene Verbindungsbasis geprüft. Für einen erneuten Versand habe ich das Remote nach abgelehnten oder ungewissen Versuchen geprüft.
+
+repo-workflows-repository_tools-show-d653a1c5 = Eintrag entfernen
+
+repo-workflows-repository_tools-show-dad5a969 = Beleg
+
+repo-workflows-repository_tools-show-db839840 = Worktrees mit diesem gemeinsamen Verzeichnis:
+
+repo-workflows-repository_tools-show-deee0d61 = Diesen Hunk als geprüft markieren
+
+repo-workflows-repository_tools-show-df2937d4 = Einschließlich App-, Bisect-, Sicherungs- und Namensraumreferenzen. Objekt-IDs benennen den exakten Stand unten.
+
+repo-workflows-repository_tools-show-e01205cf = Liste umbenennen
+
+repo-workflows-repository_tools-show-e0b832a0 = Primärer Speicher dieses Repositorys
+
+repo-workflows-repository_tools-show-e0e54b30 = Abgerufene Quelle: { $oid }
+
+repo-workflows-repository_tools-show-e27da1c1 = Verlauf (bis zu 200 Commits)
+
+repo-workflows-repository_tools-show-e37c5523 = Spiegel-Pushes: alle Referenzen erzwingen und zusätzliche Zielreferenzen löschen
+
+repo-workflows-repository_tools-show-e5c0b5df = Neuer echter Branch:
+
+repo-workflows-repository_tools-show-e6eadbe7 = Ich habe diese URLs, Zuordnungen und Folgen der Spiegelung geprüft
+
+repo-workflows-repository_tools-show-e8331aba = Quelle ausdrücklich abrufen, um committete Ordnerinhalte zu vergleichen
+
+repo-workflows-repository_tools-show-e949fe01 = Übernommene Ordner und Subtree-Veröffentlichung
+
+repo-workflows-repository_tools-show-e9e7ecb3 = Jede Abhängigkeit und jeden ausgehenden Gitlink prüfen
+
+repo-workflows-repository_tools-show-ea03ec13 = Wählen Sie ein vorhandenes konfiguriertes Quellremote. Seine Abruf- und Push-Routen können abweichen. Die Registrierung speichert nur die Herkunft. Ein fehlender Ordner lässt sich nach ausdrücklichem Abruf mit „Aktualisierung vorbereiten“ importieren.
+
+repo-workflows-repository_tools-show-ea2af9ef = Abrufspiegelung wird mit +refs/*:refs/* ausgedrückt. Sie schreibt direkt in lokale Namensräume samt Branches. Push-Spiegelung kann fremde Arbeit überschreiben oder löschen. Diese Vorschauen bereinigen und pushen nie.
+
+repo-workflows-repository_tools-show-ea303dfe = Zustand: { $report-intent-state-ref-1 }
+    Vorher: { $report-intent-previous-2 }
+    Vorgeschlagen: { $report-intent-proposed-3 }
+    Beleg: { $report-intent-receipt-ref-4 }
+    Quellbranch: { $report-intent-branch-as-deref-un-5 }
+    Erwarteter HEAD: { $report-intent-expected-head-as-d-6 }
+    Wiederherstellungseinträge: { $report-intent-evidence-7 }
+
+repo-workflows-repository_tools-show-ea721fba = Zuordnung und Arbeitsstand aktualisieren
+
+repo-workflows-repository_tools-show-ed38427e = Nur dieser Split-Commit wird gesendet. Spätere Original- oder Kandidatenänderungen kommen nicht hinzu. Schreibzugriffe auf mehrere Endpunkte sind nicht atomar. Ablehnung oder fehlende Bestätigung pausiert den Vorschlag. Keine automatische Wiederholung.
+
+repo-workflows-repository_tools-show-edc5ba83 = Ich habe den ausgewählten Commit geprüft und möchte diese übergeordnete Konfliktlösung erfassen
+
+repo-workflows-repository_tools-show-eef651ca = Parallele Branches in diesem Ordner
+
+repo-workflows-repository_tools-show-ef0a338b = Bestätigt: exakter Beleg
+
+repo-workflows-repository_tools-show-efdfe52a = Erstellen Sie zuerst einen neuen Branch. Bestehende Arbeitshunks bleiben bis zur Eigentümerwahl unzugeordnet.
+
+repo-workflows-repository_tools-show-f279f80b = Push-Refspecs (leer verwendet push.default)
+
+repo-workflows-repository_tools-show-f2d4cf1c = Dieses Git kann beliebige Wurzelreferenzen nicht aufzählen. Bekannte Pseudoreferenzen werden eingeschlossen, sofern vorhanden.
+
+repo-workflows-repository_tools-show-f41d4ab9 = Wiederherstellungsverzeichnisse behalten Original- und Kandidatendateien sowie vollständige Zugriffsmetadaten. Prüfen Sie diese Einträge und index.lock vor einer manuellen Wiederherstellung. Journale sind auf 256 Vorgänge begrenzt. Archivieren Sie erledigte Journalreferenzen erst nach Prüfung der Wiederherstellungseinträge.
+
+repo-workflows-repository_tools-show-f5265a26 = Ungeprüft
+
+repo-workflows-repository_tools-show-f581c406 = Commit-Nachrichtenentwurf
+
+repo-workflows-repository_tools-show-f5b402c5 = Ordner gegenüber abgerufenem Upstream { $base }. Die ursprüngliche Importbasis ist unbekannt, daher sind auch Upstream-Unterschiede enthalten.
+
+repo-workflows-repository_tools-show-f66ce8b9 = Exakten Commit und Ziele vorbereiten
+
+repo-workflows-repository_tools-show-fad6057b = Geprüft
+
+repo-workflows-repository_tools-show-faf582fc = Virtuellen Branch erstellen
+
+repo-workflows-repository_tools-show-fb535d0d = Vorschlag schließen; alle Arbeit behalten
+
+repo-workflows-repository_tools-show-fcb0aec1 = Remote für Prüfung / Veröffentlichung:
+
+repo-workflows-repository_tools-show-fccdc9ec = Fixierten Commit und aktuelles Ziel prüfen …
+
+repo-workflows-repository_tools-show-ff1cf26d = Committete lokale Änderungen gegenüber dem zuletzt akzeptierten Upstream { $base }
+
+repo-workflows-repository_tools-show-fff50056 = Modus verlassen; Dateien und Branchreferenzen behalten
+
+repo-workflows-repository_tools-start-send-628a48e6 = Profil oder Anmeldung des vorbereiteten Ausgangs geändert. Erneut vorbereiten und freigeben.
+
+repo-workflows-repository_tools-start-send-994ea6b0 = Exakten eingereihten Push senden
+
+repo-workflows-repository_tools-start-send-e7b0c78d = Automatischer Versand des freigegebenen einfachen Ausgangs-Pushes
+
 repo-workflows-review_workflow-review-document-ui-7d9eb7ac = Schließen
 
 repo-workflows-review_workflow-show-c3812fc4 = Entfernen

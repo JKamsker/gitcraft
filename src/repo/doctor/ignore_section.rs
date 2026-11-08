@@ -211,8 +211,14 @@ fn attributes(ui: &mut Ui, e: &Explained) {
             crate::i18n::message(
                 "repo-workflows-doctor-attributes-68cb5f93",
                 &[
-                    ("eol-word-eol-index-1", (eol_word(&eol.index)).into()),
-                    ("eol-word-eol-worktree-2", (eol_word(&eol.worktree)).into()),
+                    (
+                        "eol-word-eol-index-1",
+                        (eol_word(&eol.index)).clone().into(),
+                    ),
+                    (
+                        "eol-word-eol-worktree-2",
+                        (eol_word(&eol.worktree)).clone().into(),
+                    ),
                     (
                         "if-eol-attr-is-empty-else-eol-at-3",
                         (if eol.attr.is_empty() {
@@ -220,6 +226,7 @@ fn attributes(ui: &mut Ui, e: &Explained) {
                         } else {
                             &eol.attr
                         })
+                        .clone()
                         .into(),
                     ),
                 ],
@@ -246,17 +253,17 @@ fn attributes(ui: &mut Ui, e: &Explained) {
             }
             ("filter", name) if d.required => crate::i18n::message(
                 "repo-workflows-doctor-attributes-ec97a4d2",
-                &[("name", (name).into())],
+                &[("name", (name).clone().into())],
             ),
             ("filter", name) => crate::i18n::message(
                 "repo-workflows-doctor-attributes-4af8906f",
-                &[("name", (name).into())],
+                &[("name", (name).clone().into())],
             ),
             (attr, name) => crate::i18n::message(
                 "repo-workflows-doctor-attributes-c6b25148",
                 &[
-                    ("attr", (attr).into()),
-                    ("name", (name).into()),
+                    ("attr", (attr).clone().into()),
+                    ("name", (name).clone().into()),
                     (
                         "if-attr-merge-merges-it-else-dif-1",
                         (if attr == "merge" {
@@ -264,6 +271,7 @@ fn attributes(ui: &mut Ui, e: &Explained) {
                         } else {
                             crate::i18n::text("repo-workflows-doctor-attributes-2176c800")
                         })
+                        .clone()
                         .into(),
                     ),
                 ],

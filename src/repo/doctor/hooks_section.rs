@@ -64,7 +64,7 @@ fn folder_card(ui: &mut Ui, found: &Hooks) {
                     ui,
                     crate::i18n::message(
                         "repo-workflows-doctor-folder-card-05f75db2",
-                        &[("path", (path).into())],
+                        &[("path", (path).clone().into())],
                     ),
                 ),
                 None => dim(
@@ -116,7 +116,7 @@ fn folder_card(ui: &mut Ui, found: &Hooks) {
                         ui,
                         crate::i18n::message(
                             "repo-workflows-doctor-folder-card-5cc7fab9",
-                            &[("m-advice-1", (m.advice()).into())],
+                            &[("m-advice-1", (m.advice()).clone().into())],
                         ),
                     );
                 });
@@ -186,7 +186,7 @@ fn hook_row(ui: &mut Ui, hook: &Hook, locked: Option<&str>, acts: &mut Vec<Actio
             ui.label(
                 RichText::new(crate::i18n::message(
                     "repo-workflows-doctor-hook-row-433c4667",
-                    &[("on", (on).into())],
+                    &[("on", (on).clone().into())],
                 ))
                 .color(t.text_dim),
             );

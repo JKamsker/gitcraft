@@ -247,7 +247,7 @@ fn turn_diff(turn: &Turn, label: &str) -> Action {
             "repo-workflows-agents-turn-diff-9021b8b9",
             &[
                 ("turn-number-1", (turn.number).clone().into()),
-                ("label", (label).into()),
+                ("label", (label).clone().into()),
             ],
         ),
         since_fork: false,
@@ -333,7 +333,7 @@ fn hover(turn: &Turn) -> String {
         &[
             ("turn-number-1", (turn.number).clone().into()),
             ("when", (when).clone().into()),
-            ("prompt", (prompt).into()),
+            ("prompt", (prompt).clone().into()),
         ],
     )
 }

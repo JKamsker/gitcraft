@@ -233,13 +233,7 @@ fn suggestion(ui: &mut Ui, s: &Suggestion, locked: bool, acts: &mut Vec<Action>)
 /// Runs the suggestion's commands; scheduling maintenance (which reaches past the repository:
 /// your global config and the system's scheduler) is asked first.
 fn turn_on_action(s: &Suggestion, commands: &[String]) -> Action {
-    let label = crate::i18n::message(
-        "repo-workflows-doctor-turn-on-action-d8e3e02d",
-        &[(
-            "s-title-to-lowercase-1",
-            (s.title.to_lowercase()).clone().into(),
-        )],
-    );
+    let label = format!("Turn on: {}", s.title.to_lowercase());
     if s.title == "Scheduled maintenance" {
         return Action::Doctor(DoctorAct::Confirm(Confirm {
             title: crate::i18n::text("repo-workflows-doctor-turn-on-action-3c97132f").to_owned(),

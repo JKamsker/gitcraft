@@ -123,6 +123,7 @@ pub(super) fn started(config: Config, engine: Engine, value: &Value) -> Result<B
                 (value["description"].as_str().unwrap_or(crate::i18n::text(
                     "repo-workflows-devcontainer-started-046dacc8",
                 )))
+                .clone()
                 .into(),
             )],
         ));

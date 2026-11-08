@@ -113,9 +113,7 @@ impl RepoTab {
         self.content_recovery.cancel();
         self.content_recovery.prepared = None;
         self.dialog = None;
-        self.busy_op = Some(
-            crate::i18n::text("repo-workflows-content_recovery-content-perform-fbdf23f8").into(),
-        );
+        self.busy_op = Some("Recover content".into());
         self.op_started = Some(Instant::now());
         let repo = self.path.clone();
         self.then_or(

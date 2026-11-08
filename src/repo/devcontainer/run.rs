@@ -107,7 +107,10 @@ fn json(config: &Config, tool: &str, context: &str, args: &[String]) -> Result<V
     serde_json::from_str(&raw).map_err(|e| {
         crate::i18n::message(
             "repo-workflows-devcontainer-json-edd11b13",
-            &[("tool", (tool).into()), ("e", (e).to_string().into())],
+            &[
+                ("tool", (tool).clone().into()),
+                ("e", (e).to_string().into()),
+            ],
         )
     })
 }
@@ -170,7 +173,7 @@ pub(super) fn start(config: &Config, old: Option<&Binding>) -> Result<Binding, S
     if let Some(pause) = crate::network::refused() {
         return Err(crate::i18n::message(
             "repo-workflows-devcontainer-start-87b3fed2",
-            &[("pause-why-1", (pause.why()).into())],
+            &[("pause-why-1", (pause.why()).clone().into())],
         ));
     }
     let engine = engine(config)?;
@@ -221,13 +224,7 @@ pub(super) fn terminal(
     let shell = crate::terminal::ShellSpec {
         program: crate::shell_path::resolve("docker"),
         args: model::terminal(binding)?,
-        label: crate::i18n::message(
-            "repo-workflows-devcontainer-terminal-77e417ed",
-            &[
-                ("binding-id-12-1", (&binding.id[..12]).into()),
-                ("binding-folder-2", (binding.folder).clone().into()),
-            ],
-        ),
+        label: format!("Container {} · {}", &binding.id[..12], binding.folder),
     };
     crate::terminal::Terminal::spawn(&config.path, &shell, ctx)
 }

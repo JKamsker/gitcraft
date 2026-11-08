@@ -2,14 +2,29 @@ use super::{Act, Data, State};
 use crate::{git::repository_tools::routes::Route, repo::Action};
 fn label(route: &Route, direction: &str) -> String {
     if route.remote.is_empty() {
-        return format!("{direction}: no route configured");
+        return crate::i18n::message(
+            "repo-workflows-repository_tools-label-87dc28eb",
+            &[("direction", (direction).clone().into())],
+        );
     }
-    let counts = route
-        .counts
-        .map_or("counts unknown (fetch first)".into(), |(a, b)| {
-            format!("{a} ahead · {b} behind")
-        });
-    format!("{direction} {}/{} · {counts}", route.remote, route.branch)
+    let counts = route.counts.map_or(
+        crate::i18n::text("repo-workflows-repository_tools-label-2d5fbffb").into(),
+        |(a, b)| {
+            crate::i18n::message(
+                "repo-workflows-repository_tools-label-f25a8952",
+                &[("a", (a).clone().into()), ("b", (b).clone().into())],
+            )
+        },
+    );
+    crate::i18n::message(
+        "repo-workflows-repository_tools-label-137ebba9",
+        &[
+            ("direction", (direction).clone().into()),
+            ("route-remote-1", (route.remote).clone().into()),
+            ("route-branch-2", (route.branch).clone().into()),
+            ("counts", (counts).clone().into()),
+        ],
+    )
 }
 fn picker(
     ui: &mut egui::Ui,
@@ -28,7 +43,9 @@ fn picker(
         });
     ui.text_edit_singleline(branch);
     egui::ComboBox::from_id_salt((id, "branch"))
-        .selected_text("Known branches")
+        .selected_text(crate::i18n::text(
+            "repo-workflows-repository_tools-picker-f523255b",
+        ))
         .show_ui(ui, |ui| {
             for (_, name) in choices.iter().filter(|(r, _)| r == remote) {
                 ui.selectable_value(branch, name.clone(), name);
@@ -36,8 +53,12 @@ fn picker(
         });
 }
 pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>) {
-    ui.heading("Separate pull and push routes");
-    ui.label("Each count compares this local branch to the last fetched ref for that route. Missing or excluded tracking refs show unknown. Changing a push branch affects gitcraft's ordinary branch pushes; Git itself still uses its native push.default/refspec rules.");
+    ui.heading(crate::i18n::text(
+        "repo-workflows-repository_tools-show-5dc87aef",
+    ));
+    ui.label(crate::i18n::text(
+        "repo-workflows-repository_tools-show-5dcd35a3",
+    ));
     let Some(result) = &mut state.result else {
         ui.add(crate::spinner::Spinner::new());
         return;
@@ -52,7 +73,7 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
     };
     ui.checkbox(
         &mut state.acknowledged,
-        "I reviewed the pull and push destinations before saving",
+        crate::i18n::text("repo-workflows-repository_tools-show-b1249b5a"),
     );
     egui::ScrollArea::vertical()
         .id_salt("branch_routes")
@@ -62,43 +83,57 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
             for b in &mut data.branches {
                 ui.push_id(&b.name, |ui| {
                     ui.strong(&b.name);
-                    ui.label(label(&b.pull, "Pull from"));
-                    ui.label(label(&b.push, "Push to"));
-                    egui::CollapsingHeader::new("Change routes…")
-                        .default_open(data.selected == b.name)
-                        .show(ui, |ui| {
-                            ui.horizontal(|ui| {
-                                ui.label("Pull:");
-                                picker(
-                                    ui,
-                                    "pull",
-                                    &data.remotes,
-                                    &data.choices,
-                                    &mut b.pull_remote,
-                                    &mut b.pull_branch,
-                                );
-                            });
-                            ui.horizontal(|ui| {
-                                ui.label("Push:");
-                                picker(
-                                    ui,
-                                    "push",
-                                    &data.remotes,
-                                    &data.choices,
-                                    &mut b.push_remote,
-                                    &mut b.push_branch,
-                                );
-                            });
-                            if ui
-                                .add_enabled(
-                                    state.acknowledged,
-                                    egui::Button::new("Save both routes"),
-                                )
-                                .clicked()
-                            {
-                                save = Some(b.name.clone());
-                            }
+                    ui.label(label(
+                        &b.pull,
+                        crate::i18n::text("repo-workflows-repository_tools-show-089eb3ef"),
+                    ));
+                    ui.label(label(
+                        &b.push,
+                        crate::i18n::text("repo-workflows-repository_tools-show-a503aa66"),
+                    ));
+                    egui::CollapsingHeader::new(crate::i18n::text(
+                        "repo-workflows-repository_tools-show-8fe4dcef",
+                    ))
+                    .default_open(data.selected == b.name)
+                    .show(ui, |ui| {
+                        ui.horizontal(|ui| {
+                            ui.label(crate::i18n::text(
+                                "repo-workflows-repository_tools-show-b87ce680",
+                            ));
+                            picker(
+                                ui,
+                                "pull",
+                                &data.remotes,
+                                &data.choices,
+                                &mut b.pull_remote,
+                                &mut b.pull_branch,
+                            );
                         });
+                        ui.horizontal(|ui| {
+                            ui.label(crate::i18n::text(
+                                "repo-workflows-repository_tools-show-9fbeaee4",
+                            ));
+                            picker(
+                                ui,
+                                "push",
+                                &data.remotes,
+                                &data.choices,
+                                &mut b.push_remote,
+                                &mut b.push_branch,
+                            );
+                        });
+                        if ui
+                            .add_enabled(
+                                state.acknowledged,
+                                egui::Button::new(crate::i18n::text(
+                                    "repo-workflows-repository_tools-show-c2c3785a",
+                                )),
+                            )
+                            .clicked()
+                        {
+                            save = Some(b.name.clone());
+                        }
+                    });
                     ui.separator();
                 });
             }
@@ -112,7 +147,9 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
 }
 
 pub(super) fn force(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>) {
-    ui.heading("Force push to the push route");
+    ui.heading(crate::i18n::text(
+        "repo-workflows-repository_tools-force-01549c1f",
+    ));
     let Some(result) = &state.result else {
         ui.add(crate::spinner::Spinner::new());
         return;
@@ -125,23 +162,33 @@ pub(super) fn force(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>
             return;
         }
     };
-    ui.label(format!(
-        "Replace {} on {} ({}) with {} at {}?",
-        p.destination,
-        p.remote,
-        crate::git::redact(&p.url, None),
-        p.branch,
-        p.commit
+    ui.label(crate::i18n::message(
+        "repo-workflows-repository_tools-force-884b8ad2",
+        &[
+            ("p-destination-1", (p.destination).clone().into()),
+            ("p-remote-2", (p.remote).clone().into()),
+            (
+                "crate-git-redact-p-url-none-3",
+                (crate::git::redact(&p.url, None)).clone().into(),
+            ),
+            ("p-branch-4", (p.branch).clone().into()),
+            ("p-commit-5", (p.commit).clone().into()),
+        ],
     ));
-    ui.label(format!("The destination is currently at {}. This can remove collaborators' commits. The exact URL and expected destination commit are pinned, and a lease rejects concurrent pushes.",p.remote_commit));
+    ui.label(crate::i18n::message(
+        "repo-workflows-repository_tools-force-15d2a4c4",
+        &[("p-remote-commit-1", (p.remote_commit).clone().into())],
+    ));
     ui.checkbox(
         &mut state.acknowledged,
-        "I reviewed the destination and accept replacing its history",
+        crate::i18n::text("repo-workflows-repository_tools-force-1d53000c"),
     );
     if ui
         .add_enabled(
             state.acknowledged,
-            egui::Button::new("Force push with explicit lease"),
+            egui::Button::new(crate::i18n::text(
+                "repo-workflows-repository_tools-force-b7f756d6",
+            )),
         )
         .clicked()
     {

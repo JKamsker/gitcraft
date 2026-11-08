@@ -111,7 +111,7 @@ pub(crate) fn menu_items(ui: &mut Ui, placement: Placement, scope: Scope, acts: 
         .show(ui)
         .on_hover_text(crate::i18n::message(
             "repo-workflows-custom_commands-menu-items-7bbc1546",
-            &[("cc-repo-file-1", (cc::REPO_FILE).into())],
+            &[("cc-repo-file-1", (cc::REPO_FILE).clone().into())],
         ))
         .clicked()
     {
@@ -362,7 +362,7 @@ impl RepoTab {
                     "repo-workflows-custom_commands-custom-file-read-cbe7f164",
                     &[
                         ("self-name-1", (self.name).clone().into()),
-                        ("cc-repo-file-2", (cc::REPO_FILE).into()),
+                        ("cc-repo-file-2", (cc::REPO_FILE).clone().into()),
                     ],
                 )
             } else {
@@ -397,7 +397,7 @@ fn read_file(repo: &std::path::Path) -> Result<Option<String>, String> {
         crate::i18n::message(
             "repo-workflows-custom_commands-read-file-851cebee",
             &[
-                ("cc-repo-file-1", (cc::REPO_FILE).into()),
+                ("cc-repo-file-1", (cc::REPO_FILE).clone().into()),
                 ("e", (e).to_string().into()),
             ],
         )
@@ -411,7 +411,7 @@ fn read_file(repo: &std::path::Path) -> Result<Option<String>, String> {
             String::from_utf8(b).map_err(|_| {
                 crate::i18n::message(
                     "repo-workflows-custom_commands-read-file-55a45ca4",
-                    &[("cc-repo-file-1", (cc::REPO_FILE).into())],
+                    &[("cc-repo-file-1", (cc::REPO_FILE).clone().into())],
                 )
             })
         })

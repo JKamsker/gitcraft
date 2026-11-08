@@ -54,8 +54,11 @@ impl RepoTab {
                 crate::i18n::message(
                     "repo-workflows-bisect-bisect-menu-items-5f1847b9",
                     &[
-                        ("at", (at).into()),
-                        ("bisect-word-mark-good-1", (bisect.word(Mark::Good)).into()),
+                        ("at", (at).clone().into()),
+                        (
+                            "bisect-word-mark-good-1",
+                            (bisect.word(Mark::Good)).clone().into(),
+                        ),
                     ],
                 ),
             ),
@@ -64,8 +67,11 @@ impl RepoTab {
                 crate::i18n::message(
                     "repo-workflows-bisect-bisect-menu-items-5f1847b9",
                     &[
-                        ("at", (at).into()),
-                        ("bisect-word-mark-bad-1", (bisect.word(Mark::Bad)).into()),
+                        ("at", (at).clone().into()),
+                        (
+                            "bisect-word-mark-bad-1",
+                            (bisect.word(Mark::Bad)).clone().into(),
+                        ),
                     ],
                 ),
             ),
@@ -73,7 +79,7 @@ impl RepoTab {
                 Mark::Skip,
                 crate::i18n::message(
                     "repo-workflows-bisect-bisect-menu-items-72281c73",
-                    &[("at", (at).into())],
+                    &[("at", (at).clone().into())],
                 ),
             ),
         ] {
@@ -128,8 +134,11 @@ impl RepoTab {
                     crate::i18n::message(
                         "repo-workflows-bisect-bisect-palette-items-417fbb2c",
                         &[
-                            ("at", (at).into()),
-                            ("bisect-word-mark-good-1", (bisect.word(Mark::Good)).into()),
+                            ("at", (at).clone().into()),
+                            (
+                                "bisect-word-mark-good-1",
+                                (bisect.word(Mark::Good)).clone().into(),
+                            ),
                         ],
                     ),
                     mark(Mark::Good),
@@ -138,8 +147,11 @@ impl RepoTab {
                     crate::i18n::message(
                         "repo-workflows-bisect-bisect-palette-items-417fbb2c",
                         &[
-                            ("at", (at).into()),
-                            ("bisect-word-mark-bad-1", (bisect.word(Mark::Bad)).into()),
+                            ("at", (at).clone().into()),
+                            (
+                                "bisect-word-mark-bad-1",
+                                (bisect.word(Mark::Bad)).clone().into(),
+                            ),
                         ],
                     ),
                     mark(Mark::Bad),
@@ -147,7 +159,7 @@ impl RepoTab {
                 item(
                     crate::i18n::message(
                         "repo-workflows-bisect-bisect-palette-items-011b904c",
-                        &[("at", (at).into())],
+                        &[("at", (at).clone().into())],
                     ),
                     mark(Mark::Skip),
                 ),

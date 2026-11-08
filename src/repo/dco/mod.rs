@@ -207,7 +207,10 @@ impl RepoTab {
                                 crate::i18n::message(
                                     "repo-workflows-dco-dco-act-10fe4a7c",
                                     &[
-                                        ("signoff-sign-off-key-1", (signoff::SIGN_OFF_KEY).into()),
+                                        (
+                                            "signoff-sign-off-key-1",
+                                            (signoff::SIGN_OFF_KEY).clone().into(),
+                                        ),
                                         ("e", (e).clone().into()),
                                     ],
                                 ),
@@ -272,10 +275,7 @@ impl RepoTab {
                     UndoEntry {
                         id: 0,
                         agent: None,
-                        label: crate::i18n::message(
-                            "repo-workflows-dco-dco-op-done-5d0c9ff1",
-                            &[("plan-branch-1", (plan.branch).clone().into())],
-                        ),
+                        label: format!("Sign off the commits of {} (here only)", plan.branch),
                         undo,
                         redo,
                         heads: None,
@@ -299,10 +299,7 @@ impl RepoTab {
                     && op.label == fix_label(&plan)
                 {
                     *op = PendingOp {
-                        label: crate::i18n::message(
-                            "repo-workflows-dco-dco-op-done-55d2b32b",
-                            &[("plan-branch-1", (plan.branch).clone().into())],
-                        ),
+                        label: format!("Push the signed-off commits of {}", plan.branch),
                         ops: plan.push_steps(),
                         refresh: Refresh::All,
                         kind: OpKind::plain(),

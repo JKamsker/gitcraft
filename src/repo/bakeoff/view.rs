@@ -69,7 +69,7 @@ fn header(ui: &mut Ui, view: &mut Bakeoff, t: &Tokens, act: &mut Option<BakeAct>
                     "repo-workflows-bakeoff-header-50cd264e",
                     &[(
                         "crate-repo-short-cmp-base-1",
-                        (crate::repo::short(&cmp.base)).into(),
+                        (crate::repo::short(&cmp.base)).clone().into(),
                     )],
                 ))
                 .color(t.text_dim),
@@ -456,7 +456,7 @@ fn pick_label(view: &Bakeoff, take: &Take) -> String {
     match take {
         Take::File(n) => crate::i18n::message(
             "repo-workflows-bakeoff-pick-label-77dbc108",
-            &[("name-n-1", (name(*n)).into())],
+            &[("name-n-1", (name(*n)).clone().into())],
         ),
         Take::Hunks(list) if list.len() == 1 => {
             crate::i18n::text("repo-workflows-bakeoff-pick-label-d3d98b5d").to_owned()

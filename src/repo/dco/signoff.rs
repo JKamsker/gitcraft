@@ -222,11 +222,11 @@ pub(crate) fn plan(repo: &Path, base: &str, expected: Option<&str>) -> Result<Pl
                 ("branch", (branch).clone().into()),
                 (
                     "crate-repo-short-head-1",
-                    (crate::repo::short(&head)).into(),
+                    (crate::repo::short(&head)).clone().into(),
                 ),
                 (
                     "crate-repo-short-expected-2",
-                    (crate::repo::short(expected)).into(),
+                    (crate::repo::short(expected)).clone().into(),
                 ),
             ],
         ));
@@ -258,7 +258,7 @@ pub(crate) fn plan(repo: &Path, base: &str, expected: Option<&str>) -> Result<Pl
                 ("branch", (branch).clone().into()),
                 (
                     "crate-repo-short-merge-base-1",
-                    (crate::repo::short(&merge_base)).into(),
+                    (crate::repo::short(&merge_base)).clone().into(),
                 ),
             ],
         ));

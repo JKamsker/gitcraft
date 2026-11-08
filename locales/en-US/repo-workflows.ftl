@@ -1847,6 +1847,699 @@ repo-workflows-rehearse-rehearse-window-cae7d57b = Stop
 
 repo-workflows-release-close-button-7d9eb7ac = Close
 
+repo-workflows-repository_tools-act-08cd49af = Close isolated proposal
+
+repo-workflows-repository_tools-act-27cc6eb8 = Subtree preparation used a previous profile/sign-in; prepare again
+
+repo-workflows-repository_tools-act-346c061a = Undo accepted isolated replay
+
+repo-workflows-repository_tools-act-494336ed = Publish exact subtree split
+
+repo-workflows-repository_tools-act-519202af = Outbox preparation used a previous profile/sign-in; prepare again
+
+repo-workflows-repository_tools-act-551afaa9 = Unshelve one changelist
+
+repo-workflows-repository_tools-act-5bd57c48 = Replay in isolated worktrees
+
+repo-workflows-repository_tools-act-63403bc6 = Undo virtual branch operation
+
+repo-workflows-repository_tools-act-65d162a8 = Continue isolated replay
+
+repo-workflows-repository_tools-act-6dc9a943 = Choose one saved turn to preview its inverse
+
+repo-workflows-repository_tools-act-7f694b62 = Remove outbox entry
+
+repo-workflows-repository_tools-act-88c16034 = Subtree operation
+
+repo-workflows-repository_tools-act-901dccbe = Save virtual branch ownership
+
+repo-workflows-repository_tools-act-a3cbb206 = Save changelist
+
+repo-workflows-repository_tools-act-b4e12052 = Turn reverted. Staged contents retained. Undo from Earlier versions: { $id-draft-reference-1 }. { $id-evidence-2 }
+
+repo-workflows-repository_tools-act-b64c091a = Accept isolated replay
+
+repo-workflows-repository_tools-act-b967f21f = Queue exact push
+
+repo-workflows-repository_tools-act-bea96408 = Shelve one changelist
+
+repo-workflows-repository_tools-act-c08c65bd = Reconcile exact replay receipts
+
+repo-workflows-repository_tools-act-c1eec3a9 = Commit one changelist
+
+repo-workflows-repository_tools-act-ccd2fdda = Connection changed; reopen outbox
+
+repo-workflows-repository_tools-act-ce061d46 = Change virtual branch materialization
+
+repo-workflows-repository_tools-act-d021ec81 = Prepared subtree profile/sign-in changed; prepare and approve again
+
+repo-workflows-repository_tools-act-d64d1e25 = Go online and wait for the current operation before preparing an outbox push
+
+repo-workflows-repository_tools-act-de986fa8 = Commit virtual branch owned hunks
+
+repo-workflows-repository_tools-act-e3e83f28 = Source branch disappeared from the reviewed graph
+
+repo-workflows-repository_tools-act-fc328635 = Revert one saved turn
+
+repo-workflows-repository_tools-deferred-badge-8daa08a5 = Conflict waiting: { $p }
+
+repo-workflows-repository_tools-deferred-badge-a5eafc03 = Isolated rewrite; original branch retained until guarded acceptance
+
+repo-workflows-repository_tools-dependency-job-57895189 = Check submodule publication dependencies
+
+repo-workflows-repository_tools-dependency-job-80d8056a = Dependency operation completed
+
+repo-workflows-repository_tools-dependency-job-96731680 = Parent publication stopped; inspect per-repository outcomes
+
+repo-workflows-repository_tools-dependency-job-a7b1dc6d = Dependencies finished, but the parent repository, profile or sign-in changed. Prepare its push again.
+
+repo-workflows-repository_tools-dependency-job-f48f9c31 = Publish dependencies before parent review
+
+repo-workflows-repository_tools-dependency-job-f7c1dc97 = Dependency check found blockers; inspect each submodule
+
+repo-workflows-repository_tools-force-01549c1f = Force push to the push route
+
+repo-workflows-repository_tools-force-15d2a4c4 = The destination is currently at { $p-remote-commit-1 }. This can remove collaborators' commits. The exact URL and expected destination commit are pinned, and a lease rejects concurrent pushes.
+
+repo-workflows-repository_tools-force-1d53000c = I reviewed the destination and accept replacing its history
+
+repo-workflows-repository_tools-force-884b8ad2 = Replace { $p-destination-1 } on { $p-remote-2 } ({ $crate-git-redact-p-url-none-3 }) with { $p-branch-4 } at { $p-commit-5 }?
+
+repo-workflows-repository_tools-force-b7f756d6 = Force push with explicit lease
+
+repo-workflows-repository_tools-label-137ebba9 = { $direction } { $route-remote-1 }/{ $route-branch-2 } · { $counts }
+
+repo-workflows-repository_tools-label-2d5fbffb = counts unknown (fetch first)
+
+repo-workflows-repository_tools-label-87dc28eb = { $direction }: no route configured
+
+repo-workflows-repository_tools-label-f25a8952 = { $a } ahead · { $b } behind
+
+repo-workflows-repository_tools-object-view-14a9c8ce = Loose object: { $n } compressed bytes
+
+repo-workflows-repository_tools-object-view-3e15593a = Object ID or file version, for example HEAD:src/main.rs. Inspection never downloads missing objects. Git 2.45+ is required for this guarantee.
+
+repo-workflows-repository_tools-object-view-44de072f = { $o-kind-1 } · { $o-size-2 } bytes expanded · { $o-disk-3 } bytes on disk
+
+repo-workflows-repository_tools-object-view-56daa2be = Tree entries / linked objects
+
+repo-workflows-repository_tools-object-view-62a6da87 = Object
+
+repo-workflows-repository_tools-object-view-7b47361a = Base
+
+repo-workflows-repository_tools-object-view-8efd32c4 = How an object is stored
+
+repo-workflows-repository_tools-object-view-9147a920 = { $data-format-1 } · { $data-objects-display-2 } · resolved from { $data-query-3 }
+
+repo-workflows-repository_tools-object-view-9d4281bc = For deltas, representation size describes the delta instruction stream; expanded object size is above.
+
+repo-workflows-repository_tools-object-view-b39d687c = Delta base: { $base }
+
+repo-workflows-repository_tools-object-view-ddc47a7a = Git directory: { $data-git-dir-1 }
+    Shared directory: { $data-common-dir-2 }
+
+repo-workflows-repository_tools-object-view-e0723a86 = Inspect
+
+repo-workflows-repository_tools-object-view-f4de0102 = { $if-i-0-object-else-base-1 }: { $row-oid-2 } · { $row-kind-3 } · packed { $row-disk-4 } B · representation { $row-size-5 } B · offset { $row-offset-6 } · depth { $row-depth-7 }
+
+repo-workflows-repository_tools-patch-eef91a52 = No differences
+
+repo-workflows-repository_tools-picker-f523255b = Known branches
+
+repo-workflows-repository_tools-prepare-branch-review-2685a3d8 = Push preparation canceled
+
+repo-workflows-repository_tools-prepare-branch-review-77a313b9 = Invalid selected push continuation
+
+repo-workflows-repository_tools-prepare-branch-review-a89fdaff = The repository, profile or sign-in changed. Choose the push action again.
+
+repo-workflows-repository_tools-publish-group-1f0d64fa = Publication incomplete: { $failed } destinations failed. Inspect per-destination results.
+
+repo-workflows-repository_tools-publish-group-3cc9a2c6 = Publish group
+
+repo-workflows-repository_tools-publish-group-449d962a = Every destination published the prepared commit
+
+repo-workflows-repository_tools-refs-list-c2a1a3d6 = Copy object
+
+repo-workflows-repository_tools-refs-list-edec79bb = Inspect object
+
+repo-workflows-repository_tools-reftable-view-4101df87 = { $storage-git-1 } · current storage: { $storage-format-2 }
+
+repo-workflows-repository_tools-reftable-view-87ed192f = All other writers are stopped and I have a backup
+
+repo-workflows-repository_tools-reftable-view-891eab64 = Migration preserves refs and reflogs, refuses linked worktrees, and verifies both afterwards. Stop all other programs that write to this repository. Keep a repository backup before proceeding.
+
+repo-workflows-repository_tools-reftable-view-c2782e54 = Ref storage and guided migration
+
+repo-workflows-repository_tools-reftable-view-d3ba0aeb = Migrate to { $target } and verify
+
+repo-workflows-repository_tools-reftable-view-ea4f0afa = I checked compatibility of my installed tools with the target format
+
+repo-workflows-repository_tools-reftable-view-faca3ce1 = Reftable requires Git 2.45+ and compatible third-party tools. Some IDEs, embedded Git libraries, backup tools and older clients only support files. Check every tool that accesses this repository before migration. Files is the broadest compatibility choice.
+
+repo-workflows-repository_tools-remote-config-preview-bba0304c = Remote preview: { $e }
+
+repo-workflows-repository_tools-replacements-view-0a69dfc6 = Effective history
+
+repo-workflows-repository_tools-replacements-view-1714de4d = Convert legacy grafts to replace refs
+
+repo-workflows-repository_tools-replacements-view-33ea34c6 = Affected commit { $r-original-1 } → { $r-effective-2 }
+
+repo-workflows-repository_tools-replacements-view-4953f897 = Remove link
+
+repo-workflows-repository_tools-replacements-view-4cff5861 = Original history (--no-replace-objects)
+
+repo-workflows-repository_tools-replacements-view-5fcfdd61 = Effective parents: { $r-parents-1 }
+
+repo-workflows-repository_tools-replacements-view-7916bff6 = Create temporary graft
+
+repo-workflows-repository_tools-replacements-view-7b8c9687 = Legacy info/grafts file (converted links remain visible/removable here):
+
+repo-workflows-repository_tools-replacements-view-84da95ea = Commit:
+
+repo-workflows-repository_tools-replacements-view-9c43f2c2 = I reviewed these local history changes
+
+repo-workflows-repository_tools-replacements-view-b022884c = New parent:
+
+repo-workflows-repository_tools-replacements-view-e51254f0 = Join imported histories: replace this commit's parents with a commit from the other history. Paste full commit IDs. Cyclic joins and existing replacements are refused.
+
+repo-workflows-repository_tools-replacements-view-f5b874e5 = Replace refs and temporary history joins
+
+repo-workflows-repository_tools-replacements-view-fcc3aff3 = Replace refs affect these commits and their descendants. Joins below are local and temporary; removing the replace ref restores the original history.
+
+repo-workflows-repository_tools-repository-tool-mutation-988356ee = { $busy } is still running
+
+repo-workflows-repository_tools-repository-tools-act-07fb4089 = Make clone independent
+
+repo-workflows-repository_tools-repository-tools-act-38bb44e4 = Missing aggregate endpoint/session
+
+repo-workflows-repository_tools-repository-tools-act-3c1c7a3a = Save publication group
+
+repo-workflows-repository_tools-repository-tools-act-4e161156 = Save remote configuration
+
+repo-workflows-repository_tools-repository-tools-act-66f98362 = Resolve submodule pointer
+
+repo-workflows-repository_tools-repository-tools-act-69a2d9db = Remove replace ref
+
+repo-workflows-repository_tools-repository-tools-act-82d14313 = Save pull and push routes
+
+repo-workflows-repository_tools-repository-tools-act-888e8b45 = Migrate ref storage
+
+repo-workflows-repository_tools-repository-tools-act-a7b0c90c = Join imported histories temporarily
+
+repo-workflows-repository_tools-repository-tools-act-ad133eb8 = Convert legacy grafts to removable replace refs
+
+repo-workflows-repository_tools-repository-tools-act-baa3959f = Missing branch snapshot
+
+repo-workflows-repository_tools-repository-tools-act-e7cf34fe = Missing saved turn
+
+repo-workflows-repository_tools-review-prepared-push-88d2d1a8 = Push selected route
+
+repo-workflows-repository_tools-show-0256e5a0 = Run rebase in an isolated worktree
+
+repo-workflows-repository_tools-show-03dc5c4f = Fetch refspecs: +source:destination; ^source excludes a branch/prefix
+
+repo-workflows-repository_tools-show-04245473 = Refresh lists and file snapshots
+
+repo-workflows-repository_tools-show-05519c89 = Reviewed identical hunks stay hidden across this session's turns. Changed hunks reappear. Marks stay local. Reverting checks the inverse against current files and retains later non-overlapping changes and staged contents.
+
+repo-workflows-repository_tools-show-057248ff = Publish to several hosts
+
+repo-workflows-repository_tools-show-05e1813b = Open retained candidate
+
+repo-workflows-repository_tools-show-05e305a1 = I stopped other programs writing to this repository and have a backup
+
+repo-workflows-repository_tools-show-05f3fddc = Mark snapshot reviewed and save last-looked boundary
+
+repo-workflows-repository_tools-show-06b251d5 = Shared common directory: { $model-common-1 }
+
+repo-workflows-repository_tools-show-07345f3f = Send this exact subtree split
+
+repo-workflows-repository_tools-show-07aa5dfe = Shared and borrowed objects
+
+repo-workflows-repository_tools-show-089eb3ef = Pull from
+
+repo-workflows-repository_tools-show-0ae1bed9 = Save branch draft
+
+repo-workflows-repository_tools-show-0b22ea73 = Review saved agent turn
+
+repo-workflows-repository_tools-show-0d37e057 = New base:
+
+repo-workflows-repository_tools-show-0e95ad58 = Submodule checkout: { $c-head-1 }
+
+repo-workflows-repository_tools-show-107f87fc = Publish submodule dependencies before their parent
+
+repo-workflows-repository_tools-show-111eda2a = Commit this branch only
+
+repo-workflows-repository_tools-show-118694a9 = Publish dependencies, then review parent
+
+repo-workflows-repository_tools-show-11d962b1 = Missing donor directory
+
+repo-workflows-repository_tools-show-14d33bd0 = Unassigned
+
+repo-workflows-repository_tools-show-1560b7d2 = Open submodule
+
+repo-workflows-repository_tools-show-16312ab3 = Register source locally
+
+repo-workflows-repository_tools-show-16d60e39 = For a plain vendored folder without subtree history: Fetch, inspect its differences, then explicitly Associate it with that fetched baseline. Association preserves every folder byte and records those differences as local edits; only future upstream changes are merged. Accept the reviewed association before subsequent updates. Existing Git-subtree imports can use Prepare update directly.
+
+repo-workflows-repository_tools-show-16f5b799 = Named changelists
+
+repo-workflows-repository_tools-show-17c47592 = Shelve this list only
+
+repo-workflows-repository_tools-show-181a4047 = Session { $aggregate-session-1 } · { $aggregate-saved-turns-2 } saved turn(s) · fixed base { $review-parent-3 } → endpoint { $review-turn-4 }. Later saved turns and current unsaved files are excluded.
+
+repo-workflows-repository_tools-show-1919101c = Replay this stack in separate worktrees
+
+repo-workflows-repository_tools-show-19af9596 = Compare candidate of { $s-branch-1 }
+
+repo-workflows-repository_tools-show-19cca4e2 = Check fetches heads/tags into temporary app-owned refs on each submodule. It checks the named fetch endpoint, including gitlinks in outgoing history. Nested dependencies publish first. These pushes are not atomic; failures stop their parent.
+
+repo-workflows-repository_tools-show-1a6e5e0d = Associate existing folder with fetched baseline
+
+repo-workflows-repository_tools-show-1b5dcef8 = Edits changed since preview; preview again before saving.
+
+repo-workflows-repository_tools-show-1bd5bcfa = Current source: { $view-branch-1 }
+
+repo-workflows-repository_tools-show-1c0954b2 = Lists own whole files and keep independent draft messages. Commit uses the reviewed raw working snapshot, creates an unsigned commit and bypasses hooks and filters. Other staged files remain staged. Shelve saves staged and working layers independently; unshelve refuses newer edits on its paths.
+
+repo-workflows-repository_tools-show-1e4f897e = Git directory: { $model-git-1 }
+
+repo-workflows-repository_tools-show-1e9112fe = Fetch registered branch
+
+repo-workflows-repository_tools-show-1f711390 = Prepare update in own worktree
+
+repo-workflows-repository_tools-show-1f89e0a1 = Mark visible unreviewed hunks reviewed
+
+repo-workflows-repository_tools-show-1fad1933 = already published
+
+repo-workflows-repository_tools-show-1fbe68fb = Last-looked boundary: { $aggregate-last-looked-as-deref-u-1 }
+
+repo-workflows-repository_tools-show-202c8fbc = Opt in: automatically send this plain push when online, only if preflight has no findings
+
+repo-workflows-repository_tools-show-222bd382 = Prepare selected send…
+
+repo-workflows-repository_tools-show-2250c14b = Staged folder changes
+
+repo-workflows-repository_tools-show-2c00ff77 = Retry failed destinations only
+
+repo-workflows-repository_tools-show-2d0adec7 = Object store: { $crate-remote-display-model-objec-1 }
+
+repo-workflows-repository_tools-show-2ddef7c7 = Refresh subtree registry
+
+repo-workflows-repository_tools-show-2e1d0813 = I reviewed this exact queued commit, every endpoint and preflight finding
+
+repo-workflows-repository_tools-show-301d9809 = Make this clone independent
+
+repo-workflows-repository_tools-show-31a04bc4 = Required: { $oid }
+
+repo-workflows-repository_tools-show-325b12c6 = Reload this fixed saved endpoint
+
+repo-workflows-repository_tools-show-33463eb4 = Close proposal; retain worktrees
+
+repo-workflows-repository_tools-show-34b10b8d = Rebase { $name }
+
+repo-workflows-repository_tools-show-36c73d64 = Exact proposed branch patch
+
+repo-workflows-repository_tools-show-3a7402e9 = I reviewed each original → candidate OID and the candidate diff before accepting or undoing
+
+repo-workflows-repository_tools-show-3acc29f8 = { $c-path-1 } · base { $c-base-as-deref-unwrap-or-none-2 } · ours { $c-ours-3 } · theirs { $c-theirs-4 }
+
+repo-workflows-repository_tools-show-3cc9a2c6 = Publish group
+
+repo-workflows-repository_tools-show-3e04e021 = Prepare a renewed publication review
+
+repo-workflows-repository_tools-show-3e9abe63 = Preview reverting only this turn…
+
+repo-workflows-repository_tools-show-3f2768b0 = Checked fetch URL: { $git-redact-n-fetch-url-none-1 } · { $if-n-published-already-published-2 }
+
+repo-workflows-repository_tools-show-41251e4b = Untracked files (not included in split publication):
+
+repo-workflows-repository_tools-show-412ec52f = Reviewed isolated restack inputs (children use the preceding rewritten parent result):
+
+repo-workflows-repository_tools-show-41a222be = Commit this list only
+
+repo-workflows-repository_tools-show-43a8ef7d = Register an existing or new vendored folder
+
+repo-workflows-repository_tools-show-440174a7 = Undo accepted layers
+
+repo-workflows-repository_tools-show-4498585c = Result: { $oid }
+
+repo-workflows-repository_tools-show-44e05a73 = Known commits containing both sides (you can also paste any full commit ID):
+
+repo-workflows-repository_tools-show-454ee70f = Draft commit message for this list
+
+repo-workflows-repository_tools-show-4601e33d = Accept requires a completely clean original checkout, including untracked and ignored files, and the exact original branch/OID. Resolve conflicts and stage their resolutions in the candidate worktree. Uncertain acceptance is reconciled without rerunning it. No candidate is cleaned up automatically.
+
+repo-workflows-repository_tools-show-469f9427 = Undo last virtual operation
+
+repo-workflows-repository_tools-show-46aafc00 = Open submodule to merge
+
+repo-workflows-repository_tools-show-4734d197 = Revert only this turn
+
+repo-workflows-repository_tools-show-4759498a = Create
+
+repo-workflows-repository_tools-show-4829ff52 = Source branch:
+
+repo-workflows-repository_tools-show-49346e37 = Exact source: { $n-source-1 } · push URL: { $git-redact-n-push-url-none-2 }
+
+repo-workflows-repository_tools-show-4c8748ea = Queue this exact commit using its push route
+
+repo-workflows-repository_tools-show-4d07d136 = Only the recorded commit is sent. Rewrites, destination changes and rejected or uncertain sends pause for review. Sending after a crash is uncertain and is never retried automatically. Queue data and protected commits are local application refs; do not mirror-push application refs.
+
+repo-workflows-repository_tools-show-4e161156 = Save remote configuration
+
+repo-workflows-repository_tools-show-4f480ac9 = Inverse of { $p-parent-1 } → { $p-turn-2 } against current working files; { $p-paths-len-3 } affected paths
+
+repo-workflows-repository_tools-show-507eaa08 = original { $s-branch-1 }
+
+repo-workflows-repository_tools-show-51768487 = Submodule conflict graph
+
+repo-workflows-repository_tools-show-52b07a38 = Push outbox
+
+repo-workflows-repository_tools-show-5370d2e8 = Current hunks and their owners:
+
+repo-workflows-repository_tools-show-5471de9c = Reconcile exact acceptance receipts
+
+repo-workflows-repository_tools-show-5673c401 = { $review-hunks-len-1 } hunks · { $review-hunks-len-unreviewed-len-2 } hidden reviewed
+
+repo-workflows-repository_tools-show-5d3cc263 = All refs and namespace history
+
+repo-workflows-repository_tools-show-5dc87aef = Separate pull and push routes
+
+repo-workflows-repository_tools-show-5dcd35a3 = Each count compares this local branch to the last fetched ref for that route. Missing or excluded tracking refs show unknown. Changing a push branch affects gitcraft's ordinary branch pushes; Git itself still uses its native push.default/refspec rules.
+
+repo-workflows-repository_tools-show-5dfdfed0 = I reviewed the exact split, all destination endpoints, selected profile/account and preflight findings
+
+repo-workflows-repository_tools-show-5e3184e8 = Preview display truncated at 64000 characters.
+
+repo-workflows-repository_tools-show-5f715b70 = Hunk display truncated; inspect the file diff before assigning ownership.
+
+repo-workflows-repository_tools-show-5fa7aac5 = Ready
+
+repo-workflows-repository_tools-show-5fb1b07d = Group { $p-group-1 } · { $p-commit-2 } → refs/heads/{ $p-branch-3 }
+
+repo-workflows-repository_tools-show-616296e8 = Replay { $s-branch-1 } after { $s-old-base-2 } onto { $s-onto-3 }
+
+repo-workflows-repository_tools-show-625c67be = Exact native transaction receipts distinguish committed metadata from an uncertain acknowledgement. This inspection never rolls back files, removes locks or retries publication.
+
+repo-workflows-repository_tools-show-666eca6d = Source remote:
+
+repo-workflows-repository_tools-show-66dfd7a6 = Review candidate patch
+
+repo-workflows-repository_tools-show-67572031 = Remote: { $e-draft-name-1 } · all changes are repository-local
+
+repo-workflows-repository_tools-show-6b30bed0 = Each hunk belongs to one real branch. The checked-out branch stays at its anchor commit, and Git's real index stays intact. Virtual branch commits use reviewed raw contents, create unsigned commits and bypass hooks and filters. Changed ownership and overlapping activation require explicit resolution. Working-folder changes require native macOS/Linux.
+
+repo-workflows-repository_tools-show-6bdc8428 = candidate not yet complete
+
+repo-workflows-repository_tools-show-6c1991e9 = Make independent copies a complete pack for refs, original ancestry, reflogs and index entries, verifies it in a separate repository, then removes the alternate link. Donors remain unchanged. The original alternate metadata is retained as a recovery backup. Staging is limited to 128 MiB per pack; larger repositories can use git repack -a before preparing again.
+
+repo-workflows-repository_tools-show-6c892519 = Only the first 100 matching refs were examined. Paste a full commit ID to check another candidate.
+
+repo-workflows-repository_tools-show-6f2680ab = { $b-name-1 } · { $if-b-active-active-else-inactive-2 } · { $b-owned-len-3 } owned hunks
+
+repo-workflows-repository_tools-show-71ba13e6 = Show reviewed unchanged hunks
+
+repo-workflows-repository_tools-show-72353618 = Preview mappings and prune deletions against fetch URL
+
+repo-workflows-repository_tools-show-72456f4c = Display truncated at 32000 characters; open the turn comparison for more.
+
+repo-workflows-repository_tools-show-739ffe8f = Everything since last looked · saved turns only
+
+repo-workflows-repository_tools-show-7432d850 = Inspect local edits
+
+repo-workflows-repository_tools-show-7790f11b = Save named group
+
+repo-workflows-repository_tools-show-77c3b92d = No recorded state publications in this worktree.
+
+repo-workflows-repository_tools-show-78f32476 = Send selected exact push
+
+repo-workflows-repository_tools-show-798b0df6 = Destination branch:
+
+repo-workflows-repository_tools-show-79af8f6d = New list:
+
+repo-workflows-repository_tools-show-7b868cc6 = Apply this inverse; stop on overlapping or stale edits. A safety draft will preserve the current files.
+
+repo-workflows-repository_tools-show-7bd990ec = candidate { $s-branch-1 }
+
+repo-workflows-repository_tools-show-7c52fd3d = Refresh proposals and receipts
+
+repo-workflows-repository_tools-show-7d86e238 = Conflicts that can wait
+
+repo-workflows-repository_tools-show-7e381308 = Squashed import
+
+repo-workflows-repository_tools-show-7eb9930d = Reload publication receipts
+
+repo-workflows-repository_tools-show-7ffc5022 = Real branch tip: { $b-tip-1 }
+
+repo-workflows-repository_tools-show-80c567ae = Old base (replay commits after):
+
+repo-workflows-repository_tools-show-80ef5663 = No preflight findings in identity, signatures, messages, secrets, large blobs or remote history.
+
+repo-workflows-repository_tools-show-83e94e8a = { $p-plan-commits-len-1 } outgoing commits
+
+repo-workflows-repository_tools-show-8472b5d8 = Published: { $git-redact-output-none-1 }
+
+repo-workflows-repository_tools-show-84e9b213 = Filter refs:
+
+repo-workflows-repository_tools-show-864a00e5 = Lends objects to { $borrower }
+
+repo-workflows-repository_tools-show-88db1c04 = publication required
+
+repo-workflows-repository_tools-show-89f4921c = Fetch URLs (first is fetched; one per line)
+
+repo-workflows-repository_tools-show-8bb0f122 = { $c-branch-1 } at { $c-old-2 }
+
+repo-workflows-repository_tools-show-8bbd26a7 = Release stale ownership { $h-key-8-1 }
+
+repo-workflows-repository_tools-show-8cc484e4 = Legacy entry: profile/account consent missing
+
+repo-workflows-repository_tools-show-8daa08a5 = Conflict waiting: { $p }
+
+repo-workflows-repository_tools-show-8dd5e5cc = History of ref / prefix (blank = all):
+
+repo-workflows-repository_tools-show-8edc0123 = I reviewed every destination and accept partial publication
+
+repo-workflows-repository_tools-show-8f3b56b3 = I reviewed each named remote, exact commit and target branch
+
+repo-workflows-repository_tools-show-8f8df690 = State publication receipts
+
+repo-workflows-repository_tools-show-8fb60b6e = Scoped sign-in: { $crate-git-redact-endpoint-none-1 } · account { $account-2 } · username { $username-3 }
+
+repo-workflows-repository_tools-show-8fd0f155 = Anchor: { $m-anchor-1 } at { $crate-repo-short-m-base-2 }
+
+repo-workflows-repository_tools-show-8fe4dcef = Change routes…
+
+repo-workflows-repository_tools-show-9174163c = Isolated restack
+
+repo-workflows-repository_tools-show-927164d1 = I reviewed this saved snapshot through the displayed endpoint
+
+repo-workflows-repository_tools-show-92958e20 = Unshelve this list
+
+repo-workflows-repository_tools-show-93fdd760 = Full upstream history
+
+repo-workflows-repository_tools-show-96a8a275 = Queue consent pins the selected profile, connection account metadata and any scoped transient sign-in. A changed or missing legacy witness requires renewed approval. Prepared results expire after profile/sign-in changes.
+
+repo-workflows-repository_tools-show-98a12458 = Continue / reconcile candidate worktree
+
+repo-workflows-repository_tools-show-99256c25 = Selected profile { $p-consent-profile-1 } · connection account metadata pinned
+
+repo-workflows-repository_tools-show-99d05df7 = Split committed folder history
+
+repo-workflows-repository_tools-show-9aa26ad9 = Assign each current file to one active list (or leave it unassigned):
+
+repo-workflows-repository_tools-show-9b1cea76 = { $p-plan-commits-len-1 } outgoing commits inspected
+
+repo-workflows-repository_tools-show-9b9a8d05 = Read
+
+repo-workflows-repository_tools-show-9bb7e70d = Continue / inspect resolved candidate
+
+repo-workflows-repository_tools-show-9cbacb41 = Commit this exact owned-hunk tree as an unsigned virtual branch commit
+
+repo-workflows-repository_tools-show-9d8f0223 = Pending: retain and inspect
+
+repo-workflows-repository_tools-show-9e153558 = Exact split { $p-plan-head-1 } → { $p-plan-remote-2 }/{ $p-plan-destination-3 }
+
+repo-workflows-repository_tools-show-9e8617f1 = initial parent of this session
+
+repo-workflows-repository_tools-show-9fbeaee4 = Push:
+
+repo-workflows-repository_tools-show-a1016f72 = Partial clone: some objects may require its promisor remote.
+
+repo-workflows-repository_tools-show-a17b0445 = Exact commit { $p-plan-head-1 } → { $p-plan-remote-2 } / { $p-plan-destination-3 }
+
+repo-workflows-repository_tools-show-a23601d6 = Uses installed Git's contrib subtree helper only on Prepare/Continue. Fetch and Publish are explicit network actions. Candidates, application refs and recovery directories remain local and retained; do not mirror-push application refs. Native Unix checkout only; helper absence/failure leaves an inspectable proposal.
+
+repo-workflows-repository_tools-show-a253af39 = Saved inactive: { $h-path-1 } · { $h-key-8-2 }
+
+repo-workflows-repository_tools-show-a2869e42 = Read outbox again
+
+repo-workflows-repository_tools-show-a2bc21d3 = Approved profile { $consent-profile-1 } · selected account metadata pinned
+
+repo-workflows-repository_tools-show-a39608b9 = Deactivate these hunks
+
+repo-workflows-repository_tools-show-a503aa66 = Push to
+
+repo-workflows-repository_tools-show-a6888267 = Last accepted import: { $oid }
+
+repo-workflows-repository_tools-show-a6b3283e = Folder:
+
+repo-workflows-repository_tools-show-aa785909 = In flight or interrupted: inspect its worktree and reconcile receipts explicitly
+
+repo-workflows-repository_tools-show-aaac53fc = Only owned hunks of { $p-name-1 } will enter this branch commit. The folder, anchor and real index remain as reviewed.
+
+repo-workflows-repository_tools-show-ab27abcb = Inspect state publication receipts
+
+repo-workflows-repository_tools-show-ab31db17 = Stale ownership: { $h-path-1 }
+
+repo-workflows-repository_tools-show-ad16979e = Committed source: { $v-branch-1 } at { $v-head-2 }
+
+repo-workflows-repository_tools-show-ae033504 = Saved groups
+
+repo-workflows-repository_tools-show-ae30be2e = Save draft message
+
+repo-workflows-repository_tools-show-aff83496 = Group:
+
+repo-workflows-repository_tools-show-b0a1bb3e = Reconcile exact acceptance receipt
+
+repo-workflows-repository_tools-show-b0e84ec1 = Accept this subtree update
+
+repo-workflows-repository_tools-show-b1249b5a = I reviewed the pull and push destinations before saving
+
+repo-workflows-repository_tools-show-b26a038e = Pick an existing commit containing both sides, or open the submodule, merge there, then refresh this graph. Recording changes only the parent index.
+
+repo-workflows-repository_tools-show-b2f82ce9 = { $p-branch-1 }: { $p-expected-2 } after { $p-old-base-3 } → { $p-onto-4 }
+
+repo-workflows-repository_tools-show-b7b34c26 = Record chosen submodule commit in parent
+
+repo-workflows-repository_tools-show-b85186ac = Parent { $p-branch-1 } at { $p-commit-2 } → { $p-parent-remote-3 }/{ $p-parent-branch-4 } ({ $git-redact-p-parent-url-none-5 })
+
+repo-workflows-repository_tools-show-b87ce680 = Pull:
+
+repo-workflows-repository_tools-show-b9cc89c6 = Renewed approval keeps the ORIGINAL pinned commit and accepts the CURRENT destination and source history. Verify any uncertain prior outcome on the remote first. Autosend is disabled.
+
+repo-workflows-repository_tools-show-ba765b08 = Accept ready candidates
+
+repo-workflows-repository_tools-show-ba8a03e2 = Refresh topology and prepare again
+
+repo-workflows-repository_tools-show-bbcce2f9 = Refresh after merge
+
+repo-workflows-repository_tools-show-be1e9f5f = Activate these hunks
+
+repo-workflows-repository_tools-show-c23fbbaa = Remote URLs, refspecs and mirror policy
+
+repo-workflows-repository_tools-show-c29574be = Preview truncated; compare this turn before accepting.
+
+repo-workflows-repository_tools-show-c2c3785a = Save both routes
+
+repo-workflows-repository_tools-show-c757c39b = Rebase and restack run in their own retained, detached worktrees. Originals stay unchanged until you accept. Resolve conflicts and stage the result in the proposal's worktree, then Continue. Replays are unsigned and skip repository hooks. Acceptance uses the guarded native transaction and refuses dirty/stale original worktrees; layers report partial success individually. Undo restores each accepted original tip through the same guard. No worktree is deleted automatically.
+
+repo-workflows-repository_tools-show-c7879dfc = Review split publication
+
+repo-workflows-repository_tools-show-cb9b7596 = Unstaged folder changes
+
+repo-workflows-repository_tools-show-ccbcb47e = Parent: { $git-redact-s-none-1 }
+
+repo-workflows-repository_tools-show-d05d82b6 = Push URLs (blank inherits fetch URLs; Git pushes to every listed URL)
+
+repo-workflows-repository_tools-show-d15b2630 = These pushes are not atomic. A successful host stays published if another host fails. Each destination receives the exact commit shown; retry sends only failed destinations.
+
+repo-workflows-repository_tools-show-d3197597 = Committed folder changes
+
+repo-workflows-repository_tools-show-d329d33b = Preview commit of owned hunks…
+
+repo-workflows-repository_tools-show-d5680e1f = Pruning with these mappings would delete { $p-prune-len-1 } local refs:
+
+repo-workflows-repository_tools-show-d5714f7d = I reviewed this exact candidate patch / fetched association baseline; for a renewed send I inspected the remote after any rejected/uncertain attempt
+
+repo-workflows-repository_tools-show-d653a1c5 = Remove entry
+
+repo-workflows-repository_tools-show-dad5a969 = Receipt
+
+repo-workflows-repository_tools-show-db839840 = Worktrees using this common directory:
+
+repo-workflows-repository_tools-show-deee0d61 = Mark this hunk reviewed
+
+repo-workflows-repository_tools-show-df2937d4 = Includes application, bisect, backup and namespace refs. Object IDs name the exact snapshot below.
+
+repo-workflows-repository_tools-show-e01205cf = Rename list
+
+repo-workflows-repository_tools-show-e0b832a0 = This repository's primary store
+
+repo-workflows-repository_tools-show-e0e54b30 = Fetched source: { $oid }
+
+repo-workflows-repository_tools-show-e27da1c1 = History (up to 200 commits)
+
+repo-workflows-repository_tools-show-e37c5523 = Mirror pushes: force all refs and delete extra destination refs
+
+repo-workflows-repository_tools-show-e5c0b5df = New real branch:
+
+repo-workflows-repository_tools-show-e6eadbe7 = I reviewed these URLs, mappings and mirror consequences
+
+repo-workflows-repository_tools-show-e8331aba = Fetch source explicitly to compare committed folder contents
+
+repo-workflows-repository_tools-show-e949fe01 = Vendored folders and subtree publication
+
+repo-workflows-repository_tools-show-e9e7ecb3 = Check every dependency and outgoing gitlink
+
+repo-workflows-repository_tools-show-ea03ec13 = Choose an existing configured source remote; its fetch and push routes may differ. Registration records provenance only. A missing folder can be imported with Prepare update after an explicit Fetch.
+
+repo-workflows-repository_tools-show-ea2af9ef = Fetch mirroring is expressed by +refs/*:refs/*. It writes directly into local namespaces, including branches. Push mirroring can overwrite or delete others' work. These previews never prune or push.
+
+repo-workflows-repository_tools-show-ea303dfe = State: { $report-intent-state-ref-1 }
+    Previous: { $report-intent-previous-2 }
+    Proposed: { $report-intent-proposed-3 }
+    Receipt: { $report-intent-receipt-ref-4 }
+    Source branch: { $report-intent-branch-as-deref-un-5 }
+    Expected HEAD: { $report-intent-expected-head-as-d-6 }
+    Recovery entries: { $report-intent-evidence-7 }
+
+repo-workflows-repository_tools-show-ea721fba = Refresh ownership and working snapshot
+
+repo-workflows-repository_tools-show-ed38427e = Only this split commit is sent. No later original or candidate edits join it. Multiple endpoint writes are not atomic. Rejection or missing acknowledgement pauses the proposal; no automatic retry.
+
+repo-workflows-repository_tools-show-edc5ba83 = I reviewed the selected commit and want to record this parent resolution
+
+repo-workflows-repository_tools-show-eef651ca = Parallel branches in this folder
+
+repo-workflows-repository_tools-show-ef0a338b = Committed: exact receipt
+
+repo-workflows-repository_tools-show-efdfe52a = Create a new branch to start. Existing working hunks remain unassigned until you choose their owners.
+
+repo-workflows-repository_tools-show-f279f80b = Push refspecs (blank uses push.default)
+
+repo-workflows-repository_tools-show-f2d4cf1c = This Git cannot enumerate arbitrary root refs; established pseudorefs are included when present.
+
+repo-workflows-repository_tools-show-f41d4ab9 = Recovery directories retain original/candidate files and full access metadata. Inspect these entries and index.lock before any manual recovery. Journals are bounded to 256 operations; archive resolved journal refs explicitly after inspecting their recovery entries.
+
+repo-workflows-repository_tools-show-f5265a26 = Unreviewed
+
+repo-workflows-repository_tools-show-f581c406 = Draft commit message
+
+repo-workflows-repository_tools-show-f5b402c5 = Folder versus fetched upstream { $base }; original import baseline is unknown, so this also includes upstream differences
+
+repo-workflows-repository_tools-show-f66ce8b9 = Prepare exact commit and destinations
+
+repo-workflows-repository_tools-show-fad6057b = Reviewed
+
+repo-workflows-repository_tools-show-faf582fc = Create virtual branch
+
+repo-workflows-repository_tools-show-fb535d0d = Close proposal; retain all work
+
+repo-workflows-repository_tools-show-fcb0aec1 = Check/publish remote:
+
+repo-workflows-repository_tools-show-fccdc9ec = Review pinned commit and current destination…
+
+repo-workflows-repository_tools-show-ff1cf26d = Committed local edits relative to last accepted upstream { $base }
+
+repo-workflows-repository_tools-show-fff50056 = Leave mode; retain files and branch refs
+
+repo-workflows-repository_tools-start-send-628a48e6 = Prepared outbox profile/sign-in changed; prepare and approve again
+
+repo-workflows-repository_tools-start-send-994ea6b0 = Send exact queued push
+
+repo-workflows-repository_tools-start-send-e7b0c78d = Autosend opted-in plain outbox push
+
 repo-workflows-review_workflow-review-document-ui-7d9eb7ac = Close
 
 repo-workflows-review_workflow-show-c3812fc4 = Remove

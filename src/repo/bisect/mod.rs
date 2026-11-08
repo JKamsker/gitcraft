@@ -164,14 +164,14 @@ impl RepoTab {
     fn reset_bisect(&mut self, ctx: &egui::Context) {
         let state = self.bisect.state.as_ref();
         let label = if state.is_some_and(|b| b.outcome.is_some()) {
-            crate::i18n::text("repo-workflows-bisect-reset-bisect-1bdcc155")
+            "Finish bisect"
         } else {
-            crate::i18n::text("repo-workflows-bisect-reset-bisect-0ddac35c")
+            "Stop bisect"
         };
         let back = match state.and_then(Bisect::start_branch) {
             Some(branch) => crate::i18n::message(
                 "repo-workflows-bisect-reset-bisect-fd58b76b",
-                &[("branch", (branch).into())],
+                &[("branch", (branch).clone().into())],
             ),
             None => crate::i18n::text("repo-workflows-bisect-reset-bisect-b63b6486").to_owned(),
         };
@@ -202,11 +202,9 @@ impl RepoTab {
             ));
             return;
         }
-        self.bisect_step(
-            crate::i18n::text("repo-workflows-bisect-start-bisect-db936451"),
-            ctx,
-            move |path| git::bisect_start(path, &bad, good.as_deref()),
-        );
+        self.bisect_step("Start bisect", ctx, move |path| {
+            git::bisect_start(path, &bad, good.as_deref())
+        });
     }
 
     fn mark_bisect(&mut self, mark: Mark, rev: Option<String>, ctx: &egui::Context) {
@@ -218,20 +216,9 @@ impl RepoTab {
             return;
         };
         let label = match (&rev, mark) {
-            (Some(rev), _) => crate::i18n::message(
-                "repo-workflows-bisect-mark-bisect-22f6b91b",
-                &[
-                    ("short-rev-1", (short(rev)).into()),
-                    ("bisect-word-mark-2", (bisect.word(mark)).into()),
-                ],
-            ),
-            (None, Mark::Skip) => {
-                crate::i18n::text("repo-workflows-bisect-mark-bisect-15306802").to_owned()
-            }
-            (None, _) => crate::i18n::message(
-                "repo-workflows-bisect-mark-bisect-9b0f3138",
-                &[("bisect-word-mark-1", (bisect.word(mark)).into())],
-            ),
+            (Some(rev), _) => format!("Mark {} as {}", short(rev), bisect.word(mark)),
+            (None, Mark::Skip) => "Skip this commit".to_owned(),
+            (None, _) => format!("Mark as {}", bisect.word(mark)),
         };
         self.bisect_step(&label, ctx, move |path| {
             git::bisect_mark(path, &bisect, mark, rev.as_deref())
@@ -274,7 +261,7 @@ impl RepoTab {
             Err(e) => (
                 crate::i18n::message(
                     "repo-workflows-bisect-bisect-step-done-8336fbfe",
-                    &[("label", (label).into()), ("e", (e).clone().into())],
+                    &[("label", (label).clone().into()), ("e", (e).clone().into())],
                 ),
                 true,
             ),
@@ -334,8 +321,7 @@ impl RepoTab {
         if command.is_empty() || self.busy_op.is_some() || self.bisect.running() {
             return;
         }
-        self.busy_op =
-            Some(crate::i18n::text("repo-workflows-bisect-start-bisect-run-d300d73e").to_owned());
+        self.busy_op = Some("Bisect run".to_owned());
         self.op_started = Some(Instant::now());
         self.status = None;
         self.bisect.last_command = command.clone();
@@ -411,7 +397,7 @@ impl RepoTab {
                 crate::i18n::text("repo-workflows-bisect-stop-bisect-action-fff2c8f7").to_owned()
             });
         Action::Dialog(Dialog::confirm(
-            crate::i18n::text("repo-workflows-bisect-stop-bisect-action-0ddac35c"),
+            "Stop bisect",
             crate::i18n::message(
                 "repo-workflows-bisect-stop-bisect-action-c380662a",
                 &[("back", (back).clone().into())],
@@ -491,7 +477,7 @@ fn run_message(
                     "repo-workflows-bisect-run-message-b4eba258",
                     &[
                         ("code", (code).clone().into()),
-                        ("last-line", (last_line).into()),
+                        ("last-line", (last_line).clone().into()),
                     ],
                 ),
                 true,

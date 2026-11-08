@@ -88,7 +88,7 @@ impl State {
                 "repo-workflows-content_recovery-show-c006906c",
                 &[
                     ("preview-bytes-len-1", (preview.bytes.len()).clone().into()),
-                    ("preview-blob-12-2", (&preview.blob[..12]).into()),
+                    ("preview-blob-12-2", (&preview.blob[..12]).clone().into()),
                 ],
             ));
             if let Some(source) = &preview.source {
@@ -230,6 +230,7 @@ impl State {
                                             .unwrap_or(crate::i18n::text(
                                                 "repo-workflows-content_recovery-show-fbdaf564",
                                             )))
+                                        .clone()
                                         .into(),
                                     ),
                                     ("path", (path).clone().into()),

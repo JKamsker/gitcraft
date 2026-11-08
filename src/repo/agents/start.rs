@@ -192,7 +192,10 @@ impl StartForm {
             ui.label(
                 RichText::new(crate::i18n::message(
                     "repo-workflows-agents-ui-44e1cc2b",
-                    &[("crate-manual-command-1", (crate::manual::command()).into())],
+                    &[(
+                        "crate-manual-command-1",
+                        (crate::manual::command()).clone().into(),
+                    )],
                 ))
                 .small()
                 .color(t.text_faint),
@@ -213,7 +216,7 @@ impl StartForm {
         if self.branches.iter().any(|b| b == branch) {
             return Some(crate::i18n::message(
                 "repo-workflows-agents-problem-80f33652",
-                &[("branch", (branch).into())],
+                &[("branch", (branch).clone().into())],
             ));
         }
         let base = self.base.trim();
@@ -291,7 +294,7 @@ impl StartForm {
                 ui.label(
                     RichText::new(crate::i18n::message(
                         "repo-workflows-agents-agent-choice-2b8f8124",
-                        &[("cli-label-1", (cli.label).into())],
+                        &[("cli-label-1", (cli.label).clone().into())],
                     ))
                     .small()
                     .color(t.text_faint),
@@ -480,12 +483,13 @@ mod fluent_partition_tests {
             focus: false,
             repo: "/supplied/repository".into(),
             branches: vec![],
-            folder_for: Box::new(|_| panic!("supplied UI must not discover folders")),
+            folder_for: Box::new(|_| "unexpected-folder-resolution".into()),
         }
     }
 
     #[test]
-    fn fluent_partition_actual_start_form_keeps_action_payload_in_both_languages() {
+    fn fluent_partition_actual_start_form_keeps_action_payload_in_both_languages()
+    -> Result<(), String> {
         for (language, title, task, start) in [
             ("en-US", "Start agent task", "Task", "Start"),
             ("de", "Agent-Aufgabe starten", "Aufgabe", "Starten"),
@@ -523,7 +527,7 @@ mod fluent_partition_tests {
                 (supplied_form(), None),
             );
             let Some(AgentAct::Start(payload)) = &recorded.state().1 else {
-                panic!("expected recorded Start action");
+                return Err("expected recorded Start action".into());
             };
             assert_eq!(payload.agent, "codex --model exact-model");
             assert_eq!(payload.branch, "topic/Überprüfung");
@@ -535,6 +539,7 @@ mod fluent_partition_tests {
             );
         }
         crate::i18n::set_language("en-US");
+        Ok(())
     }
 
     #[test]

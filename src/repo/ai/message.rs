@@ -32,12 +32,18 @@ impl RepoTab {
         } else if settings.enabled() && self.amend {
             crate::i18n::message(
                 "repo-workflows-ai-ai-message-button-05060623",
-                &[("settings-tool-short-1", (settings.tool.short()).into())],
+                &[(
+                    "settings-tool-short-1",
+                    (settings.tool.short()).clone().into(),
+                )],
             )
         } else if settings.enabled() {
             crate::i18n::message(
                 "repo-workflows-ai-ai-message-button-33272cf9",
-                &[("settings-tool-short-1", (settings.tool.short()).into())],
+                &[(
+                    "settings-tool-short-1",
+                    (settings.tool.short()).clone().into(),
+                )],
             )
         } else {
             crate::i18n::text("repo-workflows-ai-ai-message-button-a1323968").to_owned()
@@ -93,17 +99,17 @@ impl RepoTab {
             let text = match found {
                 Some(true) if no_command => crate::i18n::message(
                     "repo-workflows-ai-tool-menu-671a1cd9",
-                    &[("tool-label-1", (tool.label()).into())],
+                    &[("tool-label-1", (tool.label()).clone().into())],
                 ),
                 Some(true) => tool.label().to_owned(),
                 Some(false) => crate::i18n::message(
                     "repo-workflows-ai-tool-menu-9b1177a4",
-                    &[("tool-label-1", (tool.label()).into())],
+                    &[("tool-label-1", (tool.label()).clone().into())],
                 ),
                 None if matches!(self.ai.tools, Look::Failed(_)) => tool.label().to_owned(),
                 None => crate::i18n::message(
                     "repo-workflows-ai-tool-menu-0c0aa296",
-                    &[("tool-label-1", (tool.label()).into())],
+                    &[("tool-label-1", (tool.label()).clone().into())],
                 ),
             };
             let refused = if no_command {
@@ -287,7 +293,10 @@ fn writing_row(ui: &mut Ui, running: &Running) -> bool {
             RichText::new(crate::i18n::message(
                 "repo-workflows-ai-writing-row-ea07a4e5",
                 &[
-                    ("running-tool-short-1", (running.tool.short()).into()),
+                    (
+                        "running-tool-short-1",
+                        (running.tool.short()).clone().into(),
+                    ),
                     (
                         "elapsed-running-started-2",
                         (elapsed(running.started)).clone().into(),

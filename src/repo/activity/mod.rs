@@ -177,9 +177,12 @@ pub(super) fn bounded(output: &str) -> String {
     crate::i18n::message(
         "repo-workflows-activity-bounded-62a56981",
         &[
-            ("output-head-end-1", (&output[..head_end]).into()),
+            ("output-head-end-1", (&output[..head_end]).clone().into()),
             ("left-out", (left_out).clone().into()),
-            ("output-tail-start-2", (&output[tail_start..]).into()),
+            (
+                "output-tail-start-2",
+                (&output[tail_start..]).clone().into(),
+            ),
         ],
     )
 }

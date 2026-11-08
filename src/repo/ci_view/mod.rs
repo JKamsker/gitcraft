@@ -131,7 +131,7 @@ impl RepoTab {
             self.status = Some((
                 crate::i18n::message(
                     "repo-workflows-ci_view-open-ci-991ae978",
-                    &[("editor", (editor).into())],
+                    &[("editor", (editor).clone().into())],
                 ),
                 true,
             ));

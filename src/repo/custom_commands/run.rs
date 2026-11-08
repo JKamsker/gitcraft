@@ -103,7 +103,7 @@ impl RepoTab {
             Err(e) => {
                 self.terminal_error = Some(crate::i18n::message(
                     "repo-workflows-custom_commands-run-custom-in-terminal-f33b19b3",
-                    &[("name", (name).into()), ("e", (e).clone().into())],
+                    &[("name", (name).clone().into()), ("e", (e).clone().into())],
                 ))
             }
         }
