@@ -7,6 +7,7 @@
 // Shared parts land before the views using them; dropped once every view is in (#175).
 #![allow(dead_code)]
 
+pub mod constellation;
 pub mod history;
 
 /// Where what a view shows came from, and how far it can be trusted: shown above every view.
