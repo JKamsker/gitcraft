@@ -1050,7 +1050,7 @@ fn one_turn_reversal_retains_later_hunks_and_index_and_rejects_stale_overlap() -
     let index = std::fs::read(f.0.join(".git/index")).map_err(|e| e.to_string())?;
     let p = turn::inverse_preview(&f.0, &parent, &turn, &|| true)?;
     let backup = turn::inverse_apply(&f.0, &p, &|| true)?;
-    assert!(list(&f.0, &|| true)?.iter().any(|d| d.id == backup));
+    assert!(list(&f.0, &|| true)?.iter().any(|d| d.id == backup.draft));
     assert_eq!(
         std::fs::read(f.0.join("file")).map_err(|e| e.to_string())?,
         base.replace("line 25\n", "later retained\n").as_bytes()
@@ -1154,7 +1154,10 @@ fn file_exchange_rolls_back_owned_changes_when_guard_fails_mid_batch() -> Result
             Ok(())
         }
     };
-    assert!(working_transaction::apply(&f.0, &before, &after, &check, &|| true).is_err());
+    let policies = native_files::capture_policies(&f.0, &before, &|| true)?;
+    assert!(
+        working_transaction::apply(&f.0, &before, &after, &policies, &check, &|| true).is_err()
+    );
     assert_eq!(
         std::fs::read(f.0.join("a")).map_err(|e| e.to_string())?,
         b"before a"

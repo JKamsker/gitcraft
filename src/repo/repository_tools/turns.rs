@@ -76,8 +76,8 @@ pub(super) fn act(tab: &mut RepoTab, act: Act, ctx: &egui::Context) -> Option<Ac
             tab.repository_tool_mutation("Revert one saved turn", false, ctx, move |r| {
                 logic::inverse_apply(r.repo, &preview, &|| !r.control.is_cancelled()).map(|id| {
                     format!(
-                        "Turn reverted. Staged contents retained. Undo from Earlier versions: {}",
-                        id.reference
+                        "Turn reverted. Staged contents retained. Undo from Earlier versions: {}. {}",
+                        id.draft.reference, id.evidence
                     )
                 })
             })

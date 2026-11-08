@@ -25,6 +25,8 @@ pub struct Branch {
     pub message: String,
     pub owned: Vec<Hunk>,
     permissions: BTreeMap<String, u32>,
+    #[serde(default)]
+    access: native_files::Policies,
 }
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Hunk {
@@ -42,6 +44,8 @@ struct Undo {
     before: BTreeMap<String, Option<Entry>>,
     after: BTreeMap<String, Option<Entry>>,
     permissions: BTreeMap<String, u32>,
+    #[serde(default)]
+    access: native_files::Policies,
 }
 #[derive(Clone, Serialize, Deserialize)]
 struct Move {
@@ -224,6 +228,11 @@ fn snapshot(
         );
     }
     if files {
+        if native_files::capture_policies(&ctx.repo, &view.source.work, active)?
+            != *view.source.policies
+        {
+            return Err("Working full access policy changed since virtual preview".into());
+        }
         for (p, before) in view.source.work.iter() {
             if read_file(ctx, p, before.as_ref().map_or("100644", |(m, _)| m), active)? != *before {
                 return Err(format!("{p} changed since the ownership preview; refresh"));
@@ -459,6 +468,7 @@ pub fn read(repo: &Path, active: &dyn Fn() -> bool) -> Result<View, String> {
         }
     }
 
+    source.policies = Arc::new(native_files::capture_policies(repo, &source.work, active)?);
     let stale=state.mode.as_ref().and_then(|m|{
         if source.source.head.as_deref()!=Some(&m.base)||source.source.branch.as_deref()!=Some(&m.anchor){Some("Anchor checkout changed. Return to its exact base or leave virtual mode while retaining files and branch refs".into())}else{None}
     });
@@ -603,6 +613,13 @@ fn undo_record(
     Undo {
         previous: view.version.clone(),
         moves,
+        access: view
+            .source
+            .policies
+            .iter()
+            .filter(|(p, _)| before.contains_key(*p))
+            .map(|(p, policy)| (p.clone(), policy.clone()))
+            .collect(),
         before,
         after,
         permissions,
@@ -665,6 +682,7 @@ pub fn edit(
                 message: String::new(),
                 owned: Vec::new(),
                 permissions: BTreeMap::new(),
+                access: BTreeMap::new(),
             });
             moves.push(Move {
                 reference,
@@ -704,6 +722,14 @@ pub fn edit(
                     if b.name == name {
                         b.owned.push(h.clone());
                         if view.source.work.get(&h.path).is_some_and(Option::is_some) {
+                            b.access.insert(
+                                h.path.clone(),
+                                view.source
+                                    .policies
+                                    .get(&h.path)
+                                    .ok_or("Full working access policy missing; refresh")?
+                                    .clone(),
+                            );
                             b.permissions.insert(
                                 h.path.clone(),
                                 super::permissions::Pin::capture(repo, &h.path, active)?.bits(),
@@ -866,21 +892,20 @@ pub fn toggle(
         active,
     )?;
     snapshot(&ctx, view, true, active)?;
-    working_transaction::apply_with_commit(
+    let evidence = working_transaction::apply_with_commit(
         repo,
         &before,
         &target,
+        &view.source.policies,
         &|| snapshot(&ctx, view, false, active),
-        &|| publish(&ctx, view, &next, &[], active),
-        if !b.active {
-            Some(&b.permissions)
-        } else {
-            None
+        &|| {
+            publish(&ctx, view, &next, &[], active).map(|()| native_files::CommitOutcome::Committed)
         },
+        if !b.active { Some(&b.access) } else { None },
         active,
     )?;
     Ok(format!(
-        "{} {}; real index unchanged",
+        "{} {}; real index unchanged. {evidence}",
         if b.active { "Deactivated" } else { "Activated" },
         name
     ))
@@ -1056,17 +1081,20 @@ pub fn undo(repo: &Path, view: &View, active: &dyn Fn() -> bool) -> Result<Strin
         return Err("An affected file has staged edits; unstage it before virtual undo".into());
     }
     previous.undo = None;
-    working_transaction::apply_with_commit(
+    let evidence = working_transaction::apply_with_commit(
         repo,
         &before,
         &target,
+        &view.source.policies,
         &|| snapshot(&ctx, view, false, active),
-        &|| publish(&ctx, view, &previous, &moves, active),
-        Some(&u.permissions),
+        &|| {
+            publish(&ctx, view, &previous, &moves, active)
+                .map(|()| native_files::CommitOutcome::Committed)
+        },
+        Some(&u.access),
         active,
     )?;
-    Ok(
-        "Undid the last virtual operation; unrelated edits and recovery branch refs retained"
-            .into(),
-    )
+    Ok(format!(
+        "Undid the last virtual operation; unrelated edits and recovery branch refs retained. {evidence}"
+    ))
 }

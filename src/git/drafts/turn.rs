@@ -12,6 +12,7 @@ pub struct Inverse {
     source: Arc<Source>,
     target: Arc<working_transaction::Contents>,
     files: Arc<BTreeMap<String, Option<(String, Vec<u8>)>>>,
+    policies: Arc<native_files::Policies>,
 }
 fn read_paths(
     ctx: &Context,
@@ -168,15 +169,25 @@ pub fn inverse_preview(
         patch: Arc::new(patch),
         paths,
         source: Arc::new(now),
+        policies: Arc::new(native_files::capture_policies(repo, &files, active)?),
         files: Arc::new(files),
         target: Arc::new(target),
     })
 }
-pub fn inverse_apply(repo: &Path, p: &Inverse, active: &dyn Fn() -> bool) -> Result<Id, String> {
+pub struct Applied {
+    pub draft: Id,
+    pub evidence: String,
+}
+pub fn inverse_apply(
+    repo: &Path,
+    p: &Inverse,
+    active: &dyn Fn() -> bool,
+) -> Result<Applied, String> {
     let ctx = Context::new(repo, active)?;
     let verify = || -> Result<(), String> {
         if source(&ctx, active)? != *p.source
             || read_paths(&ctx, &p.paths, &p.source, active)? != *p.files
+            || native_files::capture_policies(repo, &p.files, active)? != *p.policies
         {
             return Err(
                 "HEAD, index or working files changed since the turn preview; reopen it".into(),
@@ -200,8 +211,12 @@ pub fn inverse_apply(repo: &Path, p: &Inverse, active: &dyn Fn() -> bool) -> Res
         }
         Ok(())
     };
-    working_transaction::apply(repo, &p.files, &p.target, &check, active)?;
-    Ok(backup.id)
+    let evidence =
+        working_transaction::apply(repo, &p.files, &p.target, &p.policies, &check, active)?;
+    Ok(Applied {
+        draft: backup.id,
+        evidence,
+    })
 }
 
 #[derive(Clone)]

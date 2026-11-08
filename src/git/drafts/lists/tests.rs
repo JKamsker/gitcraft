@@ -210,6 +210,7 @@ fn pure_state_snapshot_budget_stops_before_fifth_eight_mib_read_without_allocati
 #[test]
 fn pure_state_unshelve_refuses_another_active_owner_before_restoring_contents() {
     let shelf = Shelf {
+        access: BTreeMap::new(),
         permissions: BTreeMap::new(),
         base: BTreeMap::new(),
         index: BTreeMap::new(),

@@ -20,6 +20,8 @@ pub struct List {
 }
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Shelf {
+    #[serde(default)]
+    access: native_files::Policies,
     permissions: BTreeMap<String, u32>,
     base: BTreeMap<String, Option<Entry>>,
     index: BTreeMap<String, Option<Entry>>,
@@ -33,6 +35,7 @@ pub struct View {
     pub reference: String,
     pub(super) source: Arc<Source>,
     pub(super) work: Arc<Contents>,
+    pub(super) policies: Arc<native_files::Policies>,
     pub(super) head: Arc<BTreeMap<String, Entry>>,
 }
 pub(super) fn entries(
@@ -190,6 +193,7 @@ pub fn read(repo: &Path, active: &dyn Fn() -> bool) -> Result<View, String> {
         reference,
         version,
         source: Arc::new(now),
+        policies: Arc::new(native_files::capture_policies(repo, &work, active)?),
         work: Arc::new(work),
         head: Arc::new(head),
     })
@@ -199,6 +203,9 @@ fn verify(ctx: &Context, view: &View, work: bool, active: &dyn Fn() -> bool) -> 
         return Err("Changelists, HEAD or staged contents changed; reopen the lists".into());
     }
     if work {
+        if native_files::capture_policies(&ctx.repo, &view.work, active)? != *view.policies {
+            return Err("Working-file full access policy changed since preview".into());
+        }
         for (p, expected) in view.work.iter() {
             if read_file(
                 ctx,
@@ -736,6 +743,12 @@ pub fn shelve(
             })
             .collect::<Result<BTreeMap<_, _>, String>>()?;
         owned.shelf = Some(Shelf {
+            access: view
+                .policies
+                .iter()
+                .filter(|(p, _)| list.paths.contains(*p))
+                .map(|(p, policy)| (p.clone(), policy.clone()))
+                .collect(),
             permissions,
             base: base.clone(),
             index,
@@ -767,21 +780,22 @@ pub fn shelve(
             Err(e) => Err(e),
         }
     };
-    working_transaction::apply_with_commit(
+    let evidence = working_transaction::apply_with_commit(
         repo,
         &current,
         &target,
+        &view.policies,
         &check,
-        &commit,
+        &|| commit().map(|()| native_files::CommitOutcome::Committed),
         if restore {
-            list.shelf.as_ref().map(|s| &s.permissions)
+            list.shelf.as_ref().map(|s| &s.access)
         } else {
             None
         },
         active,
     )?;
     Ok(format!(
-        "{} {}; other lists retained",
+        "{} {}; other lists retained. {evidence}",
         if restore { "Unshelved" } else { "Shelved" },
         list.name
     ))

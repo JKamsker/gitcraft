@@ -183,11 +183,8 @@ pub(crate) fn copy_index_policy(
     }
     #[cfg(windows)]
     {
-        return Err("Native working-state access policy is unavailable on Windows".into());
-        if read(file, path)? != *original {
-            return Err("Full index access policy could not be preserved".into());
-        }
-        Ok(())
+        let _ = (file, path, original);
+        Err("Native working-state access policy is unavailable on Windows".into())
     }
     #[cfg(not(any(
         target_os = "linux",

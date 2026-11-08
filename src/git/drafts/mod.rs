@@ -81,6 +81,7 @@ impl Default for Retention {
 struct Source {
     raw: Vec<u8>,
     cache: Vec<u8>,
+    cache_snapshot: Option<std::sync::Arc<native_files::Snapshot>>,
     shared: Option<(String, Vec<u8>)>,
     index: BTreeMap<String, Entry>,
     skip: BTreeSet<String>,
@@ -372,8 +373,34 @@ fn source(ctx: &Context, active: &dyn Fn() -> bool) -> Result<Source, String> {
         let s = String::from_utf8(bytes).map_err(|_| "Invalid HEAD")?;
         Ok((!s.trim().is_empty()).then(|| s.trim().to_owned()))
     };
+    let cache = internal_file(ctx, &ctx.index_file, active)?.unwrap_or_default();
+    let cache_snapshot =
+        if !remote::is_remote(&ctx.repo) && cfg!(any(target_os = "macos", target_os = "linux")) {
+            let path = Path::new(&ctx.index_file);
+            let dir = native_files::Directory::open(path.parent().ok_or("Missing index parent")?)
+                .map_err(|e| e.to_string())?;
+            let snapshot = native_files::Snapshot::read(
+                &dir,
+                path.file_name()
+                    .and_then(|n| n.to_str())
+                    .ok_or("Invalid index name")?,
+                32 * 1024 * 1024,
+            )?;
+            if snapshot
+                .as_ref()
+                .map(|s| s.bytes.as_slice())
+                .unwrap_or_default()
+                != cache
+            {
+                return Err("Index/policy changed while reading source".into());
+            }
+            snapshot.map(std::sync::Arc::new)
+        } else {
+            None
+        };
     Ok(Source {
-        cache: internal_file(ctx, &ctx.index_file, active)?.unwrap_or_default(),
+        cache,
+        cache_snapshot,
         shared: if ctx.shared_file.is_empty() {
             None
         } else {
