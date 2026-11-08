@@ -522,7 +522,6 @@ fn filtered_ancestor_keeps_rewrite_offers_and_drop_replays_hidden_commit_then_un
     assert!(!offers.iter().any(|o| matches!(o, Offer::CherryPick { .. })));
     assert!(offers.iter().any(|o| matches!(o, Offer::Rewrite(_))));
     assert_eq!(tab.surgery_refusal(&older), None);
-    let hidden_contents = std::fs::read(dir.join("hidden.txt")).map_err(|e| e.to_string())?;
     run(
         &mut tab,
         &ctx,
@@ -533,8 +532,10 @@ fn filtered_ancestor_keeps_rewrite_offers_and_drop_replays_hidden_commit_then_un
     );
     assert_eq!(subjects(&dir), ["head", "hidden checkpoint", "base"]);
     assert_eq!(
-        std::fs::read(dir.join("hidden.txt")).map_err(|e| e.to_string())?,
-        hidden_contents
+        std::fs::read_to_string(dir.join("hidden.txt"))
+            .map_err(|e| e.to_string())?
+            .replace("\r\n", "\n"),
+        "hidden checkpoint\n"
     );
     run(&mut tab, &ctx, Action::Undo);
     assert_eq!(git::head(&dir), head);
