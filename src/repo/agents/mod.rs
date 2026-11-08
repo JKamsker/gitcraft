@@ -368,18 +368,18 @@ impl RepoTab {
             form.saving = true;
         }
         let repo = self.path.clone();
+        let submitted = recipe.clone();
         self.then(
             ctx,
             move || recipe.save(&repo),
-            |tab, result, _| match result {
+            move |tab, result, _| match result {
                 Ok(()) => {
                     tab.agents.dialog = None;
                     tab.status = Some(("Worktree setup recipe saved".to_owned(), false));
                 }
                 Err(e) => {
                     if let Some(AgentDialog::Recipe(form)) = &mut tab.agents.dialog {
-                        form.saving = false;
-                        form.error = Some(e);
+                        form.save_failed(e, submitted);
                     }
                 }
             },
