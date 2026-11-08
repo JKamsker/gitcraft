@@ -45,6 +45,9 @@ fn chip(ui: &mut egui::Ui, t: &Tokens, panel: Panel, acts: &mut Vec<Action>) {
                 .sense(Sense::click()),
         )
         .on_hover_text("Show that window");
+    crate::a11y::a11y(&label, egui::WidgetType::Button, || {
+        format!("Show the {} window", panel.noun())
+    });
     if label.clicked() {
         acts.push(Action::Popout(Request::Focus(panel)));
     }
@@ -58,5 +61,50 @@ fn capitalized(noun: &str) -> String {
     match chars.next() {
         Some(first) => first.to_uppercase().chain(chars).collect(),
         None => String::new(),
+    }
+}
+
+#[cfg(test)]
+mod interaction_tests {
+    use super::*;
+    use egui_kittest::{Harness, kittest::Queryable};
+
+    #[test]
+    fn painted_action_has_button_role_keyboard_activation_and_focus_ring() {
+        let mut h = Harness::new_ui_state(
+            move |ui, state: &mut (bool, Vec<Action>)| {
+                if !std::mem::replace(&mut state.0, true) {
+                    crate::theme::install_fonts(ui.ctx());
+                    egui_extras::install_image_loaders(ui.ctx());
+                    return;
+                }
+                chip(ui, &Tokens::get(ui.ctx()), Panel::Diff, &mut state.1);
+                crate::a11y::end_frame(ui.ctx());
+            },
+            (false, Vec::new()),
+        );
+        h.run_steps(2);
+        let button = h.get_by_role_and_label(egui::accesskit::Role::Button, "Show the diff window");
+        assert!(!button.is_focused());
+        h.key_press(egui::Key::Tab);
+        h.run();
+        assert!(
+            h.get_by_role_and_label(egui::accesskit::Role::Button, "Show the diff window")
+                .is_focused()
+        );
+        let accent = Tokens::get(&h.ctx).accent;
+        assert!(
+            h.output().shapes.iter().any(|shape| matches!(
+                &shape.shape, egui::Shape::Rect(rect)
+                    if rect.stroke == egui::Stroke::new(2.0, accent)
+            )),
+            "keyboard focus must produce the painted accent ring"
+        );
+        h.key_press(egui::Key::Enter);
+        h.run();
+        assert!(matches!(
+            h.state().1.as_slice(),
+            [Action::Popout(Request::Focus(Panel::Diff))]
+        ));
     }
 }

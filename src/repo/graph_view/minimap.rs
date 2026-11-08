@@ -113,11 +113,7 @@ impl RepoTab {
             ui.id().with("history-minimap"),
             Sense::click_and_drag(),
         );
-        crate::a11y::a11y(
-            &response,
-            egui::WidgetType::Slider,
-            "Loaded history minimap. Drag to scroll; arrow and Page Up/Down keys move the viewport. Blue HEAD, green tags, yellow search hits.",
-        );
+        let label = "Loaded history minimap. Drag to scroll; arrow and Page Up/Down keys move the viewport. Blue HEAD, green tags, yellow search hits.";
         let p = ui.painter_at(rect);
         p.rect_filled(rect, 3.0, t.dock);
         p.text(
@@ -132,6 +128,7 @@ impl RepoTab {
             pos2(rect.right() - 4.0, rect.bottom() - 20.0),
         );
         if map.height() <= 0.0 || self.history_minimap.rows == 0 {
+            crate::a11y::value::slider(&response, label, 0.0, 0.0..=0.0, ROW_PITCH, true);
             return;
         }
         let n = self.history_minimap.bins.len();
@@ -235,6 +232,17 @@ impl RepoTab {
                 self.history_minimap.offset =
                     Some((offset + delta).clamp(0.0, (full_h - viewport).max(0.0)));
             }
+        }
+        if let Some(at) = crate::a11y::value::slider(
+            &response,
+            label,
+            self.history_minimap.offset.unwrap_or(offset),
+            0.0..=(full_h - viewport).max(0.0),
+            ROW_PITCH,
+            true,
+        ) {
+            self.history_minimap.offset = Some(at);
+            ui.ctx().request_repaint();
         }
         response.on_hover_text(format!("{} projected rows of loaded history. Drag to scroll; focused: arrows or Page Up/Down. Blue: HEAD · green: tags · yellow: search hits · grey: collapsed context. {}",self.history_minimap.rows,if self.has_more {"Older history is not loaded; scrolling to the boundary loads another page."} else {"All available history is loaded."}));
     }

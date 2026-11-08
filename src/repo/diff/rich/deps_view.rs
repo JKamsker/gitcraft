@@ -115,6 +115,9 @@ fn row(ui: &mut Ui, t: &Tokens, diff: &DepsDiff, d: &DepChange, acts: &mut Vec<A
         (_, _, Some(n)) => format!("Go to line {n} of the lockfile"),
         _ => String::new(),
     };
+    crate::a11y::a11y(&name, egui::WidgetType::Button, || {
+        format!("Package {}. {tip}", d.name)
+    });
     if name.on_hover_text(tip).clicked() {
         let (old, new) = match d.change {
             Change::Removed => (d.old_line, None),
@@ -143,5 +146,79 @@ fn row(ui: &mut Ui, t: &Tokens, diff: &DepsDiff, d: &DepChange, acts: &mut Vec<A
         {
             ui.ctx().open_url(egui::OpenUrl::new_tab(url));
         }
+    }
+}
+
+#[cfg(test)]
+mod interaction_tests {
+    use super::*;
+    use egui_kittest::{Harness, kittest::Queryable};
+
+    #[test]
+    fn painted_action_has_button_role_keyboard_activation_and_focus_ring() {
+        let diff = DepsDiff {
+            ecosystem: super::super::deps::Ecosystem::Cargo,
+            file: "Cargo.lock",
+            changes: vec![DepChange {
+                change: Change::Added,
+                name: "serde".into(),
+                old: None,
+                new: Some("1.0".into()),
+                license: None,
+                old_line: None,
+                new_line: Some(12),
+                registry: (None, None),
+            }],
+        };
+        let mut h = Harness::new_ui_state(
+            move |ui, state: &mut (bool, Vec<Action>)| {
+                if !std::mem::replace(&mut state.0, true) {
+                    crate::theme::install_fonts(ui.ctx());
+                    egui_extras::install_image_loaders(ui.ctx());
+                    return;
+                }
+                row(
+                    ui,
+                    &Tokens::get(ui.ctx()),
+                    &diff,
+                    &diff.changes[0],
+                    &mut state.1,
+                );
+                crate::a11y::end_frame(ui.ctx());
+            },
+            (false, Vec::new()),
+        );
+        h.run_steps(2);
+        let button = h.get_by_role_and_label(
+            egui::accesskit::Role::Button,
+            "Package serde. Go to line 12 of the lockfile",
+        );
+        assert!(!button.is_focused());
+        h.key_press(egui::Key::Tab);
+        h.run();
+        assert!(
+            h.get_by_role_and_label(
+                egui::accesskit::Role::Button,
+                "Package serde. Go to line 12 of the lockfile"
+            )
+            .is_focused()
+        );
+        let accent = Tokens::get(&h.ctx).accent;
+        assert!(
+            h.output().shapes.iter().any(|shape| matches!(
+                &shape.shape, egui::Shape::Rect(rect)
+                    if rect.stroke == egui::Stroke::new(2.0, accent)
+            )),
+            "keyboard focus must produce the painted accent ring"
+        );
+        h.key_press(egui::Key::Enter);
+        h.run();
+        assert!(matches!(
+            h.state().1.as_slice(),
+            [Action::DiffGoToLine {
+                old: None,
+                new: Some(12)
+            }]
+        ));
     }
 }

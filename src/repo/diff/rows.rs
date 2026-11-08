@@ -145,16 +145,11 @@ impl<'a> Rows<'a> {
                 Sense::click_and_drag(),
             )
             .on_hover_cursor(egui::CursorIcon::PointingHand);
-        crate::a11y::a11y(
-            &map,
-            egui::WidgetType::Slider,
-            "Diff change map. Arrow keys scroll a line; Page Up and Page Down scroll a page; Home and End reach the ends.",
-        );
         // Under the lines, so dragging over them selects text (a click still picks a line).
         let text_drag = ui.interact(
             body,
             ui.id().with(("diff_text", path)),
-            Sense::click_and_drag(),
+            Sense::CLICK | Sense::DRAG,
         );
         let mut scroll = egui::ScrollArea::both()
             .id_salt(("diff_scroll", path, split))
@@ -223,7 +218,19 @@ impl<'a> Rows<'a> {
                 }
             })
         });
-        let shown = out.inner;
+        let mut shown = out.inner;
+        if let Some(offset) = crate::a11y::value::slider(
+            &map,
+            "Diff change map. Arrow keys scroll a line; Page Up and Page Down scroll a page; Home and End reach the ends.",
+            shown.state.offset.y,
+            0.0..=(total_h - shown.inner_rect.height()).max(0.0),
+            LINE_H,
+            true,
+        ) {
+            shown.state.offset.y = offset;
+            shown.state.store(ui.ctx(), shown.id);
+            ui.ctx().request_repaint();
+        }
         self.offset = shown.state.offset.y;
         let view_w = shown.inner_rect.width();
         self.seen = Seen {
@@ -679,6 +686,78 @@ fn map_keyboard(ui: &Ui, offset: f32, page: f32, total: f32) -> Option<f32> {
 #[cfg(test)]
 mod accessibility_tests {
     use super::*;
+
+    #[test]
+    fn actual_diff_map_publishes_scroll_range_and_applies_assistive_scroll() {
+        use egui_kittest::{
+            Harness,
+            kittest::{NodeT, Queryable},
+        };
+        let view = DiffView::new(DiffKey::Commit {
+            hash: "recorded".into(),
+            path: "file.rs".into(),
+        });
+        let data = DiffData {
+            lines: (1..=100)
+                .map(|line| super::super::DiffLine {
+                    kind: Kind::Context,
+                    old: Some(line),
+                    new: Some(line),
+                    text: "unchanged".into(),
+                    raw: " unchanged".into(),
+                })
+                .collect(),
+            spans: vec![None; 100],
+            changed: vec![None; 100],
+            ..Default::default()
+        };
+        let mut h = Harness::new_ui_state(
+            move |ui, state: &mut (bool, f32)| {
+                if !std::mem::replace(&mut state.0, true) {
+                    crate::theme::install_fonts(ui.ctx());
+                    return;
+                }
+                let mut rows = Rows::new(ui, &view, &data, None, false, false);
+                rows.show(ui, "file.rs", &mut Vec::new());
+                state.1 = rows.offset;
+                crate::a11y::end_frame(ui.ctx());
+            },
+            (false, 0.0),
+        );
+        h.run_steps(2);
+        let node = h.get_by_role(egui::accesskit::Role::Slider);
+        let data = node.accesskit_node().data();
+        assert_eq!(data.numeric_value(), Some(0.0));
+        assert_eq!(data.min_numeric_value(), Some(0.0));
+        assert!(data.max_numeric_value().is_some_and(|max| max > 100.0));
+        assert_eq!(
+            data.orientation(),
+            Some(egui::accesskit::Orientation::Vertical)
+        );
+        let (target_node, target_tree) = node.accesskit_node().locate();
+        h.event(egui::Event::AccessKitActionRequest(
+            egui::accesskit::ActionRequest {
+                action: egui::accesskit::Action::SetValue,
+                target_node,
+                target_tree,
+                data: Some(egui::accesskit::ActionData::NumericValue(100.0)),
+            },
+        ));
+        h.run();
+        assert_eq!(h.state().1, 100.0);
+        h.run_steps(2);
+        assert_eq!(
+            h.state().1,
+            100.0,
+            "actual ScrollArea state must retain the requested position"
+        );
+        h.key_press(egui::Key::Tab);
+        h.run();
+        assert!(
+            h.get_by_role(egui::accesskit::Role::Slider).is_focused(),
+            "the text drag hit shield must not take keyboard focus"
+        );
+    }
     #[test]
     fn change_map_keys_scroll_and_clamp_and_leave_modified_keys_alone() {
         use egui::{Key, Modifiers};

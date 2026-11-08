@@ -77,12 +77,6 @@ pub(in crate::repo::diff) fn compare_view(ui: &mut Ui, cmp: &Compare, acts: &mut
     let height = (ui.available_height() - strip - 8.0).max(120.0);
     let (area, resp) =
         ui.allocate_exact_size(vec2(ui.available_width(), height), Sense::click_and_drag());
-    crate::a11y::a11y(&resp, egui::WidgetType::Slider, || {
-        format!(
-            "Image comparison for {}. Arrow keys pan, plus and minus zoom, Home fits. Use controls above to change comparison mode.",
-            cmp.path
-        )
-    });
     let area = area.shrink(8.0);
     let canvas = canvas(cmp);
     let ctx = ui.ctx().clone();
@@ -175,6 +169,41 @@ pub(in crate::repo::diff) fn compare_view(ui: &mut Ui, cmp: &Compare, acts: &mut
             }
             input(ui, &resp, &mut state, canvas, (area, None), swipe_line);
         }
+    }
+    let pane = if mode == Mode::TwoUp {
+        Rect::from_min_size(area.min, vec2((area.width() - 12.0) / 2.0, area.height()))
+    } else {
+        area
+    };
+    let zoom = state.scale(canvas, pane.size());
+    let center = if state.zoom.is_some() {
+        state.center
+    } else {
+        vec2(0.5, 0.5)
+    };
+    if let Some(percent) = crate::a11y::value::slider(
+        &resp,
+        || {
+            format!(
+                "Image comparison zoom for {}. Pan position {:.0}%, {:.0}%. Arrow keys pan; plus and minus zoom; Home fits. Use controls above to change comparison mode.",
+                cmp.path,
+                center.x * 100.0,
+                center.y * 100.0
+            )
+        },
+        zoom * ppp * 100.0,
+        super::view_state::MIN_ZOOM.min(zoom) * ppp * 100.0
+            ..=super::view_state::MAX_ZOOM * ppp * 100.0,
+        10.0,
+        false,
+    ) {
+        state.zoom_at(
+            percent / (zoom * ppp * 100.0).max(0.001),
+            pane.center(),
+            canvas,
+            pane,
+        );
+        ui.ctx().request_repaint();
     }
     ui.data_mut(|d| d.insert_temp(key, state));
     if let Some(history) = history.filter(|h| h.len() > 1) {
@@ -550,5 +579,88 @@ mod accessibility_tests {
                 _ => unreachable!(),
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod value_accessibility_tests {
+    use super::*;
+    use egui_kittest::{
+        Harness,
+        kittest::{NodeT, Queryable},
+    };
+
+    #[test]
+    fn image_zoom_exposes_percent_and_applies_assistive_value_to_actual_view_state()
+    -> Result<(), String> {
+        // All lazies are precompleted: rendering cannot start Git/history/difference work.
+        let compare = Compare {
+            old: None,
+            new: Some(Decoded {
+                image: Arc::new(ColorImage::filled([2, 2], Color32::WHITE)),
+                width: 2,
+                height: 2,
+                scaled: false,
+            }),
+            diff: super::super::lazy::Lazy::ready(None),
+            history: super::super::lazy::Lazy::ready(Arc::new(Vec::new())),
+            old_bytes: None,
+            new_bytes: Some(4),
+            id: "a11y-recorded-image".into(),
+            repo: std::path::PathBuf::from("/recorded"),
+            path: "picture.png".into(),
+            from: None,
+            current: None,
+            textures: Default::default(),
+        };
+        let key = egui::Id::new(("image-compare", &compare.repo, &compare.path));
+        let mut h = Harness::new_ui_state(
+            move |ui, initialized: &mut bool| {
+                if !std::mem::replace(initialized, true) {
+                    crate::theme::install_fonts(ui.ctx());
+                    egui_extras::install_image_loaders(ui.ctx());
+                    return;
+                }
+                compare_view(ui, &compare, &mut Vec::new());
+                crate::a11y::end_frame(ui.ctx());
+            },
+            false,
+        );
+        h.run_steps(2);
+        let node = h.get_by_role(egui::accesskit::Role::Slider);
+        let data = node.accesskit_node().data();
+        assert!(
+            node.accesskit_node()
+                .label()
+                .is_some_and(|label| label.starts_with("Image comparison zoom for picture.png."))
+        );
+        assert_eq!(data.numeric_value(), Some(100.0));
+        assert_eq!(
+            data.orientation(),
+            Some(egui::accesskit::Orientation::Horizontal)
+        );
+        let (target_node, target_tree) = node.accesskit_node().locate();
+        h.event(egui::Event::AccessKitActionRequest(
+            egui::accesskit::ActionRequest {
+                action: egui::accesskit::Action::SetValue,
+                target_tree,
+                target_node,
+                data: Some(egui::accesskit::ActionData::NumericValue(200.0)),
+            },
+        ));
+        h.run();
+        let state: ViewState = h
+            .ctx
+            .data(|data| data.get_temp(key))
+            .ok_or("actual image state missing")?;
+        assert_eq!(state.zoom, Some(2.0));
+        assert_eq!(
+            h.get_by_role(egui::accesskit::Role::Slider)
+                .accesskit_node()
+                .data()
+                .numeric_value(),
+            Some(200.0)
+        );
+        Ok(())
     }
 }

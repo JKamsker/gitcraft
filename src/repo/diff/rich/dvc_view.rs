@@ -59,6 +59,12 @@ fn pair(
             )
             .on_hover_cursor(egui::CursorIcon::PointingHand)
             .on_hover_text("Go to its line");
+        crate::a11y::a11y(&path, egui::WidgetType::Button, || {
+            format!(
+                "Go to line {} for tracked data {}, {state}",
+                any.line, any.path
+            )
+        });
         if path.clicked() {
             let (o, n) = match new {
                 Some(n) => (None, Some(n.line)),
@@ -116,4 +122,69 @@ fn side(ui: &mut Ui, t: &Tokens, title: &str, tracked: Option<&Tracked>) {
                 .on_hover_text(hash);
             }
         });
+}
+
+#[cfg(test)]
+mod interaction_tests {
+    use super::*;
+    use egui_kittest::{Harness, kittest::Queryable};
+
+    #[test]
+    fn painted_action_has_button_role_keyboard_activation_and_focus_ring() {
+        let tracked = Tracked {
+            path: "data.csv".into(),
+            line: 7,
+            ..Default::default()
+        };
+        let mut h = Harness::new_ui_state(
+            move |ui, state: &mut (bool, Vec<Action>)| {
+                if !std::mem::replace(&mut state.0, true) {
+                    crate::theme::install_fonts(ui.ctx());
+                    egui_extras::install_image_loaders(ui.ctx());
+                    return;
+                }
+                pair(
+                    ui,
+                    &Tokens::get(ui.ctx()),
+                    None,
+                    Some(&tracked),
+                    &mut state.1,
+                );
+                crate::a11y::end_frame(ui.ctx());
+            },
+            (false, Vec::new()),
+        );
+        h.run_steps(2);
+        let button = h.get_by_role_and_label(
+            egui::accesskit::Role::Button,
+            "Go to line 7 for tracked data data.csv, now tracked",
+        );
+        assert!(!button.is_focused());
+        h.key_press(egui::Key::Tab);
+        h.run();
+        assert!(
+            h.get_by_role_and_label(
+                egui::accesskit::Role::Button,
+                "Go to line 7 for tracked data data.csv, now tracked"
+            )
+            .is_focused()
+        );
+        let accent = Tokens::get(&h.ctx).accent;
+        assert!(
+            h.output().shapes.iter().any(|shape| matches!(
+                &shape.shape, egui::Shape::Rect(rect)
+                    if rect.stroke == egui::Stroke::new(2.0, accent)
+            )),
+            "keyboard focus must produce the painted accent ring"
+        );
+        h.key_press(egui::Key::Enter);
+        h.run();
+        assert!(matches!(
+            h.state().1.as_slice(),
+            [Action::DiffGoToLine {
+                old: None,
+                new: Some(7)
+            }]
+        ));
+    }
 }

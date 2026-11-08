@@ -8,6 +8,7 @@
 mod focus;
 pub mod labels;
 pub mod motion;
+pub mod value;
 
 use egui::{Response, WidgetInfo, WidgetType};
 

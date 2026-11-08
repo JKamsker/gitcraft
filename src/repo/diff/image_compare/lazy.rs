@@ -23,6 +23,13 @@ impl<T> Default for Lazy<T> {
 }
 
 impl<T: Clone + Send + 'static> Lazy<T> {
+    #[cfg(test)]
+    pub(super) fn ready(value: T) -> Self {
+        Self {
+            state: Arc::new(Mutex::new(State::Done(value))),
+        }
+    }
+
     /// The value if it is made; else starts making it with `make` (the first time), and asks
     /// `ctx` to draw again once it is. A `make` that panics leaves `fallback`.
     pub fn get(
