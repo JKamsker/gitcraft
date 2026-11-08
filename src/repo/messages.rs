@@ -713,6 +713,9 @@ fn operation_display(label: &str, depth: usize) -> String {
                 if rendered != inner {
                     return crate::i18n::message(id, &[("operation", rendered.into())]);
                 }
+                // A custom inner command must stay opaque as an entire wrapper. Do not
+                // let a more general label/path template reinterpret its first word.
+                return label.to_owned();
             }
         }
     }
@@ -909,13 +912,13 @@ fn operation_display(label: &str, depth: usize) -> String {
             ("(?s)^Add$", "repo-core-0976", &[][..]),
             ("(?s)^to$", "repo-core-1102", &[][..]),
             ("(?s)^Go\\ to\\ line\\ (.*?)\\ of\\ the\\ file\\ before\\ the\\ change$", "repo-core-2040", &[("o", false)][..]),
-            ("(?s)^Remove\\ unused\\ fork\\ remotes\\ \\(([0-9]+))$", "repo-core-0121", &[("unused", true)][..]),
+            ("(?s)^Remove\\ unused\\ fork\\ remotes\\ \\(([0-9]+)\\)$", "repo-core-0121", &[("unused", true)][..]),
             ("(?s)^Interactive\\ rebase\\ (.*?)\\ onto\\ (.*?)…$", "repo-core-2988", &[("target", false), ("at", false)][..]),
             ("(?s)^Interactive\\ rebase\\ onto\\ (.*?)$", "repo-core-3342", &[("onto-label", false)][..]),
             ("(?s)^Revert\\ a\\ hunk\\ of\\ (.*?)\\ from\\ (.*?)$", "repo-core-3311", &[("path", false), ("hash", false)][..]),
             ("(?s)^Keep\\ both\\ versions\\ of\\ (.*?)$", "repo-core-0590", &[("path", false)][..]),
             ("(?s)^Revert\\ (.*?)\\ as\\ changed\\ in\\ (.*?)$", "repo-core-3309", &[("path", false), ("hash", false)][..]),
-            ("(?s)^Revert\\ ([0-9]+) line(.*?)\\ of\\ (.*?)\\ from\\ (.*?)$", "repo-core-3312", &[("n", true), ("s", false), ("path", false), ("hash", false)][..]),
+            ("(?s)^Revert\\ ([0-9]+)\\ line(.*?)\\ of\\ (.*?)\\ from\\ (.*?)$", "repo-core-3312", &[("n", true), ("", false), ("path", false), ("hash", false)][..]),
             ("(?s)^(.*?)\\ \\(its\\ fixup!\\ commit\\)$", "repo-core-2538", &[("label", false)][..]),
             ("(?s)^Rebase\\ commit\\ (.*?),\\ (.*?),\\ (.*?),\\ (.*?)$", "repo-core-3249", &[("hash", false), ("summary", false), ("author", false), ("label", false)][..]),
             ("(?s)^Edit\\ the\\ message\\ of\\ (.*?)$", "repo-core-3321", &[("hash", false)][..]),
@@ -927,11 +930,11 @@ fn operation_display(label: &str, depth: usize) -> String {
             ("(?s)^Reset\\ (.*?)\\ to\\ here…$", "repo-core-2986", &[("target", false)][..]),
             ("(?s)^Create\\ tag\\ at\\ (.*?)…$", "repo-core-2992", &[("at", false)][..]),
             ("(?s)^Open\\ (.*?)\\ in\\ editor$", "repo-core-3001", &[("path", false)][..]),
-            ("(?s)^([0-9]+) picked\\ file(.*?)$", "repo-core-1498", &[("n", true), ("s", false)][..]),
+            ("(?s)^([0-9]+)\\ picked\\ file(.*?)$", "repo-core-1498", &[("n", true), ("", false)][..]),
             ("(?s)^(.*?)\\ notes\\ “(.*?)”\\ (.*?)\\ (.*?)$", "repo-core-1100", &[("Push", false), ("namespace", false), ("", false), ("remote", false)][..]),
             ("(?s)^Rename\\ (.*?)\\ to\\ (.*?)$", "repo-core-1233", &[("old", false), ("new", false)][..]),
-            ("(?s)^Go\\ to\\ line\\ ([0-9]+)", "repo-core-2039", &[("n", true)][..]),
-            ("(?s)^(Stage|Unstage|Discard|Revert)\\ ([0-9]+) line(.*?)\\ of\\ (.*?)$", "repo-core-0164", &[("verb", false), ("n", true), ("s", false), ("path", false)][..]),
+            ("(?s)^Go\\ to\\ line\\ ([0-9]+)$", "repo-core-2039", &[("n", true)][..]),
+            ("(?s)^(Stage|Unstage|Discard|Revert)\\ ([0-9]+)\\ line(.*?)\\ of\\ (.*?)$", "repo-core-0164", &[("verb", false), ("n", true), ("", false), ("path", false)][..]),
             ("(?s)^Fold\\ into\\ (.*?)$", "repo-core-2530", &[("hash", false)][..]),
             ("(?s)^(.*?)\\ worktree\\ (.*?)$", "repo-core-3595", &[("label", false), ("name", false)][..]),
             ("(?s)^Push\\ tag\\ (.*?)$", "repo-core-3541", &[("name", false)][..]),
@@ -948,7 +951,7 @@ fn operation_display(label: &str, depth: usize) -> String {
             ("(?s)^(.*?)\\ for\\ (.*?)$", "repo-core-0729", &[("label", false), ("path", false)][..]),
             ("(?s)^Open\\ (.*?)$", "repo-core-3003", &[("path", false)][..]),
             ("(?s)^Pop\\ (.*?)$", "repo-core-3512", &[("name", false)][..]),
-            ("(?s)^(.*?)\\ (.*?)\\ (.*?)\\ (.*?)$", "repo-core-2447", &[("verb", false), ("hash", false), ("word", false), ("target", false)][..]),
+            ("(?s)^(Move|Squash|Fixup)\\ (.*?)\\ (above|below|into)\\ (.*?)$", "repo-core-2447", &[("verb", false), ("hash", false), ("word", false), ("target", false)][..]),
             ("(?s)^(.*?)\\ (.*?)$", "repo-core-2999", &[("label", false), ("path", false)][..]),
         ].into_iter().map(|(pattern, id, args)| Template {
             pattern: regex::Regex::new(pattern).expect("fixed operation label pattern"),
@@ -962,11 +965,13 @@ fn operation_display(label: &str, depth: usize) -> String {
             };
             // A template whose leading value is another operation must recognize it.
             // This prevents generic label/path forms from translating custom commands.
-            if !matches!(template.id, "repo-core-0164" | "repo-core-2447")
-                && template
-                    .args
-                    .first()
-                    .is_some_and(|(name, _)| matches!(*name, "label" | "verb" | "Push"))
+            if !matches!(
+                template.id,
+                "repo-core-0164" | "repo-core-2447" | "repo-core-0387" | "repo-core-2659"
+            ) && template
+                .args
+                .first()
+                .is_some_and(|(name, _)| matches!(*name, "label" | "verb" | "Push"))
             {
                 let inner = captures.get(1).map_or("", |v| v.as_str());
                 if crate::i18n::language() == crate::i18n::Language::German
@@ -1005,6 +1010,30 @@ fn operation_display(label: &str, depth: usize) -> String {
 }
 /// Present a status without changing its stored operation/status identity.
 pub(crate) fn display_status(status: &str) -> String {
+    if let Some(rest) = status.strip_prefix(crate::git::CANCELLED) {
+        const PULL_NOTE: &str = "\nIf the pull had started merging or rebasing, that is left in progress: Abort in the toolbar goes back to where the branch was.";
+        let (body, pull) = rest
+            .strip_suffix(PULL_NOTE)
+            .map_or((rest, false), |body| (body, true));
+        let rendered = if body.is_empty() {
+            Some(crate::i18n::text("repo-core-cancelled").to_owned())
+        } else {
+            [(
+                "\nUntil it is deleted, git refuses to work in this repository. Delete it if no other git program is running here.", "one"
+            ), (
+                "\nUntil them are deleted, git refuses to work in this repository. Delete them if no other git program is running here.", "many"
+            )].into_iter().find_map(|(suffix, amount)| {
+                body.strip_prefix(", but git left ").and_then(|v| v.strip_suffix(suffix)).and_then(|v| v.strip_suffix(" behind"))
+                    .map(|locks| crate::i18n::message("repo-core-cancelled-locks", &[("locks", locks.into()), ("amount", amount.into())]))
+            })
+        };
+        if let Some(mut rendered) = rendered {
+            if pull {
+                rendered.push_str(crate::i18n::text("repo-core-4160"));
+            }
+            return rendered;
+        }
+    }
     let rendered = display_operation(status);
     if rendered != status {
         return rendered;

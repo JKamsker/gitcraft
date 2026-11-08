@@ -152,7 +152,10 @@ repo-core-0871 = Pop
 repo-core-0872 = Apply
 repo-core-0976 = Add
 repo-core-1062 = Save
-repo-core-1100 = { $Push } notes “{ $namespace }” { $to } { $remote }
+repo-core-1100 = { $Push ->
+        [Fetch] Fetch notes “{ $namespace }” from { $remote }
+       *[Push] Push notes “{ $namespace }” to { $remote }
+    }
 repo-core-1101 = from
 repo-core-1102 = to
 repo-core-1233 = Rename { $old } to { $new }
@@ -235,3 +238,14 @@ repo-core-4203 = Create branch…
 repo-core-4204 = Create tag…
 repo-core-operation-dco = Sign off the commits of { $branch }
 repo-core-operation-dco-here = Sign off the commits of { $branch } (here only)
+
+repo-core-4160 = { "" }
+    If the pull had started merging or rebasing, that is left in progress: Abort in the toolbar goes back to where the branch was.
+
+repo-core-cancelled = cancelled
+
+repo-core-cancelled-locks = cancelled, but git left { $locks } behind
+    { $amount ->
+        [one] Until it is deleted, git refuses to work in this repository. Delete it if no other git program is running here.
+       *[many] Until them are deleted, git refuses to work in this repository. Delete them if no other git program is running here.
+    }

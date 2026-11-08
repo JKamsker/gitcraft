@@ -152,7 +152,10 @@ repo-core-0871 = Übernehmen
 repo-core-0872 = Anwenden
 repo-core-0976 = Hinzufügen
 repo-core-1062 = Speichern
-repo-core-1100 = { $Push } von Notizen „{ $namespace }“ { $to } { $remote }
+repo-core-1100 = { $Push ->
+        [Fetch] Notizen „{ $namespace }“ von { $remote } abrufen
+       *[Push] Notizen „{ $namespace }“ nach { $remote } pushen
+    }
 repo-core-1101 = von
 repo-core-1102 = an
 repo-core-1233 = { $old } in { $new } umbenennen
@@ -172,7 +175,14 @@ repo-core-2443 = unter
 repo-core-2444 = Zusammenfassen
 repo-core-2445 = in
 repo-core-2446 = Fixup
-repo-core-2447 = { $verb } { $hash } { $word } { $target }
+repo-core-2447 = { $verb ->
+        [Move] { $word ->
+            [above] { $hash } vor { $target } verschieben
+           *[below] { $hash } hinter { $target } verschieben
+        }
+        [Squash] { $hash } mit { $target } zusammenfassen
+       *[Fixup] { $hash } in { $target } einarbeiten
+    }
 repo-core-2529 = fixup! für { $hash } committen
 repo-core-2530 = In { $hash } einarbeiten
 repo-core-2538 = { $label } (sein fixup!-Commit)
@@ -235,3 +245,14 @@ repo-core-4203 = Branch erstellen…
 repo-core-4204 = Tag erstellen…
 repo-core-operation-dco = Commits von { $branch } mit Signed-off-by versehen
 repo-core-operation-dco-here = Commits von { $branch } mit Signed-off-by versehen (nur hier)
+
+repo-core-4160 = { "" }
+    Falls Pull bereits mit Merge oder Rebase begonnen hatte, bleibt dies aktiv: Abbrechen in der Werkzeugleiste kehrt zur ursprünglichen Branch-Position zurück.
+
+repo-core-cancelled = Abgebrochen
+
+repo-core-cancelled-locks = Abgebrochen, aber Git hat { $locks } zurückgelassen.
+    { $amount ->
+        [one] Solange diese Sperrdatei existiert, verweigert Git die Arbeit in diesem Repository. Lösche sie, wenn hier kein anderes Git-Programm läuft.
+       *[many] Solange diese Sperrdateien existieren, verweigert Git die Arbeit in diesem Repository. Lösche sie, wenn hier kein anderes Git-Programm läuft.
+    }
