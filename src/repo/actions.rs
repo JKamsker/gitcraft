@@ -56,6 +56,7 @@ pub(crate) enum Action {
     /// Something done in the pipeline view.
     Ci(ci_view::CiAct),
     LocalCi(super::local_ci::Act),
+    Email(super::email::Act),
     /// Something done in the reflog view (opening it on a reflog, or on the lost commits).
     Reflog(reflog::ReflogAct),
     CloseReflog,
