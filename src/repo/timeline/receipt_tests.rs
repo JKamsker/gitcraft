@@ -116,7 +116,19 @@ fn receipt_of(dir: &Path, action: Action) -> (Option<Receipt>, String) {
     let ctx = egui::Context::default();
     let mut tab = RepoTab::new(dir.to_owned(), &ctx);
     assert!(wait(&mut tab, &ctx, settled));
+    let review = match &action {
+        Action::AskRebase { onto, .. } => Some((
+            tab.refs.current.clone().expect("no branch"),
+            git::head(dir),
+            git::resolve(dir, onto).expect("no rebase target"),
+        )),
+        _ => None,
+    };
     tab.apply(action, &ctx);
+    if let Some((branch, head, onto)) = review {
+        let accepted = tab.accept_rebase_for_test(&ctx, &branch, &head, &onto);
+        tab.apply(accepted, &ctx);
+    }
     assert!(
         wait(&mut tab, &ctx, settled),
         "status={:?}, loading={}, busy={}, history={}, timeline_loaded={}, awaiting={:?}",

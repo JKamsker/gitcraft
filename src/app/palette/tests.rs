@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use egui::{Event, Key};
+use egui_kittest::kittest::Queryable;
 
 use super::Palette;
 use crate::app::{App, Saved, Tab};
@@ -144,6 +145,8 @@ fn enter(harness: &mut H<'_>) {
 #[test]
 fn typing_reb_ranks_rebase_first_and_its_branch_is_picked_next() {
     let dir = repo("rebase");
+    let before = git_ok(&dir, &["rev-parse", "refs/heads/main"]);
+    let onto = git_ok(&dir, &["rev-parse", "refs/heads/side"]);
     let _asking = asking();
     let mut harness = window(&dir);
     open_and_type(&mut harness, "reb");
@@ -160,6 +163,17 @@ fn typing_reb_ranks_rebase_first_and_its_branch_is_picked_next() {
     assert_eq!(listed(&harness), ["side"]);
     enter(&mut harness);
     assert!(harness.state().palette.is_none());
+    settle(&mut harness);
+    {
+        let state = harness.state_mut();
+        let active = state.active;
+        let Some(Tab::Repo(tab)) = state.tabs.get_mut(active) else {
+            panic!("no repository tab");
+        };
+        tab.review_rebase_for_test(&egui::Context::default(), "main", &before, &onto);
+    }
+    harness.step();
+    harness.get_by_label("Rebase").click();
     settle(&mut harness);
     let log = git_ok(&dir, &["log", "--format=%s", "main"]);
     let _ = std::fs::remove_dir_all(&dir);

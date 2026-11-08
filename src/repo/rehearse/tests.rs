@@ -159,7 +159,20 @@ fn applying_does_it_for_real_and_it_can_be_undone() -> Result<(), String> {
         .iter()
         .filter(|e| e.undo.is_some())
         .count();
+    let before = repo.rev("feature")?;
+    let onto = repo.rev("main")?;
     act(&mut tab, &ctx, RehearseAct::Apply(RehearseKind::Rebase))?;
+    let accepted = tab.accept_rebase_for_test(&ctx, "feature", &before, &onto);
+    assert_eq!(
+        tab.timeline
+            .entries
+            .iter()
+            .filter(|e| e.undo.is_some())
+            .count(),
+        undo_before
+    );
+    tab.apply(accepted, &ctx);
+    settle(&mut tab, &ctx)?;
     assert!(tab.rehearsing.run.is_none());
     // The real rebase gives what the rehearsal said.
     assert_eq!(repo.rev("main")?, repo.rev("feature~3")?);
