@@ -27,3 +27,6 @@ mod rust_dependencies;
 mod echo_push;
 
 mod sharing;
+
+#[cfg(test)]
+mod presentation_tests;
