@@ -36,7 +36,7 @@ pub(crate) fn read_migration(
         MigrationSource::Staged => {
             args.extend(["diff", "--cached"]);
             (
-                "Staged changes (HEAD → index)".into(),
+                crate::i18n::text("backend-staged-changes-head-index-3cc293").into(),
                 snapshot
                     .as_ref()
                     .and_then(|s| s.0.clone())
@@ -47,7 +47,13 @@ pub(crate) fn read_migration(
         MigrationSource::Commit(rev) => {
             args.extend(["show", "--format=", "--root", "--diff-merges=first-parent"]);
             let oid = resolve(repo, rev, active)?;
-            (format!("Commit {oid} · first parent"), vec![oid])
+            (
+                crate::i18n::message(
+                    "backend-commit-oid-first-parent-7f4877",
+                    &[("oid", (oid).to_string().into())],
+                ),
+                vec![oid],
+            )
         }
         MigrationSource::Range(from, to) => {
             args.push("diff");
@@ -82,9 +88,10 @@ pub(crate) fn read_migration(
     if let Some((before_head, before_index)) = snapshot
         && (head(repo, active)? != before_head || index(repo, active)?.0 != before_index)
     {
-        return Err(
-            "HEAD or index changed while detecting moves. Refresh the migration map.".into(),
-        );
+        return Err(crate::i18n::text(
+            "backend-head-or-index-changed-while-detecting-moves-refresh-the-migration-728ab0",
+        )
+        .into());
     }
     Ok(Migration {
         label,
@@ -103,21 +110,27 @@ fn parse_moves(bytes: &[u8]) -> Result<(Vec<Move>, usize), String> {
         if meta.is_empty() {
             continue;
         }
-        let text = std::str::from_utf8(meta).map_err(|_| "Invalid move metadata")?;
+        let text = std::str::from_utf8(meta)
+            .map_err(|_| crate::i18n::text("backend-invalid-move-metadata-9be2ad"))?;
         let f: Vec<_> = text.split(' ').collect();
         if f.len() != 5 || !f[0].starts_with(':') || !hash(f[2]) || !hash(f[3]) {
-            return Err("Invalid migration record".into());
+            return Err(crate::i18n::text("backend-invalid-migration-record-72a022").into());
         }
-        let old = fields.next().ok_or("Missing migration path")?.to_vec();
+        let old = fields
+            .next()
+            .ok_or(crate::i18n::text("backend-missing-migration-path-d27471"))?
+            .to_vec();
         let code = f[4]
             .as_bytes()
             .first()
             .copied()
-            .ok_or("Missing migration status")?;
+            .ok_or(crate::i18n::text("backend-missing-migration-status-4e93c7"))?;
         if matches!(code, b'R' | b'C') {
             let new = fields
                 .next()
-                .ok_or("Missing migration destination")?
+                .ok_or(crate::i18n::text(
+                    "backend-missing-migration-destination-6bf2c0",
+                ))?
                 .to_vec();
             let score = f[4]
                 .get(1..)
@@ -141,7 +154,10 @@ fn parse_moves(bytes: &[u8]) -> Result<(Vec<Move>, usize), String> {
             other += 1;
         }
         if moves.len() + other > MAX_ROWS {
-            return Err("More than 2,000 changed paths; use a smaller commit/range".into());
+            return Err(crate::i18n::text(
+                "backend-more-than-2-000-changed-paths-use-a-smaller-commit-range-84502d",
+            )
+            .into());
         }
     }
     Ok((moves, other))

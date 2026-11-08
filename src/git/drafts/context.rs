@@ -107,7 +107,9 @@ impl Context {
             )?;
             String::from_utf8(bytes)
                 .map(|s| s.trim_end_matches(['\n', '\r']).to_owned())
-                .map_err(|_| "Draft metadata paths must be UTF-8".into())
+                .map_err(|_| {
+                    crate::i18n::text("backend-draft-metadata-paths-must-be-utf-8-1229c6").into()
+                })
         };
         let objects = initial(&[
             "rev-parse",
@@ -122,7 +124,7 @@ impl Context {
         let shared_file = initial(&["rev-parse", "--path-format=absolute", "--shared-index-path"])?;
         let format = initial(&["rev-parse", "--show-object-format"])?;
         if !matches!(format.as_str(), "sha1" | "sha256") {
-            return Err("Unknown Git object format".into());
+            return Err(crate::i18n::text("backend-unknown-git-object-format-36dcdb").into());
         }
         let worktree = initial(&["rev-parse", "--show-toplevel"])?;
         let own = initial(&["rev-parse", "--absolute-git-dir"])?;
@@ -131,7 +133,7 @@ impl Context {
             "main".to_owned()
         } else {
             own.strip_prefix(&(common + "/"))
-                .ok_or("Draft worktree directory is not inside the common Git directory")?
+                .ok_or(crate::i18n::text("backend-draft-worktree-directory-is-not-inside-the-common-git-directory-8735a0"))?
                 .to_owned()
         };
         let id = format!("{:x}", md5::compute(key));
@@ -224,7 +226,7 @@ impl Context {
     ) -> Result<String, String> {
         String::from_utf8(self.run(args, input, &[0], active)?)
             .map(|s| s.trim_end_matches(['\n', '\r']).into())
-            .map_err(|_| "Draft Git output is not UTF-8".into())
+            .map_err(|_| crate::i18n::text("backend-draft-git-output-is-not-utf-8-67b4f2").into())
     }
     /// Git apply resolves relative paths from cwd, even with an explicit work tree.
     /// Use the real root as cwd but retain the empty private config and private index.
@@ -265,7 +267,8 @@ fn private_dir(repo: &Path, active: &dyn Fn() -> bool) -> Result<PathBuf, String
     if let Some(target) = remote::parse(repo) {
         let request = remote::Request { cwd: Some(target.path), script: "umask 077; d=$(mktemp -d \"${TMPDIR:-/tmp}/gitcraft-drafts.XXXXXXXX\") || exit 1; mkdir \"$d/hooks\" && : >\"$d/empty\" || exit 1; cd -P -- \"$d\" && pwd -P".into(), ..Default::default() };
         let out = git::forecast_remote(&target.host, request, active)?;
-        let path = String::from_utf8(out.stdout).map_err(|_| "Invalid draft temporary path")?;
+        let path = String::from_utf8(out.stdout)
+            .map_err(|_| crate::i18n::text("backend-invalid-draft-temporary-path-66cc35"))?;
         let path = path.trim_end_matches(['\n', '\r']);
         if out.code != 0
             || !path.starts_with('/')
@@ -275,7 +278,10 @@ fn private_dir(repo: &Path, active: &dyn Fn() -> bool) -> Result<PathBuf, String
                 .next()
                 .is_some_and(|n| n.starts_with("gitcraft-drafts."))
         {
-            return Err("Could not prepare private draft directory".into());
+            return Err(crate::i18n::text(
+                "backend-could-not-prepare-private-draft-directory-d1d9f3",
+            )
+            .into());
         }
         return Ok(remote::encode(&target.host, path));
     }
@@ -303,7 +309,7 @@ fn private_dir(repo: &Path, active: &dyn Fn() -> bool) -> Result<PathBuf, String
             Err(e) => return Err(e.to_string()),
         }
     }
-    Err("Could not prepare private draft directory".into())
+    Err(crate::i18n::text("backend-could-not-prepare-private-draft-directory-d1d9f3").into())
 }
 impl Drop for Context {
     fn drop(&mut self) {

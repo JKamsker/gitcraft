@@ -18,7 +18,10 @@ fn endpoint(h: &Hosting) -> Result<String, String> {
         || parts.len() != 2
         || parts.iter().any(|p| !super::cloud::plain(p))
     {
-        return Err("Use a hosted Bitbucket Cloud workspace/repository remote".into());
+        return Err(crate::i18n::text(
+            "backend-use-a-hosted-bitbucket-cloud-workspace-repository-remote-91dabd",
+        )
+        .into());
     }
     Ok(format!(
         "repositories/{}/{}",
@@ -37,38 +40,50 @@ fn repository(api: &Api) -> Result<Value, String> {
     if !required(&v, "/full_name")?.eq_ignore_ascii_case(&api.hosting.path)
         || required(&v, "/uuid")?.is_empty()
     {
-        return Err("Bitbucket returned a different repository".into());
+        return Err(
+            crate::i18n::text("backend-bitbucket-returned-a-different-repository-a4f546").into(),
+        );
     }
     Ok(v)
 }
 /// Follow only the same native collection; never credentials to a returned foreign next URL.
 fn pages(api: &Api, first: &str) -> Result<Vec<Value>, String> {
-    let collection = first.split('?').next().ok_or("Missing collection")?;
+    let collection = first
+        .split('?')
+        .next()
+        .ok_or(crate::i18n::text("backend-missing-collection-78c679"))?;
     let expected = format!("https://api.bitbucket.org/2.0/{collection}");
     let mut path = first.to_owned();
     let mut seen = HashSet::new();
     let mut out = vec![];
     loop {
         if !seen.insert(path.clone()) {
-            return Err("Bitbucket repeated a page cursor".into());
+            return Err(
+                crate::i18n::text("backend-bitbucket-repeated-a-page-cursor-a84432").into(),
+            );
         }
         let v = api.get(&path)?;
         out.extend(
             v.get("values")
                 .and_then(Value::as_array)
                 .cloned()
-                .ok_or("Bitbucket returned no result list")?,
+                .ok_or(crate::i18n::text(
+                    "backend-bitbucket-returned-no-result-list-7bc9e5",
+                ))?,
         );
         if out.len() > 10000 || seen.len() > 100 {
-            return Err(
-                "Bitbucket collection exceeds the supported bound; use its forge page".into(),
-            );
+            return Err(crate::i18n::text(
+                "backend-bitbucket-collection-exceeds-the-supported-bound-use-its-forge-pa-bce46b",
+            )
+            .into());
         }
         let next = text(&v, "/next");
         if next.is_empty() {
             return Ok(out);
         }
-        let u = url::Url::parse(&next).map_err(|_| "Bitbucket returned an invalid next URL")?;
+        let u = url::Url::parse(&next).map_err(|_| {
+            crate::i18n::text("backend-bitbucket-returned-an-invalid-next-url-da9652")
+        })?;
         if !u.username().is_empty()
             || u.password().is_some()
             || u.fragment().is_some()
@@ -80,11 +95,16 @@ fn pages(api: &Api, first: &str) -> Result<Vec<Value>, String> {
                 u.path()
             ) != expected
         {
-            return Err("Bitbucket pagination left the displayed collection".into());
+            return Err(crate::i18n::text(
+                "backend-bitbucket-pagination-left-the-displayed-collection-4c2d4d",
+            )
+            .into());
         }
         path = format!(
             "{collection}?{}",
-            u.query().ok_or("Bitbucket next page has no cursor")?
+            u.query().ok_or(crate::i18n::text(
+                "backend-bitbucket-next-page-has-no-cursor-e07683"
+            ))?
         );
     }
 }
@@ -93,7 +113,7 @@ fn pages(api: &Api, first: &str) -> Result<Vec<Value>, String> {
 /// spec order is the reverse of git diff: source first, comparison base second.
 fn diffstat(api: &Api, base: &str, head: &str) -> Result<Vec<Value>, String> {
     if !crate::pull_request::is_oid(base) || !crate::pull_request::is_oid(head) {
-        return Err("Invalid Bitbucket diffstat revision".into());
+        return Err(crate::i18n::text("backend-invalid-bitbucket-diffstat-revision-e74ea5").into());
     }
     pages(
         api,
@@ -109,7 +129,9 @@ fn parse(v: &Value, h: &Hosting) -> Result<PullRequest, String> {
         .get("id")
         .and_then(Value::as_u64)
         .filter(|n| *n > 0)
-        .ok_or("Bitbucket PR has no native ID")?;
+        .ok_or(crate::i18n::text(
+            "backend-bitbucket-pr-has-no-native-id-f795d6",
+        ))?;
     Ok(PullRequest {
         number: n,
         title: required(v, "/title")?.into(),
@@ -127,7 +149,10 @@ fn create(api: &Api, n: &NewPullRequest) -> Result<String, String> {
         || !crate::pull_request::is_branch_name(n.base)
         || n.title.trim().is_empty()
     {
-        return Err("Choose valid source/target branches and a title".into());
+        return Err(crate::i18n::text(
+            "backend-choose-valid-source-target-branches-and-a-title-0803b8",
+        )
+        .into());
     }
     let repo = repository(api)?;
     api.guard_context()?;
@@ -140,12 +165,17 @@ fn create(api: &Api, n: &NewPullRequest) -> Result<String, String> {
         .iter()
         .any(|s| s.is_empty() || s.chars().any(char::is_control))
     {
-        return Err("Bitbucket reviewers must be native UUIDs".into());
+        return Err(
+            crate::i18n::text("backend-bitbucket-reviewers-must-be-native-uuids-7d5dc3").into(),
+        );
     }
     let v=api.send("POST",&format!("{}/pullrequests",endpoint(&api.hosting)?),Some(&json!({"title":n.title,"description":n.body,"draft":n.draft,"source":{"branch":{"name":n.branch},"repository":{"uuid":repo["uuid"]}},"destination":{"branch":{"name":n.base}},"reviewers":reviewers})))?;
-    parse(&v, &api.hosting)
-        .map(|p| p.url)
-        .map_err(|e| format!("Create response unreadable; refresh before creating again: {e}"))
+    parse(&v, &api.hosting).map(|p| p.url).map_err(|e| {
+        crate::i18n::message(
+            "backend-create-response-unreadable-refresh-before-creating-again-e-bb0176",
+            &[("detail", (e).to_string().into())],
+        )
+    })
 }
 impl Provider for Bitbucket {
     fn name(&self) -> &'static str {
@@ -170,7 +200,7 @@ impl Provider for Bitbucket {
     }
     fn retarget(&self, _: &Path, h: &Hosting, n: u64, base: &str) -> Result<(), String> {
         if !crate::pull_request::is_branch_name(base) {
-            return Err("Invalid target branch".into());
+            return Err(crate::i18n::text("backend-invalid-target-branch-d8264c").into());
         }
         let api = Api::new(Service::Bitbucket, h)?;
         details::snapshot(&api, n)?;

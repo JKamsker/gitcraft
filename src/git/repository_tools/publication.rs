@@ -70,22 +70,28 @@ pub(crate) fn save_group(runner: &Runner<'_>, manager: &Manager) -> Result<Strin
             .iter()
             .any(|r| !manager.remotes.contains(r))
     {
-        return Err("Choose a group name (letters, digits, - or _) and existing remotes".into());
+        return Err(crate::i18n::text(
+            "backend-choose-a-group-name-letters-digits-or-and-existing-remotes-c7a18a",
+        )
+        .into());
     }
     set_values(
         runner,
         &format!("gitcraft-publication.{}.remote", manager.group),
         &manager.selected,
     )?;
-    Ok(format!(
-        "Saved publication group {}. Reopen Publish to several hosts to prepare its exact commit and URLs.",
-        manager.group
+    Ok(crate::i18n::message(
+        "backend-saved-publication-group-reopen-publish-to-several-hosts-to-prepar-36d805",
+        &[("group", (manager.group).to_string().into())],
     ))
 }
 pub(crate) fn prepare(repo: &Path, mut manager: Manager) -> Result<Manager, String> {
     manager.snapshot.check(repo)?;
     if manager.groups.get(&manager.group) != Some(&manager.selected) {
-        return Err("Save the named publication group before preparing".into());
+        return Err(crate::i18n::text(
+            "backend-save-the-named-publication-group-before-preparing-3c8823",
+        )
+        .into());
     }
     let branch = text(repo, &["symbolic-ref", "--short", "HEAD"])?
         .trim()
@@ -96,8 +102,9 @@ pub(crate) fn prepare(repo: &Path, mut manager: Manager) -> Result<Manager, Stri
     let mut destinations = Vec::new();
     for remote in &manager.selected {
         if boolean(repo, &format!("remote.{remote}.mirror"), false)? {
-            return Err(format!(
-                "{remote} is a mirror; publication groups only send the selected branch. Change its mirror policy first."
+            return Err(crate::i18n::message(
+                "backend-remote-is-a-mirror-publication-groups-only-send-the-selected-bran-60271a",
+                &[("remote", (remote).to_string().into())],
             ));
         }
         for url in text(
@@ -115,7 +122,9 @@ pub(crate) fn prepare(repo: &Path, mut manager: Manager) -> Result<Manager, Stri
         }
     }
     if destinations.is_empty() {
-        return Err("Group has no publication destinations".into());
+        return Err(
+            crate::i18n::text("backend-group-has-no-publication-destinations-1b3f2b").into(),
+        );
     }
     manager.plan = Some(Plan {
         snapshot: manager.snapshot.clone(),
@@ -140,10 +149,9 @@ fn publish_inner(
     mut manager: Manager,
     retry: bool,
 ) -> Result<Manager, String> {
-    let plan = manager
-        .plan
-        .as_mut()
-        .ok_or("Prepare this publication first")?;
+    let plan = manager.plan.as_mut().ok_or(crate::i18n::text(
+        "backend-prepare-this-publication-first-b9aa77",
+    ))?;
     plan.snapshot.check_publication(runner.repo)?;
     for destination in &mut plan.destinations {
         if retry && !matches!(destination.result, Some(Err(_))) {

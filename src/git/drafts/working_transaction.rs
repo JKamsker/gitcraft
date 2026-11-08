@@ -13,13 +13,19 @@ fn intended_policy(
     restored: Option<&Policies>,
 ) -> Result<Option<native_files::Policy>, String> {
     let policy = if target.is_some() && restored.is_some() {
-        let saved=restored.and_then(|saved|saved.get(path)).ok_or_else(||format!("{path} has no saved full access policy; legacy mode-only undo is unavailable; no file changed"))?;
+        let saved = restored.and_then(|saved| saved.get(path)).ok_or_else(|| {
+            crate::i18n::message(
+                "backend-path-has-no-saved-full-access-policy-legacy-mode-only-undo-is-una-62db30",
+                &[("path", (path).to_string().into())],
+            )
+        })?;
         saved.validate()?;
         if let Some((mode, _)) = target
             && (saved.mode() & 0o111 != 0) != (mode == "100755")
         {
-            return Err(format!(
-                "{path} saved full policy conflicts with its Git mode; snapshot retained"
+            return Err(crate::i18n::message(
+                "backend-path-saved-full-policy-conflicts-with-its-git-mode-snapshot-retai-b8a745",
+                &[("path", (path).to_string().into())],
             ));
         }
         Some(saved.clone())
@@ -65,13 +71,21 @@ fn native_apply(
     use std::sync::Arc;
     let identity = crate::git::recovery::pinned_worktree(repo, active)?;
     if identity.host.is_some() {
-        return Err("Working-folder publication requires a native macOS/Linux checkout; no remote file changed".into());
+        return Err(crate::i18n::text(
+            "backend-working-folder-publication-requires-a-native-macos-linux-checkout-98c78b",
+        )
+        .into());
     }
-    let pin = identity.root_pin.as_ref().ok_or("Missing root identity")?;
+    let pin = identity
+        .root_pin
+        .as_ref()
+        .ok_or(crate::i18n::text("backend-missing-root-identity-d5af53"))?;
     let mut items = Vec::new();
     for (path, target) in after {
         valid_path(path)?;
-        let expected = before.get(path).ok_or("Missing before-file snapshot")?;
+        let expected = before.get(path).ok_or(crate::i18n::text(
+            "backend-missing-before-file-snapshot-f90126",
+        ))?;
         let policy = intended_policy(path, target, policies, restored_policy)?;
         if restored_policy.is_none()
             && !replacement_needed(expected, target, policies.get(path), policy.as_ref())
@@ -87,15 +101,16 @@ fn native_apply(
         let parent = Path::new(&pin.physical)
             .join(path)
             .parent()
-            .ok_or("Missing parent")?
+            .ok_or(crate::i18n::text("backend-missing-parent-27f5e2"))?
             .to_owned();
         let directory = Arc::new(Directory::from_file(parent, held).map_err(|e| e.to_string())?);
         let old = Snapshot::read(&directory, &name, FILE_LIMIT)?;
         if old.as_ref().map(|s| &s.bytes) != expected.as_ref().map(|(_, bytes)| bytes)
             || old.as_ref().map(|s| &s.policy) != policies.get(path)
         {
-            return Err(format!(
-                "{path} contents or full access policy changed since preview"
+            return Err(crate::i18n::message(
+                "backend-path-contents-or-full-access-policy-changed-since-preview-983e44",
+                &[("path", (path).to_string().into())],
             ));
         }
         if !replacement_needed(
@@ -142,9 +157,16 @@ fn native_apply(
         commit(&evidence)
     })();
     match result {
-        Ok(CommitOutcome::Committed) => Ok(format!("Native recovery entries retained: {evidence}")),
-        Ok(CommitOutcome::Unknown(message)) => Err(format!(
-            "{message}. Publication is uncertain: current materialization and all original/candidate entries retained; no rollback attempted. Recovery: {evidence}"
+        Ok(CommitOutcome::Committed) => Ok(crate::i18n::message(
+            "backend-native-recovery-entries-retained-evidence-44a484",
+            &[("evidence", (evidence).to_string().into())],
+        )),
+        Ok(CommitOutcome::Unknown(message)) => Err(crate::i18n::message(
+            "backend-message-publication-is-uncertain-current-materialization-and-all-e89e19",
+            &[
+                ("message", (message).to_string().into()),
+                ("evidence", (evidence).to_string().into()),
+            ],
         )),
         Err(error) => {
             let failures = items
@@ -153,13 +175,21 @@ fn native_apply(
                 .filter_map(|item| item.rollback().err())
                 .collect::<Vec<_>>();
             if failures.is_empty() {
-                Err(format!(
-                    "{error}. Owned changes restored create-only. Recovery entries retained: {evidence}"
+                Err(crate::i18n::message(
+                    "backend-error-owned-changes-restored-create-only-recovery-entries-retaine-d8c785",
+                    &[
+                        ("detail", (error).to_string().into()),
+                        ("evidence", (evidence).to_string().into()),
+                    ],
                 ))
             } else {
-                Err(format!(
-                    "{error}. Attention required: {}. All recovery entries retained: {evidence}",
-                    failures.join("; ")
+                Err(crate::i18n::message(
+                    "backend-error-attention-required-all-recovery-entries-retained-evidence-e5c552",
+                    &[
+                        ("detail", (error).to_string().into()),
+                        ("failures", (failures.join("; ")).to_string().into()),
+                        ("evidence", (evidence).to_string().into()),
+                    ],
                 ))
             }
         }
@@ -216,7 +246,10 @@ pub(super) fn apply_with_commit(
             restored_policy,
             active,
         );
-        Err("Native working-folder publication is unavailable; no files changed".into())
+        Err(crate::i18n::text(
+            "backend-native-working-folder-publication-is-unavailable-no-files-changed-254613",
+        )
+        .into())
     }
 }
 

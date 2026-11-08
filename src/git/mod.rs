@@ -33,6 +33,7 @@ pub mod doctor;
 pub mod dry_run;
 pub(crate) mod dvc;
 pub mod errors;
+pub use errors::display_error;
 pub mod external_tool;
 pub(crate) mod file_comparison;
 mod files;
@@ -177,7 +178,10 @@ const LITERAL_PATHS: &str = "--literal-pathspecs";
 /// revision that would be read as an option is refused.
 fn not_an_option(rev: &str) -> Result<&str, String> {
     if rev.starts_with('-') {
-        Err(format!("{rev} is not a revision"))
+        Err(crate::i18n::message(
+            "backend-rev-is-not-a-revision-bf38d4",
+            &[("rev", (rev).to_string().into())],
+        ))
     } else {
         Ok(rev)
     }
@@ -280,6 +284,11 @@ pub fn version() -> Result<String, String> {
     run(None, &["--version"]).map(|s| s.trim().to_owned())
 }
 
+// The dropped-repository classifier consumes this raw identity.
+fn outside_repository(path: &Path) -> String {
+    format!("{} is not inside a git repository", path.display())
+}
+
 /// The top-level folder of the repository containing `path`.
 pub fn toplevel(path: &Path) -> Result<PathBuf, String> {
     let out = run(Some(path), &["rev-parse", "--show-toplevel"]).map_err(|e| {
@@ -290,7 +299,7 @@ pub fn toplevel(path: &Path) -> Result<PathBuf, String> {
         {
             e
         } else {
-            format!("{} is not inside a git repository", path.display())
+            outside_repository(path)
         }
     })?;
     // Only the line end: a folder's name can end with a space.
@@ -303,7 +312,12 @@ pub fn toplevel(path: &Path) -> Result<PathBuf, String> {
 }
 
 pub fn init(path: &Path) -> Result<(), String> {
-    crate::remote::create_dir_all(path).map_err(|e| format!("could not create folder: {e}"))?;
+    crate::remote::create_dir_all(path).map_err(|e| {
+        crate::i18n::message(
+            "backend-could-not-create-folder-e-3a9f18",
+            &[("detail", (e).to_string().into())],
+        )
+    })?;
     run(Some(path), &["init"]).map(|_| ())
 }
 
@@ -353,16 +367,16 @@ pub fn identity(repo: &Path) -> Identity {
 /// "3 minutes ago", "2 days ago"… for `time` seen from `now` (both Unix seconds).
 pub fn relative_time(time: i64, now: i64) -> String {
     let secs = now.saturating_sub(time).max(0);
-    let (n, unit) = match secs {
-        0..60 => return "just now".to_owned(),
-        60..3_600 => (secs / 60, "minute"),
-        3_600..86_400 => (secs / 3_600, "hour"),
-        86_400..604_800 => (secs / 86_400, "day"),
-        604_800..2_629_800 => (secs / 604_800, "week"),
-        2_629_800..31_557_600 => (secs / 2_629_800, "month"),
-        _ => (secs / 31_557_600, "year"),
+    let (count, id) = match secs {
+        0..60 => return crate::i18n::text("backend-just-now-7ddb44").to_owned(),
+        60..3_600 => (secs / 60, "backend-relative-minutes"),
+        3_600..86_400 => (secs / 3_600, "backend-relative-hours"),
+        86_400..604_800 => (secs / 86_400, "backend-relative-days"),
+        604_800..2_629_800 => (secs / 604_800, "backend-relative-weeks"),
+        2_629_800..31_557_600 => (secs / 2_629_800, "backend-relative-months"),
+        _ => (secs / 31_557_600, "backend-relative-years"),
     };
-    format!("{n} {unit}{} ago", if n == 1 { "" } else { "s" })
+    crate::i18n::message(id, &[("count", count.into())])
 }
 
 pub fn now() -> i64 {
@@ -408,3 +422,269 @@ pub(crate) use bundles::bundle_git_path;
 pub(crate) use command::{PushTarget, local_repair_input, push_preflight_with, repair_host};
 
 pub(crate) mod prompt_session;
+
+#[cfg(test)]
+mod backend_relative_time_tests {
+    #[test]
+    fn backend_fluent_relative_time_uses_numeric_plurals_and_preserves_time_boundaries() {
+        let units = [60, 3_600, 86_400, 604_800, 2_629_800, 31_557_600];
+        for (locale, singular, plural) in [
+            (
+                "en-US",
+                [
+                    "1 minute ago",
+                    "1 hour ago",
+                    "1 day ago",
+                    "1 week ago",
+                    "1 month ago",
+                    "1 year ago",
+                ],
+                [
+                    "2 minutes ago",
+                    "2 hours ago",
+                    "2 days ago",
+                    "2 weeks ago",
+                    "2 months ago",
+                    "2 years ago",
+                ],
+            ),
+            (
+                "de",
+                [
+                    "vor 1 Minute",
+                    "vor 1 Stunde",
+                    "vor 1 Tag",
+                    "vor 1 Woche",
+                    "vor 1 Monat",
+                    "vor 1 Jahr",
+                ],
+                [
+                    "vor 2 Minuten",
+                    "vor 2 Stunden",
+                    "vor 2 Tagen",
+                    "vor 2 Wochen",
+                    "vor 2 Monaten",
+                    "vor 2 Jahren",
+                ],
+            ),
+        ] {
+            crate::i18n::set_language(locale);
+            for (i, seconds) in units.into_iter().enumerate() {
+                assert_eq!(super::relative_time(0, seconds), singular[i]);
+                assert_eq!(super::relative_time(0, 2 * seconds), plural[i]);
+            }
+            let just_now = if locale == "de" {
+                "Gerade eben"
+            } else {
+                "just now"
+            };
+            assert_eq!(super::relative_time(0, 59), just_now);
+            assert_eq!(super::relative_time(100, 0), just_now);
+            assert_eq!(super::relative_time(i64::MAX, i64::MIN), just_now);
+            assert!(!super::relative_time(i64::MIN, i64::MAX).is_empty());
+        }
+        crate::i18n::set_language("en-US");
+    }
+}
+
+#[cfg(test)]
+mod backend_fluent_adapter_tests {
+    use super::*;
+
+    #[test]
+    fn backend_fluent_operation_labels_keep_commands_and_control_identity() -> Result<(), String> {
+        let opaque = "provider HTTP 409: /refs/heads/de/main";
+        for (locale, merge, cancelled) in [
+            ("en-US", "Merge", "Read cancelled"),
+            ("de", "Zusammenführen", "Das Lesen wurde abgebrochen."),
+        ] {
+            crate::i18n::set_language(locale);
+            assert_eq!(InProgress::Merge.label(), merge);
+            for (op, command, continues) in [
+                (InProgress::Merge, "merge", false),
+                (InProgress::CherryPick, "cherry-pick", false),
+                (InProgress::Revert, "revert", false),
+                (InProgress::Rebase, "rebase", true),
+                (InProgress::Am, "am", true),
+            ] {
+                assert_eq!(op.command(), command);
+                assert_eq!(op.continues(), continues);
+            }
+            // Exercise the real production early-cancellation adapter: no command is built.
+            let raw = command::draft_bytes(
+                std::path::Path::new("/not-used"),
+                &["status"],
+                &[],
+                Vec::new(),
+                &[0],
+                &|| false,
+            )
+            .err()
+            .ok_or("missing cancellation failure")?;
+            assert_eq!(raw, "Read cancelled");
+            assert!(raw.contains("cancelled"));
+            assert_eq!(display_error(&raw), cancelled);
+            assert_eq!(display_error(opaque), opaque);
+            for unknown in [
+                "provider isn't a folder on opaque remote",
+                "provider didn't finish within 3 seconds and was stopped",
+            ] {
+                assert_eq!(display_error(unknown), unknown);
+            }
+            let helper = "Contained bundle Git: invalid keep hash";
+            assert_eq!(
+                display_error(helper),
+                if locale == "de" {
+                    "Git im begrenzten Bundle-Helfer: Ungültiger Keep-Hash."
+                } else {
+                    helper
+                }
+            );
+            let steps = dvc::pull_steps();
+            assert_eq!(
+                steps[0].last().map(String::as_str),
+                Some("gitcraft-dvc-pull")
+            );
+            assert!(steps[0][1].contains("DVC is not installed on this repository machine"));
+            assert!(goes_over_network(
+                &steps[0].iter().map(String::as_str).collect::<Vec<_>>()
+            ));
+            assert_eq!(testlane::Verdict::Good.word(), "good");
+            assert_eq!(
+                testlane::Verdict::parse("bad"),
+                Some(testlane::Verdict::Bad)
+            );
+        }
+        crate::i18n::set_language("en-US");
+        Ok(())
+    }
+
+    #[test]
+    fn backend_fluent_supplied_state_keeps_argv_refs_and_payloads() -> Result<(), String> {
+        use doctor::health::{Health, Objects, suggestions};
+        let health = Health {
+            status_took: Some(std::time::Duration::from_millis(1234)),
+            remote: true,
+            objects: Objects {
+                loose: 2345,
+                packs: 2,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let query = "author:\"Jane Doe\" after:2w path:src/de.rs";
+        crate::i18n::set_language("en-US");
+        let english_plan = search_query::prepare(query, false).map_err(|e| e.message)?;
+        let english_ops: Vec<_> = suggestions(&health).into_iter().map(|s| s.ops).collect();
+        for locale in ["en-US", "de"] {
+            crate::i18n::set_language(locale);
+            let cmd = command::apply_command_extras(
+                std::process::Command::new("/fixed/git-not-executed"),
+                None,
+                &command::Extra::default(),
+                &[
+                    "fetch",
+                    "origin",
+                    "refs/heads/de/main:refs/remotes/origin/de/main",
+                ],
+            );
+            assert_eq!(cmd.get_program(), "/fixed/git-not-executed");
+            assert_eq!(
+                cmd.get_args().collect::<Vec<_>>(),
+                [
+                    "fetch",
+                    "origin",
+                    "refs/heads/de/main:refs/remotes/origin/de/main"
+                ]
+            );
+            assert_eq!(
+                search_query::prepare(query, false).map_err(|e| e.message)?,
+                english_plan
+            );
+            assert_eq!(
+                suggestions(&health)
+                    .into_iter()
+                    .map(|s| s.ops)
+                    .collect::<Vec<_>>(),
+                english_ops
+            );
+            let warning = suggestions(&health)[2].why.clone();
+            assert!(
+                warning.contains(if locale == "de" {
+                    "1.234 ms"
+                } else {
+                    "1,234 ms"
+                }),
+                "{warning}"
+            );
+            assert_eq!(parse_lfs_pointer("version https://git-lfs.github.com/spec/v1\noid sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\nsize 1234\n").map(|p| p.size), Some(1234));
+        }
+        crate::i18n::set_language("en-US");
+        Ok(())
+    }
+
+    #[test]
+    fn backend_fluent_file_and_line_labels_use_numeric_counts() -> Result<(), String> {
+        use file_comparison::Version;
+        for (locale, one, many, binary, lines, size) in [
+            (
+                "en-US",
+                "100644 · 1 byte",
+                "100644 · 1,234 bytes",
+                "100644 · 2 bytes · binary",
+                "lines 1,234–2,345",
+                "1.0 KB",
+            ),
+            (
+                "de",
+                "100644 · 1 Byte",
+                "100644 · 1.234 Bytes",
+                "100644 · 2 Bytes · binär",
+                "Zeilen 1.234–2.345",
+                "1,0 KB",
+            ),
+        ] {
+            crate::i18n::set_language(locale);
+            let make = |bytes| Version {
+                mode: Some("100644".into()),
+                oid: Some("a".repeat(40)),
+                bytes,
+                warning: None,
+            };
+            assert_eq!(make(vec![1]).label(), one);
+            assert_eq!(make(vec![1; 1234]).label(), many);
+            assert_eq!(make(vec![0, 1]).label(), binary);
+            assert_eq!(
+                crate::forge::links::Lines::new(1234, 2345)
+                    .ok_or("missing line range")?
+                    .label(),
+                lines
+            );
+            assert_eq!(human_size(1024), size);
+        }
+        crate::i18n::set_language("en-US");
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod backend_fluent_identity_tests {
+    #[test]
+    fn backend_fluent_outside_repository_keeps_drop_classification() {
+        for locale in ["en-US", "de"] {
+            crate::i18n::set_language(locale);
+            let raw = super::outside_repository(std::path::Path::new("/fixture/de/repo"));
+            assert_eq!(raw, "/fixture/de/repo is not inside a git repository");
+            assert!(raw.to_lowercase().contains("not inside a git repository"));
+            assert_eq!(
+                super::display_error(&raw),
+                if locale == "de" {
+                    "/fixture/de/repo liegt nicht in einem Git-Repository."
+                } else {
+                    &raw
+                }
+            );
+        }
+        crate::i18n::set_language("en-US");
+    }
+}

@@ -42,11 +42,12 @@ pub fn configured(name: &str, kind: Kind) -> Result<Plan, String> {
         return Err(no_tool_set(kind));
     }
     if needs_terminal(name) {
-        return Err(format!(
-            "{name} runs in a terminal, which a tool started from the window doesn't have. Run \
-             git {} in the terminal panel, or choose a tool with a window in Settings → Git → \
-             External tools.",
-            kind.command()
+        return Err(crate::i18n::message(
+            "backend-name-runs-in-a-terminal-which-a-tool-started-from-the-window-does-6f1e1c",
+            &[
+                ("name", (name).to_string().into()),
+                ("kind", (kind.command()).to_string().into()),
+            ],
         ));
     }
     Ok(Plan {
@@ -58,11 +59,12 @@ pub fn configured(name: &str, kind: Kind) -> Result<Plan, String> {
 
 /// What to say when git's config names no tool.
 pub fn no_tool_set(kind: Kind) -> String {
-    format!(
-        "No {noun} tool is set: choose one in Settings → Git → External tools, or set {key} in \
-         git's config (git config --global {key} <tool>).",
-        noun = kind.noun(),
-        key = kind.key(),
+    crate::i18n::message(
+        "backend-no-noun-tool-is-set-choose-one-in-settings-git-external-tools-or-cf8598",
+        &[
+            ("noun", (kind.noun()).to_string().into()),
+            ("key", (kind.key()).to_string().into()),
+        ],
     )
 }
 

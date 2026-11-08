@@ -3,7 +3,7 @@
 use std::{io::Read, path::Path};
 
 const CAP: usize = 1 << 20;
-const REFUSED: &str = "Sparse patterns must be an unchanged regular file of at most 1 MiB; inspect them in the terminal";
+const REFUSED: &str = "backend-sparse-patterns-refused";
 
 pub(super) fn read(path: &Path) -> Result<String, String> {
     if let Some(target) = crate::remote::parse(path) {
@@ -13,29 +13,35 @@ pub(super) fn read(path: &Path) -> Result<String, String> {
     let file = match open(path) {
         Ok(file) => file,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(String::new()),
-        Err(e) => return Err(format!("{REFUSED}: {e}")),
+        Err(e) => {
+            return Err(crate::i18n::message(
+                "backend-sparse-patterns-detail",
+                &[("detail", e.to_string().into())],
+            ));
+        }
     };
     let before = file.metadata().map_err(|e| e.to_string())?;
     regular(before.is_file(), before.len())?;
     // Also refuse Windows reparse points before reading their contents.
     if !unchanged(&before, &before) {
-        return Err(REFUSED.into());
+        return Err(crate::i18n::text(REFUSED).into());
     }
     let bytes = bounded(&file)?;
     let after = file.metadata().map_err(|e| e.to_string())?;
-    let named = std::fs::symlink_metadata(path).map_err(|_| REFUSED.to_owned())?;
+    let named =
+        std::fs::symlink_metadata(path).map_err(|_| crate::i18n::text(REFUSED).to_owned())?;
     if !unchanged(&before, &after) || !unchanged(&after, &named) {
-        return Err(REFUSED.into());
+        return Err(crate::i18n::text(REFUSED).into());
     }
     #[cfg(windows)]
     {
         // Metadata alone cannot distinguish a replacement with copied size/timestamps.
         // Reuse the accepted native handle identity; keep both no-follow handles alive.
-        let named_file = open(path).map_err(|_| REFUSED.to_owned())?;
+        let named_file = open(path).map_err(|_| crate::i18n::text(REFUSED).to_owned())?;
         if crate::git::recovery::native_file_identity(&file)?.0
             != crate::git::recovery::native_file_identity(&named_file)?.0
         {
-            return Err(REFUSED.into());
+            return Err(crate::i18n::text(REFUSED).into());
         }
     }
     decode(0, bytes)
@@ -64,13 +70,13 @@ fn open(path: &Path) -> std::io::Result<std::fs::File> {
 }
 #[cfg(not(any(unix, windows)))]
 fn open(_: &Path) -> std::io::Result<std::fs::File> {
-    Err(std::io::Error::other(
-        "Bounded sparse metadata is unsupported on this platform",
-    ))
+    Err(std::io::Error::other(crate::i18n::text(
+        "backend-bounded-sparse-metadata-is-unsupported-on-this-platform-9fa9fe",
+    )))
 }
 fn regular(is_file: bool, len: u64) -> Result<(), String> {
     if !is_file || len > CAP as u64 {
-        Err(REFUSED.into())
+        Err(crate::i18n::text(REFUSED).into())
     } else {
         Ok(())
     }
@@ -112,10 +118,15 @@ fn bounded(reader: impl Read) -> Result<Vec<u8>, String> {
 fn decode(code: i32, bytes: Vec<u8>) -> Result<String, String> {
     match code {
         11 if bytes.is_empty() => Ok(String::new()),
-        0 if bytes.len() <= CAP => String::from_utf8(bytes)
-            .map_err(|_| "Sparse patterns are not UTF-8; inspect them in the terminal".into()),
-        _ => Err(format!(
-            "{REFUSED}. Remote reads require python3 and descriptor no-follow/nonblocking support"
+        0 if bytes.len() <= CAP => String::from_utf8(bytes).map_err(|_| {
+            crate::i18n::text(
+                "backend-sparse-patterns-are-not-utf-8-inspect-them-in-the-terminal-6b42d3",
+            )
+            .into()
+        }),
+        _ => Err(crate::i18n::message(
+            "backend-refused-remote-reads-require-python3-and-descriptor-no-follow-non-0f288a",
+            &[("refused", crate::i18n::text(REFUSED).to_string().into())],
         )),
     }
 }

@@ -15,9 +15,10 @@ impl CredentialCommandPolicy {
     )]
     pub fn bind_git(&mut self, selected: &Path) -> Result<(), String> {
         if !selected.is_absolute() {
-            return Err(
-                "Explicit credentials require the actual selected absolute Git executable".into(),
-            );
+            return Err(crate::i18n::text(
+                "backend-explicit-credentials-require-the-actual-selected-absolute-git-exe-41caa2",
+            )
+            .into());
         }
         self.environment
             .retain(|(key, _)| *key != "GITCRAFT_GIT_ORIGINAL");
@@ -38,7 +39,10 @@ pub(crate) fn credential_command_policy(
     args: &[&str],
 ) -> Result<CredentialCommandPolicy, String> {
     if !cfg!(unix) && !dir.is_some_and(remote::is_remote) {
-        return Err("Explicit transient HTTPS sign-in is unavailable for local Windows Git: the native/MSYS transport identity boundary has not been established. Use an explicitly selected profile credential manager instead.".into());
+        return Err(crate::i18n::text(
+            "backend-explicit-transient-https-sign-in-is-unavailable-for-local-windows-7d90ff",
+        )
+        .into());
     }
     for pair in args.windows(2) {
         if pair[0] == "-c" {
@@ -52,7 +56,7 @@ pub(crate) fn credential_command_policy(
                 || key == "alias.gitcraft-credential-transport"
             {
                 return Err(
-                    "This command attempts to replace the explicit credential transport policy"
+                    crate::i18n::text("backend-this-command-attempts-to-replace-the-explicit-credential-transpor-082086")
                         .into(),
                 );
             }
@@ -64,7 +68,10 @@ pub(crate) fn credential_command_policy(
         .as_ref()
         .is_some_and(|scope| scope.is_https())
     {
-        return Err("Explicit transient sign-in requires HTTPS and Git 2.46 or newer on the repository machine. Use the profile credential manager for other transports.".into());
+        return Err(crate::i18n::text(
+            "backend-explicit-transient-sign-in-requires-https-and-git-2-46-or-newer-o-1f40fa",
+        )
+        .into());
     }
     // The owning runner may carry private, command-only remote configuration.
     // Do not resolve its alias or inspect a different config here. Actual URL
@@ -84,7 +91,10 @@ fn policy_for_keys<'a>(
     ];
     for key in keys {
         if key.len() > 32768 || key.chars().any(char::is_control) {
-            return Err("Invalid credential transport configuration key".into());
+            return Err(crate::i18n::text(
+                "backend-invalid-credential-transport-configuration-key-a7103f",
+            )
+            .into());
         }
         let lower = key.to_ascii_lowercase();
         let value = if lower.starts_with("http.") && lower.ends_with(".followredirects") {
@@ -103,9 +113,11 @@ fn policy_for_keys<'a>(
             if lower.starts_with("credential.") && lower.ends_with(".helper") {
                 config.push(format!(
                     "{key}={}",
-                    CREDENTIAL_HELPER
-                        .strip_prefix("credential.helper=")
-                        .ok_or("Invalid built-in credential helper definition")?
+                    CREDENTIAL_HELPER.strip_prefix("credential.helper=").ok_or(
+                        crate::i18n::text(
+                            "backend-invalid-built-in-credential-helper-definition-e77905"
+                        )
+                    )?
                 ));
             }
         }

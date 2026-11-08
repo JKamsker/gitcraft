@@ -32,9 +32,14 @@ impl Service {
             Self::Azure => {
                 let org = s
                     .strip_prefix("https://dev.azure.com/")
-                    .ok_or("Use https://dev.azure.com/ORGANIZATION")?;
+                    .ok_or(crate::i18n::text(
+                        "backend-use-https-dev-azure-com-organization-87fdec",
+                    ))?;
                 if !plain(org) {
-                    return Err("Use one plain Azure organization name".into());
+                    return Err(crate::i18n::text(
+                        "backend-use-one-plain-azure-organization-name-a62b8b",
+                    )
+                    .into());
                 }
                 Ok(format!(
                     "https://dev.azure.com/{}",
@@ -42,7 +47,9 @@ impl Service {
                 ))
             }
             Self::Bitbucket if s == "https://bitbucket.org" => Ok(s.into()),
-            _ => Err("Bitbucket Cloud uses https://bitbucket.org".into()),
+            _ => Err(
+                crate::i18n::text("backend-bitbucket-cloud-uses-https-bitbucket-org-e58569").into(),
+            ),
         }
     }
 }
@@ -72,21 +79,33 @@ impl Account {
                 .chars()
                 .any(|c| c.is_control() || c.is_whitespace())
         {
-            return Err("Choose the native account's stable user ID".into());
+            return Err(crate::i18n::text(
+                "backend-choose-the-native-account-s-stable-user-id-fd9c56",
+            )
+            .into());
         }
         if self.credential_user.chars().any(char::is_control)
             || self.secret_ref.chars().any(char::is_control)
         {
-            return Err("Account metadata cannot contain control characters".into());
+            return Err(crate::i18n::text(
+                "backend-account-metadata-cannot-contain-control-characters-dcf623",
+            )
+            .into());
         }
         if !self.config_dir.is_empty()
             && (!Path::new(&self.config_dir).is_absolute()
                 || self.config_dir.chars().any(char::is_control))
         {
-            return Err("Azure CLI configuration folder must be absolute".into());
+            return Err(crate::i18n::text(
+                "backend-azure-cli-configuration-folder-must-be-absolute-e7ac9c",
+            )
+            .into());
         }
         if s == Service::Bitbucket && self.credential_user.is_empty() {
-            return Err("Choose the Atlassian email used with this API token".into());
+            return Err(crate::i18n::text(
+                "backend-choose-the-atlassian-email-used-with-this-api-token-8d225a",
+            )
+            .into());
         }
         Ok(())
     }
@@ -103,33 +122,45 @@ impl Account {
     pub fn store(&self, s: Service, token: &str) -> Result<(), String> {
         self.validate(s)?;
         if token.is_empty() || token.chars().any(char::is_control) || self.secret_ref.is_empty() {
-            return Err("Enter a token and secure reference".into());
+            return Err(
+                crate::i18n::text("backend-enter-a-token-and-secure-reference-ae8840").into(),
+            );
         }
         if !crate::portable::credential_store() {
-            return Err("Credential storage is disabled".into());
+            return Err(crate::i18n::text("backend-credential-storage-is-disabled-ddef8c").into());
         }
         keyring::Entry::new("gitcraft-native-forge", &self.key(s))
-            .map_err(|_| "Cannot open secure store")?
+            .map_err(|_| crate::i18n::text("backend-cannot-open-secure-store-a4aa7a"))?
             .set_password(token)
-            .map_err(|_| "Cannot save selected credential".into())
+            .map_err(|_| crate::i18n::text("backend-cannot-save-selected-credential-146c35").into())
     }
     pub fn forget(&self, s: Service) -> Result<(), String> {
         if !crate::portable::credential_store() {
-            return Err("Credential storage is disabled".into());
+            return Err(crate::i18n::text("backend-credential-storage-is-disabled-ddef8c").into());
         }
         keyring::Entry::new("gitcraft-native-forge", &self.key(s))
-            .map_err(|_| "Cannot open secure store")?
+            .map_err(|_| crate::i18n::text("backend-cannot-open-secure-store-a4aa7a"))?
             .delete_credential()
-            .map_err(|_| "Cannot forget selected credential".into())
+            .map_err(|_| {
+                crate::i18n::text("backend-cannot-forget-selected-credential-834a7e").into()
+            })
     }
     fn secret(&self, s: Service) -> Result<String, String> {
         if self.secret_ref.is_empty() || !crate::portable::credential_store() {
-            return Err("Save this profile's selected provider token in Connections first".into());
+            return Err(crate::i18n::text(
+                "backend-save-this-profile-s-selected-provider-token-in-connections-first-48842f",
+            )
+            .into());
         }
         keyring::Entry::new("gitcraft-native-forge", &self.key(s))
-            .map_err(|_| "Cannot open secure store")?
+            .map_err(|_| crate::i18n::text("backend-cannot-open-secure-store-a4aa7a"))?
             .get_password()
-            .map_err(|_| "Selected provider credential is unavailable on this computer".into())
+            .map_err(|_| {
+                crate::i18n::text(
+                    "backend-selected-provider-credential-is-unavailable-on-this-computer-65eed6",
+                )
+                .into()
+            })
     }
 }
 pub(super) fn plain(s: &str) -> bool {
@@ -160,7 +191,12 @@ pub(super) fn required<'a>(v: &'a Value, p: &str) -> Result<&'a str, String> {
     v.pointer(p)
         .and_then(Value::as_str)
         .filter(|s| !s.is_empty())
-        .ok_or_else(|| format!("Provider response is missing {p}"))
+        .ok_or_else(|| {
+            crate::i18n::message(
+                "backend-provider-response-is-missing-p-efbf32",
+                &[("pointer", (p).to_string().into())],
+            )
+        })
 }
 #[cfg(test)]
 type Recording =
@@ -202,7 +238,10 @@ impl Api {
                     Service::Bitbucket => "https://bitbucket.org",
                 }
         {
-            return Err("Selected provider server does not match the displayed repository".into());
+            return Err(crate::i18n::text(
+                "backend-selected-provider-server-does-not-match-the-displayed-repository-13d818",
+            )
+            .into());
         }
         use base64::Engine;
         let (authorization, expires) = match service {
@@ -261,13 +300,19 @@ impl Api {
             },
         )?;
         if !id.eq_ignore_ascii_case(&self.viewer) {
-            return Err("Provider authenticated a different native account; reload after selecting its exact stable ID".into());
+            return Err(crate::i18n::text(
+                "backend-provider-authenticated-a-different-native-account-reload-after-se-b79626",
+            )
+            .into());
         }
         Ok(())
     }
     pub fn guard_context(&self) -> Result<(), String> {
         if self.context != connections::current() {
-            return Err("Profile changed; reload this pull request before writing".into());
+            return Err(crate::i18n::text(
+                "backend-profile-changed-reload-this-pull-request-before-writing-335973",
+            )
+            .into());
         }
         self.verify_viewer()
     }
@@ -279,7 +324,9 @@ impl Api {
         if bytes.is_empty() {
             Ok(Value::Null)
         } else {
-            serde_json::from_slice(&bytes).map_err(|_| "Provider returned invalid JSON".into())
+            serde_json::from_slice(&bytes).map_err(|_| {
+                crate::i18n::text("backend-provider-returned-invalid-json-2d3db8").into()
+            })
         }
     }
     pub fn bytes(
@@ -300,7 +347,7 @@ impl Api {
                 .split('/')
                 .any(|p| p == "." || p == "..")
         {
-            return Err("Invalid provider API path".into());
+            return Err(crate::i18n::text("backend-invalid-provider-api-path-5358fa").into());
         }
         let path = if self.service == Service::Azure && !path.contains("api-version=") {
             format!(
@@ -325,9 +372,10 @@ impl Api {
         }
         let remaining = Duration::from_secs(120).saturating_sub(self.began.elapsed());
         if remaining.is_zero() || self.expires.is_some_and(|exp| now() + 15 >= exp) {
-            return Err(
-                "Provider session expired; reload to acquire the selected account again".into(),
-            );
+            return Err(crate::i18n::text(
+                "backend-provider-session-expired-reload-to-acquire-the-selected-account-a-02409a",
+            )
+            .into());
         }
         let url = format!("{}/{path}", self.base);
         let req = self
@@ -344,31 +392,30 @@ impl Api {
             None => req.call(),
         }
         .map_err(|e| match e {
-            ureq::Error::Status(s, _) => format!(
-                "{} returned HTTP {s}; check selected account and permissions",
-                self.service.name()
-            ),
-            _ => format!(
-                "{} transport failed{}",
-                self.service.name(),
-                if method == "GET" {
+            ureq::Error::Status(s, _) => crate::i18n::message("backend-returned-http-s-check-selected-account-and-permissions-1327cc", &[("name", (self.service.name()).to_string().into()), ("status", (s).to_string().into())]),
+            _ => crate::i18n::message("backend-transport-failed-c42359", &[("name", (self.service.name()).to_string().into()), ("if", (if method == "GET" {
                     ""
                 } else {
-                    "; the write outcome is uncertain, refresh before trying again"
-                }
-            ),
+                    crate::i18n::text("backend-the-write-outcome-is-uncertain-refresh-before-trying-again-c04611")
+                }).to_string().into())]),
         })?;
         if !(200..300).contains(&response.status()) {
-            return Err("Provider redirect refused; credentials were not forwarded".into());
+            return Err(crate::i18n::text(
+                "backend-provider-redirect-refused-credentials-were-not-forwarded-71c0f0",
+            )
+            .into());
         }
         let mut bytes = vec![];
         response
             .into_reader()
             .take(8 * 1024 * 1024 + 1)
             .read_to_end(&mut bytes)
-            .map_err(|_| "Cannot read provider response")?;
+            .map_err(|_| crate::i18n::text("backend-cannot-read-provider-response-6e29aa"))?;
         if bytes.len() > 8 * 1024 * 1024 {
-            return Err("Provider response exceeds 8 MiB; use the forge page".into());
+            return Err(crate::i18n::text(
+                "backend-provider-response-exceeds-8-mib-use-the-forge-page-e7a40f",
+            )
+            .into());
         }
         if crate::tasks::cancellation().is_cancelled() {
             return Err(
@@ -382,7 +429,9 @@ impl Api {
             .get("value")
             .and_then(Value::as_array)
             .cloned()
-            .ok_or_else(|| "Provider returned no result list".into())
+            .ok_or_else(|| {
+                crate::i18n::text("backend-provider-returned-no-result-list-f70d77").into()
+            })
     }
     #[cfg(test)]
     pub fn recording(service: Service, h: Hosting, viewer: &str, record: Recording) -> Self {
@@ -420,10 +469,14 @@ fn azure_token(a: &Account) -> Result<(String, Option<u64>), String> {
         },
     )?;
     if !out.status.success() {
-        return Err("Selected Azure CLI login unavailable; sign in with az in the selected configuration directory".into());
+        return Err(crate::i18n::text(
+            "backend-selected-azure-cli-login-unavailable-sign-in-with-az-in-the-selec-0daa14",
+        )
+        .into());
     }
-    let value: Value = serde_json::from_slice(&out.stdout)
-        .map_err(|_| "Azure CLI returned invalid token metadata")?;
+    let value: Value = serde_json::from_slice(&out.stdout).map_err(|_| {
+        crate::i18n::text("backend-azure-cli-returned-invalid-token-metadata-d65a19")
+    })?;
     parse_azure_token(&value, now())
 }
 pub(super) fn azure_command(c: &mut std::process::Command, a: &Account) {
@@ -458,9 +511,14 @@ fn parse_azure_token(v: &Value, now: u64) -> Result<(String, Option<u64>), Strin
             v.as_u64()
                 .or_else(|| v.as_str().and_then(|s| s.parse().ok()))
         })
-        .ok_or("Azure CLI must provide expires_on; update az or use an explicitly stored PAT")?;
+        .ok_or(crate::i18n::text(
+            "backend-azure-cli-must-provide-expires-on-update-az-or-use-an-explicitly-26eb57",
+        ))?;
     if exp <= now + 15 || token.len() > 65536 || token.chars().any(char::is_whitespace) {
-        return Err("Azure CLI returned an expired or unusable token".into());
+        return Err(crate::i18n::text(
+            "backend-azure-cli-returned-an-expired-or-unusable-token-bdfc27",
+        )
+        .into());
     }
     Ok((format!("Bearer {token}"), Some(exp)))
 }

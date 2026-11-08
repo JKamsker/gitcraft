@@ -20,15 +20,23 @@ pub(crate) fn read(file: &File, path: &Path) -> Result<AccessMetadata, String> {
         let _ = path;
         use rustix::fs::{fgetxattr, fgetxattr_query, flistxattr, flistxattr_query};
         const LIMIT: usize = 1024 * 1024;
-        let size = flistxattr_query(file)
-            .map_err(|e| format!("Cannot snapshot output access metadata: {e}"))?;
+        let size = flistxattr_query(file).map_err(|e| {
+            crate::i18n::message(
+                "backend-cannot-snapshot-output-access-metadata-e-94a33b",
+                &[("detail", (e).to_string().into())],
+            )
+        })?;
         if size > LIMIT {
-            return Err("Output access metadata exceeds 1 MiB".into());
+            return Err(
+                crate::i18n::text("backend-output-access-metadata-exceeds-1-mib-9bd2af").into(),
+            );
         }
         let mut names = vec![0; size];
         let n = flistxattr(file, &mut names[..]).map_err(|e| e.to_string())?;
         if n > names.len() {
-            return Err("Output metadata changed while listing".into());
+            return Err(
+                crate::i18n::text("backend-output-metadata-changed-while-listing-aef402").into(),
+            );
         }
         names.truncate(n);
         let mut names = names
@@ -45,15 +53,21 @@ pub(crate) fn read(file: &File, path: &Path) -> Result<AccessMetadata, String> {
                 .and_then(|n| n.checked_add(size))
                 .and_then(|n| n.checked_add(16));
             if next.is_none_or(|n| n > LIMIT) {
-                return Err("Output access metadata exceeds 1 MiB".into());
+                return Err(crate::i18n::text(
+                    "backend-output-access-metadata-exceeds-1-mib-9bd2af",
+                )
+                .into());
             }
             let mut value = vec![0; size];
             let n = fgetxattr(file, name, &mut value[..]).map_err(|e| e.to_string())?;
             if n > value.len() {
-                return Err("Output metadata changed while reading".into());
+                return Err(crate::i18n::text(
+                    "backend-output-metadata-changed-while-reading-d70336",
+                )
+                .into());
             }
             value.truncate(n);
-            total = next.ok_or("Output metadata overflow")?;
+            total = next.ok_or(crate::i18n::text("backend-output-metadata-overflow-678173"))?;
             exact.push((name.to_vec(), value));
         }
         #[cfg(target_os = "macos")]
@@ -69,7 +83,10 @@ pub(crate) fn read(file: &File, path: &Path) -> Result<AccessMetadata, String> {
         let _ = file;
         {
             let _ = (file, path);
-            Err("Native working-state access policy is unavailable on Windows".into())
+            Err(crate::i18n::text(
+                "backend-native-working-state-access-policy-is-unavailable-on-windows-22cb83",
+            )
+            .into())
         }
     }
     #[cfg(not(any(
@@ -105,14 +122,19 @@ fn mac_acl(file: &File, path: &Path) -> Result<Vec<exacl::AclEntry>, String> {
         );
         let current = same_file::Handle::from_file(current).map_err(|e| e.to_string())?;
         if current != identity {
-            return Err("Output identity changed during native ACL read".into());
+            return Err(crate::i18n::text(
+                "backend-output-identity-changed-during-native-acl-read-624d92",
+            )
+            .into());
         }
         Ok(())
     };
     check()?;
     let acl = exacl::getfacl(path, exacl::AclOption::SYMLINK_ACL).map_err(|e| e.to_string())?;
     if acl.len() > 128 || acl.iter().any(|e| e.name.len() > 1024) {
-        return Err("Native ACL exceeds bounded snapshot limits".into());
+        return Err(
+            crate::i18n::text("backend-native-acl-exceeds-bounded-snapshot-limits-52b958").into(),
+        );
     }
     check()?;
     Ok(acl)
@@ -141,14 +163,20 @@ pub(crate) fn copy_index_policy(
         #[cfg(target_os = "macos")]
         restore_mac_acl(file, path, original)?;
         if read(file, path)? != *original {
-            return Err("Index access metadata could not be preserved".into());
+            return Err(crate::i18n::text(
+                "backend-index-access-metadata-could-not-be-preserved-3b9ff1",
+            )
+            .into());
         }
         Ok(())
     }
     #[cfg(windows)]
     {
         let _ = (file, path, original);
-        Err("Native working-state access policy is unavailable on Windows".into())
+        Err(crate::i18n::text(
+            "backend-native-working-state-access-policy-is-unavailable-on-windows-22cb83",
+        )
+        .into())
     }
     #[cfg(not(any(
         target_os = "linux",
@@ -158,7 +186,10 @@ pub(crate) fn copy_index_policy(
     )))]
     {
         let _ = (file, path, original);
-        Err("Index access policy is unsupported on this platform".into())
+        Err(
+            crate::i18n::text("backend-index-access-policy-is-unsupported-on-this-platform-5b2f02")
+                .into(),
+        )
     }
 }
 
@@ -173,10 +204,17 @@ pub(super) fn restore_mac_acl(
 ) -> Result<(), String> {
     // mac_acl verifies that this path still names the held, no-follow regular file.
     let _ = mac_acl(file, path)?;
-    exacl::setfacl(&[path], &original.acl, exacl::AclOption::SYMLINK_ACL)
-        .map_err(|e| format!("Could not preserve output ACL: {e}"))?;
+    exacl::setfacl(&[path], &original.acl, exacl::AclOption::SYMLINK_ACL).map_err(|e| {
+        crate::i18n::message(
+            "backend-could-not-preserve-output-acl-e-6734a5",
+            &[("detail", (e).to_string().into())],
+        )
+    })?;
     if mac_acl(file, path)? != original.acl {
-        return Err("Replacement ACL differs from the captured output policy".into());
+        return Err(crate::i18n::text(
+            "backend-replacement-acl-differs-from-the-captured-output-policy-47d11f",
+        )
+        .into());
     }
     Ok(())
 }

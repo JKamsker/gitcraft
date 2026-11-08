@@ -32,10 +32,18 @@ impl Workspace {
             match mkdir.create(&path) {
                 Ok(()) => return Ok(Self(path)),
                 Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => (),
-                Err(e) => return Err(format!("Could not create an isolated setup context: {e}")),
+                Err(e) => {
+                    return Err(crate::i18n::message(
+                        "backend-could-not-create-an-isolated-setup-context-e-31868f",
+                        &[("detail", (e).to_string().into())],
+                    ));
+                }
             }
         }
-        Err("Could not create a new isolated setup context".into())
+        Err(
+            crate::i18n::text("backend-could-not-create-a-new-isolated-setup-context-b2354d")
+                .into(),
+        )
     }
 }
 impl Drop for Workspace {
@@ -64,7 +72,10 @@ impl HelperPaths {
             let value = std::env::var_os(name)
                 .map(|v| {
                     v.into_string().map_err(|_| {
-                        format!("{name} must be UTF-8 for selected setup authentication")
+                        crate::i18n::message(
+                            "backend-name-must-be-utf-8-for-selected-setup-authentication-e0b537",
+                            &[("name", (name).to_string().into())],
+                        )
                     })
                 })
                 .transpose()?;
@@ -72,8 +83,9 @@ impl HelperPaths {
                 .as_ref()
                 .is_some_and(|v| v.len() > 32768 || v.chars().any(char::is_control))
             {
-                return Err(format!(
-                    "{name} contains unsupported characters for selected setup authentication"
+                return Err(crate::i18n::message(
+                    "backend-name-contains-unsupported-characters-for-selected-setup-authentic-aabb5c",
+                    &[("name", (name).to_string().into())],
                 ));
             }
             paths.push((name, value));
@@ -112,13 +124,22 @@ fn transport_command(source: &str, local: bool, executable: &Path) -> Result<Clo
         context.choices.validate()?;
         let (sanitized, changed) = crate::portability::sanitize_url(source)?;
         if changed || sanitized != source {
-            return Err("Preview a credential-free HTTPS or SSH source before cloning".into());
+            return Err(crate::i18n::text(
+                "backend-preview-a-credential-free-https-or-ssh-source-before-cloning-399db2",
+            )
+            .into());
         }
         if !source.starts_with("https://") && context.choices.ssh_key.is_empty() {
-            return Err("Select an explicit SSH key in this profile before restoring an SSH repository; ambient identities are not used".into());
+            return Err(crate::i18n::text(
+                "backend-select-an-explicit-ssh-key-in-this-profile-before-restoring-an-ss-9bee64",
+            )
+            .into());
         }
         if !source.starts_with("https://") && !Path::new(&context.choices.ssh_key).is_file() {
-            return Err("The explicitly selected SSH key file is unavailable; finish this profile's local setup before restoring SSH repositories".into());
+            return Err(crate::i18n::text(
+                "backend-the-explicitly-selected-ssh-key-file-is-unavailable-finish-this-p-bde415",
+            )
+            .into());
         }
         context.choices
     };
@@ -164,7 +185,9 @@ fn transport_command(source: &str, local: bool, executable: &Path) -> Result<Clo
             .strip_prefix("https://")
             .and_then(|s| s.split_once('/'))
             .map(|(h, _)| h)
-            .ok_or("Invalid previewed HTTPS host")?;
+            .ok_or(crate::i18n::text(
+                "backend-invalid-previewed-https-host-227969",
+            ))?;
         let mut selected = Vec::new();
         for (tool, account) in [("gh", &choices.github), ("glab", &choices.gitlab)] {
             if account.selected() && account.host.eq_ignore_ascii_case(host) {
@@ -187,9 +210,9 @@ fn transport_command(source: &str, local: bool, executable: &Path) -> Result<Clo
         if let Some((tool, account)) = selected.pop() {
             let helpers = HelperPaths::capture()?;
             let generated = connections::helper_command(tool, &account, executable);
-            let raw = generated
-                .strip_prefix('!')
-                .ok_or("Could not prepare the selected authentication helper")?;
+            let raw = generated.strip_prefix('!').ok_or(crate::i18n::text(
+                "backend-could-not-prepare-the-selected-authentication-helper-826285",
+            ))?;
             config.push((format!("credential.https://{host}.helper"), String::new()));
             config.push((
                 format!("credential.https://{host}.helper"),
@@ -242,7 +265,10 @@ fn clone_command(
     executable: &Path,
 ) -> Result<CloneCommand, String> {
     if crate::remote::is_remote(parent) || !parent.is_absolute() || !destination.is_absolute() {
-        return Err("Setup clones require local absolute folders".into());
+        return Err(crate::i18n::text(
+            "backend-setup-clones-require-local-absolute-folders-a23011",
+        )
+        .into());
     }
     let mut prepared = transport_command(source, local, executable)?;
     prepared
@@ -267,7 +293,10 @@ fn fetch_command(
     executable: &Path,
 ) -> Result<CloneCommand, String> {
     if crate::remote::is_remote(repo) || !repo.is_absolute() {
-        return Err("Setup fetches require a newly imported local repository".into());
+        return Err(crate::i18n::text(
+            "backend-setup-fetches-require-a-newly-imported-local-repository-7bbb73",
+        )
+        .into());
     }
     crate::portability::reference(remote)?;
     let mut prepared = transport_command(source, false, executable)?;
@@ -290,8 +319,11 @@ pub(crate) fn setup_fetch(
     remote: &str,
     active: &dyn Fn() -> bool,
 ) -> Result<(), String> {
-    let executable = std::env::current_exe()
-        .map_err(|_| "Could not locate the selected profile authentication helper")?;
+    let executable = std::env::current_exe().map_err(|_| {
+        crate::i18n::text(
+            "backend-could-not-locate-the-selected-profile-authentication-helper-63e669",
+        )
+    })?;
     let CloneCommand {
         command,
         workspace: _workspace,
@@ -300,8 +332,9 @@ pub(crate) fn setup_fetch(
     if out.status.success() {
         Ok(())
     } else {
-        Err(format!(
-            "Secondary remote {remote} could not be fetched with this profile's explicit authentication; completed setup steps were retained"
+        Err(crate::i18n::message(
+            "backend-secondary-remote-remote-could-not-be-fetched-with-this-profile-s-f7f7b0",
+            &[("remote", (remote).to_string().into())],
         ))
     }
 }
@@ -314,8 +347,11 @@ pub(crate) fn setup_clone(
     local: bool,
     active: &dyn Fn() -> bool,
 ) -> Result<(), String> {
-    let executable = std::env::current_exe()
-        .map_err(|_| "Could not locate the selected profile authentication helper")?;
+    let executable = std::env::current_exe().map_err(|_| {
+        crate::i18n::text(
+            "backend-could-not-locate-the-selected-profile-authentication-helper-63e669",
+        )
+    })?;
     let CloneCommand {
         command,
         workspace: _workspace,
@@ -324,7 +360,10 @@ pub(crate) fn setup_clone(
     if out.status.success() {
         Ok(())
     } else {
-        Err("The previewed source could not be cloned with this profile's explicit authentication. Check local setup and use a new destination; ambient credentials and URL rewrites are not used".into())
+        Err(crate::i18n::text(
+            "backend-the-previewed-source-could-not-be-cloned-with-this-profile-s-expl-cc87af",
+        )
+        .into())
     }
 }
 
@@ -361,7 +400,7 @@ pub(crate) fn setup_run(
     active: &dyn Fn() -> bool,
 ) -> Result<Vec<u8>, String> {
     if crate::remote::is_remote(repo) {
-        return Err("Setup targets local folders only".into());
+        return Err(crate::i18n::text("backend-setup-targets-local-folders-only-e1dfde").into());
     }
     let mut command = practice_command(repo);
     command
@@ -381,9 +420,14 @@ pub(crate) fn setup_run(
     if out.status.success() {
         Ok(out.stdout)
     } else {
-        Err(format!(
-            "Setup step failed: {}",
-            crate::diagnostics::crash::scrub(&String::from_utf8_lossy(&out.stderr))
+        Err(crate::i18n::message(
+            "backend-setup-step-failed-f3d4fe",
+            &[(
+                "crate",
+                (crate::diagnostics::crash::scrub(&String::from_utf8_lossy(&out.stderr)))
+                    .to_string()
+                    .into(),
+            )],
         ))
     }
 }

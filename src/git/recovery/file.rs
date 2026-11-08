@@ -46,7 +46,10 @@ pub(super) fn capture(reader: &Reader<'_>, root: &str) -> Result<RootPin, String
             },
         )?;
         if !reader.active() || out.code != 0 || !out.stderr.is_empty() || out.stdout.len() > 8192 {
-            return Err("Cannot capture the remote working-root identity".into());
+            return Err(crate::i18n::text(
+                "backend-cannot-capture-the-remote-working-root-identity-3c942e",
+            )
+            .into());
         }
         parse_pin(&out.stdout)
     } else {
@@ -60,15 +63,16 @@ fn pin_script(root: &str) -> String {
     )
 }
 fn parse_pin(bytes: &[u8]) -> Result<RootPin, String> {
-    let split = bytes
-        .iter()
-        .position(|b| *b == 0)
-        .ok_or("Missing root identity separator")?;
-    let physical = std::str::from_utf8(&bytes[..split]).map_err(|_| "Root path is not UTF-8")?;
+    let split = bytes.iter().position(|b| *b == 0).ok_or(crate::i18n::text(
+        "backend-missing-root-identity-separator-a7274b",
+    ))?;
+    let physical = std::str::from_utf8(&bytes[..split])
+        .map_err(|_| crate::i18n::text("backend-root-path-is-not-utf-8-e3f90e"))?;
     let token = bytes[split + 1..]
         .strip_suffix(b"\n")
-        .ok_or("Truncated root identity")?;
-    let token = std::str::from_utf8(token).map_err(|_| "Invalid filesystem identity")?;
+        .ok_or(crate::i18n::text("backend-truncated-root-identity-27d7ff"))?;
+    let token = std::str::from_utf8(token)
+        .map_err(|_| crate::i18n::text("backend-invalid-filesystem-identity-9dc568"))?;
     let parts: Vec<_> = token.splitn(3, ':').collect();
     if !physical.starts_with('/')
         || physical.len() > 4096
@@ -81,7 +85,7 @@ fn parse_pin(bytes: &[u8]) -> Result<RootPin, String> {
             .any(|part| part.is_empty() || !part.bytes().all(|b| b.is_ascii_digit()))
         || parts[2].is_empty()
     {
-        return Err("Invalid filesystem identity".into());
+        return Err(crate::i18n::text("backend-invalid-filesystem-identity-9dc568").into());
     }
     Ok(RootPin {
         physical: physical.into(),
@@ -102,7 +106,10 @@ fn local_pin(root: &Path) -> Result<RootPin, String> {
         .map_err(|e| e.to_string())?,
     );
     Ok(RootPin {
-        physical: physical.to_str().ok_or("Root path is not UTF-8")?.into(),
+        physical: physical
+            .to_str()
+            .ok_or(crate::i18n::text("backend-root-path-is-not-utf-8-e3f90e"))?
+            .into(),
         token: native_token(&file)?,
         _held: Some(std::sync::Arc::new(file)),
     })
@@ -112,7 +119,7 @@ fn native_token(file: &std::fs::File) -> Result<String, String> {
     use std::os::unix::fs::MetadataExt;
     let meta = file.metadata().map_err(|e| e.to_string())?;
     if !meta.is_dir() {
-        return Err("Working root is not a directory".into());
+        return Err(crate::i18n::text("backend-working-root-is-not-a-directory-48a45e").into());
     }
     Ok(format!("{}:{}", meta.dev(), meta.ino()))
 }
@@ -134,10 +141,15 @@ fn local_pin(root: &Path) -> Result<RootPin, String> {
         .map_err(|e| e.to_string())?;
     let meta = file.metadata().map_err(|e| e.to_string())?;
     if !meta.is_dir() || meta.file_attributes() & 0x400 != 0 {
-        return Err("Working root is linked or not a directory".into());
+        return Err(
+            crate::i18n::text("backend-working-root-is-linked-or-not-a-directory-5a3f3b").into(),
+        );
     }
     Ok(RootPin {
-        physical: physical.to_str().ok_or("Root path is not UTF-8")?.into(),
+        physical: physical
+            .to_str()
+            .ok_or(crate::i18n::text("backend-root-path-is-not-utf-8-e3f90e"))?
+            .into(),
         token: native_token(&file)?,
         _held: Some(std::sync::Arc::new(file)),
     })
@@ -160,7 +172,10 @@ pub(crate) fn native_file_identity(file: &std::fs::File) -> Result<(String, u64)
         return Err(std::io::Error::last_os_error().to_string());
     }
     if info.nFileIndexHigh == 0 && info.nFileIndexLow == 0 {
-        return Err("This filesystem does not expose a usable directory identity".into());
+        return Err(crate::i18n::text(
+            "backend-this-filesystem-does-not-expose-a-usable-directory-identity-766092",
+        )
+        .into());
     }
     Ok((
         format!(
@@ -172,10 +187,18 @@ pub(crate) fn native_file_identity(file: &std::fs::File) -> Result<(String, u64)
 }
 #[cfg(not(any(unix, windows)))]
 fn local_pin(_: &Path) -> Result<RootPin, String> {
-    Err("Filesystem identity is unavailable on this platform".into())
+    Err(
+        crate::i18n::text("backend-filesystem-identity-is-unavailable-on-this-platform-ccdc09")
+            .into(),
+    )
 }
 fn pinned(identity: &Identity) -> Result<&RootPin, String> {
-    identity.root_pin.as_ref().ok_or_else(||"Safe file recovery is unavailable: working-root filesystem identity could not be captured".into())
+    identity.root_pin.as_ref().ok_or_else(|| {
+        crate::i18n::text(
+            "backend-safe-file-recovery-is-unavailable-working-root-filesystem-identit-a4ddcb",
+        )
+        .into()
+    })
 }
 
 pub(super) fn valid_path(path: &str) -> Result<(), String> {
@@ -186,7 +209,10 @@ pub(super) fn valid_path(path: &str) -> Result<(), String> {
             .chars()
             .any(|c| c.is_control() || matches!(c, '\\' | ':' | '<' | '>' | '"' | '|' | '?' | '*'))
     {
-        return Err("Choose a portable repository-relative filename".into());
+        return Err(crate::i18n::text(
+            "backend-choose-a-portable-repository-relative-filename-c109a3",
+        )
+        .into());
     }
     for part in path.split('/') {
         let folded:String=part.chars().filter(|c| !matches!(*c,'\u{200c}'..='\u{200f}'|'\u{202a}'..='\u{202e}'|'\u{2060}'..='\u{206f}'|'\u{feff}')).flat_map(char::to_lowercase).collect();
@@ -200,16 +226,18 @@ pub(super) fn valid_path(path: &str) -> Result<(), String> {
                 && (stem.starts_with("com") || stem.starts_with("lpt"))
                 && matches!(stem.as_bytes()[3], b'1'..=b'9'))
         {
-            return Err("Destination crosses Git metadata or a reserved/ambiguous filename".into());
+            return Err(crate::i18n::text(
+                "backend-destination-crosses-git-metadata-or-a-reserved-ambiguous-filename-7a1e1c",
+            )
+            .into());
         }
     }
     Ok(())
 }
 fn root(identity: &Identity) -> Result<&str, String> {
-    identity
-        .root
-        .as_deref()
-        .ok_or_else(|| "File recovery needs a working repository".into())
+    identity.root.as_deref().ok_or_else(|| {
+        crate::i18n::text("backend-file-recovery-needs-a-working-repository-4a4bd6").into()
+    })
 }
 pub(super) fn available(
     reader: &Reader<'_>,
@@ -234,7 +262,10 @@ pub(super) fn available(
         if out.code == 0 && out.stdout == b"available\n" && out.stderr.is_empty() {
             Ok(())
         } else {
-            Err("Destination exists, crosses a link, or has an unavailable parent".into())
+            Err(crate::i18n::text(
+                "backend-destination-exists-crosses-a-link-or-has-an-unavailable-parent-9e1a12",
+            )
+            .into())
         }
     } else {
         local_available(
@@ -272,7 +303,10 @@ pub(super) fn create(
         if out.code == 0 && out.stdout == b"created\n" && out.stderr.is_empty() {
             Ok(())
         } else {
-            Err("New-file recovery failed safely. The destination must not exist; remote recovery requires GNU ln and Git metadata on the same filesystem. Existing files were not overwritten.".into())
+            Err(crate::i18n::text(
+                "backend-new-file-recovery-failed-safely-the-destination-must-not-exist-re-64b66f",
+            )
+            .into())
         }
     } else {
         local_create(
@@ -290,10 +324,15 @@ fn remote_script(identity: &Identity, path: &str, create: bool) -> Result<String
     let pin = pinned(identity)?;
     let root = root(identity)?;
     if !root.starts_with('/') || !identity.common.starts_with('/') {
-        return Err("Remote repository metadata must be absolute".into());
+        return Err(crate::i18n::text(
+            "backend-remote-repository-metadata-must-be-absolute-967767",
+        )
+        .into());
     }
     let parts: Vec<_> = path.split('/').collect();
-    let (name, parents) = parts.split_last().ok_or("Empty destination")?;
+    let (name, parents) = parts
+        .split_last()
+        .ok_or(crate::i18n::text("backend-empty-destination-93a1ec"))?;
     let mut script = format!(
         "umask 077\ncd -P -- {} || exit 1\nrecovery_root=$(pwd -P) || exit 1\n[ \"$recovery_root\" = / ] && recovery_root=\n",
         sh_quote(root)
@@ -333,25 +372,38 @@ pub(crate) fn parent(
     use rustix::fs::{Mode, OFlags, fstat, open, openat};
     use std::os::unix::fs::MetadataExt;
     let parts: Vec<_> = path.split('/').collect();
-    let (name, folders) = parts.split_last().ok_or("Empty destination")?;
+    let (name, folders) = parts
+        .split_last()
+        .ok_or(crate::i18n::text("backend-empty-destination-93a1ec"))?;
     let flags = OFlags::RDONLY | OFlags::CLOEXEC | OFlags::DIRECTORY | OFlags::NOFOLLOW;
     let mut dir = std::fs::File::from(open(root, flags, Mode::empty()).map_err(|e| e.to_string())?);
     if native_token(&dir)? != pin.token {
-        return Err("The working-root filesystem identity changed since preview".into());
+        return Err(crate::i18n::text(
+            "backend-the-working-root-filesystem-identity-changed-since-preview-1e3c36",
+        )
+        .into());
     }
     let metadata = std::fs::metadata(common).map_err(|e| e.to_string())?;
     let root_stat = fstat(&dir).map_err(|e| e.to_string())?;
     if root_stat.st_dev as u64 == metadata.dev() && root_stat.st_ino == metadata.ino() {
-        return Err("Working root is Git metadata; choose another repository".into());
+        return Err(crate::i18n::text(
+            "backend-working-root-is-git-metadata-choose-another-repository-b744cc",
+        )
+        .into());
     }
     for folder in folders {
-        dir = std::fs::File::from(
-            openat(&dir, *folder, flags, Mode::empty())
-                .map_err(|e| format!("Destination parent is unavailable or linked: {e}"))?,
-        );
+        dir = std::fs::File::from(openat(&dir, *folder, flags, Mode::empty()).map_err(|e| {
+            crate::i18n::message(
+                "backend-destination-parent-is-unavailable-or-linked-e-5f15ea",
+                &[("detail", (e).to_string().into())],
+            )
+        })?);
         let stat = fstat(&dir).map_err(|e| e.to_string())?;
         if stat.st_dev as u64 == metadata.dev() && stat.st_ino == metadata.ino() {
-            return Err("Recovery cannot create files inside Git metadata".into());
+            return Err(crate::i18n::text(
+                "backend-recovery-cannot-create-files-inside-git-metadata-7c0c95",
+            )
+            .into());
         }
     }
     Ok((dir, (*name).into()))
@@ -362,7 +414,10 @@ fn local_available(root: &Path, common: &Path, path: &str, pin: &RootPin) -> Res
     let (dir, name) = parent(root, common, path, pin)?;
     match statat(&dir, name.as_str(), AtFlags::SYMLINK_NOFOLLOW) {
         Err(rustix::io::Errno::NOENT) => Ok(()),
-        _ => Err("Destination already exists or cannot be verified".into()),
+        _ => Err(crate::i18n::text(
+            "backend-destination-already-exists-or-cannot-be-verified-7698f4",
+        )
+        .into()),
     }
 }
 #[cfg(unix)]
@@ -381,14 +436,32 @@ fn local_create(
         OFlags::WRONLY | OFlags::CLOEXEC | OFlags::NOFOLLOW | OFlags::CREATE | OFlags::EXCL,
         Mode::from_bits_truncate(0o600),
     )
-    .map_err(|e| format!("Could not exclusively create recovery file: {e}"))?;
+    .map_err(|e| {
+        crate::i18n::message(
+            "backend-could-not-exclusively-create-recovery-file-e-b44bcb",
+            &[("detail", (e).to_string().into())],
+        )
+    })?;
     let mut file = std::fs::File::from(fd);
-    file.write_all(bytes).and_then(|_|file.sync_all()).map_err(|e|format!("A new recovery file may be incomplete at {path}; existing files were preserved: {e}"))
+    file.write_all(bytes)
+        .and_then(|_| file.sync_all())
+        .map_err(|e| {
+            crate::i18n::message(
+                "backend-a-new-recovery-file-may-be-incomplete-at-path-existing-files-were-01ba73",
+                &[
+                    ("path", (path).to_string().into()),
+                    ("detail", (e).to_string().into()),
+                ],
+            )
+        })
 }
 #[cfg(windows)]
 fn physical_ancestors(root: &Path) -> Result<Vec<std::path::PathBuf>, String> {
     if !root.is_absolute() {
-        return Err("Recovery root must be a physical absolute path".into());
+        return Err(crate::i18n::text(
+            "backend-recovery-root-must-be-a-physical-absolute-path-9c7a6c",
+        )
+        .into());
     }
     let mut paths: Vec<_> = root
         .ancestors()
@@ -398,7 +471,9 @@ fn physical_ancestors(root: &Path) -> Result<Vec<std::path::PathBuf>, String> {
     paths.reverse();
     paths.dedup();
     if paths.last().is_none_or(|path| path != root) {
-        return Err("Cannot anchor the physical recovery path".into());
+        return Err(
+            crate::i18n::text("backend-cannot-anchor-the-physical-recovery-path-8c4599").into(),
+        );
     }
     Ok(paths)
 }
@@ -426,30 +501,45 @@ pub(crate) fn windows_parent(
         let directory = open(&ancestor, true)?;
         let meta = directory.metadata().map_err(|e| e.to_string())?;
         if !meta.is_dir() || meta.file_attributes() & 0x400 != 0 {
-            return Err("A physical recovery ancestor is linked or unavailable".into());
+            return Err(crate::i18n::text(
+                "backend-a-physical-recovery-ancestor-is-linked-or-unavailable-4d9ba0",
+            )
+            .into());
         }
         held.push(directory);
     }
-    let root_file = held.last().ok_or("Missing physical recovery root")?;
+    let root_file = held.last().ok_or(crate::i18n::text(
+        "backend-missing-physical-recovery-root-9c47ec",
+    ))?;
     if native_token(root_file)? != pin.token {
-        return Err("The working-root filesystem identity changed since preview".into());
+        return Err(crate::i18n::text(
+            "backend-the-working-root-filesystem-identity-changed-since-preview-1e3c36",
+        )
+        .into());
     }
     let metadata_root = std::fs::canonicalize(common).map_err(|e| e.to_string())?;
     if std::fs::canonicalize(root).map_err(|e| e.to_string())? == metadata_root {
-        return Err("Working root is Git metadata".into());
+        return Err(crate::i18n::text("backend-working-root-is-git-metadata-6377ab").into());
     }
     let mut dest = root.to_path_buf();
     let parts: Vec<_> = path.split('/').collect();
-    let (name, folders) = parts.split_last().ok_or("Empty destination")?;
+    let (name, folders) = parts
+        .split_last()
+        .ok_or(crate::i18n::text("backend-empty-destination-93a1ec"))?;
     for folder in folders {
         dest.push(folder);
         let dir = open(&dest, true)?;
         let meta = dir.metadata().map_err(|e| e.to_string())?;
         if !meta.is_dir() || meta.file_attributes() & 0x400 != 0 {
-            return Err("Destination parent is linked or not a folder".into());
+            return Err(crate::i18n::text(
+                "backend-destination-parent-is-linked-or-not-a-folder-143350",
+            )
+            .into());
         }
         if std::fs::canonicalize(&dest).map_err(|e| e.to_string())? == metadata_root {
-            return Err("Destination crosses Git metadata".into());
+            return Err(
+                crate::i18n::text("backend-destination-crosses-git-metadata-e5ce00").into(),
+            );
         }
         held.push(dir);
     }
@@ -461,7 +551,10 @@ fn local_available(root: &Path, common: &Path, path: &str, pin: &RootPin) -> Res
     let (_held, dest) = windows_parent(root, common, path, pin)?;
     match std::fs::symlink_metadata(dest) {
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
-        _ => Err("Destination already exists or cannot be verified".into()),
+        _ => Err(crate::i18n::text(
+            "backend-destination-already-exists-or-cannot-be-verified-7698f4",
+        )
+        .into()),
     }
 }
 #[cfg(windows)]
@@ -481,15 +574,31 @@ fn local_create(
         .custom_flags(0x0020_0000)
         .open(dest)
         .map_err(|e| e.to_string())?;
-    file.write_all(bytes).and_then(|_|file.sync_all()).map_err(|e|format!("A new recovery file may be incomplete at {path}; existing files were preserved: {e}"))
+    file.write_all(bytes)
+        .and_then(|_| file.sync_all())
+        .map_err(|e| {
+            crate::i18n::message(
+                "backend-a-new-recovery-file-may-be-incomplete-at-path-existing-files-were-01ba73",
+                &[
+                    ("path", (path).to_string().into()),
+                    ("detail", (e).to_string().into()),
+                ],
+            )
+        })
 }
 #[cfg(not(any(unix, windows)))]
 fn local_available(_: &Path, _: &Path, _: &str, _: &RootPin) -> Result<(), String> {
-    Err("Safe new-file recovery is unsupported on this platform".into())
+    Err(
+        crate::i18n::text("backend-safe-new-file-recovery-is-unsupported-on-this-platform-c88192")
+            .into(),
+    )
 }
 #[cfg(not(any(unix, windows)))]
 fn local_create(_: &Path, _: &Path, _: &str, _: &[u8], _: &RootPin) -> Result<(), String> {
-    Err("Safe new-file recovery is unsupported on this platform".into())
+    Err(
+        crate::i18n::text("backend-safe-new-file-recovery-is-unsupported-on-this-platform-c88192")
+            .into(),
+    )
 }
 #[cfg(test)]
 mod tests {

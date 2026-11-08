@@ -286,8 +286,16 @@ impl Provider for GitHub {
         let mine_fields = format!("{FIELDS},statusCheckRollup,comments,reviews");
         let mine = inbox::parse_github(&list(&["--author", "@me"], &mine_fields)?, false)?;
         let cut = [
-            inbox::cut_note(asked.len(), MAX, "asking your review"),
-            inbox::cut_note(mine.len(), MAX, "of yours"),
+            inbox::cut_note(
+                asked.len(),
+                MAX,
+                crate::i18n::text("backend-asking-your-review-3c3907"),
+            ),
+            inbox::cut_note(
+                mine.len(),
+                MAX,
+                crate::i18n::text("backend-of-yours-2a649f"),
+            ),
         ];
         Ok(inbox::Answer {
             prs: inbox::merged(vec![asked, mine]),
@@ -312,8 +320,15 @@ impl Pages for GitHub {
 }
 
 fn parse_list(json: &str) -> Result<Vec<PullRequest>, String> {
-    let value: Value =
-        serde_json::from_str(json).map_err(|e| format!("unexpected {TOOL} output: {e}"))?;
+    let value: Value = serde_json::from_str(json).map_err(|e| {
+        crate::i18n::message(
+            "backend-unexpected-tool-output-e-164ff7",
+            &[
+                ("tool", (TOOL).to_string().into()),
+                ("detail", (e).to_string().into()),
+            ],
+        )
+    })?;
     Ok(value
         .as_array()
         .map_or(&[][..], Vec::as_slice)

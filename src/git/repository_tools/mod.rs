@@ -34,7 +34,10 @@ impl ReadOutput {
         }
         let message = String::from_utf8_lossy(&self.stderr).trim().to_owned();
         Err(if message.is_empty() {
-            format!("Repository metadata command failed ({:?})", self.code)
+            crate::i18n::message(
+                "backend-repository-metadata-command-failed-089f86",
+                &[("code", format!("{:?}", self.code).into())],
+            )
         } else {
             message
         })
@@ -56,7 +59,8 @@ pub(super) fn captured(
     Ok(crate::git::Captured {
         code: out.code,
         raw: out.stdout.clone(),
-        stdout: String::from_utf8(out.stdout).map_err(|_| "Repository metadata is not UTF-8")?,
+        stdout: String::from_utf8(out.stdout)
+            .map_err(|_| crate::i18n::text("backend-repository-metadata-is-not-utf-8-aa6912"))?,
         stderr: String::from_utf8_lossy(&out.stderr).into_owned(),
     })
 }
@@ -66,7 +70,7 @@ pub(super) fn text_codes(
     accepted: &[i32],
 ) -> Result<String, String> {
     String::from_utf8(capture_with(repo, args, Vec::new(), 32 << 20, &[], None)?.checked(accepted)?)
-        .map_err(|_| "Repository metadata is not UTF-8".into())
+        .map_err(|_| crate::i18n::text("backend-repository-metadata-is-not-utf-8-aa6912").into())
 }
 pub(super) fn capture_with(
     repo: &std::path::Path,
@@ -114,7 +118,10 @@ pub(super) fn capture_with_timeout(
             None => crate::remote::exec(&target.host, &request),
         }?;
         if out.stdout.len() > cap {
-            return Err("Repository metadata exceeds the inspection limit".into());
+            return Err(crate::i18n::text(
+                "backend-repository-metadata-exceeds-the-inspection-limit-5d3406",
+            )
+            .into());
         }
         if crate::tasks::cancellation().is_cancelled()
             || control.as_ref().is_some_and(|c| c.is_cancelled())
@@ -203,10 +210,10 @@ impl ReadBudget {
             .deadline
             .saturating_duration_since(std::time::Instant::now());
         if left.is_zero() || self.remaining.get() == 0 {
-            return Err(
-                "Repository analysis reached its time/work limit; narrow the selection and retry"
-                    .into(),
-            );
+            return Err(crate::i18n::text(
+                "backend-repository-analysis-reached-its-time-work-limit-narrow-the-select-a665b8",
+            )
+            .into());
         }
         self.remaining.set(self.remaining.get() - 1);
         Ok(left.min(std::time::Duration::from_secs(120)))
@@ -225,8 +232,9 @@ impl ReadBudget {
         args: &[&str],
         control: Option<std::sync::Arc<crate::git::OpControl>>,
     ) -> Result<String, String> {
-        String::from_utf8(self.read(repo, args, control)?.checked(&[0])?)
-            .map_err(|_| "Repository metadata is not UTF-8".into())
+        String::from_utf8(self.read(repo, args, control)?.checked(&[0])?).map_err(|_| {
+            crate::i18n::text("backend-repository-metadata-is-not-utf-8-aa6912").into()
+        })
     }
 }
 #[cfg(test)]

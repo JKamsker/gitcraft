@@ -29,23 +29,28 @@ impl DiffAlgorithm {
     /// What the diff header calls it.
     pub fn label(self) -> &'static str {
         match self {
-            DiffAlgorithm::Myers => "Myers",
-            DiffAlgorithm::Minimal => "Minimal",
-            DiffAlgorithm::Patience => "Patience",
-            DiffAlgorithm::Histogram => "Histogram",
+            DiffAlgorithm::Myers => crate::i18n::text("backend-diff-myers"),
+            DiffAlgorithm::Minimal => crate::i18n::text("backend-diff-minimal"),
+            DiffAlgorithm::Patience => crate::i18n::text("backend-diff-patience"),
+            DiffAlgorithm::Histogram => crate::i18n::text("backend-diff-histogram"),
         }
     }
 
     /// What it does, for its tooltip.
     pub fn about(self) -> &'static str {
         match self {
-            DiffAlgorithm::Myers => "The classic algorithm, fast: pairs the longest common runs",
-            DiffAlgorithm::Minimal => "Myers, taking the time to find the smallest diff",
-            DiffAlgorithm::Patience => {
-                "Pairs lines that appear once on each side first, so braces and blank lines \
-                 don't line up unrelated code"
+            DiffAlgorithm::Myers => crate::i18n::text(
+                "backend-the-classic-algorithm-fast-pairs-the-longest-common-runs-bb690f",
+            ),
+            DiffAlgorithm::Minimal => {
+                crate::i18n::text("backend-myers-taking-the-time-to-find-the-smallest-diff-f4df46")
             }
-            DiffAlgorithm::Histogram => "Patience, extended to lines that are rare; often clearest",
+            DiffAlgorithm::Patience => crate::i18n::text(
+                "backend-pairs-lines-that-appear-once-on-each-side-first-so-braces-and-bla-ec78a3",
+            ),
+            DiffAlgorithm::Histogram => crate::i18n::text(
+                "backend-patience-extended-to-lines-that-are-rare-often-clearest-9778f4",
+            ),
         }
     }
 
@@ -100,8 +105,14 @@ mod tests {
         let args: std::collections::HashSet<_> =
             DiffAlgorithm::ALL.iter().map(|a| a.arg()).collect();
         assert_eq!(args.len(), DiffAlgorithm::ALL.len());
-        for a in DiffAlgorithm::ALL {
-            assert!(a.arg().ends_with(&a.label().to_lowercase()));
-        }
+        assert_eq!(
+            DiffAlgorithm::ALL.map(DiffAlgorithm::arg),
+            [
+                "--diff-algorithm=myers",
+                "--diff-algorithm=minimal",
+                "--diff-algorithm=patience",
+                "--diff-algorithm=histogram"
+            ],
+        );
     }
 }

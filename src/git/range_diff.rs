@@ -112,8 +112,13 @@ pub fn range_diff(repo: &Path, old: &Series, new: &Series) -> Result<RangeDiff, 
     for (side, series) in [("old", old), ("new", new)] {
         let n = series_len(repo, series)?;
         if n > MAX_SERIES {
-            return Err(format!(
-                "the {side} version has {n} commits, more than the {MAX_SERIES} gitcraft compares"
+            return Err(crate::i18n::message(
+                "backend-the-side-version-has-n-commits-more-than-the-max-series-gitcraft-a7d6fa",
+                &[
+                    ("side", (side).to_string().into()),
+                    ("count", (n).into()),
+                    ("max_series", (MAX_SERIES).into()),
+                ],
             ));
         }
     }
@@ -147,9 +152,12 @@ fn series_len(repo: &Path, series: &Series) -> Result<usize, String> {
         Some(repo),
         &["rev-list", "--count", "--no-merges", &series.range(), "--"],
     )?;
-    out.trim()
-        .parse()
-        .map_err(|_| format!("git counted {:?} commits", out.trim()))
+    out.trim().parse().map_err(|_| {
+        crate::i18n::message(
+            "backend-git-counted-commits-35b029",
+            &[("detail", format!("{:?}", out.trim()).into())],
+        )
+    })
 }
 
 /// The commits of `series`, oldest first, as range-diff takes them (merges left out).

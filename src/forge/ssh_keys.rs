@@ -8,7 +8,7 @@ use public_key::PublicKey;
 use std::process::Command;
 use std::time::Duration;
 
-const FAILED: &str = "Public-key registration failed. Check the selected account's key-management permission and installed tool/login; no private key or tool diagnostics are displayed.";
+const FAILED: &str = "backend-public-key-registration-failed";
 
 pub(crate) struct SshKeyAccount {
     owner: String,
@@ -32,9 +32,10 @@ impl SshKeyAccount {
             return Err("Public-key upload cancelled before sending.".into());
         }
         if title.len() > 512 || title.chars().any(char::is_control) {
-            return Err(
-                "Choose a public key title within 512 bytes, without control characters.".into(),
-            );
+            return Err(crate::i18n::text(
+                "backend-choose-a-public-key-title-within-512-bytes-without-control-charac-a2bdb7",
+            )
+            .into());
         }
         let body = json!({"title":title,"key":public_key.as_str()});
         match self.target {
@@ -53,7 +54,7 @@ impl SshKeyAccount {
             }
             Target::Gitea(api) => {
                 api.send("POST", "user/keys", Some(&body))
-                    .map_err(|_| FAILED.to_owned())?;
+                    .map_err(|_| crate::i18n::text(FAILED).to_owned())?;
             }
         }
         Ok(())
@@ -66,13 +67,16 @@ pub(crate) fn prepare(
     active: &dyn Fn() -> bool,
 ) -> Result<SshKeyAccount, String> {
     if account.trim().is_empty() {
-        return Err(
-            "Choose the existing GitHub username or tea login alias before checking the account."
-                .into(),
-        );
+        return Err(crate::i18n::text(
+            "backend-choose-the-existing-github-username-or-tea-login-alias-before-che-ac8c75",
+        )
+        .into());
     }
     if !hosting.web.starts_with("https://") || hosting.web.contains(['\n', '\r']) {
-        return Err("SSH public-key registration requires a known HTTPS forge server.".into());
+        return Err(crate::i18n::text(
+            "backend-ssh-public-key-registration-requires-a-known-https-forge-server-5c786b",
+        )
+        .into());
     }
     let mut context = connections::current();
     match hosting.forge {
@@ -88,7 +92,9 @@ pub(crate) fn prepare(
                 .get("login")
                 .and_then(Value::as_str)
                 .filter(|owner| owner.eq_ignore_ascii_case(account))
-                .ok_or("The GitHub account did not match the selected username.")?
+                .ok_or(crate::i18n::text(
+                    "backend-the-github-account-did-not-match-the-selected-username-94af31",
+                ))?
                 .to_owned();
             Ok(SshKeyAccount {
                 owner,
@@ -108,26 +114,34 @@ pub(crate) fn prepare(
             context.choices.validate()?;
             let api = context.run(|| super::gitea::ssh_key_api(hosting));
             if !api.logged_in() {
-                return Err("No existing tea login for this HTTPS server was found.".into());
+                return Err(crate::i18n::text(
+                    "backend-no-existing-tea-login-for-this-https-server-was-found-06ceba",
+                )
+                .into());
             }
             if !active() {
                 return Err("Account check cancelled.".into());
             }
-            let answer = api.get("user").map_err(|_| FAILED.to_owned())?;
+            let answer = api
+                .get("user")
+                .map_err(|_| crate::i18n::text(FAILED).to_owned())?;
             let owner = answer
                 .get("login")
                 .and_then(Value::as_str)
                 .filter(|s| !s.is_empty() && !s.chars().any(char::is_control))
-                .ok_or("The forge did not identify its current account.")?
+                .ok_or(crate::i18n::text(
+                    "backend-the-forge-did-not-identify-its-current-account-c0cbf8",
+                ))?
                 .to_owned();
             Ok(SshKeyAccount {
                 owner,
                 target: Target::Gitea(Box::new(api)),
             })
         }
-        Forge::GitLab | Forge::Azure | Forge::Bitbucket => {
-            Err("This SSH helper registers keys on GitHub, Forgejo and Gitea.".into())
-        }
+        Forge::GitLab | Forge::Azure | Forge::Bitbucket => Err(crate::i18n::text(
+            "backend-this-ssh-helper-registers-keys-on-github-forgejo-and-gitea-7078f5",
+        )
+        .into()),
     }
 }
 
@@ -178,11 +192,11 @@ fn execute(
         },
     )
     .and_then(|out| out.complete())
-    .map_err(|_| FAILED.to_owned())?;
+    .map_err(|_| crate::i18n::text(FAILED).to_owned())?;
     if !output.status.success() {
-        return Err(FAILED.into());
+        return Err(crate::i18n::text(FAILED).into());
     }
-    serde_json::from_slice(&output.stdout).map_err(|_| FAILED.to_owned())
+    serde_json::from_slice(&output.stdout).map_err(|_| crate::i18n::text(FAILED).to_owned())
 }
 
 #[cfg(all(test, unix))]

@@ -33,9 +33,11 @@ impl Engine {
     /// How the ghost run says what it ran on.
     pub fn describe(self) -> &'static str {
         match self {
-            Engine::Replay => "git replay, in memory",
-            Engine::MergeTree => "git merge-tree, in memory",
-            Engine::Scratch => "a scratch clone in the temporary folder",
+            Engine::Replay => crate::i18n::text("backend-git-replay-in-memory-a8f3e8"),
+            Engine::MergeTree => crate::i18n::text("backend-git-merge-tree-in-memory-565553"),
+            Engine::Scratch => {
+                crate::i18n::text("backend-a-scratch-clone-in-the-temporary-folder-3c56aa")
+            }
         }
     }
 }
@@ -86,10 +88,10 @@ pub fn partial_clone(repo: &std::path::Path) -> bool {
 /// Refuses to work in a partial clone (see [`partial_clone`]).
 fn not_partial(repo: &std::path::Path) -> Result<(), String> {
     if partial_clone(repo) {
-        Err(
-            "this is a partial clone: working it out would download files from the remote"
-                .to_owned(),
+        Err(crate::i18n::text(
+            "backend-this-is-a-partial-clone-working-it-out-would-download-files-from-7e1a13",
         )
+        .to_owned())
     } else {
         Ok(())
     }
@@ -107,7 +109,12 @@ fn tree_of(repo: &std::path::Path, oid: &str) -> Result<String, String> {
         &["rev-parse", "--verify", "-q", &format!("{oid}^{{tree}}")],
     )
     .map(|s| s.trim().to_owned())
-    .map_err(|_| format!("{oid} has no tree"))
+    .map_err(|_| {
+        crate::i18n::message(
+            "backend-oid-has-no-tree-0ea71d",
+            &[("oid", (oid).to_string().into())],
+        )
+    })
 }
 
 #[cfg(test)]

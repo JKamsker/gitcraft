@@ -122,9 +122,21 @@ impl Provider for GitLab {
         let number = number.to_string();
         let args = ["issue", "view", &number, "--output", "json"];
         let out = cli::run(TOOL, "issue", repo, &args)?;
-        let value: Value =
-            serde_json::from_str(&out).map_err(|e| format!("unexpected {TOOL} output: {e}"))?;
-        parse_issue(&value).ok_or_else(|| format!("unexpected {TOOL} output: not an issue"))
+        let value: Value = serde_json::from_str(&out).map_err(|e| {
+            crate::i18n::message(
+                "backend-unexpected-tool-output-e-164ff7",
+                &[
+                    ("tool", (TOOL).to_string().into()),
+                    ("detail", (e).to_string().into()),
+                ],
+            )
+        })?;
+        parse_issue(&value).ok_or_else(|| {
+            crate::i18n::message(
+                "backend-unexpected-tool-output-not-an-issue-ae58a9",
+                &[("tool", (TOOL).to_string().into())],
+            )
+        })
     }
 
     /// Two lists: those whose review is asked of you, and yours. The list has neither
@@ -140,23 +152,37 @@ impl Provider for GitLab {
         let asked = inbox::parse_gitlab(&list("--reviewer=@me")?, true)?;
         let mut mine = inbox::parse_gitlab(&list("--author=@me")?, false)?;
         let mut cut: Vec<String> = [
-            inbox::cut_note(asked.len(), MAX, "asking your review"),
-            inbox::cut_note(mine.len(), MAX, "of yours"),
+            inbox::cut_note(
+                asked.len(),
+                MAX,
+                crate::i18n::text("backend-asking-your-review-3c3907"),
+            ),
+            inbox::cut_note(
+                mine.len(),
+                MAX,
+                crate::i18n::text("backend-of-yours-2a649f"),
+            ),
         ]
         .into_iter()
         .flatten()
         .collect();
         // Named by its path, as `glab api` takes it wherever it runs: `:id` is the project of
         // the folder glab runs in, which for a repository on another machine is none.
-        let project = project_id(&hosting.path)
-            .ok_or_else(|| format!("{TOOL} needs a plain group/project path"))?;
+        let project = project_id(&hosting.path).ok_or_else(|| {
+            crate::i18n::message(
+                "backend-tool-needs-a-plain-group-project-path-2c0929",
+                &[("tool", (TOOL).to_string().into())],
+            )
+        })?;
         let host = api_authority(hosting);
         let api = |rest: String| run(&["api", "--hostname", &host, &rest]);
         if mine.len() > inbox::MAX_MINE {
-            cut.push(format!(
-                "the pipelines and notes of only {} of your {} merge requests were read",
-                inbox::MAX_MINE,
-                mine.len()
+            cut.push(crate::i18n::message(
+                "backend-the-pipelines-and-notes-of-only-of-your-merge-requests-were-read-e52d15",
+                &[
+                    ("inbox", (inbox::MAX_MINE).into()),
+                    ("count", (mine.len()).into()),
+                ],
             ));
         }
         for mr in mine.iter_mut().take(inbox::MAX_MINE) {
@@ -264,7 +290,12 @@ impl Provider for GitLab {
             std::process::id(),
             new.tag.replace(['/', '\\'], "-")
         ));
-        std::fs::write(&notes, new.notes).map_err(|e| format!("Couldn't write the notes: {e}"))?;
+        std::fs::write(&notes, new.notes).map_err(|e| {
+            crate::i18n::message(
+                "backend-couldn-t-write-the-notes-e-26c183",
+                &[("detail", (e).to_string().into())],
+            )
+        })?;
         let path = notes.to_string_lossy().into_owned();
         let made = self.run(
             repo,
@@ -344,8 +375,15 @@ fn project_id(path: &str) -> Option<String> {
 }
 
 fn parse_list(json: &str) -> Result<Vec<PullRequest>, String> {
-    let value: Value =
-        serde_json::from_str(json).map_err(|e| format!("unexpected {TOOL} output: {e}"))?;
+    let value: Value = serde_json::from_str(json).map_err(|e| {
+        crate::i18n::message(
+            "backend-unexpected-tool-output-e-164ff7",
+            &[
+                ("tool", (TOOL).to_string().into()),
+                ("detail", (e).to_string().into()),
+            ],
+        )
+    })?;
     let text = |v: &Value, pointer: &str| {
         v.pointer(pointer)
             .and_then(Value::as_str)
@@ -372,11 +410,21 @@ fn parse_list(json: &str) -> Result<Vec<PullRequest>, String> {
 
 /// glab's list of issues.
 fn parse_issues(json: &str) -> Result<Vec<Issue>, String> {
-    let value: Value =
-        serde_json::from_str(json).map_err(|e| format!("unexpected {TOOL} output: {e}"))?;
-    let list = value
-        .as_array()
-        .ok_or_else(|| format!("unexpected {TOOL} output: not a list of issues"))?;
+    let value: Value = serde_json::from_str(json).map_err(|e| {
+        crate::i18n::message(
+            "backend-unexpected-tool-output-e-164ff7",
+            &[
+                ("tool", (TOOL).to_string().into()),
+                ("detail", (e).to_string().into()),
+            ],
+        )
+    })?;
+    let list = value.as_array().ok_or_else(|| {
+        crate::i18n::message(
+            "backend-unexpected-tool-output-not-a-list-of-issues-92f726",
+            &[("tool", (TOOL).to_string().into())],
+        )
+    })?;
     Ok(list.iter().filter_map(parse_issue).collect())
 }
 

@@ -78,7 +78,10 @@ fn tokens(node: Node, text: &str) -> Result<Vec<String>, String> {
     while let Some(n) = stack.pop() {
         visited += 1;
         if visited > 100_000 {
-            return Err("Function exceeds structural node budget".into());
+            return Err(crate::i18n::text(
+                "backend-function-exceeds-structural-node-budget-b455cb",
+            )
+            .into());
         }
         if n.kind().contains("comment") {
             continue;
@@ -91,7 +94,10 @@ fn tokens(node: Node, text: &str) -> Result<Vec<String>, String> {
         {
             let s = source(n, text);
             if s.len() > 8192 || out.len() > 50_000 {
-                return Err("Function exceeds structural token budget".into());
+                return Err(crate::i18n::text(
+                    "backend-function-exceeds-structural-token-budget-53be10",
+                )
+                .into());
             }
             if !s.is_empty() {
                 out.push(s.into());
@@ -115,7 +121,9 @@ pub(super) fn parse(
     }
     let mut parser = Parser::new();
     parser
-        .set_language(&language(path).ok_or("Unsupported source language")?)
+        .set_language(&language(path).ok_or(crate::i18n::text(
+            "backend-unsupported-source-language-01dd7e",
+        ))?)
         .map_err(|e| e.to_string())?;
     let began = Instant::now();
     let mut stop =
@@ -128,8 +136,9 @@ pub(super) fn parse(
         )
         .ok_or("Symbol parsing cancelled or exceeded two seconds")?;
     if tree.root_node().has_error() {
-        return Err(format!(
-            "Cannot prove symbol lineage: {path} has syntax errors for its grammar"
+        return Err(crate::i18n::message(
+            "backend-cannot-prove-symbol-lineage-path-has-syntax-errors-for-its-gramma-1bbed8",
+            &[("path", (path).to_string().into())],
         ));
     }
     let mut stack = vec![tree.root_node()];

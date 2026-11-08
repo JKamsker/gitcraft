@@ -34,14 +34,19 @@ const QUERY: &str = "query($owner: String!, $name: String!, $number: Int!, $afte
 
 /// Reads all of it for the pull request `number` of `owner/name`.
 pub fn fetch(repo: &Path, host: &str, path: &str, number: u64) -> Result<PrExtras, String> {
-    let (owner, name) = path.split_once('/').ok_or("unexpected repository name")?;
+    let (owner, name) = path.split_once('/').ok_or(crate::i18n::text(
+        "backend-unexpected-repository-name-cf7267",
+    ))?;
     // A push between two pages would put threads of two commits together: it's read again.
     for _ in 0..2 {
         if let Some(extras) = fetch_pages(repo, host, owner, name, number)? {
             return Ok(extras);
         }
     }
-    Err("The pull request changed while it was read. Load it again.".to_owned())
+    Err(crate::i18n::text(
+        "backend-the-pull-request-changed-while-it-was-read-load-it-again-fe77a7",
+    )
+    .to_owned())
 }
 
 /// All pages of it, or `None` if they weren't all of the same commit.
@@ -92,15 +97,21 @@ fn add_page(all: &mut PrExtras, page: PrExtras) -> bool {
 
 /// The page of threads `json` holds, and where the next one starts if there is one.
 pub(crate) fn parse(json: &str) -> Result<(PrExtras, Option<String>), String> {
-    let v: Value =
-        serde_json::from_str(json).map_err(|e| format!("unexpected output of gh: {e}"))?;
-    let repository = v
-        .pointer("/data/repository")
-        .ok_or("GitHub doesn't know this repository")?;
+    let v: Value = serde_json::from_str(json).map_err(|e| {
+        crate::i18n::message(
+            "backend-unexpected-output-of-gh-e-24588e",
+            &[("detail", (e).to_string().into())],
+        )
+    })?;
+    let repository = v.pointer("/data/repository").ok_or(crate::i18n::text(
+        "backend-github-doesn-t-know-this-repository-26677d",
+    ))?;
     let pr = repository
         .get("pullRequest")
         .filter(|pr| !pr.is_null())
-        .ok_or("GitHub doesn't know this pull request")?;
+        .ok_or(crate::i18n::text(
+            "backend-github-doesn-t-know-this-pull-request-5e9e83",
+        ))?;
     let allowed = |key: &str| {
         repository
             .get(key)

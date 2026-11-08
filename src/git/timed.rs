@@ -47,8 +47,17 @@ pub fn run_timed(
     };
     Err(if said.is_empty() {
         match code {
-            Some(code) => format!("{what} failed (exit status {code})"),
-            None => format!("{what} was stopped by a signal"),
+            Some(code) => crate::i18n::message(
+                "backend-what-failed-exit-status-code-4558d1",
+                &[
+                    ("what", (what).to_string().into()),
+                    ("code", (code).to_string().into()),
+                ],
+            ),
+            None => crate::i18n::message(
+                "backend-what-was-stopped-by-a-signal-d75f6c",
+                &[("what", (what).to_string().into())],
+            ),
         }
     } else {
         said
@@ -188,5 +197,34 @@ mod tests {
         assert!(started.elapsed() < Duration::from_secs(10));
         assert!(out.is_ok(), "{out:?}");
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod backend_fluent_identity_tests {
+    #[test]
+    fn backend_fluent_timeout_keeps_timeout_classification() {
+        for locale in ["en-US", "de"] {
+            crate::i18n::set_language(locale);
+            let raw = super::stopped(
+                "git interpret-trailers",
+                std::time::Duration::from_millis(2100),
+            );
+            assert_eq!(
+                raw,
+                "git interpret-trailers didn't finish within 3 seconds and was stopped"
+            );
+            assert!(raw.contains("didn't finish within"));
+            assert_eq!(crate::across::short_reason(&raw), "timed out");
+            assert_eq!(
+                crate::git::display_error(&raw),
+                if locale == "de" {
+                    "git interpret-trailers wurde nicht innerhalb von 3 Sekunden fertig und wurde gestoppt."
+                } else {
+                    &raw
+                }
+            );
+        }
+        crate::i18n::set_language("en-US");
     }
 }

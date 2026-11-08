@@ -25,7 +25,10 @@ fn canonical_commit(
     mut run: impl FnMut(&[&str]) -> Result<String, String>,
 ) -> Result<String, String> {
     if !super::object::valid_oid(oid) {
-        return Err("Use a full immutable submodule commit or tag object ID".into());
+        return Err(crate::i18n::text(
+            "backend-use-a-full-immutable-submodule-commit-or-tag-object-id-2631e6",
+        )
+        .into());
     }
     let commit = run(&[
         "--no-replace-objects",
@@ -36,7 +39,10 @@ fn canonical_commit(
     ])?;
     let commit = commit.trim();
     if !super::object::valid_oid(commit) {
-        return Err("Submodule selection did not resolve to a commit ID".into());
+        return Err(crate::i18n::text(
+            "backend-submodule-selection-did-not-resolve-to-a-commit-id-a0ae9b",
+        )
+        .into());
     }
     Ok(commit.into())
 }
@@ -72,7 +78,10 @@ pub(crate) fn read(repo: &Path, path: &str) -> Result<Conflict, String> {
             .components()
             .any(|c| !matches!(c, std::path::Component::Normal(_)))
     {
-        return Err("Choose a conflicted submodule path inside this repository".into());
+        return Err(crate::i18n::text(
+            "backend-choose-a-conflicted-submodule-path-inside-this-repository-77ac4a",
+        )
+        .into());
     }
     let stages = text(
         repo,
@@ -89,30 +98,38 @@ pub(crate) fn read(repo: &Path, path: &str) -> Result<Conflict, String> {
     let mut ours = None;
     let mut theirs = None;
     for record in stages.split('\0').filter(|s| !s.is_empty()) {
-        let (meta, name) = record
-            .split_once('\t')
-            .ok_or("Invalid conflicted index entry")?;
+        let (meta, name) = record.split_once('\t').ok_or(crate::i18n::text(
+            "backend-invalid-conflicted-index-entry-a41ad8",
+        ))?;
         let f: Vec<_> = meta.split_whitespace().collect();
         if name != path || f.len() != 3 || f[0] != "160000" {
-            return Err("This is not a pure submodule-pointer conflict".into());
+            return Err(crate::i18n::text(
+                "backend-this-is-not-a-pure-submodule-pointer-conflict-907df6",
+            )
+            .into());
         }
         match f[2] {
             "1" => base = Some(f[1].into()),
             "2" => ours = Some(f[1].to_owned()),
             "3" => theirs = Some(f[1].to_owned()),
-            _ => return Err("Unexpected conflict stage".into()),
+            _ => return Err(crate::i18n::text("backend-unexpected-conflict-stage-525fe9").into()),
         }
     }
-    let ours =
-        ours.ok_or("Ours has no submodule commit; handle this add/delete conflict in Changes")?;
-    let theirs = theirs
-        .ok_or("Theirs has no submodule commit; handle this add/delete conflict in Changes")?;
+    let ours = ours.ok_or(crate::i18n::text(
+        "backend-ours-has-no-submodule-commit-handle-this-add-delete-conflict-in-c-201e44",
+    ))?;
+    let theirs = theirs.ok_or(crate::i18n::text(
+        "backend-theirs-has-no-submodule-commit-handle-this-add-delete-conflict-in-1a69fc",
+    ))?;
     let child = crate::remote::join(repo, path);
     if !text(&child, &["rev-parse", "--show-prefix"])?
         .trim()
         .is_empty()
     {
-        return Err("Initialize/open this submodule before resolving its graph".into());
+        return Err(crate::i18n::text(
+            "backend-initialize-open-this-submodule-before-resolving-its-graph-b8561e",
+        )
+        .into());
     }
     for oid in [&ours, &theirs] {
         text(
@@ -163,7 +180,7 @@ pub(crate) fn read(repo: &Path, path: &str) -> Result<Conflict, String> {
     {
         candidates.push(Candidate {
             oid: head.clone(),
-            label: "Submodule HEAD".into(),
+            label: crate::i18n::text("backend-submodule-head-55afe5").into(),
         });
     }
     let mut tips = vec![ours.clone(), theirs.clone()];
@@ -232,7 +249,10 @@ pub(crate) fn resolve(
             &oid,
         )?
     {
-        return Err("Choose an existing submodule commit containing both ours and theirs".into());
+        return Err(crate::i18n::text(
+            "backend-choose-an-existing-submodule-commit-containing-both-ours-and-thei-a57c4d",
+        )
+        .into());
     }
     text(
         &conflict.child,
@@ -244,9 +264,13 @@ pub(crate) fn resolve(
         ],
     )?;
     let evidence = super::submodule_index::record(runner, conflict, &oid)?;
-    Ok(format!(
-        "Recorded submodule {} at {oid} in the parent index. The submodule checkout was not moved; commit the resolution in the parent when ready. Retained index evidence: {evidence}",
-        conflict.path
+    Ok(crate::i18n::message(
+        "backend-recorded-submodule-at-oid-in-the-parent-index-the-submodule-check-3131eb",
+        &[
+            ("path", (conflict.path).to_string().into()),
+            ("oid", (oid).to_string().into()),
+            ("evidence", (evidence).to_string().into()),
+        ],
     ))
 }
 #[cfg(test)]

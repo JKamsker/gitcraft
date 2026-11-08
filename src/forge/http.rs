@@ -124,7 +124,7 @@ impl Api {
             || endpoint.contains("://")
             || endpoint.chars().any(char::is_control)
         {
-            return Err("Invalid history API endpoint".into());
+            return Err(crate::i18n::text("backend-invalid-history-api-endpoint-07a9e5").into());
         }
         let url = format!("{}/{}", self.base, endpoint);
         let mut request = self
@@ -135,31 +135,35 @@ impl Api {
         if let Some(login) = &self.login {
             request = request.set("Authorization", &login.header());
         }
-        let response =
-            match request.call() {
-                Ok(response) if !(300..400).contains(&response.status()) => response,
-                Err(ureq::Error::Status(401, _)) => {
-                    if let Some(forget) = self.on_refused {
-                        forget(self.refused_key.as_deref().unwrap_or(&self.web));
-                    }
-                    return Err("Selected forge account was refused".into());
+        let response = match request.call() {
+            Ok(response) if !(300..400).contains(&response.status()) => response,
+            Err(ureq::Error::Status(401, _)) => {
+                if let Some(forget) = self.on_refused {
+                    forget(self.refused_key.as_deref().unwrap_or(&self.web));
                 }
-                _ => return Err(
-                    "Forge history request failed; check server support and the selected account"
-                        .into(),
-                ),
-            };
+                return Err(
+                    crate::i18n::text("backend-selected-forge-account-was-refused-74c524").into(),
+                );
+            }
+            _ => return Err(crate::i18n::text(
+                "backend-forge-history-request-failed-check-server-support-and-the-selecte-1cb61b",
+            )
+            .into()),
+        };
         let mut bytes = Vec::new();
         response
             .into_reader()
             .take(2 * 1024 * 1024 + 1)
             .read_to_end(&mut bytes)
-            .map_err(|_| "Forge history response could not be read")?;
+            .map_err(|_| {
+                crate::i18n::text("backend-forge-history-response-could-not-be-read-a63d58")
+            })?;
         if bytes.len() > 2 * 1024 * 1024 || !active() {
             return Err("Forge history response exceeded its budget or was cancelled".into());
         }
-        serde_json::from_slice(&bytes)
-            .map_err(|_| "Forge history response is malformed JSON".into())
+        serde_json::from_slice(&bytes).map_err(|_| {
+            crate::i18n::text("backend-forge-history-response-is-malformed-json-712688").into()
+        })
     }
 
     /// Every item of a list the API gives page by page, up to `max`.
@@ -182,7 +186,7 @@ impl Api {
             let items = match answer {
                 Value::Array(items) => items,
                 Value::Null => Vec::new(),
-                _ => return Err(self.unexpected("a list")),
+                _ => return Err(self.unexpected(crate::i18n::text("backend-a-list-34d4e6"))),
             };
             // An endpoint that doesn't page gives everything every time: the first page is it.
             // A short page isn't the last one: the server's own cap on a page may be below ours.
@@ -280,9 +284,12 @@ impl Api {
                     .to_owned();
                 Err(Failure {
                     status: Some(response.status()),
-                    message: format!(
-                        "{} sent gitcraft to {to}: set the remote to the server's own address",
-                        self.host
+                    message: crate::i18n::message(
+                        "backend-sent-gitcraft-to-to-set-the-remote-to-the-server-s-own-address-bb13b3",
+                        &[
+                            ("host", (self.host).to_string().into()),
+                            ("to", (to).to_string().into()),
+                        ],
                     ),
                 })
             }
@@ -311,7 +318,13 @@ impl Api {
             }
             Err(ureq::Error::Transport(e)) => Err(Failure {
                 status: None,
-                message: format!("couldn't reach {}: {e}", self.host),
+                message: crate::i18n::message(
+                    "backend-couldn-t-reach-e-a66171",
+                    &[
+                        ("host", (self.host).to_string().into()),
+                        ("detail", (e).to_string().into()),
+                    ],
+                ),
             }),
         }
     }
@@ -319,7 +332,13 @@ impl Api {
     fn unexpected(&self, what: &str) -> Failure {
         Failure {
             status: None,
-            message: format!("{} didn't answer with {what}", self.name),
+            message: crate::i18n::message(
+                "backend-didn-t-answer-with-what-92132b",
+                &[
+                    ("name", (self.name).to_string().into()),
+                    ("what", (what).to_string().into()),
+                ],
+            ),
         }
     }
 
@@ -333,19 +352,31 @@ impl Api {
         };
         match (status, &self.login) {
             // A private repository is "not found" to whoever isn't known.
-            (404, None) => format!(
-                "{}: {said}. If the repository is private, gitcraft found no login for {}: add one \
-                 with `tea login add`, or let git's credential helper keep one for https://{}",
-                self.name, self.host, self.host
+            (404, None) => crate::i18n::message(
+                "backend-said-if-the-repository-is-private-gitcraft-found-no-login-for-add-ad86e5",
+                &[
+                    ("name", (self.name).to_string().into()),
+                    ("said", (said).to_string().into()),
+                    ("host", (self.host).to_string().into()),
+                    ("host4", (self.host).to_string().into()),
+                ],
             ),
-            (401 | 403, None) => format!(
-                "{}: {said}. gitcraft found no login for {}: add one with `tea login add`, or \
-                 let git's credential helper keep one for https://{}",
-                self.name, self.host, self.host
+            (401 | 403, None) => crate::i18n::message(
+                "backend-said-gitcraft-found-no-login-for-add-one-with-tea-login-add-or-le-871d68",
+                &[
+                    ("name", (self.name).to_string().into()),
+                    ("said", (said).to_string().into()),
+                    ("host", (self.host).to_string().into()),
+                    ("host4", (self.host).to_string().into()),
+                ],
             ),
-            (401, Some(_)) => format!(
-                "{}: {said}. The login gitcraft found for {} was refused",
-                self.name, self.host
+            (401, Some(_)) => crate::i18n::message(
+                "backend-said-the-login-gitcraft-found-for-was-refused-4caf6f",
+                &[
+                    ("name", (self.name).to_string().into()),
+                    ("said", (said).to_string().into()),
+                    ("host", (self.host).to_string().into()),
+                ],
             ),
             _ => format!("{}: {said}", self.name),
         }

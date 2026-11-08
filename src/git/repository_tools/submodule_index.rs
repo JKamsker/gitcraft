@@ -12,16 +12,29 @@ pub(super) enum Phase {
 
 pub(super) fn blocker(repo: &Path) -> Option<String> {
     if crate::remote::is_remote(repo) {
-        Some("Recording this parent index over SSH/WSL is unavailable: the transport cannot retain the native index identity and full access policy. Open the graph to merge there, then stage the resolved pointer using Git on that machine.".into())
+        Some(
+            crate::i18n::text(
+                "backend-recording-this-parent-index-over-ssh-wsl-is-unavailable-the-trans-e378bd",
+            )
+            .into(),
+        )
     } else if !cfg!(any(target_os = "macos", target_os = "linux")) {
-        Some("Recording this parent index requires the shared macOS/Linux native publisher. Merge in the submodule, then stage the resolved pointer with Git on this platform.".into())
+        Some(
+            crate::i18n::text(
+                "backend-recording-this-parent-index-requires-the-shared-macos-linux-nativ-c9a1cb",
+            )
+            .into(),
+        )
     } else {
         None
     }
 }
 fn stages_match(observed: &[u8], expected: &[u8]) -> Result<(), String> {
     if observed != expected {
-        return Err("Conflict stages changed; the newer parent index was preserved. Reopen the submodule graph".into());
+        return Err(crate::i18n::text(
+            "backend-conflict-stages-changed-the-newer-parent-index-was-preserved-reop-cdb456",
+        )
+        .into());
     }
     Ok(())
 }
@@ -30,10 +43,10 @@ fn publish_if_current<T>(
     publish: impl FnOnce() -> Result<T, String>,
 ) -> Result<T, String> {
     if !current {
-        return Err(
-            "Parent index changed during submodule validation; the newer index was preserved"
-                .into(),
-        );
+        return Err(crate::i18n::text(
+            "backend-parent-index-changed-during-submodule-validation-the-newer-index-20aca2",
+        )
+        .into());
     }
     publish()
 }
@@ -62,10 +75,14 @@ pub(super) fn record_with_hook(
         &["rev-parse", "--path-format=absolute", "--git-path", "index"],
         Some(runner.control.clone()),
     )?;
-    let before = IndexSnapshot::capture(Path::new(path.trim()))?
-        .ok_or("The conflicted parent index disappeared")?;
+    let before = IndexSnapshot::capture(Path::new(path.trim()))?.ok_or(crate::i18n::text(
+        "backend-the-conflicted-parent-index-disappeared-01e809",
+    ))?;
     if before.bytes().len() > crate::git::drafts::FILE_LIMIT {
-        return Err("Safe submodule resolution is limited to an 8 MiB parent index; use Git to stage this larger index".into());
+        return Err(crate::i18n::text(
+            "backend-safe-submodule-resolution-is-limited-to-an-8-mib-parent-index-use-246377",
+        )
+        .into());
     }
     // Child validation has already finished. Parse the captured immutable index,
     // prepare one private candidate, and recheck exact bytes/identity/policy at
@@ -117,7 +134,9 @@ pub(super) fn record_with_hook(
     ])?;
     let active = || !runner.control.is_cancelled() && !crate::tasks::cancellation().is_cancelled();
     let after = super::object::files::read(&candidate, crate::git::drafts::FILE_LIMIT, &active)?
-        .ok_or("Private index disappeared")?;
+        .ok_or(crate::i18n::text(
+            "backend-private-index-disappeared-40d3a9",
+        ))?;
     let staged = run(&[
         "--literal-pathspecs",
         "ls-files",
@@ -133,7 +152,10 @@ pub(super) fn record_with_hook(
     if super::object::files::read(&candidate, crate::git::drafts::FILE_LIMIT, &active)?.as_deref()
         != Some(after.as_slice())
     {
-        return Err("Private index changed during verification; parent index was preserved".into());
+        return Err(crate::i18n::text(
+            "backend-private-index-changed-during-verification-parent-index-was-preser-455348",
+        )
+        .into());
     }
     hook(Phase::Prepared)?;
     conflict.snapshot.check(runner.repo)?;
@@ -150,9 +172,12 @@ pub(super) fn record_with_hook(
         // a post-publication cancellation; accept releases the captured owned lock.
         match transaction.accept() {
             Ok(evidence) => Ok(evidence),
-            Err(e) => Err(format!(
-                "Index publication needs inspection: {e}. {}",
-                transaction.retain()
+            Err(e) => Err(crate::i18n::message(
+                "backend-index-publication-needs-inspection-e-235dca",
+                &[
+                    ("detail", (e).to_string().into()),
+                    ("transaction", (transaction.retain()).to_string().into()),
+                ],
             )),
         }
     })

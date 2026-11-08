@@ -72,7 +72,12 @@ impl Scratch {
                 &dest,
             ],
         )
-        .map_err(|e| format!("could not make a scratch clone: {e}"))?;
+        .map_err(|e| {
+            crate::i18n::message(
+                "backend-could-not-make-a-scratch-clone-e-94509c",
+                &[("detail", (e).to_string().into())],
+            )
+        })?;
         Ok(scratch)
     }
 

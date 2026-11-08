@@ -52,7 +52,9 @@ pub fn preview(
         .files
         .iter()
         .find(|f| f.path == path)
-        .ok_or("This file is not in the draft")?;
+        .ok_or(crate::i18n::text(
+            "backend-this-file-is-not-in-the-draft-0c674a",
+        ))?;
     let (entry, saved_tree) = if index_layer {
         (&file.index, &meta.index_tree)
     } else {
@@ -77,22 +79,33 @@ pub fn preview(
         .map(|e| format!("{} blob {}\t{path}\0", e.mode, e.oid))
         .unwrap_or_default();
     if actual != expected.as_bytes() {
-        return Err("Draft file metadata does not match its protected tree".into());
+        return Err(crate::i18n::text(
+            "backend-draft-file-metadata-does-not-match-its-protected-tree-2734e8",
+        )
+        .into());
     }
     let saved = if let Some(e) = entry {
         if !matches!(e.mode.as_str(), "100644" | "100755") {
-            return Err("Draft recovery supports regular-file contents only; links and submodules are not followed".into());
+            return Err(crate::i18n::text(
+                "backend-draft-recovery-supports-regular-file-contents-only-links-and-subm-b6fdc3",
+            )
+            .into());
         }
         let n = ctx
             .text(&["cat-file", "-s", &e.oid], vec![], active)?
             .parse::<usize>()
-            .map_err(|_| "Invalid saved blob size")?;
+            .map_err(|_| crate::i18n::text("backend-invalid-saved-blob-size-7b7dd0"))?;
         if n > FILE_LIMIT {
-            return Err("Saved file exceeds the 8 MiB recovery limit".into());
+            return Err(crate::i18n::text(
+                "backend-saved-file-exceeds-the-8-mib-recovery-limit-b60286",
+            )
+            .into());
         }
         let bytes = ctx.run(&["cat-file", "blob", &e.oid], vec![], &[0], active)?;
         if bytes.len() > FILE_LIMIT {
-            return Err("Saved file exceeds the recovery limit".into());
+            return Err(
+                crate::i18n::text("backend-saved-file-exceeds-the-recovery-limit-a79388").into(),
+            );
         }
         Some((e.mode.clone(), bytes))
     } else {
@@ -111,17 +124,18 @@ pub fn preview(
         .chain(saved.iter())
         .any(|(_, b)| b.contains(&0) || std::str::from_utf8(b).is_err());
     let raw = diff(&ctx, before.as_ref(), saved.as_ref(), binary, active)?;
-    let text = String::from_utf8(raw).map_err(|_| "Cannot render recovery diff as UTF-8")?;
+    let text = String::from_utf8(raw)
+        .map_err(|_| crate::i18n::text("backend-cannot-render-recovery-diff-as-utf-8-1e4512"))?;
     let hunks = if before == saved {
         Vec::new()
     } else if binary || before.is_none() || saved.is_none() {
         vec![RestoreHunk {
             label: if binary {
-                "Whole binary file".into()
+                crate::i18n::text("backend-whole-binary-file-ba2a52").into()
             } else if before.is_none() {
-                "Create saved file".into()
+                crate::i18n::text("backend-create-saved-file-9b75eb").into()
             } else {
-                "Restore saved deletion".into()
+                crate::i18n::text("backend-restore-saved-deletion-f99c5b").into()
             },
             range: 0..before.as_ref().map_or(0, |(_, b)| b.len()),
             replacement: Arc::new(saved.as_ref().map_or_else(Vec::new, |(_, b)| b.clone())),
@@ -129,15 +143,33 @@ pub fn preview(
     } else {
         parse_hunks(
             &text,
-            &before.as_ref().ok_or("No current file")?.1,
-            &saved.as_ref().ok_or("No saved file")?.1,
+            &before
+                .as_ref()
+                .ok_or(crate::i18n::text("backend-no-current-file-e0bad1"))?
+                .1,
+            &saved
+                .as_ref()
+                .ok_or(crate::i18n::text("backend-no-saved-file-9a45c2"))?
+                .1,
         )?
     };
     let lines = if binary {
-        vec![format!(
-            "Binary content: {} → {} bytes. Recovery is for the whole file.",
-            before.as_ref().map_or(0, |(_, b)| b.len()),
-            saved.as_ref().map_or(0, |(_, b)| b.len())
+        vec![crate::i18n::message(
+            "backend-binary-content-bytes-recovery-is-for-the-whole-file-8d40d8",
+            &[
+                (
+                    "count",
+                    (before.as_ref().map_or(0, |(_, b)| b.len()))
+                        .to_string()
+                        .into(),
+                ),
+                (
+                    "count2",
+                    (saved.as_ref().map_or(0, |(_, b)| b.len()))
+                        .to_string()
+                        .into(),
+                ),
+            ],
         )]
     } else {
         text.lines()
@@ -176,11 +208,11 @@ pub fn restore(
     active: &dyn Fn() -> bool,
 ) -> Result<Id, String> {
     if selected.is_empty() {
-        return Err("Select at least one hunk".into());
+        return Err(crate::i18n::text("backend-select-at-least-one-hunk-f99c15").into());
     }
     let selected: BTreeSet<_> = selected.iter().copied().collect();
     if selected.iter().any(|i| *i >= view.hunks.len()) {
-        return Err("Invalid recovery hunk selection".into());
+        return Err(crate::i18n::text("backend-invalid-recovery-hunk-selection-a77e8e").into());
     }
     let ctx = Context::new(repo, active)?;
     let check = || -> Result<Source, String> {
@@ -198,9 +230,10 @@ pub fn restore(
             || now.head != view.head
             || now.branch != view.branch
         {
-            return Err(
-                "HEAD or staged contents changed since preview; reopen the recovery preview".into(),
-            );
+            return Err(crate::i18n::text(
+                "backend-head-or-staged-contents-changed-since-preview-reopen-the-recovery-cf955e",
+            )
+            .into());
         }
         included(&ctx, &now, &view.path, active)?;
         let current = read_file(
@@ -212,9 +245,10 @@ pub fn restore(
         if current.as_ref().map(|(m, b)| (m, b.as_slice()))
             != view.before.as_ref().map(|(m, b)| (m, b.as_slice()))
         {
-            return Err(
-                "The working file changed since preview; reopen the recovery preview".into(),
-            );
+            return Err(crate::i18n::text(
+                "backend-the-working-file-changed-since-preview-reopen-the-recovery-previe-41803a",
+            )
+            .into());
         }
         Ok(now)
     };
@@ -225,7 +259,7 @@ pub fn restore(
     for i in &selected {
         let h = &view.hunks[*i];
         if h.range.start < from || h.range.end > before.len() {
-            return Err("Incompatible recovery ranges".into());
+            return Err(crate::i18n::text("backend-incompatible-recovery-ranges-d5d45b").into());
         }
         bytes.extend_from_slice(&before[from..h.range.start]);
         bytes.extend_from_slice(&h.replacement);
@@ -233,7 +267,10 @@ pub fn restore(
     }
     bytes.extend_from_slice(&before[from..]);
     if bytes.len() > FILE_LIMIT {
-        return Err("Selected hunks exceed the 8 MiB recovery limit".into());
+        return Err(crate::i18n::text(
+            "backend-selected-hunks-exceed-the-8-mib-recovery-limit-9f4710",
+        )
+        .into());
     }
     let target = if view.saved.is_none() && selected.len() == view.hunks.len() {
         None
@@ -260,7 +297,7 @@ pub fn restore(
     )?;
     let patch = repath(&raw, &view.path, before_owned.is_none(), target.is_none())?;
     if patch.is_empty() {
-        return Err("No content changes to recover".into());
+        return Err(crate::i18n::text("backend-no-content-changes-to-recover-eaa12d").into());
     }
     let permissions = if view.before.is_some() && target.is_some() {
         Some(super::permissions::Pin::capture(repo, &view.path, active)?)
@@ -274,7 +311,9 @@ pub fn restore(
         Some(&view.path),
         active,
     )?
-    .ok_or("Could not protect the current file")?;
+    .ok_or(crate::i18n::text(
+        "backend-could-not-protect-the-current-file-8bbe18",
+    ))?;
     check()?;
     tree(&ctx, &now.index, active)?;
     // Git 2.52 apply crashes with --attr-source and an explicit private Git directory.
@@ -304,7 +343,12 @@ pub fn restore(
     args.push("-");
     ctx.work(&args, patch, &[0], active)?;
     if let (Some(pin), Some((_, bytes))) = (permissions, target.as_ref()) {
-        pin.restore(&view.path,bytes,active).map_err(|error|format!("Contents recovered and safety draft saved, but permission restoration needs attention: {error}"))?;
+        pin.restore(&view.path, bytes, active).map_err(|error| {
+            crate::i18n::message(
+                "backend-contents-recovered-and-safety-draft-saved-but-permission-restorat-c326e3",
+                &[("detail", (error).to_string().into())],
+            )
+        })?;
     }
     Ok(backup.id)
 }
@@ -327,10 +371,10 @@ pub(super) fn included(
             )?
             .is_empty()
         {
-            return Err(
-                "This path is now ignored; recovery will not overwrite or create ignored files"
-                    .into(),
-            );
+            return Err(crate::i18n::text(
+                "backend-this-path-is-now-ignored-recovery-will-not-overwrite-or-create-ig-3ffec0",
+            )
+            .into());
         }
     }
     Ok(())
@@ -343,7 +387,7 @@ fn scratch(
     active: &dyn Fn() -> bool,
 ) -> Result<String, String> {
     if !name.bytes().all(|b| b.is_ascii_alphabetic() || b == b'-') {
-        return Err("Invalid scratch name".into());
+        return Err(crate::i18n::text("backend-invalid-scratch-name-6abb39").into());
     }
     let path = ctx.path.join(name);
     if let Some(target) = remote::parse(&path) {
@@ -359,7 +403,7 @@ fn scratch(
             active,
         )?;
         if out.code != 0 {
-            return Err("Could not prepare recovery diff".into());
+            return Err(crate::i18n::text("backend-could-not-prepare-recovery-diff-d0b416").into());
         }
     } else {
         std::fs::write(&path, bytes).map_err(|e| e.to_string())?;
@@ -428,7 +472,8 @@ fn diff(
     )
 }
 fn repath(raw: &[u8], path: &str, create: bool, delete: bool) -> Result<Vec<u8>, String> {
-    let text = std::str::from_utf8(raw).map_err(|_| "Recovery patch is not UTF-8")?;
+    let text = std::str::from_utf8(raw)
+        .map_err(|_| crate::i18n::text("backend-recovery-patch-is-not-utf-8-47aee6"))?;
     if text.is_empty() {
         return Ok(vec![]);
     }
@@ -482,21 +527,39 @@ fn parse_hunks(text: &str, before: &[u8], saved: &[u8]) -> Result<Vec<RestoreHun
     let mut hunks = Vec::new();
     let range = |s: &str, offsets: &[usize]| -> Result<Range<usize>, String> {
         let (start, count) = s.split_once(',').unwrap_or((s, "1"));
-        let start = start.parse::<usize>().map_err(|_| "Invalid hunk start")?;
-        let count = count.parse::<usize>().map_err(|_| "Invalid hunk count")?;
+        let start = start
+            .parse::<usize>()
+            .map_err(|_| crate::i18n::text("backend-invalid-hunk-start-1152df"))?;
+        let count = count
+            .parse::<usize>()
+            .map_err(|_| crate::i18n::text("backend-invalid-hunk-count-f8ceba"))?;
         let from = if count == 0 {
             start
         } else {
-            start.checked_sub(1).ok_or("Invalid hunk position")?
+            start
+                .checked_sub(1)
+                .ok_or(crate::i18n::text("backend-invalid-hunk-position-774dce"))?
         };
-        let end = from.checked_add(count).ok_or("Hunk range overflow")?;
-        Ok(*offsets.get(from).ok_or("Hunk outside file")?
-            ..*offsets.get(end).ok_or("Hunk outside file")?)
+        let end = from
+            .checked_add(count)
+            .ok_or(crate::i18n::text("backend-hunk-range-overflow-e3e7c7"))?;
+        Ok(*offsets
+            .get(from)
+            .ok_or(crate::i18n::text("backend-hunk-outside-file-c360da"))?
+            ..*offsets
+                .get(end)
+                .ok_or(crate::i18n::text("backend-hunk-outside-file-c360da"))?)
     };
     for line in text.lines().filter(|s| s.starts_with("@@ -")) {
-        let rest = line.strip_prefix("@@ -").ok_or("Invalid hunk")?;
-        let (ranges, _) = rest.split_once(" @@").ok_or("Invalid hunk")?;
-        let (old, new) = ranges.split_once(" +").ok_or("Invalid hunk")?;
+        let rest = line
+            .strip_prefix("@@ -")
+            .ok_or(crate::i18n::text("backend-invalid-hunk-1e6899"))?;
+        let (ranges, _) = rest
+            .split_once(" @@")
+            .ok_or(crate::i18n::text("backend-invalid-hunk-1e6899"))?;
+        let (old, new) = ranges
+            .split_once(" +")
+            .ok_or(crate::i18n::text("backend-invalid-hunk-1e6899"))?;
         let old = range(old, &a)?;
         let new = range(new, &b)?;
         hunks.push(RestoreHunk {
@@ -505,7 +568,10 @@ fn parse_hunks(text: &str, before: &[u8], saved: &[u8]) -> Result<Vec<RestoreHun
             replacement: Arc::new(saved[new].to_vec()),
         });
         if hunks.len() > 200 {
-            return Err("This file has over 200 recovery hunks; use Git in the terminal".into());
+            return Err(crate::i18n::text(
+                "backend-this-file-has-over-200-recovery-hunks-use-git-in-the-terminal-f94fd3",
+            )
+            .into());
         }
     }
     Ok(hunks)
@@ -530,7 +596,9 @@ pub(super) fn raw_attributes(ctx: &Context, active: &dyn Fn() -> bool) -> Result
             active,
         )?;
         if out.code != 0 {
-            return Err("Could not isolate recovery attributes".into());
+            return Err(
+                crate::i18n::text("backend-could-not-isolate-recovery-attributes-b2c844").into(),
+            );
         }
     } else {
         std::fs::create_dir_all(dir)

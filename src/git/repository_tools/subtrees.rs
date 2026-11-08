@@ -15,9 +15,9 @@ use std::{
 };
 const REF: &str = "refs/gitcraft/subtrees/state";
 const LIMIT: usize = 2 << 20;
-const HISTORY: &str = "Squashed imports add a condensed upstream commit; full-history imports retain upstream ancestry. Both keep local folder edits and can conflict. This choice controls future imports; registering an existing folder does not convert its old history. Split reconstructs folder-only history from the selected committed HEAD; staged, unstaged and untracked work is shown separately and is not published.";
+const HISTORY: &str = "backend-subtree-history-explanation";
 pub(crate) fn history_explanation() -> &'static str {
-    HISTORY
+    crate::i18n::text(HISTORY)
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) enum History {
@@ -135,7 +135,10 @@ fn overlap(a: &str, b: &str) -> bool {
 }
 fn validate(r: &Registry, common: &Path) -> Result<(), String> {
     if r.sources.len() > 64 || r.candidates.len() > 64 {
-        return Err("Subtree registry supports 64 sources and 64 retained candidates; archive reviewed metadata explicitly before adding more".into());
+        return Err(crate::i18n::text(
+            "backend-subtree-registry-supports-64-sources-and-64-retained-candidates-a-bdc189",
+        )
+        .into());
     }
     let mut ids = BTreeSet::new();
     for (i, s) in r.sources.iter().enumerate() {
@@ -147,12 +150,18 @@ fn validate(r: &Registry, common: &Path) -> Result<(), String> {
             || r.sources[..i].iter().any(|p| overlap(&p.prefix, &s.prefix))
             || s.fetched.iter().chain(s.imported.iter()).any(|s| !oid(s))
         {
-            return Err("Invalid or overlapping subtree source metadata".into());
+            return Err(crate::i18n::text(
+                "backend-invalid-or-overlapping-subtree-source-metadata-858490",
+            )
+            .into());
         }
     }
     ids.clear();
     for c in &r.candidates {
-        let parent = c.worktree.parent().ok_or("Candidate parent missing")?;
+        let parent = c
+            .worktree
+            .parent()
+            .ok_or(crate::i18n::text("backend-candidate-parent-missing-0cd9e4"))?;
         if !id(&c.id)
             || !ids.insert(&c.id)
             || !r.sources.iter().any(|s| s.id == c.source)
@@ -173,7 +182,10 @@ fn validate(r: &Registry, common: &Path) -> Result<(), String> {
             })
             || c.notice.len() > 65536
         {
-            return Err("Invalid retained subtree candidate metadata".into());
+            return Err(crate::i18n::text(
+                "backend-invalid-retained-subtree-candidate-metadata-3b3282",
+            )
+            .into());
         }
     }
     Ok(())
@@ -183,14 +195,14 @@ fn source<'a>(v: &'a View, key: &str) -> Result<&'a Source, String> {
         .sources
         .iter()
         .find(|s| s.id == key)
-        .ok_or("Registered subtree disappeared".into())
+        .ok_or(crate::i18n::text("backend-registered-subtree-disappeared-359d79").into())
 }
 fn candidate(v: &View, key: &str) -> Result<usize, String> {
     v.state
         .candidates
         .iter()
         .position(|c| c.id == key)
-        .ok_or("Subtree candidate disappeared".into())
+        .ok_or(crate::i18n::text("backend-subtree-candidate-disappeared-a8d155").into())
 }
 fn bytes(ctx: &Context, args: &[&str], ok: &[i32]) -> Result<Vec<u8>, String> {
     ctx.source(args, vec![], ok, &|| {
@@ -200,11 +212,14 @@ fn bytes(ctx: &Context, args: &[&str], ok: &[i32]) -> Result<Vec<u8>, String> {
 fn text(ctx: &Context, args: &[&str], ok: &[i32]) -> Result<String, String> {
     String::from_utf8(bytes(ctx, args, ok)?)
         .map(|s| s.trim_end_matches(['\r', '\n']).to_owned())
-        .map_err(|_| "Subtree metadata requires UTF-8".into())
+        .map_err(|_| crate::i18n::text("backend-subtree-metadata-requires-utf-8-2132f4").into())
 }
 fn common(ctx: &Context) -> Result<PathBuf, String> {
     if !cfg!(unix) || crate::remote::is_remote(&ctx.repo) {
-        return Err("Subtree candidates currently require a physical native Unix checkout; no helper was dispatched".into());
+        return Err(crate::i18n::text(
+            "backend-subtree-candidates-currently-require-a-physical-native-unix-check-452d42",
+        )
+        .into());
     }
     let p = PathBuf::from(text(
         ctx,
@@ -212,13 +227,19 @@ fn common(ctx: &Context) -> Result<PathBuf, String> {
         &[0],
     )?);
     if std::fs::canonicalize(&p).map_err(|e| e.to_string())? != p {
-        return Err("Use the physical repository path for subtree candidates".into());
+        return Err(crate::i18n::text(
+            "backend-use-the-physical-repository-path-for-subtree-candidates-41840d",
+        )
+        .into());
     }
     Ok(p)
 }
 fn state(ctx: &Context) -> Result<(String, Registry), String> {
     if !text(ctx, &["symbolic-ref", "-q", REF], &[0, 1])?.is_empty() {
-        return Err("Subtree state must be a direct application ref".into());
+        return Err(crate::i18n::text(
+            "backend-subtree-state-must-be-a-direct-application-ref-28f144",
+        )
+        .into());
     }
     let version = text(ctx, &["rev-parse", "--verify", "-q", REF], &[0, 1])?;
     let data = if version.is_empty() {
@@ -226,12 +247,12 @@ fn state(ctx: &Context) -> Result<(String, Registry), String> {
     } else {
         let n = text(ctx, &["cat-file", "-s", &version], &[0])?
             .parse::<usize>()
-            .map_err(|_| "Invalid subtree state size")?;
+            .map_err(|_| crate::i18n::text("backend-invalid-subtree-state-size-bec4a1"))?;
         if n > LIMIT {
-            return Err("Subtree state exceeds 2 MiB".into());
+            return Err(crate::i18n::text("backend-subtree-state-exceeds-2-mib-754414").into());
         }
         serde_json::from_slice(&bytes(ctx, &["cat-file", "blob", &version], &[0])?)
-            .map_err(|_| "Invalid subtree registry JSON")?
+            .map_err(|_| crate::i18n::text("backend-invalid-subtree-registry-json-97f529"))?
     };
     Ok((version, data))
 }
@@ -247,7 +268,7 @@ fn resolve(ctx: &Context, rev: &str) -> Result<String, String> {
         &[0],
     )?;
     if !oid(&out) {
-        return Err("Invalid immutable subtree commit".into());
+        return Err(crate::i18n::text("backend-invalid-immutable-subtree-commit-d12622").into());
     }
     Ok(out)
 }
@@ -263,11 +284,12 @@ fn tree(ctx: &Context, head: &str, path: &str) -> Result<Option<String>, String>
     if raw.is_empty() {
         return Ok(None);
     }
-    let s = std::str::from_utf8(&raw).map_err(|_| "Invalid vendored tree metadata")?;
+    let s = std::str::from_utf8(&raw)
+        .map_err(|_| crate::i18n::text("backend-invalid-vendored-tree-metadata-20f7eb"))?;
     let (meta, name) = s
         .trim_end_matches('\0')
         .split_once('\t')
-        .ok_or("Invalid vendored tree")?;
+        .ok_or(crate::i18n::text("backend-invalid-vendored-tree-e66d63"))?;
     let parts = meta.split(' ').collect::<Vec<_>>();
     if parts.len() != 3
         || parts[0] != "040000"
@@ -275,10 +297,10 @@ fn tree(ctx: &Context, head: &str, path: &str) -> Result<Option<String>, String>
         || name != path
         || !oid(parts[2])
     {
-        return Err(
-            "The registered prefix must be a real tree directory, not a file, symlink or submodule"
-                .into(),
-        );
+        return Err(crate::i18n::text(
+            "backend-the-registered-prefix-must-be-a-real-tree-directory-not-a-file-sy-af4f5e",
+        )
+        .into());
     }
     Ok(Some(parts[2].into()))
 }
@@ -297,10 +319,10 @@ fn diff(ctx: &Context, a: &str, b: &str) -> Result<String, String> {
         &[0],
     )?;
     if out.len() > 8 << 20 {
-        return Err(
-            "Subtree diff exceeds the 8 MiB display limit; narrow the folder before reviewing"
-                .into(),
-        );
+        return Err(crate::i18n::text(
+            "backend-subtree-diff-exceeds-the-8-mib-display-limit-narrow-the-folder-be-7823ed",
+        )
+        .into());
     }
     Ok(out)
 }
@@ -308,15 +330,19 @@ fn local(ctx: &Context, v: &View, s: &Source) -> Result<Local, String> {
     let active = || !crate::tasks::cancellation().is_cancelled();
     git::drafts::inspection_index(ctx, &active)?;
     let private = |args: &[&str]| -> Result<String, String> {
-        String::from_utf8(ctx.work(args, vec![], &[0], &active)?)
-            .map_err(|_| "Subtree worktree output requires UTF-8".into())
+        String::from_utf8(ctx.work(args, vec![], &[0], &active)?).map_err(|_| {
+            crate::i18n::text("backend-subtree-worktree-output-requires-utf-8-310558").into()
+        })
     };
 
     let head_tree = tree(ctx, &v.head, &s.prefix)?;
     let baseline = s.imported.clone().or_else(|| s.fetched.clone());
-    let committed=match (&baseline,head_tree) {
-        (Some(a),Some(b))=>diff(ctx,&format!("{a}^{{tree}}"),&b)?,
-        _=>"No committed import/source comparison yet. Fetch the registered source explicitly, or prepare its first import.".into(),
+    let committed = match (&baseline, head_tree) {
+        (Some(a), Some(b)) => diff(ctx, &format!("{a}^{{tree}}"), &b)?,
+        _ => crate::i18n::text(
+            "backend-no-committed-import-source-comparison-yet-fetch-the-registered-so-91eddc",
+        )
+        .into(),
     };
     let staged = private(&[
         "--literal-pathspecs",
@@ -353,18 +379,22 @@ fn local(ctx: &Context, v: &View, s: &Source) -> Result<Local, String> {
         &active,
     )?;
     if staged.len() > 8 << 20 || working.len() > 8 << 20 || raw.len() > 1 << 20 {
-        return Err("Working subtree changes exceed the bounded display limit".into());
+        return Err(crate::i18n::text(
+            "backend-working-subtree-changes-exceed-the-bounded-display-limit-bb95d2",
+        )
+        .into());
     }
     let untracked = std::str::from_utf8(&raw)
-        .map_err(|_| "Untracked subtree paths require UTF-8")?
+        .map_err(|_| crate::i18n::text("backend-untracked-subtree-paths-require-utf-8-af9925"))?
         .split('\0')
         .filter(|s| !s.is_empty())
         .map(str::to_owned)
         .collect::<Vec<_>>();
     if untracked.len() > 2000 {
-        return Err(
-            "More than 2000 untracked subtree paths; narrow the folder before reviewing".into(),
-        );
+        return Err(crate::i18n::text(
+            "backend-more-than-2000-untracked-subtree-paths-narrow-the-folder-before-r-06b533",
+        )
+        .into());
     }
     Ok(Local {
         source: s.id.clone(),
@@ -396,12 +426,12 @@ pub(crate) fn read(repo: &Path, selected: &str) -> Result<View, String> {
         helper: {
             let exec = PathBuf::from(text(&ctx, &["--exec-path"], &[0])?).join("git-subtree");
             if std::fs::metadata(&exec).is_ok_and(|m| m.is_file()) {
-                format!(
-                    "Installed helper file: {} (file presence only; execution/capability unverified)",
-                    exec.display()
+                crate::i18n::message(
+                    "backend-installed-helper-file-file-presence-only-execution-capability-unv-c5719d",
+                    &[("path", (exec.display()).to_string().into())],
                 )
             } else {
-                "git-subtree was not found in Git's exec path. Install Git's contrib subtree helper before preparing an update/split; a PATH-provided helper is attempted only by your explicit Prepare action".into()
+                crate::i18n::text("backend-git-subtree-was-not-found-in-git-s-exec-path-install-git-s-contri-3a96ae").into()
             }
         },
     };
@@ -440,7 +470,10 @@ fn check(repo: &Path, v: &View, head: bool) -> Result<Context, String> {
         || preflight::outbox_config_stamp(repo)? != v.route
         || (head && (branch(&ctx)? != v.branch || resolve(&ctx, "HEAD")? != v.head))
     {
-        return Err("Subtree registry, checkout or selected route changed; read a new view".into());
+        return Err(crate::i18n::text(
+            "backend-subtree-registry-checkout-or-selected-route-changed-read-a-new-vi-e8529f",
+        )
+        .into());
     }
     Ok(ctx)
 }
@@ -449,7 +482,7 @@ fn save(repo: &Path, v: &mut View) -> Result<(), String> {
     let ctx = check(repo, v, false)?;
     let data = serde_json::to_vec(&v.state).map_err(|e| e.to_string())?;
     if data.len() > LIMIT {
-        return Err("Subtree registry exceeds 2 MiB".into());
+        return Err(crate::i18n::text("backend-subtree-registry-exceeds-2-mib-040d88").into());
     }
     let active = || !crate::tasks::cancellation().is_cancelled();
     let new = ctx.blob(data, &active)?;
@@ -476,13 +509,18 @@ fn save(repo: &Path, v: &mut View) -> Result<(), String> {
     for o in pins {
         let pin = format!("refs/gitcraft/subtrees/pins/{o}");
         if !text(&ctx, &["symbolic-ref", "-q", &pin], &[0, 1])?.is_empty() {
-            return Err("Subtree object pin became indirect".into());
+            return Err(
+                crate::i18n::text("backend-subtree-object-pin-became-indirect-a530b9").into(),
+            );
         }
         let old = text(&ctx, &["rev-parse", "--verify", "-q", &pin], &[0, 1])?;
         if old.is_empty() {
             tx.push_str(&format!("option no-deref\ncreate {pin} {o}\n"));
         } else if old != o {
-            return Err("An immutable subtree object pin changed".into());
+            return Err(crate::i18n::text(
+                "backend-an-immutable-subtree-object-pin-changed-ad53fb",
+            )
+            .into());
         } else {
             tx.push_str(&format!("option no-deref\nverify {pin} {o}\n"));
         }
@@ -521,7 +559,9 @@ fn route(repo: &Path, s: &Source) -> Result<(), String> {
     ] {
         let urls = super::guard::text(repo, &flags)?;
         if urls.is_empty() {
-            return Err("Registered source has no endpoint".into());
+            return Err(
+                crate::i18n::text("backend-registered-source-has-no-endpoint-bbd38e").into(),
+            );
         }
         for url in urls.lines() {
             validate_url(url)?;
@@ -543,9 +583,10 @@ pub(crate) fn register(
         || !plain(&branch)
         || v.state.sources.iter().any(|s| overlap(&path, &s.prefix))
     {
-        return Err(
-            "Choose a non-overlapping relative folder, configured remote and branch".into(),
-        );
+        return Err(crate::i18n::text(
+            "backend-choose-a-non-overlapping-relative-folder-configured-remote-and-br-814b4a",
+        )
+        .into());
     }
     bytes(
         &ctx,
@@ -566,7 +607,10 @@ pub(crate) fn register(
     let mut view = v.clone();
     view.state.sources.push(s);
     save(r.repo, &mut view)?;
-    Ok("Subtree source registered locally; no helper or network operation ran".into())
+    Ok(crate::i18n::text(
+        "backend-subtree-source-registered-locally-no-helper-or-network-operation-c8a7e5",
+    )
+    .into())
 }
 fn fetch_words(s: &Source, pin: &str) -> Vec<String> {
     [
@@ -600,7 +644,10 @@ pub(crate) fn fetch(r: &Runner<'_>, v: &View, key: &str) -> Result<String, Strin
     let pin = format!("refs/gitcraft/subtrees/fetch/{}", next_id());
     let ctx = check(r.repo, v, true)?;
     if !text(&ctx, &["rev-parse", "--verify", "-q", &pin], &[0, 1])?.is_empty() {
-        return Err("Private subtree fetch ref already exists; no fetch attempted".into());
+        return Err(crate::i18n::text(
+            "backend-private-subtree-fetch-ref-already-exists-no-fetch-attempted-bd251e",
+        )
+        .into());
     }
     let args = fetch_words(&s, &pin);
     r.run(&args.iter().map(String::as_str).collect::<Vec<_>>())?;
@@ -611,11 +658,12 @@ pub(crate) fn fetch(r: &Runner<'_>, v: &View, key: &str) -> Result<String, Strin
         .sources
         .iter_mut()
         .find(|s| s.id == key)
-        .ok_or("Subtree disappeared")?
+        .ok_or(crate::i18n::text("backend-subtree-disappeared-1c5e16"))?
         .fetched = Some(result);
     save(r.repo, &mut view)?;
-    Ok(format!(
-        "Fetched the registered branch into {pin}; original branch/index unchanged. Refresh to inspect local edits or prepare its import"
+    Ok(crate::i18n::message(
+        "backend-fetched-the-registered-branch-into-pin-original-branch-index-unch-367bf0",
+        &[("pin", (pin).to_string().into())],
     ))
 }
 fn subtree_words(
@@ -631,7 +679,7 @@ fn subtree_words(
             Kind::Split => "split",
             Kind::Associate => {
                 return Err(
-                    "Association uses immutable metadata commits, not a subtree helper".into(),
+                    crate::i18n::text("backend-association-uses-immutable-metadata-commits-not-a-subtree-helper-f977d8").into(),
                 );
             }
             Kind::Update if exists => "merge",
@@ -647,7 +695,9 @@ fn subtree_words(
         a.push(
             upstream
                 .filter(|s| oid(s))
-                .ok_or("Fetch a source commit before preparing an import")?
+                .ok_or(crate::i18n::text(
+                    "backend-fetch-a-source-commit-before-preparing-an-import-587a9b",
+                ))?
                 .into(),
         );
     } else {
@@ -660,9 +710,9 @@ fn owned(r: &Runner<'_>, v: &View, c: &Candidate, args: &[&str]) -> Result<Strin
         r,
         &v.common,
         &c.worktree,
-        c.identity
-            .as_deref()
-            .ok_or("Creation outcome is unacknowledged; candidate cannot be adopted")?,
+        c.identity.as_deref().ok_or(crate::i18n::text(
+            "backend-creation-outcome-is-unacknowledged-candidate-cannot-be-adopted-f78ef5",
+        ))?,
         args,
     )
 }
@@ -698,7 +748,10 @@ fn clean_source(ctx: &Context) -> Result<(), String> {
     )?;
     let untracked = ctx.work(&["ls-files", "--others", "-z"], vec![], &[0], &active)?;
     if !staged.is_empty() || !work.is_empty() || !untracked.is_empty() {
-        return Err("Original checkout must have no staged, unstaged or untracked files (including ignored files) before accepting; your work was retained".into());
+        return Err(crate::i18n::text(
+            "backend-original-checkout-must-have-no-staged-unstaged-or-untracked-files-b562d4",
+        )
+        .into());
     }
     Ok(())
 }
@@ -708,34 +761,43 @@ pub(crate) fn prepare(r: &Runner<'_>, v: &View, key: &str, kind: Kind) -> Result
     if !v.branch.starts_with("refs/heads/")
         || !text(&ctx, &["symbolic-ref", "-q", &v.branch], &[0, 1])?.is_empty()
     {
-        return Err("Select a direct local branch before preparing a subtree candidate".into());
+        return Err(crate::i18n::text(
+            "backend-select-a-direct-local-branch-before-preparing-a-subtree-candidate-364b76",
+        )
+        .into());
     }
     let exists = tree(&ctx, &v.head, &s.prefix)?.is_some();
     if kind == Kind::Split && !exists {
-        return Err("Commit a vendored folder before splitting its history".into());
+        return Err(crate::i18n::text(
+            "backend-commit-a-vendored-folder-before-splitting-its-history-994603",
+        )
+        .into());
     }
     let args = if kind == Kind::Associate {
         if !exists || s.imported.is_some() || s.fetched.is_none() {
-            return Err("Association requires an existing folder, reviewed fetched baseline and no prior accepted import".into());
+            return Err(crate::i18n::text(
+                "backend-association-requires-an-existing-folder-reviewed-fetched-baseline-8325da",
+            )
+            .into());
         }
         if v.local
             .as_ref()
             .is_none_or(|l| l.source != s.id || l.baseline != s.fetched)
         {
-            return Err(
-                "Inspect this folder against the exact fetched baseline before associating it"
-                    .into(),
-            );
+            return Err(crate::i18n::text(
+                "backend-inspect-this-folder-against-the-exact-fetched-baseline-before-ass-b4af92",
+            )
+            .into());
         }
         Vec::new()
     } else {
         subtree_words(&s, kind, &v.head, s.fetched.as_deref(), exists)?
     };
     if v.state.candidates.len() >= 64 {
-        return Err(
-            "64 candidates retained; explicitly archive reviewed metadata before preparing more"
-                .into(),
-        );
+        return Err(crate::i18n::text(
+            "backend-64-candidates-retained-explicitly-archive-reviewed-metadata-befor-1eab61",
+        )
+        .into());
     }
     let id = next_id();
     let parent = tempfile::Builder::new()
@@ -745,10 +807,32 @@ pub(crate) fn prepare(r: &Runner<'_>, v: &View, key: &str, kind: Kind) -> Result
         .keep();
     let worktree = parent.join("candidate");
     let mut view = v.clone();
-    view.state.candidates.push(Candidate{id:id.clone(),source:key.into(),branch:v.branch.clone(),old:v.head.clone(),upstream:if kind!=Kind::Split{s.fetched.clone()}else{None},kind,stage:Stage::Preparing,worktree:worktree.clone(),identity:None,result:None,notice:"Creation intent persisted. If acknowledgement is lost, this directory is never automatically adopted or removed".into()});
+    view.state.candidates.push(Candidate {
+        id: id.clone(),
+        source: key.into(),
+        branch: v.branch.clone(),
+        old: v.head.clone(),
+        upstream: if kind != Kind::Split {
+            s.fetched.clone()
+        } else {
+            None
+        },
+        kind,
+        stage: Stage::Preparing,
+        worktree: worktree.clone(),
+        identity: None,
+        result: None,
+        notice: crate::i18n::text(
+            "backend-creation-intent-persisted-if-acknowledgement-is-lost-this-directo-00e4cd",
+        )
+        .into(),
+    });
     save(r.repo, &mut view)?; // Before any helper/ref/working-folder operation.
     if std::fs::symlink_metadata(&worktree).is_ok() {
-        return Err("Candidate path appeared; no existing directory was adopted".into());
+        return Err(crate::i18n::text(
+            "backend-candidate-path-appeared-no-existing-directory-was-adopted-3ed7f8",
+        )
+        .into());
     }
     check(r.repo, &view, true)?;
     r.run(&[
@@ -765,14 +849,19 @@ pub(crate) fn prepare(r: &Runner<'_>, v: &View, key: &str, kind: Kind) -> Result
         "--reason",
         "gitcraft retained subtree candidate",
         "--",
-        worktree.to_str().ok_or("Candidate path requires UTF-8")?,
+        worktree.to_str().ok_or(crate::i18n::text(
+            "backend-candidate-path-requires-utf-8-df8c79",
+        ))?,
         &v.head,
     ])?;
     let i = candidate(&view, &id)?;
     view.state.candidates[i].identity =
         Some(deferred::registered_identity(r.repo, &v.common, &worktree)?);
     view.state.candidates[i].stage = Stage::Running;
-    view.state.candidates[i].notice="Helper dispatch recorded; an interrupted operation requires inspection/reconciliation, never automatic retry".into();
+    view.state.candidates[i].notice = crate::i18n::text(
+        "backend-helper-dispatch-recorded-an-interrupted-operation-requires-inspec-07f6aa",
+    )
+    .into();
     save(r.repo, &mut view)?;
     let c = view.state.candidates[i].clone();
     let result = if kind == Kind::Associate {
@@ -786,9 +875,12 @@ pub(crate) fn prepare(r: &Runner<'_>, v: &View, key: &str, kind: Kind) -> Result
         )
     };
     finish(r, &mut view, i, result)?;
-    Ok(format!(
-        "Subtree candidate {id} retained at {}. Refresh to inspect its result before accepting or publishing",
-        worktree.display()
+    Ok(crate::i18n::message(
+        "backend-subtree-candidate-id-retained-at-refresh-to-inspect-its-result-be-4e0ada",
+        &[
+            ("id", (id).to_string().into()),
+            ("path", (worktree.display()).to_string().into()),
+        ],
     ))
 }
 fn association_message(prefix: &str, old: &str, base: &str) -> String {
@@ -822,10 +914,9 @@ fn association_words(c: &Candidate, s: &Source, parent: &str, base: &str) -> Vec
     ]
 }
 fn associate(r: &Runner<'_>, v: &View, c: &Candidate, s: &Source) -> Result<String, String> {
-    let base = c
-        .upstream
-        .as_deref()
-        .ok_or("No immutable association baseline")?;
+    let base = c.upstream.as_deref().ok_or(crate::i18n::text(
+        "backend-no-immutable-association-baseline-301ce5",
+    ))?;
     let parent = if let Some(args) = baseline_words(s, base) {
         owned(
             r,
@@ -839,7 +930,10 @@ fn associate(r: &Runner<'_>, v: &View, c: &Candidate, s: &Source) -> Result<Stri
         base.to_owned()
     };
     if !oid(&parent) {
-        return Err("Invalid association parent; retained without updating candidate HEAD".into());
+        return Err(crate::i18n::text(
+            "backend-invalid-association-parent-retained-without-updating-candidate-he-6819eb",
+        )
+        .into());
     }
     let args = association_words(c, s, &parent, base);
     let result = owned(
@@ -851,7 +945,10 @@ fn associate(r: &Runner<'_>, v: &View, c: &Candidate, s: &Source) -> Result<Stri
     .trim()
     .to_owned();
     if !oid(&result) {
-        return Err("Invalid association result; retained without updating candidate HEAD".into());
+        return Err(crate::i18n::text(
+            "backend-invalid-association-result-retained-without-updating-candidate-he-583370",
+        )
+        .into());
     }
     owned(
         r,
@@ -893,14 +990,19 @@ fn finish(
                 out.lines()
                     .rev()
                     .find(|s| oid(s))
-                    .ok_or("Subtree split did not return an immutable commit")?
+                    .ok_or(crate::i18n::text(
+                        "backend-subtree-split-did-not-return-an-immutable-commit-e9d2fb",
+                    ))?
                     .into()
             } else {
                 owned(r, v, &c, &["rev-parse", "--verify", "HEAD"])?
             };
             let value = value.trim().to_owned();
             if !oid(&value) {
-                return Err("Invalid subtree result; retained for inspection".into());
+                return Err(crate::i18n::text(
+                    "backend-invalid-subtree-result-retained-for-inspection-642ff8",
+                )
+                .into());
             }
             if c.kind == Kind::Split {
                 let s = source(v, &c.source)?;
@@ -917,7 +1019,7 @@ fn finish(
                     &["rev-parse", "--verify", &format!("{value}^{{tree}}")],
                 )?;
                 if expected.trim() != actual.trim() {
-                    return Err("Split result tree differs from the selected committed folder; retained without publication consent".into());
+                    return Err(crate::i18n::text("backend-split-result-tree-differs-from-the-selected-committed-folder-reta-816a29").into());
                 }
             }
             v.state.candidates[i].result = Some(value);
@@ -926,8 +1028,10 @@ fn finish(
             } else {
                 Stage::Ready
             };
-            v.state.candidates[i].notice =
-                "Immutable result retained; original checkout and branch were not changed".into();
+            v.state.candidates[i].notice = crate::i18n::text(
+                "backend-immutable-result-retained-original-checkout-and-branch-were-not-c-3f0680",
+            )
+            .into();
         }
         err => {
             v.state.candidates[i].stage = if !unmerged.is_empty() {
@@ -935,15 +1039,24 @@ fn finish(
             } else {
                 Stage::Paused
             };
-            v.state.candidates[i].notice = format!(
-                "{}\nUnmerged: {}\nCandidate status: {}\nInspect retained work. No original branch was updated and no helper is retried automatically.",
-                git::redact(
-                    &err.err()
-                        .unwrap_or_else(|| "Helper left working changes".into()),
-                    None
-                ),
-                unmerged,
-                status
+            v.state.candidates[i].notice = crate::i18n::message(
+                "backend-unmerged-candidate-status-inspect-retained-work-no-original-branc-5a2435",
+                &[
+                    (
+                        "git",
+                        (git::redact(
+                            &err.err().unwrap_or_else(|| {
+                                crate::i18n::text("backend-helper-left-working-changes-edf853")
+                                    .into()
+                            }),
+                            None,
+                        ))
+                        .to_string()
+                        .into(),
+                    ),
+                    ("unmerged", (unmerged).to_string().into()),
+                    ("status", (status).to_string().into()),
+                ],
             );
             if v.state.candidates[i].notice.len() > 65536 {
                 v.state.candidates[i].notice =
@@ -960,7 +1073,10 @@ pub(crate) fn resume(r: &Runner<'_>, v: &View, key: &str) -> Result<String, Stri
     if c.kind != Kind::Update
         || !matches!(c.stage, Stage::Conflict | Stage::Running | Stage::Paused)
     {
-        return Err("Only an inspected retained import may be continued".into());
+        return Err(crate::i18n::text(
+            "backend-only-an-inspected-retained-import-may-be-continued-9a9ccb",
+        )
+        .into());
     }
     if !owned(
         r,
@@ -977,7 +1093,10 @@ pub(crate) fn resume(r: &Runner<'_>, v: &View, key: &str) -> Result<String, Stri
     )?
     .is_empty()
     {
-        return Err("Resolve and stage every candidate conflict before continuing; original files remain unchanged".into());
+        return Err(crate::i18n::text(
+            "backend-resolve-and-stage-every-candidate-conflict-before-continuing-orig-007c3a",
+        )
+        .into());
     }
     let head = owned(r, v, &c, &["rev-parse", "--verify", "HEAD"])?;
     let pending = owned(r, v, &c, &["rev-parse", "--verify", "-q", "MERGE_HEAD"]);
@@ -989,10 +1108,16 @@ pub(crate) fn resume(r: &Runner<'_>, v: &View, key: &str) -> Result<String, Stri
     } else if head.trim() != c.old {
         Ok(String::new())
     } else {
-        Err("No acknowledged merge result exists. Inspect this candidate, then prepare a new update explicitly; the helper was not rerun".into())
+        Err(crate::i18n::text(
+            "backend-no-acknowledged-merge-result-exists-inspect-this-candidate-then-p-9fc5b1",
+        )
+        .into())
     };
     finish(r, &mut view, i, result)?;
-    Ok("Candidate inspected; refresh to review the immutable result".into())
+    Ok(crate::i18n::text(
+        "backend-candidate-inspected-refresh-to-review-the-immutable-result-fab422",
+    )
+    .into())
 }
 fn accept_allowed(c: &Candidate, branch: &str, head: &str, clean: bool) -> Result<(), String> {
     if c.stage != Stage::Ready
@@ -1002,7 +1127,10 @@ fn accept_allowed(c: &Candidate, branch: &str, head: &str, clean: bool) -> Resul
         || head != c.old
         || !clean
     {
-        return Err("Acceptance requires the reviewed direct branch at its original commit and a completely clean original checkout".into());
+        return Err(crate::i18n::text(
+            "backend-acceptance-requires-the-reviewed-direct-branch-at-its-original-co-723f86",
+        )
+        .into());
     }
     Ok(())
 }
@@ -1013,7 +1141,10 @@ pub(crate) fn accept(r: &Runner<'_>, v: &View, key: &str) -> Result<String, Stri
     clean_source(&ctx)?;
     accept_allowed(&c, &v.branch, &v.head, true)?;
     if v.candidate_diff.as_ref().map(|(id, _)| id.as_str()) != Some(key) {
-        return Err("Review this exact candidate patch before accepting".into());
+        return Err(crate::i18n::text(
+            "backend-review-this-exact-candidate-patch-before-accepting-c38089",
+        )
+        .into());
     }
     if owned(r, v, &c, &["rev-parse", "--verify", "HEAD"])?.trim()
         != c.result.as_deref().unwrap_or("")
@@ -1025,7 +1156,10 @@ pub(crate) fn accept(r: &Runner<'_>, v: &View, key: &str) -> Result<String, Stri
         )?
         .is_empty()
     {
-        return Err("Candidate changed; refresh and review it before accepting".into());
+        return Err(crate::i18n::text(
+            "backend-candidate-changed-refresh-and-review-it-before-accepting-91448b",
+        )
+        .into());
     }
     let mut view = v.clone();
     view.state.candidates[i].stage = Stage::Accepting;
@@ -1036,24 +1170,32 @@ pub(crate) fn accept(r: &Runner<'_>, v: &View, key: &str) -> Result<String, Stri
         r.repo,
         &c.branch,
         &c.old,
-        c.result.as_deref().ok_or("No result")?,
+        c.result
+            .as_deref()
+            .ok_or(crate::i18n::text("backend-no-result-c6008b"))?,
     )?;
     view.state.candidates[i].stage = Stage::Accepted;
     view.state
         .sources
         .iter_mut()
         .find(|s| s.id == c.source)
-        .ok_or("Source disappeared")?
+        .ok_or(crate::i18n::text("backend-source-disappeared-5ff00e"))?
         .imported = c.upstream;
     save(r.repo, &mut view)?;
-    Ok("Subtree update accepted through the shared guarded checkout transaction; candidate and object pins retained".into())
+    Ok(crate::i18n::text(
+        "backend-subtree-update-accepted-through-the-shared-guarded-checkout-trans-ec2bef",
+    )
+    .into())
 }
 pub(crate) fn reconcile(r: &Runner<'_>, v: &View, key: &str) -> Result<String, String> {
     let ctx = check(r.repo, v, false)?;
     let i = candidate(v, key)?;
     let c = &v.state.candidates[i];
     if c.stage != Stage::Accepting {
-        return Err("Only an uncertain acceptance can be reconciled here; inspect ambiguous network sends at the remote before renewed approval".into());
+        return Err(crate::i18n::text(
+            "backend-only-an-uncertain-acceptance-can-be-reconciled-here-inspect-ambig-a6dce1",
+        )
+        .into());
     }
     clean_source(&ctx)?;
     let head = resolve(&ctx, "HEAD")?;
@@ -1063,10 +1205,10 @@ pub(crate) fn reconcile(r: &Runner<'_>, v: &View, key: &str) -> Result<String, S
     } else if branch == c.branch && head == c.old {
         Stage::Ready
     } else {
-        return Err(
-            "Original checkout differs from both exact acceptance receipts; retained without retry"
-                .into(),
-        );
+        return Err(crate::i18n::text(
+            "backend-original-checkout-differs-from-both-exact-acceptance-receipts-ret-e5ab48",
+        )
+        .into());
     };
     let mut view = v.clone();
     view.state.candidates[i].stage = stage;
@@ -1075,11 +1217,14 @@ pub(crate) fn reconcile(r: &Runner<'_>, v: &View, key: &str) -> Result<String, S
             .sources
             .iter_mut()
             .find(|s| s.id == c.source)
-            .ok_or("Source disappeared")?
+            .ok_or(crate::i18n::text("backend-source-disappeared-5ff00e"))?
             .imported = c.upstream.clone();
     }
     save(r.repo, &mut view)?;
-    Ok("Exact original checkout receipt reconciled; no branch or working files changed".into())
+    Ok(crate::i18n::text(
+        "backend-exact-original-checkout-receipt-reconciled-no-branch-or-working-f-50d6bd",
+    )
+    .into())
 }
 pub(crate) fn close(r: &Runner<'_>, v: &View, key: &str) -> Result<String, String> {
     check(r.repo, v, false)?;
@@ -1088,22 +1233,24 @@ pub(crate) fn close(r: &Runner<'_>, v: &View, key: &str) -> Result<String, Strin
         v.state.candidates[i].stage,
         Stage::Accepting | Stage::Sending
     ) {
-        return Err("Inspect/reconcile the uncertain outcome before closing its metadata".into());
+        return Err(crate::i18n::text(
+            "backend-inspect-reconcile-the-uncertain-outcome-before-closing-its-metada-1a17fe",
+        )
+        .into());
     }
     let mut view = v.clone();
     view.state.candidates[i].stage = Stage::Closed;
     save(r.repo, &mut view)?;
-    Ok(
-        "Proposal closed; its worktree, results and pins remain retained for manual inspection"
-            .into(),
+    Ok(crate::i18n::text(
+        "backend-proposal-closed-its-worktree-results-and-pins-remain-retained-for-d32620",
     )
+    .into())
 }
 fn principal(c: Option<&git::Credentials>) -> Result<Option<(String, String, String)>, String> {
     c.map(|c| {
-        let s = c
-            .scope
-            .as_ref()
-            .ok_or("Sign-in lacks endpoint/account scope; sign in again")?;
+        let s = c.scope.as_ref().ok_or(crate::i18n::text(
+            "backend-sign-in-lacks-endpoint-account-scope-sign-in-again-71595d",
+        ))?;
         Ok((s.endpoint(), s.account().into(), c.username.clone()))
     })
     .transpose()
@@ -1124,7 +1271,9 @@ fn push_words(s: &Source, c: &Candidate) -> Result<Vec<Vec<String>>, String> {
         s.remote.clone(),
         format!(
             "{}:refs/heads/{}",
-            c.result.as_deref().ok_or("Split result missing")?,
+            c.result
+                .as_deref()
+                .ok_or(crate::i18n::text("backend-split-result-missing-1948a0"))?,
             s.branch
         ),
     ]])
@@ -1141,11 +1290,17 @@ pub(crate) fn prepare_publish(
     check(repo, v, true)?;
     let c = &v.state.candidates[candidate(v, key)?];
     if !publishable(c, renewed) {
-        return Err("Split is not ready. Uncertain/rejected sends require explicit remote inspection and renewed approval".into());
+        return Err(crate::i18n::text(
+            "backend-split-is-not-ready-uncertain-rejected-sends-require-explicit-remo-73d014",
+        )
+        .into());
     }
     let context = crate::connections::current();
     if context.error.is_some() || context.choices != profile.connections {
-        return Err("Selected profile/connection changed; prepare again".into());
+        return Err(crate::i18n::text(
+            "backend-selected-profile-connection-changed-prepare-again-b5de52",
+        )
+        .into());
     }
     let s = source(v, &c.source)?;
     route(repo, s)?;
@@ -1158,9 +1313,10 @@ pub(crate) fn prepare_publish(
         || plan.force
         || plan.deleting
     {
-        return Err(
-            "Publication preflight differs from the registered exact split destination".into(),
-        );
+        return Err(crate::i18n::text(
+            "backend-publication-preflight-differs-from-the-registered-exact-split-des-11eaf6",
+        )
+        .into());
     }
     Ok(Prepared {
         view: v.clone(),
@@ -1181,17 +1337,25 @@ pub(crate) fn send(
     let ctx = check(r.repo, &p.view, true)?;
     let _ = ctx;
     if p.context != crate::connections::current() || p.principal != principal(r.credentials)? {
-        return Err("Prepared connection/account changed; prepare and approve again".into());
+        return Err(crate::i18n::text(
+            "backend-prepared-connection-account-changed-prepare-and-approve-again-975afc",
+        )
+        .into());
     }
     let i = candidate(&p.view, &p.id)?;
     let c = &p.view.state.candidates[i];
     if !publishable(c, p.renewed) {
-        return Err("Split no longer eligible for this approval".into());
+        return Err(
+            crate::i18n::text("backend-split-no-longer-eligible-for-this-approval-51ae0f").into(),
+        );
     }
     preflight::check(r.repo, &p.plan)?;
     let mut view = p.view.clone();
     view.state.candidates[i].stage = Stage::Sending;
-    view.state.candidates[i].notice="Network dispatch intent persisted. Missing/rejected receipt never causes automatic retry. Inspect the remote before renewed approval".into();
+    view.state.candidates[i].notice = crate::i18n::text(
+        "backend-network-dispatch-intent-persisted-missing-rejected-receipt-never-786593",
+    )
+    .into();
     save(r.repo, &mut view)?;
     let result = preflight::execute_bound_controlled(
         r.repo,
@@ -1205,7 +1369,20 @@ pub(crate) fn send(
     } else {
         Stage::Paused
     };
-    view.state.candidates[i].notice=result.as_ref().map(|_|"Exact split push acknowledged; local candidate/pins retained".into()).unwrap_or_else(|e|format!("Push rejected or uncertain: {}. Inspect destination before renewing approval; no automatic retry",git::redact(e,None)));
+    view.state.candidates[i].notice = result
+        .as_ref()
+        .map(|_| {
+            crate::i18n::text(
+                "backend-exact-split-push-acknowledged-local-candidate-pins-retained-557cac",
+            )
+            .into()
+        })
+        .unwrap_or_else(|e| {
+            crate::i18n::message(
+                "backend-push-rejected-or-uncertain-inspect-destination-before-renewing-ap-8dc126",
+                &[("git", (git::redact(e, None)).to_string().into())],
+            )
+        });
     save(r.repo, &mut view)?;
     result
 }

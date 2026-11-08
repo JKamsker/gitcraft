@@ -35,14 +35,21 @@ fn receipt(ctx: &Context, reference: &str) -> Result<Option<String>, String> {
         &|| true,
     )?;
     if raw.len() > 4096 {
-        return Err("Publication receipt enumeration exceeds limit".into());
+        return Err(crate::i18n::text(
+            "backend-publication-receipt-enumeration-exceeds-limit-549096",
+        )
+        .into());
     }
-    let text = std::str::from_utf8(&raw).map_err(|_| "Invalid receipt metadata")?;
+    let text = std::str::from_utf8(&raw)
+        .map_err(|_| crate::i18n::text("backend-invalid-receipt-metadata-64b00a"))?;
     for row in text.lines() {
         let fields = row.split('\0').collect::<Vec<_>>();
         if fields.len() == 3 && fields[0] == reference {
             if !fields[2].is_empty() || !oid_valid(fields[1]) {
-                return Err("Publication receipt is not a direct immutable object ref".into());
+                return Err(crate::i18n::text(
+                    "backend-publication-receipt-is-not-a-direct-immutable-object-ref-5ed70d",
+                )
+                .into());
             }
             return Ok(Some(fields[1].into()));
         }
@@ -62,9 +69,12 @@ fn classify(
         CommitOutcome::Committed
     } else {
         CommitOutcome::Unknown(match observed {
-            Ok(None) => "receipt is absent".into(),
-            Ok(Some(_)) => "receipt differs".into(),
-            Err(e) => format!("receipt cannot be read: {e}"),
+            Ok(None) => crate::i18n::text("backend-receipt-is-absent-e2fe09").into(),
+            Ok(Some(_)) => crate::i18n::text("backend-receipt-differs-04859a").into(),
+            Err(e) => crate::i18n::message(
+                "backend-receipt-cannot-be-read-e-24e7af",
+                &[("detail", (e).to_string().into())],
+            ),
         })
     }
 }
@@ -82,7 +92,7 @@ pub(super) fn begin(
             .bytes()
             .all(|b| b.is_ascii_alphanumeric() || b == b'-')
     {
-        return Err("Invalid publication scope".into());
+        return Err(crate::i18n::text("backend-invalid-publication-scope-c7a4fc").into());
     }
     static NEXT: AtomicU64 = AtomicU64::new(1);
     let operation = format!(
@@ -106,10 +116,10 @@ pub(super) fn begin(
     };
     let bytes = serde_json::to_vec(&intent).map_err(|e| e.to_string())?;
     if bytes.len() > 2 * 1024 * 1024 {
-        return Err(
-            "Publication recovery context exceeds 2 MiB; no state transaction was dispatched"
-                .into(),
-        );
+        return Err(crate::i18n::text(
+            "backend-publication-recovery-context-exceeds-2-mib-no-state-transaction-w-e58ef3",
+        )
+        .into());
     }
     let blob = ctx.blob(bytes, active)?;
     let input = format!("100644 blob {blob}\tintent.json\n040000 tree {proposed}\tproposed\n");
@@ -118,8 +128,27 @@ pub(super) fn begin(
         "refs/gitcraft/state-publication-pending/{}/{operation}",
         ctx.id
     );
-    ctx.source(&["update-ref","--no-deref",&pending,&root,&"0".repeat(root.len())],vec![],&[0],active)
-        .map_err(|e|format!("No state transaction was dispatched; pending journal {operation} may need inspection: {e}"))?;
+    ctx.source(
+        &[
+            "update-ref",
+            "--no-deref",
+            &pending,
+            &root,
+            &"0".repeat(root.len()),
+        ],
+        vec![],
+        &[0],
+        active,
+    )
+    .map_err(|e| {
+        crate::i18n::message(
+            "backend-no-state-transaction-was-dispatched-pending-journal-operation-may-fddb32",
+            &[
+                ("operation", (operation).to_string().into()),
+                ("detail", (e).to_string().into()),
+            ],
+        )
+    })?;
     Ok(Pending { intent })
 }
 impl Pending {
@@ -146,9 +175,15 @@ impl Pending {
         );
         match outcome {
             CommitOutcome::Committed => CommitOutcome::Committed,
-            CommitOutcome::Unknown(reason) => CommitOutcome::Unknown(format!(
-                "State publication {} is pending exact reconciliation ({reason}; {error}). No automatic retry. Receipt: {}. Original/candidate recovery entries: {}",
-                self.intent.operation, self.intent.receipt_ref, self.intent.evidence
+            CommitOutcome::Unknown(reason) => CommitOutcome::Unknown(crate::i18n::message(
+                "backend-state-publication-is-pending-exact-reconciliation-reason-error-no-f75f60",
+                &[
+                    ("intent", (self.intent.operation).to_string().into()),
+                    ("reason", (reason).to_string().into()),
+                    ("detail", (error).to_string().into()),
+                    ("intent4", (self.intent.receipt_ref).to_string().into()),
+                    ("intent5", (self.intent.evidence).to_string().into()),
+                ],
             )),
         }
     }
@@ -166,15 +201,21 @@ fn reports(ctx: &Context) -> Result<Vec<Report>, String> {
         &|| true,
     )?;
     if rows.len() > 256 * 1024 {
-        return Err("Publication journal enumeration exceeds 256 KiB".into());
+        return Err(crate::i18n::text(
+            "backend-publication-journal-enumeration-exceeds-256-kib-a299e2",
+        )
+        .into());
     }
     let mut reports = Vec::new();
     for row in std::str::from_utf8(&rows)
-        .map_err(|_| "Invalid pending publication refs")?
+        .map_err(|_| crate::i18n::text("backend-invalid-pending-publication-refs-66eca9"))?
         .lines()
     {
         if reports.len() >= 256 {
-            return Err("Publication journal has 256 entries; inspect/archive resolved journal refs explicitly".into());
+            return Err(crate::i18n::text(
+                "backend-publication-journal-has-256-entries-inspect-archive-resolved-jour-51f4a9",
+            )
+            .into());
         }
         let fields = row.split('\0').collect::<Vec<_>>();
         if fields.len() != 3
@@ -182,15 +223,21 @@ fn reports(ctx: &Context) -> Result<Vec<Report>, String> {
             || !fields[2].is_empty()
             || !oid_valid(fields[1])
         {
-            return Err("Pending publication ref is not a direct application object".into());
+            return Err(crate::i18n::text(
+                "backend-pending-publication-ref-is-not-a-direct-application-object-13c69a",
+            )
+            .into());
         }
         let spec = format!("{}:intent.json", fields[1]);
         let size = ctx
             .text(&["cat-file", "-s", &spec], vec![], &|| true)?
             .parse::<usize>()
-            .map_err(|_| "Invalid publication journal size")?;
+            .map_err(|_| crate::i18n::text("backend-invalid-publication-journal-size-83996c"))?;
         if size > 2 * 1024 * 1024 {
-            return Err("Publication journal entry exceeds 2 MiB".into());
+            return Err(crate::i18n::text(
+                "backend-publication-journal-entry-exceeds-2-mib-4b0c7d",
+            )
+            .into());
         }
         let intent: Intent = serde_json::from_slice(&ctx.run(
             &["cat-file", "blob", &spec],
@@ -198,7 +245,7 @@ fn reports(ctx: &Context) -> Result<Vec<Report>, String> {
             &[0],
             &|| true,
         )?)
-        .map_err(|_| "Invalid publication journal")?;
+        .map_err(|_| crate::i18n::text("backend-invalid-publication-journal-3280e5"))?;
         let expected_receipt = format!(
             "refs/gitcraft/state-publication-receipts/{}/{}",
             ctx.id, intent.operation
@@ -207,10 +254,13 @@ fn reports(ctx: &Context) -> Result<Vec<Report>, String> {
             || intent.receipt_ref != expected_receipt
             || fields[0] != format!("{prefix}{}", intent.operation)
         {
-            return Err("Publication journal context mismatches its operation".into());
+            return Err(crate::i18n::text(
+                "backend-publication-journal-context-mismatches-its-operation-77a2c5",
+            )
+            .into());
         }
         let outcome = classify(false, &intent.proposed, receipt(ctx, &intent.receipt_ref));
-        let (committed,detail)=match outcome {CommitOutcome::Committed=>(true,"Exact native transaction receipt confirms committed metadata. If acknowledgement was lost, inspect retained index.lock and recovery entries before resuming writes; this reader does not remove or adopt them.".into()),CommitOutcome::Unknown(e)=>(false,format!("Pending: {e}. Current materialization and backups must be inspected; no rollback or retry is authorized by this read."))};
+        let (committed,detail)=match outcome {CommitOutcome::Committed=>(true,crate::i18n::text("backend-exact-native-transaction-receipt-confirms-committed-metadata-if-a-77d0fc").into()),CommitOutcome::Unknown(e)=>(false,crate::i18n::message("backend-pending-e-current-materialization-and-backups-must-be-inspected-n-43737f", &[("detail", (e).to_string().into())]))};
         reports.push(Report {
             intent,
             committed,
@@ -221,9 +271,13 @@ fn reports(ctx: &Context) -> Result<Vec<Report>, String> {
 }
 pub(super) fn guard(ctx: &Context) -> Result<(), String> {
     if let Some(report) = reports(ctx)?.into_iter().find(|r| !r.committed) {
-        return Err(format!(
-            "State publication {} remains pending; use Inspect state publication receipts. {} Recovery: {}",
-            report.intent.operation, report.detail, report.intent.evidence
+        return Err(crate::i18n::message(
+            "backend-state-publication-remains-pending-use-inspect-state-publication-r-247eda",
+            &[
+                ("report", (report.intent.operation).to_string().into()),
+                ("detail", (report.detail).to_string().into()),
+                ("report3", (report.intent.evidence).to_string().into()),
+            ],
         ));
     }
     Ok(())

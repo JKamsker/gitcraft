@@ -55,15 +55,20 @@ pub(super) fn load(
             return;
         }
         let Ok(base) = std::fs::canonicalize(configured) else {
-            out.notices.push(format!(
-                "Local transcript root unavailable: {}",
-                redact(&configured.display().to_string())
+            out.notices.push(crate::i18n::message(
+                "backend-local-transcript-root-unavailable-7f760d",
+                &[(
+                    "path",
+                    (redact(&configured.display().to_string()))
+                        .to_string()
+                        .into(),
+                )],
             ));
             continue;
         };
         if std::fs::symlink_metadata(configured).is_ok_and(|m| m.file_type().is_symlink()) {
             out.notices.push(
-                "A linked transcript root was refused; choose its physical directory explicitly"
+                crate::i18n::text("backend-a-linked-transcript-root-was-refused-choose-its-physical-director-72500c")
                     .into(),
             );
             continue;
@@ -73,7 +78,7 @@ pub(super) fn load(
         discover(&base, &base, 0, &mut visited, &mut files);
         files.sort_by(|a, b| b.cmp(a));
         if visited >= 4096 || files.len() > 200 {
-            out.notices.push("Local discovery is bounded to 4,096 entries, depth five and the 200 newest JSONL files per root; choose a narrower root for older sessions".into());
+            out.notices.push(crate::i18n::text("backend-local-discovery-is-bounded-to-4-096-entries-depth-five-and-the-20-ae128f").into());
         }
         for (_, rel) in files.into_iter().take(200) {
             if !active() || *budget == 0 {
@@ -82,9 +87,9 @@ pub(super) fn load(
             let Some(bytes) =
                 crate::safe_read::read_inside(&base, &rel, FILE_LIMIT.min(*budget) as u64)
             else {
-                out.notices.push(format!(
-                    "Unreadable, linked or oversized local transcript omitted: {}",
-                    redact(&rel)
+                out.notices.push(crate::i18n::message(
+                    "backend-unreadable-linked-or-oversized-local-transcript-omitted-d1efa1",
+                    &[("redact", (redact(&rel)).to_string().into())],
                 ));
                 continue;
             };
@@ -92,11 +97,11 @@ pub(super) fn load(
             let (steps, notices) = parse::transcript(&bytes, root, start, end, false);
             out.notices.extend(notices);
             if !steps.is_empty() {
-                out.sessions.push(Session{source:format!("Local {}",redact(&base.join(&rel).display().to_string())),relation:format!("Worktree matched exactly; records within {} hours before commit through 10 minutes after. Time/path correlation, not an authenticated commit link",options.hours.clamp(1,168)),steps});
+                out.sessions.push(Session{source:crate::i18n::message("backend-local-6aed87", &[("path", (redact(&base.join(&rel).display().to_string())).to_string().into())]),relation:crate::i18n::message("backend-worktree-matched-exactly-records-within-hours-before-commit-throu-f5600a", &[("options", (options.hours.clamp(1,168)).into())]),steps});
             }
             if out.sessions.len() >= 64 {
                 out.notices
-                    .push("Stopped at 64 candidate sessions; narrow the root/time window".into());
+                    .push(crate::i18n::text("backend-stopped-at-64-candidate-sessions-narrow-the-root-time-window-a5d972").into());
                 return;
             }
         }

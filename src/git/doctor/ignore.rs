@@ -109,7 +109,7 @@ pub fn explain(repo: &Path, typed: &str) -> Result<Explained, String> {
 pub fn clean_path(typed: &str, top: &str) -> Result<String, String> {
     let trimmed = typed.trim_matches(['\n', '\r']);
     if trimmed.contains(['\n', '\r', '\0']) {
-        return Err("A path can't hold a line break".to_owned());
+        return Err(crate::i18n::text("backend-a-path-can-t-hold-a-line-break-9fb70f").to_owned());
     }
     let mut path = trimmed.replace('\\', "/");
     let top = top.replace('\\', "/");
@@ -119,19 +119,26 @@ pub fn clean_path(typed: &str, top: &str) -> Result<String, String> {
     {
         path = rest.to_owned();
     } else if path.starts_with('/') || path.as_bytes().get(1) == Some(&b':') {
-        return Err(
-            "That path is outside the repository: type it from the repository's top".to_owned(),
-        );
+        return Err(crate::i18n::text(
+            "backend-that-path-is-outside-the-repository-type-it-from-the-repository-s-88d6be",
+        )
+        .to_owned());
     }
     while let Some(rest) = path.strip_prefix("./") {
         path = rest.to_owned();
     }
     let path = path.trim_end_matches('/').to_owned();
     if path.trim().is_empty() || path == "." {
-        return Err("Type the path of a file or folder in the repository".to_owned());
+        return Err(crate::i18n::text(
+            "backend-type-the-path-of-a-file-or-folder-in-the-repository-c824bc",
+        )
+        .to_owned());
     }
     if path.split('/').any(|part| part == "..") {
-        return Err("The path must be inside the repository (no ..)".to_owned());
+        return Err(
+            crate::i18n::text("backend-the-path-must-be-inside-the-repository-no-6fd5ca")
+                .to_owned(),
+        );
     }
     Ok(path)
 }
@@ -168,7 +175,12 @@ fn rule_for(repo: &Path, path: &str) -> Result<Option<Rule>, String> {
         ],
         &[0, 1],
     )
-    .map_err(|e| format!("Could not check the ignore rules: {e}"))?;
+    .map_err(|e| {
+        crate::i18n::message(
+            "backend-could-not-check-the-ignore-rules-e-fd6eab",
+            &[("detail", (e).to_string().into())],
+        )
+    })?;
     Ok(out.lines().next().and_then(parse_check_ignore))
 }
 
@@ -207,8 +219,12 @@ pub fn parse_check_ignore(line: &str) -> Option<Rule> {
 
 /// Every attribute git gives `path` (`check-attr -a -z`).
 fn attributes(repo: &Path, path: &str) -> Result<Vec<Attr>, String> {
-    let out = run(Some(repo), &["check-attr", "-a", "-z", "--", path])
-        .map_err(|e| format!("Could not read the attributes: {e}"))?;
+    let out = run(Some(repo), &["check-attr", "-a", "-z", "--", path]).map_err(|e| {
+        crate::i18n::message(
+            "backend-could-not-read-the-attributes-e-9bbcd0",
+            &[("detail", (e).to_string().into())],
+        )
+    })?;
     Ok(parse_check_attr(&out))
 }
 
@@ -245,7 +261,12 @@ fn line_endings(repo: &Path, path: &str) -> Result<Option<Eol>, String> {
             path,
         ],
     )
-    .map_err(|e| format!("Could not read the line endings: {e}"))?;
+    .map_err(|e| {
+        crate::i18n::message(
+            "backend-could-not-read-the-line-endings-e-8b6f2e",
+            &[("detail", (e).to_string().into())],
+        )
+    })?;
     Ok(out
         .split('\0')
         .filter(|entry| entry.split_once('\t').is_some_and(|(_, p)| p == path))
@@ -365,68 +386,96 @@ pub fn meaning(attrs: &[Attr]) -> Vec<String> {
     };
     let mut out = Vec::new();
     match get("text") {
-        Some("set") => {
-            out.push("Text: git normalises its line endings to LF when storing it.".to_owned())
-        }
+        Some("set") => out.push(
+            crate::i18n::text(
+                "backend-text-git-normalises-its-line-endings-to-lf-when-storing-it-e5c6d9",
+            )
+            .to_owned(),
+        ),
         Some("unset") if get("binary") != Some("set") => out.push(
-            "-text: git never converts its line endings (it is still diffed and merged as text)."
-                .to_owned(),
+            crate::i18n::text(
+                "backend-text-git-never-converts-its-line-endings-it-is-still-diffed-and-m-0869b0",
+            )
+            .to_owned(),
         ),
         Some("auto") => out.push(
-            "text=auto: git decides from its contents whether it is text, and normalises text."
-                .to_owned(),
+            crate::i18n::text(
+                "backend-text-auto-git-decides-from-its-contents-whether-it-is-text-and-no-f26011",
+            )
+            .to_owned(),
         ),
         _ => {}
     }
     match get("eol") {
-        Some("lf") => out.push("Text, checked out with LF line endings.".to_owned()),
-        Some("crlf") => out.push("Text, checked out with CRLF line endings.".to_owned()),
+        Some("lf") => out.push(
+            crate::i18n::text("backend-text-checked-out-with-lf-line-endings-20e453").to_owned(),
+        ),
+        Some("crlf") => out.push(
+            crate::i18n::text("backend-text-checked-out-with-crlf-line-endings-947339").to_owned(),
+        ),
         _ => {}
     }
     if get("binary") == Some("set") {
-        out.push("binary: no diff, no merge, no line-ending conversion.".to_owned());
+        out.push(
+            crate::i18n::text("backend-binary-no-diff-no-merge-no-line-ending-conversion-7c78ce")
+                .to_owned(),
+        );
     }
     match get("filter") {
         Some("lfs") => out.push(
-            "Stored in Git LFS: the repository keeps a pointer, LFS the contents.".to_owned(),
+            crate::i18n::text(
+                "backend-stored-in-git-lfs-the-repository-keeps-a-pointer-lfs-the-contents-e81097",
+            )
+            .to_owned(),
         ),
-        Some(v) if !builtin_value(v) => out.push(format!(
-            "Run through the {v} filter when added and checked out."
+        Some(v) if !builtin_value(v) => out.push(crate::i18n::message(
+            "backend-run-through-the-v-filter-when-added-and-checked-out-87161e",
+            &[("value", (v).to_string().into())],
         )),
         _ => {}
     }
     let binary = get("binary") == Some("set");
     match get("merge") {
         Some("unset") if !binary => out.push(
-            "-merge: any change on both sides is a conflict; your version is left in the working \
-             tree."
-                .to_owned(),
+            crate::i18n::text(
+                "backend-merge-any-change-on-both-sides-is-a-conflict-your-version-is-left-521217",
+            )
+            .to_owned(),
         ),
         Some("union") => out.push(
-            "merge=union: both sides' lines are kept, in no set order and without conflicts: \
-             check the result."
-                .to_owned(),
+            crate::i18n::text(
+                "backend-merge-union-both-sides-lines-are-kept-in-no-set-order-and-without-1de3ba",
+            )
+            .to_owned(),
         ),
-        Some(v) if !builtin_merge(v) => out.push(format!("Merged with the {v} merge driver.")),
+        Some(v) if !builtin_merge(v) => out.push(crate::i18n::message(
+            "backend-merged-with-the-v-merge-driver-22c9b0",
+            &[("value", (v).to_string().into())],
+        )),
         _ => {}
     }
     match get("diff") {
-        Some("unset") if !binary => {
-            out.push("-diff: diffs say only \"Binary files differ\".".to_owned())
-        }
-        Some(v) if BUILTIN_DIFF.contains(&v) => out.push(format!(
-            "Diffed with git's own {v} patterns (function names in hunks)."
+        Some("unset") if !binary => out.push(
+            crate::i18n::text("backend-diff-diffs-say-only-binary-files-differ-da8247").to_owned(),
+        ),
+        Some(v) if BUILTIN_DIFF.contains(&v) => out.push(crate::i18n::message(
+            "backend-diffed-with-git-s-own-v-patterns-function-names-in-hunks-e85843",
+            &[("value", (v).to_string().into())],
         )),
-        Some(v) if !builtin_value(v) => out.push(format!("Diffed with the {v} diff driver.")),
+        Some(v) if !builtin_value(v) => out.push(crate::i18n::message(
+            "backend-diffed-with-the-v-diff-driver-5f19be",
+            &[("value", (v).to_string().into())],
+        )),
         _ => {}
     }
     if let Some(enc) = get("working-tree-encoding").filter(|v| !builtin_value(v)) {
-        out.push(format!(
-            "Kept as {enc} in the working tree, UTF-8 in the repository."
+        out.push(crate::i18n::message(
+            "backend-kept-as-enc-in-the-working-tree-utf-8-in-the-repository-4ef2b1",
+            &[("enc", (enc).to_string().into())],
         ));
     }
     if get("export-ignore") == Some("set") {
-        out.push("Left out of archives (git archive).".to_owned());
+        out.push(crate::i18n::text("backend-left-out-of-archives-git-archive-a96899").to_owned());
     }
     out
 }
@@ -445,7 +494,12 @@ pub fn ignored_files(repo: &Path, max: usize) -> Result<(Vec<String>, usize), St
             "-z",
         ],
     )
-    .map_err(|e| format!("Could not list the ignored files: {e}"))?;
+    .map_err(|e| {
+        crate::i18n::message(
+            "backend-could-not-list-the-ignored-files-e-011113",
+            &[("detail", (e).to_string().into())],
+        )
+    })?;
     let all = collapse(out.split('\0').filter(|p| !p.is_empty()));
     let total = all.len();
     Ok((all.into_iter().take(max).collect(), total))

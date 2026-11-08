@@ -51,10 +51,16 @@ pub struct Spec {
 }
 fn common(ctx: &Context, active: &dyn Fn() -> bool) -> Result<PathBuf, String> {
     if !cfg!(unix) {
-        return Err("Deferred replay and acceptance require proven native Unix cwd ownership. No rewrite was dispatched on this platform".into());
+        return Err(crate::i18n::text(
+            "backend-deferred-replay-and-acceptance-require-proven-native-unix-cwd-own-d64834",
+        )
+        .into());
     }
     if remote::is_remote(&ctx.repo) {
-        return Err("Deferred rewrites require a native checkout and proven native acceptance. No remote rewrite was dispatched".into());
+        return Err(crate::i18n::text(
+            "backend-deferred-rewrites-require-a-native-checkout-and-proven-native-acc-dce663",
+        )
+        .into());
     }
     let bytes = ctx.source(
         &["rev-parse", "--path-format=absolute", "--git-common-dir"],
@@ -64,11 +70,14 @@ fn common(ctx: &Context, active: &dyn Fn() -> bool) -> Result<PathBuf, String> {
     )?;
     let p = PathBuf::from(
         String::from_utf8(bytes)
-            .map_err(|_| "Common directory must be UTF-8")?
+            .map_err(|_| crate::i18n::text("backend-common-directory-must-be-utf-8-6f8d3c"))?
             .trim_end_matches(['\r', '\n']),
     );
     if std::fs::canonicalize(&p).map_err(|e| e.to_string())? != p {
-        return Err("Use the physical native repository path for deferred rewrites".into());
+        return Err(crate::i18n::text(
+            "backend-use-the-physical-native-repository-path-for-deferred-rewrites-ac2265",
+        )
+        .into());
     }
     Ok(p)
 }
@@ -77,7 +86,9 @@ fn valid_id(id: &str) -> bool {
 }
 fn validate(view: &View) -> Result<(), String> {
     if view.jobs.jobs.len() > 64 {
-        return Err("At most 64 deferred jobs are supported".into());
+        return Err(
+            crate::i18n::text("backend-at-most-64-deferred-jobs-are-supported-a36bd5").into(),
+        );
     }
     let mut ids = BTreeSet::new();
     for job in &view.jobs.jobs {
@@ -87,7 +98,7 @@ fn validate(view: &View) -> Result<(), String> {
             || job.steps.len() > 32
             || job.cursor > job.steps.len()
         {
-            return Err("Invalid deferred job metadata".into());
+            return Err(crate::i18n::text("backend-invalid-deferred-job-metadata-cd6ec7").into());
         }
         let mut branches = BTreeSet::new();
         for (i, s) in job.steps.iter().enumerate() {
@@ -120,7 +131,10 @@ fn validate(view: &View) -> Result<(), String> {
                 || !oid_valid(&s.onto)
                 || s.result.as_ref().is_some_and(|r| !oid_valid(r))
             {
-                return Err("Deferred worktree or immutable source metadata is invalid".into());
+                return Err(crate::i18n::text(
+                    "backend-deferred-worktree-or-immutable-source-metadata-is-invalid-49791b",
+                )
+                .into());
             }
         }
     }
@@ -133,7 +147,10 @@ pub fn read(repo: &Path, active: &dyn Fn() -> bool) -> Result<View, String> {
         .source(&["symbolic-ref", "-q", REF], vec![], &[0, 1], active)?
         .is_empty()
     {
-        return Err("Deferred registry must be a direct application ref".into());
+        return Err(crate::i18n::text(
+            "backend-deferred-registry-must-be-a-direct-application-ref-4533c7",
+        )
+        .into());
     }
     let version = String::from_utf8(ctx.source(
         &["rev-parse", "--verify", "-q", REF],
@@ -141,7 +158,7 @@ pub fn read(repo: &Path, active: &dyn Fn() -> bool) -> Result<View, String> {
         &[0, 1],
         active,
     )?)
-    .map_err(|_| "Invalid deferred registry")?
+    .map_err(|_| crate::i18n::text("backend-invalid-deferred-registry-501b3e"))?
     .trim()
     .to_owned();
     let jobs = if version.is_empty() {
@@ -150,12 +167,12 @@ pub fn read(repo: &Path, active: &dyn Fn() -> bool) -> Result<View, String> {
         let n = ctx
             .text(&["cat-file", "-s", &version], vec![], active)?
             .parse::<usize>()
-            .map_err(|_| "Invalid deferred registry size")?;
+            .map_err(|_| crate::i18n::text("backend-invalid-deferred-registry-size-465b87"))?;
         if n > 2 * 1024 * 1024 {
-            return Err("Deferred registry exceeds 2 MiB".into());
+            return Err(crate::i18n::text("backend-deferred-registry-exceeds-2-mib-7f5238").into());
         }
         serde_json::from_slice(&ctx.run(&["cat-file", "blob", &version], vec![], &[0], active)?)
-            .map_err(|_| "Invalid deferred registry JSON")?
+            .map_err(|_| crate::i18n::text("backend-invalid-deferred-registry-json-8fc61b"))?
     };
     let branch = String::from_utf8(ctx.source(
         &["symbolic-ref", "--short", "-q", "HEAD"],
@@ -163,7 +180,7 @@ pub fn read(repo: &Path, active: &dyn Fn() -> bool) -> Result<View, String> {
         &[0, 1],
         active,
     )?)
-    .map_err(|_| "Invalid current branch")?
+    .map_err(|_| crate::i18n::text("backend-invalid-current-branch-34f949"))?
     .trim()
     .to_owned();
     let refs = ctx.source(
@@ -177,10 +194,10 @@ pub fn read(repo: &Path, active: &dyn Fn() -> bool) -> Result<View, String> {
         active,
     )?;
     if refs.len() > 2 * 1024 * 1024 {
-        return Err("Branch preview exceeds 2 MiB".into());
+        return Err(crate::i18n::text("backend-branch-preview-exceeds-2-mib-c90983").into());
     }
     let branches = std::str::from_utf8(&refs)
-        .map_err(|_| "Invalid branches")?
+        .map_err(|_| crate::i18n::text("backend-invalid-branches-683248"))?
         .lines()
         .filter_map(|s| {
             s.split_once('\0')
@@ -200,7 +217,10 @@ pub fn read(repo: &Path, active: &dyn Fn() -> bool) -> Result<View, String> {
 fn check(repo: &Path, v: &View, active: &dyn Fn() -> bool) -> Result<(), String> {
     let now = read(repo, active)?;
     if now.version != v.version || now.common != v.common {
-        return Err("Deferred jobs changed; refresh before continuing".into());
+        return Err(crate::i18n::text(
+            "backend-deferred-jobs-changed-refresh-before-continuing-0f9e9d",
+        )
+        .into());
     }
     Ok(())
 }
@@ -208,11 +228,11 @@ fn save(repo: &Path, view: &mut View, active: &dyn Fn() -> bool) -> Result<(), S
     validate(view)?;
     let ctx = Context::new(repo, active)?;
     if common(&ctx, active)? != view.common {
-        return Err("Repository identity changed".into());
+        return Err(crate::i18n::text("backend-repository-identity-changed-2f0e64").into());
     }
     let bytes = serde_json::to_vec(&view.jobs).map_err(|e| e.to_string())?;
     if bytes.len() > 2 * 1024 * 1024 {
-        return Err("Deferred registry exceeds 2 MiB".into());
+        return Err(crate::i18n::text("backend-deferred-registry-exceeds-2-mib-7f5238").into());
     }
     let new = ctx.blob(bytes, active)?;
     let zero = "0".repeat(new.len());
@@ -239,14 +259,14 @@ fn save(repo: &Path, view: &mut View, active: &dyn Fn() -> bool) -> Result<(), S
                     &[0, 1],
                     active,
                 )?)
-                .map_err(|_| "Invalid deferred pin")?
+                .map_err(|_| crate::i18n::text("backend-invalid-deferred-pin-e1fc9c"))?
                 .trim()
                 .to_owned();
                 if previous.is_empty() {
                     tx.push_str(&format!("create {pin} {oid}\n"));
                 } else if previous != *oid {
                     return Err(
-                        "An immutable deferred result pin changed; inspect it before continuing"
+                        crate::i18n::text("backend-an-immutable-deferred-result-pin-changed-inspect-it-before-contin-1175c3")
                             .into(),
                     );
                 }
@@ -279,7 +299,7 @@ fn save(repo: &Path, view: &mut View, active: &dyn Fn() -> bool) -> Result<(), S
 }
 fn resolve(ctx: &Context, rev: &str, active: &dyn Fn() -> bool) -> Result<String, String> {
     if rev.is_empty() || rev.starts_with('-') || rev.chars().any(char::is_control) {
-        return Err("Choose a branch or immutable commit".into());
+        return Err(crate::i18n::text("backend-choose-a-branch-or-immutable-commit-360acf").into());
     }
     String::from_utf8(ctx.source(
         &[
@@ -293,7 +313,7 @@ fn resolve(ctx: &Context, rev: &str, active: &dyn Fn() -> bool) -> Result<String
         active,
     )?)
     .map(|s| s.trim().into())
-    .map_err(|_| "Invalid revision".into())
+    .map_err(|_| crate::i18n::text("backend-invalid-revision-3e52aa").into())
 }
 fn safe_dir(path: &Path) -> Result<(), String> {
     if let Some(parent) = path.parent() {
@@ -301,7 +321,10 @@ fn safe_dir(path: &Path) -> Result<(), String> {
     }
     match std::fs::symlink_metadata(path) {
         Ok(m) if m.is_dir() && !m.file_type().is_symlink() => Ok(()),
-        Ok(_) => Err("Deferred directory is linked or not a directory".into()),
+        Ok(_) => Err(crate::i18n::text(
+            "backend-deferred-directory-is-linked-or-not-a-directory-925871",
+        )
+        .into()),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
             let mut b = std::fs::DirBuilder::new();
             #[cfg(unix)]
@@ -387,24 +410,35 @@ fn owned_command_at(
     args: &[&str],
 ) -> Result<Vec<String>, String> {
     if !cfg!(unix) {
-        return Err("Deferred replay requires native Unix descriptor ownership; no replay was dispatched on this platform".into());
+        return Err(crate::i18n::text(
+            "backend-deferred-replay-requires-native-unix-descriptor-ownership-no-repl-4a8f0e",
+        )
+        .into());
     }
     if binding != observed {
-        return Err("Deferred metadata/link identity changed; no replay was dispatched".into());
+        return Err(crate::i18n::text(
+            "backend-deferred-metadata-link-identity-changed-no-replay-was-dispatched-65b3b5",
+        )
+        .into());
     }
-    let pin = root_identity.ok_or("No owned directory identity")?;
+    let pin = root_identity.ok_or(crate::i18n::text(
+        "backend-no-owned-directory-identity-e958ff",
+    ))?;
     Ok([
         "-c",
         OWNED_ALIAS,
         "gitcraft-owned-replay",
         pin,
-        worktree.to_str().ok_or("Worktree path must be UTF-8")?,
-        binding
-            .metadata
-            .to_str()
-            .ok_or("Metadata path must be UTF-8")?,
+        worktree.to_str().ok_or(crate::i18n::text(
+            "backend-worktree-path-must-be-utf-8-20c4a0",
+        ))?,
+        binding.metadata.to_str().ok_or(crate::i18n::text(
+            "backend-metadata-path-must-be-utf-8-95f687",
+        ))?,
         &binding.metadata_identity,
-        binding.common.to_str().ok_or("Common path must be UTF-8")?,
+        binding.common.to_str().ok_or(crate::i18n::text(
+            "backend-common-path-must-be-utf-8-169a0d",
+        ))?,
         &binding.common_identity,
         &binding.link_identity,
         &binding.link_text,
@@ -419,9 +453,9 @@ fn owned_run(r: &Runner<'_>, common: &Path, s: &Step, args: &[&str]) -> Result<S
         r,
         common,
         &s.worktree,
-        s.root_identity
-            .as_deref()
-            .ok_or("No owned directory identity")?,
+        s.root_identity.as_deref().ok_or(crate::i18n::text(
+            "backend-no-owned-directory-identity-e958ff",
+        ))?,
         args,
     )
 }
@@ -444,9 +478,10 @@ pub(in crate::git) fn registered_run(
         args,
     )?;
     if !ownership.unchanged() {
-        return Err(
-            "Deferred metadata/link changed before dispatch; no replay was dispatched".into(),
-        );
+        return Err(crate::i18n::text(
+            "backend-deferred-metadata-link-changed-before-dispatch-no-replay-was-disp-3d62f9",
+        )
+        .into());
     }
     let result = run(
         r,
@@ -454,7 +489,7 @@ pub(in crate::git) fn registered_run(
         &words.iter().map(String::as_str).collect::<Vec<_>>(),
     );
     if !ownership.unchanged() {
-        return Err("Deferred ownership changed during replay; identities were checked but an operation may have run through captured physical paths. Inspect and reconcile the retained candidate before continuing".into());
+        return Err(crate::i18n::text("backend-deferred-ownership-changed").into());
     }
     result
 }
@@ -484,7 +519,7 @@ pub fn start(
     let active = || !r.control.is_cancelled();
     check(r.repo, expected, &active)?;
     if specs.is_empty() || specs.len() > 32 {
-        return Err("Select 1–32 replay layers".into());
+        return Err(crate::i18n::text("backend-select-1-32-replay-layers-993fec").into());
     }
     let ctx = Context::new(r.repo, &active)?;
     static IDS: AtomicU64 = AtomicU64::new(0);
@@ -500,7 +535,9 @@ pub fn start(
         let reference = format!("refs/heads/{}", spec.branch);
         ctx.source(&["check-ref-format", &reference], vec![], &[0], &active)?;
         if !branches.insert(spec.branch.clone()) {
-            return Err("A branch appears twice in the replay".into());
+            return Err(
+                crate::i18n::text("backend-a-branch-appears-twice-in-the-replay-30fbdd").into(),
+            );
         }
         let old = resolve(&ctx, &reference, &active)?;
         if old != spec.expected
@@ -513,10 +550,10 @@ pub fn start(
                 )?
                 .is_empty()
         {
-            return Err(
-                "Source branch changed or became indirect since preview; refresh before replaying"
-                    .into(),
-            );
+            return Err(crate::i18n::text(
+                "backend-source-branch-changed-or-became-indirect-since-preview-refresh-be-95f83e",
+            )
+            .into());
         }
 
         let old_base = resolve(&ctx, &spec.old_base, &active)?;
@@ -527,7 +564,11 @@ pub fn start(
             &[0],
             &active,
         )
-        .map_err(|_| "The old base must be an ancestor of the original branch")?;
+        .map_err(|_| {
+            crate::i18n::text(
+                "backend-the-old-base-must-be-an-ancestor-of-the-original-branch-e1c11e",
+            )
+        })?;
         let worktree = expected
             .common
             .join("gitcraft/deferred-rewrites")
@@ -555,7 +596,10 @@ pub fn start(
         cursor: 0,
         busy: false,
         cancelled: false,
-        notice: "Prepared immutable replay inputs; original branches retained".into(),
+        notice: crate::i18n::text(
+            "backend-prepared-immutable-replay-inputs-original-branches-retained-3bc283",
+        )
+        .into(),
     });
     save(r.repo, &mut view, &active)?;
     resume(r, &view, &id)
@@ -573,26 +617,32 @@ fn ownership_paths(
             .ok()
             .map(|s| s.trim_end_matches(['\r', '\n']).to_owned())
     };
-    let gitfile = text(gitfile).ok_or("Invalid owned Git link")?;
-    let gitdir = PathBuf::from(
-        gitfile
-            .strip_prefix("gitdir: ")
-            .ok_or("Candidate is not a linked worktree")?,
-    );
+    let gitfile =
+        text(gitfile).ok_or(crate::i18n::text("backend-invalid-owned-git-link-80fea5"))?;
+    let gitdir = PathBuf::from(gitfile.strip_prefix("gitdir: ").ok_or(crate::i18n::text(
+        "backend-candidate-is-not-a-linked-worktree-41ee36",
+    ))?);
     let relative = gitdir
         .strip_prefix(common.join("worktrees"))
-        .map_err(|_| "Candidate belongs to another repository")?;
+        .map_err(|_| crate::i18n::text("backend-candidate-belongs-to-another-repository-621077"))?;
     if relative.components().count() != 1
         || !matches!(
             relative.components().next(),
             Some(std::path::Component::Normal(_))
         )
     {
-        return Err("Candidate metadata is outside its owned registration".into());
+        return Err(crate::i18n::text(
+            "backend-candidate-metadata-is-outside-its-owned-registration-ee927f",
+        )
+        .into());
     }
-    let backlink = text(backlink).ok_or("Invalid owned Git backlink")?;
+    let backlink = text(backlink).ok_or(crate::i18n::text(
+        "backend-invalid-owned-git-backlink-2a6784",
+    ))?;
     if Path::new(&backlink) != worktree.join(".git") {
-        return Err("Candidate registration backlink changed".into());
+        return Err(
+            crate::i18n::text("backend-candidate-registration-backlink-changed-73c0cc").into(),
+        );
     }
     Ok(gitdir)
 }
@@ -622,7 +672,10 @@ fn root_identity(path: &Path) -> Result<String, String> {
     #[cfg(any(unix, windows))]
     return crate::git::recovery::native_file_identity(&file).map(|v| v.0);
     #[cfg(not(any(unix, windows)))]
-    Err("Stable worktree directory identities are unavailable on this platform".into())
+    Err(crate::i18n::text(
+        "backend-stable-worktree-directory-identities-are-unavailable-on-this-plat-d2adb7",
+    )
+    .into())
 }
 #[cfg(unix)]
 fn filesystem_owned_at(
@@ -632,7 +685,9 @@ fn filesystem_owned_at(
 ) -> Result<Ownership, String> {
     use native_files::{Directory, Snapshot};
     if std::fs::canonicalize(worktree).map_err(|e| e.to_string())? != worktree {
-        return Err("Deferred worktree physical path changed".into());
+        return Err(
+            crate::i18n::text("backend-deferred-worktree-physical-path-changed-898b40").into(),
+        );
     }
     let root = Directory::open(worktree).map_err(|e| e.to_string())?;
     if identity
@@ -642,17 +697,22 @@ fn filesystem_owned_at(
                 .as_str(),
         )
     {
-        return Err("Deferred worktree identity changed".into());
+        return Err(crate::i18n::text("backend-deferred-worktree-identity-changed-c453de").into());
     }
-    let link = Snapshot::read(&root, ".git", 8192)?.ok_or("Candidate Git link missing")?;
-    let text = std::str::from_utf8(&link.bytes).map_err(|_| "Invalid owned Git link")?;
+    let link = Snapshot::read(&root, ".git", 8192)?.ok_or(crate::i18n::text(
+        "backend-candidate-git-link-missing-504a57",
+    ))?;
+    let text = std::str::from_utf8(&link.bytes)
+        .map_err(|_| crate::i18n::text("backend-invalid-owned-git-link-80fea5"))?;
     if text.contains('\0') {
-        return Err("Invalid owned Git link".into());
+        return Err(crate::i18n::text("backend-invalid-owned-git-link-80fea5").into());
     }
     let path = PathBuf::from(
         text.trim_end_matches(['\r', '\n'])
             .strip_prefix("gitdir: ")
-            .ok_or("Candidate is not a linked worktree")?,
+            .ok_or(crate::i18n::text(
+                "backend-candidate-is-not-a-linked-worktree-41ee36",
+            ))?,
     );
     // Validate its single registration component before opening its files.
     ownership_paths(
@@ -662,26 +722,31 @@ fn filesystem_owned_at(
         worktree
             .join(".git")
             .to_str()
-            .ok_or("Non UTF-8 worktree")?
+            .ok_or(crate::i18n::text("backend-non-utf-8-worktree-c28e6c"))?
             .as_bytes(),
     )?;
     if std::fs::canonicalize(&path).map_err(|e| e.to_string())? != path
         || std::fs::canonicalize(common).map_err(|e| e.to_string())? != common
     {
-        return Err("Deferred metadata/common directory is linked".into());
+        return Err(crate::i18n::text(
+            "backend-deferred-metadata-common-directory-is-linked-8d7429",
+        )
+        .into());
     }
     let metadata = Directory::open(&path).map_err(|e| e.to_string())?;
     let common_dir = Directory::open(common).map_err(|e| e.to_string())?;
-    let backlink =
-        Snapshot::read(&metadata, "gitdir", 8192)?.ok_or("Candidate backlink missing")?;
+    let backlink = Snapshot::read(&metadata, "gitdir", 8192)?.ok_or(crate::i18n::text(
+        "backend-candidate-backlink-missing-25d58b",
+    ))?;
     ownership_paths(common, worktree, &link.bytes, &backlink.bytes)?;
-    let common_link = Snapshot::read(&metadata, "commondir", 8192)?
-        .ok_or("Candidate common directory link missing")?;
+    let common_link = Snapshot::read(&metadata, "commondir", 8192)?.ok_or(crate::i18n::text(
+        "backend-candidate-common-directory-link-missing-0140f5",
+    ))?;
     let common_text = std::str::from_utf8(&common_link.bytes)
-        .map_err(|_| "Invalid common link")?
+        .map_err(|_| crate::i18n::text("backend-invalid-common-link-720f23"))?
         .trim_end_matches(['\r', '\n']);
     if std::fs::canonicalize(path.join(common_text)).map_err(|e| e.to_string())? != common {
-        return Err("Candidate common directory changed".into());
+        return Err(crate::i18n::text("backend-candidate-common-directory-changed-2dc85f").into());
     }
     let binding = DispatchBinding {
         metadata: path,
@@ -702,13 +767,19 @@ fn filesystem_owned_at(
         || !backlink.same_at(&owned.metadata, "gitdir")
         || !common_link.same_at(&owned.metadata, "commondir")
     {
-        return Err("Deferred ownership moved while observing it".into());
+        return Err(crate::i18n::text(
+            "backend-deferred-ownership-moved-while-observing-it-f456a7",
+        )
+        .into());
     }
     Ok(owned)
 }
 #[cfg(not(unix))]
 fn filesystem_owned_at(_: &Path, _: &Path, _: Option<&str>) -> Result<Ownership, String> {
-    Err("Deferred native descriptor ownership unavailable on this platform".into())
+    Err(crate::i18n::text(
+        "backend-deferred-native-descriptor-ownership-unavailable-on-this-platform-6866ca",
+    )
+    .into())
 }
 fn owned(repo: &Path, common: &Path, s: &Step) -> Result<Ownership, String> {
     owned_at(repo, common, &s.worktree, s.root_identity.as_deref())
@@ -723,15 +794,20 @@ fn owned_at(
     let wt = git::worktree_list(repo, None)?
         .into_iter()
         .find(|w| w.path == worktree)
-        .ok_or("Deferred worktree is missing or no longer registered; no replay was dispatched")?;
+        .ok_or(crate::i18n::text(
+            "backend-deferred-worktree-is-missing-or-no-longer-registered-no-replay-wa-ed9a59",
+        ))?;
     if wt.branch.is_some() {
-        return Err("Deferred replay worktree is attached to a branch; detach it before continuing so no original branch is rewritten".into());
+        return Err(crate::i18n::text(
+            "backend-deferred-replay-worktree-is-attached-to-a-branch-detach-it-before-bc5b06",
+        )
+        .into());
     }
     if !ownership.unchanged() {
-        return Err(
-            "Deferred ownership changed while reading registrations; no replay was dispatched"
-                .into(),
-        );
+        return Err(crate::i18n::text(
+            "backend-deferred-ownership-changed-while-reading-registrations-no-replay-08ff21",
+        )
+        .into());
     }
     Ok(ownership)
 }
@@ -747,10 +823,16 @@ pub(in crate::git) fn registered_identity(
 }
 fn acceptance_allowed(job: &Job, undo: bool) -> Result<(), String> {
     if job.busy {
-        return Err("Acceptance outcome is uncertain. Inspect its recovery evidence and reconcile exact receipts before any acceptance or undo retry".into());
+        return Err(crate::i18n::text(
+            "backend-acceptance-outcome-is-uncertain-inspect-its-recovery-evidence-and-823070",
+        )
+        .into());
     }
     if job.cursor != job.steps.len() || (job.cancelled && !undo) {
-        return Err("Complete every candidate before accepting; closed proposals can only undo already accepted layers".into());
+        return Err(crate::i18n::text(
+            "backend-complete-every-candidate-before-accepting-closed-proposals-can-on-6478dd",
+        )
+        .into());
     }
     Ok(())
 }
@@ -806,9 +888,12 @@ pub fn resume(r: &Runner<'_>, expected: &View, id: &str) -> Result<String, Strin
         .jobs
         .iter()
         .position(|j| j.id == id)
-        .ok_or("Job disappeared")?;
+        .ok_or(crate::i18n::text("backend-job-disappeared-b3757e"))?;
     if view.jobs.jobs[j].cancelled {
-        return Err("This proposal is closed; its worktrees and results were retained".into());
+        return Err(crate::i18n::text(
+            "backend-this-proposal-is-closed-its-worktrees-and-results-were-retained-bb7c5e",
+        )
+        .into());
     }
     while view.jobs.jobs[j].cursor < view.jobs.jobs[j].steps.len() {
         let i = view.jobs.jobs[j].cursor;
@@ -823,18 +908,19 @@ pub fn resume(r: &Runner<'_>, expected: &View, id: &str) -> Result<String, Strin
             }
         }
         view.jobs.jobs[j].busy = true;
-        view.jobs.jobs[j].notice="Replay is in flight or its outcome needs reconciliation after interruption. Continue explicitly to inspect its owned worktree".into();
+        view.jobs.jobs[j].notice = crate::i18n::text(
+            "backend-replay-is-in-flight-or-its-outcome-needs-reconciliation-after-int-1ce19b",
+        )
+        .into();
         save(r.repo, &mut view, &active)?;
         let mut s = view.jobs.jobs[j].steps[i].clone();
         if !s.made {
-            safe_dir(
-                s.worktree
-                    .parent()
-                    .ok_or("Missing owned workspace parent")?,
-            )?;
+            safe_dir(s.worktree.parent().ok_or(crate::i18n::text(
+                "backend-missing-owned-workspace-parent-421bdd",
+            ))?)?;
             if s.worktree.exists() {
                 return Err(
-                    "Owned path already exists; it was retained rather than adopted or reset"
+                    crate::i18n::text("backend-owned-path-already-exists-it-was-retained-rather-than-adopted-or-78089b")
                         .into(),
                 );
             }
@@ -847,13 +933,16 @@ pub fn resume(r: &Runner<'_>, expected: &View, id: &str) -> Result<String, Strin
                     "--detach",
                     "--lock",
                     "--reason=gitcraft deferred replay",
-                    s.worktree.to_str().ok_or("Worktree path must be UTF-8")?,
+                    s.worktree.to_str().ok_or(crate::i18n::text(
+                        "backend-worktree-path-must-be-utf-8-20c4a0",
+                    ))?,
                     &s.old,
                 ],
             );
             if let Err(e) = result {
-                view.jobs.jobs[j].notice = format!(
-                    "Worktree creation stopped; inspect the retained path before retrying: {e}"
+                view.jobs.jobs[j].notice = crate::i18n::message(
+                    "backend-worktree-creation-stopped-inspect-the-retained-path-before-retryi-32e9f2",
+                    &[("detail", (e).to_string().into())],
                 );
                 save(r.repo, &mut view, &active)?;
                 return Err(e);
@@ -876,7 +965,10 @@ pub fn resume(r: &Runner<'_>, expected: &View, id: &str) -> Result<String, Strin
             Replay::Reconcile => {
                 // Explicit continuation reconciles a completed detached replay after a lost
                 // acknowledgement. It does not rerun or reset that user's resolution work.
-                Ok("Reconciled the current detached candidate".into())
+                Ok(
+                    crate::i18n::text("backend-reconciled-the-current-detached-candidate-b853a7")
+                        .into(),
+                )
             }
             Replay::Start => owned_run(
                 r,
@@ -907,14 +999,17 @@ pub fn resume(r: &Runner<'_>, expected: &View, id: &str) -> Result<String, Strin
                             .take(4000)
                             .collect::<String>()
                     })
-                    .unwrap_or_else(|| "Replay remains in progress".into());
-                format!(
-                    "Replay stopped: {detail}. Inspect the owned worktree and continue explicitly; originals were retained"
+                    .unwrap_or_else(|| {
+                        crate::i18n::text("backend-deferred-replay-in-progress").into()
+                    });
+                crate::i18n::message(
+                    "backend-deferred-replay-stopped",
+                    &[("detail", detail.into())],
                 )
             } else {
-                format!(
-                    "Conflicts waiting in {}. Resolve and stage them there, then Continue",
-                    s.branch
+                crate::i18n::message(
+                    "backend-conflicts-waiting-in-resolve-and-stage-them-there-then-continue-b65c65",
+                    &[("branch", (s.branch).to_string().into())],
                 )
             };
             save(r.repo, &mut view, &active)?;
@@ -928,26 +1023,33 @@ pub fn resume(r: &Runner<'_>, expected: &View, id: &str) -> Result<String, Strin
         )?
         .is_empty()
         {
-            return Err("Candidate has uncommitted/untracked work; retain or commit it before declaring the replay complete".into());
+            return Err(crate::i18n::text(
+                "backend-candidate-has-uncommitted-untracked-work-retain-or-commit-it-befo-cf9313",
+            )
+            .into());
         }
         let candidate = git::resolve(&s.worktree, "HEAD")?;
         git::run(
             Some(&s.worktree),
             &["merge-base", "--is-ancestor", &s.onto, &candidate],
         )
-        .map_err(
-            |_| "Candidate no longer contains its reviewed new base; inspect it before continuing",
-        )?;
+        .map_err(|_| {
+            crate::i18n::text(
+                "backend-candidate-no-longer-contains-its-reviewed-new-base-inspect-it-bef-8e0115",
+            )
+        })?;
         view.jobs.jobs[j].steps[i].result = Some(candidate);
         view.jobs.jobs[j].cursor += 1;
         view.jobs.jobs[j].busy = false;
-        view.jobs.jobs[j].notice = "Candidate layer saved; original branch retained".into();
+        view.jobs.jobs[j].notice =
+            crate::i18n::text("backend-candidate-layer-saved-original-branch-retained-21f878")
+                .into();
         save(r.repo, &mut view, &active)?;
     }
-    Ok(
-        "Every candidate is ready for explicit guarded acceptance. Original branches are unchanged"
-            .into(),
+    Ok(crate::i18n::text(
+        "backend-every-candidate-is-ready-for-explicit-guarded-acceptance-original-63dc66",
     )
+    .into())
 }
 pub fn close(
     repo: &Path,
@@ -962,12 +1064,14 @@ pub fn close(
         .jobs
         .iter_mut()
         .find(|j| j.id == id)
-        .ok_or("Job disappeared")?;
+        .ok_or(crate::i18n::text("backend-job-disappeared-b3757e"))?;
     j.cancelled = true;
-    j.notice =
-        "Proposal closed; owned worktrees, resolution work and immutable results retained".into();
+    j.notice = crate::i18n::text(
+        "backend-proposal-closed-owned-worktrees-resolution-work-and-immutable-res-1ccf73",
+    )
+    .into();
     save(repo, &mut next, active)?;
-    Ok("Proposal closed; nothing was deleted or reset".into())
+    Ok(crate::i18n::text("backend-proposal-closed-nothing-was-deleted-or-reset-3f9c8e").into())
 }
 fn acceptance_place(
     r: &Runner<'_>,
@@ -982,7 +1086,10 @@ fn acceptance_place(
         .filter(|w| w.branch.as_deref() == Some(branch))
         .collect::<Vec<_>>();
     if places.len() > 1 {
-        return Err("Branch is checked out in multiple worktrees; make its acceptance target unambiguous first".into());
+        return Err(crate::i18n::text(
+            "backend-branch-is-checked-out-in-multiple-worktrees-make-its-acceptance-t-68b867",
+        )
+        .into());
     }
     if let Some(w) = places.first() {
         return Ok(w.path.clone());
@@ -993,9 +1100,14 @@ fn acceptance_place(
         .join(id)
         .join(format!("accept-{i}"));
     if p.exists() {
-        return Err("An earlier acceptance workspace exists but is not attached to this branch; inspect it instead of overwriting it".into());
+        return Err(crate::i18n::text(
+            "backend-an-earlier-acceptance-workspace-exists-but-is-not-attached-to-thi-715aa8",
+        )
+        .into());
     }
-    safe_dir(p.parent().ok_or("Missing acceptance parent")?)?;
+    safe_dir(p.parent().ok_or(crate::i18n::text(
+        "backend-missing-acceptance-parent-152c38",
+    ))?)?;
     run(
         r,
         r.repo,
@@ -1004,7 +1116,8 @@ fn acceptance_place(
             "add",
             "--lock",
             "--reason=gitcraft guarded acceptance",
-            p.to_str().ok_or("Invalid acceptance path")?,
+            p.to_str()
+                .ok_or(crate::i18n::text("backend-invalid-acceptance-path-46b7dd"))?,
             branch,
         ],
     )?;
@@ -1019,7 +1132,7 @@ pub fn accept(r: &Runner<'_>, expected: &View, id: &str, undo: bool) -> Result<S
         .jobs
         .iter()
         .position(|j| j.id == id)
-        .ok_or("Job disappeared")?;
+        .ok_or(crate::i18n::text("backend-job-disappeared-b3757e"))?;
     acceptance_allowed(&view.jobs.jobs[j], undo)?;
     let indices = if undo {
         (0..view.jobs.jobs[j].steps.len()).rev().collect::<Vec<_>>()
@@ -1031,16 +1144,18 @@ pub fn accept(r: &Runner<'_>, expected: &View, id: &str, undo: bool) -> Result<S
         if s.accepted != undo {
             continue;
         }
-        let result = s.result.as_deref().ok_or("No immutable candidate result")?;
+        let result = s.result.as_deref().ok_or(crate::i18n::text(
+            "backend-no-immutable-candidate-result-5fa445",
+        ))?;
         let (old, new) = if undo {
             (result, s.old.as_str())
         } else {
             (s.old.as_str(), result)
         };
         if git::resolve(r.repo, &format!("refs/heads/{}", s.branch))? != old {
-            return Err(format!(
-                "{} changed since this proposal; no update of that branch was attempted",
-                s.branch
+            return Err(crate::i18n::message(
+                "backend-changed-since-this-proposal-no-update-of-that-branch-was-attempte-4c03d4",
+                &[("branch", (s.branch).to_string().into())],
             ));
         }
         owned(r.repo, &view.common, &s)?;
@@ -1053,15 +1168,14 @@ pub fn accept(r: &Runner<'_>, expected: &View, id: &str, undo: bool) -> Result<S
                 )?
                 .is_empty())
         {
-            return Err("Candidate changed or contains unresolved work; refresh and review it before accepting".into());
+            return Err(crate::i18n::text(
+                "backend-candidate-changed-or-contains-unresolved-work-refresh-and-review-c12d9a",
+            )
+            .into());
         }
         let place = acceptance_place(r, &view, id, i, &s.branch)?;
         view.jobs.jobs[j].busy = true;
-        view.jobs.jobs[j].notice = format!(
-            "Guarded {} of {} in flight. An interrupted acknowledgement requires inspection before retrying",
-            if undo { "undo" } else { "acceptance" },
-            s.branch
-        );
+        view.jobs.jobs[j].notice = guarded_in_flight(&s.branch, undo);
         save(r.repo, &mut view, &active)?;
         let result = crate::push_preflight::accept_rewrite(
             &place,
@@ -1072,23 +1186,25 @@ pub fn accept(r: &Runner<'_>, expected: &View, id: &str, undo: bool) -> Result<S
         if result.is_ok() {
             view.jobs.jobs[j].steps[i].accepted = !undo;
             view.jobs.jobs[j].busy = false;
-            view.jobs.jobs[j].notice = format!(
-                "{} {} as {}",
-                if undo { "Restored" } else { "Accepted" },
-                s.branch,
-                new
-            );
+            view.jobs.jobs[j].notice = accepted_tip(&s.branch, new, undo);
             save(r.repo, &mut view, &active)?;
         } else {
-            view.jobs.jobs[j].notice="Guarded acceptance stopped. Earlier successful layers retain their receipts. Inspect HEAD, index, files and the native recovery evidence before retrying; no automatic reset was attempted".into();
+            view.jobs.jobs[j].notice = crate::i18n::text(
+                "backend-guarded-acceptance-stopped-earlier-successful-layers-retain-their-61ef3b",
+            )
+            .into();
             save(r.repo, &mut view, &active)?;
             return result.map(|_| String::new());
         }
     }
     Ok(if undo {
-        "Restored accepted original tips through guarded transactions"
+        crate::i18n::text(
+            "backend-restored-accepted-original-tips-through-guarded-transactions-2bec9f",
+        )
     } else {
-        "Accepted candidate layers through guarded transactions; per-layer receipts retained"
+        crate::i18n::text(
+            "backend-accepted-candidate-layers-through-guarded-transactions-per-layer-8a4829",
+        )
     }
     .into())
 }
@@ -1106,14 +1222,17 @@ pub fn reconcile(
         .jobs
         .iter_mut()
         .find(|j| j.id == id)
-        .ok_or("Job disappeared")?;
+        .ok_or(crate::i18n::text("backend-job-disappeared-b3757e"))?;
     for s in &mut j.steps {
         let Some(candidate) = &s.result else {
             continue;
         };
         let actual = git::resolve(repo, &format!("refs/heads/{}", s.branch))?;
         if actual != s.old && actual != *candidate {
-            return Err("An original branch has another tip; preserve and review that new work instead of reconciling automatically".into());
+            return Err(crate::i18n::text(
+                "backend-an-original-branch-has-another-tip-preserve-and-review-that-new-w-f7dd61",
+            )
+            .into());
         }
         for w in git::worktree_list(repo, None)?
             .iter()
@@ -1125,7 +1244,7 @@ pub fn reconcile(
             )?
             .is_empty()
             {
-                return Err("An original worktree has edits or an incomplete checkout. Inspect and resolve it before reconciling the acceptance receipt".into());
+                return Err(crate::i18n::text("backend-an-original-worktree-has-edits-or-an-incomplete-checkout-inspect-b7498f").into());
             }
         }
         if s.old != *candidate {
@@ -1133,9 +1252,15 @@ pub fn reconcile(
         }
     }
     j.busy = false;
-    j.notice="Acceptance receipts reconciled to exact original/candidate OIDs after clean worktree inspection".into();
+    j.notice = crate::i18n::text(
+        "backend-acceptance-receipts-reconciled-to-exact-original-candidate-oids-a-16087e",
+    )
+    .into();
     save(repo, &mut next, active)?;
-    Ok("Reconciled exact branch tips; no files or branches were changed".into())
+    Ok(crate::i18n::text(
+        "backend-reconciled-exact-branch-tips-no-files-or-branches-were-changed-2c67be",
+    )
+    .into())
 }
 
 #[cfg(test)]
@@ -1369,3 +1494,64 @@ pub(crate) mod tests {
 #[cfg(test)]
 #[path = "deferred/runtime_tests.rs"]
 mod runtime_tests;
+
+fn guarded_in_flight(branch: &str, undo: bool) -> String {
+    crate::i18n::message(
+        if undo {
+            "backend-deferred-undo-in-flight"
+        } else {
+            "backend-deferred-acceptance-in-flight"
+        },
+        &[("branch", branch.into())],
+    )
+}
+
+fn accepted_tip(branch: &str, oid: &str, undo: bool) -> String {
+    crate::i18n::message(
+        if undo {
+            "backend-deferred-restored-tip"
+        } else {
+            "backend-deferred-accepted-tip"
+        },
+        &[("branch", branch.into()), ("oid", oid.into())],
+    )
+}
+
+#[cfg(test)]
+mod backend_fluent_notice_tests {
+    #[test]
+    fn backend_fluent_deferred_notices_preserve_branch_and_tip() {
+        for locale in ["en-US", "de"] {
+            crate::i18n::set_language(locale);
+            for (undo, english, german) in [
+                (
+                    false,
+                    "Accepted de/feature as abc123",
+                    "de/feature als abc123 übernommen.",
+                ),
+                (
+                    true,
+                    "Restored de/feature as abc123",
+                    "de/feature als abc123 wiederhergestellt.",
+                ),
+            ] {
+                assert_eq!(
+                    super::accepted_tip("de/feature", "abc123", undo),
+                    if locale == "de" { german } else { english }
+                );
+                let notice = super::guarded_in_flight("de/feature", undo);
+                assert!(notice.contains("de/feature"));
+                if locale == "de" {
+                    assert!(notice.contains(if undo {
+                        "Rückgängigmachen"
+                    } else {
+                        "Übernahme"
+                    }));
+                } else {
+                    assert!(notice.contains(if undo { "undo" } else { "acceptance" }));
+                }
+            }
+        }
+        crate::i18n::set_language("en-US");
+    }
+}

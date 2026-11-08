@@ -158,23 +158,36 @@ impl UnitySetup {
     /// LFS is the repository's choice and doesn't count.
     pub fn needs_fixing(&self) -> Option<String> {
         if self.force_text == Some(false) {
-            return Some("assets aren't saved as text".to_owned());
+            return Some(
+                crate::i18n::text("backend-assets-aren-t-saved-as-text-bc57da").to_owned(),
+            );
         }
         if self.visible_meta() == Some(false) {
-            return Some(".meta files are hidden".to_owned());
+            return Some(crate::i18n::text("backend-meta-files-are-hidden-2c8bdc").to_owned());
         }
         if let Some(d) = self.tracked_generated.first() {
-            return Some(format!("{d} has files committed"));
+            return Some(crate::i18n::message(
+                "backend-d-has-files-committed-90143a",
+                &[("d", (d).to_string().into())],
+            ));
         }
         if let Some(d) = self
             .unignored
             .iter()
             .find(|d| matches!(d.as_str(), "Library" | "Temp"))
         {
-            return Some(format!("{d} isn't ignored"));
+            return Some(crate::i18n::message(
+                "backend-d-isn-t-ignored-560779",
+                &[("d", (d).to_string().into())],
+            ));
         }
         if self.missing_yaml.len() == UNITY_YAML.len() {
-            return Some("scenes and prefabs aren't merged with Smart Merge".to_owned());
+            return Some(
+                crate::i18n::text(
+                    "backend-scenes-and-prefabs-aren-t-merged-with-smart-merge-79e82c",
+                )
+                .to_owned(),
+            );
         }
         None
     }
@@ -385,7 +398,15 @@ pub fn append_block(repo: &Path, rel: &str, block: &str) -> Result<(), String> {
     let text = match crate::remote::read_to_string(&file) {
         Ok(t) => t,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
-        Err(e) => return Err(format!("Could not read {rel}: {e}")),
+        Err(e) => {
+            return Err(crate::i18n::message(
+                "backend-could-not-read-rel-e-22a177",
+                &[
+                    ("rel", (rel).to_string().into()),
+                    ("detail", (e).to_string().into()),
+                ],
+            ));
+        }
     };
     let crlf = text.contains("\r\n");
     let mut out = text.clone();
@@ -402,7 +423,15 @@ pub fn append_block(repo: &Path, rel: &str, block: &str) -> Result<(), String> {
     } else {
         block.to_owned()
     });
-    crate::remote::write(&file, out.as_bytes()).map_err(|e| format!("Could not write {rel}: {e}"))
+    crate::remote::write(&file, out.as_bytes()).map_err(|e| {
+        crate::i18n::message(
+            "backend-could-not-write-rel-e-38ec61",
+            &[
+                ("rel", (rel).to_string().into()),
+                ("detail", (e).to_string().into()),
+            ],
+        )
+    })
 }
 
 /// An asset or folder staged without its `.meta`, or a `.meta` without its asset.

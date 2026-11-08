@@ -25,16 +25,19 @@ impl Snapshot {
         match (&self.bytes, &self.identity, &self.modified) {
             (None, None, None) => Ok(None),
             (Some(bytes), Some(id), Some(time)) if id.len() <= 256 && time.len() <= 128 => {
-                let bytes = B64
-                    .decode(bytes)
-                    .map_err(|_| "Invalid ignore-file snapshot")?;
+                let bytes = B64.decode(bytes).map_err(|_| {
+                    crate::i18n::text("backend-invalid-ignore-file-snapshot-f7dbde")
+                })?;
                 if bytes.len() > LIMIT || bytes.contains(&0) || std::str::from_utf8(&bytes).is_err()
                 {
-                    return Err("Ignore file must be UTF-8 text within64KiB".into());
+                    return Err(crate::i18n::text(
+                        "backend-ignore-file-must-be-utf-8-text-within64kib-75c96a",
+                    )
+                    .into());
                 }
                 Ok(Some(bytes))
             }
-            _ => Err("Incomplete ignore-file identity".into()),
+            _ => Err(crate::i18n::text("backend-incomplete-ignore-file-identity-1bffaf").into()),
         }
     }
 }
@@ -66,7 +69,9 @@ fn payload(commit: &str) -> Vec<u8> {
 /// complete patch for deliberate human inspection; it must not call this semantic proof.
 fn whitespace_patch(reader: &Reader<'_>, commit: &str) -> Result<String, String> {
     if !oid(commit) {
-        return Err("Choose an immutable formatting commit".into());
+        return Err(
+            crate::i18n::text("backend-choose-an-immutable-formatting-commit-0a1ec4").into(),
+        );
     }
     let parents = reader.run(
         &[
@@ -80,13 +85,17 @@ fn whitespace_patch(reader: &Reader<'_>, commit: &str) -> Result<String, String>
         vec![],
         &[0],
     )?;
-    let parents = std::str::from_utf8(&parents).map_err(|_| "Invalid commit parents")?;
+    let parents = std::str::from_utf8(&parents)
+        .map_err(|_| crate::i18n::text("backend-invalid-commit-parents-8430cf"))?;
     let parents: Vec<_> = parents.split_whitespace().collect();
     let [parent] = parents.as_slice() else {
-        return Err("Only single-parent whitespace commits can be added here".into());
+        return Err(crate::i18n::text(
+            "backend-only-single-parent-whitespace-commits-can-be-added-here-747852",
+        )
+        .into());
     };
     if !oid(parent) {
-        return Err("Invalid formatting parent".into());
+        return Err(crate::i18n::text("backend-invalid-formatting-parent-1a34d8").into());
     }
     let raw = reader.run(
         &[
@@ -111,13 +120,19 @@ fn whitespace_patch(reader: &Reader<'_>, commit: &str) -> Result<String, String>
     while let Some(header) = fields.next() {
         files += 1;
         if files > 16 {
-            return Err("Formatting preview is limited to16changed files".into());
+            return Err(crate::i18n::text(
+                "backend-formatting-preview-is-limited-to16changed-files-417caf",
+            )
+            .into());
         }
-        let _path = fields.next().ok_or("Truncated formatting path")?;
-        let header = std::str::from_utf8(header).map_err(|_| "Invalid formatting metadata")?;
+        let _path = fields.next().ok_or(crate::i18n::text(
+            "backend-truncated-formatting-path-4a462e",
+        ))?;
+        let header = std::str::from_utf8(header)
+            .map_err(|_| crate::i18n::text("backend-invalid-formatting-metadata-0e00ea"))?;
         let f: Vec<_> = header.trim_start_matches(':').split_whitespace().collect();
         let [old_mode, new_mode, old, new, status] = f.as_slice() else {
-            return Err("Malformed formatting change".into());
+            return Err(crate::i18n::text("backend-malformed-formatting-change-c905a3").into());
         };
         if old_mode != new_mode
             || !matches!(*old_mode, "100644" | "100755")
@@ -125,7 +140,10 @@ fn whitespace_patch(reader: &Reader<'_>, commit: &str) -> Result<String, String>
             || !oid(old)
             || !oid(new)
         {
-            return Err("Formatting candidates cannot add/delete/rename files, change modes or include links/submodules".into());
+            return Err(crate::i18n::text(
+                "backend-formatting-candidates-cannot-add-delete-rename-files-change-modes-482a3d",
+            )
+            .into());
         }
         let mut versions = Vec::new();
         for id in [*old, *new] {
@@ -133,14 +151,22 @@ fn whitespace_patch(reader: &Reader<'_>, commit: &str) -> Result<String, String>
             let size = std::str::from_utf8(&size)
                 .ok()
                 .and_then(|s| s.trim().parse::<usize>().ok())
-                .ok_or("Invalid formatting blob size")?;
+                .ok_or(crate::i18n::text(
+                    "backend-invalid-formatting-blob-size-1cf4e4",
+                ))?;
             total = total.saturating_add(size);
             if size > 2 * 1024 * 1024 || total > 8 * 1024 * 1024 {
-                return Err("Formatting preview exceeds2MiB/blob or8MiB total".into());
+                return Err(crate::i18n::text(
+                    "backend-formatting-preview-exceeds2mib-blob-or8mib-total-f805cb",
+                )
+                .into());
             }
             let bytes = reader.run(&["cat-file", "blob", id], vec![], &[0])?;
             if bytes.len() != size || bytes.contains(&0) {
-                return Err("Binary/incomplete versions cannot be classified as formatting".into());
+                return Err(crate::i18n::text(
+                    "backend-binary-incomplete-versions-cannot-be-classified-as-formatting-4d9fbb",
+                )
+                .into());
             }
             let actual = reader.run(
                 &["hash-object", "--no-filters", "--stdin"],
@@ -148,17 +174,27 @@ fn whitespace_patch(reader: &Reader<'_>, commit: &str) -> Result<String, String>
                 &[0],
             )?;
             if actual.trim_ascii() != id.as_bytes() {
-                return Err("Formatting object identity changed".into());
+                return Err(
+                    crate::i18n::text("backend-formatting-object-identity-changed-21c4eb").into(),
+                );
             }
-            versions.push(String::from_utf8(bytes).map_err(|_| "Non-UTF-8 formatting version")?);
+            versions.push(
+                String::from_utf8(bytes).map_err(|_| {
+                    crate::i18n::text("backend-non-utf-8-formatting-version-f771ba")
+                })?,
+            );
         }
         let normalized = |s: &str| s.chars().filter(|c| !c.is_whitespace()).collect::<String>();
         if normalized(&versions[0]) != normalized(&versions[1]) {
-            return Err("Commit contains non-whitespace changes".into());
+            return Err(
+                crate::i18n::text("backend-commit-contains-non-whitespace-changes-5b4389").into(),
+            );
         }
     }
     if files == 0 {
-        return Err("Commit has no material whitespace change".into());
+        return Err(
+            crate::i18n::text("backend-commit-has-no-material-whitespace-change-e918f2").into(),
+        );
     }
     reader
         .run(
@@ -175,7 +211,11 @@ fn whitespace_patch(reader: &Reader<'_>, commit: &str) -> Result<String, String>
             vec![],
             &[0],
         )
-        .map_err(|_| "Git -w finds additional changes; inspect this commit manually")?;
+        .map_err(|_| {
+            crate::i18n::text(
+                "backend-git-w-finds-additional-changes-inspect-this-commit-manually-242aca",
+            )
+        })?;
     let patch = reader.run(
         &[
             "diff",
@@ -191,9 +231,13 @@ fn whitespace_patch(reader: &Reader<'_>, commit: &str) -> Result<String, String>
         &[0],
     )?;
     if patch.len() > 1024 * 1024 {
-        return Err("Full formatting patch exceeds1MiB; inspect it manually".into());
+        return Err(crate::i18n::text(
+            "backend-full-formatting-patch-exceeds1mib-inspect-it-manually-ea3911",
+        )
+        .into());
     }
-    String::from_utf8(patch).map_err(|_| "Formatting patch is not UTF-8".into())
+    String::from_utf8(patch)
+        .map_err(|_| crate::i18n::text("backend-formatting-patch-is-not-utf-8-55702b").into())
 }
 pub(crate) fn prepare(
     repo: &Path,
@@ -204,7 +248,8 @@ pub(crate) fn prepare(
     let identity = recovery::pinned_worktree(repo, active)?;
     let (expected, held) = snapshot(&identity, active)?;
     let bytes = expected.decoded()?.unwrap_or_default();
-    let existing = String::from_utf8(bytes).map_err(|_| "Ignore file is not UTF-8")?;
+    let existing = String::from_utf8(bytes)
+        .map_err(|_| crate::i18n::text("backend-ignore-file-is-not-utf-8-f2fc41"))?;
     Ok(Preview {
         commit: commit.into(),
         patch,
@@ -229,7 +274,14 @@ pub(crate) fn perform(preview: &Preview, active: &dyn Fn() -> bool) -> Result<Ap
             Some(&payload(&preview.commit)),
             active,
         )?;
-        return match value.get("result").and_then(serde_json::Value::as_str){Some("changed")=>Ok(Appended::Changed),Some("present")=>Ok(Appended::AlreadyPresent),_=>Err("Ignore append did not return a complete acknowledgement; inspect the file before retrying".into())};
+        return match value.get("result").and_then(serde_json::Value::as_str) {
+            Some("changed") => Ok(Appended::Changed),
+            Some("present") => Ok(Appended::AlreadyPresent),
+            _ => Err(crate::i18n::text(
+                "backend-ignore-append-did-not-return-a-complete-acknowledgement-inspect-t-62f845",
+            )
+            .into()),
+        };
     }
     local_append(
         &preview.identity,
@@ -247,8 +299,8 @@ fn snapshot(
     }
     if let Some(host) = &identity.host {
         let value = remote_call(identity, host, "read", &Snapshot::missing(), None, active)?;
-        let state: Snapshot =
-            serde_json::from_value(value).map_err(|_| "Invalid remote ignore snapshot")?;
+        let state: Snapshot = serde_json::from_value(value)
+            .map_err(|_| crate::i18n::text("backend-invalid-remote-ignore-snapshot-b7ddaf"))?;
         state.decoded()?;
         return Ok((state, None));
     }
@@ -262,7 +314,10 @@ fn remote_call(
     bytes: Option<&[u8]>,
     active: &dyn Fn() -> bool,
 ) -> Result<serde_json::Value, String> {
-    let pin = identity.root_pin.as_ref().ok_or("Missing root pin")?;
+    let pin = identity
+        .root_pin
+        .as_ref()
+        .ok_or(crate::i18n::text("backend-missing-root-pin-9ed8c4"))?;
     let request =
         serde_json::json!({"op":op,"expected":expected,"payload":bytes.map(|b|B64.encode(b))});
     let script = format!(
@@ -283,26 +338,33 @@ fn remote_call(
     )?;
     // Once deliberate append succeeds, late cancellation must not conceal its outcome.
     if out.code != 0 || !out.stderr.is_empty() || out.stdout.len() > 256 * 1024 {
-        return Err("Remote ignore edit refused or was interrupted. Python3 and stable plain files are required; inspect the file before retrying an append".into());
+        return Err(crate::i18n::text(
+            "backend-remote-ignore-edit-refused-or-was-interrupted-python3-and-stable-9bad3b",
+        )
+        .into());
     }
     if op == "read" && !active() {
         return Err("Ignore preview cancelled".into());
     }
-    serde_json::from_slice(&out.stdout)
-        .map_err(|_| "Malformed remote ignore-file acknowledgement".into())
+    serde_json::from_slice(&out.stdout).map_err(|_| {
+        crate::i18n::text("backend-malformed-remote-ignore-file-acknowledgement-6fc30e").into()
+    })
 }
 #[cfg(any(unix, windows))]
 fn stamp(file: &std::fs::File, bytes: Vec<u8>) -> Result<Snapshot, String> {
     let meta = file.metadata().map_err(|e| e.to_string())?;
     let (identity, links) = recovery::native_file_identity(file)?;
     if !meta.is_file() || links != 1 {
-        return Err("Ignore edits refuse links, hardlinks and special files".into());
+        return Err(crate::i18n::text(
+            "backend-ignore-edits-refuse-links-hardlinks-and-special-files-c1ea13",
+        )
+        .into());
     }
     #[cfg(windows)]
     {
         use std::os::windows::fs::MetadataExt;
         if meta.file_attributes() & 0x400 != 0 {
-            return Err("Ignore file is a reparse point".into());
+            return Err(crate::i18n::text("backend-ignore-file-is-a-reparse-point-0d69da").into());
         }
     }
     let time = meta.modified().map_err(|e| e.to_string())?;
@@ -328,14 +390,17 @@ fn read_open(file: &mut std::fs::File) -> Result<Snapshot, String> {
         .map_err(|e| e.to_string())?;
     let after = stamp(file, bytes)?;
     if before.identity != after.identity || before.modified != after.modified {
-        return Err("Ignore file changed while reading".into());
+        return Err(crate::i18n::text("backend-ignore-file-changed-while-reading-b1e7ae").into());
     }
     Ok(after)
 }
 #[cfg(unix)]
 fn local_snapshot(identity: &Identity) -> Result<(Snapshot, Option<Arc<std::fs::File>>), String> {
     use rustix::fs::{Mode, OFlags, openat};
-    let pin = identity.root_pin.as_ref().ok_or("Missing root pin")?;
+    let pin = identity
+        .root_pin
+        .as_ref()
+        .ok_or(crate::i18n::text("backend-missing-root-pin-9ed8c4"))?;
     let (dir, name) = recovery::pinned_parent(
         Path::new(&pin.physical),
         Path::new(&identity.common),
@@ -359,7 +424,10 @@ fn local_snapshot(identity: &Identity) -> Result<(Snapshot, Option<Arc<std::fs::
 #[cfg(windows)]
 fn local_snapshot(identity: &Identity) -> Result<(Snapshot, Option<Arc<std::fs::File>>), String> {
     use std::os::windows::fs::OpenOptionsExt;
-    let pin = identity.root_pin.as_ref().ok_or("Missing root pin")?;
+    let pin = identity
+        .root_pin
+        .as_ref()
+        .ok_or(crate::i18n::text("backend-missing-root-pin-9ed8c4"))?;
     let (_parents, path) = recovery::pinned_parent(
         Path::new(&pin.physical),
         Path::new(&identity.common),
@@ -391,7 +459,10 @@ fn append_open(
     if existing {
         let current = read_open(&mut file)?;
         if &current != expected {
-            return Err("Ignore file changed since preview; prepare again".into());
+            return Err(crate::i18n::text(
+                "backend-ignore-file-changed-since-preview-prepare-again-073e15",
+            )
+            .into());
         }
         if contains(&current.decoded()?.unwrap_or_default(), commit) {
             return Ok(Appended::AlreadyPresent);
@@ -399,13 +470,22 @@ fn append_open(
     }
     let bytes = payload(commit);
     let count = file.write(&bytes).map_err(|e| {
-        format!("Ignore append may be incomplete; existing bytes were preserved: {e}")
+        crate::i18n::message(
+            "backend-ignore-append-may-be-incomplete-existing-bytes-were-preserved-e-5fa2c5",
+            &[("detail", (e).to_string().into())],
+        )
     })?;
     if count != bytes.len() {
-        return Err("Ignore append was partial; inspect the file before retrying. Existing bytes were preserved".into());
+        return Err(crate::i18n::text(
+            "backend-ignore-append-was-partial-inspect-the-file-before-retrying-existi-a0ee9e",
+        )
+        .into());
     }
     file.sync_all().map_err(|e| {
-        format!("Entry was appended but durability is uncertain; inspect before retrying: {e}")
+        crate::i18n::message(
+            "backend-entry-was-appended-but-durability-is-uncertain-inspect-before-ret-b2f100",
+            &[("detail", (e).to_string().into())],
+        )
     })?;
     Ok(Appended::Changed)
 }
@@ -417,7 +497,10 @@ fn local_append(
     active: &dyn Fn() -> bool,
 ) -> Result<Appended, String> {
     use rustix::fs::{Mode, OFlags, openat};
-    let pin = identity.root_pin.as_ref().ok_or("Missing root pin")?;
+    let pin = identity
+        .root_pin
+        .as_ref()
+        .ok_or(crate::i18n::text("backend-missing-root-pin-9ed8c4"))?;
     let (dir, name) = recovery::pinned_parent(
         Path::new(&pin.physical),
         Path::new(&identity.common),
@@ -449,7 +532,10 @@ fn local_append(
     active: &dyn Fn() -> bool,
 ) -> Result<Appended, String> {
     use std::os::windows::fs::OpenOptionsExt;
-    let pin = identity.root_pin.as_ref().ok_or("Missing root pin")?;
+    let pin = identity
+        .root_pin
+        .as_ref()
+        .ok_or(crate::i18n::text("backend-missing-root-pin-9ed8c4"))?;
     let (_parents, path) = recovery::pinned_parent(
         Path::new(&pin.physical),
         Path::new(&identity.common),
@@ -472,7 +558,10 @@ fn local_append(
 }
 #[cfg(not(any(unix, windows)))]
 fn local_snapshot(_: &Identity) -> Result<(Snapshot, Option<Arc<std::fs::File>>), String> {
-    Err("Safe ignore-file edits are unsupported on this platform".into())
+    Err(
+        crate::i18n::text("backend-safe-ignore-file-edits-are-unsupported-on-this-platform-da2200")
+            .into(),
+    )
 }
 #[cfg(not(any(unix, windows)))]
 fn local_append(
@@ -481,7 +570,10 @@ fn local_append(
     _: &str,
     _: &dyn Fn() -> bool,
 ) -> Result<Appended, String> {
-    Err("Safe ignore-file edits are unsupported on this platform".into())
+    Err(
+        crate::i18n::text("backend-safe-ignore-file-edits-are-unsupported-on-this-platform-da2200")
+            .into(),
+    )
 }
 // No shell redirection opens an existing path. Python opens exactly once relative to
 // the already pinned cwd, with NOFOLLOW/NONBLOCK and fstat checks before any I/O.

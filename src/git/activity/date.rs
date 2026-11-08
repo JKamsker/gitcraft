@@ -36,7 +36,9 @@ impl Day {
             .ok()
             .and_then(|s| s.get(..10))
             .and_then(Self::parse)
-            .ok_or_else(|| "Git returned an unsupported calendar date".into())
+            .ok_or_else(|| {
+                crate::i18n::text("backend-git-returned-an-unsupported-calendar-date-791647").into()
+            })
     }
     pub fn month_days(self) -> u32 {
         match self.month {

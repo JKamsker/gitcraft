@@ -138,38 +138,46 @@ impl<'a> Reader<'a> {
     pub fn run(&self, args: &[&str], input: Option<&[u8]>) -> Result<Vec<u8>, String> {
         let out = self.output(args, input).map_err(|error| {
             if args.first() == Some(&"update-ref") && (error.to_ascii_lowercase().contains("cancel") || error.contains("timed out")) {
-                format!("Ref recovery was interrupted and may have completed. Inspect the branch/stash list before retrying: {error}")
+                crate::i18n::message("backend-ref-recovery-was-interrupted-and-may-have-completed-inspect-the-b-333dce", &[("detail", (error).to_string().into())])
             } else { error }
         })?;
         if out.code == 0 && out.stderr.is_empty() {
             Ok(out.stdout)
         } else {
-            Err(format!(
-                "Content recovery Git failed ({}): {}",
-                out.code,
-                String::from_utf8_lossy(&out.stderr)
-                    .chars()
-                    .take(2000)
-                    .collect::<String>()
+            Err(crate::i18n::message(
+                "backend-content-recovery-git-failed-bb7f44",
+                &[
+                    ("code", (out.code).to_string().into()),
+                    (
+                        "from_utf8_lossy",
+                        (String::from_utf8_lossy(&out.stderr)
+                            .chars()
+                            .take(2000)
+                            .collect::<String>())
+                        .to_string()
+                        .into(),
+                    ),
+                ],
             ))
         }
     }
     pub fn identity(&self) -> Result<Identity, String> {
         let text = |args: &[&str]| -> Result<String, String> {
             let bytes = self.run(args, None)?;
-            let bytes = bytes
-                .strip_suffix(b"\n")
-                .ok_or("Truncated repository metadata")?;
+            let bytes = bytes.strip_suffix(b"\n").ok_or(crate::i18n::text(
+                "backend-truncated-repository-metadata-04adb4",
+            ))?;
             let bytes = if cfg!(windows) && !remote::is_remote(self.repo) {
                 bytes.strip_suffix(b"\r").unwrap_or(bytes)
             } else {
                 bytes
             };
-            let value =
-                std::str::from_utf8(bytes).map_err(|_| "Repository metadata is not UTF-8")?;
+            let value = std::str::from_utf8(bytes).map_err(|_| {
+                crate::i18n::text("backend-repository-metadata-is-not-utf-8-aa6912")
+            })?;
             if value.chars().any(char::is_control) {
                 return Err(
-                    "Repository metadata paths contain unsupported control characters".into(),
+                    crate::i18n::text("backend-repository-metadata-paths-contain-unsupported-control-characters-37b6ea").into(),
                 );
             }
             Ok(value.to_owned())
@@ -191,7 +199,7 @@ impl<'a> Reader<'a> {
             .as_deref()
             .and_then(|root| file::capture(self, root).ok());
         if !matches!(identity.format.as_str(), "sha1" | "sha256") {
-            return Err("Unsupported object format".into());
+            return Err(crate::i18n::text("backend-unsupported-object-format-f8189c").into());
         }
         Ok(identity)
     }
@@ -203,7 +211,9 @@ pub(crate) fn search(
     active: &dyn Fn() -> bool,
 ) -> Result<Results, String> {
     if query.trim().is_empty() || query.len() > 4096 || query.contains('\0') {
-        return Err("Enter 1–4096 bytes of literal text to find".into());
+        return Err(
+            crate::i18n::text("backend-enter-1-4096-bytes-of-literal-text-to-find-d295ef").into(),
+        );
     }
     // The worker's captured profile remains pinned across every subprocess and remote hop.
     search_inner(repo, query, active)
@@ -216,7 +226,12 @@ fn search_inner(repo: &Path, query: &str, active: &dyn Fn() -> bool) -> Result<R
         ..Default::default()
     };
     if identity.root.is_some() && identity.root_pin.is_none() {
-        report.notes.push("Safe file recovery is unavailable because this machine could not verify the working-root filesystem identity. Branch/stash recovery remains available.".into());
+        report.notes.push(
+            crate::i18n::text(
+                "backend-safe-file-recovery-is-unavailable-because-this-machine-could-not-fb246d",
+            )
+            .into(),
+        );
     }
     let fsck = reader.output(
         &[
@@ -229,23 +244,29 @@ fn search_inner(repo: &Path, query: &str, active: &dyn Fn() -> bool) -> Result<R
         None,
     )?;
     if fsck.code != 0 {
-        return Err(format!(
-            "Recovery scan could not verify the local object store: {}",
-            String::from_utf8_lossy(&fsck.stderr)
-                .chars()
-                .take(2000)
-                .collect::<String>()
+        return Err(crate::i18n::message(
+            "backend-recovery-scan-could-not-verify-the-local-object-store-f4153b",
+            &[(
+                "from_utf8_lossy",
+                (String::from_utf8_lossy(&fsck.stderr)
+                    .chars()
+                    .take(2000)
+                    .collect::<String>())
+                .to_string()
+                .into(),
+            )],
         ));
     }
-    let diagnostics =
-        std::str::from_utf8(&fsck.stderr).map_err(|_| "Invalid object scan diagnostics")?;
+    let diagnostics = std::str::from_utf8(&fsck.stderr)
+        .map_err(|_| crate::i18n::text("backend-invalid-object-scan-diagnostics-7c43a7"))?;
     if diagnostics
         .lines()
         .any(|line| !line.starts_with("notice: "))
     {
-        return Err(
-            "Object scan returned warnings; inspect the repository with Git before recovery".into(),
-        );
+        return Err(crate::i18n::text(
+            "backend-object-scan-returned-warnings-inspect-the-repository-with-git-bef-456b39",
+        )
+        .into());
     }
     if !diagnostics.is_empty() {
         report.notes.push(diagnostics.chars().take(1000).collect());
@@ -254,15 +275,15 @@ fn search_inner(repo: &Path, query: &str, active: &dyn Fn() -> bool) -> Result<R
     let mut unreachable = BTreeSet::<String>::new();
     let mut blobs: BTreeMap<String, Vec<Provenance>> = BTreeMap::new();
     for line in std::str::from_utf8(&fsck.stdout)
-        .map_err(|_| "Invalid object scan output")?
+        .map_err(|_| crate::i18n::text("backend-invalid-object-scan-output-14d7dd"))?
         .lines()
     {
         let parts: Vec<_> = line.split_whitespace().collect();
         let [kind, ty, oid] = parts.as_slice() else {
-            return Err("Malformed object scan record".into());
+            return Err(crate::i18n::text("backend-malformed-object-scan-record-724ff2").into());
         };
         if !matches!(*kind, "unreachable" | "dangling") || !valid_oid(oid) {
-            return Err("Malformed object scan identity".into());
+            return Err(crate::i18n::text("backend-malformed-object-scan-identity-6b6829").into());
         }
         match *ty {
             "commit" => {
@@ -281,16 +302,20 @@ fn search_inner(repo: &Path, query: &str, active: &dyn Fn() -> bool) -> Result<R
                 }
             }
             "tree" | "tag" => (),
-            _ => return Err("Unsupported object scan type".into()),
+            _ => {
+                return Err(
+                    crate::i18n::text("backend-unsupported-object-scan-type-9f8f3f").into(),
+                );
+            }
         }
     }
     let reflogs = reader.run(&["rev-list", "--max-count=501", "--reflog", "--all"], None)?;
     for oid in std::str::from_utf8(&reflogs)
-        .map_err(|_| "Invalid reflog walk")?
+        .map_err(|_| crate::i18n::text("backend-invalid-reflog-walk-2f6ac0"))?
         .lines()
     {
         if !valid_oid(oid) {
-            return Err("Invalid reflog commit ID".into());
+            return Err(crate::i18n::text("backend-invalid-reflog-commit-id-d0b3b5").into());
         }
         if commits.len() < COMMITS || commits.contains(oid) {
             commits.insert(oid.into());
@@ -313,16 +338,19 @@ fn search_inner(repo: &Path, query: &str, active: &dyn Fn() -> bool) -> Result<R
             ],
             None,
         )?)
-        .map_err(|_| "Invalid stash reflog")?
+        .map_err(|_| crate::i18n::text("backend-invalid-stash-reflog-4b1662"))?
         .lines()
         {
             if !valid_oid(oid) {
-                return Err("Invalid stash commit ID".into());
+                return Err(crate::i18n::text("backend-invalid-stash-commit-id-e3d52e").into());
             }
             live.insert(oid.to_owned());
         }
     } else if stash.code != 1 || !stash.stderr.is_empty() {
-        return Err("Cannot inspect the current stash ref safely".into());
+        return Err(crate::i18n::text(
+            "backend-cannot-inspect-the-current-stash-ref-safely-8a96e7",
+        )
+        .into());
     }
     let all = read_commits(&reader, &commits, &mut report)?;
     let parents: BTreeSet<_> = all
@@ -405,7 +433,10 @@ fn search_inner(repo: &Path, query: &str, active: &dyn Fn() -> bool) -> Result<R
             continue;
         };
         if kind != "blob" {
-            return Err("An expected content object changed type".into());
+            return Err(crate::i18n::text(
+                "backend-an-expected-content-object-changed-type-2096e4",
+            )
+            .into());
         }
         if size > BLOB_LIMIT {
             report.large += 1;
@@ -452,7 +483,10 @@ fn search_inner(repo: &Path, query: &str, active: &dyn Fn() -> bool) -> Result<R
         .hits
         .sort_by(|a, b| b.when().cmp(&a.when()).then_with(|| a.blob.cmp(&b.blob)));
     if reader.identity()? != identity {
-        return Err("Repository identity changed during search; search again".into());
+        return Err(crate::i18n::text(
+            "backend-repository-identity-changed-during-search-search-again-28cf73",
+        )
+        .into());
     }
     Ok(Results {
         identity,
@@ -490,22 +524,24 @@ fn parse_commit(oid: &str, bytes: &[u8]) -> Result<Commit, String> {
     let split = bytes
         .windows(2)
         .position(|window| window == b"\n\n")
-        .ok_or("Malformed commit object")?;
+        .ok_or(crate::i18n::text("backend-malformed-commit-object-20d1ec"))?;
     let mut tree = None;
     let mut parents = Vec::new();
     let mut when = None;
     for line in bytes[..split].split(|b| *b == b'\n') {
         if let Some(value) = line.strip_prefix(b"tree ") {
-            let value = std::str::from_utf8(value).map_err(|_| "Invalid commit tree")?;
+            let value = std::str::from_utf8(value)
+                .map_err(|_| crate::i18n::text("backend-invalid-commit-tree-f82ac0"))?;
             if tree.is_some() || !valid_oid(value) {
-                return Err("Invalid commit tree".into());
+                return Err(crate::i18n::text("backend-invalid-commit-tree-f82ac0").into());
             }
             tree = Some(value.to_owned());
         }
         if let Some(value) = line.strip_prefix(b"parent ") {
-            let value = std::str::from_utf8(value).map_err(|_| "Invalid commit parent")?;
+            let value = std::str::from_utf8(value)
+                .map_err(|_| crate::i18n::text("backend-invalid-commit-parent-87c5f3"))?;
             if !valid_oid(value) || parents.len() >= 64 {
-                return Err("Invalid commit parents".into());
+                return Err(crate::i18n::text("backend-invalid-commit-parents-8430cf").into());
             }
             parents.push(value.to_owned());
         }
@@ -518,13 +554,15 @@ fn parse_commit(oid: &str, bytes: &[u8]) -> Result<Commit, String> {
                 .and_then(|time| time.parse::<i64>().ok());
         }
     }
-    let message = bytes.get(split + 2..).ok_or("Missing commit message")?;
+    let message = bytes
+        .get(split + 2..)
+        .ok_or(crate::i18n::text("backend-missing-commit-message-832b0d"))?;
     let subject = message.split(|b| *b == b'\n').next().unwrap_or_default();
     Ok(Commit {
         oid: oid.into(),
-        tree: tree.ok_or("Missing commit tree")?,
+        tree: tree.ok_or(crate::i18n::text("backend-missing-commit-tree-2e21e3"))?,
         parents,
-        when: when.ok_or("Missing commit time")?,
+        when: when.ok_or(crate::i18n::text("backend-missing-commit-time-3db252"))?,
         subject: String::from_utf8_lossy(subject)
             .chars()
             .filter(|c| !c.is_control())
@@ -552,15 +590,16 @@ fn tree_entries(
     let mut entries = Vec::new();
     for row in bytes.split(|b| *b == 0).filter(|r| !r.is_empty()) {
         let Some(tab) = row.iter().position(|b| *b == b'\t') else {
-            return Err("Invalid tree record".into());
+            return Err(crate::i18n::text("backend-invalid-tree-record-bf9356").into());
         };
-        let info = std::str::from_utf8(&row[..tab]).map_err(|_| "Invalid tree metadata")?;
+        let info = std::str::from_utf8(&row[..tab])
+            .map_err(|_| crate::i18n::text("backend-invalid-tree-metadata-1d2e46"))?;
         let parts: Vec<_> = info.split_whitespace().collect();
         let [mode, kind, oid] = parts.as_slice() else {
-            return Err("Invalid tree entry".into());
+            return Err(crate::i18n::text("backend-invalid-tree-entry-8d7b6f").into());
         };
         if !valid_oid(oid) {
-            return Err("Invalid tree object ID".into());
+            return Err(crate::i18n::text("backend-invalid-tree-object-id-58c8bf").into());
         }
         if *kind != "blob" {
             continue;
@@ -574,13 +613,13 @@ fn tree_entries(
             continue;
         }
         if !matches!(*mode, "100644" | "100755" | "120000") {
-            return Err("Invalid blob mode".into());
+            return Err(crate::i18n::text("backend-invalid-blob-mode-f621df").into());
         }
         if entries.len() >= ENTRIES {
-            return Err(
-                "A tree exceeds 15000 file entries; narrow recovery with Git in the terminal"
-                    .into(),
-            );
+            return Err(crate::i18n::text(
+                "backend-a-tree-exceeds-15000-file-entries-narrow-recovery-with-git-in-the-447484",
+            )
+            .into());
         }
         entries.push((path.into(), (*mode).into(), (*oid).into()));
     }
@@ -611,7 +650,10 @@ pub(super) fn valid_oid(oid: &str) -> bool {
 pub(crate) fn pinned_worktree(repo: &Path, active: &dyn Fn() -> bool) -> Result<Identity, String> {
     let identity = Reader::new(repo, active).identity()?;
     if identity.root.is_none() || identity.root_pin.is_none() {
-        return Err("A stable working-root identity is required for this file action".into());
+        return Err(crate::i18n::text(
+            "backend-a-stable-working-root-identity-is-required-for-this-file-action-753797",
+        )
+        .into());
     }
     Ok(identity)
 }

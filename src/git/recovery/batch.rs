@@ -10,7 +10,7 @@ fn input(ids: impl IntoIterator<Item = impl AsRef<str>>) -> Result<Vec<u8>, Stri
     for oid in ids {
         let oid = oid.as_ref();
         if !valid_oid(oid) {
-            return Err("Invalid batch object ID".into());
+            return Err(crate::i18n::text("backend-invalid-batch-object-id-1f74f1").into());
         }
         bytes.extend_from_slice(oid.as_bytes());
         bytes.push(b'\n');
@@ -21,10 +21,11 @@ pub(super) fn check(reader: &Reader<'_>, ids: &[String]) -> Result<Vec<Checked>,
     let mut results = Vec::new();
     for group in ids.chunks(128) {
         let out = reader.run(&["cat-file", "--batch-check"], Some(&input(group)?))?;
-        let text = std::str::from_utf8(&out).map_err(|_| "Invalid batch object metadata")?;
+        let text = std::str::from_utf8(&out)
+            .map_err(|_| crate::i18n::text("backend-invalid-batch-object-metadata-3e59c5"))?;
         let rows: Vec<_> = text.lines().collect();
         if rows.len() != group.len() || (!out.is_empty() && !out.ends_with(b"\n")) {
-            return Err("Truncated batch metadata".into());
+            return Err(crate::i18n::text("backend-truncated-batch-metadata-b539a8").into());
         }
         for (oid, row) in group.iter().zip(rows) {
             let fields: Vec<_> = row.split(' ').collect();
@@ -38,10 +39,14 @@ pub(super) fn check(reader: &Reader<'_>, ids: &[String]) -> Result<Vec<Checked>,
                 {
                     Some((
                         (*kind).to_owned(),
-                        size.parse::<usize>().map_err(|_| "Object size overflow")?,
+                        size.parse::<usize>().map_err(|_| {
+                            crate::i18n::text("backend-object-size-overflow-e2837f")
+                        })?,
                     ))
                 }
-                _ => return Err("Malformed batch metadata".into()),
+                _ => {
+                    return Err(crate::i18n::text("backend-malformed-batch-metadata-2f6f82").into());
+                }
             };
             results.push(Checked {
                 oid: oid.clone(),
@@ -88,29 +93,45 @@ fn frames(
     let mut objects = Vec::new();
     for (oid, size) in requests {
         if *size > super::BLOB_LIMIT {
-            return Err("Content batch exceeds per-object limit".into());
+            return Err(
+                crate::i18n::text("backend-content-batch-exceeds-per-object-limit-da4d59").into(),
+            );
         }
-        let tail = out.get(at..).ok_or("Truncated content frame")?;
+        let tail = out
+            .get(at..)
+            .ok_or(crate::i18n::text("backend-truncated-content-frame-d19b14"))?;
         let end = tail
             .iter()
             .take(256)
             .position(|b| *b == b'\n')
-            .ok_or("Invalid content frame header")?;
-        let header = std::str::from_utf8(&tail[..end]).map_err(|_| "Invalid content header")?;
+            .ok_or(crate::i18n::text(
+                "backend-invalid-content-frame-header-c77eee",
+            ))?;
+        let header = std::str::from_utf8(&tail[..end])
+            .map_err(|_| crate::i18n::text("backend-invalid-content-header-6bf865"))?;
         if header != format!("{oid} {kind} {size}") {
-            return Err("Object changed or content batch is malformed".into());
+            return Err(crate::i18n::text(
+                "backend-object-changed-or-content-batch-is-malformed-c3a322",
+            )
+            .into());
         }
-        at = at.checked_add(end + 1).ok_or("Content range overflow")?;
-        let end = at.checked_add(*size).ok_or("Content size overflow")?;
-        let bytes = out.get(at..end).ok_or("Truncated object contents")?;
+        at = at
+            .checked_add(end + 1)
+            .ok_or(crate::i18n::text("backend-content-range-overflow-aca589"))?;
+        let end = at
+            .checked_add(*size)
+            .ok_or(crate::i18n::text("backend-content-size-overflow-facc93"))?;
+        let bytes = out.get(at..end).ok_or(crate::i18n::text(
+            "backend-truncated-object-contents-2122df",
+        ))?;
         if out.get(end) != Some(&b'\n') {
-            return Err("Missing object frame separator".into());
+            return Err(crate::i18n::text("backend-missing-object-frame-separator-5ff7b5").into());
         }
         objects.push((oid.clone(), bytes.to_vec()));
         at = end + 1;
     }
     if at != out.len() {
-        return Err("Trailing data after content batch".into());
+        return Err(crate::i18n::text("backend-trailing-data-after-content-batch-891e65").into());
     }
     Ok(objects)
 }

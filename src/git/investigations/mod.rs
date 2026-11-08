@@ -31,7 +31,10 @@ impl<'a> Reader<'a> {
             ok,
             &|| self.active(),
         )
-        .map_err(|e| e.replace("Draft", "History investigation"))
+        .map_err(|e| match e.as_str() {
+            "Draft cancelled" => "History investigation cancelled".into(),
+            _ => e,
+        })
     }
     /// The same immutable command policy is inspectable without starting Git.
     pub fn command(&self, args: &[&str]) -> Vec<String> {
@@ -72,7 +75,7 @@ impl<'a> Reader<'a> {
             || tips.len() > 30000
             || tips.iter().any(|s| !oid(s))
         {
-            return Err("Invalid pinned graph request".into());
+            return Err(crate::i18n::text("backend-invalid-pinned-graph-request-820048").into());
         }
         super::commits::investigation_page(self, tips, Default::default(), 0, limit)
     }
@@ -101,7 +104,7 @@ pub(crate) fn page(
         || limit > git::LOG_PAGE
         || skip > 100000
     {
-        return Err("Invalid pinned graph page request".into());
+        return Err(crate::i18n::text("backend-invalid-pinned-graph-page-request-52f635").into());
     }
     super::commits::investigation_page(&Reader::new(repo, active), tips, order, skip, limit)
 }

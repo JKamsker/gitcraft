@@ -100,7 +100,9 @@ fn helper_trace(trace: &str) -> Vec<String> {
                     || line.contains(&format!("credential-{name}\" "))
             })
             .map(|name| name.to_owned())
-            .unwrap_or_else(|| "custom or profile helper (command withheld)".into())
+            .unwrap_or_else(|| {
+                crate::i18n::text("backend-custom-or-profile-helper-command-withheld-3c758a").into()
+            })
         })
         .collect()
 }

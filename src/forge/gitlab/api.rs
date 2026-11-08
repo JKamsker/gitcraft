@@ -21,7 +21,7 @@ pub(super) struct Api {
 impl Api {
     pub fn new(_repo: &Path, hosting: &Hosting) -> Result<Self, String> {
         if hosting.forge != Forge::GitLab {
-            return Err("This isn't a GitLab repository".into());
+            return Err(crate::i18n::text("backend-this-isn-t-a-gitlab-repository-f90a12").into());
         }
         if let Some(e) = crate::connections::current().error {
             return Err(e);
@@ -52,7 +52,7 @@ impl Api {
     ) -> Result<Value, String> {
         self.context.run(|| {
             if Instant::now() >= self.deadline {
-                return Err("GitLab request deadline exceeded; refresh to try again".into());
+                return Err(crate::i18n::text("backend-gitlab-request-deadline-exceeded-refresh-to-try-again-3eebb5").into());
             }
             if crate::tasks::cancellation().is_cancelled() {
                 return Err("GitLab operation cancelled".into());
@@ -64,7 +64,7 @@ impl Api {
             crate::connections::configure_cli(&mut cmd, "glab", &super::api_authority(&self.hosting))?;
             crate::shell_path::apply(&mut cmd);
             let input = body.map(serde_json::to_vec).transpose().map_err(|e| e.to_string())?;
-            if input.as_ref().is_some_and(|b| b.len() > 1 << 20) { return Err("GitLab request exceeds 1 MiB".into()); }
+            if input.as_ref().is_some_and(|b| b.len() > 1 << 20) { return Err(crate::i18n::text("backend-gitlab-request-exceeds-1-mib-0da4c3").into()); }
             let out = crate::processes::run(cmd, crate::processes::Options {
                 input,
                 background: true,
@@ -74,13 +74,13 @@ impl Api {
                 ..Default::default()
             })?.complete()?;
             self.bytes.fetch_add(out.stdout.len(), Ordering::Relaxed);
-            if self.bytes.load(Ordering::Relaxed) > 32 << 20 { return Err("GitLab request exceeds the 32 MiB aggregate response limit".into()); }
+            if self.bytes.load(Ordering::Relaxed) > 32 << 20 { return Err(crate::i18n::text("backend-gitlab-request-exceeds-the-32-mib-aggregate-response-limit-10dc9e").into()); }
             if !out.status.success() {
                 // No automatic retry: a write may have reached GitLab before a disconnect.
-                return Err(format!("GitLab request failed ({}): {}. A write may already have reached GitLab; refresh before retrying.", out.status, crate::diagnostics::crash::scrub(&String::from_utf8_lossy(&out.stderr))));
+                return Err(crate::i18n::message("backend-gitlab-request-failed-a-write-may-already-have-reached-gitlab-ref-5c5ff0", &[("status", (out.status).to_string().into()), ("crate", (crate::diagnostics::crash::scrub(&String::from_utf8_lossy(&out.stderr))).to_string().into())]));
             }
             if out.stdout.iter().all(u8::is_ascii_whitespace) { Ok(Value::Null) }
-            else { serde_json::from_slice(&out.stdout).map_err(|_| "GitLab returned an invalid JSON response".into()) }
+            else { serde_json::from_slice(&out.stdout).map_err(|_| crate::i18n::text("backend-gitlab-returned-an-invalid-json-response-a8a37b").into()) }
         })
     }
     pub fn all(&self, endpoint: &str) -> Result<Vec<Value>, String> {
@@ -88,12 +88,12 @@ impl Api {
         for page in 1..=11 {
             let sep = if endpoint.contains('?') { '&' } else { '?' };
             let v = self.get(&format!("{endpoint}{sep}per_page=100&page={page}"))?;
-            let items = v
-                .as_array()
-                .ok_or("GitLab returned an invalid paged response")?;
+            let items = v.as_array().ok_or(crate::i18n::text(
+                "backend-gitlab-returned-an-invalid-paged-response-2dc665",
+            ))?;
             if out.len() + items.len() > 1000 {
                 return Err(
-                    "GitLab returned more than 1,000 items; open the complete discussion on GitLab"
+                    crate::i18n::text("backend-gitlab-returned-more-than-1-000-items-open-the-complete-discussio-ad9b05")
                         .into(),
                 );
             }
@@ -102,7 +102,10 @@ impl Api {
                 return Ok(out);
             }
         }
-        Err("GitLab returned more than 1,000 items; open the complete discussion on GitLab".into())
+        Err(crate::i18n::text(
+            "backend-gitlab-returned-more-than-1-000-items-open-the-complete-discussio-ad9b05",
+        )
+        .into())
     }
 }
 pub(super) fn segment(value: &str) -> String {
@@ -156,7 +159,10 @@ pub(super) fn command(
             .bytes()
             .all(|b| b.is_ascii_alphanumeric() || b".-:".contains(&b))
     {
-        return Err("The native GitLab page requires an explicit HTTPS authority (with its web port); refresh the repository source".into());
+        return Err(crate::i18n::text(
+            "backend-the-native-gitlab-page-requires-an-explicit-https-authority-with-964194",
+        )
+        .into());
     }
     if !["GET", "POST", "PUT"].contains(&method)
         || endpoint.starts_with('/')
@@ -164,7 +170,7 @@ pub(super) fn command(
         || endpoint.chars().any(char::is_whitespace)
         || endpoint.contains('\\')
     {
-        return Err("Invalid GitLab API operation".into());
+        return Err(crate::i18n::text("backend-invalid-gitlab-api-operation-311ceb").into());
     }
     cmd.current_dir(std::env::temp_dir())
         .args([

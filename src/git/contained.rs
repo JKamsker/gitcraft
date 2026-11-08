@@ -62,7 +62,12 @@ pub fn containment(repo: &Path, hash: &str) -> Result<Containment, String> {
             "refs/tags",
         ],
     )
-    .map_err(|e| format!("Could not list the branches and tags containing it: {e}"))?;
+    .map_err(|e| {
+        crate::i18n::message(
+            "backend-could-not-list-the-branches-and-tags-containing-it-e-20d486",
+            &[("detail", (e).to_string().into())],
+        )
+    })?;
     let mut found = sort_refs(&out);
     found.describe = describe_contains(repo, hash)?;
     Ok(found)
@@ -92,7 +97,10 @@ fn describe_contains(repo: &Path, hash: &str) -> Result<Option<String>, String> 
         Ok(out) => Ok(Some(out.trim().to_owned()).filter(|s| !s.is_empty())),
         // No tag contains it (or there are no tags at all).
         Err(e) if e.contains("cannot describe") || e.contains("No tags can describe") => Ok(None),
-        Err(e) => Err(format!("Could not find the first tag after it: {e}")),
+        Err(e) => Err(crate::i18n::message(
+            "backend-could-not-find-the-first-tag-after-it-e-61ec1b",
+            &[("detail", (e).to_string().into())],
+        )),
     }
 }
 

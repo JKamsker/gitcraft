@@ -72,8 +72,9 @@ pub(super) fn bytes(
         return Err("Object inspection cancelled".into());
     }
     let output = read(repo, &args, Vec::new(), 16 * 1024 * 1024).map_err(|e| {
-        format!(
-            "{e}. This inspector requires Git 2.45+ (--no-lazy-fetch) on the repository machine."
+        crate::i18n::message(
+            "backend-e-this-inspector-requires-git-2-45-no-lazy-fetch-on-the-repositor-60c44a",
+            &[("detail", (e).to_string().into())],
         )
     })?;
     if !active() {
@@ -86,8 +87,12 @@ pub(super) fn text(
     args: &[&str],
     active: &dyn Fn() -> bool,
 ) -> Result<String, String> {
-    String::from_utf8(bytes(repo, args, active)?)
-        .map_err(|_| "Object storage metadata is not UTF-8; inspect this repository in Git.".into())
+    String::from_utf8(bytes(repo, args, active)?).map_err(|_| {
+        crate::i18n::text(
+            "backend-object-storage-metadata-is-not-utf-8-inspect-this-repository-in-g-01dd60",
+        )
+        .into()
+    })
 }
 fn line(repo: &Path, args: &[&str], active: &dyn Fn() -> bool) -> Result<String, String> {
     Ok(text(repo, args, active)?
@@ -99,7 +104,10 @@ pub(crate) fn valid_oid(s: &str) -> bool {
 }
 fn resolve(repo: &Path, query: &str, active: &dyn Fn() -> bool) -> Result<String, String> {
     if query.is_empty() || query.len() > 4096 || query.contains(['\n', '\r', '\0']) {
-        return Err("Enter an object ID, revision, or revision:path of at most 4096 bytes (without line breaks).".into());
+        return Err(crate::i18n::text(
+            "backend-enter-an-object-id-revision-or-revision-path-of-at-most-4096-byte-0460ac",
+        )
+        .into());
     }
     if valid_oid(query) {
         return Ok(query.to_ascii_lowercase());
@@ -110,7 +118,10 @@ fn resolve(repo: &Path, query: &str, active: &dyn Fn() -> bool) -> Result<String
         active,
     )?;
     if !valid_oid(&oid) {
-        return Err("Git did not resolve this expression to one full object ID.".into());
+        return Err(crate::i18n::text(
+            "backend-git-did-not-resolve-this-expression-to-one-full-object-id-5cc014",
+        )
+        .into());
     }
     Ok(oid)
 }
@@ -130,19 +141,21 @@ fn metadata(repo: &Path, oid: &str, active: &dyn Fn() -> bool) -> Result<Option<
     if !active() {
         return Err("Object inspection cancelled".into());
     }
-    let s = String::from_utf8(out).map_err(|_| "Invalid cat-file metadata")?;
+    let s = String::from_utf8(out)
+        .map_err(|_| crate::i18n::text("backend-invalid-cat-file-metadata-cb4422"))?;
     let fields: Vec<_> = s.split_whitespace().collect();
     if fields.len() == 2 && fields[0] == oid && fields[1] == "missing" {
         return Ok(None);
     }
     if fields.len() != 5 || fields[0] != oid || !valid_oid(fields[4]) {
-        return Err(
-            "Git returned unexpected object metadata; no storage claim can be made.".into(),
-        );
+        return Err(crate::i18n::text(
+            "backend-git-returned-unexpected-object-metadata-no-storage-claim-can-be-m-cb2cf6",
+        )
+        .into());
     }
     let number = |s: &str| {
         s.parse::<u64>()
-            .map_err(|_| "Invalid object size".to_owned())
+            .map_err(|_| crate::i18n::text("backend-invalid-object-size-8e8433").to_owned())
     };
     Ok(Some(Object {
         oid: oid.into(),
@@ -161,20 +174,22 @@ pub(super) fn pack_rows(output: &str) -> Result<BTreeMap<String, Packed>, String
             continue;
         }
         if !matches!(f.len(), 5 | 7) {
-            return Err("Unexpected verify-pack record".into());
+            return Err(crate::i18n::text("backend-unexpected-verify-pack-record-2617e8").into());
         }
         let parse = |s: &str| {
-            s.parse::<u64>()
-                .map_err(|_| "Invalid verify-pack number".to_owned())
+            s.parse::<u64>().map_err(|_| {
+                crate::i18n::text("backend-invalid-verify-pack-number-e8df94").to_owned()
+            })
         };
         let depth = if f.len() == 7 {
-            usize::try_from(parse(f[5])?).map_err(|_| "Delta depth is too large")?
+            usize::try_from(parse(f[5])?)
+                .map_err(|_| crate::i18n::text("backend-delta-depth-is-too-large-c1d7e9"))?
         } else {
             0
         };
         let base = if f.len() == 7 {
             if !valid_oid(f[6]) {
-                return Err("Invalid delta base".into());
+                return Err(crate::i18n::text("backend-invalid-delta-base-662b8d").into());
             }
             Some(f[6].to_owned())
         } else {
@@ -224,9 +239,14 @@ fn representations(
         let mut seen = BTreeSet::from([oid.to_owned()]);
         while let Some(base) = chain.last().and_then(|r| r.base.as_ref()) {
             if chain.len() >= 128 || !seen.insert(base.clone()) {
-                return Err("Cyclic or excessive delta chain; inspect the pack with Git.".into());
+                return Err(crate::i18n::text(
+                    "backend-cyclic-or-excessive-delta-chain-inspect-the-pack-with-git-0733f0",
+                )
+                .into());
             }
-            let row = rows.get(base).ok_or("A delta base is absent from its pack; storage may have changed or be corrupt. Refresh the inspector.")?;
+            let row = rows.get(base).ok_or(crate::i18n::text(
+                "backend-a-delta-base-is-absent-from-its-pack-storage-may-have-changed-or-e28452",
+            ))?;
             chain.push(row.clone());
         }
         let path = pack.with_extension("pack");
@@ -244,16 +264,20 @@ fn entries(repo: &Path, object: &Object, active: &dyn Fn() -> bool) -> Result<Ve
         let mut entries = Vec::new();
         for record in out.split(|b| *b == 0).filter(|r| !r.is_empty()) {
             if entries.len() >= MAX_TREE {
-                return Err("Tree exceeds 2,000 entries; inspect a subtree by object ID.".into());
+                return Err(crate::i18n::text(
+                    "backend-tree-exceeds-2-000-entries-inspect-a-subtree-by-object-id-b60059",
+                )
+                .into());
             }
             let tab = record
                 .iter()
                 .position(|b| *b == b'\t')
-                .ok_or("Invalid tree entry")?;
-            let meta = std::str::from_utf8(&record[..tab]).map_err(|_| "Invalid tree metadata")?;
+                .ok_or(crate::i18n::text("backend-invalid-tree-entry-8d7b6f"))?;
+            let meta = std::str::from_utf8(&record[..tab])
+                .map_err(|_| crate::i18n::text("backend-invalid-tree-metadata-1d2e46"))?;
             let f: Vec<_> = meta.split_whitespace().collect();
             if f.len() != 3 || !valid_oid(f[2]) {
-                return Err("Invalid tree object ID".into());
+                return Err(crate::i18n::text("backend-invalid-tree-object-id-58c8bf").into());
             }
             entries.push(Entry {
                 name: String::from_utf8_lossy(&record[tab + 1..]).into_owned(),
@@ -303,7 +327,10 @@ pub(crate) fn inspect(
     if !matches!(format.as_str(), "sha1" | "sha256")
         || oid.len() != if format == "sha256" { 64 } else { 40 }
     {
-        return Err("The object ID does not match this repository's object format.".into());
+        return Err(crate::i18n::text(
+            "backend-the-object-id-does-not-match-this-repository-s-object-format-71f1c0",
+        )
+        .into());
     }
     let git_dir = line(repo, &["rev-parse", "--absolute-git-dir"], active)?;
     let common_dir = line(
@@ -341,19 +368,41 @@ pub(crate) fn inspect(
             .iter()
             .filter(|s| !s.available || s.error.is_some())
             .map(|s| {
-                format!(
-                    "Object store {}: {}",
-                    remote::display(&s.path),
-                    s.error.as_deref().unwrap_or("missing donor")
+                crate::i18n::message(
+                    "backend-object-store-4411af",
+                    &[
+                        ("path", (remote::display(&s.path)).to_string().into()),
+                        (
+                            "status",
+                            (s.error
+                                .as_deref()
+                                .unwrap_or(crate::i18n::text("backend-missing-donor-5cbabd")))
+                            .to_string()
+                            .into(),
+                        ),
+                    ],
                 )
             }),
     );
-    let missing = object.is_none().then(|| format!("{oid} is missing from the available object stores. No download was attempted; a promisor configuration alone does not prove that this particular object is promised."));
+    let missing = object.is_none().then(|| {
+        crate::i18n::message(
+            "backend-oid-is-missing-from-the-available-object-stores-no-download-was-a-23e0f1",
+            &[("oid", (oid).to_string().into())],
+        )
+    });
     if object.is_some() && representations.is_empty() {
-        notes.push("Git can read this object, but no representation was found in the primary store. It may be borrowed from an alternate; inspect shared and borrowed objects.".into());
+        notes.push(
+            crate::i18n::text(
+                "backend-git-can-read-this-object-but-no-representation-was-found-in-the-p-62b245",
+            )
+            .into(),
+        );
     }
     if resolve(repo, query, active)? != oid {
-        return Err("The revision changed while inspecting. Inspect again.".into());
+        return Err(crate::i18n::text(
+            "backend-the-revision-changed-while-inspecting-inspect-again-c4d2dc",
+        )
+        .into());
     }
     Ok(Inspection {
         query: query.into(),

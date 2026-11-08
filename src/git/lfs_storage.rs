@@ -73,8 +73,12 @@ pub(crate) fn parse_files_json(json: &str) -> Result<Vec<LfsFile>, String> {
     if json.trim().is_empty() {
         return Ok(Vec::new());
     }
-    let raw: RawFiles = serde_json::from_str(json.trim())
-        .map_err(|e| format!("git-lfs listed its files in a way gitcraft can't read: {e}"))?;
+    let raw: RawFiles = serde_json::from_str(json.trim()).map_err(|e| {
+        crate::i18n::message(
+            "backend-git-lfs-listed-its-files-in-a-way-gitcraft-can-t-read-e-0c7414",
+            &[("detail", (e).to_string().into())],
+        )
+    })?;
     Ok(raw
         .files
         .unwrap_or_default()
@@ -143,7 +147,9 @@ pub struct LfsUsage {
 /// `lfs.storage`) and their size, counted where the repository is.
 pub fn lfs_usage(repo: &Path) -> Result<LfsUsage, String> {
     let env = run(Some(repo), &["lfs", "env"])?;
-    let dir = media_dir(&env).ok_or("git lfs env doesn't say where the LFS objects are")?;
+    let dir = media_dir(&env).ok_or(crate::i18n::text(
+        "backend-git-lfs-env-doesn-t-say-where-the-lfs-objects-are-635d67",
+    ))?;
     let (bytes, objects) = match crate::remote::parse(repo) {
         None => count_here(Path::new(&dir)),
         Some(target) => count_there(&target, &dir)?,
@@ -202,10 +208,12 @@ fn count_there(target: &crate::remote::Target, dir: &str) -> Result<(u64, u64), 
     let text = String::from_utf8_lossy(&out.stdout);
     parse_du(&text).ok_or_else(|| {
         let e = String::from_utf8_lossy(&out.stderr);
-        format!(
-            "Could not measure the LFS objects on {}: {}",
-            target.host.label(),
-            e.trim()
+        crate::i18n::message(
+            "backend-could-not-measure-the-lfs-objects-on-12efd6",
+            &[
+                ("target", (target.host.label()).to_string().into()),
+                ("detail", (e.trim()).to_string().into()),
+            ],
         )
     })
 }
@@ -234,9 +242,9 @@ pub struct PrunePlan {
 pub fn lfs_prune_plan(repo: &Path) -> Result<PrunePlan, String> {
     let out = run(Some(repo), &["lfs", "prune", "--dry-run"])?;
     parse_prune(&out).ok_or_else(|| {
-        format!(
-            "git lfs prune said something gitcraft can't read: {}",
-            out.trim()
+        crate::i18n::message(
+            "backend-git-lfs-prune-said-something-gitcraft-can-t-read-fc2fc0",
+            &[("detail", (out.trim()).to_string().into())],
         )
     })
 }
@@ -386,8 +394,9 @@ pub fn set_fetch_filter(repo: &Path, exclude: bool, list: &[String]) -> Result<(
         return Ok(());
     }
     if let Some(bad) = list.iter().find(|p| p.contains(',')) {
-        return Err(format!(
-            "{bad} has a comma, which git-lfs would read as two patterns"
+        return Err(crate::i18n::message(
+            "backend-bad-has-a-comma-which-git-lfs-would-read-as-two-patterns-001188",
+            &[("bad", (bad).to_string().into())],
         ));
     }
     run(Some(repo), &["config", "--local", key, &list.join(",")]).map(|_| ())

@@ -41,7 +41,15 @@ pub fn fold_attributes(
         args.extend(chunk.iter().map(String::as_str));
         match run(Some(repo), &args) {
             Ok(out) => found.extend(parse_check_attr(&out)),
-            Err(e) => return (found, Some(format!("Couldn't read .gitattributes: {e}"))),
+            Err(e) => {
+                return (
+                    found,
+                    Some(crate::i18n::message(
+                        "backend-couldn-t-read-gitattributes-e-28eb49",
+                        &[("detail", (e).to_string().into())],
+                    )),
+                );
+            }
         }
     }
     (found, None)

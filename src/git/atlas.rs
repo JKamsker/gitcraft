@@ -18,10 +18,10 @@ struct Budget {
 impl Budget {
     fn charge(&mut self, bytes: usize, work: usize) -> Result<(), String> {
         if bytes > self.bytes || work > self.work {
-            return Err(
-                "Atlas expanded allocation/work budget exceeded; choose a smaller history window"
-                    .into(),
-            );
+            return Err(crate::i18n::text(
+                "backend-atlas-expanded-allocation-work-budget-exceeded-choose-a-smaller-h-74b2db",
+            )
+            .into());
         }
         self.bytes -= bytes;
         self.work -= work;
@@ -90,13 +90,13 @@ fn tree_sizes(data: &[u8]) -> Result<BTreeMap<Vec<u8>, u64>, String> {
         let tab = entry
             .iter()
             .position(|b| *b == b'\t')
-            .ok_or("Invalid tree entry")?;
+            .ok_or(crate::i18n::text("backend-invalid-tree-entry-8d7b6f"))?;
         let fields: Vec<_> = entry[..tab]
             .split(|b| b.is_ascii_whitespace())
             .filter(|s| !s.is_empty())
             .collect();
         if fields.len() != 4 {
-            return Err("Invalid tree size".into());
+            return Err(crate::i18n::text("backend-invalid-tree-size-48d58f").into());
         }
         let size = if fields[1] == b"commit" {
             0
@@ -104,11 +104,15 @@ fn tree_sizes(data: &[u8]) -> Result<BTreeMap<Vec<u8>, u64>, String> {
             std::str::from_utf8(fields[3])
                 .ok()
                 .and_then(|s| s.parse().ok())
-                .ok_or("Blob size unavailable (objects may be missing locally)")?
+                .ok_or(crate::i18n::text(
+                    "backend-blob-size-unavailable-objects-may-be-missing-locally-4fe3f0",
+                ))?
         };
         files.insert(entry[tab + 1..].to_vec(), size);
         if files.len() > 100_000 {
-            return Err("Atlas is limited to 100,000 files".into());
+            return Err(
+                crate::i18n::text("backend-atlas-is-limited-to-100-000-files-386850").into(),
+            );
         }
     }
     Ok(files)
@@ -192,7 +196,14 @@ fn build_budget(
             let email: String = record.email.chars().take(96).collect();
             let shortened = name.len() != record.name.len() || email.len() != record.email.len();
             let label = if shortened {
-                format!("{name} <{email}>… [contributor #{}]", id + 1)
+                crate::i18n::message(
+                    "backend-name-email-contributor-325382",
+                    &[
+                        ("name", (name).to_string().into()),
+                        ("email", (email).to_string().into()),
+                        ("id", (id + 1).to_string().into()),
+                    ],
+                )
             } else {
                 format!("{name} <{email}>")
             };
@@ -270,7 +281,7 @@ fn parent(path: &[u8]) -> &[u8] {
 }
 fn validate(path: &[u8]) -> Result<(), String> {
     if path.is_empty() || path.len() > 32_768 || path.split(|b| *b == b'/').count() > 128 {
-        return Err("Atlas path/depth budget exceeded".into());
+        return Err(crate::i18n::text("backend-atlas-path-depth-budget-exceeded-4b5e68").into());
     }
     Ok(())
 }
@@ -323,7 +334,7 @@ fn allocate(
     budget: &mut Budget,
 ) -> Result<usize, String> {
     if nodes.len() >= 200_000 {
-        return Err("Atlas expanded node budget exceeded".into());
+        return Err(crate::i18n::text("backend-atlas-expanded-node-budget-exceeded-f1b1be").into());
     }
     budget.charge(2 * path.len() + 512, 1)?;
     let id = nodes.len();

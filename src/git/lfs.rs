@@ -101,7 +101,10 @@ pub fn parse_lfs_pointer(text: &str) -> Option<LfsPointer> {
 pub fn human_size(bytes: u64) -> String {
     const UNITS: [&str; 4] = ["KB", "MB", "GB", "TB"];
     if bytes < 1024 {
-        return format!("{bytes} B");
+        return crate::i18n::message(
+            "backend-lfs-size",
+            &[("size", bytes.into()), ("unit", "B".into())],
+        );
     }
     let mut size = bytes as f64 / 1024.0;
     let mut unit = 0;
@@ -109,7 +112,10 @@ pub fn human_size(bytes: u64) -> String {
         size /= 1024.0;
         unit += 1;
     }
-    format!("{size:.1} {}", UNITS[unit])
+    crate::i18n::message(
+        "backend-lfs-size-decimal",
+        &[("size", size.into()), ("unit", UNITS[unit].into())],
+    )
 }
 
 #[cfg(test)]

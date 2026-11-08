@@ -13,7 +13,10 @@ pub(crate) fn range(
     active: &dyn Fn() -> bool,
 ) -> Result<Vec<Commit>, String> {
     if !oid(target) || (!base.is_empty() && !oid(base)) {
-        return Err("Choose immutable commit IDs for both range ends".into());
+        return Err(crate::i18n::text(
+            "backend-choose-immutable-commit-ids-for-both-range-ends-ebe621",
+        )
+        .into());
     }
     let mut input = format!("{target}\n");
     if !base.is_empty() {
@@ -37,24 +40,31 @@ pub(crate) fn range(
     parse(&output)
 }
 fn parse(output: &[u8]) -> Result<Vec<Commit>, String> {
-    let text = std::str::from_utf8(output).map_err(|_| "Release history is not UTF-8")?;
+    let text = std::str::from_utf8(output)
+        .map_err(|_| crate::i18n::text("backend-release-history-is-not-utf-8-8f357f"))?;
     let fields: Vec<_> = text.split('\0').collect();
     let (records, tail) = fields.as_chunks::<5>();
     if !tail.iter().all(|f| f.trim().is_empty()) {
-        return Err("Release history returned incomplete metadata".into());
+        return Err(crate::i18n::text(
+            "backend-release-history-returned-incomplete-metadata-669952",
+        )
+        .into());
     }
     if records.len() > LIMIT {
-        return Err(
-            "This range exceeds the postcard's 200-commit limit; choose a narrower release range"
-                .into(),
-        );
+        return Err(crate::i18n::text(
+            "backend-this-range-exceeds-the-postcard-s-200-commit-limit-choose-a-narro-6ed720",
+        )
+        .into());
     }
     let commits: Result<Vec<_>, String> = records
         .iter()
         .map(|[hash, parents, author, date, summary]| {
             let hash = hash.trim();
             if !oid(hash) || !parents.split_whitespace().all(oid) {
-                return Err("Release history returned invalid commit IDs".into());
+                return Err(crate::i18n::text(
+                    "backend-release-history-returned-invalid-commit-ids-2acae8",
+                )
+                .into());
             }
             Ok(Commit {
                 hash: hash.into(),
@@ -68,7 +78,10 @@ fn parse(output: &[u8]) -> Result<Vec<Commit>, String> {
         .collect();
     let commits = commits?;
     if commits.is_empty() {
-        return Err("The selected release range contains no commits".into());
+        return Err(crate::i18n::text(
+            "backend-the-selected-release-range-contains-no-commits-1e8d7d",
+        )
+        .into());
     }
     Ok(commits)
 }

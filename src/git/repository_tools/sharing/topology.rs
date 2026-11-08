@@ -45,11 +45,13 @@ fn normalize(path: &Path) -> PathBuf {
 }
 fn unquote(line: &[u8]) -> Result<String, String> {
     if line.first() != Some(&b'"') {
-        return String::from_utf8(line.to_vec())
-            .map_err(|_| "Alternate paths must be UTF-8 for this inspector".into());
+        return String::from_utf8(line.to_vec()).map_err(|_| {
+            crate::i18n::text("backend-alternate-paths-must-be-utf-8-for-this-inspector-68a5cb")
+                .into()
+        });
     }
     if line.last() != Some(&b'"') || line.len() < 2 {
-        return Err("Unterminated quoted alternate path".into());
+        return Err(crate::i18n::text("backend-unterminated-quoted-alternate-path-02fe39").into());
     }
     let mut out = Vec::new();
     let mut i = 1;
@@ -60,7 +62,9 @@ fn unquote(line: &[u8]) -> Result<String, String> {
             out.push(c);
             continue;
         }
-        let b = *line.get(i).ok_or("Incomplete alternate path escape")?;
+        let b = *line.get(i).ok_or(crate::i18n::text(
+            "backend-incomplete-alternate-path-escape-8138d2",
+        ))?;
         i += 1;
         match b {
             b'n' => out.push(b'\n'),
@@ -72,25 +76,34 @@ fn unquote(line: &[u8]) -> Result<String, String> {
             b'a' => out.push(7),
             b'\\' | b'"' => out.push(b),
             b'0'..=b'7' => {
-                let digits = line
-                    .get(i - 1..i + 2)
-                    .ok_or("Incomplete octal alternate escape")?;
+                let digits = line.get(i - 1..i + 2).ok_or(crate::i18n::text(
+                    "backend-incomplete-octal-alternate-escape-f7cbe1",
+                ))?;
                 if !digits.iter().all(|b| matches!(b, b'0'..=b'7')) {
-                    return Err("Invalid octal alternate escape".into());
+                    return Err(
+                        crate::i18n::text("backend-invalid-octal-alternate-escape-7479d9").into(),
+                    );
                 }
                 let n = u16::from(digits[0] - b'0') * 64
                     + u16::from(digits[1] - b'0') * 8
                     + u16::from(digits[2] - b'0');
-                out.push(u8::try_from(n).map_err(|_| "Alternate escape is out of range")?);
+                out.push(u8::try_from(n).map_err(|_| {
+                    crate::i18n::text("backend-alternate-escape-is-out-of-range-e7a5ac")
+                })?);
                 i += 2;
             }
-            _ => return Err("Unsupported alternate path escape".into()),
+            _ => {
+                return Err(
+                    crate::i18n::text("backend-unsupported-alternate-path-escape-9907fa").into(),
+                );
+            }
         }
     }
-    let path =
-        String::from_utf8(out).map_err(|_| "Alternate paths must be UTF-8 for this inspector")?;
+    let path = String::from_utf8(out).map_err(|_| {
+        crate::i18n::text("backend-alternate-paths-must-be-utf-8-for-this-inspector-68a5cb")
+    })?;
     if path.contains('\0') {
-        return Err("Alternate path contains NUL".into());
+        return Err(crate::i18n::text("backend-alternate-path-contains-nul-437a1a").into());
     }
     Ok(path)
 }
@@ -132,9 +145,10 @@ pub(crate) fn read(
         }
         match walk.enter(&path, parent.as_deref(), &ancestors)? {
             Visit::Cycle => {
-                topology
-                    .warnings
-                    .push(format!("Cyclic alternate: {}", remote::display(&path)));
+                topology.warnings.push(crate::i18n::message(
+                    "backend-cyclic-alternate-51c069",
+                    &[("path", (remote::display(&path)).to_string().into())],
+                ));
                 continue;
             }
             Visit::Duplicate => continue,
@@ -143,7 +157,10 @@ pub(crate) fn read(
         let mut descendants = ancestors;
         descendants.push(path.clone());
         if topology.stores.len() >= 16 {
-            return Err("More than 16 object stores; inspect this topology with Git.".into());
+            return Err(crate::i18n::text(
+                "backend-more-than-16-object-stores-inspect-this-topology-with-git-528129",
+            )
+            .into());
         }
         let mut store = Store {
             path: path.clone(),
@@ -184,10 +201,7 @@ pub(crate) fn read(
             )?
             .is_some_and(|s| !s.is_empty())
             {
-                topology.warnings.push(format!(
-                    "{} has HTTP alternates; remote objects are not downloaded or enumerated.",
-                    remote::display(&path)
-                ));
+                topology.warnings.push(crate::i18n::message("backend-has-http-alternates-remote-objects-are-not-downloaded-or-enumerat-3eb811", &[("path", (remote::display(&path)).to_string().into())]));
             }
         }
         topology.stores.push(store);
@@ -217,7 +231,10 @@ impl Walk {
         if let Some(parent) = parent {
             self.edges.insert((parent.to_owned(), path.to_owned()));
             if self.edges.len() > 256 {
-                return Err("More than 256 alternate edges; inspect this topology with Git".into());
+                return Err(crate::i18n::text(
+                    "backend-more-than-256-alternate-edges-inspect-this-topology-with-git-714df2",
+                )
+                .into());
             }
         }
         if ancestors.iter().any(|p| p == path) {

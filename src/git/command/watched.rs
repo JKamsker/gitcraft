@@ -249,7 +249,7 @@ pub(in crate::git) fn run_watched_extra_recorded(
             .lines()
             .any(|l| remote::is_missing_folder(l.as_bytes()))
     {
-        let e = format!("{} isn't a folder on {}", t.path, t.host.label());
+        let e = super::missing_folder(t);
         return (Err(e), recorded);
     }
     let e = failure_message(
@@ -281,9 +281,9 @@ pub(super) fn reviewed(
         &words,
         ended.code,
         if ended.code == Some(0) {
-            "Reviewed push completed"
+            crate::i18n::text("backend-reviewed-push-completed-f39141")
         } else {
-            "Reviewed push failed; server diagnostics withheld"
+            crate::i18n::text("backend-reviewed-push-failed-server-diagnostics-withheld-2b8b01")
         },
         None,
         started,

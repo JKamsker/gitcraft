@@ -33,21 +33,21 @@ pub(super) fn resolve(configuration: &str, operand: &str, push: bool) -> Result<
     let mut ordinary = Rewrites::default();
     let mut pushing = Rewrites::default();
     if !configuration.is_empty() && !configuration.ends_with('\0') {
-        return Err("Unterminated Git URL rewrite metadata".into());
+        return Err(crate::i18n::text("backend-literal-3e443be9").into());
     }
     for record in configuration.split_terminator('\0') {
         let (key, prefix) = record
             .split_once('\n')
-            .ok_or("Malformed Git URL rewrite metadata")?;
+            .ok_or(crate::i18n::text("backend-literal-47aa1cbc"))?;
         let key = key
             .strip_prefix("url.")
-            .ok_or("Unexpected Git URL rewrite metadata key")?;
+            .ok_or(crate::i18n::text("backend-literal-6d801c1d"))?;
         if let Some(base) = key.strip_suffix(".insteadof") {
             ordinary.add(base, prefix);
         } else if let Some(base) = key.strip_suffix(".pushinsteadof") {
             pushing.add(base, prefix);
         } else {
-            return Err("Unexpected Git URL rewrite metadata variable".into());
+            return Err(crate::i18n::text("backend-literal-eb9e9120").into());
         }
     }
     Ok(push

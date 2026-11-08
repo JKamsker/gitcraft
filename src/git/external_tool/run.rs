@@ -34,9 +34,9 @@ pub fn place_of(repo: &Path) -> Place {
 pub fn open_diff(repo: &Path, choice: &ToolChoice, target: &DiffTarget) -> Result<(), String> {
     let rest = target.args()?;
     if !has_differences(repo, &rest)? {
-        return Err(format!(
-            "{} is the same on both sides: there is nothing to compare",
-            target.path()
+        return Err(crate::i18n::message(
+            "backend-is-the-same-on-both-sides-there-is-nothing-to-compare-8e179a",
+            &[("target", (target.path()).to_string().into())],
         ));
     }
     let plan = plan_for(repo, choice, Kind::Diff)?;
@@ -44,11 +44,16 @@ pub fn open_diff(repo: &Path, choice: &ToolChoice, target: &DiffTarget) -> Resul
     if ran.code == Some(0) {
         Ok(())
     } else {
-        Err(format!(
-            "{} could not show {}: {}",
-            plan.label,
-            target.path(),
-            failure(&ran, Kind::Diff, &plan)
+        Err(crate::i18n::message(
+            "backend-could-not-show-816812",
+            &[
+                ("label", (plan.label).to_string().into()),
+                ("target", (target.path()).to_string().into()),
+                (
+                    "failure",
+                    (failure(&ran, Kind::Diff, &plan)).to_string().into(),
+                ),
+            ],
         ))
     }
 }
@@ -69,15 +74,35 @@ pub fn resolve_conflict(
     if !unmerged_stages(repo, path)?.is_empty() {
         let what = failure(&ran, Kind::Merge, &plan);
         if not_available(&ran) {
-            return Err(format!("{} could not open {path}: {what}", plan.label));
+            return Err(crate::i18n::message(
+                "backend-could-not-open-path-what-d891ee",
+                &[
+                    ("label", (plan.label).to_string().into()),
+                    ("path", (path).to_string().into()),
+                    ("what", (what).to_string().into()),
+                ],
+            ));
         }
-        let why = if said(&ran, "seems unchanged") {
-            format!("{} was closed without saving it", plan.label)
+        let why = if said(&ran, crate::i18n::text("backend-seems-unchanged-ee1946")) {
+            crate::i18n::message(
+                "backend-was-closed-without-saving-it-ec597f",
+                &[("label", (plan.label).to_string().into())],
+            )
         } else {
-            format!("{} didn't report success ({what})", plan.label)
+            crate::i18n::message(
+                "backend-didn-t-report-success-what-2f58d5",
+                &[
+                    ("label", (plan.label).to_string().into()),
+                    ("what", (what).to_string().into()),
+                ],
+            )
         };
-        return Ok(MergeOutcome::Unresolved(format!(
-            "{path} is still conflicted: {why}"
+        return Ok(MergeOutcome::Unresolved(crate::i18n::message(
+            "backend-path-is-still-conflicted-why-98b46d",
+            &[
+                ("path", (path).to_string().into()),
+                ("why", (why).to_string().into()),
+            ],
         )));
     }
     Ok(MergeOutcome::Resolved)
@@ -178,10 +203,9 @@ pub(super) fn program_for(
     };
     match place {
         Place::Wsl => installed().map(Some).ok_or_else(|| {
-            format!(
-                "{} wasn't found in Program Files. Set where it is (its .exe) in Settings → Git \
-                 → External tools.",
-                preset.label()
+            crate::i18n::message(
+                "backend-wasn-t-found-in-program-files-set-where-it-is-its-exe-in-settings-3448c5",
+                &[("preset", (preset.label()).to_string().into())],
             )
         }),
         Place::Here if cfg!(windows) && !has_path_setting(repo, preset, kind) => Ok(installed()),
@@ -213,35 +237,45 @@ fn mergeable(repo: &Path, path: &str) -> Result<(), String> {
     // `git mergetool` reads the names it is given as patterns (`x*.txt` would also merge
     // `xa.txt`), whatever `--literal-pathspecs` says.
     if path.contains(['*', '?', '[']) {
-        return Err(format!(
-            "{path} has *, ? or [ in its name, which git mergetool takes for a pattern of other \
-             files too: resolve it in the conflict editor or the terminal"
+        return Err(crate::i18n::message(
+            "backend-path-has-or-in-its-name-which-git-mergetool-takes-for-a-pattern-o-41cfa5",
+            &[("path", (path).to_string().into())],
         ));
     }
     let stages = unmerged_stages(repo, path)?;
     if stages.is_empty() {
-        return Err(format!("{path} has no conflict left to resolve"));
+        return Err(crate::i18n::message(
+            "backend-path-has-no-conflict-left-to-resolve-288ab4",
+            &[("path", (path).to_string().into())],
+        ));
     }
     let side = |n: u8| stages.iter().find(|(_, stage)| *stage == n);
     let (Some(ours), Some(theirs)) = (side(2), side(3)) else {
         let deleted = if side(2).is_none() && side(3).is_none() {
-            "on both sides"
+            crate::i18n::text("backend-on-both-sides-f9fcb5")
         } else {
-            "on one side"
+            crate::i18n::text("backend-on-one-side-75fe0e")
         };
-        return Err(format!(
-            "{path} was deleted {deleted}, so there are no two versions to merge: keep it \
-             with Mark resolved, or delete it with git rm in the terminal"
+        return Err(crate::i18n::message(
+            "backend-path-was-deleted-deleted-so-there-are-no-two-versions-to-merge-ke-907744",
+            &[
+                ("path", (path).to_string().into()),
+                ("deleted", (deleted).to_string().into()),
+            ],
         ));
     };
     for (mode, _) in [ours, theirs] {
         let what = match mode.as_str() {
-            "120000" => "a symbolic link",
-            "160000" => "a submodule",
+            "120000" => crate::i18n::text("backend-a-symbolic-link-f5d6a3"),
+            "160000" => crate::i18n::text("backend-a-submodule-fcedac"),
             _ => continue,
         };
-        return Err(format!(
-            "{path} is {what} on one side: a merge tool can only merge the contents of files"
+        return Err(crate::i18n::message(
+            "backend-path-is-what-on-one-side-a-merge-tool-can-only-merge-the-contents-afa08e",
+            &[
+                ("path", (path).to_string().into()),
+                ("what", (what).to_string().into()),
+            ],
         ));
     }
     Ok(())
@@ -342,13 +376,25 @@ fn failure(ran: &ToolRun, kind: Kind, plan: &Plan) -> String {
         .collect();
     let said = match lines.as_slice() {
         [] => match ran.code {
-            Some(code) => format!("git {} exited with code {code}", kind.command()),
-            None => format!("git {} was stopped", kind.command()),
+            Some(code) => crate::i18n::message(
+                "backend-git-exited-with-code-code-4a4781",
+                &[
+                    ("kind", (kind.command()).to_string().into()),
+                    ("code", (code).to_string().into()),
+                ],
+            ),
+            None => crate::i18n::message(
+                "backend-git-was-stopped-760e14",
+                &[("kind", (kind.command()).to_string().into())],
+            ),
         },
         lines => lines[..lines.len().min(2)].join(" "),
     };
     if not_available(ran) && plan.name != plan.label {
-        format!("{said}. Install it, or set where it is in Settings → Git → External tools.")
+        crate::i18n::message(
+            "backend-said-install-it-or-set-where-it-is-in-settings-git-external-tools-c32799",
+            &[("said", (said).to_string().into())],
+        )
     } else {
         said
     }

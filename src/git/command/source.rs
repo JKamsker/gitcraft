@@ -31,12 +31,18 @@ impl CommandSource {
     pub fn capture(repo: &Path) -> Result<Arc<Self>, String> {
         let before = run(Some(repo), &["config", "--null", "--list"])?;
         if before.len() > 4 * 1024 * 1024 {
-            return Err("Git configuration exceeds the 4MiB command-source budget".into());
+            return Err(crate::i18n::text(
+                "backend-git-configuration-exceeds-the-4mib-command-source-budget-ca57bd",
+            )
+            .into());
         }
         let mut entries = parse_config(&before)?;
         let remotes = run(Some(repo), &["remote"])?;
         if remotes.lines().count() > 200 {
-            return Err("More than 200 Git remotes; narrow the command source".into());
+            return Err(crate::i18n::text(
+                "backend-more-than-200-git-remotes-narrow-the-command-source-5f52bb",
+            )
+            .into());
         }
         let mut endpoints = Vec::new();
         for name in remotes.lines() {
@@ -71,7 +77,10 @@ impl CommandSource {
             &["for-each-ref", "--format=%(objectname) %(refname)"],
         )?;
         if listing.len() > 16 * 1024 * 1024 || listing.lines().count() > 100_000 {
-            return Err("Git ref snapshot exceeds its finite command-source budget".into());
+            return Err(crate::i18n::text(
+                "backend-git-ref-snapshot-exceeds-its-finite-command-source-budget-bdd429",
+            )
+            .into());
         }
         let head = run_ok_codes(Some(repo), &["symbolic-ref", "-q", "HEAD"], &[0, 1])?;
         let head = if head.trim().is_empty() {
@@ -81,7 +90,10 @@ impl CommandSource {
         };
         let config = render_config(entries, worktree.as_deref(), &hooks, format.trim())?;
         if run(Some(repo), &["config", "--null", "--list"])? != before {
-            return Err("Git routing/profile changed during capture; try again".into());
+            return Err(crate::i18n::text(
+                "backend-git-routing-profile-changed-during-capture-try-again-9de43f",
+            )
+            .into());
         }
         let id = format!(
             "{:x}",
@@ -126,9 +138,13 @@ impl CommandSource {
             .map_err(|e| e.to_string())?;
         let mut packed = "# pack-refs with: sorted\n".to_owned();
         for line in listing.lines() {
-            let (oid, reference) = line.split_once(' ').ok_or("Malformed captured ref")?;
+            let (oid, reference) = line
+                .split_once(' ')
+                .ok_or(crate::i18n::text("backend-malformed-captured-ref-556d1a"))?;
             if !safe_reference(reference) || !object_id(oid) {
-                return Err("Invalid captured ref identity".into());
+                return Err(
+                    crate::i18n::text("backend-invalid-captured-ref-identity-169ea0").into(),
+                );
             }
             packed.push_str(line);
             packed.push('\n');
@@ -141,7 +157,7 @@ impl CommandSource {
         SOURCES
             .get_or_init(Default::default)
             .lock()
-            .map_err(|_| "Command source registry unavailable")?
+            .map_err(|_| crate::i18n::text("backend-command-source-registry-unavailable-f0c177"))?
             .insert(source.id.clone(), Arc::downgrade(&source));
         Ok(source)
     }
@@ -150,9 +166,9 @@ impl CommandSource {
         &self,
         guard: impl Fn() -> Result<(), String> + Send + Sync + 'static,
     ) -> Result<(), String> {
-        self.execution_guard
-            .set(Box::new(guard))
-            .map_err(|_| "Execution evidence was already bound".into())
+        self.execution_guard.set(Box::new(guard)).map_err(|_| {
+            crate::i18n::text("backend-execution-evidence-was-already-bound-c595ef").into()
+        })
     }
     fn reconcile_push(&self) -> Result<(), String> {
         self.check_context()?;
@@ -205,7 +221,10 @@ impl CommandSource {
     }
     pub fn check_context(&self) -> Result<(), String> {
         if run(Some(&self.repo), &["config", "--null", "--list"])? != self.configuration {
-            return Err("Git routing or profile changed during the operation. A completed transfer may already have affected the captured destination; refresh before retrying.".into());
+            return Err(crate::i18n::text(
+                "backend-git-routing-or-profile-changed-during-the-operation-a-completed-t-01600a",
+            )
+            .into());
         }
         Ok(())
     }
@@ -220,7 +239,8 @@ impl CommandSource {
     }
     pub(crate) fn reviewed_binding(repo: &Path, args: &[String]) -> Result<Arc<Self>, String> {
         let words: Vec<_> = args.iter().map(String::as_str).collect();
-        resolve(Some(repo), &words)?.ok_or("Reviewed echo source is missing".into())
+        resolve(Some(repo), &words)?
+            .ok_or(crate::i18n::text("backend-reviewed-echo-source-is-missing-cdaf3c").into())
     }
     pub fn owns(&self, args: &[String]) -> bool {
         args.windows(2)
@@ -236,7 +256,7 @@ impl CommandSource {
     /// The captured Git directory's ref value, without consulting a mutable remote name.
     pub fn reference(&self, reference: &str) -> Result<Option<String>, String> {
         if !safe_reference(reference) {
-            return Err("Invalid captured ref name".into());
+            return Err(crate::i18n::text("backend-invalid-captured-ref-name-3c2bb3").into());
         }
         let args = self.bind(&["rev-parse", "--verify", "--end-of-options", reference]);
         let out = run_ok_codes(
@@ -255,9 +275,13 @@ impl CommandSource {
         )?
         .lines()
         .map(|line| {
-            let (oid, reference) = line.split_once(' ').ok_or("Invalid captured ref listing")?;
+            let (oid, reference) = line.split_once(' ').ok_or(crate::i18n::text(
+                "backend-invalid-captured-ref-listing-2d6845",
+            ))?;
             if !object_id(oid) || !safe_reference(reference) {
-                return Err("Invalid captured ref identity".into());
+                return Err(
+                    crate::i18n::text("backend-invalid-captured-ref-identity-169ea0").into(),
+                );
             }
             Ok((reference.to_owned(), oid.to_owned()))
         })
@@ -320,7 +344,10 @@ fn private_directory(repo: &Path, id: &str) -> Result<PathBuf, String> {
                         .all(|b| b.is_ascii_alphanumeric() || b == b'.' || b == b'-')
             })
         {
-            return Err("Could not create a private command-source directory".into());
+            return Err(crate::i18n::text(
+                "backend-could-not-create-a-private-command-source-directory-2bd777",
+            )
+            .into());
         }
         Ok(remote::encode(&target.host, path))
     } else {
@@ -407,17 +434,22 @@ fn resolve(repo: Option<&Path>, args: &[&str]) -> Result<Option<Arc<CommandSourc
         return Ok(None);
     }
     if ids.len() != 1 {
-        return Err("Ambiguous captured command source".into());
+        return Err(crate::i18n::text("backend-ambiguous-captured-command-source-b730dc").into());
     }
     let source = SOURCES
         .get_or_init(Default::default)
         .lock()
-        .map_err(|_| "Command source registry unavailable")?
+        .map_err(|_| crate::i18n::text("backend-command-source-registry-unavailable-f0c177"))?
         .get(ids[0])
         .and_then(Weak::upgrade)
-        .ok_or("Captured command source expired; prepare the operation again")?;
+        .ok_or(crate::i18n::text(
+            "backend-captured-command-source-expired-prepare-the-operation-again-ef9524",
+        ))?;
     if repo != Some(source.repo.as_path()) {
-        return Err("Captured command source belongs to another repository".into());
+        return Err(crate::i18n::text(
+            "backend-captured-command-source-belongs-to-another-repository-b6fb6f",
+        )
+        .into());
     }
     Ok(Some(source))
 }
@@ -430,7 +462,12 @@ pub(super) fn finish(
         && super::after_options(args).first() == Some(&"push")
         && let Some(source) = source
     {
-        source.reconcile_push().map_err(|e| format!("Push completed at the captured destination, but local tracking metadata could not be reconciled: {e}. Refresh before retrying."))?;
+        source.reconcile_push().map_err(|e| {
+            crate::i18n::message(
+                "backend-push-completed-at-the-captured-destination-but-local-tracking-met-c5e4b1",
+                &[("detail", (e).to_string().into())],
+            )
+        })?;
     }
     Ok(())
 }
@@ -469,7 +506,10 @@ fn parse_config(config: &str) -> Result<Vec<(String, String)>, String> {
         .map(|row| {
             let (key, value) = row.split_once('\n').unwrap_or((row, "true"));
             if key.is_empty() {
-                return Err("Invalid captured Git configuration key".into());
+                return Err(crate::i18n::text(
+                    "backend-invalid-captured-git-configuration-key-4a916d",
+                )
+                .into());
             }
             Ok((key.to_owned(), value.to_owned()))
         })
@@ -492,7 +532,7 @@ fn render_config(
     object_format: &str,
 ) -> Result<String, String> {
     if !matches!(object_format, "sha1" | "sha256") {
-        return Err("Unsupported Git object format".into());
+        return Err(crate::i18n::text("backend-unsupported-git-object-format-696069").into());
     }
     entries.retain(|(k, _)| {
         !matches!(
@@ -521,9 +561,9 @@ fn render_config(
     }
     let mut out = String::new();
     for (key, value) in entries {
-        let (section, rest) = key
-            .split_once('.')
-            .ok_or("Invalid captured config section")?;
+        let (section, rest) = key.split_once('.').ok_or(crate::i18n::text(
+            "backend-invalid-captured-config-section-377e0c",
+        ))?;
         let (subsection, variable) = rest
             .rsplit_once('.')
             .map_or((None, rest), |(s, v)| (Some(s), v));
@@ -535,7 +575,9 @@ fn render_config(
                 .all(|b| b.is_ascii_alphanumeric() || b == b'-')
             || value.contains('\0')
         {
-            return Err("Invalid captured configuration value".into());
+            return Err(
+                crate::i18n::text("backend-invalid-captured-configuration-value-614893").into(),
+            );
         }
         out.push_str(&format!(
             "[{section}{}]\n\t{variable} = {}\n",

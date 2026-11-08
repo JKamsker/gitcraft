@@ -43,7 +43,10 @@ impl GitLabTarget {
     }
     fn guard(&self) -> Result<Value, String> {
         if self.context != crate::connections::current() {
-            return Err("Profile connections changed. Reload the merge request.".into());
+            return Err(crate::i18n::text(
+                "backend-profile-connections-changed-reload-the-merge-request-6f0b5b",
+            )
+            .into());
         }
         let me = self.api.get("user")?;
         if Some(at(&me, "/username")) != self.details.extras.viewer.as_deref()
@@ -53,7 +56,10 @@ impl GitLabTarget {
                 .map(|id| id.to_string())
                 != self.details.extras.native_account
         {
-            return Err("The GitLab account changed. Reload before sending.".into());
+            return Err(crate::i18n::text(
+                "backend-the-gitlab-account-changed-reload-before-sending-ba87f5",
+            )
+            .into());
         }
         let mr = self.api.get(&self.endpoint())?;
         if !super::api::source_matches(&self.api.hosting, at(&mr, "/web_url"))
@@ -70,15 +76,21 @@ impl GitLabTarget {
             || at(&mr, "/diff_refs/base_sha") != self.details.base_oid
             || Some(details::revision(&mr)) != self.details.extras.review_revision
         {
-            return Err("The merge request changed. Reload before sending.".into());
+            return Err(crate::i18n::text(
+                "backend-the-merge-request-changed-reload-before-sending-608007",
+            )
+            .into());
         }
         Ok(mr)
     }
     fn body(body: &str) -> Result<(), String> {
         if body.trim().is_empty() || body.len() > 1024 * 1024 {
-            Err("Write a comment of at most 1 MiB".into())
+            Err(crate::i18n::text("backend-write-a-comment-of-at-most-1-mib-b09b42").into())
         } else if body.lines().any(|line| line.trim_start().starts_with('/')) {
-            Err("GitLab quick actions are not sent from this revision-bound review. Use GitLab for slash commands.".into())
+            Err(crate::i18n::text(
+                "backend-gitlab-quick-actions-are-not-sent-from-this-revision-bound-review-2552ca",
+            )
+            .into())
         } else {
             Ok(())
         }
@@ -101,15 +113,21 @@ impl GitLabTarget {
             .iter()
             .any(|thread| thread.id == id)
         {
-            return Err(
-                "This discussion was not present in the displayed review; reload it.".into(),
-            );
+            return Err(crate::i18n::text(
+                "backend-this-discussion-was-not-present-in-the-displayed-review-reload-it-6e75ef",
+            )
+            .into());
         }
         self.api
             .all(&format!("{}/discussions", self.endpoint()))?
             .into_iter()
             .find(|d| at(d, "/id") == id)
-            .ok_or("This discussion is no longer in the merge request. Reload it.".into())
+            .ok_or(
+                crate::i18n::text(
+                    "backend-this-discussion-is-no-longer-in-the-merge-request-reload-it-f52143",
+                )
+                .into(),
+            )
     }
 }
 impl Target for GitLabTarget {
@@ -125,7 +143,10 @@ impl Target for GitLabTarget {
             Verdict::Approve => {
                 let approvals = self.api.get(&format!("{}/approvals", self.endpoint()))?;
                 if approvals.get("user_can_approve").and_then(Value::as_bool) != Some(true) {
-                    return Err("GitLab has not granted this account approval rights.".into());
+                    return Err(crate::i18n::text(
+                        "backend-gitlab-has-not-granted-this-account-approval-rights-d2c890",
+                    )
+                    .into());
                 }
                 if !body.trim().is_empty() {
                     self.note(body)?;
@@ -142,14 +163,17 @@ impl Target for GitLabTarget {
                         if body.trim().is_empty() {
                             e
                         } else {
-                            format!("Your comment was published, but approval failed: {e}")
+                            crate::i18n::message(
+                                "backend-your-comment-was-published-but-approval-failed-e-2e4e79",
+                                &[("detail", (e).to_string().into())],
+                            )
                         }
                     })
             }
-            Verdict::RequestChanges => Err(
-                "GitLab has no request-changes verdict here; send a discussion comment instead."
-                    .into(),
-            ),
+            Verdict::RequestChanges => Err(crate::i18n::text(
+                "backend-gitlab-has-no-request-changes-verdict-here-send-a-discussion-comm-7d88cd",
+            )
+            .into()),
         }
     }
     fn comment_now(&self, comment: &LineComment) -> Result<(), String> {
@@ -168,13 +192,22 @@ impl Target for GitLabTarget {
             .map(|_| ())
     }
     fn add_pending(&self, _: &LineComment) -> Result<(), String> {
-        Err("Use Comment now: this GitLab page publishes each line comment explicitly.".into())
+        Err(crate::i18n::text(
+            "backend-use-comment-now-this-gitlab-page-publishes-each-line-comment-expl-d0c051",
+        )
+        .into())
     }
     fn remove_pending(&self, _: &str, _: bool) -> Result<(), String> {
-        Err("There is no pending GitLab review on this page.".into())
+        Err(
+            crate::i18n::text("backend-there-is-no-pending-gitlab-review-on-this-page-8a69df")
+                .into(),
+        )
     }
     fn discard_pending(&self) -> Result<(), String> {
-        Err("There is no pending GitLab review on this page.".into())
+        Err(
+            crate::i18n::text("backend-there-is-no-pending-gitlab-review-on-this-page-8a69df")
+                .into(),
+        )
     }
     fn reply(&self, thread: &str, body: &str) -> Result<(), String> {
         Self::body(body)?;
@@ -196,7 +229,10 @@ impl Target for GitLabTarget {
             .iter()
             .any(|n| n.get("resolvable").and_then(Value::as_bool) == Some(true))
         {
-            return Err("This GitLab discussion cannot be resolved.".into());
+            return Err(crate::i18n::text(
+                "backend-this-gitlab-discussion-cannot-be-resolved-e50df6",
+            )
+            .into());
         }
         self.guard()?;
         self.api
@@ -208,7 +244,10 @@ impl Target for GitLabTarget {
             .map(|_| ())
     }
     fn dismiss(&self, _: &str, _: &str) -> Result<(), String> {
-        Err("GitLab approvals cannot be dismissed with GitHub review semantics.".into())
+        Err(crate::i18n::text(
+            "backend-gitlab-approvals-cannot-be-dismissed-with-github-review-semantics-3cd69f",
+        )
+        .into())
     }
     fn merge(&self, method: MergeMethod, delete_branch: bool) -> Result<(), String> {
         let mr = self.guard()?;
@@ -217,27 +256,37 @@ impl Target for GitLabTarget {
         if let Some(blocker) = details::blocker(&mr, &project, &approvals) {
             return Err(blocker);
         }
-        let squash = match method {
-            MergeMethod::Merge if at(&project, "/squash_option") != "always" => false,
-            MergeMethod::Squash if at(&project, "/squash_option") != "never" => true,
-            _ => return Err("That merge method is not allowed by GitLab's current policy.".into()),
-        };
+        let squash =
+            match method {
+                MergeMethod::Merge if at(&project, "/squash_option") != "always" => false,
+                MergeMethod::Squash if at(&project, "/squash_option") != "never" => true,
+                _ => return Err(crate::i18n::text(
+                    "backend-that-merge-method-is-not-allowed-by-gitlab-s-current-policy-d79825",
+                )
+                .into()),
+            };
         if delete_branch && self.details.extras.head_repo.as_deref() != Some(&self.api.hosting.path)
         {
-            return Err("Deleting a fork's branch is not offered from this repository.".into());
+            return Err(crate::i18n::text(
+                "backend-deleting-a-fork-s-branch-is-not-offered-from-this-repository-665374",
+            )
+            .into());
         }
         self.guard()?;
         let result = self.api.send("PUT", &format!("{}/merge", self.endpoint()), Some(&json!({"sha":self.details.head_oid,"squash":squash,"should_remove_source_branch":delete_branch})))?;
         if at(&result, "/state") != "merged" {
-            return Err(
-                "GitLab has not confirmed the merge. Refresh its state before another attempt."
-                    .into(),
-            );
+            return Err(crate::i18n::text(
+                "backend-gitlab-has-not-confirmed-the-merge-refresh-its-state-before-anoth-025a28",
+            )
+            .into());
         }
         Ok(())
     }
     fn apply_suggestion(&self, _: &Suggestion) -> Result<(), String> {
-        Err("Apply GitLab suggestions on GitLab; no direct branch writes are offered here.".into())
+        Err(crate::i18n::text(
+            "backend-apply-gitlab-suggestions-on-gitlab-no-direct-branch-writes-are-of-b44f97",
+        )
+        .into())
     }
 }
 /// Derive both old/new coordinates for context lines, preserving rename paths and all diff SHAs.
@@ -252,14 +301,20 @@ pub(super) fn position(
         .filter(|d| at(d, if direct { "/new_path" } else { "/old_path" }) == comment.path)
         .collect();
     if matching.len() != 1 {
-        return Err("The file is not uniquely present in GitLab's current diff. Reload it.".into());
+        return Err(crate::i18n::text(
+            "backend-the-file-is-not-uniquely-present-in-gitlab-s-current-diff-reload-3f091a",
+        )
+        .into());
     }
     let diff = matching[0];
     if ["too_large", "collapsed"]
         .iter()
         .any(|key| diff.get(key).and_then(Value::as_bool) == Some(true))
     {
-        return Err("GitLab omitted this diff; reload or use a conversation comment".into());
+        return Err(crate::i18n::text(
+            "backend-gitlab-omitted-this-diff-reload-or-use-a-conversation-comment-43d7af",
+        )
+        .into());
     }
     let mut old = 0u64;
     let mut new = 0u64;
@@ -273,10 +328,12 @@ pub(super) fn position(
                     .and_then(|p| p.split(',').next())
                     .and_then(|n| n.parse::<u64>().ok())
             };
-            old =
-                coordinate(parts.next(), '-').ok_or("GitLab returned invalid diff coordinates")?;
-            new =
-                coordinate(parts.next(), '+').ok_or("GitLab returned invalid diff coordinates")?;
+            old = coordinate(parts.next(), '-').ok_or(crate::i18n::text(
+                "backend-gitlab-returned-invalid-diff-coordinates-8e6a15",
+            ))?;
+            new = coordinate(parts.next(), '+').ok_or(crate::i18n::text(
+                "backend-gitlab-returned-invalid-diff-coordinates-8e6a15",
+            ))?;
             hunk = true;
             continue;
         }
@@ -287,7 +344,12 @@ pub(super) fn position(
             Some(b' ') => (true, true),
             Some(b'-') => (true, false),
             Some(b'+') => (false, true),
-            _ => return Err("GitLab returned an invalid text diff".into()),
+            _ => {
+                return Err(crate::i18n::text(
+                    "backend-gitlab-returned-an-invalid-text-diff-273858",
+                )
+                .into());
+            }
         };
         if (comment.side == DiffSide::Left && left && old == comment.line)
             || (comment.side == DiffSide::Right && right && new == comment.line)
@@ -302,15 +364,18 @@ pub(super) fn position(
             return Ok(p);
         }
         if left {
-            old = old
-                .checked_add(1)
-                .ok_or("GitLab diff coordinate overflow")?;
+            old = old.checked_add(1).ok_or(crate::i18n::text(
+                "backend-gitlab-diff-coordinate-overflow-b7bda1",
+            ))?;
         }
         if right {
-            new = new
-                .checked_add(1)
-                .ok_or("GitLab diff coordinate overflow")?;
+            new = new.checked_add(1).ok_or(crate::i18n::text(
+                "backend-gitlab-diff-coordinate-overflow-b7bda1",
+            ))?;
         }
     }
-    Err("That line was not included in GitLab's current text diff; use a conversation comment or reload.".into())
+    Err(crate::i18n::text(
+        "backend-that-line-was-not-included-in-gitlab-s-current-text-diff-use-a-co-945d8f",
+    )
+    .into())
 }

@@ -101,7 +101,12 @@ pub fn health(repo: &Path, unix_there: bool) -> Result<Health, String> {
         }));
         let objects = run(Some(repo), &["count-objects", "-v"])
             .map(|out| parse_count_objects(&out))
-            .map_err(|e| format!("Could not count the objects: {e}"))?;
+            .map_err(|e| {
+                crate::i18n::message(
+                    "backend-could-not-count-the-objects-e-bb5e79",
+                    &[("detail", (e).to_string().into())],
+                )
+            })?;
         // The best of two: the first may be reading a cold disk.
         let status_took = (0..2)
             .filter_map(|_| {
@@ -264,15 +269,16 @@ const MANY_LOOSE: u64 = 2000;
 pub fn suggestions(h: &Health) -> Vec<Suggestion> {
     let slow = h.status_took.is_some_and(|t| t >= SLOW_STATUS);
     let status_note = match h.status_took {
-        Some(t) => format!("git status took {} ms here", t.as_millis()),
-        None => "git status couldn't be timed".to_owned(),
+        Some(t) => crate::i18n::message(
+            if h.remote {
+                "backend-health-status-remote"
+            } else {
+                "backend-health-status-local"
+            },
+            &[("milliseconds", (t.as_millis() as u64).into())],
+        ),
+        None => crate::i18n::text("backend-health-status-unknown").to_owned(),
     };
-    let remote_note = if h.remote {
-        " (over the connection to that machine)"
-    } else {
-        ""
-    };
-    let status_note = format!("{status_note}{remote_note}");
     // A partial clone would fetch every tree it lacks to compute the changed paths.
     let write_graph: &[&str] = if h.partial {
         &["commit-graph", "write", "--reachable"]
@@ -281,15 +287,12 @@ pub fn suggestions(h: &Health) -> Vec<Suggestion> {
     };
     let mut out = vec![
         Suggestion {
-            title: "Commit-graph",
+            title: crate::i18n::text("backend-health-commit-graph"),
             why: if h.shallow {
-                "A file of every commit's parents and dates that makes walking history much \
-                 faster; git doesn't use one in a shallow clone like this one."
+                crate::i18n::text("backend-a-file-of-every-commit-s-parents-and-dates-that-makes-walking-his-c7c844")
                     .to_owned()
             } else {
-                "A file of every commit's parents and dates that makes walking history (the \
-                 graph, ahead / behind counts, merges) much faster. Writing it takes a while on \
-                 a big history; fetches keep it up to date once fetch.writeCommitGraph is on."
+                crate::i18n::text("backend-a-file-of-every-commit-s-parents-and-dates-that-makes-walking-his-302dd7")
                     .to_owned()
             },
             state: if h.shallow {
@@ -303,37 +306,32 @@ pub fn suggestions(h: &Health) -> Vec<Suggestion> {
             ]),
         },
         Suggestion {
-            title: "Scheduled maintenance",
-            why: "git maintenance start registers the repository and has the system run git in \
-                  the background (cron, systemd, launchd or the Windows Task Scheduler): every \
-                  hour it prefetches from the remotes and keeps the commit-graph up to date, \
-                  every day it repacks. It turns automatic gc off for the repository, since \
-                  the schedule does that work."
-                .to_owned(),
+            title: crate::i18n::text("backend-scheduled-maintenance-f688c9"),
+            why: crate::i18n::text(
+                "backend-git-maintenance-start-registers-the-repository-and-has-the-system-3c11ab",
+            )
+            .to_owned(),
             state: on(h.maintenance),
             ops: ops(&[&["maintenance", "start"]]),
         },
         Suggestion {
-            title: "File system monitor",
-            why: format!(
-                "git's own monitor watches the working tree, so status needn't look at every \
-                 file; {status_note}{}.",
+            title: crate::i18n::text("backend-file-system-monitor-bd6322"),
+            why: crate::i18n::message(
                 if slow {
-                    ", which it would speed up"
+                    "backend-health-monitor-slow"
                 } else {
-                    ""
-                }
+                    "backend-health-monitor"
+                },
+                &[("status", status_note.as_str().into())],
             ),
             state: h.fsmonitor.unwrap_or(State::Off),
             ops: ops(&[&["config", "--local", "core.fsmonitor", "true"]]),
         },
         Suggestion {
-            title: "Untracked cache",
-            why: format!(
-                "git remembers which folders have untracked files and only looks again in \
-                 those that changed; {status_note}. Turning it on first checks the file system \
-                 keeps folders' times as git needs; it fills up the next time git writes the \
-                 index."
+            title: crate::i18n::text("backend-untracked-cache-de0942"),
+            why: crate::i18n::message(
+                "backend-health-untracked",
+                &[("status", status_note.as_str().into())],
             ),
             state: on(h.untracked_cache),
             ops: ops(&[
@@ -345,13 +343,14 @@ pub fn suggestions(h: &Health) -> Vec<Suggestion> {
     ];
     if h.objects.loose > MANY_LOOSE || (h.objects.packs > 50 && !h.partial) {
         out.push(Suggestion {
-            title: "Pack the objects",
-            why: format!(
-                "{} loose objects in {} KiB and {} packs: git gc packs them into one, which \
-                 saves room and time on every read. Unreachable objects younger than two weeks \
-                 are kept, but reflog entries older than 90 days (30 for unreachable commits) \
-                 expire, and with them the way back to abandoned commits that old.",
-                h.objects.loose, h.objects.loose_kib, h.objects.packs
+            title: crate::i18n::text("backend-pack-the-objects-5a853d"),
+            why: crate::i18n::message(
+                "backend-loose-objects-in-kib-and-packs-git-gc-packs-them-into-one-which-s-cc160c",
+                &[
+                    ("objects", h.objects.loose.into()),
+                    ("kib", h.objects.loose_kib.into()),
+                    ("packs", h.objects.packs.into()),
+                ],
             ),
             state: State::Off,
             ops: ops(&[&["gc", "--quiet"]]),

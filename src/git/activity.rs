@@ -179,9 +179,10 @@ pub(in crate::git) fn capture_roots(
     let head = run(&["rev-parse", "--revs-only", "HEAD"], None)?;
     let head = head.strip_suffix(b"\n").unwrap_or(&head);
     if !head.is_empty() && !is_hash(head) {
-        return Err("Invalid history HEAD".into());
+        return Err(crate::i18n::text("backend-invalid-history-head-40e4e6").into());
     }
-    let head = String::from_utf8(head.to_vec()).map_err(|_| "Invalid history HEAD")?;
+    let head = String::from_utf8(head.to_vec())
+        .map_err(|_| crate::i18n::text("backend-invalid-history-head-40e4e6"))?;
     let roots = run(
         &[
             "rev-parse",
@@ -198,14 +199,17 @@ pub(in crate::git) fn capture_roots(
     }
     for line in roots.split(|b| *b == b'\n').filter(|s| !s.is_empty()) {
         if !is_hash(line) {
-            return Err("Git returned an invalid history tip".into());
+            return Err(
+                crate::i18n::text("backend-git-returned-an-invalid-history-tip-ca3530").into(),
+            );
         }
         tips.insert(line.to_vec());
     }
     if tips.len() > 10_000 {
-        return Err(
-            "More than 10,000 reference tips; narrow this repository before analyzing it".into(),
-        );
+        return Err(crate::i18n::text(
+            "backend-more-than-10-000-reference-tips-narrow-this-repository-before-ana-6894b3",
+        )
+        .into());
     }
     Ok(Roots { head, tips })
 }
@@ -319,12 +323,12 @@ fn parse(data: &[u8]) -> Result<Vec<Record>, String> {
             continue;
         }
         if !is_hash(field) {
-            return Err("Unexpected Git history record".into());
+            return Err(crate::i18n::text("backend-unexpected-git-history-record-795234").into());
         }
         let mut next = || {
-            fields
-                .next()
-                .ok_or_else(|| "Truncated Git history record".to_owned())
+            fields.next().ok_or_else(|| {
+                crate::i18n::text("backend-truncated-git-history-record-9b3de9").to_owned()
+            })
         };
         let text = |b: &[u8]| String::from_utf8_lossy(b).into_owned();
         let name = text(next()?);
@@ -338,7 +342,9 @@ fn parse(data: &[u8]) -> Result<Vec<Record>, String> {
                 fields.next();
                 break;
             }
-            let raw = fields.next().ok_or("Missing path record")?;
+            let raw = fields
+                .next()
+                .ok_or(crate::i18n::text("backend-missing-path-record-a3acd2"))?;
             let raw = raw.strip_prefix(b"\n").unwrap_or(raw);
             if raw.is_empty() {
                 continue;
@@ -351,11 +357,15 @@ fn parse(data: &[u8]) -> Result<Vec<Record>, String> {
                 || metadata[4].len() != 1
                 || !b"ACDMTUXB".contains(&metadata[4][0])
             {
-                return Err("Invalid changed-path metadata".into());
+                return Err(
+                    crate::i18n::text("backend-invalid-changed-path-metadata-cbecea").into(),
+                );
             }
-            let path = fields.next().ok_or("Missing changed path")?;
+            let path = fields
+                .next()
+                .ok_or(crate::i18n::text("backend-missing-changed-path-0c6d08"))?;
             if path.is_empty() {
-                return Err("Empty changed path".into());
+                return Err(crate::i18n::text("backend-empty-changed-path-d10710").into());
             }
             paths.insert(path.to_vec());
         }

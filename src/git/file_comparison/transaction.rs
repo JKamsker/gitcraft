@@ -58,14 +58,17 @@ fn verify_patch(path: &str, patch: &str) -> Result<(), String> {
             .lines()
             .any(|l| l.starts_with("rename ") || l.starts_with("copy "))
     {
-        return Err("The selected patch no longer belongs to this file".into());
+        return Err(crate::i18n::text(
+            "backend-the-selected-patch-no-longer-belongs-to-this-file-4bf31f",
+        )
+        .into());
     }
     let a = format!("--- {}", quote_path("a/", path));
     let b = format!("+++ {}", quote_path("b/", path));
     if !patch.lines().any(|l| l == a || l == "--- /dev/null")
         || !patch.lines().any(|l| l == b || l == "+++ /dev/null")
     {
-        return Err("Invalid staging boundary header".into());
+        return Err(crate::i18n::text("backend-invalid-staging-boundary-header-2ef0ea").into());
     }
     Ok(())
 }
@@ -77,10 +80,16 @@ pub(super) fn verify(repo: &Path, lens: &Lens) -> Result<(), String> {
                 None | Some("100644" | "100755" | "120000")
             )
     }) {
-        return Err("This file type is read-only in the staging lens".into());
+        return Err(crate::i18n::text(
+            "backend-this-file-type-is-read-only-in-the-staging-lens-f7da04",
+        )
+        .into());
     }
     if lens.staging_warning.is_some() {
-        return Err("Use normal Git staging for files with conversions".into());
+        return Err(crate::i18n::text(
+            "backend-use-normal-git-staging-for-files-with-conversions-b9ba1f",
+        )
+        .into());
     }
     let (warning, attributes_stamp) = lens::attribute_state(repo, &lens.spec.path, &|| true)?;
     if super::head(repo, &|| true)? != lens.head
@@ -92,7 +101,10 @@ pub(super) fn verify(repo: &Path, lens: &Lens) -> Result<(), String> {
         || warning.is_some()
         || attributes_stamp != lens.attributes_stamp
     {
-        return Err("The staging lens is stale. Refresh before staging or unstaging.".into());
+        return Err(crate::i18n::text(
+            "backend-the-staging-lens-is-stale-refresh-before-staging-or-unstaging-3bc2ce",
+        )
+        .into());
     }
     Ok(())
 }
@@ -125,24 +137,36 @@ pub(super) fn alternate(repo: &Path, index: &Path, args: &[&str]) -> Result<(), 
     }
 }
 fn read_index(path: &Path) -> Result<Option<Vec<u8>>, String> {
-    let parent = path.parent().ok_or("Index has no parent")?;
+    let parent = path
+        .parent()
+        .ok_or(crate::i18n::text("backend-index-has-no-parent-b1c595"))?;
     let directory =
         crate::standalone::directory::Directory::open(parent).map_err(|e| e.to_string())?;
-    let name = path.file_name().ok_or("Index has no name")?;
+    let name = path
+        .file_name()
+        .ok_or(crate::i18n::text("backend-index-has-no-name-a4f6d6"))?;
     let file = match directory.read(name) {
         Ok(f) => f,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-        Err(e) => return Err(format!("Cannot read a no-follow regular Git index: {e}")),
+        Err(e) => {
+            return Err(crate::i18n::message(
+                "backend-cannot-read-a-no-follow-regular-git-index-e-782528",
+                &[("detail", (e).to_string().into())],
+            ));
+        }
     };
     if !file.metadata().map_err(|e| e.to_string())?.is_file() {
-        return Err("Git index is not a regular file".into());
+        return Err(crate::i18n::text("backend-git-index-is-not-a-regular-file-3e68c7").into());
     }
     let mut bytes = Vec::new();
     file.take(INDEX_LIMIT + 1)
         .read_to_end(&mut bytes)
         .map_err(|e| e.to_string())?;
     if bytes.len() as u64 > INDEX_LIMIT {
-        return Err("The index exceeds the 16 MiB staging transaction limit".into());
+        return Err(crate::i18n::text(
+            "backend-the-index-exceeds-the-16-mib-staging-transaction-limit-f64011",
+        )
+        .into());
     }
     Ok(Some(bytes))
 }
@@ -168,7 +192,7 @@ impl Scratch {
                 Err(e) => return Err(e.to_string()),
             }
         }
-        Err("Could not create a private comparison folder".into())
+        Err(crate::i18n::text("backend-could-not-create-a-private-comparison-folder-bea1e3").into())
     }
 }
 impl Drop for Scratch {
@@ -202,7 +226,10 @@ fn remote_apply(
 
 fn remote_apply_script(lens: &Lens, patch: &str, reverse: bool) -> Result<String, String> {
     if lens.work_raw.warning.is_some() {
-        return Err("This working version cannot be staged safely".into());
+        return Err(crate::i18n::text(
+            "backend-this-working-version-cannot-be-staged-safely-6424e7",
+        )
+        .into());
     }
     let b64 = |v: &[u8]| base64::engine::general_purpose::STANDARD.encode(v);
     let mut work = lens
@@ -244,18 +271,22 @@ pub(super) fn index_stamp(repo: &Path, active: &dyn Fn() -> bool) -> Result<Stri
         )?;
         if out.code != 0 {
             if String::from_utf8_lossy(&out.stderr).contains("Safe index reads require Perl") {
-                return Err("Safe remote index reads require Perl with Fcntl no-follow support on the repository machine".into());
+                return Err(crate::i18n::text("backend-safe-remote-index-reads-require-perl-with-fcntl-no-follow-support-a25491").into());
             }
             if String::from_utf8_lossy(&out.stderr).contains("File comparison requires md5sum") {
-                return Err("File comparison requires md5sum (Linux/WSL) or md5 (macOS) on the repository machine".into());
+                return Err(crate::i18n::text("backend-file-comparison-requires-md5sum-linux-wsl-or-md5-macos-on-the-rep-b6009f").into());
             }
-            return Err("Could not fingerprint the Git index safely (16 MiB limit)".into());
+            return Err(crate::i18n::text(
+                "backend-could-not-fingerprint-the-git-index-safely-16-mib-limit-b7c078",
+            )
+            .into());
         }
-        let stamp = String::from_utf8(out.stdout).map_err(|_| "Invalid index fingerprint")?;
+        let stamp = String::from_utf8(out.stdout)
+            .map_err(|_| crate::i18n::text("backend-invalid-index-fingerprint-ac6c56"))?;
         if stamp != "missing"
             && !(stamp.len() == 32 && stamp.bytes().all(|b| b.is_ascii_hexdigit()))
         {
-            return Err("Invalid index fingerprint".into());
+            return Err(crate::i18n::text("backend-invalid-index-fingerprint-ac6c56").into());
         }
         return Ok(stamp);
     }

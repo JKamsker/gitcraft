@@ -80,12 +80,13 @@ impl Trace<'_> {
             return Err("Symbol history cancelled or reached its time budget".into());
         }
         if self.files.len() >= 1500 {
-            return Err(
-                "Symbol history reached 1500 file versions; reduce the history depth".into(),
-            );
+            return Err(crate::i18n::text(
+                "backend-symbol-history-reached-1500-file-versions-reduce-the-history-dept-44674d",
+            )
+            .into());
         }
         if !path_ok(path) {
-            return Err("Unsafe symbol history path".into());
+            return Err(crate::i18n::text("backend-unsafe-symbol-history-path-2d73ae").into());
         }
         if !syntax::supported(path) {
             return Ok(Arc::new(Vec::new()));
@@ -100,35 +101,44 @@ impl Trace<'_> {
             self.files.insert(key, result.clone());
             return Ok(result);
         }
-        let fields = tree
-            .split(|b| *b == b'\t')
-            .next()
-            .ok_or("Invalid symbol file metadata")?;
+        let fields = tree.split(|b| *b == b'\t').next().ok_or(crate::i18n::text(
+            "backend-invalid-symbol-file-metadata-19117c",
+        ))?;
         let fields = std::str::from_utf8(fields)
-            .map_err(|_| "Invalid symbol metadata")?
+            .map_err(|_| crate::i18n::text("backend-invalid-symbol-metadata-d188d5"))?
             .split_whitespace()
             .collect::<Vec<_>>();
         let [mode, kind, blob] = fields.as_slice() else {
-            return Err("Invalid symbol file metadata".into());
+            return Err(crate::i18n::text("backend-invalid-symbol-file-metadata-19117c").into());
         };
         if !matches!(*mode, "100644" | "100755") || *kind != "blob" || !oid(blob) {
-            return Err("Symbol history supports regular source files only".into());
+            return Err(crate::i18n::text(
+                "backend-symbol-history-supports-regular-source-files-only-ed227c",
+            )
+            .into());
         }
         let size = self.reader.run(&["cat-file", "-s", blob], vec![], &[0])?;
         let size = std::str::from_utf8(&size)
-            .map_err(|_| "Invalid source size")?
+            .map_err(|_| crate::i18n::text("backend-invalid-source-size-32e774"))?
             .trim()
             .parse::<usize>()
-            .map_err(|_| "Invalid source size")?;
+            .map_err(|_| crate::i18n::text("backend-invalid-source-size-32e774"))?;
         if size > 2 * 1024 * 1024 || self.bytes.saturating_add(size) > 64 * 1024 * 1024 {
-            return Err("Symbol history reached 2 MiB/file or 64 MiB total source budget".into());
+            return Err(crate::i18n::text(
+                "backend-symbol-history-reached-2-mib-file-or-64-mib-total-source-budget-67d2a8",
+            )
+            .into());
         }
         let bytes = self.reader.run(&["cat-file", "blob", blob], vec![], &[0])?;
         if bytes.len() != size || bytes.contains(&0) {
-            return Err("Binary or incomplete source is not parsed".into());
+            return Err(crate::i18n::text(
+                "backend-binary-or-incomplete-source-is-not-parsed-5f25dc",
+            )
+            .into());
         }
-        let text =
-            std::str::from_utf8(&bytes).map_err(|_| "Symbol history requires UTF-8 source")?;
+        let text = std::str::from_utf8(&bytes).map_err(|_| {
+            crate::i18n::text("backend-symbol-history-requires-utf-8-source-5761c0")
+        })?;
         self.bytes += size;
         let symbols = Arc::new(syntax::parse(path, text, blob, &|| self.reader.active())?);
         self.files.insert(key, symbols.clone());
@@ -166,16 +176,24 @@ impl Trace<'_> {
         while i < fields.len() {
             let status = fields[i];
             i += 1;
-            let path = std::str::from_utf8(fields.get(i).ok_or("Truncated file change")?)
-                .map_err(|_| "Non-UTF-8 file history")?;
+            let path = std::str::from_utf8(
+                fields
+                    .get(i)
+                    .ok_or(crate::i18n::text("backend-truncated-file-change-f4e8b8"))?,
+            )
+            .map_err(|_| crate::i18n::text("backend-non-utf-8-file-history-4d9013"))?;
             i += 1;
             if !path_ok(path) {
                 changes.limited = true;
                 continue;
             }
             if matches!(status.first(), Some(b'R' | b'C')) {
-                let next = std::str::from_utf8(fields.get(i).ok_or("Truncated rename")?)
-                    .map_err(|_| "Non-UTF-8 rename")?;
+                let next = std::str::from_utf8(
+                    fields
+                        .get(i)
+                        .ok_or(crate::i18n::text("backend-truncated-rename-d463db"))?,
+                )
+                .map_err(|_| "Non-UTF-8 rename")?;
                 i += 1;
                 if !path_ok(next) {
                     changes.limited = true;
@@ -228,7 +246,10 @@ impl Trace<'_> {
         for path in ordered {
             out.extend(self.file(at, &path)?.iter().cloned());
             if out.len() > 10000 {
-                return Err("Too many structural function candidates".into());
+                return Err(crate::i18n::text(
+                    "backend-too-many-structural-function-candidates-c6b12a",
+                )
+                .into());
             }
         }
         Ok(out)
@@ -255,7 +276,7 @@ impl Trace<'_> {
         )?;
         let fields = bytes.split(|b| *b == 0).collect::<Vec<_>>();
         if fields.len() != 4 {
-            return Err("Invalid symbol event metadata".into());
+            return Err(crate::i18n::text("backend-invalid-symbol-event-metadata-c646cc").into());
         }
         Ok(Step {
             commit: commit.into(),
@@ -264,9 +285,9 @@ impl Trace<'_> {
                 .take(200)
                 .collect(),
             time: std::str::from_utf8(fields[1])
-                .map_err(|_| "Invalid event time")?
+                .map_err(|_| crate::i18n::text("backend-invalid-event-time-719624"))?
                 .parse()
-                .map_err(|_| "Invalid event time")?,
+                .map_err(|_| crate::i18n::text("backend-invalid-event-time-719624"))?,
             subject: String::from_utf8_lossy(fields[2])
                 .chars()
                 .take(500)
@@ -298,9 +319,19 @@ fn choose(current: &Symbol, candidates: &[Symbol]) -> Result<Option<(Symbol, u8)
         .filter(|s| s.path == current.path && s.qualified == current.qualified)
         .collect::<Vec<_>>();
     match same.as_slice() {
-        [only] => return Ok(Some(((*only).clone(), (similarity(current, only) * 100.).round() as u8))),
-        [] => {},
-        _ => return Err("More than one function has this path and qualified name; structural identity is ambiguous.".into()),
+        [only] => {
+            return Ok(Some((
+                (*only).clone(),
+                (similarity(current, only) * 100.).round() as u8,
+            )));
+        }
+        [] => {}
+        _ => {
+            return Err(crate::i18n::text(
+                "backend-more-than-one-function-has-this-path-and-qualified-name-structura-513daf",
+            )
+            .into());
+        }
     }
     let mut ranked = candidates
         .iter()
@@ -319,14 +350,20 @@ fn choose(current: &Symbol, candidates: &[Symbol]) -> Result<Option<(Symbol, u8)
         return if candidates.is_empty() {
             Ok(None)
         } else {
-            Err("No unambiguous structural identity survived this transition. Body similarity alone cannot prove creation or deletion; lineage is incomplete.".into())
+            Err(crate::i18n::text(
+                "backend-no-unambiguous-structural-identity-survived-this-transition-body-9f6beb",
+            )
+            .into())
         };
     };
     if ranked
         .get(1)
         .is_some_and(|other| ((other.1 + other.2) - (score + bonus)).abs() < 0.04)
     {
-        return Err("Two functions have similarly strong bodies; lineage is ambiguous. Open a nearer revision or choose a qualified function name.".into());
+        return Err(crate::i18n::text(
+            "backend-two-functions-have-similarly-strong-bodies-lineage-is-ambiguous-o-7c9c12",
+        )
+        .into());
     }
     Ok(Some(((*best).clone(), (score * 100.).round() as u8)))
 }
@@ -344,13 +381,18 @@ fn boundary_event(
         .and_then(|line| line.strip_prefix(b"tree "))
         .is_some_and(|tree| std::str::from_utf8(tree).is_ok_and(oid))
     {
-        return Err("Invalid stored commit header at symbol boundary".into());
+        return Err(crate::i18n::text(
+            "backend-invalid-stored-commit-header-at-symbol-boundary-6a933f",
+        )
+        .into());
     }
     let mut parents = 0;
     for line in headers {
         if let Some(parent) = line.strip_prefix(b"parent ") {
             if !std::str::from_utf8(parent).is_ok_and(oid) {
-                return Err("Invalid stored commit parent".into());
+                return Err(
+                    crate::i18n::text("backend-invalid-stored-commit-parent-d31683").into(),
+                );
             }
             parents += 1;
         }
@@ -363,21 +405,35 @@ fn boundary_event(
         ("Earlier boundary (creation unproven)", true)
     })
 }
+fn display_boundary(boundary: &str) -> &str {
+    let id = match boundary {
+        "Created" => "backend-created-d70b9e",
+        "Earlier shallow boundary (creation unproven)" => {
+            "backend-earlier-shallow-boundary-creation-unproven-4afdd7"
+        }
+        "Earlier boundary (creation unproven)" => {
+            "backend-earlier-boundary-creation-unproven-801381"
+        }
+        _ => return boundary,
+    };
+    crate::i18n::text(id)
+}
+
 fn event(before: &Symbol, after: &Symbol) -> String {
     let mut events = Vec::new();
     if before.path != after.path {
-        events.push("Moved");
+        events.push(crate::i18n::text("backend-moved-b11c90"));
     }
     if before.qualified != after.qualified {
-        events.push("Renamed");
+        events.push(crate::i18n::text("backend-renamed-05487a"));
     }
     if before.tokens != after.tokens {
-        events.push("Body edited");
+        events.push(crate::i18n::text("backend-body-edited-719318"));
     } else if before.body != after.body {
-        events.push("Reformatted");
+        events.push(crate::i18n::text("backend-reformatted-10c026"));
     }
     if events.is_empty() {
-        "Selected version".into()
+        crate::i18n::text("backend-selected-version-f988b6").into()
     } else {
         events.join(" · ")
     }
@@ -429,21 +485,25 @@ pub(crate) fn investigate(
     active: &dyn Fn() -> bool,
 ) -> Result<Answer, String> {
     if !cfg!(feature = "symbol-history") {
-        return Err(
-            "This build has symbol history disabled; enable the symbol-history Cargo feature"
-                .into(),
-        );
+        return Err(crate::i18n::text(
+            "backend-this-build-has-symbol-history-disabled-enable-the-symbol-history-c9b07c",
+        )
+        .into());
     }
     if !path_ok(path) || !syntax::supported(path) {
-        return Err(
-            "Choose a Rust, Python, JavaScript, TypeScript/TSX, Go, C or C++ source file".into(),
-        );
+        return Err(crate::i18n::text(
+            "backend-choose-a-rust-python-javascript-typescript-tsx-go-c-or-c-source-f-3c5a5f",
+        )
+        .into());
     }
     if !(16..=2048).contains(&depth) {
-        return Err("History depth must be 16–2048 first-parent commits".into());
+        return Err(crate::i18n::text(
+            "backend-history-depth-must-be-16-2048-first-parent-commits-41a5b6",
+        )
+        .into());
     }
     if revision.starts_with('-') || revision.chars().any(char::is_control) || revision.len() > 256 {
-        return Err("Invalid history revision".into());
+        return Err(crate::i18n::text("backend-invalid-history-revision-5c3ef6").into());
     }
     let mut trace = Trace {
         reader: Reader::new(repo, active),
@@ -462,17 +522,17 @@ pub(crate) fn investigate(
         &[0],
     )?;
     let selected = std::str::from_utf8(&resolved)
-        .map_err(|_| "Invalid revision")?
+        .map_err(|_| crate::i18n::text("backend-invalid-revision-3e52aa"))?
         .trim()
         .to_owned();
     if !oid(&selected) {
-        return Err("Invalid pinned revision".into());
+        return Err(crate::i18n::text("backend-invalid-pinned-revision-254e96").into());
     }
     let head = trace
         .reader
         .run(&["rev-parse", "--verify", "HEAD"], vec![], &[0])?;
     let head = std::str::from_utf8(&head)
-        .map_err(|_| "Invalid HEAD")?
+        .map_err(|_| crate::i18n::text("backend-invalid-head-e1661b"))?
         .trim()
         .to_owned();
     let mut tip = head.clone();
@@ -488,19 +548,25 @@ pub(crate) fn investigate(
         &[0],
     )?;
     let parse_ids = |bytes: &[u8]| -> Result<Vec<String>, String> {
-        let text = std::str::from_utf8(bytes).map_err(|_| "Invalid history")?;
+        let text = std::str::from_utf8(bytes)
+            .map_err(|_| crate::i18n::text("backend-invalid-history-037731"))?;
         text.lines()
             .map(|s| {
                 if oid(s) {
                     Ok(s.into())
                 } else {
-                    Err("Invalid history ID".into())
+                    Err(crate::i18n::text("backend-invalid-history-id-4032e7").into())
                 }
             })
             .collect()
     };
     let mut commits = parse_ids(&ids)?;
-    let mut notes=vec!["An unambiguous same-path, qualified-name identity survives body rewrites; displayed similarity scores describe bodies, not proof of semantic equivalence. Renames and splits use structural heuristics; inspect the pinned source. Merge events follow the first parent; alternative branch lifetimes can be opened separately. Reads do not fetch missing objects or run repository tools.".into()];
+    let mut notes = vec![
+        crate::i18n::text(
+            "backend-an-unambiguous-same-path-qualified-name-identity-survives-body-re-56dc01",
+        )
+        .into(),
+    ];
     if !commits.contains(&selected) {
         tip = selected.clone();
         ids = trace.reader.run(
@@ -515,17 +581,27 @@ pub(crate) fn investigate(
             &[0],
         )?;
         commits = parse_ids(&ids)?;
-        notes.push("Selected revision is outside the loaded first-parent HEAD path. This timeline ends at that revision.".into());
+        notes.push(
+            crate::i18n::text(
+                "backend-selected-revision-is-outside-the-loaded-first-parent-head-path-th-7752ee",
+            )
+            .into(),
+        );
     }
     let limited = commits.len() > depth;
     commits.truncate(depth);
     if limited {
-        notes.push(format!("Loaded the newest {depth} first-parent commits; increase history depth to follow earlier versions."));
+        notes.push(crate::i18n::message(
+            "backend-loaded-the-newest-depth-first-parent-commits-increase-history-dep-5bb262",
+            &[("depth", (depth).into())],
+        ));
     }
     let mut at = commits
         .iter()
         .position(|id| id == &selected)
-        .ok_or("Selected revision exceeds history budget")?;
+        .ok_or(crate::i18n::text(
+            "backend-selected-revision-exceeds-history-budget-1187be",
+        ))?;
     let mut lookup_path = path.to_owned();
     let mut matches = Vec::new();
     while at < commits.len() {
@@ -557,7 +633,10 @@ pub(crate) fn investigate(
     }
     if matches.len() != 1 {
         if matches.is_empty() {
-            return Err("No matching function was found within the local history budget".into());
+            return Err(crate::i18n::text(
+                "backend-no-matching-function-was-found-within-the-local-history-budget-04d06d",
+            )
+            .into());
         }
         return Ok(Answer::Choices(matches));
     }
@@ -584,12 +663,12 @@ pub(crate) fn investigate(
         };
         let Some((previous, confidence)) = chosen else {
             if changes.limited {
-                notes.push("A bulk/unsupported file transition prevents proving creation; lineage stops here.".into());
+                notes.push(crate::i18n::text("backend-a-bulk-unsupported-file-transition-prevents-proving-creation-line-e9e5ff").into());
                 incomplete = true;
             } else {
                 steps.push(trace.step(
                     &commits[at],
-                    "Created".into(),
+                    crate::i18n::text("backend-created-d70b9e").into(),
                     Some(current.clone()),
                     vec![],
                     None,
@@ -606,7 +685,7 @@ pub(crate) fn investigate(
             let related = splits(&previous, &current, &all);
             let mut what = event(&previous, &current);
             if !related.is_empty() {
-                what.push_str(" · Possible split");
+                what.push_str(crate::i18n::text("backend-possible-split-5f50f5"));
             }
             steps.push(trace.step(
                 &commits[at],
@@ -629,11 +708,17 @@ pub(crate) fn investigate(
             .reader
             .run(&["cat-file", "commit", &commits[at]], vec![], &[0])?;
         let (boundary, unproven) = boundary_event(&raw, &parents)?;
-        steps.push(trace.step(&commits[at], boundary.into(), Some(current), vec![], None)?);
+        steps.push(trace.step(
+            &commits[at],
+            display_boundary(boundary).into(),
+            Some(current),
+            vec![],
+            None,
+        )?);
         if unproven {
             incomplete = true;
             if boundary.contains("shallow") {
-                notes.push("The earlier commit is a shallow cut point, not the function's proven creation. Fetch history explicitly to investigate further; this view does not fetch.".into());
+                notes.push(crate::i18n::text("backend-the-earlier-commit-is-a-shallow-cut-point-not-the-function-s-prov-9698ad").into());
             }
         }
     }
@@ -655,10 +740,21 @@ pub(crate) fn investigate(
         };
         let Some((following, confidence)) = chosen else {
             if changes.limited {
-                notes.push("A bulk/unsupported transition prevents proving deletion.".into());
+                notes.push(
+                    crate::i18n::text(
+                        "backend-a-bulk-unsupported-transition-prevents-proving-deletion-16de7f",
+                    )
+                    .into(),
+                );
                 incomplete = true;
             } else {
-                steps.push(trace.step(&commits[next], "Deleted".into(), None, vec![], None)?);
+                steps.push(trace.step(
+                    &commits[next],
+                    crate::i18n::text("backend-deleted-b48ff3").into(),
+                    None,
+                    vec![],
+                    None,
+                )?);
             }
             break;
         };
@@ -669,7 +765,7 @@ pub(crate) fn investigate(
             let related = splits(&current, &following, &candidates);
             let mut what = event(&current, &following);
             if !related.is_empty() {
-                what.push_str(" · Possible split");
+                what.push_str(crate::i18n::text("backend-possible-split-5f50f5"));
             }
             steps.push(trace.step(
                 &commits[next],
@@ -684,7 +780,7 @@ pub(crate) fn investigate(
     if steps.is_empty() {
         steps.push(trace.step(
             &commits[seed_at],
-            "Selected version".into(),
+            crate::i18n::text("backend-selected-version-f988b6").into(),
             Some(current),
             vec![],
             None,

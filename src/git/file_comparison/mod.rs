@@ -57,16 +57,25 @@ impl Version {
     }
     pub fn label(&self) -> String {
         match &self.mode {
-            None => "Missing".into(),
-            Some(m) => format!(
-                "{} · {} bytes{}",
-                m,
-                self.bytes.len(),
+            None => crate::i18n::text("backend-version-missing").into(),
+            Some(mode) => crate::i18n::message(
                 if self.bytes.contains(&0) {
-                    " · binary"
+                    "backend-version-bytes-binary"
                 } else {
-                    ""
-                }
+                    "backend-version-bytes"
+                },
+                &[
+                    (
+                        "mode",
+                        if mode == "unknown" {
+                            crate::i18n::text("backend-version-unknown-mode")
+                        } else {
+                            mode.as_str()
+                        }
+                        .into(),
+                    ),
+                    ("count", self.bytes.len().into()),
+                ],
             ),
         }
     }
@@ -88,9 +97,14 @@ pub(super) fn run(
     if out.code == 0 {
         Ok(out.stdout)
     } else {
-        Err(format!(
-            "Could not compare files: {}",
-            String::from_utf8_lossy(&out.stderr).trim()
+        Err(crate::i18n::message(
+            "backend-could-not-compare-files-4ff498",
+            &[(
+                "from_utf8_lossy",
+                (String::from_utf8_lossy(&out.stderr).trim())
+                    .to_string()
+                    .into(),
+            )],
         ))
     }
 }
@@ -114,10 +128,10 @@ pub(crate) fn resolve(
         active,
     )?;
     let oid = std::str::from_utf8(&bytes)
-        .map_err(|_| "Invalid revision")?
+        .map_err(|_| crate::i18n::text("backend-invalid-revision-3e52aa"))?
         .trim();
     if !hash(oid) {
-        return Err("Git returned an invalid commit id".into());
+        return Err(crate::i18n::text("backend-git-returned-an-invalid-commit-id-621dfa").into());
     }
     Ok(oid.into())
 }
@@ -133,12 +147,13 @@ pub(super) fn head(repo: &Path, active: &dyn Fn() -> bool) -> Result<Option<Stri
         if symbolic.code == 0 {
             return Ok(None);
         }
-        return Err("Could not resolve HEAD".into());
+        return Err(crate::i18n::text("backend-could-not-resolve-head-32445d").into());
     }
-    let oid = String::from_utf8(out.stdout).map_err(|_| "Invalid HEAD")?;
+    let oid = String::from_utf8(out.stdout)
+        .map_err(|_| crate::i18n::text("backend-invalid-head-e1661b"))?;
     let oid = oid.trim();
     if !hash(oid) {
-        return Err("Invalid HEAD".into());
+        return Err(crate::i18n::text("backend-invalid-head-e1661b").into());
     }
     Ok(Some(oid.into()))
 }
@@ -176,14 +191,18 @@ pub(super) fn index(repo: &Path, active: &dyn Fn() -> bool) -> Result<IndexEntri
         let tab = row
             .iter()
             .position(|b| *b == b'\t')
-            .ok_or("Invalid index record")?;
-        let metadata = std::str::from_utf8(&row[..tab]).map_err(|_| "Invalid index metadata")?;
+            .ok_or(crate::i18n::text("backend-invalid-index-record-8a8e83"))?;
+        let metadata = std::str::from_utf8(&row[..tab])
+            .map_err(|_| crate::i18n::text("backend-invalid-index-metadata-f6b2f3"))?;
         let fields: Vec<_> = metadata.split(' ').collect();
         if fields.len() != 3 || !hash(fields[1]) {
-            return Err("Invalid index entry".into());
+            return Err(crate::i18n::text("backend-invalid-index-entry-cf3e7b").into());
         }
         if fields[2] != "0" {
-            return Err("Resolve index conflicts before opening these file comparisons".into());
+            return Err(crate::i18n::text(
+                "backend-resolve-index-conflicts-before-opening-these-file-comparisons-2b7d7c",
+            )
+            .into());
         }
         let entry = Entry {
             path: row[tab + 1..].to_vec(),
@@ -201,7 +220,10 @@ pub(super) fn tree(
     active: &dyn Fn() -> bool,
 ) -> Result<BTreeMap<Vec<u8>, Entry>, String> {
     if !folder.is_empty() && !valid_path(repo, folder) {
-        return Err("Choose a repository-relative folder without . or .. components".into());
+        return Err(crate::i18n::text(
+            "backend-choose-a-repository-relative-folder-without-or-components-f7160d",
+        )
+        .into());
     }
     let mut args = vec![
         "--no-lazy-fetch",
@@ -222,11 +244,12 @@ pub(super) fn tree(
         let tab = row
             .iter()
             .position(|b| *b == b'\t')
-            .ok_or("Invalid tree record")?;
-        let metadata = std::str::from_utf8(&row[..tab]).map_err(|_| "Invalid tree metadata")?;
+            .ok_or(crate::i18n::text("backend-invalid-tree-record-bf9356"))?;
+        let metadata = std::str::from_utf8(&row[..tab])
+            .map_err(|_| crate::i18n::text("backend-invalid-tree-metadata-1d2e46"))?;
         let fields: Vec<_> = metadata.split(' ').collect();
         if fields.len() != 3 || !hash(fields[2]) {
-            return Err("Invalid tree entry".into());
+            return Err(crate::i18n::text("backend-invalid-tree-entry-8d7b6f").into());
         }
         let entry = Entry {
             path: row[tab + 1..].to_vec(),
@@ -235,7 +258,10 @@ pub(super) fn tree(
         };
         entries.insert(entry.path.clone(), entry);
         if entries.len() > MAX_ROWS {
-            return Err("More than 2,000 files; choose a narrower folder".into());
+            return Err(crate::i18n::text(
+                "backend-more-than-2-000-files-choose-a-narrower-folder-8c65ab",
+            )
+            .into());
         }
     }
     Ok(entries)
@@ -252,7 +278,11 @@ pub(crate) fn blob(
         return Ok(Version {
             mode: Some(entry.mode.clone()),
             oid: Some(entry.oid.clone()),
-            bytes: format!("Submodule commit {}\n", entry.oid).into_bytes(),
+            bytes: crate::i18n::message(
+                "backend-submodule-commit-7c6bb2",
+                &[("oid", (entry.oid).to_string().into())],
+            )
+            .into_bytes(),
             warning: None,
         });
     }
@@ -264,9 +294,12 @@ pub(crate) fn blob(
     let size = std::str::from_utf8(&size)
         .ok()
         .and_then(|s| s.trim().parse::<usize>().ok())
-        .ok_or("Invalid blob size")?;
+        .ok_or(crate::i18n::text("backend-invalid-blob-size-924b45"))?;
     if size > FILE_LIMIT {
-        return Err("File comparison is limited to 2 MiB per version".into());
+        return Err(crate::i18n::text(
+            "backend-file-comparison-is-limited-to-2-mib-per-version-6a524d",
+        )
+        .into());
     }
     let bytes = run(
         repo,
@@ -274,7 +307,9 @@ pub(crate) fn blob(
         active,
     )?;
     if bytes.len() != size {
-        return Err("The blob could not be read completely".into());
+        return Err(
+            crate::i18n::text("backend-the-blob-could-not-be-read-completely-bad905").into(),
+        );
     }
     Ok(Version {
         mode: Some(entry.mode.clone()),
@@ -302,10 +337,12 @@ pub(crate) fn matrix(
     active: &dyn Fn() -> bool,
 ) -> Result<Matrix, String> {
     if !(2..=8).contains(&branches.len()) {
-        return Err("Choose between two and eight branches".into());
+        return Err(
+            crate::i18n::text("backend-choose-between-two-and-eight-branches-455163").into(),
+        );
     }
     if folder.starts_with('/') {
-        return Err("Choose a repository-relative folder".into());
+        return Err(crate::i18n::text("backend-choose-a-repository-relative-folder-1fdb08").into());
     }
     let folder = folder.trim_end_matches('/');
     let mut columns = Vec::new();
@@ -315,7 +352,10 @@ pub(crate) fn matrix(
         let files = tree(repo, &oid, folder, active)?;
         paths.extend(files.keys().cloned());
         if paths.len() > MAX_ROWS {
-            return Err("More than 2,000 distinct paths; choose a narrower folder".into());
+            return Err(crate::i18n::text(
+                "backend-more-than-2-000-distinct-paths-choose-a-narrower-folder-77a035",
+            )
+            .into());
         }
         columns.push(Column {
             label: branch.clone(),

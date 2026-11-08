@@ -27,7 +27,10 @@ pub(super) fn details(repo: &Path, number: u64) -> Result<PrDetails, String> {
     if read_in_step(&details) {
         Ok(details)
     } else {
-        Err("The pull request changed while it was read. Load it again.".to_owned())
+        Err(crate::i18n::text(
+            "backend-the-pull-request-changed-while-it-was-read-load-it-again-fe77a7",
+        )
+        .to_owned())
     }
 }
 
@@ -47,15 +50,22 @@ fn read_details(repo: &Path, number: u64) -> Result<PrDetails, String> {
             }
             Err(e) => details.inline_error = Some(e),
         },
-        None => details.inline_error = Some("unexpected pull request URL".to_owned()),
+        None => {
+            details.inline_error =
+                Some(crate::i18n::text("backend-unexpected-pull-request-url-c63386").to_owned())
+        }
     }
     details.timeline.sort_by_key(|entry| entry.at);
     Ok(details)
 }
 
 pub(crate) fn parse_details(json: &str) -> Result<PrDetails, String> {
-    let v: Value =
-        serde_json::from_str(json).map_err(|e| format!("unexpected output of gh: {e}"))?;
+    let v: Value = serde_json::from_str(json).map_err(|e| {
+        crate::i18n::message(
+            "backend-unexpected-output-of-gh-e-24588e",
+            &[("detail", (e).to_string().into())],
+        )
+    })?;
     let text = |key: &str| at(&v, key).to_owned();
     let number = |key: &str| v.pointer(key).and_then(Value::as_u64).unwrap_or(0);
     let time = |key: &str| parse_time(at(&v, key)).unwrap_or(0);
@@ -129,8 +139,8 @@ fn review(v: &Value) -> Option<Entry> {
     let body = at(v, "/body");
     let verdict = match at(v, "/state") {
         "APPROVED" => "approved",
-        "CHANGES_REQUESTED" => "requested changes",
-        "DISMISSED" => "had a review dismissed",
+        "CHANGES_REQUESTED" => crate::i18n::text("backend-requested-changes-7adfe7"),
+        "DISMISSED" => crate::i18n::text("backend-had-a-review-dismissed-2ab8b3"),
         "COMMENTED" if !body.is_empty() => "reviewed",
         _ => return None,
     };

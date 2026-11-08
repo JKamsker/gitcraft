@@ -56,7 +56,7 @@ pub(in crate::git) fn run(
             .any(|line| line.starts_with("error:") || line.starts_with("fatal:"))
     {
         return Err(if error.trim().is_empty() {
-            "Git history read failed".into()
+            crate::i18n::text("backend-git-history-read-failed-b51ce1").into()
         } else {
             error.trim().to_owned()
         });
@@ -78,7 +78,8 @@ pub(super) fn config(
     }
     args.push(key);
     let data = run(repo, &args, None, active)?;
-    let value = String::from_utf8(data).map_err(|_| "Mailmap configuration is not UTF-8")?;
+    let value = String::from_utf8(data)
+        .map_err(|_| crate::i18n::text("backend-mailmap-configuration-is-not-utf-8-d695be"))?;
     let value = value.trim_end_matches(['\r', '\n']);
     Ok((!value.is_empty()).then(|| value.to_owned()))
 }

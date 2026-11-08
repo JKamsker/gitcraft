@@ -60,11 +60,17 @@ fn path_ok(path: &str) -> bool {
 }
 fn one_line(text: &str, line: usize) -> Result<&str, String> {
     if !(1..=LINES).contains(&line) {
-        return Err("Line history is limited to20000 source lines".into());
+        return Err(crate::i18n::text(
+            "backend-line-history-is-limited-to20000-source-lines-04852f",
+        )
+        .into());
     }
-    text.split_terminator('\n')
-        .nth(line - 1)
-        .ok_or_else(|| "The selected line no longer exists at the pinned revision".into())
+    text.split_terminator('\n').nth(line - 1).ok_or_else(|| {
+        crate::i18n::text(
+            "backend-the-selected-line-no-longer-exists-at-the-pinned-revision-240588",
+        )
+        .into()
+    })
 }
 fn normal(text: &str) -> String {
     text.chars().filter(|c| !c.is_whitespace()).collect()
@@ -74,11 +80,11 @@ pub(crate) fn quoted_path(value: &str) -> Result<String, String> {
         return if path_ok(value) {
             Ok(value.into())
         } else {
-            Err("Invalid Git history path".into())
+            Err(crate::i18n::text("backend-invalid-git-history-path-660844").into())
         };
     }
     if !value.ends_with('"') || value.len() < 2 {
-        return Err("Truncated quoted Git path".into());
+        return Err(crate::i18n::text("backend-truncated-quoted-git-path-b14143").into());
     }
     let mut out = Vec::new();
     let bytes = &value.as_bytes()[1..value.len() - 1];
@@ -90,7 +96,9 @@ pub(crate) fn quoted_path(value: &str) -> Result<String, String> {
             out.push(b);
             continue;
         }
-        let b = *bytes.get(i).ok_or("Truncated path escape")?;
+        let b = *bytes
+            .get(i)
+            .ok_or(crate::i18n::text("backend-truncated-path-escape-c967c4"))?;
         i += 1;
         match b {
             b'\\' | b'"' => out.push(b),
@@ -102,51 +110,64 @@ pub(crate) fn quoted_path(value: &str) -> Result<String, String> {
             b'v' => out.push(11),
             b'a' => out.push(7),
             b'0'..=b'7' => {
-                let rest = bytes.get(i..i + 2).ok_or("Truncated octal path")?;
+                let rest = bytes
+                    .get(i..i + 2)
+                    .ok_or(crate::i18n::text("backend-truncated-octal-path-791865"))?;
                 if !rest.iter().all(|b| matches!(b, b'0'..=b'7')) {
-                    return Err("Invalid octal path".into());
+                    return Err(crate::i18n::text("backend-invalid-octal-path-cffcb9").into());
                 }
                 let n = u16::from(b - b'0') * 64
                     + u16::from(rest[0] - b'0') * 8
                     + u16::from(rest[1] - b'0');
-                out.push(u8::try_from(n).map_err(|_| "Invalid octal byte")?);
+                out.push(
+                    u8::try_from(n)
+                        .map_err(|_| crate::i18n::text("backend-invalid-octal-byte-2cb6f3"))?,
+                );
                 i += 2;
             }
-            _ => return Err("Unsupported Git path escape".into()),
+            _ => {
+                return Err(crate::i18n::text("backend-unsupported-git-path-escape-830db8").into());
+            }
         }
     }
-    let path = String::from_utf8(out).map_err(|_| "Non-UTF-8 history paths are not traced")?;
+    let path = String::from_utf8(out)
+        .map_err(|_| crate::i18n::text("backend-non-utf-8-history-paths-are-not-traced-996cbd"))?;
     if !path_ok(&path) {
-        return Err("Unsafe history path".into());
+        return Err(crate::i18n::text("backend-unsafe-history-path-efda61").into());
     }
     Ok(path)
 }
 fn blame_frame(out: &[u8]) -> Result<Attribution, String> {
-    let text = std::str::from_utf8(out).map_err(|_| "Blame returned non-UTF-8 metadata")?;
+    let text = std::str::from_utf8(out)
+        .map_err(|_| crate::i18n::text("backend-blame-returned-non-utf-8-metadata-0fe8ff"))?;
     let mut lines = text.lines();
-    let first = lines.next().ok_or("Empty line blame")?;
+    let first = lines
+        .next()
+        .ok_or(crate::i18n::text("backend-empty-line-blame-207bb2"))?;
     if first.len() > 256 {
-        return Err("Oversized blame header".into());
+        return Err(crate::i18n::text("backend-oversized-blame-header-f86d74").into());
     }
     let header: Vec<_> = first.split_whitespace().collect();
     let [commit, line, _, _] = header.as_slice() else {
-        return Err("Invalid single-line blame header".into());
+        return Err(crate::i18n::text("backend-invalid-single-line-blame-header-c0c4d6").into());
     };
     if !oid(commit) {
-        return Err("Invalid blame object ID".into());
+        return Err(crate::i18n::text("backend-invalid-blame-object-id-643be1").into());
     }
     let line = line
         .parse::<usize>()
-        .map_err(|_| "Invalid original line number")?;
+        .map_err(|_| crate::i18n::text("backend-invalid-original-line-number-ef5d80"))?;
     if !(1..=LINES).contains(&line) {
-        return Err("Original line exceeds history limits".into());
+        return Err(
+            crate::i18n::text("backend-original-line-exceeds-history-limits-b786ac").into(),
+        );
     }
     let mut path = None;
     let mut records = 0;
     for line in lines {
         if let Some(value) = line.strip_prefix("filename ") {
             if path.is_some() {
-                return Err("Duplicate blame filename".into());
+                return Err(crate::i18n::text("backend-duplicate-blame-filename-98efa9").into());
             }
             path = Some(quoted_path(value)?);
         } else if line.starts_with('\t') {
@@ -154,11 +175,13 @@ fn blame_frame(out: &[u8]) -> Result<Attribution, String> {
         }
     }
     if records != 1 {
-        return Err("Blame did not return exactly one line".into());
+        return Err(
+            crate::i18n::text("backend-blame-did-not-return-exactly-one-line-c10bf8").into(),
+        );
     }
     Ok(Attribution {
         commit: (*commit).into(),
-        path: path.ok_or("Missing blame filename")?,
+        path: path.ok_or(crate::i18n::text("backend-missing-blame-filename-4cccd2"))?,
         line,
     })
 }
@@ -172,13 +195,16 @@ fn previous_line(
     let now: Vec<_> = current.split_terminator('\n').collect();
     let old: Vec<_> = parent.split_terminator('\n').collect();
     if now.len() > LINES || old.len() > LINES {
-        return Err("File has over20000 lines".into());
+        return Err(crate::i18n::text("backend-file-has-over20000-lines-20a678").into());
     }
-    let target = normal(now.get(line - 1).ok_or("Invalid current line")?);
+    let target = normal(
+        now.get(line - 1)
+            .ok_or(crate::i18n::text("backend-invalid-current-line-1d2e70"))?,
+    );
     if current == parent {
         return Ok(Some((
             line,
-            "Identical raw file version; exact line position",
+            crate::i18n::text("backend-identical-raw-file-version-exact-line-position-e1df9d"),
         )));
     }
     let old_normal: Vec<_> = old.iter().map(|text| normal(text)).collect();
@@ -191,7 +217,7 @@ fn previous_line(
     if equal.len() == 1 {
         return Ok(Some((
             equal[0] + 1,
-            "Unique whitespace-normalized line match",
+            crate::i18n::text("backend-unique-whitespace-normalized-line-match-fe3b3c"),
         )));
     }
     let anchor = |at: usize| -> Option<usize> {
@@ -225,7 +251,9 @@ fn previous_line(
         if equal.is_empty() || equal.contains(&candidate) {
             return Ok(Some((
                 candidate + 1,
-                "Parent line aligned by unique surrounding context; inspect the version",
+                crate::i18n::text(
+                    "backend-parent-line-aligned-by-unique-surrounding-context-inspect-the-ver-a6d5be",
+                ),
             )));
         }
     }
@@ -258,29 +286,36 @@ impl<'a> Trace<'a> {
             return Ok(None);
         }
         let mut records = out.split(|b| *b == 0).filter(|s| !s.is_empty());
-        let record = records.next().ok_or("Missing tree record")?;
+        let record = records
+            .next()
+            .ok_or(crate::i18n::text("backend-missing-tree-record-147457"))?;
         if records.next().is_some() {
-            return Err("Line history expected one exact file".into());
+            return Err(
+                crate::i18n::text("backend-line-history-expected-one-exact-file-83fede").into(),
+            );
         }
         let split = record
             .iter()
             .position(|b| *b == b'\t')
-            .ok_or("Invalid tree record")?;
+            .ok_or(crate::i18n::text("backend-invalid-tree-record-bf9356"))?;
         if &record[split + 1..] != path.as_bytes() {
-            return Err("Tree path did not match its literal request".into());
+            return Err(crate::i18n::text(
+                "backend-tree-path-did-not-match-its-literal-request-ea4301",
+            )
+            .into());
         }
         let fields: Vec<_> = std::str::from_utf8(&record[..split])
-            .map_err(|_| "Invalid tree metadata")?
+            .map_err(|_| crate::i18n::text("backend-invalid-tree-metadata-1d2e46"))?
             .split_whitespace()
             .collect();
         let [mode, kind, id] = fields.as_slice() else {
-            return Err("Invalid tree entry".into());
+            return Err(crate::i18n::text("backend-invalid-tree-entry-8d7b6f").into());
         };
         if !matches!(*mode, "100644" | "100755") || *kind != "blob" || !oid(id) {
-            return Err(
-                "Line history only reads regular text blobs; links/submodules are not followed"
-                    .into(),
-            );
+            return Err(crate::i18n::text(
+                "backend-line-history-only-reads-regular-text-blobs-links-submodules-are-n-8668cf",
+            )
+            .into());
         }
         if let Some(file) = self.blobs.get(*id) {
             let file = file.clone();
@@ -291,13 +326,19 @@ impl<'a> Trace<'a> {
         let size = std::str::from_utf8(&size)
             .ok()
             .and_then(|s| s.trim().parse::<usize>().ok())
-            .ok_or("Invalid blob size")?;
+            .ok_or(crate::i18n::text("backend-invalid-blob-size-924b45"))?;
         if size > FILE || self.bytes.saturating_add(size) > TOTAL {
-            return Err("Line history reached its2MiB/file or32MiB snapshot budget".into());
+            return Err(crate::i18n::text(
+                "backend-line-history-reached-its2mib-file-or32mib-snapshot-budget-06c25d",
+            )
+            .into());
         }
         let bytes = self.reader.run(&["cat-file", "blob", id], vec![], &[0])?;
         if bytes.len() != size || bytes.contains(&0) {
-            return Err("Binary or incomplete file version cannot be traced".into());
+            return Err(crate::i18n::text(
+                "backend-binary-or-incomplete-file-version-cannot-be-traced-af9e9a",
+            )
+            .into());
         }
         let actual = self.reader.run(
             &["hash-object", "--no-filters", "--stdin"],
@@ -305,12 +346,16 @@ impl<'a> Trace<'a> {
             &[0],
         )?;
         if actual.trim_ascii() != id.as_bytes() {
-            return Err("Blob identity changed while tracing history".into());
+            return Err(crate::i18n::text(
+                "backend-blob-identity-changed-while-tracing-history-2ff14d",
+            )
+            .into());
         }
-        let text =
-            String::from_utf8(bytes).map_err(|_| "Non-UTF-8 file versions cannot be traced")?;
+        let text = String::from_utf8(bytes).map_err(|_| {
+            crate::i18n::text("backend-non-utf-8-file-versions-cannot-be-traced-d40721")
+        })?;
         if text.split_terminator('\n').count() > LINES {
-            return Err("File has over20000 lines".into());
+            return Err(crate::i18n::text("backend-file-has-over20000-lines-20a678").into());
         }
         self.bytes += size;
         let file = std::sync::Arc::new(FileVersion {
@@ -336,30 +381,37 @@ impl<'a> Trace<'a> {
             &[0],
         )?;
         if out.len() > 16384 {
-            return Err("Version metadata exceeds16KiB".into());
+            return Err(crate::i18n::text("backend-version-metadata-exceeds16kib-daf692").into());
         }
         let fields: Vec<_> = out.split(|b| *b == 0).collect();
         let [parents, author, email, time, subject, tail] = fields.as_slice() else {
-            return Err("Invalid version metadata".into());
+            return Err(crate::i18n::text("backend-invalid-version-metadata-4fe146").into());
         };
         if !tail.iter().all(u8::is_ascii_whitespace) {
-            return Err("Trailing version metadata".into());
+            return Err(crate::i18n::text("backend-trailing-version-metadata-1d44b4").into());
         }
         let text = |b: &[u8]| {
-            String::from_utf8(b.to_vec()).map_err(|_| "Invalid UTF-8 version metadata".to_owned())
+            String::from_utf8(b.to_vec()).map_err(|_| {
+                crate::i18n::text("backend-invalid-utf-8-version-metadata-b59dcf").to_owned()
+            })
         };
         let parents: Vec<_> = text(parents)?
             .split_whitespace()
             .map(str::to_owned)
             .collect();
         if parents.len() > 8 || parents.iter().any(|id| !oid(id)) {
-            return Err("Unsupported or malformed commit parent list".into());
+            return Err(crate::i18n::text(
+                "backend-unsupported-or-malformed-commit-parent-list-337df5",
+            )
+            .into());
         }
         Ok((
             parents,
             text(author)?,
             text(email)?,
-            text(time)?.parse().map_err(|_| "Invalid author time")?,
+            text(time)?
+                .parse()
+                .map_err(|_| crate::i18n::text("backend-invalid-author-time-982ba5"))?,
             text(subject)?,
         ))
     }
@@ -389,20 +441,30 @@ impl<'a> Trace<'a> {
         while let Some(status) = fields.next() {
             seen += 1;
             if seen > 10000 {
-                return Err("Rename detection exceeded10000 changed paths".into());
+                return Err(crate::i18n::text(
+                    "backend-rename-detection-exceeded10000-changed-paths-4d972b",
+                )
+                .into());
             }
-            let first = fields.next().ok_or("Truncated rename record")?;
+            let first = fields
+                .next()
+                .ok_or(crate::i18n::text("backend-truncated-rename-record-dd5b2b"))?;
             let rename = matches!(status.first(), Some(b'R' | b'C'));
             let second = if rename {
-                Some(fields.next().ok_or("Truncated rename destination")?)
+                Some(fields.next().ok_or(crate::i18n::text(
+                    "backend-truncated-rename-destination-f609c2",
+                ))?)
             } else {
                 None
             };
             if second.is_some_and(|new| new == path.as_bytes()) {
-                let old =
-                    std::str::from_utf8(first).map_err(|_| "Renamed history path is not UTF-8")?;
+                let old = std::str::from_utf8(first).map_err(|_| {
+                    crate::i18n::text("backend-renamed-history-path-is-not-utf-8-30395e")
+                })?;
                 if !path_ok(old) {
-                    return Err("Unsafe renamed history path".into());
+                    return Err(
+                        crate::i18n::text("backend-unsafe-renamed-history-path-7b2f2d").into(),
+                    );
                 }
                 return Ok(Some(old.into()));
             }
@@ -429,14 +491,14 @@ impl<'a> Trace<'a> {
             &[0],
         )?;
         let value = std::str::from_utf8(&out)
-            .map_err(|_| "Invalid file history")?
+            .map_err(|_| crate::i18n::text("backend-invalid-file-history-921c83"))?
             .trim();
         if value.is_empty() {
             Ok(None)
         } else if oid(value) {
             Ok(Some(value.into()))
         } else {
-            Err("Invalid file-history object ID".into())
+            Err(crate::i18n::text("backend-invalid-file-history-object-id-8473d2").into())
         }
     }
 }
@@ -449,7 +511,10 @@ pub(crate) fn trace(
     active: &dyn Fn() -> bool,
 ) -> Result<Dossier, String> {
     if !(oid(revision) || revision == "HEAD") || !path_ok(path) || !(1..=LINES).contains(&line) {
-        return Err("Choose a valid committed file and line (up to20000 lines)".into());
+        return Err(crate::i18n::text(
+            "backend-choose-a-valid-committed-file-and-line-up-to20000-lines-ff8536",
+        )
+        .into());
     }
     let mut t = Trace {
         reader: Reader::new(repo, active),
@@ -468,11 +533,11 @@ pub(crate) fn trace(
         &[0],
     )?;
     let commit = std::str::from_utf8(&resolved)
-        .map_err(|_| "Invalid pinned commit")?
+        .map_err(|_| crate::i18n::text("backend-invalid-pinned-commit-b28d61"))?
         .trim()
         .to_owned();
     if !oid(&commit) {
-        return Err("Invalid pinned history commit".into());
+        return Err(crate::i18n::text("backend-invalid-pinned-history-commit-6a5b76").into());
     }
     let start = Seed {
         commit,
@@ -493,12 +558,17 @@ pub(crate) fn trace(
             return Err("Line history cancelled or exceeded120seconds".into());
         }
         if !seen.insert(cursor.clone()) {
-            result.stopped = "History mapping returned to a previously visited line".into();
+            result.stopped = crate::i18n::text(
+                "backend-history-mapping-returned-to-a-previously-visited-line-13b05d",
+            )
+            .into();
             break;
         }
         let file = t
             .file(&cursor.commit, &cursor.path)?
-            .ok_or("Pinned history file is missing")?;
+            .ok_or(crate::i18n::text(
+                "backend-pinned-history-file-is-missing-7e85cd",
+            ))?;
         let text = one_line(&file.text, cursor.line)?.to_owned();
         let range = format!("{},{}", cursor.line, cursor.line);
         let attribution = blame_frame(&t.reader.run(
@@ -524,10 +594,15 @@ pub(crate) fn trace(
         )?)?;
         let origin = t
             .file(&attribution.commit, &attribution.path)?
-            .ok_or("The attributed file is missing")?;
+            .ok_or(crate::i18n::text(
+                "backend-the-attributed-file-is-missing-5beb1a",
+            ))?;
         let original = one_line(&origin.text, attribution.line)?;
         if normal(original) != normal(&text) {
-            return Err("Blame attribution did not match the pinned raw line".into());
+            return Err(crate::i18n::text(
+                "backend-blame-attribution-did-not-match-the-pinned-raw-line-93aee5",
+            )
+            .into());
         }
         let (parents, author, email, time, subject) = t.parents(&cursor.commit)?;
         let mut mapped = Vec::new();
@@ -588,38 +663,46 @@ pub(crate) fn trace(
                 subject,
                 attribution,
                 note: if copied.is_some(){
-                    "Git copy/move attribution verified in a parent history; whole-file patch mapping was unavailable".into()
+                    crate::i18n::text("backend-git-copy-move-attribution-verified-in-a-parent-history-whole-file-36df4f").into()
                 } else if step == 0 && !changed {
-                    "Selected snapshot context; attribution names the last semantic edit".into()
+                    crate::i18n::text("backend-selected-snapshot-context-attribution-names-the-last-semantic-edi-cb4480").into()
                 } else {
                     mapped
                         .first()
-                        .map_or("No unique parent line mapping", |(_, _, note)| *note)
+                        .map_or(crate::i18n::text("backend-no-unique-parent-line-mapping-cb23e8"), |(_, _, note)| *note)
                         .into()
                 },
                 whitespace_only,
             });
         }
         if parents.is_empty() {
-            result.stopped = "Reached a root or shallow history boundary".into();
+            result.stopped =
+                crate::i18n::text("backend-reached-a-root-or-shallow-history-boundary-50fce1")
+                    .into();
             break;
         }
         if let Some(next) = copied {
             cursor = next;
             if step + 1 == STEPS {
                 result.stopped =
-                    "128 history steps reached; continue from the pinned earlier line".into();
+                    crate::i18n::text("backend-128-history-steps-reached-continue-from-the-pinned-earlier-line-d9e1e1").into();
                 result.continuation = Some(cursor.clone());
             }
             continue;
         }
         if mapped.is_empty() {
-            result.stopped="Line introduction or an ambiguous/unequal parent edit; no earlier line was guessed".into();
+            result.stopped = crate::i18n::text(
+                "backend-line-introduction-or-an-ambiguous-unequal-parent-edit-no-earlier-ab2444",
+            )
+            .into();
             break;
         }
         if parents.len() > 1 {
             result.alternatives = mapped.into_iter().map(|(seed, _, _)| seed).collect();
-            result.stopped="Merge boundary: choose an explicitly mapped parent to continue; other histories may differ".into();
+            result.stopped = crate::i18n::text(
+                "backend-merge-boundary-choose-an-explicitly-mapped-parent-to-continue-oth-3a0c2f",
+            )
+            .into();
             break;
         }
         let (mut next, old, _) = mapped.remove(0);
@@ -632,8 +715,10 @@ pub(crate) fn trace(
         }
         cursor = next;
         if step + 1 == STEPS {
-            result.stopped =
-                "128 history steps reached; continue from the pinned earlier line".into();
+            result.stopped = crate::i18n::text(
+                "backend-128-history-steps-reached-continue-from-the-pinned-earlier-line-d9e1e1",
+            )
+            .into();
             result.continuation = Some(cursor.clone());
         }
     }

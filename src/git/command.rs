@@ -232,7 +232,12 @@ fn execute(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Result<Ran, Stri
                 .as_ref()
                 .map(std::fs::File::create)
                 .transpose()
-                .map_err(|e| format!("could not save output: {e}"))?,
+                .map_err(|e| {
+                    crate::i18n::message(
+                        "backend-could-not-save-output-e-d0d53d",
+                        &[("detail", (e).to_string().into())],
+                    )
+                })?,
             output_limit: extra.output_limit.unwrap_or(64 << 20),
             background: extra.long || extra.tool || extra.test.is_some() || goes_over_network(args),
             timeout: extra.timeout,
@@ -472,15 +477,16 @@ pub fn shell_command_here(dir: &Path, script: &str) -> (String, Vec<String>) {
     ("git".to_owned(), args.to_vec())
 }
 
+// Kept raw for recent-status/across classification. Translate only at display_error.
+pub(super) fn missing_folder(target: &Target) -> String {
+    format!("{} isn't a folder on {}", target.path, target.host.label())
+}
+
 fn execute_there(target: &Target, extra: &Extra, args: &[&str]) -> Result<Ran, String> {
     let out = remote::exec(&target.host, &remote_request(target, extra, args))?;
     // The folder is gone (or never was) on that machine.
     if out.code == 1 && remote::is_missing_folder(&out.stderr) {
-        return Err(format!(
-            "{} isn't a folder on {}",
-            target.path,
-            target.host.label()
-        ));
+        return Err(missing_folder(target));
     }
     let (stderr, events) = if extra.trace_hooks {
         super::hooks::split_trace(&out.stderr)
@@ -489,7 +495,10 @@ fn execute_there(target: &Target, extra: &Extra, args: &[&str]) -> Result<Ran, S
     };
     Ok(Ran {
         code: Some(out.code),
-        status: format!("exit status: {}", out.code),
+        status: crate::i18n::message(
+            "backend-exit-status-c5b63a",
+            &[("code", (out.code).to_string().into())],
+        ),
         stdout: out.stdout,
         stderr,
         failed_hook: (out.code != 0)
@@ -530,11 +539,7 @@ pub fn run_if_connected(dir: &Path, args: &[&str]) -> Option<Result<String, Stri
     Some(if out.code == 0 {
         Ok(String::from_utf8_lossy(&out.stdout).into_owned())
     } else if out.code == 1 && remote::is_missing_folder(&out.stderr) {
-        Err(format!(
-            "{} isn't a folder on {}",
-            target.path,
-            target.host.label()
-        ))
+        Err(missing_folder(&target))
     } else {
         Err(download_read_error(
             args,
@@ -564,15 +569,14 @@ pub fn run_captured(dir: &Path, args: &[&str], input: Option<&[u8]>) -> Result<C
             request.stdin = input.map(<[u8]>::to_vec);
             let out = remote::exec(&target.host, &request)?;
             if out.code == 1 && remote::is_missing_folder(&out.stderr) {
-                return Err(format!(
-                    "{} isn't a folder on {}",
-                    target.path,
-                    target.host.label()
-                ));
+                return Err(missing_folder(&target));
             }
             Ran {
                 code: Some(out.code),
-                status: format!("exit status: {}", out.code),
+                status: crate::i18n::message(
+                    "backend-exit-status-c5b63a",
+                    &[("code", (out.code).to_string().into())],
+                ),
                 stdout: out.stdout,
                 stderr: out.stderr,
                 failed_hook: None,
@@ -619,7 +623,13 @@ pub fn run_env(
     } else {
         let stderr = String::from_utf8_lossy(&out.stderr).trim().to_owned();
         Err(if stderr.is_empty() {
-            format!("git {} failed ({})", args.join(" "), out.status)
+            crate::i18n::message(
+                "backend-git-failed-da095f",
+                &[
+                    ("args", (args.join(" ")).to_string().into()),
+                    ("status", (out.status).to_string().into()),
+                ],
+            )
         } else {
             stderr
         })
@@ -674,7 +684,10 @@ fn inert_object_options(
         args.first().copied(),
         Some("ls-tree" | "cat-file" | "rev-parse" | "hash-object" | "update-ref")
     ) {
-        return Err("Sandbox source preparation permits only raw object plumbing".into());
+        return Err(crate::i18n::text(
+            "backend-sandbox-source-preparation-permits-only-raw-object-plumbing-c05abe",
+        )
+        .into());
     }
     Ok(Extra {
         pre: vec![
@@ -772,7 +785,12 @@ pub(crate) fn transfer_pack(
 pub fn run_to_file(dir: &Path, args: &[&str], file: &Path) -> Result<(), String> {
     if remote::is_remote(dir) {
         return run_bytes(Some(dir), args).and_then(|bytes| {
-            std::fs::write(file, bytes).map_err(|e| format!("could not save it: {e}"))
+            std::fs::write(file, bytes).map_err(|e| {
+                crate::i18n::message(
+                    "backend-could-not-save-it-e-24f824",
+                    &[("detail", (e).to_string().into())],
+                )
+            })
         });
     }
     let out = execute(
@@ -799,7 +817,13 @@ pub fn run_code(dir: Option<&Path>, args: &[&str], ok: &[i32]) -> Result<(i32, V
         _ => {
             let stderr = String::from_utf8_lossy(&out.stderr).trim().to_owned();
             Err(if stderr.is_empty() {
-                format!("git {} failed ({})", args.join(" "), out.status)
+                crate::i18n::message(
+                    "backend-git-failed-da095f",
+                    &[
+                        ("args", (args.join(" ")).to_string().into()),
+                        ("status", (out.status).to_string().into()),
+                    ],
+                )
             } else {
                 stderr
             })
@@ -870,7 +894,13 @@ pub fn run_call(dir: Option<&Path>, args: &[&str], call: Call) -> Result<Vec<u8>
     }
     let said = String::from_utf8_lossy(&out.stderr).trim().to_owned();
     Err(if said.is_empty() {
-        format!("git {} failed ({})", args.join(" "), out.status)
+        crate::i18n::message(
+            "backend-git-failed-da095f",
+            &[
+                ("args", (args.join(" ")).to_string().into()),
+                ("status", (out.status).to_string().into()),
+            ],
+        )
     } else {
         said
     })
@@ -957,13 +987,20 @@ pub(crate) fn run_workspace_command(
         ..Default::default()
     };
     let command = if let Some(target) = remote::parse(dir) {
-        let record =
-            remote::parse(record).ok_or("remote owner record is on a different machine")?;
+        let record = remote::parse(record).ok_or(crate::i18n::text(
+            "backend-remote-owner-record-is-on-a-different-machine-5eab4e",
+        ))?;
         if record.host != target.host {
-            return Err("remote owner record is on a different machine".into());
+            return Err(crate::i18n::text(
+                "backend-remote-owner-record-is-on-a-different-machine-5eab4e",
+            )
+            .into());
         }
         if owned.directory.is_some() {
-            return Err("remote private directories use their fenced shell operation".into());
+            return Err(crate::i18n::text(
+                "backend-remote-private-directories-use-their-fenced-shell-operation-9bbfda",
+            )
+            .into());
         }
         let request = remote_request(&target, &extra, args);
         remote::streaming_command_authority(
@@ -976,7 +1013,10 @@ pub(crate) fn run_workspace_command(
         .configure(&mut options)
     } else {
         if remote::parse(record).is_some() {
-            return Err("native owner record is on a different machine".into());
+            return Err(crate::i18n::text(
+                "backend-native-owner-record-is-on-a-different-machine-56f2b5",
+            )
+            .into());
         }
         remote::native_owner::command_with_authority(
             local_command(Some(dir), &extra, args),
@@ -1159,7 +1199,13 @@ fn failure_message(args: &[&str], status: &str, stdout: &str, stderr: &str) -> S
     // Merges and pulls report conflicts on stdout and the summary on stderr.
     let (stderr, stdout) = (stderr.trim(), stdout.trim());
     match (stderr.is_empty(), stdout.is_empty()) {
-        (true, true) => format!("git {} failed ({status})", args.join(" ")),
+        (true, true) => crate::i18n::message(
+            "backend-git-failed-status-db85b2",
+            &[
+                ("args", (args.join(" ")).to_string().into()),
+                ("status", (status).to_string().into()),
+            ],
+        ),
         (false, true) => stderr.to_owned(),
         (true, false) => stdout.to_owned(),
         (false, false) => format!("{stderr}\n{stdout}"),
@@ -1229,7 +1275,13 @@ fn finish(out: Ran, args: &[&str], ok: &[i32]) -> Result<String, String> {
             args,
             match (&out.failed_hook, said.is_empty()) {
                 (Some(hook), _) => hook.explain(&said, args),
-                (None, true) => format!("git {} failed ({})", args.join(" "), out.status),
+                (None, true) => crate::i18n::message(
+                    "backend-git-failed-da095f",
+                    &[
+                        ("args", (args.join(" ")).to_string().into()),
+                        ("status", (out.status).to_string().into()),
+                    ],
+                ),
                 (None, false) => said,
             },
         ))
@@ -1376,10 +1428,10 @@ pub(crate) fn syntax_read(
     timeout: std::time::Duration,
 ) -> Result<Vec<u8>, String> {
     if crate::remote::is_remote(repo) {
-        return Err(
-            "Syntax comparison is currently available for local repositories. Showing the patch."
-                .to_owned(),
-        );
+        return Err(crate::i18n::text(
+            "backend-syntax-comparison-is-currently-available-for-local-repositories-s-c279dd",
+        )
+        .to_owned());
     }
     let args: Vec<_> = std::iter::once("--no-lazy-fetch")
         .chain(args.iter().copied())
@@ -1392,7 +1444,10 @@ fn syntax_read_error(error: String) -> String {
         .lines()
         .any(|line| line.trim() == "unknown option: --no-lazy-fetch")
     {
-        format!("Syntax preparation requires Git with --no-lazy-fetch support: {error}")
+        crate::i18n::message(
+            "backend-syntax-preparation-requires-git-with-no-lazy-fetch-support-error-0c471c",
+            &[("detail", (error).to_string().into())],
+        )
     } else {
         error
     }
@@ -1441,7 +1496,10 @@ pub(super) fn comparison_output(
         }
     };
     if out.stdout.len() > 8 * 1024 * 1024 || out.stderr.len() > 64 * 1024 {
-        return Err("Comparison output exceeds the size limit; choose fewer files".into());
+        return Err(crate::i18n::text(
+            "backend-comparison-output-exceeds-the-size-limit-choose-fewer-files-727a73",
+        )
+        .into());
     }
     if !active() {
         return Err("Comparison cancelled".into());
@@ -1837,14 +1895,20 @@ pub(crate) fn draft_bytes(
         return Err("Read cancelled".into());
     }
     if stdout.len() > 64 << 20 || stderr.len() > 64 << 10 {
-        return Err("Read output exceeds limit".into());
+        return Err(crate::i18n::text("backend-read-output-exceeds-limit-042a31").into());
     }
     if ok.contains(&code) && stderr.is_empty() {
         Ok(stdout)
     } else {
-        Err(format!(
-            "Git command failed ({code}): {}",
-            String::from_utf8_lossy(&stderr).trim()
+        Err(crate::i18n::message(
+            "backend-git-command-failed-code-a5e2b6",
+            &[
+                ("code", (code).to_string().into()),
+                (
+                    "from_utf8_lossy",
+                    (String::from_utf8_lossy(&stderr).trim()).to_string().into(),
+                ),
+            ],
         ))
     }
 }
@@ -1956,7 +2020,7 @@ pub(super) fn recovery_output(
         return Err("Recovery cancelled".into());
     }
     if out.stdout.len() > MAX || out.stderr.len() > MAX {
-        return Err("Recovery output exceeds limit".into());
+        return Err(crate::i18n::text("backend-recovery-output-exceeds-limit-3e73fc").into());
     }
     Ok(out)
 }
@@ -1987,10 +2051,12 @@ pub(crate) fn push_preflight_with(
         lfs_objects,
         receive_pack,
     } = target;
-    let (source, destination) = args
-        .last()
-        .and_then(|s| s.split_once(':'))
-        .ok_or("Missing inspected refspec")?;
+    let (source, destination) =
+        args.last()
+            .and_then(|s| s.split_once(':'))
+            .ok_or(crate::i18n::text(
+                "backend-missing-inspected-refspec-fa73fb",
+            ))?;
     let remote_tip = args.iter().find_map(|a| {
         a.strip_prefix("--force-with-lease=")
             .and_then(|v| v.rsplit_once(':'))
@@ -2041,19 +2107,27 @@ pub(crate) fn push_preflight_with(
         &[0],
         &|| true,
     )
-    .map_err(|_| "The reviewed address could not be pinned; no push was run.")?
+    .map_err(|_| {
+        crate::i18n::text("backend-the-reviewed-address-could-not-be-pinned-no-push-was-run-8a62d8")
+    })?
     .trim_end()
         != address
     {
-        return Err("The reviewed address could not be pinned; no push was run.".into());
+        return Err(crate::i18n::text(
+            "backend-the-reviewed-address-could-not-be-pinned-no-push-was-run-8a62d8",
+        )
+        .into());
     }
     let out = execute_preflight(dir, &extra, &words, control)?;
     if out.code == Some(0) {
-        Ok("Push completed.".into())
+        Ok(crate::i18n::text("backend-push-completed-5fccd0").into())
     } else if is_auth_error(&String::from_utf8_lossy(&out.stderr)) {
-        Err("Authentication failed for the reviewed push target.".into())
+        Err(
+            crate::i18n::text("backend-authentication-failed-for-the-reviewed-push-target-75e906")
+                .into(),
+        )
     } else {
-        Err(reviewed_refusal(&out.stdout,source,destination).unwrap_or_else(||"The reviewed push was refused or failed. Fetch and reopen preflight before trying again; server diagnostics were withheld because they can contain credentials or secrets.".into()))
+        Err(reviewed_refusal(&out.stdout,source,destination).unwrap_or_else(||crate::i18n::text("backend-the-reviewed-push-was-refused-or-failed-fetch-and-reopen-prefligh-59a6f0").into()))
     }
 }
 
@@ -2124,7 +2198,10 @@ fn reviewed_push_extra(
         ("GIT_CONFIG_KEY_15", "GIT_CONFIG_VALUE_15"),
     ];
     if values.len() > VARS.len() {
-        return Err("Too many pinned transport settings; no push was run.".into());
+        return Err(crate::i18n::text(
+            "backend-too-many-pinned-transport-settings-no-push-was-run-f9ebc3",
+        )
+        .into());
     }
     let mut extra = Extra {
         pre: Vec::new(),
@@ -2230,7 +2307,9 @@ pub(crate) fn local_repair_input(
     env: &[(&'static str, String)],
 ) -> Result<std::process::Output, String> {
     if remote::is_remote(dir) {
-        return Err("Local repair expected a local repository".into());
+        return Err(
+            crate::i18n::text("backend-local-repair-expected-a-local-repository-4833dc").into(),
+        );
     }
     let mut command = local_command(Some(dir), &Extra::default(), &[]);
     for name in PREFLIGHT_REMOVE {
@@ -2261,7 +2340,9 @@ pub(crate) fn repair_host(
     input: Vec<u8>,
     env: &[(&'static str, String)],
 ) -> Result<remote::Output, String> {
-    let target = remote::parse(dir).ok_or("Expected remote repository")?;
+    let target = remote::parse(dir).ok_or(crate::i18n::text(
+        "backend-expected-remote-repository-987cc6",
+    ))?;
     let mut request = remote_request(&target, &Extra::default(), &[]);
     request.script = script.into();
     request.stdin = Some(input);
@@ -2620,7 +2701,7 @@ fn practice_command(dir: &Path) -> Command {
 }
 pub(crate) fn practice_run(dir: &Path, args: &[&str]) -> Result<String, String> {
     if remote::is_remote(dir) {
-        return Err("Practice repositories are local".into());
+        return Err(crate::i18n::text("backend-practice-repositories-are-local-7d0527").into());
     }
     let mut cmd = practice_command(dir);
     cmd.args(args);
@@ -2666,7 +2747,7 @@ pub(crate) fn onboarding_local_config(
     active: &dyn Fn() -> bool,
 ) -> Result<Option<String>, String> {
     if !["user.name", "user.email"].contains(&key) {
-        return Err("Unsupported setup configuration key".into());
+        return Err(crate::i18n::text("backend-unsupported-setup-configuration-key-c326ad").into());
     }
     if !active() {
         return Err("Export cancelled".into());
@@ -2684,15 +2765,17 @@ pub(crate) fn onboarding_local_config(
         return Ok(None);
     }
     if bytes.code != Some(0) {
-        return Err("Could not inspect local setup configuration".into());
+        return Err(crate::i18n::text(
+            "backend-could-not-inspect-local-setup-configuration-3f3361",
+        )
+        .into());
     }
-    let value = bytes
-        .stdout
-        .strip_suffix(&[0])
-        .ok_or("Invalid configuration response")?;
+    let value = bytes.stdout.strip_suffix(&[0]).ok_or(crate::i18n::text(
+        "backend-invalid-configuration-response-260489",
+    ))?;
     String::from_utf8(value.to_vec())
         .map(Some)
-        .map_err(|_| "Local configuration is not UTF-8".into())
+        .map_err(|_| crate::i18n::text("backend-local-configuration-is-not-utf-8-311338").into())
 }
 
 fn download_read_error(args: &[&str], error: String) -> String {
@@ -2708,8 +2791,9 @@ fn download_read_error(args: &[&str], error: String) -> String {
         .iter()
         .any(|text| error.to_lowercase().contains(text))
     {
-        format!(
-            "{error}\nAutomatic object downloads are disabled. In a partial clone, use Graph tools → Sparse checkout and downloads to explicitly download history objects, then retry this file/diff."
+        crate::i18n::message(
+            "backend-error-automatic-object-downloads-are-disabled-in-a-partial-clone-5cfc0a",
+            &[("detail", (error).to_string().into())],
         )
     } else {
         error
@@ -3147,5 +3231,32 @@ mod internals_merge_recording {
             }
             Ok(())
         })
+    }
+}
+
+#[cfg(test)]
+mod backend_fluent_identity_tests {
+    #[test]
+    fn backend_fluent_missing_folder_keeps_recent_status_identity() {
+        let target = crate::remote::Target {
+            host: crate::remote::Host::Ssh("fixture-host".into()),
+            path: "/fixture/de/repo".into(),
+        };
+        for locale in ["en-US", "de"] {
+            crate::i18n::set_language(locale);
+            let raw = super::missing_folder(&target);
+            assert_eq!(raw, "/fixture/de/repo isn't a folder on SSH · fixture-host");
+            assert!(raw.to_lowercase().contains("isn't a folder on"));
+            assert_eq!(crate::across::short_reason(&raw), "folder not found");
+            assert_eq!(
+                crate::git::display_error(&raw),
+                if locale == "de" {
+                    "/fixture/de/repo ist kein Ordner auf SSH · fixture-host."
+                } else {
+                    &raw
+                }
+            );
+        }
+        crate::i18n::set_language("en-US");
     }
 }

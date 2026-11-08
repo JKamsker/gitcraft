@@ -41,12 +41,15 @@ pub(crate) fn values(repo: &Path, key: &str) -> Result<Vec<String>, String> {
 pub(crate) fn inspect(repo: &Path, name: &str) -> Result<Editor, String> {
     let remotes = text(repo, &["remote"])?;
     let name = if name.is_empty() {
-        remotes.lines().next().ok_or("Add a remote first")?
+        remotes
+            .lines()
+            .next()
+            .ok_or(crate::i18n::text("backend-add-a-remote-first-3c4e21"))?
     } else {
         name
     };
     if !remotes.lines().any(|r| r == name) {
-        return Err("Remote no longer exists".into());
+        return Err(crate::i18n::text("backend-remote-no-longer-exists-75df57").into());
     }
     let get = |field: &str| values(repo, &format!("remote.{name}.{field}"));
     let draft = Settings {
@@ -89,7 +92,10 @@ fn parse(s: &str, negative_allowed: bool) -> Result<Spec, String> {
         .map_or((false, s.strip_prefix('+').unwrap_or(s)), |s| (true, s));
     if negative {
         if !negative_allowed || !valid_ref(s) {
-            return Err("Negative fetch refspecs must name one refs/ prefix or pattern, without a destination".into());
+            return Err(crate::i18n::text(
+                "backend-negative-fetch-refspecs-must-name-one-refs-prefix-or-pattern-with-430a51",
+            )
+            .into());
         }
         return Ok(Spec {
             source: s.into(),
@@ -98,10 +104,16 @@ fn parse(s: &str, negative_allowed: bool) -> Result<Spec, String> {
         });
     }
     let Some((a, b)) = s.split_once(':') else {
-        return Err("Use source:destination refspecs with full refs/ names".into());
+        return Err(crate::i18n::text(
+            "backend-use-source-destination-refspecs-with-full-refs-names-af7293",
+        )
+        .into());
     };
     if !valid_ref(a) || !valid_ref(b) || a.matches('*').count() != b.matches('*').count() {
-        return Err("Refspecs need valid full refs and matching single wildcards".into());
+        return Err(crate::i18n::text(
+            "backend-refspecs-need-valid-full-refs-and-matching-single-wildcards-68b6f0",
+        )
+        .into());
     }
     Ok(Spec {
         source: a.into(),
@@ -123,10 +135,19 @@ pub(crate) fn boolean(repo: &Path, key: &str, default: bool) -> Result<bool, Str
         Some(0) => match out.stdout.trim() {
             "true" => Ok(true),
             "false" => Ok(false),
-            _ => Err(format!("Invalid boolean configuration for {key}")),
+            _ => Err(crate::i18n::message(
+                "backend-invalid-boolean-configuration-for-key-cc173e",
+                &[("key", (key).to_string().into())],
+            )),
         },
         Some(1) => Ok(default),
-        _ => Err(format!("Cannot read {key}: {}", out.stderr.trim())),
+        _ => Err(crate::i18n::message(
+            "backend-cannot-read-key-656d12",
+            &[
+                ("key", (key).to_string().into()),
+                ("detail", (out.stderr.trim()).to_string().into()),
+            ],
+        )),
     }
 }
 pub(crate) fn validate_url(url: &str) -> Result<(), String> {
@@ -134,7 +155,10 @@ pub(crate) fn validate_url(url: &str) -> Result<(), String> {
         .find("::")
         .is_some_and(|i| !url[..i].contains(['/', '\\']));
     if url.is_empty() || url.starts_with('-') || url.contains(['\n', '\r', '\0']) || helper {
-        return Err("Use a regular HTTPS, SSH, Git or filesystem URL without options or external transport helpers".into());
+        return Err(crate::i18n::text(
+            "backend-use-a-regular-https-ssh-git-or-filesystem-url-without-options-or-e1d8bf",
+        )
+        .into());
     }
     Ok(())
 }
@@ -152,8 +176,9 @@ fn local_edit_blocker(repo: &Path, name: &str) -> Result<Option<String>, String>
             .map(|(_, v)| v.to_owned())
             .collect();
         if values(repo, &key)? != own {
-            return Ok(Some(format!(
-                "{key} contains inherited, included, profile or worktree values. This editor writes the repository config only; remove or edit those values at their source first."
+            return Ok(Some(crate::i18n::message(
+                "backend-key-contains-inherited-included-profile-or-worktree-values-this-e-d5d29c",
+                &[("key", (key).to_string().into())],
             )));
         }
     }
@@ -161,7 +186,7 @@ fn local_edit_blocker(repo: &Path, name: &str) -> Result<Option<String>, String>
 }
 pub(crate) fn validate(settings: &Settings) -> Result<(), String> {
     if settings.fetch_urls.is_empty() {
-        return Err("A fetch URL is required".into());
+        return Err(crate::i18n::text("backend-a-fetch-url-is-required-786e9b").into());
     }
     for url in settings.fetch_urls.iter().chain(&settings.push_urls) {
         validate_url(url)?;
@@ -202,7 +227,10 @@ pub(crate) fn preview(repo: &Path, mut editor: Editor) -> Result<Editor, String>
     let mut mappings = Vec::new();
     for src in &sources {
         if excluded(src) {
-            mappings.push(format!("{src} excluded"));
+            mappings.push(crate::i18n::message(
+                "backend-src-excluded-90f08f",
+                &[("src", (src).to_string().into())],
+            ));
             continue;
         }
         for spec in specs.iter().filter(|s| !s.negative) {
@@ -231,7 +259,10 @@ pub(crate) fn preview(repo: &Path, mut editor: Editor) -> Result<Editor, String>
         }
     }
     for s in &editor.draft.fetch {
-        mappings.push(format!("Fetch mapping: {s}"));
+        mappings.push(crate::i18n::message(
+            "backend-fetch-mapping-s-d20aba",
+            &[("status", (s).to_string().into())],
+        ));
     }
     for push in &editor.draft.push {
         let spec = parse(push, false)?;
@@ -241,12 +272,23 @@ pub(crate) fn preview(repo: &Path, mut editor: Editor) -> Result<Editor, String>
                 spec.destination.as_deref().unwrap_or_default(),
                 src,
             ) {
-                mappings.push(format!("Push: {src} → {dst}"));
+                mappings.push(crate::i18n::message(
+                    "backend-push-src-dst-330d40",
+                    &[
+                        ("src", (src).to_string().into()),
+                        ("dst", (dst).to_string().into()),
+                    ],
+                ));
             }
         }
     }
     if editor.draft.mirror {
-        mappings.push("Push mirror: force all refs and delete destination refs absent locally. This can overwrite other people's work.".into());
+        mappings.push(
+            crate::i18n::text(
+                "backend-push-mirror-force-all-refs-and-delete-destination-refs-absent-loc-7d3f23",
+            )
+            .into(),
+        );
     }
     editor.snapshot.check(repo)?;
     editor.preview = Some(Preview {
@@ -285,7 +327,9 @@ pub(crate) fn save(runner: &Runner<'_>, editor: &Editor) -> Result<String, Strin
             .as_ref()
             .is_none_or(|p| p.draft != editor.draft)
     {
-        return Err("Preview these exact edits before saving".into());
+        return Err(
+            crate::i18n::text("backend-preview-these-exact-edits-before-saving-42b709").into(),
+        );
     }
     editor.snapshot.check(runner.repo)?;
     if let Some(why) = local_edit_blocker(runner.repo, &editor.draft.name)? {
@@ -299,15 +343,26 @@ pub(crate) fn save(runner: &Runner<'_>, editor: &Editor) -> Result<String, Strin
         ("push", s.push.clone()),
         ("mirror", vec![s.mirror.to_string()]),
     ] {
-        set_values(runner, &format!("remote.{}.{field}", s.name), &value).map_err(|e| format!("Remote configuration save stopped at {field}: {e}. Earlier fields may already be saved; reopen the editor before retrying."))?;
+        set_values(runner, &format!("remote.{}.{field}", s.name), &value).map_err(|e| {
+            crate::i18n::message(
+                "backend-remote-configuration-save-stopped-at-field-e-earlier-fields-may-a-62ad6b",
+                &[
+                    ("field", (field).to_string().into()),
+                    ("detail", (e).to_string().into()),
+                ],
+            )
+        })?;
     }
     if inspect(runner.repo, &s.name)?.draft != *s {
-        return Err("Effective remote settings differ after saving. Reopen the editor and check inherited configuration before using this remote.".into());
+        return Err(crate::i18n::text(
+            "backend-effective-remote-settings-differ-after-saving-reopen-the-editor-a-c282a7",
+        )
+        .into());
     }
-    Ok(
-        "Remote URLs, refspecs and mirror policy saved. No fetch, push or prune was performed."
-            .into(),
+    Ok(crate::i18n::text(
+        "backend-remote-urls-refspecs-and-mirror-policy-saved-no-fetch-push-or-pru-e34804",
     )
+    .into())
 }
 #[cfg(test)]
 mod tests {

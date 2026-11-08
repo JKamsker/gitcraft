@@ -66,8 +66,12 @@ fn route(repo: &Path, oid: &str, remote: String, branch: String) -> Result<Route
             let fields: Vec<_> = out.split_whitespace().collect();
             if fields.len() == 2 {
                 Some((
-                    fields[0].parse().map_err(|_| "Invalid ahead count")?,
-                    fields[1].parse().map_err(|_| "Invalid behind count")?,
+                    fields[0]
+                        .parse()
+                        .map_err(|_| crate::i18n::text("backend-invalid-ahead-count-832f7a"))?,
+                    fields[1]
+                        .parse()
+                        .map_err(|_| crate::i18n::text("backend-invalid-behind-count-7b81e5"))?,
                 ))
             } else {
                 None
@@ -101,7 +105,7 @@ pub(crate) fn read(repo: &Path, selected: &str) -> Result<Browser, String> {
     for row in rows.lines() {
         let f: Vec<_> = row.split('\0').collect();
         if f.len() != 6 {
-            return Err("Invalid route metadata".into());
+            return Err(crate::i18n::text("backend-invalid-route-metadata-f712ed").into());
         }
         let name = f[0];
         let oid = f[1];
@@ -182,9 +186,9 @@ pub(crate) fn save(runner: &Runner<'_>, browser: &Browser, name: &str) -> Result
         .branches
         .iter()
         .find(|b| b.name == name)
-        .ok_or("Branch disappeared")?;
+        .ok_or(crate::i18n::text("backend-branch-disappeared-fb9b46"))?;
     if !browser.remotes.contains(&b.pull_remote) || !browser.remotes.contains(&b.push_remote) {
-        return Err("Pick existing pull and push remotes".into());
+        return Err(crate::i18n::text("backend-pick-existing-pull-and-push-remotes-6252ba").into());
     }
     for branch in [&b.pull_branch, &b.push_branch] {
         text(
@@ -209,17 +213,28 @@ pub(crate) fn save(runner: &Runner<'_>, browser: &Browser, name: &str) -> Result
         .branches
         .iter()
         .find(|v| v.name == name)
-        .ok_or("Branch disappeared after saving")?;
+        .ok_or(crate::i18n::text(
+            "backend-branch-disappeared-after-saving-ac90c9",
+        ))?;
     if actual.pull.remote != b.pull_remote
         || actual.pull.branch != b.pull_branch
         || actual.push.remote != b.push_remote
         || actual.push.branch != b.push_branch
     {
-        return Err("Effective routes differ after saving. A higher priority include, worktree or profile value may still apply; reopen routes before pushing.".into());
+        return Err(crate::i18n::text(
+            "backend-effective-routes-differ-after-saving-a-higher-priority-include-wo-b74cc3",
+        )
+        .into());
     }
-    Ok(format!(
-        "{name}: pull from {}/{}; push to {}/{}",
-        b.pull_remote, b.pull_branch, b.push_remote, b.push_branch
+    Ok(crate::i18n::message(
+        "backend-name-pull-from-push-to-a9bc1d",
+        &[
+            ("name", (name).to_string().into()),
+            ("pull_remote", (b.pull_remote).to_string().into()),
+            ("pull_branch", (b.pull_branch).to_string().into()),
+            ("push_remote", (b.push_remote).to_string().into()),
+            ("push_branch", (b.push_branch).to_string().into()),
+        ],
     ))
 }
 /// Only rewrites a plain current-branch push when the user explicitly picked its branch
@@ -254,9 +269,12 @@ pub(crate) fn rewrite_plain_push(
         .branches
         .iter()
         .find(|b| b.name == branch)
-        .ok_or("Branch disappeared")?;
+        .ok_or(crate::i18n::text("backend-branch-disappeared-fb9b46"))?;
     if !browser.remotes.contains(&route.push.remote) {
-        return Err("Configured push remote is unavailable; choose its route again".into());
+        return Err(crate::i18n::text(
+            "backend-configured-push-remote-is-unavailable-choose-its-route-again-ecbe0c",
+        )
+        .into());
     }
     text(repo, &["check-ref-format", &format!("refs/heads/{target}")])?;
     let mut rewritten: Vec<String> = args.iter().map(|s| (*s).into()).collect();
@@ -278,12 +296,12 @@ pub(crate) fn prepare_push(
         .branches
         .iter()
         .find(|b| b.name == branch)
-        .ok_or("Branch disappeared")?;
+        .ok_or(crate::i18n::text("backend-branch-disappeared-fb9b46"))?;
     if b.oid != expected {
-        return Err("Branch changed; choose Push again".into());
+        return Err(crate::i18n::text("backend-branch-changed-choose-push-again-d8dfcf").into());
     }
     if !browser.remotes.contains(&b.push.remote) {
-        return Err("Choose a push route first".into());
+        return Err(crate::i18n::text("backend-choose-a-push-route-first-b7904c").into());
     }
     browser.snapshot.check(repo)?;
     let urls = text(
@@ -409,9 +427,12 @@ pub(crate) fn prepare_force(repo: &Path, branch: &str, expected: &str) -> Result
         .branches
         .iter()
         .find(|b| b.name == branch)
-        .ok_or("Branch disappeared")?;
+        .ok_or(crate::i18n::text("backend-branch-disappeared-fb9b46"))?;
     if b.oid != expected || !browser.remotes.contains(&b.push.remote) {
-        return Err("Branch or push route changed; choose it again".into());
+        return Err(crate::i18n::text(
+            "backend-branch-or-push-route-changed-choose-it-again-10567b",
+        )
+        .into());
     }
     let urls = text(
         repo,
@@ -419,7 +440,10 @@ pub(crate) fn prepare_force(repo: &Path, branch: &str, expected: &str) -> Result
     )?;
     let urls: Vec<_> = urls.lines().collect();
     if urls.len() != 1 {
-        return Err("Force push requires exactly one push URL. Use the remote editor to choose it explicitly.".into());
+        return Err(crate::i18n::text(
+            "backend-force-push-requires-exactly-one-push-url-use-the-remote-editor-to-5a89fa",
+        )
+        .into());
     }
     super::remote_config::validate_url(urls[0])?;
     let destination = format!("refs/heads/{}", b.push.branch);
@@ -444,7 +468,9 @@ pub(crate) fn prepare_force(repo: &Path, branch: &str, expected: &str) -> Result
                 .filter(|(_, r)| *r == destination)
                 .map(|(o, _)| o.to_owned())
         })
-        .ok_or("Push branch does not exist on this destination; use an ordinary push")?;
+        .ok_or(crate::i18n::text(
+            "backend-push-branch-does-not-exist-on-this-destination-use-an-ordinary-pu-14bce0",
+        ))?;
     browser.snapshot.check(repo)?;
     Ok(Force {
         snapshot: browser.snapshot,
