@@ -227,10 +227,10 @@ impl Pick {
 
     pub fn verb(self) -> &'static str {
         match self {
-            Pick::Stage => "Stage",
-            Pick::Unstage => "Unstage",
-            Pick::Discard => "Discard",
-            Pick::Revert => "Revert",
+            Pick::Stage => crate::i18n::text("repo-core-0836"),
+            Pick::Unstage => crate::i18n::text("repo-core-0844"),
+            Pick::Discard => crate::i18n::text("repo-core-0858"),
+            Pick::Revert => crate::i18n::text("repo-core-3310"),
         }
     }
 }

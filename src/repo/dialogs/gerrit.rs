@@ -19,7 +19,13 @@ pub(super) fn review(
     title(
         ui,
         crate::i18n::text("repo-core-0031"),
-        &crate::i18n::message("repo-core-1328", &[("min", format!("{}", &head[..head.len().min(8)]).into()), ("remote", format!("{}", remote).into())]),
+        &crate::i18n::message(
+            "repo-core-1328",
+            &[
+                ("min", format!("{}", &head[..head.len().min(8)]).into()),
+                ("remote", format!("{}", remote).into()),
+            ],
+        ),
         &t,
     );
     if let Some(warning) = web_warning {
@@ -63,15 +69,19 @@ pub(super) fn review(
         }
     }
     if !crate::gerrit::valid_topic(topic) {
-        ui.label(
-            egui::RichText::new(crate::i18n::text("repo-core-1337")).color(t.warning),
-        );
+        ui.label(egui::RichText::new(crate::i18n::text("repo-core-1337")).color(t.warning));
     }
     ui.add_space(10.0);
     // A deliberate click is needed; Enter in the topic field must not send a review.
-    buttons(ui, crate::i18n::text("repo-core-0031"), plan.is_ok(), false, || Action::Ops {
-        label: crate::i18n::text("repo-core-0031").to_owned(),
-        ops: plan.unwrap_or_default(),
-        refresh: Refresh::All,
-    })
+    buttons(
+        ui,
+        crate::i18n::text("repo-core-0031"),
+        plan.is_ok(),
+        false,
+        || Action::Ops {
+            label: crate::i18n::text("repo-core-0031").to_owned(),
+            ops: plan.unwrap_or_default(),
+            refresh: Refresh::All,
+        },
+    )
 }

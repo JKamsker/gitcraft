@@ -14,12 +14,14 @@ use crate::theme::{self, Tokens};
 fn banner_text(reused: Reused, whole: bool) -> String {
     let check = crate::i18n::text("repo-core-0680");
     match (reused, whole) {
-        (Reused::Rerere, false) => crate::i18n::message("repo-core-0681", &[("check", format!("{}", check).into())]),
-        (Reused::Rerere, true) => crate::i18n::message("repo-core-0682", &[("check", format!("{}", check).into())]),
-        (Reused::NoMarkers, false) => crate::i18n::text("repo-core-0683")
-            .to_owned(),
-        (Reused::NoMarkers, true) => crate::i18n::text("repo-core-0684")
-            .to_owned(),
+        (Reused::Rerere, false) => {
+            crate::i18n::message("repo-core-0681", &[("check", format!("{}", check).into())])
+        }
+        (Reused::Rerere, true) => {
+            crate::i18n::message("repo-core-0682", &[("check", format!("{}", check).into())])
+        }
+        (Reused::NoMarkers, false) => crate::i18n::text("repo-core-0683").to_owned(),
+        (Reused::NoMarkers, true) => crate::i18n::text("repo-core-0684").to_owned(),
     }
 }
 
@@ -32,7 +34,13 @@ fn back_action(path: &str, reused: Reused) -> (&'static str, &'static str, Actio
             crate::i18n::text("repo-core-0687"),
             Action::Dialog(Dialog::confirm(
                 crate::i18n::text("repo-core-0688"),
-                crate::i18n::message("repo-core-0689", &[("path", format!("{}", path).into()), ("lost", format!("{}", lost).into())]),
+                crate::i18n::message(
+                    "repo-core-0689",
+                    &[
+                        ("path", format!("{}", path).into()),
+                        ("lost", format!("{}", lost).into()),
+                    ],
+                ),
                 crate::i18n::text("repo-core-0690"),
                 forget_ops(path, true),
                 None,
@@ -43,7 +51,13 @@ fn back_action(path: &str, reused: Reused) -> (&'static str, &'static str, Actio
             crate::i18n::text("repo-core-0692"),
             Action::Dialog(Dialog::confirm(
                 crate::i18n::text("repo-core-0693"),
-                crate::i18n::message("repo-core-0694", &[("path", format!("{}", path).into()), ("lost", format!("{}", lost).into())]),
+                crate::i18n::message(
+                    "repo-core-0694",
+                    &[
+                        ("path", format!("{}", path).into()),
+                        ("lost", format!("{}", lost).into()),
+                    ],
+                ),
                 crate::i18n::text("repo-core-0695"),
                 forget_ops(path, false),
                 None,
@@ -128,9 +142,7 @@ pub(super) fn rerere_switch(
             enabled,
             egui::Checkbox::new(&mut checked, crate::i18n::text("repo-core-0699")),
         )
-        .on_hover_text(
-            crate::i18n::text("repo-core-0700"),
-        )
+        .on_hover_text(crate::i18n::text("repo-core-0700"))
         .changed()
     {
         acts.push(Action::Rerere(RerereAct::SetEnabled(checked)));
@@ -138,7 +150,10 @@ pub(super) fn rerere_switch(
     if setup.on && setup.stages {
         let t = Tokens::get(ui.ctx());
         if ui
-            .add_enabled(enabled, egui::Button::new(crate::i18n::text("repo-core-0701")))
+            .add_enabled(
+                enabled,
+                egui::Button::new(crate::i18n::text("repo-core-0701")),
+            )
             .on_hover_text(crate::i18n::text("repo-core-0702"))
             .clicked()
         {
@@ -149,9 +164,7 @@ pub(super) fn rerere_switch(
                 .color(t.warning)
                 .small(),
         )
-        .on_hover_text(
-            crate::i18n::text("repo-core-0704"),
-        );
+        .on_hover_text(crate::i18n::text("repo-core-0704"));
     }
 }
 

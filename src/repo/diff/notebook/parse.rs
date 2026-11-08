@@ -103,7 +103,10 @@ pub fn parse(bytes: &[u8]) -> Result<Notebook, String> {
         .map_err(|e| crate::i18n::message("repo-core-1864", &[("e", format!("{}", e).into())]))?;
     let major = doc.get("nbformat").and_then(Value::as_i64).unwrap_or(0);
     if major < 4 {
-        return Err(crate::i18n::message("repo-core-1866", &[("major", format!("{}", major).into())]));
+        return Err(crate::i18n::message(
+            "repo-core-1866",
+            &[("major", format!("{}", major).into())],
+        ));
     }
     let cells = doc
         .get("cells")
@@ -186,7 +189,13 @@ fn cut(text: String) -> String {
     {
         Some((at, _)) => {
             let more = text[at..].lines().count().saturating_sub(1);
-            crate::i18n::message("repo-core-1884", &[("at", format!("{}", &text[..at]).into()), ("more", format!("{}", more).into())])
+            crate::i18n::message(
+                "repo-core-1884",
+                &[
+                    ("at", format!("{}", &text[..at]).into()),
+                    ("more", format!("{}", more).into()),
+                ],
+            )
         }
         None => text,
     }

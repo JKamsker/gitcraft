@@ -18,21 +18,30 @@ pub(super) fn column_headers(ui: &Ui, t: &Tokens, header: Rect, cols: &Cols, gra
     let font = theme::semibold(10.5);
     let right = header.right();
     let mut labels = vec![
-        (header.left() + 10.0, "BRANCH / TAG"),
+        (header.left() + 10.0, crate::i18n::text("repo-core-2612")),
         (header.left() + cols.refs + 10.0, graph),
-        (header.left() + cols.refs + cols.graph + 6.0, "DESCRIPTION"),
+        (
+            header.left() + cols.refs + cols.graph + 6.0,
+            crate::i18n::text("repo-core-2613"),
+        ),
     ];
     if cols.hash > 0.0 {
         labels.push((right - cols.trailing(), crate::i18n::text("repo-core-0893")));
     }
     if cols.author > 0.0 {
-        labels.push((right - cols.author - cols.when - cols.date, "AUTHOR"));
+        labels.push((
+            right - cols.author - cols.when - cols.date,
+            crate::i18n::text("repo-core-2614"),
+        ));
     }
     if cols.when > 0.0 {
-        labels.push((right - cols.when - cols.date, "WHEN"));
+        labels.push((
+            right - cols.when - cols.date,
+            crate::i18n::text("repo-core-2615"),
+        ));
     }
     if cols.date > 0.0 {
-        labels.push((right - cols.date, "DATE"));
+        labels.push((right - cols.date, crate::i18n::text("repo-core-2616")));
     }
     // Each label is clipped where the next column starts, so a narrow window
     // cuts DESCRIPTION short instead of running into AUTHOR.
@@ -60,14 +69,17 @@ pub(super) fn header_menu(resp: &Response, settings: &Settings) {
             let mut next = settings.clone();
             ui.checkbox(&mut next.show_hash, crate::i18n::text("repo-core-0056"));
             ui.checkbox(&mut next.show_author, crate::i18n::text("repo-core-1671"));
-            ui.checkbox(&mut next.show_when, "When");
-            ui.checkbox(&mut next.show_date, "Date");
-            ui.checkbox(&mut next.show_test_lane, crate::i18n::text("repo-core-1020"))
-                .on_hover_text(crate::repo::TEST_LANE_TIP);
+            ui.checkbox(&mut next.show_when, crate::i18n::text("repo-core-2617"));
+            ui.checkbox(&mut next.show_date, crate::i18n::text("repo-core-2618"));
+            ui.checkbox(
+                &mut next.show_test_lane,
+                crate::i18n::text("repo-core-1020"),
+            )
+            .on_hover_text(crate::repo::TEST_LANE_TIP);
             ui.separator();
             let mut fit = next.fit_visible_refs();
             if ui
-                .checkbox(&mut fit, "Fit visible branch / tag pills")
+                .checkbox(&mut fit, crate::i18n::text("repo-core-2619"))
                 .changed()
             {
                 next.auto_refs_width = fit;
@@ -77,28 +89,26 @@ pub(super) fn header_menu(resp: &Response, settings: &Settings) {
             }
             let mut compact = next.compact_graph;
             if ui
-                .checkbox(&mut compact, "Compact graph column")
+                .checkbox(&mut compact, crate::i18n::text("repo-core-2620"))
                 .on_hover_text(settings::COMPACT_TIP)
                 .changed()
             {
                 next.set_compact_graph(compact);
             }
-            if crate::menu_item::MenuItem::new("Fit graph column to its lanes")
+            if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-2621"))
                 .icon("command")
-                .refused(
-                    (next.graph_width <= 0.0).then_some("The graph column already fits its lanes"),
-                )
+                .refused((next.graph_width <= 0.0).then_some(crate::i18n::text("repo-core-2622")))
                 .show(ui)
-                .on_hover_text("As double-clicking its border does")
+                .on_hover_text(crate::i18n::text("repo-core-2623"))
                 .clicked()
             {
                 next.graph_width = 0.0;
             }
             ui.separator();
-            if crate::menu_item::MenuItem::new("Reset columns")
+            if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-2624"))
                 .icon("undo-2")
                 .show(ui)
-                .on_hover_text("Every column back to its first width")
+                .on_hover_text(crate::i18n::text("repo-core-2625"))
                 .clicked()
             {
                 next.reset_columns();

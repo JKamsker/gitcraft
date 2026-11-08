@@ -61,11 +61,22 @@ pub(in crate::repo::diff) fn compare_view(ui: &mut Ui, cmp: &Compare, acts: &mut
     match mode {
         Mode::Swipe => slider(
             ui,
-            (crate::i18n::text("repo-core-1810"), crate::i18n::text("repo-core-1811")),
+            (
+                crate::i18n::text("repo-core-1810"),
+                crate::i18n::text("repo-core-1811"),
+            ),
             &mut state.swipe,
             Some(crate::i18n::text("repo-core-1812")),
         ),
-        Mode::Onion => slider(ui, (crate::i18n::text("repo-core-1813"), crate::i18n::text("repo-core-1814")), &mut state.onion, None),
+        Mode::Onion => slider(
+            ui,
+            (
+                crate::i18n::text("repo-core-1813"),
+                crate::i18n::text("repo-core-1814"),
+            ),
+            &mut state.onion,
+            None,
+        ),
         _ => {}
     }
     let history = cmp.versions(ui.ctx());
@@ -100,7 +111,10 @@ pub(in crate::repo::diff) fn compare_view(ui: &mut Ui, cmp: &Compare, acts: &mut
             let half = vec2((area.width() - gap) / 2.0, area.height());
             let left = Rect::from_min_size(area.min, half);
             let right = Rect::from_min_size(pos2(left.right() + gap, area.top()), half);
-            for (rect, side, missing) in [(left, &old, crate::i18n::text("repo-core-1695")), (right, &new, crate::i18n::text("repo-core-1696"))] {
+            for (rect, side, missing) in [
+                (left, &old, crate::i18n::text("repo-core-1695")),
+                (right, &new, crate::i18n::text("repo-core-1696")),
+            ] {
                 let p = ui.painter_at(rect);
                 match side {
                     Some((tex, d)) => {
@@ -184,7 +198,14 @@ pub(in crate::repo::diff) fn compare_view(ui: &mut Ui, cmp: &Compare, acts: &mut
     if let Some(percent) = crate::a11y::value::slider(
         &resp,
         || {
-            crate::i18n::message("repo-core-1818", &[("path", format!("{}", cmp.path).into()), ("x", (center.x * 100.0).into()), ("y", (center.y * 100.0).into())])
+            crate::i18n::message(
+                "repo-core-1818",
+                &[
+                    ("path", format!("{}", cmp.path).into()),
+                    ("x", (center.x * 100.0).into()),
+                    ("y", (center.y * 100.0).into()),
+                ],
+            )
         },
         zoom * ppp * 100.0,
         super::view_state::MIN_ZOOM.min(zoom) * ppp * 100.0
@@ -226,14 +247,25 @@ fn canvas(cmp: &Compare) -> egui::Vec2 {
 /// "640 × 480 → 800 × 600 · 12.0 KB → 14.1 KB · 3.2% of pixels changed".
 pub(super) fn changes(cmp: &Compare, diff: Option<&Difference>) -> String {
     let dims = |d: &Decoded| {
-        let scaled = if d.scaled { crate::i18n::text("repo-core-1819") } else { "" };
-        crate::i18n::message("repo-core-1820", &[("width", format!("{}", d.width).into()), ("height", format!("{}", d.height).into()), ("scaled", format!("{}", scaled).into())])
+        let scaled = if d.scaled {
+            crate::i18n::text("repo-core-1819")
+        } else {
+            ""
+        };
+        crate::i18n::message(
+            "repo-core-1820",
+            &[
+                ("width", format!("{}", d.width).into()),
+                ("height", format!("{}", d.height).into()),
+                ("scaled", format!("{}", scaled).into()),
+            ],
+        )
     };
     let mut parts = Vec::new();
     match (&cmp.old, &cmp.new) {
-        (Some(a), Some(b)) if (a.width, a.height) == (b.width, b.height) => {
-            parts.push(crate::i18n::message("repo-core-1821", &[("b", format!("{}", dims(b)).into())]))
-        }
+        (Some(a), Some(b)) if (a.width, a.height) == (b.width, b.height) => parts.push(
+            crate::i18n::message("repo-core-1821", &[("b", format!("{}", dims(b)).into())]),
+        ),
         (Some(a), Some(b)) => parts.push(format!("{} → {}", dims(a), dims(b))),
         (None, Some(b)) => parts.push(dims(b)),
         (Some(a), None) => parts.push(dims(a)),
@@ -459,7 +491,14 @@ fn filmstrip(
                     crate::a11y::a11y_selected(
                         &resp,
                         || {
-                            crate::i18n::message("repo-core-1830", &[("hash", format!("{}", crate::repo::short(&v.hash)).into()), ("summary", format!("{}", v.summary).into()), ("path", format!("{}", v.path).into())])
+                            crate::i18n::message(
+                                "repo-core-1830",
+                                &[
+                                    ("hash", format!("{}", crate::repo::short(&v.hash)).into()),
+                                    ("summary", format!("{}", v.summary).into()),
+                                    ("path", format!("{}", v.path).into()),
+                                ],
+                            )
                         },
                         current,
                     );

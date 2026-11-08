@@ -112,11 +112,11 @@ impl RepoTab {
         rewrite_items(ui, &rewrite, idle, is_head, acts);
         ui.separator();
         let merge = commit.parents.len() > 1;
-        if MenuItem::new("Create patch from commit…")
+        if MenuItem::new(crate::i18n::text("repo-core-2627"))
             .icon("file-diff")
-            .refused(merge.then_some("A merge commit makes no patch"))
+            .refused(merge.then_some(crate::i18n::text("repo-core-2628")))
             .show(ui)
-            .on_hover_text("Save it as a file for git am (git format-patch)")
+            .on_hover_text(crate::i18n::text("repo-core-2629"))
             .clicked()
         {
             acts.push(Action::SavePatch {
@@ -125,7 +125,7 @@ impl RepoTab {
             });
         }
         if is_head
-            && crate::menu_item::MenuItem::new("Apply patch…")
+            && crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-2630"))
                 .icon("file-diff")
                 .enabled(idle)
                 .show(ui)
@@ -175,7 +175,12 @@ impl RepoTab {
         if let Some(name) = branch
             && let Some((menu, target)) = self.branch_link_menu(name)
         {
-            menu.items(ui, &format!("branch {name}"), &target, acts);
+            menu.items(
+                ui,
+                &crate::i18n::message("repo-core-2631", &[("name", format!("{}", name).into())]),
+                &target,
+                acts,
+            );
             any = true;
         }
         if any {
@@ -204,11 +209,14 @@ impl RepoTab {
             name: branch,
             remote: !local,
         };
-        if crate::menu_item::MenuItem::new(format!("Check out {branch}"))
-            .icon("log-in")
-            .enabled(idle)
-            .show(ui)
-            .clicked()
+        if crate::menu_item::MenuItem::new(crate::i18n::message(
+            "repo-core-2632",
+            &[("branch", format!("{}", branch).into())],
+        ))
+        .icon("log-in")
+        .enabled(idle)
+        .show(ui)
+        .clicked()
         {
             acts.push(if local {
                 Action::Checkout(branch.to_owned())
@@ -219,22 +227,40 @@ impl RepoTab {
         let Some(current) = self.refs.current.as_deref() else {
             return;
         };
-        if crate::menu_item::MenuItem::new(format!("Fast-forward {current} to {branch}"))
-            .icon("arrow-right")
-            .enabled(idle)
-            .show(ui)
-            .clicked()
+        if crate::menu_item::MenuItem::new(crate::i18n::message(
+            "repo-core-2634",
+            &[
+                ("current", format!("{}", current).into()),
+                ("branch", format!("{}", branch).into()),
+            ],
+        ))
+        .icon("arrow-right")
+        .enabled(idle)
+        .show(ui)
+        .clicked()
         {
             acts.push(fast_forward_action(git_ref, current));
         }
-        let merge = format!("Merge {branch} into {current}");
+        let merge = crate::i18n::message(
+            "repo-core-2636",
+            &[
+                ("branch", format!("{}", branch).into()),
+                ("current", format!("{}", current).into()),
+            ],
+        );
         if self
             .conflict_button(ui, merge, idle, Op::Merge, hash)
             .clicked()
         {
             acts.push(merge_action(git_ref, current));
         }
-        let rebase = format!("Rebase {current} onto {branch}");
+        let rebase = crate::i18n::message(
+            "repo-core-2637",
+            &[
+                ("current", format!("{}", current).into()),
+                ("branch", format!("{}", branch).into()),
+            ],
+        );
         let rebase = self.conflict_button(ui, rebase, idle, Op::Rebase, hash);
         offer(&rebase, || GhostOp::Rebase {
             onto: git_ref.full(),
@@ -243,11 +269,17 @@ impl RepoTab {
         if rebase.clicked() {
             acts.push(rebase_action(git_ref, current));
         }
-        if crate::menu_item::MenuItem::new(format!("Interactive rebase {current} onto {branch}…"))
-            .icon("git-merge")
-            .enabled(idle)
-            .show(ui)
-            .clicked()
+        if crate::menu_item::MenuItem::new(crate::i18n::message(
+            "repo-core-2638",
+            &[
+                ("current", format!("{}", current).into()),
+                ("branch", format!("{}", branch).into()),
+            ],
+        ))
+        .icon("git-merge")
+        .enabled(idle)
+        .show(ui)
+        .clicked()
         {
             acts.push(interactive_rebase_action(git_ref));
         }
@@ -278,24 +310,27 @@ impl RepoTab {
             .filter(|b| b.target == hash)
             .collect();
         for b in &here {
-            crate::menu_item::MenuItem::new(format!("Branch {}", b.name))
-                .icon("git-branch-plus")
-                .submenu(ui, |ui| {
-                    self.branch_menu_items(ui, acts, b, idle);
-                });
+            crate::menu_item::MenuItem::new(crate::i18n::message(
+                "repo-core-2639",
+                &[("name", format!("{}", b.name).into())],
+            ))
+            .icon("git-branch-plus")
+            .submenu(ui, |ui| {
+                self.branch_menu_items(ui, acts, b, idle);
+            });
         }
         if !here.is_empty() {
             ui.separator();
         }
         // At HEAD, the new-branch key does the same.
-        let mut create = MenuItem::new("Create branch here…").icon("git-branch-plus");
+        let mut create = MenuItem::new(crate::i18n::text("repo-core-2641")).icon("git-branch-plus");
         if is_head {
             create = create.keys(crate::keymap::Command::NewBranch);
         }
         if create.show(ui).clicked() {
             acts.push(Action::Dialog(Dialog::create_branch(hash, short)));
         }
-        if crate::menu_item::MenuItem::new("Create tag here…")
+        if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-2642"))
             .icon("tag")
             .show(ui)
             .clicked()
@@ -310,25 +345,22 @@ impl RepoTab {
             .icon("package")
             .enabled(idle)
             .show(ui)
-            .on_hover_text(
-                "The next version, notes from the commits since the last tag, a tag, the push \
-                 and the forge's release, shown before it runs",
-            )
+            .on_hover_text(crate::i18n::text("repo-core-2643"))
             .clicked()
         {
             acts.push(Action::Release(super::super::release::ReleaseAct::Open(
                 hash.to_owned(),
             )));
         }
-        if crate::menu_item::MenuItem::new("Create worktree from this commit…")
+        if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-2644"))
             .icon("folder-git-2")
             .show(ui)
-            .on_hover_text("A second working folder on a new branch starting here")
+            .on_hover_text(crate::i18n::text("repo-core-2646"))
             .clicked()
         {
             acts.push(Action::Dialog(Dialog::worktree_at(&self.path, hash)));
         }
-        if crate::menu_item::MenuItem::new("Check out this commit (detached)")
+        if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-2647"))
             .icon("log-in")
             .enabled(idle)
             .refused(is_head.then_some(crate::i18n::text("repo-core-0796")))
@@ -364,16 +396,19 @@ impl RepoTab {
                     }
                 })
                 .unwrap_or_default();
-            if crate::menu_item::MenuItem::new(format!("Compare with {other}"))
-                .icon("file-diff")
-                .show(ui)
-                .on_hover_text("Also Ctrl+click on a commit")
-                .clicked()
+            if crate::menu_item::MenuItem::new(crate::i18n::message(
+                "repo-core-2648",
+                &[("other", format!("{}", other).into())],
+            ))
+            .icon("file-diff")
+            .show(ui)
+            .on_hover_text(crate::i18n::text("repo-core-2649"))
+            .clicked()
             {
                 acts.push(compare);
             }
         }
-        if crate::menu_item::MenuItem::new("Compare with the working tree")
+        if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-2650"))
             .icon("file-diff")
             .show(ui)
             .clicked()
@@ -382,7 +417,7 @@ impl RepoTab {
                 base: hash.to_owned(),
                 base_label: short.to_owned(),
                 target: None,
-                target_label: "working tree".to_owned(),
+                target_label: crate::i18n::text("repo-core-2651").to_owned(),
                 since_fork: false,
             });
         }
@@ -415,20 +450,23 @@ fn rewrite_items(ui: &mut Ui, r: &Rewrite<'_>, idle: bool, is_head: bool, acts: 
         target,
         ..
     } = *r;
-    if crate::menu_item::MenuItem::new(format!("Interactive rebase {target} onto this commit…"))
-        .icon("git-merge")
-        .enabled(idle)
-        .refused(is_head.then_some(crate::i18n::text("repo-core-0796")))
-        .show(ui)
-        .on_hover_text("Reorder, reword, squash or drop the commits after this one")
-        .clicked()
+    if crate::menu_item::MenuItem::new(crate::i18n::message(
+        "repo-core-2652",
+        &[("target", format!("{}", target).into())],
+    ))
+    .icon("git-merge")
+    .enabled(idle)
+    .refused(is_head.then_some(crate::i18n::text("repo-core-0796")))
+    .show(ui)
+    .on_hover_text(crate::i18n::text("repo-core-2653"))
+    .clicked()
     {
         acts.push(Action::InteractiveRebase {
             onto: hash.to_owned(),
             label: short.to_owned(),
         });
     }
-    let cherry_pick = "Cherry-pick onto current branch".to_owned();
+    let cherry_pick = crate::i18n::text("repo-core-2654").to_owned();
     let picked = if r.merge {
         crate::menu_item::MenuItem::new(cherry_pick)
             .icon("command")
@@ -442,7 +480,7 @@ fn rewrite_items(ui: &mut Ui, r: &Rewrite<'_>, idle: bool, is_head: bool, acts: 
     if picked.clicked() {
         acts.push(cherry_pick_action(hash));
     }
-    if crate::menu_item::MenuItem::new("Revert commit")
+    if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-2655"))
         .icon("undo-2")
         .enabled(idle)
         .show(ui)
@@ -451,13 +489,16 @@ fn rewrite_items(ui: &mut Ui, r: &Rewrite<'_>, idle: bool, is_head: bool, acts: 
         acts.push(revert_action(hash, short));
     }
     {
-        crate::menu_item::MenuItem::new(format!("Reset {target} to here"))
-            .icon("undo-2")
-            .enabled(idle)
-            .refused(is_head.then_some(crate::i18n::text("repo-core-0796")))
-            .submenu(ui, |ui| {
-                reset_items(ui, r, acts);
-            });
+        crate::menu_item::MenuItem::new(crate::i18n::message(
+            "repo-core-2656",
+            &[("target", format!("{}", target).into())],
+        ))
+        .icon("undo-2")
+        .enabled(idle)
+        .refused(is_head.then_some(crate::i18n::text("repo-core-0796")))
+        .submenu(ui, |ui| {
+            reset_items(ui, r, acts);
+        });
     }
 }
 
@@ -473,7 +514,12 @@ pub(in crate::repo) fn reset_items(ui: &mut Ui, r: &Rewrite<'_>, acts: &mut Vec<
         ..
     } = *r;
     for (mode, undo_mode, label, explain) in [
-        ("--soft", "--soft", crate::i18n::text("repo-core-0373"), crate::i18n::text("repo-core-0375")),
+        (
+            "--soft",
+            "--soft",
+            crate::i18n::text("repo-core-0373"),
+            crate::i18n::text("repo-core-0375"),
+        ),
         (
             "--mixed",
             "--mixed",
@@ -484,8 +530,7 @@ pub(in crate::repo) fn reset_items(ui: &mut Ui, r: &Rewrite<'_>, acts: &mut Vec<
             "--keep",
             "--keep",
             crate::i18n::text("repo-core-0380"),
-            "Drops the commits after this one, keeps uncommitted changes. It stops, changing \
-             nothing, if a file with changes is one those commits touched.",
+            crate::i18n::text("repo-core-2657"),
         ),
         (
             "--hard",
@@ -506,9 +551,23 @@ pub(in crate::repo) fn reset_items(ui: &mut Ui, r: &Rewrite<'_>, acts: &mut Vec<
         if button.clicked() {
             acts.push(Action::Dialog(
                 Dialog::confirm(
-                    &format!("{label} reset"),
-                    format!("Move {target} to {short} ({summary})? {explain}"),
-                    &crate::i18n::message("repo-core-0389", &[("to-lowercase", format!("{}", label.to_lowercase()).into())]),
+                    &crate::i18n::message(
+                        "repo-core-2659",
+                        &[("label", format!("{}", label).into())],
+                    ),
+                    crate::i18n::message(
+                        "repo-core-2660",
+                        &[
+                            ("target", format!("{}", target).into()),
+                            ("short", format!("{}", short).into()),
+                            ("summary", format!("{}", summary).into()),
+                            ("explain", format!("{}", explain).into()),
+                        ],
+                    ),
+                    &crate::i18n::message(
+                        "repo-core-0389",
+                        &[("to-lowercase", format!("{}", label.to_lowercase()).into())],
+                    ),
                     reset_steps(mode, hash, target, head),
                     None,
                 )
@@ -522,9 +581,15 @@ pub(in crate::repo) fn reset_items(ui: &mut Ui, r: &Rewrite<'_>, acts: &mut Vec<
                         mode == "--hard",
                     ),
                     if mode == "--hard" {
-                        format!("Leaving {target}")
+                        crate::i18n::message(
+                            "repo-core-2661",
+                            &[("target", format!("{}", target).into())],
+                        )
                     } else {
-                        format!("Leaving {target}, changes kept")
+                        crate::i18n::message(
+                            "repo-core-2662",
+                            &[("target", format!("{}", target).into())],
+                        )
                     },
                 ),
             ));
@@ -561,7 +626,7 @@ fn copy_items(
     selected: bool,
     first_branch: bool,
 ) {
-    if crate::menu_item::MenuItem::new("Copy commit hash")
+    if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-2663"))
         .icon("copy")
         .keys_when(crate::keymap::Command::GraphCopyHash, selected)
         .show(ui)
@@ -569,7 +634,7 @@ fn copy_items(
     {
         ui.ctx().copy_text(hash.to_owned());
     }
-    if crate::menu_item::MenuItem::new("Copy message")
+    if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-2664"))
         .icon("copy")
         .keys_when(crate::keymap::Command::GraphCopyMessage, selected)
         .show(ui)
@@ -578,14 +643,17 @@ fn copy_items(
         ui.ctx().copy_text(summary.to_owned());
     }
     if let Some(name) = branch
-        && crate::menu_item::MenuItem::new(format!("Copy branch name ({name})"))
-            .icon("copy")
-            .keys_when(
-                crate::keymap::Command::GraphCopyBranch,
-                selected && first_branch,
-            )
-            .show(ui)
-            .clicked()
+        && crate::menu_item::MenuItem::new(crate::i18n::message(
+            "repo-core-2665",
+            &[("name", format!("{}", name).into())],
+        ))
+        .icon("copy")
+        .keys_when(
+            crate::keymap::Command::GraphCopyBranch,
+            selected && first_branch,
+        )
+        .show(ui)
+        .clicked()
     {
         ui.ctx().copy_text(name.to_owned());
     }

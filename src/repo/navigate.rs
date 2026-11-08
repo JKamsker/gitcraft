@@ -105,9 +105,9 @@ impl RepoTab {
             }
             None => {
                 self.status = Some((
-                    format!(
-                        "Commit {} is not in the loaded history",
-                        hash.get(..8).unwrap_or(hash)
+                    crate::i18n::message(
+                        "repo-core-2900",
+                        &[("hash", format!("{}", hash.get(..8).unwrap_or(hash)).into())],
                     ),
                     true,
                 ));

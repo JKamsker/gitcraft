@@ -93,7 +93,10 @@ impl LineLinks<'_> {
         ui.separator();
         let target = self.target(old, picked, header);
         let what = if old {
-            crate::i18n::message("repo-core-1860", &[("label", format!("{}", picked.label()).into())])
+            crate::i18n::message(
+                "repo-core-1860",
+                &[("label", format!("{}", picked.label()).into())],
+            )
         } else {
             picked.label()
         };

@@ -132,12 +132,22 @@ impl Form {
         let cancelled_tx = tx.clone();
         let cancelled_ctx = ctx.clone();
         let key = mutation.then(|| crate::repo::messages::mutation_key(&self.repo));
-        let result = pool.submit_cancellable(token.clone(), tasks::Priority::Interactive, key,
-            Some(Box::new(move || { let _ = cancelled_tx.send(Event::Done(Err(crate::i18n::text("repo-core-1159").into()))); cancelled_ctx.request_repaint(); })),
+        let result = pool.submit_cancellable(
+            token.clone(),
+            tasks::Priority::Interactive,
+            key,
+            Some(Box::new(move || {
+                let _ =
+                    cancelled_tx.send(Event::Done(Err(crate::i18n::text("repo-core-1159").into())));
+                cancelled_ctx.request_repaint();
+            })),
             Box::new(move || {
-                let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| work(&tx))).unwrap_or_else(|_| Err(crate::i18n::text("repo-core-1160").into()));
-                let _ = tx.send(Event::Done(result)); ctx.request_repaint();
-            }));
+                let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| work(&tx)))
+                    .unwrap_or_else(|_| Err(crate::i18n::text("repo-core-1160").into()));
+                let _ = tx.send(Event::Done(result));
+                ctx.request_repaint();
+            }),
+        );
         match result {
             Ok(()) => {
                 self.active = Some(token);
@@ -199,18 +209,55 @@ impl Form {
         self.poll();
         ui.set_width(850.0);
         ui.heading(crate::i18n::text("repo-core-1162"));
-        ui.label(crate::i18n::message("repo-core-1163", &[("label", format!("{}", crate::teleport::Machine::of(&self.repo).label()).into())]));
+        ui.label(crate::i18n::message(
+            "repo-core-1163",
+            &[(
+                "label",
+                format!("{}", crate::teleport::Machine::of(&self.repo).label()).into(),
+            )],
+        ));
         let idle = self.active.is_none();
         ui.add_enabled_ui(idle, |ui| {
-            ui.horizontal(|ui| { ui.label(crate::i18n::text("repo-core-1164")); ui.text_edit_singleline(&mut self.revision); ui.label(crate::i18n::text("repo-core-1165")); ui.add(egui::DragValue::new(&mut self.count).range(1..=32)); });
+            ui.horizontal(|ui| {
+                ui.label(crate::i18n::text("repo-core-1164"));
+                ui.text_edit_singleline(&mut self.revision);
+                ui.label(crate::i18n::text("repo-core-1165"));
+                ui.add(egui::DragValue::new(&mut self.count).range(1..=32));
+            });
             ui.label(crate::i18n::text("repo-core-1166"));
             if ui.button(crate::i18n::text("repo-core-1167")).clicked() {
-                let repo = self.repo.clone(); let revision = self.revision.clone(); let count = self.count;
-                self.submit(ui.ctx(), false, move |tx| { let commits = git::behaviour_commits(&repo, &revision, count)?; let _ = tx.send(Event::Loaded(commits)); Ok(()) });
+                let repo = self.repo.clone();
+                let revision = self.revision.clone();
+                let count = self.count;
+                self.submit(ui.ctx(), false, move |tx| {
+                    let commits = git::behaviour_commits(&repo, &revision, count)?;
+                    let _ = tx.send(Event::Loaded(commits));
+                    Ok(())
+                });
             }
-            ui.label(crate::i18n::text("repo-core-1168")); ui.text_edit_multiline(&mut self.command);
-            ui.horizontal(|ui| { ui.selectable_value(&mut self.mode, Mode::Text, crate::i18n::text("repo-core-1169")); ui.selectable_value(&mut self.mode, Mode::Number, crate::i18n::text("repo-core-1170")); ui.selectable_value(&mut self.mode, Mode::Png, crate::i18n::text("repo-core-1171")); });
-            ui.horizontal(|ui| { ui.label(crate::i18n::text("repo-core-1172")); ui.add(egui::DragValue::new(&mut self.timeout).range(1..=600)); });
+            ui.label(crate::i18n::text("repo-core-1168"));
+            ui.text_edit_multiline(&mut self.command);
+            ui.horizontal(|ui| {
+                ui.selectable_value(
+                    &mut self.mode,
+                    Mode::Text,
+                    crate::i18n::text("repo-core-1169"),
+                );
+                ui.selectable_value(
+                    &mut self.mode,
+                    Mode::Number,
+                    crate::i18n::text("repo-core-1170"),
+                );
+                ui.selectable_value(
+                    &mut self.mode,
+                    Mode::Png,
+                    crate::i18n::text("repo-core-1171"),
+                );
+            });
+            ui.horizontal(|ui| {
+                ui.label(crate::i18n::text("repo-core-1172"));
+                ui.add(egui::DragValue::new(&mut self.timeout).range(1..=600));
+            });
         });
         if self
             .loaded_selection
@@ -296,7 +343,10 @@ impl Form {
                 self.benchmark_points(ui);
             }
             if ui
-                .add(egui::Slider::new(&mut self.index, 0..=self.commits.len() - 1).text(crate::i18n::text("repo-core-1177")))
+                .add(
+                    egui::Slider::new(&mut self.index, 0..=self.commits.len() - 1)
+                        .text(crate::i18n::text("repo-core-1177")),
+                )
                 .changed()
             {
                 self.texture = None;
@@ -305,7 +355,10 @@ impl Form {
             ui.label(format!("{} · {}", commit.hash, commit.summary));
             if let Some(i) = self.first_change {
                 if ui
-                    .button(crate::i18n::message("repo-core-1178", &[("hash", format!("{}", &self.commits[i].hash[..8]).into())]))
+                    .button(crate::i18n::message(
+                        "repo-core-1178",
+                        &[("hash", format!("{}", &self.commits[i].hash[..8]).into())],
+                    ))
                     .clicked()
                 {
                     return Outcome::Done(Box::new(crate::repo::Action::SelectHash(
@@ -324,8 +377,12 @@ impl Form {
                             Frame::Unknown => crate::i18n::text("repo-core-1181"),
                             Frame::Queued => crate::i18n::text("repo-core-1182"),
                             Frame::Failed(_) => crate::i18n::text("repo-core-1183"),
-                            Frame::Observed(Observation::Inconsistent) => crate::i18n::text("repo-core-1184"),
-                            Frame::Observed(Observation::Stable(_)) => crate::i18n::text("repo-core-1185"),
+                            Frame::Observed(Observation::Inconsistent) => {
+                                crate::i18n::text("repo-core-1184")
+                            }
+                            Frame::Observed(Observation::Stable(_)) => {
+                                crate::i18n::text("repo-core-1185")
+                            }
                         };
                         if ui
                             .selectable_label(
@@ -353,9 +410,24 @@ impl Form {
                     ui.label(crate::i18n::text("repo-core-1189"));
                 }
                 Frame::Observed(Observation::Stable(sample)) => {
-                    ui.label(crate::i18n::message("repo-core-1190", &[("code", format!("{}", sample.code).into())]));
+                    ui.label(crate::i18n::message(
+                        "repo-core-1190",
+                        &[("code", format!("{}", sample.code).into())],
+                    ));
                     if !sample.stderr.is_empty() {
-                        ui.collapsing(crate::i18n::text("repo-core-1191"), |ui| { let preview: String = sample.stderr.iter().take(8192).flat_map(|b| std::ascii::escape_default(*b)).map(char::from).collect(); ui.monospace(preview); if sample.stderr.len() > 8192 { ui.label(crate::i18n::text("repo-core-1192")); } });
+                        ui.collapsing(crate::i18n::text("repo-core-1191"), |ui| {
+                            let preview: String = sample
+                                .stderr
+                                .iter()
+                                .take(8192)
+                                .flat_map(|b| std::ascii::escape_default(*b))
+                                .map(char::from)
+                                .collect();
+                            ui.monospace(preview);
+                            if sample.stderr.len() > 8192 {
+                                ui.label(crate::i18n::text("repo-core-1192"));
+                            }
+                        });
                     }
                     match &sample.value {
                         Value::Text(text) => {

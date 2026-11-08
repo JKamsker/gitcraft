@@ -99,12 +99,23 @@ pub fn diff(sides: &Sides) -> Result<DvcDiff, String> {
     let read = |text: &Option<String>, side: &str| -> Result<Vec<Tracked>, String> {
         text.as_deref()
             .map(|t| {
-                tracked(t).map_err(|e| crate::i18n::message("repo-core-2167", &[("side", format!("{}", side).into()), ("e", format!("{}", e).into())]))
+                tracked(t).map_err(|e| {
+                    crate::i18n::message(
+                        "repo-core-2167",
+                        &[
+                            ("side", format!("{}", side).into()),
+                            ("e", format!("{}", e).into()),
+                        ],
+                    )
+                })
             })
             .transpose()
             .map(Option::unwrap_or_default)
     };
-    let (old, new) = (read(&sides.old, crate::i18n::text("repo-core-2049"))?, read(&sides.new, crate::i18n::text("repo-core-2050"))?);
+    let (old, new) = (
+        read(&sides.old, crate::i18n::text("repo-core-2049"))?,
+        read(&sides.new, crate::i18n::text("repo-core-2050"))?,
+    );
     let mut pairs: Vec<(Option<Tracked>, Option<Tracked>)> = Vec::new();
     for n in &new {
         let o = old

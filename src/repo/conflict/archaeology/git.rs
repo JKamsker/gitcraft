@@ -70,7 +70,9 @@ fn operation(repo: &Path, state: Option<InProgress>) -> Result<Operation, String
     let rev = |name: &str| {
         git::run(Some(repo), &["rev-parse", "--verify", "-q", name])
             .map(|s| s.trim().to_owned())
-            .map_err(|_| crate::i18n::message("repo-core-0402", &[("name", format!("{}", name).into())]))
+            .map_err(|_| {
+                crate::i18n::message("repo-core-0402", &[("name", format!("{}", name).into())])
+            })
     };
     let shown = rev(head)?;
     let base = match base {
@@ -200,7 +202,9 @@ fn one_commit(repo: &Path, hash: &str) -> Result<Step, String> {
         .into_iter()
         .next()
         .map(|(_, s)| s)
-        .ok_or_else(|| crate::i18n::message("repo-core-0416", &[("hash", format!("{}", hash).into())]))
+        .ok_or_else(|| {
+            crate::i18n::message("repo-core-0416", &[("hash", format!("{}", hash).into())])
+        })
 }
 
 /// Whether merging commits `a` and `b` (from `base`, or their merge base) conflicts in `path`,
@@ -223,8 +227,7 @@ pub fn merge_conflicts(
     args.extend([a, b]);
     let out = git::run_ok_codes(Some(repo), &args, &[0, 1]).map_err(|e| {
         if e.contains("unknown option") || e.contains("usage: git merge-tree") {
-            crate::i18n::text("repo-core-0425")
-                .to_owned()
+            crate::i18n::text("repo-core-0425").to_owned()
         } else {
             crate::i18n::message("repo-core-0426", &[("e", format!("{}", e).into())])
         }
@@ -260,7 +263,13 @@ pub fn change(repo: &Path, hash: &str, path: &str) -> Result<String, String> {
         return Ok(out);
     }
     let mut kept = lines[..MAX_PATCH_LINES].join("\n");
-    kept.push_str(&crate::i18n::message("repo-core-0432", &[("MAX-PATCH-LINES", format!("{}", lines.len() - MAX_PATCH_LINES).into())]));
+    kept.push_str(&crate::i18n::message(
+        "repo-core-0432",
+        &[(
+            "MAX-PATCH-LINES",
+            format!("{}", lines.len() - MAX_PATCH_LINES).into(),
+        )],
+    ));
     Ok(kept)
 }
 

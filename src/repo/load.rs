@@ -134,8 +134,9 @@ impl RepoTab {
                     crate::tasks::read(move || super::issue_work::read(&path))?
                 };
                 let identity = git::identity(&path);
-                let worktree_root = git::read_worktree_root(&path)
-                    .map_err(|e| format!("Could not read the worktrees root: {e}"))?;
+                let worktree_root = git::read_worktree_root(&path).map_err(|e| {
+                    crate::i18n::message("repo-core-2893", &[("e", format!("{}", e).into())])
+                })?;
                 let history = history.join()??.into_iter().map(Arc::new).collect();
                 let (work, worktrees) = work_trees.join()??;
                 let (stashes, remotes, submodules, lfs, issues) = (
@@ -378,7 +379,7 @@ impl RepoTab {
             let page = (|| {
                 let mut slot = stream
                     .lock()
-                    .map_err(|_| "Reading older history failed".to_owned())?;
+                    .map_err(|_| crate::i18n::text("repo-core-2894").to_owned())?;
                 // The first page of this history (since it was last reloaded) starts the
                 // `git log` the next ones are read from.
                 if slot

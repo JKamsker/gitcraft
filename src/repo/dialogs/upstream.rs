@@ -27,7 +27,10 @@ pub(super) fn set_upstream(
     title(
         ui,
         crate::i18n::text("repo-core-1522"),
-        &crate::i18n::message("repo-core-1523", &[("branch", format!("{}", branch).into())]),
+        &crate::i18n::message(
+            "repo-core-1523",
+            &[("branch", format!("{}", branch).into())],
+        ),
         &t,
     );
     if remote_names.len() > 1 {
@@ -70,14 +73,31 @@ pub(super) fn set_upstream(
     ui.add_space(6.0);
     if valid {
         let note = if exists {
-            crate::i18n::message("repo-core-1528", &[("remote", format!("{}", remote).into()), ("target", format!("{}", target).into())])
+            crate::i18n::message(
+                "repo-core-1528",
+                &[
+                    ("remote", format!("{}", remote).into()),
+                    ("target", format!("{}", target).into()),
+                ],
+            )
         } else {
-            crate::i18n::message("repo-core-1529", &[("remote", format!("{}", remote).into()), ("target", format!("{}", target).into()), ("branch", format!("{}", branch).into())])
+            crate::i18n::message(
+                "repo-core-1529",
+                &[
+                    ("remote", format!("{}", remote).into()),
+                    ("target", format!("{}", target).into()),
+                    ("branch", format!("{}", branch).into()),
+                ],
+            )
         };
         ui.label(RichText::new(note).color(t.text_dim));
     }
     ui.add_space(10.0);
-    let button = if exists { crate::i18n::text("repo-core-1522") } else { crate::i18n::text("repo-core-0032") };
+    let button = if exists {
+        crate::i18n::text("repo-core-1522")
+    } else {
+        crate::i18n::text("repo-core-0032")
+    };
     buttons(ui, button, valid, enter, || {
         let upstream = format!("{remote}/{target}");
         if exists {
@@ -89,7 +109,10 @@ pub(super) fn set_upstream(
                 branch.to_owned(),
             ];
             Action::UndoableOps {
-                label: crate::i18n::message("repo-core-1532", &[("upstream", format!("{}", upstream).into())]),
+                label: crate::i18n::message(
+                    "repo-core-1532",
+                    &[("upstream", format!("{}", upstream).into())],
+                ),
                 ops: vec![set.clone()],
                 refresh: Refresh::All,
                 undo: Undo::Custom {
@@ -99,7 +122,13 @@ pub(super) fn set_upstream(
             }
         } else {
             Action::Ops {
-                label: crate::i18n::message("repo-core-1533", &[("branch", format!("{}", branch).into()), ("upstream", format!("{}", upstream).into())]),
+                label: crate::i18n::message(
+                    "repo-core-1533",
+                    &[
+                        ("branch", format!("{}", branch).into()),
+                        ("upstream", format!("{}", upstream).into()),
+                    ],
+                ),
                 ops: vec![vec![
                     "push".to_owned(),
                     "-u".to_owned(),

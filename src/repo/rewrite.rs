@@ -36,7 +36,10 @@ impl RepoTab {
                 .chain(steps)
                 .collect();
             self.run_undoable(
-                &format!("Edit the message of {}", short(&hash)),
+                &crate::i18n::message(
+                    "repo-core-3321",
+                    &[("hash", format!("{}", short(&hash)).into())],
+                ),
                 guarded,
                 Refresh::All,
                 Undo::HeadMove { mode: "--keep" },
@@ -70,7 +73,7 @@ impl RepoTab {
                 .entries
                 .iter_mut()
                 .find(|e| e.commit.hash == hash)
-                .ok_or("only commits of the checked-out branch can be edited")?;
+                .ok_or(crate::i18n::text("repo-core-3188"))?;
             entry.step = rebase::Step::Reword;
             entry.message = message;
             if let Some(problem) = editor.problem() {
@@ -82,7 +85,12 @@ impl RepoTab {
             Ok(editor) => self.with_rebase_command(editor, ctx, move |tab, command, ctx| {
                 tab.reword_ready(&hash, command, ctx);
             }),
-            Err(e) => self.status = Some((format!("Edit message: {e}"), true)),
+            Err(e) => {
+                self.status = Some((
+                    crate::i18n::message("repo-core-3322", &[("e", format!("{}", e).into())]),
+                    true,
+                ))
+            }
         }
     }
 
@@ -111,22 +119,33 @@ impl RepoTab {
             // Started while something else ran: say so rather than drop it.
             Ok(_) if self.busy_op.is_some() => {
                 self.status = Some((
-                    format!(
-                        "Edit message: {} is still running, try again when it's done",
-                        self.busy_op.as_deref().unwrap_or_default()
+                    crate::i18n::message(
+                        "repo-core-3323",
+                        &[(
+                            "self",
+                            format!("{}", self.busy_op.as_deref().unwrap_or_default()).into(),
+                        )],
                     ),
                     true,
                 ));
             }
             // The todo list replaces the commits read: not one made since.
             Ok((command, head)) => self.run_undoable(
-                &format!("Edit the message of {}", short(hash)),
+                &crate::i18n::message(
+                    "repo-core-3321",
+                    &[("hash", format!("{}", short(hash)).into())],
+                ),
                 vec![self.same_branch(), expect_ref_at("HEAD", &head), command],
                 Refresh::All,
                 Undo::HeadMove { mode: "--keep" },
                 ctx,
             ),
-            Err(e) => self.status = Some((format!("Edit message: {e}"), true)),
+            Err(e) => {
+                self.status = Some((
+                    crate::i18n::message("repo-core-3322", &[("e", format!("{}", e).into())]),
+                    true,
+                ))
+            }
         }
     }
 
@@ -179,8 +198,9 @@ impl RepoTab {
         match result {
             Ok(commits) if commits.is_empty() => {
                 self.status = Some((
-                    format!(
-                        "Nothing to rebase: {label} already contains every commit of this branch"
+                    crate::i18n::message(
+                        "repo-core-3324",
+                        &[("label", format!("{}", label).into())],
                     ),
                     true,
                 ));
@@ -193,7 +213,12 @@ impl RepoTab {
                 editor.branch_guard = Some(self.same_branch());
                 self.rebase = Some(editor);
             }
-            Err(e) => self.status = Some((format!("Interactive rebase: {e}"), true)),
+            Err(e) => {
+                self.status = Some((
+                    crate::i18n::message("repo-core-3325", &[("e", format!("{}", e).into())]),
+                    true,
+                ))
+            }
         }
     }
 
@@ -209,19 +234,75 @@ impl RepoTab {
         let guard = self.same_branch();
         let upstream = self.upstream_ref(&branch);
         let repo = self.path.clone();
-        self.then(ctx,move|| -> Result<String,String> {
-            let pinned=git::forecast_run(&repo,&["--no-lazy-fetch","rev-parse","--verify","--end-of-options",&format!("{onto}^{{commit}}")],&[],&[0],&||true)?;
-            let pinned=pinned.trim().to_owned();if !git::investigations::oid(&pinned){return Err("Invalid rebase target".into());}Ok(pinned)
-        },move|tab,result,ctx|{
-            if tab.plain_rebase_request!=requested||tab.dialog.is_some(){return;}
-            let pinned=match result{Ok(p)=>p,Err(e)=>{tab.status=Some((format!("Rebase preview: {e}"),true));return;}};
-            if tab.busy_op.is_some()||tab.refs.head!=head||tab.same_branch()!=guard{tab.status=Some(("The branch changed while preparing the rebase preview; reopen it.".into(),true));return;}
-            let ask=git::PreviewAsk::rebase(&branch,&head,&pinned,upstream);
-            let steps=vec![guard,expect_ref_at("HEAD",&head),vec!["rebase".into(),"--end-of-options".into(),pinned]];
-            tab.open_dialog(super::Dialog::confirm(&label,
-                "Replay the branch's unique commits onto the pinned target. Conflicts stop for resolution. Dirty tracked changes prevent this rebase from starting.".into(),
-                "Rebase",steps,None).undo(Undo::HeadMove{mode:"--keep"}).preview(ask,format!("Commits rewritten on {branch}")),ctx);
-        });
+        self.then(
+            ctx,
+            move || -> Result<String, String> {
+                let pinned = git::forecast_run(
+                    &repo,
+                    &[
+                        "--no-lazy-fetch",
+                        "rev-parse",
+                        "--verify",
+                        "--end-of-options",
+                        &format!("{onto}^{{commit}}"),
+                    ],
+                    &[],
+                    &[0],
+                    &|| true,
+                )?;
+                let pinned = pinned.trim().to_owned();
+                if !git::investigations::oid(&pinned) {
+                    return Err(crate::i18n::text("repo-core-3328").into());
+                }
+                Ok(pinned)
+            },
+            move |tab, result, ctx| {
+                if tab.plain_rebase_request != requested || tab.dialog.is_some() {
+                    return;
+                }
+                let pinned = match result {
+                    Ok(p) => p,
+                    Err(e) => {
+                        tab.status = Some((
+                            crate::i18n::message(
+                                "repo-core-3329",
+                                &[("e", format!("{}", e).into())],
+                            ),
+                            true,
+                        ));
+                        return;
+                    }
+                };
+                if tab.busy_op.is_some() || tab.refs.head != head || tab.same_branch() != guard {
+                    tab.status = Some((crate::i18n::text("repo-core-3330").into(), true));
+                    return;
+                }
+                let ask = git::PreviewAsk::rebase(&branch, &head, &pinned, upstream);
+                let steps = vec![
+                    guard,
+                    expect_ref_at("HEAD", &head),
+                    vec!["rebase".into(), "--end-of-options".into(), pinned],
+                ];
+                tab.open_dialog(
+                    super::Dialog::confirm(
+                        &label,
+                        crate::i18n::text("repo-core-3331").into(),
+                        crate::i18n::text("repo-core-3051"),
+                        steps,
+                        None,
+                    )
+                    .undo(Undo::HeadMove { mode: "--keep" })
+                    .preview(
+                        ask,
+                        crate::i18n::message(
+                            "repo-core-3332",
+                            &[("branch", format!("{}", branch).into())],
+                        ),
+                    ),
+                    ctx,
+                );
+            },
+        );
     }
 
     pub(super) fn ask_run_rebase(&mut self, ctx: &egui::Context) {
@@ -271,12 +352,25 @@ impl RepoTab {
                 .iter()
                 .map(|e| format!("todo: {} {} {}", e.step.label(), e.commit.hash, e.message)),
         );
-        self.open_dialog(super::Dialog::confirm("Interactive rebase",
-            "Replay this todo list? Dropped commits leave the branch; kept commits may receive new IDs. Git autostashes and restores tracked uncommitted changes; restoring that stash can conflict.".into(),
-            "Start rebase", Vec::new(), None)
+        self.open_dialog(
+            super::Dialog::confirm(
+                crate::i18n::text("repo-core-3337"),
+                crate::i18n::text("repo-core-3338").into(),
+                crate::i18n::text("repo-core-3242"),
+                Vec::new(),
+                None,
+            )
             .instead(super::Action::ConfirmedRebase(id), described)
             .undo(Undo::HeadMove { mode: "--keep" })
-            .preview(ask, format!("Commits rewritten or dropped on {branch}")), ctx);
+            .preview(
+                ask,
+                crate::i18n::message(
+                    "repo-core-3339",
+                    &[("branch", format!("{}", branch).into())],
+                ),
+            ),
+            ctx,
+        );
     }
 
     pub(super) fn confirmed_rebase(&mut self, id: u64, ctx: &egui::Context) {
@@ -286,10 +380,7 @@ impl RepoTab {
             .as_ref()
             .is_some_and(|editor| editor.id == id && editor.approved(&guard, &self.refs.head))
         {
-            self.status = Some((
-                "The approved rebase branch, HEAD or todo changed. Reopen its preview.".into(),
-                true,
-            ));
+            self.status = Some((crate::i18n::text("repo-core-3340").into(), true));
             return;
         }
         self.run_rebase(ctx);
@@ -313,17 +404,17 @@ impl RepoTab {
         }
         if editor.has_approval() {
             if !editor.approved(&guard, &self.refs.head) {
-                self.status = Some((
-                    "The approved rebase context changed. Reopen its preview.".into(),
-                    true,
-                ));
+                self.status = Some((crate::i18n::text("repo-core-3341").into(), true));
                 return;
             }
         } else if let Err(reason) = editor.approve(&guard) {
             self.status = Some((reason, true));
             return;
         }
-        let label = format!("Interactive rebase onto {}", editor.onto_label);
+        let label = crate::i18n::message(
+            "repo-core-3342",
+            &[("onto-label", format!("{}", editor.onto_label).into())],
+        );
         // Started once: until its files are written (elsewhere, in the background), it can't
         // be started again, and it runs only if this editor is still the one open then.
         editor.starting = true;
@@ -363,30 +454,27 @@ impl RepoTab {
         };
         editor.starting = false;
         if !editor.approved(&current_guard, &self.refs.head) {
-            self.status = Some(("The approved rebase branch, HEAD or todo changed while preparing its command. Reopen its preview.".into(), true));
+            self.status = Some((crate::i18n::text("repo-core-3343").into(), true));
             return;
         }
         let Some(retained_guard) = editor.branch_guard.clone() else {
-            self.status = Some((
-                "The approved rebase has no retained branch identity; reopen its preview.".into(),
-                true,
-            ));
+            self.status = Some((crate::i18n::text("repo-core-3344").into(), true));
             return;
         };
         match command {
             // Something else started while the files were written.
             Ok(_) if self.busy_op.is_some() => {
                 self.status = Some((
-                    format!("{label}: something else is running, try again when it's done"),
+                    crate::i18n::message(
+                        "repo-core-3345",
+                        &[("label", format!("{}", label).into())],
+                    ),
                     true,
                 ));
             }
             Ok((command, head, refs)) => {
                 if head != editor.head {
-                    self.status = Some((
-                        "The prepared rebase does not match its approved HEAD.".into(),
-                        true,
-                    ));
+                    self.status = Some((crate::i18n::text("repo-core-3346").into(), true));
                     return;
                 }
                 let guards = [retained_guard.clone(), expect_ref_at("HEAD", &head)];

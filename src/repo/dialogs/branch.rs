@@ -21,30 +21,47 @@ pub(super) fn create_branch(
     focus: &mut bool,
 ) -> Outcome {
     let t = Tokens::get(ui.ctx());
-    title(ui, crate::i18n::text("repo-core-0140"), &crate::i18n::message("repo-core-1213", &[("at-label", format!("{}", at_label).into())]), &t);
+    title(
+        ui,
+        crate::i18n::text("repo-core-0140"),
+        &crate::i18n::message(
+            "repo-core-1213",
+            &[("at-label", format!("{}", at_label).into())],
+        ),
+        &t,
+    );
     field(ui, name, "feature/my-branch", focus);
     dash_spaces(name);
     ui.add_space(6.0);
     ui.checkbox(checkout, crate::i18n::text("repo-core-1215"));
     ui.add_space(12.0);
     let valid = usable(name);
-    buttons(ui, crate::i18n::text("repo-core-1216"), valid, enter, || {
-        let name = name.trim().to_owned();
-        let args: Vec<String> = if *checkout {
-            vec!["switch".into(), "-c".into(), name.clone(), at.to_owned()]
-        } else {
-            vec!["branch".into(), name.clone(), at.to_owned()]
-        };
-        Action::UndoableOps {
-            label: crate::i18n::message("repo-core-1218", &[("name", format!("{}", name).into())]),
-            ops: vec![args.clone()],
-            refresh: Refresh::All,
-            undo: Undo::Custom {
-                undo: create_branch_undo(&name, at, *checkout, previous),
-                redo: vec![args],
-            },
-        }
-    })
+    buttons(
+        ui,
+        crate::i18n::text("repo-core-1216"),
+        valid,
+        enter,
+        || {
+            let name = name.trim().to_owned();
+            let args: Vec<String> = if *checkout {
+                vec!["switch".into(), "-c".into(), name.clone(), at.to_owned()]
+            } else {
+                vec!["branch".into(), name.clone(), at.to_owned()]
+            };
+            Action::UndoableOps {
+                label: crate::i18n::message(
+                    "repo-core-1218",
+                    &[("name", format!("{}", name).into())],
+                ),
+                ops: vec![args.clone()],
+                refresh: Refresh::All,
+                undo: Undo::Custom {
+                    undo: create_branch_undo(&name, at, *checkout, previous),
+                    redo: vec![args],
+                },
+            }
+        },
+    )
 }
 
 /// How creating the branch `name` at the commit `at` (and checking it out, from `previous`) is
@@ -94,7 +111,15 @@ pub(super) fn tag(
     focus: &mut bool,
 ) -> Outcome {
     let t = Tokens::get(ui.ctx());
-    title(ui, crate::i18n::text("repo-core-0141"), &crate::i18n::message("repo-core-1220", &[("at-label", format!("{}", at_label).into())]), &t);
+    title(
+        ui,
+        crate::i18n::text("repo-core-0141"),
+        &crate::i18n::message(
+            "repo-core-1220",
+            &[("at-label", format!("{}", at_label).into())],
+        ),
+        &t,
+    );
     field(ui, name, "v1.2.0", focus);
     dash_spaces(name);
     ui.add_space(4.0);
@@ -107,7 +132,13 @@ pub(super) fn tag(
     );
     if let Some(remote) = remote {
         ui.add_space(4.0);
-        ui.checkbox(push, crate::i18n::message("repo-core-1223", &[("remote", format!("{}", remote).into())]));
+        ui.checkbox(
+            push,
+            crate::i18n::message(
+                "repo-core-1223",
+                &[("remote", format!("{}", remote).into())],
+            ),
+        );
     }
     ui.add_space(8.0);
     ui.checkbox(release, crate::i18n::text("repo-core-1224"));
@@ -169,24 +200,36 @@ pub(super) fn rename_branch(
     dash_spaces(new);
     ui.add_space(8.0);
     let valid = usable(new) && new.trim() != old;
-    buttons(ui, crate::i18n::text("repo-core-1232"), valid, enter, || {
-        let new = new.trim().to_owned();
-        let old = old.to_owned();
-        let rename = |from: &str, to: &str| {
-            let mut steps = vec![vec!["branch".into(), "-m".into(), from.into(), to.into()]];
-            steps.extend(crate::git::stack::reparent_ops(children, to));
-            steps
-        };
-        Action::UndoableOps {
-            label: crate::i18n::message("repo-core-1233", &[("old", format!("{}", old).into()), ("new", format!("{}", new).into())]),
-            ops: rename(&old, &new),
-            refresh: Refresh::All,
-            undo: Undo::Custom {
-                undo: rename(&new, &old),
-                redo: rename(&old, &new),
-            },
-        }
-    })
+    buttons(
+        ui,
+        crate::i18n::text("repo-core-1232"),
+        valid,
+        enter,
+        || {
+            let new = new.trim().to_owned();
+            let old = old.to_owned();
+            let rename = |from: &str, to: &str| {
+                let mut steps = vec![vec!["branch".into(), "-m".into(), from.into(), to.into()]];
+                steps.extend(crate::git::stack::reparent_ops(children, to));
+                steps
+            };
+            Action::UndoableOps {
+                label: crate::i18n::message(
+                    "repo-core-1233",
+                    &[
+                        ("old", format!("{}", old).into()),
+                        ("new", format!("{}", new).into()),
+                    ],
+                ),
+                ops: rename(&old, &new),
+                refresh: Refresh::All,
+                undo: Undo::Custom {
+                    undo: rename(&new, &old),
+                    redo: rename(&old, &new),
+                },
+            }
+        },
+    )
 }
 
 #[cfg(test)]

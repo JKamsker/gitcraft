@@ -142,7 +142,10 @@ impl Store {
             return Err(crate::i18n::text("repo-core-1045").to_owned());
         }
         if text.chars().count() > MAX_TEMPLATE_LEN {
-            return Err(crate::i18n::message("repo-core-1046", &[("MAX-TEMPLATE-LEN", format!("{}", MAX_TEMPLATE_LEN).into())]));
+            return Err(crate::i18n::message(
+                "repo-core-1046",
+                &[("MAX-TEMPLATE-LEN", format!("{}", MAX_TEMPLATE_LEN).into())],
+            ));
         }
         let list = self.templates_mut(scope, repo);
         let template = Template {
@@ -154,7 +157,10 @@ impl Store {
             return Ok(());
         }
         if list.len() >= MAX_TEMPLATES {
-            return Err(crate::i18n::message("repo-core-1047", &[("MAX-TEMPLATES", format!("{}", MAX_TEMPLATES).into())]));
+            return Err(crate::i18n::message(
+                "repo-core-1047",
+                &[("MAX-TEMPLATES", format!("{}", MAX_TEMPLATES).into())],
+            ));
         }
         list.push(template);
         list.sort_by_key(|t| t.name.to_lowercase());

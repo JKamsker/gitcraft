@@ -257,13 +257,19 @@ fn spoken(status: &Status) -> String {
     } else {
         tally
     };
-    crate::a11y::labels::join([crate::i18n::message("repo-core-0283", &[("tally", (tally).into())]).as_str(), crate::i18n::text("repo-core-0284")])
+    crate::a11y::labels::join([
+        crate::i18n::message("repo-core-0283", &[("tally", (tally).into())]).as_str(),
+        crate::i18n::text("repo-core-0284"),
+    ])
 }
 
 /// What a dot's tooltip says: the tally, then the checks that need attention.
 pub(super) fn tooltip(status: &Status) -> String {
     let mut text = match ci::tally_label(&status.checks) {
-        tally if tally.is_empty() => crate::i18n::message("repo-core-0285", &[("state", format!("{}", state_word(status.state)).into())]),
+        tally if tally.is_empty() => crate::i18n::message(
+            "repo-core-0285",
+            &[("state", format!("{}", state_word(status.state)).into())],
+        ),
         tally => crate::i18n::message("repo-core-0286", &[("tally", (tally).into())]),
     };
     let mut worst: Vec<_> = status
@@ -276,7 +282,10 @@ pub(super) fn tooltip(status: &Status) -> String {
         text.push_str(&format!("\n{}  {}", state_word(check.state), check.name));
     }
     if worst.len() > 8 {
-        text.push_str(&crate::i18n::message("repo-core-0287", &[("len", format!("{}", worst.len() - 8).into())]));
+        text.push_str(&crate::i18n::message(
+            "repo-core-0287",
+            &[("len", format!("{}", worst.len() - 8).into())],
+        ));
     }
     text.push_str(crate::i18n::text("repo-core-0288"));
     text

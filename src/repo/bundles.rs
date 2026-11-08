@@ -66,7 +66,10 @@ impl RepoTab {
             }
             Err(e) => {
                 self.dialog = None;
-                self.status = Some((crate::i18n::message("repo-core-0263", &[("e", format!("{}", e).into())]), true));
+                self.status = Some((
+                    crate::i18n::message("repo-core-0263", &[("e", format!("{}", e).into())]),
+                    true,
+                ));
             }
         }
     }
@@ -90,7 +93,10 @@ impl RepoTab {
             }
             Err(e) => {
                 self.dialog = None;
-                self.status = Some((crate::i18n::message("repo-core-0264", &[("e", format!("{}", e).into())]), true));
+                self.status = Some((
+                    crate::i18n::message("repo-core-0264", &[("e", format!("{}", e).into())]),
+                    true,
+                ));
             }
         }
     }
@@ -112,7 +118,10 @@ impl RepoTab {
             return;
         };
         let repo = self.path.clone();
-        let label = crate::i18n::message("repo-core-0267", &[("file", format!("{}", file.display()).into())]);
+        let label = crate::i18n::message(
+            "repo-core-0267",
+            &[("file", format!("{}", file.display()).into())],
+        );
         self.bundle_job(label, Refresh::Status, ctx, move || {
             let bytes = git::export_bundle(&repo, &refs, Some(&base))?;
             git::save_bundle_file(&file, &bytes)
@@ -157,8 +166,20 @@ impl RepoTab {
         // Untrusted prerequisite descriptions are never interpreted as an authentication
         // request or used to retry a previous operation.
         self.status = Some(match result {
-            Ok(()) => (crate::i18n::message("repo-core-0269", &[("label", format!("{}", label).into())]), false),
-            Err(e) => (crate::i18n::message("repo-core-0270", &[("label", format!("{}", label).into()), ("e", format!("{}", e).into())]), true),
+            Ok(()) => (
+                crate::i18n::message("repo-core-0269", &[("label", format!("{}", label).into())]),
+                false,
+            ),
+            Err(e) => (
+                crate::i18n::message(
+                    "repo-core-0270",
+                    &[
+                        ("label", format!("{}", label).into()),
+                        ("e", format!("{}", e).into()),
+                    ],
+                ),
+                true,
+            ),
         });
         match refresh {
             Refresh::All => self.reload(ctx),

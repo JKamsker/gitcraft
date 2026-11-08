@@ -133,14 +133,26 @@ impl Form {
         let failed_tx = tx.clone();
         let failed_ctx = ctx.clone();
         let key = Some(crate::repo::messages::mutation_key(&repo));
-        let result = pool.submit_cancellable(token.clone(), crate::tasks::Priority::Interactive, key,
-            Some(Box::new(move || { let _ = failed_tx.send(Event::Done(import, Err(crate::i18n::text("repo-core-1159").into()))); failed_ctx.request_repaint(); })),
+        let result = pool.submit_cancellable(
+            token.clone(),
+            crate::tasks::Priority::Interactive,
+            key,
+            Some(Box::new(move || {
+                let _ = failed_tx.send(Event::Done(
+                    import,
+                    Err(crate::i18n::text("repo-core-1159").into()),
+                ));
+                failed_ctx.request_repaint();
+            })),
             Box::new(move || {
-                let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(||
-                    crate::git::check_bundle(&repo, &preview, &selected, &prefix, import)))
-                    .unwrap_or_else(|_| Err(crate::i18n::text("repo-core-1242").into()));
-                let _ = tx.send(Event::Done(import, result)); ctx.request_repaint();
-            }));
+                let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    crate::git::check_bundle(&repo, &preview, &selected, &prefix, import)
+                }))
+                .unwrap_or_else(|_| Err(crate::i18n::text("repo-core-1242").into()));
+                let _ = tx.send(Event::Done(import, result));
+                ctx.request_repaint();
+            }),
+        );
         match result {
             Ok(()) => {
                 self.active = Some(token);
@@ -175,68 +187,172 @@ impl Form {
         ui.set_width(740.0);
         let mut outcome = Outcome::Open;
         let height = (ui.ctx().content_rect().height() - 100.0).max(180.0);
-        egui::ScrollArea::vertical().max_height(height).show(ui, |ui| {
-            let t = Tokens::get(ui.ctx());
-            ui.heading(crate::i18n::text("repo-core-1243"));
-            ui.label(crate::i18n::message("repo-core-1244", &[("label", format!("{}", self.label).into())]));
-            ui.monospace(format!("SHA-256 {}", self.preview.digest));
-            ui.label(crate::i18n::text("repo-core-1246"));
-            if let Some(error) = &self.preview.verification_error { ui.colored_label(t.danger, crate::i18n::message("repo-core-1247", &[("error", format!("{}", error).into())])); }
-            ui.label(crate::i18n::text("repo-core-1248"));
-            ui.label(crate::i18n::text("repo-core-1249"));
-            let supported = crate::remote::is_remote(&self.repo) || cfg!(any(target_os = "linux", windows));
-            if !supported { ui.colored_label(t.danger, crate::i18n::text("repo-core-1251")); }
-            ui.label(crate::i18n::text("repo-core-1252"));
-            ui.collapsing(crate::i18n::message("repo-core-1253", &[("count", (self.preview.prerequisites.len()).into())]), |ui| {
-                if self.preview.prerequisites.is_empty() { ui.label(crate::i18n::text("repo-core-1254")); }
-                for r in &self.preview.prerequisites { ui.monospace(format!("{} {}", r.oid, r.name)); }
-            });
-            let editable = self.active.is_none() && self.imported.is_empty();
-            let before = (self.prefix.clone(), self.selected.clone());
-            ui.add_enabled_ui(editable, |ui| {
-                ui.label(crate::i18n::text("repo-core-1255"));
-                ui.text_edit_singleline(&mut self.prefix);
-                ui.label(crate::i18n::text("repo-core-1256"));
-                egui::ScrollArea::vertical().max_height(190.0).id_salt("bundle_ref_selection").show(ui, |ui| {
-                    for r in &self.preview.refs {
-                        let mut selected = self.selected.contains(&r.name);
-                        if ui.checkbox(&mut selected, format!("{} · {}", r.name, r.oid)).changed() {
-                            if selected { self.selected.insert(r.name.clone()); } else { self.selected.remove(&r.name); }
+        egui::ScrollArea::vertical()
+            .max_height(height)
+            .show(ui, |ui| {
+                let t = Tokens::get(ui.ctx());
+                ui.heading(crate::i18n::text("repo-core-1243"));
+                ui.label(crate::i18n::message(
+                    "repo-core-1244",
+                    &[("label", format!("{}", self.label).into())],
+                ));
+                ui.monospace(format!("SHA-256 {}", self.preview.digest));
+                ui.label(crate::i18n::text("repo-core-1246"));
+                if let Some(error) = &self.preview.verification_error {
+                    ui.colored_label(
+                        t.danger,
+                        crate::i18n::message(
+                            "repo-core-1247",
+                            &[("error", format!("{}", error).into())],
+                        ),
+                    );
+                }
+                ui.label(crate::i18n::text("repo-core-1248"));
+                ui.label(crate::i18n::text("repo-core-1249"));
+                let supported =
+                    crate::remote::is_remote(&self.repo) || cfg!(any(target_os = "linux", windows));
+                if !supported {
+                    ui.colored_label(t.danger, crate::i18n::text("repo-core-1251"));
+                }
+                ui.label(crate::i18n::text("repo-core-1252"));
+                ui.collapsing(
+                    crate::i18n::message(
+                        "repo-core-1253",
+                        &[("count", (self.preview.prerequisites.len()).into())],
+                    ),
+                    |ui| {
+                        if self.preview.prerequisites.is_empty() {
+                            ui.label(crate::i18n::text("repo-core-1254"));
+                        }
+                        for r in &self.preview.prerequisites {
+                            ui.monospace(format!("{} {}", r.oid, r.name));
+                        }
+                    },
+                );
+                let editable = self.active.is_none() && self.imported.is_empty();
+                let before = (self.prefix.clone(), self.selected.clone());
+                ui.add_enabled_ui(editable, |ui| {
+                    ui.label(crate::i18n::text("repo-core-1255"));
+                    ui.text_edit_singleline(&mut self.prefix);
+                    ui.label(crate::i18n::text("repo-core-1256"));
+                    egui::ScrollArea::vertical()
+                        .max_height(190.0)
+                        .id_salt("bundle_ref_selection")
+                        .show(ui, |ui| {
+                            for r in &self.preview.refs {
+                                let mut selected = self.selected.contains(&r.name);
+                                if ui
+                                    .checkbox(&mut selected, format!("{} · {}", r.name, r.oid))
+                                    .changed()
+                                {
+                                    if selected {
+                                        self.selected.insert(r.name.clone());
+                                    } else {
+                                        self.selected.remove(&r.name);
+                                    }
+                                }
+                            }
+                        });
+                });
+                if before != (self.prefix.clone(), self.selected.clone()) {
+                    self.confirm = false;
+                }
+                let mapping =
+                    crate::git::import_mapping(&self.preview.refs, &self.selected, &self.prefix);
+                egui::CollapsingHeader::new(crate::i18n::text("repo-core-1258"))
+                    .default_open(true)
+                    .show(ui, |ui| {
+                        egui::ScrollArea::vertical()
+                            .max_height(160.0)
+                            .id_salt("bundle_exact_refs")
+                            .show(ui, |ui| match &mapping {
+                                Ok(refs) => {
+                                    for r in refs {
+                                        ui.monospace(format!("{} {}", r.oid, r.name));
+                                    }
+                                }
+                                Err(e) => {
+                                    ui.colored_label(t.danger, e);
+                                }
+                            });
+                    });
+                if self.verified {
+                    ui.label(crate::i18n::text("repo-core-1260"));
+                }
+                if !self.imported.is_empty() {
+                    ui.label(crate::i18n::text("repo-core-1261"));
+                    for r in &self.imported {
+                        ui.horizontal(|ui| {
+                            ui.monospace(&r.name);
+                            if ui
+                                .small_button(crate::i18n::text("repo-core-1262"))
+                                .clicked()
+                            {
+                                ui.ctx().copy_text(r.name.clone());
+                            }
+                        });
+                    }
+                }
+                if let Some(error) = &self.error {
+                    ui.colored_label(t.danger, error);
+                }
+                if self.active.is_some() {
+                    ui.add(crate::spinner::Spinner::new());
+                    if ui.button(crate::i18n::text("repo-core-1263")).clicked() {
+                        if let Some(token) = &self.active {
+                            token.cancel();
                         }
                     }
-                });
-            });
-            if before != (self.prefix.clone(), self.selected.clone()) { self.confirm = false; }
-            let mapping = crate::git::import_mapping(&self.preview.refs, &self.selected, &self.prefix);
-            egui::CollapsingHeader::new(crate::i18n::text("repo-core-1258")).default_open(true).show(ui, |ui| {
-                egui::ScrollArea::vertical().max_height(160.0).id_salt("bundle_exact_refs").show(ui, |ui| {
-                    match &mapping { Ok(refs) => { for r in refs { ui.monospace(format!("{} {}", r.oid, r.name)); } },
-                        Err(e) => { ui.colored_label(t.danger, e); } }
-                });
-            });
-            if self.verified { ui.label(crate::i18n::text("repo-core-1260")); }
-            if !self.imported.is_empty() {
-                ui.label(crate::i18n::text("repo-core-1261"));
-                for r in &self.imported { ui.horizontal(|ui| { ui.monospace(&r.name); if ui.small_button(crate::i18n::text("repo-core-1262")).clicked() { ui.ctx().copy_text(r.name.clone()); } }); }
-            }
-            if let Some(error) = &self.error { ui.colored_label(t.danger, error); }
-            if self.active.is_some() {
-                ui.add(crate::spinner::Spinner::new());
-                if ui.button(crate::i18n::text("repo-core-1263")).clicked() { if let Some(token) = &self.active { token.cancel(); } }
-            } else if self.imported.is_empty() {
-                ui.add_enabled_ui(supported && mapping.is_ok(), |ui| {
-                    ui.checkbox(&mut self.consent, crate::i18n::text("repo-core-1264"));
-                    if ui.add_enabled(self.consent, egui::Button::new(crate::i18n::text("repo-core-1265"))).clicked() { self.start(false, ui.ctx()); }
-                    ui.add_enabled_ui(self.verified, |ui| {
-                        ui.checkbox(&mut self.confirm, crate::i18n::message("repo-core-1266", &[("count", (self.selected.len()).into()), ("prefix", format!("{}", self.prefix).into())]));
-                        if ui.add_enabled(self.confirm, egui::Button::new(crate::i18n::text("repo-core-1267"))).clicked() { self.start(true, ui.ctx()); }
+                } else if self.imported.is_empty() {
+                    ui.add_enabled_ui(supported && mapping.is_ok(), |ui| {
+                        ui.checkbox(&mut self.consent, crate::i18n::text("repo-core-1264"));
+                        if ui
+                            .add_enabled(
+                                self.consent,
+                                egui::Button::new(crate::i18n::text("repo-core-1265")),
+                            )
+                            .clicked()
+                        {
+                            self.start(false, ui.ctx());
+                        }
+                        ui.add_enabled_ui(self.verified, |ui| {
+                            ui.checkbox(
+                                &mut self.confirm,
+                                crate::i18n::message(
+                                    "repo-core-1266",
+                                    &[
+                                        ("count", (self.selected.len()).into()),
+                                        ("prefix", format!("{}", self.prefix).into()),
+                                    ],
+                                ),
+                            );
+                            if ui
+                                .add_enabled(
+                                    self.confirm,
+                                    egui::Button::new(crate::i18n::text("repo-core-1267")),
+                                )
+                                .clicked()
+                            {
+                                self.start(true, ui.ctx());
+                            }
+                        });
                     });
-                });
-            }
-            if ui.button(if self.imported.is_empty() { crate::i18n::text("repo-core-0595") } else { crate::i18n::text("repo-core-1268") }).clicked() {
-                outcome = if self.imported.is_empty() { Outcome::Cancel } else { Outcome::Done(Box::new(Action::Reload)) };
-            }
-        });
+                }
+                if ui
+                    .button(if self.imported.is_empty() {
+                        crate::i18n::text("repo-core-0595")
+                    } else {
+                        crate::i18n::text("repo-core-1268")
+                    })
+                    .clicked()
+                {
+                    outcome = if self.imported.is_empty() {
+                        Outcome::Cancel
+                    } else {
+                        Outcome::Done(Box::new(Action::Reload))
+                    };
+                }
+            });
         outcome
     }
 }

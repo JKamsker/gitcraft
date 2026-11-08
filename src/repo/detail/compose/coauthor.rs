@@ -63,7 +63,10 @@ impl RepoTab {
                     Some(Ok(all)) => {
                         let shown = filtered(all, filter, &me);
                         if shown.is_empty() {
-                            ui.label(RichText::new(crate::i18n::text("repo-core-0944")).color(t.text_faint));
+                            ui.label(
+                                RichText::new(crate::i18n::text("repo-core-0944"))
+                                    .color(t.text_faint),
+                            );
                         }
                         egui::ScrollArea::vertical()
                             .max_height(260.0)
@@ -73,8 +76,14 @@ impl RepoTab {
                                     let r =
                                         ui.add_enabled(!busy, egui::Button::new(text).truncate());
                                     let plural = if a.commits == 1 { "" } else { "s" };
-                                    if r.on_hover_text(crate::i18n::message("repo-core-0945", &[("commits", format!("{}", a.commits).into()), ("plural", format!("{}", plural).into())]))
-                                        .clicked()
+                                    if r.on_hover_text(crate::i18n::message(
+                                        "repo-core-0945",
+                                        &[
+                                            ("commits", format!("{}", a.commits).into()),
+                                            ("plural", format!("{}", plural).into()),
+                                        ],
+                                    ))
+                                    .clicked()
                                     {
                                         picked = Some(a.clone());
                                     }
@@ -126,10 +135,8 @@ impl RepoTab {
                         if super::join_message(&tab.commit_summary, &tab.commit_body) == before {
                             tab.set_message(&message);
                         } else {
-                            tab.compose.notice = Some(
-                                crate::i18n::text("repo-core-0946")
-                                    .to_owned(),
-                            );
+                            tab.compose.notice =
+                                Some(crate::i18n::text("repo-core-0946").to_owned());
                         }
                     }
                     Err(e) => tab.compose.notice = Some(e),

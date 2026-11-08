@@ -349,7 +349,10 @@ impl Compare {
         if data.to.as_deref() == Some(rev) {
             Some(self.target_label.clone())
         } else if data.from == rev && self.since_fork {
-            Some(format!("merge base {}", short(rev)))
+            Some(crate::i18n::message(
+                "repo-core-3619",
+                &[("rev", format!("{}", short(rev)).into())],
+            ))
         } else if data.from == rev {
             Some(self.base_label.clone())
         } else {

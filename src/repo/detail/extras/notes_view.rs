@@ -21,21 +21,34 @@ pub(super) fn section(
         None => Summary::Loading,
         Some(Err(_)) => Summary::Text(crate::i18n::text("repo-core-1081").to_owned(), t.danger),
         Some(Ok(Some(text))) => Summary::Text(first_line(text), t.text_dim),
-        Some(Ok(None)) => Summary::Text(crate::i18n::message("repo-core-1103", &[("namespace", format!("{}", namespace).into())]), t.text_faint),
+        Some(Ok(None)) => Summary::Text(
+            crate::i18n::message(
+                "repo-core-1103",
+                &[("namespace", format!("{}", namespace).into())],
+            ),
+            t.text_faint,
+        ),
     };
     let has_note = matches!(notes.note, Some(Ok(Some(_))));
-    section::section(ui, crate::i18n::text("repo-core-1104"), summary, has_note, None, |ui| {
-        namespace_picker(ui, notes, cmds);
-        if let Some(e) = &notes.error {
-            section::error(ui, e);
-        }
-        match notes.draft.take() {
-            Some(draft) => notes.draft = editor(ui, notes.saving, idle, draft, cmds),
-            None => note(ui, notes, idle, cmds),
-        }
-        ui.add_space(4.0);
-        share(ui, notes, remotes, idle, cmds);
-    });
+    section::section(
+        ui,
+        crate::i18n::text("repo-core-1104"),
+        summary,
+        has_note,
+        None,
+        |ui| {
+            namespace_picker(ui, notes, cmds);
+            if let Some(e) = &notes.error {
+                section::error(ui, e);
+            }
+            match notes.draft.take() {
+                Some(draft) => notes.draft = editor(ui, notes.saving, idle, draft, cmds),
+                None => note(ui, notes, idle, cmds),
+            }
+            ui.add_space(4.0);
+            share(ui, notes, remotes, idle, cmds);
+        },
+    );
 }
 
 /// The note's first line, for the header.
@@ -76,7 +89,10 @@ fn namespace_choices(ui: &mut Ui, notes: &mut Notes, current: &str, cmds: &mut V
                 }
             })
             .response
-            .on_hover_text(crate::i18n::message("repo-core-1108", &[("current", format!("{}", current).into())]));
+            .on_hover_text(crate::i18n::message(
+                "repo-core-1108",
+                &[("current", format!("{}", current).into())],
+            ));
         let field = ui.add(
             egui::TextEdit::singleline(&mut notes.new_namespace)
                 .hint_text(crate::i18n::text("repo-core-1109"))
@@ -84,7 +100,14 @@ fn namespace_choices(ui: &mut Ui, notes: &mut Notes, current: &str, cmds: &mut V
         );
         let typed = !notes.new_namespace.trim().is_empty();
         let enter = field.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
-        if ui.add_enabled(typed, egui::Button::new(crate::i18n::text("repo-core-1110"))).clicked() || (enter && typed) {
+        if ui
+            .add_enabled(
+                typed,
+                egui::Button::new(crate::i18n::text("repo-core-1110")),
+            )
+            .clicked()
+            || (enter && typed)
+        {
             cmds.push(ExtrasCmd::PickNamespace(notes.new_namespace.clone()));
         }
     });
@@ -100,7 +123,10 @@ fn note(ui: &mut Ui, notes: &mut Notes, idle: bool, cmds: &mut Vec<ExtrasCmd>) {
         Some(Ok(None)) => {
             section::faint(ui, crate::i18n::text("repo-core-1112"));
             if ui
-                .add_enabled(!busy, egui::Button::new(crate::i18n::text("repo-core-1113")))
+                .add_enabled(
+                    !busy,
+                    egui::Button::new(crate::i18n::text("repo-core-1113")),
+                )
                 .clicked()
             {
                 notes.draft = Some(String::new());
@@ -120,7 +146,10 @@ fn note(ui: &mut Ui, notes: &mut Notes, idle: bool, cmds: &mut Vec<ExtrasCmd>) {
                 if notes.confirm_delete {
                     ui.label(RichText::new(crate::i18n::text("repo-core-1114")).color(t.danger));
                     if ui
-                        .add_enabled(!busy && idle, egui::Button::new(crate::i18n::text("repo-core-1115")))
+                        .add_enabled(
+                            !busy && idle,
+                            egui::Button::new(crate::i18n::text("repo-core-1115")),
+                        )
                         .clicked()
                     {
                         cmds.push(ExtrasCmd::DeleteNote);
@@ -129,11 +158,20 @@ fn note(ui: &mut Ui, notes: &mut Notes, idle: bool, cmds: &mut Vec<ExtrasCmd>) {
                         notes.confirm_delete = false;
                     }
                 } else {
-                    if ui.add_enabled(!busy, egui::Button::new(crate::i18n::text("repo-core-1116"))).clicked() {
+                    if ui
+                        .add_enabled(
+                            !busy,
+                            egui::Button::new(crate::i18n::text("repo-core-1116")),
+                        )
+                        .clicked()
+                    {
                         notes.draft = Some(text.trim_end().to_owned());
                     }
                     if ui
-                        .add_enabled(!busy, egui::Button::new(crate::i18n::text("repo-core-1117")))
+                        .add_enabled(
+                            !busy,
+                            egui::Button::new(crate::i18n::text("repo-core-1117")),
+                        )
                         .clicked()
                     {
                         notes.confirm_delete = true;
@@ -173,13 +211,17 @@ fn editor(
     ui.horizontal(|ui| {
         // Not while an operation runs: a notes fetch or push would hold the same ref.
         let can_save = !saving && idle && !draft.trim().is_empty();
-        if widgets::primary_button(ui, crate::i18n::text("repo-core-1119"), can_save, 90.0).clicked()
+        if widgets::primary_button(ui, crate::i18n::text("repo-core-1119"), can_save, 90.0)
+            .clicked()
             || (save_keys && can_save)
         {
             cmds.push(ExtrasCmd::SaveNote(draft.clone()));
         }
         if ui
-            .add_enabled(!saving, egui::Button::new(crate::i18n::text("repo-core-0443")))
+            .add_enabled(
+                !saving,
+                egui::Button::new(crate::i18n::text("repo-core-0443")),
+            )
             .clicked()
         {
             keep = false;
@@ -188,7 +230,10 @@ fn editor(
             ui.add(crate::spinner::Spinner::new().size(12.0));
         } else {
             ui.label(
-                RichText::new(crate::i18n::message("repo-core-1120", &[("command", format!("{}", crate::manual::command()).into())]))
+                RichText::new(crate::i18n::message(
+                    "repo-core-1120",
+                    &[("command", format!("{}", crate::manual::command()).into())],
+                ))
                 .small()
                 .color(t.text_faint),
             );
@@ -230,19 +275,37 @@ fn share(
             });
         let fetch = ui
             .add_enabled(idle, egui::Button::new(crate::i18n::text("repo-core-1123")))
-            .on_hover_text(crate::i18n::message("repo-core-1124", &[("namespace", format!("{}", namespace).into()), ("remote", format!("{}", remote).into())]))
+            .on_hover_text(crate::i18n::message(
+                "repo-core-1124",
+                &[
+                    ("namespace", format!("{}", namespace).into()),
+                    ("remote", format!("{}", remote).into()),
+                ],
+            ))
             .on_disabled_hover_text(crate::i18n::text("repo-core-1125"));
         if fetch.clicked() {
             cmds.push(ExtrasCmd::FetchNotes(remote.clone()));
         }
         let has_notes = notes.existing.contains(&namespace);
         let push = ui
-            .add_enabled(idle && has_notes, egui::Button::new(crate::i18n::text("repo-core-1126")))
-            .on_hover_text(crate::i18n::message("repo-core-1127", &[("namespace", format!("{}", namespace).into()), ("remote", format!("{}", remote).into())]))
+            .add_enabled(
+                idle && has_notes,
+                egui::Button::new(crate::i18n::text("repo-core-1126")),
+            )
+            .on_hover_text(crate::i18n::message(
+                "repo-core-1127",
+                &[
+                    ("namespace", format!("{}", namespace).into()),
+                    ("remote", format!("{}", remote).into()),
+                ],
+            ))
             .on_disabled_hover_text(if has_notes {
                 crate::i18n::text("repo-core-1125").to_owned()
             } else {
-                crate::i18n::message("repo-core-1128", &[("namespace", format!("{}", namespace).into())])
+                crate::i18n::message(
+                    "repo-core-1128",
+                    &[("namespace", format!("{}", namespace).into())],
+                )
             });
         if push.clicked() {
             cmds.push(ExtrasCmd::PushNotes(remote.clone()));

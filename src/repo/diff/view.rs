@@ -97,14 +97,35 @@ impl RepoTab {
                     ui.label(crate::i18n::text("repo-core-2345"));
                 }
                 let mut encoding = view.encrypted.json_encoding;
-                egui::ComboBox::from_id_salt("sops_json_encoding").selected_text(encoding.label()).show_ui(ui, |ui| {
-                    use super::encrypted::JsonEncoding;
-                    for choice in [JsonEncoding::Ask,JsonEncoding::Document,JsonEncoding::Binary] { ui.selectable_value(&mut encoding,choice,choice.label()); }
-                });
-                if encoding != view.encrypted.json_encoding { acts.push(Action::DiffDecryptedEncoding(encoding)); }
+                egui::ComboBox::from_id_salt("sops_json_encoding")
+                    .selected_text(encoding.label())
+                    .show_ui(ui, |ui| {
+                        use super::encrypted::JsonEncoding;
+                        for choice in [
+                            JsonEncoding::Ask,
+                            JsonEncoding::Document,
+                            JsonEncoding::Binary,
+                        ] {
+                            ui.selectable_value(&mut encoding, choice, choice.label());
+                        }
+                    });
+                if encoding != view.encrypted.json_encoding {
+                    acts.push(Action::DiffDecryptedEncoding(encoding));
+                }
                 if view.encrypted.enabled {
-                    if ui.button(crate::i18n::text("repo-core-2347")).clicked() { acts.push(Action::DiffDecrypted(false)); }
-                } else if ui.add_enabled(idle && !self.loading && view.request == view.data_request, egui::Button::new(crate::i18n::text("repo-core-2348"))).on_hover_text(crate::i18n::text("repo-core-2349")).clicked() { acts.push(Action::DiffDecrypted(true)); }
+                    if ui.button(crate::i18n::text("repo-core-2347")).clicked() {
+                        acts.push(Action::DiffDecrypted(false));
+                    }
+                } else if ui
+                    .add_enabled(
+                        idle && !self.loading && view.request == view.data_request,
+                        egui::Button::new(crate::i18n::text("repo-core-2348")),
+                    )
+                    .on_hover_text(crate::i18n::text("repo-core-2349"))
+                    .clicked()
+                {
+                    acts.push(Action::DiffDecrypted(true));
+                }
             });
         }
         if view.encrypted.enabled {
@@ -417,7 +438,10 @@ impl RepoTab {
         match key {
             DiffKey::Commit { hash, path } => (
                 path.clone(),
-                crate::i18n::message("repo-core-2355", &[("hash", format!("{}", hash.get(..8).unwrap_or(hash)).into())]),
+                crate::i18n::message(
+                    "repo-core-2355",
+                    &[("hash", format!("{}", hash.get(..8).unwrap_or(hash)).into())],
+                ),
             ),
             DiffKey::Work(file) => (
                 file.path.clone(),
@@ -517,7 +541,9 @@ impl RepoTab {
                         widgets::chip(ui, crate::i18n::text("repo-core-2360"), t.warning);
                     }
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if icons::small_button(ui, "x", crate::i18n::text("repo-core-0711")).clicked() {
+                        if icons::small_button(ui, "x", crate::i18n::text("repo-core-0711"))
+                            .clicked()
+                        {
                             acts.push(Action::CloseDiff);
                         }
                         popout::button(ui, Panel::Diff, !self.docked(Panel::Diff), acts);
@@ -604,7 +630,14 @@ impl RepoTab {
                             ui.add_space(4.0);
                         }
                         let on = usize::from(as_file);
-                        if let Some(i) = widgets::switch(ui, &[crate::i18n::text("repo-core-2367"), crate::i18n::text("repo-core-2368")], on) {
+                        if let Some(i) = widgets::switch(
+                            ui,
+                            &[
+                                crate::i18n::text("repo-core-2367"),
+                                crate::i18n::text("repo-core-2368"),
+                            ],
+                            on,
+                        ) {
                             acts.push(Action::DiffAsFile(i == 1));
                         }
                     });
@@ -646,9 +679,7 @@ impl RepoTab {
                     idle && self.keep_both.is_none(),
                     egui::Button::new(crate::i18n::text("repo-core-2371")),
                 )
-                .on_hover_text(
-                    crate::i18n::text("repo-core-2372"),
-                )
+                .on_hover_text(crate::i18n::text("repo-core-2372"))
                 .on_disabled_hover_text(crate::i18n::text("repo-core-2373"))
                 .clicked()
         {
@@ -698,10 +729,17 @@ impl RepoTab {
         if lines && revertable && chosen > 0 {
             let noun = if chosen == 1 { "line" } else { "lines" };
             let b = ui
-                .add_enabled(idle, egui::Button::new(format!("Revert {chosen} {noun}")))
-                .on_hover_text(
-                    crate::i18n::text("repo-core-2379"),
-                );
+                .add_enabled(
+                    idle,
+                    egui::Button::new(crate::i18n::message(
+                        "repo-core-2378",
+                        &[
+                            ("chosen", format!("{}", chosen).into()),
+                            ("noun", format!("{}", noun).into()),
+                        ],
+                    )),
+                )
+                .on_hover_text(crate::i18n::text("repo-core-2379"));
             if b.clicked() {
                 acts.push(Action::PickLines {
                     pick: Pick::Revert,
@@ -715,9 +753,7 @@ impl RepoTab {
         }
         let b = ui
             .add_enabled(idle, egui::Button::new(crate::i18n::text("repo-core-2380")))
-            .on_hover_text(
-                crate::i18n::text("repo-core-2381"),
-            );
+            .on_hover_text(crate::i18n::text("repo-core-2381"));
         if b.clicked() {
             acts.push(Action::RevertFile {
                 hash: hash.to_owned(),
@@ -738,7 +774,10 @@ impl RepoTab {
         };
         match to {
             Some(to) => format!("{} → {}", name(from), name(to)),
-            None => crate::i18n::message("repo-core-2382", &[("from", format!("{}", name(from)).into())]),
+            None => crate::i18n::message(
+                "repo-core-2382",
+                &[("from", format!("{}", name(from)).into())],
+            ),
         }
     }
 }
@@ -882,7 +921,27 @@ fn change_steps(ui: &mut Ui, acts: &mut Vec<Action>) {
     if icons::small_button(
         ui,
         "arrow-down",
-        &crate::i18n::message("repo-core-2399", &[("NextChange", format!("{}", crate::keymap::label(ui.ctx(), crate::keymap::Command::NextChange)).into()), ("NextChangeAlt", format!("{}", crate::keymap::label(ui.ctx(), crate::keymap::Command::NextChangeAlt)).into())]),
+        &crate::i18n::message(
+            "repo-core-2399",
+            &[
+                (
+                    "NextChange",
+                    format!(
+                        "{}",
+                        crate::keymap::label(ui.ctx(), crate::keymap::Command::NextChange)
+                    )
+                    .into(),
+                ),
+                (
+                    "NextChangeAlt",
+                    format!(
+                        "{}",
+                        crate::keymap::label(ui.ctx(), crate::keymap::Command::NextChangeAlt)
+                    )
+                    .into(),
+                ),
+            ],
+        ),
     )
     .clicked()
     {
@@ -891,7 +950,27 @@ fn change_steps(ui: &mut Ui, acts: &mut Vec<Action>) {
     if icons::small_button(
         ui,
         "arrow-up",
-        &crate::i18n::message("repo-core-2401", &[("PreviousChange", format!("{}", crate::keymap::label(ui.ctx(), crate::keymap::Command::PreviousChange)).into()), ("PreviousChangeAlt", format!("{}", crate::keymap::label(ui.ctx(), crate::keymap::Command::PreviousChangeAlt)).into())]),
+        &crate::i18n::message(
+            "repo-core-2401",
+            &[
+                (
+                    "PreviousChange",
+                    format!(
+                        "{}",
+                        crate::keymap::label(ui.ctx(), crate::keymap::Command::PreviousChange)
+                    )
+                    .into(),
+                ),
+                (
+                    "PreviousChangeAlt",
+                    format!(
+                        "{}",
+                        crate::keymap::label(ui.ctx(), crate::keymap::Command::PreviousChangeAlt)
+                    )
+                    .into(),
+                ),
+            ],
+        ),
     )
     .clicked()
     {
@@ -939,7 +1018,10 @@ fn ready_data<'a>(
         if let Some(lfs) = &data.lfs {
             find.rendered(ui, identity, |t| {
                 let mut doc = find::rendered::Document::default();
-                for (side, pointer) in [(crate::i18n::text("repo-core-1564"), &lfs.old), (crate::i18n::text("repo-core-1565"), &lfs.new)] {
+                for (side, pointer) in [
+                    (crate::i18n::text("repo-core-1564"), &lfs.old),
+                    (crate::i18n::text("repo-core-1565"), &lfs.new),
+                ] {
                     if let Some(pointer) = pointer {
                         doc.text(
                             &format!(
@@ -956,9 +1038,7 @@ fn ready_data<'a>(
             return None;
         }
         if data.compare.is_some() || data.image.is_some() {
-            ui.label(
-                crate::i18n::text("repo-core-2404"),
-            );
+            ui.label(crate::i18n::text("repo-core-2404"));
         }
     }
     if let Some(lfs) = &data.lfs {
@@ -978,7 +1058,10 @@ fn ready_data<'a>(
                 {
                     acts.push(Action::DiffSvgSource(false));
                 }
-                if ui.selectable_label(view.svg_source, crate::i18n::text("repo-core-2406")).clicked() {
+                if ui
+                    .selectable_label(view.svg_source, crate::i18n::text("repo-core-2406"))
+                    .clicked()
+                {
                     acts.push(Action::DiffSvgSource(true));
                 }
             });

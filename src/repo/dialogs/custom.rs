@@ -90,7 +90,11 @@ fn ask(
         ui.add_space(6.0);
     }
     *focus = false;
-    ui.label(RichText::new(crate::i18n::text("repo-core-1287")).color(t.text_dim).small());
+    ui.label(
+        RichText::new(crate::i18n::text("repo-core-1287"))
+            .color(t.text_dim)
+            .small(),
+    );
     command_line(ui, "custom-ask", &command.command);
     ui.add_space(12.0);
     // Enter runs it only from an answer typed: a confirmation alone wants a click, so that a
@@ -173,7 +177,13 @@ fn review(ui: &mut Ui, repo: &str, file: &RepoFile) -> Outcome {
     title(
         ui,
         crate::i18n::text("repo-core-1292"),
-        &crate::i18n::message("repo-core-1293", &[("REPO-FILE", format!("{}", cc::REPO_FILE).into()), ("repo", format!("{}", repo).into())]),
+        &crate::i18n::message(
+            "repo-core-1293",
+            &[
+                ("REPO-FILE", format!("{}", cc::REPO_FILE).into()),
+                ("repo", format!("{}", repo).into()),
+            ],
+        ),
         &t,
     );
     let commands = match &file.commands {
@@ -201,7 +211,13 @@ fn review(ui: &mut Ui, repo: &str, file: &RepoFile) -> Outcome {
                         .wrap(),
                 );
                 ui.label(
-                    RichText::new(crate::i18n::message("repo-core-1296", &[("label", format!("{}", c.placement.label()).into()), ("label2", format!("{}", c.output.label()).into())]))
+                    RichText::new(crate::i18n::message(
+                        "repo-core-1296",
+                        &[
+                            ("label", format!("{}", c.placement.label()).into()),
+                            ("label2", format!("{}", c.output.label()).into()),
+                        ],
+                    ))
                     .color(t.text_faint)
                     .small(),
                 );
@@ -213,12 +229,21 @@ fn review(ui: &mut Ui, repo: &str, file: &RepoFile) -> Outcome {
                     );
                 }
                 for p in &c.prompts {
-                    let mut asks = crate::i18n::message("repo-core-1298", &[("variable", format!("{}", p.variable).into()), ("label", format!("{}", p.kind.label()).into())]);
+                    let mut asks = crate::i18n::message(
+                        "repo-core-1298",
+                        &[
+                            ("variable", format!("{}", p.variable).into()),
+                            ("label", format!("{}", p.kind.label()).into()),
+                        ],
+                    );
                     if !p.label.trim().is_empty() {
                         asks.push_str(&format!(": {}", p.label.trim()));
                     }
                     if !p.default.is_empty() {
-                        asks.push_str(&crate::i18n::message("repo-core-1299", &[("default", format!("{}", p.default).into())]));
+                        asks.push_str(&crate::i18n::message(
+                            "repo-core-1299",
+                            &[("default", format!("{}", p.default).into())],
+                        ));
                     }
                     ui.label(RichText::new(asks).color(t.text_dim).small());
                 }
@@ -228,10 +253,16 @@ fn review(ui: &mut Ui, repo: &str, file: &RepoFile) -> Outcome {
         });
     ui.add_space(8.0);
     let (digest, count) = (file.digest.clone(), commands.len());
-    buttons(ui, crate::i18n::text("repo-core-1300"), true, false, move || {
-        Action::Custom(CustomAct::Trust {
-            digest,
-            commands: count,
-        })
-    })
+    buttons(
+        ui,
+        crate::i18n::text("repo-core-1300"),
+        true,
+        false,
+        move || {
+            Action::Custom(CustomAct::Trust {
+                digest,
+                commands: count,
+            })
+        },
+    )
 }

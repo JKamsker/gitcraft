@@ -36,7 +36,7 @@ impl RepoTab {
                 default_open: true,
                 button: Some(Button {
                     icon: "git-branch-plus",
-                    tooltip: "Start work from an issue assigned to you…",
+                    tooltip: crate::i18n::text("repo-core-3447"),
                     action: Some(Action::Issue(IssueAct::OpenPicker)),
                 }),
             },
@@ -117,13 +117,17 @@ impl RepoTab {
         let sub = format!(
             "{}{} · {}{}",
             if moved {
-                "changed since you last looked · "
+                crate::i18n::text("repo-core-3449")
             } else {
                 ""
             },
             pr.branch,
             pr.author,
-            if pr.draft { " · draft" } else { "" }
+            if pr.draft {
+                crate::i18n::text("repo-core-3450")
+            } else {
+                ""
+            }
         );
         let sub = p.text(
             pos2(rect.left() + 48.0, y + 8.0),
@@ -150,15 +154,9 @@ impl RepoTab {
             crate::repo::versions::VersionsAct::PrSeen(pr.number),
         ));
         let r = r.on_hover_text(if has_view {
-            format!(
-                "{}\nClick to show its changes; double-click to open details",
-                pr.url
-            )
+            crate::i18n::message("repo-core-3451", &[("url", format!("{}", pr.url).into())])
         } else {
-            format!(
-                "{}\nClick to show its changes; double-click to open in the browser",
-                pr.url
-            )
+            crate::i18n::message("repo-core-3452", &[("url", format!("{}", pr.url).into())])
         });
         let r = match badges {
             Some(why) => r.on_hover_text(why),
@@ -178,14 +176,14 @@ impl RepoTab {
             .style(crate::theme::menu_style)
             .show(|ui| {
                 if has_view
-                    && crate::menu_item::MenuItem::new("Open")
+                    && crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-3453"))
                         .icon("eye")
                         .show(ui)
                         .clicked()
                 {
                     acts.push(Action::OpenPr(pr.number));
                 }
-                if crate::menu_item::MenuItem::new("Open in the browser")
+                if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-3454"))
                     .icon("external-link")
                     .show(ui)
                     .clicked()
@@ -199,11 +197,14 @@ impl RepoTab {
                 }
                 self.pr_since_items(ui, acts, pr);
                 self.pr_worktree_button(ui, acts, pr.number, &pr.branch, &pr.sha, idle, true);
-                if crate::menu_item::MenuItem::new(format!("Check out {}", pr.branch))
-                    .icon("log-in")
-                    .enabled(idle)
-                    .show(ui)
-                    .clicked()
+                if crate::menu_item::MenuItem::new(crate::i18n::message(
+                    "repo-core-3455",
+                    &[("branch", format!("{}", pr.branch).into())],
+                ))
+                .icon("log-in")
+                .enabled(idle)
+                .show(ui)
+                .clicked()
                 {
                     if self.refs.local.iter().any(|b| b.name == pr.branch) {
                         acts.push(Action::Checkout(pr.branch.clone()));
@@ -215,7 +216,7 @@ impl RepoTab {
                     }
                 }
                 self.fork_items(ui, acts, pr.number, idle, false);
-                if crate::menu_item::MenuItem::new("Copy URL")
+                if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-3456"))
                     .icon("copy")
                     .show(ui)
                     .clicked()
@@ -279,20 +280,26 @@ impl RepoTab {
     ) {
         let plan = self.pr_worktree_plan(number, branch, sha);
         let (enabled, tip) = match &plan {
-            PrWorktree::Here => (false, "Its branch is checked out here".to_owned()),
-            PrWorktree::Open(path) => (true, format!("Opens {}", crate::remote::display(path))),
+            PrWorktree::Here => (false, crate::i18n::text("repo-core-3457").to_owned()),
+            PrWorktree::Open(path) => (
+                true,
+                crate::i18n::message(
+                    "repo-core-3458",
+                    &[("path", format!("{}", crate::remote::display(path)).into())],
+                ),
+            ),
             PrWorktree::Create { path, .. } => (
                 idle,
-                format!(
-                    "Makes a worktree in {} and opens it",
-                    crate::remote::display(path)
+                crate::i18n::message(
+                    "repo-core-3459",
+                    &[("path", format!("{}", crate::remote::display(path)).into())],
                 ),
             ),
         };
         let r = if in_menu {
             // Why it can't open, under it; what it would do, on hover.
             let here = matches!(plan, PrWorktree::Here);
-            MenuItem::new("Open in worktree")
+            MenuItem::new(crate::i18n::text("repo-core-3460"))
                 .icon("folder-git-2")
                 .enabled(enabled || here)
                 .refused(here.then_some(tip.as_str()))
@@ -304,7 +311,7 @@ impl RepoTab {
             let t = Tokens::get(ui.ctx());
             let button = egui::Button::image_and_text(
                 icons::image("folder-git-2", 14.0, t.icon),
-                "Open in worktree",
+                crate::i18n::text("repo-core-3460"),
             )
             .min_size(vec2(0.0, 26.0));
             ui.add_enabled(enabled, button)
@@ -331,7 +338,13 @@ impl RepoTab {
     ) {
         match self.pr_worktree_plan(number, branch, sha) {
             PrWorktree::Here => {
-                self.status = Some((format!("#{number}'s branch is checked out here"), false));
+                self.status = Some((
+                    crate::i18n::message(
+                        "repo-core-3461",
+                        &[("number", format!("{}", number).into())],
+                    ),
+                    false,
+                ));
             }
             PrWorktree::Open(path) => {
                 self.open_request = Some(crate::repo::OpenRequest::Worktree(path));
@@ -340,7 +353,10 @@ impl RepoTab {
                 if self.busy_op.is_some() {
                     return;
                 }
-                let label = format!("Open #{number} in a worktree");
+                let label = crate::i18n::message(
+                    "repo-core-3462",
+                    &[("number", format!("{}", number).into())],
+                );
                 self.open_when_done = Some((label.clone(), path));
                 self.run_ops(
                     &label,

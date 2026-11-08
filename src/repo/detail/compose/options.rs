@@ -43,9 +43,7 @@ impl RepoTab {
                 ui.separator();
                 let mut run_hook = !store.no_hook_prefill;
                 ui.checkbox(&mut run_hook, crate::i18n::text("repo-core-0968"))
-                    .on_hover_text(
-                        crate::i18n::text("repo-core-0969"),
-                    );
+                    .on_hover_text(crate::i18n::text("repo-core-0969"));
                 store.no_hook_prefill = !run_hook;
                 ui.separator();
                 rules_ui(ui, &mut store.issue_rules, draft, forge.as_ref());
@@ -64,9 +62,16 @@ fn rules_ui(
     forge: Option<&IssueRule>,
 ) {
     let t = Tokens::get(ui.ctx());
-    ui.label(RichText::new(crate::i18n::text("repo-core-0970")).color(t.text_faint).small());
+    ui.label(
+        RichText::new(crate::i18n::text("repo-core-0970"))
+            .color(t.text_faint)
+            .small(),
+    );
     let forge_note = match forge {
-        Some(f) => crate::i18n::message("repo-core-0971", &[("replace", format!("{}", f.url.replace("$1", "12")).into())]),
+        Some(f) => crate::i18n::message(
+            "repo-core-0971",
+            &[("replace", format!("{}", f.url.replace("$1", "12")).into())],
+        ),
         None => crate::i18n::text("repo-core-0972").to_owned(),
     };
     ui.label(RichText::new(forge_note).color(t.text_dim).small());
@@ -134,7 +139,10 @@ pub fn add_rule(rules: &mut Vec<IssueRule>, rule: &IssueRule) -> Result<(), Stri
         return Err(crate::i18n::text("repo-core-0978").to_owned());
     }
     if rules.len() >= MAX_RULES {
-        return Err(crate::i18n::message("repo-core-0979", &[("MAX-RULES", format!("{}", MAX_RULES).into())]));
+        return Err(crate::i18n::message(
+            "repo-core-0979",
+            &[("MAX-RULES", format!("{}", MAX_RULES).into())],
+        ));
     }
     rules.push(rule);
     Ok(())

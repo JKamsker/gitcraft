@@ -223,7 +223,10 @@ fn finish_budget(
     within_budget: &dyn Fn() -> bool,
 ) -> Vec<Forecast> {
     if requested() && !within_budget() {
-        rows.extend(unfinished(&plan[rows.len()..], "Forecast time budget exceeded; this position was not checked. Recheck rebase weather to try again."));
+        rows.extend(unfinished(
+            &plan[rows.len()..],
+            crate::i18n::text("repo-core-3255"),
+        ));
     }
     rows
 }
@@ -283,15 +286,14 @@ fn replay_rows(
                     applied.forecast,
                     Forecast::Conflict(_) | Forecast::Unknown(_)
                 ) {
-                    blocked = Some("Not checked: an earlier commit conflicts. Resolve it before later positions can be predicted.".to_owned());
+                    blocked = Some(crate::i18n::text("repo-core-3256").to_owned());
                 }
                 tree = applied.tree;
                 rows.push(applied.forecast);
             }
             Err(e) => {
-                let reason = format!(
-                    "Forecast unavailable (requires Git with --attr-source and merge-tree --write-tree --merge-base): {e}"
-                );
+                let reason =
+                    crate::i18n::message("repo-core-3257", &[("e", format!("{}", e).into())]);
                 blocked = Some(reason.clone());
                 rows.push(Forecast::Unknown(reason));
             }
@@ -412,26 +414,34 @@ fn apply(
         let mut conflicts = Vec::new();
         for path in files {
             let checked = if !mergiraf {
-                Err("Disabled in Settings".to_owned())
+                Err(crate::i18n::text("repo-core-3273").to_owned())
             } else {
-                context.bytes(&["show", "--end-of-options", &format!("{result_tree}:{path}")], &[0], active)
-                    .and_then(|bytes| String::from_utf8(bytes).map_err(|_| "Binary conflict".to_owned()))
+                context
+                    .bytes(
+                        &["show", "--end-of-options", &format!("{result_tree}:{path}")],
+                        &[0],
+                        active,
+                    )
+                    .and_then(|bytes| {
+                        String::from_utf8(bytes)
+                            .map_err(|_| crate::i18n::text("repo-core-3275").to_owned())
+                    })
                     .and_then(|text| {
                         if !text.lines().any(|line| line.starts_with("<<<<<<< ")) {
-                            return Err("Structural or binary conflict; Mergiraf cannot check this forecast".to_owned());
+                            return Err(crate::i18n::text("repo-core-3276").to_owned());
                         }
                         crate::mergiraf::solve_text(&path, &text, active)
                     })
             };
             if !active() {
-                return Err("Forecast cancelled or timed out".into());
+                return Err(crate::i18n::text("repo-core-3277").into());
             }
             let result = match checked {
                 Ok(text) if !text.lines().any(|line| line.starts_with("<<<<<<< ")) => {
-                    "Mergiraf solves the text conflict (not applied)".to_owned()
+                    crate::i18n::text("repo-core-3278").to_owned()
                 }
-                Ok(_) => "Mergiraf leaves conflicts".to_owned(),
-                Err(e) => format!("Mergiraf: {e}"),
+                Ok(_) => crate::i18n::text("repo-core-3279").to_owned(),
+                Err(e) => crate::i18n::message("repo-core-3280", &[("e", format!("{}", e).into())]),
             };
             conflicts.push((path, result));
         }
@@ -447,7 +457,7 @@ fn parse_merge(output: &str) -> Result<(String, Vec<String>), String> {
     let mut fields = output.split('\0');
     let tree = fields.next().unwrap_or_default();
     if !matches!(tree.len(), 40 | 64) || !tree.bytes().all(|b| b.is_ascii_hexdigit()) {
-        return Err("Git returned no forecast tree".to_owned());
+        return Err(crate::i18n::text("repo-core-3281").to_owned());
     }
     let mut files = Vec::new();
     for path in fields.take_while(|path| !path.is_empty()) {
@@ -460,14 +470,48 @@ fn parse_merge(output: &str) -> Result<(String, Vec<String>), String> {
 
 pub(super) fn badge(ui: &mut egui::Ui, forecast: Option<&Forecast>, dropped: bool, t: &Tokens) {
     let (icon, color, tip) = if dropped {
-        ("minus", t.text_faint, "Dropped: not replayed".to_owned())
+        (
+            "minus",
+            t.text_faint,
+            crate::i18n::text("repo-core-3282").to_owned(),
+        )
     } else {
         match forecast {
-            Some(Forecast::Clean) => ("sun", t.accent, "Applies cleanly with Git defaults and simulated-tree attributes. Source merge settings, hooks, custom drivers and global/info attributes are excluded.".to_owned()),
-            Some(Forecast::Conflict(files)) => ("cloud-lightning", t.danger, format!("Conflicts here (simulated-tree attributes):\n{}", files.iter().map(|(path, result)| format!("{path}\n  {result}")).collect::<Vec<_>>().join("\n"))),
-            Some(Forecast::Empty) => ("cloud", t.text_dim, "Becomes empty here. Git may stop for you to skip or keep this commit.".to_owned()),
+            Some(Forecast::Clean) => (
+                "sun",
+                t.accent,
+                crate::i18n::text("repo-core-3284").to_owned(),
+            ),
+            Some(Forecast::Conflict(files)) => (
+                "cloud-lightning",
+                t.danger,
+                crate::i18n::message(
+                    "repo-core-3286",
+                    &[(
+                        "n",
+                        format!(
+                            "{}",
+                            files
+                                .iter()
+                                .map(|(path, result)| format!("{path}\n  {result}"))
+                                .collect::<Vec<_>>()
+                                .join("\n")
+                        )
+                        .into(),
+                    )],
+                ),
+            ),
+            Some(Forecast::Empty) => (
+                "cloud",
+                t.text_dim,
+                crate::i18n::text("repo-core-3288").to_owned(),
+            ),
             Some(Forecast::Unknown(reason)) => ("cloud", t.text_dim, reason.clone()),
-            _ => ("cloud", t.text_faint, "Checking rebase weather…".to_owned()),
+            _ => (
+                "cloud",
+                t.text_faint,
+                crate::i18n::text("repo-core-3289").to_owned(),
+            ),
         }
     };
     ui.add(crate::icons::image(icon, 18.0, color).sense(egui::Sense::hover()))

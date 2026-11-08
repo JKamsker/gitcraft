@@ -19,14 +19,14 @@ impl RepoTab {
             (
                 "history",
                 crate::i18n::text("repo-core-0058"),
-                "Where HEAD and each branch have been",
+                crate::i18n::text("repo-core-3470"),
                 Source::head(),
                 ReflogAct::Show(Source::head()),
             ),
             (
                 "search",
                 crate::i18n::text("repo-core-0060"),
-                "Commits no branch, tag or stash has any more",
+                crate::i18n::text("repo-core-3471"),
                 Source::Lost,
                 ReflogAct::FindLost,
             ),
@@ -42,7 +42,7 @@ impl RepoTab {
             Header {
                 key: "recovery",
                 icon: "history",
-                title: "RECOVERY",
+                title: crate::i18n::text("repo-core-3472"),
                 count: found,
                 default_open: false,
                 button: None,
@@ -52,22 +52,20 @@ impl RepoTab {
             return;
         }
         if ui
-            .button("Lost and found by content…")
-            .on_hover_text(
-                "Search remembered text in reflogs, dropped stashes and unreachable blobs",
-            )
+            .button(crate::i18n::text("repo-core-3473"))
+            .on_hover_text(crate::i18n::text("repo-core-3474"))
             .clicked()
         {
             acts.push(Action::OpenContentRecovery);
         }
-        if ui.button("Earlier versions of working changes…").clicked() {
+        if ui.button(crate::i18n::text("repo-core-3475")).clicked() {
             acts.push(Action::EarlierVersions);
         }
         let t = Tokens::get(ui.ctx());
-        if ui.button("Symbol biography…").clicked() {
+        if ui.button(crate::i18n::text("repo-core-3476")).clicked() {
             acts.push(Action::OpenSymbolBiography(None));
         }
-        if ui.button("Explain line history…").clicked() {
+        if ui.button(crate::i18n::text("repo-core-3477")).clicked() {
             acts.push(Action::OpenLineDossier(None));
         }
         let shown = self.reflog.as_ref().map(|v| &v.source);

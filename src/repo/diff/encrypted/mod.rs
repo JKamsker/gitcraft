@@ -76,9 +76,7 @@ impl State {
             }
             Err(mpsc::TryRecvError::Empty) => {}
             Err(mpsc::TryRecvError::Disconnected) => {
-                self.result = Some(Err(
-                    "Decryption stopped. Return to the encrypted patch and try again.".into(),
-                ));
+                self.result = Some(Err(crate::i18n::text("repo-core-3913").into()));
                 self.receiver = None;
             }
         }
@@ -117,25 +115,23 @@ fn load(
     active: &dyn Fn() -> bool,
 ) -> Result<Comparison, String> {
     if !active() {
-        return Err("Decryption cancelled.".into());
+        return Err(crate::i18n::text("repo-core-3914").into());
     }
     // Failures are generalized so no custom CLI diagnostic or decrypted source can
     // enter app activity/output.
-    let (old, new) = private_sides(repo, key, active).map_err(|_| {
-        "Could not read both encrypted sides within 2 MiB. Refresh the encrypted patch.".to_owned()
-    })?;
+    let (old, new) = private_sides(repo, key, active)
+        .map_err(|_| crate::i18n::text("repo-core-3915").to_owned())?;
     let result =
         compare_with_encoding(key.path(), &old, &new, encoding, active, |format, input| {
             tool::decrypt(format, input, active)
         })?;
     if !active() {
-        return Err("Decryption cancelled.".into());
+        return Err(crate::i18n::text("repo-core-3914").into());
     }
-    let current = private_sides(repo, key, active).map_err(|_| {
-        "The comparison changed while decrypting. Refresh the encrypted patch.".to_owned()
-    })?;
+    let current = private_sides(repo, key, active)
+        .map_err(|_| crate::i18n::text("repo-core-3916").to_owned())?;
     if current != (old, new) {
-        return Err("The comparison changed while decrypting. Refresh the encrypted patch and choose Show decrypted again.".into());
+        return Err(crate::i18n::text("repo-core-3917").into());
     }
     Ok(result)
 }
@@ -173,15 +169,15 @@ fn await_ciphertext(
     let start = Instant::now();
     loop {
         if !active() {
-            return Err("Decryption cancelled.".into());
+            return Err(crate::i18n::text("repo-core-3914").into());
         }
         if start.elapsed() > Duration::from_secs(15) {
-            return Err("Encrypted source reading exceeded 15 seconds. Retry when the connection and background workers are available.".into());
+            return Err(crate::i18n::text("repo-core-3918").into());
         }
         match receive.recv_timeout(Duration::from_millis(20)) {
             Ok(result) => return result,
             Err(mpsc::RecvTimeoutError::Timeout) => (),
-            Err(_) => return Err("Encrypted source reader stopped.".into()),
+            Err(_) => return Err(crate::i18n::text("repo-core-3919").into()),
         }
     }
 }
@@ -208,7 +204,7 @@ fn compare_with_encoding(
     let before = inspect(path, old)?;
     let after = inspect(path, new)?;
     if before.is_none() && after.is_none() {
-        return Err("No supported SOPS metadata was found. Use the encrypted patch.".into());
+        return Err(crate::i18n::text("repo-core-3920").into());
     }
     if encoding == JsonEncoding::Ask
         && [before.as_ref(), after.as_ref()]
@@ -216,14 +212,14 @@ fn compare_with_encoding(
             .flatten()
             .any(|e| e.ambiguous_json)
     {
-        return Err("This data + sops envelope could be a JSON document or binary content. Choose JSON document or Binary envelope above, then retry. The filename cannot identify the format.".into());
+        return Err(crate::i18n::text("repo-core-3921").into());
     }
     let recipients_changed = recipients(before.as_ref()) != recipients(after.as_ref());
     let metadata_changed =
         before.as_ref().map(|e| &e.metadata) != after.as_ref().map(|e| &e.metadata);
     let mut plain = |text: &str, envelope: &Option<model::Envelope>| {
         if !active() {
-            return Err("Decryption cancelled.".into());
+            return Err(crate::i18n::text("repo-core-3914").into());
         }
         match envelope {
             Some(envelope) => {
@@ -237,10 +233,8 @@ fn compare_with_encoding(
                 // JSON encoding can escape binary NUL bytes. Validate the decoded data
                 // string too, rather than accepting those bytes as supported text.
                 if envelope.ambiguous_json && format == model::Format::Json {
-                    let value: serde_json::Value =
-                        serde_json::from_str(&decrypted).map_err(|_| {
-                            "SOPS did not return the chosen JSON document format.".to_owned()
-                        })?;
+                    let value: serde_json::Value = serde_json::from_str(&decrypted)
+                        .map_err(|_| crate::i18n::text("repo-core-3922").to_owned())?;
                     if let Some(data) = value.get("data").and_then(serde_json::Value::as_str) {
                         tool::plaintext(data.as_bytes().to_vec())?;
                     }
@@ -253,7 +247,7 @@ fn compare_with_encoding(
     let old = plain(old, &before)?;
     let new = plain(new, &after)?;
     if !active() {
-        return Err("Decryption cancelled.".into());
+        return Err(crate::i18n::text("repo-core-3914").into());
     }
     use super::line_diff::{Edit, diff_lines};
     let (mut old_number, mut new_number) = (0, 0);

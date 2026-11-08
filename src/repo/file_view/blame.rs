@@ -147,7 +147,13 @@ impl RepoTab {
                 if stop {
                     crate::repo::widgets::a11y(&gutter_resp, egui::WidgetType::Button, || {
                         let short = line.hash.get(..7).unwrap_or(&line.hash);
-                        crate::i18n::message("repo-core-2477", &[("i", format!("{}", i + 1).into()), ("short", format!("{}", short).into())])
+                        crate::i18n::message(
+                            "repo-core-2477",
+                            &[
+                                ("i", format!("{}", i + 1).into()),
+                                ("short", format!("{}", short).into()),
+                            ],
+                        )
                     });
                 }
                 if first {
@@ -193,7 +199,17 @@ impl RepoTab {
                     }
                 }
                 if !line.uncommitted() {
-                    let gutter_resp = gutter_resp.on_hover_text(crate::i18n::message("repo-core-2479", &[("author", format!("{}", line.author).into()), ("now", format!("{}", git::relative_time(line.time, now)).into()), ("summary", format!("{}", line.summary).into())]));
+                    let gutter_resp = gutter_resp.on_hover_text(crate::i18n::message(
+                        "repo-core-2479",
+                        &[
+                            ("author", format!("{}", line.author).into()),
+                            (
+                                "now",
+                                format!("{}", git::relative_time(line.time, now)).into(),
+                            ),
+                            ("summary", format!("{}", line.summary).into()),
+                        ],
+                    ));
                     if gutter_resp.clicked() {
                         acts.push(Action::CloseFileView);
                         acts.push(Action::SelectHash(line.hash.clone()));

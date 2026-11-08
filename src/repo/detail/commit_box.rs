@@ -20,7 +20,13 @@ impl RepoTab {
         ui.horizontal(|ui| {
             ui.label(
                 RichText::new(match continuing {
-                    Some(s) => crate::i18n::message("repo-core-0892", &[("to-uppercase", format!("{}", s.label().to_uppercase()).into())]),
+                    Some(s) => crate::i18n::message(
+                        "repo-core-0892",
+                        &[(
+                            "to-uppercase",
+                            format!("{}", s.label().to_uppercase()).into(),
+                        )],
+                    ),
                     None => crate::i18n::text("repo-core-0893").to_owned(),
                 })
                 .font(theme::semibold(10.5))
@@ -32,9 +38,7 @@ impl RepoTab {
                         !rebasing && !self.refs.head.is_empty(),
                         egui::Checkbox::new(&mut amending, crate::i18n::text("repo-core-0894")),
                     )
-                    .on_hover_text(
-                        crate::i18n::text("repo-core-0895"),
-                    );
+                    .on_hover_text(crate::i18n::text("repo-core-0895"));
                 // Over an empty box, or what the template and hook put there.
                 amend_started = amend.changed()
                     && amending
@@ -71,11 +75,9 @@ impl RepoTab {
                 .is_some_and(|b| !b.upstream.is_empty() && b.ahead_behind().0 == 0);
             if pushed {
                 ui.label(
-                    RichText::new(
-                        crate::i18n::text("repo-core-0896"),
-                    )
-                    .color(t.warning)
-                    .small(),
+                    RichText::new(crate::i18n::text("repo-core-0896"))
+                        .color(t.warning)
+                        .small(),
                 );
             }
         }
@@ -106,19 +108,23 @@ impl RepoTab {
         let len = self.commit_summary.chars().count();
         if len > 72 {
             ui.label(
-                RichText::new(crate::i18n::message("repo-core-0898", &[("len", format!("{}", len).into())]))
-                    .color(t.warning)
-                    .small(),
+                RichText::new(crate::i18n::message(
+                    "repo-core-0898",
+                    &[("len", format!("{}", len).into())],
+                ))
+                .color(t.warning)
+                .small(),
             );
         }
         if rebasing {
             // `--continue` takes no `--no-verify`: nothing ticked waits for the next commit.
             self.skip_hooks.commit = false;
         } else {
-            ui.checkbox(&mut self.skip_hooks.commit, crate::i18n::text("repo-core-0899"))
-                .on_hover_text(
-                    crate::i18n::text("repo-core-0900"),
-                );
+            ui.checkbox(
+                &mut self.skip_hooks.commit,
+                crate::i18n::text("repo-core-0899"),
+            )
+            .on_hover_text(crate::i18n::text("repo-core-0900"));
         }
         ui.add_space(4.0);
         let staged = self.work.staged.len();
@@ -127,11 +133,26 @@ impl RepoTab {
         let label = if restack {
             crate::i18n::text("repo-core-0901").to_owned()
         } else if let Some(s) = continuing {
-            crate::i18n::message("repo-core-0352", &[("to-lowercase", format!("{}", s.label().to_lowercase()).into())])
+            crate::i18n::message(
+                "repo-core-0352",
+                &[(
+                    "to-lowercase",
+                    format!("{}", s.label().to_lowercase()).into(),
+                )],
+            )
         } else if self.amend {
             crate::i18n::text("repo-core-0894").to_owned()
         } else if staged > 0 {
-            crate::i18n::message("repo-core-0902", &[("staged", format!("{}", staged).into()), ("s", format!("{}", if staged == 1 { "" } else { "s" }).into())])
+            crate::i18n::message(
+                "repo-core-0902",
+                &[
+                    ("staged", format!("{}", staged).into()),
+                    (
+                        "s",
+                        format!("{}", if staged == 1 { "" } else { "s" }).into(),
+                    ),
+                ],
+            )
         } else {
             crate::i18n::text("repo-core-0903").to_owned()
         };
@@ -177,7 +198,10 @@ impl RepoTab {
                     crate::i18n::text("repo-core-0905").to_owned()
                 } else if elsewhere.is_none() && !profile_value.is_empty() && value == profile_value
                 {
-                    crate::i18n::message("repo-core-0906", &[("title", format!("{}", profile.title()).into())])
+                    crate::i18n::message(
+                        "repo-core-0906",
+                        &[("title", format!("{}", profile.title()).into())],
+                    )
                 } else if let Some(host) = &elsewhere {
                     crate::i18n::message("repo-core-0907", &[("host", format!("{}", host).into())])
                 } else {
@@ -192,9 +216,22 @@ impl RepoTab {
                 let source = if name_from == email_from {
                     format!(" · {name_from}")
                 } else {
-                    crate::i18n::message("repo-core-0911", &[("name-from", format!("{}", name_from).into()), ("email-from", format!("{}", email_from).into())])
+                    crate::i18n::message(
+                        "repo-core-0911",
+                        &[
+                            ("name-from", format!("{}", name_from).into()),
+                            ("email-from", format!("{}", email_from).into()),
+                        ],
+                    )
                 };
-                crate::i18n::message("repo-core-0912", &[("name", format!("{}", id.name).into()), ("email", format!("{}", id.email).into()), ("source", format!("{}", source).into())])
+                crate::i18n::message(
+                    "repo-core-0912",
+                    &[
+                        ("name", format!("{}", id.name).into()),
+                        ("email", format!("{}", id.email).into()),
+                        ("source", format!("{}", source).into()),
+                    ],
+                )
             };
             let resp =
                 ui.add(egui::Label::new(RichText::new(who).color(t.text_faint).small()).truncate());
@@ -218,7 +255,10 @@ impl RepoTab {
                     && !choices.iter().any(|(_, n, e)| n == name && e == email)
                 {
                     choices.push((
-                        crate::i18n::message("repo-core-0915", &[("title", format!("{}", p.title()).into())]),
+                        crate::i18n::message(
+                            "repo-core-0915",
+                            &[("title", format!("{}", p.title()).into())],
+                        ),
                         name.to_owned(),
                         email.to_owned(),
                     ));
@@ -239,7 +279,7 @@ impl RepoTab {
                             let text = format!("{label} — {name} <{email}>");
                             if ui
                                 .add_enabled(idle, egui::Button::new(text))
-                                .on_hover_text("Sets it in this repository's own config")
+                                .on_hover_text(crate::i18n::text("repo-core-0920"))
                                 .clicked()
                             {
                                 acts.push(Action::SetIdentity(name.clone(), email.clone()));
@@ -248,10 +288,11 @@ impl RepoTab {
                         if (id.local || id.local_email) && elsewhere.is_none() {
                             ui.separator();
                             if ui
-                                .add_enabled(idle, egui::Button::new(crate::i18n::text("repo-core-0154")))
-                                .on_hover_text(
-                                    crate::i18n::text("repo-core-0921"),
+                                .add_enabled(
+                                    idle,
+                                    egui::Button::new(crate::i18n::text("repo-core-0154")),
                                 )
+                                .on_hover_text(crate::i18n::text("repo-core-0921"))
                                 .clicked()
                             {
                                 acts.push(Action::ClearIdentity {

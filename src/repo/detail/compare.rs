@@ -45,7 +45,9 @@ impl RepoTab {
                 if d.files.is_empty() {
                     ui.add_space(10.0);
                     ui.vertical_centered(|ui| {
-                        ui.label(RichText::new(crate::i18n::text("repo-core-0923")).color(t.text_dim));
+                        ui.label(
+                            RichText::new(crate::i18n::text("repo-core-0923")).color(t.text_dim),
+                        );
                     });
                     return;
                 }
@@ -100,17 +102,33 @@ fn compare_summary(ui: &mut Ui, acts: &mut Vec<Action>, c: &Compare) {
                             }
                         });
                     };
-                    let note = if c.since_fork { crate::i18n::text("repo-core-0929") } else { "" };
-                    ui.label(RichText::new(crate::i18n::text("repo-core-0930")).color(t.text_faint));
+                    let note = if c.since_fork {
+                        crate::i18n::text("repo-core-0929")
+                    } else {
+                        ""
+                    };
+                    ui.label(
+                        RichText::new(crate::i18n::text("repo-core-0930")).color(t.text_faint),
+                    );
                     end(ui, &c.base_label, data.map(|d| d.from.as_str()), note);
                     ui.end_row();
-                    ui.label(RichText::new(crate::i18n::text("repo-core-0931")).color(t.text_faint));
+                    ui.label(
+                        RichText::new(crate::i18n::text("repo-core-0931")).color(t.text_faint),
+                    );
                     end(ui, target_name, data.and_then(|d| d.to.as_deref()), "");
                     ui.end_row();
                 });
             if let Some(d) = data {
                 let (behind, ahead) = d.apart;
-                let commits = |n: u32| crate::i18n::message("repo-core-0932", &[("n", (n).into()), ("s", format!("{}", if n == 1 { "" } else { "s" }).into())]);
+                let commits = |n: u32| {
+                    crate::i18n::message(
+                        "repo-core-0932",
+                        &[
+                            ("n", (n).into()),
+                            ("s", format!("{}", if n == 1 { "" } else { "s" }).into()),
+                        ],
+                    )
+                };
                 let other = if c.target.is_some() {
                     target_name
                 } else {
@@ -118,20 +136,40 @@ fn compare_summary(ui: &mut Ui, acts: &mut Vec<Action>, c: &Compare) {
                 };
                 let text = match (ahead, behind) {
                     (0, 0) => crate::i18n::text("repo-core-0933").to_owned(),
-                    (a, 0) => crate::i18n::message("repo-core-0934", &[("other", format!("{}", other).into()), ("a", format!("{}", commits(a)).into())]),
-                    (0, b) => crate::i18n::message("repo-core-0935", &[("other", format!("{}", other).into()), ("b", format!("{}", commits(b)).into())]),
-                    (a, b) => crate::i18n::message("repo-core-0936", &[("other", format!("{}", other).into()), ("a", format!("{}", commits(a)).into()), ("b", format!("{}", b).into())]),
+                    (a, 0) => crate::i18n::message(
+                        "repo-core-0934",
+                        &[
+                            ("other", format!("{}", other).into()),
+                            ("a", format!("{}", commits(a)).into()),
+                        ],
+                    ),
+                    (0, b) => crate::i18n::message(
+                        "repo-core-0935",
+                        &[
+                            ("other", format!("{}", other).into()),
+                            ("b", format!("{}", commits(b)).into()),
+                        ],
+                    ),
+                    (a, b) => crate::i18n::message(
+                        "repo-core-0936",
+                        &[
+                            ("other", format!("{}", other).into()),
+                            ("a", format!("{}", commits(a)).into()),
+                            ("b", format!("{}", b).into()),
+                        ],
+                    ),
                 };
                 ui.label(RichText::new(text).color(t.text_dim).small());
             }
             ui.horizontal(|ui| {
                 let mut since = c.since_fork;
-                let label = crate::i18n::message("repo-core-0937", &[("target-name", format!("{}", target_name).into())]);
+                let label = crate::i18n::message(
+                    "repo-core-0937",
+                    &[("target-name", format!("{}", target_name).into())],
+                );
                 if ui
                     .checkbox(&mut since, label)
-                    .on_hover_text(
-                        crate::i18n::text("repo-core-0938"),
-                    )
+                    .on_hover_text(crate::i18n::text("repo-core-0938"))
                     .changed()
                 {
                     acts.push(Action::CompareSinceFork(since));

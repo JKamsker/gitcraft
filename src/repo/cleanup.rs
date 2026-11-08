@@ -73,7 +73,10 @@ impl RepoTab {
             match result {
                 Ok(version) => state.version = Some(version),
                 Err(e) => {
-                    state.error = Some(crate::i18n::message("repo-core-0293", &[("e", format!("{}", e).into())]))
+                    state.error = Some(crate::i18n::message(
+                        "repo-core-0293",
+                        &[("e", format!("{}", e).into())],
+                    ))
                 }
             }
         }
@@ -81,45 +84,115 @@ impl RepoTab {
         let mut start = false;
         let mut cancel = false;
         let idle = state.running.is_none() && self.busy_op.is_none() && !state.capability.busy();
-        egui::Window::new(crate::i18n::text("repo-core-0294")).id(egui::Id::new(("cleanup", &self.path))).open(&mut open).default_width(620.0).show(ctx, |ui| {
-            egui::ScrollArea::vertical().max_height(650.0).show(ui, |ui| {
-                ui.label(crate::i18n::message("repo-core-0296", &[("self", format!("{}", self.path.display()).into())]));
-                ui.label(crate::i18n::text("repo-core-0297"));
-                if let Some(version) = &state.version { ui.label(crate::i18n::message("repo-core-0298", &[("version", format!("{}", version).into())])); }
-                if let Some(report) = &state.report {
-                    result_ui(ui, report, &mut state.publishing);
-                } else {
-                    ui.add_enabled_ui(idle, |ui| {
-                        ui.label(crate::i18n::text("repo-core-0299"));
-                        ui.horizontal(|ui| {
-                            ui.text_edit_singleline(&mut state.parent);
-                            if ui.button(crate::i18n::text("repo-core-0300")).clicked() && let Some(folder) = rfd::FileDialog::new().pick_folder() { state.parent = folder.display().to_string(); }
-                        });
-                        ui.label(crate::i18n::text("repo-core-0301"));
-                        ui.add(egui::TextEdit::multiline(&mut state.paths).desired_rows(3).char_limit(64 << 10));
-                        ui.label(crate::i18n::text("repo-core-0302"));
-                        let mut remove = None;
-                        for (index, rule) in state.replacements.iter_mut().enumerate() {
-                            ui.horizontal(|ui| {
-                                ui.label(format!("{}", index + 1));
-                                ui.add(egui::TextEdit::singleline(&mut rule.find).hint_text(crate::i18n::text("repo-core-0303")).password(true).char_limit(4096).desired_width(200.0));
-                                ui.label("→");
-                                ui.add(egui::TextEdit::singleline(&mut rule.replace).hint_text(crate::i18n::text("repo-core-0304")).char_limit(4096).desired_width(200.0));
-                                if ui.small_button(crate::i18n::text("repo-core-0305")).clicked() { remove = Some(index); }
+        egui::Window::new(crate::i18n::text("repo-core-0294"))
+            .id(egui::Id::new(("cleanup", &self.path)))
+            .open(&mut open)
+            .default_width(620.0)
+            .show(ctx, |ui| {
+                egui::ScrollArea::vertical()
+                    .max_height(650.0)
+                    .show(ui, |ui| {
+                        ui.label(crate::i18n::message(
+                            "repo-core-0296",
+                            &[("self", format!("{}", self.path.display()).into())],
+                        ));
+                        ui.label(crate::i18n::text("repo-core-0297"));
+                        if let Some(version) = &state.version {
+                            ui.label(crate::i18n::message(
+                                "repo-core-0298",
+                                &[("version", format!("{}", version).into())],
+                            ));
+                        }
+                        if let Some(report) = &state.report {
+                            result_ui(ui, report, &mut state.publishing);
+                        } else {
+                            ui.add_enabled_ui(idle, |ui| {
+                                ui.label(crate::i18n::text("repo-core-0299"));
+                                ui.horizontal(|ui| {
+                                    ui.text_edit_singleline(&mut state.parent);
+                                    if ui.button(crate::i18n::text("repo-core-0300")).clicked()
+                                        && let Some(folder) = rfd::FileDialog::new().pick_folder()
+                                    {
+                                        state.parent = folder.display().to_string();
+                                    }
+                                });
+                                ui.label(crate::i18n::text("repo-core-0301"));
+                                ui.add(
+                                    egui::TextEdit::multiline(&mut state.paths)
+                                        .desired_rows(3)
+                                        .char_limit(64 << 10),
+                                );
+                                ui.label(crate::i18n::text("repo-core-0302"));
+                                let mut remove = None;
+                                for (index, rule) in state.replacements.iter_mut().enumerate() {
+                                    ui.horizontal(|ui| {
+                                        ui.label(format!("{}", index + 1));
+                                        ui.add(
+                                            egui::TextEdit::singleline(&mut rule.find)
+                                                .hint_text(crate::i18n::text("repo-core-0303"))
+                                                .password(true)
+                                                .char_limit(4096)
+                                                .desired_width(200.0),
+                                        );
+                                        ui.label("→");
+                                        ui.add(
+                                            egui::TextEdit::singleline(&mut rule.replace)
+                                                .hint_text(crate::i18n::text("repo-core-0304"))
+                                                .char_limit(4096)
+                                                .desired_width(200.0),
+                                        );
+                                        if ui
+                                            .small_button(crate::i18n::text("repo-core-0305"))
+                                            .clicked()
+                                        {
+                                            remove = Some(index);
+                                        }
+                                    });
+                                }
+                                if let Some(index) = remove {
+                                    state.replacements.remove(index);
+                                }
+                                if ui
+                                    .add_enabled(
+                                        state.replacements.len() < 32,
+                                        egui::Button::new(crate::i18n::text("repo-core-0306")),
+                                    )
+                                    .clicked()
+                                {
+                                    state.replacements.push(Replacement::default());
+                                }
+                                ui.label(crate::i18n::text("repo-core-0307"));
+                                ui.checkbox(
+                                    &mut state.acknowledged,
+                                    crate::i18n::text("repo-core-0308"),
+                                );
+                                if ui
+                                    .add_enabled(
+                                        state.version.is_some()
+                                            && state.acknowledged
+                                            && !state.parent.trim().is_empty(),
+                                        egui::Button::new(crate::i18n::text("repo-core-0309")),
+                                    )
+                                    .clicked()
+                                {
+                                    start = true;
+                                }
                             });
                         }
-                        if let Some(index) = remove { state.replacements.remove(index); }
-                        if ui.add_enabled(state.replacements.len() < 32, egui::Button::new(crate::i18n::text("repo-core-0306"))).clicked() { state.replacements.push(Replacement::default()); }
-                        ui.label(crate::i18n::text("repo-core-0307"));
-                        ui.checkbox(&mut state.acknowledged, crate::i18n::text("repo-core-0308"));
-                        if ui.add_enabled(state.version.is_some() && state.acknowledged && !state.parent.trim().is_empty(), egui::Button::new(crate::i18n::text("repo-core-0309"))).clicked() { start = true; }
+                        if state.capability.busy() {
+                            ui.label(crate::i18n::text("repo-core-0310"));
+                        }
+                        if state.running.is_some() {
+                            ui.label(crate::i18n::text("repo-core-0311"));
+                            if ui.button(crate::i18n::text("repo-core-0312")).clicked() {
+                                cancel = true;
+                            }
+                        }
+                        if let Some(error) = &state.error {
+                            ui.colored_label(crate::theme::Tokens::get(ctx).danger, error);
+                        }
                     });
-                }
-                if state.capability.busy() { ui.label(crate::i18n::text("repo-core-0310")); }
-                if state.running.is_some() { ui.label(crate::i18n::text("repo-core-0311")); if ui.button(crate::i18n::text("repo-core-0312")).clicked() { cancel = true; } }
-                if let Some(error) = &state.error { ui.colored_label(crate::theme::Tokens::get(ctx).danger, error); }
             });
-        });
         if cancel && let Some(token) = &state.running {
             token.cancel();
         }
@@ -171,11 +244,17 @@ fn completion(result: Result<Report, String>) -> Msg {
     }))
 }
 fn report_ui(ui: &mut egui::Ui, report: &Report) {
-    ui.label(crate::i18n::message("repo-core-0313", &[("report", format!("{}", report.repo.display()).into())]));
+    ui.label(crate::i18n::message(
+        "repo-core-0313",
+        &[("report", format!("{}", report.repo.display()).into())],
+    ));
     if ui.button(crate::i18n::text("repo-core-0314")).clicked() {
         ui.ctx().copy_text(report.repo.display().to_string());
     }
-    ui.label(crate::i18n::message("repo-core-0315", &[("count", (report.changes.len()).into())]));
+    ui.label(crate::i18n::message(
+        "repo-core-0315",
+        &[("count", (report.changes.len()).into())],
+    ));
     for change in &report.changes {
         ui.label(format!(
             "{}: {} → {}",
@@ -214,10 +293,7 @@ fn publishing_ui(ui: &mut egui::Ui, report: &Report) {
 
 fn result_ui(ui: &mut egui::Ui, report: &Report, publishing: &mut bool) {
     report_ui(ui, report);
-    if ui
-        .button(crate::i18n::text("repo-core-0324"))
-        .clicked()
-    {
+    if ui.button(crate::i18n::text("repo-core-0324")).clicked() {
         *publishing = true;
     }
     if *publishing {

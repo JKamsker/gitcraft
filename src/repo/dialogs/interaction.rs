@@ -21,7 +21,13 @@ pub(super) fn find_interaction(
     title(
         ui,
         crate::i18n::text("repo-core-1338"),
-        &crate::i18n::message("repo-core-1339", &[("machine", format!("{}", machine).into()), ("MAX-CHANGES", format!("{}", MAX_CHANGES).into())]),
+        &crate::i18n::message(
+            "repo-core-1339",
+            &[
+                ("machine", format!("{}", machine).into()),
+                ("MAX-CHANGES", format!("{}", MAX_CHANGES).into()),
+            ],
+        ),
         &t,
     );
     let mut no_focus = false;
@@ -53,11 +59,17 @@ pub(super) fn find_interaction(
         && usable(&spec.b)
         && spec.a.trim() != spec.b.trim()
         && !spec.command.trim().is_empty();
-    buttons(ui, crate::i18n::text("repo-core-1348"), valid, enter, || {
-        let mut spec = spec.clone();
-        spec.a = spec.a.trim().to_owned();
-        spec.b = spec.b.trim().to_owned();
-        spec.command = spec.command.trim().to_owned();
-        Action::Interaction(InteractionAct::Start(spec))
-    })
+    buttons(
+        ui,
+        crate::i18n::text("repo-core-1348"),
+        valid,
+        enter,
+        || {
+            let mut spec = spec.clone();
+            spec.a = spec.a.trim().to_owned();
+            spec.b = spec.b.trim().to_owned();
+            spec.command = spec.command.trim().to_owned();
+            Action::Interaction(InteractionAct::Start(spec))
+        },
+    )
 }

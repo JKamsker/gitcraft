@@ -110,7 +110,13 @@ pub(super) fn free_name(
         }
         passed.push(name);
     }
-    Err(crate::i18n::message("repo-core-0569", &[("path", format!("{}", path).into()), ("tag", format!("{}", tagged(path, tag)).into())]))
+    Err(crate::i18n::message(
+        "repo-core-0569",
+        &[
+            ("path", format!("{}", path).into()),
+            ("tag", format!("{}", tagged(path, tag)).into()),
+        ],
+    ))
 }
 
 /// Whether there is something at `rel` in the repository at `repo`: a file, a folder or a link
@@ -132,7 +138,13 @@ fn exists(file: &Path) -> Result<bool, String> {
         return match std::fs::symlink_metadata(file) {
             Ok(_) => Ok(true),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(false),
-            Err(e) => Err(crate::i18n::message("repo-core-0571", &[("file", format!("{}", file.display()).into()), ("e", format!("{}", e).into())])),
+            Err(e) => Err(crate::i18n::message(
+                "repo-core-0571",
+                &[
+                    ("file", format!("{}", file.display()).into()),
+                    ("e", format!("{}", e).into()),
+                ],
+            )),
         };
     };
     let f = crate::remote::sh_path(&target.path);
@@ -154,11 +166,29 @@ fn exists(file: &Path) -> Result<bool, String> {
 /// submodule, or a side that deleted the file.
 fn writable<'a>(stage: Option<&'a Stage>, path: &str, who: &str) -> Result<&'a Stage, String> {
     let stage = stage.ok_or_else(|| {
-        crate::i18n::message("repo-core-0573", &[("who", format!("{}", who).into()), ("path", format!("{}", path).into())])
+        crate::i18n::message(
+            "repo-core-0573",
+            &[
+                ("who", format!("{}", who).into()),
+                ("path", format!("{}", path).into()),
+            ],
+        )
     })?;
     match stage.mode.as_str() {
-        "120000" => Err(crate::i18n::message("repo-core-0574", &[("who", format!("{}", who).into()), ("path", format!("{}", path).into())])),
-        "160000" => Err(crate::i18n::message("repo-core-0575", &[("who", format!("{}", who).into()), ("path", format!("{}", path).into())])),
+        "120000" => Err(crate::i18n::message(
+            "repo-core-0574",
+            &[
+                ("who", format!("{}", who).into()),
+                ("path", format!("{}", path).into()),
+            ],
+        )),
+        "160000" => Err(crate::i18n::message(
+            "repo-core-0575",
+            &[
+                ("who", format!("{}", who).into()),
+                ("path", format!("{}", path).into()),
+            ],
+        )),
         _ => Ok(stage),
     }
 }
@@ -168,13 +198,22 @@ fn writable<'a>(stage: Option<&'a Stage>, path: &str, who: &str) -> Result<&'a S
 pub fn plan(repo: &Path, path: &str, state: Option<InProgress>) -> Result<Plan, String> {
     let stages = git::conflict_stages(repo, path)?;
     if stages.ours.is_none() && stages.theirs.is_none() {
-        return Err(crate::i18n::message("repo-core-0576", &[("path", format!("{}", path).into())]));
+        return Err(crate::i18n::message(
+            "repo-core-0576",
+            &[("path", format!("{}", path).into())],
+        ));
     }
     let rebase = state == Some(InProgress::Rebase);
     let (ours_who, theirs_who) = if rebase {
-        (crate::i18n::text("repo-core-0577"), crate::i18n::text("repo-core-0578"))
+        (
+            crate::i18n::text("repo-core-0577"),
+            crate::i18n::text("repo-core-0578"),
+        )
     } else {
-        (crate::i18n::text("repo-core-0579"), crate::i18n::text("repo-core-0580"))
+        (
+            crate::i18n::text("repo-core-0579"),
+            crate::i18n::text("repo-core-0580"),
+        )
     };
     let ours = writable(stages.ours.as_ref(), path, ours_who)?;
     let theirs = writable(stages.theirs.as_ref(), path, theirs_who)?;
@@ -192,8 +231,15 @@ pub fn plan(repo: &Path, path: &str, state: Option<InProgress>) -> Result<Plan, 
                 },
                 oid: stage.oid.clone(),
                 executable: stage.mode == "100755",
-                size: git::checked_out_size(repo, &stage.oid)
-                    .map_err(|e| crate::i18n::message("repo-core-0582", &[("who", format!("{}", who).into()), ("e", format!("{}", e).into())]))?,
+                size: git::checked_out_size(repo, &stage.oid).map_err(|e| {
+                    crate::i18n::message(
+                        "repo-core-0582",
+                        &[
+                            ("who", format!("{}", who).into()),
+                            ("e", format!("{}", e).into()),
+                        ],
+                    )
+                })?,
                 ignored: git::is_ignored(repo, &target)?,
                 target,
                 taken,
@@ -219,14 +265,30 @@ pub fn write(repo: &Path, plan: &Plan) -> Result<(), String> {
     let mut written: Option<&str> = None;
     for version in [&plan.ours, &plan.theirs] {
         let done = git::checked_out_blob(repo, &version.oid, &plan.path)
-            .map_err(|e| crate::i18n::message("repo-core-0583", &[("origin", format!("{}", version.origin).into()), ("e", format!("{}", e).into())]))
+            .map_err(|e| {
+                crate::i18n::message(
+                    "repo-core-0583",
+                    &[
+                        ("origin", format!("{}", version.origin).into()),
+                        ("e", format!("{}", e).into()),
+                    ],
+                )
+            })
             .and_then(|bytes| {
                 create_new(
                     &crate::remote::join(repo, &version.target),
                     &bytes,
                     version.executable,
                 )
-                .map_err(|e| crate::i18n::message("repo-core-0584", &[("target", format!("{}", version.target).into()), ("e", format!("{}", e).into())]))
+                .map_err(|e| {
+                    crate::i18n::message(
+                        "repo-core-0584",
+                        &[
+                            ("target", format!("{}", version.target).into()),
+                            ("e", format!("{}", e).into()),
+                        ],
+                    )
+                })
             });
         if let Err(e) = done {
             if let Some(first) = written {
@@ -343,7 +405,14 @@ pub fn still_in_conflict(repo: &Path, plan: &Plan) -> Result<(), String> {
     if same(stages.ours.as_ref(), &plan.ours) && same(stages.theirs.as_ref(), &plan.theirs) {
         Ok(())
     } else {
-        Err(crate::i18n::message("repo-core-0589", &[("path", format!("{}", plan.path).into()), ("target", format!("{}", plan.ours.target).into()), ("target2", format!("{}", plan.theirs.target).into())]))
+        Err(crate::i18n::message(
+            "repo-core-0589",
+            &[
+                ("path", format!("{}", plan.path).into()),
+                ("target", format!("{}", plan.ours.target).into()),
+                ("target2", format!("{}", plan.theirs.target).into()),
+            ],
+        ))
     }
 }
 

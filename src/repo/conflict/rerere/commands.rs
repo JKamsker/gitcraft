@@ -26,7 +26,15 @@ fn bool_config(repo: &Path, name: &str) -> Result<Option<bool>, String> {
         &["config", "--type=bool", "--get", name],
         &[0, 1],
     )
-    .map_err(|e| crate::i18n::message("repo-core-0635", &[("name", format!("{}", name).into()), ("e", format!("{}", e).into())]))?;
+    .map_err(|e| {
+        crate::i18n::message(
+            "repo-core-0635",
+            &[
+                ("name", format!("{}", name).into()),
+                ("e", format!("{}", e).into()),
+            ],
+        )
+    })?;
     Ok(match set.trim() {
         "true" => Some(true),
         "false" => Some(false),
@@ -265,7 +273,13 @@ pub fn preimage(
         Err(e) if e.contains("object-id") || e.contains("usage:") => {
             Err(crate::i18n::text("repo-core-0669").to_owned())
         }
-        Err(e) => Err(crate::i18n::message("repo-core-0670", &[("path", format!("{}", path).into()), ("e", format!("{}", e).into())])),
+        Err(e) => Err(crate::i18n::message(
+            "repo-core-0670",
+            &[
+                ("path", format!("{}", path).into()),
+                ("e", format!("{}", e).into()),
+            ],
+        )),
     }
 }
 

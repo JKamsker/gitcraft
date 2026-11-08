@@ -85,9 +85,29 @@ pub(crate) fn reset_action(r: &Rewrite<'_>, mode: &ResetMode) -> Action {
     } = *r;
     Action::Dialog(
         Dialog::confirm(
-            &crate::i18n::message("repo-core-0387", &[("label", format!("{}", crate::i18n::text(mode.label)).into())]),
-            crate::i18n::message("repo-core-0388", &[("target", format!("{}", target).into()), ("short", format!("{}", short).into()), ("summary", format!("{}", summary).into()), ("explain", format!("{}", crate::i18n::text(mode.explain)).into())]),
-            &crate::i18n::message("repo-core-0389", &[("to-lowercase", format!("{}", crate::i18n::text(mode.label).to_lowercase()).into())]),
+            &crate::i18n::message(
+                "repo-core-0387",
+                &[("label", format!("{}", crate::i18n::text(mode.label)).into())],
+            ),
+            crate::i18n::message(
+                "repo-core-0388",
+                &[
+                    ("target", format!("{}", target).into()),
+                    ("short", format!("{}", short).into()),
+                    ("summary", format!("{}", summary).into()),
+                    (
+                        "explain",
+                        format!("{}", crate::i18n::text(mode.explain)).into(),
+                    ),
+                ],
+            ),
+            &crate::i18n::message(
+                "repo-core-0389",
+                &[(
+                    "to-lowercase",
+                    format!("{}", crate::i18n::text(mode.label).to_lowercase()).into(),
+                )],
+            ),
             reset_steps(mode.mode, hash, target, head),
             None,
         )

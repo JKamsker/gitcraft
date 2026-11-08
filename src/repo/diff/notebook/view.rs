@@ -34,7 +34,11 @@ pub(in crate::repo::diff) fn notebook_bar(
         .show(ui, |ui| {
             ui.set_width(ui.available_width());
             ui.horizontal_wrapped(|ui| {
-                if let Some(i) = widgets::switch(ui, &[crate::i18n::text("repo-core-1900"), "JSON"], usize::from(json)) {
+                if let Some(i) = widgets::switch(
+                    ui,
+                    &[crate::i18n::text("repo-core-1900"), "JSON"],
+                    usize::from(json),
+                ) {
                     json = i == 1;
                     ui.data_mut(|d| d.insert_temp(key, json));
                 }
@@ -61,13 +65,14 @@ pub(in crate::repo::diff) fn notebook_bar(
 fn strip_box(ui: &mut Ui, t: &Tokens, strip: &StripState, acts: &mut Vec<Action>) {
     if let StripState::Other(name) = strip {
         ui.label(
-            RichText::new(crate::i18n::message("repo-core-1903", &[("name", format!("{}", name).into())]))
+            RichText::new(crate::i18n::message(
+                "repo-core-1903",
+                &[("name", format!("{}", name).into())],
+            ))
             .color(t.text_dim)
             .small(),
         )
-        .on_hover_text(
-            crate::i18n::text("repo-core-1904"),
-        );
+        .on_hover_text(crate::i18n::text("repo-core-1904"));
         return;
     }
     let mut on = matches!(strip, StripState::Ours(_));
@@ -78,7 +83,10 @@ fn strip_box(ui: &mut Ui, t: &Tokens, strip: &StripState, acts: &mut Vec<Action>
     };
     let r = ui
         .checkbox(&mut on, crate::i18n::text("repo-core-1907"))
-        .on_hover_text(crate::i18n::message("repo-core-1908", &[("tool", format!("{}", tool).into())]));
+        .on_hover_text(crate::i18n::message(
+            "repo-core-1908",
+            &[("tool", format!("{}", tool).into())],
+        ));
     if r.changed() {
         acts.push(Action::StripNotebookOutputs(on));
     }
@@ -97,9 +105,30 @@ pub(super) fn summary(nb: &NotebookData) -> String {
     .enumerate()
     .map(|(i, (n, what))| {
         if i == 0 {
-            crate::i18n::message("repo-core-1909", &[("n", (n).into()), ("cells", format!("{}", if n == 1 { crate::i18n::text("repo-core-1910") } else { "cells" }).into()), ("what", format!("{}", what).into())])
+            crate::i18n::message(
+                "repo-core-1909",
+                &[
+                    ("n", (n).into()),
+                    (
+                        "cells",
+                        format!(
+                            "{}",
+                            if n == 1 {
+                                crate::i18n::text("repo-core-1910")
+                            } else {
+                                "cells"
+                            }
+                        )
+                        .into(),
+                    ),
+                    ("what", format!("{}", what).into()),
+                ],
+            )
         } else {
-            crate::i18n::message("repo-core-1911", &[("n", (n).into()), ("what", format!("{}", what).into())])
+            crate::i18n::message(
+                "repo-core-1911",
+                &[("n", (n).into()), ("what", format!("{}", what).into())],
+            )
         }
     })
     .collect();
@@ -156,9 +185,15 @@ fn folded(ui: &mut Ui, t: &Tokens, unchanged: &mut Vec<&CellChange>) {
                 for c in cells {
                     let Some(cell) = c.new.as_ref() else { continue };
                     ui.label(
-                        RichText::new(crate::i18n::message("repo-core-1919", &[("label", format!("{}", cell.kind.label()).into()), ("number", format!("{}", c.number).into())]))
-                            .color(t.text_dim)
-                            .small(),
+                        RichText::new(crate::i18n::message(
+                            "repo-core-1919",
+                            &[
+                                ("label", format!("{}", cell.kind.label()).into()),
+                                ("number", format!("{}", c.number).into()),
+                            ],
+                        ))
+                        .color(t.text_dim)
+                        .small(),
                     );
                     for line in cell.source.lines().take(40) {
                         ui.add(
@@ -198,7 +233,14 @@ fn cell(ui: &mut Ui, t: &Tokens, c: &CellChange) {
                 }
                 let kind = either.map_or(crate::i18n::text("repo-core-1910"), |c| c.kind.label());
                 ui.label(
-                    RichText::new(crate::i18n::message("repo-core-1921", &[("kind", format!("{}", kind).into()), ("number", format!("{}", c.number).into())])).font(theme::medium(12.5)),
+                    RichText::new(crate::i18n::message(
+                        "repo-core-1921",
+                        &[
+                            ("kind", format!("{}", kind).into()),
+                            ("number", format!("{}", c.number).into()),
+                        ],
+                    ))
+                    .font(theme::medium(12.5)),
                 );
                 let count = |c: &Option<Cell>| {
                     c.as_ref()
@@ -224,22 +266,24 @@ fn cell(ui: &mut Ui, t: &Tokens, c: &CellChange) {
             ui.add_space(4.0);
             lines(ui, t, &c.source);
             if c.metadata_changed {
-                egui::CollapsingHeader::new(RichText::new(crate::i18n::text("repo-core-1925")).color(t.text_dim).small())
-                    .id_salt(("cell-metadata", c.number, word))
-                    .show(ui, |ui| {
-                        let (a, b) = (
-                            c.old.as_ref().map_or("", |c| c.metadata.as_str()),
-                            c.new.as_ref().map_or("", |c| c.metadata.as_str()),
-                        );
-                        let (a, b): (Vec<&str>, Vec<&str>) =
-                            (a.lines().collect(), b.lines().collect());
-                        let d: Vec<(Edit, String)> =
-                            crate::repo::diff::line_diff::diff_lines(&a, &b)
-                                .into_iter()
-                                .map(|(e, l)| (e, l.to_owned()))
-                                .collect();
-                        lines(ui, t, &d);
-                    });
+                egui::CollapsingHeader::new(
+                    RichText::new(crate::i18n::text("repo-core-1925"))
+                        .color(t.text_dim)
+                        .small(),
+                )
+                .id_salt(("cell-metadata", c.number, word))
+                .show(ui, |ui| {
+                    let (a, b) = (
+                        c.old.as_ref().map_or("", |c| c.metadata.as_str()),
+                        c.new.as_ref().map_or("", |c| c.metadata.as_str()),
+                    );
+                    let (a, b): (Vec<&str>, Vec<&str>) = (a.lines().collect(), b.lines().collect());
+                    let d: Vec<(Edit, String)> = crate::repo::diff::line_diff::diff_lines(&a, &b)
+                        .into_iter()
+                        .map(|(e, l)| (e, l.to_owned()))
+                        .collect();
+                    lines(ui, t, &d);
+                });
             }
             outputs(ui, t, c);
         });
@@ -289,7 +333,10 @@ fn outputs(ui: &mut Ui, t: &Tokens, c: &CellChange) {
         }
         return;
     }
-    let sides = [(crate::i18n::text("repo-core-1931"), old, 0), (crate::i18n::text("repo-core-1932"), new, 1)];
+    let sides = [
+        (crate::i18n::text("repo-core-1931"), old, 0),
+        (crate::i18n::text("repo-core-1932"), new, 1),
+    ];
     if ui.available_width() < SIDE_BY_SIDE {
         for (title, list, side) in sides {
             ui.label(RichText::new(title).color(t.text_dim).small());
@@ -326,11 +373,13 @@ fn output(ui: &mut Ui, t: &Tokens, id: (&str, usize, usize), o: &Output) {
         } => {
             ui.add(egui::Label::new(mono(&format!("{name}: {value}")).color(t.danger)).wrap());
             if !traceback.is_empty() {
-                egui::CollapsingHeader::new(RichText::new(crate::i18n::text("repo-core-1935")).small())
-                    .id_salt(id)
-                    .show(ui, |ui| {
-                        ui.add(egui::Label::new(mono(traceback)).wrap());
-                    });
+                egui::CollapsingHeader::new(
+                    RichText::new(crate::i18n::text("repo-core-1935")).small(),
+                )
+                .id_salt(id)
+                .show(ui, |ui| {
+                    ui.add(egui::Label::new(mono(traceback)).wrap());
+                });
             }
         }
         Output::Image { bytes, uri, .. } => {
@@ -346,7 +395,10 @@ fn output(ui: &mut Ui, t: &Tokens, id: (&str, usize, usize), o: &Output) {
             let text = if kinds.is_empty() {
                 crate::i18n::text("repo-core-1936").to_owned()
             } else {
-                crate::i18n::message("repo-core-1937", &[("kinds", format!("{}", kinds.join(", ")).into())])
+                crate::i18n::message(
+                    "repo-core-1937",
+                    &[("kinds", format!("{}", kinds.join(", ")).into())],
+                )
             };
             ui.label(RichText::new(text).color(t.text_faint).small());
         }

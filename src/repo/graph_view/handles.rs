@@ -85,7 +85,10 @@ impl RepoTab {
                 )
                 .on_hover_cursor(egui::CursorIcon::ResizeHorizontal);
             crate::repo::widgets::a11y(&resp, egui::WidgetType::ResizeHandle, || {
-                format!("Resize the {} column", bar_name(bar))
+                crate::i18n::message(
+                    "repo-core-2609",
+                    &[("bar", format!("{}", bar_name(bar)).into())],
+                )
             });
             let active = resp.hovered() || resp.dragged();
             ui.painter().line_segment(

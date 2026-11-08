@@ -187,7 +187,10 @@ impl RepoTab {
         ui.menu_button(crate::i18n::text("repo-core-0221"), |ui| {
             let mut settings = crate::settings::Settings::get(ui.ctx());
             if ui
-                .checkbox(&mut settings.graph_lane_walk, crate::i18n::text("repo-core-0222"))
+                .checkbox(
+                    &mut settings.graph_lane_walk,
+                    crate::i18n::text("repo-core-0222"),
+                )
                 .changed()
             {
                 settings.set(ui.ctx());
@@ -247,7 +250,10 @@ impl RepoTab {
                                     if ui
                                         .selectable_label(
                                             self.branch_bands.pins.get(&full) == Some(&band),
-                                            crate::i18n::message("repo-core-0231", &[("band", format!("{}", band + 1).into())]),
+                                            crate::i18n::message(
+                                                "repo-core-0231",
+                                                &[("band", format!("{}", band + 1).into())],
+                                            ),
                                         )
                                         .clicked()
                                     {
@@ -271,16 +277,13 @@ impl RepoTab {
                 }
             });
             if self.branch_bands.model != Model::Compact || !self.branch_bands.pins.is_empty() {
-                ui.small(
-                    crate::i18n::text("repo-core-0234"),
-                );
+                ui.small(crate::i18n::text("repo-core-0234"));
             }
         });
         if self.band_reader.busy() {
             ui.add(crate::spinner::Spinner::new().size(14.0));
-            ui.small(crate::i18n::text("repo-core-0235")).on_hover_text(
-                crate::i18n::text("repo-core-0236"),
-            );
+            ui.small(crate::i18n::text("repo-core-0235"))
+                .on_hover_text(crate::i18n::text("repo-core-0236"));
         }
         if changed {
             self.branch_bands.store(ui.ctx(), self.repo_key());

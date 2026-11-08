@@ -16,8 +16,11 @@ const GUTTER: f32 = 52.0;
 pub(in crate::repo::diff) fn show(ui: &mut Ui, data: &Structural) {
     let t = Tokens::get(ui.ctx());
     ui.label(
-        egui::RichText::new(crate::i18n::message("repo-core-2339", &[("language", format!("{}", data.language).into())]))
-            .color(t.text_dim),
+        egui::RichText::new(crate::i18n::message(
+            "repo-core-2339",
+            &[("language", format!("{}", data.language).into())],
+        ))
+        .color(t.text_dim),
     );
     ui.label(
         egui::RichText::new(crate::i18n::text("repo-core-2340"))
@@ -45,7 +48,13 @@ pub(in crate::repo::diff) fn show(ui: &mut Ui, data: &Structural) {
                 if index == 0 {
                     let (rect, _) =
                         ui.allocate_exact_size(vec2(half * 2.0, HEIGHT), Sense::hover());
-                    for (column, label) in [crate::i18n::text("repo-core-1564"), crate::i18n::text("repo-core-1565")].into_iter().enumerate() {
+                    for (column, label) in [
+                        crate::i18n::text("repo-core-1564"),
+                        crate::i18n::text("repo-core-1565"),
+                    ]
+                    .into_iter()
+                    .enumerate()
+                    {
                         ui.painter().text(
                             pos2(rect.left() + half * column as f32 + GUTTER, rect.center().y),
                             Align2::LEFT_CENTER,

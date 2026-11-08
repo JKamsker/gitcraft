@@ -89,7 +89,7 @@ pub(crate) fn switcher(
         .show(ui, |ui| {
             ui.add(
                 egui::TextEdit::singleline(query)
-                    .hint_text("Search worktrees")
+                    .hint_text(crate::i18n::text("repo-core-3780"))
                     .desired_width(f32::INFINITY)
                     .margin(egui::Margin::symmetric(8, 4)),
             )
@@ -108,7 +108,9 @@ pub(crate) fn switcher(
         egui::Frame::new()
             .inner_margin(egui::Margin::symmetric(16, 8))
             .show(ui, |ui| {
-                ui.label(egui::RichText::new("No worktree matches").color(t.text_dim));
+                ui.label(
+                    egui::RichText::new(crate::i18n::text("repo-core-3781")).color(t.text_dim),
+                );
             });
         return picked;
     }
@@ -145,8 +147,8 @@ pub(in crate::repo) fn paint_dirty(painter: &egui::Painter, t: &Tokens, center: 
 /// What the hover text of a worktree says about its uncommitted changes, if it has any.
 pub(in crate::repo) fn changes_line(wt: &Worktree) -> Option<String> {
     match changes_elsewhere(wt)? {
-        1 => Some("1 file with uncommitted changes".to_owned()),
-        n => Some(format!("{n} files with uncommitted changes")),
+        1 => Some(crate::i18n::text("repo-core-3783").to_owned()),
+        n => Some(crate::i18n::message("repo-core-3784", &[("n", (n).into())])),
     }
 }
 
@@ -159,7 +161,7 @@ fn switcher_row(ui: &mut Ui, wt: &Worktree, work: Option<&str>) -> Response {
         || {
             let changes = changes_line(wt).unwrap_or_default();
             let path = crate::remote::display(&wt.path);
-            let notes = [(wt.current, "open here")];
+            let notes = [(wt.current, crate::i18n::text("repo-core-3567"))];
             let base = crate::a11y::labels::worktree(&path, wt.branch.as_deref(), None, &notes);
             crate::a11y::labels::join([base.as_str(), work.unwrap_or(""), changes.as_str()])
         },

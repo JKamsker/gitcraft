@@ -44,13 +44,20 @@ impl Reason {
     /// What the checklist and the tooltip say.
     pub fn describe(&self) -> String {
         match self {
-            Reason::Merged(Merged::Into(base)) => crate::i18n::message("repo-core-0241", &[("base", format!("{}", base).into())]),
+            Reason::Merged(Merged::Into(base)) => {
+                crate::i18n::message("repo-core-0241", &[("base", format!("{}", base).into())])
+            }
             Reason::Merged(Merged::Rebased(base)) => {
                 crate::i18n::message("repo-core-0242", &[("base", format!("{}", base).into())])
             }
-            Reason::Merged(Merged::Pr(n, base)) => crate::i18n::message("repo-core-0243", &[("n", (*n).into()), ("base", format!("{}", base).into())]),
+            Reason::Merged(Merged::Pr(n, base)) => crate::i18n::message(
+                "repo-core-0243",
+                &[("n", (*n).into()), ("base", format!("{}", base).into())],
+            ),
             Reason::UpstreamGone => crate::i18n::text("repo-core-0244").to_owned(),
-            Reason::Stale(days) => crate::i18n::message("repo-core-0245", &[("days", (*days).into())]),
+            Reason::Stale(days) => {
+                crate::i18n::message("repo-core-0245", &[("days", (*days).into())])
+            }
         }
     }
 
@@ -314,7 +321,10 @@ impl HealthState {
             Err(e) => {
                 // Asked again on the next change or reload, rather than never.
                 self.asked = None;
-                self.error = Some(crate::i18n::message("repo-core-0246", &[("e", format!("{}", e).into())]));
+                self.error = Some(crate::i18n::message(
+                    "repo-core-0246",
+                    &[("e", format!("{}", e).into())],
+                ));
             }
         }
         std::mem::take(&mut self.pending)

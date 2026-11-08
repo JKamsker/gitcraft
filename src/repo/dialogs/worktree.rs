@@ -74,7 +74,9 @@ pub(super) fn add_worktree(
         changed |= ui
             .radio_value(new_branch, false, crate::i18n::text("repo-core-1537"))
             .changed();
-        changed |= ui.radio_value(new_branch, true, crate::i18n::text("repo-core-1538")).changed();
+        changed |= ui
+            .radio_value(new_branch, true, crate::i18n::text("repo-core-1538"))
+            .changed();
     });
     ui.add_space(4.0);
     if *new_branch {
@@ -89,23 +91,33 @@ pub(super) fn add_worktree(
             .color(t.text_dim)
             .small(),
     );
-    folder_field(ui, repo, root, &mut root_edited, crate::i18n::text("repo-core-1540"));
+    folder_field(
+        ui,
+        repo,
+        root,
+        &mut root_edited,
+        crate::i18n::text("repo-core-1540"),
+    );
     ui.horizontal(|ui| {
-        if ui.small_button(crate::i18n::text("repo-core-1541")).clicked() {
+        if ui
+            .small_button(crate::i18n::text("repo-core-1541"))
+            .clicked()
+        {
             *root = crate::remote::git_path(&git::default_worktree_root(repo));
             root_edited = true;
         }
-        if ui.small_button(crate::i18n::text("repo-core-1542")).clicked() {
+        if ui
+            .small_button(crate::i18n::text("repo-core-1542"))
+            .clicked()
+        {
             *root = ".worktrees".to_owned();
             root_edited = true;
         }
     });
     ui.label(
-        RichText::new(
-            crate::i18n::text("repo-core-1544"),
-        )
-        .color(t.text_faint)
-        .small(),
+        RichText::new(crate::i18n::text("repo-core-1544"))
+            .color(t.text_faint)
+            .small(),
     );
     ui.label(
         RichText::new(crate::i18n::text("repo-core-1545"))
@@ -128,9 +140,23 @@ pub(super) fn add_worktree(
         *path = suggested_folder(repo, root, name);
     }
     ui.add_space(8.0);
-    ui.label(RichText::new(crate::i18n::text("repo-core-1546")).color(t.text_dim).small());
-    folder_field(ui, repo, path, path_edited, crate::i18n::text("repo-core-1546"));
-    if *path_edited && ui.small_button(crate::i18n::text("repo-core-1547")).clicked() {
+    ui.label(
+        RichText::new(crate::i18n::text("repo-core-1546"))
+            .color(t.text_dim)
+            .small(),
+    );
+    folder_field(
+        ui,
+        repo,
+        path,
+        path_edited,
+        crate::i18n::text("repo-core-1546"),
+    );
+    if *path_edited
+        && ui
+            .small_button(crate::i18n::text("repo-core-1547"))
+            .clicked()
+    {
         *path_edited = false;
         let name = if *new_branch {
             new_name.as_str()
@@ -151,42 +177,48 @@ pub(super) fn add_worktree(
         usable(branch)
     };
     let valid = name_ok && usable(path) && folder.is_ok() && resolved_root.is_ok();
-    buttons(ui, crate::i18n::text("repo-core-0976"), valid, enter, || {
-        let path = folder.clone().unwrap_or_default();
-        let args: Vec<String> = if *new_branch {
-            vec![
-                "worktree".into(),
-                "add".into(),
-                "-b".into(),
-                new_name.trim().to_owned(),
-                "--".into(),
-                path.clone(),
-                base.to_owned(),
-            ]
-        } else {
-            vec![
-                "worktree".into(),
-                "add".into(),
-                "--".into(),
-                path.clone(),
-                branch.clone(),
-            ]
-        };
-        Action::Ops {
-            label: crate::i18n::text("repo-core-1535").to_owned(),
-            ops: vec![
+    buttons(
+        ui,
+        crate::i18n::text("repo-core-0976"),
+        valid,
+        enter,
+        || {
+            let path = folder.clone().unwrap_or_default();
+            let args: Vec<String> = if *new_branch {
                 vec![
-                    "config".into(),
-                    "--local".into(),
+                    "worktree".into(),
+                    "add".into(),
+                    "-b".into(),
+                    new_name.trim().to_owned(),
                     "--".into(),
-                    git::WORKTREE_ROOT_KEY.into(),
-                    root.trim().to_owned(),
+                    path.clone(),
+                    base.to_owned(),
+                ]
+            } else {
+                vec![
+                    "worktree".into(),
+                    "add".into(),
+                    "--".into(),
+                    path.clone(),
+                    branch.clone(),
+                ]
+            };
+            Action::Ops {
+                label: crate::i18n::text("repo-core-1535").to_owned(),
+                ops: vec![
+                    vec![
+                        "config".into(),
+                        "--local".into(),
+                        "--".into(),
+                        git::WORKTREE_ROOT_KEY.into(),
+                        root.trim().to_owned(),
+                    ],
+                    args,
                 ],
-                args,
-            ],
-            refresh: Refresh::All,
-        }
-    })
+                refresh: Refresh::All,
+            }
+        },
+    )
 }
 
 /// Suggest a branch subfolder using the root resolved from the main checkout.
@@ -202,9 +234,12 @@ fn new_branch_field(ui: &mut Ui, new_name: &mut String, base: &str, focus: &mut 
     let edit = field(ui, new_name, "feature/my-branch", focus);
     dash_spaces(new_name);
     ui.label(
-        RichText::new(crate::i18n::message("repo-core-1549", &[("base", format!("{}", base).into())]))
-            .color(t.text_faint)
-            .small(),
+        RichText::new(crate::i18n::message(
+            "repo-core-1549",
+            &[("base", format!("{}", base).into())],
+        ))
+        .color(t.text_faint)
+        .small(),
     );
     edit.changed()
 }
@@ -228,9 +263,7 @@ fn branch_choice(ui: &mut Ui, branch: &mut String, free: &[&str]) -> bool {
                 }
             }
             if free.is_empty() {
-                ui.label(
-                    RichText::new(crate::i18n::text("repo-core-1552")).color(t.text_faint),
-                );
+                ui.label(RichText::new(crate::i18n::text("repo-core-1552")).color(t.text_faint));
             }
         });
     changed
@@ -258,7 +291,8 @@ fn folder_field(
         if ui
             .add_enabled(
                 can_pick,
-                egui::Button::new(crate::i18n::text("repo-core-0300")).min_size(egui::vec2(80.0, 28.0)),
+                egui::Button::new(crate::i18n::text("repo-core-0300"))
+                    .min_size(egui::vec2(80.0, 28.0)),
             )
             .on_disabled_hover_text(crate::i18n::text("repo-core-1553"))
             .clicked()

@@ -39,7 +39,11 @@ pub(in crate::repo::diff) fn binary_view(ui: &mut Ui, pair: &BinaryPair, id: &st
                 ));
             }
             if let Some(m) = &pair.members {
-                options.push((Show::Members, crate::i18n::text("repo-core-1598"), !m.is_empty()));
+                options.push((
+                    Show::Members,
+                    crate::i18n::text("repo-core-1598"),
+                    !m.is_empty(),
+                ));
             }
             if has_bytes(pair) {
                 options.push((Show::Hex, crate::i18n::text("repo-core-1684"), true));
@@ -52,7 +56,10 @@ pub(in crate::repo::diff) fn binary_view(ui: &mut Ui, pair: &BinaryPair, id: &st
                     .iter()
                     .any(|s| s.as_ref().is_some_and(|s| s.kind.is_none() && !s.failed))
                 {
-                    let text = crate::i18n::message("repo-core-1685", &[("MAX-READ", format!("{}", human_size(MAX_READ)).into())]);
+                    let text = crate::i18n::message(
+                        "repo-core-1685",
+                        &[("MAX-READ", format!("{}", human_size(MAX_READ)).into())],
+                    );
                     ui.label(RichText::new(text).color(t.text_dim));
                 }
                 return;
@@ -112,8 +119,16 @@ pub(super) fn size_text(s: &Side) -> String {
     let limit = human_size(MAX_READ);
     match (s.size, s.kind.is_some()) {
         (Some(n), true) => human_size(n),
-        (Some(n), false) => crate::i18n::message("repo-core-1689", &[("n", format!("{}", human_size(n)).into()), ("limit", format!("{}", limit).into())]),
-        (None, _) => crate::i18n::message("repo-core-1690", &[("limit", format!("{}", limit).into())]),
+        (Some(n), false) => crate::i18n::message(
+            "repo-core-1689",
+            &[
+                ("n", format!("{}", human_size(n)).into()),
+                ("limit", format!("{}", limit).into()),
+            ],
+        ),
+        (None, _) => {
+            crate::i18n::message("repo-core-1690", &[("limit", format!("{}", limit).into())])
+        }
     }
 }
 
@@ -122,7 +137,9 @@ fn summary(ui: &mut Ui, t: &Tokens, pair: &BinaryPair) {
     let kind = |s: &Option<Side>| s.as_ref().and_then(|s| s.kind.clone());
     let kinds = match (kind(&pair.old), kind(&pair.new)) {
         (Some(a), Some(b)) if a != b => format!("{a} → {b}"),
-        (a, b) => b.or(a).unwrap_or_else(|| crate::i18n::text("repo-core-1600").to_owned()),
+        (a, b) => b
+            .or(a)
+            .unwrap_or_else(|| crate::i18n::text("repo-core-1600").to_owned()),
     };
     ui.horizontal(|ui| {
         icons::inline(ui, "file-diff", 16.0, t.icon);
@@ -156,7 +173,10 @@ fn summary(ui: &mut Ui, t: &Tokens, pair: &BinaryPair) {
         .spacing([18.0, 4.0])
         .show(ui, |ui| {
             ui.label("");
-            for title in [crate::i18n::text("repo-core-1564"), crate::i18n::text("repo-core-1565")] {
+            for title in [
+                crate::i18n::text("repo-core-1564"),
+                crate::i18n::text("repo-core-1565"),
+            ] {
                 ui.label(
                     RichText::new(title)
                         .font(theme::semibold(12.0))
@@ -170,7 +190,12 @@ fn summary(ui: &mut Ui, t: &Tokens, pair: &BinaryPair) {
                 ui.label(RichText::new(k).color(t.text_dim));
                 for (v, side, missing, color) in [
                     (&a, &pair.old, crate::i18n::text("repo-core-1695"), t.danger),
-                    (&b, &pair.new, crate::i18n::text("repo-core-1696"), t.success),
+                    (
+                        &b,
+                        &pair.new,
+                        crate::i18n::text("repo-core-1696"),
+                        t.success,
+                    ),
                 ] {
                     let shown = match (v, side) {
                         (Some(v), _) => {
@@ -199,7 +224,10 @@ fn text_diff(ui: &mut Ui, t: &Tokens, pair: &BinaryPair) {
             crate::i18n::text("repo-core-1684")
         };
         ui.label(
-            RichText::new(crate::i18n::message("repo-core-1698", &[("more", format!("{}", more).into())]))
+            RichText::new(crate::i18n::message(
+                "repo-core-1698",
+                &[("more", format!("{}", more).into())],
+            ))
             .color(t.text_dim),
         );
     }
@@ -256,12 +284,21 @@ fn members(ui: &mut Ui, t: &Tokens, changes: &[MemberChange]) {
             for c in &changes[range] {
                 ui.horizontal(|ui| {
                     let (word, color, size) = match (c.old, c.new) {
-                        (None, Some(n)) => (crate::i18n::text("repo-core-1702"), t.success, human_size(n)),
-                        (Some(o), None) => (crate::i18n::text("repo-core-1703"), t.danger, human_size(o)),
+                        (None, Some(n)) => (
+                            crate::i18n::text("repo-core-1702"),
+                            t.success,
+                            human_size(n),
+                        ),
+                        (Some(o), None) => {
+                            (crate::i18n::text("repo-core-1703"), t.danger, human_size(o))
+                        }
                         (Some(o), Some(n)) if o == n => (
                             crate::i18n::text("repo-core-1704"),
                             t.warning,
-                            crate::i18n::message("repo-core-1705", &[("n", format!("{}", human_size(n)).into())]),
+                            crate::i18n::message(
+                                "repo-core-1705",
+                                &[("n", format!("{}", human_size(n)).into())],
+                            ),
                         ),
                         (Some(o), Some(n)) => (
                             crate::i18n::text("repo-core-1704"),

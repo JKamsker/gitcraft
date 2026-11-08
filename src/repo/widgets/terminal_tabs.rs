@@ -41,7 +41,7 @@ pub fn terminal_tabs(
     crate::menu_item::context(&plus)
         .style(crate::theme::menu_style)
         .show(|ui| shell_items(ui, acts));
-    let more = icons::small_button(ui, "chevron-down", "New terminal with…");
+    let more = icons::small_button(ui, "chevron-down", crate::i18n::text("repo-core-3773"));
     egui::Popup::menu(&more)
         .style(crate::theme::menu_style)
         .show(|ui| shell_items(ui, acts));
@@ -49,10 +49,10 @@ pub fn terminal_tabs(
         ui.add_space(4.0);
         use crate::repo::popout::{Panel, Request};
         if popped {
-            if icons::small_button(ui, "x", "Close the window (shells keep running)").clicked() {
+            if icons::small_button(ui, "x", crate::i18n::text("repo-core-3774")).clicked() {
                 acts.push(Action::Popout(Request::Close(Panel::Terminal)));
             }
-        } else if icons::small_button(ui, "x", "Hide the panel (shells keep running)").clicked() {
+        } else if icons::small_button(ui, "x", crate::i18n::text("repo-core-3775")).clicked() {
             acts.push(Action::ToggleTerminal);
         }
         crate::repo::popout::button(ui, crate::repo::popout::Panel::Terminal, popped, acts);
@@ -78,7 +78,16 @@ fn terminal_tab(
         ui.painter()
             .layout_no_wrap(label, font, if selected { t.text } else { t.text_dim });
     let (rect, resp) = ui.allocate_exact_size(vec2(galley.size().x + 44.0, 26.0), Sense::click());
-    super::a11y_selected(&resp, || format!("Terminal {}", galley.text()), selected);
+    super::a11y_selected(
+        &resp,
+        || {
+            crate::i18n::message(
+                "repo-core-3776",
+                &[("text", format!("{}", galley.text()).into())],
+            )
+        },
+        selected,
+    );
     let shape = top_rounded(t.radius as u8);
     if selected {
         ui.painter().rect_filled(rect, shape, t.card);
@@ -101,11 +110,11 @@ fn terminal_tab(
         Rect::from_center_size(pos2(rect.right() - 11.0, rect.center().y), vec2(16.0, 16.0));
     let x = ui
         .interact(x_rect, resp.id.with("close"), Sense::click())
-        .on_hover_text("Close (ends the shell)");
+        .on_hover_text(crate::i18n::text("repo-core-3778"));
     super::a11y(
         &x,
         egui::WidgetType::Button,
-        "Close terminal (ends the shell)",
+        crate::i18n::text("repo-core-3779"),
     );
     if x.hovered() {
         ui.painter().rect_filled(x_rect, t.radius_sm, t.pressed);

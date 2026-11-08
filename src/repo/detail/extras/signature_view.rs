@@ -92,12 +92,22 @@ fn body(ui: &mut Ui, sig: &Signature) {
                 ui.end_row();
             };
             if let Some(format) = sig.format {
-                row(ui, crate::i18n::text("repo-core-1139"), format.label(), false);
+                row(
+                    ui,
+                    crate::i18n::text("repo-core-1139"),
+                    format.label(),
+                    false,
+                );
             }
             row(ui, crate::i18n::text("repo-core-1140"), &sig.signer, false);
             row(ui, crate::i18n::text("repo-core-1141"), &sig.key, true);
             if sig.primary_key != sig.key {
-                row(ui, crate::i18n::text("repo-core-1142"), &sig.primary_key, true);
+                row(
+                    ui,
+                    crate::i18n::text("repo-core-1142"),
+                    &sig.primary_key,
+                    true,
+                );
             }
         });
     if sig.raw.trim().is_empty() {

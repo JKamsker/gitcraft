@@ -34,7 +34,10 @@ impl RepoTab {
         // `--`: a name that is no branch (any more) must not be taken for a file to discard
         // the changes of.
         self.run_undoable(
-            &crate::i18n::message("repo-core-0339", &[("target", format!("{}", target).into())]),
+            &crate::i18n::message(
+                "repo-core-0339",
+                &[("target", format!("{}", target).into())],
+            ),
             ops(&[&["checkout", target, "--"]]),
             Refresh::All,
             undo,
@@ -60,7 +63,10 @@ impl RepoTab {
         let run = ops(&[&["checkout", branch, "--"], &["pull", "--ff-only"]]);
         let undo = checkout_pull_undo(&previous, branch, &was, &run);
         self.run_undoable(
-            &crate::i18n::message("repo-core-0340", &[("branch", format!("{}", branch).into())]),
+            &crate::i18n::message(
+                "repo-core-0340",
+                &[("branch", format!("{}", branch).into())],
+            ),
             run,
             Refresh::All,
             undo,
@@ -125,7 +131,10 @@ impl RepoTab {
             if let super::Dialog::GerritReview { head, .. } = &mut dialog {
                 *head = b.target.clone();
             }
-            return Some((crate::i18n::text("repo-core-0345").to_owned(), Action::Dialog(dialog)));
+            return Some((
+                crate::i18n::text("repo-core-0345").to_owned(),
+                Action::Dialog(dialog),
+            ));
         }
         Some((
             crate::i18n::text("repo-core-0346").into(),
@@ -144,7 +153,10 @@ impl RepoTab {
             b.name.clone(),
         ];
         Action::UndoableOps {
-            label: crate::i18n::message("repo-core-0348", &[("upstream", format!("{}", b.upstream).into())]),
+            label: crate::i18n::message(
+                "repo-core-0348",
+                &[("upstream", format!("{}", b.upstream).into())],
+            ),
             ops: vec![unset.clone()],
             refresh: Refresh::All,
             undo: Undo::Custom {
@@ -203,7 +215,13 @@ impl RepoTab {
         }
         // A rebase or patch stopped on conflicts finishes with `--continue`, not a new commit.
         if let Some(state) = self.work.in_progress.filter(|s| s.continues()) {
-            let label = crate::i18n::message("repo-core-0352", &[("to-lowercase", format!("{}", state.label().to_lowercase()).into())]);
+            let label = crate::i18n::message(
+                "repo-core-0352",
+                &[(
+                    "to-lowercase",
+                    format!("{}", state.label().to_lowercase()).into(),
+                )],
+            );
             let mut steps = ops(&[&[state.command(), "--continue"]]);
             // Stopped at a commit to edit, with the changes not staged: they go into it, as a
             // commit stages everything when nothing is (git would refuse, talking of conflicts).
@@ -252,7 +270,11 @@ impl RepoTab {
         steps.push(commit);
         // Ticked to skip its hooks: this commit only.
         let steps = self.skip_hooks.commit_steps(steps);
-        let label = if self.amend { crate::i18n::text("repo-core-0358") } else { crate::i18n::text("repo-core-0056") };
+        let label = if self.amend {
+            crate::i18n::text("repo-core-0358")
+        } else {
+            crate::i18n::text("repo-core-0056")
+        };
         self.run_undoable(
             label,
             steps,
@@ -284,7 +306,10 @@ impl RepoTab {
         let Some(remote) = self.default_remote() else {
             return;
         };
-        let label = crate::i18n::message("repo-core-0360", &[("noun", format!("{}", hosting.forge.noun()).into())]);
+        let label = crate::i18n::message(
+            "repo-core-0360",
+            &[("noun", format!("{}", hosting.forge.noun()).into())],
+        );
         self.busy_op = Some(label.clone());
         self.op_started = Some(Instant::now());
         // Signing in after this fails must not run some earlier operation again.

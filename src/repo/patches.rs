@@ -10,7 +10,7 @@ use crate::git;
 impl RepoTab {
     /// Asks where to save the patch of commit `hash`, then writes it there.
     pub(super) fn save_patch(&mut self, hash: String, summary: &str, ctx: &egui::Context) {
-        let mut dialog = rfd::FileDialog::new().set_title("Save patch");
+        let mut dialog = rfd::FileDialog::new().set_title(crate::i18n::text("repo-core-3012"));
         // Saved on this machine: next to the repository when it is here (a folder in WSL
         // would make the dialog wait for WSL).
         if !crate::remote::is_remote(&self.path) {
@@ -18,7 +18,7 @@ impl RepoTab {
         }
         let Some(file) = dialog
             .set_file_name(patch_file_name(summary))
-            .add_filter("Patch", &["patch"])
+            .add_filter(crate::i18n::text("repo-core-3013"), &["patch"])
             .save_file()
         else {
             return;
@@ -32,20 +32,32 @@ impl RepoTab {
 
     pub(super) fn patch_saved(&mut self, file: PathBuf, result: Result<(), String>) {
         self.status = Some(match result {
-            Ok(()) => (format!("Patch saved to {}", file.display()), false),
-            Err(e) => (format!("Create patch failed: {e}"), true),
+            Ok(()) => (
+                crate::i18n::message(
+                    "repo-core-3016",
+                    &[("file", format!("{}", file.display()).into())],
+                ),
+                false,
+            ),
+            Err(e) => (
+                crate::i18n::message("repo-core-3017", &[("e", format!("{}", e).into())]),
+                true,
+            ),
         });
     }
 
     /// Asks for a patch file and applies it, undoably.
     pub(super) fn apply_patch(&mut self, ctx: &egui::Context) {
-        let mut dialog = rfd::FileDialog::new().set_title("Apply patch");
+        let mut dialog = rfd::FileDialog::new().set_title(crate::i18n::text("repo-core-3018"));
         if !crate::remote::is_remote(&self.path) {
             dialog = dialog.set_directory(&self.path);
         }
         let Some(file) = dialog
-            .add_filter("Patch", &["patch", "diff", "eml", "mbox"])
-            .add_filter("All files", &["*"])
+            .add_filter(
+                crate::i18n::text("repo-core-3013"),
+                &["patch", "diff", "eml", "mbox"],
+            )
+            .add_filter(crate::i18n::text("repo-core-3021"), &["*"])
             .pick_file()
         else {
             return;
@@ -63,13 +75,22 @@ impl RepoTab {
         ctx: &egui::Context,
     ) -> Result<(), String> {
         if let Some(busy) = &self.busy_op {
-            return Err(format!("{} is busy: {busy}", self.name));
+            return Err(crate::i18n::message(
+                "repo-core-3022",
+                &[
+                    ("name", format!("{}", self.name).into()),
+                    ("busy", format!("{}", busy).into()),
+                ],
+            ));
         }
         if matches!(
             self.dropped_patch,
             DroppedPatch::Preparing | DroppedPatch::Running(_)
         ) {
-            return Err(format!("{} is still applying a patch", self.name));
+            return Err(crate::i18n::message(
+                "repo-core-3023",
+                &[("name", format!("{}", self.name).into())],
+            ));
         }
         self.status = None;
         self.dropped_patch = DroppedPatch::Preparing;
@@ -113,15 +134,27 @@ impl RepoTab {
         let bytes = match std::fs::read(&file) {
             Ok(bytes) => bytes,
             Err(e) => {
-                let why = format!("could not read {}: {e}", file_name(&file));
-                self.status = Some((format!("Apply patch: {why}"), true));
+                let why = crate::i18n::message(
+                    "repo-core-3024",
+                    &[
+                        ("file", format!("{}", file_name(&file)).into()),
+                        ("e", format!("{}", e).into()),
+                    ],
+                );
+                self.status = Some((
+                    crate::i18n::message("repo-core-3025", &[("why", format!("{}", why).into())]),
+                    true,
+                ));
                 if dropped {
                     self.dropped_patch = DroppedPatch::Done(Err(why));
                 }
                 return;
             }
         };
-        let label = format!("Apply {}", file_name(&file));
+        let label = crate::i18n::message(
+            "repo-core-3026",
+            &[("file", format!("{}", file_name(&file)).into())],
+        );
         let mail = is_mail(&String::from_utf8_lossy(&bytes));
         // For a repository on another machine, git there reads a copy put there (in the
         // background). A panic there still comes back as an error, so that a dropped patch
@@ -138,7 +171,7 @@ impl RepoTab {
                         None => Ok(file.to_string_lossy().into_owned()),
                     },
                 ))
-                .unwrap_or_else(|_| Err("internal error while copying it there".to_owned()))
+                .unwrap_or_else(|_| Err(crate::i18n::text("repo-core-3028").to_owned()))
             },
             move |tab, file, ctx| tab.apply_prepared_patch(label, file, mail, dropped, ctx),
         );
@@ -156,9 +189,12 @@ impl RepoTab {
         let started = match file {
             Err(e) => Err(e),
             // Another operation started meanwhile: it would not start, silently.
-            Ok(_) if self.busy_op.is_some() => Err(format!(
-                "wait until {} is done",
-                self.busy_op.clone().unwrap_or_default()
+            Ok(_) if self.busy_op.is_some() => Err(crate::i18n::message(
+                "repo-core-3029",
+                &[(
+                    "self",
+                    format!("{}", self.busy_op.clone().unwrap_or_default()).into(),
+                )],
             )),
             Ok(file) => {
                 self.apply_patch_file(&label, &file, mail, ctx);
@@ -169,7 +205,16 @@ impl RepoTab {
             Ok(()) if dropped => self.dropped_patch = DroppedPatch::Running(label),
             Ok(()) => {}
             Err(e) => {
-                self.status = Some((crate::i18n::message("repo-core-0270", &[("label", format!("{}", label).into()), ("e", format!("{}", e).into())]), true));
+                self.status = Some((
+                    crate::i18n::message(
+                        "repo-core-0270",
+                        &[
+                            ("label", format!("{}", label).into()),
+                            ("e", format!("{}", e).into()),
+                        ],
+                    ),
+                    true,
+                ));
                 if dropped {
                     self.dropped_patch = DroppedPatch::Done(Err(e));
                 }

@@ -13,7 +13,10 @@ pub(super) const EDITED: &str = "repo-core-1953";
 /// Where the diff comes from, for its header: git's own merge of the parents, then the
 /// recorded one.
 pub(super) fn origin(hash: &str) -> String {
-    crate::i18n::message("repo-core-1954", &[("hash", format!("{}", hash.get(..8).unwrap_or(hash)).into())])
+    crate::i18n::message(
+        "repo-core-1954",
+        &[("hash", format!("{}", hash.get(..8).unwrap_or(hash)).into())],
+    )
 }
 
 /// `lines` of a file's remerge diff, after what git said of its `conflicts`, each hunk header
@@ -95,7 +98,10 @@ index a2ad40a..8bcb16a 100644
             .map(|l| l.text.as_str())
             .collect();
         assert_eq!(hunks.len(), 2);
-        assert!(hunks[0].starts_with("@@ -1,7 +1,3 @@") && hunks[0].ends_with(crate::i18n::text(RESOLVES)));
+        assert!(
+            hunks[0].starts_with("@@ -1,7 +1,3 @@")
+                && hunks[0].ends_with(crate::i18n::text(RESOLVES))
+        );
         // Away from the markers, in the same file: an edit beyond the merge.
         assert!(hunks[1].contains("fn tail") && hunks[1].ends_with(crate::i18n::text(EDITED)));
         // The line numbers still count from the hunk's own header.
@@ -129,11 +135,19 @@ index a2ad40a..8bcb16a 100644
             vec!["CONFLICT (modify/delete): f deleted in a and modified in b".to_owned()];
         let text = "diff --git a/f b/f\n--- a/f\n+++ /dev/null\n@@ -1 +0,0 @@\n-x\n";
         let lines = label(&conflicts, parse(text), false);
-        assert!(lines[1].text.ends_with(crate::i18n::text(RESOLVES)), "{:?}", lines[1]);
+        assert!(
+            lines[1].text.ends_with(crate::i18n::text(RESOLVES)),
+            "{:?}",
+            lines[1]
+        );
         // A content conflict whose markers git couldn't write (a link): resolved there too.
         let text = "diff --git a/l b/l\n--- a/l\n+++ b/l\n@@ -1 +1 @@\n-one\n+two\n";
         let lines = label(&content(), parse(text), false);
-        assert!(lines[1].text.ends_with(crate::i18n::text(RESOLVES)), "{:?}", lines[1]);
+        assert!(
+            lines[1].text.ends_with(crate::i18n::text(RESOLVES)),
+            "{:?}",
+            lines[1]
+        );
     }
 
     #[test]
@@ -141,7 +155,11 @@ index a2ad40a..8bcb16a 100644
         // A setext heading's underline, or an added marker: an edit, not a resolution.
         let text = "diff --git a/f b/f\n--- a/f\n+++ b/f\n@@ -1,2 +1,2 @@\n T\n-=======\n+-----\n";
         let lines = label(&[], parse(text), false);
-        assert!(lines[0].text.ends_with(crate::i18n::text(EDITED)), "{:?}", lines[0]);
+        assert!(
+            lines[0].text.ends_with(crate::i18n::text(EDITED)),
+            "{:?}",
+            lines[0]
+        );
         let text = "diff --git a/f b/f\n--- a/f\n+++ b/f\n@@ -1 +1,2 @@\n x\n+=======\n";
         let lines = label(&content(), parse(text), false);
         assert!(

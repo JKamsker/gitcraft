@@ -177,7 +177,10 @@ pub(crate) fn show(
         Some(Ok(data)) => data,
     };
     let note = match data.binary {
-        Some(size) => Some(crate::i18n::message("repo-core-2465", &[("size", (size).into())])),
+        Some(size) => Some(crate::i18n::message(
+            "repo-core-2465",
+            &[("size", (size).into())],
+        )),
         None if data.lines.is_empty() => Some(crate::i18n::text("repo-core-2466").to_owned()),
         None => None,
     };
@@ -272,7 +275,12 @@ pub(crate) fn show(
             let (rect, resp) = ui.allocate_exact_size(vec2(width, LINE_H), Sense::click_and_drag());
             crate::a11y::a11y_selected(
                 &resp,
-                || crate::i18n::message("repo-core-2471", &[("i", format!("{}", i + 1).into()), ("line", (line).into())]),
+                || {
+                    crate::i18n::message(
+                        "repo-core-2471",
+                        &[("i", format!("{}", i + 1).into()), ("line", (line).into())],
+                    )
+                },
                 pick.is_some_and(|p| p.contains(i)),
             );
             if resp.drag_started() {
@@ -366,7 +374,13 @@ fn lines_menu(
             let which = if start == end {
                 crate::i18n::message("repo-core-2472", &[("start", format!("{}", start).into())])
             } else {
-                crate::i18n::message("repo-core-2473", &[("start", format!("{}", start).into()), ("end", format!("{}", end).into())])
+                crate::i18n::message(
+                    "repo-core-2473",
+                    &[
+                        ("start", format!("{}", start).into()),
+                        ("end", format!("{}", end).into()),
+                    ],
+                )
             };
             if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-1133"))
                 .icon("copy")
@@ -385,7 +399,10 @@ fn lines_menu(
                         .icon("history")
                         .keys(crate::keymap::Command::SelectionHistory)
                         .show(ui)
-                        .on_hover_text(crate::i18n::message("repo-core-2474", &[("which", format!("{}", which).into())]));
+                        .on_hover_text(crate::i18n::message(
+                            "repo-core-2474",
+                            &[("which", format!("{}", which).into())],
+                        ));
                     if b.clicked() {
                         *asked = Some((start, end));
                     }

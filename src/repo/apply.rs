@@ -103,7 +103,13 @@ impl RepoTab {
             Action::ReloadPreflight(plan) => self.reload_preflight(*plan, ctx),
             Action::RepositoryTools(act) => self.repository_tools_act(act, ctx),
             Action::DvcPull => {
-                self.dialog=Some(super::Dialog::confirm(crate::i18n::text("repo-core-0020"), crate::i18n::text("repo-core-0143").into(), crate::i18n::text("repo-core-0144"),git::dvc::pull_steps(),None));
+                self.dialog = Some(super::Dialog::confirm(
+                    crate::i18n::text("repo-core-0020"),
+                    crate::i18n::text("repo-core-0143").into(),
+                    crate::i18n::text("repo-core-0144"),
+                    git::dvc::pull_steps(),
+                    None,
+                ));
             }
 
             Action::OpenFileComparison(page) => self.open_file_comparison(page, ctx),
@@ -668,8 +674,17 @@ impl RepoTab {
             Ok(added) => {
                 if tracked {
                     self.run_prepared(
-                        &crate::i18n::message("repo-core-0155", &[("pattern", format!("{}", pattern).into())]),
-                        &crate::i18n::message("repo-core-0156", &[("pattern", format!("{}", pattern).into()), ("path", format!("{}", path).into())]),
+                        &crate::i18n::message(
+                            "repo-core-0155",
+                            &[("pattern", format!("{}", pattern).into())],
+                        ),
+                        &crate::i18n::message(
+                            "repo-core-0156",
+                            &[
+                                ("pattern", format!("{}", pattern).into()),
+                                ("path", format!("{}", path).into()),
+                            ],
+                        ),
                         ops(&[&[
                             "--literal-pathspecs",
                             "rm",
@@ -685,9 +700,15 @@ impl RepoTab {
                     );
                 } else {
                     let msg = if added {
-                        crate::i18n::message("repo-core-0162", &[("pattern", format!("{}", pattern).into())])
+                        crate::i18n::message(
+                            "repo-core-0162",
+                            &[("pattern", format!("{}", pattern).into())],
+                        )
                     } else {
-                        crate::i18n::message("repo-core-0163", &[("pattern", format!("{}", pattern).into())])
+                        crate::i18n::message(
+                            "repo-core-0163",
+                            &[("pattern", format!("{}", pattern).into())],
+                        )
                     };
                     self.status = Some((msg, false));
                     self.reload_status(ctx);
@@ -749,7 +770,10 @@ impl RepoTab {
             key: view.key.clone(),
             request: view.request,
             pick,
-            preparing: crate::i18n::message("repo-core-0166", &[("label", format!("{}", label).into())]),
+            preparing: crate::i18n::message(
+                "repo-core-0166",
+                &[("label", format!("{}", label).into())],
+            ),
             label,
             started: Instant::now(),
         };
@@ -786,10 +810,7 @@ impl RepoTab {
             || self.load_error.is_some()
             || !current
         {
-            self.status = Some((
-                crate::i18n::text("repo-core-0167").to_owned(),
-                true,
-            ));
+            self.status = Some((crate::i18n::text("repo-core-0167").to_owned(), true));
             return;
         }
         self.apply_picked(prepared.pick, &prepared.label, saved, ctx);
@@ -844,15 +865,25 @@ impl RepoTab {
             move |tab, (result, state), ctx| {
                 tab.status = Some(match result {
                     Ok(Some(command)) => {
-                        let tool = if command == "nbstripout" { "nbstripout" } else { "Python" };
+                        let tool = if command == "nbstripout" {
+                            "nbstripout"
+                        } else {
+                            "Python"
+                        };
                         (
-                            crate::i18n::message("repo-core-0172", &[("tool", format!("{}", tool).into())]),
+                            crate::i18n::message(
+                                "repo-core-0172",
+                                &[("tool", format!("{}", tool).into())],
+                            ),
                             false,
                         )
                     }
                     Ok(_) => match state {
                         git::StripState::Other(name) => (
-                            crate::i18n::message("repo-core-0173", &[("name", format!("{}", name).into())]),
+                            crate::i18n::message(
+                                "repo-core-0173",
+                                &[("name", format!("{}", name).into())],
+                            ),
                             false,
                         ),
                         _ => (crate::i18n::text("repo-core-0174").to_owned(), false),
@@ -893,9 +924,23 @@ impl RepoTab {
                 let left = ed.take_solved(text);
                 let solved = before.saturating_sub(left);
                 let message = match (solved, left) {
-                    (0, _) => crate::i18n::message("repo-core-0176", &[("path", format!("{}", path).into())]),
-                    (_, 0) => crate::i18n::message("repo-core-0177", &[("path", format!("{}", path).into())]),
-                    _ => crate::i18n::message("repo-core-0178", &[("solved", (solved).into()), ("before", (before).into()), ("path", format!("{}", path).into()), ("left", (left).into())]),
+                    (0, _) => crate::i18n::message(
+                        "repo-core-0176",
+                        &[("path", format!("{}", path).into())],
+                    ),
+                    (_, 0) => crate::i18n::message(
+                        "repo-core-0177",
+                        &[("path", format!("{}", path).into())],
+                    ),
+                    _ => crate::i18n::message(
+                        "repo-core-0178",
+                        &[
+                            ("solved", (solved).into()),
+                            ("before", (before).into()),
+                            ("path", format!("{}", path).into()),
+                            ("left", (left).into()),
+                        ],
+                    ),
                 };
                 (message, false)
             }
@@ -951,7 +996,10 @@ impl RepoTab {
             Ok(()) => {
                 self.run_prepared(
                     crate::i18n::text("repo-core-0179"),
-                    &crate::i18n::message("repo-core-0180", &[("file", format!("{}", file).into())]),
+                    &crate::i18n::message(
+                        "repo-core-0180",
+                        &[("file", format!("{}", file).into())],
+                    ),
                     ops(&[&["--literal-pathspecs", "add", "--", &file]]),
                     Refresh::Status,
                     OpKind::plain(),
@@ -982,7 +1030,13 @@ impl RepoTab {
     ) {
         if let Some(busy) = &self.busy_op {
             self.status = Some((
-                crate::i18n::message("repo-core-0182", &[("left", (left).into()), ("busy", format!("{}", busy).into())]),
+                crate::i18n::message(
+                    "repo-core-0182",
+                    &[
+                        ("left", (left).into()),
+                        ("busy", format!("{}", busy).into()),
+                    ],
+                ),
                 true,
             ));
             return;
@@ -1038,9 +1092,15 @@ pub(crate) fn open_in_editor(editor: &str, path: &Path) -> Result<(), String> {
         crate::shell_path::apply(&mut c);
         c
     };
-    let mut child = cmd
-        .spawn()
-        .map_err(|e| crate::i18n::message("repo-core-0191", &[("editor", format!("{}", editor).into()), ("e", format!("{}", e).into())]))?;
+    let mut child = cmd.spawn().map_err(|e| {
+        crate::i18n::message(
+            "repo-core-0191",
+            &[
+                ("editor", format!("{}", editor).into()),
+                ("e", format!("{}", e).into()),
+            ],
+        )
+    })?;
     // Reaped once it ends (most editor commands hand the file over and exit at once), or each
     // file opened would leave a zombie process for as long as the app runs.
     std::thread::spawn(move || {

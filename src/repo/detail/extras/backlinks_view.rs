@@ -55,14 +55,35 @@ pub(super) fn headline(links: &[Backlink], more: bool) -> String {
     let bare = links.len() - explicit;
     let mut parts = Vec::new();
     if explicit > 0 {
-        parts.push(crate::i18n::message("repo-core-1071", &[("explicit", format!("{}", explicit).into()), ("s", format!("{}", if explicit == 1 { "" } else { "s" }).into())]));
+        parts.push(crate::i18n::message(
+            "repo-core-1071",
+            &[
+                ("explicit", format!("{}", explicit).into()),
+                (
+                    "s",
+                    format!("{}", if explicit == 1 { "" } else { "s" }).into(),
+                ),
+            ],
+        ));
     }
     if bare > 0 {
-        parts.push(crate::i18n::message("repo-core-1072", &[("bare", format!("{}", bare).into()), ("s", format!("{}", if bare == 1 { "" } else { "s" }).into())]));
+        parts.push(crate::i18n::message(
+            "repo-core-1072",
+            &[
+                ("bare", format!("{}", bare).into()),
+                ("s", format!("{}", if bare == 1 { "" } else { "s" }).into()),
+            ],
+        ));
     }
     let text = parts.join(" · ");
     if more {
-        crate::i18n::message("repo-core-1073", &[("text", format!("{}", text).into()), ("BACKLINK-CAP", format!("{}", BACKLINK_CAP).into())])
+        crate::i18n::message(
+            "repo-core-1073",
+            &[
+                ("text", format!("{}", text).into()),
+                ("BACKLINK-CAP", format!("{}", BACKLINK_CAP).into()),
+            ],
+        )
     } else {
         text
     }
@@ -70,10 +91,7 @@ pub(super) fn headline(links: &[Backlink], more: bool) -> String {
 
 fn body(ui: &mut Ui, links: &[Backlink], more: bool, cmds: &mut Vec<ExtrasCmd>) {
     if links.is_empty() {
-        section::faint(
-            ui,
-            crate::i18n::text("repo-core-1074"),
-        );
+        section::faint(ui, crate::i18n::text("repo-core-1074"));
         return;
     }
     let (explicit, bare): (Vec<&Backlink>, Vec<&Backlink>) =
@@ -83,7 +101,10 @@ fn body(ui: &mut Ui, links: &[Backlink], more: bool, cmds: &mut Vec<ExtrasCmd>) 
     if more {
         section::faint(
             ui,
-            crate::i18n::message("repo-core-1077", &[("BACKLINK-CAP", format!("{}", BACKLINK_CAP).into())]),
+            crate::i18n::message(
+                "repo-core-1077",
+                &[("BACKLINK-CAP", format!("{}", BACKLINK_CAP).into())],
+            ),
         );
     }
 }
@@ -140,8 +161,24 @@ fn row(ui: &mut Ui, link: &Backlink) -> bool {
             ui.id().with(("backlink", &link.hash)),
             Sense::click(),
         )
-        .named(|| crate::i18n::message("repo-core-1079", &[("hash", format!("{}", short(&link.hash)).into()), ("subject", format!("{}", link.subject).into())]))
-        .on_hover_text(crate::i18n::message("repo-core-1080", &[("hash", format!("{}", short(&link.hash)).into()), ("author", format!("{}", link.author).into()), ("date", format!("{}", link.date).into()), ("text", format!("{}", link.text).into())]));
+        .named(|| {
+            crate::i18n::message(
+                "repo-core-1079",
+                &[
+                    ("hash", format!("{}", short(&link.hash)).into()),
+                    ("subject", format!("{}", link.subject).into()),
+                ],
+            )
+        })
+        .on_hover_text(crate::i18n::message(
+            "repo-core-1080",
+            &[
+                ("hash", format!("{}", short(&link.hash)).into()),
+                ("author", format!("{}", link.author).into()),
+                ("date", format!("{}", link.date).into()),
+                ("text", format!("{}", link.text).into()),
+            ],
+        ));
     // The root's action label and the interaction metadata describe this same button.
     // Keep one name; a second widget_info call would overwrite its existing action label.
     ui.ctx().accesskit_node_builder(resp.id, |node| {

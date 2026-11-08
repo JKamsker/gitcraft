@@ -44,7 +44,7 @@ impl WhatItDoes {
         WhatItDoes {
             ask,
             heading,
-            files_heading: "Uncommitted changes lost".to_owned(),
+            files_heading: crate::i18n::text("repo-core-1432").to_owned(),
             state: PreviewState::Unread,
             instead: None,
         }
@@ -172,8 +172,11 @@ pub(super) fn show(ui: &mut Ui, preview: &WhatItDoes) {
             ui.add_space(8.0);
             ui.add(
                 egui::Label::new(
-                    RichText::new(crate::i18n::message("repo-core-1436", &[("e", format!("{}", e).into())]))
-                        .color(t.text_dim),
+                    RichText::new(crate::i18n::message(
+                        "repo-core-1436",
+                        &[("e", format!("{}", e).into())],
+                    ))
+                    .color(t.text_dim),
                 )
                 .wrap(),
             );
@@ -191,7 +194,13 @@ fn ready(ui: &mut Ui, preview: &WhatItDoes, found: &Preview, t: &Tokens) {
     let heading = &preview.heading;
     if preview.ask.leaving.is_some() && found.leaving_total == 0 {
         // Said, so that an empty list doesn't read as a preview that didn't work.
-        section(ui, &crate::i18n::message("repo-core-1437", &[("heading", format!("{}", heading).into())]));
+        section(
+            ui,
+            &crate::i18n::message(
+                "repo-core-1437",
+                &[("heading", format!("{}", heading).into())],
+            ),
+        );
     }
     if found.leaving_total > 0 {
         section(ui, &format!("{heading} ({})", found.leaving_total));
@@ -222,7 +231,11 @@ fn ready(ui: &mut Ui, preview: &WhatItDoes, found: &Preview, t: &Tokens) {
         }
         let more = found.lost_total.saturating_sub(found.lost_files.len());
         if more > 0 {
-            more_row(ui, &crate::i18n::message("repo-core-1439", &[("more", format!("{}", more).into())]), t);
+            more_row(
+                ui,
+                &crate::i18n::message("repo-core-1439", &[("more", format!("{}", more).into())]),
+                t,
+            );
         }
     }
 }
@@ -237,7 +250,10 @@ fn section(ui: &mut Ui, title: &str) {
 fn commit_row(ui: &mut Ui, c: &git::LeavingCommit, t: &Tokens) {
     let (where_, color) = match &c.kept {
         Kept::OnlyHere => (crate::i18n::text("repo-core-1440").to_owned(), t.danger),
-        Kept::On(name) => (crate::i18n::message("repo-core-1441", &[("name", format!("{}", name).into())]), t.text_dim),
+        Kept::On(name) => (
+            crate::i18n::message("repo-core-1441", &[("name", format!("{}", name).into())]),
+            t.text_dim,
+        ),
         Kept::Elsewhere => (crate::i18n::text("repo-core-1442").to_owned(), t.text_dim),
     };
     ui.horizontal(|ui| {
@@ -273,8 +289,13 @@ fn more_only_here(found: &Preview) -> usize {
 fn more_commits(more: usize, only_here: usize) -> String {
     match only_here {
         0 => crate::i18n::message("repo-core-1439", &[("more", format!("{}", more).into())]),
-        n if n == more => crate::i18n::message("repo-core-1443", &[("more", format!("{}", more).into())]),
-        n => crate::i18n::message("repo-core-1444", &[("more", format!("{}", more).into()), ("n", (n).into())]),
+        n if n == more => {
+            crate::i18n::message("repo-core-1443", &[("more", format!("{}", more).into())])
+        }
+        n => crate::i18n::message(
+            "repo-core-1444",
+            &[("more", format!("{}", more).into()), ("n", (n).into())],
+        ),
     }
 }
 
@@ -284,9 +305,18 @@ fn pushed_note(upstream: &str, commits: usize) -> String {
     let which = if commits == 1 {
         crate::i18n::text("repo-core-1445").to_owned()
     } else {
-        crate::i18n::message("repo-core-1446", &[("commits", format!("{}", commits).into())])
+        crate::i18n::message(
+            "repo-core-1446",
+            &[("commits", format!("{}", commits).into())],
+        )
     };
-    crate::i18n::message("repo-core-1447", &[("which", format!("{}", which).into()), ("upstream", format!("{}", upstream).into())])
+    crate::i18n::message(
+        "repo-core-1447",
+        &[
+            ("which", format!("{}", which).into()),
+            ("upstream", format!("{}", upstream).into()),
+        ],
+    )
 }
 
 /// The commands, folded: `ops` (the expectation steps, which run no git, left out), or
@@ -309,15 +339,17 @@ pub(super) fn commands(
         return;
     }
     ui.add_space(8.0);
-    egui::CollapsingHeader::new(RichText::new(crate::i18n::text("repo-core-1448")).font(theme::medium(12.0)))
-        // Folded again for another kind of dialog.
-        .id_salt(("confirm-commands", title))
-        .default_open(false)
-        .show(ui, |ui| {
-            for line in &lines {
-                ui.add(egui::Label::new(RichText::new(line).font(theme::mono(11.5))).wrap());
-            }
-        });
+    egui::CollapsingHeader::new(
+        RichText::new(crate::i18n::text("repo-core-1448")).font(theme::medium(12.0)),
+    )
+    // Folded again for another kind of dialog.
+    .id_salt(("confirm-commands", title))
+    .default_open(false)
+    .show(ui, |ui| {
+        for line in &lines {
+            ui.add(egui::Label::new(RichText::new(line).font(theme::mono(11.5))).wrap());
+        }
+    });
 }
 
 /// `op` as one would type it: `git` and its arguments, quoted where a shell would need it.
@@ -364,8 +396,14 @@ fn undo_text(undo: &Undo, lost_files: bool) -> Option<String> {
     let key = crate::manual::command();
     match undo {
         Undo::None => None,
-        Undo::HeadMove { .. } if lost_files => Some(crate::i18n::message("repo-core-1451", &[("key", format!("{}", key).into())])),
-        Undo::HeadMove { .. } | Undo::Custom { .. } => Some(crate::i18n::message("repo-core-1452", &[("key", format!("{}", key).into())])),
+        Undo::HeadMove { .. } if lost_files => Some(crate::i18n::message(
+            "repo-core-1451",
+            &[("key", format!("{}", key).into())],
+        )),
+        Undo::HeadMove { .. } | Undo::Custom { .. } => Some(crate::i18n::message(
+            "repo-core-1452",
+            &[("key", format!("{}", key).into())],
+        )),
     }
 }
 

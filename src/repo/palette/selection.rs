@@ -37,7 +37,7 @@ impl RepoTab {
         if idle && !is_head {
             items.push(
                 PaletteItem::action(
-                    format!("Cherry-pick {at}"),
+                    crate::i18n::message("repo-core-2982", &[("at", format!("{}", at).into())]),
                     "commit",
                     cherry_pick_action(hash, at),
                 )
@@ -46,14 +46,21 @@ impl RepoTab {
         }
         if idle {
             items.push(
-                PaletteItem::action(format!("Revert {at}"), "commit", revert_action(hash, at))
-                    .key("commit:revert"),
+                PaletteItem::action(
+                    crate::i18n::message("repo-core-2984", &[("at", format!("{}", at).into())]),
+                    "commit",
+                    revert_action(hash, at),
+                )
+                .key("commit:revert"),
             );
         }
         if idle && !is_head {
             items.push(
                 PaletteItem::new(
-                    format!("Reset {target} to here…"),
+                    crate::i18n::message(
+                        "repo-core-2986",
+                        &[("target", format!("{}", target).into())],
+                    ),
                     "commit",
                     PaletteRun::Pick(Pick::Reset(hash.to_owned())),
                 )
@@ -61,7 +68,13 @@ impl RepoTab {
             );
             items.push(
                 PaletteItem::action(
-                    format!("Interactive rebase {target} onto {at}…"),
+                    crate::i18n::message(
+                        "repo-core-2988",
+                        &[
+                            ("target", format!("{}", target).into()),
+                            ("at", format!("{}", at).into()),
+                        ],
+                    ),
                     "commit",
                     Action::InteractiveRebase {
                         onto: hash.to_owned(),
@@ -73,7 +86,7 @@ impl RepoTab {
         }
         items.push(
             PaletteItem::action(
-                format!("Create branch at {at}…"),
+                crate::i18n::message("repo-core-2990", &[("at", format!("{}", at).into())]),
                 "commit",
                 Action::Dialog(Dialog::create_branch(hash, at)),
             )
@@ -81,7 +94,7 @@ impl RepoTab {
         );
         items.push(
             PaletteItem::action(
-                format!("Create tag at {at}…"),
+                crate::i18n::message("repo-core-2992", &[("at", format!("{}", at).into())]),
                 "commit",
                 Action::Dialog(Dialog::tag(hash, at, self.default_remote())),
             )
@@ -90,7 +103,7 @@ impl RepoTab {
         if commit.parents.len() <= 1 {
             items.push(
                 PaletteItem::action(
-                    format!("Create patch from {at}…"),
+                    crate::i18n::message("repo-core-2994", &[("at", format!("{}", at).into())]),
                     "commit",
                     Action::SavePatch {
                         hash: hash.to_owned(),
@@ -122,13 +135,23 @@ impl RepoTab {
         let deleted = matches!(key, DiffKey::Work(f) if f.code == 'D');
         if !deleted {
             for (label, tab, kind) in [
-                ("View", FileTab::File, "view"),
-                ("File history of", FileTab::History, "history"),
+                (crate::i18n::text("repo-core-2996"), FileTab::File, "view"),
+                (
+                    crate::i18n::text("repo-core-2998"),
+                    FileTab::History,
+                    "history",
+                ),
                 (crate::i18n::text("repo-core-2498"), FileTab::Blame, "blame"),
             ] {
                 items.push(
                     PaletteItem::action(
-                        format!("{label} {path}"),
+                        crate::i18n::message(
+                            "repo-core-2999",
+                            &[
+                                ("label", format!("{}", label).into()),
+                                ("path", format!("{}", path).into()),
+                            ],
+                        ),
                         "file",
                         Action::FileView {
                             path: path.to_owned(),
@@ -144,15 +167,19 @@ impl RepoTab {
             let rel = PathBuf::from(path);
             items.push(
                 PaletteItem::action(
-                    format!("Open {path} in editor"),
+                    crate::i18n::message("repo-core-3001", &[("path", format!("{}", path).into())]),
                     "file",
                     Action::OpenInEditor(rel.clone()),
                 )
                 .key("file:editor"),
             );
             items.push(
-                PaletteItem::action(format!("Open {path}"), "file", Action::OpenPath(rel))
-                    .key("file:open"),
+                PaletteItem::action(
+                    crate::i18n::message("repo-core-3003", &[("path", format!("{}", path).into())]),
+                    "file",
+                    Action::OpenPath(rel),
+                )
+                .key("file:open"),
             );
         }
         items
@@ -164,13 +191,16 @@ impl RepoTab {
         match file.area {
             Area::Unstaged | Area::Untracked => {
                 let discard = if file.area == Area::Untracked {
-                    format!("Delete {path}…")
+                    crate::i18n::message("repo-core-3005", &[("path", format!("{}", path).into())])
                 } else {
-                    format!("Discard changes to {path}…")
+                    crate::i18n::message("repo-core-3006", &[("path", format!("{}", path).into())])
                 };
                 vec![
                     PaletteItem::action(
-                        format!("Stage {path}"),
+                        crate::i18n::message(
+                            "repo-core-3007",
+                            &[("path", format!("{}", path).into())],
+                        ),
                         "file",
                         stage_action(
                             crate::i18n::text("repo-core-0836"),
@@ -184,7 +214,7 @@ impl RepoTab {
             }
             Area::Staged => vec![
                 PaletteItem::action(
-                    format!("Unstage {path}"),
+                    crate::i18n::message("repo-core-3010", &[("path", format!("{}", path).into())]),
                     "file",
                     Action::Ops {
                         label: crate::i18n::text("repo-core-0844").to_owned(),

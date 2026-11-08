@@ -22,12 +22,7 @@ pub(super) fn remote(
     } else {
         crate::i18n::text("repo-core-1463")
     };
-    title(
-        ui,
-        heading,
-        crate::i18n::text("repo-core-1464"),
-        &t,
-    );
+    title(ui, heading, crate::i18n::text("repo-core-1464"), &t);
     field(ui, name, "origin", focus);
     ui.add_space(4.0);
     ui.add(
@@ -38,7 +33,11 @@ pub(super) fn remote(
     );
     ui.add_space(8.0);
     let valid = usable(name) && usable(url);
-    let label = if original.is_some() { crate::i18n::text("repo-core-1062") } else { crate::i18n::text("repo-core-0976") };
+    let label = if original.is_some() {
+        crate::i18n::text("repo-core-1062")
+    } else {
+        crate::i18n::text("repo-core-0976")
+    };
     buttons(ui, label, valid, enter, || {
         let (name, url) = (name.trim().to_owned(), url.trim().to_owned());
         let steps = match original {
@@ -104,13 +103,13 @@ pub(super) fn credentials(
                 }
             });
     } else {
-        ui.label(crate::i18n::message("repo-core-1474", &[("url", format!("{}", url).into())]));
+        ui.label(crate::i18n::message(
+            "repo-core-1474",
+            &[("url", format!("{}", url).into())],
+        ));
     }
     if refused {
-        ui.colored_label(
-            t.danger,
-            crate::i18n::text("repo-core-1475"),
-        );
+        ui.colored_label(t.danger, crate::i18n::text("repo-core-1475"));
         ui.add_space(6.0);
         if crate::settings::network_page::valid_https(url)
             && ui.button(crate::i18n::text("repo-core-1476")).clicked()
@@ -129,11 +128,9 @@ pub(super) fn credentials(
     );
     ui.add_space(4.0);
     ui.label(
-        RichText::new(
-            crate::i18n::text("repo-core-1479"),
-        )
-        .color(t.text_faint)
-        .small(),
+        RichText::new(crate::i18n::text("repo-core-1479"))
+            .color(t.text_faint)
+            .small(),
     );
     ui.add_space(8.0);
     let scope = crate::git::CredentialScope::for_url(url, username.trim()).ok();
@@ -143,13 +140,19 @@ pub(super) fn credentials(
     if !scope.as_ref().is_some_and(|scope| scope.is_https()) {
         ui.label(crate::i18n::text("repo-core-1480"));
     }
-    buttons(ui, crate::i18n::text("repo-core-1481"), valid, enter, || {
-        Action::SignIn(crate::git::Credentials {
-            scope: scope.clone(),
-            username: username.trim().to_owned(),
-            password: password.clone(),
-        })
-    })
+    buttons(
+        ui,
+        crate::i18n::text("repo-core-1481"),
+        valid,
+        enter,
+        || {
+            Action::SignIn(crate::git::Credentials {
+                scope: scope.clone(),
+                username: username.trim().to_owned(),
+                password: password.clone(),
+            })
+        },
+    )
 }
 
 /// A pull request of `branch` into `base`, once the branch is pushed.
@@ -169,7 +172,13 @@ pub(super) fn create_pr(
     title(
         ui,
         &crate::i18n::message("repo-core-1482", &[("noun", format!("{}", noun).into())]),
-        &crate::i18n::message("repo-core-1483", &[("branch", format!("{}", branch).into()), ("base", format!("{}", base).into())]),
+        &crate::i18n::message(
+            "repo-core-1483",
+            &[
+                ("branch", format!("{}", branch).into()),
+                ("base", format!("{}", base).into()),
+            ],
+        ),
         &t,
     );
     field(ui, pr_title, crate::i18n::text("repo-core-1484"), focus);
@@ -189,18 +198,24 @@ pub(super) fn create_pr(
     crate::repo::owners::reviewers_ui(ui, reviewers, *draft);
     ui.add_space(8.0);
     let valid = !pr_title.trim().is_empty() && !base.trim().is_empty();
-    buttons(ui, crate::i18n::text("repo-core-1216"), valid, false, || Action::CreatePr {
-        branch: branch.to_owned(),
-        base: base.trim().to_owned(),
-        title: pr_title.trim().to_owned(),
-        body: body.trim().to_owned(),
-        draft: *draft,
-        reviewers: if *draft {
-            Vec::new()
-        } else {
-            crate::repo::owners::asked(reviewers)
+    buttons(
+        ui,
+        crate::i18n::text("repo-core-1216"),
+        valid,
+        false,
+        || Action::CreatePr {
+            branch: branch.to_owned(),
+            base: base.trim().to_owned(),
+            title: pr_title.trim().to_owned(),
+            body: body.trim().to_owned(),
+            draft: *draft,
+            reviewers: if *draft {
+                Vec::new()
+            } else {
+                crate::repo::owners::asked(reviewers)
+            },
         },
-    })
+    )
 }
 
 /// `github.com` from `https://user@github.com/owner/repo.git`.

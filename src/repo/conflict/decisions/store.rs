@@ -32,7 +32,10 @@ fn read(repo: &Path, prefix: &str, keys: &[&String]) -> Result<HashMap<String, D
     let input: String = keys.iter().map(|k| format!("{prefix}{k}\n")).collect();
     let out = git::run_captured(repo, &["cat-file", "--batch"], Some(input.as_bytes()))?;
     if out.code != Some(0) {
-        return Err(crate::i18n::message("repo-core-0500", &[("trim", format!("{}", out.stderr.trim()).into())]));
+        return Err(crate::i18n::message(
+            "repo-core-0500",
+            &[("trim", format!("{}", out.stderr.trim()).into())],
+        ));
     }
     Ok(parse_batch(&out.raw, keys))
 }
@@ -80,7 +83,10 @@ fn parse_batch(out: &[u8], keys: &[&String]) -> HashMap<String, Decision> {
 /// Stores `decision` under `key`, over what was stored for it.
 pub fn save(repo: &Path, key: &str, decision: &Decision) -> Result<(), String> {
     if !valid_key(key) {
-        return Err(crate::i18n::message("repo-core-0502", &[("key", format!("{}", key).into())]));
+        return Err(crate::i18n::message(
+            "repo-core-0502",
+            &[("key", format!("{}", key).into())],
+        ));
     }
     let json = serde_json::to_string_pretty(decision)
         .map_err(|e| crate::i18n::message("repo-core-0503", &[("e", format!("{}", e).into())]))?;
@@ -91,7 +97,10 @@ pub fn save(repo: &Path, key: &str, decision: &Decision) -> Result<(), String> {
     )?;
     let blob = written.stdout.trim();
     if written.code != Some(0) || blob.is_empty() {
-        return Err(crate::i18n::message("repo-core-0507", &[("trim", format!("{}", written.stderr.trim()).into())]));
+        return Err(crate::i18n::message(
+            "repo-core-0507",
+            &[("trim", format!("{}", written.stderr.trim()).into())],
+        ));
     }
     git::run(Some(repo), &["update-ref", &format!("{REFS}{key}"), blob])
         .map(|_| ())
@@ -115,8 +124,15 @@ fn keys_under(repo: &Path, prefix: &str) -> Result<Vec<String>, String> {
 pub fn sync(repo: &Path, remote: &str, send: bool) -> Result<String, String> {
     let aside = format!("{FETCHED}{remote}/");
     let refspec = format!("+{REFS}*:{aside}*");
-    git::run(Some(repo), &["fetch", "--no-tags", remote, &refspec])
-        .map_err(|e| crate::i18n::message("repo-core-0515", &[("remote", format!("{}", remote).into()), ("e", format!("{}", e).into())]))?;
+    git::run(Some(repo), &["fetch", "--no-tags", remote, &refspec]).map_err(|e| {
+        crate::i18n::message(
+            "repo-core-0515",
+            &[
+                ("remote", format!("{}", remote).into()),
+                ("e", format!("{}", e).into()),
+            ],
+        )
+    })?;
     let theirs_keys = keys_under(repo, &aside)?;
     let theirs_refs: Vec<&String> = theirs_keys.iter().collect();
     let theirs = read(repo, &aside, &theirs_refs)?;
@@ -139,20 +155,51 @@ pub fn sync(repo: &Path, remote: &str, send: bool) -> Result<String, String> {
         let _ = git::run(Some(repo), &["update-ref", "-d", &format!("{aside}{key}")]);
     }
     let got = match taken {
-        0 => crate::i18n::message("repo-core-0517", &[("remote", format!("{}", remote).into())]),
-        1 => crate::i18n::message("repo-core-0518", &[("remote", format!("{}", remote).into())]),
-        n => crate::i18n::message("repo-core-0519", &[("n", (n).into()), ("remote", format!("{}", remote).into())]),
+        0 => crate::i18n::message(
+            "repo-core-0517",
+            &[("remote", format!("{}", remote).into())],
+        ),
+        1 => crate::i18n::message(
+            "repo-core-0518",
+            &[("remote", format!("{}", remote).into())],
+        ),
+        n => crate::i18n::message(
+            "repo-core-0519",
+            &[("n", (n).into()), ("remote", format!("{}", remote).into())],
+        ),
     };
     if !send {
         return Ok(got);
     }
     let mine = keys_under(repo, REFS)?;
     if mine.is_empty() {
-        return Ok(crate::i18n::message("repo-core-0520", &[("got", format!("{}", got).into())]));
+        return Ok(crate::i18n::message(
+            "repo-core-0520",
+            &[("got", format!("{}", got).into())],
+        ));
     }
-    git::run(Some(repo), &["push", remote, &format!("+{REFS}*:{REFS}*")])
-        .map_err(|e| crate::i18n::message("repo-core-0522", &[("got", format!("{}", got).into()), ("remote", format!("{}", remote).into()), ("e", format!("{}", e).into())]))?;
-    Ok(crate::i18n::message("repo-core-0523", &[("got", format!("{}", got).into()), ("count", (mine.len()).into()), ("s", format!("{}", if mine.len() == 1 { "" } else { "s" }).into()), ("remote", format!("{}", remote).into())]))
+    git::run(Some(repo), &["push", remote, &format!("+{REFS}*:{REFS}*")]).map_err(|e| {
+        crate::i18n::message(
+            "repo-core-0522",
+            &[
+                ("got", format!("{}", got).into()),
+                ("remote", format!("{}", remote).into()),
+                ("e", format!("{}", e).into()),
+            ],
+        )
+    })?;
+    Ok(crate::i18n::message(
+        "repo-core-0523",
+        &[
+            ("got", format!("{}", got).into()),
+            ("count", (mine.len()).into()),
+            (
+                "s",
+                format!("{}", if mine.len() == 1 { "" } else { "s" }).into(),
+            ),
+            ("remote", format!("{}", remote).into()),
+        ],
+    ))
 }
 
 #[cfg(test)]

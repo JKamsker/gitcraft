@@ -20,10 +20,7 @@ pub(super) fn load(repo: &Path, key: &DiffKey) -> Result<Structural, String> {
 
 pub(super) fn read_sides(repo: &Path, key: &DiffKey) -> Result<(String, String), String> {
     if crate::remote::is_remote(repo) {
-        return Err(
-            crate::i18n::text("repo-core-2337")
-                .to_owned(),
-        );
+        return Err(crate::i18n::text("repo-core-2337").to_owned());
     }
     let read = Read {
         repo,
@@ -82,9 +79,10 @@ impl Read<'_> {
 fn locations(read: &Read<'_>, key: &DiffKey) -> Result<(At, At), String> {
     let at = |rev: Option<&str>, path: &str| Some((rev.map(str::to_owned), path.to_owned()));
     let changed = |files: Vec<ChangedFile>, path: &str, old: Option<&str>, new: Option<&str>| {
-        let file = files.into_iter().find(|f| f.path == path).ok_or_else(|| {
-            crate::i18n::text("repo-core-1768").to_owned()
-        })?;
+        let file = files
+            .into_iter()
+            .find(|f| f.path == path)
+            .ok_or_else(|| crate::i18n::text("repo-core-1768").to_owned())?;
         let before = (file.status != 'A' && old.is_some())
             .then(|| at(old, file.old_path.as_deref().unwrap_or(path)))
             .flatten();
@@ -92,10 +90,7 @@ fn locations(read: &Read<'_>, key: &DiffKey) -> Result<(At, At), String> {
         Ok((before, after))
     };
     match key {
-        DiffKey::Remerge { .. } => Err(
-            crate::i18n::text("repo-core-1769")
-                .to_owned(),
-        ),
+        DiffKey::Remerge { .. } => Err(crate::i18n::text("repo-core-1769").to_owned()),
         DiffKey::Commit { hash, path } => {
             let parents = read.text(&[
                 "show",
@@ -148,13 +143,22 @@ fn read_side(read: &Read<'_>, side: At) -> Result<String, String> {
     };
     let bytes = match rev {
         Some(rev) => {
-            let object = if rev.is_empty() { format!(":0:{path}") } else { format!("{rev}:{path}") };
+            let object = if rev.is_empty() {
+                format!(":0:{path}")
+            } else {
+                format!("{rev}:{path}")
+            };
             // Resolve once so an index/HEAD move between the size check and read cannot
             // turn a small blob into an unbounded one.
             let blob = read.text(&["rev-parse", "--verify", "--end-of-options", &object])?;
             let blob = blob.trim();
             let size = read.text(&["cat-file", "-s", "--", blob])?;
-            if size.trim().parse::<usize>().map_err(|_| crate::i18n::text("repo-core-1776"))? > MAX_BYTES {
+            if size
+                .trim()
+                .parse::<usize>()
+                .map_err(|_| crate::i18n::text("repo-core-1776"))?
+                > MAX_BYTES
+            {
                 return Err(crate::i18n::text("repo-core-1777").to_owned());
             }
             read.bytes(&["cat-file", "blob", blob], MAX_BYTES)?

@@ -97,7 +97,7 @@ impl RepoTab {
                 label.push_str(&self.graph_description(i));
             }
             if self.graph_motion.new_commit(&commit.hash) {
-                label.push_str(". Newly received commit");
+                label.push_str(crate::i18n::text("repo-core-2701"));
             }
             label
         };
@@ -221,7 +221,10 @@ impl RepoTab {
                     t.accent_fg,
                 );
                 if link
-                    .on_hover_text(format!("Open Gerrit change {id}"))
+                    .on_hover_text(crate::i18n::message(
+                        "repo-core-2704",
+                        &[("id", format!("{}", id).into())],
+                    ))
                     .clicked()
                 {
                     acts.push(Action::OpenUrl(server.change_url(id)));
@@ -316,7 +319,7 @@ impl RepoTab {
         let r = painter.text(
             pos2(x, mid),
             Align2::LEFT_CENTER,
-            "Uncommitted changes",
+            crate::i18n::text("repo-core-2707"),
             font,
             t.text,
         );
@@ -353,10 +356,7 @@ impl RepoTab {
         let culprit = self.bisect.is_culprit(hash);
         let mark = self.bisect.mark_of(hash);
         let (color, said) = match (culprit, mark) {
-            (true, _) => (
-                t.danger,
-                "The first bad commit, as the bisect found".to_owned(),
-            ),
+            (true, _) => (t.danger, crate::i18n::text("repo-core-2710").to_owned()),
             (false, Some(mark)) => {
                 let word = match mark {
                     git::Mark::Skip => crate::i18n::text("repo-core-0292"),
@@ -364,7 +364,7 @@ impl RepoTab {
                 };
                 (
                     crate::repo::bisect::mark_color(t, mark),
-                    format!("Marked {word} in the bisect"),
+                    crate::i18n::message("repo-core-2711", &[("word", format!("{}", word).into())]),
                 )
             }
             (false, None) => return None,

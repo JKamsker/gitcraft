@@ -41,7 +41,11 @@ impl RepoTab {
             .width(280.0)
             .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
             .show(|ui| {
-                ui.label(RichText::new(crate::i18n::text("repo-core-1050")).color(t.text_faint).small());
+                ui.label(
+                    RichText::new(crate::i18n::text("repo-core-1050"))
+                        .color(t.text_faint)
+                        .small(),
+                );
                 let tip = crate::i18n::text("repo-core-1051");
                 if ui
                     .add_enabled(template.is_some(), egui::Button::new("commit.template"))
@@ -54,9 +58,7 @@ impl RepoTab {
                 }
                 if ui
                     .button(crate::i18n::text("repo-core-1054"))
-                    .on_hover_text(
-                        crate::i18n::text("repo-core-1055"),
-                    )
+                    .on_hover_text(crate::i18n::text("repo-core-1055"))
                     .clicked()
                 {
                     pick = Some(Pick::Hook);
@@ -119,13 +121,19 @@ fn template_row(ui: &mut Ui, scope: Scope, template: &Template, pick: &mut Optio
     ui.horizontal(|ui| {
         if ui
             .add(egui::Button::new(&template.name).truncate())
-            .on_hover_text(crate::i18n::message("repo-core-1058", &[("text", format!("{}", template.text).into())]))
+            .on_hover_text(crate::i18n::message(
+                "repo-core-1058",
+                &[("text", format!("{}", template.text).into())],
+            ))
             .clicked()
         {
             *pick = Some(Pick::Text(template.text.clone()));
         }
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            let delete = crate::i18n::message("repo-core-1059", &[("name", format!("{}", template.name).into())]);
+            let delete = crate::i18n::message(
+                "repo-core-1059",
+                &[("name", format!("{}", template.name).into())],
+            );
             if icons::small_button(ui, "x", &delete).clicked() {
                 *pick = Some(Pick::Delete(scope, template.name.clone()));
             }
@@ -157,7 +165,10 @@ fn save_form(ui: &mut Ui, saving: &mut SaveState, has_message: bool, pick: &mut 
         );
         let enter = field.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
         let save = ui
-            .add_enabled(has_message, egui::Button::new(crate::i18n::text("repo-core-1062")))
+            .add_enabled(
+                has_message,
+                egui::Button::new(crate::i18n::text("repo-core-1062")),
+            )
             .on_disabled_hover_text(crate::i18n::text("repo-core-1063"));
         if save.clicked() || (enter && has_message) {
             *pick = Some(Pick::Save);

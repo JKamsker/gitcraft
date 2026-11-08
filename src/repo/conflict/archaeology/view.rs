@@ -82,7 +82,10 @@ fn body(
         Read::Failed(e) => {
             ui.horizontal_wrapped(|ui| {
                 ui.label(RichText::new(e).color(t.danger));
-                if ui.small_button(crate::i18n::text("repo-core-0437")).clicked() {
+                if ui
+                    .small_button(crate::i18n::text("repo-core-0437"))
+                    .clicked()
+                {
                     acts.push(Action::Archaeology(Act::Load));
                 }
             });
@@ -148,17 +151,21 @@ fn history_header(
                 .filter(|s| s.result == Read::Reading)
             {
                 let merges = search.merges.load(std::sync::atomic::Ordering::Relaxed);
-                let cancel = ui.button(crate::i18n::text("repo-core-0443")).on_hover_text(crate::i18n::text("repo-core-0444")).clicked();
+                let cancel = ui
+                    .button(crate::i18n::text("repo-core-0443"))
+                    .on_hover_text(crate::i18n::text("repo-core-0444"))
+                    .clicked();
                 ui.label(RichText::new(merges_text(merges)).color(t.text_dim));
                 ui.add(crate::spinner::Spinner::new());
                 if cancel {
                     history.cancel();
                 }
             } else if ui
-                .add_enabled(ready, egui::Button::new(crate::i18n::text("repo-core-0445")))
-                .on_hover_text(
-                    crate::i18n::text("repo-core-0446"),
+                .add_enabled(
+                    ready,
+                    egui::Button::new(crate::i18n::text("repo-core-0445")),
                 )
+                .on_hover_text(crate::i18n::text("repo-core-0446"))
                 .on_disabled_hover_text(crate::i18n::text("repo-core-0447"))
                 .clicked()
             {
@@ -211,9 +218,15 @@ fn side_ui(
         n => crate::i18n::message("repo-core-0449", &[("n", (n).into())]),
     };
     ui.label(
-        RichText::new(crate::i18n::message("repo-core-0450", &[("name", format!("{}", name).into()), ("count", (count).into())]))
-            .color(t.text_faint)
-            .small(),
+        RichText::new(crate::i18n::message(
+            "repo-core-0450",
+            &[
+                ("name", format!("{}", name).into()),
+                ("count", (count).into()),
+            ],
+        ))
+        .color(t.text_faint)
+        .small(),
     );
     if steps.is_empty() {
         ui.label(
@@ -275,7 +288,10 @@ fn picked_ui(
     ui.horizontal_wrapped(|ui| {
         for step in [ours, theirs].into_iter().flatten() {
             if ui
-                .small_button(crate::i18n::message("repo-core-0456", &[("short", format!("{}", step.short).into())]))
+                .small_button(crate::i18n::message(
+                    "repo-core-0456",
+                    &[("short", format!("{}", step.short).into())],
+                ))
                 .on_hover_text(crate::i18n::text("repo-core-0457"))
                 .clicked()
             {
@@ -300,12 +316,24 @@ fn picked_ui(
                 Some((_, Read::Done(conflicts))) => {
                     let (text, color) = if *conflicts {
                         (
-                            crate::i18n::message("repo-core-0460", &[("short", format!("{}", a.short).into()), ("short2", format!("{}", b.short).into())]),
+                            crate::i18n::message(
+                                "repo-core-0460",
+                                &[
+                                    ("short", format!("{}", a.short).into()),
+                                    ("short2", format!("{}", b.short).into()),
+                                ],
+                            ),
                             t.warning,
                         )
                     } else {
                         (
-                            crate::i18n::message("repo-core-0461", &[("short", format!("{}", a.short).into()), ("short2", format!("{}", b.short).into())]),
+                            crate::i18n::message(
+                                "repo-core-0461",
+                                &[
+                                    ("short", format!("{}", a.short).into()),
+                                    ("short2", format!("{}", b.short).into()),
+                                ],
+                            ),
                             t.success,
                         )
                     };
@@ -364,10 +392,17 @@ fn answer_text(found: &Found, timelines: &Timelines, names: (&str, &str)) -> Str
         } => {
             let (Some(a), Some(b)) = (timelines.ours.get(*ours), timelines.theirs.get(*theirs))
             else {
-                return crate::i18n::text("repo-core-0463")
-                    .to_owned();
+                return crate::i18n::text("repo-core-0463").to_owned();
             };
-            let mut text = crate::i18n::message("repo-core-0464", &[("a", format!("{}", named(a)).into()), ("names", format!("{}", names.0).into()), ("b", format!("{}", named(b)).into()), ("names2", format!("{}", names.1).into())]);
+            let mut text = crate::i18n::message(
+                "repo-core-0464",
+                &[
+                    ("a", format!("{}", named(a)).into()),
+                    ("names", format!("{}", names.0).into()),
+                    ("b", format!("{}", named(b)).into()),
+                    ("names2", format!("{}", names.1).into()),
+                ],
+            );
             text.push_str(if *checked {
                 crate::i18n::text("repo-core-0465")
             } else {
@@ -376,14 +411,15 @@ fn answer_text(found: &Found, timelines: &Timelines, names: (&str, &str)) -> Str
             let cut =
                 (*ours == 0 && timelines.truncated.0) || (*theirs == 0 && timelines.truncated.1);
             if cut {
-                text.push_str(&crate::i18n::message("repo-core-0467", &[("MAX-COMMITS", format!("{}", super::git::MAX_COMMITS).into())]));
+                text.push_str(&crate::i18n::message(
+                    "repo-core-0467",
+                    &[("MAX-COMMITS", format!("{}", super::git::MAX_COMMITS).into())],
+                ));
             }
             text
         }
-        Found::OneSided => crate::i18n::text("repo-core-0468")
-            .to_owned(),
-        Found::TipsMergeCleanly => crate::i18n::text("repo-core-0469")
-            .to_owned(),
+        Found::OneSided => crate::i18n::text("repo-core-0468").to_owned(),
+        Found::TipsMergeCleanly => crate::i18n::text("repo-core-0469").to_owned(),
     }
 }
 
@@ -394,11 +430,16 @@ fn change_ui(ui: &mut Ui, t: &Tokens, history: &mut History) {
     };
     let mut close = false;
     ui.horizontal(|ui| {
-        close = ui.small_button(crate::i18n::text("repo-core-0470")).clicked();
+        close = ui
+            .small_button(crate::i18n::text("repo-core-0470"))
+            .clicked();
         ui.label(
-            RichText::new(crate::i18n::message("repo-core-0471", &[("short", format!("{}", short).into())]))
-                .color(t.text_faint)
-                .small(),
+            RichText::new(crate::i18n::message(
+                "repo-core-0471",
+                &[("short", format!("{}", short).into())],
+            ))
+            .color(t.text_faint)
+            .small(),
         );
     });
     match read {

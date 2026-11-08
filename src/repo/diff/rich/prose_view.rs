@@ -43,9 +43,7 @@ fn summary(prose: &ProseDiff) -> Option<&'static str> {
             }
         )
     }) {
-        Some(
-            crate::i18n::text("repo-core-2208"),
-        )
+        Some(crate::i18n::text("repo-core-2208"))
     } else if all(|p| matches!(p, Part::Kept { .. })) {
         Some(crate::i18n::text("repo-core-2209"))
     } else {
@@ -263,7 +261,9 @@ fn part(ui: &mut Ui, t: &Tokens, part: &Part, rect: Rect, captions: bool, acts: 
         );
     }
     let tip = match (old, new) {
-        (Some(o), None) => crate::i18n::message("repo-core-2220", &[("o", format!("{}", o).into())]),
+        (Some(o), None) => {
+            crate::i18n::message("repo-core-2220", &[("o", format!("{}", o).into())])
+        }
         (_, Some(n)) => crate::i18n::message("repo-core-2221", &[("n", (n).into())]),
         _ => String::new(),
     };
@@ -298,7 +298,10 @@ fn cut(text: String) -> String {
         return text;
     }
     let mut s: String = text.chars().take(MAX_CHARS).collect();
-    s.push_str(&crate::i18n::message("repo-core-2222", &[("MAX-CHARS", format!("{}", total - MAX_CHARS).into())]));
+    s.push_str(&crate::i18n::message(
+        "repo-core-2222",
+        &[("MAX-CHARS", format!("{}", total - MAX_CHARS).into())],
+    ));
     s
 }
 

@@ -24,7 +24,10 @@ pub(super) fn test_commits(
     title(
         ui,
         crate::i18n::text("repo-core-1508"),
-        &crate::i18n::message("repo-core-1509", &[("machine", format!("{}", machine).into())]),
+        &crate::i18n::message(
+            "repo-core-1509",
+            &[("machine", format!("{}", machine).into())],
+        ),
         &t,
     );
     ui.label(RichText::new(crate::i18n::text("repo-core-1510")).color(t.text_dim));
@@ -43,13 +46,14 @@ pub(super) fn test_commits(
     ui.horizontal(|ui| {
         ui.label(RichText::new(crate::i18n::text("repo-core-1514")).color(t.text_dim));
         ui.add(egui::DragValue::new(&mut start.workers).range(1..=MAX_WORKERS))
-            .on_hover_text(
-                crate::i18n::text("repo-core-1515"),
-            );
+            .on_hover_text(crate::i18n::text("repo-core-1515"));
     });
     if remote && start.workers > REMOTE_WORKERS {
         ui.label(
-            RichText::new(crate::i18n::message("repo-core-1516", &[("REMOTE-WORKERS", format!("{}", REMOTE_WORKERS).into())]))
+            RichText::new(crate::i18n::message(
+                "repo-core-1516",
+                &[("REMOTE-WORKERS", format!("{}", REMOTE_WORKERS).into())],
+            ))
             .color(t.text_faint),
         );
     }
@@ -64,12 +68,7 @@ pub(super) fn test_commits(
             crate::i18n::message("repo-core-1518", &[("old", format!("{}", old).into())]),
         );
         if !start.forget {
-            ui.label(
-                RichText::new(
-                    crate::i18n::text("repo-core-1519"),
-                )
-                .color(t.warning),
-            );
+            ui.label(RichText::new(crate::i18n::text("repo-core-1519")).color(t.warning));
         }
     }
     ui.add_space(12.0);
@@ -85,11 +84,17 @@ pub(super) fn test_commits(
         ui.add_space(4.0);
     }
     let valid = why_not.is_none();
-    buttons(ui, crate::i18n::text("repo-core-0554"), valid, enter, || {
-        let mut start = start.clone();
-        start.range = start.range.trim().to_owned();
-        start.command = start.command.trim().to_owned();
-        start.forget = start.forget && changed.is_some();
-        Action::TestLane(LaneAct::Start(start))
-    })
+    buttons(
+        ui,
+        crate::i18n::text("repo-core-0554"),
+        valid,
+        enter,
+        || {
+            let mut start = start.clone();
+            start.range = start.range.trim().to_owned();
+            start.command = start.command.trim().to_owned();
+            start.forget = start.forget && changed.is_some();
+            Action::TestLane(LaneAct::Start(start))
+        },
+    )
 }

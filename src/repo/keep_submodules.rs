@@ -22,7 +22,7 @@ pub(super) fn update_one(path: &str) -> Action {
     let mut args = UPDATE.to_vec();
     args.extend(["--", path]);
     Action::Ops {
-        label: format!("Update submodule {path}"),
+        label: crate::i18n::message("repo-core-2844", &[("path", format!("{}", path).into())]),
         ops: ops(&[&args]),
         refresh: Refresh::All,
     }

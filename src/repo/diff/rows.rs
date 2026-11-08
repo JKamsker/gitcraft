@@ -607,9 +607,18 @@ impl<'a> Rows<'a> {
                 .unwrap_or(0)
         };
         let label = if i == block.del.start {
-            crate::i18n::message("repo-core-2309", &[("false", format!("{}", number(block.add.start, false)).into())])
+            crate::i18n::message(
+                "repo-core-2309",
+                &[(
+                    "false",
+                    format!("{}", number(block.add.start, false)).into(),
+                )],
+            )
         } else if i == block.add.start {
-            crate::i18n::message("repo-core-2310", &[("true", format!("{}", number(block.del.start, true)).into())])
+            crate::i18n::message(
+                "repo-core-2310",
+                &[("true", format!("{}", number(block.del.start, true)).into())],
+            )
         } else {
             return;
         };
@@ -726,7 +735,14 @@ impl<'a> Rows<'a> {
         let count = review.marks.get(&(spot_side, number)).copied();
         let active = self.is_target((spot_side, number));
         crate::a11y::a11y(&resp, egui::WidgetType::Button, || {
-            crate::i18n::message("repo-core-2318", &[("tip", format!("{}", tip).into()), ("number", format!("{}", number).into()), ("count", format!("{}", count.unwrap_or(0)).into())])
+            crate::i18n::message(
+                "repo-core-2318",
+                &[
+                    ("tip", format!("{}", tip).into()),
+                    ("number", format!("{}", number).into()),
+                    ("count", format!("{}", count.unwrap_or(0)).into()),
+                ],
+            )
         });
         paint_gutter_mark(ui, area, count, resp.hovered(), active);
         if resp.clicked() {
@@ -791,9 +807,35 @@ fn line_label(line: &super::DiffLine) -> String {
         Kind::Fold => "folded",
         Kind::Meta => "metadata",
     };
-    crate::i18n::message("repo-core-2322", &[("kind", format!("{}", kind).into()), ("line", format!("{}", line.old
-            .map_or_else(|| crate::i18n::text("repo-core-2323").to_owned(), |n| n.to_string())).into()), ("line2", format!("{}", line.new
-            .map_or_else(|| crate::i18n::text("repo-core-2323").to_owned(), |n| n.to_string())).into()), ("text", format!("{}", line.text).into())])
+    crate::i18n::message(
+        "repo-core-2322",
+        &[
+            ("kind", format!("{}", kind).into()),
+            (
+                "line",
+                format!(
+                    "{}",
+                    line.old.map_or_else(
+                        || crate::i18n::text("repo-core-2323").to_owned(),
+                        |n| n.to_string()
+                    )
+                )
+                .into(),
+            ),
+            (
+                "line2",
+                format!(
+                    "{}",
+                    line.new.map_or_else(
+                        || crate::i18n::text("repo-core-2323").to_owned(),
+                        |n| n.to_string()
+                    )
+                )
+                .into(),
+            ),
+            ("text", format!("{}", line.text).into()),
+        ],
+    )
 }
 
 fn map_keyboard(ui: &Ui, offset: f32, page: f32, total: f32) -> Option<f32> {

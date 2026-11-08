@@ -547,7 +547,13 @@ pub(crate) fn merge_message(branch: BranchRef<'_>, current: &str) -> String {
 pub(crate) fn merge_action(branch: BranchRef<'_>, current: &str) -> Action {
     let message = merge_message(branch, current);
     Action::UndoableOps {
-        label: crate::i18n::message("repo-core-0006", &[("name", format!("{}", branch.name).into()), ("current", format!("{}", current).into())]),
+        label: crate::i18n::message(
+            "repo-core-0006",
+            &[
+                ("name", format!("{}", branch.name).into()),
+                ("current", format!("{}", current).into()),
+            ],
+        ),
         ops: ops(&[&["merge", "--no-edit", "-m", &message, &branch.full()]]),
         refresh: Refresh::All,
         undo: Undo::HeadMove { mode: "--keep" },
@@ -557,7 +563,13 @@ pub(crate) fn merge_action(branch: BranchRef<'_>, current: &str) -> Action {
 /// Moves the current branch forward to `branch`; fails (and says so) if they have diverged.
 pub(crate) fn fast_forward_action(branch: BranchRef<'_>, current: &str) -> Action {
     Action::UndoableOps {
-        label: crate::i18n::message("repo-core-0011", &[("current", format!("{}", current).into()), ("name", format!("{}", branch.name).into())]),
+        label: crate::i18n::message(
+            "repo-core-0011",
+            &[
+                ("current", format!("{}", current).into()),
+                ("name", format!("{}", branch.name).into()),
+            ],
+        ),
         ops: ops(&[&["merge", "--ff-only", &branch.full()]]),
         refresh: Refresh::All,
         undo: Undo::HeadMove { mode: "--keep" },
@@ -567,14 +579,23 @@ pub(crate) fn fast_forward_action(branch: BranchRef<'_>, current: &str) -> Actio
 pub(crate) fn rebase_action(onto: BranchRef<'_>, current: &str) -> Action {
     Action::AskRebase {
         onto: onto.full(),
-        label: crate::i18n::message("repo-core-0013", &[("current", format!("{}", current).into()), ("name", format!("{}", onto.name).into())]),
+        label: crate::i18n::message(
+            "repo-core-0013",
+            &[
+                ("current", format!("{}", current).into()),
+                ("name", format!("{}", onto.name).into()),
+            ],
+        ),
     }
 }
 
 /// Cherry-picks the commit `hash` onto what is checked out.
 pub(crate) fn cherry_pick_action(hash: &str) -> Action {
     Action::UndoableOps {
-        label: crate::i18n::message("repo-core-0014", &[("hash", format!("{}", super::short(hash)).into())]),
+        label: crate::i18n::message(
+            "repo-core-0014",
+            &[("hash", format!("{}", super::short(hash)).into())],
+        ),
         ops: ops(&[&["cherry-pick", hash]]),
         refresh: Refresh::All,
         undo: Undo::HeadMove { mode: "--keep" },
@@ -634,8 +655,16 @@ impl RepoTab {
                 "files".into(),
                 Action::OpenFileComparison(super::file_comparison::Page::Matrix),
             ),
-            (crate::i18n::text("repo-core-0029").into(), label(ctx, Command::Fetch), Action::Fetch),
-            (crate::i18n::text("repo-core-0030").into(), label(ctx, Command::Pull), Action::Pull),
+            (
+                crate::i18n::text("repo-core-0029").into(),
+                label(ctx, Command::Fetch),
+                Action::Fetch,
+            ),
+            (
+                crate::i18n::text("repo-core-0030").into(),
+                label(ctx, Command::Pull),
+                Action::Pull,
+            ),
             (
                 if self.gerrit.is_some() {
                     crate::i18n::text("repo-core-0031")
@@ -704,8 +733,16 @@ impl RepoTab {
                 "absorb".into(),
                 Action::OpenAbsorb,
             ),
-            (crate::i18n::text("repo-core-0051").into(), label(ctx, Command::Undo), Action::Undo),
-            (crate::i18n::text("repo-core-0052").into(), label(ctx, Command::Redo), Action::Redo),
+            (
+                crate::i18n::text("repo-core-0051").into(),
+                label(ctx, Command::Undo),
+                Action::Undo,
+            ),
+            (
+                crate::i18n::text("repo-core-0052").into(),
+                label(ctx, Command::Redo),
+                Action::Redo,
+            ),
             (
                 crate::i18n::text("repo-core-0053").into(),
                 label(ctx, Command::Timeline),
@@ -772,7 +809,11 @@ impl RepoTab {
                     cwd: None,
                 },
             ),
-            (crate::i18n::text("repo-core-0070").into(), label(ctx, Command::Reload), Action::Reload),
+            (
+                crate::i18n::text("repo-core-0070").into(),
+                label(ctx, Command::Reload),
+                Action::Reload,
+            ),
             (
                 crate::i18n::text("repo-core-0071").into(),
                 "branch".into(),
@@ -897,7 +938,10 @@ impl RepoTab {
         items.extend(super::popout::palette_items());
         for section in doctor::Section::ALL {
             items.push((
-                crate::i18n::message("repo-core-0114", &[("title", format!("{}", section.title()).into())]),
+                crate::i18n::message(
+                    "repo-core-0114",
+                    &[("title", format!("{}", section.title()).into())],
+                ),
                 "doctor".into(),
                 Action::OpenDoctor(section),
             ));

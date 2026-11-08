@@ -34,7 +34,11 @@ pub(super) fn start_bisect(
         true,
         crate::i18n::message("repo-core-1201", &[("at", format!("{}", at).into())]),
     );
-    ui.radio_value(this_good, false, crate::i18n::message("repo-core-1202", &[("at", format!("{}", at).into())]));
+    ui.radio_value(
+        this_good,
+        false,
+        crate::i18n::message("repo-core-1202", &[("at", format!("{}", at).into())]),
+    );
     // The other end's usual answer, unless one was typed.
     if *this_good != was_good {
         match (*this_good, other.trim()) {
@@ -64,15 +68,21 @@ pub(super) fn start_bisect(
     ui.add_space(12.0);
     let other_ok = usable(other) || (!*this_good && other.trim().is_empty());
     let valid = blocker.is_none() && other_ok;
-    buttons(ui, crate::i18n::text("repo-core-1207"), valid, enter, || {
-        let other = other.trim().to_owned();
-        let (bad, good) = if *this_good {
-            (other, Some(hash.to_owned()))
-        } else {
-            (hash.to_owned(), (!other.is_empty()).then_some(other))
-        };
-        Action::Bisect(BisectAct::Start { bad, good })
-    })
+    buttons(
+        ui,
+        crate::i18n::text("repo-core-1207"),
+        valid,
+        enter,
+        || {
+            let other = other.trim().to_owned();
+            let (bad, good) = if *this_good {
+                (other, Some(hash.to_owned()))
+            } else {
+                (hash.to_owned(), (!other.is_empty()).then_some(other))
+            };
+            Action::Bisect(BisectAct::Start { bad, good })
+        },
+    )
 }
 
 /// `git bisect run` with a command typed, on `machine` (where the repository is).
@@ -87,20 +97,22 @@ pub(super) fn bisect_run(
     title(
         ui,
         crate::i18n::text("repo-core-1208"),
-        &crate::i18n::message("repo-core-1209", &[("machine", format!("{}", machine).into())]),
+        &crate::i18n::message(
+            "repo-core-1209",
+            &[("machine", format!("{}", machine).into())],
+        ),
         &t,
     );
     field(ui, command, "cargo test, make check, ./test.sh…", focus);
     ui.add_space(6.0);
-    ui.label(
-        RichText::new(
-            crate::i18n::text("repo-core-1211"),
-        )
-        .color(t.text_dim),
-    );
+    ui.label(RichText::new(crate::i18n::text("repo-core-1211")).color(t.text_dim));
     ui.add_space(12.0);
     let valid = !command.trim().is_empty();
-    buttons(ui, crate::i18n::text("repo-core-1212"), valid, enter, || {
-        Action::Bisect(BisectAct::Run(command.trim().to_owned()))
-    })
+    buttons(
+        ui,
+        crate::i18n::text("repo-core-1212"),
+        valid,
+        enter,
+        || Action::Bisect(BisectAct::Run(command.trim().to_owned())),
+    )
 }

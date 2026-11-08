@@ -94,8 +94,18 @@ fn branches(count: usize) -> String {
 /// origin too)".
 fn delete_label(count: usize, there: Option<(usize, &[&str])>) -> String {
     match there {
-        Some((n, remotes)) => crate::i18n::message("repo-core-1271", &[("count", format!("{}", branches(count)).into()), ("n", (n).into()), ("remotes", format!("{}", remotes.join(", ")).into())]),
-        None => crate::i18n::message("repo-core-1272", &[("count", format!("{}", branches(count)).into())]),
+        Some((n, remotes)) => crate::i18n::message(
+            "repo-core-1271",
+            &[
+                ("count", format!("{}", branches(count)).into()),
+                ("n", (n).into()),
+                ("remotes", format!("{}", remotes.join(", ")).into()),
+            ],
+        ),
+        None => crate::i18n::message(
+            "repo-core-1272",
+            &[("count", format!("{}", branches(count)).into())],
+        ),
     }
 }
 
@@ -105,13 +115,8 @@ pub(super) fn cleanup(ui: &mut Ui, dialog: &mut CleanupDialog) -> Outcome {
     ui.label(RichText::new(crate::i18n::text("repo-core-1273")).font(theme::semibold(15.0)));
     ui.add_space(4.0);
     ui.add(
-        egui::Label::new(
-            RichText::new(
-                crate::i18n::text("repo-core-1274"),
-            )
-            .color(t.text_dim),
-        )
-        .wrap(),
+        egui::Label::new(RichText::new(crate::i18n::text("repo-core-1274")).color(t.text_dim))
+            .wrap(),
     );
     if let Some(e) = &dialog.error {
         ui.add_space(6.0);
@@ -120,10 +125,7 @@ pub(super) fn cleanup(ui: &mut Ui, dialog: &mut CleanupDialog) -> Outcome {
         ui.add_space(6.0);
         ui.horizontal(|ui| {
             ui.add(crate::spinner::Spinner::new());
-            ui.label(
-                RichText::new(crate::i18n::text("repo-core-1275"))
-                    .color(t.text_dim),
-            );
+            ui.label(RichText::new(crate::i18n::text("repo-core-1275")).color(t.text_dim));
         });
     }
     ui.add_space(10.0);
@@ -148,12 +150,16 @@ pub(super) fn cleanup(ui: &mut Ui, dialog: &mut CleanupDialog) -> Outcome {
     let also = if remotes.is_empty() {
         crate::i18n::text("repo-core-1277").to_owned()
     } else {
-        crate::i18n::message("repo-core-1278", &[("there", format!("{}", branches(there)).into()), ("remotes", format!("{}", remotes.join(", ")).into())])
+        crate::i18n::message(
+            "repo-core-1278",
+            &[
+                ("there", format!("{}", branches(there)).into()),
+                ("remotes", format!("{}", remotes.join(", ")).into()),
+            ],
+        )
     };
     ui.add_enabled(there > 0, egui::Checkbox::new(&mut dialog.on_remote, also))
-        .on_hover_text(
-            crate::i18n::text("repo-core-1279"),
-        )
+        .on_hover_text(crate::i18n::text("repo-core-1279"))
         .on_disabled_hover_text(crate::i18n::text("repo-core-1280"));
     ui.add_space(14.0);
     let on_remote = (dialog.on_remote && there > 0).then_some((there, &remotes[..]));
@@ -182,11 +188,23 @@ pub(super) fn cleanup(ui: &mut Ui, dialog: &mut CleanupDialog) -> Outcome {
 fn select_buttons(ui: &mut Ui, rows: &mut [(Candidate, bool)]) {
     ui.horizontal(|ui| {
         let ticked = rows.iter().filter(|(_, on)| *on).count();
-        ui.label(crate::i18n::message("repo-core-1281", &[("ticked", format!("{}", ticked).into()), ("count", (rows.len()).into())]));
-        if ui.small_button(crate::i18n::text("repo-core-1282")).clicked() {
+        ui.label(crate::i18n::message(
+            "repo-core-1281",
+            &[
+                ("ticked", format!("{}", ticked).into()),
+                ("count", (rows.len()).into()),
+            ],
+        ));
+        if ui
+            .small_button(crate::i18n::text("repo-core-1282"))
+            .clicked()
+        {
             rows.iter_mut().for_each(|(_, on)| *on = true);
         }
-        if ui.small_button(crate::i18n::text("repo-core-1283")).clicked() {
+        if ui
+            .small_button(crate::i18n::text("repo-core-1283"))
+            .clicked()
+        {
             rows.iter_mut().for_each(|(_, on)| *on = false);
         }
     });
@@ -203,7 +221,13 @@ fn checklist(ui: &mut Ui, rows: &mut [(Candidate, bool)], t: &Tokens) {
             for (c, on) in rows.iter_mut() {
                 let mut why: Vec<String> = c.reasons.iter().map(|r| r.describe()).collect();
                 if let Some((remote, name, _)) = &c.remote {
-                    why.push(crate::i18n::message("repo-core-1285", &[("remote", format!("{}", remote).into()), ("name", format!("{}", name).into())]));
+                    why.push(crate::i18n::message(
+                        "repo-core-1285",
+                        &[
+                            ("remote", format!("{}", remote).into()),
+                            ("name", format!("{}", name).into()),
+                        ],
+                    ));
                 }
                 let why = why.join(" · ");
                 ui.horizontal(|ui| {

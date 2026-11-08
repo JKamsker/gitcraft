@@ -66,7 +66,16 @@ pub fn read(
     let read = |text: &Option<String>, side: &str| -> Result<Option<Node>, String> {
         text.as_deref()
             .map(|t| {
-                parse(t).map_err(|e| crate::i18n::message("repo-core-2048", &[("format", format!("{}", format).into()), ("side", format!("{}", side).into()), ("e", format!("{}", e).into())]))
+                parse(t).map_err(|e| {
+                    crate::i18n::message(
+                        "repo-core-2048",
+                        &[
+                            ("format", format!("{}", format).into()),
+                            ("side", format!("{}", side).into()),
+                            ("e", format!("{}", e).into()),
+                        ],
+                    )
+                })
             })
             .transpose()
     };

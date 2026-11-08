@@ -28,20 +28,31 @@ pub(super) fn show(
         .show(ui, |ui| {
             ui.horizontal_wrapped(|ui| {
                 ui.label(
-                    RichText::new(crate::i18n::message("repo-core-2139", &[("file", format!("{}", diff.file).into())]))
-                        .font(theme::medium(12.5))
-                        .color(t.text),
+                    RichText::new(crate::i18n::message(
+                        "repo-core-2139",
+                        &[("file", format!("{}", diff.file).into())],
+                    ))
+                    .font(theme::medium(12.5))
+                    .color(t.text),
                 );
                 let parts: Vec<String> = [
                     (count(Change::Upgraded), crate::i18n::text("repo-core-2140")),
-                    (count(Change::Downgraded), crate::i18n::text("repo-core-2141")),
+                    (
+                        count(Change::Downgraded),
+                        crate::i18n::text("repo-core-2141"),
+                    ),
                     (count(Change::Added), crate::i18n::text("repo-core-1702")),
                     (count(Change::Removed), crate::i18n::text("repo-core-1703")),
                     (licences, crate::i18n::text("repo-core-2142")),
                 ]
                 .iter()
                 .filter(|(n, _)| *n > 0)
-                .map(|(n, what)| crate::i18n::message("repo-core-1911", &[("n", (n).into()), ("what", format!("{}", what).into())]))
+                .map(|(n, what)| {
+                    crate::i18n::message(
+                        "repo-core-1911",
+                        &[("n", (n).into()), ("what", format!("{}", what).into())],
+                    )
+                })
                 .collect();
                 let summary = if parts.is_empty() {
                     crate::i18n::text("repo-core-2143").to_owned()
@@ -109,9 +120,14 @@ fn row(
     );
     if let Some((old, new)) = &d.license {
         let text = match (old, new) {
-            (Some(o), Some(n)) => crate::i18n::message("repo-core-2145", &[("o", format!("{}", o).into()), ("n", (n).into())]),
+            (Some(o), Some(n)) => crate::i18n::message(
+                "repo-core-2145",
+                &[("o", format!("{}", o).into()), ("n", (n).into())],
+            ),
             (None, Some(n)) => crate::i18n::message("repo-core-2146", &[("n", (n).into())]),
-            (Some(o), None) => crate::i18n::message("repo-core-2147", &[("o", format!("{}", o).into())]),
+            (Some(o), None) => {
+                crate::i18n::message("repo-core-2147", &[("o", format!("{}", o).into())])
+            }
             _ => String::new(),
         };
         let c = if old.is_some() {
@@ -129,7 +145,13 @@ fn row(
         _ => String::new(),
     };
     crate::a11y::a11y(&name, egui::WidgetType::Button, || {
-        crate::i18n::message("repo-core-2150", &[("name", format!("{}", d.name).into()), ("tip", format!("{}", tip).into())])
+        crate::i18n::message(
+            "repo-core-2150",
+            &[
+                ("name", format!("{}", d.name).into()),
+                ("tip", format!("{}", tip).into()),
+            ],
+        )
     });
     if name.on_hover_text(tip).clicked() {
         let (old, new) = match d.change {

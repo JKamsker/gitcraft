@@ -17,10 +17,15 @@ impl RepoTab {
         let t = Tokens::get(ui.ctx());
         let idle = self.busy_op.is_none();
         let stash = self.stash_view.and_then(|i| self.stashes.get(i)).cloned();
-        let title = if stash.is_some() { crate::i18n::text("repo-core-0862") } else { crate::i18n::text("repo-core-0056") };
+        let title = if stash.is_some() {
+            crate::i18n::text("repo-core-0862")
+        } else {
+            crate::i18n::text("repo-core-0056")
+        };
         widgets::panel_header(ui, title, |ui| {
             if let Some(stash) = &stash {
-                let more = icons::small_button(ui, "chevron-down", crate::i18n::text("repo-core-0863"));
+                let more =
+                    icons::small_button(ui, "chevron-down", crate::i18n::text("repo-core-0863"));
                 egui::Popup::menu(&more)
                     .style(crate::theme::menu_style)
                     .show(|ui| {
@@ -31,8 +36,16 @@ impl RepoTab {
         });
         if stash.is_none() && self.detail_hash.is_some() {
             ui.horizontal(|ui| {
-                ui.selectable_value(&mut self.prompt_session.open, false, crate::i18n::text("repo-core-0056"));
-                ui.selectable_value(&mut self.prompt_session.open, true, crate::i18n::text("repo-core-0864"));
+                ui.selectable_value(
+                    &mut self.prompt_session.open,
+                    false,
+                    crate::i18n::text("repo-core-0056"),
+                );
+                ui.selectable_value(
+                    &mut self.prompt_session.open,
+                    true,
+                    crate::i18n::text("repo-core-0864"),
+                );
             });
             if self.prompt_session.open {
                 self.prompt_session_panel(ui, acts);
@@ -121,7 +134,8 @@ impl RepoTab {
                 let remerge = self.remerge_mode(detail);
                 let resolved = matches!(remerge, Mode::Checking | Mode::On);
                 if !resolved {
-                    let note = (detail.parents.len() > 1).then_some(crate::i18n::text("repo-core-0868"));
+                    let note =
+                        (detail.parents.len() > 1).then_some(crate::i18n::text("repo-core-0868"));
                     files_header(ui, &detail.files, note);
                 }
                 self.remerge_toggle(ui, acts, &remerge);
@@ -326,7 +340,13 @@ fn author_line(ui: &mut Ui, detail: &CommitDetail) {
     });
     if detail.committer != detail.author {
         ui.label(
-            RichText::new(crate::i18n::message("repo-core-0877", &[("committer", format!("{}", detail.committer).into()), ("commit-date", format!("{}", detail.commit_date).into())]))
+            RichText::new(crate::i18n::message(
+                "repo-core-0877",
+                &[
+                    ("committer", format!("{}", detail.committer).into()),
+                    ("commit-date", format!("{}", detail.commit_date).into()),
+                ],
+            ))
             .color(t.text_faint)
             .small(),
         );
@@ -461,7 +481,9 @@ fn reword_editor(ui: &mut Ui, reword: &mut Reword) -> Option<bool> {
     });
     let mut out = None;
     ui.horizontal(|ui| {
-        if widgets::primary_button(ui, crate::i18n::text("repo-core-0888"), can_save, 110.0).clicked() {
+        if widgets::primary_button(ui, crate::i18n::text("repo-core-0888"), can_save, 110.0)
+            .clicked()
+        {
             out = Some(true);
         }
         if ui.button(crate::i18n::text("repo-core-0443")).clicked() {

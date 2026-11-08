@@ -65,7 +65,7 @@ fn tree_rows_budget<'a>(
     if let Some(frame) = data.frames.get(cursor) {
         for (path, _) in &frame.changes {
             if !active() {
-                return Err("Frame cancelled".into());
+                return Err(crate::i18n::text("repo-core-2771").into());
             }
             changes.insert(path.as_slice());
         }
@@ -75,17 +75,17 @@ fn tree_rows_budget<'a>(
     let mut all = BTreeSet::new();
     let mut insert = |path: &'a [u8], directory: bool| -> Result<(), String> {
         if !active() {
-            return Err("Frame cancelled".into());
+            return Err(crate::i18n::text("repo-core-2771").into());
         }
         let effort = path.len() + 1;
         if effort > work {
-            return Err("Replay tree expanded work budget exceeded".into());
+            return Err(crate::i18n::text("repo-core-2772").into());
         }
         work -= effort;
         if !all.contains(&(path, directory)) {
             let cost = path.len() + 256;
             if cost > bytes || all.len() >= 200_000 {
-                return Err("Replay tree expanded allocation/entry budget exceeded".into());
+                return Err(crate::i18n::text("repo-core-2773").into());
             }
             bytes -= cost;
             all.insert((path, directory));
@@ -96,7 +96,7 @@ fn tree_rows_budget<'a>(
         insert(path, false)?;
         for (i, b) in path.iter().enumerate() {
             if i % 256 == 0 && !active() {
-                return Err("Frame cancelled".into());
+                return Err(crate::i18n::text("repo-core-2771").into());
             }
             if *b == b'/' {
                 insert(&path[..i], true)?;
@@ -113,7 +113,7 @@ fn tree_rows_budget<'a>(
     let mut rows = Vec::with_capacity(entries.len());
     for (path, directory) in entries {
         if !active() {
-            return Err("Frame cancelled".into());
+            return Err(crate::i18n::text("repo-core-2771").into());
         }
         let changed = !directory && changes.contains(path);
         let removed = changed && !files.contains(path);
@@ -174,51 +174,213 @@ impl RepoTab {
         }
         let mut open = true;
         let mut commit = None;
-        egui::Window::new("Watch the repository grow").id(egui::Id::new(("growth",&self.path))).open(&mut open).default_size(egui::vec2(820.0,650.0)).show(ctx,|ui| {
-            if view.reader.busy() {ui.label("Reading pinned first-parent history and baseline tree…");}
-            if let Some(error)=&view.error {ui.colored_label(crate::theme::Tokens::get(ctx).danger,error);}
-            let Some(data)=&view.data else {return;};
-            ui.label(format!("{} first-parent commits of HEAD · {}{}",data.frames.len(),if data.more {"latest 1,000 commits (partial history)"} else {"all available first-parent history"},if data.shallow {" · shallow boundary"} else {""}));
-            ui.small("The first frame is a full pinned tree. Later frames apply each commit, including merges against their first parent. Deleted files remain crossed out for their deletion frame. Branch histories are not interleaved.");
-            if data.frames.is_empty() {ui.label("No commits yet.");return;}
-            let reduced=crate::a11y::motion::reduced(ctx);
-            if reduced {view.playing=false;ui.label("Reduced motion is enabled. Scrub or step through static frames.");}
-            ui.horizontal_wrapped(|ui| {
-                if ui.add_enabled(!reduced,egui::Button::new(if view.playing {"Pause growth"} else {"Play growth"})).clicked() {view.playing = !view.playing;view.last=Instant::now();}
-                if ui.button("Previous commit").clicked() {view.cursor=view.cursor.saturating_sub(1);view.playing=false;}
-                if ui.button("Next commit").clicked() {view.cursor=(view.cursor+1).min(data.frames.len()-1);view.playing=false;}
-                ui.add(egui::Slider::new(&mut view.speed,0.5..=8.0).text("commits / second"));
-            });
-            if ui.add(egui::Slider::new(&mut view.cursor,0..=data.frames.len()-1).text("History frame")).changed() {view.playing=false;}
-            if view.playing && !view.frames.busy() && view.shown==view.cursor && view.last.elapsed()>=Duration::from_secs_f32(1.0/view.speed) {
-                if view.cursor+1<data.frames.len() {view.cursor+=1;view.last=Instant::now();} else {view.playing=false;}
-            }
-            if view.playing {ctx.request_repaint_after(Duration::from_millis(30));}
-            if view.requested!=Some(view.cursor) {
-                let at=view.cursor;let snapshot=data.clone();view.requested=Some(at);
-                view.frames.queue(move |active| {if !active(){return Err("Frame cancelled".into());} let rows=tree_rows(&snapshot,at,active)?;if !active(){return Err("Frame cancelled".into());}Ok((at,rows))});
-            }
-            if view.frames.busy() {ui.label(format!("Preparing frame {}…",view.cursor+1));}
-            let frame=&data.frames[view.shown.min(data.frames.len()-1)];
-            let t=crate::theme::Tokens::get(ctx);
-            let colour=t.lane(frame.name.bytes().fold(0usize,|h,b|h.wrapping_mul(31).wrapping_add(b as usize)));
-            ui.colored_label(colour,format!("{} · {} · {}",frame.date,frame.name,frame.subject));
-            if ui.add_enabled(!view.playing && !view.frames.busy(),egui::Button::new("Open this commit")).clicked() {commit=Some(frame.hash.clone());}
-            ui.label(format!("{} tree entries · {} paths changed in this frame",view.rows.len(),frame.changes.len()));
-            egui::ScrollArea::vertical().max_height(440.0).show_rows(ui,22.0,view.rows.len(),|ui,range| {
-                for row in &view.rows[range] {
-                    let depth=row.path.iter().filter(|b|**b==b'/').count().min(32);
-                    let name=row.path.rsplit(|b|*b==b'/').next().unwrap_or_default();
-                    ui.horizontal(|ui| {
-                        ui.add_space(depth as f32*14.0);
-                        let name=format!("{} {}",if row.directory {"▸"} else if row.removed {"−"} else if row.changed {"●"} else {"·"},String::from_utf8_lossy(name));
-                        let text=egui::RichText::new(name).color(if row.removed {t.danger} else if row.changed {colour} else {t.text_dim});
-                        let text=if row.removed {text.strikethrough()} else {text};
-                        ui.label(text).on_hover_text(format!("{}{}",String::from_utf8_lossy(&row.path),if row.changed {format!("\n{} worked here at this commit",frame.name)} else {String::new()}));
+        egui::Window::new(crate::i18n::text("repo-core-2774"))
+            .id(egui::Id::new(("growth", &self.path)))
+            .open(&mut open)
+            .default_size(egui::vec2(820.0, 650.0))
+            .show(ctx, |ui| {
+                if view.reader.busy() {
+                    ui.label(crate::i18n::text("repo-core-2776"));
+                }
+                if let Some(error) = &view.error {
+                    ui.colored_label(crate::theme::Tokens::get(ctx).danger, error);
+                }
+                let Some(data) = &view.data else {
+                    return;
+                };
+                ui.label(crate::i18n::message(
+                    "repo-core-2777",
+                    &[
+                        ("count", (data.frames.len()).into()),
+                        (
+                            "history",
+                            format!(
+                                "{}",
+                                if data.more {
+                                    crate::i18n::text("repo-core-2778")
+                                } else {
+                                    crate::i18n::text("repo-core-2779")
+                                }
+                            )
+                            .into(),
+                        ),
+                        (
+                            "else",
+                            format!(
+                                "{}",
+                                if data.shallow {
+                                    crate::i18n::text("repo-core-2780")
+                                } else {
+                                    ""
+                                }
+                            )
+                            .into(),
+                        ),
+                    ],
+                ));
+                ui.small(crate::i18n::text("repo-core-2781"));
+                if data.frames.is_empty() {
+                    ui.label(crate::i18n::text("repo-core-2782"));
+                    return;
+                }
+                let reduced = crate::a11y::motion::reduced(ctx);
+                if reduced {
+                    view.playing = false;
+                    ui.label(crate::i18n::text("repo-core-2783"));
+                }
+                ui.horizontal_wrapped(|ui| {
+                    if ui
+                        .add_enabled(
+                            !reduced,
+                            egui::Button::new(if view.playing {
+                                crate::i18n::text("repo-core-2784")
+                            } else {
+                                crate::i18n::text("repo-core-2785")
+                            }),
+                        )
+                        .clicked()
+                    {
+                        view.playing = !view.playing;
+                        view.last = Instant::now();
+                    }
+                    if ui.button(crate::i18n::text("repo-core-2786")).clicked() {
+                        view.cursor = view.cursor.saturating_sub(1);
+                        view.playing = false;
+                    }
+                    if ui.button(crate::i18n::text("repo-core-2787")).clicked() {
+                        view.cursor = (view.cursor + 1).min(data.frames.len() - 1);
+                        view.playing = false;
+                    }
+                    ui.add(
+                        egui::Slider::new(&mut view.speed, 0.5..=8.0)
+                            .text(crate::i18n::text("repo-core-2788")),
+                    );
+                });
+                if ui
+                    .add(
+                        egui::Slider::new(&mut view.cursor, 0..=data.frames.len() - 1)
+                            .text(crate::i18n::text("repo-core-2789")),
+                    )
+                    .changed()
+                {
+                    view.playing = false;
+                }
+                if view.playing
+                    && !view.frames.busy()
+                    && view.shown == view.cursor
+                    && view.last.elapsed() >= Duration::from_secs_f32(1.0 / view.speed)
+                {
+                    if view.cursor + 1 < data.frames.len() {
+                        view.cursor += 1;
+                        view.last = Instant::now();
+                    } else {
+                        view.playing = false;
+                    }
+                }
+                if view.playing {
+                    ctx.request_repaint_after(Duration::from_millis(30));
+                }
+                if view.requested != Some(view.cursor) {
+                    let at = view.cursor;
+                    let snapshot = data.clone();
+                    view.requested = Some(at);
+                    view.frames.queue(move |active| {
+                        if !active() {
+                            return Err(crate::i18n::text("repo-core-2771").into());
+                        }
+                        let rows = tree_rows(&snapshot, at, active)?;
+                        if !active() {
+                            return Err(crate::i18n::text("repo-core-2771").into());
+                        }
+                        Ok((at, rows))
                     });
                 }
+                if view.frames.busy() {
+                    ui.label(crate::i18n::message(
+                        "repo-core-2790",
+                        &[("cursor", format!("{}", view.cursor + 1).into())],
+                    ));
+                }
+                let frame = &data.frames[view.shown.min(data.frames.len() - 1)];
+                let t = crate::theme::Tokens::get(ctx);
+                let colour = t.lane(
+                    frame
+                        .name
+                        .bytes()
+                        .fold(0usize, |h, b| h.wrapping_mul(31).wrapping_add(b as usize)),
+                );
+                ui.colored_label(
+                    colour,
+                    format!("{} · {} · {}", frame.date, frame.name, frame.subject),
+                );
+                if ui
+                    .add_enabled(
+                        !view.playing && !view.frames.busy(),
+                        egui::Button::new(crate::i18n::text("repo-core-2791")),
+                    )
+                    .clicked()
+                {
+                    commit = Some(frame.hash.clone());
+                }
+                ui.label(crate::i18n::message(
+                    "repo-core-2792",
+                    &[
+                        ("count", (view.rows.len()).into()),
+                        ("count2", (frame.changes.len()).into()),
+                    ],
+                ));
+                egui::ScrollArea::vertical().max_height(440.0).show_rows(
+                    ui,
+                    22.0,
+                    view.rows.len(),
+                    |ui, range| {
+                        for row in &view.rows[range] {
+                            let depth = row.path.iter().filter(|b| **b == b'/').count().min(32);
+                            let name = row.path.rsplit(|b| *b == b'/').next().unwrap_or_default();
+                            ui.horizontal(|ui| {
+                                ui.add_space(depth as f32 * 14.0);
+                                let name = format!(
+                                    "{} {}",
+                                    if row.directory {
+                                        "▸"
+                                    } else if row.removed {
+                                        "−"
+                                    } else if row.changed {
+                                        "●"
+                                    } else {
+                                        "·"
+                                    },
+                                    String::from_utf8_lossy(name)
+                                );
+                                let text = egui::RichText::new(name).color(if row.removed {
+                                    t.danger
+                                } else if row.changed {
+                                    colour
+                                } else {
+                                    t.text_dim
+                                });
+                                let text = if row.removed {
+                                    text.strikethrough()
+                                } else {
+                                    text
+                                };
+                                ui.label(text).on_hover_text(format!(
+                                    "{}{}",
+                                    String::from_utf8_lossy(&row.path),
+                                    if row.changed {
+                                        crate::i18n::message(
+                                            "repo-core-2793",
+                                            &[("name", format!("{}", frame.name).into())],
+                                        )
+                                    } else {
+                                        String::new()
+                                    }
+                                ));
+                            });
+                        }
+                    },
+                );
             });
-        });
         if let Some(hash) = commit {
             self.activity_commit(hash, ctx);
             self.growth = None;

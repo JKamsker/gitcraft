@@ -218,13 +218,19 @@ impl RepoTab {
         let known = self.authorship.map.clone();
         let repo = self.path.clone();
         let name = branch.to_owned();
-        self.status = Some((crate::i18n::message("repo-core-0197", &[("branch", format!("{}", branch).into())]), false));
+        self.status = Some((
+            crate::i18n::message(
+                "repo-core-0197",
+                &[("branch", format!("{}", branch).into())],
+            ),
+            false,
+        ));
         self.then(
             ctx,
             move || {
-                let base = default_branch(&repo, &full)
-                    .or(main)
-                    .ok_or_else(|| crate::i18n::message("repo-core-0198", &[("name", format!("{}", name).into())]))?;
+                let base = default_branch(&repo, &full).or(main).ok_or_else(|| {
+                    crate::i18n::message("repo-core-0198", &[("name", format!("{}", name).into())])
+                })?;
                 authorship::branch::figures(&repo, &full, &base, &known, complete)
                     .map(|f| f.headline(&name))
             },
@@ -252,15 +258,13 @@ fn default_branch(repo: &std::path::Path, branch: &str) -> Option<String> {
 }
 
 /// What the search bar shows it searched when the filter is on.
-pub(crate) const AGENT_FILTER: &str = "agent-written commits";
+pub(crate) const AGENT_FILTER: &str = "Agent-written commits";
 
 /// The filter's toggle in the search bar.
 pub(crate) fn filter_toggle(ui: &mut Ui, on: bool, acts: &mut Vec<Action>) {
     if ui
         .selectable_label(on, crate::i18n::text("repo-core-0205"))
-        .on_hover_text(
-            crate::i18n::text("repo-core-0206"),
-        )
+        .on_hover_text(crate::i18n::text("repo-core-0206"))
         .clicked()
     {
         acts.push(Action::AgentFilter(!on));

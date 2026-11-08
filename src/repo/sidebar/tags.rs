@@ -33,7 +33,7 @@ impl RepoTab {
                 Header {
                     key: "tags",
                     icon: "tag",
-                    title: "TAGS",
+                    title: crate::i18n::text("repo-core-3536"),
                     count: tags.len(),
                     default_open: false,
                     button: None,
@@ -61,7 +61,7 @@ impl RepoTab {
     }
 
     fn tag_menu_items(&self, ui: &mut Ui, acts: &mut Vec<Action>, tag: &Branch, idle: bool) {
-        if crate::menu_item::MenuItem::new("Copy name")
+        if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-3390"))
             .icon("copy")
             .show(ui)
             .clicked()
@@ -69,12 +69,15 @@ impl RepoTab {
             ui.ctx().copy_text(tag.name.clone());
         }
         if crate::release::version::Version::parse(&tag.name).is_some()
-            && crate::menu_item::MenuItem::new(format!("Start hotfix from {}…", tag.name))
-                .icon("tag")
-                .enabled(idle)
-                .show(ui)
-                .on_hover_text("A hotfix branch made here (the next patch version), checked out")
-                .clicked()
+            && crate::menu_item::MenuItem::new(crate::i18n::message(
+                "repo-core-3538",
+                &[("name", format!("{}", tag.name).into())],
+            ))
+            .icon("tag")
+            .enabled(idle)
+            .show(ui)
+            .on_hover_text(crate::i18n::text("repo-core-3539"))
+            .clicked()
         {
             acts.push(Action::Hotfix(crate::repo::hotfix::HotfixAct::Start {
                 tag: tag.name.clone(),
@@ -82,27 +85,42 @@ impl RepoTab {
             }));
         }
         if let Some(remote) = self.default_remote() {
-            if crate::menu_item::MenuItem::new(format!("Push to {remote}"))
-                .icon("arrow-up-from-line")
-                .enabled(idle)
-                .show(ui)
-                .clicked()
+            if crate::menu_item::MenuItem::new(crate::i18n::message(
+                "repo-core-3540",
+                &[("remote", format!("{}", remote).into())],
+            ))
+            .icon("arrow-up-from-line")
+            .enabled(idle)
+            .show(ui)
+            .clicked()
             {
                 acts.push(Action::Ops {
-                    label: format!("Push tag {}", tag.name),
+                    label: crate::i18n::message(
+                        "repo-core-3541",
+                        &[("name", format!("{}", tag.name).into())],
+                    ),
                     ops: ops(&[&["push", &remote, &format!("refs/tags/{}", tag.name)]]),
                     refresh: Refresh::All,
                 });
             }
-            if crate::menu_item::MenuItem::new(format!("Delete from {remote}…"))
-                .icon("minus")
-                .enabled(idle)
-                .show(ui)
-                .clicked()
+            if crate::menu_item::MenuItem::new(crate::i18n::message(
+                "repo-core-3542",
+                &[("remote", format!("{}", remote).into())],
+            ))
+            .icon("minus")
+            .enabled(idle)
+            .show(ui)
+            .clicked()
             {
                 acts.push(Action::Dialog(Dialog::confirm(
-                    "Delete remote tag",
-                    format!("Delete the tag “{}” from {remote}?", tag.name),
+                    crate::i18n::text("repo-core-3543"),
+                    crate::i18n::message(
+                        "repo-core-3544",
+                        &[
+                            ("name", format!("{}", tag.name).into()),
+                            ("remote", format!("{}", remote).into()),
+                        ],
+                    ),
                     crate::i18n::text("repo-core-1115"),
                     ops(&[&[
                         "push",
@@ -115,7 +133,7 @@ impl RepoTab {
             }
         }
         ui.separator();
-        if crate::menu_item::MenuItem::new("Delete tag…")
+        if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-3545"))
             .icon("minus")
             .enabled(idle)
             .show(ui)
@@ -141,8 +159,11 @@ impl RepoTab {
             move |tab, (name, object), _| {
                 tab.dialog = Some(
                     Dialog::confirm(
-                        "Delete tag",
-                        format!("Delete the local tag “{name}”?"),
+                        crate::i18n::text("repo-core-3546"),
+                        crate::i18n::message(
+                            "repo-core-3547",
+                            &[("name", format!("{}", name).into())],
+                        ),
                         crate::i18n::text("repo-core-1115"),
                         delete_tag(&name, object.as_deref()),
                         None,

@@ -40,12 +40,17 @@ fn checks_note(blocked: bool, merge_state: &str, failed: usize, running: usize) 
         return None;
     }
     let required = if merge_state == "BLOCKED" {
-        "some may be required"
+        crate::i18n::text("repo-core-3046")
     } else {
-        "none is required"
+        crate::i18n::text("repo-core-3047")
     };
-    Some(format!(
-        "{failed} check(s) failed and {running} still running, but {required}."
+    Some(crate::i18n::message(
+        "repo-core-3048",
+        &[
+            ("failed", format!("{}", failed).into()),
+            ("running", format!("{}", running).into()),
+            ("required", format!("{}", required).into()),
+        ],
     ))
 }
 
@@ -55,7 +60,7 @@ pub(super) fn merge_box(ui: &mut Ui, draft: &mut PrDraft, d: &PrDetails, acts: &
     if extras.pr_id.is_empty() {
         // Nothing is known about the rights or the merge methods, so nothing can be said of them.
         ui.label(
-            RichText::new("Couldn't read what can be done here. Load it again.")
+            RichText::new(crate::i18n::text("repo-core-3049"))
                 .color(t.warning)
                 .small(),
         );
@@ -76,9 +81,21 @@ pub(super) fn merge_box(ui: &mut Ui, draft: &mut PrDraft, d: &PrDetails, acts: &
     draft.merge_method = Some(method);
     ui.horizontal_wrapped(|ui| {
         for (option, allowed, label) in [
-            (MergeMethod::Merge, extras.merge_allowed, "Merge commit"),
-            (MergeMethod::Squash, extras.squash_allowed, crate::i18n::text("repo-core-2444")),
-            (MergeMethod::Rebase, extras.rebase_allowed, "Rebase"),
+            (
+                MergeMethod::Merge,
+                extras.merge_allowed,
+                crate::i18n::text("repo-core-3050"),
+            ),
+            (
+                MergeMethod::Squash,
+                extras.squash_allowed,
+                crate::i18n::text("repo-core-2444"),
+            ),
+            (
+                MergeMethod::Rebase,
+                extras.rebase_allowed,
+                crate::i18n::text("repo-core-3051"),
+            ),
         ] {
             if allowed && ui.radio(method == option, label).clicked() {
                 draft.merge_method = Some(option);
@@ -92,10 +109,22 @@ pub(super) fn merge_box(ui: &mut Ui, draft: &mut PrDraft, d: &PrDetails, acts: &
     );
     if host_path.as_ref() == own_branch.as_ref() && extras.delete_branch_on_merge {
         ui.label(
-            RichText::new(format!(
-                "{} deletes {} afterwards: this repository is set to.",
-                d.forge.map_or("The forge", crate::forge::Forge::name),
-                d.head_branch
+            RichText::new(crate::i18n::message(
+                "repo-core-3052",
+                &[
+                    (
+                        "name",
+                        format!(
+                            "{}",
+                            d.forge.map_or(
+                                crate::i18n::text("repo-core-3053"),
+                                crate::forge::Forge::name
+                            )
+                        )
+                        .into(),
+                    ),
+                    ("head-branch", format!("{}", d.head_branch).into()),
+                ],
             ))
             .color(t.text_faint)
             .small(),
@@ -103,7 +132,13 @@ pub(super) fn merge_box(ui: &mut Ui, draft: &mut PrDraft, d: &PrDetails, acts: &
     } else if host_path.as_ref() == own_branch.as_ref() {
         let mut delete = draft.delete_branch.unwrap_or(false);
         if ui
-            .checkbox(&mut delete, format!("Delete {} afterwards", d.head_branch))
+            .checkbox(
+                &mut delete,
+                crate::i18n::message(
+                    "repo-core-3054",
+                    &[("head-branch", format!("{}", d.head_branch).into())],
+                ),
+            )
             .changed()
         {
             draft.delete_branch = Some(delete);
@@ -120,16 +155,19 @@ pub(super) fn merge_box(ui: &mut Ui, draft: &mut PrDraft, d: &PrDetails, acts: &
         ui.label(RichText::new(blocker).color(t.text_faint).small());
     } else if d.merge_state == "BLOCKED" {
         ui.label(
-            RichText::new("The repository's rules aren't met, but you may merge past them.")
+            RichText::new(crate::i18n::text("repo-core-3055"))
                 .color(t.warning)
                 .small(),
         );
     }
     if extras.merge_handoff {
         if ui
-            .button(format!(
-                "Complete on {}",
-                d.forge.map_or("forge", |f| f.name())
+            .button(crate::i18n::message(
+                "repo-core-3056",
+                &[(
+                    "name",
+                    format!("{}", d.forge.map_or("forge", |f| f.name())).into(),
+                )],
             ))
             .clicked()
         {
@@ -140,15 +178,21 @@ pub(super) fn merge_box(ui: &mut Ui, draft: &mut PrDraft, d: &PrDetails, acts: &
     let enabled = blocker.is_none() && !draft.posting;
     if draft.confirm_merge {
         ui.label(
-            RichText::new(format!(
-                "Merge #{} into {}? Everyone sees this at once, and it can't be undone from here.",
-                d.number, d.base_branch
+            RichText::new(crate::i18n::message(
+                "repo-core-3058",
+                &[
+                    ("number", format!("{}", d.number).into()),
+                    ("base-branch", format!("{}", d.base_branch).into()),
+                ],
             ))
             .color(t.warning),
         );
         let buttons = ui.horizontal(|ui| {
             if ui
-                .add_enabled(enabled, egui::Button::new("Yes, merge"))
+                .add_enabled(
+                    enabled,
+                    egui::Button::new(crate::i18n::text("repo-core-3059")),
+                )
                 .clicked()
             {
                 acts.push(Action::Pr(PrAct::Merge));
@@ -164,7 +208,10 @@ pub(super) fn merge_box(ui: &mut Ui, draft: &mut PrDraft, d: &PrDetails, acts: &
             buttons.response.scroll_to_me(Some(egui::Align::BOTTOM));
         }
     } else if ui
-        .add_enabled(enabled, egui::Button::new("Merge pull request"))
+        .add_enabled(
+            enabled,
+            egui::Button::new(crate::i18n::text("repo-core-3060")),
+        )
         .clicked()
     {
         acts.push(Action::Pr(PrAct::AskMerge));

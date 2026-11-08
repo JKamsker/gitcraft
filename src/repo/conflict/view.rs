@@ -47,9 +47,20 @@ impl RepoTab {
 impl ConflictEditor {
     pub(crate) fn standalone_ui(&mut self, ui: &mut Ui, editable: bool) {
         let t = Tokens::get(ui.ctx());
-        ui.label(crate::i18n::message("repo-core-0705", &[("unresolved", format!("{}", self.unresolved()).into())]));
+        ui.label(crate::i18n::message(
+            "repo-core-0705",
+            &[("unresolved", format!("{}", self.unresolved()).into())],
+        ));
         self.result_panel(ui, &t, editable, (None, false), &mut Vec::new());
-        self.conflict_list(ui, &t, (crate::i18n::text("repo-core-0706"), crate::i18n::text("repo-core-0707")), editable);
+        self.conflict_list(
+            ui,
+            &t,
+            (
+                crate::i18n::text("repo-core-0706"),
+                crate::i18n::text("repo-core-0707"),
+            ),
+            editable,
+        );
     }
 
     /// Header: the file, how many conflicts are resolved, save, the whole-file actions, close.
@@ -73,18 +84,27 @@ impl ConflictEditor {
                     ui.label(RichText::new(&self.path).font(theme::medium(13.0)));
                     widgets::chip(
                         ui,
-                        &crate::i18n::message("repo-core-0709", &[("total", format!("{}", total.saturating_sub(left).min(total)).into()), ("total2", (total).into())]),
+                        &crate::i18n::message(
+                            "repo-core-0709",
+                            &[
+                                (
+                                    "total",
+                                    format!("{}", total.saturating_sub(left).min(total)).into(),
+                                ),
+                                ("total2", (total).into()),
+                            ],
+                        ),
                         if left == 0 { t.success } else { t.warning },
                     );
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if icons::small_button(ui, "x", crate::i18n::text("repo-core-0711")).clicked() {
+                        if icons::small_button(ui, "x", crate::i18n::text("repo-core-0711"))
+                            .clicked()
+                        {
                             acts.push(Action::CloseDiff);
                         }
                         if ui
                             .button(crate::i18n::text("repo-core-0712"))
-                            .on_hover_text(
-                                crate::i18n::text("repo-core-0713"),
-                            )
+                            .on_hover_text(crate::i18n::text("repo-core-0713"))
                             .clicked()
                         {
                             acts.push(Action::Agent(crate::repo::agents::AgentAct::Send(
@@ -121,9 +141,7 @@ impl ConflictEditor {
         }
         let r = ui
             .add_enabled(idle, egui::Button::new(crate::i18n::text("repo-core-0717")))
-            .on_hover_text(
-                crate::i18n::text("repo-core-0718"),
-            )
+            .on_hover_text(crate::i18n::text("repo-core-0718"))
             .on_disabled_hover_text(if found {
                 crate::i18n::text("repo-core-0719")
             } else {
@@ -152,17 +170,23 @@ impl ConflictEditor {
                 ui.add(crate::spinner::Spinner::new());
             } else if ui
                 .add_enabled(idle, egui::Button::new(crate::i18n::text("repo-core-0723")))
-                .on_hover_text(
-                    crate::i18n::text("repo-core-0724"),
-                )
+                .on_hover_text(crate::i18n::text("repo-core-0724"))
                 .clicked()
             {
                 acts.push(Action::SolveWithMergiraf);
             }
         }
         for (label, side, tip) in [
-            (crate::i18n::text("repo-core-0725"), theirs, crate::i18n::text("repo-core-0726")),
-            (crate::i18n::text("repo-core-0727"), mine, crate::i18n::text("repo-core-0728")),
+            (
+                crate::i18n::text("repo-core-0725"),
+                theirs,
+                crate::i18n::text("repo-core-0726"),
+            ),
+            (
+                crate::i18n::text("repo-core-0727"),
+                mine,
+                crate::i18n::text("repo-core-0728"),
+            ),
         ] {
             if ui
                 .add_enabled(idle, egui::Button::new(label))
@@ -170,7 +194,13 @@ impl ConflictEditor {
                 .clicked()
             {
                 acts.push(Action::Ops {
-                    label: crate::i18n::message("repo-core-0729", &[("label", format!("{}", label).into()), ("path", format!("{}", self.path).into())]),
+                    label: crate::i18n::message(
+                        "repo-core-0729",
+                        &[
+                            ("label", format!("{}", label).into()),
+                            ("path", format!("{}", self.path).into()),
+                        ],
+                    ),
                     ops: ops(&[
                         // Not `--literal-pathspecs`: checkout runs the post-checkout hook.
                         &["checkout", side, "--", &literal_path(&self.path)],
@@ -182,9 +212,7 @@ impl ConflictEditor {
         }
         if ui
             .add_enabled(idle, egui::Button::new(crate::i18n::text("repo-core-0730")))
-            .on_hover_text(
-                crate::i18n::text("repo-core-0731"),
-            )
+            .on_hover_text(crate::i18n::text("repo-core-0731"))
             .clicked()
         {
             acts.push(Action::ResolveInMergeTool(self.path.clone()));
@@ -234,7 +262,10 @@ impl ConflictEditor {
                         };
                         ui.label(RichText::new(label).color(t.warning).small())
                             .on_hover_text(tip);
-                        if ui.small_button(crate::i18n::text("repo-core-0738")).clicked() {
+                        if ui
+                            .small_button(crate::i18n::text("repo-core-0738"))
+                            .clicked()
+                        {
                             self.manual = false;
                             self.result = self.rendered();
                         }
@@ -289,8 +320,14 @@ impl ConflictEditor {
                         .show(ui, |ui| {
                             ui.horizontal(|ui| {
                                 ui.label(
-                                    RichText::new(crate::i18n::message("repo-core-0741", &[("k", format!("{}", k + 1).into()), ("total", (total).into())]))
-                                        .font(theme::semibold(12.0)),
+                                    RichText::new(crate::i18n::message(
+                                        "repo-core-0741",
+                                        &[
+                                            ("k", format!("{}", k + 1).into()),
+                                            ("total", (total).into()),
+                                        ],
+                                    ))
+                                    .font(theme::semibold(12.0)),
                                 );
                                 ui.add_space(8.0);
                                 let recorded = self.recorded.get(k).is_some_and(Option::is_some);
@@ -393,9 +430,7 @@ fn choice_buttons(
         let b = egui::Button::new(text).fill(if on { t.accent } else { t.field });
         let response = ui.add(b);
         let response = if choice == Choice::Recorded {
-            response.on_hover_text(
-                crate::i18n::text("repo-core-0745"),
-            )
+            response.on_hover_text(crate::i18n::text("repo-core-0745"))
         } else {
             response
         };

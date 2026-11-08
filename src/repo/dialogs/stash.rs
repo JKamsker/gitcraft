@@ -110,7 +110,9 @@ pub(super) fn staged_problem(work: &WorkStatus, support: &StagedSupport) -> Opti
     match support {
         StagedSupport::Known(Ok(())) => None,
         StagedSupport::Known(Err(e)) | StagedSupport::Failed(e) => Some(e.clone()),
-        StagedSupport::Unknown | StagedSupport::Checking => Some(crate::i18n::text(CHECKING).into()),
+        StagedSupport::Unknown | StagedSupport::Checking => {
+            Some(crate::i18n::text(CHECKING).into())
+        }
     }
 }
 
@@ -134,7 +136,13 @@ pub(super) fn files_summary(files: &[String]) -> String {
     let names = names.join(", ");
     match files.len().saturating_sub(SHOWN) {
         0 => names,
-        more => crate::i18n::message("repo-core-1491", &[("names", format!("{}", names).into()), ("more", format!("{}", more).into())]),
+        more => crate::i18n::message(
+            "repo-core-1491",
+            &[
+                ("names", format!("{}", names).into()),
+                ("more", format!("{}", more).into()),
+            ],
+        ),
     }
 }
 
@@ -162,7 +170,10 @@ pub(super) fn stash(
         &t,
     );
     if d.files.is_empty() {
-        let how = crate::i18n::message("repo-core-1496", &[("command", format!("{}", crate::manual::command()).into())]);
+        let how = crate::i18n::message(
+            "repo-core-1496",
+            &[("command", format!("{}", crate::manual::command()).into())],
+        );
         choice(
             ui,
             &mut d.choice,
@@ -174,7 +185,13 @@ pub(super) fn stash(
         );
     } else {
         let n = d.files.len();
-        let label = crate::i18n::message("repo-core-1498", &[("n", (n).into()), ("s", format!("{}", if n == 1 { "" } else { "s" }).into())]);
+        let label = crate::i18n::message(
+            "repo-core-1498",
+            &[
+                ("n", (n).into()),
+                ("s", format!("{}", if n == 1 { "" } else { "s" }).into()),
+            ],
+        );
         let hint = files_summary(&d.files);
         choice(ui, &mut d.choice, Choice::Files, &label, &hint, None, &t);
     }
@@ -198,7 +215,12 @@ pub(super) fn stash(
         &t,
     );
     ui.add_space(8.0);
-    field(ui, &mut d.message, crate::i18n::text("repo-core-1503"), &mut d.focus);
+    field(
+        ui,
+        &mut d.message,
+        crate::i18n::text("repo-core-1503"),
+        &mut d.focus,
+    );
     ui.add_space(6.0);
     untracked_box(ui, d, work);
     let problem = problem(d, work, support);

@@ -189,11 +189,9 @@ pub(super) fn parallel_bisect(ui: &mut Ui, enter: bool, form: &mut ParallelForm)
         &mut focus,
     );
     ui.label(
-        RichText::new(
-            crate::i18n::text("repo-core-1411"),
-        )
-        .small()
-        .color(t.text_faint),
+        RichText::new(crate::i18n::text("repo-core-1411"))
+            .small()
+            .color(t.text_faint),
     );
     ui.add_space(8.0);
     machine(ui, form, &t);
@@ -204,8 +202,13 @@ pub(super) fn parallel_bisect(ui: &mut Ui, enter: bool, form: &mut ParallelForm)
     let missing = form.missing();
     let mut outcome = Outcome::Open;
     ui.horizontal(|ui| {
-        let start = widgets::primary_button(ui, crate::i18n::text("repo-core-1207"), setup.is_some(), 90.0)
-            .on_disabled_hover_text(missing);
+        let start = widgets::primary_button(
+            ui,
+            crate::i18n::text("repo-core-1207"),
+            setup.is_some(),
+            90.0,
+        )
+        .on_disabled_hover_text(missing);
         if let Some(setup) = setup
             && (start.clicked() || enter)
         {
@@ -231,9 +234,7 @@ fn ends(ui: &mut Ui, form: &mut ParallelForm, t: &Tokens) {
         &mut no_focus,
     );
     ui.add_space(4.0);
-    ui.label(
-        RichText::new(crate::i18n::text("repo-core-1413")).color(t.text_dim),
-    );
+    ui.label(RichText::new(crate::i18n::text("repo-core-1413")).color(t.text_dim));
     field(
         ui,
         &mut form.good,
@@ -258,7 +259,10 @@ fn machine(ui: &mut Ui, form: &mut ParallelForm, t: &Tokens) {
     let home = Machine::of(&form.repo);
     let label = |m: &Machine| {
         if *m == home {
-            crate::i18n::message("repo-core-1418", &[("label", format!("{}", capital(&m.label())).into())])
+            crate::i18n::message(
+                "repo-core-1418",
+                &[("label", format!("{}", capital(&m.label())).into())],
+            )
         } else {
             capital(&m.label())
         }
@@ -317,8 +321,20 @@ fn limits(ui: &mut Ui, form: &mut ParallelForm, t: &Tokens) {
             form.parallel_set = true;
         }
         let (said, why) = match &cores {
-            Some(Ok(n)) => (crate::i18n::message("repo-core-1426", &[("n", (n).into()), ("label", format!("{}", form.chosen().label()).into())]), None),
-            Some(Err(e)) if !e.is_empty() => (crate::i18n::text("repo-core-1427").to_owned(), Some(e.clone())),
+            Some(Ok(n)) => (
+                crate::i18n::message(
+                    "repo-core-1426",
+                    &[
+                        ("n", (n).into()),
+                        ("label", format!("{}", form.chosen().label()).into()),
+                    ],
+                ),
+                None,
+            ),
+            Some(Err(e)) if !e.is_empty() => (
+                crate::i18n::text("repo-core-1427").to_owned(),
+                Some(e.clone()),
+            ),
             _ => (crate::i18n::text("repo-core-1428").to_owned(), None),
         };
         let label = ui.label(RichText::new(said).small().color(t.text_faint));

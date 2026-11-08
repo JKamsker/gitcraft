@@ -7,7 +7,7 @@ pub(super) const TIMEOUT: Duration = Duration::from_secs(20);
 #[cfg(test)]
 thread_local! { pub(super) static TEST_PROGRAM: std::cell::RefCell<Option<std::path::PathBuf>> = const { std::cell::RefCell::new(None) }; }
 
-const FAILED: &str = "SOPS could not decrypt this side. Check the installed sops version and this computer's local keys/permissions; the encrypted patch is still available. Tool diagnostics are hidden because they can contain secrets.";
+const FAILED: &str = "repo-core-3923";
 
 pub(super) fn args(format: Format) -> [&'static str; 7] {
     [
@@ -57,7 +57,7 @@ pub(super) fn decrypt(
     .and_then(|out| out.complete())
     .map_err(safe_failure)?;
     if !out.status.success() {
-        return Err(FAILED.into());
+        return Err(crate::i18n::text(FAILED).into());
     }
     if !active() {
         return Err("Decryption cancelled.".into());
@@ -66,28 +66,27 @@ pub(super) fn decrypt(
 }
 
 fn safe_failure(error: String) -> String {
-    if error.contains("cancelled") {
-        "Decryption cancelled.".into()
+    if error.contains(crate::i18n::text("repo-core-2896")) {
+        crate::i18n::text("repo-core-3914").into()
     } else if error.contains("timed out") {
-        "Decryption exceeded 20 seconds and was stopped. The encrypted patch is still available."
-            .into()
+        crate::i18n::text("repo-core-3929").into()
     } else if error.contains("exceeded") {
-        "SOPS output exceeded its size limit (2 MiB stdout, 32 KiB diagnostics). The encrypted patch is still available.".into()
+        crate::i18n::text("repo-core-3931").into()
     } else {
-        "Could not start local SOPS. Install SOPS 3.10 or later on this computer and check its local keys/permissions. The encrypted patch is still available.".into()
+        crate::i18n::text("repo-core-3932").into()
     }
 }
 
 pub(super) fn plaintext(bytes: Vec<u8>) -> Result<String, String> {
     if bytes.len() > MAX_BYTES || bytes.contains(&0) {
-        return Err("Decrypted comparison supports UTF-8 text within 2 MiB per side; binary output is not displayed.".into());
+        return Err(crate::i18n::text("repo-core-3933").into());
     }
-    let text = String::from_utf8(bytes)
-        .map_err(|_| "Decrypted comparison supports UTF-8 text only.".to_owned())?;
+    let text =
+        String::from_utf8(bytes).map_err(|_| crate::i18n::text("repo-core-3934").to_owned())?;
     if text.lines().count() > super::model::MAX_LINES
         || text.lines().any(|line| line.chars().count() > 8192)
     {
-        return Err("Decrypted text exceeded 20,000 lines or 8,192 characters per line. Use the encrypted patch.".into());
+        return Err(crate::i18n::text("repo-core-3935").into());
     }
     Ok(text)
 }

@@ -114,35 +114,25 @@ impl RichKind {
     /// What its button does, while it is off (`on`: while it shows).
     pub fn tip(self, on: bool) -> &'static str {
         match (self, on) {
-            (_, true) => "Show the changes as lines",
-            (RichKind::Prose, false) => {
-                "Show the changes as prose: wrapped paragraphs, the words that changed marked"
-            }
-            (RichKind::Config, false) => {
-                "Show the changes by key: the keys added, removed, changed and moved"
-            }
-            (RichKind::Table, false) => {
-                "Show the changes as a table: rows and cells added, removed and changed"
-            }
-            (RichKind::Dvc, false) => "Show the data this file tracks, before and after",
-            (RichKind::Deps, false) => {
-                "Show the dependency changes: packages upgraded, downgraded, added, removed and relicensed"
-            }
-            (RichKind::Api, false) => {
-                "Show the API contract changes: what breaks the API's clients, and what was added"
-            }
+            (_, true) => crate::i18n::text("repo-core-4021"),
+            (RichKind::Prose, false) => crate::i18n::text("repo-core-4022"),
+            (RichKind::Config, false) => crate::i18n::text("repo-core-4023"),
+            (RichKind::Table, false) => crate::i18n::text("repo-core-4024"),
+            (RichKind::Dvc, false) => crate::i18n::text("repo-core-4025"),
+            (RichKind::Deps, false) => crate::i18n::text("repo-core-4026"),
+            (RichKind::Api, false) => crate::i18n::text("repo-core-4027"),
         }
     }
 
     /// How it shows a file, in a note: "Can't show this …".
     pub fn how(self) -> &'static str {
         match self {
-            RichKind::Prose => "as prose",
-            RichKind::Config => "by key",
-            RichKind::Api => "as API contract changes",
-            RichKind::Deps => "as dependency changes",
-            RichKind::Table => "as a table",
-            RichKind::Dvc => "as the data it tracks",
+            RichKind::Prose => crate::i18n::text("repo-core-4028"),
+            RichKind::Config => crate::i18n::text("repo-core-4029"),
+            RichKind::Api => crate::i18n::text("repo-core-4030"),
+            RichKind::Deps => crate::i18n::text("repo-core-4031"),
+            RichKind::Table => crate::i18n::text("repo-core-4032"),
+            RichKind::Dvc => crate::i18n::text("repo-core-4033"),
         }
     }
 }
@@ -201,23 +191,18 @@ pub(super) fn read_sides(
             Err(e) => return Err(Err(e)),
         };
         if bytes.len() > MAX_SIDE_BYTES {
-            return Err(Ok(format!(
-                "the file is over {} MB",
-                MAX_SIDE_BYTES / 1024 / 1024
-            )));
+            return Err(Ok(crate::i18n::message("repo-core-4034", &[("MAX-SIDE-BYTES", format!("{}", MAX_SIDE_BYTES / 1024 / 1024).into())])));
         }
         String::from_utf8(bytes)
             .map(Some)
-            .map_err(|_| Ok("the file isn't UTF-8 text".to_owned()))
+            .map_err(|_| Ok(crate::i18n::text("repo-core-4035").to_owned()))
     };
     let sides = Sides {
         old: read(&old)?,
         new: read(&new)?,
     };
     if sides.old.is_none() && sides.new.is_none() {
-        return Err(Err(
-            "Couldn't read the file on either side of the change".to_owned()
-        ));
+        return Err(Err(crate::i18n::text("repo-core-1963").to_owned()));
     }
     Ok(sides)
 }
@@ -312,9 +297,12 @@ pub fn fallback_note(ui: &mut Ui, kind: RichKind, note: &str) {
             ui.horizontal_wrapped(|ui| {
                 crate::icons::inline(ui, "circle-alert", 14.0, t.warning);
                 ui.label(
-                    egui::RichText::new(format!(
-                        "Can't show this {}: {note}. Showing the plain diff.",
-                        kind.how()
+                    egui::RichText::new(crate::i18n::message(
+                        "repo-core-4045",
+                        &[
+                            ("how", format!("{}", kind.how()).into()),
+                            ("note", format!("{}", note).into()),
+                        ],
                     ))
                     .color(t.text),
                 );

@@ -23,7 +23,7 @@ impl RepoTab {
             Header {
                 key: "stashes",
                 icon: "archive",
-                title: "STASHES",
+                title: crate::i18n::text("repo-core-3503"),
                 count: self.stashes.len(),
                 default_open: true,
                 button: Some(Button {
@@ -139,11 +139,11 @@ fn menu(
         .icon("check")
         .enabled(idle)
         .show(ui)
-        .on_hover_text("Bring the changes back and keep the stash")
+        .on_hover_text(crate::i18n::text("repo-core-3509"))
         .clicked()
     {
         acts.push(Action::Ops {
-            label: format!("Apply {name}"),
+            label: crate::i18n::message("repo-core-3510", &[("name", format!("{}", name).into())]),
             ops: steps(StashOp::Apply),
             refresh: Refresh::All,
         });
@@ -152,26 +152,26 @@ fn menu(
         .icon("check")
         .enabled(idle)
         .show(ui)
-        .on_hover_text("Bring the changes back and drop the stash")
+        .on_hover_text(crate::i18n::text("repo-core-3511"))
         .clicked()
     {
         acts.push(Action::Ops {
-            label: format!("Pop {name}"),
+            label: crate::i18n::message("repo-core-3512", &[("name", format!("{}", name).into())]),
             ops: steps(StashOp::Pop),
             refresh: Refresh::All,
         });
     }
     ui.separator();
-    if crate::menu_item::MenuItem::new("Drop…")
+    if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-3513"))
         .icon("minus")
         .enabled(idle)
         .show(ui)
         .clicked()
     {
         acts.push(Action::Dialog(Dialog::confirm(
-            "Drop stash",
-            format!("Delete {name}? Its changes are gone for good."),
-            "Drop",
+            crate::i18n::text("repo-core-3514"),
+            crate::i18n::message("repo-core-3515", &[("name", format!("{}", name).into())]),
+            crate::i18n::text("repo-core-3197"),
             steps(StashOp::Drop),
             None,
         )));

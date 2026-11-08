@@ -134,9 +134,7 @@ impl RepoTab {
                         }
                         crate::forge::history::lookup(
                             &repo,
-                            &hosting.ok_or(
-                                "No supported forge remote; local history remains available",
-                            )?,
+                            &hosting.ok_or(crate::i18n::text("repo-core-3620"))?,
                             &query,
                             active,
                         )
@@ -151,7 +149,7 @@ impl RepoTab {
         let t = crate::theme::Tokens::get(ui.ctx());
         ui.horizontal_wrapped(|ui| {
             ui.heading(crate::i18n::text("repo-core-2326"));
-            if ui.button("Close biography").clicked() {
+            if ui.button(crate::i18n::text("repo-core-3621")).clicked() {
                 acts.push(Action::CloseSymbolBiography);
             }
         });
@@ -184,26 +182,26 @@ impl RepoTab {
             {
                 self.symbols.line = None;
             }
-            ui.label("History depth");
+            ui.label(crate::i18n::text("repo-core-3622"));
             ui.add(egui::DragValue::new(&mut self.symbols.depth).range(16..=2048));
-            if ui.button("Trace function").clicked() {
+            if ui.button(crate::i18n::text("repo-core-3623")).clicked() {
                 trace = true;
             }
             if self.symbols.reader.busy() {
                 ui.add(crate::spinner::Spinner::new());
-                if ui.button("Cancel trace").clicked() {
+                if ui.button(crate::i18n::text("repo-core-3624")).clicked() {
                     self.symbols.reader.cancel();
-                    self.symbols.error = Some("Trace cancelled".into());
+                    self.symbols.error = Some(crate::i18n::text("repo-core-3625").into());
                 }
             }
         });
-        ui.small("Rust · Python · JavaScript/JSX · TypeScript/TSX · Go · C/C++ · committed UTF-8 source. Enter a function name, or leave it empty to choose. Rename detection and structural body similarity follow its lifetime.");
+        ui.small(crate::i18n::text("repo-core-3626"));
         if let Some(error) = &self.symbols.error {
             ui.colored_label(t.danger, error);
         }
         match &self.symbols.result {
             Some(Answer::Choices(symbols)) => {
-                ui.label("Choose the function to trace:");
+                ui.label(crate::i18n::text("repo-core-3627"));
                 egui::ScrollArea::vertical()
                     .id_salt("symbol_choices")
                     .show_rows(ui, 25., symbols.len(), |ui, range| {
@@ -219,17 +217,26 @@ impl RepoTab {
                     });
             }
             Some(Answer::History(history)) => {
-                ui.small(format!(
-                    "Pinned tip {} · {} events{}",
-                    super::short(&history.tip),
-                    history.steps.len(),
-                    if history.limited {
-                        " · incomplete lineage (see notes)"
-                    } else {
-                        ""
-                    }
+                ui.small(crate::i18n::message(
+                    "repo-core-3629",
+                    &[
+                        ("tip", format!("{}", super::short(&history.tip)).into()),
+                        ("count", (history.steps.len()).into()),
+                        (
+                            "else",
+                            format!(
+                                "{}",
+                                if history.limited {
+                                    crate::i18n::text("repo-core-3630")
+                                } else {
+                                    ""
+                                }
+                            )
+                            .into(),
+                        ),
+                    ],
                 ));
-                ui.collapsing("Scope, uncertainty and limits", |ui| {
+                ui.collapsing(crate::i18n::text("repo-core-3631"), |ui| {
                     for note in &history.notes {
                         ui.label(note);
                     }
@@ -265,12 +272,16 @@ impl RepoTab {
                         step.author, step.time, step.subject
                     ));
                     if let Some(confidence) = step.confidence {
-                        ui.small(format!(
-                            "Structural body similarity {confidence}% (heuristic)"
+                        ui.small(crate::i18n::message(
+                            "repo-core-3633",
+                            &[("confidence", format!("{}", confidence).into())],
                         ));
                     }
                     if ui
-                        .button(format!("Open commit {}", super::short(&step.commit)))
+                        .button(crate::i18n::message(
+                            "repo-core-3634",
+                            &[("commit", format!("{}", super::short(&step.commit)).into())],
+                        ))
                         .clicked()
                     {
                         acts.push(Action::SelectHash(step.commit.clone()));
@@ -278,7 +289,7 @@ impl RepoTab {
                     if self.symbols.forge_reader.busy() {
                         ui.horizontal(|ui| {
                             ui.add(crate::spinner::Spinner::new());
-                            ui.label("Loading associated pull requests…");
+                            ui.label(crate::i18n::text("repo-core-3635"));
                         });
                     }
                     if self
@@ -300,7 +311,7 @@ impl RepoTab {
                                     ui.small(n);
                                 }
                                 if e.pulls.is_empty() {
-                                    ui.small("No associated pull request found in checked forge evidence.");
+                                    ui.small(crate::i18n::text("repo-core-3636"));
                                 }
                             }
                             Err(e) => {
@@ -310,9 +321,13 @@ impl RepoTab {
                     }
                     for related in &step.related {
                         if ui
-                            .button(format!(
-                                "Follow possible split: {} · {}:{}",
-                                related.qualified, related.path, related.first
+                            .button(crate::i18n::message(
+                                "repo-core-3637",
+                                &[
+                                    ("qualified", format!("{}", related.qualified).into()),
+                                    ("path", format!("{}", related.path).into()),
+                                    ("first", format!("{}", related.first).into()),
+                                ],
                             ))
                             .clicked()
                         {
@@ -325,7 +340,7 @@ impl RepoTab {
                                 "{} · {}:{}–{}",
                                 symbol.qualified, symbol.path, symbol.first, symbol.last
                             ));
-                            if ui.button("Open pinned source").clicked() {
+                            if ui.button(crate::i18n::text("repo-core-3638")).clicked() {
                                 acts.push(Action::OpenPinnedFileLine(Seed {
                                     commit: step.commit.clone(),
                                     path: symbol.path.clone(),
@@ -346,9 +361,19 @@ impl RepoTab {
                                             "{:>5} {}",
                                             symbol.first + i,
                                             if lines[i].chars().count() > 2000 {
-                                                format!(
-                                                    "{} … [long line clipped; open pinned source]",
-                                                    lines[i].chars().take(2000).collect::<String>()
+                                                crate::i18n::message(
+                                                    "repo-core-3640",
+                                                    &[(
+                                                        "String",
+                                                        format!(
+                                                            "{}",
+                                                            lines[i]
+                                                                .chars()
+                                                                .take(2000)
+                                                                .collect::<String>()
+                                                        )
+                                                        .into(),
+                                                    )],
                                                 )
                                             } else {
                                                 lines[i].to_owned()
@@ -358,7 +383,7 @@ impl RepoTab {
                                 },
                             );
                     } else {
-                        ui.label("This function was deleted at this commit.");
+                        ui.label(crate::i18n::text("repo-core-3641"));
                     }
                 }
             }
@@ -383,14 +408,20 @@ fn scrub(ui: &mut egui::Ui, selected: &mut usize, len: usize) {
     *selected = (*selected).min(len - 1);
     ui.horizontal(|ui| {
         if ui
-            .add_enabled(*selected > 0, egui::Button::new("Previous version"))
+            .add_enabled(
+                *selected > 0,
+                egui::Button::new(crate::i18n::text("repo-core-3642")),
+            )
             .clicked()
         {
             *selected -= 1;
         }
         ui.add(egui::Slider::new(selected, 0..=len - 1).text(crate::i18n::text("repo-core-1667")));
         if ui
-            .add_enabled(*selected + 1 < len, egui::Button::new("Next version"))
+            .add_enabled(
+                *selected + 1 < len,
+                egui::Button::new(crate::i18n::text("repo-core-3643")),
+            )
             .clicked()
         {
             *selected += 1;

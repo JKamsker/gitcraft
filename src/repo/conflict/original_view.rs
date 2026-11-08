@@ -108,20 +108,16 @@ fn body(
             ui.add(crate::spinner::Spinner::new());
         }
         (Original::Added, _) => {
-            note(
-                ui,
-                t,
-                crate::i18n::text("repo-core-0626"),
-            );
+            note(ui, t, crate::i18n::text("repo-core-0626"));
         }
-        (Original::Unknown(why), _) => note(ui, t, &crate::i18n::message("repo-core-0627", &[("why", format!("{}", why).into())])),
+        (Original::Unknown(why), _) => note(
+            ui,
+            t,
+            &crate::i18n::message("repo-core-0627", &[("why", format!("{}", why).into())]),
+        ),
         (Original::Text(base), Some((ours, theirs))) => {
             if base.is_empty() {
-                note(
-                    ui,
-                    t,
-                    crate::i18n::text("repo-core-0628"),
-                );
+                note(ui, t, crate::i18n::text("repo-core-0628"));
             }
             ui.columns(2, |cols| {
                 for (col, (name, lines, side)) in cols
@@ -150,7 +146,16 @@ fn side_changes(ui: &mut Ui, t: &Tokens, (k, ours): (usize, bool), name: &str, l
         .show(ui, |ui| {
             ui.set_width(ui.available_width());
             ui.label(
-                RichText::new(crate::i18n::message("repo-core-0629", &[("name", format!("{}", name).into()), ("lines", format!("{}", super::original::summary(lines)).into())]))
+                RichText::new(crate::i18n::message(
+                    "repo-core-0629",
+                    &[
+                        ("name", format!("{}", name).into()),
+                        (
+                            "lines",
+                            format!("{}", super::original::summary(lines)).into(),
+                        ),
+                    ],
+                ))
                 .color(t.text_faint)
                 .small(),
             );
@@ -163,9 +168,12 @@ fn side_changes(ui: &mut Ui, t: &Tokens, (k, ours): (usize, bool), name: &str, l
                     }
                     if lines.len() > MAX_SHOWN {
                         ui.label(
-                            RichText::new(crate::i18n::message("repo-core-0631", &[("MAX-SHOWN", format!("{}", lines.len() - MAX_SHOWN).into())]))
-                                .color(t.text_faint)
-                                .small(),
+                            RichText::new(crate::i18n::message(
+                                "repo-core-0631",
+                                &[("MAX-SHOWN", format!("{}", lines.len() - MAX_SHOWN).into())],
+                            ))
+                            .color(t.text_faint)
+                            .small(),
                         );
                     }
                 });

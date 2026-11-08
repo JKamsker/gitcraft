@@ -44,7 +44,10 @@ pub(super) fn headline(c: &Containment) -> String {
     let mut parts = vec![count(branches, "branch", "branches")];
     parts.push(count(c.tags.total, "tag", "tags"));
     if let Some(tag) = c.first_tag() {
-        parts.push(crate::i18n::message("repo-core-1087", &[("tag", format!("{}", tag).into())]));
+        parts.push(crate::i18n::message(
+            "repo-core-1087",
+            &[("tag", format!("{}", tag).into())],
+        ));
     }
     parts.join(" · ")
 }
@@ -53,7 +56,10 @@ fn count(n: usize, one: &str, many: &str) -> String {
     match n {
         0 => crate::i18n::message("repo-core-1088", &[("many", format!("{}", many).into())]),
         1 => crate::i18n::message("repo-core-1089", &[("one", format!("{}", one).into())]),
-        n => crate::i18n::message("repo-core-1090", &[("n", (n).into()), ("many", format!("{}", many).into())]),
+        n => crate::i18n::message(
+            "repo-core-1090",
+            &[("n", (n).into()), ("many", format!("{}", many).into())],
+        ),
     }
 }
 
@@ -63,23 +69,27 @@ fn body(ui: &mut Ui, c: &Containment) {
         (Some(describe), Some(tag)) => {
             ui.horizontal_wrapped(|ui| {
                 ui.label(RichText::new(crate::i18n::text("repo-core-1091")).color(t.text_faint));
-                widgets::chip(ui, tag, t.success)
-                    .on_hover_text(crate::i18n::message("repo-core-1092", &[("describe", format!("{}", describe).into())]));
+                widgets::chip(ui, tag, t.success).on_hover_text(crate::i18n::message(
+                    "repo-core-1092",
+                    &[("describe", format!("{}", describe).into())],
+                ));
             });
         }
         _ => section::faint(ui, crate::i18n::text("repo-core-1093")),
     }
     names(ui, crate::i18n::text("repo-core-1094"), &c.local, t.accent);
-    names(ui, crate::i18n::text("repo-core-1095"), &c.remote, t.text_dim);
+    names(
+        ui,
+        crate::i18n::text("repo-core-1095"),
+        &c.remote,
+        t.text_dim,
+    );
     names(ui, crate::i18n::text("repo-core-1096"), &c.tags, t.text_dim);
     if c.local.total + c.remote.total == 0 {
         if c.tags.total > 0 {
             section::faint(ui, crate::i18n::text("repo-core-1097"));
         } else {
-            section::faint(
-                ui,
-                crate::i18n::text("repo-core-1098"),
-            );
+            section::faint(ui, crate::i18n::text("repo-core-1098"));
         }
     }
 }
@@ -98,9 +108,12 @@ fn names(ui: &mut Ui, title: &str, list: &RefList, color: egui::Color32) {
         }
         if list.hidden() > 0 {
             ui.label(
-                RichText::new(crate::i18n::message("repo-core-1099", &[("hidden", format!("{}", list.hidden()).into())]))
-                    .color(t.text_faint)
-                    .small(),
+                RichText::new(crate::i18n::message(
+                    "repo-core-1099",
+                    &[("hidden", format!("{}", list.hidden()).into())],
+                ))
+                .color(t.text_faint)
+                .small(),
             );
         }
     });

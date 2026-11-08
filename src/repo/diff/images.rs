@@ -115,9 +115,12 @@ pub(super) fn image_view(ui: &mut Ui, images: &ImagePair) {
                                 .bg_fill(t.field),
                         );
                         ui.label(
-                            egui::RichText::new(crate::i18n::message("repo-core-1851", &[("div-ceil", format!("{}", bytes.len().div_ceil(1024)).into())]))
-                                .color(t.text_faint)
-                                .small(),
+                            egui::RichText::new(crate::i18n::message(
+                                "repo-core-1851",
+                                &[("div-ceil", format!("{}", bytes.len().div_ceil(1024)).into())],
+                            ))
+                            .color(t.text_faint)
+                            .small(),
                         );
                     }
                     None => {

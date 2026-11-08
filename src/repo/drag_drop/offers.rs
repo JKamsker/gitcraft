@@ -151,15 +151,41 @@ impl Offer {
     /// The menu entry.
     pub(crate) fn label(&self) -> String {
         match self {
-            Offer::Merge { from, into } => crate::i18n::message("repo-core-2422", &[("label", format!("{}", from.label()).into()), ("into", format!("{}", into).into())]),
-            Offer::Rebase { branch, onto } => crate::i18n::message("repo-core-2423", &[("branch", format!("{}", branch).into()), ("label", format!("{}", onto.label()).into())]),
-            Offer::InteractiveRebase { branch, onto } => {
-                crate::i18n::message("repo-core-2424", &[("branch", format!("{}", branch).into()), ("label", format!("{}", onto.label()).into())])
-            }
-            Offer::FastForward { branch, to, .. } => {
-                crate::i18n::message("repo-core-2425", &[("branch", format!("{}", branch).into()), ("label", format!("{}", to.label()).into())])
-            }
-            Offer::CherryPick { hash, onto } => crate::i18n::message("repo-core-2426", &[("hash", format!("{}", short(hash)).into()), ("onto", format!("{}", onto).into())]),
+            Offer::Merge { from, into } => crate::i18n::message(
+                "repo-core-2422",
+                &[
+                    ("label", format!("{}", from.label()).into()),
+                    ("into", format!("{}", into).into()),
+                ],
+            ),
+            Offer::Rebase { branch, onto } => crate::i18n::message(
+                "repo-core-2423",
+                &[
+                    ("branch", format!("{}", branch).into()),
+                    ("label", format!("{}", onto.label()).into()),
+                ],
+            ),
+            Offer::InteractiveRebase { branch, onto } => crate::i18n::message(
+                "repo-core-2424",
+                &[
+                    ("branch", format!("{}", branch).into()),
+                    ("label", format!("{}", onto.label()).into()),
+                ],
+            ),
+            Offer::FastForward { branch, to, .. } => crate::i18n::message(
+                "repo-core-2425",
+                &[
+                    ("branch", format!("{}", branch).into()),
+                    ("label", format!("{}", to.label()).into()),
+                ],
+            ),
+            Offer::CherryPick { hash, onto } => crate::i18n::message(
+                "repo-core-2426",
+                &[
+                    ("hash", format!("{}", short(hash)).into()),
+                    ("onto", format!("{}", onto).into()),
+                ],
+            ),
             Offer::Rewrite(drop) => drop.label(),
         }
     }
@@ -167,16 +193,43 @@ impl Offer {
     /// What the entry does, naming the branch it changes, for its tooltip.
     pub(crate) fn explain(&self) -> String {
         match self {
-            Offer::Merge { from, into } => crate::i18n::message("repo-core-2427", &[("into", format!("{}", into).into()), ("label", format!("{}", from.label()).into())]),
-            Offer::Rebase { branch, onto } => crate::i18n::message("repo-core-2428", &[("branch", format!("{}", branch).into()), ("label", format!("{}", onto.label()).into())]),
-            Offer::InteractiveRebase { branch, .. } => crate::i18n::message("repo-core-2429", &[("branch", format!("{}", branch).into())]),
+            Offer::Merge { from, into } => crate::i18n::message(
+                "repo-core-2427",
+                &[
+                    ("into", format!("{}", into).into()),
+                    ("label", format!("{}", from.label()).into()),
+                ],
+            ),
+            Offer::Rebase { branch, onto } => crate::i18n::message(
+                "repo-core-2428",
+                &[
+                    ("branch", format!("{}", branch).into()),
+                    ("label", format!("{}", onto.label()).into()),
+                ],
+            ),
+            Offer::InteractiveRebase { branch, .. } => crate::i18n::message(
+                "repo-core-2429",
+                &[("branch", format!("{}", branch).into())],
+            ),
             Offer::FastForward {
                 branch,
                 to,
                 checked_out: false,
                 ..
-            } => crate::i18n::message("repo-core-2430", &[("branch", format!("{}", branch).into()), ("label", format!("{}", to.label()).into())]),
-            Offer::FastForward { branch, to, .. } => crate::i18n::message("repo-core-2431", &[("branch", format!("{}", branch).into()), ("label", format!("{}", to.label()).into())]),
+            } => crate::i18n::message(
+                "repo-core-2430",
+                &[
+                    ("branch", format!("{}", branch).into()),
+                    ("label", format!("{}", to.label()).into()),
+                ],
+            ),
+            Offer::FastForward { branch, to, .. } => crate::i18n::message(
+                "repo-core-2431",
+                &[
+                    ("branch", format!("{}", branch).into()),
+                    ("label", format!("{}", to.label()).into()),
+                ],
+            ),
             Offer::CherryPick { onto, .. } => {
                 crate::i18n::message("repo-core-2432", &[("onto", format!("{}", onto).into())])
             }

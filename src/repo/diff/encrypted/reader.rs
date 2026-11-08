@@ -80,9 +80,10 @@ impl Read<'_> {
 fn locations(read: &Read<'_>, key: &DiffKey) -> Result<(At, At), String> {
     let at = |rev: Option<&str>, path: &str| Some((rev.map(str::to_owned), path.to_owned()));
     let changed = |files: Vec<ChangedFile>, path: &str, old: Option<&str>, new: Option<&str>| {
-        let file = files.into_iter().find(|f| f.path == path).ok_or_else(|| {
-            crate::i18n::text("repo-core-1768").to_owned()
-        })?;
+        let file = files
+            .into_iter()
+            .find(|f| f.path == path)
+            .ok_or_else(|| crate::i18n::text("repo-core-1768").to_owned())?;
         let before = (file.status != 'A' && old.is_some())
             .then(|| at(old, file.old_path.as_deref().unwrap_or(path)))
             .flatten();
@@ -90,10 +91,7 @@ fn locations(read: &Read<'_>, key: &DiffKey) -> Result<(At, At), String> {
         Ok((before, after))
     };
     match key {
-        DiffKey::Remerge { .. } => Err(
-            crate::i18n::text("repo-core-1769")
-                .to_owned(),
-        ),
+        DiffKey::Remerge { .. } => Err(crate::i18n::text("repo-core-1769").to_owned()),
         DiffKey::Commit { hash, path } => {
             let parents = read.text(&[
                 "show",
@@ -171,9 +169,7 @@ fn read_side(read: &Read<'_>, side: At) -> Result<String, String> {
             if version.warning.is_some()
                 || !matches!(version.mode.as_deref(), None | Some("100644" | "100755"))
             {
-                return Err(
-                    crate::i18n::text("repo-core-1778").into(),
-                );
+                return Err(crate::i18n::text("repo-core-1778").into());
             }
             // Missing is distinct from a failed read. Only an actual missing side is empty.
             version.bytes

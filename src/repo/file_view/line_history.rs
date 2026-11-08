@@ -64,12 +64,14 @@ impl RepoTab {
                     widgets::chip(ui, &lines_label(*range), t.accent);
                     widgets::chip(ui, &where_label(at), t.text_dim);
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if icons::small_button(ui, "x", crate::i18n::text("repo-core-0711")).clicked() {
+                        if icons::small_button(ui, "x", crate::i18n::text("repo-core-0711"))
+                            .clicked()
+                        {
                             acts.push(Action::CloseFileView);
                         }
-                        let whole = ui.button(crate::i18n::text("repo-core-2489")).on_hover_text(
-                            crate::i18n::text("repo-core-2490"),
-                        );
+                        let whole = ui
+                            .button(crate::i18n::text("repo-core-2489"))
+                            .on_hover_text(crate::i18n::text("repo-core-2490"));
                         if whole.clicked() {
                             acts.push(Action::FileView {
                                 path: view.path.clone(),
@@ -89,7 +91,13 @@ pub(super) fn lines_label((start, end): LineRange) -> String {
     if start == end {
         crate::i18n::message("repo-core-2491", &[("start", format!("{}", start).into())])
     } else {
-        crate::i18n::message("repo-core-2492", &[("start", format!("{}", start).into()), ("end", format!("{}", end).into())])
+        crate::i18n::message(
+            "repo-core-2492",
+            &[
+                ("start", format!("{}", start).into()),
+                ("end", format!("{}", end).into()),
+            ],
+        )
     }
 }
 
@@ -97,8 +105,14 @@ pub(super) fn lines_label((start, end): LineRange) -> String {
 fn where_label(at: &LinesAt) -> String {
     match at {
         LinesAt::Rev(rev) => match rev.strip_suffix('^') {
-            Some(commit) => crate::i18n::message("repo-core-2493", &[("commit", format!("{}", short(commit)).into())]),
-            None => crate::i18n::message("repo-core-2494", &[("rev", format!("{}", short(rev)).into())]),
+            Some(commit) => crate::i18n::message(
+                "repo-core-2493",
+                &[("commit", format!("{}", short(commit)).into())],
+            ),
+            None => crate::i18n::message(
+                "repo-core-2494",
+                &[("rev", format!("{}", short(rev)).into())],
+            ),
         },
         LinesAt::Index => crate::i18n::text("repo-core-2495").to_owned(),
         LinesAt::WorkTree => crate::i18n::text("repo-core-2496").to_owned(),

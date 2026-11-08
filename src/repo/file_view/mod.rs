@@ -89,7 +89,10 @@ impl RepoTab {
                     if let Some(rev) = &view.rev {
                         widgets::chip(
                             ui,
-                            &crate::i18n::message("repo-core-2494", &[("rev", format!("{}", rev.get(..8).unwrap_or(rev)).into())]),
+                            &crate::i18n::message(
+                                "repo-core-2494",
+                                &[("rev", format!("{}", rev.get(..8).unwrap_or(rev)).into())],
+                            ),
                             t.text_dim,
                         );
                     }
@@ -121,7 +124,9 @@ impl RepoTab {
                         }
                     }
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if icons::small_button(ui, "x", crate::i18n::text("repo-core-0711")).clicked() {
+                        if icons::small_button(ui, "x", crate::i18n::text("repo-core-0711"))
+                            .clicked()
+                        {
                             acts.push(Action::CloseFileView);
                         }
                     });

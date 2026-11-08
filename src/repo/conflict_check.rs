@@ -305,9 +305,7 @@ fn run_check(ctx: &egui::Context, repo: &Path, info: Result<RepoInfo, String>, k
         Err(e) => return Check::Failed(e),
     };
     if partial {
-        return Check::Unavailable(
-            crate::i18n::text("repo-core-0749").to_owned(),
-        );
+        return Check::Unavailable(crate::i18n::text("repo-core-0749").to_owned());
     }
     let unavailable = match key.op {
         Op::Merge => features.merge_unavailable(),
@@ -425,7 +423,10 @@ pub(super) fn label(op: Op, check: &Check) -> Option<(String, Tone)> {
             }
             Outcome::Clean { .. } => (crate::i18n::text("repo-core-0769").to_owned(), Tone::Good),
             Outcome::Conflicts { files, .. } => (
-                crate::i18n::message("repo-core-0770", &[("len", format!("{}", files_count(files.len())).into())]),
+                crate::i18n::message(
+                    "repo-core-0770",
+                    &[("len", format!("{}", files_count(files.len())).into())],
+                ),
                 Tone::Warn,
             ),
             Outcome::Unsure(_) => (crate::i18n::text("repo-core-0771").to_owned(), Tone::Warn),
@@ -449,17 +450,15 @@ const LISTED: usize = 15;
 /// could do with each, and that uncommitted changes (`dirty`) are left out.
 pub(super) fn tooltip(op: Op, check: &Check, dirty: bool) -> String {
     let mut text = match check {
-        Check::Checking => {
-            crate::i18n::text("repo-core-0774").to_owned()
-        }
+        Check::Checking => crate::i18n::text("repo-core-0774").to_owned(),
         Check::Unavailable(why) => return why.clone(),
-        Check::Failed(e) => crate::i18n::message("repo-core-0775", &[("e", format!("{}", e).into())]),
+        Check::Failed(e) => {
+            crate::i18n::message("repo-core-0775", &[("e", format!("{}", e).into())])
+        }
         Check::Done(verdict) => verdict_text(op, verdict),
     };
     if dirty && !matches!(check, Check::Unavailable(_)) {
-        text.push_str(
-            crate::i18n::text("repo-core-0776"),
-        );
+        text.push_str(crate::i18n::text("repo-core-0776"));
     }
     text
 }
@@ -468,8 +467,7 @@ fn verdict_text(op: Op, verdict: &Verdict) -> String {
     let commits = verdict.prediction.commits;
     match &verdict.prediction.outcome {
         Outcome::Clean { changes: false } if op == Op::CherryPick => {
-            crate::i18n::text("repo-core-0777")
-                .to_owned()
+            crate::i18n::text("repo-core-0777").to_owned()
         }
         Outcome::Clean { changes: false } if op == Op::Merge => {
             crate::i18n::text("repo-core-0778").to_owned()
@@ -478,36 +476,55 @@ fn verdict_text(op: Op, verdict: &Verdict) -> String {
             let all = if commits == 1 {
                 crate::i18n::text("repo-core-0779").to_owned()
             } else {
-                crate::i18n::message("repo-core-0780", &[("commits", format!("{}", commits).into())])
+                crate::i18n::message(
+                    "repo-core-0780",
+                    &[("commits", format!("{}", commits).into())],
+                )
             };
             crate::i18n::message("repo-core-0781", &[("all", format!("{}", all).into())])
         }
         Outcome::Clean { .. } => crate::i18n::text("repo-core-0782").to_owned(),
-        Outcome::Unsure(why) => crate::i18n::message("repo-core-0783", &[("why", format!("{}", why).into())]),
+        Outcome::Unsure(why) => {
+            crate::i18n::message("repo-core-0783", &[("why", format!("{}", why).into())])
+        }
         Outcome::Conflicts { files, stop } => {
             let mut text = match stop {
-                Some(stop) if op == Op::Rebase || commits > 1 => crate::i18n::message("repo-core-0784", &[("index", format!("{}", stop.index).into()), ("commits", format!("{}", commits).into()), ("hash", format!("{}", super::short(&stop.commit.hash)).into()), ("summary", format!("{}", stop.commit.summary).into()), ("len", format!("{}", files_count(files.len())).into())]),
-                _ => crate::i18n::message("repo-core-0785", &[("len", format!("{}", files_count(files.len())).into())]),
+                Some(stop) if op == Op::Rebase || commits > 1 => crate::i18n::message(
+                    "repo-core-0784",
+                    &[
+                        ("index", format!("{}", stop.index).into()),
+                        ("commits", format!("{}", commits).into()),
+                        (
+                            "hash",
+                            format!("{}", super::short(&stop.commit.hash)).into(),
+                        ),
+                        ("summary", format!("{}", stop.commit.summary).into()),
+                        ("len", format!("{}", files_count(files.len())).into()),
+                    ],
+                ),
+                _ => crate::i18n::message(
+                    "repo-core-0785",
+                    &[("len", format!("{}", files_count(files.len())).into())],
+                ),
             };
             text.push_str(&file_lines(files, &verdict.mergiraf));
             if let Some(stop) = stop
                 && stop.index < commits
             {
-                text.push_str(
-                    crate::i18n::text("repo-core-0786"),
-                );
+                text.push_str(crate::i18n::text("repo-core-0786"));
             }
             let unchecked = verdict.mergiraf.iter().find_map(|m| match m {
                 Mergiraf::Unchecked(e) => Some(e),
                 _ => None,
             });
             if let Some(e) = unchecked {
-                text.push_str(&crate::i18n::message("repo-core-0787", &[("e", format!("{}", e).into())]));
+                text.push_str(&crate::i18n::message(
+                    "repo-core-0787",
+                    &[("e", format!("{}", e).into())],
+                ));
             }
             if verdict.mergiraf.contains(&Mergiraf::NotInstalled) {
-                text.push_str(
-                    crate::i18n::text("repo-core-0788"),
-                );
+                text.push_str(crate::i18n::text("repo-core-0788"));
             }
             text
         }
@@ -521,7 +538,9 @@ fn file_lines(files: &[ConflictFile], mergiraf: &[Mergiraf]) -> String {
         let hint = match mergiraf.get(n) {
             Some(Mergiraf::Likely) => crate::i18n::text("repo-core-0789").to_owned(),
             Some(Mergiraf::UnknownLanguage) => crate::i18n::text("repo-core-0790").to_owned(),
-            Some(Mergiraf::NotText(kinds)) => crate::i18n::message("repo-core-0791", &[("kinds", format!("{}", kinds).into())]),
+            Some(Mergiraf::NotText(kinds)) => {
+                crate::i18n::message("repo-core-0791", &[("kinds", format!("{}", kinds).into())])
+            }
             Some(Mergiraf::NotInstalled | Mergiraf::Unchecked(_)) | None => {
                 crate::i18n::text("repo-core-0792").to_owned()
             }
@@ -529,7 +548,10 @@ fn file_lines(files: &[ConflictFile], mergiraf: &[Mergiraf]) -> String {
         text.push_str(&format!("\n• {} — {hint}", file.path));
     }
     if files.len() > LISTED {
-        text.push_str(&crate::i18n::message("repo-core-0794", &[("LISTED", format!("{}", files.len() - LISTED).into())]));
+        text.push_str(&crate::i18n::message(
+            "repo-core-0794",
+            &[("LISTED", format!("{}", files.len() - LISTED).into())],
+        ));
     }
     text
 }
@@ -683,8 +705,22 @@ impl RepoTab {
             crate::i18n::text("repo-core-0801")
         };
         let doing = match op {
-            Op::Rebase => crate::i18n::message("repo-core-0802", &[("current", format!("{}", current).into()), ("target", format!("{}", target).into()), ("why", format!("{}", why).into())]),
-            _ => crate::i18n::message("repo-core-0803", &[("target", format!("{}", target).into()), ("why", format!("{}", why).into()), ("current", format!("{}", current).into())]),
+            Op::Rebase => crate::i18n::message(
+                "repo-core-0802",
+                &[
+                    ("current", format!("{}", current).into()),
+                    ("target", format!("{}", target).into()),
+                    ("why", format!("{}", why).into()),
+                ],
+            ),
+            _ => crate::i18n::message(
+                "repo-core-0803",
+                &[
+                    ("target", format!("{}", target).into()),
+                    ("why", format!("{}", why).into()),
+                    ("current", format!("{}", current).into()),
+                ],
+            ),
         };
         super::widgets::chip(ui, &format!("{what} {target}"), t.warning).on_hover_text(format!(
             "{doing}:\n{}",

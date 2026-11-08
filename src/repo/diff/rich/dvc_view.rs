@@ -24,9 +24,7 @@ pub(super) fn show(ui: &mut Ui, diff: &DvcDiff, acts: &mut Vec<Action>) {
                     );
                     if ui
                         .button(crate::i18n::text("repo-core-0020"))
-                        .on_hover_text(
-                            crate::i18n::text("repo-core-2170"),
-                        )
+                        .on_hover_text(crate::i18n::text("repo-core-2170"))
                         .clicked()
                     {
                         acts.push(Action::DvcPull);
@@ -69,7 +67,14 @@ fn pair(
             .on_hover_cursor(egui::CursorIcon::PointingHand)
             .on_hover_text(crate::i18n::text("repo-core-2173"));
         crate::a11y::a11y(&path, egui::WidgetType::Button, || {
-            crate::i18n::message("repo-core-2174", &[("line", format!("{}", any.line).into()), ("path", format!("{}", any.path).into()), ("state", format!("{}", state).into())])
+            crate::i18n::message(
+                "repo-core-2174",
+                &[
+                    ("line", format!("{}", any.line).into()),
+                    ("path", format!("{}", any.path).into()),
+                    ("state", format!("{}", state).into()),
+                ],
+            )
         });
         if path.clicked() {
             let (o, n) = match new {
@@ -80,7 +85,9 @@ fn pair(
         }
         if any.list == "deps" {
             let what = match &any.repo {
-                Some(url) => crate::i18n::message("repo-core-2175", &[("url", format!("{}", url).into())]),
+                Some(url) => {
+                    crate::i18n::message("repo-core-2175", &[("url", format!("{}", url).into())])
+                }
                 None => crate::i18n::text("repo-core-2176").to_owned(),
             };
             ui.label(RichText::new(what).color(t.text_faint));
@@ -113,7 +120,16 @@ fn side(ui: &mut Ui, t: &Tokens, title: &str, tracked: Option<&Tracked>) {
             ui.label(RichText::new(size).font(theme::semibold(16.0)));
             if let Some(files) = x.files {
                 let s = if files == 1 { "" } else { "s" };
-                ui.label(RichText::new(crate::i18n::message("repo-core-2180", &[("files", format!("{}", files).into()), ("s", format!("{}", s).into())])).color(t.text_dim));
+                ui.label(
+                    RichText::new(crate::i18n::message(
+                        "repo-core-2180",
+                        &[
+                            ("files", format!("{}", files).into()),
+                            ("s", format!("{}", s).into()),
+                        ],
+                    ))
+                    .color(t.text_dim),
+                );
             }
             if let Some(hash) = &x.hash {
                 ui.label(

@@ -38,7 +38,10 @@ impl Find {
                                     .truncate(),
                             );
                             if self.capped() {
-                                label.on_hover_text(crate::i18n::message("repo-core-2500", &[("MAX-HITS", format!("{}", thousands(MAX_HITS)).into())]));
+                                label.on_hover_text(crate::i18n::message(
+                                    "repo-core-2500",
+                                    &[("MAX-HITS", format!("{}", thousands(MAX_HITS)).into())],
+                                ));
                             } else if error {
                                 label.on_hover_text(text);
                             }
@@ -75,7 +78,10 @@ impl Find {
     fn field(&mut self, ui: &mut Ui, what: &str) {
         let edit = egui::TextEdit::singleline(&mut self.query.text)
             .id(egui::Id::new(FIELD_ID))
-            .hint_text(crate::i18n::message("repo-core-2504", &[("what", format!("{}", what).into())]))
+            .hint_text(crate::i18n::message(
+                "repo-core-2504",
+                &[("what", format!("{}", what).into())],
+            ))
             .font(theme::mono(12.0))
             .desired_width((ui.available_width() - 330.0).clamp(140.0, 420.0))
             .margin(egui::Margin::symmetric(8, 3));
@@ -112,7 +118,11 @@ impl Find {
         let t = Tokens::get(ui.ctx());
         let q = &mut self.query;
         for (label, on, tip) in [
-            ("Aa", &mut q.case_sensitive, crate::i18n::text("repo-core-2506")),
+            (
+                "Aa",
+                &mut q.case_sensitive,
+                crate::i18n::text("repo-core-2506"),
+            ),
             ("ab", &mut q.whole_word, crate::i18n::text("repo-core-2508")),
             (".*", &mut q.regex, crate::i18n::text("repo-core-2509")),
         ] {

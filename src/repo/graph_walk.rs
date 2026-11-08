@@ -82,7 +82,7 @@ impl Topology {
         let mut complete = true;
         while seen.insert(at) {
             if !active() {
-                return Err("Narration cancelled".into());
+                return Err(crate::i18n::text("repo-core-2747").into());
             }
             let Some(commit) = commits.get(at) else {
                 return Ok((count, false));
@@ -185,7 +185,7 @@ impl RepoTab {
             }
             Some(next)
         } else {
-            self.status = Some(("No loaded commit in that direction; older or hidden history may continue beyond this view".into(), false));
+            self.status = Some((crate::i18n::text("repo-core-2748").into(), false));
             None
         }
     }
@@ -195,36 +195,47 @@ impl RepoTab {
             return String::new();
         };
         if self.topology.parents.len() != self.commits.len() {
-            return "Topology analysis is preparing".into();
+            return crate::i18n::text("repo-core-2749").into();
         }
         let parents = &commit.parents;
         let children = self.topology.children.get(row).map_or(0, Vec::len);
         let shape = if parents.len() > 1 {
             "merge"
         } else if children > 1 {
-            "divergence"
+            crate::i18n::text("repo-core-2750")
         } else if parents.is_empty() {
-            "root"
+            crate::i18n::text("repo-core-2751")
         } else {
             "commit"
         };
-        let mut description = format!(
-            "{shape}; {} parents, {children} loaded children",
-            parents.len()
+        let mut description = crate::i18n::message(
+            "repo-core-2752",
+            &[
+                ("shape", format!("{}", shape).into()),
+                ("count", (parents.len()).into()),
+                ("children", format!("{}", children).into()),
+            ],
         );
         if parents.iter().any(|hash| !self.index.contains_key(hash)) {
-            description.push_str("; parents continue beyond loaded history");
+            description.push_str(crate::i18n::text("repo-core-2753"));
         }
         for branch in self.refs.local.iter().filter(|b| b.target == commit.hash) {
-            description.push_str(&format!("; branch {}", branch.name));
+            description.push_str(&crate::i18n::message(
+                "repo-core-2754",
+                &[("name", format!("{}", branch.name).into())],
+            ));
             if !branch.upstream.is_empty() {
                 if branch.upstream_gone() {
-                    description.push_str("; upstream removed");
+                    description.push_str(crate::i18n::text("repo-core-2755"));
                 } else {
                     let (ahead, behind) = branch.ahead_behind();
-                    description.push_str(&format!(
-                        ", {ahead} ahead and {behind} behind {}",
-                        branch.upstream
+                    description.push_str(&crate::i18n::message(
+                        "repo-core-2756",
+                        &[
+                            ("ahead", (ahead).into()),
+                            ("behind", (behind).into()),
+                            ("upstream", format!("{}", branch.upstream).into()),
+                        ],
                     ));
                 }
             }
@@ -249,11 +260,11 @@ impl RepoTab {
         let ignored = self.stashes.iter().map(|s| s.hash.clone()).collect();
         self.topology_reader.queue(move |active| {
             if !active() {
-                return Err("Topology analysis cancelled".into());
+                return Err(crate::i18n::text("repo-core-2757").into());
             }
             let topology = Topology::build(&commits, &index, &ignored);
             if !active() {
-                return Err("Topology analysis cancelled".into());
+                return Err(crate::i18n::text("repo-core-2757").into());
             }
             Ok(std::sync::Arc::new(topology))
         });
@@ -323,25 +334,70 @@ impl RepoTab {
         self.graph_narration.reader.queue(move |active| {
             let selected_set = topology.ancestors(selected, active);
             let base_set = topology.ancestors(base, active);
-            if !active() { return Err("Narration cancelled".into()); }
+            if !active() {
+                return Err(crate::i18n::text("repo-core-2747").into());
+            }
             let ahead = selected_set.difference(&base_set).count();
             let behind = base_set.difference(&selected_set).count();
             let common = selected_set.intersection(&base_set).copied().min();
-            let complete = selected_set.union(&base_set).all(|row| commits.get(*row).is_some_and(|c| c.parents.len() == topology.parents.get(*row).map_or(0, Vec::len)));
-            let mut result = format!("Selected history: {ahead} ahead and {behind} behind {name} within {} loaded commits", commits.len());
+            let complete = selected_set.union(&base_set).all(|row| {
+                commits.get(*row).is_some_and(|c| {
+                    c.parents.len() == topology.parents.get(*row).map_or(0, Vec::len)
+                })
+            });
+            let mut result = crate::i18n::message(
+                "repo-core-2758",
+                &[
+                    ("ahead", (ahead).into()),
+                    ("behind", (behind).into()),
+                    ("name", format!("{}", name).into()),
+                    ("count", (commits.len()).into()),
+                ],
+            );
             if let Some(common) = common.and_then(|row| commits.get(row)) {
-                result.push_str(&format!("; shared ancestor {} (author date {}). Git does not record a branch creation date", common.hash.get(..8).unwrap_or(&common.hash), common.date));
-            } else { result.push_str("; no shared ancestor in loaded history"); }
-            let mut descendants=HashSet::new(); let mut todo=vec![selected];
-            while let Some(row)=todo.pop() { if !active(){return Err("Narration cancelled".into());}
- if descendants.insert(row) {todo.extend(topology.children.get(row).into_iter().flatten());} }
-            for (release,tip) in releases {
-                let (merges, line_complete) = topology.release_integrations(tip, &descendants, &commits, active)?;
-                result.push_str(&format!("; selected ancestry introduced by {merges} observed merges on the first-parent line of {release}"));
-                if !line_complete { result.push_str(" (partial: release ancestry is not fully loaded)"); }
+                result.push_str(&crate::i18n::message(
+                    "repo-core-2759",
+                    &[
+                        (
+                            "hash",
+                            format!("{}", common.hash.get(..8).unwrap_or(&common.hash)).into(),
+                        ),
+                        ("date", format!("{}", common.date).into()),
+                    ],
+                ));
+            } else {
+                result.push_str(crate::i18n::text("repo-core-2760"));
             }
-            if !complete { result.push_str("; comparison is partial: unloaded ancestors may change counts"); }
-            if !active() { return Err("Narration cancelled".into()); }
+            let mut descendants = HashSet::new();
+            let mut todo = vec![selected];
+            while let Some(row) = todo.pop() {
+                if !active() {
+                    return Err(crate::i18n::text("repo-core-2747").into());
+                }
+                if descendants.insert(row) {
+                    todo.extend(topology.children.get(row).into_iter().flatten());
+                }
+            }
+            for (release, tip) in releases {
+                let (merges, line_complete) =
+                    topology.release_integrations(tip, &descendants, &commits, active)?;
+                result.push_str(&crate::i18n::message(
+                    "repo-core-2761",
+                    &[
+                        ("merges", format!("{}", merges).into()),
+                        ("release", format!("{}", release).into()),
+                    ],
+                ));
+                if !line_complete {
+                    result.push_str(crate::i18n::text("repo-core-2762"));
+                }
+            }
+            if !complete {
+                result.push_str(crate::i18n::text("repo-core-2763"));
+            }
+            if !active() {
+                return Err(crate::i18n::text("repo-core-2747").into());
+            }
             Ok(result)
         });
     }
@@ -356,18 +412,54 @@ impl RepoTab {
         }
         ui.horizontal_wrapped(|ui| {
             if ui
-                .checkbox(&mut settings.graph_lane_walk, crate::i18n::text("repo-core-0222"))
+                .checkbox(
+                    &mut settings.graph_lane_walk,
+                    crate::i18n::text("repo-core-0222"),
+                )
                 .changed()
             {
                 settings.set(ui.ctx());
             }
             if settings.graph_lane_walk {
-                ui.small(format!(
-                    "{} first parent · {} child · {} next descendant merge · {} branch tip",
-                    crate::keymap::label(ui.ctx(), crate::keymap::Command::GraphNext),
-                    crate::keymap::label(ui.ctx(), crate::keymap::Command::GraphPrevious),
-                    crate::keymap::label(ui.ctx(), crate::keymap::Command::GraphRight),
-                    crate::keymap::label(ui.ctx(), crate::keymap::Command::GraphLeft)
+                ui.small(crate::i18n::message(
+                    "repo-core-2764",
+                    &[
+                        (
+                            "GraphNext",
+                            format!(
+                                "{}",
+                                crate::keymap::label(ui.ctx(), crate::keymap::Command::GraphNext)
+                            )
+                            .into(),
+                        ),
+                        (
+                            "GraphPrevious",
+                            format!(
+                                "{}",
+                                crate::keymap::label(
+                                    ui.ctx(),
+                                    crate::keymap::Command::GraphPrevious
+                                )
+                            )
+                            .into(),
+                        ),
+                        (
+                            "GraphRight",
+                            format!(
+                                "{}",
+                                crate::keymap::label(ui.ctx(), crate::keymap::Command::GraphRight)
+                            )
+                            .into(),
+                        ),
+                        (
+                            "GraphLeft",
+                            format!(
+                                "{}",
+                                crate::keymap::label(ui.ctx(), crate::keymap::Command::GraphLeft)
+                            )
+                            .into(),
+                        ),
+                    ],
                 ));
                 if let Some(row) = self.selected {
                     let relations: Vec<_> = self
@@ -383,18 +475,25 @@ impl RepoTab {
                                 .get(row)
                                 .into_iter()
                                 .flatten()
-                                .map(|r| ("Child", *r)),
+                                .map(|r| (crate::i18n::text("repo-core-2765"), *r)),
                         )
                         .collect();
                     let mut chosen = None;
-                    ui.menu_button("Choose a parent or child…", |ui| {
+                    ui.menu_button(crate::i18n::text("repo-core-2766"), |ui| {
                         for (kind, row) in relations {
                             if let Some(c) = self.commits.get(row)
                                 && ui
-                                    .button(format!(
-                                        "{kind}: {} {}",
-                                        c.hash.get(..8).unwrap_or(&c.hash),
-                                        c.summary
+                                    .button(crate::i18n::message(
+                                        "repo-core-2767",
+                                        &[
+                                            ("kind", format!("{}", kind).into()),
+                                            (
+                                                "hash",
+                                                format!("{}", c.hash.get(..8).unwrap_or(&c.hash))
+                                                    .into(),
+                                            ),
+                                            ("summary", format!("{}", c.summary).into()),
+                                        ],
                                     ))
                                     .clicked()
                             {
@@ -420,14 +519,17 @@ impl RepoTab {
                     ui.small(description);
                 }
                 if ui
-                    .checkbox(&mut settings.graph_sounds, "Graph sounds")
+                    .checkbox(
+                        &mut settings.graph_sounds,
+                        crate::i18n::text("repo-core-2768"),
+                    )
                     .changed()
                 {
                     settings.set(ui.ctx());
                 }
                 if crate::audio::unavailable() {
-                    ui.small("Audio unavailable; navigation and descriptions remain available");
-                    if ui.button("Retry audio").clicked() {
+                    ui.small(crate::i18n::text("repo-core-2769"));
+                    if ui.button(crate::i18n::text("repo-core-2770")).clicked() {
                         crate::audio::retry();
                     }
                 }

@@ -30,7 +30,13 @@ pub fn parse(text: &str) -> Result<Node, String> {
 
 impl Reader<'_> {
     fn error(&self, what: &str) -> String {
-        crate::i18n::message("repo-core-2183", &[("line", format!("{}", self.line).into()), ("what", format!("{}", what).into())])
+        crate::i18n::message(
+            "repo-core-2183",
+            &[
+                ("line", format!("{}", self.line).into()),
+                ("what", format!("{}", what).into()),
+            ],
+        )
     }
 
     fn peek(&self) -> Option<u8> {
@@ -77,7 +83,10 @@ impl Reader<'_> {
             self.bump();
             Ok(())
         } else {
-            Err(self.error(&crate::i18n::message("repo-core-2185", &[("char", format!("{}", b as char).into())])))
+            Err(self.error(&crate::i18n::message(
+                "repo-core-2185",
+                &[("char", format!("{}", b as char).into())],
+            )))
         }
     }
 
@@ -101,7 +110,10 @@ impl Reader<'_> {
     fn nested(&mut self, read: fn(&mut Self) -> Result<Node, String>) -> Result<Node, String> {
         self.depth += 1;
         if self.depth > MAX_DEPTH {
-            return Err(self.error(&crate::i18n::message("repo-core-2188", &[("MAX-DEPTH", format!("{}", MAX_DEPTH).into())])));
+            return Err(self.error(&crate::i18n::message(
+                "repo-core-2188",
+                &[("MAX-DEPTH", format!("{}", MAX_DEPTH).into())],
+            )));
         }
         let node = read(self);
         self.depth -= 1;
@@ -138,7 +150,10 @@ impl Reader<'_> {
                 || text.ends_with('.')
                 || digits.starts_with('.'));
         if !strict || text.parse::<f64>().is_err() {
-            return Err(self.error(&crate::i18n::message("repo-core-2191", &[("text", format!("{}", text).into())])));
+            return Err(self.error(&crate::i18n::message(
+                "repo-core-2191",
+                &[("text", format!("{}", text).into())],
+            )));
         }
         Ok(Node::Scalar {
             text: text.to_owned(),
@@ -160,9 +175,7 @@ impl Reader<'_> {
                 Some(b'"') => return Ok(out),
                 Some(b'\\') => out.push(self.escape()?),
                 _ => {
-                    return Err(
-                        self.error(crate::i18n::text("repo-core-2193"))
-                    );
+                    return Err(self.error(crate::i18n::text("repo-core-2193")));
                 }
             }
         }

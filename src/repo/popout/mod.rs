@@ -39,7 +39,7 @@ impl Panel {
             Panel::Diff => "diff",
             Panel::Terminal => "terminal",
             Panel::Pr => "pull request",
-            Panel::Ci => "CI view",
+            Panel::Ci => crate::i18n::text("repo-core-4206"),
         }
     }
 
@@ -165,10 +165,18 @@ const MAX_WHAT: usize = 90;
 /// "Diff of src/main.rs — app — GitCraft" (the main window is "GitCraft"). Long names are cut
 /// in the middle, where a path's least telling part is.
 pub(crate) fn title(repo: &str, what: &str) -> String {
-    format!(
-        "{} — {} — GitCraft",
-        shorten(what.trim(), MAX_WHAT),
-        shorten(repo.trim(), MAX_REPO)
+    crate::i18n::message(
+        "repo-core-4208",
+        &[
+            (
+                "MAX-WHAT",
+                format!("{}", shorten(what.trim(), MAX_WHAT)).into(),
+            ),
+            (
+                "MAX-REPO",
+                format!("{}", shorten(repo.trim(), MAX_REPO)).into(),
+            ),
+        ],
     )
 }
 
@@ -190,17 +198,17 @@ pub(crate) fn shorten(text: &str, max: usize) -> String {
 pub(crate) fn palette_items() -> Vec<(String, String, Action)> {
     vec![
         (
-            "Pop out the view shown".into(),
+            crate::i18n::text("repo-core-4210").into(),
             "window".into(),
             Action::Popout(Request::PopShown),
         ),
         (
-            "Pop out the terminal".into(),
+            crate::i18n::text("repo-core-4212").into(),
             "window".into(),
             Action::Popout(Request::PopOut(Panel::Terminal)),
         ),
         (
-            "Bring back the popped-out views".into(),
+            crate::i18n::text("repo-core-4213").into(),
             "window".into(),
             Action::Popout(Request::DockAll),
         ),

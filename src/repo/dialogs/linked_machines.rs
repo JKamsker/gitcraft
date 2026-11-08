@@ -100,7 +100,10 @@ impl Form {
                 ));
                 if path != &self.repo
                     && ui
-                        .add_enabled(!self.pending, egui::Button::new(crate::i18n::text("repo-core-1367")))
+                        .add_enabled(
+                            !self.pending,
+                            egui::Button::new(crate::i18n::text("repo-core-1367")),
+                        )
                         .clicked()
                 {
                     remove = Some(path.clone());
@@ -117,9 +120,8 @@ impl Form {
             });
         }
         ui.horizontal(|ui| {
-            ui.text_edit_singleline(&mut self.add).on_hover_text(
-                crate::i18n::text("repo-core-1368"),
-            );
+            ui.text_edit_singleline(&mut self.add)
+                .on_hover_text(crate::i18n::text("repo-core-1368"));
             if ui
                 .add_enabled(
                     !self.pending && !self.add.trim().is_empty(),
@@ -171,40 +173,92 @@ impl Form {
             .map(|f| (f.path.as_str(), f))
             .collect();
         let mut open = None;
-        egui::ScrollArea::vertical().max_height(470.0).show(ui, |ui| {
-            for (path, sample) in &self.samples {
-                ui.separator();
-                ui.horizontal(|ui| {
-                    ui.strong(path.display().to_string());
-                    if ui.button(crate::i18n::text("repo-core-1372")).clicked() { open = Some(path.clone()); }
-                });
-                match sample {
-                    Err(e) => { ui.label(crate::i18n::message("repo-core-1373", &[("e", format!("{}", e).into())])); }
-                    Ok(f) => {
-                        if let Some(base) = reference {
-                            ui.label(comparison_label(base, f));
-                            if base.test_command_digest != f.test_command_digest {
-                                ui.label(crate::i18n::text("repo-core-1374"));
+        egui::ScrollArea::vertical()
+            .max_height(470.0)
+            .show(ui, |ui| {
+                for (path, sample) in &self.samples {
+                    ui.separator();
+                    ui.horizontal(|ui| {
+                        ui.strong(path.display().to_string());
+                        if ui.button(crate::i18n::text("repo-core-1372")).clicked() {
+                            open = Some(path.clone());
+                        }
+                    });
+                    match sample {
+                        Err(e) => {
+                            ui.label(crate::i18n::message(
+                                "repo-core-1373",
+                                &[("e", format!("{}", e).into())],
+                            ));
+                        }
+                        Ok(f) => {
+                            if let Some(base) = reference {
+                                ui.label(comparison_label(base, f));
+                                if base.test_command_digest != f.test_command_digest {
+                                    ui.label(crate::i18n::text("repo-core-1374"));
+                                }
+                            } else {
+                                ui.label(crate::i18n::text("repo-core-1375"));
                             }
-                        } else { ui.label(crate::i18n::text("repo-core-1375")); }
-                        ui.label(crate::i18n::message("repo-core-1376", &[("machine", format!("{}", f.machine).into()), ("head", format!("{}", f.head).into()), (crate::i18n::text("repo-core-1377"), format!("{}", f.stored_test.as_deref().unwrap_or(crate::i18n::text("repo-core-1377"))).into())]));
-                        ui.label(crate::i18n::text("repo-core-1378"));
-                        ui.collapsing(crate::i18n::text("repo-core-1379"), |ui| {
-                            ui.label(crate::i18n::message("repo-core-1380", &[("count", (f.files.len()).into()), ("tree", format!("{}", f.tree).into())]));
-                            for (key, value) in &f.settings { ui.monospace(format!("{key}: {value}")); }
-                            for (key, value) in &f.versions { ui.monospace(format!("{key}: {value}")); }
-                            ui.label(crate::i18n::text("repo-core-1382"));
-                            for paths in &f.case_collisions { ui.monospace(paths.join(" / ")); }
-                            ui.label(crate::i18n::text("repo-core-1383")); ui.monospace(&f.mode_changes);
-                            for file in &f.files {
-                                let differs = reference_files.get(file.path.as_str()).is_none_or(|b| b.mode != file.mode || b.endings != file.endings);
-                                if differs { ui.monospace(crate::i18n::message("repo-core-1384", &[("path", format!("{}", file.path).into()), ("mode", format!("{}", file.mode).into()), ("endings", format!("{}", file.endings).into())])); }
-                            }
-                        });
+                            ui.label(crate::i18n::message(
+                                "repo-core-1376",
+                                &[
+                                    ("machine", format!("{}", f.machine).into()),
+                                    ("head", format!("{}", f.head).into()),
+                                    (
+                                        crate::i18n::text("repo-core-1377"),
+                                        format!(
+                                            "{}",
+                                            f.stored_test
+                                                .as_deref()
+                                                .unwrap_or(crate::i18n::text("repo-core-1377"))
+                                        )
+                                        .into(),
+                                    ),
+                                ],
+                            ));
+                            ui.label(crate::i18n::text("repo-core-1378"));
+                            ui.collapsing(crate::i18n::text("repo-core-1379"), |ui| {
+                                ui.label(crate::i18n::message(
+                                    "repo-core-1380",
+                                    &[
+                                        ("count", (f.files.len()).into()),
+                                        ("tree", format!("{}", f.tree).into()),
+                                    ],
+                                ));
+                                for (key, value) in &f.settings {
+                                    ui.monospace(format!("{key}: {value}"));
+                                }
+                                for (key, value) in &f.versions {
+                                    ui.monospace(format!("{key}: {value}"));
+                                }
+                                ui.label(crate::i18n::text("repo-core-1382"));
+                                for paths in &f.case_collisions {
+                                    ui.monospace(paths.join(" / "));
+                                }
+                                ui.label(crate::i18n::text("repo-core-1383"));
+                                ui.monospace(&f.mode_changes);
+                                for file in &f.files {
+                                    let differs =
+                                        reference_files.get(file.path.as_str()).is_none_or(|b| {
+                                            b.mode != file.mode || b.endings != file.endings
+                                        });
+                                    if differs {
+                                        ui.monospace(crate::i18n::message(
+                                            "repo-core-1384",
+                                            &[
+                                                ("path", format!("{}", file.path).into()),
+                                                ("mode", format!("{}", file.mode).into()),
+                                                ("endings", format!("{}", file.endings).into()),
+                                            ],
+                                        ));
+                                    }
+                                }
+                            });
+                        }
                     }
                 }
-            }
-        });
+            });
         ui.label(crate::i18n::text("repo-core-1385"));
         if let Some(path) = open {
             Outcome::Done(Box::new(crate::repo::Action::OpenTab(path)))
@@ -217,16 +271,10 @@ impl Form {
 }
 fn comparison_label(a: &git::MachineFacts, b: &git::MachineFacts) -> &'static str {
     match git::compare_machine_content(a, b) {
-        git::ContentComparison::Match => {
-            crate::i18n::text("repo-core-1386")
-        }
+        git::ContentComparison::Match => crate::i18n::text("repo-core-1386"),
         git::ContentComparison::Different => crate::i18n::text("repo-core-1387"),
-        git::ContentComparison::Changed => {
-            crate::i18n::text("repo-core-1388")
-        }
-        git::ContentComparison::Incompatible => {
-            crate::i18n::text("repo-core-1389")
-        }
+        git::ContentComparison::Changed => crate::i18n::text("repo-core-1388"),
+        git::ContentComparison::Incompatible => crate::i18n::text("repo-core-1389"),
     }
 }
 

@@ -303,7 +303,7 @@ impl RebaseEditor {
                             "chevron-up",
                             &crate::keymap::tip(
                                 ui.ctx(),
-                                "Move up, later",
+                                crate::i18n::text("repo-core-3246"),
                                 crate::keymap::Command::RebaseMoveUp,
                             ),
                         )
@@ -319,7 +319,7 @@ impl RebaseEditor {
                             "chevron-down",
                             &crate::keymap::tip(
                                 ui.ctx(),
-                                "Move down, earlier",
+                                crate::i18n::text("repo-core-3247"),
                                 crate::keymap::Command::RebaseMoveDown,
                             ),
                         )
@@ -372,12 +372,14 @@ impl RebaseEditor {
                             .sense(Sense::click()),
                     );
                     let label = || {
-                        format!(
-                            "Rebase commit {}, {}, {}, {}",
-                            short(&e.commit.hash),
-                            e.commit.summary,
-                            e.commit.author,
-                            e.step.label()
+                        crate::i18n::message(
+                            "repo-core-3249",
+                            &[
+                                ("hash", format!("{}", short(&e.commit.hash)).into()),
+                                ("summary", format!("{}", e.commit.summary).into()),
+                                ("author", format!("{}", e.commit.author).into()),
+                                ("label", format!("{}", e.step.label()).into()),
+                            ],
                         )
                     };
                     for response in [&hash, &avatar, &summary] {
@@ -386,14 +388,14 @@ impl RebaseEditor {
                     picked |= hash.clicked() || avatar.clicked() || summary.clicked();
                     if matches!(e.step, Step::Squash | Step::Fixup) {
                         ui.label(
-                            egui::RichText::new("↓ into the commit below")
+                            egui::RichText::new(crate::i18n::text("repo-core-3250"))
                                 .color(t.accent_fg)
                                 .small(),
                         );
                     }
                     if e.step == Step::Edit {
                         ui.label(
-                            egui::RichText::new("stops here so you can change it")
+                            egui::RichText::new(crate::i18n::text("repo-core-3251"))
                                 .color(t.accent_fg)
                                 .small(),
                         );
@@ -483,7 +485,7 @@ fn grip(ui: &mut Ui) {
                 .circle_filled(rect.center() + egui::vec2(col, row), 1.4, color);
         }
     }
-    resp.on_hover_text("Drag to move the commit");
+    resp.on_hover_text(crate::i18n::text("repo-core-4240"));
 }
 
 #[cfg(test)]

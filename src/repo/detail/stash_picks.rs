@@ -33,7 +33,10 @@ impl RepoTab {
                             acts.push(Action::ClearStashPicks);
                         }
                         let stash = ui
-                            .add_enabled(idle, egui::Button::new(crate::i18n::text("repo-core-1150")))
+                            .add_enabled(
+                                idle,
+                                egui::Button::new(crate::i18n::text("repo-core-1150")),
+                            )
                             .on_hover_text(crate::i18n::text("repo-core-1151"))
                             .on_disabled_hover_text(crate::i18n::text("repo-core-1152"));
                         if stash.clicked() {
@@ -49,7 +52,13 @@ impl RepoTab {
 
 /// `3 files picked to stash`.
 fn picked_label(n: usize) -> String {
-    crate::i18n::message("repo-core-1153", &[("n", (n).into()), ("s", format!("{}", if n == 1 { "" } else { "s" }).into())])
+    crate::i18n::message(
+        "repo-core-1153",
+        &[
+            ("n", (n).into()),
+            ("s", format!("{}", if n == 1 { "" } else { "s" }).into()),
+        ],
+    )
 }
 
 /// The stash entries of the menu of the working-tree file `path`.
@@ -81,10 +90,13 @@ pub(super) fn stash_menu_items(
     }
     let is_picked = picked.contains(path);
     if is_picked && picked.len() > 1 {
-        if crate::menu_item::MenuItem::new(crate::i18n::message("repo-core-1155", &[("count", (picked.len()).into())]))
-            .icon("archive")
-            .show(ui)
-            .clicked()
+        if crate::menu_item::MenuItem::new(crate::i18n::message(
+            "repo-core-1155",
+            &[("count", (picked.len()).into())],
+        ))
+        .icon("archive")
+        .show(ui)
+        .clicked()
         {
             acts.push(Action::Dialog(Dialog::stash_files(
                 picked.iter().cloned().collect(),
@@ -100,7 +112,10 @@ pub(super) fn stash_menu_items(
     let pick = if is_picked {
         crate::i18n::text("repo-core-1156").to_owned()
     } else {
-        crate::i18n::message("repo-core-1157", &[("command", format!("{}", crate::manual::command()).into())])
+        crate::i18n::message(
+            "repo-core-1157",
+            &[("command", format!("{}", crate::manual::command()).into())],
+        )
     };
     if crate::menu_item::MenuItem::new(pick)
         .icon("command")

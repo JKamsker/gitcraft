@@ -9,7 +9,13 @@ use super::tree::{Field, Item, Lines, MAX_DEPTH, Node, Ty, line_at};
 pub fn parse(text: &str) -> Result<Node, String> {
     let doc = Document::parse(text).map_err(|e| {
         let line = e.span().map_or(1, |s| line_at(text, s.start));
-        crate::i18n::message("repo-core-2267", &[("line", (line).into()), ("trim", format!("{}", e.message().trim()).into())])
+        crate::i18n::message(
+            "repo-core-2267",
+            &[
+                ("line", (line).into()),
+                ("trim", format!("{}", e.message().trim()).into()),
+            ],
+        )
     })?;
     let mut r = Reader {
         text,
@@ -39,7 +45,10 @@ impl Reader<'_> {
     fn deeper(&mut self) -> Result<(), String> {
         self.depth += 1;
         if self.depth > MAX_DEPTH {
-            return Err(crate::i18n::message("repo-core-2188", &[("MAX-DEPTH", format!("{}", MAX_DEPTH).into())]));
+            return Err(crate::i18n::message(
+                "repo-core-2188",
+                &[("MAX-DEPTH", format!("{}", MAX_DEPTH).into())],
+            ));
         }
         Ok(())
     }
@@ -48,7 +57,9 @@ impl Reader<'_> {
         self.deeper()?;
         let mut fields = Vec::new();
         for (key, item) in table.iter() {
-            let (k, _) = table.get_key_value(key).ok_or(crate::i18n::text("repo-core-2268"))?;
+            let (k, _) = table
+                .get_key_value(key)
+                .ok_or(crate::i18n::text("repo-core-2268"))?;
             let line = match self.line(k.span()) {
                 0 => self.line(item.span()),
                 n => n,
@@ -119,7 +130,9 @@ impl Reader<'_> {
                 self.deeper()?;
                 let mut fields = Vec::new();
                 for (key, value) in t.iter() {
-                    let (k, _) = t.get_key_value(key).ok_or(crate::i18n::text("repo-core-2268"))?;
+                    let (k, _) = t
+                        .get_key_value(key)
+                        .ok_or(crate::i18n::text("repo-core-2268"))?;
                     let line = self.line(k.span().or_else(|| value.span()));
                     fields.push(Field {
                         key: key.to_owned(),

@@ -102,10 +102,16 @@ impl RepoTab {
                 })
             },
             move |tab, result, _| {
-                if tab.prompt_session.request != id || tab.prompt_session.requested.as_deref() != Some(&commit) {return;}
+                if tab.prompt_session.request != id
+                    || tab.prompt_session.requested.as_deref() != Some(&commit)
+                {
+                    return;
+                }
                 tab.prompt_session.loading = false;
                 if tab.path != expected || crate::git::profile_config() != profile {
-                    tab.prompt_session.result=Some(Err("Worktree or profile changed while reading; read evidence again in the selected context".into()));return;
+                    tab.prompt_session.result =
+                        Some(Err(crate::i18n::text("repo-core-3071").into()));
+                    return;
                 }
                 tab.prompt_session.result = Some(result);
                 tab.prompt_session.jump = matches(&tab.prompt_session).first().copied();
@@ -137,38 +143,33 @@ fn matches(state: &State) -> Vec<(usize, usize)> {
 }
 fn panel(ui: &mut egui::Ui, state: &mut State, hash: &str, acts: &mut Vec<Action>) {
     ui.heading(crate::i18n::text("repo-core-0864"));
-    ui.label("Local evidence only. Nothing is uploaded, executed or exported through MCP. Entire checkpoints already in Git and the recorded commit message are read; local Claude/Codex discovery is opt in. Multiple time/path matches remain separate candidates.");
-    ui.checkbox(
-        &mut state.local,
-        "Include local Claude Code and Codex transcripts",
-    );
+    ui.label(crate::i18n::text("repo-core-3072"));
+    ui.checkbox(&mut state.local, crate::i18n::text("repo-core-3073"));
     if state.local {
-        ui.label("Physical transcript roots, one per line (up to eight). Only bounded JSONL files are read; config files are excluded by the JSONL-only allowlist.");
+        ui.label(crate::i18n::text("repo-core-3074"));
         ui.add(egui::TextEdit::multiline(&mut state.roots).desired_rows(3));
         ui.horizontal(|ui| {
-            ui.label("Match records within hours before commit:");
+            ui.label(crate::i18n::text("repo-core-3075"));
             ui.add(egui::DragValue::new(&mut state.hours).range(1..=168));
-            ui.label("and 10 minutes after");
+            ui.label(crate::i18n::text("repo-core-3076"));
         });
     }
-    ui.label("Read limits: 4 MiB per file, 32 MiB total, 200 newest local files/root, 2,000 steps/transcript. Unavailable, truncated or ambiguous evidence is reported explicitly.");
+    ui.label(crate::i18n::text("repo-core-3077"));
     if ui
         .add_enabled(
             !state.loading && !hash.is_empty(),
-            egui::Button::new("Read local prompt/session evidence"),
+            egui::Button::new(crate::i18n::text("repo-core-3078")),
         )
         .clicked()
     {
         acts.push(Action::LoadPromptSession(hash.into()));
     }
     if state.loading {
-        ui.label("Reading bounded local evidence…");
+        ui.label(crate::i18n::text("repo-core-3079"));
         return;
     }
     if state.requested.as_deref() != Some(hash) {
-        ui.label(
-            "Read evidence for this selected commit. Previous commit evidence is not shown here.",
-        );
+        ui.label(crate::i18n::text("repo-core-3080"));
         return;
     }
     let matching = matches(state);
@@ -184,24 +185,35 @@ fn panel(ui: &mut egui::Ui, state: &mut State, hash: &str, acts: &mut Vec<Action
     };
     if let Some(hunk) = &state.hunk {
         if hunk.commit == e.commit {
-            ui.strong(format!(
-                "Hunk {}:{}–{} ({})",
-                logic::redact(&hunk.path),
-                hunk.range.0,
-                hunk.range.1,
-                if hunk.old { "old" } else { "new" }
+            ui.strong(crate::i18n::message(
+                "repo-core-3081",
+                &[
+                    ("path", format!("{}", logic::redact(&hunk.path)).into()),
+                    ("range", format!("{}", hunk.range.0).into()),
+                    ("range2", format!("{}", hunk.range.1).into()),
+                    (
+                        "new",
+                        format!("{}", if hunk.old { "old" } else { "new" }).into(),
+                    ),
+                ],
             ));
             if matching.is_empty() {
-                ui.label("No unique recorded edit snippet matches these commit lines. A session/time match alone is not hunk attribution.");
+                ui.label(crate::i18n::text("repo-core-3082"));
             } else {
-                ui.label(format!(
-                    "{} recorded content match(es); inspect each candidate step",
-                    matching.len()
+                ui.label(crate::i18n::message(
+                    "repo-core-3083",
+                    &[("count", (matching.len()).into())],
                 ));
                 ui.horizontal_wrapped(|ui| {
                     for (i, j) in &matching {
                         if ui
-                            .button(format!("Session {}, step {}", i + 1, j + 1))
+                            .button(crate::i18n::message(
+                                "repo-core-3084",
+                                &[
+                                    ("i", format!("{}", i + 1).into()),
+                                    ("j", format!("{}", j + 1).into()),
+                                ],
+                            ))
                             .clicked()
                         {
                             state.jump = Some((*i, *j));
@@ -211,32 +223,110 @@ fn panel(ui: &mut egui::Ui, state: &mut State, hash: &str, acts: &mut Vec<Action
             }
         }
     }
-    egui::ScrollArea::vertical().id_salt("prompt-session-local").show(ui,|ui|{
-        for notice in &e.notices {ui.weak(notice);}
-        for (i,session) in e.sessions.iter().enumerate() {
-            ui.separator();ui.strong(&session.source);ui.label(&session.relation);
-            for (j,step) in session.steps.iter().enumerate() {
-                let highlighted=matching.contains(&(i,j));
-                let response=egui::Frame::new().inner_margin(6.0).fill(if highlighted{crate::theme::Tokens::get(ui.ctx()).accent.gamma_multiply(0.12)}else{egui::Color32::TRANSPARENT}).show(ui,|ui|{
-                    ui.strong(format!("Step {} · {}{}",j+1,step.kind,step.at.map_or(String::new(),|t|format!(" · UTC epoch {t}"))));
-                    ui.label(&step.text);
-                    if let Some(path)=&step.path {
-                        ui.monospace(logic::redact(path));
-                        if step.ranges.is_empty(){ui.weak("No unique exact old/new content match in this commit; no line attribution asserted.");}
-                        for span in &step.ranges {
-                            if ui.button(if span.old {format!("Open commit diff · parent lines {}–{}",span.start,span.end)}else{format!("Open commit lines {}–{}",span.start,span.end)}).clicked(){
-                                if !span.old {acts.push(Action::OpenPinnedFileLine(crate::git::investigations::dossier::Seed{commit:e.commit.clone(),path:path.clone(),line:span.start as usize}));}
-                                else{acts.push(Action::OpenDiff(super::DiffKey::Commit{hash:e.commit.clone(),path:path.clone()}));}
-                            }
-                        }
-                    }
-                    if !step.before.is_empty(){ui.label("Recorded before:");ui.monospace(&step.before);}
-                    if !step.after.is_empty(){ui.label("Recorded after:");ui.monospace(&step.after);}
-                }).response;
-                if state.jump==Some((i,j)){response.scroll_to_me(Some(egui::Align::Center));state.jump=None;}
+    egui::ScrollArea::vertical()
+        .id_salt("prompt-session-local")
+        .show(ui, |ui| {
+            for notice in &e.notices {
+                ui.weak(notice);
             }
-        }
-    });
+            for (i, session) in e.sessions.iter().enumerate() {
+                ui.separator();
+                ui.strong(&session.source);
+                ui.label(&session.relation);
+                for (j, step) in session.steps.iter().enumerate() {
+                    let highlighted = matching.contains(&(i, j));
+                    let response = egui::Frame::new()
+                        .inner_margin(6.0)
+                        .fill(if highlighted {
+                            crate::theme::Tokens::get(ui.ctx())
+                                .accent
+                                .gamma_multiply(0.12)
+                        } else {
+                            egui::Color32::TRANSPARENT
+                        })
+                        .show(ui, |ui| {
+                            ui.strong(crate::i18n::message(
+                                "repo-core-3086",
+                                &[
+                                    ("j", format!("{}", j + 1).into()),
+                                    ("kind", format!("{}", step.kind).into()),
+                                    (
+                                        "t",
+                                        format!(
+                                            "{}",
+                                            step.at.map_or(
+                                                String::new(),
+                                                |t| crate::i18n::message(
+                                                    "repo-core-3087",
+                                                    &[("t", format!("{}", t).into())]
+                                                )
+                                            )
+                                        )
+                                        .into(),
+                                    ),
+                                ],
+                            ));
+                            ui.label(&step.text);
+                            if let Some(path) = &step.path {
+                                ui.monospace(logic::redact(path));
+                                if step.ranges.is_empty() {
+                                    ui.weak(crate::i18n::text("repo-core-3088"));
+                                }
+                                for span in &step.ranges {
+                                    if ui
+                                        .button(if span.old {
+                                            crate::i18n::message(
+                                                "repo-core-3089",
+                                                &[
+                                                    ("start", format!("{}", span.start).into()),
+                                                    ("end", format!("{}", span.end).into()),
+                                                ],
+                                            )
+                                        } else {
+                                            crate::i18n::message(
+                                                "repo-core-3090",
+                                                &[
+                                                    ("start", format!("{}", span.start).into()),
+                                                    ("end", format!("{}", span.end).into()),
+                                                ],
+                                            )
+                                        })
+                                        .clicked()
+                                    {
+                                        if !span.old {
+                                            acts.push(Action::OpenPinnedFileLine(
+                                                crate::git::investigations::dossier::Seed {
+                                                    commit: e.commit.clone(),
+                                                    path: path.clone(),
+                                                    line: span.start as usize,
+                                                },
+                                            ));
+                                        } else {
+                                            acts.push(Action::OpenDiff(super::DiffKey::Commit {
+                                                hash: e.commit.clone(),
+                                                path: path.clone(),
+                                            }));
+                                        }
+                                    }
+                                }
+                            }
+                            if !step.before.is_empty() {
+                                ui.label(crate::i18n::text("repo-core-3091"));
+                                ui.monospace(&step.before);
+                            }
+                            if !step.after.is_empty() {
+                                ui.label(crate::i18n::text("repo-core-3092"));
+                                ui.monospace(&step.after);
+                            }
+                        })
+                        .response;
+                    if state.jump == Some((i, j)) {
+                        response.scroll_to_me(Some(egui::Align::Center));
+                        state.jump = None;
+                    }
+                }
+            }
+        });
 }
 #[cfg(test)]
 mod tests {

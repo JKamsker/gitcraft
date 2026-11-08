@@ -52,22 +52,66 @@ impl CommitDrop {
             cut(&self.target_summary, 36)
         );
         match self.place {
-            Place::Above => crate::i18n::message("repo-core-2437", &[("hash", format!("{}", short(&self.hash)).into()), ("target", format!("{}", target).into())]),
-            Place::Below => crate::i18n::message("repo-core-2438", &[("hash", format!("{}", short(&self.hash)).into()), ("target", format!("{}", target).into())]),
-            Place::Squash => crate::i18n::message("repo-core-2439", &[("hash", format!("{}", short(&self.hash)).into()), ("target", format!("{}", target).into())]),
-            Place::Fixup => crate::i18n::message("repo-core-2440", &[("hash", format!("{}", short(&self.hash)).into()), ("target", format!("{}", target).into())]),
+            Place::Above => crate::i18n::message(
+                "repo-core-2437",
+                &[
+                    ("hash", format!("{}", short(&self.hash)).into()),
+                    ("target", format!("{}", target).into()),
+                ],
+            ),
+            Place::Below => crate::i18n::message(
+                "repo-core-2438",
+                &[
+                    ("hash", format!("{}", short(&self.hash)).into()),
+                    ("target", format!("{}", target).into()),
+                ],
+            ),
+            Place::Squash => crate::i18n::message(
+                "repo-core-2439",
+                &[
+                    ("hash", format!("{}", short(&self.hash)).into()),
+                    ("target", format!("{}", target).into()),
+                ],
+            ),
+            Place::Fixup => crate::i18n::message(
+                "repo-core-2440",
+                &[
+                    ("hash", format!("{}", short(&self.hash)).into()),
+                    ("target", format!("{}", target).into()),
+                ],
+            ),
         }
     }
 
     /// The label of the operation, for the toolbar and the undo list.
     fn op_label(&self) -> String {
         let (verb, word) = match self.place {
-            Place::Above => (crate::i18n::text("repo-core-2441"), crate::i18n::text("repo-core-2442")),
-            Place::Below => (crate::i18n::text("repo-core-2441"), crate::i18n::text("repo-core-2443")),
-            Place::Squash => (crate::i18n::text("repo-core-2444"), crate::i18n::text("repo-core-2445")),
-            Place::Fixup => (crate::i18n::text("repo-core-2446"), crate::i18n::text("repo-core-2445")),
+            Place::Above => (
+                crate::i18n::text("repo-core-2441"),
+                crate::i18n::text("repo-core-2442"),
+            ),
+            Place::Below => (
+                crate::i18n::text("repo-core-2441"),
+                crate::i18n::text("repo-core-2443"),
+            ),
+            Place::Squash => (
+                crate::i18n::text("repo-core-2444"),
+                crate::i18n::text("repo-core-2445"),
+            ),
+            Place::Fixup => (
+                crate::i18n::text("repo-core-2446"),
+                crate::i18n::text("repo-core-2445"),
+            ),
         };
-        crate::i18n::message("repo-core-2447", &[("verb", format!("{}", verb).into()), ("hash", format!("{}", short(&self.hash)).into()), ("word", format!("{}", word).into()), ("target", format!("{}", short(&self.target)).into())])
+        crate::i18n::message(
+            "repo-core-2447",
+            &[
+                ("verb", format!("{}", verb).into()),
+                ("hash", format!("{}", short(&self.hash)).into()),
+                ("word", format!("{}", word).into()),
+                ("target", format!("{}", short(&self.target)).into()),
+            ],
+        )
     }
 }
 
@@ -164,7 +208,16 @@ impl RepoTab {
         match command {
             Ok(_) if self.busy_op.is_some() => {
                 self.status = Some((
-                    crate::i18n::message("repo-core-2452", &[("label", format!("{}", label).into()), ("self", format!("{}", self.busy_op.as_deref().unwrap_or_default()).into())]),
+                    crate::i18n::message(
+                        "repo-core-2452",
+                        &[
+                            ("label", format!("{}", label).into()),
+                            (
+                                "self",
+                                format!("{}", self.busy_op.as_deref().unwrap_or_default()).into(),
+                            ),
+                        ],
+                    ),
                     true,
                 ));
             }

@@ -193,11 +193,25 @@ pub(super) fn summary(lines: &Lines) -> String {
     let n = |k: usize| format!("{k} line{}", if k == 1 { "" } else { "s" });
     match (added, removed) {
         (0, 0) => crate::i18n::text("repo-core-0610").to_owned(),
-        (0, r) if same == 0 => crate::i18n::message("repo-core-0611", &[("r", format!("{}", n(r)).into())]),
+        (0, r) if same == 0 => {
+            crate::i18n::message("repo-core-0611", &[("r", format!("{}", n(r)).into())])
+        }
         (0, r) => crate::i18n::message("repo-core-0612", &[("r", format!("{}", n(r)).into())]),
         (a, 0) => crate::i18n::message("repo-core-0613", &[("a", format!("{}", n(a)).into())]),
-        (a, r) if same == 0 => crate::i18n::message("repo-core-0614", &[("r", format!("{}", n(r)).into()), ("a", format!("{}", n(a)).into())]),
-        (a, r) => crate::i18n::message("repo-core-0615", &[("a", format!("{}", n(a)).into()), ("r", format!("{}", n(r)).into())]),
+        (a, r) if same == 0 => crate::i18n::message(
+            "repo-core-0614",
+            &[
+                ("r", format!("{}", n(r)).into()),
+                ("a", format!("{}", n(a)).into()),
+            ],
+        ),
+        (a, r) => crate::i18n::message(
+            "repo-core-0615",
+            &[
+                ("a", format!("{}", n(a)).into()),
+                ("r", format!("{}", n(r)).into()),
+            ],
+        ),
     }
 }
 
@@ -286,9 +300,7 @@ impl State {
             IndexBases::NotNeeded | IndexBases::Loading => Original::Loading,
             IndexBases::Added => Original::Added,
             IndexBases::Failed(why) => Original::Unknown(why),
-            IndexBases::Found(_) => Original::Unknown(
-                crate::i18n::text("repo-core-0616"),
-            ),
+            IndexBases::Found(_) => Original::Unknown(crate::i18n::text("repo-core-0616")),
         }
     }
 
@@ -326,7 +338,12 @@ impl State {
 pub(super) fn load(repo: &std::path::Path, path: &str) -> IndexBases {
     let stages = match crate::git::conflict_stages(repo, path) {
         Ok(stages) => stages,
-        Err(e) => return IndexBases::Failed(crate::i18n::message("repo-core-0617", &[("e", format!("{}", e).into())])),
+        Err(e) => {
+            return IndexBases::Failed(crate::i18n::message(
+                "repo-core-0617",
+                &[("e", format!("{}", e).into())],
+            ));
+        }
     };
     if stages.base.is_none() {
         return if stages.ours.is_some() && stages.theirs.is_some() {

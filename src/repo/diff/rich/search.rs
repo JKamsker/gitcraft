@@ -10,12 +10,20 @@ pub(in crate::repo) fn document(diff: &RichDiff, t: &Tokens) -> Document {
             for part in &p.parts {
                 match part {
                     prose::Part::Kept { text, .. } => doc.text(text, t.text),
-                    prose::Part::Added { text, .. } => {
-                        doc.text(&crate::i18n::message("repo-core-2223", &[("text", format!("{}", text).into())]), t.success)
-                    }
-                    prose::Part::Removed { text, .. } => {
-                        doc.text(&crate::i18n::message("repo-core-2224", &[("text", format!("{}", text).into())]), t.danger)
-                    }
+                    prose::Part::Added { text, .. } => doc.text(
+                        &crate::i18n::message(
+                            "repo-core-2223",
+                            &[("text", format!("{}", text).into())],
+                        ),
+                        t.success,
+                    ),
+                    prose::Part::Removed { text, .. } => doc.text(
+                        &crate::i18n::message(
+                            "repo-core-2224",
+                            &[("text", format!("{}", text).into())],
+                        ),
+                        t.danger,
+                    ),
                     prose::Part::Changed { words, .. } => {
                         doc.job(super::prose_view::search_changed(words, t))
                     }
@@ -26,13 +34,34 @@ pub(in crate::repo) fn document(diff: &RichDiff, t: &Tokens) -> Document {
             for entry in &c.entries {
                 doc.text(&format!("{} · {:?}", entry.path, entry.change), t.text);
                 if let Some(old) = &entry.old {
-                    doc.text(&crate::i18n::message("repo-core-2225", &[("old", format!("{}", old).into())]), t.danger);
+                    doc.text(
+                        &crate::i18n::message(
+                            "repo-core-2225",
+                            &[("old", format!("{}", old).into())],
+                        ),
+                        t.danger,
+                    );
                 }
                 if let Some(new) = &entry.new {
-                    doc.text(&crate::i18n::message("repo-core-2226", &[("new", format!("{}", new).into())]), t.success);
+                    doc.text(
+                        &crate::i18n::message(
+                            "repo-core-2226",
+                            &[("new", format!("{}", new).into())],
+                        ),
+                        t.success,
+                    );
                 }
                 if let Some((old, new)) = entry.kinds {
-                    doc.text(&crate::i18n::message("repo-core-2227", &[("old", format!("{}", old).into()), ("new", format!("{}", new).into())]), t.text_dim);
+                    doc.text(
+                        &crate::i18n::message(
+                            "repo-core-2227",
+                            &[
+                                ("old", format!("{}", old).into()),
+                                ("new", format!("{}", new).into()),
+                            ],
+                        ),
+                        t.text_dim,
+                    );
                 }
             }
         }
@@ -54,14 +83,42 @@ pub(in crate::repo) fn document(diff: &RichDiff, t: &Tokens) -> Document {
                         "{} · {:?} · {} → {}",
                         change.name,
                         change.change,
-                        change.old.as_deref().unwrap_or(crate::i18n::text("repo-core-2228")),
-                        change.new.as_deref().unwrap_or(crate::i18n::text("repo-core-2228"))
+                        change
+                            .old
+                            .as_deref()
+                            .unwrap_or(crate::i18n::text("repo-core-2228")),
+                        change
+                            .new
+                            .as_deref()
+                            .unwrap_or(crate::i18n::text("repo-core-2228"))
                     ),
                     t.text,
                 );
                 if let Some((old, new)) = &change.license {
                     doc.text(
-                        &crate::i18n::message("repo-core-2229", &[("declared", format!("{}", old.as_deref().unwrap_or(crate::i18n::text("repo-core-2230"))).into()), ("declared2", format!("{}", new.as_deref().unwrap_or(crate::i18n::text("repo-core-2230"))).into())]),
+                        &crate::i18n::message(
+                            "repo-core-2229",
+                            &[
+                                (
+                                    "declared",
+                                    format!(
+                                        "{}",
+                                        old.as_deref()
+                                            .unwrap_or(crate::i18n::text("repo-core-2230"))
+                                    )
+                                    .into(),
+                                ),
+                                (
+                                    "declared2",
+                                    format!(
+                                        "{}",
+                                        new.as_deref()
+                                            .unwrap_or(crate::i18n::text("repo-core-2230"))
+                                    )
+                                    .into(),
+                                ),
+                            ],
+                        ),
                         t.warning,
                     );
                 }
@@ -70,25 +127,77 @@ pub(in crate::repo) fn document(diff: &RichDiff, t: &Tokens) -> Document {
         RichDiff::Table(table) => {
             for column in &table.columns {
                 doc.text(
-                    &crate::i18n::message("repo-core-2231", &[("column", format!("{}", column.old.as_ref().map_or(crate::i18n::text("repo-core-2228"), |(_, s)| s.as_str())).into()), ("column2", format!("{}", column.new.as_ref().map_or(crate::i18n::text("repo-core-2228"), |(_, s)| s.as_str())).into())]),
+                    &crate::i18n::message(
+                        "repo-core-2231",
+                        &[
+                            (
+                                "column",
+                                format!(
+                                    "{}",
+                                    column
+                                        .old
+                                        .as_ref()
+                                        .map_or(crate::i18n::text("repo-core-2228"), |(_, s)| s
+                                            .as_str())
+                                )
+                                .into(),
+                            ),
+                            (
+                                "column2",
+                                format!(
+                                    "{}",
+                                    column
+                                        .new
+                                        .as_ref()
+                                        .map_or(crate::i18n::text("repo-core-2228"), |(_, s)| s
+                                            .as_str())
+                                )
+                                .into(),
+                            ),
+                        ],
+                    ),
                     t.text,
                 );
             }
             for row in &table.rows {
                 if let Some(old) = &row.old {
-                    doc.text(&crate::i18n::message("repo-core-2232", &[("old", format!("{}", old.join(" │ ")).into())]), t.danger);
+                    doc.text(
+                        &crate::i18n::message(
+                            "repo-core-2232",
+                            &[("old", format!("{}", old.join(" │ ")).into())],
+                        ),
+                        t.danger,
+                    );
                 }
                 if let Some(new) = &row.new {
-                    doc.text(&crate::i18n::message("repo-core-2233", &[("new", format!("{}", new.join(" │ ")).into())]), t.success);
+                    doc.text(
+                        &crate::i18n::message(
+                            "repo-core-2233",
+                            &[("new", format!("{}", new.join(" │ ")).into())],
+                        ),
+                        t.success,
+                    );
                 }
             }
         }
         RichDiff::Dvc(d) => {
             for (old, new) in &d.pairs {
-                for (side, item) in [(crate::i18n::text("repo-core-1564"), old), (crate::i18n::text("repo-core-1565"), new)] {
+                for (side, item) in [
+                    (crate::i18n::text("repo-core-1564"), old),
+                    (crate::i18n::text("repo-core-1565"), new),
+                ] {
                     if let Some(item) = item {
                         if let Some(files) = item.files {
-                            doc.text(&crate::i18n::message("repo-core-2234", &[("side", format!("{}", side).into()), ("files", format!("{}", files).into())]), t.text);
+                            doc.text(
+                                &crate::i18n::message(
+                                    "repo-core-2234",
+                                    &[
+                                        ("side", format!("{}", side).into()),
+                                        ("files", format!("{}", files).into()),
+                                    ],
+                                ),
+                                t.text,
+                            );
                         }
                         doc.text(
                             &format!(
@@ -97,7 +206,9 @@ pub(in crate::repo) fn document(diff: &RichDiff, t: &Tokens) -> Document {
                                 item.size
                                     .map(crate::git::human_size)
                                     .unwrap_or_else(|| crate::i18n::text("repo-core-2179").into()),
-                                item.hash.as_deref().unwrap_or(crate::i18n::text("repo-core-2236")),
+                                item.hash
+                                    .as_deref()
+                                    .unwrap_or(crate::i18n::text("repo-core-2236")),
                                 item.repo.as_deref().unwrap_or("")
                             ),
                             t.text,

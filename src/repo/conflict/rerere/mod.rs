@@ -150,7 +150,13 @@ impl RepoTab {
                     // Not asked again on every reload: the switch says it.
                     Err(e) => {
                         tab.rerere.setup = Some(Setup::default());
-                        tab.status = Some((crate::i18n::message("repo-core-0671", &[("e", format!("{}", e).into())]), true));
+                        tab.status = Some((
+                            crate::i18n::message(
+                                "repo-core-0671",
+                                &[("e", format!("{}", e).into())],
+                            ),
+                            true,
+                        ));
                     }
                 }
             },
@@ -250,12 +256,8 @@ impl RepoTab {
 /// What the toolbar says once rerere was set up so.
 fn switched_message(now: Setup) -> &'static str {
     match (now.on, now.stages) {
-        (true, false) => {
-            crate::i18n::text("repo-core-0677")
-        }
-        (true, true) => {
-            crate::i18n::text("repo-core-0678")
-        }
+        (true, false) => crate::i18n::text("repo-core-0677"),
+        (true, true) => crate::i18n::text("repo-core-0678"),
         (false, _) => crate::i18n::text("repo-core-0679"),
     }
 }

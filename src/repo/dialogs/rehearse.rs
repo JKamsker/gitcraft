@@ -29,23 +29,57 @@ pub(super) fn rehearse(
     title(
         ui,
         crate::i18n::text("repo-core-1453"),
-        &crate::i18n::message("repo-core-1454", &[("machine", format!("{}", machine).into())]),
+        &crate::i18n::message(
+            "repo-core-1454",
+            &[("machine", format!("{}", machine).into())],
+        ),
         &t,
     );
     let Some(current) = current else {
-        ui.label(
-            RichText::new(crate::i18n::text("repo-core-1455"))
-                .color(t.warning),
-        );
+        ui.label(RichText::new(crate::i18n::text("repo-core-1455")).color(t.warning));
         ui.add_space(12.0);
-        return buttons(ui, crate::i18n::text("repo-core-1453"), false, false, || {
-            Action::Rehearse(RehearseAct::Stop)
-        });
+        return buttons(
+            ui,
+            crate::i18n::text("repo-core-1453"),
+            false,
+            false,
+            || Action::Rehearse(RehearseAct::Stop),
+        );
     };
-    ui.radio_value(rebase, true, crate::i18n::message("repo-core-1456", &[("current", format!("{}", current).into()), ("other", format!("{}", other).into())]));
-    ui.radio_value(rebase, false, crate::i18n::message("repo-core-1457", &[("other", format!("{}", other).into()), ("current", format!("{}", current).into())]));
-    let the_other = if *rebase { crate::i18n::text("repo-core-1458") } else { crate::i18n::text("repo-core-1459") };
-    ui.checkbox(compare, crate::i18n::message("repo-core-1460", &[("the-other", format!("{}", the_other).into())]));
+    ui.radio_value(
+        rebase,
+        true,
+        crate::i18n::message(
+            "repo-core-1456",
+            &[
+                ("current", format!("{}", current).into()),
+                ("other", format!("{}", other).into()),
+            ],
+        ),
+    );
+    ui.radio_value(
+        rebase,
+        false,
+        crate::i18n::message(
+            "repo-core-1457",
+            &[
+                ("other", format!("{}", other).into()),
+                ("current", format!("{}", current).into()),
+            ],
+        ),
+    );
+    let the_other = if *rebase {
+        crate::i18n::text("repo-core-1458")
+    } else {
+        crate::i18n::text("repo-core-1459")
+    };
+    ui.checkbox(
+        compare,
+        crate::i18n::message(
+            "repo-core-1460",
+            &[("the-other", format!("{}", the_other).into())],
+        ),
+    );
     ui.add_space(6.0);
     ui.label(RichText::new(crate::i18n::text("repo-core-1461")).color(t.text_dim));
     field(ui, command, "cargo test, make check, ./test.sh…", focus);

@@ -126,9 +126,9 @@ impl<'a> Doc<'a> {
 pub fn diff(path: &str, sides: &Sides) -> Result<ApiDiff, String> {
     let (_, old, new) = config::read(path, sides)?;
     let side_version = |n: &Option<Node>| n.as_ref().and_then(version_of);
-    let version = side_version(&new).or_else(|| side_version(&old)).ok_or(
-        crate::i18n::text("repo-core-1985"),
-    )?;
+    let version = side_version(&new)
+        .or_else(|| side_version(&old))
+        .ok_or(crate::i18n::text("repo-core-1985"))?;
     let empty = Node::Map(Vec::new());
     let mut out = Vec::new();
     match (&old, &new) {
@@ -352,7 +352,13 @@ impl At {
         if self.path.is_empty() {
             self.owner.clone()
         } else {
-            crate::i18n::message("repo-core-1996", &[("owner", format!("{}", self.owner).into()), ("path", format!("{}", self.path).into())])
+            crate::i18n::message(
+                "repo-core-1996",
+                &[
+                    ("owner", format!("{}", self.owner).into()),
+                    ("path", format!("{}", self.path).into()),
+                ],
+            )
         }
     }
 }
@@ -375,15 +381,30 @@ impl<'a> Cx<'a, '_> {
             if p.place == "body" {
                 continue;
             }
-            let label = crate::i18n::message("repo-core-1997", &[("place", format!("{}", cap(&p.place)).into()), ("name", format!("{}", p.name).into())]);
+            let label = crate::i18n::message(
+                "repo-core-1997",
+                &[
+                    ("place", format!("{}", cap(&p.place)).into()),
+                    ("name", format!("{}", p.name).into()),
+                ],
+            );
             match old_params.iter().find(|o| o.is(p)) {
                 None if p.required => self.breaking(
-                    crate::i18n::message("repo-core-1998", &[("place", format!("{}", p.place).into()), ("name", format!("{}", p.name).into())]),
+                    crate::i18n::message(
+                        "repo-core-1998",
+                        &[
+                            ("place", format!("{}", p.place).into()),
+                            ("name", format!("{}", p.name).into()),
+                        ],
+                    ),
                     None,
                     Some(p.line),
                 ),
                 Some(o) if p.required && !o.required => self.breaking(
-                    crate::i18n::message("repo-core-1999", &[("label", format!("{}", label).into())]),
+                    crate::i18n::message(
+                        "repo-core-1999",
+                        &[("label", format!("{}", label).into())],
+                    ),
                     Some(o.line),
                     Some(p.line),
                 ),
@@ -402,7 +423,13 @@ impl<'a> Cx<'a, '_> {
         for o in &old_params {
             if o.place != "body" && !new_params.iter().any(|p| p.is(o)) {
                 self.breaking(
-                    crate::i18n::message("repo-core-2000", &[("place", format!("{}", cap(&o.place)).into()), ("name", format!("{}", o.name).into())]),
+                    crate::i18n::message(
+                        "repo-core-2000",
+                        &[
+                            ("place", format!("{}", cap(&o.place)).into()),
+                            ("name", format!("{}", o.name).into()),
+                        ],
+                    ),
                     Some(o.line),
                     None,
                 );
@@ -469,7 +496,10 @@ impl<'a> Cx<'a, '_> {
                 // Only a success code taken away breaks what clients rely on.
                 if o.key.starts_with('2') || o.key == "default" {
                     self.breaking(
-                        crate::i18n::message("repo-core-2007", &[("key", format!("{}", o.key).into())]),
+                        crate::i18n::message(
+                            "repo-core-2007",
+                            &[("key", format!("{}", o.key).into())],
+                        ),
                         Some(o.line),
                         None,
                     );
@@ -480,7 +510,10 @@ impl<'a> Cx<'a, '_> {
             let (nn, nl) = b.resolve(&n.node, n.line);
             if let (Some(os), Some(ns)) = (body_schema(a, on, ol).0, body_schema(b, nn, nl).0) {
                 let at = At {
-                    owner: crate::i18n::message("repo-core-2008", &[("key", format!("{}", o.key).into())]),
+                    owner: crate::i18n::message(
+                        "repo-core-2008",
+                        &[("key", format!("{}", o.key).into())],
+                    ),
                     path: String::new(),
                 };
                 self.schema(&at, Dir::Response, os, ns, 0);
@@ -520,7 +553,10 @@ impl<'a> Cx<'a, '_> {
             |n: &Node| get(n, "additionalProperties").and_then(|f| text(&f.node)) == Some("false");
         if dir == Dir::Request && !closed(old) && closed(new) {
             self.breaking(
-                crate::i18n::message("repo-core-2010", &[("name", format!("{}", at.name()).into())]),
+                crate::i18n::message(
+                    "repo-core-2010",
+                    &[("name", format!("{}", at.name()).into())],
+                ),
                 Some(ol),
                 Some(nl),
             );
@@ -533,7 +569,14 @@ impl<'a> Cx<'a, '_> {
                 // A field always returned that's gone; one that might not be there was
                 // never to be relied on.
                 if dir == Dir::Response && or.contains(&o.key) {
-                    self.breaking(crate::i18n::message("repo-core-2011", &[("name", format!("{}", child.name()).into())]), Some(o.line), None);
+                    self.breaking(
+                        crate::i18n::message(
+                            "repo-core-2011",
+                            &[("name", format!("{}", child.name()).into())],
+                        ),
+                        Some(o.line),
+                        None,
+                    );
                 }
                 continue;
             };
@@ -541,14 +584,20 @@ impl<'a> Cx<'a, '_> {
             let read_only = flag(b.resolve(&n.node, n.line).0, "readOnly");
             if dir == Dir::Response && or.contains(&o.key) && !nr.contains(&o.key) {
                 self.breaking(
-                    crate::i18n::message("repo-core-2013", &[("name", format!("{}", child.name()).into())]),
+                    crate::i18n::message(
+                        "repo-core-2013",
+                        &[("name", format!("{}", child.name()).into())],
+                    ),
                     Some(o.line),
                     Some(n.line),
                 );
             }
             if dir == Dir::Request && !or.contains(&o.key) && nr.contains(&o.key) && !read_only {
                 self.breaking(
-                    crate::i18n::message("repo-core-2014", &[("name", format!("{}", child.name()).into())]),
+                    crate::i18n::message(
+                        "repo-core-2014",
+                        &[("name", format!("{}", child.name()).into())],
+                    ),
                     Some(o.line),
                     Some(n.line),
                 );
@@ -561,7 +610,13 @@ impl<'a> Cx<'a, '_> {
                 if nr.contains(&n.key) && !read_only {
                     let path = at.child(&n.key).path;
                     self.breaking(
-                        crate::i18n::message("repo-core-2015", &[("owner", format!("{}", at.owner).into()), ("path", format!("{}", path).into())]),
+                        crate::i18n::message(
+                            "repo-core-2015",
+                            &[
+                                ("owner", format!("{}", at.owner).into()),
+                                ("path", format!("{}", path).into()),
+                            ],
+                        ),
                         None,
                         Some(n.line),
                     );
@@ -605,7 +660,14 @@ impl<'a> Cx<'a, '_> {
                 v.join(" | ")
             };
             self.breaking(
-                crate::i18n::message("repo-core-2018", &[("name", format!("{}", at.name()).into()), ("ot", format!("{}", show(&ot)).into()), ("nt", format!("{}", show(&nt)).into())]),
+                crate::i18n::message(
+                    "repo-core-2018",
+                    &[
+                        ("name", format!("{}", at.name()).into()),
+                        ("ot", format!("{}", show(&ot)).into()),
+                        ("nt", format!("{}", show(&nt)).into()),
+                    ],
+                ),
                 Some(ol),
                 Some(nl),
             );
@@ -630,7 +692,13 @@ impl<'a> Cx<'a, '_> {
             Dir::Request if oe.is_empty() => {
                 let only: Vec<&String> = ne.iter().collect();
                 self.breaking(
-                    crate::i18n::message("repo-core-2021", &[("name", format!("{}", at.name()).into()), ("only", format!("{}", quote(&only)).into())]),
+                    crate::i18n::message(
+                        "repo-core-2021",
+                        &[
+                            ("name", format!("{}", at.name()).into()),
+                            ("only", format!("{}", quote(&only)).into()),
+                        ],
+                    ),
                     Some(ol),
                     Some(line(new, nl)),
                 );
@@ -639,7 +707,13 @@ impl<'a> Cx<'a, '_> {
                 let missing: Vec<&String> = oe.iter().filter(|v| !ne.contains(v)).collect();
                 if !missing.is_empty() {
                     self.breaking(
-                        crate::i18n::message("repo-core-2022", &[("name", format!("{}", at.name()).into()), ("missing", format!("{}", quote(&missing)).into())]),
+                        crate::i18n::message(
+                            "repo-core-2022",
+                            &[
+                                ("name", format!("{}", at.name()).into()),
+                                ("missing", format!("{}", quote(&missing)).into()),
+                            ],
+                        ),
                         Some(line(old, ol)),
                         Some(line(new, nl)),
                     );
@@ -649,7 +723,13 @@ impl<'a> Cx<'a, '_> {
                 let extra: Vec<&String> = ne.iter().filter(|v| !oe.contains(v)).collect();
                 if !extra.is_empty() {
                     self.breaking(
-                        crate::i18n::message("repo-core-2023", &[("name", format!("{}", at.name()).into()), ("extra", format!("{}", quote(&extra)).into())]),
+                        crate::i18n::message(
+                            "repo-core-2023",
+                            &[
+                                ("name", format!("{}", at.name()).into()),
+                                ("extra", format!("{}", quote(&extra)).into()),
+                            ],
+                        ),
                         Some(line(old, ol)),
                         Some(line(new, nl)),
                     );

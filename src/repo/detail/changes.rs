@@ -16,9 +16,19 @@ use crate::theme::{self, Tokens};
 impl RepoTab {
     pub(super) fn changes_panel(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
         let t = Tokens::get(ui.ctx());
-        widgets::panel_header(ui, crate::i18n::text("repo-core-0811"), branch_tree::files_toggle);
+        widgets::panel_header(
+            ui,
+            crate::i18n::text("repo-core-0811"),
+            branch_tree::files_toggle,
+        );
 
-        if ui.button(crate::i18n::text("repo-core-0812")).on_hover_text(crate::i18n::text("repo-core-0813")).clicked() { acts.push(Action::EarlierVersions); }
+        if ui
+            .button(crate::i18n::text("repo-core-0812"))
+            .on_hover_text(crate::i18n::text("repo-core-0813"))
+            .clicked()
+        {
+            acts.push(Action::EarlierVersions);
+        }
         self.review_all_button(
             ui,
             crate::repo::review_workflow::ReviewSource::Working,
@@ -74,12 +84,32 @@ impl RepoTab {
                     icons::inline(ui, "circle-alert", 16.0, t.warning);
                     // A fold stopped on a conflict says so: its changes are in the rebase.
                     let what = match self.fold_stopped_here(state) {
-                        Some(fold) => crate::i18n::message("repo-core-0817", &[("label", format!("{}", fold.label).into())]),
-                        None => crate::i18n::message("repo-core-0818", &[("label", format!("{}", state.label()).into())]),
+                        Some(fold) => crate::i18n::message(
+                            "repo-core-0817",
+                            &[("label", format!("{}", fold.label).into())],
+                        ),
+                        None => crate::i18n::message(
+                            "repo-core-0818",
+                            &[("label", format!("{}", state.label()).into())],
+                        ),
                     };
                     let title = match restack {
-                        Some(p) => crate::i18n::message("repo-core-0819", &[("p", format!("{}", p.current().map_or("", |s| s.branch.as_str())).into()), ("done", format!("{}", p.done + 1).into()), ("count", (p.steps.len()).into())]),
-                        None => crate::i18n::message("repo-core-0818", &[("label", format!("{}", state.label()).into())]),
+                        Some(p) => crate::i18n::message(
+                            "repo-core-0819",
+                            &[
+                                (
+                                    "p",
+                                    format!("{}", p.current().map_or("", |s| s.branch.as_str()))
+                                        .into(),
+                                ),
+                                ("done", format!("{}", p.done + 1).into()),
+                                ("count", (p.steps.len()).into()),
+                            ],
+                        ),
+                        None => crate::i18n::message(
+                            "repo-core-0818",
+                            &[("label", format!("{}", state.label()).into())],
+                        ),
                     };
                     ui.label(
                         RichText::new(if restack.is_some() { title } else { what })
@@ -89,7 +119,10 @@ impl RepoTab {
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if restack.is_some() {
                             if ui
-                                .add_enabled(idle, egui::Button::new(crate::i18n::text("repo-core-0820")))
+                                .add_enabled(
+                                    idle,
+                                    egui::Button::new(crate::i18n::text("repo-core-0820")),
+                                )
                                 .on_hover_text(crate::i18n::text("repo-core-0821"))
                                 .clicked()
                             {
@@ -97,13 +130,23 @@ impl RepoTab {
                                     crate::repo::stack::StackAct::AbortRestack,
                                 ));
                             }
-                        } else if ui.add_enabled(idle, egui::Button::new(crate::i18n::text("repo-core-0018"))).clicked() {
+                        } else if ui
+                            .add_enabled(
+                                idle,
+                                egui::Button::new(crate::i18n::text("repo-core-0018")),
+                            )
+                            .clicked()
+                        {
                             acts.push(self.abort_for(state));
                         }
                     });
                 });
                 let hint = if restack.is_some() {
-                    if self.work.conflicted.is_empty() { crate::i18n::text("repo-core-0822") } else { crate::i18n::text("repo-core-0823") }
+                    if self.work.conflicted.is_empty() {
+                        crate::i18n::text("repo-core-0822")
+                    } else {
+                        crate::i18n::text("repo-core-0823")
+                    }
                 } else if self.work.conflicted.is_empty() && state == InProgress::Rebase {
                     crate::i18n::text("repo-core-0824")
                 } else if self.work.conflicted.is_empty() {
@@ -116,7 +159,12 @@ impl RepoTab {
     }
 
     fn conflicted_list(&self, ui: &mut Ui, acts: &mut Vec<Action>) {
-        list_header(ui, crate::i18n::text("repo-core-0827"), self.work.conflicted.len(), None);
+        list_header(
+            ui,
+            crate::i18n::text("repo-core-0827"),
+            self.work.conflicted.len(),
+            None,
+        );
         let buttons = [("check", crate::i18n::text("repo-core-0829"))];
         self.work_list(
             ui,
@@ -144,9 +192,15 @@ impl RepoTab {
             unstaged.len(),
             (!unstaged.is_empty() && idle).then_some(crate::i18n::text("repo-core-0832")),
         ) {
-            acts.push(stage_action(crate::i18n::text("repo-core-0832"), vec![vec!["add", "-A"]]));
+            acts.push(stage_action(
+                crate::i18n::text("repo-core-0832"),
+                vec![vec!["add", "-A"]],
+            ));
         }
-        let buttons = [("undo-2", crate::i18n::text("repo-core-0834")), ("plus", crate::i18n::text("repo-core-0836"))];
+        let buttons = [
+            ("undo-2", crate::i18n::text("repo-core-0834")),
+            ("plus", crate::i18n::text("repo-core-0836")),
+        ];
         self.work_list(
             ui,
             acts,
@@ -178,7 +232,10 @@ impl RepoTab {
             staged.len(),
             (!staged.is_empty() && idle).then_some(crate::i18n::text("repo-core-0840")),
         ) {
-            acts.push(stage_action(crate::i18n::text("repo-core-0840"), vec![unstage_all_args(head)]));
+            acts.push(stage_action(
+                crate::i18n::text("repo-core-0840"),
+                vec![unstage_all_args(head)],
+            ));
         }
         let paths: Vec<&str> = staged.iter().map(|f| f.path.as_str()).collect();
         self.owners_summary(ui, &paths);
@@ -191,9 +248,7 @@ impl RepoTab {
                         idle && attached,
                         egui::Button::new(crate::i18n::text("repo-core-0049")).small(),
                     )
-                    .on_hover_text(
-                        crate::i18n::text("repo-core-0841"),
-                    )
+                    .on_hover_text(crate::i18n::text("repo-core-0841"))
                     .on_disabled_hover_text(crate::i18n::text("repo-core-0842"))
                     .clicked()
                 })

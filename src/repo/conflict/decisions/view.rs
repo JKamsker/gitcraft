@@ -59,14 +59,29 @@ pub(in crate::repo) fn test_line(offer: &Offer) -> Option<(String, Option<bool>)
     }
     Some(match &d.last_test {
         Some(run) if run.passed => (
-            crate::i18n::message("repo-core-0524", &[("test", format!("{}", d.test).into()), ("at", format!("{}", ago(run.at)).into())]),
+            crate::i18n::message(
+                "repo-core-0524",
+                &[
+                    ("test", format!("{}", d.test).into()),
+                    ("at", format!("{}", ago(run.at)).into()),
+                ],
+            ),
             Some(true),
         ),
         Some(run) => (
-            crate::i18n::message("repo-core-0525", &[("test", format!("{}", d.test).into()), ("at", format!("{}", ago(run.at)).into())]),
+            crate::i18n::message(
+                "repo-core-0525",
+                &[
+                    ("test", format!("{}", d.test).into()),
+                    ("at", format!("{}", ago(run.at)).into()),
+                ],
+            ),
             Some(false),
         ),
-        None => (crate::i18n::message("repo-core-0526", &[("test", format!("{}", d.test).into())]), None),
+        None => (
+            crate::i18n::message("repo-core-0526", &[("test", format!("{}", d.test).into())]),
+            None,
+        ),
     })
 }
 
@@ -132,7 +147,10 @@ fn offer_box(
                         .as_ref()
                         .is_some_and(|r| !r.output.is_empty());
                     if has_output {
-                        ui.toggle_value(&mut offer.show_output, crate::i18n::text("repo-core-0531"));
+                        ui.toggle_value(
+                            &mut offer.show_output,
+                            crate::i18n::text("repo-core-0531"),
+                        );
                     }
                 });
                 if offer.show_output
@@ -153,11 +171,9 @@ fn offer_box(
             }
             if offer.stale {
                 ui.label(
-                    RichText::new(
-                        crate::i18n::text("repo-core-0533"),
-                    )
-                    .color(t.warning)
-                    .small(),
+                    RichText::new(crate::i18n::text("repo-core-0533"))
+                        .color(t.warning)
+                        .small(),
                 );
             }
             ui.horizontal_wrapped(|ui| {
@@ -170,9 +186,7 @@ fn offer_box(
                     if ui
                         .add_enabled(!manual, egui::Button::new(label))
                         .on_hover_text(crate::i18n::text("repo-core-0536"))
-                        .on_disabled_hover_text(
-                            crate::i18n::text("repo-core-0537"),
-                        )
+                        .on_disabled_hover_text(crate::i18n::text("repo-core-0537"))
                         .clicked()
                     {
                         pick = Some(Pick::Use);
@@ -183,9 +197,7 @@ fn offer_box(
                     && has_note
                     && ui
                         .small_button(crate::i18n::text("repo-core-0538"))
-                        .on_hover_text(
-                            crate::i18n::text("repo-core-0539"),
-                        )
+                        .on_hover_text(crate::i18n::text("repo-core-0539"))
                         .clicked()
                 {
                     pick = Some(Pick::TakeNote);
@@ -208,10 +220,10 @@ fn context_ui(ui: &mut Ui, t: &Tokens, k: usize, offer: &Offer) {
     let then = format!("{}{marker}{}", d.before, d.after);
     let now = format!("{}{marker}{}", offer.now.0, offer.now.1);
     ui.columns(2, |cols| {
-        for (col, (title, text)) in cols
-            .iter_mut()
-            .zip([(crate::i18n::text("repo-core-0543"), then.as_str()), (crate::i18n::text("repo-core-0544"), now.as_str())])
-        {
+        for (col, (title, text)) in cols.iter_mut().zip([
+            (crate::i18n::text("repo-core-0543"), then.as_str()),
+            (crate::i18n::text("repo-core-0544"), now.as_str()),
+        ]) {
             col.label(RichText::new(title).color(t.text_faint).small());
             egui::ScrollArea::horizontal()
                 .id_salt(("decision-context", k, title))
@@ -235,9 +247,7 @@ fn draft_ui(ui: &mut Ui, t: &Tokens, k: usize, draft: &mut Draft) {
         };
         if ui
             .small_button(label)
-            .on_hover_text(
-                crate::i18n::text("repo-core-0548"),
-            )
+            .on_hover_text(crate::i18n::text("repo-core-0548"))
             .clicked()
         {
             draft.open = true;
@@ -245,7 +255,10 @@ fn draft_ui(ui: &mut Ui, t: &Tokens, k: usize, draft: &mut Draft) {
         if !draft.is_empty() {
             let note = draft.note.trim();
             let kept = if note.is_empty() {
-                crate::i18n::message("repo-core-0549", &[("test", format!("{}", one_line(&draft.test)).into())])
+                crate::i18n::message(
+                    "repo-core-0549",
+                    &[("test", format!("{}", one_line(&draft.test)).into())],
+                )
             } else {
                 crate::i18n::message("repo-core-0550", &[("note", format!("{}", note).into())])
             };
@@ -279,7 +292,10 @@ fn draft_ui(ui: &mut Ui, t: &Tokens, k: usize, draft: &mut Draft) {
                 .color(t.text_faint)
                 .small(),
         );
-        if ui.small_button(crate::i18n::text("repo-core-0557")).clicked() {
+        if ui
+            .small_button(crate::i18n::text("repo-core-0557"))
+            .clicked()
+        {
             draft.test = one_line(&draft.test);
             draft.open = false;
         }
@@ -301,7 +317,10 @@ pub(in crate::repo) fn run_tests_switch(ui: &mut Ui, memo: &mut Memo, has_tests:
                 .collect();
             tests.sort();
             tests.dedup();
-            ui.label(crate::i18n::message("repo-core-0559", &[("n", format!("{}", tests.join("\n")).into())]));
+            ui.label(crate::i18n::message(
+                "repo-core-0559",
+                &[("n", format!("{}", tests.join("\n")).into())],
+            ));
         });
 }
 

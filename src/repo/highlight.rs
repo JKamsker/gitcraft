@@ -153,7 +153,10 @@ pub(crate) fn cap_line(text: &mut String, spans: Option<&mut Spans>) -> Option<S
         return None;
     }
     let (cut, _) = text.char_indices().nth(MAX_LINE_CHARS)?;
-    let note = format!(" … {} more characters", text[cut..].chars().count());
+    let note = crate::i18n::message(
+        "repo-core-2797",
+        &[("count", (text[cut..].chars().count()).into())],
+    );
     let whole = text.clone();
     text.truncate(cut);
     if let Some(spans) = spans {

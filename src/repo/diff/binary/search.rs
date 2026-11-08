@@ -4,12 +4,17 @@ use crate::theme::Tokens;
 
 pub(in crate::repo::diff) fn document(pair: &BinaryPair, t: &Tokens) -> Document {
     let mut doc = Document::default();
-    for (label, side) in [(crate::i18n::text("repo-core-1564"), &pair.old), (crate::i18n::text("repo-core-1565"), &pair.new)] {
+    for (label, side) in [
+        (crate::i18n::text("repo-core-1564"), &pair.old),
+        (crate::i18n::text("repo-core-1565"), &pair.new),
+    ] {
         let Some(side) = side else { continue };
         doc.text(
             &format!(
                 "{label} · {} · {}",
-                side.kind.as_deref().unwrap_or(crate::i18n::text("repo-core-1567")),
+                side.kind
+                    .as_deref()
+                    .unwrap_or(crate::i18n::text("repo-core-1567")),
                 side.size
                     .map(crate::git::human_size)
                     .unwrap_or_else(|| crate::i18n::text("repo-core-1568").into())
@@ -57,7 +62,14 @@ pub(in crate::repo::diff) fn document(pair: &BinaryPair, t: &Tokens) -> Document
     if let Some(members) = &pair.members {
         for member in members {
             doc.text(
-                &crate::i18n::message("repo-core-1571", &[("name", format!("{}", member.name).into()), ("old", format!("{:?}", member.old).into()), ("new", format!("{:?}", member.new).into())]),
+                &crate::i18n::message(
+                    "repo-core-1571",
+                    &[
+                        ("name", format!("{}", member.name).into()),
+                        ("old", format!("{:?}", member.old).into()),
+                        ("new", format!("{:?}", member.new).into()),
+                    ],
+                ),
                 t.text,
             );
         }

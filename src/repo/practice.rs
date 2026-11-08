@@ -11,22 +11,54 @@ impl RepoTab {
         let mut check = false;
         let t = Tokens::get(ui.ctx());
         egui::Panel::top("practice-goal")
-            .frame(egui::Frame::new().fill(t.card).inner_margin(egui::Margin::symmetric(12, 8)))
+            .frame(
+                egui::Frame::new()
+                    .fill(t.card)
+                    .inner_margin(egui::Margin::symmetric(12, 8)),
+            )
             .show(ui, |ui| {
                 ui.horizontal_wrapped(|ui| {
-                    ui.strong(format!("PRACTICE · {}", session.scenario.title()));
-                    ui.label("Local throwaway repository").on_hover_text(self.path.display().to_string());
-                    check = ui.add_enabled(!self.practice_checking && self.busy_op.is_none() && !self.loading, egui::Button::new("Check goal")).clicked();
+                    ui.strong(crate::i18n::message(
+                        "repo-core-3062",
+                        &[("title", format!("{}", session.scenario.title()).into())],
+                    ));
+                    ui.label(crate::i18n::text("repo-core-3063"))
+                        .on_hover_text(self.path.display().to_string());
+                    check = ui
+                        .add_enabled(
+                            !self.practice_checking && self.busy_op.is_none() && !self.loading,
+                            egui::Button::new(crate::i18n::text("repo-core-3064")),
+                        )
+                        .clicked();
                 });
                 ui.label(session.scenario.goal());
-                egui::CollapsingHeader::new("Hint").id_salt("practice-hint").show(ui, |ui| { ui.label(session.scenario.hint()); });
+                egui::CollapsingHeader::new(crate::i18n::text("repo-core-3065"))
+                    .id_salt("practice-hint")
+                    .show(ui, |ui| {
+                        ui.label(session.scenario.hint());
+                    });
                 if self.practice_checking {
-                    ui.horizontal(|ui| { ui.add(crate::spinner::Spinner::new()); ui.label("Checking the repository…"); });
+                    ui.horizontal(|ui| {
+                        ui.add(crate::spinner::Spinner::new());
+                        ui.label(crate::i18n::text("repo-core-3067"));
+                    });
                 } else if let Some(result) = &self.practice_result {
                     match result {
-                        Ok(true) => { ui.colored_label(t.success, "Goal complete. You can keep experimenting or start another scenario from Practice."); }
-                        Ok(false) => { ui.label("Not yet. Follow the goal above, then check again."); }
-                        Err(error) => { ui.colored_label(t.danger, format!("Could not check the goal: {error}")); }
+                        Ok(true) => {
+                            ui.colored_label(t.success, crate::i18n::text("repo-core-3068"));
+                        }
+                        Ok(false) => {
+                            ui.label(crate::i18n::text("repo-core-3069"));
+                        }
+                        Err(error) => {
+                            ui.colored_label(
+                                t.danger,
+                                crate::i18n::message(
+                                    "repo-core-3070",
+                                    &[("error", format!("{}", error).into())],
+                                ),
+                            );
+                        }
                     }
                 }
             });

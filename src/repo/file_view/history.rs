@@ -122,10 +122,20 @@ impl RepoTab {
                     );
                     let mut summary = c.summary.clone();
                     if c.path != view.path {
-                        summary = crate::i18n::message("repo-core-2485", &[("summary", format!("{}", summary).into()), ("path", format!("{}", c.path).into())]);
+                        summary = crate::i18n::message(
+                            "repo-core-2485",
+                            &[
+                                ("summary", format!("{}", summary).into()),
+                                ("path", format!("{}", c.path).into()),
+                            ],
+                        );
                     }
-                    if let (Some(&(start, _)), Some(&(_, end))) = (c.lines.first(), c.lines.last()) {
-                        summary = format!("{summary}  ·  {}", super::line_history::lines_label((start, end)).to_lowercase());
+                    if let (Some(&(start, _)), Some(&(_, end))) = (c.lines.first(), c.lines.last())
+                    {
+                        summary = format!(
+                            "{summary}  ·  {}",
+                            super::line_history::lines_label((start, end)).to_lowercase()
+                        );
                     }
                     p.with_clip_rect(Rect::from_min_max(
                         rect.min,

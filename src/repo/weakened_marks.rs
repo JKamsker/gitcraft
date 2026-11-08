@@ -119,8 +119,9 @@ impl WeakenedMarks {
             && let Ok(mut store) = self.store.lock()
         {
             store.working = false;
-            let failed = Arc::new(Err(format!(
-                "Could not start looking for weakened checks: {e}"
+            let failed = Arc::new(Err(crate::i18n::message(
+                "repo-core-3747",
+                &[("e", format!("{}", e).into())],
             )));
             for (scope, generation) in std::mem::take(&mut store.waiting) {
                 if let Some(entry) = store.scans.get_mut(&scope)

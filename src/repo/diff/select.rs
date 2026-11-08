@@ -243,9 +243,7 @@ fn lines_menu(
                         .icon("history")
                         .keys(crate::keymap::Command::SelectionHistory)
                         .show(ui)
-                        .on_hover_text(
-                            crate::i18n::text("repo-core-2328"),
-                        );
+                        .on_hover_text(crate::i18n::text("repo-core-2328"));
                     if b.clicked() {
                         acts.push(action);
                     }

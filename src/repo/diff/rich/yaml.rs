@@ -49,11 +49,23 @@ pub fn parse(text: &str) -> Result<Node, String> {
         copies: MAX_ALIAS_COPIES,
         ..Builder::default()
     };
-    Parser::new_from_str(text)
-        .load(&mut b, true)
-        .map_err(|e| crate::i18n::message("repo-core-2281", &[("line", format!("{}", e.marker().line()).into()), ("info", format!("{}", e.info()).into())]))?;
+    Parser::new_from_str(text).load(&mut b, true).map_err(|e| {
+        crate::i18n::message(
+            "repo-core-2281",
+            &[
+                ("line", format!("{}", e.marker().line()).into()),
+                ("info", format!("{}", e.info()).into()),
+            ],
+        )
+    })?;
     if let Some(line) = b.too_deep {
-        return Err(crate::i18n::message("repo-core-2282", &[("line", (line).into()), ("MAX-DEPTH", format!("{}", MAX_DEPTH).into())]));
+        return Err(crate::i18n::message(
+            "repo-core-2282",
+            &[
+                ("line", (line).into()),
+                ("MAX-DEPTH", format!("{}", MAX_DEPTH).into()),
+            ],
+        ));
     }
     Ok(match b.docs.len() {
         0 => Node::Map(Vec::new()),

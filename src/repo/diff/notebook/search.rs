@@ -9,13 +9,32 @@ pub(in crate::repo::diff) fn document(nb: &NotebookData, t: &Tokens) -> Document
     let mut doc = Document::default();
     for change in &nb.diff.cells {
         doc.text(
-            &crate::i18n::message("repo-core-1894", &[("number", format!("{}", change.number).into()), ("status", format!("{:?}", change.status).into())]),
+            &crate::i18n::message(
+                "repo-core-1894",
+                &[
+                    ("number", format!("{}", change.number).into()),
+                    ("status", format!("{:?}", change.status).into()),
+                ],
+            ),
             t.accent,
         );
-        for (label, cell) in [(crate::i18n::text("repo-core-1564"), &change.old), (crate::i18n::text("repo-core-1565"), &change.new)] {
+        for (label, cell) in [
+            (crate::i18n::text("repo-core-1564"), &change.old),
+            (crate::i18n::text("repo-core-1565"), &change.new),
+        ] {
             let Some(cell) = cell else { continue };
             doc.text(
-                &crate::i18n::message("repo-core-1895", &[("label", format!("{}", label).into()), ("label2", format!("{}", cell.kind.label()).into()), ("execution-count", format!("{:?}", cell.execution_count).into())]),
+                &crate::i18n::message(
+                    "repo-core-1895",
+                    &[
+                        ("label", format!("{}", label).into()),
+                        ("label2", format!("{}", cell.kind.label()).into()),
+                        (
+                            "execution-count",
+                            format!("{:?}", cell.execution_count).into(),
+                        ),
+                    ],
+                ),
                 t.text_dim,
             );
             if cell.kind == CellKind::Markdown {
@@ -39,11 +58,17 @@ pub(in crate::repo::diff) fn document(nb: &NotebookData, t: &Tokens) -> Document
                         doc.text(&format!("{name}: {value}\n{traceback}"), t.danger);
                     }
                     Output::Image { mime, .. } => doc.text(
-                        &crate::i18n::message("repo-core-1897", &[("mime", format!("{}", mime).into())]),
+                        &crate::i18n::message(
+                            "repo-core-1897",
+                            &[("mime", format!("{}", mime).into())],
+                        ),
                         t.text_dim,
                     ),
                     Output::Other(kinds, _) => doc.text(
-                        &crate::i18n::message("repo-core-1898", &[("kinds", format!("{}", kinds.join(", ")).into())]),
+                        &crate::i18n::message(
+                            "repo-core-1898",
+                            &[("kinds", format!("{}", kinds.join(", ")).into())],
+                        ),
                         t.warning,
                     ),
                 }

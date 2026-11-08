@@ -67,11 +67,24 @@ pub(in crate::repo) fn algorithm_menu(
             }
         })
         .response
-        .on_hover_text(crate::i18n::message("repo-core-1560", &[("kept-for", format!("{}", kept_for).into())]));
+        .on_hover_text(crate::i18n::message(
+            "repo-core-1560",
+            &[("kept-for", format!("{}", kept_for).into())],
+        ));
     if repairing {
         // Laid out right to left: beside the drop-down, on its left.
         ui.add(crate::spinner::Spinner::new().size(12.0))
-            .on_hover_text(crate::i18n::message("repo-core-1561", &[("label", format!("{}", current.map_or(crate::i18n::text("repo-core-1562"), DiffAlgorithm::label)).into())]));
+            .on_hover_text(crate::i18n::message(
+                "repo-core-1561",
+                &[(
+                    "label",
+                    format!(
+                        "{}",
+                        current.map_or(crate::i18n::text("repo-core-1562"), DiffAlgorithm::label)
+                    )
+                    .into(),
+                )],
+            ));
     }
     if picked != current {
         acts.push(Action::SetDiffAlgorithm(picked));

@@ -53,7 +53,11 @@ fn conventional(ui: &mut Ui, summary: &mut String, state: &mut PickerState, used
         state.read_from = Some(summary.clone());
     }
     let kind = current.as_ref().map(|c| c.kind.clone()).unwrap_or_default();
-    ui.label(RichText::new(crate::i18n::text("repo-core-0982")).color(t.text_faint).small());
+    ui.label(
+        RichText::new(crate::i18n::text("repo-core-0982"))
+            .color(t.text_faint)
+            .small(),
+    );
     egui::Grid::new("conventional-types")
         .num_columns(2)
         .spacing([8.0, 2.0])
@@ -62,7 +66,11 @@ fn conventional(ui: &mut Ui, summary: &mut String, state: &mut PickerState, used
                 if ui.selectable_label(kind == *name, *name).clicked() {
                     write(summary, name, state);
                 }
-                ui.label(RichText::new(crate::i18n::text(what)).color(t.text_dim).small());
+                ui.label(
+                    RichText::new(crate::i18n::text(what))
+                        .color(t.text_dim)
+                        .small(),
+                );
                 ui.end_row();
             }
         });
@@ -80,7 +88,11 @@ fn conventional(ui: &mut Ui, summary: &mut String, state: &mut PickerState, used
     });
     if !used.is_empty() {
         ui.horizontal_wrapped(|ui| {
-            ui.label(RichText::new(crate::i18n::text("repo-core-0986")).color(t.text_faint).small());
+            ui.label(
+                RichText::new(crate::i18n::text("repo-core-0986"))
+                    .color(t.text_faint)
+                    .small(),
+            );
             for scope in used.iter().take(12) {
                 if ui.small_button(scope).clicked() {
                     state.scope = scope.clone();
@@ -135,7 +147,11 @@ fn gitmoji(ui: &mut Ui, summary: &mut String) {
                             *summary = prefix::with_gitmoji(summary, emoji);
                             ui.close();
                         }
-                        ui.label(RichText::new(crate::i18n::text(what)).color(t.text_dim).small());
+                        ui.label(
+                            RichText::new(crate::i18n::text(what))
+                                .color(t.text_dim)
+                                .small(),
+                        );
                         ui.end_row();
                     }
                 });

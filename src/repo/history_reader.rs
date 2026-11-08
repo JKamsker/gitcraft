@@ -48,7 +48,9 @@ impl<T: Send + 'static> Reader<T> {
         if let Some((id, _, rx)) = &self.running {
             let result = match rx.try_recv() {
                 Ok(result) => Some(result),
-                Err(mpsc::TryRecvError::Disconnected) => Some(Err("History worker stopped".into())),
+                Err(mpsc::TryRecvError::Disconnected) => {
+                    Some(Err(crate::i18n::text("repo-core-2798").into()))
+                }
                 Err(mpsc::TryRecvError::Empty) => None,
             };
             if let Some(result) = result {

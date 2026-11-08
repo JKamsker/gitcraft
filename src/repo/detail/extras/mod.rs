@@ -429,7 +429,37 @@ impl RepoTab {
         };
         match args {
             Ok(args) => acts.push(Action::Ops {
-                label: crate::i18n::message("repo-core-1100", &[(crate::i18n::text("repo-core-0032"), format!("{}", if fetch { crate::i18n::text("repo-core-0029") } else { crate::i18n::text("repo-core-0032") }).into()), ("namespace", format!("{}", namespace).into()), (crate::i18n::text("repo-core-1102"), format!("{}", if fetch { crate::i18n::text("repo-core-1101") } else { crate::i18n::text("repo-core-1102") }).into()), ("remote", format!("{}", remote).into())]),
+                label: crate::i18n::message(
+                    "repo-core-1100",
+                    &[
+                        (
+                            crate::i18n::text("repo-core-0032"),
+                            format!(
+                                "{}",
+                                if fetch {
+                                    crate::i18n::text("repo-core-0029")
+                                } else {
+                                    crate::i18n::text("repo-core-0032")
+                                }
+                            )
+                            .into(),
+                        ),
+                        ("namespace", format!("{}", namespace).into()),
+                        (
+                            crate::i18n::text("repo-core-1102"),
+                            format!(
+                                "{}",
+                                if fetch {
+                                    crate::i18n::text("repo-core-1101")
+                                } else {
+                                    crate::i18n::text("repo-core-1102")
+                                }
+                            )
+                            .into(),
+                        ),
+                        ("remote", format!("{}", remote).into()),
+                    ],
+                ),
                 ops: vec![args],
                 refresh: Refresh::All,
             }),

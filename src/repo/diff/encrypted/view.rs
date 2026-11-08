@@ -15,7 +15,10 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State) {
             ui.label(crate::i18n::text("repo-core-1784"));
         }
         Some(Ok(data)) => {
-            if ui.selectable_label(state.wrap, crate::i18n::text("repo-core-1785")).clicked() {
+            if ui
+                .selectable_label(state.wrap, crate::i18n::text("repo-core-1785"))
+                .clicked()
+            {
                 state.wrap = !state.wrap;
             }
             comparison(ui, data, &t, state.wrap, &mut state.wrap_geometry);

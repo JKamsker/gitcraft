@@ -35,8 +35,8 @@ pub(super) fn texts_with(bytes: &[u8], extra: Option<&str>) -> Result<Texts, Str
                 .map(|s| s.trim_matches(|c: char| c == '\0' || c.is_ascii_whitespace()))
                 .map_err(|_| crate::i18n::text("repo-core-2065").into())
         };
-        let expected =
-            u64::from_str_radix(field(148, 156)?, 8).map_err(|_| crate::i18n::text("repo-core-2066"))?;
+        let expected = u64::from_str_radix(field(148, 156)?, 8)
+            .map_err(|_| crate::i18n::text("repo-core-2066"))?;
         let checksum: u64 = header
             .iter()
             .enumerate()
@@ -51,11 +51,17 @@ pub(super) fn texts_with(bytes: &[u8], extra: Option<&str>) -> Result<Texts, Str
         if expected != checksum {
             return Err(crate::i18n::text("repo-core-2067").into());
         }
-        let size =
-            usize::from_str_radix(field(124, 136)?, 8).map_err(|_| crate::i18n::text("repo-core-2068"))?;
-        let data = at.checked_add(512).ok_or(crate::i18n::text("repo-core-2069"))?;
-        let end = data.checked_add(size).ok_or(crate::i18n::text("repo-core-2069"))?;
-        let body = tar.get(data..end).ok_or(crate::i18n::text("repo-core-2070"))?;
+        let size = usize::from_str_radix(field(124, 136)?, 8)
+            .map_err(|_| crate::i18n::text("repo-core-2068"))?;
+        let data = at
+            .checked_add(512)
+            .ok_or(crate::i18n::text("repo-core-2069"))?;
+        let end = data
+            .checked_add(size)
+            .ok_or(crate::i18n::text("repo-core-2069"))?;
+        let body = tar
+            .get(data..end)
+            .ok_or(crate::i18n::text("repo-core-2070"))?;
         let name = long.take().unwrap_or(field(0, 100)?.to_owned());
         match header[156] {
             b'L' if size <= 4096 => {
@@ -91,14 +97,14 @@ pub(super) fn texts_with(bytes: &[u8], extra: Option<&str>) -> Result<Texts, Str
                         }
                         let manifest = matches!(path, "Cargo.toml" | "package.json");
                         let reason = if size > MAX_TEXT {
-                            Some(crate::i18n::message("repo-core-2080", &[("size", (size).into())]))
+                            Some(crate::i18n::message(
+                                "repo-core-2080",
+                                &[("size", (size).into())],
+                            ))
                         } else if !manifest
                             && (retained + size > 2 << 20 || result.files.len() >= 16)
                         {
-                            Some(
-                                crate::i18n::text("repo-core-2081")
-                                    .into(),
-                            )
+                            Some(crate::i18n::text("repo-core-2081").into())
                         } else {
                             None
                         };

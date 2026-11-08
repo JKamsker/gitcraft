@@ -24,7 +24,13 @@ pub(in crate::repo) fn folded_diff(
     let mut open = false;
     ui.add_space(28.0);
     ui.vertical_centered(|ui| {
-        ui.label(RichText::new(crate::i18n::message("repo-core-2539", &[("name", format!("{}", name).into())])).color(t.text_dim));
+        ui.label(
+            RichText::new(crate::i18n::message(
+                "repo-core-2539",
+                &[("name", format!("{}", name).into())],
+            ))
+            .color(t.text_dim),
+        );
         ui.add_space(4.0);
         let line = match data {
             Some(data) => {

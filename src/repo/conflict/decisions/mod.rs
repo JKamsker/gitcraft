@@ -61,7 +61,13 @@ pub fn run_test(repo: &std::path::Path, command: &str) -> Result<TestRun, String
 /// What a test's run says, for the toolbar.
 fn test_message(command: &str, run: &Result<TestRun, String>) -> (String, bool) {
     match run {
-        Ok(r) if r.passed => (crate::i18n::message("repo-core-0479", &[("command", format!("{}", command).into())]), false),
+        Ok(r) if r.passed => (
+            crate::i18n::message(
+                "repo-core-0479",
+                &[("command", format!("{}", command).into())],
+            ),
+            false,
+        ),
         Ok(r) => {
             let last = r
                 .output
@@ -69,9 +75,27 @@ fn test_message(command: &str, run: &Result<TestRun, String>) -> (String, bool) 
                 .rev()
                 .find(|l| !l.trim().is_empty())
                 .unwrap_or(crate::i18n::text("repo-core-0480"));
-            (crate::i18n::message("repo-core-0481", &[("command", format!("{}", command).into()), ("last", format!("{}", last).into())]), true)
+            (
+                crate::i18n::message(
+                    "repo-core-0481",
+                    &[
+                        ("command", format!("{}", command).into()),
+                        ("last", format!("{}", last).into()),
+                    ],
+                ),
+                true,
+            )
         }
-        Err(e) => (crate::i18n::message("repo-core-0482", &[("command", format!("{}", command).into()), ("e", format!("{}", e).into())]), true),
+        Err(e) => (
+            crate::i18n::message(
+                "repo-core-0482",
+                &[
+                    ("command", format!("{}", command).into()),
+                    ("e", format!("{}", e).into()),
+                ],
+            ),
+            true,
+        ),
     }
 }
 
@@ -110,7 +134,16 @@ fn record_and_test(repo: &std::path::Path, pending: Pending) -> Vec<(String, boo
         let run = run_test(repo, &command);
         let (mut text, bad) = test_message(&command, &run);
         if bad && others_conflicted > 0 {
-            text.push_str(&crate::i18n::message("repo-core-0485", &[("others-conflicted", format!("{}", others_conflicted).into()), ("s", format!("{}", if others_conflicted == 1 { "" } else { "s" }).into())]));
+            text.push_str(&crate::i18n::message(
+                "repo-core-0485",
+                &[
+                    ("others-conflicted", format!("{}", others_conflicted).into()),
+                    (
+                        "s",
+                        format!("{}", if others_conflicted == 1 { "" } else { "s" }).into(),
+                    ),
+                ],
+            ));
         }
         said.push((text, bad));
         if let Ok(run) = run {
@@ -146,7 +179,24 @@ impl RepoTab {
             Act::Sync(remote, send) => {
                 let repo = self.path.clone();
                 self.status = Some((
-                    crate::i18n::message("repo-core-0486", &[(crate::i18n::text("repo-core-0488"), format!("{}", if send { crate::i18n::text("repo-core-0487") } else { crate::i18n::text("repo-core-0488") }).into()), ("remote", format!("{}", remote).into())]),
+                    crate::i18n::message(
+                        "repo-core-0486",
+                        &[
+                            (
+                                crate::i18n::text("repo-core-0488"),
+                                format!(
+                                    "{}",
+                                    if send {
+                                        crate::i18n::text("repo-core-0487")
+                                    } else {
+                                        crate::i18n::text("repo-core-0488")
+                                    }
+                                )
+                                .into(),
+                            ),
+                            ("remote", format!("{}", remote).into()),
+                        ],
+                    ),
                     false,
                 ));
                 self.then(
@@ -195,9 +245,10 @@ impl RepoTab {
                         if applied > 0 {
                             tab.status = Some((
                                 match applied {
-                                    1 => crate::i18n::text("repo-core-0489")
-                                        .to_owned(),
-                                    n => crate::i18n::message("repo-core-0490", &[("n", (n).into())]),
+                                    1 => crate::i18n::text("repo-core-0489").to_owned(),
+                                    n => {
+                                        crate::i18n::message("repo-core-0490", &[("n", (n).into())])
+                                    }
                                 },
                                 false,
                             ));
@@ -291,12 +342,18 @@ impl RepoTab {
         };
         vec![
             (
-                crate::i18n::message("repo-core-0492", &[("remote", format!("{}", remote).into())]),
+                crate::i18n::message(
+                    "repo-core-0492",
+                    &[("remote", format!("{}", remote).into())],
+                ),
                 "conflicts".into(),
                 crate::repo::Action::Decisions(Act::Sync(remote.clone(), true)),
             ),
             (
-                crate::i18n::message("repo-core-0493", &[("remote", format!("{}", remote).into())]),
+                crate::i18n::message(
+                    "repo-core-0493",
+                    &[("remote", format!("{}", remote).into())],
+                ),
                 "conflicts".into(),
                 crate::repo::Action::Decisions(Act::Sync(remote, false)),
             ),

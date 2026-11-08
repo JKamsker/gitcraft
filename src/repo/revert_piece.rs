@@ -12,7 +12,13 @@ use crate::git::{self, Reverted};
 impl RepoTab {
     /// Undoes commit `hash`'s changes to `path` in the working tree.
     pub(super) fn revert_file(&mut self, hash: String, path: String, ctx: &egui::Context) {
-        let label = format!("Revert {path} as changed in {}", short(&hash));
+        let label = crate::i18n::message(
+            "repo-core-3309",
+            &[
+                ("path", format!("{}", path).into()),
+                ("hash", format!("{}", short(&hash)).into()),
+            ],
+        );
         let repo = self.path.clone();
         self.start_revert(label, ctx, move || {
             let patch = git::commit_file_patch(&repo, &hash, &path)?;
@@ -23,7 +29,7 @@ impl RepoTab {
     /// Undoes the changed `lines` (indices into the open commit diff's lines) in the working
     /// tree: a hunk's, or those clicked.
     pub(super) fn revert_lines(&mut self, lines: &BTreeSet<usize>, ctx: &egui::Context) {
-        if self.refused_while_busy("Revert") {
+        if self.refused_while_busy(crate::i18n::text("repo-core-3310")) {
             return;
         }
         let Some(view) = &mut self.diff else { return };
@@ -54,12 +60,22 @@ impl RepoTab {
             .filter(|&h| data.lines[h].kind == diff::Kind::Hunk)
             .any(|h| diff::hunk_changes(&data.lines, h) == *lines);
         let label = if whole_hunk {
-            format!("Revert a hunk of {path} from {}", short(hash))
+            crate::i18n::message(
+                "repo-core-3311",
+                &[
+                    ("path", format!("{}", path).into()),
+                    ("hash", format!("{}", short(hash)).into()),
+                ],
+            )
         } else {
-            format!(
-                "Revert {n} line{} of {path} from {}",
-                if n == 1 { "" } else { "s" },
-                short(hash)
+            crate::i18n::message(
+                "repo-core-3312",
+                &[
+                    ("n", (n).into()),
+                    ("s", format!("{}", if n == 1 { "" } else { "s" }).into()),
+                    ("path", format!("{}", path).into()),
+                    ("hash", format!("{}", short(hash)).into()),
+                ],
             )
         };
         view.chosen.clear();
@@ -108,7 +124,13 @@ impl RepoTab {
             return false;
         };
         self.status = Some((
-            format!("{label}: not done, {busy} was still running. Try again once it's done."),
+            crate::i18n::message(
+                "repo-core-3313",
+                &[
+                    ("label", format!("{}", label).into()),
+                    ("busy", format!("{}", busy).into()),
+                ],
+            ),
             true,
         ));
         true
@@ -133,19 +155,15 @@ impl RepoTab {
                 };
                 self.record_undo(label, OpKind::Normal(undo, self.refs.head.clone()), ctx);
                 (
-                    format!(
-                        "{label}: done. The change is in the working tree, to look over before \
-                         committing (Ctrl+Z undoes it)."
+                    crate::i18n::message(
+                        "repo-core-3316",
+                        &[("label", format!("{}", label).into())],
                     ),
                     false,
                 )
             }
             Ok((_, Reverted::Merged)) => (
-                format!(
-                    "{label}: the file has changed since, so the revert was merged in with a \
-                     3-way merge and staged. Look it over before committing; Ctrl+Z can't undo \
-                     this one (unstage the file and discard its changes instead)."
-                ),
+                crate::i18n::message("repo-core-3317", &[("label", format!("{}", label).into())]),
                 false,
             ),
             Ok((_, Reverted::Conflicts(files))) => {
@@ -156,14 +174,26 @@ impl RepoTab {
                     files.join(", ")
                 };
                 (
-                    format!(
-                        "{label}: conflicts with changes made since, marked in {files}. Settle \
-                         them under Conflicted, or discard the file's changes to drop the revert."
+                    crate::i18n::message(
+                        "repo-core-3318",
+                        &[
+                            ("label", format!("{}", label).into()),
+                            ("files", format!("{}", files).into()),
+                        ],
                     ),
                     true,
                 )
             }
-            Err(e) => (crate::i18n::message("repo-core-0270", &[("label", format!("{}", label).into()), ("e", format!("{}", e).into())]), true),
+            Err(e) => (
+                crate::i18n::message(
+                    "repo-core-0270",
+                    &[
+                        ("label", format!("{}", label).into()),
+                        ("e", format!("{}", e).into()),
+                    ],
+                ),
+                true,
+            ),
         });
         self.reload_status(ctx);
     }

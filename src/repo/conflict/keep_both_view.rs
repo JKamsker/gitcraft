@@ -98,7 +98,10 @@ impl RepoTab {
             move |tab, same, ctx| match same {
                 Ok(()) => tab.apply(
                     Action::Ops {
-                        label: crate::i18n::message("repo-core-0590", &[("path", format!("{}", plan.path).into())]),
+                        label: crate::i18n::message(
+                            "repo-core-0590",
+                            &[("path", format!("{}", plan.path).into())],
+                        ),
                         ops: keep_both::stage_steps(&plan),
                         refresh: Refresh::Status,
                     },
@@ -121,7 +124,10 @@ impl RepoTab {
             .corner_radius(t.radius_lg)
             .inner_margin(egui::Margin::same(18))
             .shadow(ctx.global_style().visuals.window_shadow);
-        let title = crate::i18n::message("repo-core-0590", &[("path", format!("{}", state.path()).into())]);
+        let title = crate::i18n::message(
+            "repo-core-0590",
+            &[("path", format!("{}", state.path()).into())],
+        );
         let body = |ui: &mut Ui| {
             ui.set_width(440.0_f32.min(ctx.content_rect().width() - 64.0).max(200.0));
             ui.label(RichText::new(&title).font(theme::semibold(15.0)));
@@ -181,7 +187,11 @@ fn contents(ui: &mut Ui, t: &Tokens, state: &KeepBoth) -> Option<Step> {
             ui.label(RichText::new(crate::i18n::text("repo-core-0594")).font(theme::medium(13.0)));
             ui.add_space(4.0);
             ui.add(egui::Label::new(RichText::new(error).color(t.danger)).wrap());
-            buttons(ui, Some((crate::i18n::text("repo-core-0437"), Step::Retry)), crate::i18n::text("repo-core-0595"))
+            buttons(
+                ui,
+                Some((crate::i18n::text("repo-core-0437"), Step::Retry)),
+                crate::i18n::text("repo-core-0595"),
+            )
         }
         KeepBoth::Preview(plan) | KeepBoth::Writing(plan) => {
             let writing = matches!(state, KeepBoth::Writing(_));
@@ -193,21 +203,42 @@ fn contents(ui: &mut Ui, t: &Tokens, state: &KeepBoth) -> Option<Step> {
                 });
                 return None;
             }
-            buttons(ui, Some((crate::i18n::text("repo-core-0597"), Step::Write)), crate::i18n::text("repo-core-0443"))
+            buttons(
+                ui,
+                Some((crate::i18n::text("repo-core-0597"), Step::Write)),
+                crate::i18n::text("repo-core-0443"),
+            )
         }
         KeepBoth::Written(plan) => {
             ui.add(
-                egui::Label::new(crate::i18n::message("repo-core-0598", &[("target", format!("{}", plan.ours.target).into()), ("target2", format!("{}", plan.theirs.target).into()), ("them", format!("{}", if plan.ours.ignored || plan.theirs.ignored {
-                        crate::i18n::text("repo-core-0599")
-                    } else {
-                        crate::i18n::text("repo-core-0600")
-                    }).into())]))
+                egui::Label::new(crate::i18n::message(
+                    "repo-core-0598",
+                    &[
+                        ("target", format!("{}", plan.ours.target).into()),
+                        ("target2", format!("{}", plan.theirs.target).into()),
+                        (
+                            "them",
+                            format!(
+                                "{}",
+                                if plan.ours.ignored || plan.theirs.ignored {
+                                    crate::i18n::text("repo-core-0599")
+                                } else {
+                                    crate::i18n::text("repo-core-0600")
+                                }
+                            )
+                            .into(),
+                        ),
+                    ],
+                ))
                 .wrap(),
             );
             ui.add_space(6.0);
             ui.add(
                 egui::Label::new(
-                    RichText::new(crate::i18n::message("repo-core-0601", &[("path", format!("{}", plan.path).into())]))
+                    RichText::new(crate::i18n::message(
+                        "repo-core-0601",
+                        &[("path", format!("{}", plan.path).into())],
+                    ))
                     .color(t.text_dim),
                 )
                 .wrap(),
@@ -215,12 +246,19 @@ fn contents(ui: &mut Ui, t: &Tokens, state: &KeepBoth) -> Option<Step> {
             ui.add_space(6.0);
             ui.add(
                 egui::Label::new(
-                    RichText::new(crate::i18n::message("repo-core-0602", &[("path", format!("{}", plan.path).into())]))
+                    RichText::new(crate::i18n::message(
+                        "repo-core-0602",
+                        &[("path", format!("{}", plan.path).into())],
+                    ))
                     .color(t.text_dim),
                 )
                 .wrap(),
             );
-            buttons(ui, Some((crate::i18n::text("repo-core-0603"), Step::Stage)), crate::i18n::text("repo-core-0604"))
+            buttons(
+                ui,
+                Some((crate::i18n::text("repo-core-0603"), Step::Stage)),
+                crate::i18n::text("repo-core-0604"),
+            )
         }
     }
 }
@@ -228,7 +266,10 @@ fn contents(ui: &mut Ui, t: &Tokens, state: &KeepBoth) -> Option<Step> {
 /// The two files to be written, and the warning about references to the old name.
 fn preview(ui: &mut Ui, t: &Tokens, plan: &Plan) {
     ui.add(
-        egui::Label::new(crate::i18n::message("repo-core-0605", &[("path", format!("{}", plan.path).into())]))
+        egui::Label::new(crate::i18n::message(
+            "repo-core-0605",
+            &[("path", format!("{}", plan.path).into())],
+        ))
         .wrap(),
     );
     ui.add_space(8.0);
@@ -245,7 +286,10 @@ fn preview(ui: &mut Ui, t: &Tokens, plan: &Plan) {
             ui.set_width(ui.available_width());
             ui.add(
                 egui::Label::new(
-                    RichText::new(crate::i18n::message("repo-core-0606", &[("name", format!("{}", name).into())]))
+                    RichText::new(crate::i18n::message(
+                        "repo-core-0606",
+                        &[("name", format!("{}", name).into())],
+                    ))
                     .color(t.text),
                 )
                 .wrap(),
@@ -276,11 +320,9 @@ fn version_row(ui: &mut Ui, t: &Tokens, version: &Version) {
             if version.ignored {
                 ui.add(
                     egui::Label::new(
-                        RichText::new(
-                            crate::i18n::text("repo-core-0607"),
-                        )
-                        .color(t.text_dim)
-                        .small(),
+                        RichText::new(crate::i18n::text("repo-core-0607"))
+                            .color(t.text_dim)
+                            .small(),
                     )
                     .wrap(),
                 );
@@ -288,7 +330,10 @@ fn version_row(ui: &mut Ui, t: &Tokens, version: &Version) {
             if !version.taken.is_empty() {
                 ui.add(
                     egui::Label::new(
-                        RichText::new(crate::i18n::message("repo-core-0608", &[("version", format!("{}", version.taken.join(", ")).into())]))
+                        RichText::new(crate::i18n::message(
+                            "repo-core-0608",
+                            &[("version", format!("{}", version.taken.join(", ")).into())],
+                        ))
                         .color(t.text_faint)
                         .small(),
                     )

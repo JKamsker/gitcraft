@@ -308,7 +308,7 @@ fn spawn_with(
                     .unwrap_or_else(std::sync::PoisonError::into_inner)
                     .take()
                 {
-                    let _ = cancelled_tx.send(failed("cancelled".into()));
+                    let _ = cancelled_tx.send(failed(crate::i18n::text("repo-core-2896").into()));
                     cancelled_ctx.request_repaint();
                 }
             })),
@@ -351,8 +351,8 @@ fn panic_text(payload: &(dyn std::any::Any + Send)) -> String {
         .downcast_ref::<&str>()
         .map(|s| (*s).to_owned())
         .or_else(|| payload.downcast_ref::<String>().cloned())
-        .unwrap_or_else(|| "no details".to_owned());
-    format!("Internal error: {said}")
+        .unwrap_or_else(|| crate::i18n::text("repo-core-2897").to_owned());
+    crate::i18n::message("repo-core-2898", &[("said", format!("{}", said).into())])
 }
 
 impl RepoTab {
@@ -440,7 +440,7 @@ impl RepoTab {
         {
             self.last_fetch = Instant::now();
             self.run_ops_ex(
-                "Background fetch",
+                crate::i18n::text("repo-core-2899"),
                 ops(&[&["fetch", "--all", "--prune", "--quiet"]]),
                 Refresh::All,
                 OpKind::plain(),

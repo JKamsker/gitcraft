@@ -131,10 +131,17 @@ pub(super) fn inspect(path: &str, text: &str) -> Result<Option<Envelope>, String
         for token in scanner.by_ref() {
             tokens += 1;
             match token.1 {
-                TokenType::Alias(_)|TokenType::Anchor(_)=>return Err(crate::i18n::text("repo-core-1745").into()),
-                TokenType::BlockSequenceStart|TokenType::BlockMappingStart|TokenType::FlowSequenceStart|TokenType::FlowMappingStart=>depth+=1,
-                TokenType::BlockEnd|TokenType::FlowSequenceEnd|TokenType::FlowMappingEnd=>depth=depth.saturating_sub(1),
-                _=>{}
+                TokenType::Alias(_) | TokenType::Anchor(_) => {
+                    return Err(crate::i18n::text("repo-core-1745").into());
+                }
+                TokenType::BlockSequenceStart
+                | TokenType::BlockMappingStart
+                | TokenType::FlowSequenceStart
+                | TokenType::FlowMappingStart => depth += 1,
+                TokenType::BlockEnd | TokenType::FlowSequenceEnd | TokenType::FlowMappingEnd => {
+                    depth = depth.saturating_sub(1)
+                }
+                _ => {}
             }
             if depth > 64 || tokens > 100_000 {
                 return Err(crate::i18n::text("repo-core-1746").into());
@@ -197,7 +204,10 @@ fn yaml_value(yaml: &Yaml) -> Result<Value, String> {
         Yaml::Hash(map) => {
             let mut out = Map::new();
             for (key, value) in map {
-                out.insert(key.as_str().ok_or(crate::i18n::text(BAD))?.to_owned(), yaml_value(value)?);
+                out.insert(
+                    key.as_str().ok_or(crate::i18n::text(BAD))?.to_owned(),
+                    yaml_value(value)?,
+                );
             }
             Value::Object(out)
         }

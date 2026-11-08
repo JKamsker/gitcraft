@@ -59,15 +59,23 @@ pub fn compile(rule: &IssueRule) -> Result<Regex, String> {
         return Err(crate::i18n::text("repo-core-0957").to_owned());
     }
     if pattern.len() > MAX_PATTERN {
-        return Err(crate::i18n::message("repo-core-0958", &[("MAX-PATTERN", format!("{}", MAX_PATTERN).into())]));
+        return Err(crate::i18n::message(
+            "repo-core-0958",
+            &[("MAX-PATTERN", format!("{}", MAX_PATTERN).into())],
+        ));
     }
     regex::RegexBuilder::new(pattern)
         .size_limit(SIZE_LIMIT)
         .build()
         .map_err(|e| match e {
-            regex::Error::Syntax(s) => crate::i18n::message("repo-core-0959", &[("s", format!("{}", last_line(&s)).into())]),
+            regex::Error::Syntax(s) => crate::i18n::message(
+                "repo-core-0959",
+                &[("s", format!("{}", last_line(&s)).into())],
+            ),
             regex::Error::CompiledTooBig(_) => crate::i18n::text("repo-core-0960").to_owned(),
-            other => crate::i18n::message("repo-core-0961", &[("other", format!("{}", other).into())]),
+            other => {
+                crate::i18n::message("repo-core-0961", &[("other", format!("{}", other).into())])
+            }
         })
 }
 
@@ -173,7 +181,11 @@ pub fn links_row(ui: &mut Ui, message: &str, rules: &[IssueRule]) {
     }
     let t = Tokens::get(ui.ctx());
     ui.horizontal_wrapped(|ui| {
-        ui.label(RichText::new(crate::i18n::text("repo-core-0965")).color(t.text_faint).small());
+        ui.label(
+            RichText::new(crate::i18n::text("repo-core-0965"))
+                .color(t.text_faint)
+                .small(),
+        );
         for link in links {
             ui.hyperlink_to(RichText::new(&link.text).small(), &link.url)
                 .on_hover_text(&link.url);

@@ -23,9 +23,12 @@ pub(super) fn show(ui: &mut Ui, diff: &ConfigDiff, acts: &mut Vec<Action>) {
         .show(ui, |ui| {
             ui.horizontal_wrapped(|ui| {
                 ui.label(
-                    egui::RichText::new(crate::i18n::message("repo-core-2053", &[("format", format!("{}", diff.format).into())]))
-                        .font(theme::medium(12.5))
-                        .color(t.text),
+                    egui::RichText::new(crate::i18n::message(
+                        "repo-core-2053",
+                        &[("format", format!("{}", diff.format).into())],
+                    ))
+                    .font(theme::medium(12.5))
+                    .color(t.text),
                 );
                 let summary = if diff.entries.is_empty() {
                     crate::i18n::text("repo-core-2054").to_owned()
@@ -38,7 +41,12 @@ pub(super) fn show(ui: &mut Ui, diff: &ConfigDiff, acts: &mut Vec<Action>) {
                     ]
                     .iter()
                     .filter(|(n, _)| *n > 0)
-                    .map(|(n, what)| crate::i18n::message("repo-core-1911", &[("n", (n).into()), ("what", format!("{}", what).into())]))
+                    .map(|(n, what)| {
+                        crate::i18n::message(
+                            "repo-core-1911",
+                            &[("n", (n).into()), ("what", format!("{}", what).into())],
+                        )
+                    })
                     .collect::<Vec<_>>()
                     .join(" · ")
                 };
@@ -125,7 +133,9 @@ fn row(ui: &mut Ui, t: &Tokens, font: &egui::FontId, e: &Entry, acts: &mut Vec<A
     );
     crate::a11y::a11y(&resp, egui::WidgetType::Button, &text);
     let tip = match (e.change, e.old_line, e.new_line) {
-        (Change::Removed, Some(o), _) => crate::i18n::message("repo-core-2040", &[("o", format!("{}", o).into())]),
+        (Change::Removed, Some(o), _) => {
+            crate::i18n::message("repo-core-2040", &[("o", format!("{}", o).into())])
+        }
         (_, _, Some(n)) => crate::i18n::message("repo-core-2039", &[("n", (n).into())]),
         _ => crate::i18n::text("repo-core-2062").to_owned(),
     };

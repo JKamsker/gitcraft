@@ -33,7 +33,13 @@ pub(crate) fn blocked(
     in_progress: Option<InProgress>,
 ) -> Option<String> {
     if let Some(state) = in_progress {
-        return Some(crate::i18n::message("repo-core-2520", &[("to-lowercase", format!("{}", state.label().to_lowercase()).into())]));
+        return Some(crate::i18n::message(
+            "repo-core-2520",
+            &[(
+                "to-lowercase",
+                format!("{}", state.label().to_lowercase()).into(),
+            )],
+        ));
     }
     if branch.is_none() {
         return Some(crate::i18n::text("repo-core-0842").to_owned());
@@ -64,13 +70,22 @@ impl Plan {
             return Err(why);
         }
         if read.root && read.shallow {
-            return Err(crate::i18n::message("repo-core-2525", &[("target", format!("{}", short(&read.target)).into())]));
+            return Err(crate::i18n::message(
+                "repo-core-2525",
+                &[("target", format!("{}", short(&read.target)).into())],
+            ));
         }
         if let Some(file) = &read.ignored_in_way {
-            return Err(crate::i18n::message("repo-core-2526", &[("file", format!("{}", file).into())]));
+            return Err(crate::i18n::message(
+                "repo-core-2526",
+                &[("file", format!("{}", file).into())],
+            ));
         }
         if !read.ancestor {
-            return Err(crate::i18n::message("repo-core-2527", &[("target", format!("{}", short(&read.target)).into())]));
+            return Err(crate::i18n::message(
+                "repo-core-2527",
+                &[("target", format!("{}", short(&read.target)).into())],
+            ));
         }
         // Merges first: they bring in commits of other branches, listed before the target.
         let mut commits = read.commits;
@@ -107,9 +122,15 @@ impl Plan {
     /// What the operation is called, in the status line and the undo history.
     pub(crate) fn label(&self) -> String {
         if self.keep_fixup {
-            crate::i18n::message("repo-core-2529", &[("hash", format!("{}", short(&self.target.hash)).into())])
+            crate::i18n::message(
+                "repo-core-2529",
+                &[("hash", format!("{}", short(&self.target.hash)).into())],
+            )
         } else {
-            crate::i18n::message("repo-core-2530", &[("hash", format!("{}", short(&self.target.hash)).into())])
+            crate::i18n::message(
+                "repo-core-2530",
+                &[("hash", format!("{}", short(&self.target.hash)).into())],
+            )
         }
     }
 
@@ -216,7 +237,10 @@ const VERIFY: [&str; 6] = [
 
 /// Whether `error` is the check of [`VERIFY`] failing: the trees differ.
 pub(crate) fn lost_in_rebase(error: &str) -> bool {
-    error.starts_with(&crate::i18n::message("repo-core-2534", &[("VERIFY", format!("{}", VERIFY.join(" ")).into())]))
+    error.starts_with(&crate::i18n::message(
+        "repo-core-2534",
+        &[("VERIFY", format!("{}", VERIFY.join(" ")).into())],
+    ))
 }
 
 /// A fold whose rebase stopped (on a conflict): aborting it goes back to before the fold,
@@ -308,7 +332,10 @@ impl Stopped {
         UndoEntry {
             id: 0,
             agent: None,
-            label: crate::i18n::message("repo-core-2538", &[("label", format!("{}", self.label).into())]),
+            label: crate::i18n::message(
+                "repo-core-2538",
+                &[("label", format!("{}", self.label).into())],
+            ),
             undo: vec![on_branch.clone(), soft_reset(&self.before)],
             redo: vec![on_branch, soft_reset(fixup)],
             heads: Some((self.before.clone(), fixup.to_owned())),

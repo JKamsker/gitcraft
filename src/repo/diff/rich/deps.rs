@@ -476,13 +476,24 @@ pub fn diff(path: &str, sides: &Sides) -> Result<DepsDiff, String> {
     let read = |text: &Option<String>, side: &str| -> Result<Vec<Pkg>, String> {
         text.as_deref()
             .map(|t| {
-                packages(file, t)
-                    .map_err(|e| crate::i18n::message("repo-core-2138", &[("file", format!("{}", file).into()), ("side", format!("{}", side).into()), ("e", format!("{}", e).into())]))
+                packages(file, t).map_err(|e| {
+                    crate::i18n::message(
+                        "repo-core-2138",
+                        &[
+                            ("file", format!("{}", file).into()),
+                            ("side", format!("{}", side).into()),
+                            ("e", format!("{}", e).into()),
+                        ],
+                    )
+                })
             })
             .transpose()
             .map(Option::unwrap_or_default)
     };
-    let (old, new) = (read(&sides.old, crate::i18n::text("repo-core-2049"))?, read(&sides.new, crate::i18n::text("repo-core-2050"))?);
+    let (old, new) = (
+        read(&sides.old, crate::i18n::text("repo-core-2049"))?,
+        read(&sides.new, crate::i18n::text("repo-core-2050"))?,
+    );
     Ok(DepsDiff {
         ecosystem,
         file,

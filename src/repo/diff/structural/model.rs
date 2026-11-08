@@ -56,14 +56,18 @@ struct Change {
 const BAD_REPORT: &str = "repo-core-2329";
 
 pub(super) fn parse(json: &[u8], old: &str, new: &str) -> Result<Structural, String> {
-    let report: Report = serde_json::from_slice(json).map_err(|_| crate::i18n::text(BAD_REPORT).to_owned())?;
-    if report.language == crate::i18n::text("repo-core-1683") {
+    let report: Report =
+        serde_json::from_slice(json).map_err(|_| crate::i18n::text(BAD_REPORT).to_owned())?;
+    if report.language == "Text" {
         return Err(crate::i18n::text("repo-core-2330").to_owned());
     }
     if report.language.starts_with("Text (") {
-        return Err(crate::i18n::message("repo-core-2332", &[("language", format!("{}", report.language).into())]));
+        return Err(crate::i18n::message(
+            "repo-core-2332",
+            &[("language", format!("{}", report.language).into())],
+        ));
     }
-    if report.language == crate::i18n::text("repo-core-1567") {
+    if report.language == "Binary" {
         return Err(crate::i18n::text("repo-core-2333").to_owned());
     }
     if report.language.is_empty() || report.language.len() > 100 {
@@ -139,7 +143,9 @@ pub(super) fn parse(json: &[u8], old: &str, new: &str) -> Result<Structural, Str
 }
 
 fn collect(side: Side, source: &[&str], lines: &mut BTreeMap<usize, Line>) -> Result<(), String> {
-    let text = source.get(side.line_number).ok_or(crate::i18n::text(BAD_REPORT))?;
+    let text = source
+        .get(side.line_number)
+        .ok_or(crate::i18n::text(BAD_REPORT))?;
     if text.len() > 20_000 {
         return Err(crate::i18n::text("repo-core-2336").to_owned());
     }

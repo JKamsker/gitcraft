@@ -29,10 +29,7 @@ fn completed(
 impl RepoTab {
     pub(super) fn open_commit_changes(&mut self, hash: String, ctx: &egui::Context) {
         if self.conflict.is_some() || self.rebase.is_some() || self.reword.is_some() {
-            self.status = Some((
-                crate::i18n::text("repo-core-0392").into(),
-                true,
-            ));
+            self.status = Some((crate::i18n::text("repo-core-0392").into(), true));
             return;
         }
         self.leave_pages();

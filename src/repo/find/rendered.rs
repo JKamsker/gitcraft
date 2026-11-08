@@ -238,11 +238,9 @@ impl Find {
             }
         };
         ui.label(
-            egui::RichText::new(
-                crate::i18n::text("repo-core-2516"),
-            )
-            .small()
-            .color(t.text_dim),
+            egui::RichText::new(crate::i18n::text("repo-core-2516"))
+                .small()
+                .color(t.text_dim),
         );
         if doc.limited {
             self.drop_results();
@@ -252,7 +250,9 @@ impl Find {
         }
         if let Some(hit) = self.current
             && let Some(row) = doc.rows.get(hit.line)
-            && ui.small_button(crate::i18n::text("repo-core-2518")).clicked()
+            && ui
+                .small_button(crate::i18n::text("repo-core-2518"))
+                .clicked()
         {
             ui.ctx().copy_text(row.text.clone());
         }
