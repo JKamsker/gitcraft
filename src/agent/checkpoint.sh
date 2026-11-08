@@ -53,7 +53,11 @@ rm -f -- "$gitcraft_prompts/$gitcraft_session"
 gitcraft_own=$(git rev-parse --git-path index)
 gitcraft_index=$(git rev-parse --git-path "gitcraft-checkpoint-$$.index")
 if ! cp -p -f -- "$gitcraft_own" "$gitcraft_index" 2>/dev/null; then
-  git rev-parse -q --verify HEAD >/dev/null && GIT_INDEX_FILE=$gitcraft_index git read-tree HEAD
+  if git rev-parse -q --verify HEAD >/dev/null; then
+    GIT_INDEX_FILE=$gitcraft_index git read-tree HEAD || exit 0
+  else
+    GIT_INDEX_FILE=$gitcraft_index git read-tree --empty || exit 0
+  fi
 fi
 gitcraft_tree=
 GIT_INDEX_FILE=$gitcraft_index git add -A -- . && gitcraft_tree=$(GIT_INDEX_FILE=$gitcraft_index git write-tree)
