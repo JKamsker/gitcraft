@@ -203,7 +203,16 @@ fn execute(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Result<Ran, Stri
 
 /// git with `args` in `dir` on this machine, `extra` before them.
 pub(super) fn local_command(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Command {
-    let mut cmd = repository_command(dir, args);
+    apply_command_extras(repository_command(dir, args), dir, extra, args)
+}
+/// Apply the actual production argv/environment policy to an already selected command.
+/// Recording callers can provide a fixed executable without PATH discovery.
+pub(super) fn apply_command_extras(
+    mut cmd: Command,
+    dir: Option<&Path>,
+    extra: &Extra,
+    args: &[&str],
+) -> Command {
     cmd.args(&extra.pre).args(&extra.owned_pre);
     if extra.normalize_repository && !dir.is_some_and(crate::practice::is_repository) {
         normalize_connection_command(&mut cmd, args);

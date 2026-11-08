@@ -6,6 +6,24 @@ pub(crate) struct CredentialCommandPolicy {
     pub arguments: Vec<String>,
     pub environment: Vec<(&'static str, String)>,
 }
+impl CredentialCommandPolicy {
+    /// Custom local runners bind the executable they actually selected, before
+    /// installing this environment. Shared Git runners perform this automatically.
+    pub fn bind_git(&mut self, selected: &Path) -> Result<(), String> {
+        if !selected.is_absolute() {
+            return Err(
+                "Explicit credentials require the actual selected absolute Git executable".into(),
+            );
+        }
+        self.environment
+            .retain(|(key, _)| *key != "GITCRAFT_GIT_ORIGINAL");
+        self.environment.push((
+            "GITCRAFT_GIT_ORIGINAL",
+            selected.to_string_lossy().into_owned(),
+        ));
+        Ok(())
+    }
+}
 /// Explicit credentials are authoritative and transient. Ambient helpers are not
 /// consulted or used for automatic post-success storage; persistence is a separate
 /// user action in their credential manager. Enumerate URL-specific keys too, as
@@ -36,17 +54,7 @@ pub(crate) fn credential_command_policy(
             }
         }
     }
-    let mut environment = credentials.helper_environment()?;
-    if !dir.is_some_and(remote::is_remote) {
-        let selected = git_cmd().get_program().to_owned();
-        if !Path::new(&selected).is_absolute() {
-            return Err("Could not pin the selected Git executable for explicit sign-in".into());
-        }
-        environment.push((
-            "GITCRAFT_GIT_ORIGINAL",
-            selected.to_string_lossy().into_owned(),
-        ));
-    }
+    let environment = credentials.helper_environment()?;
     // The owning runner may carry private, command-only remote configuration.
     // Do not resolve its alias or inspect a different config here. Actual URL
     // policy is installed by the designated transport at the point of launch.

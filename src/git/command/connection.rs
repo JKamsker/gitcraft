@@ -148,7 +148,8 @@ mod tests {
             ..Default::default()
         };
         profile.run(|| {
-            let cmd = local_command(
+            let cmd = apply_command_extras(
+                Command::new("/recorded/git"),
                 Some(Path::new("/synthetic/repository")),
                 &probe_extra(Path::new("/synthetic/repository")),
                 &["remote"],
