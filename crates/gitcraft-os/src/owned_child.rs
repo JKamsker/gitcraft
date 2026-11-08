@@ -3,6 +3,10 @@
 use std::io;
 use std::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command, ExitStatus};
 
+#[cfg(all(test, target_os = "macos"))]
+#[path = "owned_child_runtime_tests.rs"]
+mod owned_runtime_tests;
+
 pub struct OwnedChild {
     process: Option<Process>,
     terminal: Option<Result<ExitStatus, String>>,
