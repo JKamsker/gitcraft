@@ -1599,7 +1599,7 @@ mod tests {
         app.in_window(peer, |app| {
             app.in_window(ViewportId::from_hash_of("closed-owner"), |app| {
                 assert_eq!(app.windows.current, ViewportId::ROOT);
-                app.error = Some("recorded result".into());
+                app.error = Some("recorded result".to_owned().into());
             });
             assert_eq!(app.windows.current, peer);
             assert!(app.error.is_none());
