@@ -32,3 +32,5 @@ windows = { version = "0.62", features = [
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"
 objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSObject", "NSString", "NSAppleEventDescriptor", "NSAppleEventManager"] }
+winit = { version = "0.30.13", default-features = false }
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSApplication", "NSDockTile", "NSMenu", "NSMenuItem", "NSView", "NSImage", "NSImageView", "NSProgressIndicator", "NSControl", "NSResponder", "NSCell"] }

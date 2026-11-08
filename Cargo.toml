@@ -88,6 +88,7 @@ zbus = { version = "5", default-features = false, features = ["blocking-api", "a
 
 [workspace]
 members = [".", "crates/gitcraft-os"]
+exclude = ["vendor/winit"]
 # `cargo test` and `cargo clippy` at the root check both.
 default-members = [".", "crates/gitcraft-os"]
 
@@ -153,6 +154,7 @@ rustix = { version = "1", features = ["time"] }
 
 # winit 0.30.13 with two Windows fixes for moving the window between monitors of different
 # scales: the fix of rust-windowing/winit#4341 (released only in 0.31) and a minimum size that
-# follows the scale. Branch `gitcraft/v0.30.13` of the fork; drop this once on winit 0.31.
+# follows the scale. Exact fork source is vendored with a narrow macOS Dock-menu hook;
+# see vendor/winit/PROVENANCE.json and GITCRAFT.md. Drop after an accepted upstream hook.
 [patch.crates-io]
-winit = { git = "https://github.com/JKamsker/winit", rev = "12fdcb03ef036f0fcb7fa26d19dd7395b1feb141" }
+winit = { path = "vendor/winit" }

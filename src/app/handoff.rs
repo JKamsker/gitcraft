@@ -17,6 +17,21 @@ impl App {
                 }
             }
         }
+        for args in gitcraft_os::take_native_dock_requests() {
+            match args {
+                Ok(args) => self.handle_handoff(
+                    Request::Launch {
+                        cwd: Default::default(),
+                        args,
+                    },
+                    ctx,
+                ),
+                Err(why) => {
+                    self.handle_handoff(Request::Focus, ctx);
+                    self.report(why);
+                }
+            }
+        }
         for request in crate::instance::take_requests() {
             self.handle_handoff(request, ctx);
         }

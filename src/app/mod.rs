@@ -239,6 +239,8 @@ impl App {
         crate::instance::set_repaint(cc.egui_ctx.clone());
         let native_ctx = cc.egui_ctx.clone();
         gitcraft_os::set_native_url_wake(move || native_ctx.request_repaint());
+        let dock_ctx = cc.egui_ctx.clone();
+        gitcraft_os::set_native_dock_wake(move || dock_ctx.request_repaint());
         let saved: Saved = cc
             .storage
             .and_then(|s| eframe::get_value(s, eframe::APP_KEY))
@@ -788,9 +790,7 @@ impl App {
             }
         }
         self.advance_patches(ctx);
-        if let Some(frame) = frame {
-            self.os_shell(ctx, frame);
-        }
+        self.os_shell(ctx, frame);
         let focused = ctx.input(|i| i.raw.viewports.values().any(|v| v.focused == Some(true)));
         self.keep_drafts(ctx, focused);
         self.toast_finished(focused);

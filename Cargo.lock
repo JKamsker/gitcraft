@@ -1176,7 +1176,6 @@ checksum = "75b325c5dbd37f80359721ad39aca5a29fb04c89279657cffdda8736d0c0b9d2"
 [[package]]
 name = "dpi"
 version = "0.1.1"
-source = "git+https://github.com/JKamsker/winit?rev=12fdcb03ef036f0fcb7fa26d19dd7395b1feb141#12fdcb03ef036f0fcb7fa26d19dd7395b1feb141"
 
 [[package]]
 name = "dunce"
@@ -1928,8 +1927,10 @@ version = "0.1.0"
 dependencies = [
  "libc",
  "objc2 0.6.5",
+ "objc2-app-kit 0.3.2",
  "objc2-foundation 0.3.2",
  "windows 0.62.2",
+ "winit",
 ]
 
 [[package]]
@@ -6812,7 +6813,6 @@ checksum = "589f6da84c646204747d1270a2a5661ea66ed1cced2631d546fdfb155959f9ec"
 [[package]]
 name = "winit"
 version = "0.30.13"
-source = "git+https://github.com/JKamsker/winit?rev=12fdcb03ef036f0fcb7fa26d19dd7395b1feb141#12fdcb03ef036f0fcb7fa26d19dd7395b1feb141"
 dependencies = [
  "ahash",
  "android-activity",
