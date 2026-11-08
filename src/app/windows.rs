@@ -741,6 +741,28 @@ mod tests {
             })
     }
 
+    // build_eframe runs logic/ui during harness construction. These direct adapter tests
+    // need only recorded App state: never enter tick_model or start background watchers.
+    fn recorded_harness() -> egui_kittest::Harness<'static, Option<DesktopApp>> {
+        egui_kittest::Harness::builder()
+            .with_size([1200.0, 800.0])
+            .build_ui_state(
+                |ui, state: &mut Option<DesktopApp>| {
+                    if state.is_none() {
+                        let cc = eframe::CreationContext::_new_kittest(ui.ctx().clone());
+                        let mut app = App::launched_using(&cc, None, || {
+                            Ok("git version 2.43.0 (recorded)".into())
+                        });
+                        app.settings.check_updates = false;
+                        app.settings.notifications = false;
+                        app.settings.set(ui.ctx());
+                        *state = Some(DesktopApp::new(app));
+                    }
+                },
+                None,
+            )
+    }
+
     fn deferred(path: &str, ctx: &egui::Context) -> Tab {
         Tab::Repo(Box::new(crate::repo::RepoTab::new_deferred(
             path.into(),
@@ -1292,9 +1314,15 @@ mod tests {
     #[test]
     fn resident_missing_git_still_accepts_quit_handoff_and_keeps_git_actions_guarded()
     -> Result<(), String> {
-        let h = harness();
+        let h = recorded_harness();
         let ctx = h.ctx.clone();
-        let mut app = h.state().app.lock().map_err(|e| e.to_string())?;
+        let mut app = h
+            .state()
+            .as_ref()
+            .ok_or("no recorded App")?
+            .app
+            .lock()
+            .map_err(|e| e.to_string())?;
         app.git_version = Err("Git is unavailable (recorded)".into());
         app.settings.keep_running_in_tray = true;
         let _ = ctx.run_logic(&egui::RawInput::default(), |ctx| {
@@ -1495,9 +1523,15 @@ mod tests {
         }
         for source in [Completion::Clone, Completion::Connection, Completion::Link] {
             for poll_from_child in [false, true] {
-                let h = harness();
+                let h = recorded_harness();
                 let ctx = h.ctx.clone();
-                let mut app = h.state().app.lock().map_err(|e| e.to_string())?;
+                let mut app = h
+                    .state()
+                    .as_ref()
+                    .ok_or("no recorded App")?
+                    .app
+                    .lock()
+                    .map_err(|e| e.to_string())?;
                 let child = ViewportId::from_hash_of("completion-owner");
                 let root = PathBuf::from("/virtual/completion-target");
                 app.tabs = vec![Tab::Home];
