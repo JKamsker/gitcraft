@@ -16,7 +16,9 @@ Backlink navigation retains its scoped source PASS and is unchanged.
   one pinned regular file. Local Unix uses the accepted `8bd3e5` descriptor pattern
   (nonblocking/no-follow), checks size before reading, reads at most cap+1 and
   compares descriptor/path metadata after reading. Windows opens the reparse point
-  with rename sharing denied and rejects reparse attributes. The remote route
+  with rename sharing denied, rejects reparse attributes and reuses the accepted
+  native handle identity to reject pathname replacement with copied timestamps.
+  The remote route
   requires python3 and nonblocking/no-follow descriptors, checks type/size and
   descriptor/path identity, and withholds output until checks pass. Missing files
   remain empty patterns. HEAD/patterns/enabled/cone stale checks are preserved.

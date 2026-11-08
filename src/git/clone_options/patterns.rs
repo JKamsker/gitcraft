@@ -27,6 +27,17 @@ pub(super) fn read(path: &Path) -> Result<String, String> {
     if !unchanged(&before, &after) || !unchanged(&after, &named) {
         return Err(REFUSED.into());
     }
+    #[cfg(windows)]
+    {
+        // Metadata alone cannot distinguish a replacement with copied size/timestamps.
+        // Reuse the accepted native handle identity; keep both no-follow handles alive.
+        let named_file = open(path).map_err(|_| REFUSED.to_owned())?;
+        if crate::git::recovery::native_file_identity(&file)?.0
+            != crate::git::recovery::native_file_identity(&named_file)?.0
+        {
+            return Err(REFUSED.into());
+        }
+    }
     decode(0, bytes)
 }
 
