@@ -363,7 +363,10 @@ mod tests {
         );
     }
     #[test]
-    fn successful_first_commit_survives_queued_push_then_failure_until_confirmed_read() {
+    fn successful_first_commit_survives_queued_push_then_failure_until_confirmed_read()
+    -> Result<(), String> {
+        let f = crate::push_preflight::tests::Fixture::new()?;
+        f.commit("outgoing.txt", "outgoing\n", "Outgoing")?;
         let ctx = egui::Context::default();
         crate::settings::Settings {
             celebration_sound: true,
@@ -371,10 +374,9 @@ mod tests {
         }
         .set(&ctx);
         crate::audio::take_recorded();
-        let mut tab = RepoTab::new_deferred("/nonexistent/queued-celebration".into(), &ctx);
+        let mut tab = RepoTab::new_deferred(f.repo.clone(), &ctx);
         tab.life.phase = super::super::lifecycle::Phase::Live;
         tab.loading = true;
-        tab.tx.cancel.cancel(); // queued jobs are rejected, no commands execute
         tab.celebration_begin("Commit", &[vec!["commit".into()]], &ctx);
         tab.busy_op = Some("Commit".into());
         tab.refs.current = Some("main".into());
@@ -395,16 +397,38 @@ mod tests {
             true,
             &ctx,
         );
-        assert_eq!(tab.busy_op.as_deref(), Some("Push"));
+        assert!(tab.busy_op.is_none());
+        assert!(matches!(
+            tab.dialog,
+            Some(super::super::Dialog::PushLoading { .. })
+        ));
         assert_eq!(tab.celebration.pending.len(), 1);
-        tab.op_done(
-            "Push".into(),
-            Err("recorded failure".into()),
-            super::super::Refresh::All,
-            super::super::OpKind::plain(),
-            true,
-            &ctx,
+        assert!(crate::audio::take_recorded().is_empty());
+        let before = f.receiver_head()?;
+        let plan = super::super::push_preflight::test_support::review(&mut tab, &ctx)?;
+        assert_eq!(f.receiver_head()?, before, "review must not send");
+        let theirs = f.advance_receiver()?;
+        tab.apply(super::super::Action::SubmitPreflight(Box::new(plan)), &ctx);
+        super::super::push_preflight::test_support::wait_for(&mut tab, &ctx, |t| {
+            t.busy_op.is_none()
+        })?;
+        assert!(
+            tab.last_op
+                .as_ref()
+                .is_some_and(|op| op.ops.iter().any(|step| step
+                    .first()
+                    .is_some_and(|s| s == crate::push_preflight::APPROVED)))
         );
+        assert!(
+            tab.status
+                .as_ref()
+                .is_some_and(|(text, failed)| *failed && text.contains("stale info")),
+            "{:?}",
+            tab.status
+        );
+        assert_eq!(f.receiver_head()?, theirs);
+
+        assert_eq!(tab.celebration.pending.len(), 1);
         tab.refs.head = "root".into();
         tab.history.push(std::sync::Arc::new(crate::git::Commit {
             hash: "root".into(),
@@ -419,6 +443,7 @@ mod tests {
         );
         tab.celebration_loaded(tab.reads + 2, &ctx);
         assert!(crate::audio::take_recorded().is_empty());
+        Ok(())
     }
     #[test]
     fn merging_pull_celebrates_confirmed_merge_but_not_fast_forward_or_failure() {
