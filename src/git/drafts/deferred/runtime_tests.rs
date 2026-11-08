@@ -30,6 +30,17 @@ fn deferred_owned_conflict_keeps_source_index_files_and_branch_until_guarded_acc
         credentials: None,
     };
     let active = || true;
+    if cfg!(windows) {
+        let error = read(f.path(), &active)
+            .err()
+            .ok_or("Windows replay must refuse")?;
+        assert!(
+            error.contains("require proven native Unix cwd ownership"),
+            "{error}"
+        );
+        assert!(control.take_steps().is_empty());
+        return Ok(());
+    }
     let before = read(f.path(), &active)?;
     start(
         &r,
@@ -147,6 +158,17 @@ fn deferred_owned_stack_uses_parent_candidate_and_refuses_stale_source_tip() -> 
         credentials: None,
     };
     let active = || true;
+    if cfg!(windows) {
+        let error = read(f.path(), &active)
+            .err()
+            .ok_or("Windows replay must refuse")?;
+        assert!(
+            error.contains("require proven native Unix cwd ownership"),
+            "{error}"
+        );
+        assert!(control.take_steps().is_empty());
+        return Ok(());
+    }
     let v = read(f.path(), &active)?;
     start(
         &r,

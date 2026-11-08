@@ -287,6 +287,11 @@ fn private_dir(repo: &Path, active: &dyn Fn() -> bool) -> Result<PathBuf, String
     }
     static ID: AtomicU64 = AtomicU64::new(0);
     let root = std::fs::canonicalize(std::env::temp_dir()).map_err(|e| e.to_string())?;
+    // Git for Windows cannot read config paths in canonicalize's Win32 verbatim
+    // namespace. Use the recognized drive/UNC spelling for this private directory
+    // and every config, index, hooks and scratch path derived from it.
+    #[cfg(windows)]
+    let root = PathBuf::from(git::bundle_git_path(&root)?);
     for _ in 0..100 {
         let path = root.join(format!(
             "gitcraft-drafts.{}-{}",
@@ -327,5 +332,49 @@ impl Drop for Context {
         } else {
             let _ = std::fs::remove_dir_all(&self.path);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn private_context_opens_its_empty_config_and_keeps_source_config_isolated()
+    -> Result<(), String> {
+        let dir = tempfile::Builder::new()
+            .prefix("draft config ü ")
+            .tempdir()
+            .map_err(|e| e.to_string())?;
+        git::run(Some(dir.path()), &["init", "-q"])?;
+        git::run(Some(dir.path()), &["config", "gitcraft.sourceOnly", "true"])?;
+        let ctx = Context::new(dir.path(), &|| true)?;
+        for (key, value) in &ctx.env {
+            if matches!(*key, "GIT_CONFIG_GLOBAL" | "GIT_CONFIG_SYSTEM") {
+                assert_eq!(std::fs::read(value).map_err(|e| e.to_string())?, b"");
+                #[cfg(windows)]
+                assert!(!value.starts_with(r"\\?\"), "{key}={value}");
+            }
+        }
+        assert!(
+            ctx.run(
+                &["config", "--get", "gitcraft.sourceOnly"],
+                vec![],
+                &[1],
+                &|| true
+            )?
+            .is_empty()
+        );
+        assert_eq!(
+            ctx.source(
+                &["config", "--local", "--get", "gitcraft.sourceOnly"],
+                vec![],
+                &[0],
+                &|| true
+            )?,
+            b"true\n"
+        );
+        assert_eq!(ctx.blob(b"private bytes".to_vec(), &|| true)?.len(), 40);
+        Ok(())
     }
 }

@@ -264,6 +264,7 @@ mod tests {
             vec!["config", "user.name", "Fixture"],
             vec!["config", "user.email", "fixture@example.com"],
             vec!["config", "commit.gpgSign", "false"],
+            vec!["config", "core.autocrlf", "false"],
         ] {
             crate::git::run(Some(repo), &args)?;
         }

@@ -8,6 +8,7 @@ impl Fixture {
             vec!["config", "user.name", "Fixture"],
             vec!["config", "user.email", "fixture@example.com"],
             vec!["config", "commit.gpgSign", "false"],
+            vec!["config", "core.autocrlf", "false"],
         ] {
             f.git(&args)?;
         }
@@ -97,7 +98,27 @@ fn virtual_commits_isolate_two_hunks_in_one_file_without_moving_anchor_or_index(
         b"unowned untracked\n"
     );
     let beta = f.git(&["rev-parse", "beta"])?;
-    undo(f.path(), &f.read()?, &|| true)?;
+    let view = f.read()?;
+    let result = undo(f.path(), &view, &|| true);
+    if cfg!(windows) {
+        let error = result.err().ok_or("Windows virtual undo must refuse")?;
+        assert!(
+            error.contains("Native working-folder publication is unavailable"),
+            "{error}"
+        );
+        assert_eq!(f.git(&["rev-parse", "beta"])?, beta);
+        assert_eq!(f.read()?.version, view.version);
+        assert_eq!(
+            std::fs::read(f.path().join(".git/index")).map_err(|e| e.to_string())?,
+            index
+        );
+        assert_eq!(
+            std::fs::read(f.path().join("file")).map_err(|e| e.to_string())?,
+            work.as_bytes()
+        );
+        return Ok(());
+    }
+    result?;
     assert_eq!(f.git(&["rev-parse", "beta"])?, head);
     assert_ne!(beta, head);
     assert_eq!(
@@ -129,7 +150,32 @@ fn virtual_activation_retains_other_hunks_restores_new_file_permissions_and_reje
     f.own("alpha", "+ONE")?;
     f.own("alpha", "+new data")?;
     let index = std::fs::read(f.path().join(".git/index")).map_err(|e| e.to_string())?;
-    toggle(f.path(), &f.read()?, "alpha", &|| true)?;
+    let view = f.read()?;
+    let result = toggle(f.path(), &view, "alpha", &|| true);
+    if cfg!(windows) {
+        let error = result
+            .err()
+            .ok_or("Windows virtual activation must refuse")?;
+        assert!(
+            error.contains("Native working-folder publication is unavailable"),
+            "{error}"
+        );
+        assert_eq!(f.read()?.version, view.version);
+        assert_eq!(
+            std::fs::read(f.path().join(".git/index")).map_err(|e| e.to_string())?,
+            index
+        );
+        assert_eq!(
+            std::fs::read(f.path().join("file")).map_err(|e| e.to_string())?,
+            work.as_bytes()
+        );
+        assert_eq!(
+            std::fs::read(f.path().join("owned-new")).map_err(|e| e.to_string())?,
+            b"new data\n"
+        );
+        return Ok(());
+    }
+    result?;
     assert_eq!(
         std::fs::read(f.path().join("file")).map_err(|e| e.to_string())?,
         f.base().replace("line 30\n", "UNOWNED\n").as_bytes()

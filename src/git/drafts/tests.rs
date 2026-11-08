@@ -18,6 +18,7 @@ impl Fixture {
             vec!["config", "user.name", "Test"],
             vec!["config", "user.email", "test@example.com"],
             vec!["config", "commit.gpgSign", "false"],
+            vec!["config", "core.autocrlf", "false"],
         ] {
             git::run(Some(&p), &args)?;
         }
@@ -1081,7 +1082,28 @@ fn one_turn_reversal_retains_later_hunks_and_index_and_rejects_stale_overlap() -
     }
     let index = std::fs::read(f.0.join(".git/index")).map_err(|e| e.to_string())?;
     let p = turn::inverse_preview(&f.0, &parent, &turn, &|| true)?;
-    let backup = turn::inverse_apply(&f.0, &p, &|| true)?;
+    let result = turn::inverse_apply(&f.0, &p, &|| true);
+    if cfg!(windows) {
+        let error = result.err().ok_or("Windows turn reversal must refuse")?;
+        assert!(
+            error.contains("Native working-folder publication is unavailable"),
+            "{error}"
+        );
+        assert_eq!(
+            std::fs::read(f.0.join("file")).map_err(|e| e.to_string())?,
+            later.as_bytes()
+        );
+        assert_eq!(
+            std::fs::read(f.0.join(".git/index")).map_err(|e| e.to_string())?,
+            index
+        );
+        assert_eq!(
+            std::fs::read(f.0.join("untracked")).map_err(|e| e.to_string())?,
+            b"preserve\n"
+        );
+        return Ok(());
+    }
+    let backup = result?;
     assert!(list(&f.0, &|| true)?.iter().any(|d| d.id == backup.draft));
     assert_eq!(
         std::fs::read(f.0.join("file")).map_err(|e| e.to_string())?,

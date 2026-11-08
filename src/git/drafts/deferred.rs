@@ -1421,8 +1421,16 @@ pub(crate) mod tests {
             link_identity: "2:35".into(),
             link_text: format!("gitdir: {}", metadata.display()),
         };
-        let command = owned_command(s, &binding, &binding, &["rebase", "--continue"])
-            .map_err(|error| error.to_string())?;
+        let result = owned_command(s, &binding, &binding, &["rebase", "--continue"]);
+        if cfg!(windows) {
+            let error = result.err().ok_or("Windows replay must refuse dispatch")?;
+            assert!(
+                error.contains("requires native Unix descriptor ownership"),
+                "{error}"
+            );
+            return Ok(());
+        }
+        let command = result?;
         let shared = owned_command_at(
             &s.worktree,
             s.root_identity.as_deref(),

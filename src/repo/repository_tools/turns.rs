@@ -320,6 +320,7 @@ mod tests {
             vec!["config", "user.name", "Test"],
             vec!["config", "user.email", "test@example.com"],
             vec!["config", "commit.gpgSign", "false"],
+            vec!["config", "core.autocrlf", "false"],
         ] {
             crate::git::run(Some(repo), &args)?;
         }

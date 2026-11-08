@@ -8,6 +8,7 @@ impl Fixture {
             vec!["config", "user.name", "Fixture"],
             vec!["config", "user.email", "fixture@example.com"],
             vec!["config", "commit.gpgSign", "false"],
+            vec!["config", "core.autocrlf", "false"],
         ] {
             f.git(&args)?;
         }
@@ -63,7 +64,38 @@ fn changelist_commit_is_exact_and_keeps_other_staged_work_and_untracked_files() 
     let other = f.create("Cleanup", &["b"])?;
     let b = f.git(&["rev-parse", ":b"])?;
     let head = f.git(&["rev-parse", "HEAD"])?;
-    commit(f.path(), &f.read()?, &id, &|| true)?;
+    let index = std::fs::read(f.path().join(".git/index")).map_err(|e| e.to_string())?;
+    let view = f.read()?;
+    let result = commit(f.path(), &view, &id, &|| true);
+    if cfg!(windows) {
+        let error = result
+            .err()
+            .ok_or("Windows index publication must refuse")?;
+        assert!(
+            error.contains("Native full-policy index snapshot is unavailable"),
+            "{error}"
+        );
+        assert_eq!(f.git(&["rev-parse", "HEAD"])?, head);
+        assert_eq!(
+            std::fs::read(f.path().join(".git/index")).map_err(|e| e.to_string())?,
+            index
+        );
+        assert_eq!(f.read()?.version, view.version);
+        assert_eq!(
+            std::fs::read(f.path().join("a")).map_err(|e| e.to_string())?,
+            b"a reviewed working\n"
+        );
+        assert_eq!(
+            std::fs::read(f.path().join("b")).map_err(|e| e.to_string())?,
+            b"b later work\n"
+        );
+        assert_eq!(
+            std::fs::read(f.path().join("untracked")).map_err(|e| e.to_string())?,
+            b"keep this\n"
+        );
+        return Ok(());
+    }
+    result?;
     assert_ne!(f.git(&["rev-parse", "HEAD"])?, head);
     assert_eq!(f.git(&["show", "HEAD:a"])?, "a reviewed working");
     assert_eq!(f.git(&["show", "HEAD:b"])?, "b base");
@@ -118,7 +150,34 @@ fn shelves_keep_independent_index_work_untracked_and_permissions_and_refuse_new_
     }
     let id = f.create("Feature", &["a", "new"])?;
     let other = f.git(&["rev-parse", ":b"])?;
-    shelve(f.path(), &f.read()?, &id, false, &|| true)?;
+    let index = std::fs::read(f.path().join(".git/index")).map_err(|e| e.to_string())?;
+    let view = f.read()?;
+    let result = shelve(f.path(), &view, &id, false, &|| true);
+    if cfg!(windows) {
+        let error = result
+            .err()
+            .ok_or("Windows working publication must refuse")?;
+        assert!(
+            error.contains("Native working-folder publication is unavailable"),
+            "{error}"
+        );
+        assert_eq!(
+            std::fs::read(f.path().join(".git/index")).map_err(|e| e.to_string())?,
+            index
+        );
+        assert_eq!(f.read()?.version, view.version);
+        assert_eq!(
+            std::fs::read(f.path().join("a")).map_err(|e| e.to_string())?,
+            b"a working\n"
+        );
+        assert_eq!(
+            std::fs::read(f.path().join("new")).map_err(|e| e.to_string())?,
+            b"new data\n"
+        );
+        assert_eq!(f.git(&["rev-parse", ":b"])?, other);
+        return Ok(());
+    }
+    result?;
     assert_eq!(f.git(&["show", ":a"])?, "a base");
     assert_eq!(
         std::fs::read(f.path().join("a")).map_err(|e| e.to_string())?,
@@ -289,7 +348,28 @@ fn changelist_commit_preserves_unselected_intent_to_add_flag() -> Result<(), Str
     let before = f.git(&["ls-files", "--debug", "intent"])?;
     f.write("a", b"chosen change\n")?;
     let id = f.create("chosen", &["a"])?;
-    commit(f.path(), &f.read()?, &id, &|| true)?;
+    let head = f.git(&["rev-parse", "HEAD"])?;
+    let index = std::fs::read(f.path().join(".git/index")).map_err(|e| e.to_string())?;
+    let view = f.read()?;
+    let result = commit(f.path(), &view, &id, &|| true);
+    if cfg!(windows) {
+        let error = result
+            .err()
+            .ok_or("Windows index publication must refuse")?;
+        assert!(
+            error.contains("Native full-policy index snapshot is unavailable"),
+            "{error}"
+        );
+        assert_eq!(f.git(&["ls-files", "--debug", "intent"])?, before);
+        assert_eq!(f.git(&["rev-parse", "HEAD"])?, head);
+        assert_eq!(
+            std::fs::read(f.path().join(".git/index")).map_err(|e| e.to_string())?,
+            index
+        );
+        assert_eq!(f.read()?.version, view.version);
+        return Ok(());
+    }
+    result?;
     let after = f.git(&["ls-files", "--debug", "intent"])?;
     assert_eq!(after, before);
     assert_eq!(f.git(&["diff", "--cached", "--name-only"])?, "");
