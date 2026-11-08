@@ -523,16 +523,15 @@ fn finish(tab: &mut super::RepoTab, ctx: &egui::Context) {
     }
 }
 
-/// An operation whose later step needed signing in runs again from that step: the ones before
-/// it are done, and running them again (the tag made again) would fail before the step that
-/// needed signing in.
+/// Hook/alias text alone cannot authorize credentials. Completed steps remain
+/// completed and the failed step stays available for an explicit manual rerun.
 #[test]
-fn signing_in_runs_again_only_the_steps_that_had_not_run() -> Result<(), String> {
+fn alias_authentication_text_cannot_authorize_retry_of_remaining_steps() -> Result<(), String> {
     use super::{Action, Refresh, RepoTab};
     let dir = repo("sign-in-retry");
     let ctx = egui::Context::default();
     let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
-    // A push git answers like one that needs signing in.
+    // A non-transport alias imitates an authentication failure.
     let push = ops(&[&[
         "-c",
         "alias.gitcraft-test-auth=!printf \"Authentication failed for 'https://fixture.invalid/team/repo'\\n\" >&2; exit 1",
@@ -559,10 +558,14 @@ fn signing_in_runs_again_only_the_steps_that_had_not_run() -> Result<(), String>
     finish(&mut tab, &ctx);
     let status = tab.status.clone().map(|(s, _)| s).unwrap_or_default();
     let _ = std::fs::remove_dir_all(&dir);
-    assert!(asked);
+    assert!(!asked);
     assert_eq!(kept, Some(push));
-    // The push ran again (and needs signing in again), not the tag.
-    assert!(status.contains("sign-in needed"), "{status}");
+    assert!(tab.credentials.is_none());
+    assert!(tab.busy_op.is_none() && !tab.https_checking);
+    assert!(
+        status.contains("destination or account context changed"),
+        "{status}"
+    );
     Ok(())
 }
 
@@ -578,10 +581,10 @@ fn aborting_asks_first() {
     assert_eq!(asks, Some(ops(&[&["merge", "--abort"]])));
 }
 
-/// An undo that needed signing in stays undoable when the sign-in is cancelled, and signing in
-/// runs it again without moving the timeline until it goes through.
+/// An undo whose alias prints authentication text remains undoable, but that
+/// text cannot authorize a credential-bearing retry or move the timeline.
 #[test]
-fn an_undo_whose_sign_in_is_cancelled_stays_undoable() -> Result<(), String> {
+fn unverified_alias_authentication_keeps_undo_without_authorizing_retry() -> Result<(), String> {
     use super::timeline::{Entry, Origin, RefState};
     use super::{RepoTab, UndoEntry};
     let dir = repo("sign-in-undo");
@@ -638,10 +641,11 @@ fn an_undo_whose_sign_in_is_cancelled_stays_undoable() -> Result<(), String> {
     let entries = tab.timeline.entries.len();
     let _ = std::fs::remove_dir_all(&dir);
     assert!(running);
-    assert!(asked);
+    assert!(!asked);
     assert_eq!(after_cancel, Some(id));
-    assert!(retrying);
-    // Refused again: still there, still only once.
+    assert!(!retrying);
+    assert!(tab.credentials.is_none());
+    // No authorized retry: still there, still only once.
     assert_eq!(after_retry, Some(id));
     assert_eq!(entries, 1);
     Ok(())

@@ -26,8 +26,8 @@ impl CredentialCommandPolicy {
 }
 /// Explicit credentials are authoritative and transient. Ambient helpers are not
 /// consulted or used for automatic post-success storage; persistence is a separate
-/// user action in their credential manager. Enumerate URL-specific keys too, as
-/// their higher URL-match specificity can override a generic command-line value.
+/// user action in their credential manager. The HTTP wrapper installs exact
+/// actual-URL policy in the transport context, after repository configuration.
 pub(crate) fn credential_command_policy(
     dir: Option<&Path>,
     credentials: &Credentials,
@@ -186,7 +186,12 @@ mod tests {
                 "https://push.invalid/team/repo".into(),
             ),
         ]);
-        let command = local_command(Some(Path::new("/nonexistent/recording")), &extra, &original);
+        let command = apply_command_extras(
+            Command::new("/recording/selected/bin/git"),
+            Some(Path::new("/nonexistent/recording")),
+            &extra,
+            &original,
+        );
         let args = command
             .get_args()
             .map(|a| a.to_string_lossy().into_owned())
