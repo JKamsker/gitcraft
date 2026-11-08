@@ -310,26 +310,42 @@ impl RepoTab {
         if let Some(pick) = state.selected {
             details(ui, data, laid, pick, &state.filter, acts);
         }
-        if laid.hidden > 0 {
+        let left_out: Vec<String> = [
+            (laid.hidden_symbols, "less referred-to changed symbols"),
+            (laid.hidden_other, "files in other languages"),
+            (laid.hidden, "less referred-to sites"),
+        ]
+        .iter()
+        .filter(|(n, _)| *n > 0)
+        .map(|(n, what)| format!("{n} {what}"))
+        .collect();
+        if !left_out.is_empty() {
             let t = Tokens::get(ui.ctx());
             ui.label(
                 RichText::new(format!(
-                    "{} less referred-to sites are left out of the picture; the table lists \
-                     them",
-                    laid.hidden
+                    "Left out of the picture for room: {}; the tables list them",
+                    left_out.join(", ")
                 ))
                 .size(11.5)
                 .color(t.text_faint),
             );
         }
-        let picked = graph::show(
-            ui,
-            "impact",
-            &laid.graph,
-            &laid.positions,
-            state.selected,
-            320.0,
-        );
+        // Tall enough for its fullest column, scrolled when the area is shorter.
+        let tall = (laid.tallest as f32 * 26.0 + 80.0).max(320.0);
+        let picked = egui::ScrollArea::vertical()
+            .id_salt("impact-graph")
+            .auto_shrink([false, false])
+            .show(ui, |ui| {
+                graph::show(
+                    ui,
+                    "impact",
+                    &laid.graph,
+                    &laid.positions,
+                    state.selected,
+                    tall,
+                )
+            })
+            .inner;
         if let Some(pick) = picked.clicked {
             acts.push(act(Act::Select(Some(pick))));
             if let Pick::Node(i) = pick

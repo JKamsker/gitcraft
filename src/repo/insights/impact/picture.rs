@@ -12,7 +12,11 @@ use crate::insights::impact::{Change, Impact};
 use crate::theme::Tokens;
 
 /// At most so many referring sites are drawn; the tables list them all.
-pub(super) const MAX_SITES: usize = 160;
+pub(super) const MAX_SITES: usize = 40;
+/// At most so many changed symbols are drawn (those referred to most first), and so many files
+/// in other languages: a column stays readable; the tables list them all.
+pub(super) const MAX_SYMBOLS: usize = 24;
+pub(super) const MAX_OTHER: usize = 8;
 
 /// Which references are shown, by where the code referring is.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -96,8 +100,13 @@ pub(crate) struct Laid {
     pub(crate) positions: Vec<Pos2>,
     pub(crate) nodes: Vec<NodeRef>,
     pub(crate) edges: Vec<EdgeRef>,
-    /// Sites left out of the picture for room (listed in the tables).
+    /// Sites, symbols and files in other languages left out of the picture for room (listed
+    /// in the tables).
     pub(crate) hidden: usize,
+    pub(crate) hidden_symbols: usize,
+    pub(crate) hidden_other: usize,
+    /// The most nodes in one column: how tall the picture has to be.
+    pub(crate) tallest: usize,
 }
 
 pub(super) fn change_color(t: &Tokens, change: Change) -> Color32 {
@@ -119,8 +128,21 @@ pub(super) fn change_badge(change: Change) -> &'static str {
 /// Builds the graph of `data` as `filter` says, laid out in columns or by force.
 pub(crate) fn build(data: &Impact, filter: &Filter, force: bool, t: &Tokens) -> Laid {
     let mut laid = Laid::default();
-    let symbols = filter.symbols(data);
-    let refs = filter.refs(data);
+    let mut symbols = filter.symbols(data);
+    let mut refs = filter.refs(data);
+    // The symbols referred to most, as many as there is room for, in their order.
+    if symbols.len() > MAX_SYMBOLS {
+        let mut by_refs: BTreeMap<usize, usize> = BTreeMap::new();
+        for &r in &refs {
+            *by_refs.entry(data.refs[r].symbol).or_default() += 1;
+        }
+        let mut ranked = symbols.clone();
+        ranked.sort_by_key(|i| (std::cmp::Reverse(by_refs.get(i).copied().unwrap_or(0)), *i));
+        ranked.truncate(MAX_SYMBOLS);
+        laid.hidden_symbols = symbols.len() - MAX_SYMBOLS;
+        symbols.retain(|i| ranked.contains(i));
+        refs.retain(|&r| symbols.contains(&data.refs[r].symbol));
+    }
     let mut index: BTreeMap<usize, usize> = BTreeMap::new();
     for &i in &symbols {
         let s = &data.symbols[i];
@@ -146,7 +168,8 @@ pub(crate) fn build(data: &Impact, filter: &Filter, force: bool, t: &Tokens) -> 
         laid.nodes.push(NodeRef::Symbol(i));
     }
     if filter.symbol.is_none() && !filter.public_only {
-        for (i, o) in data.other.iter().enumerate() {
+        laid.hidden_other = data.other.len().saturating_sub(MAX_OTHER);
+        for (i, o) in data.other.iter().enumerate().take(MAX_OTHER) {
             let mut node = Node::new(o.path.clone(), t.text_faint);
             node.shape = NodeShape::Pill;
             node.badge = Some("?".to_owned());
@@ -242,6 +265,11 @@ pub(crate) fn build(data: &Impact, filter: &Filter, force: bool, t: &Tokens) -> 
             refs: list,
         });
     }
+    let mut per_column = [0usize; 3];
+    for node in &laid.graph.nodes {
+        per_column[node.column.min(2)] += 1;
+    }
+    laid.tallest = per_column.into_iter().max().unwrap_or(0);
     let how = if force {
         Arrange::Force
     } else {

@@ -140,3 +140,18 @@ fn pair_nodes_keep_clear_of_each_other() {
         assert!((*p - pos[6]).length() > 0.01);
     }
 }
+
+/// Two branches and the default one: not on one line, so no pair sits on another node.
+#[test]
+fn two_branches_and_the_default_one_make_a_triangle() {
+    let pairs = [(0, 1), (0, 2), (1, 2)];
+    let pos = picture::place(2, true, &pairs);
+    let (a, b, t) = (pos[0], pos[1], pos[2]);
+    let cross = (b - a).x * (t - a).y - (b - a).y * (t - a).x;
+    assert!(cross.abs() > 0.05, "not on one line: {pos:?}");
+    for (i, p) in pos.iter().enumerate().skip(3) {
+        for q in &pos[..3] {
+            assert!((*p - *q).length() > 0.05, "pair {i} on a branch: {pos:?}");
+        }
+    }
+}

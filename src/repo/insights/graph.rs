@@ -239,7 +239,14 @@ pub(crate) fn show(
 ) -> Picked {
     let t = Tokens::get(ui.ctx());
     let id = Id::new(("insight-graph", salt));
-    let size = vec2(ui.available_width(), ui.available_height().max(min_height));
+    // In a scrolled area the height left may be unbounded: then `min_height` it is.
+    let left = ui.available_height();
+    let height = if left.is_finite() && left < 20_000.0 {
+        left.max(min_height)
+    } else {
+        min_height
+    };
+    let size = vec2(ui.available_width(), height);
     let (rect, canvas) = ui.allocate_exact_size(size, Sense::click_and_drag());
     let painter = ui.painter_at(rect);
     painter.rect_filled(rect, t.radius, t.dock);

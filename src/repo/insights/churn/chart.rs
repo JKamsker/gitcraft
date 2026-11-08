@@ -235,8 +235,11 @@ pub(super) fn rows(
         egui::FontId::proportional(10.5),
         t.text_faint,
     );
+    // Not one result recorded: said once rather than as a row of question marks.
+    let no_results = tl.samples.iter().all(|s| s.verdict.is_none());
     for (place, title) in places.iter().zip(titles) {
-        painter.text(
+        // Clipped to its chart: a narrow one doesn't run into the next.
+        painter.with_clip_rect(place.shrink2(vec2(1.0, 0.0))).text(
             place.left_top() + vec2(2.0, 2.0),
             Align2::LEFT_TOP,
             title,
@@ -244,6 +247,16 @@ pub(super) fn rows(
             t.text_dim,
         );
         let strip = Rect::from_min_max(pos2(place.left(), place.bottom() - 12.0), place.max);
+        if no_results {
+            painter.with_clip_rect(*place).text(
+                strip.left_center() + vec2(2.0, 0.0),
+                Align2::LEFT_CENTER,
+                "no test results recorded",
+                egui::FontId::proportional(10.0),
+                t.text_faint,
+            );
+            continue;
+        }
         let step = xs(strip, n).windows(2).next().map_or(10.0, |w| w[1] - w[0]);
         let side = (step - 1.0).clamp(4.0, 11.0);
         for (k, x) in xs(strip, n).into_iter().enumerate() {

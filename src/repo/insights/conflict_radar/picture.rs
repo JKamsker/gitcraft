@@ -31,7 +31,13 @@ pub(super) fn place(branches: usize, target: bool, pairs: &[(usize, usize)]) -> 
         })
         .collect();
     if target {
-        pos.push(pos2(0.5, 0.5));
+        // Two branches face each other across the middle: the default branch goes aside, or
+        // all three and their pairs would be on one line.
+        pos.push(if branches == 2 {
+            pos2(0.86, 0.5)
+        } else {
+            pos2(0.5, 0.5)
+        });
     }
     let ends = pos.clone();
     for &(a, b) in pairs {
