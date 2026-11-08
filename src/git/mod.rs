@@ -521,6 +521,24 @@ mod backend_fluent_adapter_tests {
             assert!(raw.contains("cancelled"));
             assert_eq!(display_error(&raw), cancelled);
             assert_eq!(display_error(opaque), opaque);
+            let helper = "Contained bundle Git: invalid keep hash";
+            assert_eq!(
+                display_error(helper),
+                if locale == "de" {
+                    "Git im begrenzten Bundle-Helfer: Ungültiger Keep-Hash."
+                } else {
+                    helper
+                }
+            );
+            let steps = dvc::pull_steps();
+            assert_eq!(
+                steps[0].last().map(String::as_str),
+                Some("gitcraft-dvc-pull")
+            );
+            assert!(steps[0][1].contains("DVC is not installed on this repository machine"));
+            assert!(goes_over_network(
+                &steps[0].iter().map(String::as_str).collect::<Vec<_>>()
+            ));
             assert_eq!(testlane::Verdict::Good.word(), "good");
             assert_eq!(
                 testlane::Verdict::parse("bad"),
