@@ -7514,3 +7514,56 @@ repo-workflows-dco-whole-preview = Rewrites { $count ->
        *[no] { "\u000AThe branch has no remote branch: nothing is pushed. Pushing it later replaces the old commits there (a force push).\u000A\u000ACtrl+Z puts the commits as they were back." }
     }
 
+repo-workflows-operation-rebase-fork-push = Rebase #{ $number } onto { $base } and push
+
+repo-workflows-operation-push-rebased = Push the rebased { $branch } to { $remote }
+
+repo-workflows-operation-here-only = { $operation } (here only)
+
+repo-workflows-operation-finish-hotfix = Finish hotfix { $tag }
+
+repo-workflows-operation-push-hotfix = Push hotfix { $tag }
+
+repo-workflows-operation-start-issue-work = Start work on { $issue }
+
+repo-workflows-operation-force-unlock = Force unlock { $path }
+
+repo-workflows-operation-force-unlock-count = Force unlock { $count ->
+        [one] one file
+       *[other] { $count } files
+    }
+
+repo-workflows-operation-lfs-track = Track { $pattern } in LFS
+
+repo-workflows-operation-lfs-prune = LFS: Prune old objects
+
+repo-workflows-operation-mark-bisect = Mark in the bisect
+
+repo-workflows-operation-snapshot = Snapshot
+
+repo-workflows-operation-distribute-staged = Distribute staged fixes into { $count ->
+        [one] one commit
+       *[other] { $count } commits
+    }
+
+repo-workflows-status-rewrite-retention = { $operation }: done, but its earlier version couldn’t be kept: { $detail }
+
+repo-workflows-status-dco-local-only = { $branch }’s commits are signed off here, but not pushed{ $target ->
+        [yes] { " to " }{ $remote }
+       *[no] { "" }
+    }: Ctrl+Z puts them back as they were
+
+repo-workflows-operation-ssh-14017 = Create SSH key
+
+repo-workflows-operation-ssh-14019 = Create SSH key there
+
+repo-workflows-operation-ssh-14022 = Add selected SSH key to agent
+
+repo-workflows-operation-ssh-14024 = Add SSH key to agent there
+
+repo-workflows-operation-ssh-14036 = Test selected SSH key
+
+repo-workflows-operation-ssh-14038 = Test selected SSH key there
+
+repo-workflows-operation-ssh-14048 = Register public SSH key there
+

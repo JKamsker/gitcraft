@@ -399,7 +399,7 @@ fn set_row(
                 "Set {} to {} for {}",
                 setting.key,
                 shortened(&value),
-                scope_choice(scope).to_lowercase()
+                scope_identity(scope).to_lowercase()
             );
             acts.push(Action::Doctor(match scope {
                 // Beyond this repository: asked first.
@@ -450,6 +450,17 @@ fn set_row(
         _ => crate::i18n::text("repo-workflows-doctor-set-row-e0d5ce0a"),
     };
     faint(ui, note);
+}
+
+// Operation labels retain their original raw identity; scope_choice is paint only.
+fn scope_identity(scope: Scope) -> &'static str {
+    match scope {
+        Scope::Local => "This repository",
+        Scope::Worktree => "This worktree",
+        Scope::Global => "All my repositories",
+        Scope::System => "Everyone on this machine",
+        Scope::Command => "Command line",
+    }
 }
 
 fn scope_choice(scope: Scope) -> &'static str {

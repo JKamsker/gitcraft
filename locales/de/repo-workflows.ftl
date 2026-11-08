@@ -7512,3 +7512,56 @@ repo-workflows-dco-whole-preview = Schreibt { $count ->
        *[no] { "\u000ADer Branch hat keinen Remote-Branch: Es wird nichts gepusht. Ein späterer Push ersetzt dort die alten Commits (Force-Push).\u000A\u000AStrg+Z stellt die vorherigen Commits wieder her." }
     }
 
+repo-workflows-operation-rebase-fork-push = #{ $number } auf { $base } rebasen und pushen
+
+repo-workflows-operation-push-rebased = Den rebasierten Branch { $branch } nach { $remote } pushen
+
+repo-workflows-operation-here-only = { $operation } (nur hier)
+
+repo-workflows-operation-finish-hotfix = Hotfix { $tag } abschließen
+
+repo-workflows-operation-push-hotfix = Hotfix { $tag } pushen
+
+repo-workflows-operation-start-issue-work = Arbeit an { $issue } beginnen
+
+repo-workflows-operation-force-unlock = Entsperren von { $path } erzwingen
+
+repo-workflows-operation-force-unlock-count = Entsperren von { $count ->
+        [one] einer Datei
+       *[other] { $count } Dateien
+    } erzwingen
+
+repo-workflows-operation-lfs-track = { $pattern } mit LFS verwalten
+
+repo-workflows-operation-lfs-prune = LFS: Alte Objekte bereinigen
+
+repo-workflows-operation-mark-bisect = Im Bisect markieren
+
+repo-workflows-operation-snapshot = Momentaufnahme
+
+repo-workflows-operation-distribute-staged = Vorgemerkte Korrekturen auf { $count ->
+        [one] einen Commit
+       *[other] { $count } Commits
+    } verteilen
+
+repo-workflows-status-rewrite-retention = { $operation }: abgeschlossen, aber die frühere Version konnte nicht aufbewahrt werden: { $detail }
+
+repo-workflows-status-dco-local-only = Die Commits von { $branch } sind hier mit Sign-off versehen, aber noch nicht{ $target ->
+        [yes] { " nach " }{ $remote }
+       *[no] { "" }
+    } gepusht: Strg+Z stellt ihren vorherigen Stand wieder her
+
+repo-workflows-operation-ssh-14017 = SSH-Schlüssel erstellen
+
+repo-workflows-operation-ssh-14019 = SSH-Schlüssel dort erstellen
+
+repo-workflows-operation-ssh-14022 = Ausgewählten SSH-Schlüssel zum Agenten hinzufügen
+
+repo-workflows-operation-ssh-14024 = SSH-Schlüssel dort zum Agenten hinzufügen
+
+repo-workflows-operation-ssh-14036 = Ausgewählten SSH-Schlüssel testen
+
+repo-workflows-operation-ssh-14038 = Ausgewählten SSH-Schlüssel dort testen
+
+repo-workflows-operation-ssh-14048 = Öffentlichen SSH-Schlüssel dort registrieren
+
