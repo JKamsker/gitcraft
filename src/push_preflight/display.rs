@@ -414,7 +414,7 @@ fn dynamic(raw: &str) -> Option<String> {
         .and_then(|s| s.strip_suffix("."))
     {
         let rendered = (|| {
-            let target = target_label_display(text);
+            let target = target_label(text);
             Some(message(
                 "interaction-guards-push-identity",
                 &[("target", target.into())],
@@ -521,10 +521,12 @@ pub(crate) fn reviewed_auth_failure() -> &'static str {
 
 /// Uses the canonical redaction helper before translating its application-owned label.
 pub(crate) fn target(url: &str) -> String {
-    target_label_display(&super::target_label(url))
+    target_label(&super::target_label(url))
 }
 
-fn target_label_display(raw: &str) -> String {
+/// Localize an already redacted canonical label from `Plan::targets` or `lfs_targets()`.
+/// Raw endpoints must go through `target()` so canonical redaction runs first.
+pub(crate) fn target_label(raw: &str) -> String {
     if let Some(path) = raw.strip_prefix("Local repository: ") {
         let path = if path == "[sensitive path]" {
             crate::i18n::text("interaction-guards-push-sensitive-path")
@@ -548,7 +550,7 @@ fn target_label_display(raw: &str) -> String {
 /// Canonical path redaction/escaping with a localized redaction placeholder.
 pub(crate) fn path(path: &str) -> String {
     let raw = super::display_path(path);
-    if raw == "[sensitive path]" {
+    if raw == "[sensitive path]" && super::secret_lines(path).next().is_some() {
         crate::i18n::text("interaction-guards-push-sensitive-path").into()
     } else {
         raw

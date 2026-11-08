@@ -87,6 +87,11 @@ fn guard_display_push_supplied_findings_and_uncertain_recovery_keep_opaque_field
         );
         assert!(target("/owned/12345/repo").ends_with("/owned/12345/repo"));
         assert_eq!(path("src/a\nb.rs"), "src/a\\nb.rs");
+        assert_eq!(path("[sensitive path]"), "[sensitive path]");
+        assert_eq!(
+            target_label("Local repository: /owned/12345/repo"),
+            target("/owned/12345/repo")
+        );
     }
     set_language("en-US");
 }
