@@ -18,7 +18,7 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 static IDS: AtomicU64 = AtomicU64::new(0);
-#[derive(Clone, Default, Serialize, Deserialize)]
+#[derive(Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) struct Case {
     base: String,
     head: String,
@@ -39,11 +39,46 @@ struct Report {
 #[derive(Default)]
 pub(crate) struct State {
     case: Case,
+    generated: Option<Case>,
+    request: u64,
     busy: bool,
     cancel: ai::Cancel,
     stop: git::RunStop,
     error: Option<String>,
     report: Option<Report>,
+}
+impl State {
+    fn accept(
+        &mut self,
+        request: u64,
+        input: &Case,
+        result: Result<(Option<Case>, Option<Report>), String>,
+    ) {
+        if request != self.request {
+            return;
+        }
+        self.busy = false;
+        if self.cancel.is_cancelled() {
+            return;
+        }
+        match result {
+            Ok((case, report)) => {
+                if let Some(mut case) = case {
+                    case.approved = false;
+                    if &self.case == input {
+                        self.case = case;
+                    } else {
+                        self.generated = Some(case);
+                        self.error = Some("Generated result belongs to the earlier form. Your edits were preserved; inspect and explicitly use the result below if wanted.".into());
+                    }
+                }
+                if report.is_some() {
+                    self.report = report;
+                }
+            }
+            Err(e) => self.error = Some(e),
+        }
+    }
 }
 impl Drop for State {
     fn drop(&mut self) {
@@ -58,6 +93,7 @@ pub(crate) enum Act {
     Stop,
     Load,
     UseSelection,
+    UseGenerated,
 }
 /// Pure recording plan, validated before any process can be started.
 struct Sandbox {
@@ -310,10 +346,22 @@ impl RepoTab {
         if matches!(act, Act::Stop) {
             self.review_tools.reproducer.cancel.cancel();
             self.review_tools.reproducer.stop.stop();
+            self.review_tools.reproducer.request += 1;
+            self.review_tools.reproducer.busy = false;
+            self.review_tools.reproducer.case.approved = false;
+            return;
+        }
+        if matches!(act, Act::UseGenerated) {
+            let s = &mut self.review_tools.reproducer;
+            if let Some(mut generated) = s.generated.take() {
+                generated.approved = false;
+                s.case = generated;
+            }
             return;
         }
         if matches!(act, Act::UseSelection) {
             let c = &mut self.review_tools.reproducer.case;
+            c.approved = false;
             if let Some(v) = &self.diff {
                 match &v.key {
                     DiffKey::Range {
@@ -345,6 +393,9 @@ impl RepoTab {
             return;
         }
         s.busy = true;
+        s.request += 1;
+        let request = s.request;
+        let input = s.case.clone();
         s.error = None;
         s.cancel = ai::Cancel::new();
         s.stop = git::RunStop::default();
@@ -369,8 +420,7 @@ impl RepoTab {
         Act::Run(case)=>run(&repo,case,&stop).map(|report|(None,Some(report))),
         Act::Load=>Ok((store::load::<Case>(&repo,"reproducer-cases","latest")?,store::load::<Report>(&repo,"reproducer-evidence","latest")?)),_=>Ok((None,None))
       }
-   },|tab,result,_|{let s=&mut tab.review_tools.reproducer;s.busy=false;match result{Ok((case,report))=>{if let Some(case)=case{s.case=case;}
-if report.is_some(){s.report=report;}},Err(e)=>s.error=Some(e)}});
+   },move |tab,result,_| { tab.review_tools.reproducer.accept(request, &input, result); });
     }
     pub(in crate::repo) fn reproducer_badge(&self, ui: &mut egui::Ui, key: &DiffKey) {
         if let Some(report) = &self.review_tools.reproducer.report
@@ -417,6 +467,7 @@ pub(super) fn show(ui: &mut egui::Ui, s: &mut State, acts: &mut Vec<Action>) {
             acts.push(Action::ReviewTools(ToolsAct::Reproducer(Act::Load)));
         }
     });
+    let before = s.case.clone();
     let c = &mut s.case;
     for (text, hint) in [
         (&mut c.base, "Base revision"),
@@ -454,6 +505,11 @@ pub(super) fn show(ui: &mut egui::Ui, s: &mut State, acts: &mut Vec<Action>) {
         egui::TextEdit::singleline(&mut c.image).hint_text("Preloaded Rust Docker image or digest"),
     );
     ui.weak("Docker must be available on the repository's machine. Images are never pulled. The container has no network, no writable host mount, an unprivileged UID, resource limits, and a 120s internal timeout. Dependencies must already be vendored in the repository or preloaded in your image; cargo uses --offline.");
+    let mut content = c.clone();
+    content.approved = before.approved;
+    if content != before {
+        c.approved = false;
+    }
     ui.checkbox(
         &mut c.approved,
         "I inspected this source and explicitly approve running it in the restricted container",
@@ -478,6 +534,21 @@ pub(super) fn show(ui: &mut egui::Ui, s: &mut State, acts: &mut Vec<Action>) {
     if let Some(e) = &s.error {
         ui.label(e);
     }
+    if let Some(generated) = &s.generated {
+        egui::CollapsingHeader::new("Generated result for the earlier form").show(ui, |ui| {
+            ui.label(format!(
+                "{}:{} · {} → {}",
+                generated.path, generated.line, generated.base, generated.head
+            ));
+            ui.monospace(&generated.source);
+            if ui
+                .button("Use this generated case (approval required again)")
+                .clicked()
+            {
+                acts.push(Action::ReviewTools(ToolsAct::Reproducer(Act::UseGenerated)));
+            }
+        });
+    }
     if let Some(r) = &s.report {
         show_report(ui, r);
         if ui.button("Open pinned comparison").clicked() {
@@ -492,6 +563,43 @@ pub(super) fn show(ui: &mut egui::Ui, s: &mut State, acts: &mut Vec<Action>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn r2_pure_delayed_ai_completion_preserves_edited_form_and_cancelled_approval() {
+        let original = Case {
+            objection: "old objection".into(),
+            source: "old test".into(),
+            ..Default::default()
+        };
+        let generated = Case {
+            source: "model test".into(),
+            approved: true,
+            ..original.clone()
+        };
+        let mut state = State {
+            case: original.clone(),
+            request: 1,
+            busy: true,
+            generated: None,
+            cancel: Default::default(),
+            stop: Default::default(),
+            error: None,
+            report: None,
+        };
+        state.case.objection = "edited objection".into();
+        state.case.source = "handwritten test".into();
+        state.accept(1, &original, Ok((Some(generated.clone()), None)));
+        assert_eq!(state.case.source, "handwritten test");
+        assert_eq!(state.case.objection, "edited objection");
+        assert!(!state.generated.as_ref().expect("separate result").approved);
+        state.request = 2;
+        state.case.approved = false;
+        state.accept(1, &original, Ok((Some(generated.clone()), None)));
+        assert_eq!(state.case.source, "handwritten test");
+        state.cancel.cancel();
+        state.accept(2, &original, Ok((Some(generated), None)));
+        assert_eq!(state.case.source, "handwritten test");
+        assert!(!state.case.approved);
+    }
     #[test]
     fn recorded_sandbox_plan_contains_real_containment_and_exact_owner_cleanup()
     -> Result<(), String> {
