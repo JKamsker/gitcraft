@@ -49,32 +49,8 @@ impl RepoTab {
         let at = short(hash);
         let running = self.bisect.running();
         for (mark, label) in [
-            (
-                Mark::Good,
-                crate::i18n::message(
-                    "repo-workflows-bisect-bisect-menu-items-5f1847b9",
-                    &[
-                        ("at", (at).clone().into()),
-                        (
-                            "bisect-word-mark-good-1",
-                            (bisect.word(Mark::Good)).clone().into(),
-                        ),
-                    ],
-                ),
-            ),
-            (
-                Mark::Bad,
-                crate::i18n::message(
-                    "repo-workflows-bisect-bisect-menu-items-5f1847b9",
-                    &[
-                        ("at", (at).clone().into()),
-                        (
-                            "bisect-word-mark-bad-1",
-                            (bisect.word(Mark::Bad)).clone().into(),
-                        ),
-                    ],
-                ),
-            ),
+            (Mark::Good, mark_at(at, bisect.word(Mark::Good), false)),
+            (Mark::Bad, mark_at(at, bisect.word(Mark::Bad), false)),
             (
                 Mark::Skip,
                 crate::i18n::message(
@@ -130,32 +106,8 @@ impl RepoTab {
         if bisect.outcome.is_none() {
             let at = short(&bisect.current);
             items.extend([
-                item(
-                    crate::i18n::message(
-                        "repo-workflows-bisect-bisect-palette-items-417fbb2c",
-                        &[
-                            ("at", (at).clone().into()),
-                            (
-                                "bisect-word-mark-good-1",
-                                (bisect.word(Mark::Good)).clone().into(),
-                            ),
-                        ],
-                    ),
-                    mark(Mark::Good),
-                ),
-                item(
-                    crate::i18n::message(
-                        "repo-workflows-bisect-bisect-palette-items-417fbb2c",
-                        &[
-                            ("at", (at).clone().into()),
-                            (
-                                "bisect-word-mark-bad-1",
-                                (bisect.word(Mark::Bad)).clone().into(),
-                            ),
-                        ],
-                    ),
-                    mark(Mark::Bad),
-                ),
+                item(mark_at(at, bisect.word(Mark::Good), true), mark(Mark::Good)),
+                item(mark_at(at, bisect.word(Mark::Bad), true), mark(Mark::Bad)),
                 item(
                     crate::i18n::message(
                         "repo-workflows-bisect-bisect-palette-items-011b904c",
@@ -182,5 +134,52 @@ impl RepoTab {
             ));
         }
         items
+    }
+}
+
+/// Paint-only label. Bisect terms remain opaque Git/user data and actions retain Mark values.
+fn mark_at(at: &str, word: &str, palette: bool) -> String {
+    crate::i18n::message(
+        if palette {
+            "repo-workflows-bisect-bisect-palette-items-417fbb2c"
+        } else {
+            "repo-workflows-bisect-bisect-menu-items-5f1847b9"
+        },
+        &[("at", at.into()), ("word", word.into())],
+    )
+}
+#[cfg(test)]
+mod fluent_mark_tests {
+    use super::*;
+    #[test]
+    fn fluent_partition_actual_bisect_mark_label_preserves_good_bad_and_custom_terms() {
+        for language in ["en-US", "de"] {
+            crate::i18n::set_language(language);
+            for term in ["good", "bad", "old/provider-ß"] {
+                for palette in [false, true] {
+                    let text = mark_at("abcdef12", term, palette);
+                    assert_eq!(
+                        text,
+                        if language == "de" {
+                            format!(
+                                "{}abcdef12 als {term} markieren",
+                                if palette { "Bisect: " } else { "" }
+                            )
+                        } else {
+                            format!(
+                                "{}mark abcdef12 as {term}",
+                                if palette { "Bisect: " } else { "" }
+                            )
+                            .replacen(
+                                "mark",
+                                if palette { "mark" } else { "Mark" },
+                                1,
+                            )
+                        }
+                    );
+                }
+            }
+        }
+        crate::i18n::set_language("en-US");
     }
 }

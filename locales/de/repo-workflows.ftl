@@ -784,7 +784,7 @@ repo-workflows-bisect-bisect-menu-items-43fa49b5 = Bisect hier starten …
 
 repo-workflows-bisect-bisect-menu-items-5cc56687 = Findet den Commit, der eine Änderung eingeführt hat, durch Tests zwischen einem guten und einem schlechten Commit
 
-repo-workflows-bisect-bisect-menu-items-5f1847b9 = { $at } als { $bisect-word-mark-bad-1 } markieren
+repo-workflows-bisect-bisect-menu-items-5f1847b9 = { $at } als { $word } markieren
 
 repo-workflows-bisect-bisect-menu-items-72281c73 = { $at } im Bisect überspringen
 
@@ -794,7 +794,7 @@ repo-workflows-bisect-bisect-palette-items-23b8f037 = Bisect: stoppen
 
 repo-workflows-bisect-bisect-palette-items-34a86ddf = Bisect: abschließen
 
-repo-workflows-bisect-bisect-palette-items-417fbb2c = Bisect: { $at } als { $bisect-word-mark-bad-1 } markieren
+repo-workflows-bisect-bisect-palette-items-417fbb2c = Bisect: { $at } als { $word } markieren
 
 repo-workflows-bisect-bisect-palette-items-96774cb9 = Bisect: Befehl ausführen …
 
