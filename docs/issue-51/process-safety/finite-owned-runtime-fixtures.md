@@ -38,5 +38,45 @@ endpoint directories intentionally remain after pinned receipt deletion, matchin
 production retirement's refusal to remove directory pathnames. Unknown helper
 outcomes stay in existing controller recovery; no guessed cleanup or watchdog.
 
+## Native claim and fence turnover
+
+Prospective command, **NOT EXECUTED** (same private TMPDIR and clean parent variables):
+
+```sh
+cargo +1.95.0 test --offline --locked -p gitcraft --lib remote::workspace_claim::tests::owned_runtime_claim_fence_turnover -- --exact --ignored --test-threads=1 --nocapture
+```
+
+One namespace uses existing `Lease::native` claimants. A losing busy acquisition must
+return the actual contention error without changing any namespace entries or generation.
+An actual native mutation helper holds production `WorkspaceFence` through its fixed
+target's ready/release barrier, effect and terminal receipt. Cancelling the retained
+primary lease ticket closes its owned input, joins its EOF exit0, and invalidates its
+authority. A second native claimant starts on a retained thread/token; a busy retained
+primary lock after the old helper has exited proves the successor has entered the
+namespace while the actual operation fence still blocks generation publication.
+The test checks the pending result is absent and old generation/record unchanged before
+releasing the target. Turnover completes only after real effect and terminal proof.
+
+The successor must have a distinct generation and the same anchor. Both direct existing
+WorkspaceFence acquisition and an actual native helper reject the stale grant; the
+latter cannot create its validly named stale record or its target effect. The original
+record/receipt survive turnover and authenticate exact recovery. A live successor fence
+still verifies, pinned receipt retirement repeats safely, and fresh canary challenges
+remain responsive throughout. No invented claim or generation implementation is used.
+
+The pending thread has a cancellation/join Drop guard. Leases retain their Service
+tickets, the isolated exact invocation owns the existing dedicated lease Service lane,
+and a Drop guard shuts down/joins that lane on failure. All target and canary work is
+retained in existing Services; ordinary polls, channel receives and lock waits are
+bounded. The existing `Lease::native` handshake has its production 30s budget and its
+helper's retained input supplies EOF cancellation. No process selector, timestamp/PID
+takeover, signal hook or fallback cleanup is used. Failed runs preserve scratch records.
+
+LOOPBACK/Python/Perl/SSH/WSL variants remain **unimplemented and unvalidated**. The
+production remote launcher selects Python if its probe succeeds, otherwise Perl; it
+has no fixed-backend test adapter. Adding an audited test-only backend selector and
+repeating this schedule against that backend would be a separate source-reviewed
+fixture. This native unit deliberately does not add a backend framework or policy.
+
 No fixture runtime results are claimed by this document. Build/lint logs and final
 immutable source hashes are handed to the parent outside the repository.

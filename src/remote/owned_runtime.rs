@@ -148,6 +148,16 @@ pub(super) fn dispatch() -> Result<bool, String> {
                 std::fs::write(directory.join("target-ready"), b"ready")?;
                 until(|| Ok(directory.join("release").exists())).map_err(io::Error::other)?;
             }
+            Some("gate") => {
+                std::fs::write(directory.join("target-ready"), b"ready")?;
+                until(|| Ok(directory.join("release").exists())).map_err(io::Error::other)?;
+                std::fs::write(directory.join("mutation-effect"), b"owned mutation")?;
+                io::stdout().write_all(b"mutation-complete\n")?;
+                io::stdout().flush()?;
+            }
+            Some("touch") => {
+                std::fs::write(directory.join("unexpected-effect"), b"stale dispatch")?;
+            }
             Some("canary") => {
                 let deadline = Instant::now() + Duration::from_secs(60);
                 while Instant::now() < deadline {
