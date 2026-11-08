@@ -1,9 +1,8 @@
 //! Running a forge's own command-line tool (`gh`, `glab`), which holds the user's login.
 
 use std::collections::HashMap;
-use std::io::Write;
 use std::path::Path;
-use std::process::{Command, Stdio};
+use std::process::Command;
 use std::time::{Duration, Instant};
 
 use super::Forge;
@@ -21,29 +20,19 @@ pub(super) fn run_with_input(
     args: &[&str],
     input: Option<&str>,
 ) -> Result<String, String> {
-    let (mut cmd, not_installed) = prepared(tool, noun, repo, args)?;
-    let out = match input {
-        None => cmd.output().map_err(not_installed)?,
-        Some(input) => {
-            let mut child = cmd
-                .stdin(Stdio::piped())
-                .stdout(Stdio::piped())
-                .stderr(Stdio::piped())
-                .spawn()
-                .map_err(not_installed)?;
-            if let Some(mut stdin) = child.stdin.take() {
-                // A tool that stops reading has stopped for a reason, which its exit code and
-                // error output below tell better than the broken pipe would.
-                let _ = stdin.write_all(input.as_bytes());
-            }
-            child.wait_with_output().map_err(|e| e.to_string())?
-        }
-    };
-    answer(tool, &out)
+    if input.is_some_and(|text| text.len() > INPUT_LIMIT) {
+        return Err(format!("{tool} input exceeds {INPUT_LIMIT} bytes"));
+    }
+    let (cmd, start_error) = prepared(tool, noun, repo, args)?;
+    let options = bounded_options(TOOL_TIMEOUT, input);
+    finish_run(
+        tool,
+        TOOL_TIMEOUT,
+        dispatch(cmd, options, start_error, crate::processes::run_checked),
+    )
 }
 
-/// [`run`], stopped when it hasn't finished `within` that long: for what nobody waits on (the
-/// inbox), where a tool that hangs would otherwise stay until the app ends.
+/// [`run`], with the caller's deadline (including time queued in the process service).
 pub(super) fn run_within(
     tool: &str,
     noun: &str,
@@ -51,58 +40,70 @@ pub(super) fn run_within(
     args: &[&str],
     within: Duration,
 ) -> Result<String, String> {
-    use std::io::Read;
-    let (mut cmd, not_installed) = prepared(tool, noun, repo, args)?;
-    let mut child = cmd
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(not_installed)?;
-    // Read as it comes, or a long answer would fill the pipe and the tool wait on it forever.
-    let drain = |pipe: Option<Box<dyn Read + Send>>| {
-        std::thread::spawn(move || {
-            let mut bytes = Vec::new();
-            if let Some(mut pipe) = pipe {
-                let _ = pipe.read_to_end(&mut bytes);
-            }
-            bytes
-        })
-    };
-    let stdout = drain(
-        child
-            .stdout
-            .take()
-            .map(|p| Box::new(p) as Box<dyn Read + Send>),
-    );
-    let stderr = drain(
-        child
-            .stderr
-            .take()
-            .map(|p| Box::new(p) as Box<dyn Read + Send>),
-    );
-    let until = Instant::now() + within;
-    let status = loop {
-        match child.try_wait() {
-            Ok(Some(status)) => break status,
-            Ok(None) if Instant::now() < until => std::thread::sleep(Duration::from_millis(50)),
-            Ok(None) => {
-                let _ = child.kill();
-                let _ = child.wait();
-                // The readers are left: what the tool started may hold its pipes a while yet.
-                return Err(format!(
-                    "{tool} didn't finish within {} seconds",
-                    within.as_secs()
-                ));
-            }
-            Err(e) => return Err(format!("couldn't wait for {tool}: {e}")),
+    let (cmd, start_error) = prepared(tool, noun, repo, args)?;
+    finish_run(
+        tool,
+        within,
+        dispatch(
+            cmd,
+            bounded_options(within, None),
+            start_error,
+            crate::processes::run_checked,
+        ),
+    )
+}
+
+// Network commands get two minutes; inbox callers supply their shorter deadline.
+const TOOL_TIMEOUT: Duration = Duration::from_secs(120);
+const INPUT_LIMIT: usize = 16 * 1024 * 1024;
+const OUTPUT_LIMIT: usize = 16 * 1024 * 1024;
+const ERROR_LIMIT: usize = 64 * 1024;
+
+fn bounded_options(within: Duration, input: Option<&str>) -> crate::processes::Options {
+    crate::processes::Options {
+        timeout: Some(within),
+        // Service ignores BrokenPipe while still collecting the tool's exit diagnostics.
+        input: input.map(|text| text.as_bytes().to_vec()),
+        output_limit: OUTPUT_LIMIT,
+        stderr_limit: Some(ERROR_LIMIT),
+        ..Default::default()
+    }
+}
+
+fn dispatch(
+    command: Command,
+    options: crate::processes::Options,
+    start_error: impl FnOnce(String) -> String,
+    run: impl FnOnce(
+        Command,
+        crate::processes::Options,
+    ) -> Result<crate::processes::Output, crate::processes::Failure>,
+) -> Result<crate::processes::Output, String> {
+    run(command, options).map_err(|error| match error {
+        crate::processes::Failure::Failed(message) => start_error(message),
+        other => other.message(),
+    })
+}
+
+fn finish_run(
+    tool: &str,
+    within: Duration,
+    result: Result<crate::processes::Output, String>,
+) -> Result<String, String> {
+    let output = result?;
+    // Only confirmed timeout cleanup gets the familiar deadline wording. Uncertain cleanup
+    // retains its complete() error, even if the direct child exited successfully.
+    let timed_out = output.stop_kind == Some(crate::processes::StopKind::TimedOut);
+    let out = output.complete().map_err(|error| {
+        if timed_out {
+            format!(
+                "{tool} didn't finish within {} seconds: {error}",
+                within.as_secs()
+            )
+        } else {
+            error
         }
-    };
-    let out = std::process::Output {
-        status,
-        stdout: stdout.join().unwrap_or_default(),
-        stderr: stderr.join().unwrap_or_default(),
-    };
+    })?;
     answer(tool, &out)
 }
 
@@ -122,7 +123,7 @@ fn prepared(
     noun: &str,
     repo: &Path,
     args: &[&str],
-) -> Result<(Command, impl Fn(std::io::Error) -> String), String> {
+) -> Result<(Command, impl Fn(String) -> String), String> {
     let mut cmd = tool_command(tool);
     let remote = crate::remote::parse(repo).is_some();
     let context = crate::connections::current();
@@ -171,13 +172,17 @@ fn prepared(
     }
     let here = remote || repo.is_dir();
     let (tool, noun, shown) = (tool.to_owned(), noun.to_owned(), repo.display().to_string());
-    let not_installed = move |e: std::io::Error| match e.kind() {
-        std::io::ErrorKind::NotFound if here => {
-            format!("{tool} isn't installed: gitcraft uses it for {noun}s")
-        }
-        _ => format!("couldn't run {tool} in {shown}: {e}"),
+    // Service failures are strings, not typed spawn errors. Keep the original cause and an
+    // installation hint for a failed launch, without guessing an OS errno or rebuilding PATH.
+    let start_error = move |error: String| {
+        let hint = if here && error.starts_with("could not run process:") {
+            format!("; check that {tool} is installed: gitcraft uses it for {noun}s")
+        } else {
+            String::new()
+        };
+        format!("couldn't run {tool} in {shown}: {error}{hint}")
     };
-    Ok((cmd, not_installed))
+    Ok((cmd, start_error))
 }
 
 /// The forge whose tool `tool` is.
@@ -341,33 +346,57 @@ fn trusted_host(forge: Forge, tool: &str, host: &str) -> Result<bool, String> {
     Ok(signed_in)
 }
 
-/// Whether `tool` says it is signed in to `host`; no when it doesn't say so within
-/// [`AUTH_CHECK_FOR`] (it is stopped).
+/// Whether `tool` reports a login within [`AUTH_CHECK_FOR`]. An incomplete check stays an
+/// error, so cancellation, timeout or uncertain cleanup cannot be cached as signed out.
 fn signed_in_to(tool: &str, host: &str) -> Result<bool, String> {
     let mut cmd = tool_command(tool);
     cmd.args(["auth", "status", "--hostname", host])
-        .current_dir(std::env::temp_dir())
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null());
-    let mut child = cmd.spawn().map_err(|e| match e.kind() {
-        std::io::ErrorKind::NotFound => format!("{tool} isn't installed"),
-        _ => format!("couldn't run {tool}: {e}"),
-    })?;
-    let until = Instant::now() + AUTH_CHECK_FOR;
-    loop {
-        match child.try_wait() {
-            Ok(Some(status)) => return Ok(status.success()),
-            Ok(None) if Instant::now() < until => {
-                std::thread::sleep(Duration::from_millis(50));
-            }
-            _ => {
-                let _ = child.kill();
-                let _ = child.wait();
-                return Ok(false);
-            }
-        }
+        .current_dir(std::env::temp_dir());
+    let options = auth_options(AUTH_CHECK_FOR, false)?;
+    // No auth output reaches an error message, including partial output on failure.
+    finish_auth(crate::processes::run_checked(cmd, options))
+        .map_err(|error| format!("couldn't check {tool} login: {error}"))
+}
+
+fn finish_auth(
+    result: Result<crate::processes::Output, crate::processes::Failure>,
+) -> Result<bool, String> {
+    result
+        .map_err(crate::processes::Failure::message)?
+        .complete()
+        .map(|out| out.status.success())
+}
+
+#[cfg(windows)]
+const NULL_SINK: &str = "NUL";
+#[cfg(not(windows))]
+const NULL_SINK: &str = "/dev/null";
+
+fn auth_options(within: Duration, keep: bool) -> Result<crate::processes::Options, String> {
+    auth_options_with(within, keep, |path| {
+        std::fs::OpenOptions::new().write(true).open(path)
+    })
+}
+
+fn auth_options_with(
+    within: Duration,
+    keep: bool,
+    open_sink: impl FnOnce(&str) -> std::io::Result<std::fs::File>,
+) -> Result<crate::processes::Options, String> {
+    let mut options = bounded_options(within, None);
+    options.output_limit = ERROR_LIMIT;
+    // Preserve byte accounting so excessive stderr still stops the command, but never retain
+    // tokens or account details in the captured result (including diagnostics on failure).
+    options.stderr_filter = Some(Box::new(|bytes| vec![0; bytes.len()]));
+    if !keep {
+        // Service overrides Command.stdout: redirect through its file option, so `gh auth
+        // token` goes directly to the OS null device and is never captured in memory.
+        options.stdout_file = Some(
+            open_sink(NULL_SINK)
+                .map_err(|error| format!("couldn't open the null output sink: {error}"))?,
+        );
     }
+    Ok(options)
 }
 
 /// The forge's tool, set to answer this repository in plain JSON.
@@ -412,6 +441,140 @@ fn failure(tool: &str, out: &std::process::Output) -> String {
         return stdout;
     }
     format!("{tool} failed ({})", out.status)
+}
+
+/// What diagnostics say about a forge's tool: its version, and whether it has a login (never
+/// any token or account).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct ToolReport {
+    pub tool: &'static str,
+    /// The first line of `tool --version`; `None` when it isn't installed or didn't answer.
+    pub version: Option<String>,
+    /// Whether it has a login: `None` when that couldn't be told.
+    pub signed_in: Option<bool>,
+}
+
+/// How long a tool may take to answer diagnostics.
+const REPORT_TIMEOUT: Duration = Duration::from_secs(5);
+
+/// [`ToolReport`] for `gh` (`auth token` exits 0 when a login is stored, without asking the
+/// server; the token itself is never read), `glab` (`auth status`, which asks the server) or
+/// `tea` (its configured logins counted).
+pub(crate) fn tool_report(tool: &'static str) -> ToolReport {
+    let version = report_answer(tool, &["--version"], true).and_then(|(ok, out)| {
+        ok.then(|| out.lines().next().unwrap_or_default().trim().to_owned())
+            .filter(|v| !v.is_empty())
+    });
+    let signed_in = match tool {
+        _ if version.is_none() => None,
+        "tea" => Some(!super::gitea::tea_servers().is_empty()),
+        "gh" => report_answer(tool, &["auth", "token"], false).map(|(ok, _)| ok),
+        _ => report_answer(tool, &["auth", "status"], false).map(|(ok, _)| ok),
+    };
+    ToolReport {
+        tool,
+        version,
+        signed_in,
+    }
+}
+
+/// Runs `tool` with `args` and no input, waiting at most [`REPORT_TIMEOUT`]: whether it
+/// succeeded, and its standard output when `keep` (else it goes nowhere). `None` when it
+/// couldn't be run or took too long. The output is read as it comes, so a long one can't stall
+/// the tool.
+fn report_answer(tool: &str, args: &[&str], keep: bool) -> Option<(bool, String)> {
+    let mut cmd = tool_command(tool);
+    cmd.args(args).current_dir(std::env::temp_dir());
+    let options = auth_options(REPORT_TIMEOUT, keep).ok()?;
+    finish_report(crate::processes::run_checked(cmd, options), keep)
+}
+
+fn finish_report(
+    result: Result<crate::processes::Output, crate::processes::Failure>,
+    keep: bool,
+) -> Option<(bool, String)> {
+    let out = result.ok()?.complete().ok()?;
+    Some((
+        out.status.success(),
+        if keep {
+            String::from_utf8_lossy(&out.stdout).into_owned()
+        } else {
+            String::new()
+        },
+    ))
+}
+
+pub(super) fn history_api(
+    hosting: &super::Hosting,
+    endpoint: &str,
+    active: &dyn Fn() -> bool,
+) -> Result<serde_json::Value, String> {
+    let (tool, forge) = match hosting.forge {
+        Forge::GitHub => ("gh", Forge::GitHub),
+        Forge::GitLab => ("glab", Forge::GitLab),
+        _ => return Err("This forge uses its HTTP API".into()),
+    };
+    let authority = hosting
+        .web
+        .split_once("://")
+        .map(|(_, rest)| rest.trim_end_matches('/'))
+        .ok_or("Invalid forge address")?;
+    if authority.contains(['/', '@', '\n', '\r'])
+        || authority.starts_with('-')
+        || endpoint.starts_with(['/', '-'])
+        || endpoint.contains("://")
+        || endpoint.chars().any(char::is_control)
+    {
+        return Err("Invalid history API address".into());
+    }
+    let actual = super::location(&format!("{}/_history_guard_", hosting.web))
+        .map(|(host, _)| host)
+        .ok_or("Invalid forge authority")?;
+    if !actual.eq_ignore_ascii_case(&hosting.host) {
+        return Err("Forge account and API authority do not match".into());
+    }
+    if !active() {
+        return Err("History lookup cancelled".into());
+    }
+    let mut command = tool_command(tool);
+    command
+        .current_dir(std::env::temp_dir())
+        .env_remove("GH_DEBUG")
+        .env_remove("GLAB_DEBUG")
+        .env_remove("GH_FORCE_TTY")
+        .env("GH_PROMPT_DISABLED", "1");
+    match forge {
+        Forge::GitHub => {
+            command.env("GH_REPO", format!("{}/{}", hosting.host, hosting.path));
+        }
+        Forge::GitLab => {
+            command.env("GITLAB_HOST", authority);
+        }
+        _ => {}
+    }
+    command.args(["api", "--hostname", authority, endpoint]);
+    let output = crate::processes::run(
+        command,
+        crate::processes::Options {
+            background: true,
+            timeout: Some(Duration::from_secs(15)),
+            output_limit: 2 * 1024 * 1024,
+            stderr_limit: Some(16 * 1024),
+            ..Default::default()
+        },
+    )
+    .and_then(|o| o.complete())
+    .map_err(|_| "Bounded forge history lookup failed or was cancelled")?;
+    if !active() {
+        return Err("History lookup cancelled".into());
+    }
+    if !output.status.success() {
+        return Err(
+            "Forge history lookup failed; check the selected account and server API support".into(),
+        );
+    }
+    serde_json::from_slice(&output.stdout)
+        .map_err(|_| "Forge history lookup returned malformed JSON".into())
 }
 
 #[cfg(test)]
@@ -544,149 +707,174 @@ mod tests {
             assert_eq!(envs.get("NO_COLOR"), Some(&Some("1".to_owned())));
         }
     }
-}
 
-/// What diagnostics say about a forge's tool: its version, and whether it has a login (never
-/// any token or account).
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct ToolReport {
-    pub tool: &'static str,
-    /// The first line of `tool --version`; `None` when it isn't installed or didn't answer.
-    pub version: Option<String>,
-    /// Whether it has a login: `None` when that couldn't be told.
-    pub signed_in: Option<bool>,
-}
-
-/// How long a tool may take to answer diagnostics.
-const REPORT_TIMEOUT: Duration = Duration::from_secs(5);
-
-/// [`ToolReport`] for `gh` (`auth token` exits 0 when a login is stored, without asking the
-/// server; the token itself is never read), `glab` (`auth status`, which asks the server) or
-/// `tea` (its configured logins counted).
-pub(crate) fn tool_report(tool: &'static str) -> ToolReport {
-    let version = report_answer(tool, &["--version"], true).and_then(|(ok, out)| {
-        ok.then(|| out.lines().next().unwrap_or_default().trim().to_owned())
-            .filter(|v| !v.is_empty())
-    });
-    let signed_in = match tool {
-        _ if version.is_none() => None,
-        "tea" => Some(!super::gitea::tea_servers().is_empty()),
-        "gh" => report_answer(tool, &["auth", "token"], false).map(|(ok, _)| ok),
-        _ => report_answer(tool, &["auth", "status"], false).map(|(ok, _)| ok),
-    };
-    ToolReport {
-        tool,
-        version,
-        signed_in,
+    #[test]
+    fn bounded_requests_keep_input_deadline_and_ambient_cancellation() -> Result<(), String> {
+        let cancel = crate::tasks::Cancellation::default();
+        crate::tasks::with_cancellation(cancel.clone(), || {
+            let options = bounded_options(Duration::from_secs(7), Some("a body\n"));
+            cancel.cancel();
+            let mut command = Command::new("/recorded/gh");
+            command
+                .args(["api", "endpoint"])
+                .current_dir("/recorded/repo");
+            command.env("GH_HOST", "recorded.example");
+            let result = dispatch(
+                command,
+                options,
+                |error| format!("start: {error}"),
+                |command, options| {
+                    assert_eq!(command.get_program(), "/recorded/gh");
+                    assert_eq!(command.get_args().collect::<Vec<_>>(), ["api", "endpoint"]);
+                    assert_eq!(command.get_current_dir(), Some(Path::new("/recorded/repo")));
+                    assert_eq!(
+                        command.get_envs().collect::<Vec<_>>(),
+                        [(
+                            std::ffi::OsStr::new("GH_HOST"),
+                            Some(std::ffi::OsStr::new("recorded.example"))
+                        )]
+                    );
+                    assert_eq!(options.input.as_deref(), Some(b"a body\n".as_slice()));
+                    assert_eq!(options.timeout, Some(Duration::from_secs(7)));
+                    assert_eq!(options.output_limit, OUTPUT_LIMIT);
+                    assert_eq!(options.stderr_limit, Some(ERROR_LIMIT));
+                    assert!(!options.hold_input);
+                    assert!(options.cancel.is_cancelled());
+                    Err(crate::processes::Failure::CancelledBeforeStart)
+                },
+            );
+            assert!(matches!(result, Err(ref error) if error == "cancelled before execution"));
+        });
+        assert_eq!(TOOL_TIMEOUT, Duration::from_secs(120));
+        Ok(())
     }
-}
 
-/// Runs `tool` with `args` and no input, waiting at most [`REPORT_TIMEOUT`]: whether it
-/// succeeded, and its standard output when `keep` (else it goes nowhere). `None` when it
-/// couldn't be run or took too long. The output is read as it comes, so a long one can't stall
-/// the tool.
-fn report_answer(tool: &str, args: &[&str], keep: bool) -> Option<(bool, String)> {
-    let mut cmd = tool_command(tool);
-    cmd.args(args)
-        .current_dir(std::env::temp_dir())
-        .stdin(Stdio::null())
-        .stdout(if keep { Stdio::piped() } else { Stdio::null() })
-        .stderr(Stdio::null());
-    let mut child = cmd.spawn().ok()?;
-    let reader = child.stdout.take().map(|mut out| {
-        std::thread::spawn(move || {
-            let mut text = String::new();
-            let _ = std::io::Read::read_to_string(&mut out, &mut text);
-            text
-        })
-    });
-    let started = Instant::now();
-    let status = loop {
-        match child.try_wait() {
-            Ok(Some(status)) => break status,
-            Ok(None) if started.elapsed() < REPORT_TIMEOUT => {
-                std::thread::sleep(Duration::from_millis(30));
+    #[test]
+    fn stopped_or_uncertain_results_never_become_success_or_authentication() {
+        use crate::processes::{StopKind, recording_output};
+        for kind in [
+            StopKind::Cancelled,
+            StopKind::TimedOut,
+            StopKind::Failed,
+            StopKind::Uncertain,
+        ] {
+            let result = finish_run(
+                "gh",
+                Duration::from_secs(3),
+                Ok(recording_output(Some(kind))),
+            );
+            assert!(result.is_err());
+            if kind == StopKind::Uncertain {
+                assert_eq!(result, Err("cleanup proof missing".into()));
             }
-            _ => {
-                let _ = child.kill();
-                let _ = child.wait();
-                return None;
+            if kind == StopKind::TimedOut {
+                assert!(
+                    result.is_err_and(|error| error.contains("didn't finish within 3 seconds"))
+                );
             }
+            assert!(finish_auth(Ok(recording_output(Some(kind)))).is_err());
+            assert!(finish_report(Ok(recording_output(Some(kind))), true).is_none());
         }
-    };
-    let text = reader.and_then(|r| r.join().ok()).unwrap_or_default();
-    Some((status.success(), text))
-}
+        assert_eq!(finish_auth(Ok(recording_output(None))), Ok(true));
+    }
 
-pub(super) fn history_api(
-    hosting: &super::Hosting,
-    endpoint: &str,
-    active: &dyn Fn() -> bool,
-) -> Result<serde_json::Value, String> {
-    let (tool, forge) = match hosting.forge {
-        Forge::GitHub => ("gh", Forge::GitHub),
-        Forge::GitLab => ("glab", Forge::GitLab),
-        _ => return Err("This forge uses its HTTP API".into()),
-    };
-    let authority = hosting
-        .web
-        .split_once("://")
-        .map(|(_, rest)| rest.trim_end_matches('/'))
-        .ok_or("Invalid forge address")?;
-    if authority.contains(['/', '@', '\n', '\r'])
-        || authority.starts_with('-')
-        || endpoint.starts_with(['/', '-'])
-        || endpoint.contains("://")
-        || endpoint.chars().any(char::is_control)
-    {
-        return Err("Invalid history API address".into());
-    }
-    let actual = super::location(&format!("{}/_history_guard_", hosting.web))
-        .map(|(host, _)| host)
-        .ok_or("Invalid forge authority")?;
-    if !actual.eq_ignore_ascii_case(&hosting.host) {
-        return Err("Forge account and API authority do not match".into());
-    }
-    if !active() {
-        return Err("History lookup cancelled".into());
-    }
-    let mut command = tool_command(tool);
-    command
-        .current_dir(std::env::temp_dir())
-        .env_remove("GH_DEBUG")
-        .env_remove("GLAB_DEBUG")
-        .env_remove("GH_FORCE_TTY")
-        .env("GH_PROMPT_DISABLED", "1");
-    match forge {
-        Forge::GitHub => {
-            command.env("GH_REPO", format!("{}/{}", hosting.host, hosting.path));
+    #[test]
+    fn tool_exit_diagnostics_survive_and_discarded_reports_reveal_no_output() {
+        use crate::processes::recording_output;
+        let mut output = recording_output(None);
+        output.stdout = b"tool response".to_vec();
+        assert_eq!(
+            finish_run("gh", TOOL_TIMEOUT, Ok(output)),
+            Ok("tool response".into())
+        );
+        #[cfg(unix)]
+        let failed_status = {
+            use std::os::unix::process::ExitStatusExt;
+            std::process::ExitStatus::from_raw(3 << 8)
+        };
+        #[cfg(windows)]
+        let failed_status = {
+            use std::os::windows::process::ExitStatusExt;
+            std::process::ExitStatus::from_raw(3)
+        };
+        let mut failed = recording_output(None);
+        failed.status = failed_status;
+        failed.stderr = b"actual exit diagnostic".to_vec();
+        assert_eq!(
+            finish_run("gh", TOOL_TIMEOUT, Ok(failed)),
+            Err("actual exit diagnostic".into())
+        );
+        for success in [false, true] {
+            let mut output = recording_output(None);
+            if !success {
+                output.status = failed_status;
+            }
+            output.stdout = b"secret token".to_vec();
+            output.stderr = b"secret account".to_vec();
+            assert_eq!(
+                finish_report(Ok(output), false),
+                Some((success, String::new()))
+            );
         }
-        Forge::GitLab => {
-            command.env("GITLAB_HOST", authority);
-        }
-        _ => {}
     }
-    command.args(["api", "--hostname", authority, endpoint]);
-    let output = crate::processes::run(
-        command,
-        crate::processes::Options {
-            background: true,
-            timeout: Some(Duration::from_secs(15)),
-            output_limit: 2 * 1024 * 1024,
-            stderr_limit: Some(16 * 1024),
-            ..Default::default()
-        },
-    )
-    .and_then(|o| o.complete())
-    .map_err(|_| "Bounded forge history lookup failed or was cancelled")?;
-    if !active() {
-        return Err("History lookup cancelled".into());
+
+    #[test]
+    fn auth_capture_is_bounded_and_redacts_stderr_before_retention() -> Result<(), String> {
+        // keep=true does not open a sink or launch a program. The production keep=false path
+        // uses stdout_file, since Command.stdout would be overridden by Service.
+        let mut options = auth_options(REPORT_TIMEOUT, true)?;
+        assert_eq!(options.timeout, Some(REPORT_TIMEOUT));
+        assert_eq!(options.output_limit, ERROR_LIMIT);
+        assert_eq!(options.stderr_limit, Some(ERROR_LIMIT));
+        assert!(options.stdout_file.is_none());
+        assert!(options.input.is_none());
+        let filter = options.stderr_filter.as_mut().ok_or("missing redaction")?;
+        assert_eq!(filter(b"secret token"), vec![0; 12]);
+        assert_eq!(filter(b""), Vec::<u8>::new());
+        assert_eq!(filter(&vec![b's'; ERROR_LIMIT + 1]).len(), ERROR_LIMIT + 1);
+        Ok(())
     }
-    if !output.status.success() {
-        return Err(
-            "Forge history lookup failed; check the selected account and server API support".into(),
+
+    #[test]
+    fn secret_discard_requires_null_sink_and_refuses_failed_open() {
+        // Recording opener: never opens a file or starts the service. A sink failure must
+        // refuse construction rather than falling back to captured token stdout.
+        let opened = std::cell::Cell::new(false);
+        let result = auth_options_with(REPORT_TIMEOUT, false, |path| {
+            opened.set(true);
+            assert_eq!(path, NULL_SINK);
+            #[cfg(unix)]
+            assert_eq!(path, "/dev/null");
+            #[cfg(windows)]
+            assert_eq!(path, "NUL");
+            Err(std::io::Error::other("recorded sink refusal"))
+        });
+        assert!(opened.get());
+        assert!(result.is_err_and(|error| error.contains("recorded sink refusal")));
+        assert!(
+            auth_options_with(REPORT_TIMEOUT, true, |_| {
+                opened.set(false);
+                Err(std::io::Error::other("unexpected open"))
+            })
+            .is_ok()
+        );
+        assert!(opened.get());
+    }
+
+    #[test]
+    fn oversized_input_refuses_before_command_preparation() {
+        // An invalid path/tool would reach discovery if preparation ran. The input guard is
+        // first, so this is a pure rejection test with no filesystem or process access.
+        let input = "x".repeat(INPUT_LIMIT + 1);
+        assert_eq!(
+            run_with_input(
+                "/recorded/gh",
+                "review",
+                Path::new("/recorded/repo"),
+                &[],
+                Some(&input)
+            ),
+            Err(format!("/recorded/gh input exceeds {INPUT_LIMIT} bytes")),
         );
     }
-    serde_json::from_slice(&output.stdout)
-        .map_err(|_| "Forge history lookup returned malformed JSON".into())
 }
