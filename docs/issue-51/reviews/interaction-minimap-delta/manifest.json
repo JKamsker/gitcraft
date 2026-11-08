@@ -1,0 +1,37 @@
+{
+  "candidate": "3c28f1b37a67527c3b338699b983ec0b299963f5",
+  "method_sha256": "8b7a91c24ab9aa8972964ac98d4b83bc242911a04879a2be1086f18759b42cda",
+  "verification": "root independent source and hash inspection; no new test execution",
+  "artifacts": [
+    {
+      "path": "/tmp/gitcraft-interaction-3c28f1b3-minimap-source.rs",
+      "archive": "gitcraft-interaction-3c28f1b3-minimap-source.rs.gz",
+      "sha256": "1a21aa38781788c503407b82066f8a632db85ee83e1b0cf15d2b3daec5f57fa5"
+    },
+    {
+      "path": "/tmp/gitcraft-interaction-3c28f1b3-minimap-probe.rs",
+      "archive": "gitcraft-interaction-3c28f1b3-minimap-probe.rs.gz",
+      "sha256": "b633f14174bfbd4dc34bac87295e514bcf3346d8f5b26bea7ab6520064079ad1"
+    },
+    {
+      "path": "/tmp/gitcraft-interaction-3c28f1b3-minimap-value.rs",
+      "archive": "gitcraft-interaction-3c28f1b3-minimap-value.rs.gz",
+      "sha256": "7ae490f84bcef03ca99ea921eb0ef6159a9c1c834e1819ab2514c41230a9392d"
+    },
+    {
+      "path": "/tmp/gitcraft-interaction-3c28f1b3-minimap-0.log",
+      "archive": "gitcraft-interaction-3c28f1b3-minimap-0.log.gz",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/gitcraft-interaction-3c28f1b3-minimap-1.log",
+      "archive": "gitcraft-interaction-3c28f1b3-minimap-1.log.gz",
+      "sha256": "23771cb96e30a223a3ba142d56f7facb5d5f9666567ea0866b6c04f36c6c4bca"
+    },
+    {
+      "path": "/tmp/gitcraft-interaction-3c28f1b3-minimap-2.log",
+      "archive": "gitcraft-interaction-3c28f1b3-minimap-2.log.gz",
+      "sha256": "d7dae192715495fa89ccbe279af3efb9792c1dae1768228e369035e68a1df673"
+    }
+  ]
+}
