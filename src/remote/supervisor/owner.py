@@ -79,13 +79,17 @@ def control(owner):
     try: return read_receipt(owner)
     except FileNotFoundError: pass
     s = socket.socket(socket.AF_UNIX)
-    s.settimeout(5)
+    end = time.monotonic() + 5
+    def budget():
+        left = end - time.monotonic()
+        if left <= 0: raise TimeoutError('owner control deadline')
+        s.settimeout(left)
     try:
-        s.connect(owner['path'] + '/control')
-        s.sendall(encode(dict(owner, op='stop')))
+        budget(); s.connect(owner['path'] + '/control')
+        budget(); s.sendall(encode(dict(owner, op='stop')))
         value = bytearray()
         while not value.endswith(b'\n') and len(value) <= 2048:
-            chunk = s.recv(2049 - len(value))
+            budget(); chunk = s.recv(2049 - len(value))
             if not chunk: break
             value.extend(chunk)
         # Never accept a socket-only response instead of the atomic terminal receipt.
@@ -144,6 +148,38 @@ class Forwarder:
             except BlockingIOError: pass
             except OSError: connected = False
         return connected
+
+def emit(fd, chunks, seconds=5, write=os.write, now=time.monotonic, pause=time.sleep):
+    end = now() + seconds
+    for chunk in chunks:
+        pending = memoryview(chunk)
+        while pending:
+            if now() >= end: raise TimeoutError('protocol emission deadline')
+            try:
+                count = write(fd, pending)
+                if count <= 0: raise BrokenPipeError('protocol emission closed')
+                pending = pending[count:]
+            except (BlockingIOError, InterruptedError): pause(.002)
+    if now() >= end: raise TimeoutError('protocol emission deadline')
+
+class Handshake:
+    def __init__(self, frame, deadline):
+        self.pending = bytearray(frame)
+        self.deadline = deadline
+        self.released = False
+    def step(self, stopped, now, write, release):
+        if self.released: return True
+        if stopped or now() >= self.deadline: return None
+        try:
+            count = write(self.pending)
+            if count <= 0: raise BrokenPipeError('ownership emission closed')
+            del self.pending[:count]
+        except (BlockingIOError, InterruptedError): return False
+        if self.pending: return False
+        if now() >= self.deadline: return None
+        release()
+        self.released = True
+        return True
 
 def run(req, controller, stream=False):
     nonce = req['nonce']
@@ -224,14 +260,9 @@ def run(req, controller, stream=False):
             if req.get('record'):
                 atomic(req['record'], encode(owner), exclusive=True)
             hello = ('O1 {nonce} {path} {token}\n'.format(**owner)).encode()
-            if stream:
-                sys.stderr.buffer.write(b'__GITCRAFT_OWNER__ ' + hello)
-                sys.stderr.buffer.flush()
-            else:
-                sys.stdout.buffer.write(hello); sys.stdout.buffer.flush()
-            if stream:
-                os.set_blocking(1, False); os.set_blocking(2, False)
-            os.write(gate_w, b'G'); os.close(gate_w); gate_w = None
+            os.set_blocking(1, False); os.set_blocking(2, False)
+            handshake = Handshake(b'__GITCRAFT_OWNER__ ' + hello if stream else hello,
+                                  min(deadline, time.monotonic() + 5))
             status_bytes = bytearray()
             while not stopped:
                 if time.monotonic() >= deadline: break
@@ -278,6 +309,12 @@ def run(req, controller, stream=False):
                         if len(output[which]) + len(chunk) > MAX: stopped = True; delivery = False
                         output[which].extend(chunk[:max(0, MAX - len(output[which]))])
                         if forward and not forward.add(which, chunk): stopped = True; delivery = False
+                if gate_w is not None:
+                    state = handshake.step(stopped, time.monotonic,
+                        lambda data: os.write(2 if stream else 1, data),
+                        lambda: os.write(gate_w, b'G'))
+                    if state is None: delivery = False; break
+                    if state: os.close(gate_w); gate_w = None
         finally:
             # The owned anchor has never been waited on. Even premature anchor death
             # retains its identity as our unreaped direct child until these signals finish.
@@ -310,7 +347,7 @@ def run(req, controller, stream=False):
             final = receipt(owner, 'stopped', code, delivery)
             atomic(owner['path'] + '/terminal', encode(final))
             for client in clients:
-                try: client.settimeout(.1); client.sendall(encode(final))
+                try: emit(client.fileno(), [encode(final)], .1)
                 except OSError: pass
                 client.close()
             selector.close(); sock.close()
@@ -321,15 +358,19 @@ def delivery_code(command_code, complete):
     return command_code if complete else 125
 
 class Frames:
-    def __init__(self): self.pending = bytearray()
+    def __init__(self): self.pending = bytearray(); self.deadline = None
     def read(self, receive):
         while True:
             end = self.pending.find(b'\n')
             if end >= 0:
                 if end >= 96 << 20: raise ValueError('oversized request frame')
                 result = bytes(self.pending[:end+1]); del self.pending[:end+1]
+                self.deadline = None
                 return result
             if len(self.pending) >= 96 << 20: raise ValueError('oversized request frame')
+            if self.pending and self.deadline is None: self.deadline = time.monotonic() + 30
+            if self.deadline is not None and time.monotonic() >= self.deadline:
+                raise TimeoutError('incomplete request deadline')
             chunk = receive(65536)
             if not chunk:
                 if self.pending: raise ValueError('incomplete request frame')
@@ -339,11 +380,18 @@ class Frames:
 def serve():
     # Unbuffered reads prevent input for the next request from being stolen by buffering.
     controller = os.fdopen(os.dup(0), 'rb', buffering=0)
-    print('__GITCRAFT_READY__', flush=True)
+    os.set_blocking(1, False); os.set_blocking(2, False)
+    emit(1, [b'__GITCRAFT_READY__\n'])
     previous = None
     frames = Frames()
+    waiter = selectors.DefaultSelector(); waiter.register(controller, selectors.EVENT_READ)
     while True:
-        line = frames.read(lambda count: os.read(controller.fileno(), count))
+        def receive(count):
+            end = frames.deadline or time.monotonic() + 3600
+            timeout = max(0, end - time.monotonic())
+            if not waiter.select(timeout): raise TimeoutError('controller frame deadline')
+            return os.read(controller.fileno(), count)
+        line = frames.read(receive)
         if line is None: return
         if line.startswith(b'A '):
             if previous is None or line != ('A ' + previous['nonce'] + '\n').encode():
@@ -351,14 +399,13 @@ def serve():
             retire(previous); previous = None
             continue
         if line.startswith(b'P '):
-            sys.stdout.buffer.write(line); sys.stdout.buffer.flush(); continue
+            emit(1, [line]); continue
         req = json.loads(line)
-        print('S ' + req['nonce'], flush=True)
+        emit(1, [('S ' + req['nonce'] + '\n').encode()])
         code, output, owner = run(req, controller)
         previous = owner
-        sys.stdout.buffer.write(b'C1 ' + encode(read_receipt(owner))); sys.stdout.buffer.flush()
-        print('R {} {} {} {}'.format(req['nonce'], code, len(output[0]), len(output[1])), flush=True)
-        sys.stdout.buffer.write(output[0]); sys.stdout.buffer.write(output[1]); sys.stdout.buffer.flush()
+        header = 'R {} {} {} {}\n'.format(req['nonce'], code, len(output[0]), len(output[1])).encode()
+        emit(1, [b'C1 ' + encode(read_receipt(owner)), header, output[0], output[1]])
 
 def main():
     mode = sys.argv[1]
@@ -371,7 +418,8 @@ def main():
     elif mode == 'control':
         print(json.dumps(control(json.loads(sys.stdin.buffer.readline(2049)))), flush=True)
     elif mode == 'stream':
-        print('\n__GITCRAFT_READY__', flush=True)
+        os.set_blocking(1, False); os.set_blocking(2, False)
+        emit(1, [b'\n__GITCRAFT_READY__\n'])
         fd = os.open(sys.argv[2], os.O_RDONLY | os.O_NOFOLLOW)
         with os.fdopen(fd, 'rb') as f: req = json.load(f)
         os.unlink(sys.argv[2])

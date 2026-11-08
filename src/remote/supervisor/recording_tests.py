@@ -9,6 +9,30 @@ class Recording:
     def kill(self,p,s): self.events.append(('direct',p,s))
     def waitpid(self,p,f): self.events.append(('reap',p,f)); return p,0
 class Pure(unittest.TestCase):
+    def test_full_handshake_sink_still_allows_eof_stop_deadline_and_never_releases(self):
+        for stopped, now in [(True,0),(False,5)]:
+            owner=Recording(); released=[]; frame=m.Handshake(b'private-marker',5)
+            def blocked(data): raise BlockingIOError()
+            self.assertFalse(frame.step(False,lambda:0,blocked,lambda:released.append(True)))
+            self.assertIsNone(frame.step(stopped,lambda:now,blocked,lambda:released.append(True)))
+            m.finish_owned(424242,True,owner,lambda _:None)
+            self.assertEqual(released,[])
+            self.assertEqual([e[0] for e in owner.events],['group','group','reap'])
+        sent=[]; released=[]; frame=m.Handshake(b'abc',5)
+        def partial(data): sent.append(bytes(data[:1])); return 1
+        self.assertFalse(frame.step(False,lambda:0,partial,lambda:released.append(True)))
+        self.assertFalse(frame.step(False,lambda:0,partial,lambda:released.append(True)))
+        self.assertTrue(frame.step(False,lambda:0,partial,lambda:released.append(True)))
+        self.assertEqual(b''.join(sent),b'abc'); self.assertEqual(released,[True])
+    def test_ready_and_reply_emission_share_an_absolute_partial_write_budget(self):
+        ticks=[0]; sent=[]
+        def blocked(fd,data): ticks[0]+=1; raise BlockingIOError()
+        with self.assertRaises(TimeoutError): m.emit(1,[b'READY'],3,blocked,lambda:ticks[0],lambda _:None)
+        self.assertEqual(ticks[0],3)
+        ticks[0]=0
+        def slow(fd,data): ticks[0]+=1; sent.append(bytes(data[:1])); return 1
+        with self.assertRaises(TimeoutError): m.emit(1,[b'head',b'body'],3,slow,lambda:ticks[0],lambda _:None)
+        self.assertEqual(b''.join(sent),b'hea')
     def test_actual_frame_reader_retains_coalesced_ack_and_request_at_every_split(self):
         data=b'A oldnonce\n{"nonce":"next"}\nP ping\n'
         expected=[b'A oldnonce\n',b'{"nonce":"next"}\n',b'P ping\n',None]

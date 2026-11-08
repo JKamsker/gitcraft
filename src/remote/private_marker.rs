@@ -2,6 +2,7 @@
 //! Login banners need not end with a newline; capability bytes are always consumed privately.
 pub(super) struct Filter {
     prefix: &'static [u8],
+    // EOF drops this private buffer; partial ownership frames are never flushed to output.
     pending: Vec<u8>,
     discard: bool,
     accepted: bool,
@@ -81,6 +82,28 @@ mod recording_tests {
                 filter.feed(b"__OWNER__ user-output\n", accept),
                 b"__OWNER__ user-output\n"
             );
+        }
+    }
+    #[test]
+    fn eof_mid_marker_discards_private_bytes_without_accepting_an_owner() {
+        for input in [
+            b"banner__OWNER__ private-capability".as_slice(),
+            b"__OWNER__ invalid-token",
+        ] {
+            for split in 0..=input.len() {
+                let mut filter = Filter::new(PREFIX);
+                let mut accepted = 0;
+                let mut accept = |_: &[u8]| {
+                    accepted += 1;
+                    true
+                };
+                let mut output = filter.feed(&input[..split], &mut accept);
+                output.extend(filter.feed(&input[split..], &mut accept));
+                output.extend(filter.feed(&[], &mut accept));
+                drop(filter); // Production EOF drops the filter; there is no flush operation.
+                assert!(output.is_empty());
+                assert_eq!(accepted, 0);
+            }
         }
     }
     #[test]

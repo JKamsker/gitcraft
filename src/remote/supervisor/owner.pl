@@ -135,6 +135,33 @@ sub forward_flush {
     }
     return 1;
 }
+sub emit {
+    my ($fd,$chunks,$seconds,$ops)=@_; $seconds //= 5;
+    $ops //= {now=>sub {time()},pause=>sub {sleep(.002)},write=>sub {syswrite($fd,$_[0],length($_[0])-$_[1],$_[1])}};
+    my $end=$ops->{now}->()+$seconds;
+    for my $chunk (@$chunks) {
+        my $sent=0;
+        while ($sent<length($chunk)) {
+            die 'protocol emission deadline' if $ops->{now}->()>=$end;
+            my $n=$ops->{write}->($chunk,$sent);
+            if (!defined($n)) { if ($!{EAGAIN} || $!{EWOULDBLOCK} || $!{EINTR}) {$ops->{pause}->();next;} die 'protocol emission failed'; }
+            die 'protocol emission closed' unless $n>0; $sent+=$n;
+        }
+    }
+    die 'protocol emission deadline' if $ops->{now}->()>=$end;
+}
+sub handshake_step {
+    my ($state,$stopped,$now,$write,$release)=@_;
+    return 1 if $state->{released};
+    return -1 if $stopped || $now->()>=$state->{until};
+    my $n=$write->($state->{pending});
+    if (!defined($n)) {return 0 if $!{EAGAIN} || $!{EWOULDBLOCK} || $!{EINTR}; die 'ownership emission failed';}
+    die 'ownership emission closed' unless $n>0;
+    substr($state->{pending},0,$n,'');
+    return 0 if length($state->{pending});
+    return -1 if $now->()>=$state->{until};
+    $release->(); $state->{released}=1; return 1;
+}
 sub run {
     my ($req, $controller, $stream) = @_;
     die 'invalid request nonce' unless $req->{nonce} =~ /\A[0-9a-f]{1,96}\z/;
@@ -190,10 +217,8 @@ sub run {
         $established = 1;
         atomic($req->{record}, encode($o), 1) if $req->{record};
         my $hello = "O1 $o->{nonce} $o->{path} $o->{token}\n";
-        if ($stream) { print STDERR "__GITCRAFT_OWNER__ $hello"; STDERR->flush; }
-        else { print STDOUT $hello; STDOUT->flush; }
-        if ($stream) { STDOUT->blocking(0); STDERR->blocking(0); }
-        syswrite($gate_w, 'G') == 1 or die 'anchor release failed'; close($gate_w); undef($gate_w);
+        STDOUT->blocking(0); STDERR->blocking(0);
+        my $handshake={pending=>($stream ? '__GITCRAFT_OWNER__ ' : '').$hello,until=>time()+5};
         my $select = IO::Select->new($controller,$server,$status_r,$out_r,$err_r);
         my %kind = (fileno($controller)=>'controller',fileno($server)=>'socket',fileno($status_r)=>'status',fileno($out_r)=>0,fileno($err_r)=>1);
         my $deadline = time()+$duration; my $status = ''; my $stopped = 0;
@@ -233,6 +258,13 @@ sub run {
                     if ($stream && !forward_add(\@pending,$which,$bytes)) { $stopped=1; $delivery=0; }
                 }
             }
+            if ($gate_w) {
+                my $state=handshake_step($handshake,$stopped,sub {time()},
+                    sub {syswrite($stream ? \*STDERR : \*STDOUT,$_[0])},
+                    sub {syswrite($gate_w,'G')==1 or die 'anchor release failed';});
+                if ($state<0) {$delivery=0;last;}
+                if ($state) {close($gate_w);undef($gate_w);}
+            }
         }
     }; $error = $@;
     # Always finish the same unreaped anchor, even when the controller/output is lost.
@@ -257,7 +289,7 @@ sub run {
     $delivery=0 if $stream && (length($pending[0]) || length($pending[1]));
     close($status_r); close($server);
     my $final = {%$o,state=>'stopped',code=>$code,complete=>$delivery ? JSON::PP::true : JSON::PP::false}; atomic("$o->{path}/terminal",encode($final),0);
-    for my $client (values %clients) { syswrite($client->{handle},encode($final)); close($client->{handle}); }
+    for my $client (values %clients) { eval {emit($client->{handle},[encode($final)],.1);}; close($client->{handle}); }
     die $error if $error;
     return (delivery_code($code,$delivery),\@output,$o);
 }
@@ -268,9 +300,12 @@ sub frame_read {
         my $end=index($state->{pending},"\n");
         if ($end>=0) {
             die 'oversized request frame' if $end >= (96<<20);
+            delete $state->{until};
             return substr($state->{pending},0,$end+1,'');
         }
         die 'oversized request frame' if length($state->{pending}) >= (96<<20);
+        $state->{until} //= time()+30 if length($state->{pending});
+        die 'incomplete request deadline' if defined($state->{until}) && time()>=$state->{until};
         my $chunk=$receive->(65536);
         if (!defined($chunk) || !length($chunk)) {
             die 'incomplete request frame' if length($state->{pending});
@@ -282,22 +317,25 @@ sub frame_read {
 sub serve {
     open(my $controller, '<&', \*STDIN) or die 'controller missing'; cloexec($controller);
     STDOUT->autoflush(1); binmode(STDOUT); binmode(STDERR); binmode($controller);
-    print "__GITCRAFT_READY__\n";
+    STDOUT->blocking(0); STDERR->blocking(0);
+    emit(\*STDOUT,["__GITCRAFT_READY__\n"]);
     my $previous;
-    my $frames={pending=>''};
+    my $frames={pending=>''}; my $waiting=IO::Select->new($controller);
     while (1) {
-        my $line=frame_read($frames,sub { my ($count)=@_; my $n=sysread($controller,my $bytes,$count); die 'controller read failed' unless defined($n); return $n ? $bytes : undef; });
+        my $line=frame_read($frames,sub { my ($count)=@_;
+            my $left=($frames->{until} // time()+3600)-time();
+            die 'controller frame deadline' if $left<=0 || !$waiting->can_read($left);
+ my $n=sysread($controller,my $bytes,$count); die 'controller read failed' unless defined($n); return $n ? $bytes : undef; });
         return unless defined($line);
         if ($line =~ /\AA ([0-9a-f]{1,96})\n\z/) {
             die 'invalid retirement acknowledgement' unless $previous && $previous->{nonce} eq $1;
             retire($previous); undef($previous); next;
         }
-        if ($line =~ /\AP ([0-9a-f]{1,96})\n\z/) { print $line; next; }
-        my $req = $JSON->decode($line); print "S $req->{nonce}\n";
+        if ($line =~ /\AP ([0-9a-f]{1,96})\n\z/) { emit(\*STDOUT,[$line]); next; }
+        my $req = $JSON->decode($line); emit(\*STDOUT,["S $req->{nonce}\n"]);
         my ($code,$out,$owner) = run($req,$controller,0);
         $previous=$owner;
-        print "C1 ",encode(terminal($owner));
-        print "R $req->{nonce} $code ",length($out->[0]),' ',length($out->[1]),"\n",$out->[0],$out->[1];
+        emit(\*STDOUT,['C1 '.encode(terminal($owner)), "R $req->{nonce} $code ".length($out->[0]).' '.length($out->[1])."\n",$out->[0],$out->[1]]);
     }
 }
 my $mode = shift(@ARGV) // '';
@@ -311,12 +349,32 @@ elsif ($mode eq 'serve') { serve(); }
 elsif ($mode eq 'retire') { my $line = <STDIN>; retire($JSON->decode($line)); print "retired\n"; }
 elsif ($mode eq 'control') { my $line = <STDIN>; print encode(control($JSON->decode($line))); }
 elsif ($mode eq 'stream') {
-    print STDOUT "\n__GITCRAFT_READY__\n"; STDOUT->flush;
+    STDOUT->blocking(0); STDERR->blocking(0);
+    emit(\*STDOUT,["\n__GITCRAFT_READY__\n"]);
     my $path = shift(@ARGV); sysopen(my $f,$path,O_RDONLY|O_NOFOLLOW) or die 'request missing'; local $/; my $req = $JSON->decode(<$f>); close($f); unlink($path); (my $dir = $path) =~ s{/[^/]+$}{}; rmdir($dir);
     open(my $controller,'<&',\*STDIN) or die 'controller missing'; cloexec($controller);
     my ($code,$out) = run($req,$controller,1); exit($code);
 }
 elsif ($mode eq 'recording') {
+    for my $stop (0,1) {
+        my $released=0; my $frame={pending=>'private-marker',until=>5};
+        my $blocked=sub {$!=EAGAIN;return undef;};
+        die 'blocked handshake released' unless handshake_step($frame,0,sub {0},$blocked,sub {$released++;})==0;
+        die 'EOF/deadline handshake released' unless handshake_step($frame,$stop,sub {$stop ? 0 : 5},$blocked,sub {$released++;})==-1 && !$released;
+        my @events; finish_owned(424242,1,{signal=>sub {push @events,'signal';},pause=>sub {},reap=>sub {push @events,'reap';}});
+        die 'blocked handshake failed retirement' unless join(',',@events) eq 'signal,signal,reap';
+    }
+    {
+        my $frame={pending=>'abc',until=>5}; my $sent='';my $released=0;
+        for my $expected (0,0,1) {
+            my $state=handshake_step($frame,0,sub {0},sub {$sent.=substr($_[0],0,1);return 1;},sub {$released++;});
+            die 'partial handshake gate ordering' unless $state==$expected;
+        }
+        die 'incomplete handshake release' unless $sent eq 'abc' && $released==1;
+        my $ticks=0;
+        my $ok=eval {emit(undef,['READY'],3,{now=>sub {$ticks},pause=>sub {},write=>sub {$ticks++;$!=EAGAIN;return undef;}});1;};
+        die 'unbounded ready emission' if $ok || $ticks!=3;
+    }
     my $frames_input="A oldnonce\n{\"nonce\":\"next\"}\nP ping\n";
     for my $split (0..length($frames_input)) {
         my @chunks=grep {length($_)} (substr($frames_input,0,$split),substr($frames_input,$split));
@@ -359,6 +417,6 @@ elsif ($mode eq 'recording') {
     my $ops = {signal=>sub {push @events, $_[0] ? 'group' : 'direct'; die 'refused' if $_[0];},pause=>sub {},reap=>sub {push @events,'reap';}};
     my $ok = eval {finish_owned(424242,1,$ops);1;};
     die 'refusal acknowledged' if $ok || join(',',@events) ne 'group,direct,reap';
-    print "11 recording-only owner gates passed\n";
+    print "13 recording-only owner gates passed\n";
 }
 else { die 'unknown owner operation'; }
