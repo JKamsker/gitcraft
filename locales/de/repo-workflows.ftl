@@ -5924,15 +5924,343 @@ repo-workflows-test_lane-test-palette-items-a7530fc4 = tests teststrecke
 
 repo-workflows-test_lane-test-palette-items-e30e705a = Testen stoppen
 
+repo-workflows-timeline-branch-at-old-tip-d2a49cac = Branch { $name } erstellen
+
+repo-workflows-timeline-changed-files-88ffdf28 = Keine Dateiinhalte geändert
+
+repo-workflows-timeline-changed-files-abc7e989 = Dateien
+
+repo-workflows-timeline-changed-files-e1614a83 = und { $more } weitere
+
+repo-workflows-timeline-changed-refs-1b870022 = Kein Branch verschoben (ein Stash, ein Tag usw.)
+
+repo-workflows-timeline-changed-refs-2eee037c = Branches
+
+repo-workflows-timeline-changed-refs-312c661d = Setzt { $change-name-1 } auf { $short-change-old-2 } zurück (Reset, falls ausgecheckt; uncommittete Änderungen bleiben erhalten). Kann rückgängig gemacht werden.
+
+repo-workflows-timeline-changed-refs-4ea9935c = Hash kopieren
+
+repo-workflows-timeline-changed-refs-92e3b324 = { $change-name-1 } auf { $short-change-old-2 } zurücksetzen
+
+repo-workflows-timeline-changed-refs-a7884d9f = Neuer Branch dort
+
+repo-workflows-timeline-changed-refs-e46853a8 = Erstellt { $self-free-branch-name-format-was-1 } unter { $short-change-old-2 }, während { $change-name-3 } unverändert bleibt
+
 repo-workflows-timeline-close-button-7d9eb7ac = Schließen
 
 repo-workflows-timeline-commits-683768ab = und { $total-list-len-1 } weitere
 
+repo-workflows-timeline-describe-0e4c8e5b = Ausgecheckt: { $at-now-1 } → { $at-target-2 }
+
+repo-workflows-timeline-describe-39787410 = { $n }: unter { $short-new-1 } erneut erstellt
+
+repo-workflows-timeline-describe-891c0723 = { $n }: gelöscht (hier unter { $short-old-1 } aufbewahrt)
+
+repo-workflows-timeline-describe-ca9be28b = Ein losgelöster HEAD unter { $crate-repo-short-s-head-1 }
+
+repo-workflows-timeline-describe-reflog-0026c505 = Revert
+
+repo-workflows-timeline-describe-reflog-32fa2259 = Auf { $to } zurücksetzen
+
+repo-workflows-timeline-describe-reflog-43695d49 = { $w-merge-len-1 } mergen
+
+repo-workflows-timeline-describe-reflog-4475f515 = Amend
+
+repo-workflows-timeline-describe-reflog-4c49fdb6 = Cherry-Pick
+
+repo-workflows-timeline-describe-reflog-56bb1bb2 = Branch erstellt
+
+repo-workflows-timeline-describe-reflog-5cf8ed93 = { $to } auschecken
+
+repo-workflows-timeline-describe-reflog-82a9c46f = Commit
+
+repo-workflows-timeline-describe-reflog-8e9d44a6 = Merge-Commit
+
+repo-workflows-timeline-describe-reflog-99e71f48 = Auschecken
+
+repo-workflows-timeline-describe-reflog-9eb5b275 = Rebase
+
+repo-workflows-timeline-describe-reflog-b11c9047 = Verschoben
+
+repo-workflows-timeline-describe-reflog-b66d0441 = Pull
+
+repo-workflows-timeline-describe-reflog-daee7606 = Zurücksetzen
+
+repo-workflows-timeline-discard-02af6d89 = In { $folder-arg } wurde zwischenzeitlich gearbeitet (Cherry-Pick fortgesetzt oder Commits erstellt). Es wird nichts verworfen. Entfernen Sie das Arbeitsverzeichnis und { $name } selbst, wenn Sie sie nicht benötigen.
+
+repo-workflows-timeline-discard-remove-36f5baee = { $label }: abgeschlossen
+
+repo-workflows-timeline-discard-remove-66f54467 = { $branch } verwerfen
+
+repo-workflows-timeline-discard-remove-8336fbfe = { $label } fehlgeschlagen: { $e }
+
+repo-workflows-timeline-entry-detail-03a933b9 = Rückgängig gemacht oder auf einem Seitenpfad des Baums
+
+repo-workflows-timeline-entry-detail-26583776 = Abgeschlossen: Das Repository liegt hinter diesem Punkt
+
+repo-workflows-timeline-entry-detail-601272f1 = In gitcraft erstellt
+
+repo-workflows-timeline-entry-detail-6fa556f4 = Vor dem ältesten Eintrag
+
+repo-workflows-timeline-entry-detail-cc07e410 = Das Repository ist jetzt hier
+
+repo-workflows-timeline-entry-detail-dfe997bf = Außerhalb von gitcraft erstellt (Terminal, andere Anwendung oder während gitcraft geschlossen war)
+
+repo-workflows-timeline-entry-detail-f1c36dc4 = Die Branches vor dem ältesten noch vorhandenen Zeitleisteneintrag.
+
+repo-workflows-timeline-fallback-label-1ac54e67 = Branch { $c-name-1 } erstellt
+
+repo-workflows-timeline-fallback-label-4da74cbd = { $one-c-1 } und { $rest-len-2 } weitere
+
+repo-workflows-timeline-fallback-label-b11c9047 = Verschoben
+
+repo-workflows-timeline-fallback-label-b5bd817d = Branch { $c-name-1 } gelöscht
+
+repo-workflows-timeline-fallback-label-c049332b = { $named-head-new-1 } auschecken
+
+repo-workflows-timeline-fallback-label-e48d463d = { $c-name-1 } verschoben
+
 repo-workflows-timeline-finished-19766ed6 = Abbrechen
+
+repo-workflows-timeline-finished-34a13b7e = { $branch } enthält die vorherigen Commits im Arbeitsverzeichnis { $crate-remote-display-folder-1 }. Lösen Sie die Konflikte dort und setzen Sie den Cherry-Pick fort{ $match-left-0-string-new-1-1-more-2 }. Entfernen Sie anschließend das Arbeitsverzeichnis aus der Seitenleiste (der Branch bleibt).
+
+repo-workflows-timeline-finished-475e7702 = Diesen Versuch verwerfen…
+
+repo-workflows-timeline-finished-57272758 = Arbeitsverzeichnis und Branch { $branch } verwerfen? Wenn dort inzwischen gearbeitet wurde, wird nichts entfernt.
+
+repo-workflows-timeline-finished-635b324e = { " " }(ein weiterer Commit folgt)
+
+repo-workflows-timeline-finished-65b04ffc = Arbeitsverzeichnis öffnen
+
+repo-workflows-timeline-finished-69c5b35c = { $short-commit-1 } { $summary } lässt sich ohne den Vorgang nicht anwenden: Konflikte in
+
+repo-workflows-timeline-finished-9f36aac7 = { $branch } wurde unter { $short-tip-1 } erstellt.
+
+repo-workflows-timeline-finished-c36998e0 = { $branch } auschecken
+
+repo-workflows-timeline-finished-c8854cb8 = (keine Datei bleibt ungemergt: Prüfen Sie das Arbeitsverzeichnis)
+
+repo-workflows-timeline-finished-c9361f4d = { " " }({ $n } weitere Commits folgen)
+
+repo-workflows-timeline-finished-eb1a70e3 = Verwerfen
+
+repo-workflows-timeline-finished-f63a600e = Entfernt Arbeitsverzeichnis und Branch { $branch }
 
 repo-workflows-timeline-forget-confirm-19766ed6 = Abbrechen
 
+repo-workflows-timeline-forget-confirm-a6bd489d = Vergessen
+
+repo-workflows-timeline-jump-a5337838 = Dorthin wechseln
+
+repo-workflows-timeline-jump-b77dfff9 = { $label }: Dies würde „{ $skipped }“ überspringen, das keinen Branch verschoben hat. Gehen Sie stattdessen mit { $cmd }+Z / { $cmd }+Y schrittweise vor.
+
 repo-workflows-timeline-jump-controls-19766ed6 = Abbrechen
+
+repo-workflows-timeline-jump-controls-1dec3ad6 = Das Repository ist bereits hier
+
+repo-workflows-timeline-jump-controls-26d159f6 = Hierher wechseln
+
+repo-workflows-timeline-jump-controls-3006b913 = Ein Wechsel hierher ändert Folgendes:
+
+repo-workflows-timeline-jump-controls-8020ed90 = Branches und HEAD auf den Stand direkt nach diesem Vorgang zurücksetzen (auch per Doppelklick auf eine Zeile)
+
+repo-workflows-timeline-jump-controls-b968e7d2 = Dateiänderungen bleiben erhalten. Vorgemerkte Änderungen werden nicht mehr vorgemerkt sein. Git lehnt den Vorgang ab, wenn Änderungen verloren gingen. Stashes und Tags bleiben unverändert.
+
+repo-workflows-timeline-jump-controls-c651b224 = Im Repository ändert sich nichts: Nur die Markierung in der Zeitleiste wird verschoben.
+
+repo-workflows-timeline-jump-controls-ecbb5934 = Warten Sie, bis der aktuelle Git-Vorgang beendet ist
+
+repo-workflows-timeline-jump-target-1e4e36b2 = Zu „{ $self-timeline-get-id-label-1 }“ wechseln
+
+repo-workflows-timeline-jump-target-bd63e54c = Zum Stand vor der Zeitleiste wechseln
+
+repo-workflows-timeline-load-from-199a3034 = Die Zeitleiste in { $path-display-1 } ist beschädigt ({ $e }); sie bleibt unverändert und es wird keine neue gespeichert
+
+repo-workflows-timeline-load-from-7d803910 = Die Zeitleiste in { $path-display-1 } kann nicht gelesen werden: { $e }
+
+repo-workflows-timeline-load-from-ac62d083 = Die Zeitleiste in { $path-display-1 } wurde von einer neueren gitcraft-Version geschrieben; sie bleibt unverändert und diese Version speichert keine Zeitleiste
+
+repo-workflows-timeline-notes-32f54038 = Dieselbe Änderung
+
+repo-workflows-timeline-notes-431569df = Nachricht geändert
+
+repo-workflows-timeline-notes-521926c1 = Jetzt signiert
+
+repo-workflows-timeline-notes-553d30ef = Gleiche Dateien
+
+repo-workflows-timeline-notes-6e54e0e9 = Nur in der neuen Version
+
+repo-workflows-timeline-notes-716dcf0f = Signatur ersetzt
+
+repo-workflows-timeline-notes-b2f0d6f0 = Unterschiedliche Dateien
+
+repo-workflows-timeline-notes-b5c609b3 = Die Änderung unterscheidet sich
+
+repo-workflows-timeline-notes-c267b6be = Signatur entfernt
+
+repo-workflows-timeline-notes-e448894a = Entfernt oder in einem anderen Commit zusammengeführt
+
+repo-workflows-timeline-notes-fcc760d7 = Autor geändert
+
+repo-workflows-timeline-outside-label-d1d10f56 = { $first } und { $rest-len-1 } weitere
+
+repo-workflows-timeline-pair-row-086cbeb5 = Entfernt oder in einem anderen Commit zusammengeführt
+
+repo-workflows-timeline-pair-row-1162b77f = Nur in der neuen Version
+
+repo-workflows-timeline-pair-row-d28f50d6 = Zugeordnet, aber Änderung oder Nachricht unterschiedlich
+
+repo-workflows-timeline-pair-row-dbbc6123 = Dieselbe Änderung
+
+repo-workflows-timeline-plan-09f68a9f = Der Vorgang hat auf { $branch } nicht nur Commits erstellt, sondern den Branch umgeschrieben oder zurückgesetzt. Machen Sie ihn stattdessen rückgängig.
+
+repo-workflows-timeline-plan-41296321 = Commit { $crate-repo-short-commit-1 } ist nicht mehr im Repository (durch git gc entfernt)
+
+repo-workflows-timeline-plan-42c2d675 = { $branch } existiert nicht mehr
+
+repo-workflows-timeline-plan-4b600f60 = Seine Commits befinden sich nicht mehr auf { $branch } (zwischenzeitlich umgeschrieben oder zurückgesetzt)
+
+repo-workflows-timeline-plan-a4ff5403 = Die spätere Arbeit auf { $branch } enthält einen Merge-Commit: Nur eine geradlinige Commit-Folge kann erneut angewendet werden
+
+repo-workflows-timeline-plan-da23e638 = So kann nur ein Vorgang entfernt werden, der genau einen Branch verschoben hat
+
+repo-workflows-timeline-planned-32b970db = Seitdem wurde auf { $plan-branch-1 } nichts committet: Der neue Branch liegt am Stand vor diesem Vorgang.
+
+repo-workflows-timeline-planned-464cf7b4 = Herausgenommen ({ $plan-removed-total-1 }):
+
+repo-workflows-timeline-planned-5c26ac7a = { $plan-branch-1 } bleibt unverändert. Die Commits werden in einem Arbeitsverzeichnis neben dem Repository erneut angewendet, das nach erfolgreicher Anwendung wieder entfernt wird.
+
+repo-workflows-timeline-planned-7f445154 = Neuer Branch
+
+repo-workflows-timeline-planned-9ae4d55a = Branch erstellen
+
+repo-workflows-timeline-planned-bc5f9685 = Erneut angewendet ({ $plan-later-len-1 }):
+
+repo-workflows-timeline-put-branch-back-94acd0c3 = { $branch } auf { $crate-repo-short-commit-1 } zurücksetzen
+
+repo-workflows-timeline-receipt-section-94c37af0 = Jeden Commit nachverfolgen ({ $receipt-pairs-len-1 })
+
+repo-workflows-timeline-receipt-section-a5fcdee7 = UMSCHREIBUNGSBELEG
+
+repo-workflows-timeline-record-56546037 = Der Umschreibungsbeleg konnte nicht erstellt werden: { $e }
+
+repo-workflows-timeline-record-ef197d90 = Die Commits von „{ $tab-timeline-get-id-map-or-e-e-l-1 }“ konnten nicht vor git gc geschützt werden: { $e }
+
+repo-workflows-timeline-redo-2b66f1cb = { $entry-label-1 } wiederholen
+
+repo-workflows-timeline-redo-4aaf2710 = Nichts zu wiederholen
+
+repo-workflows-timeline-redo-74273989 = Wiederholen
+
+repo-workflows-timeline-release-dropped-005d7b4f = Alte Zeitleisten-Refs konnten nicht entfernt werden: { $e }
+
+repo-workflows-timeline-remove-done-0457f228 = { $label } fehlgeschlagen: { $error }
+
+repo-workflows-timeline-remove-done-7da61c9b = { $label } (bei einem Konflikt angehalten)
+
+repo-workflows-timeline-remove-done-cd7d7755 = { $label }: abgeschlossen, auf dem neuen Branch { $branch }
+
+repo-workflows-timeline-remove-done-ff66751a = { $label }: bei einem Konflikt angehalten. Lösen Sie ihn in seinem Arbeitsverzeichnis.
+
+repo-workflows-timeline-remove-section-013b5c2e = Diesen Vorgang entfernen, spätere Arbeit behalten…
+
+repo-workflows-timeline-remove-section-08b980d5 = Wendet die seit diesem Vorgang auf { $branch } erstellten Commits ohne ihn auf einem neuen Branch erneut an. { $branch } bleibt unverändert.
+
+repo-workflows-timeline-remove-section-17123003 = Commits werden gelesen…
+
+repo-workflows-timeline-remove-section-50ad636b = Spätere Commits werden erneut angewendet…
+
+repo-workflows-timeline-remove-section-e0e6aea3 = DIESEN VORGANG ENTFERNEN, SPÄTERE ARBEIT BEHALTEN
+
+repo-workflows-timeline-replay-5fa33495 = Ein Branch namens { $name } existiert bereits: Wählen Sie einen anderen Namen
+
+repo-workflows-timeline-replay-abfe0bc2 = { $plan-branch-1 } wurde seit dieser Berechnung verschoben: erneut anfordern, um die anzuwendenden Commits zu sehen
+
+repo-workflows-timeline-replay-d57fcfd1 = Erneutes Anwenden der späteren Commits fehlgeschlagen: { $e }
+
+repo-workflows-timeline-replay-e7c57ae8 = { $name } wurde erstellt, aber sein Arbeitsverzeichnis unter { $arg } konnte nicht entfernt werden: { $e }
+
+repo-workflows-timeline-replay-fddf601c = Das Arbeitsverzeichnis zum erneuten Anwenden der Commits konnte unter { $arg } nicht erstellt werden: { $e }
+
+repo-workflows-timeline-restore-steps-115ccf2e = { $target-branch-1 } existierte damals nicht und ist ausgecheckt: Checken Sie zunächst einen anderen Branch aus
+
+repo-workflows-timeline-restore-steps-2912ea1a = { $name } ist in einem anderen Arbeitsverzeichnis ausgecheckt: Wechseln Sie dort zunächst auf einen anderen Branch
+
+repo-workflows-timeline-restore-steps-41b8db1b = Damals gab es noch keinen Commit: Wählen Sie einen späteren Eintrag oder dort „Neuer Branch“
+
+repo-workflows-timeline-restore-steps-749ee471 = { $target-branch-1 } ist in einem anderen Arbeitsverzeichnis ausgecheckt: Wechseln Sie dort zunächst auf einen anderen Branch
+
+repo-workflows-timeline-restore-steps-8ffa662e = { $name } wird von Git als Option gelesen: Benennen Sie den Branch zunächst um
+
+repo-workflows-timeline-restore-steps-ebcbed7a = { $target-branch-1 } hatte damals noch keinen Commit: Wählen Sie einen späteren Eintrag oder dort „Neuer Branch“
+
+repo-workflows-timeline-run-remove-6fd826a1 = Wählen Sie einen noch nicht vergebenen Namen für den neuen Branch (nicht „{ $name }“)
+
+repo-workflows-timeline-run-remove-73ccc5e0 = „{ $self-entry-label-plan-id-1 }“ aus { $plan-branch-2 } entfernen, als { $name }
+
+repo-workflows-timeline-run-remove-d0ee0326 = „{ $name }“ ist kein gültiger Branch-Name
+
+repo-workflows-timeline-save-to-8a68e68f = Die Zeitleiste kann nicht gespeichert werden: { $e }
+
+repo-workflows-timeline-save-to-a23306bd = Die Zeitleiste kann nicht in { $path-display-1 } gespeichert werden: { $e }
+
+repo-workflows-timeline-sentence-31b36481 = Dateien am Ende identisch
+
+repo-workflows-timeline-sentence-360c0cec = Nachrichten beibehalten
+
+repo-workflows-timeline-sentence-4a61e684 = Zu viele Commits, um sie einzeln nachzuverfolgen
+
+repo-workflows-timeline-sentence-99e79f74 = Dateien am Ende unterschiedlich
+
+repo-workflows-timeline-sentence-b5ea0271 = { $old } Commits → { $new }
+
+repo-workflows-timeline-sentence-d30ebcc6 = Autoren beibehalten
+
+repo-workflows-timeline-show-receipt-e172bf9c = { $label }: abgeschlossen. { $receipt-sentence-1 } (Beleg in der Zeitleiste, Strg+Umschalt+Z)
+
+repo-workflows-timeline-signatures-33c87627 = Signaturen ersetzt, { $a-b-1 } zusätzlich signiert
+
+repo-workflows-timeline-signatures-aa14a1ba = Signaturen ersetzt
+
+repo-workflows-timeline-signatures-b59d95ba = Signaturen ersetzt, { $b-a-1 } entfernt
+
+repo-workflows-timeline-timeline-op-ended-be0297e1 = { $label } (teilweise angehalten)
+
+repo-workflows-timeline-timeline-unsettled-21705388 = { $what }: Warten, bis das Repository erneut gelesen wurde…
+
+repo-workflows-timeline-timeline-unsettled-3fd5b04c = { $what }: Das Repository konnte nicht erneut gelesen werden. Laden Sie es zunächst mit F5 neu.
+
+repo-workflows-timeline-timeline-view-ui-1d9ae2c2 = Noch nichts in der Zeitleiste
+
+repo-workflows-timeline-timeline-view-ui-232c6bba = Commits, Merges, Rebases, Resets, Checkouts und Branch-Änderungen erscheinen hier, sowohl aus gitcraft als auch aus anderen Quellen, und bleiben nach einem Neustart erhalten.
+
+repo-workflows-timeline-timeline-view-ui-3b4f9f54 = Alle außer den neuesten 50 vergessen (und den Weg zum aktuellen Stand)
+
+repo-workflows-timeline-timeline-view-ui-8225e6ab = Vergessen…
+
+repo-workflows-timeline-timeline-view-ui-961b2a04 = Schließen (Esc)
+
+repo-workflows-timeline-timeline-view-ui-9dcff98e = Zeitleiste
+
+repo-workflows-timeline-timeline-view-ui-9f54c719 = Die gesamte Zeitleiste vergessen
+
+repo-workflows-timeline-timeline-view-ui-d4512de3 = Stand unter dem Zeiger · Zeiger loslassen, um die Vorschau zu beenden
+
+repo-workflows-timeline-toggle-timeline-d12d6347 = Beenden oder schließen Sie zunächst den Konflikt- oder Rebase-Editor, um die Zeitleiste anzuzeigen
+
+repo-workflows-timeline-tree-rows-06b96bb5 = Die Branches vor dem ältesten noch vorhandenen Zeitleisteneintrag
+
+repo-workflows-timeline-tree-rows-601272f1 = In gitcraft erstellt
+
+repo-workflows-timeline-tree-rows-6fa556f4 = Vor dem ältesten Eintrag
+
+repo-workflows-timeline-tree-rows-d5686d26 = Außerhalb von gitcraft erstellt (Terminal, andere Anwendung oder während gitcraft geschlossen war)
+
+repo-workflows-timeline-undo-83290078 = Nichts rückgängig zu machen
+
+repo-workflows-timeline-undo-a8283ade = Rückgängig
+
+repo-workflows-timeline-undo-bf959af0 = { $entry-label-1 } rückgängig machen
 
 repo-workflows-working_drafts-history-7d9eb7ac = Schließen
 
@@ -6289,5 +6617,35 @@ repo-workflows-test-lane-progress-head = { $state ->
         [running] Tests für { $range } mit `{ $command }`: { $details }
         [stopped] Tests für { $range } mit `{ $command }` gestoppt: { $details }
        *[done] { $range } mit `{ $command }` getestet: { $details }
+    }
+
+repo-workflows-timeline-entry-count = { $count ->
+        [one] Ein Eintrag
+       *[other] { $count } Einträge
+    } · { $command }+Z / { $command }+Y zurück / vorwärts
+
+repo-workflows-timeline-forget-confirm = { $count ->
+        [one] Einen Eintrag vergessen
+       *[other] { $count } Einträge vergessen
+    }? Sie können anschließend nicht mehr rückgängig gemacht werden. Alte Commits, die nur durch sie aufbewahrt wurden, können von git gc entfernt werden. Ihre Branches ändern sich nicht.
+
+repo-workflows-timeline-authors-changed = { $count ->
+        [one] ein Autor geändert
+       *[other] { $count } Autoren geändert
+    }
+
+repo-workflows-timeline-messages-changed = { $count ->
+        [one] eine Nachricht geändert
+       *[other] { $count } Nachrichten geändert
+    }
+
+repo-workflows-timeline-commits-signed = { $count ->
+        [one] ein Commit jetzt signiert
+       *[other] { $count } Commits jetzt signiert
+    }
+
+repo-workflows-timeline-signatures-dropped = { $count ->
+        [one] eine Signatur entfernt
+       *[other] { $count } Signaturen entfernt
     }
 

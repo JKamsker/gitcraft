@@ -11,9 +11,11 @@ use crate::theme::{self, Tokens};
 pub(super) fn receipt_section(ui: &mut Ui, receipt: &Receipt) {
     let t = Tokens::get(ui.ctx());
     ui.label(
-        RichText::new("REWRITE RECEIPT")
-            .font(theme::semibold(10.5))
-            .color(t.text_faint),
+        RichText::new(crate::i18n::text(
+            "repo-workflows-timeline-receipt-section-a5fcdee7",
+        ))
+        .font(theme::semibold(10.5))
+        .color(t.text_faint),
     );
     ui.add_space(2.0);
     ui.add(egui::Label::new(RichText::new(receipt.sentence()).color(t.text)).wrap());
@@ -30,28 +32,43 @@ pub(super) fn receipt_section(ui: &mut Ui, receipt: &Receipt) {
     if receipt.pairs.is_empty() {
         return;
     }
-    egui::CollapsingHeader::new(format!("Follow each commit ({})", receipt.pairs.len()))
-        .id_salt(("receipt", &receipt.new_tip))
-        .show(ui, |ui| {
-            for pair in &receipt.pairs {
-                pair_row(ui, pair);
-                ui.add_space(4.0);
-            }
-        });
+    egui::CollapsingHeader::new(crate::i18n::message(
+        "repo-workflows-timeline-receipt-section-94c37af0",
+        &[("receipt-pairs-len-1", (receipt.pairs.len()).clone().into())],
+    ))
+    .id_salt(("receipt", &receipt.new_tip))
+    .show(ui, |ui| {
+        for pair in &receipt.pairs {
+            pair_row(ui, pair);
+            ui.add_space(4.0);
+        }
+    });
 }
 
 /// One old commit and its replacement, with what differs between them.
 fn pair_row(ui: &mut Ui, pair: &Pair) {
     let t = Tokens::get(ui.ctx());
     let (mark, color, meaning) = match pair.kind {
-        PairKind::Same => ("=", t.success, "The same change"),
+        PairKind::Same => (
+            "=",
+            t.success,
+            crate::i18n::text("repo-workflows-timeline-pair-row-dbbc6123"),
+        ),
         PairKind::Changed => (
             "≠",
             t.warning,
-            "Paired, but the change or the message differs",
+            crate::i18n::text("repo-workflows-timeline-pair-row-d28f50d6"),
         ),
-        PairKind::Added => ("+", t.accent, "Only in the new version"),
-        PairKind::Dropped => ("−", t.danger, "Dropped, or squashed into another"),
+        PairKind::Added => (
+            "+",
+            t.accent,
+            crate::i18n::text("repo-workflows-timeline-pair-row-1162b77f"),
+        ),
+        PairKind::Dropped => (
+            "−",
+            t.danger,
+            crate::i18n::text("repo-workflows-timeline-pair-row-086cbeb5"),
+        ),
     };
     let side = |c: &Option<Commit>, missing: &str| match c {
         Some(c) => format!("{} {}", short(&c.hash), c.summary),
@@ -87,29 +104,39 @@ fn pair_row(ui: &mut Ui, pair: &Pair) {
 pub(super) fn notes(pair: &Pair) -> Vec<&'static str> {
     let mut notes = Vec::new();
     match pair.kind {
-        PairKind::Added => notes.push("only in the new version"),
-        PairKind::Dropped => notes.push("dropped, or squashed into another"),
-        PairKind::Same => notes.push("same change"),
-        PairKind::Changed => notes.push("the change differs"),
+        PairKind::Added => notes.push(crate::i18n::text("repo-workflows-timeline-notes-6e54e0e9")),
+        PairKind::Dropped => {
+            notes.push(crate::i18n::text("repo-workflows-timeline-notes-e448894a"))
+        }
+        PairKind::Same => notes.push(crate::i18n::text("repo-workflows-timeline-notes-32f54038")),
+        PairKind::Changed => {
+            notes.push(crate::i18n::text("repo-workflows-timeline-notes-b5c609b3"))
+        }
     }
     // A same change on a moved base has other files: only worth saying for a changed one.
     if pair.paired() && pair.kind == PairKind::Changed {
         notes.push(if pair.same_tree() {
-            "same files"
+            crate::i18n::text("repo-workflows-timeline-notes-553d30ef")
         } else {
-            "files differ"
+            crate::i18n::text("repo-workflows-timeline-notes-b2f0d6f0")
         });
     }
     if pair.message_changed() {
-        notes.push("message changed");
+        notes.push(crate::i18n::text("repo-workflows-timeline-notes-431569df"));
     }
     if pair.author_changed() {
-        notes.push("author changed");
+        notes.push(crate::i18n::text("repo-workflows-timeline-notes-fcc760d7"));
     }
     match (&pair.old, &pair.new) {
-        (Some(o), Some(n)) if o.signed && n.signed => notes.push("signature replaced"),
-        (Some(o), Some(_)) if o.signed => notes.push("signature dropped"),
-        (Some(o), Some(n)) if !o.signed && n.signed => notes.push("now signed"),
+        (Some(o), Some(n)) if o.signed && n.signed => {
+            notes.push(crate::i18n::text("repo-workflows-timeline-notes-716dcf0f"))
+        }
+        (Some(o), Some(_)) if o.signed => {
+            notes.push(crate::i18n::text("repo-workflows-timeline-notes-c267b6be"))
+        }
+        (Some(o), Some(n)) if !o.signed && n.signed => {
+            notes.push(crate::i18n::text("repo-workflows-timeline-notes-521926c1"))
+        }
         _ => {}
     }
     notes

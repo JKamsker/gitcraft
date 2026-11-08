@@ -329,14 +329,24 @@ impl RepoTab {
                     }
                 }
                 if let Some(e) = receipt_error {
-                    tab.timeline_error =
-                        Some(format!("The rewrite's receipt couldn't be made: {e}"));
+                    tab.timeline_error = Some(crate::i18n::message(
+                        "repo-workflows-timeline-record-56546037",
+                        &[("e", (e).clone().into())],
+                    ));
                 }
                 tab.show_receipt(id);
                 if let Err(e) = kept {
-                    tab.timeline_error = Some(format!(
-                        "The commits of “{}” couldn't be kept from git gc: {e}",
-                        tab.timeline.get(id).map_or("", |e| e.label.as_str())
+                    tab.timeline_error = Some(crate::i18n::message(
+                        "repo-workflows-timeline-record-ef197d90",
+                        &[
+                            (
+                                "tab-timeline-get-id-map-or-e-e-l-1",
+                                (tab.timeline.get(id).map_or("", |e| e.label.as_str()))
+                                    .clone()
+                                    .into(),
+                            ),
+                            ("e", (e).clone().into()),
+                        ],
                     ));
                 }
                 tab.save_timeline(ctx);
@@ -400,8 +410,10 @@ impl RepoTab {
             move || snapshot::release(&path, &key, &ids),
             |tab, result, _| {
                 if let Err(e) = result {
-                    tab.timeline_error =
-                        Some(format!("Old timeline refs couldn't be removed: {e}"));
+                    tab.timeline_error = Some(crate::i18n::message(
+                        "repo-workflows-timeline-release-dropped-005d7b4f",
+                        &[("e", (e).clone().into())],
+                    ));
                 }
             },
         );
