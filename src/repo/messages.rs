@@ -704,6 +704,8 @@ pub(crate) fn display_operation(label: &str) -> String {
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum PaintFamily {
     CoreLines,
+    LegacyPrefix,
+    WorkflowFixed,
     Review,
     Workflow,
     Legacy,
@@ -722,9 +724,13 @@ impl Painted {
     }
 }
 fn known_operation(label: &str, depth: usize) -> Option<Painted> {
-    operation_display_inner(label, depth, PaintFamily::Review)
+    review::fixed(label)
+        .map(Painted::Known)
         .or_else(|| workflow::shared_fixed(label).map(Painted::Known))
+        .or_else(|| operation_template(label, depth, PaintFamily::WorkflowFixed))
+        .or_else(|| operation_display_inner(label, depth, PaintFamily::LegacyPrefix))
         .or_else(|| operation_template(label, depth, PaintFamily::CoreLines))
+        .or_else(|| operation_display_inner(label, depth, PaintFamily::Review))
         .or_else(|| operation_display_inner(label, depth, PaintFamily::Workflow))
         .or_else(|| operation_display_inner(label, depth, PaintFamily::Legacy))
 }
@@ -744,10 +750,12 @@ fn operation_display_inner(label: &str, depth: usize, family: PaintFamily) -> Op
             .map(Painted::Known)
             .or_else(|| operation_template(label, depth, family));
     }
-    if family == PaintFamily::Legacy {
-        let shared = crate::operation_labels::display(label);
-        if shared != label {
-            return Some(Painted::Known(shared));
+    if matches!(family, PaintFamily::Legacy | PaintFamily::LegacyPrefix) {
+        if family == PaintFamily::Legacy {
+            let shared = crate::operation_labels::display(label);
+            if shared != label {
+                return Some(Painted::Known(shared));
+            }
         }
         if depth < 4 {
             for (prefix, id) in [
@@ -785,6 +793,9 @@ fn operation_display_inner(label: &str, depth: usize, family: PaintFamily) -> Op
                 )));
             }
         }
+    }
+    if family == PaintFamily::LegacyPrefix {
+        return None;
     }
     operation_template(label, depth, family)
 }
@@ -1028,7 +1039,11 @@ fn operation_template(label: &str, depth: usize, family: PaintFamily) -> Option<
             } else {
                 PaintFamily::Legacy
             };
-            if family == PaintFamily::CoreLines {
+            if family == PaintFamily::WorkflowFixed {
+                if source_family != PaintFamily::Workflow || !template.args.is_empty() {
+                    continue;
+                }
+            } else if family == PaintFamily::CoreLines {
                 if template.id != "repo-core-0164" {
                     continue;
                 }
@@ -1038,7 +1053,7 @@ fn operation_template(label: &str, depth: usize, family: PaintFamily) -> Option<
             let Some(captures) = template.pattern.captures(label) else {
                 continue;
             };
-            if family == PaintFamily::Workflow {
+            if matches!(family, PaintFamily::Workflow | PaintFamily::WorkflowFixed) {
                 let mut args = Vec::new();
                 for (i, (name, numeric)) in template.args.iter().enumerate() {
                     if name.is_empty() {
@@ -1143,14 +1158,16 @@ pub(crate) fn display_status(status: &str) -> String {
     if let Some(rendered) = known_operation(status, 0) {
         return rendered.text(status);
     }
-    match status.split_once(": ") {
-        Some((label, detail)) => format!(
+    if let Some((label, detail)) = status.split_once(": ")
+        && let Some(Painted::Known(label)) = known_operation(label, 0)
+    {
+        return format!(
             "{}: {}",
-            display_operation(label),
+            label,
             crate::git::display_error(&crate::forge::inbox::display_error(detail))
-        ),
-        None => crate::git::display_error(&crate::forge::inbox::display_error(status)),
+        );
     }
+    crate::git::display_error(&crate::forge::inbox::display_error(status))
 }
 
 #[cfg(test)]

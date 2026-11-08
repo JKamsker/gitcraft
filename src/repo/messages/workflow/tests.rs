@@ -1115,9 +1115,9 @@ const CASES: &[Case] = &[
     }, // supplied entry 43
     Case {
         raw: "Sign off the commits of opaque-plan-branch-1/Stage1/日本語/00001234 (here only)",
-        id: "repo-workflows-dco-dco-op-done-5d0c9ff1",
+        id: "repo-core-operation-dco-here",
         args: &[(
-            "plan-branch-1",
+            "branch",
             Sample::Text(
                 "opaque-plan-branch-1/Stage1/日本語/00001234",
                 "opaque-plan-branch-1/Stage1/日本語/00001234",
@@ -1207,9 +1207,9 @@ const CASES: &[Case] = &[
     }, // supplied entry 294
     Case {
         raw: "Sign off the commits of opaque-plan-branch-1/Stage1/日本語/00001234",
-        id: "repo-workflows-dco-fix-label-dfc76b8d",
+        id: "repo-core-operation-dco",
         args: &[(
-            "plan-branch-1",
+            "branch",
             Sample::Text(
                 "opaque-plan-branch-1/Stage1/日本語/00001234",
                 "opaque-plan-branch-1/Stage1/日本語/00001234",
@@ -2532,13 +2532,13 @@ const CASES: &[Case] = &[
     }, // supplied entry 269
     Case {
         raw: "Undo Push",
-        id: "repo-workflows-timeline-undo-bf959af0",
-        args: &[("entry-label-1", Sample::Text("Push", "Pushen"))],
+        id: "interaction-operation-undo",
+        args: &[("operation", Sample::Text("Push", "Pushen"))],
     }, // supplied entry 285
     Case {
         raw: "Redo Push",
-        id: "repo-workflows-timeline-redo-2b66f1cb",
-        args: &[("entry-label-1", Sample::Text("Push", "Pushen"))],
+        id: "interaction-operation-redo",
+        args: &[("operation", Sample::Text("Push", "Pushen"))],
     }, // supplied entry 288
     Case {
         raw: "Push",
@@ -2689,6 +2689,8 @@ fn workflow_selector_defaults_nested_guards_and_numeric_identity_are_paint_only(
             "Restack stopped at refs/00001234 on conflicts: resolve them at provider location, then Continue restack (or Abort restack)",
             "Push: done. provider prose (receipt in the timeline, Ctrl+Shift+Z)",
             "external-custom, and 12 more",
+            "external provider: Analysis cancelled",
+            "external provider failed: Analysis cancelled",
         ] {
             assert_eq!(display_operation(raw), raw, "operation unknown: {raw}");
             assert_eq!(display_status(raw), raw, "status unknown: {raw}");
@@ -2755,6 +2757,116 @@ fn workflow_receipt_adapter_accepts_only_finite_owned_clause_order_and_opaque_ex
         } else {
             "Final files identical"
         }));
+    }
+    crate::i18n::set_language("en-US");
+}
+
+#[test]
+fn workflow_finite_scope_health_noun_and_state_choices_render_each_supplied_contract() {
+    for language in ["en-US", "de"] {
+        crate::i18n::set_language(language);
+        for (raw, id) in [
+            (
+                "this repository",
+                "repo-workflows-doctor-scope-choice-38429e22",
+            ),
+            (
+                "this worktree",
+                "repo-workflows-doctor-scope-choice-0eb26325",
+            ),
+            (
+                "all my repositories",
+                "repo-workflows-doctor-scope-choice-59b8031f",
+            ),
+            (
+                "everyone on this machine",
+                "repo-workflows-doctor-scope-choice-ad944dcb",
+            ),
+            (
+                "command line",
+                "repo-workflows-doctor-scope-choice-c925a118",
+            ),
+        ] {
+            let input = format!("Set opaque-key to opaque-value for {raw}");
+            assert_eq!(
+                display_operation(&input),
+                crate::i18n::message(
+                    "repo-workflows-doctor-set-row-921f564b",
+                    &[
+                        ("setting-key-1", "opaque-key".into()),
+                        ("shortened-value-2", "opaque-value".into()),
+                        (
+                            "scope-choice-scope-to-lowercase-3",
+                            crate::i18n::text(id).into()
+                        )
+                    ]
+                )
+            );
+        }
+        for (raw, id) in [
+            ("commit-graph", "backend-health-commit-graph"),
+            (
+                "scheduled maintenance",
+                "backend-scheduled-maintenance-f688c9",
+            ),
+            ("file system monitor", "backend-file-system-monitor-bd6322"),
+            ("untracked cache", "backend-untracked-cache-de0942"),
+            ("pack the objects", "backend-pack-the-objects-5a853d"),
+        ] {
+            let input = format!("Turn on: {raw}");
+            assert_eq!(
+                display_operation(&input),
+                crate::i18n::message(
+                    "repo-workflows-doctor-turn-on-action-d8e3e02d",
+                    &[("s-title-to-lowercase-1", crate::i18n::text(id).into())]
+                )
+            );
+        }
+        for (raw, id) in [
+            ("pull request", "backend-noun-pull-request"),
+            ("merge request", "backend-noun-merge-request"),
+        ] {
+            let input = format!("Publish {raw}s");
+            assert_eq!(
+                display_operation(&input),
+                crate::i18n::message(
+                    "repo-workflows-stack-publish-done-c4ffa0c1",
+                    &[("noun", crate::i18n::text(id).into())]
+                )
+            );
+        }
+        for (raw, id) in [
+            ("merge", "backend-in-progress-merge"),
+            ("cherry-pick", "backend-in-progress-cherry-pick"),
+            ("revert", "backend-in-progress-revert"),
+            ("rebase", "backend-in-progress-rebase"),
+            ("patch", "backend-in-progress-patch"),
+        ] {
+            let input = format!("Distribute staged fixes: a {raw} is in progress");
+            assert_eq!(
+                display_operation(&input),
+                crate::i18n::message(
+                    "repo-workflows-surgery-open-absorb-edcc444b",
+                    &[("state-label-to-lowercase-1", crate::i18n::text(id).into())]
+                )
+            );
+        }
+        for raw in ["this repository ", "THIS REPOSITORY", "custom scope"] {
+            assert!(scope(raw).is_none());
+        }
+        for raw in [
+            "commit-graph ",
+            "Commit-graph",
+            "external provider suggestion",
+        ] {
+            assert!(health(raw).is_none());
+        }
+        for raw in ["pull requests", "custom request"] {
+            assert!(noun(raw).is_none());
+        }
+        for raw in ["Merge", "external state"] {
+            assert!(in_progress(raw).is_none());
+        }
     }
     crate::i18n::set_language("en-US");
 }
