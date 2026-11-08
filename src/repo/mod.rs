@@ -68,7 +68,7 @@ mod hooks;
 mod hotfix;
 mod https_recovery;
 mod interaction;
-mod issue_work;
+pub(crate) mod issue_work;
 mod keep_submodules;
 mod keys;
 mod layout;

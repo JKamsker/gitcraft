@@ -1940,6 +1940,7 @@ dependencies = [
  "toml_edit",
  "two-face",
  "ureq 2.12.1",
+ "url",
  "vt100",
  "windows 0.62.2",
  "windows-sys 0.61.2",

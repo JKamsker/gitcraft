@@ -288,7 +288,7 @@ fn without_comments(text: &str) -> String {
 
 /// `text` cut to [`MAX_LINES`] lines and [`MAX_CHARS`] characters (on a character's
 /// boundary), marked as cut when it was.
-fn cap(text: &str) -> String {
+pub(super) fn cap(text: &str) -> String {
     let mut cut = false;
     let mut kept: String = text
         .lines()

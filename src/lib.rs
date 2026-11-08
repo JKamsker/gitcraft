@@ -62,6 +62,7 @@ mod teleport;
 mod terminal;
 mod theme;
 mod tour;
+mod trackers;
 mod update;
 mod vscode_theme;
 mod weakened;

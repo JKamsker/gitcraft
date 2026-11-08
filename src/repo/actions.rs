@@ -844,7 +844,7 @@ impl RepoTab {
                 Action::LfsStorage(super::lfs_storage::StorageAct::OpenPanel),
             ));
         }
-        if self.hosting.is_some() {
+        {
             items.push((
                 "Start work from an issue…".into(),
                 "issue".into(),

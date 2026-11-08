@@ -26,6 +26,16 @@ pub(crate) fn branch_name(number: u64, title: &str) -> String {
     }
 }
 
+pub(crate) fn tracker_branch(key: &str, title: &str) -> String {
+    let key = slug(key);
+    let words = slug(title);
+    if words.is_empty() {
+        key
+    } else {
+        format!("{key}-{words}")
+    }
+}
+
 /// The title's words, lowercase, joined by single dashes, cut after [`TITLE_CHARS`] characters
 /// (or [`TITLE_BYTES`] bytes) at a word's end when one is near (else within the word, on a
 /// character's boundary).

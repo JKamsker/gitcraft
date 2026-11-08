@@ -389,6 +389,8 @@ fn parse_issue(item: &Value) -> Option<Issue> {
             .to_owned()
     };
     Some(Issue {
+        tracker: None,
+        acceptance: None,
         number: item.get("iid").and_then(Value::as_u64)?,
         title: text("title"),
         body: text("description"),
