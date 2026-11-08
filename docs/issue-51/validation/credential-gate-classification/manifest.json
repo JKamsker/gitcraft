@@ -1,0 +1,10 @@
+{
+  "application": "3709210325195046dc2b444990c9069eda879cde",
+  "tests_reported_passed": 2,
+  "execution_class": "one pure scope test and one actual owned Git credential-fill test with eight dummy endpoint cases",
+  "log_sha256": "feeb2b218a577d1373eb1a81574a42975a0319b61fe00270745915bf8ecef664",
+  "compressed_sha256": "a90fcf320ae6fa28be029fb8726d5a55afc1d80241fb593faddf8890eea7b02b",
+  "correction": "This is not pure recording-only evidence; writer acknowledged gate selection error",
+  "runtime_hold": "UNCHANGED",
+  "parent_reexecution": false
+}

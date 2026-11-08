@@ -1,0 +1,268 @@
+{
+  "schema_version": 1,
+  "created_at_utc": "2026-11-08T00:05:26.937899+00:00",
+  "candidate": "4a9a22c806126a813d9d5633a699dd7cafa135da",
+  "source_base": "baf5126118232b2f6da2f8411bef2e884ff6c474",
+  "scope": "Only three parent visual R2 follow-ups; no whole-task or process-safety acceptance",
+  "verdicts": {
+    "minimap_agent_filter": "PASS",
+    "celebration_worker_before_after_head": "PASS",
+    "postcard_cumulative_edge_layout_budget": "PASS"
+  },
+  "reviewer_parent_mutations": false,
+  "subagents": false,
+  "ci_pr_external_writes": false,
+  "os_process_runtime_tests": false,
+  "environment": {
+    "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "CARGO_BUILD_JOBS": 2,
+    "TMPDIR": "/private/tmp",
+    "SHELL": "/tmp/gitcraft-integration-tools/validation-shell",
+    "PATH_prefix": "/tmp/gitcraft-integration-tools",
+    "cargo_build_args": [
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "--no-run",
+      "--message-format=json"
+    ]
+  },
+  "exact_build": "PASS",
+  "exact_candidate_test_count": 34,
+  "exact_candidate_tests": [
+    "repo::authorship_view::tests::the_lens_through_the_tab",
+    "repo::graph_view::minimap::tests::actual_minimap_marks_loaded_refs_and_clicks_scroll_without_changing_selection",
+    "repo::graph_view::minimap::tests::endpoints_and_drag_anchor_respect_loaded_extent",
+    "repo::graph_view::minimap::tests::large_minimap_capture_shares_rows_edges_and_search_set",
+    "repo::graph_view::minimap::tests::minimap_uses_shared_focus_ring_and_keyboard_scroll",
+    "repo::celebration::tests::confirmation_uses_the_operation_target_after_later_head_moves",
+    "repo::celebration::tests::failed_noop_and_unconfirmed_operations_do_not_celebrate",
+    "repo::celebration::tests::first_commit_is_opt_in_confirmed_once_and_sound_is_independent_of_motion",
+    "repo::celebration::tests::merging_pull_celebrates_confirmed_merge_but_not_fast_forward_or_failure",
+    "repo::celebration::tests::real_commit_worker_pins_its_target_before_a_later_commit_and_delayed_read",
+    "repo::celebration::tests::release_requires_explicit_designation_and_confirmed_target",
+    "repo::celebration::tests::stale_ui_head_does_not_celebrate_an_already_completed_merge_on_pull",
+    "repo::celebration::tests::successful_first_commit_survives_queued_push_then_failure_until_confirmed_read",
+    "repo::postcards::export::tests::publication_never_overwrites_and_cancellation_leaves_no_output",
+    "repo::postcards::export::tests::swapped_parent_cannot_redirect_publication",
+    "repo::postcards::render::tests::dense_octopus_postcards_paint_every_commit_inside_the_graph",
+    "repo::postcards::render::tests::graph_budget_counts_excluded_and_repeated_parents_across_rows",
+    "repo::postcards::render::tests::wide_text_is_laid_out_with_an_ellipsis_in_one_visible_line",
+    "repo::postcards::tests::anonymization_removes_names_and_subjects_from_render_input_and_preview",
+    "repo::postcards::tests::closing_discards_owned_disclosures_before_a_later_profile_reopens",
+    "repo::postcards::tests::composed_png_decodes_at_expected_size_and_contains_painted_graph_and_text",
+    "repo::postcards::tests::destination_capture_runs_only_in_the_owned_export_worker",
+    "repo::postcards::tests::postcard_controls_anonymize_then_compose_the_displayed_preview",
+    "repo::postcards::tests::profile_change_cancels_a_queued_read_and_discards_prior_disclosures",
+    "repo::postcards::tests::shortened_contributor_names_keep_distinct_disclosed_identities",
+    "git::postcards::tests::metadata_parser_bounds_release_size_and_rejects_incomplete_records",
+    "graph::tests::a_branch_shares_unchanged_bypass_lanes",
+    "graph::tests::first_parent_history_opens_no_lane_for_merged_parents",
+    "graph::tests::lane_names_follow_first_parent_runs_without_leaking_into_reused_columns",
+    "graph::tests::linear_history_uses_one_lane",
+    "graph::tests::merge_and_branch",
+    "repo::ci_view::graph::tests::jobs_that_waited_for_others_come_after_them",
+    "repo::ci_view::graph::tests::no_jobs_no_columns",
+    "repo::ci_view::graph::tests::stages_are_columns_in_their_order_with_failures_on_top"
+  ],
+  "additional_append_only_probe_count": 3,
+  "additional_probes": [
+    "repo::celebration::independent_review_r3::delayed_merge_then_noop_pull_emits_one_cue_and_invalid_first_commit_is_rejected",
+    "repo::graph_view::minimap::independent_review_r3::actual_agent_actions_retire_late_minimap_models_on_apply_refresh_and_clear",
+    "repo::postcards::render::independent_review_r3::exact_edge_boundary_and_full_render_refusal_precede_composition"
+  ],
+  "append_only_probe_files": [
+    {
+      "path": "src/repo/celebration.rs",
+      "sha256": "bf2236750edc32a2bc604f30675e896bf5b85f487e3fe6ab100e6e65e1801a4d",
+      "production_prefix_unchanged": true
+    },
+    {
+      "path": "src/repo/graph_view/minimap.rs",
+      "sha256": "ab3e7864d684bfbd1d5bf7ffbfe536c4e99e342daaad6ef03b9a34d2ee5ffb2f",
+      "production_prefix_unchanged": true
+    },
+    {
+      "path": "src/repo/postcards/render.rs",
+      "sha256": "a07bfbd7111df18b6b2039d8a39437fcf9a1d4c8ed22669057ae8c77123d280c",
+      "production_prefix_unchanged": true
+    }
+  ],
+  "archive_verified_files": 1516,
+  "final_parent_head": "229d8217607ff5585c0b3009c5e3ca386434d172",
+  "final_parent_status": "",
+  "parent_changed_only_documentation": true,
+  "report": {
+    "path": "/tmp/gitcraft-51-visual-followups-r3.md",
+    "sha256": "6ae11f6fbdeff8596dd6ef9ff04842018e3cbc218c22deeee698746bef50529a"
+  },
+  "artifacts": [
+    {
+      "path": "/tmp/gitcraft-51-visual-followups-r3-evidence/add-probes.py",
+      "bytes": 7223,
+      "sha256": "f9cc40fd9bb855169513ea3aa605b7cedf9a9559f42b7a8e204d4c8d3cb4449c"
+    },
+    {
+      "path": "/tmp/gitcraft-51-visual-followups-r3-evidence/candidate.tar",
+      "bytes": 17643520,
+      "sha256": "a7abfde1262ebd9934265f66f1e2d745275dee88d1202633fb23b0ef59c3a745"
+    },
+    {
+      "path": "/tmp/gitcraft-51-visual-followups-r3-evidence/exact-build.jsonl",
+      "bytes": 422281,
+      "sha256": "cdac9d6144ed8dee8665e854e19b4e2f85a14d131617f9ff724dc90bbf030bbd"
+    },
+    {
+      "path": "/tmp/gitcraft-51-visual-followups-r3-evidence/exact-build.stderr",
+      "bytes": 280,
+      "sha256": "aa79ca5d4d08d5e92c60e6626cd054061e50143958434bceee0622519afdaa96"
+    },
+    {
+      "path": "/tmp/gitcraft-51-visual-followups-r3-evidence/exact-execution.json",
+      "bytes": 2748,
+      "sha256": "eaa8fc46989ccd6c3e6b4f5bd1c1b7053c80af6c5063c216dfb9e75268c8c5fa"
+    },
+    {
+      "path": "/tmp/gitcraft-51-visual-followups-r3-evidence/exact-group-0.log",
+      "bytes": 182,
+      "sha256": "4a204b26670c489c1b4c0762d60c1933cf7db4ced34c0c4174555260a9a95789"
+    },
+    {
+      "path": "/tmp/gitcraft-51-visual-followups-r3-evidence/exact-group-1.log",
+      "bytes": 532,
+      "sha256": "22963750814b4475e50d33d1ea58e1ba813e78acad6ee7f765803357803ba35e"
+    },
+    {
+      "path": "/tmp/gitcraft-51-visual-followups-r3-evidence/exact-group-2.log",
+      "bytes": 963,
+      "sha256": "4e319c58cab779f7df71497a0639db7111c32aa99c8168711895aa1f494ff8da"
+    },
+    {
+      "path": "/tmp/gitcraft-51-visual-followups-r3-evidence/exact-group-3.log",
+      "bytes": 1339,
+      "sha256": "1c31dc1b3c484fe7418af9f52bbc936921bccfe9e386fc2c77beca6f6e09a879"
+    },
+    {
+      "path": "/tmp/gitcraft-51-visual-followups-r3-evidence/exact-group-4.log",
+      "bytes": 217,
+      "sha256": "b84e038c8d625e1057af42fe5fbcefc63099182cb8b0e2bcaab7f74a337370e3"
+    },
+    {
+      "path": "/tmp/gitcraft-51-visual-followups-r3-evidence/exact-group-5.log",
+      "bytes": 698,
+      "sha256": "8a64bc0906916fa5bd89fe28b7186ab9cec7ea51020de638574eb41c7dcd14e8"
+    },
+    {
+      "path": "/tmp/gitcraft-51-visual-followups-r3-evidence/exact-tests",
+      "bytes": 143170360,
+      "sha256": "7ef2699dd2abc4151fda8d798e58ca7d699478514a13b6782f75c2fead5b409d"
+    },
+    {
+      "path": "/tmp/gitcraft-51-visual-followups-r3-evidence/final-parent-binding.json",
+      "bytes": 10130,
+      "sha256": "19de787ee06f1cb8b960618a527eb8fa93d6a770a9b69b34bef8f5dc6e7d0bb2"
+    },
+    {
+      "path": "/tmp/gitcraft-51-visual-followups-r3-evidence/gitcraft-51-visual-content-r2.md",
+      "bytes": 13964,
+      "sha256": "384cbe56fd76a80e411b03713c135368ac8ab44cc68d7ca3dba5df9091401a51"
+    },
+    {
+      "path": "/tmp/gitcraft-51-visual-followups-r3-evidence/gitcraft-51-visual-lifecycle-r2.md",
+      "bytes": 11932,
+      "sha256": "be174e699ba1b31ebb533a757a5cd51d6ea8d565cdc5457dbca1261246a0f44f"
+    },
+    {
+      "path": "/tmp/gitcraft-51-visual-followups-r3-evidence/gitcraft-51-visual-ui-r2.md",
+      "bytes": 10051,
+      "sha256": "d36d7dfa422fad3fb4d0c41cdfabed8c07694da48f0b0622baff27da31813673"
+    },
+    {
+      "path": "/tmp/gitcraft-51-visual-followups-r3-evidence/historical-evidence-verification.json",
+      "bytes": 247,
+      "sha256": "906d6440d80df9540f762c2c626a5595eb873ae73794500fd6910262390170cf"
+    },
+    {
+      "path": "/tmp/gitcraft-51-visual-followups-r3-evidence/independent-probes.log",
+      "bytes": 511,
+      "sha256": "c7bb31a1e6932ec41d99a6465bb1a628782f3f4c9eb0696e5c54d55895107719"
+    },
+    {
+      "path": "/tmp/gitcraft-51-visual-followups-r3-evidence/initial-binding.json",
+      "bytes": 341,
+      "sha256": "f1762866ae240efd8239f949ee831359882395675be9d243abaf32ed754953f9"
+    },
+    {
+      "path": "/tmp/gitcraft-51-visual-followups-r3-evidence/probe-build.jsonl",
+      "bytes": 422410,
+      "sha256": "28e45e066cb94ec29524068a132f54e4fbad42aec3180f6b7b18c532be49771b"
+    },
+    {
+      "path": "/tmp/gitcraft-51-visual-followups-r3-evidence/probe-build.stderr",
+      "bytes": 172,
+      "sha256": "47513c8e053365013e1e2eefe831da7bbaebbd31b7d7fa78ce135755a4f8cc0e"
+    },
+    {
+      "path": "/tmp/gitcraft-51-visual-followups-r3-evidence/probe-execution.json",
+      "bytes": 496,
+      "sha256": "f8a09f7d8e2e62ac4d036b5a03d5172ddfd7495131cd16c2c6a0c363571ed4bf"
+    },
+    {
+      "path": "/tmp/gitcraft-51-visual-followups-r3-evidence/probe-source/src/repo/celebration.rs",
+      "bytes": 24753,
+      "sha256": "bf2236750edc32a2bc604f30675e896bf5b85f487e3fe6ab100e6e65e1801a4d"
+    },
+    {
+      "path": "/tmp/gitcraft-51-visual-followups-r3-evidence/probe-source/src/repo/graph_view/minimap.rs",
+      "bytes": 18227,
+      "sha256": "ab3e7864d684bfbd1d5bf7ffbfe536c4e99e342daaad6ef03b9a34d2ee5ffb2f"
+    },
+    {
+      "path": "/tmp/gitcraft-51-visual-followups-r3-evidence/probe-source/src/repo/postcards/render.rs",
+      "bytes": 19084,
+      "sha256": "a07bfbd7111df18b6b2039d8a39437fcf9a1d4c8ed22669057ae8c77123d280c"
+    },
+    {
+      "path": "/tmp/gitcraft-51-visual-followups-r3-evidence/probe-tests",
+      "bytes": 143259112,
+      "sha256": "1dcc800c861f642793ab7faeec8f1d424730a420d219bddacb9000d7f247b438"
+    },
+    {
+      "path": "/tmp/gitcraft-51-visual-followups-r3-evidence/review.md",
+      "bytes": 11567,
+      "sha256": "6ae11f6fbdeff8596dd6ef9ff04842018e3cbc218c22deeee698746bef50529a"
+    },
+    {
+      "path": "/tmp/gitcraft-51-visual-followups-r3-evidence/run-exact.py",
+      "bytes": 1783,
+      "sha256": "c3b869566483c8a985a7b2490950927279eddb62921d9c22d08302e8db3dffec"
+    },
+    {
+      "path": "/tmp/gitcraft-51-visual-followups-r3-evidence/source-files.json",
+      "bytes": 213768,
+      "sha256": "25901c23c36cdb6dffdddb8db34e25bb3712e4d8177d5c058e880328e5faf0b4"
+    },
+    {
+      "path": "/tmp/gitcraft-51-visual-followups-r3-evidence/source-integrity.json",
+      "bytes": 8167,
+      "sha256": "1d943f43d96574f0f82b9769faa57b3aff005438e39c9a678cc29f3f15d21de6"
+    },
+    {
+      "path": "/tmp/gitcraft-51-visual-followups-r3-evidence/writer-celebration-26061b7a-test.log",
+      "bytes": 2048,
+      "sha256": "b9eb7286f604a00d8e2e82469a34c907d77880ff34be40427deb286ef392f856"
+    },
+    {
+      "path": "/tmp/gitcraft-51-visual-followups-r3-evidence/writer-minimap-4143becd-test.log",
+      "bytes": 1267,
+      "sha256": "d5ec55d815aaae286e1a2827706d6beb31bedb98be61e21e84002a4ca968c55f"
+    },
+    {
+      "path": "/tmp/gitcraft-51-visual-followups-r3-evidence/writer-postcards-4a9a22c8-test.log",
+      "bytes": 2424,
+      "sha256": "02cf12a00823e479b8f68c03dba47db384eea59aa4dcb5f13d2cf667e135eafe"
+    }
+  ]
+}

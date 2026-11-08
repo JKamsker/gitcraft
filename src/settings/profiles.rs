@@ -31,6 +31,9 @@ pub struct UserProfile {
     pub signing: Signing,
     /// Expected outgoing author by host or host/namespace; used by push preflight.
     pub author_hosts: Vec<HostAuthor>,
+    pub connections: crate::connections::Choices,
+    /// Imported setup requirements must be verified on this machine before use.
+    pub pending_setup: Option<crate::portability::ConnectionRequirements>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -48,9 +51,15 @@ impl Default for UserProfile {
             name: "Default".to_owned(),
             author_name: String::new(),
             author_email: String::new(),
+            pending_setup: None,
             own_signing: false,
             signing: Signing::default(),
             author_hosts: Vec::new(),
+            connections: crate::connections::Choices {
+                github: crate::connections::Account::on("github.com"),
+                gitlab: crate::connections::Account::on("gitlab.com"),
+                ..Default::default()
+            },
         }
     }
 }
@@ -85,10 +94,18 @@ impl UserProfile {
     }
 
     /// Whether it sets anything in git's config.
+    pub fn pending_setup(&self) -> bool {
+        self.pending_setup.as_ref().is_some_and(|p| p.pending())
+    }
+
     pub fn sets_git(&self) -> bool {
         !self.author_name.trim().is_empty()
             || !self.author_email.trim().is_empty()
             || self.own_signing
+            || !self.connections.ssh_key.is_empty()
+            || self.connections.github.selected()
+            || self.connections.gitlab.selected()
+            || !self.connections.tea_login.is_empty()
     }
 
     /// Its name, or a stand-in when it has none.
@@ -205,6 +222,49 @@ pub fn config_text(profile: &UserProfile, includes: &[PathBuf]) -> String {
     if !email.is_empty() {
         text.push_str(&entry("user.email", email));
     }
+    if !profile.connections.ssh_key.is_empty()
+        && let Ok(exe) = std::env::current_exe()
+    {
+        // The installed helper speaks OpenSSH even if the included user config selects
+        // PuTTY. Auto probes this wrapper as OpenSSH and still detects a repository-local
+        // Plink override by its executable name; local ssh.variant retains precedence.
+        text.push_str(&entry("ssh.variant", "auto"));
+        text.push_str(&entry(
+            "core.sshCommand",
+            &crate::connections::ssh_helper_command(&profile.connections.ssh_key, &exe),
+        ));
+    }
+    if let Ok(exe) = std::env::current_exe() {
+        for (tool, account) in [
+            ("gh", &profile.connections.github),
+            ("glab", &profile.connections.gitlab),
+        ] {
+            if account.selected() {
+                let section = format!("credential.https://{}.helper", account.host);
+                text.push_str(&entry(&section, ""));
+                text.push_str(&entry(
+                    &section,
+                    &crate::connections::helper_command(tool, account, &exe),
+                ));
+            }
+        }
+    }
+    if !profile.connections.tea_login.is_empty()
+        && !profile.connections.tea_host.is_empty()
+        && let Ok(exe) = std::env::current_exe()
+    {
+        let account = crate::connections::Account {
+            host: profile.connections.tea_host.clone(),
+            user: profile.connections.tea_login.clone(),
+            config_dir: String::new(),
+        };
+        let section = format!("credential.https://{}.helper", account.host);
+        text.push_str(&entry(&section, ""));
+        text.push_str(&entry(
+            &section,
+            &crate::connections::helper_command("tea", &account, &exe),
+        ));
+    }
     if profile.own_signing {
         let s = &profile.signing;
         let flag = |on: bool| if on { "true" } else { "false" };
@@ -254,37 +314,77 @@ fn write_file(path: &Path, text: &str) -> Result<(), String> {
 /// Has gitcraft's git commands go by `profile` from now on: writes its config file (when it
 /// changed) and points git at it, or back at the user's own config when it sets nothing.
 pub fn apply(profile: &UserProfile) {
-    if !profile.sets_git() {
-        crate::git::set_profile_config(None);
-        *lock(&ERROR) = None;
+    let mut context = crate::connections::Context {
+        choices: profile.connections.clone(),
+        ..Default::default()
+    };
+    if profile.pending_setup() {
+        let message =
+            "This imported profile needs fresh local account/key setup before use".to_owned();
+        context.choices = Default::default();
+        context.error = Some(message.clone());
+        *lock(&ERROR) = Some(message);
+        crate::connections::set(context);
         return;
     }
-    let result = config_path(profile.id)
-        .ok_or_else(|| "No folder to keep the profile's git config in".to_owned())
-        .and_then(|path| {
-            let text = config_text(profile, &user_global_files());
-            let mut written = lock(&WRITTEN);
-            let fresh = written
-                .as_ref()
-                .is_some_and(|(p, t)| *p == path && *t == text)
-                && path.is_file();
-            if !fresh {
-                write_file(&path, &text)?;
-                *written = Some((path.clone(), text));
-            }
-            Ok(path)
-        });
+    let result = profile.connections.validate().and_then(|_| {
+        if profile.sets_git() && std::env::current_exe().is_err() {
+            return Err("Could not locate gitcraft's connection helpers".to_owned());
+        }
+        if !profile.sets_git() {
+            return Ok(None);
+        }
+        config_path(profile.id)
+            .ok_or_else(|| "No folder to keep the profile's git config in".to_owned())
+            .and_then(|path| {
+                let text = config_text(profile, &user_global_files());
+                let mut written = lock(&WRITTEN);
+                let fresh = written
+                    .as_ref()
+                    .is_some_and(|(p, t)| *p == path && *t == text)
+                    && path.is_file();
+                if !fresh {
+                    write_file(&path, &text)?;
+                    *written = Some((path.clone(), text.clone()));
+                }
+                static SESSION: std::sync::OnceLock<u128> = std::sync::OnceLock::new();
+                let session = SESSION.get_or_init(|| {
+                    std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_nanos()
+                });
+                let snapshot = path
+                    .parent()
+                    .unwrap_or(Path::new("."))
+                    .join("snapshots")
+                    .join(format!(
+                        "{}-{}-{session}-{:x}.gitconfig",
+                        profile.id,
+                        std::process::id(),
+                        md5::compute(text.as_bytes())
+                    ));
+                let lease = crate::connections::ConfigLease::acquire(snapshot.clone());
+                if !snapshot.is_file() {
+                    write_file(&snapshot, &text)?;
+                }
+                Ok(Some(lease))
+            })
+    });
     match result {
-        Ok(path) => {
-            crate::git::set_profile_config(Some(path));
+        Ok(lease) => {
+            context.git_config = lease.as_ref().map(|lease| lease.path.clone());
+            context.lease = lease;
             *lock(&ERROR) = None;
         }
-        Err(e) => {
-            // Better the user's own config than a stale profile's.
-            crate::git::set_profile_config(None);
-            *lock(&ERROR) = Some(format!("The profile's git settings aren't in use: {e}"));
+        Err(error) => {
+            context.error = Some(error.clone());
+            *lock(&ERROR) = Some(format!(
+                "The profile's connection settings aren't in use: {error}"
+            ));
         }
     }
+    crate::connections::set(context);
 }
 
 /// Why the active profile's git settings aren't in use, if they aren't.
@@ -489,6 +589,215 @@ mod tests {
             )
         );
         assert_eq!(after, "repo@example.com");
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod connection_tests {
+    use super::*;
+    use std::process::Command;
+
+    #[test]
+    fn ssh_key_and_host_helpers_round_trip_through_git_config() -> Result<(), String> {
+        let directory = std::env::temp_dir().join(format!(
+            "gitcraft-profile-key-config-{}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
+        let key = directory.join("work 'key' $(not-a-command); `literal` \\");
+        let mut profile = UserProfile::default();
+        profile.connections.ssh_key = key.to_string_lossy().into_owned();
+        profile.connections.github.user = "work".into();
+        profile.author_name = "Work author".into();
+        let text = config_text(&profile, &[]);
+        let file = directory.join("profile.gitconfig");
+        std::fs::write(&file, &text).map_err(|e| e.to_string())?;
+        let get = |name: &str| -> Result<String, String> {
+            let out = Command::new("git")
+                .args(["config", "--file"])
+                .arg(&file)
+                .args(["--get-all", name])
+                .output()
+                .map_err(|e| e.to_string())?;
+            if !out.status.success() {
+                return Err(String::from_utf8_lossy(&out.stderr).into_owned());
+            }
+            Ok(String::from_utf8_lossy(&out.stdout).trim_end().to_owned())
+        };
+        assert_eq!(
+            get("core.sshCommand")?,
+            crate::connections::ssh_helper_command(
+                &profile.connections.ssh_key,
+                &std::env::current_exe().map_err(|e| e.to_string())?
+            )
+        );
+        assert_eq!(get("user.name")?, "Work author");
+        assert_eq!(get("ssh.variant")?, "auto");
+        let helpers = get("credential.https://github.com.helper")?;
+        assert!(helpers.starts_with('\n'));
+        assert!(helpers.contains("--gitcraft-profile-credential gh "));
+        assert!(!text.contains("password="));
+        let _ = std::fs::remove_dir_all(directory);
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn selected_openssh_profile_overrides_inherited_putty_variant_and_keeps_nondefault_port()
+    -> Result<(), String> {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = std::env::temp_dir().join(format!(
+            "gitcraft-profile-ssh-variant-{}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+        let repo = dir.join("repo");
+        std::fs::create_dir_all(&repo).map_err(|e| e.to_string())?;
+        assert!(
+            Command::new("git")
+                .args(["init", "-q"])
+                .arg(&repo)
+                .status()
+                .map_err(|e| e.to_string())?
+                .success()
+        );
+        let key = dir.join("selected key");
+        std::fs::write(&key, "").map_err(|e| e.to_string())?;
+        let recorder = dir.join("record-ssh");
+        let args_file = dir.join("args");
+        let effective = dir.join("effective");
+        // This transport only records Git's arguments and asks real OpenSSH to parse them.
+        // -G never connects, and stdout is kept away from Git's protocol parser.
+        let script = format!(
+            "#!/bin/sh\nprintf '%s\\n' \"$@\" > {}\nssh -F /dev/null -G -o IdentitiesOnly=yes -i {} \"$@\" > {} 2>/dev/null\ncase \" $* \" in *' -G '*) exit 0;; esac\nexit 1\n",
+            crate::connections::shell_quote(&args_file.to_string_lossy()),
+            crate::connections::shell_quote(&key.to_string_lossy()),
+            crate::connections::shell_quote(&effective.to_string_lossy())
+        );
+        std::fs::write(&recorder, script).map_err(|e| e.to_string())?;
+        std::fs::set_permissions(&recorder, std::fs::Permissions::from_mode(0o755))
+            .map_err(|e| e.to_string())?;
+        let global = dir.join("user.gitconfig");
+        let config = dir.join("profile.gitconfig");
+        let mut profile = UserProfile::default();
+        profile.connections.ssh_key = key.to_string_lossy().into_owned();
+        for variant in ["plink", "tortoiseplink", "putty", "simple"] {
+            std::fs::write(&global, entry("ssh.variant", variant)).map_err(|e| e.to_string())?;
+            let mut text = config_text(&profile, std::slice::from_ref(&global));
+            // Replace only the executable with the recording transport, retaining profile
+            // variant generation and production Git invocation/context handling.
+            text.push_str(&entry(
+                "core.sshCommand",
+                &crate::connections::shell_quote(&recorder.to_string_lossy()),
+            ));
+            std::fs::write(&config, text).map_err(|e| e.to_string())?;
+            let context = crate::connections::Context {
+                git_config: Some(config.clone()),
+                choices: profile.connections.clone(),
+                ..Default::default()
+            };
+            assert!(
+                context
+                    .run(|| crate::git::run(
+                        Some(&repo),
+                        &["ls-remote", "ssh://git@fixture.invalid:2222/team/repo"]
+                    ))
+                    .is_err()
+            );
+            let args = std::fs::read_to_string(&args_file).map_err(|e| e.to_string())?;
+            assert!(
+                args.lines()
+                    .collect::<Vec<_>>()
+                    .windows(2)
+                    .any(|pair| pair == ["-p", "2222"]),
+                "{variant}: {args}"
+            );
+            assert!(!args.lines().any(|arg| arg == "-P"), "{variant}: {args}");
+            let parsed = std::fs::read_to_string(&effective).map_err(|e| e.to_string())?;
+            assert!(
+                parsed.lines().any(|line| line == "port 2222"),
+                "{variant}: {parsed}"
+            );
+        }
+        // A local command alone must retain Git's Plink basename detection; requiring
+        // users to add a second local ssh.variant setting would break existing repos.
+        let plink = dir.join("plink");
+        std::fs::write(
+            &plink,
+            format!(
+                "#!/bin/sh\nprintf '%s\\n' \"$@\" > {}\nexit 1\n",
+                crate::connections::shell_quote(&args_file.to_string_lossy())
+            ),
+        )
+        .map_err(|e| e.to_string())?;
+        std::fs::set_permissions(&plink, std::fs::Permissions::from_mode(0o755))
+            .map_err(|e| e.to_string())?;
+        assert!(
+            Command::new("git")
+                .current_dir(&repo)
+                .args([
+                    "config",
+                    "core.sshCommand",
+                    &crate::connections::shell_quote(&plink.to_string_lossy())
+                ])
+                .status()
+                .map_err(|e| e.to_string())?
+                .success()
+        );
+        let context = crate::connections::Context {
+            git_config: Some(config.clone()),
+            choices: profile.connections.clone(),
+            ..Default::default()
+        };
+        assert!(
+            context
+                .run(|| crate::git::run(
+                    Some(&repo),
+                    &["ls-remote", "ssh://git@fixture.invalid:2222/team/repo"]
+                ))
+                .is_err()
+        );
+        let args = std::fs::read_to_string(&args_file).map_err(|e| e.to_string())?;
+        assert!(
+            args.lines()
+                .collect::<Vec<_>>()
+                .windows(2)
+                .any(|pair| pair == ["-P", "2222"]),
+            "{args}"
+        );
+        assert!(!args.lines().any(|arg| arg == "-p"), "{args}");
+        // Git's repository-local policy still has precedence over the generated profile.
+        assert!(
+            Command::new("git")
+                .current_dir(&repo)
+                .args(["config", "ssh.variant", "plink"])
+                .status()
+                .map_err(|e| e.to_string())?
+                .success()
+        );
+        let context = crate::connections::Context {
+            git_config: Some(config),
+            choices: profile.connections,
+            ..Default::default()
+        };
+        assert!(
+            context
+                .run(|| crate::git::run(
+                    Some(&repo),
+                    &["ls-remote", "ssh://git@fixture.invalid:2222/team/repo"]
+                ))
+                .is_err()
+        );
+        let args = std::fs::read_to_string(args_file).map_err(|e| e.to_string())?;
+        assert!(
+            args.lines()
+                .collect::<Vec<_>>()
+                .windows(2)
+                .any(|pair| pair == ["-P", "2222"]),
+            "{args}"
+        );
+        let _ = std::fs::remove_dir_all(dir);
         Ok(())
     }
 }

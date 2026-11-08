@@ -45,6 +45,13 @@ impl RepoTab {
 }
 
 impl ConflictEditor {
+    pub(crate) fn standalone_ui(&mut self, ui: &mut Ui, editable: bool) {
+        let t = Tokens::get(ui.ctx());
+        ui.label(format!("{} unresolved conflict(s)", self.unresolved()));
+        self.result_panel(ui, &t, editable, (None, false), &mut Vec::new());
+        self.conflict_list(ui, &t, ("Local", "Remote"), editable);
+    }
+
     /// Header: the file, how many conflicts are resolved, save, the whole-file actions, close.
     /// `smart`: for a Unity YAML file, whether Unity's Smart Merge can solve it.
     fn header(

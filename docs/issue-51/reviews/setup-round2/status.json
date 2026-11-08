@@ -1,0 +1,13 @@
+{
+  "candidate": "adca6abfcf961b31f8b799ed4d32e907910d8ffb",
+  "verdict": "FAIL F4 push-route retry binding and F6 incidental URL confirmation",
+  "static_pass": [
+    "F1",
+    "F2",
+    "F3",
+    "F5"
+  ],
+  "tests_executed_by_reviewer": 0,
+  "diagnostic_gate": "FAILED at exact candidate; subsequent harness correction and validation pending",
+  "full_runtime": "HELD"
+}

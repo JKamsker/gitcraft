@@ -41,7 +41,7 @@ impl<T: Clone + Send + 'static> Lazy<T> {
             State::NotAsked => *s = State::Working,
         }
         let (state, ctx) = (self.state.clone(), ctx.clone());
-        std::thread::spawn(move || {
+        crate::connections::spawn(move || {
             let made =
                 std::panic::catch_unwind(std::panic::AssertUnwindSafe(make)).unwrap_or(fallback);
             *state

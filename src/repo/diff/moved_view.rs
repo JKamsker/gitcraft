@@ -36,9 +36,13 @@ pub(in crate::repo) struct Opened {
     reindented: bool,
 }
 
+#[cfg(test)]
+thread_local! { pub(in crate::repo) static PREPARATIONS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) }; }
 impl Opened {
     /// Block `b` of `data` compared, if it is there.
     pub(in crate::repo) fn new(data: &DiffData, b: usize) -> Option<Self> {
+        #[cfg(test)]
+        PREPARATIONS.with(|n| n.set(n.get() + 1));
         let block = data.moves.blocks.get(b)?;
         let lines = &data.lines;
         let compared = moved::compare(lines, block);
@@ -132,18 +136,23 @@ pub(super) fn panel(
         .show(ui, |ui| {
             header(ui, t, &data.lines, block, open, acts);
             ui.add_space(6.0);
-            let font = theme::mono(12.0);
-            ui.spacing_mut().item_spacing.y = 0.0;
-            egui::ScrollArea::vertical()
-                .id_salt(("diff_moved_rows", open.block))
-                .max_height(MAX_H)
-                .auto_shrink([false, true])
-                .show_rows(ui, ROW_H, open.rows.len(), |ui, range| {
-                    for r in &open.rows[range] {
-                        let text = data.lines.get(r.line).map_or("", |l| l.text.as_str());
-                        row(ui, t, &font, r.mark, text, r.changed);
-                    }
-                });
+            content(ui, t, data, open);
+        });
+}
+
+/// Read-only moved content, also used by the change-wide source/destination view.
+pub(in crate::repo) fn content(ui: &mut Ui, t: &Tokens, data: &DiffData, open: &Opened) {
+    let font = theme::mono(12.0);
+    ui.spacing_mut().item_spacing.y = 0.0;
+    egui::ScrollArea::vertical()
+        .id_salt(("diff_moved_rows", open.block))
+        .max_height(MAX_H)
+        .auto_shrink([false, true])
+        .show_rows(ui, ROW_H, open.rows.len(), |ui, range| {
+            for r in &open.rows[range] {
+                let text = data.lines.get(r.line).map_or("", |l| l.text.as_str());
+                row(ui, t, &font, r.mark, text, r.changed);
+            }
         });
 }
 

@@ -1,0 +1,6 @@
+{
+  "candidate": "53832430c296f039d287b4219385d1401c69afa8",
+  "verdict": "SCOPED PASS all8 corrections",
+  "independent_checks": "27 pure/headless/recording harness tests",
+  "full_runtime": "HELD"
+}

@@ -1,0 +1,7 @@
+{
+  "reviewed_application": "bc201e42d3480c4cc9525c948a69fb06afd3ac73",
+  "reviewed_docs": "cfc96d8ff949e35d0de5ea643e76b1551b874769",
+  "verdict": "FAIL: three P2 followups",
+  "corrections_under_review": "4a9a22c806126a813d9d5633a699dd7cafa135da",
+  "runtime_process_gate": "HELD"
+}

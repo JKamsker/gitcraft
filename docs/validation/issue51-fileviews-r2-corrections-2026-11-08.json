@@ -1,0 +1,167 @@
+{
+  "source_commit": "1535d831578ee600bf6ef2f385c019e1eb569da8",
+  "environment": {
+    "TMPDIR": "/private/tmp",
+    "SHELL": "/tmp/gitcraft-integration-tools/validation-shell",
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0"
+  },
+  "commands": [
+    {
+      "name": "svg",
+      "source_commit": "1535d831578ee600bf6ef2f385c019e1eb569da8",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--lib",
+        "svg::tests::",
+        "--",
+        "--test-threads=2",
+        "--nocapture"
+      ],
+      "code": 0,
+      "seconds": 47.0,
+      "log": "/tmp/gitcraft-fileviews-r3-final-svg.log",
+      "log_sha256": "c1959dd9b8d1657be0142a5abb0ee841e10f9c8c5ccb9b9f17316a3393d5741e"
+    },
+    {
+      "name": "lock",
+      "source_commit": "1535d831578ee600bf6ef2f385c019e1eb569da8",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--lib",
+        "standalone::save::tests::lock_release",
+        "--",
+        "--test-threads=2",
+        "--nocapture"
+      ],
+      "code": 0,
+      "seconds": 0.31,
+      "log": "/tmp/gitcraft-fileviews-r3-final-lock.log",
+      "log_sha256": "32b78f9322261ced5f8ebe2e1b7de6931ef61ce84942c3fe9eee22a6e8a824d3"
+    },
+    {
+      "name": "xattrs",
+      "source_commit": "1535d831578ee600bf6ef2f385c019e1eb569da8",
+      "command": [
+        "python3",
+        "tests/remote_index_xattr_recording.py",
+        "-v"
+      ],
+      "code": 0,
+      "seconds": 0.09,
+      "log": "/tmp/gitcraft-fileviews-r3-final-xattrs.log",
+      "log_sha256": "bc63d22755002d1d1127ff59503498a54bfcb69ad59277d6d5e1c526ce332a5f"
+    },
+    {
+      "name": "check",
+      "source_commit": "1535d831578ee600bf6ef2f385c019e1eb569da8",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "check",
+        "--all-targets"
+      ],
+      "code": 0,
+      "seconds": 17.74,
+      "log": "/tmp/gitcraft-fileviews-r3-final-check.log",
+      "log_sha256": "f38445e15f1a4ec021826e620e194a88d6aa8275464a4cc3bc692ad8aed10139"
+    },
+    {
+      "name": "build",
+      "source_commit": "1535d831578ee600bf6ef2f385c019e1eb569da8",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "build",
+        "--bin",
+        "gitcraft"
+      ],
+      "code": 0,
+      "seconds": 33.79,
+      "log": "/tmp/gitcraft-fileviews-r3-final-build.log",
+      "log_sha256": "fc7e04f267d3664ac2f1b9c1b96b0bce82883740993588c12613d47b3c8ef339"
+    },
+    {
+      "name": "qualified-lint",
+      "source_commit": "1535d831578ee600bf6ef2f385c019e1eb569da8",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "clippy",
+        "--all-targets",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings",
+        "-A",
+        "dead_code"
+      ],
+      "code": 0,
+      "seconds": 20.48,
+      "log": "/tmp/gitcraft-fileviews-r3-final-qualified-lint.log",
+      "log_sha256": "ee62d03f329d2cf243e97ffe5204a92658159fa6d3f48acbf0dab17527c7eb9a"
+    },
+    {
+      "name": "format",
+      "source_commit": "1535d831578ee600bf6ef2f385c019e1eb569da8",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "fmt",
+        "--check"
+      ],
+      "code": 0,
+      "seconds": 1.72,
+      "log": "/tmp/gitcraft-fileviews-r3-final-format.log",
+      "log_sha256": "49be90882a31ca9ef7f54039ae751af35e170876383848f3c04157fe97b0725e"
+    },
+    {
+      "name": "whitespace",
+      "source_commit": "1535d831578ee600bf6ef2f385c019e1eb569da8",
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "code": 0,
+      "seconds": 0.01,
+      "log": "/tmp/gitcraft-fileviews-r3-final-whitespace.log",
+      "log_sha256": "d7798dfec88b02264a6939cff6a0b19aef57286fa6d3ee90cdee1744c0bd3264"
+    }
+  ],
+  "logs_archive": "issue51-fileviews-r2-corrections-2026-11-08-tests.log.gz",
+  "logs_archive_sha256": "bb37f659275f9e9d388de395589f9e1f4f94802cdae953c2d6e08a75c3487713",
+  "test_binary_sha256": "1f3a0c44762c5a5607fa7ff7ec29b7d7c28f5b1226ed806be0988a5a42f6aac8",
+  "build_binary_sha256": "3bff8003c8b94274da172a751cbebb1a889f53cadb5aeade6538af94539cb741",
+  "passed_test_cases": {
+    "svg": 6,
+    "lock": 5,
+    "xattrs_recording": 8
+  },
+  "prior_review": {
+    "core": {
+      "path": "/tmp/gitcraft-51-fileviews-core-r2.md",
+      "sha256": "1ef94d66d42af8c21e6a21819950cf73d0268cd8bdb45c9e097fb05439e6335c"
+    },
+    "content": {
+      "path": "/tmp/gitcraft-51-fileviews-content-r2.md",
+      "sha256": "f097e5518424b71d2337c37e8a9a63808d2b6b8d1b705673498ca6b1cad010f3"
+    },
+    "ui": {
+      "path": "/tmp/gitcraft-51-fileviews-ui-r2.md",
+      "sha256": "d45b4c451fa68bc91d7046b55a374f96a40017cee7c17ccb311ede0c499ebab7"
+    }
+  },
+  "source_files": {
+    "src/svg.rs": "a0da85d04664c011a9e7c2e549bb0bed44627342d72d54d1fa8e5fa22f7afe30",
+    "src/standalone/save.rs": "0182b5d6d888ff606a5c42716dcd6e8f7f5abb82ae44ffedf0094cc5d65b5844",
+    "src/git/file_comparison/remote_index.py": "5bb1446faf40dfbc24b6374645efaf19b9dc5962018a7e60ed33cfca08a29f4b",
+    "tests/remote_index_xattr_recording.py": "9fdf09d77995b5336e376a089920d4f83fdda284d10c4001103ae428cdc39e5a"
+  },
+  "status": "Implementation corrected; permitted local gates pass; independent re-review and held runtime/platform/combined gates pending",
+  "runtime_hold": "No actual Git/process/helper/SOPS/mux/credential fixtures. Only pure/headless/recording and owned filesystem-only regression tests; compilation/check/lint permitted."
+}

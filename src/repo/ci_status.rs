@@ -44,6 +44,15 @@ pub(super) struct CiStatuses {
 }
 
 impl CiStatuses {
+    pub(super) fn account_changed(&mut self) {
+        let in_flight = self.loading;
+        *self = CiStatuses {
+            projects: self.projects.clone(),
+            loading: in_flight,
+            superseded: in_flight,
+            ..Default::default()
+        };
+    }
     /// The repository's builds are now read from `projects` (its remotes or upstreams
     /// changed): what was read from a project no longer among them goes, along with the answer
     /// still on its way. That one keeps the slot until it comes, so the two can't land in the

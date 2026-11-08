@@ -1,0 +1,40 @@
+{
+  "owner": "8aaadb4fb1af291a12368c3ff0160892126885c1",
+  "files": [
+    {
+      "path": "src/git/command/credential_policy.rs",
+      "sha256": "efedb66f73b5c247d17ffcc71ecd6d999ae208cc0cfd305c4d575bbca3c889ca",
+      "matches_owner": true
+    },
+    {
+      "path": "src/git/credential_scope.rs",
+      "sha256": "373538cb2f8687b275fc404dd32abaca0b38ff271903c021c8fe1fc0099d652d",
+      "matches_owner": true
+    },
+    {
+      "path": "src/git/command/endpoints.rs",
+      "sha256": "13e7170ab8dfb4c2890cbbeea2d5e96c8a386f137fb8a38abd498de2b0820262",
+      "matches_owner": true
+    },
+    {
+      "path": "src/repo/https_recovery.rs",
+      "sha256": "313da52d01ee58df1b777b56c3848eab56b4037910c6d59ee24b207ba39c63d9",
+      "matches_owner": true
+    },
+    {
+      "path": "src/connections.rs",
+      "sha256": "7d12f5bfe0c9e370c68c4ed610634ec9c3216f60d9319b6f42818144eb9b325a",
+      "matches_owner": true
+    },
+    {
+      "path": "src/git/command/watched.rs",
+      "sha256": "ee4f9be34b2fa4dbaf848a383f14f561f9429bc2dd5cde895e6952a24c4f7993",
+      "matches_owner": true
+    },
+    {
+      "path": "src/git/hooks.rs",
+      "sha256": "b02860bfbf3f63b389cf5d01a33a53f7792606b0ba8a13e092f36fa65b7fe648",
+      "matches_owner": true
+    }
+  ]
+}

@@ -193,7 +193,7 @@ fn paint_graph(p: &Painter, t: &Tokens, rect: Rect, l: &Layout, rows: usize) {
         );
     }
 
-    for (i, (m, row)) in HISTORY.iter().zip(&g.rows).take(rows).enumerate() {
+    for (i, (m, row)) in HISTORY.iter().zip(g.rows.iter()).take(rows).enumerate() {
         let top = header.bottom() + i as f32 * ROW_PITCH;
         let r = Rect::from_min_size(pos2(rect.left(), top), vec2(rect.width(), ROW_PITCH));
         if i == 0 {

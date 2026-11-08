@@ -5,7 +5,9 @@
 
 mod compare;
 mod parse;
+mod search;
 mod view;
+pub(super) use search::document as search_document;
 
 use std::path::Path;
 

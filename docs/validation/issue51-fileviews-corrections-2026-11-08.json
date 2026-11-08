@@ -1,0 +1,404 @@
+{
+  "source_commit": "10727c7e88725b4510350ec3416bd1e4ebfcfeda",
+  "environment": {
+    "TMPDIR": "/private/tmp",
+    "SHELL": "/tmp/gitcraft-integration-tools/validation-shell",
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "GITCRAFT_TEST_SOPS": "/tmp/gitcraft-51-orchestration/real-tools/sops-v3.13.3.darwin.arm64",
+    "GITCRAFT_TEST_AGE_KEYGEN": "/tmp/gitcraft-51-orchestration/real-tools/age-keygen"
+  },
+  "commands": [
+    {
+      "name": "sops",
+      "source_commit": "10727c7e88725b4510350ec3416bd1e4ebfcfeda",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--lib",
+        "encrypted::tests",
+        "--",
+        "--test-threads=2",
+        "--nocapture"
+      ],
+      "code": 0,
+      "seconds": 51.04,
+      "log": "/tmp/gitcraft-fileviews-correction-final-sops.log",
+      "log_sha256": "fc4dd12d7f9267561d64c8c022e28c628dde6df207d3735122fcd286f1ebee11",
+      "archive_section": "sops.log",
+      "test_executions": 21
+    },
+    {
+      "name": "standalone",
+      "source_commit": "10727c7e88725b4510350ec3416bd1e4ebfcfeda",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--lib",
+        "standalone::",
+        "--",
+        "--test-threads=2",
+        "--nocapture"
+      ],
+      "code": 0,
+      "seconds": 0.62,
+      "log": "/tmp/gitcraft-fileviews-correction-final-standalone.log",
+      "log_sha256": "d660b82313b332a0be080c5e3d4e3e9028162597b08db3ec06187dd14a86ffed",
+      "archive_section": "standalone.log",
+      "test_executions": 24
+    },
+    {
+      "name": "wrap",
+      "source_commit": "10727c7e88725b4510350ec3416bd1e4ebfcfeda",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--lib",
+        "diff::wrap::",
+        "--",
+        "--test-threads=2",
+        "--nocapture"
+      ],
+      "code": 0,
+      "seconds": 0.24,
+      "log": "/tmp/gitcraft-fileviews-correction-final-wrap.log",
+      "log_sha256": "2280213efbbb0af2762e4a408bf5b4e67e8f5c2f92898112aca97d31c6978da7",
+      "archive_section": "wrap.log",
+      "test_executions": 1
+    },
+    {
+      "name": "comparison",
+      "source_commit": "10727c7e88725b4510350ec3416bd1e4ebfcfeda",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--lib",
+        "file_comparison",
+        "--",
+        "--test-threads=2",
+        "--nocapture",
+        "--skip",
+        "encoded_remote_readers_and_locked_staging"
+      ],
+      "code": 0,
+      "seconds": 8.66,
+      "log": "/tmp/gitcraft-fileviews-correction-final-comparison.log",
+      "log_sha256": "753abd82087c6913fc5c6d9563eed24c3ee5c824d51102928ff0c8681aaab00f",
+      "archive_section": "comparison.log",
+      "test_executions": 42
+    },
+    {
+      "name": "svg",
+      "source_commit": "10727c7e88725b4510350ec3416bd1e4ebfcfeda",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--lib",
+        "svg",
+        "--",
+        "--test-threads=2",
+        "--nocapture"
+      ],
+      "code": 0,
+      "seconds": 0.46,
+      "log": "/tmp/gitcraft-fileviews-correction-final-svg.log",
+      "log_sha256": "b3a1a72abb6695812d3ebe95495aa762b236fb2a3ef29b31fd1563d326f28ed7",
+      "archive_section": "svg.log",
+      "test_executions": 7
+    },
+    {
+      "name": "dvc",
+      "source_commit": "10727c7e88725b4510350ec3416bd1e4ebfcfeda",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--lib",
+        "dvc::",
+        "--",
+        "--test-threads=2",
+        "--nocapture"
+      ],
+      "code": 0,
+      "seconds": 0.37,
+      "log": "/tmp/gitcraft-fileviews-correction-final-dvc.log",
+      "log_sha256": "2763245f1a8c613b932a9ddf7039323c4f3f488aeaa543fd3f2b4e01cd58c795",
+      "archive_section": "dvc.log",
+      "test_executions": 2
+    },
+    {
+      "name": "binary",
+      "source_commit": "10727c7e88725b4510350ec3416bd1e4ebfcfeda",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--lib",
+        "diff::binary::",
+        "--",
+        "--test-threads=2",
+        "--nocapture"
+      ],
+      "code": 0,
+      "seconds": 1.05,
+      "log": "/tmp/gitcraft-fileviews-correction-final-binary.log",
+      "log_sha256": "2b7341ee6f68ba9b2c68e8f9dcfcf020cfa4a0af2112b23159f34ecfab3d2879",
+      "archive_section": "binary.log",
+      "test_executions": 31
+    },
+    {
+      "name": "reset",
+      "source_commit": "10727c7e88725b4510350ec3416bd1e4ebfcfeda",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--lib",
+        "keep_reset",
+        "--",
+        "--test-threads=2",
+        "--nocapture"
+      ],
+      "code": 0,
+      "seconds": 0.34,
+      "log": "/tmp/gitcraft-fileviews-correction-final-reset.log",
+      "log_sha256": "75606277cf1a4ee08f16d149f9ad24193d2f0198ac50a1fa7520c0b0331cd068",
+      "archive_section": "reset.log",
+      "test_executions": 2
+    },
+    {
+      "name": "reset-mode",
+      "source_commit": "10727c7e88725b4510350ec3416bd1e4ebfcfeda",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--lib",
+        "keep_is_a_shared_reset_mode",
+        "--",
+        "--test-threads=2",
+        "--nocapture"
+      ],
+      "code": 0,
+      "seconds": 0.24,
+      "log": "/tmp/gitcraft-fileviews-correction-final-reset-mode.log",
+      "log_sha256": "d8c69a218390d3ef8e0e06031af7ee882202b3daf5f7ab6584dab83700739ed7",
+      "archive_section": "reset-mode.log",
+      "test_executions": 1
+    },
+    {
+      "name": "moved",
+      "source_commit": "10727c7e88725b4510350ec3416bd1e4ebfcfeda",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--lib",
+        "diff::moved_tests",
+        "--",
+        "--test-threads=2",
+        "--nocapture"
+      ],
+      "code": 0,
+      "seconds": 0.48,
+      "log": "/tmp/gitcraft-fileviews-correction-final-moved.log",
+      "log_sha256": "483aabb77c79b4a324ef613691efaf7eb2e8dd248a925c4c0a7b2383a444243b",
+      "archive_section": "moved.log",
+      "test_executions": 14
+    },
+    {
+      "name": "patch",
+      "source_commit": "10727c7e88725b4510350ec3416bd1e4ebfcfeda",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--lib",
+        "diff::tests",
+        "--",
+        "--test-threads=2",
+        "--nocapture"
+      ],
+      "code": 0,
+      "seconds": 1.27,
+      "log": "/tmp/gitcraft-fileviews-correction-final-patch.log",
+      "log_sha256": "5cc0185b6e1a3d95db3e1501a7a8b26f6973b272bfb52836ea99580cefb81016",
+      "archive_section": "patch.log",
+      "test_executions": 57
+    },
+    {
+      "name": "algorithm",
+      "source_commit": "10727c7e88725b4510350ec3416bd1e4ebfcfeda",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--lib",
+        "diff::algorithm_tests",
+        "--",
+        "--test-threads=2",
+        "--nocapture"
+      ],
+      "code": 0,
+      "seconds": 1.14,
+      "log": "/tmp/gitcraft-fileviews-correction-final-algorithm.log",
+      "log_sha256": "0b14c964d63fcd767d545a876bc635b51522ddbc491d70130a92a0321777db1b",
+      "archive_section": "algorithm.log",
+      "test_executions": 6
+    },
+    {
+      "name": "context",
+      "source_commit": "10727c7e88725b4510350ec3416bd1e4ebfcfeda",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--lib",
+        "diff::context::",
+        "--",
+        "--test-threads=2",
+        "--nocapture"
+      ],
+      "code": 0,
+      "seconds": 0.62,
+      "log": "/tmp/gitcraft-fileviews-correction-final-context.log",
+      "log_sha256": "b364aa1e7a2ec64f77dc518b287e5bb2204f9dbcd3a381a0c174e505903889ee",
+      "archive_section": "context.log",
+      "test_executions": 15
+    },
+    {
+      "name": "standalone-cli",
+      "source_commit": "10727c7e88725b4510350ec3416bd1e4ebfcfeda",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--test",
+        "standalone_cli",
+        "--",
+        "--test-threads=2"
+      ],
+      "code": 0,
+      "seconds": 32.86,
+      "log": "/tmp/gitcraft-fileviews-correction-final-standalone-cli.log",
+      "log_sha256": "532e44a936ed92608d10af4470d5663c3671b2aeac3eb6d7c22a588a4a4dc8cb",
+      "archive_section": "standalone-cli.log",
+      "test_executions": 3
+    },
+    {
+      "name": "line-history",
+      "source_commit": "10727c7e88725b4510350ec3416bd1e4ebfcfeda",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--lib",
+        "line_log",
+        "--",
+        "--test-threads=2",
+        "--nocapture"
+      ],
+      "code": 0,
+      "seconds": 0.24,
+      "log": "/tmp/gitcraft-fileviews-correction-final-line-history.log",
+      "log_sha256": "c081bcfcc3353a003adfb0a152ecc83feee27551ee3860c495eaf17d00ff7bb7",
+      "archive_section": "line-history.log",
+      "test_executions": 10
+    },
+    {
+      "name": "check",
+      "source_commit": "10727c7e88725b4510350ec3416bd1e4ebfcfeda",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "check",
+        "--all-targets"
+      ],
+      "code": 0,
+      "seconds": 16.18,
+      "log": "/tmp/gitcraft-fileviews-correction-final-check.log",
+      "log_sha256": "66bf48b75db29e9d5736d63bb987eb1cb25477d3956f71ebe9e73666b1aa6b75",
+      "archive_section": "check.log"
+    },
+    {
+      "name": "build",
+      "source_commit": "10727c7e88725b4510350ec3416bd1e4ebfcfeda",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "build",
+        "--bin",
+        "gitcraft"
+      ],
+      "code": 0,
+      "seconds": 32.61,
+      "log": "/tmp/gitcraft-fileviews-correction-final-build.log",
+      "log_sha256": "639acb70838530f2f6f99608731d80ffe9e937be38297c8cff34223f98e07292",
+      "archive_section": "build.log"
+    },
+    {
+      "name": "clippy",
+      "source_commit": "10727c7e88725b4510350ec3416bd1e4ebfcfeda",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "clippy",
+        "--all-targets",
+        "--no-deps"
+      ],
+      "code": 0,
+      "seconds": 23.73,
+      "log": "/tmp/gitcraft-fileviews-correction-final-clippy.log",
+      "log_sha256": "c67b87c850d8334e9c37a108271fe6d9c37b85369d74d7a5c019d78e8c423191",
+      "archive_section": "clippy.log"
+    },
+    {
+      "name": "qualified-lint",
+      "source_commit": "10727c7e88725b4510350ec3416bd1e4ebfcfeda",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "clippy",
+        "--all-targets",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings",
+        "-A",
+        "dead_code"
+      ],
+      "code": 0,
+      "seconds": 23.11,
+      "log": "/tmp/gitcraft-fileviews-correction-final-qualified-lint.log",
+      "log_sha256": "e90e4b233d44731af128e93a44a3b288dfc77afe5d361d309982cbf1a99a32f2",
+      "archive_section": "qualified-lint.log"
+    }
+  ],
+  "test_binary_sha256": "21ea31281ac07bd05a85eebbcd437b8be9172a55274e8639f19d18cd3d6c3af2",
+  "reported_test_executions": 236,
+  "real_tools": {
+    "sops-v3.13.3.darwin.arm64": "b97c0d434aab577dc40310e8d22ff9e45eef4c80638ab978daae9b4681c59286",
+    "age-keygen": "c16e229245123d0ad27442317461d63915416cad0294395cd19ca93feb3211ea",
+    "age-v1.3.2-darwin-arm64.tar.gz": "e2020b073c44f692685a24d6abc378817eb81ffaaf49fd0531ef8565f767f2f5"
+  },
+  "status": "implementation corrected and locally validated; independent R2 review and parent combined validation pending",
+  "limitations": [
+    "No native Windows/Linux runtime. Windows full SACL/label/audit gate is cfg(windows) and explicitly ignored pending an owned privileged native run.",
+    "No live SSH/WSL or DVC service. Remote transaction program executed directly only in owned macOS fixtures; legacy encoded SSH runtime fixture excluded.",
+    "No full suite, legacy parallel-bisect timeout/cancel or remote cleanup tests; no CI or PR.",
+    "Qualified lint allows only baseline dead_code; strict unqualified -D warnings is not claimed.",
+    "Remote writes require Python 3 standard-library POSIX/ctypes APIs; index fingerprints require Perl/Fcntl and verified md5 (Darwin) or md5sum (Linux/WSL). Missing capabilities refuse explicitly."
+  ],
+  "parent_reviews": [
+    "/tmp/gitcraft-51-fileviews-review-content-r1.md",
+    "/tmp/gitcraft-51-fileviews-review-ui-r1.md",
+    "/tmp/gitcraft-51-fileviews-review-core-r1.md"
+  ],
+  "logs_archive": "issue51-fileviews-corrections-2026-11-08-tests.log.gz",
+  "logs_archive_sha256": "380b8faaea9fd7c1fa0a540f77e4cd8de4ee248553788fc875921c303b809234"
+}

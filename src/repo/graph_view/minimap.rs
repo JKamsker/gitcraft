@@ -45,13 +45,12 @@ struct Model {
     rows: usize,
 }
 fn build(
-    commits: &[std::sync::Arc<crate::git::Commit>],
     graph: &crate::graph::Graph,
     head: &str,
     matches: &std::collections::HashSet<String>,
     active: &dyn Fn() -> bool,
 ) -> Result<Model, String> {
-    let rows = commits.len();
+    let rows = graph.rows.len();
     let mut bins = vec![Bin::default(); rows.min(BINS)];
     for projected in 0..rows {
         if !active() {
@@ -71,21 +70,24 @@ fn build(
                 bin.lanes |= 1 << col;
             }
         }
-        for c in &commits[raw..raw + 1] {
-            bin.head |= c.hash == head;
-            bin.tag |= c
-                .refs
-                .iter()
-                .any(|r| r.starts_with("tag: ") || r.starts_with("refs/tags/"));
-            bin.hit |= matches.contains(&c.hash);
-        }
+        bin.head |= g.hash.as_ref() == head;
+        bin.tag |= g.tagged;
+        bin.hit |= matches.contains(g.hash.as_ref());
     }
     Ok(Model { bins, rows })
+}
+fn lane_coverage(width: usize) -> String {
+    if width > LANES {
+        format!(
+            "Shape shows the first {LANES} of {width} lanes; all rows and HEAD, tag and search markers remain represented."
+        )
+    } else {
+        format!("Shape shows all {} lanes.", width.max(1))
+    }
 }
 impl RepoTab {
     fn prepare_minimap(&mut self, ctx: &egui::Context) {
         if self.history_minimap.dirty {
-            let commits = self.commits.clone();
             let graph = self.graph.clone();
             let head = self.refs.head.clone();
             let matches = self.search.matches.clone();
@@ -93,7 +95,7 @@ impl RepoTab {
             self.history_minimap.rows = 0;
             self.history_minimap
                 .reader
-                .queue(move |active| build(&commits, &graph, &head, &matches, active));
+                .queue(move |active| build(&graph, &head, &matches, active));
             self.history_minimap.dirty = false;
         }
         if let Some(Ok(model)) = self.history_minimap.reader.poll(&self.tx, ctx) {
@@ -113,13 +115,24 @@ impl RepoTab {
             ui.id().with("history-minimap"),
             Sense::click_and_drag(),
         );
-        response.widget_info(||egui::WidgetInfo::labeled(egui::WidgetType::Slider,true,"Loaded history minimap. Drag to scroll; arrow and Page Up/Down keys move the viewport. Blue HEAD, green tags, yellow search hits."));
+        let coverage = lane_coverage(self.graph.width);
+        crate::a11y::a11y(
+            &response,
+            egui::WidgetType::Slider,
+            format!(
+                "Loaded history minimap. {coverage} Drag to scroll; arrow and Page Up/Down keys move the viewport. Blue HEAD, green tags, yellow search hits."
+            ),
+        );
         let p = ui.painter_at(rect);
         p.rect_filled(rect, 3.0, t.dock);
         p.text(
             pos2(rect.center().x, rect.top() + 3.0),
             Align2::CENTER_TOP,
-            "History",
+            if self.graph.width > LANES {
+                "History · 24 lanes"
+            } else {
+                "History"
+            },
             FontId::proportional(10.0),
             t.text_dim,
         );
@@ -232,13 +245,81 @@ impl RepoTab {
                     Some((offset + delta).clamp(0.0, (full_h - viewport).max(0.0)));
             }
         }
-        response.on_hover_text(format!("{} projected rows of loaded history. Drag to scroll; focused: arrows or Page Up/Down. Blue: HEAD · green: tags · yellow: search hits · grey: collapsed context. {}",self.history_minimap.rows,if self.has_more {"Older history is not loaded; scrolling to the boundary loads another page."} else {"All available history is loaded."}));
+        response.on_hover_text(format!("{} projected rows of loaded history. {coverage} Drag to scroll; focused: arrows or Page Up/Down. Blue: HEAD · green: tags · yellow: search hits · grey: collapsed context. {}",self.history_minimap.rows,if self.has_more {"Older history is not loaded; scrolling to the boundary loads another page."} else {"All available history is loaded."}));
     }
 }
 #[cfg(test)]
 mod tests {
     use super::*;
     use egui::vec2;
+    #[test]
+    fn large_minimap_capture_shares_rows_edges_and_search_set() {
+        use std::sync::Arc;
+        let ctx = egui::Context::default();
+        let mut tab = RepoTab::new_deferred("/nonexistent/minimap-capture".into(), &ctx);
+        let commits: Vec<_> = (0..10_000)
+            .map(|i| {
+                Arc::new(crate::git::Commit {
+                    hash: format!("{i:040x}"),
+                    parents: if i < 9_999 {
+                        vec![format!("{:040x}", i + 1)]
+                    } else {
+                        Vec::new()
+                    },
+                    ..Default::default()
+                })
+            })
+            .collect();
+        tab.graph = crate::graph::layout(&commits);
+        let before = tab.graph.rows.as_ptr();
+        let first_edges = tab.graph.rows[0].outgoing.as_ptr();
+        let graph = tab.graph.clone();
+        let matches = tab.search.matches.clone();
+        assert_eq!(graph.rows.as_ptr(), before);
+        assert_eq!(graph.rows[0].outgoing.as_ptr(), first_edges);
+        assert!(Arc::ptr_eq(&matches, &tab.search.matches));
+        assert_eq!(Arc::strong_count(&graph.rows), 2);
+        // UI queue capture uses those same Arc clones; preparation changes no row.
+        tab.prepare_minimap(&ctx);
+        assert_eq!(tab.graph.rows.as_ptr(), before);
+        assert!(!tab.history_minimap.dirty);
+        assert!(Arc::strong_count(&graph.rows) >= 2);
+        assert!(lane_coverage(32).contains("first 24 of 32 lanes"));
+    }
+    #[test]
+    fn minimap_uses_shared_focus_ring_and_keyboard_scroll() {
+        use egui_kittest::{Harness, kittest::Queryable};
+        let ctx = egui::Context::default();
+        let mut tab = RepoTab::new_deferred("/nonexistent/minimap-focus".into(), &ctx);
+        tab.history_minimap.dirty = false;
+        tab.history_minimap.rows = 100;
+        tab.history_minimap.bins = vec![
+            Bin {
+                lanes: 1,
+                ..Default::default()
+            };
+            100
+        ];
+        tab.graph.width = 32;
+        let mut harness = Harness::builder().with_size([150.0, 450.0]).build_ui_state(
+            |ui, tab: &mut RepoTab| {
+                let rect = Rect::from_min_size(pos2(8.0, 8.0), vec2(110.0, 400.0));
+                tab.history_minimap(ui, rect, 0.0, 300.0);
+            },
+            tab,
+        );
+        harness.run();
+        harness.key_press(egui::Key::Tab);
+        harness.run();
+        assert!(
+            harness
+                .get_by_label_contains("first 24 of 32 lanes")
+                .is_focused()
+        );
+        harness.key_press(egui::Key::PageDown);
+        harness.run();
+        assert_eq!(harness.state().history_minimap.offset, Some(300.0));
+    }
     #[test]
     fn actual_minimap_marks_loaded_refs_and_clicks_scroll_without_changing_selection() {
         use std::sync::Arc;
@@ -264,20 +345,14 @@ mod tests {
             .collect();
         tab.graph = crate::graph::layout(&tab.commits);
         tab.refs.head = tab.commits[20].hash.clone();
-        tab.search.matches.insert(tab.commits[70].hash.clone());
+        std::sync::Arc::make_mut(&mut tab.search.matches).insert(tab.commits[70].hash.clone());
         tab.selected = Some(0);
         tab.has_more = true;
-        let model = build(
-            &tab.commits,
-            &tab.graph,
-            &tab.refs.head,
-            &tab.search.matches,
-            &|| true,
-        )
-        .unwrap_or_else(|_| Model {
-            bins: Vec::new(),
-            rows: 0,
-        });
+        let model = build(&tab.graph, &tab.refs.head, &tab.search.matches, &|| true)
+            .unwrap_or_else(|_| Model {
+                bins: Vec::new(),
+                rows: 0,
+            });
         tab.history_minimap.bins = model.bins;
         tab.history_minimap.rows = model.rows;
         tab.history_minimap.dirty = false;

@@ -10,6 +10,7 @@ use super::{Dialog, Msg, OpKind, PendingOp, Refresh, RepoTab, Undo, UndoEntry, o
 use crate::git;
 
 /// An operation that takes longer than this gets a notification when it ends.
+const EXPECT_HTTPS_ROUTE: &str = "--gitcraft-expect-https-route";
 pub(super) const LONG_OP: Duration = Duration::from_secs(4);
 
 impl RepoTab {
@@ -96,6 +97,7 @@ impl RepoTab {
         }
         self.graph_motion_begin(&ops);
         self.celebration_begin(label, &ops, ctx);
+        let observe_celebration_head = self.celebration_needs_head();
         self.busy_op = Some(label.to_owned());
         self.op_started = Some(Instant::now());
         let control = self.follow_op(&ops, quiet, ctx);
@@ -111,6 +113,7 @@ impl RepoTab {
         // A quiet one (the background fetch) never asks to sign in, and must not take the place
         // of the operation that did while its sign-in dialog is open.
         if !quiet {
+            self.invalidate_https_challenge();
             self.last_op = Some(PendingOp {
                 label: label.to_owned(),
                 ops: ops.clone(),
@@ -146,6 +149,7 @@ impl RepoTab {
             } else {
                 Vec::new()
             };
+            let celebration_before = observe_celebration_head.then(|| git::head(&path));
             let (result, kind, stopped) =
                 run_steps_counted(&path, &ops, kind, creds.as_ref(), quiet, Some(&control));
             let result = match result {
@@ -154,13 +158,24 @@ impl RepoTab {
                 }
                 result => result,
             };
-            Msg::OpDone {
+            // Pin the successful action's target before another queued action
+            // can start. This read stays on the owned mutation worker.
+            let observed = (result.is_ok() && observe_celebration_head).then(|| git::head(&path));
+            let done = Msg::OpDone {
                 label,
                 result,
                 refresh,
                 kind,
                 quiet,
                 stopped,
+            };
+            if let Some(head) = observed {
+                Msg::Then(Box::new(move |tab, ctx| {
+                    tab.celebration_observed_heads(celebration_before.unwrap_or_default(), head);
+                    tab.handle(done, ctx);
+                }))
+            } else {
+                done
             }
         });
     }
@@ -175,7 +190,9 @@ impl RepoTab {
             let mut i = 0;
             op.ops.retain(|step| {
                 i += 1;
-                i > stopped || is_expectation(step)
+                i > stopped
+                    || is_expectation(step)
+                    || step.first().is_some_and(|m| m == EXPECT_HTTPS_ROUTE)
             });
         }
     }
@@ -193,8 +210,159 @@ impl RepoTab {
         self.run_ops(label, ops, refresh, OpKind::Normal(undo, before), ctx);
     }
 
+    /// Clear all views of this endpoint, including parked worktrees. A cached
+    /// transient secret already has an exact scope; fetch URL guesses are not needed.
+    pub(crate) fn forget_https_memory(&mut self, path: &std::path::Path, url: &str) {
+        if self.path == path
+            || self
+                .credentials
+                .as_ref()
+                .is_some_and(|c| c.scope.as_ref().is_some_and(|scope| scope.matches_url(url)))
+        {
+            let had_signin = self.credentials.is_some()
+                || self.https_challenge.is_some()
+                || matches!(self.dialog, Some(Dialog::Credentials { .. }));
+            self.credentials = None;
+            if had_signin {
+                self.invalidate_https_challenge();
+            }
+        }
+        for parked in &mut self.parked {
+            parked.forget_https_memory(path, url);
+        }
+    }
+    pub(super) fn switch_https(&mut self, url: String, ctx: &egui::Context) {
+        if !crate::settings::network_page::valid_https(&url) {
+            return;
+        }
+        if let Some(busy) = &self.busy_op {
+            self.status = Some((
+                format!("Wait until {busy} finishes before switching sign-ins"),
+                true,
+            ));
+            return;
+        }
+        let challenge = self
+            .https_challenge
+            .as_ref()
+            .filter(|ticket| self.https_ticket_current(ticket))
+            .cloned();
+        let Some(binding) = challenge.as_ref().and_then(|ticket| ticket.binding.clone()) else {
+            self.invalidate_https_challenge();
+            self.status=Some(("This sign-in has no verified operation route. Run the operation again before switching accounts.".into(),true));
+            return;
+        };
+        if !challenge
+            .as_ref()
+            .is_some_and(|ticket| ticket.authorizes_endpoint(&url))
+        {
+            self.inspect_unbound_https(vec![url], ctx);
+            return;
+        }
+        let path = self.path.clone();
+        self.forget_https_memory(&path, &url);
+        crate::settings::network_page::rejected(ctx, path.clone(), url.clone());
+        let mut ticket = self.https_ticket(url.clone());
+        ticket.binding = Some(binding.clone());
+        let reads = self.reads;
+        self.then_or(
+            ctx,
+            true,
+            |error| (Err(error), false),
+            move || {
+                if let Err(error) = binding.verify(&path) {
+                    return (Err(error), false);
+                }
+                let result = git::https_reject(&path, &url);
+                let route_current = binding.verify(&path).is_ok();
+                (result, route_current)
+            },
+            move |tab, (result, route_current), _| {
+                if tab.reads != reads || !route_current {
+                    tab.invalidate_https_challenge();
+                }
+                tab.https_rejection_done(ticket, result);
+            },
+        );
+    }
+
     /// Remembers the credentials and runs the operation that needed them again.
     pub(super) fn sign_in(&mut self, creds: git::Credentials, ctx: &egui::Context) {
+        let challenge = self.https_challenge.take();
+        if !challenge.as_ref().is_some_and(|ticket| {
+            self.https_ticket_current(ticket)
+                && creds
+                    .scope
+                    .as_ref()
+                    .is_some_and(|scope| ticket.endpoints.iter().any(|url| scope.matches_url(url)))
+        }) {
+            self.status = Some(("The sign-in destination or account context changed. Run the operation again before signing in.".into(), true));
+            return;
+        }
+        let Some(ticket) = challenge else {
+            return;
+        };
+        let Some(binding) = ticket.binding.clone() else {
+            self.invalidate_https_challenge();
+            self.status = Some((
+                "This sign-in has no verified destination snapshot. Run the operation again."
+                    .into(),
+                true,
+            ));
+            return;
+        };
+        let selected = ticket.endpoints.iter().find(|url| {
+            creds
+                .scope
+                .as_ref()
+                .is_some_and(|scope| scope.matches_url(url))
+        });
+        if !selected.is_some_and(|url| ticket.authorizes_endpoint(url)) {
+            self.inspect_unbound_https(selected.cloned().into_iter().collect(), ctx);
+            return;
+        }
+        self.https_checking = true;
+        self.status = Some(("Checking the sign-in destination…".into(), false));
+        let path = self.path.clone();
+        self.then_or(
+            ctx,
+            true,
+            Err,
+            move || binding.verify(&path),
+            move |tab, result, ctx| {
+                if !tab.https_ticket_current(&ticket) {
+                    tab.status = Some((
+                        "Sign-in was discarded because the operation or connection changed.".into(),
+                        true,
+                    ));
+                    return;
+                }
+                tab.https_checking = false;
+                if let Err(error) = result {
+                    tab.invalidate_https_challenge();
+                    tab.status = Some((error, true));
+                    return;
+                }
+                if let Some(binding) = ticket.binding
+                    && let Some(op) = &mut tab.last_op
+                {
+                    match serde_json::to_string(&binding) {
+                        Ok(json) => op.ops.insert(0, vec![EXPECT_HTTPS_ROUTE.into(), json]),
+                        Err(_) => {
+                            tab.status = Some((
+                                "Could not preserve the sign-in route. Run the operation again."
+                                    .into(),
+                                true,
+                            ));
+                            return;
+                        }
+                    }
+                }
+                tab.accept_scoped_signin(creds, ctx);
+            },
+        );
+    }
+    fn accept_scoped_signin(&mut self, creds: git::Credentials, ctx: &egui::Context) {
         self.credentials = Some(creds);
         if let Some(busy) = &self.busy_op
             && let Some(op) = &self.last_op
@@ -245,6 +413,7 @@ impl RepoTab {
         {
             self.network_failed = true;
         }
+        let auth_failure = running.as_ref().and_then(|r| r.control.auth_failure());
         let steps = running.map(|r| r.control.take_steps()).unwrap_or_default();
         self.log_activity(&label, &result, cancelled, quiet, steps);
         let long = self
@@ -288,16 +457,13 @@ impl RepoTab {
             Err(e) if git::is_auth_error(e) && !quiet => {
                 self.agent_needs_sign_in(&label);
                 // Typed credentials that were refused are forgotten.
-                let refused = self.credentials.take().is_some();
+                let typed = self.credentials.take().is_some();
+                let refused = typed || e.contains("401") || e.contains("403");
                 self.status = Some((format!("{label}: sign-in needed"), true));
-                let url = self
-                    .default_remote()
-                    .and_then(|r| self.remotes.iter().find(|x| x.name == r))
-                    .map(|r| r.url.clone())
-                    .unwrap_or_default();
-                // An undo or redo stays where it is in the timeline until signing in runs it
-                // again, so that cancelling the sign-in keeps it.
-                self.dialog = Some(Dialog::credentials(&url, refused));
+                // Only a URL reported by the failed step, or its captured destinations.
+                // An absent endpoint must never be replaced with the default fetch URL.
+                let failure = auth_failure.unwrap_or_else(|| git::AuthFailure::from_error(e, &[]));
+                self.offer_failed_https_signin(failure, refused, ctx);
             }
             Err(e) => {
                 self.note_reused(Some(e));
@@ -429,12 +595,36 @@ fn run_step(
     if control.is_cancelled() {
         return Err(git::CANCELLED.to_owned());
     }
+    let binding = if git::goes_over_network(args) {
+        match git::RouteBinding::capture(path, args) {
+            Ok(binding) => Some(binding),
+            Err(error) => {
+                return Err(format!(
+                    "Could not verify the network operation's destinations; command not started: {}",
+                    crate::diagnostics::crash::scrub(&error)
+                ));
+            }
+        }
+    } else {
+        None
+    };
+    let endpoints = binding
+        .as_ref()
+        .map(|b| b.urls().to_vec())
+        .unwrap_or_default();
     // Each call kept for the activity log.
     let (result, recorded) = if git::goes_over_network(args) {
         git::run_watched_recorded(Some(path), args, creds, quiet, control)
     } else {
         git::run_recorded(Some(path), args, creds, quiet)
     };
+    if let Err(error) = &result
+        && git::is_auth_error(error)
+    {
+        let mut failure = git::AuthFailure::from_error(error, &endpoints);
+        failure.binding = binding;
+        control.authentication_failed(failure);
+    }
     let mut recorded = recorded;
     recorded.output = super::activity::bounded(&recorded.output);
     control.record(recorded);
@@ -495,7 +685,7 @@ pub(super) fn offline_refusal(ops: &[Vec<String>]) -> Option<String> {
 /// `remote` subcommands that ask it (`update`, `prune`, `show` without `-n`) and LFS's
 /// transfers. Not `remote add` / `rename` / `set-url` / `remove`, which only write the config,
 /// nor `submodule update`, which reaches one only when a commit is missing (and then says so).
-pub(super) fn reaches_a_remote(op: &[String]) -> bool {
+pub(crate) fn reaches_a_remote(op: &[String]) -> bool {
     if op
         .first()
         .is_some_and(|s| s == crate::push_preflight::APPROVED)
@@ -515,7 +705,7 @@ pub(super) fn reaches_a_remote(op: &[String]) -> bool {
     };
     let rest: Vec<&str> = words.collect();
     match sub {
-        Some("fetch" | "pull" | "push" | "clone" | "ls-remote") => true,
+        Some("fetch" | "pull" | "push" | "clone" | "ls-remote" | git::dvc::PULL_ALIAS) => true,
         Some("remote") => match rest.first().copied() {
             Some("update" | "prune") => true,
             Some("show") => !rest.contains(&"-n"),
@@ -550,6 +740,18 @@ pub(super) fn run_steps_counted(
     quiet: bool,
     control: Option<&Arc<git::OpControl>>,
 ) -> (Result<String, String>, OpKind, usize) {
+    for op in ops {
+        if let [marker, json] = op.as_slice()
+            && marker == EXPECT_HTTPS_ROUTE
+        {
+            let check = serde_json::from_str::<git::RouteBinding>(json)
+                .map_err(|_| "Invalid sign-in route proof".to_owned())
+                .and_then(|binding| binding.verify(path));
+            if let Err(error) = check {
+                return (Err(error), kind, 0);
+            }
+        }
+    }
     // Undoing a HEAD move resets the branch checked out now: after a checkout or a commit made
     // elsewhere since, that would throw away commits that aren't the operation's.
     let expected = match &kind {
@@ -608,7 +810,7 @@ pub(super) fn run_steps_counted(
     let mut stopped = ops.len();
     let mut tried = Vec::new();
     for (i, op) in ops.iter().enumerate() {
-        if is_expectation(op) {
+        if is_expectation(op) || op.first().is_some_and(|m| m == EXPECT_HTTPS_ROUTE) {
             continue;
         }
         if let [mark, says, args @ ..] = &op[..]
@@ -797,6 +999,7 @@ pub(super) fn is_expectation(op: &[String]) -> bool {
         || expected_symref(op).is_some()
         || expected_tree(op).is_some()
         || matches!(op, [mark, _, _] if mark == crate::gerrit::CHECK)
+        || matches!(op, [mark, _] if mark == EXPECT_HTTPS_ROUTE)
 }
 
 fn check_expected(
@@ -1105,5 +1308,39 @@ mod tests {
         assert_eq!(head_now, mine);
         assert!(matches!(undone, Some(Ok(_))));
         assert_eq!(main_after, Ok(was));
+    }
+}
+
+#[cfg(test)]
+mod signout_tests {
+    use super::*;
+    #[test]
+    fn signout_clears_nested_parked_credentials_before_a_view_is_reopened() -> Result<(), String> {
+        let ctx = egui::Context::default();
+        let url = "https://push-a.invalid/team/repo.git";
+        let mut main = RepoTab::new_deferred("/nonexistent/signout-main".into(), &ctx);
+        let mut parked = RepoTab::new_deferred("/nonexistent/signout-worktree".into(), &ctx);
+        let mut nested = RepoTab::new_deferred("/nonexistent/signout-nested".into(), &ctx);
+        let unrelated = git::Credentials::for_url(
+            "https://push-b.invalid/team/repo.git",
+            "other".into(),
+            "DUMMY_OTHER".into(),
+        )?;
+        main.credentials = Some(unrelated);
+        parked.credentials = Some(git::Credentials::for_url(
+            url,
+            "old-account".into(),
+            "DUMMY_OLD".into(),
+        )?);
+        nested.credentials = parked.credentials.clone();
+        parked.parked.push(Box::new(nested));
+        let path = parked.path.clone();
+        main.parked.push(Box::new(parked));
+        main.forget_https_memory(std::path::Path::new("/nonexistent/another-tab"), url);
+        assert!(main.credentials.is_some());
+        let reopened = main.take_parked(&path).ok_or("Parked view missing")?;
+        assert!(reopened.credentials.is_none());
+        assert!(reopened.parked[0].credentials.is_none());
+        Ok(())
     }
 }

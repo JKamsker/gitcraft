@@ -13,6 +13,8 @@ mod bundles;
 #[cfg(test)]
 mod clone_tests;
 mod command;
+mod credential_scope;
+pub use credential_scope::{CREDENTIAL_HELPER, CredentialScope};
 mod commit_msg;
 mod commits;
 mod conflict;
@@ -22,8 +24,10 @@ mod diff;
 mod diff_algorithm;
 pub mod doctor;
 pub mod dry_run;
+pub(crate) mod dvc;
 pub mod errors;
 pub mod external_tool;
+pub(crate) mod file_comparison;
 mod files;
 mod fold;
 pub(crate) mod growth;
@@ -393,3 +397,4 @@ mod push_hooks;
 pub(crate) use command::{PushTarget, local_repair_input, push_preflight_with, repair_host};
 
 pub(crate) mod prompt_session;
+pub(crate) use bundles::bundle_git_path;

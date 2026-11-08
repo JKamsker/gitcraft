@@ -56,6 +56,31 @@ impl RepoTab {
                 acts.push(Action::Reload);
             }
             widgets::toolbar_separator(ui);
+            ui.menu_button("File views", |ui| {
+                for (label, page) in [
+                    (
+                        "Code moved across files",
+                        super::file_comparison::Page::CodeMoves,
+                    ),
+                    (
+                        "File migration map",
+                        super::file_comparison::Page::Migration,
+                    ),
+                    (
+                        "Three-state staging lens",
+                        super::file_comparison::Page::Lens,
+                    ),
+                    (
+                        "File versions across branches",
+                        super::file_comparison::Page::Matrix,
+                    ),
+                ] {
+                    if ui.button(label).clicked() {
+                        acts.push(Action::OpenFileComparison(page));
+                        ui.close();
+                    }
+                }
+            });
             self.head_label(ui, idle, acts);
             self.target_conflict_badge(ui);
             self.network_chip(ui, acts);
@@ -298,6 +323,13 @@ impl RepoTab {
         if search.clicked() {
             acts.push(Action::ToggleSearch);
         }
+        if ui
+            .button("Tour")
+            .on_hover_text("README, workflow, contributors and setup checklist")
+            .clicked()
+        {
+            acts.push(Action::OpenTour);
+        }
         let doctor = icons::tool_button(ui, "wrench", "", true).on_hover_text(
             "Repository doctor: ignore rules, hooks, health, configuration, hidden changes",
         );
@@ -318,6 +350,10 @@ impl RepoTab {
         egui::Popup::menu(&open)
             .style(crate::theme::menu_style)
             .show(|ui| {
+                if ui.button("Set up SSH…").clicked() {
+                    acts.push(Action::OpenSshSetup);
+                    ui.close();
+                }
                 let browser = MenuItem::new("Open in browser")
                     .refused(page.is_none().then_some("No remote with a web page"))
                     .show(ui);

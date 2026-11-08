@@ -53,6 +53,7 @@ pub(super) struct Api {
     login: Option<Login>,
     /// Told the server's `web` when it refused the login, so that it isn't sent again.
     on_refused: Option<fn(&str)>,
+    refused_key: Option<String>,
     agent: ureq::Agent,
 }
 
@@ -61,6 +62,15 @@ const PAGE: usize = 50;
 
 impl Api {
     /// The API of the forge whose web pages are at `web` (`https://host[:port]`).
+    #[cfg(test)]
+    pub(super) fn fixture(base: &str, login: Login) -> Self {
+        let mut api = Self::new("fixture", base, "127.0.0.1", Some(login));
+        api.agent = ureq::AgentBuilder::new()
+            .timeout(Duration::from_secs(3))
+            .redirects(0)
+            .build();
+        api
+    }
     pub fn new(name: &'static str, web: &str, host: &str, login: Option<Login>) -> Api {
         Api {
             base: format!("{}/api/v1", web.trim_end_matches('/')),
@@ -69,6 +79,7 @@ impl Api {
             web: web.trim_end_matches('/').to_owned(),
             login,
             on_refused: None,
+            refused_key: None,
             agent: with_proxy(ureq::AgentBuilder::new(), web)
                 // A large repository on a busy server can take its time over a page of the list.
                 .timeout(Duration::from_secs(30))
@@ -80,13 +91,11 @@ impl Api {
         }
     }
 
-    /// Calls `forget` with the server's address when it refuses the login.
-    pub fn on_refused(mut self, forget: fn(&str)) -> Api {
+    pub fn on_refused_key(mut self, forget: fn(&str), key: &str) -> Api {
         self.on_refused = Some(forget);
+        self.refused_key = Some(key.to_owned());
         self
     }
-
-    /// "Forgejo" or "Gitea".
     pub fn name(&self) -> &'static str {
         self.name
     }
@@ -292,7 +301,7 @@ impl Api {
                     && self.login.is_some()
                     && let Some(forget) = self.on_refused
                 {
-                    forget(&self.web);
+                    forget(self.refused_key.as_deref().unwrap_or(&self.web));
                 }
                 let text = response.into_string().unwrap_or_default();
                 Err(Failure {
@@ -352,6 +361,13 @@ pub(crate) fn with_proxy(builder: ureq::AgentBuilder, web: &str) -> ureq::AgentB
         Some(proxy) => builder.proxy(proxy),
         None => builder,
     }
+}
+
+/// The exact environment choice used by the REST client. Never display it without redaction.
+pub(crate) fn environment_proxy(web: &str) -> Option<String> {
+    proxy_for(web, |name| {
+        std::env::var(name).ok().filter(|v| !v.is_empty())
+    })
 }
 
 /// The proxy for `web` (`https://host[:port]`): the scheme's own variable, else `ALL_PROXY`, unless

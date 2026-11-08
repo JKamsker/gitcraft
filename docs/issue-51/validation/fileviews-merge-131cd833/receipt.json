@@ -1,0 +1,25 @@
+{
+  "application": "131cd833ea9504daec87400ec8efcacd583cfe7a",
+  "svg_tests": {
+    "command": "cargo +1.95.0 test --locked --lib svg::tests:: -- --test-threads=1",
+    "passed": 7,
+    "failed": 0,
+    "exit_code": 0
+  },
+  "all_target_check": {
+    "command": "cargo +1.95.0 check --locked --all-targets",
+    "exit_code": 0
+  },
+  "environment": "CARGO_BUILD_JOBS=2; test TMPDIR=/private/tmp PATH=/tmp/gitcraft-integration-tools:$PATH SHELL=/tmp/gitcraft-integration-tools/validation-shell",
+  "logs": [
+    {
+      "log": "svg-131cd833-test.log.gz",
+      "sha256": "1a2e920b0c343fd125c4859672c1e81e664875eeb18ca9053a35ce3b93a6833e"
+    },
+    {
+      "log": "fileviews-merge-131cd833-check.log.gz",
+      "sha256": "c060542c91c2e6c8134f897cbeeade4f36b5479b1db3f91a81e2ffeeee66f3e1"
+    }
+  ],
+  "limits": "No new runtime/Git/helper/native fixture, full suite, CI or PR. Documentation archival does not rerun prior gates."
+}

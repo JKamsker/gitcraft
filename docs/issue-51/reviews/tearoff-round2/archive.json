@@ -1,0 +1,132 @@
+{
+  "report_sha256": "9fde67108f6c05f9d118db96146f5fcc353c22255ec3078ea6a7cdfef87fbf6a",
+  "manifest_sha256": "8b7e9448cd1a9806202596024216446289e11e784f4f2dd1659501edd6e2c241",
+  "artifacts": [
+    {
+      "original_path": "/private/tmp/gitcraft-tearoff-r2-evidence/bounded_size.rs",
+      "sha256": "2c0f6bb0e5051b7c783948567723a365c44c89d885ae46ef97fceed0c5c19a78",
+      "bytes": 454,
+      "archive": "evidence-000-bounded_size.rs.gz"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-tearoff-r2-evidence/close_policy.rs",
+      "sha256": "98f61b9869d15ed88161569b63376251b2c17d4dc3f63973af4e5d27b545e74d",
+      "bytes": 592,
+      "archive": "evidence-001-close_policy.rs.gz"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-tearoff-r2-evidence/desktop_logic.rs",
+      "sha256": "a1a83710023af4b0108bb355b9afa73e7d7410b21dbf1d3121837f7b81666ddd",
+      "bytes": 270,
+      "archive": "evidence-002-desktop_logic.rs.gz"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-tearoff-r2-evidence/drop_target.rs",
+      "sha256": "0c98eba4be1a1d186154aa0daef6e8677eeca50e1ee3a9362a52cbd5b0be2068",
+      "bytes": 248,
+      "archive": "evidence-003-drop_target.rs.gz"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-tearoff-r2-evidence/patch-extractions.json",
+      "sha256": "80808eaae002bfe9b96c5c29984894ba59364800263481a52889963f3e0bee32",
+      "bytes": 2914,
+      "archive": "evidence-004-patch-extractions.json.gz"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-tearoff-r2-evidence/patch-probe",
+      "sha256": "e4944757c2043fbfca6211f34de7864729bac10ecda768ee465d4d16e4fe7a7d",
+      "bytes": 565496,
+      "archive": "not copied: binary or >2MB; hash retained"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-tearoff-r2-evidence/patch-probe.log",
+      "sha256": "ee00999849c03395772a8b8cec804c256b65a43ad01acdc3bd5dcc3cfa6a3227",
+      "bytes": 231,
+      "archive": "evidence-006-patch-probe.log.gz"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-tearoff-r2-evidence/patch-probe.rs",
+      "sha256": "0f9237f9f4c882ead189771e3b4b241c44da34f72129348dad811bd2f412196c",
+      "bytes": 4994,
+      "archive": "evidence-007-patch-probe.rs.gz"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-tearoff-r2-evidence/probe",
+      "sha256": "0735581ff454a74d8b217c96c42625469cf85ee83d4af7005992fe144421fa9b",
+      "bytes": 5678376,
+      "archive": "not copied: binary or >2MB; hash retained"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-tearoff-r2-evidence/probe-initial.rs",
+      "sha256": "2c5f71b82d69e307729d7956d0d5c6465b9ec788fcd8ffd33c2c405e52481530",
+      "bytes": 2854,
+      "archive": "evidence-009-probe-initial.rs.gz"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-tearoff-r2-evidence/probe.log",
+      "sha256": "98fe8312fcea9d08e4911d1dbee018548ef9936ded7440eb564495d50b84bbb5",
+      "bytes": 403,
+      "archive": "evidence-010-probe.log.gz"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-tearoff-r2-evidence/probe.rs",
+      "sha256": "b1140e738bb326dc0ca5f19dbfb5ca30efb14cf7c5398568f95cdc7a6ebfb160",
+      "bytes": 3659,
+      "archive": "evidence-011-probe.rs.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-51-interaction-corrections-review-r2-manifest.json",
+      "sha256": "697fc2960847d4c7847874bdaef92b14d2a7b778432d8c96a19ac6eb0ee2a5b7",
+      "bytes": 11194,
+      "archive": "evidence-012-gitcraft-51-interaction-corrections-review-r2-manifest.json.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-51-interaction-corrections-review-r2.md",
+      "sha256": "d520554730f96838d7bed765a7b78a7ac5206249321cf4ec8e174d153c131134",
+      "bytes": 10109,
+      "archive": "evidence-013-gitcraft-51-interaction-corrections-review-r2.md.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-51-tearoff-review-r1-manifest.json",
+      "sha256": "18a961f0ec3c1706ee65527d9242e9c0e208fd4f41e4982d225c4b4b32c2a904",
+      "bytes": 10390,
+      "archive": "evidence-014-gitcraft-51-tearoff-review-r1-manifest.json.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-51-tearoff-review-r1.md",
+      "sha256": "110aef94ab765393631695658eb69e33f16a548afdd9bb4f988650864160c355",
+      "bytes": 16498,
+      "archive": "evidence-015-gitcraft-51-tearoff-review-r1.md.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-51-tearoff-review-r2.md",
+      "sha256": "9fde67108f6c05f9d118db96146f5fcc353c22255ec3078ea6a7cdfef87fbf6a",
+      "bytes": 12621,
+      "archive": "evidence-016-gitcraft-51-tearoff-review-r2.md.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-interaction-f48a28ad-tearoff-fixes-0.log",
+      "sha256": "7415f55c2704a17b7a10dc30c5644337067b71a1eb13784a55386b00c0cd154f",
+      "bytes": 2811,
+      "archive": "evidence-017-gitcraft-interaction-f48a28ad-tearoff-fixes-0.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-interaction-f48a28ad-tearoff-fixes-1.log",
+      "sha256": "932cf6b0c7e2028995f1360b9a962c5c529b5d90354d3b9ee3d3db16d662ebb5",
+      "bytes": 1230,
+      "archive": "evidence-018-gitcraft-interaction-f48a28ad-tearoff-fixes-1.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-interaction-f48a28ad-tearoff-fixes-2.log",
+      "sha256": "f2066ca264b9a8598ecd436c70919e1efe1acea4098ad2a13b5d82d67bc049ec",
+      "bytes": 72,
+      "archive": "evidence-019-gitcraft-interaction-f48a28ad-tearoff-fixes-2.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-interaction-tearoff-corrections-validation.json",
+      "sha256": "6c35d0ce2a75f316cc63f1eafe8393c163479197bb68730bd1624f0c0b11f021",
+      "bytes": 1898,
+      "archive": "evidence-020-gitcraft-interaction-tearoff-corrections-validation.json.gz"
+    }
+  ]
+}

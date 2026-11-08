@@ -30,6 +30,8 @@ pub struct Pkg {
     /// The package as its registry knows it (name, version); `None` for one of the project's
     /// own (a workspace member, a path dependency), which no registry has.
     pub registry: Registry,
+    /// Only a lockfile-recorded public registry permits a metadata request.
+    pub public_registry: bool,
 }
 
 impl Pkg {
@@ -40,6 +42,7 @@ impl Pkg {
             license,
             line,
             registry: Some((name.to_owned(), version.to_owned())),
+            public_registry: false,
         }
     }
 
@@ -73,6 +76,7 @@ pub struct DepChange {
     pub new_line: Option<u32>,
     /// The package on its registry before and after, for the links.
     pub registry: (Registry, Registry),
+    pub metadata_registry: (Registry, Registry),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -219,18 +223,19 @@ fn toml_packages(root: &Node) -> Vec<Pkg> {
                 Some(rev) => format!("{version} (git {rev})"),
                 None => version.to_owned(),
             };
-            let pkg = Pkg::new(name, &shown, None, i.line);
+            let pkg = Pkg::new(name, &shown, license(&i.node, "license"), i.line);
             let uv_local = matches!(
                 get(&i.node, "source").map(|f| &f.node),
                 Some(Node::Map(m)) if m.iter().any(|f| matches!(f.key.as_str(), "editable" | "virtual" | "directory" | "path"))
             );
             let cargo_local = source.is_none() && get(&i.node, "checksum").is_none() && get(&i.node, "source").is_none();
-            let pkg = if git.is_some() || uv_local || (cargo_local && !is_poetry(root)) {
+            let pkg = if git.is_some() || uv_local || (cargo_local && !is_poetry(root)) || source.is_some_and(|s| s.starts_with("registry+") && s != "registry+https://github.com/rust-lang/crates.io-index" && s != "registry+sparse+https://index.crates.io/") {
                 pkg.local()
             } else {
                 pkg
             };
             Some(Pkg {
+                public_registry: matches!(source, Some("registry+https://github.com/rust-lang/crates.io-index" | "registry+sparse+https://index.crates.io/")),
                 registry: pkg.registry.map(|(n, _)| (n, version.to_owned())),
                 ..pkg
             })
@@ -260,15 +265,19 @@ fn npm_packages(root: &Node) -> Vec<Pkg> {
                     .rsplit_once("node_modules/")
                     .map_or(f.key.as_str(), |(_, n)| n);
                 let name = text(&f.node, "name").unwrap_or(name);
-                let pkg = Pkg::new(
+                let mut pkg = Pkg::new(
                     name,
                     text(&f.node, "version")?,
                     license(&f.node, "license"),
                     f.line,
                 );
+                pkg.public_registry = text(&f.node, "resolved")
+                    .is_some_and(|r| r.starts_with("https://registry.npmjs.org/"));
                 // A workspace (not under `node_modules`) or a link is the project's own.
-                let local =
-                    !f.key.contains("node_modules/") || text(&f.node, "link") == Some("true");
+                let local = !f.key.contains("node_modules/")
+                    || text(&f.node, "link") == Some("true")
+                    || text(&f.node, "resolved")
+                        .is_some_and(|r| !r.starts_with("https://registry.npmjs.org/"));
                 Some(if local { pkg.local() } else { pkg })
             })
             .collect();
@@ -292,6 +301,8 @@ fn npm_v1(node: &Node, out: &mut Vec<Pkg>, depth: usize) {
     for f in fields {
         if let Some(version) = text(&f.node, "version") {
             let mut pkg = Pkg::new(&f.key, version, None, f.line);
+            pkg.public_registry = text(&f.node, "resolved")
+                .is_some_and(|r| r.starts_with("https://registry.npmjs.org/"));
             // An alias, `npm:other@1.2.0`: the registry has `other`.
             if let Some((real, v)) = version.strip_prefix("npm:").and_then(|a| {
                 a.rfind('@')
@@ -561,6 +572,12 @@ fn change(kind: Change, name: &str, old: Option<&Pkg>, new: Option<&Pkg>) -> Dep
         license,
         old_line: old.map(|p| p.line),
         new_line: new.map(|p| p.line),
+        metadata_registry: (
+            old.filter(|p| p.public_registry)
+                .and_then(|p| p.registry.clone()),
+            new.filter(|p| p.public_registry)
+                .and_then(|p| p.registry.clone()),
+        ),
         registry: (
             old.and_then(|p| p.registry.clone()),
             new.and_then(|p| p.registry.clone()),

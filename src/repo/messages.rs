@@ -369,7 +369,11 @@ impl RepoTab {
     }
 
     fn poll_as(&mut self, ctx: &egui::Context, shown: bool) {
+        self.notice_connections(ctx);
         self.shown = shown;
+        if !shown || self.fs_pending.is_some() {
+            self.discard_decrypted();
+        }
         if let Some(poller) = &mut self.poller {
             poller.tick(ctx);
         }
@@ -387,6 +391,7 @@ impl RepoTab {
             self.handle(msg, ctx);
         }
         if !self.sleeping() {
+            self.sync_branch_bands(ctx);
             self.poll_branch_bands(ctx);
             self.poll_graph_topology(ctx);
             self.poll_postcards(ctx);

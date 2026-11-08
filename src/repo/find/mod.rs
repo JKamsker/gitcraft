@@ -7,6 +7,7 @@ mod keys;
 mod marks;
 mod matcher;
 mod order;
+pub(in crate::repo) mod rendered;
 mod scan;
 mod sources;
 #[cfg(test)]
@@ -46,6 +47,7 @@ impl Seen {
 /// The find bar of a repository's tab and its search.
 #[derive(Default)]
 pub(crate) struct Find {
+    rendered_document: Option<(String, rendered::Document)>,
     pub(crate) open: bool,
     /// Give the text field the keyboard on the next frame.
     pub(crate) focus: bool,
@@ -84,6 +86,7 @@ impl Find {
         self.open = false;
         self.focus = false;
         self.drop_results();
+        self.rendered_document = None;
     }
 
     /// Forgets the search: nothing shown has lines to search (an image, a spinner…).
@@ -158,7 +161,7 @@ impl Find {
             self.order_of = Some(of);
         }
         match layout {
-            Layout::Lines => {
+            Layout::Lines | Layout::Rendered(_) => {
                 let new = scan.found.get(self.ordered_lines..).unwrap_or_default();
                 self.order.extend(order::ordered(new, layout));
                 self.ordered_lines = scan.found.len();

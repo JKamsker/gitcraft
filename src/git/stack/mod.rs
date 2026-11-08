@@ -260,7 +260,7 @@ pub(crate) fn in_parallel<T: Sync, R: Send>(items: &[T], work: impl Fn(&T) -> R 
         std::thread::scope(|scope| {
             let running: Vec<_> = chunk
                 .iter()
-                .map(|item| scope.spawn(|| work(item)))
+                .map(|item| scope.spawn(crate::connections::inherit(|| work(item))))
                 .collect();
             for (item, job) in chunk.iter().zip(running) {
                 // A job that panicked is done again here, where the panic shows.

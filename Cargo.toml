@@ -37,6 +37,9 @@ egui_commonmark = { version = "0.25", default-features = false, features = ["pul
 egui_extras = { version = "0.36", default-features = false, features = ["svg", "image"] }
 # Sign-ins kept with "Remember connection": Credential Manager, Keychain, Secret Service.
 keyring = "4.2"
+# Bounded SVG rendering with explicitly disabled external resolvers; already transitive.
+resvg = { version = "=0.45.1", default-features = false, features = ["raster-images"] }
+roxmltree = "=0.20.0"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "bmp", "webp"] }
 md5 = "0.7"
 # Inflating the members of .docx / .odt / .zip files and PDF streams, for their text in diffs.
@@ -85,6 +88,7 @@ tempfile = "3"
 rustix = { version = "1", features = ["fs", "process"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
+# Read native ACLs for publication and serialize durable shelf/undo policy.
 exacl = { version = "=0.13.0", default-features = false, features = ["serde"] }
 # Keep native rounded corners while drawing the tabs over a transparent title bar.
 objc2 = "0.6"

@@ -44,6 +44,8 @@ impl RepoTab {
                     .stroke(egui::Stroke::new(1.0, t.separator)),
             )
             .show(ui, |ui| self.toolbar(ui, &mut acts));
+        self.ssh_setup_window(&ctx);
+        self.practice_banner(ui);
         self.push_banner(ui, &mut acts);
         self.detached_panel(ui, &mut acts);
         self.error_card_panel(ui);
@@ -114,7 +116,9 @@ impl RepoTab {
         egui::CentralPanel::default()
             .frame(egui::Frame::new().fill(t.dock))
             .show(ui, |ui| {
-                if self.conflict.is_some() {
+                if self.file_comparison.is_some() {
+                    self.file_comparison_view(ui, &mut acts);
+                } else if self.conflict.is_some() {
                     self.conflict_view(ui, &mut acts);
                 } else if self.rebase.is_some() {
                     self.rebase_view(ui, &mut acts);
@@ -133,6 +137,8 @@ impl RepoTab {
                     && self.docked(Panel::Diff)
                 {
                     self.diff_view(ui, &mut acts);
+                } else if self.tour.is_some() {
+                    self.tour_view(ui, &mut acts);
                 } else if self.file_view.is_some() {
                     self.file_view(ui, &mut acts);
                 } else if self.ci_view.is_some() && self.docked(Panel::Ci) {
@@ -261,7 +267,9 @@ impl RepoTab {
             });
             let diff_keys = self.diff.is_some()
                 && (self.main_keys(ctx, Panel::Diff) || self.conflict.is_some());
-            if esc && self.close_drop_menu() {
+            if esc && self.file_comparison.is_some() {
+                acts.push(Action::CloseFileComparison);
+            } else if esc && self.close_drop_menu() {
             } else if esc && diff_keys && self.note_open(ctx) {
                 acts.push(Action::Agent(super::agents::AgentAct::Tray(
                     super::agents::TrayAct::Close,

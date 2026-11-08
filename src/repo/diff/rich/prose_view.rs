@@ -205,7 +205,7 @@ fn caption(part: &Part, captions: bool) -> Option<&'static str> {
 }
 
 /// The text of a part, laid out to wrap within `width`.
-fn part_job(part: &Part, t: &Tokens, width: f32) -> LayoutJob {
+pub(super) fn part_job(part: &Part, t: &Tokens, width: f32) -> LayoutJob {
     let font = egui::FontId::proportional(14.0);
     let mut job = match part {
         Part::Kept { text, .. } => plain(text, &font, t.text_dim, false),
@@ -324,10 +324,32 @@ fn plain(text: &str, font: &egui::FontId, color: Color32, struck: bool) -> Layou
 /// An edited paragraph's words, each with what stood before it: kept ones plain, removed ones
 /// struck through on red, added ones on green.
 fn changed(words: &[(Change, String)], font: &egui::FontId, t: &Tokens) -> LayoutJob {
+    changed_with_limit(words, font, t, Some(MAX_CHARS))
+}
+pub(super) fn search_changed(words: &[(Change, String)], t: &Tokens) -> LayoutJob {
+    changed_with_limit(words, &egui::FontId::proportional(14.0), t, None)
+}
+fn append(job: &mut LayoutJob, text: &str, format: TextFormat) {
+    if let Some(last) = job.sections.last_mut()
+        && last.format == format
+        && last.byte_range.end.0 == job.text.len()
+    {
+        job.text.push_str(text);
+        last.byte_range.end = egui::text::ByteIndex(job.text.len());
+    } else {
+        job.append(text, 0.0, format);
+    }
+}
+fn changed_with_limit(
+    words: &[(Change, String)],
+    font: &egui::FontId,
+    t: &Tokens,
+    limit: Option<usize>,
+) -> LayoutJob {
     let mut job = LayoutJob::default();
     let mut shown = 0;
     for (change, word) in words {
-        if shown > MAX_CHARS {
+        if limit.is_some_and(|limit| shown > limit) {
             job.append(" …", 0.0, TextFormat::simple(font.clone(), t.text_faint));
             break;
         }
@@ -336,16 +358,16 @@ fn changed(words: &[(Change, String)], font: &egui::FontId, t: &Tokens) -> Layou
         let lead = word.len() - word.trim_start().len();
         let (space, body) = word.split_at(lead);
         if !space.is_empty() {
-            job.append(space, 0.0, TextFormat::simple(font.clone(), t.text));
+            append(&mut job, space, TextFormat::simple(font.clone(), t.text));
         }
         let (background, strike) = match change {
             Change::Kept => (Color32::TRANSPARENT, Stroke::NONE),
             Change::Removed => (t.danger.gamma_multiply(0.35), Stroke::new(1.0, t.text_dim)),
             Change::Added => (t.success.gamma_multiply(0.35), Stroke::NONE),
         };
-        job.append(
+        append(
+            &mut job,
             body,
-            0.0,
             TextFormat {
                 font_id: font.clone(),
                 color: t.text,

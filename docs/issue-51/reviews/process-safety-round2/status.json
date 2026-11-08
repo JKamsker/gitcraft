@@ -1,0 +1,12 @@
+{
+  "candidate": "bc2521c6a8422571e67ae2da00e381bde48f6de5",
+  "verdict": "STATIC FAIL",
+  "scopes": [
+    "remote transport",
+    "native ownership",
+    "bisect and callers"
+  ],
+  "execution": "No tests/builds/helpers/supervisors/owned-child fixtures executed by reviewers",
+  "corrections": "forwarded to active writer",
+  "runtime": "HELD"
+}

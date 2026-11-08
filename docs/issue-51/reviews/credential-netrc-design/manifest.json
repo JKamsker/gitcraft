@@ -1,0 +1,203 @@
+{
+  "review": "Selected-account/netrc minimal design and narrow154 cleanup correction",
+  "candidate": "154c34b09123be9c97e3fd0945f3ab6dbc02c1f7",
+  "tree": "2ead8b1615d66199c7911d6b1523b0b3fdf8a1df",
+  "parent": "73331f2d20809903300bd34d3b472d84035cd152",
+  "snapshot": "/tmp/gitcraft-credential-netrc-154c-source",
+  "verdict": "NARROW_STATIC_CLEANUP_PASS; R3-1/R3-2_OPEN_AT154; DESIGN_ONLY_NOT_API_ACCEPTANCE",
+  "report": {
+    "path": "/tmp/gitcraft-51-credential-netrc-design-note.md",
+    "sha256": "2a16b87fa81df4a7a6833d4a9a888c4af8e2106f7c135fb9d80be0cc5a4a3155"
+  },
+  "source_sha256_and_blob": {
+    "src/git/command/credential_policy.rs": {
+      "sha256": "9ded0d005c120c60bdf2715ea2e4fda17864cc1b2beb2cdded48ddb48cc15a33",
+      "blob": "f8f153083c4652b4ffa7b5555cc30fb15ba7edaa",
+      "snapshot_matches_git_object": true
+    },
+    "src/git/credential_scope.rs": {
+      "sha256": "201050e57bf13276fedba05681a319f48da0b1810bd0c33cdc5b5f9b509fb924",
+      "blob": "44b8ba616cec4d674f817375fc7bb4889d3da04c",
+      "snapshot_matches_git_object": true
+    },
+    "src/git/command.rs": {
+      "sha256": "e6652b1f900036ee7b6c1cd753f7a8217344b06d5ee1e23687106cf1aacdbdff",
+      "blob": "4910820b8e977a150efc9ae77676f155c605e97c",
+      "snapshot_matches_git_object": true
+    },
+    "src/git/command/endpoints.rs": {
+      "sha256": "a153c5b4944593a1acf17e43ce705322dd89bfe0d2f0dcc3b7572a3255ec4c9b",
+      "blob": "5c2fb28cf8ceecf5bb0c9e5494e38d787e477321",
+      "snapshot_matches_git_object": true
+    },
+    "src/git/command/connection.rs": {
+      "sha256": "b38784bd8cc923e3b9f9dfd2a140c45954428b70ab55bdc025fa71eab6b7b5ff",
+      "blob": "ee7baeb4fba75f01c537a353925108a31d98d0fe",
+      "snapshot_matches_git_object": true
+    },
+    "src/git/command/watched.rs": {
+      "sha256": "ee4f9be34b2fa4dbaf848a383f14f561f9429bc2dd5cde895e6952a24c4f7993",
+      "blob": "743887c9fa91d6a5b23a9a0a3b3209b1dee1ccbe",
+      "snapshot_matches_git_object": true
+    },
+    "src/repo/https_recovery.rs": {
+      "sha256": "41f85518d3962082f6ba5529d61c6083767390b781d3c0ce94022e6b436e52fa",
+      "blob": "6c13dc7e3b772b389b7ad142ba45598c90dca639",
+      "snapshot_matches_git_object": true
+    },
+    "src/repo/dialogs/remote.rs": {
+      "sha256": "e7ca1649a46b869b29ed64671a2f515b743e9be0fa94a81420b0e883bb8b3ee6",
+      "blob": "f2021d5940ab03490b0e73cea96f966d5d6a905c",
+      "snapshot_matches_git_object": true
+    },
+    "src/repo/operations.rs": {
+      "sha256": "59e47aa07165fd73139db50610c4d5445ff5f9dec3473f15f48ad73630bc0a57",
+      "blob": "2e59d308c018bbc9a95b25f7eea6ad3a974fbda7",
+      "snapshot_matches_git_object": true
+    }
+  },
+  "inputs_sha256": {
+    "/tmp/gitcraft-51-credential-setup-review-r3.md": "489adea2f82ceecdaeb7481919f4e7bff37b7d9b331fe98a478d74e9c44b54c3",
+    "/tmp/gitcraft-51-credential-setup-review-r3-manifest.json": "0ce6116d3a9fc2f6f595e750a346487ebadf5b953879141921a62fdb11362506",
+    "/tmp/gitcraft-51-setup-corrections-154c34b0-handoff.md": "4a171966992190f1afe3735531fae0f9f06a6272c96be75dcc1bb6cd537758c0",
+    "/tmp/gitcraft-51-setup-corrections-154c34b0-manifest.json": "04710f26c6f984392946c609cbb0400da8219db290cfa65a7cad9f71cd40ace9",
+    "/tmp/gitcraft-51-credential-api-review-r1.md": "b4991b816143079e65693052c1024b1001592830fca12215172dbbef53643763",
+    "/tmp/gitcraft-51-credential-direct-review-r2.md": "c769fa58798e308640a4bb99eac6eefd3d01cfad7c6c9c54690727f1778b64f0",
+    "/tmp/gitcraft-51-credential-policy-static-note.md": "ada4fe03eca6ce986980ef8edadc8f2e361f7ee018a8cb1276d46fa2603b99cc",
+    "/tmp/gitcraft-51-setup-review-r1.md": "0a0243da9bc26ad185731c6685d7467d755ea82f5712b7ea6368c201229058e3",
+    "/tmp/gitcraft-51-setup-review-r3.md": "e178914d450ffe86f9b33929d4d60b1c8950ed95e330c3a2ab70f8e48d786d2f",
+    "/tmp/gitcraft-51-setup-r8-pure-validation.json": "9c89ca6319750dc4d2025a4e253f564f4444f9da7f7544bd22972d343cdb8008"
+  },
+  "input_scope": {
+    "fresh_R3_report_and_manifests": "full read/parsed",
+    "154_handoff_and_manifest": "full read/parsed",
+    "original_API_R1_R2_policy_note": "read; preserve prior classifications",
+    "setup_F4": "relevant original F4 and R3 correction sections; broader setup not rereviewed",
+    "owner_R8_receipt": "inspected only,19 reported selected passes and18 gates; lint qualified -A dead_code; no rerun"
+  },
+  "owner_manifest_hash_verification": {
+    "source_sha256": {
+      "matched": 1000,
+      "missing": [],
+      "mismatched": []
+    },
+    "artifact_sha256": {
+      "matched": 23,
+      "missing": [],
+      "mismatched": []
+    },
+    "review_input_sha256": {
+      "matched": 6,
+      "missing": [],
+      "mismatched": []
+    }
+  },
+  "primary_sources": [
+    {
+      "path": "/tmp/gitcraft-credential-netrc-evidence/git-v2.43.0-http.c",
+      "url": "https://raw.githubusercontent.com/git/git/v2.43.0/http.c",
+      "sha256": "b830f05c8207052d9e963162a2826cf9e0448d2d635d87d9fab3235d47fb914f",
+      "class": "static primary-source document retrieval; not program execution"
+    },
+    {
+      "path": "/tmp/gitcraft-credential-netrc-evidence/git-v2.45.0-http.c",
+      "url": "https://raw.githubusercontent.com/git/git/v2.45.0/http.c",
+      "sha256": "74c3e32ca4da3306981c93524833d6ddf6c94d376594581d137641cbf308bb64",
+      "class": "static primary-source document retrieval; not program execution"
+    },
+    {
+      "path": "/tmp/gitcraft-credential-netrc-evidence/git-v2.46.0-http.c",
+      "url": "https://raw.githubusercontent.com/git/git/v2.46.0/http.c",
+      "sha256": "6426cd4e2674ec3fbf9ffb1e28ff4b725a96c7cd4748b4616a16e7803aa57882",
+      "class": "static primary-source document retrieval; not program execution"
+    },
+    {
+      "path": "/tmp/gitcraft-credential-netrc-evidence/git-v2.47.0-http.c",
+      "url": "https://raw.githubusercontent.com/git/git/v2.47.0/http.c",
+      "sha256": "ff609bbe9b3fb7ee521ea495d972a0ab9d80d5fb777be096986e625e31e96870",
+      "class": "static primary-source document retrieval; not program execution"
+    },
+    {
+      "path": "/tmp/gitcraft-credential-netrc-evidence/git-v2.46.0-http-config.txt",
+      "url": "https://raw.githubusercontent.com/git/git/v2.46.0/Documentation/config/http.txt",
+      "sha256": "b7917f6971be6a52074c24f4202cceed9c80926a61cffd5fff65ca430eb2a1d8",
+      "class": "static primary-source document retrieval; not program execution"
+    },
+    {
+      "path": "/tmp/gitcraft-credential-netrc-evidence/git-v2.43.0-credential.c",
+      "url": "https://raw.githubusercontent.com/git/git/v2.43.0/credential.c",
+      "sha256": "138070450bd634e8c0e0de3b4c43d32f6823c5cc9f9d9016ea2fc18d08872414",
+      "class": "static primary-source document retrieval; not program execution"
+    },
+    {
+      "path": "/tmp/gitcraft-credential-netrc-evidence/git-v2.46.0-credential.c",
+      "url": "https://raw.githubusercontent.com/git/git/v2.46.0/credential.c",
+      "sha256": "03c7a79a12ef17bcd3b16f9468ab1fde27873b0e28de802eeaa10a5492909d51",
+      "class": "static primary-source document retrieval; not program execution"
+    },
+    {
+      "path": "/tmp/gitcraft-credential-netrc-evidence/curl-8_10_1-url.c",
+      "url": "https://raw.githubusercontent.com/curl/curl/curl-8_10_1/lib/url.c",
+      "sha256": "0eab859dea32b8dec4524d47afc433ac762e5c2620ee5cdb02f135a72532d4be",
+      "class": "static primary-source document retrieval; not program execution"
+    },
+    {
+      "path": "/tmp/gitcraft-credential-netrc-evidence/curl-7_88_1-url.c",
+      "url": "https://raw.githubusercontent.com/curl/curl/curl-7_88_1/lib/url.c",
+      "sha256": "75536a51c281f55572340167d5ce1d5e33715cefcb76543229a88bbbb3db5fc2",
+      "class": "static primary-source document retrieval; not program execution"
+    },
+    {
+      "path": "/tmp/gitcraft-credential-netrc-evidence/curl-netrc-doc.html",
+      "url": "https://curl.se/libcurl/c/CURLOPT_NETRC.html",
+      "sha256": "42a54818d2eb2be26d2c0e27c5aa34725d2240563376fdf7695ad1c97965549b",
+      "class": "static primary-source document retrieval; not program execution"
+    },
+    {
+      "path": "/tmp/gitcraft-credential-netrc-evidence/curl-netrc-file-doc.html",
+      "url": "https://curl.se/libcurl/c/CURLOPT_NETRC_FILE.html",
+      "sha256": "6be407ab377904b0365dc04586a5cd595dae924bb80054aa08564d18ee26260d",
+      "class": "static primary-source document retrieval; not program execution"
+    },
+    {
+      "path": "/tmp/gitcraft-credential-netrc-evidence/git-v2.54.0-http.c",
+      "url": "https://raw.githubusercontent.com/git/git/v2.54.0/http.c",
+      "sha256": "3199b5d9cf7be976bf43290f1080d58edfff103e0d03326197b70cdec48e2e7c",
+      "class": "static primary-source document retrieval; not program execution"
+    },
+    {
+      "path": "/tmp/gitcraft-credential-netrc-evidence/git-v2.54.0-credential.c",
+      "url": "https://raw.githubusercontent.com/git/git/v2.54.0/credential.c",
+      "sha256": "7d9ddaf3978af10176f600429119dcab518d2e488fbb5ced091422a0436b213b",
+      "class": "static primary-source document retrieval; not program execution"
+    },
+    {
+      "path": "/tmp/gitcraft-credential-netrc-evidence/git-v2.46.0-relnotes.txt",
+      "url": "https://raw.githubusercontent.com/git/git/v2.46.0/Documentation/RelNotes/2.46.0.txt",
+      "sha256": "418fd85a1b3f8e6b145e36c3f66935f5027602551ada933914b089f60d5cb8dd",
+      "class": "static primary-source document retrieval; not program execution"
+    }
+  ],
+  "execution_inventory": {
+    "candidate_builds": 0,
+    "candidate_tests": 0,
+    "pure_compiled_adapters": 0,
+    "app_constructors": 0,
+    "generated_alias_or_helper_execution": 0,
+    "Git_auth_or_credential_fill_fixtures": 0,
+    "netrc_or_secret_reads": 0,
+    "HTTP_SSH_PTY_native_fixtures": 0,
+    "process_control_or_cancellation_fixtures": 0,
+    "full_suite_CI_PR": 0,
+    "tracked_source_edits": 0,
+    "subagents": 0,
+    "performed": "Git immutable object tooling/archive reads; static primary source retrieval; Python text/JSON parsing/hashing; note/manifest output only"
+  },
+  "dispositions": {
+    "R3_cleanup_final_pathname_rmdir": "resolved narrowly at154; empty0700 dir remains deliberately; no native lifetime or reclamation proof",
+    "R3-2_netrc": "OPEN at154; design Git>=2.46 exact actual-HTTPS URL proactiveAuth=basic +emptyAuth=false; sole scoped helper supplies full selected account before curl; pin version guard on repository-machine actual executable; unsupported transient mode refusal",
+    "R3-1_foreign_routes": "OPEN at154; selected endpoint must be authoritative route member regardless parser confirmation; laterc742 not reviewed",
+    "API_final_acceptance": "not given"
+  },
+  "hold": "No runtime/native/process/auth/network fixture authorization; future preserved-candidate native tests require separate hold clearance."
+}

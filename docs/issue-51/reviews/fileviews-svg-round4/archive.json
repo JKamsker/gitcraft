@@ -1,0 +1,144 @@
+{
+  "report_sha256": "3d3f5a916b1eea461f43f983a02a598e29d951cff6474410819bf2a437795e24",
+  "manifest_sha256": "432a604fbf4bd24638d9b3660009114b2e9819b0666f56b090d38bb30aa9b6ba",
+  "artifacts": [
+    {
+      "original_path": "/private/tmp/gitcraft-fileviews-svg-r4-131cd833/Cargo.lock",
+      "sha256": "9721bce71ffa357af2157093175dac7356c92b3b455ee157fb321345e365cd03",
+      "bytes": 177555,
+      "archive": "evidence-000-Cargo.lock.gz"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-fileviews-svg-r4-131cd833/Cargo.toml",
+      "sha256": "8f536c8f48138bc2a79f96988af53b95d46367e5b494463537c485589ceb01ca",
+      "bytes": 8310,
+      "archive": "evidence-001-Cargo.toml.gz"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-fileviews-svg-r4-131cd833/dependency-preservation.json",
+      "sha256": "f21cf9e7b36590092757f650d5c5a99d704a5080e703ca5f6366c963fedd4767",
+      "bytes": 928,
+      "archive": "evidence-002-dependency-preservation.json.gz"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-fileviews-svg-r4-131cd833/independent-command.json",
+      "sha256": "9aeae5fdde5019d8419212efacbcff8fc7a3476bf123c5848371a7cfc5b1e926",
+      "bytes": 1402,
+      "archive": "evidence-003-independent-command.json.gz"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-fileviews-svg-r4-131cd833/independent-compile.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "archive": "evidence-004-independent-compile.log.gz"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-fileviews-svg-r4-131cd833/independent-pure.log",
+      "sha256": "942bd274425dd79051993ed10c1b9ca561f4cc1be58e2015a9cd3bb264f9e33d",
+      "bytes": 392,
+      "archive": "evidence-005-independent-pure.log.gz"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-fileviews-svg-r4-131cd833/independent-result.json",
+      "sha256": "6a6b81eed48c3df94d52728a0e76a909030d8ee16d4ca3b65972e4a77ade1c4e",
+      "bytes": 517,
+      "archive": "evidence-006-independent-result.json.gz"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-fileviews-svg-r4-131cd833/parent-svg-test-observed.log",
+      "sha256": "1a2e920b0c343fd125c4859672c1e81e664875eeb18ca9053a35ce3b93a6833e",
+      "bytes": 3471,
+      "archive": "evidence-007-parent-svg-test-observed.log.gz"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-fileviews-svg-r4-131cd833/preservation.json",
+      "sha256": "1b915b924744871facf426e774ac34959d9275f94c1586888ba5a6e11e6c34a7",
+      "bytes": 770,
+      "archive": "evidence-008-preservation.json.gz"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-fileviews-svg-r4-131cd833/prior-clip-depth-1.svg",
+      "sha256": "5c78d64b92c0f91c19adcb2ed3c518d5916b3b6773198af26198334b5f803b5d",
+      "bytes": 201,
+      "archive": "evidence-009-prior-clip-depth-1.svg.gz"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-fileviews-svg-r4-131cd833/prior-clip-depth-4.svg",
+      "sha256": "82ba1d4105ce6bb3a7e0ab98f00ca86d7a080db7417f20c7b12ded73391a506d",
+      "bytes": 582,
+      "archive": "evidence-010-prior-clip-depth-4.svg.gz"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-fileviews-svg-r4-131cd833/prior-clip-depth-8.svg",
+      "sha256": "062de54b46e1cd42c57bf2f6b7bccf7b90fcfc239af8c01436adc88415596242",
+      "bytes": 1090,
+      "archive": "evidence-011-prior-clip-depth-8.svg.gz"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-fileviews-svg-r4-131cd833/src/git/file_comparison/remote_index.py",
+      "sha256": "5bb1446faf40dfbc24b6374645efaf19b9dc5962018a7e60ed33cfca08a29f4b",
+      "bytes": 15006,
+      "archive": "evidence-012-remote_index.py.gz"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-fileviews-svg-r4-131cd833/src/repo/diff/images.rs",
+      "sha256": "cf8f70c4323125f9e640d9f60db6747d9f0cf442ae585b12fd3aa14ed0dac40a",
+      "bytes": 7587,
+      "archive": "evidence-013-images.rs.gz"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-fileviews-svg-r4-131cd833/src/repo/diff/view.rs",
+      "sha256": "ec629d2a2a8c66a1d454ef41f227e892f8e73d2445e8e610c518af178889dadd",
+      "bytes": 37467,
+      "archive": "evidence-014-view.rs.gz"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-fileviews-svg-r4-131cd833/src/standalone/save.rs",
+      "sha256": "0182b5d6d888ff606a5c42716dcd6e8f7f5abb82ae44ffedf0094cc5d65b5844",
+      "bytes": 48969,
+      "archive": "evidence-015-save.rs.gz"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-fileviews-svg-r4-131cd833/src/svg.rs",
+      "sha256": "9c32962c61a1b77646b45ced231656cee3b2890b1e3ce0848a1612fb4b314bd6",
+      "bytes": 21632,
+      "archive": "evidence-016-svg.rs.gz"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-fileviews-svg-r4-131cd833/svg-r4-pure",
+      "sha256": "275639b3ccab17e5f53a62828c5a77682bb6db899b8eb6283753418f340be3c3",
+      "bytes": 5328168,
+      "archive": "not copied: binary or >2MB; hash retained"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-fileviews-svg-r4-131cd833/svg-r4-pure.rs",
+      "sha256": "0b6510831696e974c58437640ec966c45ebf5630e2dbb40f703b0c25ffa7ae3b",
+      "bytes": 13039,
+      "archive": "evidence-018-svg-r4-pure.rs.gz"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-fileviews-svg-r4-131cd833/tests/remote_index_xattr_recording.py",
+      "sha256": "9fdf09d77995b5336e376a089920d4f83fdda284d10c4001103ae428cdc39e5a",
+      "bytes": 9098,
+      "archive": "evidence-019-remote_index_xattr_recording.py.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-51-fileviews-review-r3-manifest.json",
+      "sha256": "a95f203e673a61ef5ac522a9db38ca7b40bbb8e86dafab864e83cd471b7e327e",
+      "bytes": 6105,
+      "archive": "evidence-020-gitcraft-51-fileviews-review-r3-manifest.json.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-51-fileviews-review-r3.md",
+      "sha256": "f1b8b0edab72c99cc3bcb894ab7ea57350623a3cb5052c309f3552416365a906",
+      "bytes": 11618,
+      "archive": "evidence-021-gitcraft-51-fileviews-review-r3.md.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-51-fileviews-svg-review-r4.md",
+      "sha256": "3d3f5a916b1eea461f43f983a02a598e29d951cff6474410819bf2a437795e24",
+      "bytes": 6878,
+      "archive": "evidence-022-gitcraft-51-fileviews-svg-review-r4.md.gz"
+    }
+  ]
+}

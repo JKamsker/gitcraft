@@ -26,7 +26,7 @@ mod collision_view;
 pub(crate) mod columns;
 mod commands;
 mod commit_actions;
-mod conflict;
+pub(crate) mod conflict;
 mod conflict_check;
 mod content_recovery;
 #[cfg(test)]
@@ -47,6 +47,7 @@ mod drift_view;
 mod error_help;
 mod external_tools;
 pub(crate) mod fence_view;
+pub(crate) mod file_comparison;
 mod file_text;
 pub(crate) mod file_view;
 mod find;
@@ -67,6 +68,7 @@ mod history_activity;
 mod history_reader;
 mod hooks;
 mod hotfix;
+mod https_recovery;
 mod interaction;
 mod issue_work;
 mod keep_submodules;
@@ -97,6 +99,7 @@ mod postcards;
 mod pr_merge;
 mod pr_review;
 mod pr_view;
+mod practice;
 #[cfg(test)]
 mod process_benchmarks;
 pub(crate) mod pull;
@@ -118,6 +121,7 @@ mod running;
 mod samples;
 mod saved_views;
 mod sidebar;
+mod ssh_setup;
 mod stack;
 mod state;
 mod surgery;
@@ -128,6 +132,7 @@ mod test_lane;
 mod tests;
 mod timeline;
 mod toolbar;
+mod tour;
 mod unity;
 mod versions;
 mod watch;
@@ -251,6 +256,9 @@ pub struct RepoTab {
     submodules: Vec<Submodule>,
     /// It keeps files in Git LFS, and git-lfs is installed.
     lfs: bool,
+    practice: Option<crate::practice::Session>,
+    practice_checking: bool,
+    practice_result: Option<Result<bool, String>>,
     /// Its LFS file locks, when it keeps files in LFS.
     lfs_locks: lfs_locks::LockState,
     /// What it keeps in LFS on disk, and what is only pointers.
@@ -299,6 +307,7 @@ pub struct RepoTab {
     /// One active syntax comparison and at most one latest replacement across diff views.
     structural_running: Option<(u64, u64)>,
     structural_pending: bool,
+    file_comparison: Option<file_comparison::State>,
     compare: Option<Compare>,
     /// The pull request the big area shows.
     pr_view: Option<pr_view::PrView>,
@@ -311,6 +320,8 @@ pub struct RepoTab {
     versions: versions::Versions,
     /// The repository doctor, when the big area shows it.
     doctor: Option<Box<doctor::DoctorView>>,
+    tour: Option<tour::TourView>,
+    ssh_setup: Option<ssh_setup::State>,
     pr_requests: u64,
     /// What was written on each pull request and not sent, by its number.
     pr_drafts: HashMap<u64, pr_review::PrDraft>,
@@ -352,8 +363,12 @@ pub struct RepoTab {
     preflight_timeline: Option<Option<u64>>,
     /// HTTPS credentials typed in this session, used for every later git command of the tab.
     credentials: Option<git::Credentials>,
+    connection_context: crate::connections::Context,
     /// The last operation started, to run again after signing in.
     last_op: Option<PendingOp>,
+    https_generation: u64,
+    https_checking: bool,
+    https_challenge: Option<https_recovery::Ticket>,
     /// A known git failure explained, with its fix (see [`crate::error_card`]).
     error_card: Option<crate::error_card::ErrorCard>,
     /// The forge has been asked for avatars.
@@ -595,7 +610,7 @@ impl RepoTab {
             work: WorkStatus::default(),
             commits: Vec::new(),
             graph: Graph {
-                rows: Vec::new(),
+                rows: Vec::new().into(),
                 width: 0,
             },
             graph_labels: HashMap::new(),
@@ -608,6 +623,9 @@ impl RepoTab {
             remotes: Vec::new(),
             submodules: Vec::new(),
             lfs: false,
+            practice: None,
+            practice_checking: false,
+            practice_result: None,
             lfs_locks: Default::default(),
             lfs_storage: Default::default(),
             unity: Default::default(),
@@ -637,12 +655,15 @@ impl RepoTab {
             diff: None,
             structural_running: None,
             structural_pending: false,
+            file_comparison: None,
             compare: None,
             pr_view: None,
             ci_view: None,
             reflog: None,
             versions: Default::default(),
             doctor: None,
+            tour: None,
+            ssh_setup: None,
             pr_requests: 0,
             pr_drafts: HashMap::new(),
             compare_requests: 0,
@@ -669,7 +690,11 @@ impl RepoTab {
             preflight_after: None,
             preflight_timeline: None,
             credentials: None,
+            connection_context: crate::connections::current(),
             last_op: None,
+            https_generation: 0,
+            https_checking: false,
+            https_challenge: None,
             error_card: None,
             avatars_hinted: false,
             diff_ignore_ws: false,

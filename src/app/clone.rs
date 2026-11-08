@@ -153,10 +153,21 @@ impl App {
             return;
         }
         let url = form.url.trim().to_owned();
-        let creds = (form.auth && !form.username.trim().is_empty()).then(|| git::Credentials {
-            username: form.username.trim().to_owned(),
-            password: form.password.clone(),
-        });
+        let creds = if form.auth && !form.username.trim().is_empty() {
+            match git::Credentials::for_url(
+                &url,
+                form.username.trim().to_owned(),
+                form.password.clone(),
+            ) {
+                Ok(creds) => Some(creds),
+                Err(error) => {
+                    form.error = Some(error);
+                    return;
+                }
+            }
+        } else {
+            None
+        };
         self.clone_parent = Some(PathBuf::from(form.parent.trim()));
         let (tx, rx) = channel();
         let ctx2 = ctx.clone();
@@ -164,7 +175,7 @@ impl App {
         let repaint = ctx.clone();
         let control = git::OpControl::new(move || repaint.request_repaint());
         let following = Arc::clone(&control);
-        std::thread::spawn(move || {
+        crate::connections::spawn(move || {
             let _ = tx.send(git::clone(&url, &dest2, creds.as_ref(), &following));
             ctx2.request_repaint();
         });
@@ -190,14 +201,18 @@ impl App {
             }
             // On another machine, it opens once reached again, the credentials along.
             Ok(()) if crate::remote::is_remote(&dest) => {
-                let creds =
-                    self.cloning_form
-                        .take()
-                        .filter(|f| f.auth)
-                        .map(|form| git::Credentials {
-                            username: form.username.trim().to_owned(),
-                            password: form.password,
-                        });
+                let creds = self
+                    .cloning_form
+                    .take()
+                    .filter(|f| f.auth)
+                    .and_then(|form| {
+                        git::Credentials::for_url(
+                            form.url.trim(),
+                            form.username.trim().to_owned(),
+                            form.password,
+                        )
+                        .ok()
+                    });
                 self.connect(dest, creds, ctx);
             }
             Ok(()) => {
@@ -209,11 +224,13 @@ impl App {
                 if let Some(form) = self.cloning_form.take().filter(|f| f.auth)
                     && let Some(Tab::Repo(repo)) = self.tabs.get_mut(self.active)
                     && root.as_ref() == Some(&repo.path)
+                    && let Ok(creds) = git::Credentials::for_url(
+                        form.url.trim(),
+                        form.username.trim().to_owned(),
+                        form.password,
+                    )
                 {
-                    repo.set_credentials(git::Credentials {
-                        username: form.username.trim().to_owned(),
-                        password: form.password,
-                    });
+                    repo.set_credentials(creds);
                 }
             }
             // Back to the form, asking for credentials.

@@ -43,7 +43,7 @@ pub(crate) struct ResetMode {
     undo_mode: &'static str,
 }
 
-pub(crate) const RESET_MODES: [ResetMode; 3] = [
+pub(crate) const RESET_MODES: [ResetMode; 4] = [
     ResetMode {
         label: "Soft",
         short: "Keeps every change, staged",
@@ -57,6 +57,14 @@ pub(crate) const RESET_MODES: [ResetMode; 3] = [
         explain: "Keeps every change, unstaged.",
         mode: "--mixed",
         undo_mode: "--mixed",
+    },
+    ResetMode {
+        label: "Keep",
+        short: "Keeps local changes; stops if changed files would be touched",
+        explain: "Moves the branch while preserving uncommitted changes. Stops without moving \
+                  the branch if a file changed locally must also change for this reset.",
+        mode: "--keep",
+        undo_mode: "--keep",
     },
     ResetMode {
         label: "Hard",
@@ -109,4 +117,24 @@ pub(crate) fn reset_steps(mode: &str, hash: &str, target: &str, head: &str) -> V
     ];
     steps.extend(ops(&[&["reset", mode, hash]]));
     steps
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn keep_is_a_shared_reset_mode_with_a_guarded_plan_and_safe_undo() -> Result<(), String> {
+        assert_eq!(RESET_MODES.len(), 4);
+        let keep = RESET_MODES
+            .iter()
+            .find(|m| m.label == "Keep")
+            .ok_or("Missing Keep reset")?;
+        assert_eq!(keep.mode, "--keep");
+        assert_eq!(keep.undo_mode, "--keep");
+        let plan = reset_steps(keep.mode, "target", "main", "expected");
+        assert_eq!(plan[0], expect_symref("HEAD", "refs/heads/main"));
+        assert_eq!(plan[1], expect_ref_at("HEAD", "expected"));
+        assert_eq!(plan[2], vec!["reset", "--keep", "target"]);
+        Ok(())
+    }
 }
