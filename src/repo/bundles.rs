@@ -81,10 +81,12 @@ impl RepoTab {
         }
         match result {
             Ok(preview) => {
-                self.dialog = Some(Dialog::BundleIncoming {
+                self.dialog = Some(Dialog::bundle_incoming(
+                    self.path.clone(),
+                    self._jobs.0.child(),
                     label,
-                    preview: Box::new(preview),
-                });
+                    preview,
+                ));
             }
             Err(e) => {
                 self.dialog = None;
@@ -214,6 +216,9 @@ mod tests {
                     refs: Vec::new(),
                     prerequisites: Vec::new(),
                     verification_error: None,
+                    bytes: std::sync::Arc::new(Vec::new()),
+                    digest: String::new(),
+                    repository: String::new(),
                 }),
             );
             tab.bundle_export_loaded(first, Err("obsolete export".into()));

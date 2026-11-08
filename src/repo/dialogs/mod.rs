@@ -78,10 +78,7 @@ pub enum Dialog {
         selected: std::collections::BTreeSet<String>,
         base: String,
     },
-    BundleIncoming {
-        label: String,
-        preview: Box<crate::git::BundlePreview>,
-    },
+    BundleIncoming(Box<bundles::Form>),
     CreateBranch {
         /// Commit the branch starts at.
         at: String,
@@ -550,7 +547,7 @@ impl RepoTab {
                     if ui.button("Cancel").clicked() { Outcome::Cancel } else { Outcome::Open }
                 }
                 Dialog::BundleExport { refs, selected, base } => bundles::export(ui, refs, selected, base, idle),
-                Dialog::BundleIncoming { label, preview } => bundles::incoming(ui, label, preview),
+                Dialog::BundleIncoming(form) => form.show(ui),
                 Dialog::CreateBranch {
                     at,
                     at_label,

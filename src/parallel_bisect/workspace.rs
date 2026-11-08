@@ -97,7 +97,7 @@ impl Workspace {
             authority.generation
         )))
     }
-    fn execute(
+    pub(super) fn execute(
         &self,
         dir: &Path,
         args: &[&str],
@@ -621,7 +621,7 @@ fn git_common_dir(repo: &Path) -> Result<String, String> {
     })
 }
 
-fn canonical_common(repo: &Path) -> Result<String, String> {
+pub(super) fn canonical_common(repo: &Path) -> Result<String, String> {
     let common = git_common_dir(repo)?;
     let canonical = if remote::parse(repo).is_some() {
         runner::shell(repo, "cd \"$1\" && pwd -P", &[&common])?

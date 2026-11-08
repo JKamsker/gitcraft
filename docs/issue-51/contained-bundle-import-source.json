@@ -1,0 +1,140 @@
+{
+  "base_commit": "79d65c9b7721d89a862755a9d8c55cb05b1e056a",
+  "status": "source implementation; pure recording and compilation gates only; independent review and runtime pending",
+  "scope": "#37.11 contained bundle verification/import; no supervisor framework change",
+  "source": [
+    {
+      "path": "crates/gitcraft-os/src/bundle_resources.rs",
+      "git_blob": "c5d6cd194382a664bd43ecc1e23c96c7d33192eb",
+      "sha256": "45b79760601500fa344c05270a7a6aeea7acd257cc4edc746f18fc59cfea53d0"
+    },
+    {
+      "path": "crates/gitcraft-os/src/lib.rs",
+      "git_blob": "a8455d7e70e6eece23f1fd8ce54328b520f0a0bc",
+      "sha256": "25da807db8b2bf8451a25bb36abf3a58d884eadc9544b514c522c43b9d1d79fd"
+    },
+    {
+      "path": "src/git/bundle_helper.rs",
+      "git_blob": "11cffe06f1333adc2a5e2911be26fef598896b81",
+      "sha256": "b1a8f01c2e483ba07970cfacb8b6219f782df14d240d6d1156d8f8223f4040b2"
+    },
+    {
+      "path": "src/git/bundles.rs",
+      "git_blob": "ceed3d8d9c35ed2883d3b0cbfe40441c0b00bda9",
+      "sha256": "50f7ef9e76b0d838470ea62fe7ec45b80da0bb2d529f1da73789bfd1b55eb6b5"
+    },
+    {
+      "path": "src/git/mod.rs",
+      "git_blob": "1f3dfa6735e32168d16e83cacd47f738e46d41ff",
+      "sha256": "d655c7e702329ce690776b7df3b79aa7f6ce9f36549299b45ed6f9e3bb6195c6"
+    },
+    {
+      "path": "src/lib.rs",
+      "git_blob": "7215070eab3d81d609ae5b23fbc9e29ad061548d",
+      "sha256": "9b91b376f82776cfe8f6983e41e43660448500eae12c40eb68b0a7d9b91226d4"
+    },
+    {
+      "path": "src/parallel_bisect/bundle.rs",
+      "git_blob": "0b9063d8c1364ef229e28c25c7da6a7d266ba7c4",
+      "sha256": "267587d3ba4edf5d7d7f5b38310fcda93861b378e25265117ad1f2c5c2094016"
+    },
+    {
+      "path": "src/parallel_bisect/mod.rs",
+      "git_blob": "f2bf5ea1172cabe20375b54b23bea9d9a3558699",
+      "sha256": "bfed0914d9441d5f4ab7f98bce8b2a809bdda5725c17f2425c76aeaab4298755"
+    },
+    {
+      "path": "src/parallel_bisect/workspace.rs",
+      "git_blob": "569cded83444b476c0f99b77da6499a6d7782a08",
+      "sha256": "bd6117abae8426514f10fef9ce45397614a75d9973dfa207c32ac3a456856a15"
+    },
+    {
+      "path": "src/repo/bundles.rs",
+      "git_blob": "0237a8d40f22279e06961f02e67a8ba479e18a83",
+      "sha256": "fc71c0602224144fc6a6e11b693351c3647a80a1c2f4f6940df77d25358ba067"
+    },
+    {
+      "path": "src/repo/dialogs/bundles.rs",
+      "git_blob": "3d010e2ce3825591d53a17df060f4c694fb77297",
+      "sha256": "35835f4d0b8210d2a92c358ac90d760cffa73a099fb84b6b4b05fc0a19d229f9"
+    },
+    {
+      "path": "src/repo/dialogs/mod.rs",
+      "git_blob": "dabe3a39999f2dfd8d59b237662d711d6f0d73fc",
+      "sha256": "2f218e12a1e8c4c00a659e302bb915657f52e52173529d809b3d7ffec6ad7b49"
+    }
+  ],
+  "gates": [
+    {
+      "command": "CARGO_BUILD_JOBS=2 cargo +1.95.0 test --locked -p gitcraft-os bundle_resources::recording_tests",
+      "result": "2 passed",
+      "log": "/tmp/gitcraft51-bundle-os-recording.log",
+      "log_sha256": "246554526f04f0da66d1d569b72d2762deefa940b5d4f063331909f539afc663"
+    },
+    {
+      "command": "CARGO_BUILD_JOBS=2 cargo +1.95.0 test --locked --lib recording_import",
+      "result": "3 passed",
+      "log": "/tmp/gitcraft51-bundle-ui-mapping-recording.log",
+      "log_sha256": "6a81429aa45ce5224ff80d62e0fe0aad6483734fe870010684184c9d70f58fa6"
+    },
+    {
+      "command": "CARGO_BUILD_JOBS=2 cargo +1.95.0 test --locked --lib parallel_bisect::bundle::recording_tests",
+      "result": "3 passed",
+      "log": "/tmp/gitcraft51-bundle-pipeline-recording.log",
+      "log_sha256": "b5759a4ec30daf967eb0d9bac9183cc0618f535fab81b39a36f88c652098b811"
+    },
+    {
+      "command": "CARGO_BUILD_JOBS=2 cargo +1.95.0 test --locked --lib git::bundle_helper::recording_tests",
+      "result": "1 passed",
+      "log": "/tmp/gitcraft51-bundle-helper-recording.log",
+      "log_sha256": "0cdf0f04d56c67cf427537de650735cdea3b2f2baba32fbd59495029d3c9169c"
+    },
+    {
+      "command": "CARGO_BUILD_JOBS=2 cargo +1.95.0 check --locked --all-targets",
+      "result": "PASS; 14 inherited lib / 9 lib-test warnings",
+      "log": "/tmp/gitcraft51-bundle-check.log",
+      "log_sha256": "f79e41c443e14455b9b941a2d4c04cedfe06a2632e14251c247282dce96a4557"
+    },
+    {
+      "command": "CARGO_BUILD_JOBS=2 cargo +1.95.0 build --locked",
+      "result": "PASS; 14 inherited warnings",
+      "log": "/tmp/gitcraft51-bundle-build.log",
+      "log_sha256": "9ef4ed1a2600e602d70828b79ecda3dc75935290f013dec76e109e942e601011"
+    },
+    {
+      "command": "CARGO_BUILD_JOBS=2 cargo +1.95.0 check --locked -p gitcraft-os --all-targets --target x86_64-pc-windows-gnu",
+      "result": "PASS; compilation only",
+      "log": "/tmp/gitcraft51-bundle-windows-check.log",
+      "log_sha256": "295dd8cfb5f67820fc82a3114e0ce58803adeab226e87f947c89857f085afe8b"
+    }
+  ],
+  "test_environment": {
+    "TMPDIR": "/private/tmp",
+    "PATH_prefix": "/tmp/gitcraft-integration-tools",
+    "SHELL": "/tmp/gitcraft-integration-tools/validation-shell"
+  },
+  "other_checks": [
+    "cargo +1.95.0 fmt --all -- --check: PASS",
+    "git diff --check: PASS"
+  ],
+  "not_executed": [
+    "bundle/helper/Git/SSH/WSL runtime fixtures",
+    "actual kernel resource installation or memory enforcement",
+    "inherited runtime tests/full suite",
+    "Linux cross compilation",
+    "Windows application helper compilation/runtime"
+  ],
+  "preserved_core_files_unchanged": true,
+  "supported_limits": {
+    "linux": "hard AS 1 GiB per process; per-file 512 MiB; CPU 120 s; not aggregate cgroup containment",
+    "windows": "Job aggregate committed memory 1 GiB; max 8 processes; no independent disk quota",
+    "ssh_wsl": "Linux + Python3 only, no unbounded backend fallback; runtime unvalidated",
+    "macos": "unpack/import explicitly refused; header inspection/export remain available"
+  },
+  "remaining": [
+    "exact-source independent review",
+    "parent-authorized owned runtime gates listed in report",
+    "fresh-dev combined integration checks/review"
+  ],
+  "no_binary_evidence_committed": true
+}
