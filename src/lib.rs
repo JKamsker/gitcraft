@@ -27,6 +27,7 @@ mod git;
 mod glossary;
 mod graph;
 mod icons;
+mod i18n;
 mod image_cache;
 mod image_fit;
 mod instance;

@@ -53,7 +53,7 @@ struct Step {
 
 /// What the palette's entries were made from: the active tab, and its repository (a tab's
 /// view can change to another worktree) and what that repository's entries are made from.
-type EntriesKey = (usize, Option<(PathBuf, PaletteGeneration)>, String);
+type EntriesKey = (usize, Option<(PathBuf, PaletteGeneration)>, String, u64);
 
 /// What the list shown was ranked for: the query, the step, and the entries' key.
 type RankedFor = (String, bool, EntriesKey);
@@ -88,6 +88,7 @@ impl App {
                 _ => None,
             },
             serde_json::to_string(&self.settings.key_bindings).unwrap_or_default(),
+            crate::i18n::generation(),
         )
     }
 
