@@ -285,6 +285,7 @@ pub(crate) enum Action {
     DropMenu(drag_drop::DropMenu),
     /// Move or squash a commit of the checked-out branch onto another of it.
     CommitDrop(drag_drop::CommitDrop),
+    OpenBehaviour,
     OpenLinkedMachines,
     OpenBundleExport,
     OpenBundleInspect,
@@ -566,6 +567,11 @@ impl RepoTab {
             PullMode::ALL.map(|m| (m.label().into(), "remote".into(), Action::PullWith(m))),
         );
         items.extend([
+            (
+                "Behaviour timeline…".into(),
+                "command output benchmark screenshot".into(),
+                Action::OpenBehaviour,
+            ),
             (
                 "Linked project copies…".into(),
                 "machines".into(),

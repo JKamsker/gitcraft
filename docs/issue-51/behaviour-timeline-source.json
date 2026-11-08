@@ -1,0 +1,82 @@
+{
+  "base": "a67afada3b7d7c167c8a3bffae2699b16ddb7050",
+  "status": "source implementation; independent review and runtime gates pending",
+  "runtime_hold": true,
+  "sources": [
+    {
+      "path": "src/git/behaviour.rs",
+      "sha256": "c072a72f5d01775237b8ad31e5de5af0284426ae3050b4c6dbfd4e8f71101b1e",
+      "git_blob": "b793ca5fc41b104185dfb0a25f0a989849f55ec3"
+    },
+    {
+      "path": "src/git/mod.rs",
+      "sha256": "30145861199e2a5368def7c4c1701902f03986cf5836c641679d4bbd26c2d9bc",
+      "git_blob": "3973da322ad88bb1144db72968cfda104da9d103"
+    },
+    {
+      "path": "src/parallel_bisect/observe.rs",
+      "sha256": "0ae3c374adf8fa807c4646f40c4558bb3c2f28441af8703ec1ed8a380c69e4a1",
+      "git_blob": "8ec318d11c41cd0be2e58082c79fe88429c92ae8"
+    },
+    {
+      "path": "src/parallel_bisect/mod.rs",
+      "sha256": "224da0b5a048301ae9b6801aff1958724684210e3a3ccd508bede911f2d08aeb",
+      "git_blob": "f07068000398a53c9d04d91219d9ec82b21ff2a7"
+    },
+    {
+      "path": "src/repo/actions.rs",
+      "sha256": "ecaf4c1eb25b3384bd8c34eec7173dfb88ffed9f95a7b0a1d8dc158d8cdf6562",
+      "git_blob": "6459c215d4ea96e2674b2634db5e2c2e92945e41"
+    },
+    {
+      "path": "src/repo/apply.rs",
+      "sha256": "1e7326191bd1a921952bf323ca5d8b957089f5f5b2385a769bc70109c8866262",
+      "git_blob": "ab4dbef0f0386e9fb050baea997893c43da8d18e"
+    },
+    {
+      "path": "src/repo/mod.rs",
+      "sha256": "5a465ea8605fc869810f026252b56f194cfc3bf5af19477d063f19e88ae6c49e",
+      "git_blob": "6e2031294003bf872c1710160b7b9557cde0f02e"
+    },
+    {
+      "path": "src/repo/dialogs/mod.rs",
+      "sha256": "80c77da6a9c7632c2861c18d22b98207f704765b7d673ed0a4c28487cae34d2a",
+      "git_blob": "f7865852bce26d5111fa5da5e88b1f97a08d33c7"
+    },
+    {
+      "path": "src/repo/dialogs/behaviour.rs",
+      "sha256": "fe14c37d8ca3cf9a1c0f7a3271001718e3f9c6610acdeb8f3a35c6c5d7fc16b3",
+      "git_blob": "33c7a2e571a95782b61f8289ca815be0b4d7f72f"
+    }
+  ],
+  "gates": [
+    {
+      "command": "CARGO_BUILD_JOBS=2 cargo +1.95.0 test --locked --lib parallel_bisect::observe::tests",
+      "result": "4 passed; 3190 app tests filtered; 0 OS tests/15 filtered; pure in-memory only"
+    },
+    {
+      "command": "CARGO_BUILD_JOBS=2 cargo +1.95.0 test --locked --lib git::behaviour::tests",
+      "result": "1 passed; 3193 app tests filtered; 0 OS tests/15 filtered; parser only"
+    },
+    {
+      "command": "CARGO_BUILD_JOBS=2 cargo +1.95.0 test --locked --lib repo::dialogs::behaviour::tests",
+      "result": "2 passed; 3192 app tests filtered; 0 OS tests/15 filtered; injected UI and messages only"
+    },
+    {
+      "command": "CARGO_BUILD_JOBS=2 cargo +1.95.0 check --locked --all-targets",
+      "result": "pass; 14 lib/9 lib-test existing warnings"
+    },
+    {
+      "command": "CARGO_BUILD_JOBS=2 cargo +1.95.0 build --locked",
+      "result": "pass; 14 existing lib warnings"
+    },
+    {
+      "command": "cargo +1.95.0 fmt --all -- --check; git diff --check",
+      "result": "pass"
+    },
+    {
+      "command": "git diff --quiet e494b165 -- crates/gitcraft-os src/processes.rs src/remote",
+      "result": "pass; no OS/process/supervisor changes"
+    }
+  ]
+}
