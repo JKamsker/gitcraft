@@ -94,6 +94,34 @@ pub fn toast_text(name: &str, code: i32, stdout: &[u8], stderr: &[u8]) -> (Strin
     (text, failed)
 }
 
+/// Opt-in presentation from the actual outcome. The raw toast producer stays stable.
+/// This resolves the emission locale; retain these input fields and call at paint when
+/// a longer-lived result must follow subsequent language changes.
+pub fn display_toast_text(name: &str, code: i32, stdout: &[u8], stderr: &[u8]) -> (String, bool) {
+    let (raw, failed) = toast_text(name, code, stdout, stderr);
+    let raw_head = if failed {
+        format!("{name} failed (exit status {code})")
+    } else {
+        format!("{name} finished")
+    };
+    let head = if failed {
+        crate::i18n::message(
+            "interaction-custom-display-failed",
+            &[("name", name.into()), ("code", code.into())],
+        )
+    } else {
+        crate::i18n::message(
+            "interaction-custom-display-finished",
+            &[("name", name.into())],
+        )
+    };
+    // The prefix is constructed from the same typed outcome; output is never reparsed.
+    (
+        head + raw.strip_prefix(&raw_head).unwrap_or_default(),
+        failed,
+    )
+}
+
 /// The last [`TOAST_LINES`] lines of `text`, no more than [`TOAST_CHARS`] characters.
 fn tail(text: &str) -> String {
     let lines: Vec<&str> = text.lines().collect();
@@ -139,4 +167,50 @@ fn clean(text: &str) -> String {
         })
         .collect();
     lines.join("\n").trim().to_owned()
+}
+
+#[cfg(test)]
+mod display_tests {
+    use super::*;
+    #[test]
+    fn typed_toast_display_keeps_failed_flag_and_cleaned_external_tail_unchanged() {
+        let name = "Name\nfailed (exit status 5): {$x} 色";
+        for code in [0, 5] {
+            let raw = toast_text(
+                name,
+                code,
+                b"opaque stdout\n",
+                b"\x1b[31mprovider error: finished\x1b[0m\n",
+            );
+            crate::i18n::set_language("de");
+            let shown = display_toast_text(
+                name,
+                code,
+                b"opaque stdout\n",
+                b"\x1b[31mprovider error: finished\x1b[0m\n",
+            );
+            assert_eq!(shown.1, raw.1);
+            assert!(shown.0.starts_with(name));
+            assert!(
+                shown
+                    .0
+                    .ends_with("\nopaque stdout\nprovider error: finished")
+            );
+            assert!(shown.0.contains(if code == 0 {
+                "abgeschlossen"
+            } else {
+                "fehlgeschlagen (Exitstatus 5)"
+            }));
+            crate::i18n::set_language("en-US");
+            assert_eq!(
+                display_toast_text(
+                    name,
+                    code,
+                    b"opaque stdout\n",
+                    b"\x1b[31mprovider error: finished\x1b[0m\n"
+                ),
+                raw
+            );
+        }
+    }
 }

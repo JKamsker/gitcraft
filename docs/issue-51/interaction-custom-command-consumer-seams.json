@@ -1,0 +1,8 @@
+{
+  "source_base": "47e2cb40b886437f603bfff0ac09da20cddc719d",
+  "foreign_seams": [
+    {"path": "src/repo/custom_commands/run.rs", "actual_source": "Ok(out) => cc::toast_text(&name, out.code, &out.stdout, &out.stderr)", "opt_in_render": "cc::display_toast_text with identical typed arguments", "limits": "emission-locale projection; retain original name/code/streams for later per-paint language switching, never parse raw status text", "keep": "raw toast_text producer, failed flag, control/operation state and external output"},
+    {"path": "src/repo/dialogs/custom.rs", "actual_paint": "Review file.commands Err", "render": "file.display_error()", "keep": "commands.is_ok(), raw error, raw text/digest/trust/action identity"}
+  ],
+  "provenance": "RepoFile private parsed_text source flag distinguishes new(text) from unreadable(error); no inferred I/O origin"
+}

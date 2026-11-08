@@ -1,0 +1,8 @@
+{
+  "base": "47e2cb40b886437f603bfff0ac09da20cddc719d",
+  "protected_blocks": {
+    "src/custom_commands/program.rs": "52d58db6348cf6eeb0c45c3b6e476a1b0c2e0babc15e2ad174e51b6beb26e3d0",
+    "src/custom_commands/repo_file.rs": "d4f15430f33f3e3a632be13642a7b3e785907988475727cedad767158fad98cd",
+    "src/custom_commands/mod.rs": "98c20b5804bf866decdc712ac5d340f2a22b1ba19cb094078e46cdf84f1e836f"
+  }
+}
