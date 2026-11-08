@@ -158,8 +158,9 @@ fn job(acts: &mut Vec<Action>, v: &logic::View, j: Job) {
         j,
     )));
 }
-fn patch(ui: &mut egui::Ui, label: &str, s: &str) {
+fn patch(ui: &mut egui::Ui, id: &str, label: &str, s: &str) {
     egui::CollapsingHeader::new(label)
+        .id_salt(id)
         .default_open(false)
         .show(ui, |ui| {
             egui::ScrollArea::both().max_height(210.).show(ui, |ui| {
@@ -212,6 +213,7 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
             egui::CollapsingHeader::new(crate::i18n::text(
                 "repo-workflows-repository_tools-show-43a8ef7d",
             ))
+            .id_salt("subtree-discovery")
             .show(ui, |ui| {
                 ui.label(crate::i18n::text(
                     "repo-workflows-repository_tools-show-ea03ec13",
@@ -370,6 +372,7 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
                                 });
                                 patch(
                                     ui,
+                                    "repo-workflows-repository_tools-show-d3197597",
                                     crate::i18n::text(
                                         "repo-workflows-repository_tools-show-d3197597",
                                     ),
@@ -377,6 +380,7 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
                                 );
                                 patch(
                                     ui,
+                                    "repo-workflows-repository_tools-show-2250c14b",
                                     crate::i18n::text(
                                         "repo-workflows-repository_tools-show-2250c14b",
                                     ),
@@ -384,6 +388,7 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
                                 );
                                 patch(
                                     ui,
+                                    "repo-workflows-repository_tools-show-cb9b7596",
                                     crate::i18n::text(
                                         "repo-workflows-repository_tools-show-cb9b7596",
                                     ),
@@ -433,6 +438,7 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
                             {
                                 patch(
                                     ui,
+                                    "repo-workflows-repository_tools-show-36c73d64",
                                     crate::i18n::text(
                                         "repo-workflows-repository_tools-show-36c73d64",
                                     ),

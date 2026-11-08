@@ -94,6 +94,7 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
                     egui::CollapsingHeader::new(crate::i18n::text(
                         "repo-workflows-repository_tools-show-8fe4dcef",
                     ))
+                    .id_salt("branch-route-edit")
                     .default_open(data.selected == b.name)
                     .show(ui, |ui| {
                         ui.horizontal(|ui| {

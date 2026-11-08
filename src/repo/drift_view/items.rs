@@ -38,6 +38,7 @@ fn sections(ui: &mut Ui, view: &DriftView, report: &Report, acts: &mut Vec<Actio
     if report.judged {
         section(
             ui,
+            "unrelated",
             &crate::i18n::message(
                 "repo-workflows-drift_view-sections-1bb434ba",
                 &[("unrelated-len-1", (unrelated.len()).clone().into())],
@@ -63,6 +64,7 @@ fn sections(ui: &mut Ui, view: &DriftView, report: &Report, acts: &mut Vec<Actio
     }
     section(
         ui,
+        "dependencies",
         &crate::i18n::message(
             "repo-workflows-drift_view-sections-14063185",
             &[(
@@ -92,6 +94,7 @@ fn sections(ui: &mut Ui, view: &DriftView, report: &Report, acts: &mut Vec<Actio
     );
     section(
         ui,
+        "signatures",
         &crate::i18n::message(
             "repo-workflows-drift_view-sections-a8299dbd",
             &[(
@@ -121,13 +124,14 @@ fn sections(ui: &mut Ui, view: &DriftView, report: &Report, acts: &mut Vec<Actio
             ("files", (report.formatting_files.len()).into()),
         ],
     );
-    section(ui, &title, |ui| {
+    section(ui, "formatting", &title, |ui| {
         for file in report.formatting_files.iter().take(LISTED) {
             item(ui, view, report, file, std::slice::from_ref(file), acts);
         }
     });
     section(
         ui,
+        "files",
         &crate::i18n::message(
             "repo-workflows-drift_view-sections-619bb740",
             &[("report-files-len-1", (report.files.len()).clone().into())],
@@ -140,9 +144,9 @@ fn sections(ui: &mut Ui, view: &DriftView, report: &Report, acts: &mut Vec<Actio
     );
 }
 
-fn section(ui: &mut Ui, title: &str, add: impl FnOnce(&mut Ui)) {
+fn section(ui: &mut Ui, id: &str, title: &str, add: impl FnOnce(&mut Ui)) {
     egui::CollapsingHeader::new(RichText::new(title).font(theme::medium(12.5)))
-        .id_salt(title.split(" (").next().unwrap_or(title))
+        .id_salt(id)
         .default_open(false)
         .show(ui, add);
 }
@@ -193,5 +197,56 @@ fn item(
         if let Some(key) = view.diff_key(report, first) {
             acts.push(Action::OpenDiff(key));
         }
+    }
+}
+#[cfg(test)]
+mod fluent_section_tests {
+    use super::*;
+    use egui_kittest::{Harness, kittest::Queryable};
+    #[test]
+    fn fluent_partition_drift_count_header_keeps_expansion_across_language_and_count() {
+        crate::i18n::set_language("en-US");
+        let mut initialized = false;
+        let mut h = Harness::new_ui_state(
+            |ui, count: &mut usize| {
+                if !initialized {
+                    crate::theme::install_fonts(ui.ctx());
+                    initialized = true;
+                    ui.ctx().request_discard("install supplied fonts");
+                    return;
+                }
+                let title = crate::i18n::message(
+                    "repo-workflows-drift_view-sections-14063185",
+                    &[("report-dependencies-len-1", (*count).into())],
+                );
+                section(ui, "dependencies", &title, |ui| {
+                    ui.label("Supplied dependency body");
+                });
+            },
+            1usize,
+        );
+        let title = crate::i18n::message(
+            "repo-workflows-drift_view-sections-14063185",
+            &[("report-dependencies-len-1", 1.into())],
+        );
+        assert!(h.query_by_label("Supplied dependency body").is_none());
+        h.get_by_label(&title).click();
+        h.run();
+        h.get_by_label("Supplied dependency body");
+        crate::i18n::set_language("de");
+        *h.state_mut() = 1234;
+        h.run();
+        h.get_by_label("Supplied dependency body");
+        let title = crate::i18n::message(
+            "repo-workflows-drift_view-sections-14063185",
+            &[("report-dependencies-len-1", 1234.into())],
+        );
+        h.get_by_label(&title).click();
+        h.run();
+        assert!(h.query_by_label("Supplied dependency body").is_none());
+        crate::i18n::set_language("en-US");
+        *h.state_mut() = 2;
+        h.run();
+        assert!(h.query_by_label("Supplied dependency body").is_none());
     }
 }

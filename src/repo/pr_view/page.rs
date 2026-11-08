@@ -30,6 +30,7 @@ impl RepoTab {
                 "repo-workflows-pr_view-pr-view-ui-c6f6b4c5",
                 &[("relocated-len-1", (relocated.len()).clone().into())],
             ))
+            .id_salt("pr-relocations")
             .show(ui, |ui| {
                 if let Some(Ok(files)) = &view.files {
                     for target in relocated.values() {

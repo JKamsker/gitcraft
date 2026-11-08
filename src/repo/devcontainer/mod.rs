@@ -250,6 +250,7 @@ impl RepoTab {
                 egui::CollapsingHeader::new(crate::i18n::text(
                     "repo-workflows-devcontainer-devcontainer-window-df4a39c8",
                 ))
+                .id_salt("devcontainer-source")
                 .show(ui, |ui| {
                     ui.add(egui::Label::new(&config.source).selectable(true));
                 });

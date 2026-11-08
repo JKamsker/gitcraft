@@ -251,6 +251,7 @@ impl RepoTab {
                         (state.selected.len()).clone().into(),
                     )],
                 ))
+                .id_salt("file-comparison-branches")
                 .default_open(state.selected.len() < 2)
                 .show(ui, |ui| {
                     ui.horizontal_wrapped(|ui| {

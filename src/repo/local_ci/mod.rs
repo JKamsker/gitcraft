@@ -161,6 +161,7 @@ impl State {
     fn ui(&mut self, ui: &mut egui::Ui, acts: &mut Vec<Action>, remotes: &[crate::git::Remote]) {
         self.poll(ui.ctx());
         egui::CollapsingHeader::new(crate::i18n::text("repo-workflows-local_ci-ui-a38baafc"))
+            .id_salt("local-actions-controls")
             .default_open(true)
             .show(ui, |ui| {
                 egui::ScrollArea::vertical()
@@ -235,6 +236,7 @@ impl State {
             egui::CollapsingHeader::new(crate::i18n::text(
                 "repo-workflows-local_ci-controls-b19c65b7",
             ))
+            .id_salt("local-actions-output")
             .default_open(true)
             .show(ui, |ui| {
                 egui::ScrollArea::vertical()

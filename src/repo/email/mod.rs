@@ -185,6 +185,7 @@ impl RepoTab {
                     egui::CollapsingHeader::new(crate::i18n::text(
                         "repo-workflows-email-email-window-d9adba22",
                     ))
+                    .id_salt("email-cover")
                     .default_open(true)
                     .show(ui, |ui| {
                         ui.label(&received.cover);

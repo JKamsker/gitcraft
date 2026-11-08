@@ -114,6 +114,7 @@ impl State {
                         (hit.provenance.len()).clone().into(),
                     )],
                 ))
+                .id_salt("recovery-provenance")
                 .show(ui, |ui| {
                     for (i, source) in hit.provenance.iter().enumerate() {
                         if ui
