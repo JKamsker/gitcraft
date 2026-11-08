@@ -252,12 +252,18 @@ impl App {
         ui.with_layout(egui::Layout::top_down(egui::Align::Min), |ui| {
             ui.horizontal(|ui| {
                 ui.label(
-                    RichText::new("WORKSPACES")
+                    RichText::new(crate::i18n::text("interaction-workspace-heading"))
                         .font(theme::semibold(10.5))
                         .color(t.text_faint),
                 );
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if icons::small_button(ui, "plus", "New workspace").clicked() {
+                    if icons::small_button(
+                        ui,
+                        "plus",
+                        crate::i18n::text("interaction-workspace-new"),
+                    )
+                    .clicked()
+                    {
                         self.workspaces_view.naming = Some(Naming {
                             index: None,
                             text: String::new(),
@@ -266,11 +272,11 @@ impl App {
                         });
                     }
                     let find = ui
-                        .link(RichText::new("Where's my work?").small())
-                        .on_hover_text(
-                            "Commits not pushed, stashes and changes in every repository \
-                             gitcraft knows",
-                        );
+                        .link(
+                            RichText::new(crate::i18n::text("interaction-workspace-my-work"))
+                                .small(),
+                        )
+                        .on_hover_text(crate::i18n::text("interaction-workspace-my-work-tip"));
                     if find.clicked() {
                         open_my_work = true;
                     }
@@ -278,12 +284,9 @@ impl App {
             });
             if self.workspaces.is_empty() && self.workspaces_view.naming.is_none() {
                 ui.label(
-                    RichText::new(
-                        "Group repositories you work on together to see how each stands, and \
-                         fetch or open them all at once. + on the right makes one.",
-                    )
-                    .color(t.text_faint)
-                    .small(),
+                    RichText::new(crate::i18n::text("interaction-workspace-intro"))
+                        .color(t.text_faint)
+                        .small(),
                 );
             }
             if self
@@ -317,7 +320,7 @@ impl App {
             Request::Add(i, path) => self.add_to_workspace(i, &path),
             Request::Browse(i) => {
                 if let Some(dir) = rfd::FileDialog::new()
-                    .set_title("Add a repository to the workspace")
+                    .set_title(crate::i18n::text("interaction-workspace-browse-title"))
                     .pick_folder()
                 {
                     // One on another machine is taken as it is: finding its top folder would
@@ -351,7 +354,10 @@ impl App {
         } else {
             self.workspaces_view.notice = Some((
                 i,
-                format!("{} is in this workspace already.", repo_name(path)),
+                crate::i18n::message(
+                    "interaction-workspace-already",
+                    &[("repository", repo_name(path).into())],
+                ),
             ));
         }
     }
@@ -369,16 +375,18 @@ impl App {
                 Err(e) => failed.push(format!(
                     "{} ({})",
                     repo_name(path),
-                    across::short_reason(&e)
+                    across::display_reason(&e)
                 )),
             }
         }
         if !failed.is_empty() {
-            let msg = format!(
-                "{} of {} didn't open: {}",
-                failed.len(),
-                paths.len(),
-                failed.join(", ")
+            let msg = crate::i18n::message(
+                "interaction-workspace-failed-open",
+                &[
+                    ("failed", failed.len().into()),
+                    ("total", paths.len().into()),
+                    ("details", failed.join(", ").into()),
+                ],
             );
             self.toasts
                 .push(super::panels::Toast::new(msg.clone(), true));
@@ -395,7 +403,7 @@ impl App {
         ui.horizontal(|ui| {
             let field = ui.add(
                 egui::TextEdit::singleline(&mut naming.text)
-                    .hint_text("Workspace name")
+                    .hint_text(crate::i18n::text("interaction-workspace-name"))
                     .desired_width(260.0)
                     .char_limit(across::workspaces::MAX_NAME),
             );
@@ -411,18 +419,22 @@ impl App {
             // Only the field's own keys: Escape closing a menu elsewhere keeps the name.
             let own = field.has_focus() || field.lost_focus();
             let label = if naming.index.is_some() {
-                "Rename"
+                crate::i18n::text("interaction-workspace-rename")
             } else {
-                "Create"
+                crate::i18n::text("interaction-workspace-create")
             };
             if ui.button(label).clicked() || (field.lost_focus() && enter) {
                 done = Some(true);
-            } else if ui.button("Cancel").clicked() || (own && escape) {
+            } else if ui
+                .button(crate::i18n::text("interaction-workspace-cancel"))
+                .clicked()
+                || (own && escape)
+            {
                 done = Some(false);
             }
         });
         if let Some(err) = &naming.error {
-            ui.colored_label(t.danger, err);
+            ui.colored_label(t.danger, across::workspaces::display_error(err));
         }
         match done {
             Some(true) => {
@@ -473,11 +485,11 @@ impl App {
                 if let Some((i, text)) = &self.workspaces_view.notice
                     && *i == index
                 {
-                    ui.colored_label(t.warning, text);
+                    ui.colored_label(t.warning, git::display_error(text));
                 }
                 if repos.is_empty() {
                     ui.label(
-                        RichText::new("No repositories yet: + on this card adds one.")
+                        RichText::new(crate::i18n::text("interaction-workspace-empty"))
                             .color(t.text_faint)
                             .small(),
                     );
@@ -509,16 +521,19 @@ impl App {
         let asked = self.workspaces_view.confirm?;
         let (text, button, request) = match asked {
             Confirm::Delete(i) if i == index => (
-                format!(
-                    "Delete the workspace “{name}”? Its repositories stay where they are; only \
-                     the group goes."
+                crate::i18n::message(
+                    "interaction-workspace-delete-question",
+                    &[("name", name.into())],
                 ),
-                "Delete",
+                crate::i18n::text("interaction-workspace-delete"),
                 Request::Delete(index),
             ),
             Confirm::OpenAll(i) if i == index => (
-                format!("Open all {} repositories in tabs?", repos.len()),
-                "Open all",
+                crate::i18n::message(
+                    "interaction-workspace-open-question",
+                    &[("count", repos.len().into())],
+                ),
+                crate::i18n::text("interaction-workspace-open-all"),
                 Request::Open(repos.to_vec()),
             ),
             _ => return None,
@@ -529,7 +544,10 @@ impl App {
             if ui.button(button).clicked() {
                 answer = Some(true);
             }
-            if ui.button("Cancel").clicked() {
+            if ui
+                .button(crate::i18n::text("interaction-workspace-cancel"))
+                .clicked()
+            {
                 answer = Some(false);
             }
         });
@@ -556,11 +574,18 @@ impl App {
         ui.horizontal(|ui| {
             // The buttons first, from the right: a long name takes what is left and is cut.
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                let more = icons::small_button(ui, "settings", "Rename or delete the workspace");
+                let more = icons::small_button(
+                    ui,
+                    "settings",
+                    crate::i18n::text("interaction-workspace-more"),
+                );
                 egui::Popup::menu(&more)
                     .style(theme::menu_style)
                     .show(|ui| {
-                        if ui.button("Rename…").clicked() {
+                        if ui
+                            .button(crate::i18n::text("interaction-workspace-rename-menu"))
+                            .clicked()
+                        {
                             self.workspaces_view.naming = Some(Naming {
                                 index: Some(index),
                                 text: name.to_owned(),
@@ -568,13 +593,20 @@ impl App {
                                 focus: true,
                             });
                         }
-                        if ui.button("Delete workspace…").clicked() {
+                        if ui
+                            .button(crate::i18n::text("interaction-workspace-delete-menu"))
+                            .clicked()
+                        {
                             self.workspaces_view.confirm = Some(Confirm::Delete(index));
                         }
                     });
                 let has = !repos.is_empty();
                 let open = ui.add_enabled_ui(has, |ui| {
-                    icons::small_button(ui, "folder-open", "Open all in tabs")
+                    icons::small_button(
+                        ui,
+                        "folder-open",
+                        crate::i18n::text("interaction-workspace-open-tip"),
+                    )
                 });
                 if open.inner.clicked() {
                     if repos.len() > OPEN_WITHOUT_ASKING {
@@ -584,27 +616,36 @@ impl App {
                     }
                 }
                 let fetch = ui.add_enabled_ui(has, |ui| {
-                    icons::small_button(ui, "cloud-download", "Fetch all (asks for no password)")
+                    icons::small_button(
+                        ui,
+                        "cloud-download",
+                        crate::i18n::text("interaction-workspace-fetch-tip"),
+                    )
                 });
                 if fetch.inner.clicked() {
                     request = Some(Request::Fetch(repos.to_vec()));
                 }
                 let look = ui.add_enabled_ui(has, |ui| {
-                    icons::small_button(ui, "refresh-cw", "Look again (connects to other machines)")
+                    icons::small_button(
+                        ui,
+                        "refresh-cw",
+                        crate::i18n::text("interaction-workspace-look-tip"),
+                    )
                 });
                 if look.inner.clicked() {
                     request = Some(Request::Look(repos.to_vec()));
                 }
-                let add = icons::small_button(ui, "plus", "Add a repository");
+                let add =
+                    icons::small_button(ui, "plus", crate::i18n::text("interaction-workspace-add"));
                 if let Some(r) = self.add_menu(&add, index, repos) {
                     request = Some(r);
                 }
                 ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
                     icons::inline(ui, "rows-2", 14.0, t.accent);
-                    let count = match repos.len() {
-                        1 => "1 repository".to_owned(),
-                        n => format!("{n} repositories"),
-                    };
+                    let count = crate::i18n::message(
+                        "interaction-workspace-count",
+                        &[("count", repos.len().into())],
+                    );
                     ui.add(
                         egui::Label::new(
                             RichText::new(name)
@@ -652,7 +693,10 @@ impl App {
                 if !candidates.is_empty() {
                     ui.separator();
                 }
-                if ui.button("Another folder…").clicked() {
+                if ui
+                    .button(crate::i18n::text("interaction-workspace-another"))
+                    .clicked()
+                {
                     request = Some(Request::Browse(index));
                 }
             });
@@ -731,9 +775,12 @@ fn workspace_row(
         let x_rect = Rect::from_center_size(pos2(rect.right() - 12.0, y), vec2(20.0, 20.0));
         let x = ui
             .interact(x_rect, resp.id.with("remove"), Sense::click())
-            .on_hover_text("Remove from the workspace");
+            .on_hover_text(crate::i18n::text("interaction-workspace-remove"));
         crate::a11y::a11y(&x, egui::WidgetType::Button, || {
-            format!("Remove {} from the workspace", repo_name(path))
+            crate::i18n::message(
+                "interaction-workspace-remove-name",
+                &[("repository", repo_name(path).into())],
+            )
         });
         if x.hovered() {
             ui.painter().rect_filled(x_rect, t.radius_sm, t.pressed);
@@ -773,26 +820,41 @@ fn status_parts(state: Option<&RepoState>, connected: bool, t: &Tokens) -> Vec<P
         return vec![if connected {
             part(None, "…", t.text_faint)
         } else {
-            part(None, "not connected: look again to connect", t.text_faint)
+            part(
+                None,
+                crate::i18n::text("interaction-workspace-disconnected"),
+                t.text_faint,
+            )
         }];
     };
     let mut parts = Vec::new();
     match state.busy {
-        Some(Busy::Fetching) => parts.push(part(Some("cloud-download"), "fetching…", t.text_dim)),
+        Some(Busy::Fetching) => parts.push(part(
+            Some("cloud-download"),
+            crate::i18n::text("interaction-workspace-fetching"),
+            t.text_dim,
+        )),
         Some(Busy::Looking) if state.seen.is_none() => {
-            parts.push(part(None, "looking…", t.text_faint));
+            parts.push(part(
+                None,
+                crate::i18n::text("interaction-workspace-looking"),
+                t.text_faint,
+            ));
         }
         _ => {}
     }
     if let Some((e, _)) = &state.fetch_error {
-        let words = format!("fetch: {}", across::short_reason(e));
+        let words = crate::i18n::message(
+            "interaction-workspace-fetch-error",
+            &[("reason", across::display_reason(e).into())],
+        );
         parts.push(part(Some("circle-alert"), words, t.danger));
     }
     match &state.seen {
         Some(Ok(o)) => parts.extend(overview_parts(o, git::now(), t)),
         Some(Err(e)) => parts.push(part(
             Some("circle-alert"),
-            across::short_reason(e),
+            across::display_reason(e),
             t.danger,
         )),
         None => {}
@@ -804,8 +866,13 @@ fn status_parts(state: Option<&RepoState>, connected: bool, t: &Tokens) -> Vec<P
 fn overview_parts(o: &Overview, now: i64, t: &Tokens) -> Vec<Part> {
     let branch = match &o.branch {
         Some(b) => b.clone(),
-        None if o.head.is_empty() => "no commits".to_owned(),
-        None => format!("detached at {}", o.head),
+        None if o.head.is_empty() => {
+            crate::i18n::text("interaction-workspace-no-commits").to_owned()
+        }
+        None => crate::i18n::message(
+            "interaction-workspace-detached",
+            &[("commit", o.head.as_str().into())],
+        ),
     };
     let mut parts = vec![Part {
         shrinks: true,
@@ -815,29 +882,44 @@ fn overview_parts(o: &Overview, now: i64, t: &Tokens) -> Vec<Part> {
         parts.push(part(None, changed_text(o.changed), t.warning));
     }
     if o.ahead > 0 {
-        parts.push(part(Some("arrow-up"), o.ahead.to_string(), t.text_dim));
+        parts.push(part(
+            Some("arrow-up"),
+            crate::i18n::number(o.ahead),
+            t.text_dim,
+        ));
     }
     if o.behind > 0 {
-        parts.push(part(Some("arrow-down"), o.behind.to_string(), t.text_dim));
+        parts.push(part(
+            Some("arrow-down"),
+            crate::i18n::number(o.behind),
+            t.text_dim,
+        ));
     }
     if o.has_remote {
         parts.push(part(None, fetched_text(o.last_fetch, now), t.text_faint));
     } else {
-        parts.push(part(None, "no remote", t.text_faint));
+        parts.push(part(
+            None,
+            crate::i18n::text("interaction-workspace-no-remote"),
+            t.text_faint,
+        ));
     }
     parts
 }
 
 /// "1 changed", "12 changed".
 pub(super) fn changed_text(n: usize) -> String {
-    format!("{n} changed")
+    crate::i18n::message("interaction-workspace-changed", &[("count", n.into())])
 }
 
-/// "fetched 3 hours ago", or "never fetched".
+/// A localized relative fetch age, or the no-fetch fallback.
 pub(super) fn fetched_text(at: Option<i64>, now: i64) -> String {
     match at {
-        Some(at) => format!("fetched {}", git::relative_time(at, now)),
-        None => "never fetched".to_owned(),
+        Some(at) => crate::i18n::message(
+            "interaction-workspace-fetched",
+            &[("time", git::relative_time(at, now).into())],
+        ),
+        None => crate::i18n::text("interaction-workspace-never").to_owned(),
     }
 }
 
@@ -926,20 +1008,33 @@ fn row_tooltip(path: &Path, state: Option<&RepoState>) -> String {
     let mut failed = false;
     if let Some(state) = state {
         if let Some(Err(e)) = &state.seen {
-            tip.push_str(&format!("\n\nCouldn't look at it: {e}"));
+            tip.push_str("\n\n");
+            tip.push_str(&crate::i18n::message(
+                "interaction-workspace-look-error",
+                &[("reason", git::display_error(e).into())],
+            ));
             failed = true;
         }
         if let Some((e, _)) = &state.fetch_error {
-            tip.push_str(&format!("\n\nThe last fetch failed: {e}"));
+            tip.push_str("\n\n");
+            tip.push_str(&crate::i18n::message(
+                "interaction-workspace-fetch-failed",
+                &[("reason", git::display_error(e).into())],
+            ));
         }
         if let Some(Ok(o)) = &state.seen
             && !o.upstream.is_empty()
         {
-            tip.push_str(&format!("\nTracks {}", o.upstream));
+            tip.push_str("\n");
+            tip.push_str(&crate::i18n::message(
+                "interaction-workspace-tracks",
+                &[("upstream", o.upstream.as_str().into())],
+            ));
         }
     }
     if !failed {
-        tip.push_str("\nClick to open");
+        tip.push('\n');
+        tip.push_str(crate::i18n::text("interaction-workspace-click-open"));
     }
     tip
 }
@@ -954,3 +1049,118 @@ pub(super) fn repo_name(path: &Path) -> String {
 #[cfg(test)]
 #[path = "workspaces_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+mod localization_tests {
+    use super::*;
+    use egui_kittest::{Harness, kittest::Queryable};
+
+    #[test]
+    fn actual_workspace_row_keeps_raw_errors_and_keyboard_remove_under_german_labels() {
+        crate::i18n::set_language("de");
+        let path = PathBuf::from("/workspace/日本語");
+        let state = RepoState {
+            seen: Some(Err("External Git diagnostic 日本語".into())),
+            ..Default::default()
+        };
+        let fonts = std::cell::Cell::new(false);
+        let mut h = Harness::new_ui_state(
+            move |ui, removed: &mut bool| {
+                if !fonts.replace(true) {
+                    theme::install_fonts(ui.ctx());
+                    return;
+                }
+                let t = Tokens::get(ui.ctx());
+                *removed |= matches!(
+                    workspace_row(ui, &path, Some(&state), &t),
+                    Some(RowClick::Remove)
+                );
+                let tip = row_tooltip(&path, Some(&state));
+                assert!(tip.starts_with("/workspace/日本語\n\n"));
+                assert_eq!(
+                    state.seen.as_ref().unwrap().as_ref().unwrap_err(),
+                    "External Git diagnostic 日本語"
+                );
+                crate::a11y::end_frame(ui.ctx());
+            },
+            false,
+        );
+        h.run();
+        h.get_by_label(
+            "/workspace/日本語 Konnte nicht geprüft werden: External Git diagnostic 日本語",
+        );
+        h.key_press(egui::Key::Tab);
+        h.run();
+        h.key_press(egui::Key::Tab);
+        h.run();
+        assert!(
+            h.get_by_label("日本語 aus dem Arbeitsbereich entfernen")
+                .is_focused()
+        );
+        h.key_press(egui::Key::Enter);
+        h.run();
+        assert!(*h.state());
+        crate::i18n::set_language("en-US");
+        h.run();
+        h.get_by_label("/workspace/日本語 Couldn't look at it: External Git diagnostic 日本語");
+    }
+
+    #[test]
+    fn locale_numbers_relative_age_and_error_classifiers_are_separate_from_raw_state() {
+        crate::i18n::set_language("de");
+        let overview = Overview {
+            branch: Some("refs/feature-日本語".into()),
+            changed: 1234,
+            ahead: 2345,
+            behind: 3456,
+            has_remote: true,
+            ..Default::default()
+        };
+        let t = Tokens::get(&egui::Context::default());
+        let texts: Vec<_> = overview_parts(&overview, 0, &t)
+            .into_iter()
+            .map(|p| p.text)
+            .collect();
+        assert_eq!(
+            texts,
+            [
+                "refs/feature-日本語",
+                "1.234 geändert",
+                "2.345",
+                "3.456",
+                "noch nie abgerufen"
+            ]
+        );
+        assert_eq!(
+            fetched_text(Some(100 - 7200), 100),
+            "abgerufen vor 2 Stunden"
+        );
+        let raw = "fatal: not a git repository";
+        assert_eq!(across::short_reason(raw), "not a repository");
+        assert_eq!(across::display_reason(raw), "kein Repository");
+        let mut workspaces = across::workspaces::Workspaces::default();
+        let blank = workspaces.create(" ").unwrap_err();
+        assert_eq!(blank, "Give the workspace a name.");
+        assert_eq!(
+            across::workspaces::display_error(&blank),
+            "Gib dem Arbeitsbereich einen Namen."
+        );
+        workspaces.create("Opaque 日本語").unwrap();
+        let duplicate = workspaces.create("Opaque 日本語").unwrap_err();
+        assert_eq!(
+            duplicate,
+            "There is a workspace called “Opaque 日本語” already."
+        );
+        assert_eq!(
+            across::workspaces::display_error(&duplicate),
+            "Ein Arbeitsbereich namens „Opaque 日本語“ ist bereits vorhanden."
+        );
+        assert_eq!(
+            across::workspaces::display_error("External provider output 日本語"),
+            "External provider output 日本語"
+        );
+        crate::i18n::set_language("en-US");
+        assert_eq!(across::workspaces::display_error(&duplicate), duplicate);
+        assert_eq!(across::display_reason(raw), "not a repository");
+    }
+}

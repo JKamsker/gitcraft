@@ -1113,3 +1113,63 @@ interaction-release-tag-object = { $kind ->
         [signed] Erstellt den signierten Tag { $tag } an { $commit } mit den Release Notes als Nachricht (git tag -s { $tag })
        *[annotated] Erstellt den annotierten Tag { $tag } an { $commit } mit den Release Notes als Nachricht (git tag -a { $tag })
     }
+interaction-workspace-heading = ARBEITSBEREICHE
+interaction-workspace-new = Neuer Arbeitsbereich
+interaction-workspace-my-work = Wo ist meine Arbeit?
+interaction-workspace-my-work-tip = Nicht gepushte Commits, Stashes und Änderungen in allen gitcraft bekannten Repositories
+interaction-workspace-intro = Gruppiere Repositories, an denen du gemeinsam arbeitest, um ihren Status zu sehen und sie zusammen abzurufen oder zu öffnen. Mit + rechts erstellst du eine Gruppe.
+interaction-workspace-browse-title = Repository zum Arbeitsbereich hinzufügen
+interaction-workspace-name = Name des Arbeitsbereichs
+interaction-workspace-rename = Umbenennen
+interaction-workspace-create = Erstellen
+interaction-workspace-cancel = Abbrechen
+interaction-workspace-empty = Noch keine Repositories: Mit + auf dieser Karte fügst du eines hinzu.
+interaction-workspace-delete = Löschen
+interaction-workspace-open-all = Alle öffnen
+interaction-workspace-more = Arbeitsbereich umbenennen oder löschen
+interaction-workspace-rename-menu = Umbenennen…
+interaction-workspace-delete-menu = Arbeitsbereich löschen…
+interaction-workspace-open-tip = Alle in Tabs öffnen
+interaction-workspace-fetch-tip = Alle abrufen (ohne Passwortabfrage)
+interaction-workspace-look-tip = Erneut prüfen (stellt Verbindungen zu anderen Rechnern her)
+interaction-workspace-add = Repository hinzufügen
+interaction-workspace-another = Anderer Ordner…
+interaction-workspace-remove = Aus dem Arbeitsbereich entfernen
+interaction-workspace-disconnected = nicht verbunden: zum Verbinden erneut prüfen
+interaction-workspace-fetching = wird abgerufen…
+interaction-workspace-looking = wird geprüft…
+interaction-workspace-no-commits = keine Commits
+interaction-workspace-no-remote = kein Remote
+interaction-workspace-never = noch nie abgerufen
+interaction-workspace-already = { $repository } ist bereits in diesem Arbeitsbereich.
+interaction-workspace-failed-open = { $failed } von { $total } konnten nicht geöffnet werden: { $details }
+interaction-workspace-delete-question = Arbeitsbereich „{ $name }“ löschen? Seine Repositories bleiben an ihrem Ort; nur die Gruppe wird entfernt.
+interaction-workspace-open-question = { $count ->
+        [one] Dieses Repository in einem Tab öffnen?
+       *[other] Alle { $count } Repositories in Tabs öffnen?
+    }
+interaction-workspace-count = { $count ->
+        [one] 1 Repository
+       *[other] { $count } Repositories
+    }
+interaction-workspace-remove-name = { $repository } aus dem Arbeitsbereich entfernen
+interaction-workspace-fetch-error = Abrufen: { $reason }
+interaction-workspace-detached = losgelöst bei { $commit }
+interaction-workspace-changed = { $count } geändert
+interaction-workspace-fetched = abgerufen { $time }
+interaction-workspace-look-error = Konnte nicht geprüft werden: { $reason }
+interaction-workspace-fetch-failed = Der letzte Abruf ist fehlgeschlagen: { $reason }
+interaction-workspace-tracks = Folgt { $upstream }
+interaction-workspace-click-open = Zum Öffnen klicken
+interaction-workspace-reason-signin = Anmeldung erforderlich
+interaction-workspace-reason-timeout = Zeitlimit überschritten
+interaction-workspace-reason-busy = noch beschäftigt
+interaction-workspace-reason-folder = Ordner nicht gefunden
+interaction-workspace-reason-repository = kein Repository
+interaction-workspace-reason-connection = Verbindung nicht möglich
+interaction-workspace-reason-failed = fehlgeschlagen
+interaction-workspace-name-gone = Dieser Arbeitsbereich ist nicht mehr vorhanden
+interaction-workspace-name-required = Gib dem Arbeitsbereich einen Namen.
+interaction-workspace-name-controls = Der Name eines Arbeitsbereichs darf keine Zeilenumbrüche oder Tabulatoren enthalten.
+interaction-workspace-name-length = Der Name eines Arbeitsbereichs darf höchstens { $limit } Zeichen lang sein.
+interaction-workspace-name-duplicate = Ein Arbeitsbereich namens „{ $name }“ ist bereits vorhanden.

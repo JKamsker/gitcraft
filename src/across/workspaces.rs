@@ -135,6 +135,37 @@ fn same(a: &Path, b: &Path) -> bool {
     }
 }
 
+/// Translate only known name-validation diagnostics, preserving raw state and opaque input.
+pub fn display_error(raw: &str) -> String {
+    let fixed = match raw {
+        "that workspace is gone" => Some("interaction-workspace-name-gone"),
+        "Give the workspace a name." => Some("interaction-workspace-name-required"),
+        "A workspace's name can't have line breaks or tabs in it." => {
+            Some("interaction-workspace-name-controls")
+        }
+        _ => None,
+    };
+    if let Some(id) = fixed {
+        return crate::i18n::text(id).to_owned();
+    }
+    if raw == format!("A workspace's name can be at most {MAX_NAME} characters long.") {
+        return crate::i18n::message(
+            "interaction-workspace-name-length",
+            &[("limit", MAX_NAME.into())],
+        );
+    }
+    if let Some(name) = raw
+        .strip_prefix("There is a workspace called “")
+        .and_then(|s| s.strip_suffix("” already."))
+    {
+        return crate::i18n::message(
+            "interaction-workspace-name-duplicate",
+            &[("name", name.into())],
+        );
+    }
+    crate::git::display_error(raw)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

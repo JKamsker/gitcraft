@@ -1113,3 +1113,63 @@ interaction-release-tag-object = { $kind ->
         [signed] Makes the signed tag { $tag } at { $commit }, its message the notes (git tag -s { $tag })
        *[annotated] Makes the annotated tag { $tag } at { $commit }, its message the notes (git tag -a { $tag })
     }
+interaction-workspace-heading = WORKSPACES
+interaction-workspace-new = New workspace
+interaction-workspace-my-work = Where's my work?
+interaction-workspace-my-work-tip = Commits not pushed, stashes and changes in every repository gitcraft knows
+interaction-workspace-intro = Group repositories you work on together to see how each stands, and fetch or open them all at once. + on the right makes one.
+interaction-workspace-browse-title = Add a repository to the workspace
+interaction-workspace-name = Workspace name
+interaction-workspace-rename = Rename
+interaction-workspace-create = Create
+interaction-workspace-cancel = Cancel
+interaction-workspace-empty = No repositories yet: + on this card adds one.
+interaction-workspace-delete = Delete
+interaction-workspace-open-all = Open all
+interaction-workspace-more = Rename or delete the workspace
+interaction-workspace-rename-menu = Rename…
+interaction-workspace-delete-menu = Delete workspace…
+interaction-workspace-open-tip = Open all in tabs
+interaction-workspace-fetch-tip = Fetch all (asks for no password)
+interaction-workspace-look-tip = Look again (connects to other machines)
+interaction-workspace-add = Add a repository
+interaction-workspace-another = Another folder…
+interaction-workspace-remove = Remove from the workspace
+interaction-workspace-disconnected = not connected: look again to connect
+interaction-workspace-fetching = fetching…
+interaction-workspace-looking = looking…
+interaction-workspace-no-commits = no commits
+interaction-workspace-no-remote = no remote
+interaction-workspace-never = never fetched
+interaction-workspace-already = { $repository } is in this workspace already.
+interaction-workspace-failed-open = { $failed } of { $total } didn't open: { $details }
+interaction-workspace-delete-question = Delete the workspace “{ $name }”? Its repositories stay where they are; only the group goes.
+interaction-workspace-open-question = { $count ->
+        [one] Open this repository in a tab?
+       *[other] Open all { $count } repositories in tabs?
+    }
+interaction-workspace-count = { $count ->
+        [one] 1 repository
+       *[other] { $count } repositories
+    }
+interaction-workspace-remove-name = Remove { $repository } from the workspace
+interaction-workspace-fetch-error = fetch: { $reason }
+interaction-workspace-detached = detached at { $commit }
+interaction-workspace-changed = { $count } changed
+interaction-workspace-fetched = fetched { $time }
+interaction-workspace-look-error = Couldn't look at it: { $reason }
+interaction-workspace-fetch-failed = The last fetch failed: { $reason }
+interaction-workspace-tracks = Tracks { $upstream }
+interaction-workspace-click-open = Click to open
+interaction-workspace-reason-signin = needs a sign-in
+interaction-workspace-reason-timeout = timed out
+interaction-workspace-reason-busy = still busy
+interaction-workspace-reason-folder = folder not found
+interaction-workspace-reason-repository = not a repository
+interaction-workspace-reason-connection = can't connect
+interaction-workspace-reason-failed = failed
+interaction-workspace-name-gone = that workspace is gone
+interaction-workspace-name-required = Give the workspace a name.
+interaction-workspace-name-controls = A workspace's name can't have line breaks or tabs in it.
+interaction-workspace-name-length = A workspace's name can be at most { $limit } characters long.
+interaction-workspace-name-duplicate = There is a workspace called “{ $name }” already.
