@@ -299,57 +299,103 @@ impl RepoTab {
             && to == &report.case.head
             && path == &report.case.path
         {
-            ui.group(|ui|{ui.label(format!("Reproducer at line {} · base exit {:?}, head exit {:?}. Inspect observed output; correctness is your judgment.",report.case.line,report.base.code,report.head.code));egui::CollapsingHeader::new("Base and head observations").show(ui,|ui|show_report(ui,report));});
+            ui.group(|ui|{ui.label(crate::i18n::message("repo-workflows-review-message-reproducer-at-line-line-base-exit-base-head-ex-0e54cd", &[("line", (report.case.line.as_str()).into()), ("base", (exit_code(report.base.code)).into()), ("head", (exit_code(report.head.code)).into())]));egui::CollapsingHeader::new(crate::i18n::text("repo-workflows-review-label-base-and-head-observations-e69344")).id_salt("repo-workflows-review-label-base-and-head-observations-e69344").show(ui,|ui|show_report(ui,report));});
         }
     }
 }
+fn exit_code(code: Option<i32>) -> String {
+    code.map(|code| crate::i18n::number(code))
+        .unwrap_or_else(|| {
+            crate::i18n::text("repo-workflows-review-label-unknown-b23a6a").to_owned()
+        })
+}
 fn show_report(ui: &mut egui::Ui, r: &Report) {
-    ui.label(format!(
-        "Pinned {}:{} · {}..{}",
-        r.case.path,
-        r.case.line,
-        crate::repo::short(&r.case.base),
-        crate::repo::short(&r.case.head)
+    ui.label(crate::i18n::message(
+        "repo-workflows-review-message-pinned-path-line-base-head-b813c6",
+        &[
+            ("path", (r.case.path.as_str()).into()),
+            ("line", (r.case.line.as_str()).into()),
+            ("base", (crate::repo::short(&r.case.base)).into()),
+            ("head", (crate::repo::short(&r.case.head)).into()),
+        ],
     ));
-    ui.label("Exit-code differences can include build failures. They are observations, not an automatic defect verdict.");
+    ui.label(crate::i18n::text(
+        "repo-workflows-review-label-exit-code-differences-can-include-build-failur-324428",
+    ));
     ui.columns(2, |cols| {
-        cols[0].strong("Base");
+        cols[0].strong(crate::i18n::text("repo-workflows-review-label-base-7b4736"));
         contracts::show_observation(&mut cols[0], &r.base);
-        cols[1].strong("Head");
+        cols[1].strong(crate::i18n::text("repo-workflows-review-label-head-9bb0aa"));
         contracts::show_observation(&mut cols[1], &r.head);
     });
     for error in &r.cleanup {
-        ui.label(format!("Cleanup needs attention: {error}"));
+        ui.label(crate::i18n::message(
+            "repo-workflows-review-message-cleanup-needs-attention-detail-3403ce",
+            &[(
+                "detail",
+                (crate::repo::messages::display_status(error)).into(),
+            )],
+        ));
     }
 }
 pub(super) fn show(ui: &mut egui::Ui, s: &mut State, acts: &mut Vec<Action>) {
-    ui.heading("AI objection → concrete reproducer");
-    ui.label("Start with a Rust integration test. Generation uses the AI tool you selected in Settings and only runs when invoked. Inspect or edit its source; execution is a separate explicit action.");
+    ui.heading(crate::i18n::text(
+        "repo-workflows-review-label-ai-objection-concrete-reproducer-55420a",
+    ));
+    ui.label(crate::i18n::text(
+        "repo-workflows-review-label-start-with-a-rust-integration-test-generation-6cf14f",
+    ));
     ui.horizontal(|ui| {
-        if ui.button("Use open diff / PR revisions").clicked() {
+        if ui
+            .button(crate::i18n::text(
+                "repo-workflows-review-label-use-open-diff-pr-revisions-9fc2d9",
+            ))
+            .clicked()
+        {
             acts.push(Action::ReviewTools(ToolsAct::Reproducer(Act::UseSelection)));
         }
-        if ui.button("Load preserved case and observations").clicked() {
+        if ui
+            .button(crate::i18n::text(
+                "repo-workflows-review-label-load-preserved-case-and-observations-2177f5",
+            ))
+            .clicked()
+        {
             acts.push(Action::ReviewTools(ToolsAct::Reproducer(Act::Load)));
         }
     });
     let before = s.case.clone();
     let c = &mut s.case;
     for (text, hint) in [
-        (&mut c.base, "Base revision"),
-        (&mut c.head, "Head revision"),
-        (&mut c.path, "File path"),
-        (&mut c.line, "Pinned hunk line"),
+        (
+            &mut c.base,
+            crate::i18n::text("repo-workflows-review-label-base-revision-7438b8"),
+        ),
+        (
+            &mut c.head,
+            crate::i18n::text("repo-workflows-review-label-head-revision-5887ea"),
+        ),
+        (
+            &mut c.path,
+            crate::i18n::text("repo-workflows-review-label-file-path-2fb6d3"),
+        ),
+        (
+            &mut c.line,
+            crate::i18n::text("repo-workflows-review-label-pinned-hunk-line-ba3843"),
+        ),
     ] {
         ui.add(egui::TextEdit::singleline(text).hint_text(hint));
     }
     ui.add(
-        egui::TextEdit::multiline(&mut c.objection).hint_text("Concrete objection to reproduce"),
+        egui::TextEdit::multiline(&mut c.objection).hint_text(crate::i18n::text(
+            "repo-workflows-review-label-concrete-objection-to-reproduce-f74adb",
+        )),
     );
     if ui
         .add_enabled(
             !s.busy,
-            egui::Button::new("Show me: generate a test with selected AI"),
+            egui::Button::new(crate::i18n::text(
+                "repo-workflows-review-label-show-me-generate-a-test-with-selected-ai-dd497a",
+            )),
         )
         .clicked()
     {
@@ -362,16 +408,24 @@ pub(super) fn show(ui: &mut egui::Ui, s: &mut State, acts: &mut Vec<Action>) {
             .code_editor()
             .desired_rows(12)
             .desired_width(f32::INFINITY)
-            .hint_text("Rust integration test source (editable)"),
+            .hint_text(crate::i18n::text(
+                "repo-workflows-review-label-rust-integration-test-source-editable-adba55",
+            )),
     );
     if c.image.is_empty() {
         c.image = "rust:1.95.0".into();
     }
     ui.add(
-        egui::TextEdit::singleline(&mut c.image).hint_text("Preloaded Rust Docker image or digest"),
+        egui::TextEdit::singleline(&mut c.image).hint_text(crate::i18n::text(
+            "repo-workflows-review-label-preloaded-rust-docker-image-or-digest-70313d",
+        )),
     );
-    ui.weak("Source is streamed from raw Git trees/blobs without host checkout, hooks, filters or host extraction. Limits: UTF-8 safe paths, 20,000 files, 16MiB per blob, 128MiB total; submodule objects must already be initialized locally. Source export has a 60s preparation budget.");
-    ui.weak("Docker must be available on the repository's machine. Images are never pulled. The container has no network, no writable host mount, an unprivileged UID, resource limits, and a 120s internal timeout. The preloaded image must provide /bin/sh, GNU-compatible timeout, tar, cargo, mkdir and cp. Dependencies must already be vendored in the repository or preloaded in the image; cargo uses --offline.");
+    ui.weak(crate::i18n::text(
+        "repo-workflows-review-label-source-is-streamed-from-raw-git-trees-blobs-wi-96131a",
+    ));
+    ui.weak(crate::i18n::text(
+        "repo-workflows-review-label-docker-must-be-available-on-the-repository-s-m-286675",
+    ));
     let mut content = c.clone();
     content.approved = before.approved;
     if content != before {
@@ -379,12 +433,16 @@ pub(super) fn show(ui: &mut egui::Ui, s: &mut State, acts: &mut Vec<Action>) {
     }
     ui.checkbox(
         &mut c.approved,
-        "I inspected this source and explicitly approve running it in the restricted container",
+        crate::i18n::text(
+            "repo-workflows-review-label-i-inspected-this-source-and-explicitly-approve-d28ee6",
+        ),
     );
     if ui
         .add_enabled(
             !s.busy && c.approved,
-            egui::Button::new("Run identical test on base and head in sandbox"),
+            egui::Button::new(crate::i18n::text(
+                "repo-workflows-review-label-run-identical-test-on-base-and-head-in-sandbox-813afc",
+            )),
         )
         .clicked()
     {
@@ -394,22 +452,27 @@ pub(super) fn show(ui: &mut egui::Ui, s: &mut State, acts: &mut Vec<Action>) {
     }
     if s.busy {
         ui.add(crate::spinner::Spinner::new());
-        if ui.button("Stop generation / sandbox run").clicked() {
+        if ui
+            .button(crate::i18n::text(
+                "repo-workflows-review-label-stop-generation-sandbox-run-350bbf",
+            ))
+            .clicked()
+        {
             acts.push(Action::ReviewTools(ToolsAct::Reproducer(Act::Stop)));
         }
     }
     if let Some(e) = &s.error {
-        ui.label(e);
+        ui.label(crate::repo::messages::display_status(e));
     }
     if let Some(generated) = &s.generated {
-        egui::CollapsingHeader::new("Generated result for the earlier form").show(ui, |ui| {
+        egui::CollapsingHeader::new(crate::i18n::text("repo-workflows-review-label-generated-result-for-the-earlier-form-ebc96e")).id_salt("repo-workflows-review-label-generated-result-for-the-earlier-form-ebc96e").show(ui, |ui| {
             ui.label(format!(
                 "{}:{} · {} → {}",
                 generated.path, generated.line, generated.base, generated.head
             ));
             ui.monospace(&generated.source);
             if ui
-                .button("Use this generated case (approval required again)")
+                .button(crate::i18n::text("repo-workflows-review-label-use-this-generated-case-approval-required-agai-ee18e0"))
                 .clicked()
             {
                 acts.push(Action::ReviewTools(ToolsAct::Reproducer(Act::UseGenerated)));
@@ -418,7 +481,12 @@ pub(super) fn show(ui: &mut egui::Ui, s: &mut State, acts: &mut Vec<Action>) {
     }
     if let Some(r) = &s.report {
         show_report(ui, r);
-        if ui.button("Open pinned comparison").clicked() {
+        if ui
+            .button(crate::i18n::text(
+                "repo-workflows-review-label-open-pinned-comparison-85160d",
+            ))
+            .clicked()
+        {
             acts.push(Action::OpenDiff(DiffKey::Range {
                 from: r.case.base.clone(),
                 to: Some(r.case.head.clone()),

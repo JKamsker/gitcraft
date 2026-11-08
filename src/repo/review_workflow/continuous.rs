@@ -45,7 +45,12 @@ impl RepoTab {
         source: ReviewSource,
         acts: &mut Vec<Action>,
     ) {
-        if ui.button("Review all changes").clicked() {
+        if ui
+            .button(crate::i18n::text(
+                "repo-workflows-review-label-review-all-changes-243201",
+            ))
+            .clicked()
+        {
             acts.push(Action::Review(ReviewAct::Open(source)));
         }
     }
@@ -281,8 +286,15 @@ impl RepoTab {
     }
     pub(in crate::repo) fn review_document_ui(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
         ui.horizontal(|ui| {
-            ui.heading("Review all changes");
-            if ui.button("Reload").clicked() {
+            ui.heading(crate::i18n::text(
+                "repo-workflows-review-label-review-all-changes-243201",
+            ));
+            if ui
+                .button(crate::i18n::text(
+                    "repo-workflows-review-label-reload-bdc090",
+                ))
+                .clicked()
+            {
                 acts.push(Action::Review(ReviewAct::Reload));
             }
             if ui
@@ -305,7 +317,7 @@ impl RepoTab {
                 });
         }
         let state = &self.review_document;
-        ui.weak(&state.identity);
+        ui.weak(crate::repo::messages::display_status(&state.identity));
         let Some(data) = &state.data else {
             ui.add(crate::spinner::Spinner::new());
             return;
@@ -313,7 +325,7 @@ impl RepoTab {
         let data = match data {
             Ok(data) => data,
             Err(e) => {
-                ui.label(e);
+                ui.label(crate::repo::messages::display_status(e));
                 return;
             }
         };
@@ -322,14 +334,10 @@ impl RepoTab {
             .id_salt(("continuous-review", state.request))
             .show(ui, |ui| {
                 for (file, (key, data)) in state.keys.iter().zip(data).enumerate() {
-                    egui::CollapsingHeader::new(format!(
-                        "{}{}",
-                        key.path(),
-                        match key {
-                            DiffKey::Work(f) if f.area == Area::Staged => " · staged",
-                            _ => "",
-                        }
-                    ))
+                    egui::CollapsingHeader::new(match key {
+                        DiffKey::Work(f) if f.area == Area::Staged => crate::i18n::message("repo-workflows-review-message-path-staged-3ef034", &[("path", (key.path()).into())]),
+                        _ => key.path().to_owned(),
+                    })
                     .id_salt(file)
                     .default_open(true)
                     .show(ui, |ui| {
@@ -358,7 +366,7 @@ impl RepoTab {
                                     );
                                     for &pick in picks(key, data.partial, data.revertable) {
                                         if ui
-                                            .add_enabled(idle, egui::Button::new(pick.verb()))
+                                            .add_enabled(idle, egui::Button::new(crate::repo::messages::display_operation(pick.verb())))
                                             .clicked()
                                         {
                                             acts.push(Action::Review(ReviewAct::Pick {
@@ -369,7 +377,7 @@ impl RepoTab {
                                             }));
                                         }
                                     }
-                                    if ui.small_button("Open file diff").clicked() {
+                                    if ui.small_button(crate::i18n::text("repo-workflows-review-label-open-file-diff-5dcae6")).clicked() {
                                         acts.push(Action::OpenDiff(key.clone()));
                                     }
                                 });
@@ -382,7 +390,7 @@ impl RepoTab {
                                             )
                                         && ui
                                             .small_button(format!("{}", number))
-                                            .on_hover_text("Comment on this line")
+                                            .on_hover_text(crate::i18n::text("repo-workflows-review-label-comment-on-this-line-8ee642"))
                                             .clicked()
                                     {
                                         acts.push(Action::Pr(
@@ -483,16 +491,32 @@ fn file_intro(
     data: &diff::DiffData,
     acts: &mut Vec<Action>,
 ) -> egui::Response {
-    let response = ui.button("Open file diff");
+    let response = ui.button(crate::i18n::text(
+        "repo-workflows-review-label-open-file-diff-5dcae6",
+    ));
     if response.clicked() {
         acts.push(Action::OpenDiff(key.clone()));
     }
     metadata_ui(ui, key, data);
     response
 }
+fn display_area(area: Area) -> &'static str {
+    match area {
+        Area::Staged => crate::i18n::text("repo-workflows-review-label-staged-daec45"),
+        Area::Unstaged => crate::i18n::text("repo-workflows-review-label-unstaged-06b7ba"),
+        Area::Untracked => crate::i18n::text("repo-workflows-review-label-untracked-c7ba54"),
+        Area::Conflicted => crate::i18n::text("repo-workflows-review-label-conflict-014659"),
+    }
+}
 fn metadata_ui(ui: &mut Ui, key: &DiffKey, data: &diff::DiffData) {
     if let DiffKey::Work(file) = key {
-        ui.label(format!("Status {} · {:?}", file.code, file.area));
+        ui.label(crate::i18n::message(
+            "repo-workflows-review-message-status-code-area-52cf53",
+            &[
+                ("code", (file.code.to_string()).into()),
+                ("area", (display_area(file.area)).into()),
+            ],
+        ));
         if let Some(old) = &file.old_path {
             ui.label(format!("{old} → {}", file.path));
         }
@@ -502,9 +526,9 @@ fn metadata_ui(ui: &mut Ui, key: &DiffKey, data: &diff::DiffData) {
     }
     if data.lines.is_empty() {
         ui.weak(if data.binary.is_some() || data.image.is_some() || data.lfs.is_some() {
-            "Binary, image or LFS content: open the file comparison to inspect both versions."
+            crate::i18n::text("repo-workflows-review-label-binary-image-or-lfs-content-open-the-file-comp-3596ad")
         } else {
-            "No textual hunks. Review the metadata above for mode, rename, copy or empty-file changes."
+            crate::i18n::text("repo-workflows-review-label-no-textual-hunks-review-the-metadata-above-for-c3487e")
         });
     }
 }

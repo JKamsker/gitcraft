@@ -704,6 +704,22 @@ impl RepoTab {
         );
     }
 }
+fn display_phase(phase: &str) -> &str {
+    match phase {
+        "Old failure" => crate::i18n::text("repo-workflows-review-label-old-failure-af0d68"),
+        "Invariant" => crate::i18n::text("repo-workflows-review-label-invariant-59d137"),
+        "Fix" => crate::i18n::text("repo-workflows-review-label-fix-21f159"),
+        "Result" => crate::i18n::text("repo-workflows-review-label-result-6e7d50"),
+        _ => phase,
+    }
+}
+fn display_verdict(verdict: &str) -> &str {
+    match verdict {
+        "good" => crate::i18n::text("repo-workflows-review-label-good-770e60"),
+        "bad" => crate::i18n::text("repo-workflows-review-label-bad-2f05d4"),
+        _ => verdict,
+    }
+}
 pub(in crate::repo) fn show(
     ui: &mut egui::Ui,
     state: &mut Storyboard,
@@ -712,48 +728,44 @@ pub(in crate::repo) fn show(
     remotes: &[git::Remote],
     acts: &mut Vec<Action>,
 ) {
-    egui::CollapsingHeader::new("Review storyboard").show(ui, |ui| {
-        if ui.button("Load storyboard").clicked() {
+    egui::CollapsingHeader::new(crate::i18n::text("repo-workflows-review-label-review-storyboard-f917d1")).id_salt("repo-workflows-review-label-review-storyboard-f917d1").show(ui, |ui| {
+        if ui.button(crate::i18n::text("repo-workflows-review-label-load-storyboard-df2f79")).clicked() {
             acts.push(Action::Story(StoryAct::Load));
         }
-        egui::ComboBox::from_id_salt("story-sharing-remote").selected_text(if state.remote.is_empty(){"Choose storyboard remote"}else{&state.remote}).show_ui(ui,|ui|{
+        egui::ComboBox::from_id_salt("story-sharing-remote").selected_text(if state.remote.is_empty(){crate::i18n::text("repo-workflows-review-label-choose-storyboard-remote-bd2c8d")}else{&state.remote}).show_ui(ui,|ui|{
             for remote in remotes {ui.selectable_value(&mut state.remote,remote.name.clone(),&remote.name);}
         });
-        ui.weak("Sharing publishes the cards and their pinned source history through a dedicated Git ref. Imported cards are advisory Git metadata; they never execute tests or commands.");
-        if ui.button("Fetch shared author storyboard").clicked(){acts.push(Action::Story(StoryAct::Fetch{remote:state.remote.clone(),head:f.to.clone()}));}
-        if state.imported {ui.label("Showing imported storyboard; load the local storyboard before editing.");}
+        ui.weak(crate::i18n::text("repo-workflows-review-label-sharing-publishes-the-cards-and-their-pinned-s-4f1959"));
+        if ui.button(crate::i18n::text("repo-workflows-review-label-fetch-shared-author-storyboard-ec4246")).clicked(){acts.push(Action::Story(StoryAct::Fetch{remote:state.remote.clone(),head:f.to.clone()}));}
+        if state.imported {ui.label(crate::i18n::text("repo-workflows-review-label-showing-imported-storyboard-load-the-local-sto-cc81d0"));}
         let own = d
             .extras
             .viewer
             .as_deref()
             .is_some_and(|v| v.eq_ignore_ascii_case(&d.author));
-        if own && ui.button("Publish my local storyboard").clicked(){acts.push(Action::Story(StoryAct::Publish{remote:state.remote.clone(),head:f.to.clone()}));}
+        if own && ui.button(crate::i18n::text("repo-workflows-review-label-publish-my-local-storyboard-3ee6c4")).clicked(){acts.push(Action::Story(StoryAct::Publish{remote:state.remote.clone(),head:f.to.clone()}));}
         let own=own && !state.imported;
         if let Some(rows) = &state.rows {
             match rows {
                 Err(e) => {
-                    ui.label(e);
+                    ui.label(crate::repo::messages::display_status(e));
                 }
                 Ok(rows) => {
                     for (i, row) in rows.iter().enumerate() {
                         ui.group(|ui| {
-                            ui.strong(format!("{}. {}", i + 1, row.card.phase));
+                            ui.strong(format!("{}. {}", i + 1, display_phase(&row.card.phase)));
                             ui.label(&row.card.text);
-                            ui.weak(format!(
-                                "Pinned {}..{}",
-                                crate::repo::short(&row.card.base),
-                                crate::repo::short(&row.card.head)
-                            ));
+                            ui.weak(crate::i18n::message("repo-workflows-review-message-pinned-base-head-96c6e6", &[("base", (crate::repo::short(&row.card.base)).into()), ("head", (crate::repo::short(&row.card.head)).into())]));
                             if let Some(stale) = &row.stale {
-                                ui.colored_label(egui::Color32::YELLOW, format!("Stale: {stale}"));
+                                ui.colored_label(egui::Color32::YELLOW, crate::i18n::message("repo-workflows-review-message-stale-detail-264fc0", &[("detail", (crate::repo::messages::display_status(stale)).into())]));
                             }
                             ui.horizontal_wrapped(|ui| {
                                 if let Some((commit, path, line)) = &row.target
                                     && ui
                                         .button(if *line > 0 {
-                                            "Open pinned hunk"
+                                            crate::i18n::text("repo-workflows-review-label-open-pinned-hunk-beb93d")
                                         } else {
-                                            "Open file"
+                                            crate::i18n::text("repo-workflows-review-label-open-file-4190c0")
                                         })
                                         .clicked()
                                 {
@@ -763,7 +775,7 @@ pub(in crate::repo) fn show(
                                     Anchor::Code {
                                         commit, path, line, ..
                                     } => {
-                                        if ui.button("Open original revision").clicked() {
+                                        if ui.button(crate::i18n::text("repo-workflows-review-label-open-original-revision-e14b40")).clicked() {
                                             open(acts, commit, path, *line);
                                         }
                                     }
@@ -773,9 +785,7 @@ pub(in crate::repo) fn show(
                                         verdict,
                                         ..
                                     } => {
-                                        ui.monospace(format!(
-                                            "Observed {verdict} · tree {tree} · {command}"
-                                        ));
+                                        ui.monospace(crate::i18n::message("repo-workflows-review-message-observed-verdict-tree-tree-command-a654d0", &[("verdict", (display_verdict(verdict)).into()), ("tree", (tree.as_str()).into()), ("command", (crate::repo::messages::display_status(command)).into())]));
                                     }
                                 }
                                 if own {
@@ -804,39 +814,39 @@ pub(in crate::repo) fn show(
         if own {
             let form = &mut state.form;
             egui::ComboBox::from_id_salt("story-phase")
-                .selected_text(["Old failure", "Invariant", "Fix", "Result"][form.phase])
+                .selected_text([crate::i18n::text("repo-workflows-review-label-old-failure-af0d68"), crate::i18n::text("repo-workflows-review-label-invariant-59d137"), crate::i18n::text("repo-workflows-review-label-fix-21f159"), crate::i18n::text("repo-workflows-review-label-result-6e7d50")][form.phase])
                 .show_ui(ui, |ui| {
-                    for (i, name) in ["Old failure", "Invariant", "Fix", "Result"]
+                    for (i, name) in [crate::i18n::text("repo-workflows-review-label-old-failure-af0d68"), crate::i18n::text("repo-workflows-review-label-invariant-59d137"), crate::i18n::text("repo-workflows-review-label-fix-21f159"), crate::i18n::text("repo-workflows-review-label-result-6e7d50")]
                         .iter()
                         .enumerate()
                     {
                         ui.selectable_value(&mut form.phase, i, *name);
                     }
                 });
-            ui.add(egui::TextEdit::multiline(&mut form.text).hint_text("Explain this step"));
-            ui.checkbox(&mut form.test, "Pin a test-lane result at this revision");
+            ui.add(egui::TextEdit::multiline(&mut form.text).hint_text(crate::i18n::text("repo-workflows-review-label-explain-this-step-7f09ed")));
+            ui.checkbox(&mut form.test, crate::i18n::text("repo-workflows-review-label-pin-a-test-lane-result-at-this-revision-6f1f6f"));
             ui.add(
                 egui::TextEdit::singleline(&mut form.commit)
-                    .hint_text("Commit (empty = current PR head)"),
+                    .hint_text(crate::i18n::text("repo-workflows-review-label-commit-empty-current-pr-head-6e6c30")),
             );
             if !form.test {
                 ui.add(
                     egui::TextEdit::singleline(&mut form.path)
-                        .hint_text("Repository-relative path"),
+                        .hint_text(crate::i18n::text("repo-workflows-review-label-repository-relative-path-3f3f0a")),
                 );
                 ui.add(
                     egui::TextEdit::singleline(&mut form.line)
-                        .hint_text("Line (empty = entire file)"),
+                        .hint_text(crate::i18n::text("repo-workflows-review-label-line-empty-entire-file-afe710")),
                 );
             }
-            if ui.button("Add revision-pinned card").clicked() {
+            if ui.button(crate::i18n::text("repo-workflows-review-label-add-revision-pinned-card-634c2d")).clicked() {
                 acts.push(Action::Story(StoryAct::Add {
                     form: form.clone(),
                     head: f.to.clone(),
                 }));
             }
         }
-        ui.weak("Stored in this clone. Cards never execute commands or change the pull request.");
+        ui.weak(crate::i18n::text("repo-workflows-review-label-stored-in-this-clone-cards-never-execute-comma-4cb802"));
     });
 }
 fn open(acts: &mut Vec<Action>, commit: &str, path: &str, line: u64) {

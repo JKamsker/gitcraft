@@ -491,29 +491,60 @@ impl RepoTab {
     pub(in crate::repo) fn intent_badge(&self, ui: &mut egui::Ui, path: &str) {
         let s = &self.review_tools.intents;
         for seen in s.rows.iter().filter(|s| applies(&s.card, path, now())) {
-            let status = if seen.local {
-                "Local intent"
+            let text = if seen.local {
+                crate::i18n::message(
+                    "repo-workflows-review-message-local-intent-author-message-symbol-minutes-one-e26b68",
+                    &[
+                        ("author", (seen.card.author.as_str()).into()),
+                        ("message", (seen.card.message.as_str()).into()),
+                        ("symbol", (seen.card.symbol.as_str()).into()),
+                        (
+                            "minutes",
+                            (seen.card.expires.saturating_sub(now()).div_ceil(60)).into(),
+                        ),
+                    ],
+                )
             } else if network::refused().is_some() {
-                "Offline · cached"
+                crate::i18n::message(
+                    "repo-workflows-review-message-offline-cached-author-message-symbol-minutes-o-5044d7",
+                    &[
+                        ("author", (seen.card.author.as_str()).into()),
+                        ("message", (seen.card.message.as_str()).into()),
+                        ("symbol", (seen.card.symbol.as_str()).into()),
+                        (
+                            "minutes",
+                            (seen.card.expires.saturating_sub(now()).div_ceil(60)).into(),
+                        ),
+                    ],
+                )
             } else if s.synced == 0 || now().saturating_sub(s.synced) > 120 {
-                "Stale · not recently synchronized"
+                crate::i18n::message(
+                    "repo-workflows-review-message-stale-not-recently-synchronized-author-message-cd8c1a",
+                    &[
+                        ("author", (seen.card.author.as_str()).into()),
+                        ("message", (seen.card.message.as_str()).into()),
+                        ("symbol", (seen.card.symbol.as_str()).into()),
+                        (
+                            "minutes",
+                            (seen.card.expires.saturating_sub(now()).div_ceil(60)).into(),
+                        ),
+                    ],
+                )
             } else {
-                "Shared intent"
+                crate::i18n::message(
+                    "repo-workflows-review-message-shared-intent-author-message-symbol-minutes-on-0422e3",
+                    &[
+                        ("author", (seen.card.author.as_str()).into()),
+                        ("message", (seen.card.message.as_str()).into()),
+                        ("symbol", (seen.card.symbol.as_str()).into()),
+                        (
+                            "minutes",
+                            (seen.card.expires.saturating_sub(now()).div_ceil(60)).into(),
+                        ),
+                    ],
+                )
             };
-            ui.label(
-                egui::RichText::new(format!(
-                    "{status}: {} · {}{} (expires in {} minutes)",
-                    seen.card.author,
-                    seen.card.message,
-                    if seen.card.symbol.is_empty() {
-                        String::new()
-                    } else {
-                        format!(" · {}", seen.card.symbol)
-                    },
-                    seen.card.expires.saturating_sub(now()).div_ceil(60)
-                ))
-                .small(),
-            );
+            ui.label(egui::RichText::new(text).small());
         }
     }
 }
@@ -523,12 +554,16 @@ pub(super) fn show(
     remotes: &[git::Remote],
     acts: &mut Vec<Action>,
 ) {
-    ui.heading("Intent cards");
-    ui.label("Advisory notes travel through refs/gitcraft/intents. They never lock code or prevent another person's work.");
+    ui.heading(crate::i18n::text(
+        "repo-workflows-review-label-intent-cards-b73148",
+    ));
+    ui.label(crate::i18n::text(
+        "repo-workflows-review-label-advisory-notes-travel-through-refs-gitcraft-in-05b884",
+    ));
     let previous_remote = s.remote.clone();
     egui::ComboBox::from_id_salt("intent-remote")
         .selected_text(if s.remote.is_empty() {
-            "Choose sharing remote"
+            crate::i18n::text("repo-workflows-review-label-choose-sharing-remote-a61f48")
         } else {
             &s.remote
         })
@@ -542,9 +577,18 @@ pub(super) fn show(
     }
     ui.horizontal(|ui| {
         for (label, act) in [
-            ("Read cached intents", Act::Read),
-            ("Fetch teammate intents", Act::Sync(s.remote.clone())),
-            ("Publish my intents", Act::Publish(s.remote.clone())),
+            (
+                crate::i18n::text("repo-workflows-review-label-read-cached-intents-816c85"),
+                Act::Read,
+            ),
+            (
+                crate::i18n::text("repo-workflows-review-label-fetch-teammate-intents-313dc0"),
+                Act::Sync(s.remote.clone()),
+            ),
+            (
+                crate::i18n::text("repo-workflows-review-label-publish-my-intents-cd3137"),
+                Act::Publish(s.remote.clone()),
+            ),
         ] {
             if ui.add_enabled(!s.busy, egui::Button::new(label)).clicked() {
                 acts.push(Action::ReviewTools(ToolsAct::Intent(act)));
@@ -552,21 +596,25 @@ pub(super) fn show(
         }
     });
     if let Some(e) = &s.error {
-        ui.label(e);
+        ui.label(crate::repo::messages::display_status(e));
     }
     if network::refused().is_some() {
-        ui.label("Offline: cached observations only");
+        ui.label(crate::i18n::text(
+            "repo-workflows-review-label-offline-cached-observations-only-e0eb0f",
+        ));
     } else if s.synced == 0 || now().saturating_sub(s.synced) > 120 {
-        ui.label("Stale: shared refs have not been synchronized recently");
+        ui.label(crate::i18n::text(
+            "repo-workflows-review-label-stale-shared-refs-have-not-been-synchronized-r-f7babb",
+        ));
     }
     if !s.quarantine.is_empty() {
-        egui::CollapsingHeader::new(format!(
-            "{} invalid/oversize intent records quarantined",
-            s.quarantine.len()
+        egui::CollapsingHeader::new(crate::i18n::message(
+            "repo-workflows-review-message-count-one-one-invalid-oversize-intent-record-q-0432a3",
+            &[("count", (s.quarantine.len()).into())],
         ))
         .show(ui, |ui| {
             for warning in &s.quarantine {
-                ui.label(warning);
+                ui.label(crate::repo::messages::display_status(warning));
             }
         });
     }
@@ -578,28 +626,46 @@ pub(super) fn show(
             ));
             let left = seen.card.expires.saturating_sub(now());
             ui.weak(if left == 0 {
-                "Expired / ended".into()
+                crate::i18n::text("repo-workflows-review-label-expired-ended-6f52b4").into()
             } else {
-                format!("Expires in {} minutes", left.div_ceil(60))
+                crate::i18n::message("repo-workflows-review-message-minutes-one-expires-in-one-minute-other-expire-287948", &[("minutes", (left.div_ceil(60)).into())])
             });
-            if seen.local && left > 0 && ui.button("End this intent").clicked() {
+            if seen.local && left > 0 && ui.button(crate::i18n::text("repo-workflows-review-label-end-this-intent-c9706e")).clicked() {
                 acts.push(Action::ReviewTools(ToolsAct::Intent(Act::Expire(
                     seen.reference.clone(),
                 ))));
             }
         });
     }
-    ui.add(egui::TextEdit::singleline(&mut s.path).hint_text("Repository-relative path or folder"));
-    ui.add(egui::TextEdit::singleline(&mut s.symbol).hint_text("Symbol (optional)"));
-    ui.add(egui::TextEdit::singleline(&mut s.message).hint_text("Changing token lifetime…"));
+    ui.add(
+        egui::TextEdit::singleline(&mut s.path).hint_text(crate::i18n::text(
+            "repo-workflows-review-label-repository-relative-path-or-folder-f7f7ab",
+        )),
+    );
+    ui.add(
+        egui::TextEdit::singleline(&mut s.symbol).hint_text(crate::i18n::text(
+            "repo-workflows-review-label-symbol-optional-e114d2",
+        )),
+    );
+    ui.add(
+        egui::TextEdit::singleline(&mut s.message).hint_text(crate::i18n::text(
+            "repo-workflows-review-label-changing-token-lifetime-187d31",
+        )),
+    );
     if s.minutes == 0 {
         s.minutes = 60;
     }
-    ui.add(egui::Slider::new(&mut s.minutes, 1..=1440).text("Minutes"));
+    ui.add(
+        egui::Slider::new(&mut s.minutes, 1..=1440).text(crate::i18n::text(
+            "repo-workflows-review-label-minutes-4f846a",
+        )),
+    );
     if ui
         .add_enabled(
             !s.busy,
-            egui::Button::new("Post local intent (publish when ready)"),
+            egui::Button::new(crate::i18n::text(
+                "repo-workflows-review-label-post-local-intent-publish-when-ready-ee6bdb",
+            )),
         )
         .clicked()
     {
