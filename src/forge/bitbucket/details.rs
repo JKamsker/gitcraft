@@ -53,7 +53,7 @@ pub(super) fn read(api: &Api, n: u64) -> Result<PrDetails, String> {
         let comments = pages(api, &format!("{end}/comments?pagelen=100"));
         let commits = pages(api, &format!("{end}/commits?pagelen=100"));
         let statuses = pages(api, &format!("{end}/statuses?pagelen=100"));
-        let diffstat = pages(api, &format!("{end}/diffstat?pagelen=100"));
+        let diffstat = diffstat(api, &base, &p.sha);
         let after = snapshot(api, n)?;
         api.verify_viewer()?;
         if s.revision() != after.revision() || s.pr["state"] != after.pr["state"] {

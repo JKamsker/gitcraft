@@ -30,6 +30,7 @@ struct Model {
     repeated: bool,
     comments_error: bool,
     drift: bool,
+    diff_next: Option<String>,
 }
 fn recording() -> (Api, Arc<Mutex<Model>>) {
     let state = Arc::new(Mutex::new(Model {
@@ -71,7 +72,15 @@ fn recording() -> (Api, Arc<Mutex<Model>>) {
                 }
                 json!({"values":[{"name":"Build","state":"SUCCESSFUL"}]})
             } else if p.ends_with("/diffstat") {
-                json!({"values":[{"old":{"path":"old.rs"},"new":{"path":"new.rs"},"lines_added":2,"lines_removed":1}]})
+                return Err("recorded native PR diffstat returns 302, not a JSON page".into());
+            } else if p.contains("/diffstat/") {
+                assert!(p.starts_with("repositories/team/repo/diffstat/"));
+                assert!(path.contains("topic=false") || path.contains("page=2"));
+                let mut v = json!({"values":[{"old":{"path":"old.rs"},"new":{"path":"new.rs"},"lines_added":2,"lines_removed":1}]});
+                if let Some(next) = &m.diff_next {
+                    v["next"] = json!(next);
+                }
+                v
             } else if p.contains("/src/") {
                 json!("one\ntwo\nthree\n")
             } else if p.ends_with("/pullrequests/7") {
@@ -282,5 +291,62 @@ fn source_read_retries_and_partial_discussion_failure_is_visible() -> Result<(),
             .is_some_and(|s| s.contains("comments failure"))
     );
     assert!(d.extras.threads.is_empty());
+    Ok(())
+}
+
+#[test]
+fn repository_diffstat_binds_common_and_source_commits_without_following_pr_redirects()
+-> Result<(), String> {
+    let (api, m) = recording();
+    let d = details::read(&api, 7)?;
+    assert_eq!((d.changed_files, d.additions, d.deletions), (1, 2, 1));
+    let target = post::BitbucketTarget::new(api.clone(), &d).ok_or("target")?;
+    target.comment_now(&LineComment {
+        path: "new.rs".into(),
+        line: 2,
+        side: DiffSide::Left,
+        body: "Renamed old side".into(),
+    })?;
+    {
+        let model = m.lock().map_err(|e| e.to_string())?;
+        let expected = format!(
+            "repositories/team/repo/diffstat/{}..{}?topic=false&renames=true&pagelen=100",
+            "a".repeat(40),
+            "c".repeat(40)
+        );
+        assert_eq!(
+            model
+                .calls
+                .iter()
+                .filter(|(_, p, _)| p == &expected)
+                .count(),
+            2
+        );
+        assert!(
+            !model
+                .calls
+                .iter()
+                .any(|(_, p, _)| p.contains("pullrequests/7/diffstat"))
+        );
+        let w = writes(&model);
+        assert_eq!(w.len(), 1);
+        assert!(
+            w[0].2
+                .as_ref()
+                .is_some_and(|v| v["inline"]["from"] == 2 && v["inline"]["path"] == "new.rs")
+        );
+    }
+    for next in [
+        "https://evil.invalid/2.0/repositories/team/repo/diffstat/anything?page=2".to_owned(),
+        format!(
+            "https://api.bitbucket.org/2.0/repositories/team/repo/diffstat/{}..{}?page=2",
+            "a".repeat(40),
+            "c".repeat(40)
+        ),
+    ] {
+        m.lock().map_err(|e| e.to_string())?.diff_next = Some(next);
+        assert!(diffstat(&api, &d.base_oid, &d.head_oid).is_err());
+    }
+    assert!(diffstat(&api, "main", &d.head_oid).is_err());
     Ok(())
 }

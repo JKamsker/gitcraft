@@ -93,7 +93,7 @@ impl Target for BitbucketTarget {
             return Err("Choose a displayed line".into());
         }
         let end = self.end()?;
-        let changes = pages(&self.api, &format!("{end}/diffstat?pagelen=100"))?;
+        let changes = diffstat(&self.api, &self.shown.base_oid, &self.shown.head_oid)?;
         let matching = changes
             .iter()
             .filter(|v| text(v, "/new/path") == c.path || text(v, "/old/path") == c.path)

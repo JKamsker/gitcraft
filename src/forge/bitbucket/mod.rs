@@ -88,6 +88,22 @@ fn pages(api: &Api, first: &str) -> Result<Vec<Value>, String> {
         );
     }
 }
+/// PR diffstat is a 302 convenience route. Use the documented JSON repository
+/// endpoint with immutable commits instead, keeping redirects disabled. Bitbucket's
+/// spec order is the reverse of git diff: source first, comparison base second.
+fn diffstat(api: &Api, base: &str, head: &str) -> Result<Vec<Value>, String> {
+    if !crate::pull_request::is_oid(base) || !crate::pull_request::is_oid(head) {
+        return Err("Invalid Bitbucket diffstat revision".into());
+    }
+    pages(
+        api,
+        &format!(
+            "{}/diffstat/{head}..{base}?topic=false&renames=true&pagelen=100",
+            endpoint(&api.hosting)?
+        ),
+    )
+}
+
 fn parse(v: &Value, h: &Hosting) -> Result<PullRequest, String> {
     let n = v
         .get("id")
