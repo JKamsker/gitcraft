@@ -188,12 +188,11 @@ impl Trace<'_> {
                 continue;
             }
             if matches!(status.first(), Some(b'R' | b'C')) {
-                let next = std::str::from_utf8(
+                let next = rename_path(
                     fields
                         .get(i)
                         .ok_or(crate::i18n::text("backend-truncated-rename-d463db"))?,
-                )
-                .map_err(|_| "Non-UTF-8 rename")?;
+                )?;
                 i += 1;
                 if !path_ok(next) {
                     changes.limited = true;
@@ -366,6 +365,10 @@ fn choose(current: &Symbol, candidates: &[Symbol]) -> Result<Option<(Symbol, u8)
         .into());
     }
     Ok(Some(((*best).clone(), (score * 100.).round() as u8)))
+}
+
+fn rename_path(bytes: &[u8]) -> Result<&str, &'static str> {
+    std::str::from_utf8(bytes).map_err(|_| crate::i18n::text("backend-symbol-rename-not-utf8"))
 }
 
 fn boundary_event(
@@ -792,4 +795,24 @@ pub(crate) fn investigate(
         notes,
         limited: incomplete,
     }))
+}
+
+#[cfg(test)]
+mod backend_fluent_rename_tests {
+    #[test]
+    fn backend_fluent_symbol_rename_diagnostic_preserves_raw_paths() {
+        for language in ["en-US", "de"] {
+            crate::i18n::set_language(language);
+            assert_eq!(super::rename_path(b"de/raw path.rs"), Ok("de/raw path.rs"));
+            assert_eq!(
+                super::rename_path(b"de/\xff.rs"),
+                Err(if language == "de" {
+                    "Der Umbenennungspfad ist nicht UTF-8-kodiert."
+                } else {
+                    "Non-UTF-8 rename"
+                })
+            );
+        }
+        crate::i18n::set_language("en-US");
+    }
 }

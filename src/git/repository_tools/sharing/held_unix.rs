@@ -10,7 +10,10 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 fn err(e: impl std::fmt::Display) -> String {
-    format!("Cannot establish held object-store ownership: {e}")
+    crate::i18n::message(
+        "backend-cannot-establish-held-object-store-ownership-e-52cc72",
+        &[("detail", (e).to_string().into())],
+    )
 }
 fn flags() -> OFlags {
     OFlags::RDONLY | OFlags::CLOEXEC | OFlags::NOFOLLOW | OFlags::NONBLOCK
@@ -23,7 +26,9 @@ fn regular(dir: &File, name: &str) -> Result<File, String> {
     let file = File::from(fs::openat(dir, name, flags(), Mode::empty()).map_err(err)?);
     let stat = fs::fstat(&file).map_err(err)?;
     if FileType::from_raw_mode(stat.st_mode) != FileType::RegularFile {
-        return Err(err("metadata is not a regular file"));
+        return Err(err(crate::i18n::text(
+            "backend-metadata-is-not-a-regular-file-680efc",
+        )));
     }
     Ok(file)
 }
@@ -36,7 +41,9 @@ fn read(file: &File, max: usize) -> Result<Vec<u8>, String> {
             break;
         }
         if out.len() + count > max {
-            return Err(err("metadata exceeds its byte limit"));
+            return Err(err(crate::i18n::text(
+                "backend-metadata-exceeds-its-byte-limit-116946",
+            )));
         }
         out.extend_from_slice(&buffer[..count]);
     }
@@ -65,10 +72,16 @@ impl Ownership {
         expected: &[u8],
     ) -> Result<Self, String> {
         if crate::remote::is_remote(repo) {
-            return Err("Make independent is unavailable over SSH/WSL: this transport cannot retain filesystem ownership handles. Read-only inspection remains available.".into());
+            return Err(crate::i18n::text(
+                "backend-make-independent-is-unavailable-over-ssh-wsl-this-transport-canno-95fb58",
+            )
+            .into());
         }
         if !repo.is_absolute() || git != repo.join(".git") || objects != git.join("objects") {
-            return Err("Make independent requires a local conventional clone with its own .git/objects directory.".into());
+            return Err(crate::i18n::text(
+                "backend-make-independent-requires-a-local-conventional-clone-with-its-own-f9f879",
+            )
+            .into());
         }
         let root = Arc::new(File::from(
             fs::open("/", flags() | OFlags::DIRECTORY, Mode::empty()).map_err(err)?,
@@ -82,9 +95,9 @@ impl Ownership {
                     parent = Self::child(&mut nodes, &parent, name)?;
                 }
                 _ => {
-                    return Err(err(
-                        "repository paths must be absolute without . or .. components",
-                    ));
+                    return Err(err(crate::i18n::text(
+                        "backend-repository-paths-must-be-absolute-without-or-components-5976bf",
+                    )));
                 }
             }
         }
@@ -95,10 +108,14 @@ impl Ownership {
         let pack = Self::child(&mut nodes, &objects, std::ffi::OsStr::new("pack"))?;
         let alternate = Arc::new(regular(&info, "alternates")?);
         if alternate.metadata().map_err(err)?.nlink() != 1 {
-            return Err(err("hard-linked alternate metadata is unsupported"));
+            return Err(err(crate::i18n::text(
+                "backend-hard-linked-alternate-metadata-is-unsupported-e3c0aa",
+            )));
         }
         if read(&alternate, 64 * 1024)? != expected {
-            return Err(err("alternate content changed during capture"));
+            return Err(err(crate::i18n::text(
+                "backend-alternate-content-changed-during-capture-33483d",
+            )));
         }
         let result = Self {
             nodes,
@@ -151,7 +168,9 @@ impl Ownership {
                     .map_err(err)?,
                 ))? != identity(&node.file)?
             {
-                return Err(err("repository or metadata ancestor identity changed"));
+                return Err(err(crate::i18n::text(
+                    "backend-repository-or-metadata-ancestor-identity-changed-84cc47",
+                )));
             }
         }
         if alternate_present {
@@ -159,12 +178,14 @@ impl Ownership {
             if identity(&current)? != identity(&self.alternate)?
                 || read(&current, 64 * 1024)? != self.expected
             {
-                return Err(err("alternate file identity or content changed"));
+                return Err(err(crate::i18n::text(
+                    "backend-alternate-file-identity-or-content-changed-56b09f",
+                )));
             }
         } else {
             match fs::statat(self.info.as_ref(), "alternates", AtFlags::SYMLINK_NOFOLLOW) {
                 Err(rustix::io::Errno::NOENT) => (),
-                Ok(_) => return Err("An alternate link was created during final proof; independence was not committed".into()),
+                Ok(_) => return Err(crate::i18n::text("backend-an-alternate-link-was-created-during-final-proof-independence-was-81494f").into()),
                 Err(error) => return Err(err(error)),
             }
         }
@@ -173,14 +194,20 @@ impl Ownership {
     pub fn lock(&self) -> Result<Lock<'_>, String> {
         self.locked
             .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
-            .map_err(|_| "This prepared independence operation is already running".to_owned())?;
+            .map_err(|_| {
+                crate::i18n::text(
+                    "backend-this-prepared-independence-operation-is-already-running-09db5e",
+                )
+                .to_owned()
+            })?;
         if let Err(error) = fs::flock(
             self.alternate.as_ref(),
             fs::FlockOperation::NonBlockingLockExclusive,
         ) {
             self.locked.store(false, Ordering::Release);
-            return Err(format!(
-                "Could not lock the inspected alternate file: {error}"
+            return Err(crate::i18n::message(
+                "backend-could-not-lock-the-inspected-alternate-file-error-2bc960",
+                &[("detail", (error).to_string().into())],
             ));
         }
         Ok(Lock(self))
@@ -206,8 +233,12 @@ impl Ownership {
                 "alternates",
                 RenameFlags::NOREPLACE,
             );
-            return Err(format!(
-                "Alternate identity changed during guarded rename; recovery: {recovery:?}; retained {backup}"
+            return Err(crate::i18n::message(
+                "backend-alternate-identity-changed-during-guarded-rename-recovery-recover-7673aa",
+                &[
+                    ("recovery", format!("{:?}", recovery).into()),
+                    ("backup", (backup).to_string().into()),
+                ],
             ));
         }
         Ok(())
@@ -217,7 +248,10 @@ impl Ownership {
         if identity(&backup)? != identity(&self.alternate)?
             || read(&backup, 64 * 1024)? != self.expected
         {
-            return Err("Retained alternate backup identity or content changed".into());
+            return Err(crate::i18n::text(
+                "backend-retained-alternate-backup-identity-or-content-changed-8be403",
+            )
+            .into());
         }
         Ok(())
     }
@@ -228,7 +262,10 @@ impl Ownership {
             {
                 return Ok(());
             }
-            return Err("A newer alternate file exists; it was not overwritten.".into());
+            return Err(crate::i18n::text(
+                "backend-a-newer-alternate-file-exists-it-was-not-overwritten-7f799b",
+            )
+            .into());
         }
         fs::renameat_with(
             self.info.as_ref(),
@@ -295,13 +332,17 @@ impl Ownership {
                     Ok(()) => {
                         let installed = regular(&self.pack, &name)?;
                         if identity(&installed)? != identity(&source)? {
-                            return Err(err("installed pack identity changed"));
+                            return Err(err(crate::i18n::text(
+                                "backend-installed-pack-identity-changed-8739f6",
+                            )));
                         }
                     }
                     Err(rustix::io::Errno::EXIST) => {
                         let existing = regular(&self.pack, &name)?;
                         if read(&existing, 128 << 20)? != bytes {
-                            return Err(err("an existing pack differs and was not overwritten"));
+                            return Err(err(crate::i18n::text(
+                                "backend-an-existing-pack-differs-and-was-not-overwritten-fdbff8",
+                            )));
                         }
                     }
                     Err(e) => return Err(err(e)),
@@ -313,13 +354,31 @@ impl Ownership {
         let cleanup = stage.cleanup();
         match (result, cleanup) {
             (Ok(()), Ok(())) => Ok(()),
-            (result, cleanup) => Err(format!(
-                "Pack installation: {}; staging cleanup: {cleanup:?}; retained private directory .git/objects/pack/{staging}",
-                result.err().unwrap_or_else(|| "completed".into())
-            )),
+            (result, cleanup) => Err(pack_installation_error(result, cleanup, &staging)),
         }
     }
 }
+fn pack_installation_error(
+    result: Result<(), String>,
+    cleanup: Result<(), String>,
+    staging: &str,
+) -> String {
+    crate::i18n::message(
+        "backend-pack-installation-staging-cleanup-cleanup-retained-private-direct-480fa1",
+        &[
+            (
+                "result",
+                result
+                    .err()
+                    .unwrap_or_else(|| crate::i18n::text("backend-completed-4ddb3e").into())
+                    .into(),
+            ),
+            ("cleanup", format!("{cleanup:?}").into()),
+            ("staging", staging.into()),
+        ],
+    )
+}
+
 pub(super) struct Lock<'a>(&'a Ownership);
 impl Drop for Lock<'_> {
     fn drop(&mut self) {
@@ -375,5 +434,62 @@ mod pack_cleanup_recording {
         });
         assert_eq!(names, ["pack", "idx"]);
         assert!(result.err().is_some_and(|e| e.contains("recorded failure")));
+    }
+}
+
+#[cfg(test)]
+mod backend_fluent_ownership_diagnostics {
+    #[test]
+    fn backend_fluent_held_unix_refusal_and_details_are_presented_without_io() {
+        use std::path::Path;
+        for language in ["en-US", "de"] {
+            crate::i18n::set_language(language);
+            // Supplied nonconventional path returns before the first filesystem open.
+            let refusal = super::Ownership::capture(
+                Path::new("relative/repo"),
+                Path::new("relative/repo/.git"),
+                Path::new("relative/repo/.git/objects"),
+                b"opaque donor bytes",
+            )
+            .err();
+            assert_eq!(
+                refusal.as_deref(),
+                Some(if language == "de" {
+                    "Das Unabhängigmachen erfordert einen herkömmlichen lokalen Klon mit einem eigenen Verzeichnis .git/objects."
+                } else {
+                    "Make independent requires a local conventional clone with its own .git/objects directory."
+                })
+            );
+            let detail = "OS error 13: /raw/de/repo/.git/objects";
+            assert_eq!(
+                super::err(detail),
+                if language == "de" {
+                    format!(
+                        "Die gehaltene Kontrolle über den Objektspeicher konnte nicht hergestellt werden: {detail}"
+                    )
+                } else {
+                    format!("Cannot establish held object-store ownership: {detail}")
+                }
+            );
+            let envelope = super::pack_installation_error(
+                Err(detail.into()),
+                Err("opaque cleanup failure /raw/pack".into()),
+                ".gitcraft-raw-nonce",
+            );
+            assert!(envelope.contains(detail));
+            assert!(envelope.contains("Err(\"opaque cleanup failure /raw/pack\")"));
+            assert!(envelope.contains(".git/objects/pack/.gitcraft-raw-nonce"));
+            let completed = super::pack_installation_error(
+                Ok(()),
+                Err("opaque cleanup".into()),
+                ".gitcraft-retained",
+            );
+            assert!(completed.contains(if language == "de" {
+                "abgeschlossen"
+            } else {
+                "completed"
+            }));
+        }
+        crate::i18n::set_language("en-US");
     }
 }

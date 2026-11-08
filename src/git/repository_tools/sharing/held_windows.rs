@@ -19,7 +19,10 @@ const DIRECTORY: u32 = 0x0200_0000;
 const NOFOLLOW: u32 = 0x0020_0000;
 const REPARSE: u32 = 0x400;
 fn err(e: impl std::fmt::Display) -> String {
-    format!("Cannot retain Windows object-store ownership: {e}")
+    crate::i18n::message(
+        "backend-cannot-retain-windows-object-store-ownership-e-af8dbd",
+        &[("detail", (e).to_string().into())],
+    )
 }
 fn open(path: &Path, directory: bool, write: bool) -> Result<File, String> {
     let file = std::fs::OpenOptions::new()
@@ -34,9 +37,9 @@ fn open(path: &Path, directory: bool, write: bool) -> Result<File, String> {
         || meta.is_dir() != directory
         || (!directory && !meta.is_file())
     {
-        return Err(err(
-            "reparse points and non-regular metadata are unsupported",
-        ));
+        return Err(err(crate::i18n::text(
+            "backend-reparse-points-and-non-regular-metadata-are-unsupported-43b774",
+        )));
     }
     Ok(file)
 }
@@ -49,7 +52,9 @@ fn locked_read(path: &Path) -> Result<File, String> {
         .map_err(err)?;
     let meta = file.metadata().map_err(err)?;
     if !meta.is_file() || meta.file_attributes() & REPARSE != 0 {
-        return Err(err("pack data must be a plain file"));
+        return Err(err(crate::i18n::text(
+            "backend-pack-data-must-be-a-plain-file-fa5f92",
+        )));
     }
     Ok(file)
 }
@@ -69,7 +74,9 @@ fn alternate(path: &Path, create: bool) -> Result<File, String> {
         .map_err(err)?;
     let meta = file.metadata().map_err(err)?;
     if !meta.is_file() || meta.file_attributes() & REPARSE != 0 {
-        return Err(err("alternate metadata must be a plain file"));
+        return Err(err(crate::i18n::text(
+            "backend-alternate-metadata-must-be-a-plain-file-93cc17",
+        )));
     }
     Ok(file)
 }
@@ -84,7 +91,9 @@ fn same_file(path: &Path, held: &File) -> Result<bool, String> {
         .map_err(err)?;
     let meta = file.metadata().map_err(err)?;
     if !meta.is_file() || meta.file_attributes() & REPARSE != 0 {
-        return Err(err("replaced alternate metadata is not a plain file"));
+        return Err(err(crate::i18n::text(
+            "backend-replaced-alternate-metadata-is-not-a-plain-file-12c788",
+        )));
     }
     let a = winapi_util::file::information(&file).map_err(err)?;
     let b = winapi_util::file::information(held).map_err(err)?;
@@ -101,7 +110,9 @@ fn read(file: &File, max: usize) -> Result<Vec<u8>, String> {
             return Ok(data);
         }
         if data.len() + count > max {
-            return Err(err("metadata exceeds its byte limit"));
+            return Err(err(crate::i18n::text(
+                "backend-metadata-exceeds-its-byte-limit-116946",
+            )));
         }
         data.extend_from_slice(&buffer[..count]);
     }
@@ -132,10 +143,15 @@ impl Ownership {
         expected: &[u8],
     ) -> Result<Self, String> {
         if crate::remote::is_remote(repo) {
-            return Err("Make independent on SSH/WSL requires an owned remote helper with held filesystem identities. Read-only inspection remains available.".into());
+            return Err(crate::i18n::text(
+                "backend-make-independent-on-ssh-wsl-requires-an-owned-remote-helper-with-75bff7",
+            )
+            .into());
         }
         if !repo.is_absolute() || git != repo.join(".git") || objects != git.join("objects") {
-            return Err(err("a conventional local .git/objects clone is required"));
+            return Err(err(crate::i18n::text(
+                "backend-a-conventional-local-git-objects-clone-is-required-dd8898",
+            )));
         }
         let mut nodes = Vec::new();
         let mut path = PathBuf::new();
@@ -150,7 +166,11 @@ impl Ownership {
                     path.push(name);
                     Self::hold(&mut nodes, &path)?;
                 }
-                _ => return Err(err("repository paths cannot contain . or ..")),
+                _ => {
+                    return Err(err(crate::i18n::text(
+                        "backend-repository-paths-cannot-contain-or-da343b",
+                    )));
+                }
             }
         }
         for directory in [
@@ -165,10 +185,16 @@ impl Ownership {
             .iter()
             .find(|node| node.path == objects.join("info"))
             .map(|node| node.file.clone())
-            .ok_or_else(|| err("no retained info directory"))?;
+            .ok_or_else(|| {
+                err(crate::i18n::text(
+                    "backend-no-retained-info-directory-bdff69",
+                ))
+            })?;
         let alternate = Arc::new(alternate(&objects.join("info/alternates"), false)?);
         if read(&alternate, 64 * 1024)? != expected {
-            return Err(err("alternate bytes changed during capture"));
+            return Err(err(crate::i18n::text(
+                "backend-alternate-bytes-changed-during-capture-fd9bce",
+            )));
         }
         let result = Self {
             nodes,
@@ -186,8 +212,11 @@ impl Ownership {
     }
     fn hold(nodes: &mut Vec<Node>, path: &Path) -> Result<(), String> {
         let file = Arc::new(open(path, true, false)?);
-        let at = rename::final_path(&file)
-            .ok_or_else(|| err("the system could not report the held directory location"))?;
+        let at = rename::final_path(&file).ok_or_else(|| {
+            err(crate::i18n::text(
+                "backend-the-system-could-not-report-the-held-directory-location-8699e1",
+            ))
+        })?;
         // All parent handles remain open without delete sharing before a child is opened.
         // Thus an already captured ancestor cannot be renamed/replaced between these opens.
         nodes.push(Node {
@@ -202,22 +231,32 @@ impl Ownership {
             if rename::final_path(&node.file).as_ref() != Some(&node.at)
                 || node.file.metadata().map_err(err)?.file_attributes() & REPARSE != 0
             {
-                return Err(err("a held ancestor is unavailable or changed"));
+                return Err(err(crate::i18n::text(
+                    "backend-a-held-ancestor-is-unavailable-or-changed-461243",
+                )));
             }
         }
         let actual = read(&self.alternate, 64 * 1024)?;
         if actual != self.expected {
-            return Err(err("the actual held alternate content changed"));
+            return Err(err(crate::i18n::text(
+                "backend-the-actual-held-alternate-content-changed-270b63",
+            )));
         }
         let path = self.info.join("alternates");
         if present {
             if !same_file(&path, &self.alternate)? {
-                return Err(err("the alternate name no longer belongs to the held file"));
+                return Err(err(crate::i18n::text(
+                    "backend-the-alternate-name-no-longer-belongs-to-the-held-file-1970b2",
+                )));
             }
         } else {
             match std::fs::symlink_metadata(&path) {
                 Err(error) if error.kind() == std::io::ErrorKind::NotFound => (),
-                _ => return Err(err("an alternate name exists after guarded removal")),
+                _ => {
+                    return Err(err(crate::i18n::text(
+                        "backend-an-alternate-name-exists-after-guarded-removal-6a7d93",
+                    )));
+                }
             }
         }
         Ok(())
@@ -225,7 +264,11 @@ impl Ownership {
     pub fn lock(&self) -> Result<Lock<'_>, String> {
         self.locked
             .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
-            .map_err(|_| err("this independence operation is already active"))?;
+            .map_err(|_| {
+                err(crate::i18n::text(
+                    "backend-this-independence-operation-is-already-active-15ac1c",
+                ))
+            })?;
         Ok(Lock(self))
     }
     pub fn detach(&self, name: &str) -> Result<(), String> {
@@ -233,25 +276,29 @@ impl Ownership {
         // Source and destination directory are actual retained handles. A hard-link
         // alias keeps exactly its original contents; only this directory entry moves.
         rename::no_replace(&self.alternate, &self.info_file, name).map_err(err)?;
-        *self
-            .backup
-            .lock()
-            .map_err(|_| err("backup ownership lock failed"))? = Some(name.into());
+        *self.backup.lock().map_err(|_| {
+            err(crate::i18n::text(
+                "backend-backup-ownership-lock-failed-5e6ba4",
+            ))
+        })? = Some(name.into());
         self.verify_backup(name)
     }
     pub fn verify_backup(&self, name: &str) -> Result<(), String> {
-        let backup = self
-            .backup
-            .lock()
-            .map_err(|_| err("backup ownership lock failed"))?;
+        let backup = self.backup.lock().map_err(|_| {
+            err(crate::i18n::text(
+                "backend-backup-ownership-lock-failed-5e6ba4",
+            ))
+        })?;
         let Some(held_name) = backup.as_ref() else {
-            return Err(err("no held backup"));
+            return Err(err(crate::i18n::text("backend-no-held-backup-d4b8fb")));
         };
         if held_name != name
             || !same_file(&self.info.join(name), &self.alternate)?
             || read(&self.alternate, 64 * 1024)? != self.expected
         {
-            return Err(err("held backup identity or captured bytes changed"));
+            return Err(err(crate::i18n::text(
+                "backend-held-backup-identity-or-captured-bytes-changed-2ce651",
+            )));
         }
         Ok(())
     }
@@ -264,7 +311,9 @@ impl Ownership {
                 {
                     return Ok(());
                 }
-                return Err(err("a newer alternate file exists; it was not overwritten"));
+                return Err(err(crate::i18n::text(
+                    "backend-a-newer-alternate-file-exists-it-was-not-overwritten-1a1775",
+                )));
             }
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => (),
             Err(error) => return Err(err(error)),
@@ -276,14 +325,18 @@ impl Ownership {
         file.write_all(&self.expected).map_err(err)?;
         file.sync_all().map_err(err)?;
         rename::no_replace(&file, &self.info_file, "alternates").map_err(|error| {
-            err(format!(
-                "create-only restore refused: {error}; retained {private}"
+            err(crate::i18n::message(
+                "backend-create-only-restore-refused-error-retained-private-5798f2",
+                &[
+                    ("detail", (error).to_string().into()),
+                    ("private", (private).to_string().into()),
+                ],
             ))
         })?;
         if !same_file(&destination, &file)? || read(&file, 64 * 1024)? != self.expected {
-            return Err(err(
-                "restored alternate identity/content could not be proven",
-            ));
+            return Err(err(crate::i18n::text(
+                "backend-restored-alternate-identity-content-could-not-be-proven-b3d3a6",
+            )));
         }
         Ok(())
     }
@@ -296,10 +349,11 @@ impl Ownership {
     ) -> Result<(), String> {
         self.current(true)?;
         let directory = open(&self.pack, true, false)?;
-        let mut installed = self
-            .installed
-            .lock()
-            .map_err(|_| err("installed pack lock failed"))?;
+        let mut installed = self.installed.lock().map_err(|_| {
+            err(crate::i18n::text(
+                "backend-installed-pack-lock-failed-64eb56",
+            ))
+        })?;
         for (suffix, bytes) in [("pack", pack), ("idx", index)] {
             let name = format!("pack-{hash}.{suffix}");
             let private = format!(".gitcraft-{nonce}.{suffix}");
@@ -315,9 +369,16 @@ impl Ownership {
             let write = source.write_all(bytes).and_then(|_| source.sync_all());
             if let Err(e) = write {
                 let cleanup = rename::discard(&source);
-                return Err(err(format!(
-                    "{e}; owned temporary cleanup: {cleanup:?}; retained if cleanup failed: {}",
-                    self.pack.join(&private).display()
+                return Err(err(crate::i18n::message(
+                    "backend-e-owned-temporary-cleanup-cleanup-retained-if-cleanup-failed-6f4f0d",
+                    &[
+                        ("detail", (e).to_string().into()),
+                        ("cleanup", format!("{:?}", cleanup).into()),
+                        (
+                            "path",
+                            (self.pack.join(&private).display()).to_string().into(),
+                        ),
+                    ],
                 )));
             }
             match rename::no_replace(&source, &directory, &name) {
@@ -329,9 +390,16 @@ impl Ownership {
                         Ok(existing) => existing,
                         Err(e) => {
                             let cleanup = rename::discard(&source);
-                            return Err(err(format!(
-                                "{e}; owned temporary cleanup: {cleanup:?}; retained if cleanup failed: {}",
-                                self.pack.join(&private).display()
+                            return Err(err(crate::i18n::message(
+                                "backend-e-owned-temporary-cleanup-cleanup-retained-if-cleanup-failed-6f4f0d",
+                                &[
+                                    ("detail", (e).to_string().into()),
+                                    ("cleanup", format!("{:?}", cleanup).into()),
+                                    (
+                                        "path",
+                                        (self.pack.join(&private).display()).to_string().into(),
+                                    ),
+                                ],
                             )));
                         }
                     };
@@ -341,18 +409,31 @@ impl Ownership {
                         || comparison.as_ref().is_ok_and(|v| v != bytes)
                         || cleanup.is_err()
                     {
-                        return Err(err(format!(
-                            "existing pack differs or cannot be verified; was not overwritten; owned temporary cleanup: {cleanup:?}; retained if cleanup failed: {}",
-                            self.pack.join(&private).display()
+                        return Err(err(crate::i18n::message(
+                            "backend-existing-pack-differs-or-cannot-be-verified-was-not-overwritten-o-d6cb93",
+                            &[
+                                ("cleanup", format!("{:?}", cleanup).into()),
+                                (
+                                    "path",
+                                    (self.pack.join(&private).display()).to_string().into(),
+                                ),
+                            ],
                         )));
                     }
                     installed.push(Arc::new(existing));
                 }
                 Err(e) => {
                     let cleanup = rename::discard(&source);
-                    return Err(err(format!(
-                        "{e}; owned temporary cleanup: {cleanup:?}; retained if cleanup failed: {}",
-                        self.pack.join(&private).display()
+                    return Err(err(crate::i18n::message(
+                        "backend-e-owned-temporary-cleanup-cleanup-retained-if-cleanup-failed-6f4f0d",
+                        &[
+                            ("detail", (e).to_string().into()),
+                            ("cleanup", format!("{:?}", cleanup).into()),
+                            (
+                                "path",
+                                (self.pack.join(&private).display()).to_string().into(),
+                            ),
+                        ],
                     )));
                 }
             }
@@ -364,5 +445,37 @@ pub(super) struct Lock<'a>(&'a Ownership);
 impl Drop for Lock<'_> {
     fn drop(&mut self) {
         self.0.locked.store(false, Ordering::Release);
+    }
+}
+
+#[cfg(test)]
+mod backend_fluent_ownership_diagnostics {
+    #[test]
+    fn backend_fluent_held_windows_refusal_and_opaque_details_without_io() {
+        use std::path::Path;
+        for language in ["en-US", "de"] {
+            crate::i18n::set_language(language);
+            let detail = "OS error 5: C:\\raw\\de\\repo";
+            let error = super::err(detail);
+            assert!(error.ends_with(detail));
+            assert!(error.starts_with(if language == "de" {
+                "Die Kontrolle über den Windows-Objektspeicher"
+            } else {
+                "Cannot retain Windows object-store ownership"
+            }));
+            let refusal = super::Ownership::capture(
+                Path::new("relative"),
+                Path::new("other"),
+                Path::new("objects"),
+                b"opaque",
+            )
+            .err();
+            assert!(refusal.is_some_and(|e| e.contains(if language == "de" {
+                "Ein herkömmlicher lokaler Klon"
+            } else {
+                "a conventional local .git/objects clone"
+            })));
+        }
+        crate::i18n::set_language("en-US");
     }
 }

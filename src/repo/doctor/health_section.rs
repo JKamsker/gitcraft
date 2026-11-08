@@ -136,7 +136,7 @@ fn suggestion(ui: &mut Ui, s: &Suggestion, locked: bool, acts: &mut Vec<Action>)
     let t = Tokens::get(ui.ctx());
     ui.horizontal(|ui| {
         ui.label(
-            RichText::new(s.title)
+            RichText::new(s.display_title())
                 .font(crate::theme::semibold(13.0))
                 .color(t.text),
         );
