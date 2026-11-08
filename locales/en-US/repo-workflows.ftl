@@ -4809,6 +4809,8 @@ repo-workflows-repository_tools-show-1e9112fe = Fetch registered branch
 
 repo-workflows-repository_tools-show-1f711390 = Prepare update in own worktree
 
+repo-workflows-repository_tools-subtrees-sign-commits = Sign commits
+
 repo-workflows-repository_tools-show-1f89e0a1 = Mark visible unreviewed hunks reviewed
 
 repo-workflows-repository_tools-show-1fad1933 = already published

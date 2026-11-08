@@ -62,6 +62,8 @@ pub(crate) struct Candidate {
     pub old: String,
     pub upstream: Option<String>,
     pub kind: Kind,
+    #[serde(default)]
+    pub sign_commits: bool,
     pub stage: Stage,
     pub worktree: PathBuf,
     pub identity: Option<String>,
@@ -89,6 +91,7 @@ pub(crate) struct View {
     pub branch: String,
     pub head: String,
     pub remotes: Vec<String>,
+    pub sign_commits: bool,
     pub local: Option<Local>,
     pub candidate_diff: Option<(String, String)>,
     pub common: PathBuf,
@@ -410,6 +413,14 @@ pub(crate) fn read(repo: &Path, selected: &str) -> Result<View, String> {
     let common = common(&ctx)?;
     let (version, state) = state(&ctx)?;
     validate(&state, &common)?;
+    // Read outside the drafts inspection context, which disables signing itself.
+    let sign_commits = super::text_codes(
+        repo,
+        &["config", "--bool", "--get", "commit.gpgSign"],
+        &[0, 1],
+    )?
+    .trim()
+        == "true";
     let mut view = View {
         state,
         version,
@@ -419,6 +430,7 @@ pub(crate) fn read(repo: &Path, selected: &str) -> Result<View, String> {
             .lines()
             .map(str::to_owned)
             .collect(),
+        sign_commits,
         local: None,
         candidate_diff: None,
         common,
@@ -672,6 +684,7 @@ fn subtree_words(
     old: &str,
     upstream: Option<&str>,
     exists: bool,
+    sign_commits: bool,
 ) -> Result<Vec<String>, String> {
     let mut a = vec![
         "subtree".into(),
@@ -688,6 +701,9 @@ fn subtree_words(
         .into(),
         format!("--prefix={}", s.prefix),
     ];
+    if sign_commits {
+        a.push("--gpg-sign".into());
+    }
     if kind == Kind::Update {
         if s.history == History::Squash {
             a.push("--squash".into());
@@ -705,6 +721,20 @@ fn subtree_words(
     }
     Ok(a)
 }
+/// These options reach the inner Git command after deferred's ownership checks.
+/// Keep the deferred runner's unsigned default for every other consumer.
+fn candidate_words<'a>(sign_commits: bool, args: &[&'a str]) -> Vec<&'a str> {
+    let mut words = vec![
+        "-c",
+        if sign_commits {
+            "commit.gpgSign=true"
+        } else {
+            "commit.gpgSign=false"
+        },
+    ];
+    words.extend_from_slice(args);
+    words
+}
 fn owned(r: &Runner<'_>, v: &View, c: &Candidate, args: &[&str]) -> Result<String, String> {
     deferred::registered_run(
         r,
@@ -713,7 +743,7 @@ fn owned(r: &Runner<'_>, v: &View, c: &Candidate, args: &[&str]) -> Result<Strin
         c.identity.as_deref().ok_or(crate::i18n::text(
             "backend-creation-outcome-is-unacknowledged-candidate-cannot-be-adopted-f78ef5",
         ))?,
-        args,
+        &candidate_words(c.sign_commits, args),
     )
 }
 fn clean_source(ctx: &Context) -> Result<(), String> {
@@ -755,7 +785,13 @@ fn clean_source(ctx: &Context) -> Result<(), String> {
     }
     Ok(())
 }
-pub(crate) fn prepare(r: &Runner<'_>, v: &View, key: &str, kind: Kind) -> Result<String, String> {
+pub(crate) fn prepare(
+    r: &Runner<'_>,
+    v: &View,
+    key: &str,
+    kind: Kind,
+    sign_commits: bool,
+) -> Result<String, String> {
     let ctx = check(r.repo, v, true)?;
     let s = source(v, key)?.clone();
     if !v.branch.starts_with("refs/heads/")
@@ -791,7 +827,14 @@ pub(crate) fn prepare(r: &Runner<'_>, v: &View, key: &str, kind: Kind) -> Result
         }
         Vec::new()
     } else {
-        subtree_words(&s, kind, &v.head, s.fetched.as_deref(), exists)?
+        subtree_words(
+            &s,
+            kind,
+            &v.head,
+            s.fetched.as_deref(),
+            exists,
+            sign_commits,
+        )?
     };
     if v.state.candidates.len() >= 64 {
         return Err(crate::i18n::text(
@@ -818,6 +861,7 @@ pub(crate) fn prepare(r: &Runner<'_>, v: &View, key: &str, kind: Kind) -> Result
             None
         },
         kind,
+        sign_commits,
         stage: Stage::Preparing,
         worktree: worktree.clone(),
         identity: None,
