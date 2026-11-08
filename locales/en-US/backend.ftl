@@ -388,7 +388,10 @@ backend-content-size-changed-since-search-c298d8 = Content size changed since se
 backend-content-size-overflow-facc93 = Content size overflow
 backend-contents-recovered-and-safety-draft-saved-but-permission-restorat-c326e3 = Contents recovered and safety draft saved, but permission restoration needs attention: { $detail }
 backend-contributor-mailmap-unavailable-e-860d54 = Contributor mailmap unavailable: { $detail }
-backend-copied-and-independently-verified-required-objects-alternate-link-6fc4fd = Copied and independently verified { $count } required objects. Alternate link removed; donor repositories were not modified. Recovery metadata: .git/objects/info/{ $backup }
+backend-copied-and-independently-verified-required-objects-alternate-link-6fc4fd = { $count ->
+        [one] Copied and independently verified { $count } required object. Alternate link removed; donor repositories were not modified. Recovery metadata: .git/objects/info/{ $backup }
+       *[other] Copied and independently verified { $count } required objects. Alternate link removed; donor repositories were not modified. Recovery metadata: .git/objects/info/{ $backup }
+    }
 backend-could-not-allocate-a-fresh-cleanup-folder-f43b39 = Could not allocate a fresh cleanup folder
 backend-could-not-check-e-668235 = Could not check { $label }: { $detail }
 backend-could-not-check-gitignore-e-27d776 = could not check .gitignore: { $detail }
@@ -523,6 +526,7 @@ backend-create-only-installation-refused-e-evidence-501da1 = Create-only install
 backend-create-only-rollback-refused-e-evidence-cacf21 = Create-only rollback refused: { $detail }; evidence { $evidence }
 backend-create-response-unreadable-refresh-before-creating-again-e-bb0176 = Create response unreadable; refresh before creating again: { $detail }
 backend-create-saved-file-9b75eb = Create saved file
+backend-created-d70b9e = Created
 backend-created-name-head-and-working-files-were-preserved-6e7643 = Created { $name }; HEAD and working files were preserved
 backend-creation-intent-persisted-if-acknowledgement-is-lost-this-directo-00e4cd = Creation intent persisted. If acknowledgement is lost, this directory is never automatically adopted or removed
 backend-creation-outcome-is-unacknowledged-candidate-cannot-be-adopted-f78ef5 = Creation outcome is unacknowledged; candidate cannot be adopted
@@ -559,6 +563,7 @@ backend-deferred-worktree-identity-changed-c453de = Deferred worktree identity c
 backend-deferred-worktree-is-missing-or-no-longer-registered-no-replay-wa-ed9a59 = Deferred worktree is missing or no longer registered; no replay was dispatched
 backend-deferred-worktree-or-immutable-source-metadata-is-invalid-49791b = Deferred worktree or immutable source metadata is invalid
 backend-deferred-worktree-physical-path-changed-898b40 = Deferred worktree physical path changed
+backend-deleted-b48ff3 = Deleted
 backend-deleting-a-fork-s-branch-is-not-offered-from-this-repository-665374 = Deleting a fork's branch is not offered from this repository.
 backend-delta-depth-is-too-large-c1d7e9 = Delta depth is too large
 backend-dependencies-published-parent-awaits-push-preflight-and-outgoing-2a9d8d = Dependencies published; parent awaits push preflight and outgoing review
@@ -581,12 +586,12 @@ backend-didn-t-say-which-release-tag-is-1ede89 = { $name } didn't say which rele
 backend-didn-t-say-who-is-logged-in-d78e69 = { $name } didn't say who is logged in
 backend-didn-t-say-who-the-login-is-ecaade = { $name } didn't say who the login is
 backend-diff-diffs-say-only-binary-files-differ-da8247 = -diff: diffs say only "Binary files differ".
+backend-diff-histogram = Histogram
 backend-diffed-with-git-s-own-v-patterns-function-names-in-hunks-e85843 = Diffed with git's own { $value } patterns (function names in hunks).
 backend-diffed-with-the-v-diff-driver-5f19be = Diffed with the { $value } diff driver.
 backend-directory-moved-recovery-09ef49 = Directory moved; recovery { $evidence }
 backend-discussion-was-not-in-this-displayed-azure-pr-42c527 = Discussion was not in this displayed Azure PR
-backend-display-stopped-at-256-kib-b74fab = [display stopped at 256 KiB]
-    
+backend-display-stopped-at-256-kib-b74fab = [display stopped at 256 KiB]{ "\u000A" }
 backend-draft-cancelled-426ba2 = Draft cancelled
 backend-draft-content-exceeds-32-mib-make-a-manual-backup-before-continui-5603e0 = Draft content exceeds 32 MiB; make a manual backup before continuing
 backend-draft-file-metadata-does-not-match-its-protected-tree-2734e8 = Draft file metadata does not match its protected tree
@@ -1304,7 +1309,7 @@ backend-lock-is-not-in-this-repository-s-git-folder-left-alone-043d3a = { $lock 
 backend-lock-parent-moved-evidence-retained-in-held-directory-formerly-0c41fb = Lock parent moved; evidence retained in held directory formerly { $r }
 backend-lock-release-capture-failed-e-evidence-0c66f8 = Lock release capture failed: { $detail }; evidence { $r }
 backend-lock-was-written-again-since-a-git-is-using-it-left-alone-91d27e = { $lock } was written again since: a git is using it, left alone
-backend-loose-objects-in-kib-and-packs-git-gc-packs-them-into-one-which-s-cc160c = { $host } loose objects in { $host2 } KiB and { $host3 } packs: git gc packs them into one, which saves room and time on every read. Unreachable objects younger than two weeks are kept, but reflog entries older than 90 days (30 for unreachable commits) expire, and with them the way back to abandoned commits that old.
+backend-loose-objects-in-kib-and-packs-git-gc-packs-them-into-one-which-s-cc160c = { $objects } loose objects in { $kib } KiB and { $packs } packs: git gc packs them into one, which saves room and time on every read. Unreachable objects younger than two weeks are kept, but reflog entries older than 90 days (30 for unreachable commits) expire, and with them the way back to abandoned commits that old.
 backend-mailmap-configuration-is-not-utf-8-d695be = Mailmap configuration is not UTF-8
 backend-mailmap-repository-path-is-not-utf-8-74b4cc = Mailmap repository path is not UTF-8
 backend-make-an-initial-commit-20a10b = Make an initial commit
@@ -1405,11 +1410,15 @@ backend-more-than-256-candidate-submodule-branches-narrow-the-remote-bran-3cb46d
 backend-more-than-max-packs-use-git-in-the-terminal-40f8d7 = More than { $max } packs; use Git in the terminal.
 backend-more-than-one-function-has-this-path-and-qualified-name-structura-513daf = More than one function has this path and qualified name; structural identity is ambiguous.
 backend-move-or-back-up-ignored-files-outside-the-working-tree-before-cha-cfc50b = Move or back up ignored files outside the working tree before changing sparse folders. Git can delete ignored files during sparse checkout.
+backend-moved-b11c90 = Moved
 backend-moved-since-the-export-dialog-opened-reopen-it-274c7b = { $name } moved since the export dialog opened; reopen it
 backend-moved-since-the-rehearsal-it-was-at-now-rehearse-again-bfec19 = { $short_ref } moved since the rehearsal (it was at { $then }, { $now }): rehearse again
 backend-my-last-days-author-email-and-their-ancestors-within-the-visible-3110ea = My last { $days } days (author email { $email }) and their ancestors, within the visible graph scope
 backend-myers-taking-the-time-to-find-the-smallest-diff-f4df46 = Myers, taking the time to find the smallest diff
-backend-n-locks-stayed-97c137 = { $count } locks stayed: { $failed }
+backend-n-locks-stayed-97c137 = { $count ->
+        [one] { $count } lock stayed: { $failed }
+       *[other] { $count } locks stayed: { $failed }
+    }
 backend-n-merged-left-alone-28e650 = #{ $count } merged, left alone
 backend-n-new-comments-c3c595 = { $count } new comments
 backend-name-contains-unsupported-characters-for-selected-setup-authentic-aabb5c = { $name } contains unsupported characters for selected setup authentication
@@ -1568,8 +1577,7 @@ backend-output-identity-changed-during-native-acl-read-624d92 = Output identity 
 backend-output-metadata-changed-while-listing-aef402 = Output metadata changed while listing
 backend-output-metadata-changed-while-reading-d70336 = Output metadata changed while reading
 backend-output-metadata-overflow-678173 = Output metadata overflow
-backend-output-truncated-b46ce7 = 
-    [output truncated]
+backend-output-truncated-b46ce7 = { "\u000A" }[output truncated]
 backend-over-1000-refs-select-a-bundle-with-git-in-the-terminal-029f90 = Over 1000 refs; select a bundle with Git in the terminal
 backend-over-the-connection-to-that-machine-69e244 =  (over the connection to that machine)
 backend-oversized-blame-header-f86d74 = Oversized blame header
@@ -1711,6 +1719,7 @@ backend-recovery-source-bytes-changed-or-were-pruned-6b4858 = Recovery source by
 backend-ref-history-is-not-utf-8-0af8d8 = Ref history is not UTF-8
 backend-ref-metadata-is-not-utf-8-6ef259 = Ref metadata is not UTF-8
 backend-ref-recovery-was-interrupted-and-may-have-completed-inspect-the-b-333dce = Ref recovery was interrupted and may have completed. Inspect the branch/stash list before retrying: { $detail }
+backend-reformatted-10c026 = Reformatted
 backend-refs-committed-but-index-release-needs-attention-error-6be47a = Refs committed but index release needs attention: { $detail }; { $index }
 backend-refs-committed-index-release-needs-attention-and-no-rollback-was-f6b682 = Refs committed; index release needs attention and no rollback was attempted: { $detail }
 backend-refs-moved-while-exporting-or-the-range-excludes-a-selected-ref-n-a6c9b9 = Refs moved while exporting, or the range excludes a selected ref; no bundle saved. Reopen the export dialog.
@@ -1759,6 +1768,7 @@ backend-removed-path-path-abb2ac = Removed path: { $path }
 backend-removed-queue-entry-protected-source-commit-is-retained-for-recov-91464b = Removed queue entry; protected source commit is retained for recovery
 backend-rename-detection-exceeded10000-changed-paths-4d972b = Rename detection exceeded10000 changed paths
 backend-rename-metadata-too-large-40ee73 = Rename metadata too large
+backend-renamed-05487a = Renamed
 backend-renamed-history-path-is-not-utf-8-30395e = Renamed history path is not UTF-8
 backend-renewed-approval-no-longer-applies-544f7d = Renewed approval no longer applies
 backend-repair-the-missing-cyclic-http-or-unreadable-donors-before-prepar-2a920e = Repair the missing, cyclic, HTTP or unreadable donors before preparing independence.
@@ -1936,8 +1946,7 @@ backend-stopped-at-64-candidate-sessions-narrow-the-root-time-window-a5d972 = St
 backend-stored-in-git-lfs-the-repository-keeps-a-pointer-lfs-the-contents-e81097 = Stored in Git LFS: the repository keeps a pointer, LFS the contents.
 backend-stream-consumer-exceeded-the-bounded-output-queue-101b12 = stream consumer exceeded the bounded output queue
 backend-stream-line-exceeds-1-mib-589b21 = stream line exceeds 1 MiB
-backend-submodule-commit-7c6bb2 = Submodule commit { $oid }
-    
+backend-submodule-commit-7c6bb2 = Submodule commit { $oid }{ "\u000A" }
 backend-submodule-head-55afe5 = Submodule HEAD
 backend-submodule-selection-did-not-resolve-to-a-commit-id-a0ae9b = Submodule selection did not resolve to a commit ID
 backend-submodule-snapshot-missing-ae3935 = Submodule snapshot missing

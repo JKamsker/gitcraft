@@ -401,7 +401,7 @@ fn boundary_event(
         }
     }
     Ok(if parents == 0 {
-        ("Created", false)
+        (crate::i18n::text("backend-created-d70b9e"), false)
     } else if traversable_parents.iter().all(u8::is_ascii_whitespace) {
         (
             crate::i18n::text("backend-earlier-shallow-boundary-creation-unproven-4afdd7"),
@@ -417,15 +417,15 @@ fn boundary_event(
 fn event(before: &Symbol, after: &Symbol) -> String {
     let mut events = Vec::new();
     if before.path != after.path {
-        events.push("Moved");
+        events.push(crate::i18n::text("backend-moved-b11c90"));
     }
     if before.qualified != after.qualified {
-        events.push("Renamed");
+        events.push(crate::i18n::text("backend-renamed-05487a"));
     }
     if before.tokens != after.tokens {
         events.push(crate::i18n::text("backend-body-edited-719318"));
     } else if before.body != after.body {
-        events.push("Reformatted");
+        events.push(crate::i18n::text("backend-reformatted-10c026"));
     }
     if events.is_empty() {
         crate::i18n::text("backend-selected-version-f988b6").into()
@@ -663,7 +663,7 @@ pub(crate) fn investigate(
             } else {
                 steps.push(trace.step(
                     &commits[at],
-                    "Created".into(),
+                    crate::i18n::text("backend-created-d70b9e").into(),
                     Some(current.clone()),
                     vec![],
                     None,
@@ -737,7 +737,13 @@ pub(crate) fn investigate(
                 );
                 incomplete = true;
             } else {
-                steps.push(trace.step(&commits[next], "Deleted".into(), None, vec![], None)?);
+                steps.push(trace.step(
+                    &commits[next],
+                    crate::i18n::text("backend-deleted-b48ff3").into(),
+                    None,
+                    vec![],
+                    None,
+                )?);
             }
             break;
         };

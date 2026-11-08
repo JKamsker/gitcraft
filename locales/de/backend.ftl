@@ -388,7 +388,10 @@ backend-content-size-changed-since-search-c298d8 = Die Inhaltsgröße hat sich s
 backend-content-size-overflow-facc93 = Inhaltsgrößenüberlauf
 backend-contents-recovered-and-safety-draft-saved-but-permission-restorat-c326e3 = Inhalte wiederhergestellt und Sicherheitsentwurf gespeichert, aber die Berechtigungswiederherstellung erfordert Aufmerksamkeit: { $detail }
 backend-contributor-mailmap-unavailable-e-860d54 = Die Mailmap der Mitwirkenden ist nicht verfügbar: { $detail }
-backend-copied-and-independently-verified-required-objects-alternate-link-6fc4fd = { $count } erforderliche Objekte wurden kopiert und unabhängig geprüft. Die alternative Verknüpfung wurde entfernt; Spenderrepositorys wurden nicht verändert. Wiederherstellungsmetadaten: .git/objects/info/{ $backup }.
+backend-copied-and-independently-verified-required-objects-alternate-link-6fc4fd = { $count ->
+        [one] { $count } erforderliches Objekt wurde kopiert und unabhängig geprüft. Die alternative Verknüpfung wurde entfernt; Spenderrepositorys wurden nicht verändert. Wiederherstellungsmetadaten: .git/objects/info/{ $backup }
+       *[other] { $count } erforderliche Objekte wurden kopiert und unabhängig geprüft. Die alternative Verknüpfung wurde entfernt; Spenderrepositorys wurden nicht verändert. Wiederherstellungsmetadaten: .git/objects/info/{ $backup }
+    }
 backend-could-not-allocate-a-fresh-cleanup-folder-f43b39 = Ein neuer Bereinigungsordner konnte nicht angelegt werden.
 backend-could-not-check-e-668235 = { $label } konnte nicht geprüft werden: { $detail }
 backend-could-not-check-gitignore-e-27d776 = .gitignore konnte nicht geprüft werden: { $detail }
@@ -523,6 +526,7 @@ backend-create-only-installation-refused-e-evidence-501da1 = Installation ohne �
 backend-create-only-rollback-refused-e-evidence-cacf21 = Rücksetzung ohne Überschreiben verweigert: { $detail }; Belege: { $evidence }
 backend-create-response-unreadable-refresh-before-creating-again-e-bb0176 = Die Antwort zur Erstellung ist unlesbar; vor erneutem Erstellen aktualisieren: { $detail }
 backend-create-saved-file-9b75eb = Gespeicherte Datei erstellen
+backend-created-d70b9e = Erstellt
 backend-created-name-head-and-working-files-were-preserved-6e7643 = { $name } wurde erstellt; HEAD und Arbeitsdateien wurden bewahrt.
 backend-creation-intent-persisted-if-acknowledgement-is-lost-this-directo-00e4cd = Die Erstellungsabsicht wurde gespeichert. Geht die Bestätigung verloren, wird dieses Verzeichnis niemals automatisch übernommen oder entfernt.
 backend-creation-outcome-is-unacknowledged-candidate-cannot-be-adopted-f78ef5 = Das Erstellungsergebnis ist unbestätigt; der Kandidat kann nicht übernommen werden.
@@ -559,6 +563,7 @@ backend-deferred-worktree-identity-changed-c453de = Die Identität des verzöger
 backend-deferred-worktree-is-missing-or-no-longer-registered-no-replay-wa-ed9a59 = Das verzögerte Arbeitsverzeichnis fehlt oder ist nicht mehr registriert; es wurde keine Wiedergabe gestartet.
 backend-deferred-worktree-or-immutable-source-metadata-is-invalid-49791b = Das verzögerte Arbeitsverzeichnis oder die unveränderlichen Quellmetadaten sind ungültig.
 backend-deferred-worktree-physical-path-changed-898b40 = Der physische Pfad des verzögerten Arbeitsverzeichnisses hat sich geändert.
+backend-deleted-b48ff3 = Gelöscht
 backend-deleting-a-fork-s-branch-is-not-offered-from-this-repository-665374 = Das Löschen eines Fork-Branches wird aus diesem Repository nicht angeboten.
 backend-delta-depth-is-too-large-c1d7e9 = Die Delta-Tiefe ist zu groß.
 backend-dependencies-published-parent-awaits-push-preflight-and-outgoing-2a9d8d = Die Abhängigkeiten sind veröffentlicht; der Push des übergeordneten Repositorys wartet auf die Vorabprüfung und die Prüfung ausgehender Änderungen.
@@ -581,12 +586,12 @@ backend-didn-t-say-which-release-tag-is-1ede89 = { $name } hat nicht angegeben, 
 backend-didn-t-say-who-is-logged-in-d78e69 = { $name } hat nicht angegeben, wer angemeldet ist.
 backend-didn-t-say-who-the-login-is-ecaade = { $name } hat das angemeldete Konto nicht angegeben.
 backend-diff-diffs-say-only-binary-files-differ-da8247 = -diff: Diffs melden nur „Binary files differ“.
+backend-diff-histogram = Histogramm
 backend-diffed-with-git-s-own-v-patterns-function-names-in-hunks-e85843 = Diff mit den Git-eigenen Mustern für { $value } (Funktionsnamen in Hunks).
 backend-diffed-with-the-v-diff-driver-5f19be = Diff mit dem Diff-Treiber { $value }.
 backend-directory-moved-recovery-09ef49 = Das Verzeichnis wurde verschoben; Wiederherstellung: { $evidence }
 backend-discussion-was-not-in-this-displayed-azure-pr-42c527 = Diese Diskussion war nicht im angezeigten Azure-PR enthalten.
-backend-display-stopped-at-256-kib-b74fab = [Anzeige bei 256 KiB gestoppt]
-    
+backend-display-stopped-at-256-kib-b74fab = [Anzeige bei 256 KiB gestoppt]{ "\u000A" }
 backend-draft-cancelled-426ba2 = Entwurf abgebrochen
 backend-draft-content-exceeds-32-mib-make-a-manual-backup-before-continui-5603e0 = Der Entwurfsinhalt überschreitet 32 MiB; vor dem Fortfahren manuell sichern.
 backend-draft-file-metadata-does-not-match-its-protected-tree-2734e8 = Die Entwurfsdateimetadaten passen nicht zu ihrem geschützten Baum.
@@ -1304,7 +1309,7 @@ backend-lock-is-not-in-this-repository-s-git-folder-left-alone-043d3a = { $lock 
 backend-lock-parent-moved-evidence-retained-in-held-directory-formerly-0c41fb = Das Sperrverzeichnis wurde verschoben; Belege bleiben im gehaltenen Verzeichnis, das zuvor unter { $r } lag.
 backend-lock-release-capture-failed-e-evidence-0c66f8 = Das Erfassen der Sperrfreigabe ist fehlgeschlagen: { $detail }; Belege: { $r }
 backend-lock-was-written-again-since-a-git-is-using-it-left-alone-91d27e = { $lock } wurde inzwischen erneut geschrieben: Git verwendet sie, unverändert gelassen.
-backend-loose-objects-in-kib-and-packs-git-gc-packs-them-into-one-which-s-cc160c = { $host } lose Objekte in { $host2 } KiB und { $host3 } Packs: git gc packt sie zusammen und spart so Platz und Lesezeit. Nicht erreichbare Objekte unter zwei Wochen bleiben erhalten, aber Reflog-Einträge über 90 Tage (30 bei nicht erreichbaren Commits) verfallen und damit der Rückweg zu so alten aufgegebenen Commits.
+backend-loose-objects-in-kib-and-packs-git-gc-packs-them-into-one-which-s-cc160c = { $objects } lose Objekte in { $kib } KiB und { $packs } Packs: git gc packt sie zusammen und spart so Platz und Lesezeit. Nicht erreichbare Objekte unter zwei Wochen bleiben erhalten, aber Reflog-Einträge über 90 Tage (30 bei nicht erreichbaren Commits) verfallen und damit der Rückweg zu so alten aufgegebenen Commits.
 backend-mailmap-configuration-is-not-utf-8-d695be = Die Mailmap-Konfiguration ist nicht UTF-8.
 backend-mailmap-repository-path-is-not-utf-8-74b4cc = Der Mailmap-Repository-Pfad ist nicht UTF-8.
 backend-make-an-initial-commit-20a10b = Einen ersten Commit erstellen.
@@ -1405,11 +1410,15 @@ backend-more-than-256-candidate-submodule-branches-narrow-the-remote-bran-3cb46d
 backend-more-than-max-packs-use-git-in-the-terminal-40f8d7 = Mehr als { $max } Packs; verwende Git im Terminal.
 backend-more-than-one-function-has-this-path-and-qualified-name-structura-513daf = Mehrere Funktionen haben diesen Pfad und qualifizierten Namen; die strukturelle Identität ist mehrdeutig.
 backend-move-or-back-up-ignored-files-outside-the-working-tree-before-cha-cfc50b = Vor dem Ändern der Sparse-Ordner ignorierte Dateien aus dem Arbeitsverzeichnis verschieben oder sichern. Git kann ignorierte Dateien beim Sparse-Checkout löschen.
+backend-moved-b11c90 = Verschoben
 backend-moved-since-the-export-dialog-opened-reopen-it-274c7b = { $name } wurde seit dem Öffnen des Exportdialogs verschoben; den Dialog erneut öffnen.
 backend-moved-since-the-rehearsal-it-was-at-now-rehearse-again-bfec19 = { $short_ref } wurde seit der Probe verschoben (zuvor bei { $then }, { $now }): erneut proben.
 backend-my-last-days-author-email-and-their-ancestors-within-the-visible-3110ea = Meine letzten { $days } Tage (Autoren-E-Mail { $email }) und deren Vorfahren innerhalb des sichtbaren Graphbereichs
 backend-myers-taking-the-time-to-find-the-smallest-diff-f4df46 = Myers mit zusätzlicher Zeit für den kleinstmöglichen Diff.
-backend-n-locks-stayed-97c137 = { $count } Sperren blieben bestehen: { $failed }
+backend-n-locks-stayed-97c137 = { $count ->
+        [one] { $count } Sperre blieb bestehen: { $failed }
+       *[other] { $count } Sperren blieben bestehen: { $failed }
+    }
 backend-n-merged-left-alone-28e650 = #{ $count } wurde gemergt und unverändert gelassen.
 backend-n-new-comments-c3c595 = { $count } neue Kommentare
 backend-name-contains-unsupported-characters-for-selected-setup-authentic-aabb5c = { $name } enthält nicht unterstützte Zeichen für die ausgewählte Setup-Authentifizierung.
@@ -1568,8 +1577,7 @@ backend-output-identity-changed-during-native-acl-read-624d92 = Die Ausgabeident
 backend-output-metadata-changed-while-listing-aef402 = Die Ausgabemetadaten wurden beim Auflisten geändert.
 backend-output-metadata-changed-while-reading-d70336 = Die Ausgabemetadaten wurden beim Lesen geändert.
 backend-output-metadata-overflow-678173 = Überlauf der Ausgabemetadaten
-backend-output-truncated-b46ce7 = 
-    [Ausgabe gekürzt]
+backend-output-truncated-b46ce7 = { "\u000A" }[Ausgabe gekürzt]
 backend-over-1000-refs-select-a-bundle-with-git-in-the-terminal-029f90 = Mehr als 1.000 Referenzen; ein Bundle mit Git im Terminal auswählen.
 backend-over-the-connection-to-that-machine-69e244 =  (über die Verbindung zu diesem Rechner)
 backend-oversized-blame-header-f86d74 = Zu großer Blame-Header
@@ -1711,6 +1719,7 @@ backend-recovery-source-bytes-changed-or-were-pruned-6b4858 = Wiederherstellungs
 backend-ref-history-is-not-utf-8-0af8d8 = Der Ref-Verlauf ist nicht UTF-8-kodiert.
 backend-ref-metadata-is-not-utf-8-6ef259 = Die Ref-Metadaten sind nicht UTF-8-kodiert.
 backend-ref-recovery-was-interrupted-and-may-have-completed-inspect-the-b-333dce = Die Referenzwiederherstellung wurde unterbrochen und könnte abgeschlossen sein. Vor erneutem Versuch die Branch-/Stash-Liste prüfen: { $detail }
+backend-reformatted-10c026 = Neu formatiert
 backend-refs-committed-but-index-release-needs-attention-error-6be47a = Referenzen committet, aber die Indexfreigabe erfordert Aufmerksamkeit: { $detail }; { $index }
 backend-refs-committed-index-release-needs-attention-and-no-rollback-was-f6b682 = Referenzen committet; die Indexfreigabe erfordert Aufmerksamkeit, und es wurde kein Rücksetzen versucht: { $detail }
 backend-refs-moved-while-exporting-or-the-range-excludes-a-selected-ref-n-a6c9b9 = Referenzen wurden beim Export verschoben oder der Bereich schließt eine ausgewählte Referenz aus; kein Bundle gespeichert. Den Exportdialog erneut öffnen.
@@ -1759,6 +1768,7 @@ backend-removed-path-path-abb2ac = Entfernter Pfad: { $path }
 backend-removed-queue-entry-protected-source-commit-is-retained-for-recov-91464b = Der Warteschlangeneintrag wurde entfernt; der geschützte Quellcommit bleibt zur Wiederherstellung erhalten.
 backend-rename-detection-exceeded10000-changed-paths-4d972b = Die Umbenennungserkennung überschreitet 10.000 geänderte Pfade.
 backend-rename-metadata-too-large-40ee73 = Die Umbenennungsmetadaten sind zu groß.
+backend-renamed-05487a = Umbenannt
 backend-renamed-history-path-is-not-utf-8-30395e = Der umbenannte Verlaufspfad ist nicht UTF-8.
 backend-renewed-approval-no-longer-applies-544f7d = Die erneute Zustimmung gilt nicht mehr.
 backend-repair-the-missing-cyclic-http-or-unreadable-donors-before-prepar-2a920e = Repariere die fehlenden, zyklischen, HTTP-basierten oder unlesbaren Spenderrepositorys, bevor du die Unabhängigkeit vorbereitest.
@@ -1936,8 +1946,7 @@ backend-stopped-at-64-candidate-sessions-narrow-the-root-time-window-a5d972 = Be
 backend-stored-in-git-lfs-the-repository-keeps-a-pointer-lfs-the-contents-e81097 = In Git LFS gespeichert: Das Repository enthält einen Zeiger, LFS den Inhalt.
 backend-stream-consumer-exceeded-the-bounded-output-queue-101b12 = Der Stream-Verbraucher hat die begrenzte Ausgabewarteschlange überschritten.
 backend-stream-line-exceeds-1-mib-589b21 = Die Stream-Zeile überschreitet 1 MiB.
-backend-submodule-commit-7c6bb2 = Submodulcommit { $oid }
-    
+backend-submodule-commit-7c6bb2 = Submodulcommit { $oid }{ "\u000A" }
 backend-submodule-head-55afe5 = Submodul-HEAD
 backend-submodule-selection-did-not-resolve-to-a-commit-id-a0ae9b = Die Submodulauswahl wurde nicht zu einer Commit-ID aufgelöst.
 backend-submodule-snapshot-missing-ae3935 = Der Submodulschnappschuss fehlt.

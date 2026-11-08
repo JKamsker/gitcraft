@@ -32,7 +32,7 @@ impl DiffAlgorithm {
             DiffAlgorithm::Myers => "Myers",
             DiffAlgorithm::Minimal => "Minimal",
             DiffAlgorithm::Patience => "Patience",
-            DiffAlgorithm::Histogram => "Histogram",
+            DiffAlgorithm::Histogram => crate::i18n::text("backend-diff-histogram"),
         }
     }
 
@@ -105,8 +105,14 @@ mod tests {
         let args: std::collections::HashSet<_> =
             DiffAlgorithm::ALL.iter().map(|a| a.arg()).collect();
         assert_eq!(args.len(), DiffAlgorithm::ALL.len());
-        for a in DiffAlgorithm::ALL {
-            assert!(a.arg().ends_with(&a.label().to_lowercase()));
-        }
+        assert_eq!(
+            DiffAlgorithm::ALL.map(DiffAlgorithm::arg),
+            [
+                "--diff-algorithm=myers",
+                "--diff-algorithm=minimal",
+                "--diff-algorithm=patience",
+                "--diff-algorithm=histogram"
+            ],
+        );
     }
 }

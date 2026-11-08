@@ -31,17 +31,11 @@ impl Lines {
     /// "line 12" or "lines 10–14".
     pub fn label(self) -> String {
         if self.first == self.last {
-            crate::i18n::message(
-                "backend-line-a8712f",
-                &[("first", (self.first).to_string().into())],
-            )
+            crate::i18n::message("backend-line-a8712f", &[("first", self.first.into())])
         } else {
             crate::i18n::message(
                 "backend-lines-16dc00",
-                &[
-                    ("first", (self.first).to_string().into()),
-                    ("last", (self.last).to_string().into()),
-                ],
+                &[("first", self.first.into()), ("last", self.last.into())],
             )
         }
     }

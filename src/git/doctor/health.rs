@@ -347,9 +347,9 @@ pub fn suggestions(h: &Health) -> Vec<Suggestion> {
             why: crate::i18n::message(
                 "backend-loose-objects-in-kib-and-packs-git-gc-packs-them-into-one-which-s-cc160c",
                 &[
-                    ("host", (h.objects.loose).into()),
-                    ("host2", (h.objects.loose_kib).into()),
-                    ("host3", (h.objects.packs).into()),
+                    ("objects", h.objects.loose.into()),
+                    ("kib", h.objects.loose_kib.into()),
+                    ("packs", h.objects.packs.into()),
                 ],
             ),
             state: State::Off,
