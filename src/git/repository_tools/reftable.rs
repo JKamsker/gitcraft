@@ -9,6 +9,11 @@ pub(crate) struct Storage {
     pub blocked: Option<String>,
     pub snapshot: Snapshot,
 }
+// Older migration implementations corrupt reflog identities, including Git 2.51.
+// Fixed upstream: ec922e0d300f6541802c6460aefd63b837b2afd7 (Git 2.52).
+fn safe_reflog_migration(version: &str) -> bool {
+    crate::git::parse_version(version).is_some_and(|v| v >= (2, 52))
+}
 pub(crate) fn inspect(repo: &Path) -> Result<Storage, String> {
     let git = text(repo, &["--version"])?.trim().to_owned();
     let reported = text(repo, &["rev-parse", "--show-ref-format"])?
@@ -28,7 +33,8 @@ pub(crate) fn inspect(repo: &Path) -> Result<Storage, String> {
     };
     let help = super::captured(repo, &["refs", "migrate", "-h"], None)?;
     let help = format!("{}{}", help.stdout, help.stderr);
-    let migrates = help.contains("--ref-format") && help.contains("--reflog");
+    let migrates =
+        safe_reflog_migration(&git) && help.contains("--ref-format") && help.contains("--reflog");
     let snapshot = Snapshot::capture(repo)?;
     let git_dir = snapshot.identity.trim();
     let common = text(
@@ -50,12 +56,7 @@ pub(crate) fn inspect(repo: &Path) -> Result<Storage, String> {
             .into(),
         )
     } else if !migrates {
-        Some(
-            crate::i18n::text(
-                "backend-this-git-cannot-migrate-refs-while-preserving-reflogs-install-a-c-8bf101",
-            )
-            .into(),
-        )
+        Some(crate::i18n::text("backend-reftable-migration-requires-git-252").into())
     } else {
         None
     };
@@ -165,6 +166,20 @@ fn ref_witness(repo: &Path) -> Result<Vec<super::all_refs::Reference>, String> {
 mod tests {
     use super::*;
     #[test]
+    fn recording_affected_and_unknown_git_versions_cannot_migrate_reflogs() {
+        for version in ["git version 2.50.1", "git version 2.51.0", "unknown"] {
+            assert!(!safe_reflog_migration(version), "{version}");
+        }
+        for version in [
+            "git version 2.52.0",
+            "git version 2.52.1.windows.1",
+            "git version 3.0.0",
+        ] {
+            assert!(safe_reflog_migration(version), "{version}");
+        }
+    }
+
+    #[test]
     fn recording_strict_verification_and_snapshot_refusal_precede_migration() {
         for failure in 0..3 {
             let calls = std::cell::RefCell::new(Vec::new());
@@ -224,6 +239,32 @@ mod tests {
         let refs = ref_witness(r.path());
         let before = inspect(r.path())?;
         if !before.migrates {
+            let control = crate::git::OpControl::new(|| {});
+            let runner = Runner {
+                repo: r.path(),
+                control: &control,
+                credentials: None,
+            };
+            let original_refs = refs?;
+            let logs = r.git(&[
+                "reflog",
+                "show",
+                "--all",
+                "--format=%gD%x00%H%x00%gn%x00%ge%x00%gs",
+            ])?;
+            assert!(before.blocked.is_some());
+            assert!(migrate(&runner, &before, "reftable").is_err());
+            assert_eq!(inspect(r.path())?.format, "files");
+            assert_eq!(ref_witness(r.path())?, original_refs);
+            assert_eq!(
+                r.git(&[
+                    "reflog",
+                    "show",
+                    "--all",
+                    "--format=%gD%x00%H%x00%gn%x00%ge%x00%gs"
+                ])?,
+                logs
+            );
             return Ok(());
         }
         let control = crate::git::OpControl::new(|| {});

@@ -2484,3 +2484,5 @@ backend-your-own-core-excludesfile-every-repository-332eb5 = Your own (core.excl
 backend-your-own-git-s-default-place-every-repository-45a1e4 = Your own (git's default place), every repository
 backend-your-own-ignore-file-besides-each-repository-s-gitignore-60ecaa = Your own ignore file, besides each repository's .gitignore.
 backend-your-pending-review-was-sent-or-discarded-meanwhile-load-it-again-9836ae = Your pending review was sent or discarded meanwhile. Load it again.
+
+backend-reftable-migration-requires-git-252 = Reference migration requires Git 2.52 or later with reflog migration support; older versions can corrupt reflog identities.
