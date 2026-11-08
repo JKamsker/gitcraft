@@ -22,14 +22,27 @@ class Pure(unittest.TestCase):
         self.assertEqual(m.delivery_code(0,False),125)
         self.assertEqual(m.delivery_code(0,True),0)
         self.assertEqual(m.delivery_code(7,True),7)
-    def test_retirement_without_receipt_erases_nothing(self):
+    def test_retirement_pins_receipt_and_every_removal_to_one_identity(self):
         owner=dict(v=1,nonce='a',path=m.ROOT+'b'*32,token='c'*64)
-        actions=[]
-        def missing(_): raise ValueError('missing atomic receipt')
-        with self.assertRaises(ValueError): m.retire(owner,missing,actions.append,actions.append)
-        self.assertEqual(actions,[])
-        m.retire(owner,lambda _:None,actions.append,actions.append)
-        self.assertEqual(actions,[owner['path']+'/'+n for n in ('input','control','terminal')]+[owner['path']])
+        events=[]
+        class Directory:
+            def __init__(self,path): self.identity='original'; events.append(('pin',path))
+            def __enter__(self): return self
+            def __exit__(self,*unused): events.append(('close',self.identity))
+            def receipt(self):
+                events.append(('receipt',self.identity))
+                # Simulate pathname substitution after validation; the pinned identity stays.
+                self.pathname='foreign'
+                return m.encode(m.receipt(owner,'stopped',0))
+            def unlink(self,name): events.append(('unlink',self.identity,name)); self.pathname='foreign-again'
+        m.retire(owner,Directory)
+        self.assertEqual([e for e in events if e[0]=='unlink'],[('unlink','original',n) for n in ('input','control','terminal')])
+        self.assertEqual(events[-1],('close','original'))
+        events.clear()
+        class Missing(Directory):
+            def receipt(self): raise ValueError('missing atomic receipt')
+        with self.assertRaises(ValueError): m.retire(owner,Missing)
+        self.assertFalse(any(e[0]=='unlink' for e in events))
     def test_forwarding_backpressure_never_blocks_control_and_is_bounded(self):
         def blocked(fd, data): raise BlockingIOError()
         forward = m.Forwarder(blocked)

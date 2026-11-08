@@ -25,6 +25,8 @@ pub struct Link {
     pub tooltip: String,
 }
 
+mod receipt_retirement;
+pub use receipt_retirement::retire_private_receipt;
 mod private;
 pub use private::{create_private_directory, detach_controller, random_bytes};
 mod controller_reaper;

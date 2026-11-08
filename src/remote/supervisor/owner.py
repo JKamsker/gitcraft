@@ -1,6 +1,6 @@
 # gitcraft owned execution protocol v1. Python 3 POSIX backend.
 # No process discovery; group authority is a live, directly owned anchor child.
-import base64, errno, json, os, re, selectors, signal, socket, sys, time
+import base64, errno, json, os, re, selectors, signal, socket, stat, sys, time
 
 MAX = 64 << 20
 ROOT = '/tmp/gitcraft-owned-'
@@ -37,16 +37,42 @@ def atomic(path, data, exclusive=False):
         except OSError: pass
         raise
 
-def read_receipt(owner):
-    # The endpoint is a capability, not a PID or an arbitrary script/path.
-    fd = os.open(owner['path'] + '/terminal', os.O_RDONLY | os.O_NOFOLLOW)
-    with os.fdopen(fd, 'rb') as f:
-        value = json.loads(f.read(2049))
+class PinnedDirectory:
+    # Keep the checked directory identity even if its pathname is renamed/replaced.
+    def __init__(self, path):
+        self.fd = os.open(path, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC)
+        try:
+            info = os.fstat(self.fd)
+            if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.geteuid() or stat.S_IMODE(info.st_mode) != 0o700:
+                raise ValueError('endpoint directory is not private')
+        except BaseException:
+            os.close(self.fd); raise
+    def __enter__(self): return self
+    def __exit__(self, *unused): os.close(self.fd)
+    def receipt(self):
+        fd = os.open('terminal', os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC, dir_fd=self.fd)
+        with os.fdopen(fd, 'rb') as f:
+            info = os.fstat(f.fileno())
+            if not stat.S_ISREG(info.st_mode) or info.st_uid != os.geteuid() or info.st_mode & 0o077 or info.st_size > 2048:
+                raise ValueError('receipt is not a bounded private regular file')
+            data = f.read(2049)
+        if len(data) > 2048: raise ValueError('oversized receipt')
+        return data
+    def unlink(self, name):
+        try: os.unlink(name, dir_fd=self.fd)
+        except FileNotFoundError: pass
+
+def checked_receipt(owner, data):
+    value = json.loads(data)
     if set(value) != {'v', 'nonce', 'path', 'token', 'state', 'code', 'complete'}:
         raise ValueError('invalid terminal receipt')
     if any(value[k] != owner[k] for k in owner) or value['state'] != 'stopped' or type(value['complete']) is not bool or type(value['code']) is not int or not 0 <= value['code'] <= 255:
         raise ValueError('unconfirmed cleanup')
     return value
+
+def read_receipt(owner):
+    with PinnedDirectory(owner['path']) as directory:
+        return checked_receipt(owner, directory.receipt())
 
 def control(owner):
     owner = endpoint(owner)
@@ -67,13 +93,14 @@ def control(owner):
         return read_receipt(owner)
     finally: s.close()
 
-def retire(owner, read=read_receipt, unlink=os.unlink, rmdir=os.rmdir):
+def retire(owner, pin=PinnedDirectory):
     owner = endpoint(owner)
-    read(owner)  # Never erase recovery evidence without complete cleanup proof.
-    for name in ('input', 'control', 'terminal'):
-        try: unlink(owner['path'] + '/' + name)
-        except FileNotFoundError: pass
-    rmdir(owner['path'])
+    with pin(owner['path']) as directory:
+        checked_receipt(owner, directory.receipt())
+        for name in ('input', 'control', 'terminal'):
+            directory.unlink(name)
+    # An empty private directory is retained: pathname rmdir cannot atomically
+    # prove it still names the held directory. Never delete a substituted entry.
 
 def finish_owned(anchor, established, ops=os, pause=time.sleep):
     failure = None

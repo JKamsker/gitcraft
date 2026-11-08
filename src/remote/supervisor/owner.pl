@@ -6,7 +6,7 @@ use IO::Socket::UNIX;
 use IO::Select;
 use JSON::PP;
 use MIME::Base64 qw(decode_base64);
-use Fcntl qw(O_RDONLY O_WRONLY O_RDWR O_CREAT O_EXCL O_NOFOLLOW F_GETFD F_SETFD FD_CLOEXEC);
+use Fcntl qw(O_RDONLY O_WRONLY O_RDWR O_CREAT O_EXCL O_NOFOLLOW O_DIRECTORY O_NONBLOCK S_ISDIR S_ISREG F_GETFD F_SETFD FD_CLOEXEC);
 use Time::HiRes qw(time sleep);
 use Errno qw(ESRCH EAGAIN EWOULDBLOCK);
 use Socket qw(SOCK_STREAM);
@@ -40,18 +40,21 @@ sub atomic {
     rename($name, $path) or die 'receipt rename failed' unless $exclusive;
 }
 sub terminal {
-    my ($o) = @_;
+    my ($o,$relative) = @_;
     my $f;
-    if (!sysopen($f, "$o->{path}/terminal", O_RDONLY|O_NOFOLLOW)) {
+    if (!sysopen($f, ($relative // "$o->{path}/terminal"), O_RDONLY|O_NOFOLLOW|O_NONBLOCK)) {
         return undef if $!{ENOENT};
         die 'receipt open failed';
     }
-    my $bytes = ''; read($f, $bytes, 2049); close($f);
+    my @info=stat($f);
+    die 'receipt is not private regular file' unless @info && S_ISREG($info[2]) && $info[4] == $> && !($info[2]&0077) && $info[7] <= 2048;
+    my $bytes = ''; my $n=read($f, $bytes, 2049); close($f);
+    die 'receipt read failed' unless defined($n);
     die 'oversized receipt' if length($bytes) > 2048;
     my $v = $JSON->decode($bytes);
     die 'invalid receipt' unless ref($v) eq 'HASH' && join(',',sort keys %$v) eq 'code,complete,nonce,path,state,token,v';
     for my $k (keys %$o) { die 'unconfirmed receipt' unless $v->{$k} eq $o->{$k}; }
-    die 'unconfirmed receipt' unless $v->{state} eq 'stopped' && $v->{code} =~ /\A[0-9]+\z/ && $v->{code} <= 255;
+    die 'unconfirmed receipt' unless $v->{state} eq 'stopped' && $v->{code} =~ /\A[0-9]+\z/ && $v->{code} <= 255 && JSON::PP::is_bool($v->{complete});
     return $v;
 }
 sub control {
@@ -69,19 +72,31 @@ sub control {
     return $final;
 }
 sub cloexec { my $fd = fcntl($_[0], F_GETFD, 0); defined($fd) && fcntl($_[0], F_SETFD, $fd|FD_CLOEXEC) or die 'close-on-exec failed'; }
+sub pinned_directory {
+    my ($path,$body)=@_;
+    sysopen(my $dir,$path,O_RDONLY|O_DIRECTORY|O_NOFOLLOW) or die 'endpoint directory unavailable';
+    my @info=stat($dir);
+    die 'endpoint directory is not private' unless @info && S_ISDIR($info[2]) && $info[4] == $> && ($info[2]&0777)==0700;
+    sysopen(my $saved,'.',O_RDONLY|O_DIRECTORY|O_NOFOLLOW) or die 'cannot retain current directory';
+    # Core Perl chdir(FILEHANDLE) uses fchdir; unsupported platforms fail closed.
+    chdir($dir) or die 'cannot pin endpoint directory';
+    my $ok=eval {$body->();1;}; my $error=$@;
+    chdir($saved) or die 'cannot restore current directory';
+    close($saved); close($dir);
+    die $error unless $ok;
+}
 sub retire {
     my ($owner,$ops)=@_; identity($owner);
     $ops //= {
-        receipt=>sub { terminal($_[0]) or die 'missing atomic retirement receipt'; },
-        unlink=>sub { my ($path)=@_; unlink($path) or die 'retirement unlink failed' if -e $path || -l $path; },
-        rmdir=>sub { rmdir($_[0]) or die 'retirement directory failed'; }
+        pin=>\&pinned_directory,
+        receipt=>sub { terminal($_[0],'terminal') or die 'missing atomic retirement receipt'; },
+        unlink=>sub { my $ok=unlink($_[0]); die 'retirement unlink failed' if !$ok && !$!{ENOENT}; }
     };
-    $ops->{receipt}->($owner);
-    for my $name ('input','control','terminal') {
-        my $path="$owner->{path}/$name";
-        $ops->{unlink}->($path);
-    }
-    $ops->{rmdir}->($owner->{path});
+    $ops->{pin}->($owner->{path},sub {
+        $ops->{receipt}->($owner);
+        for my $name ('input','control','terminal') { $ops->{unlink}->($name); }
+    });
+    # Retain the empty directory; do not rmdir a possibly substituted pathname.
 }
 sub finish_owned {
     my ($anchor, $established, $ops) = @_;
@@ -317,14 +332,14 @@ elsif ($mode eq 'recording') {
         my $ok=eval {finish_owned(424242,1,$ops);1;};
         die 'double refusal skipped reap' if $ok || join(',',@failed) ne 'signal,signal,reap';
     }
-    my @retired;
+    my @retired; my $held; my $pathname='original';
     my $retiring={v=>1,nonce=>'a',path=>'/tmp/gitcraft-owned-'.('b'x32),token=>'c'x64};
-    my $retire_ops={receipt=>sub {die 'missing atomic receipt';},unlink=>sub {push @retired,$_[0];},rmdir=>sub {push @retired,$_[0];}};
+    my $retire_ops={pin=>sub {$held=$pathname; $_[1]->();},receipt=>sub {die 'missing atomic receipt';},unlink=>sub {push @retired,"$held/$_[0]"; $pathname='foreign-again';}};
     my $erased=eval {retire($retiring,$retire_ops);1;};
     die 'retired without proof' if $erased || @retired;
-    $retire_ops->{receipt}=sub {};
+    $retire_ops->{receipt}=sub {$pathname='foreign';};
     retire($retiring,$retire_ops);
-    die 'unexpected retirement target' unless join(',',@retired) eq join(',',map {"$retiring->{path}/$_"} ('input','control','terminal')).",$retiring->{path}";
+    die 'retirement escaped pinned identity' unless join(',',@retired) eq 'original/input,original/control,original/terminal';
     my @queued=('abcdef','');
     die 'blocked forward lost bytes' unless forward_flush(\@queued,sub {$!=EAGAIN; return undef;}) && $queued[0] eq 'abcdef';
     die 'partial forward lost bytes' unless forward_flush(\@queued,sub {return 2;}) && $queued[0] eq 'cdef';

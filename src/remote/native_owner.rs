@@ -183,9 +183,8 @@ impl Endpoint {
         if !self.valid() {
             return Err("invalid native endpoint".into());
         }
-        self.terminal()?;
-        std::fs::remove_file(self.path.join("terminal")).map_err(|e| e.to_string())?;
-        std::fs::remove_dir(&self.path).map_err(|e| e.to_string())
+        gitcraft_os::retire_private_receipt(&self.path, |bytes| self.confirms(bytes))
+            .map_err(|e| e.to_string())
     }
 }
 
