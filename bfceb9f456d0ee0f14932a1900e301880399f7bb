@@ -1,0 +1,16 @@
+Independent adversarial review: PASS
+
+Candidate: bfceb9f456d0ee0f14932a1900e301880399f7bb
+Base: 760c79bb69ffc3af5401612bd9c48dcd254eca54
+Reviewer: separate agent /root/final_adversarial_review; fresh context, read-only.
+
+PASS at bfceb9f456d0ee0f14932a1900e301880399f7bb against 760c79bb69ffc3af5401612bd9c48dcd254eca54. No actionable introduced findings.
+
+- Terminal fields are privately owned; launch/close/select/hide/error/paste transitions preserve behavior. Palette ordering, labels, shortcuts, popout coordination, and owned-session teardown remain consistent.
+- Metrics correction passes review. All 5 scanner tests passed; baseline JSON reproduced exactly; reported results and zero central-file edits for Hide verified. Additional Git-config variations produced identical history metrics.
+- All 41 archived evidence files match manifest hashes. Application source matches the tested commit; consolidated implementation matches the accepted tree.
+- Evidence honestly reports existing limitations: 3 reproduced baseline test failures, 6 existing strict-Clippy warnings, and Windows check blocked by missing MinGW. No whole-suite, release-performance, SSH, or WSL pass is implied.
+
+Review remained read-only; no CI or process/PTY tests ran.
+
+Prior round at 0c2b68e1 identified configuration-dependent history metrics. Response: pinned no-renames/Myers/no textconv/no external diff/quoting policy, raw Git blob source reads, real Git fixtures, and regenerated baseline. Final round verified the correction and reported no unresolved objections.
