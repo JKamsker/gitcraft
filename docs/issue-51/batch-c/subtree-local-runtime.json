@@ -1,0 +1,91 @@
+{
+  "application": "cc337f2fcca30d51e9bb4cfeee5a7e9140b7296d",
+  "initial_application": "e8bef07e6a4b4764d4513b33666781d61c4e3ea2",
+  "test_only": true,
+  "runtime": {
+    "candidate": "cc337f2fcca30d51e9bb4cfeee5a7e9140b7296d",
+    "private": "/private/tmp/g51-subtree-bl1bc67_",
+    "scope": "two exact owned-local subtree lifecycle tests, sequential, stop first failure; actual helper+local filesystem transport, no push/publication or external transport",
+    "stock_template": "/opt/homebrew/share/git-core/templates",
+    "stock_hooks": [
+      "applypatch-msg.sample",
+      "commit-msg.sample",
+      "fsmonitor-watchman.sample",
+      "post-update.sample",
+      "pre-applypatch.sample",
+      "pre-commit.sample",
+      "pre-merge-commit.sample",
+      "pre-push.sample",
+      "pre-rebase.sample",
+      "pre-receive.sample",
+      "prepare-commit-msg.sample",
+      "push-to-checkout.sample",
+      "sendemail-validate.sample",
+      "update.sample"
+    ],
+    "adapter_sha256": "058fe0245579d4e2b87b5bd73e6fd4928b021bd2130f68a1971965fa937dc8ed",
+    "results": [
+      {
+        "name": "git::repository_tools::subtrees::runtime_tests::subtree_owned_squash_import_conflict_accept_and_split",
+        "command": [
+          "cargo",
+          "+1.95.0",
+          "test",
+          "--locked",
+          "--offline",
+          "--lib",
+          "git::repository_tools::subtrees::runtime_tests::subtree_owned_squash_import_conflict_accept_and_split",
+          "--",
+          "--exact",
+          "--test-threads=1",
+          "--nocapture"
+        ],
+        "exit": 0,
+        "pass": true,
+        "seconds": 74.532,
+        "log": "/private/tmp/g51-subtree-bl1bc67_/01.log",
+        "sha256": "c7d6be916552013b30f6bae2f1cc0e9bbb4a273b17f2a59bcb6441a5ec048468"
+      },
+      {
+        "name": "git::repository_tools::subtrees::runtime_tests::subtree_owned_full_history_import_conflict_accept_and_split",
+        "command": [
+          "cargo",
+          "+1.95.0",
+          "test",
+          "--locked",
+          "--offline",
+          "--lib",
+          "git::repository_tools::subtrees::runtime_tests::subtree_owned_full_history_import_conflict_accept_and_split",
+          "--",
+          "--exact",
+          "--test-threads=1",
+          "--nocapture"
+        ],
+        "exit": 0,
+        "pass": true,
+        "seconds": 45.467,
+        "log": "/private/tmp/g51-subtree-bl1bc67_/02.log",
+        "sha256": "37270f5ab48b36913b1c57792ae5a0df543648051f8a33f6adf9764902f94306"
+      }
+    ]
+  },
+  "runtime_receipt_sha256": "fd60f62a350575455006bece7eb38c264b2a85d6c2e35dfaf7a2e513292196ec",
+  "initial_failure_retained": "/private/tmp/g51-subtree-wmomym8i/results.json",
+  "initial_failure_explanation": "Identical root Fixture commits triggered native subtree cache collision on full split. Independent source root message fixes only fixture; no application fallback or assertion weakened.",
+  "compile_log_sha256": "eb9474ac6dbea7c01cf78231f1cc444a427d0b11dd295b4d550651109f1146d2",
+  "pure_gates": {
+    "count": 9,
+    "commit": "e8bef07e6a4b4764d4513b33666781d61c4e3ea2",
+    "log_sha256": "0b95200f1e71c6fcb66fe8918032256e94727e208bc6240a9a29feab8057f332"
+  },
+  "source_hashes": {
+    "src/git/repository_tools/subtrees/runtime_tests.rs": "ef3fe79625886dce958100ef1208a417a40b46ddcd18590de8b2bd3e6a0a5425",
+    "src/git/repository_tools/subtrees.rs": "f5c73899d1e20c4966e48cc1f032368c55c3168fac2b447b9e090187f1bc8b32"
+  },
+  "limits": [
+    "macOS native Git2.56 and installed git-subtree only",
+    "Local filesystem remote only; no external network or credential tests",
+    "No reviewed send/remote publication, GUI, Linux/Windows runtime coverage",
+    "Application production unchanged; integration/combined review still required"
+  ]
+}
