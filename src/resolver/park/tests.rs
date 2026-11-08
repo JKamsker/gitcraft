@@ -695,7 +695,9 @@ fn filtered_clean_edit_after_parking_is_refused_before_any_writes() -> Result<()
     );
     let before = state(&repo)?;
     let index = std::fs::read(git_dir(repo.path())?.join("index")).map_err(|e| e.to_string())?;
-    let error = bring_back(repo.path(), &parked).expect_err("must retain hidden user edit");
+    let error = bring_back(repo.path(), &parked)
+        .err()
+        .ok_or("must retain hidden user edit")?;
     assert!(error.contains("raw bytes changed"), "{error}");
     assert_eq!(state(&repo)?, before);
     assert_eq!(

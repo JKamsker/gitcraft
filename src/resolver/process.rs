@@ -232,7 +232,9 @@ mod tests {
         assert!(!running.stop_now());
         lock(&running.feed).exit = Some(failure_exit(Failure::CancelledBeforeStart));
         assert!(running.stop_now());
-        *lock(&running.worker) = Some(std::thread::spawn(|| panic!("synthetic worker panic")));
+        *lock(&running.worker) = Some(std::thread::spawn(|| {
+            std::panic::resume_unwind(Box::new("synthetic worker panic"))
+        }));
         assert!(!running.stop_now());
         assert!(
             !running.stop_now(),
