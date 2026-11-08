@@ -332,69 +332,57 @@ fn fix_dialog(plan: &Plan, who: &str, email: &str) -> Dialog {
     .refresh(Refresh::All)
 }
 
-fn plural(n: usize, one: &str, many: &str) -> String {
-    format!("{n} {}", if n == 1 { one } else { many })
-}
-
 /// What [`fix_dialog`] says it will do.
 pub(crate) fn fix_preview(plan: &Plan, who: &str, email: &str) -> String {
     let unsigned = plan.unsigned();
-    let mut text = format!(
-        "Rewrites the {} of {} since {} (rebase --signoff), adding \"Signed-off-by: {who}\" \
-         to each that doesn't have it. {} the DCO check refuses now:\n",
-        plural(plan.commits.len(), "commit", "commits"),
-        plan.branch,
-        super::short(&plan.base),
-        if unsigned.len() == 1 {
-            "1 of them is one".to_owned()
-        } else {
-            format!("{} of them are ones", unsigned.len())
-        },
-    );
-    for c in unsigned.iter().take(8) {
-        text.push_str(&format!("  • {} {}\n", super::short(&c.hash), c.summary));
-    }
-    if unsigned.len() > 8 {
-        text.push_str(&format!("  • and {} more\n", unsigned.len() - 8));
-    }
+    let commits = unsigned
+        .iter()
+        .take(8)
+        .map(|c| format!("  • {} {}\n", super::short(&c.hash), c.summary))
+        .collect::<String>();
     let others = plan.by_others(email);
-    if !others.is_empty() {
-        let mut names: Vec<&str> = Vec::new();
-        for c in &others {
-            if !names.contains(&c.author.as_str()) {
-                names.push(&c.author);
-            }
+    let mut names: Vec<&str> = Vec::new();
+    for c in &others {
+        if !names.contains(&c.author.as_str()) {
+            names.push(&c.author);
         }
-        text.push_str(&format!(
-            "\n{} by {}: you become their committer, and your sign-off certifies them. Only \
-             go ahead if you may.\n",
-            if others.len() == 1 {
-                "1 of them is".to_owned()
-            } else {
-                format!("{} of them are", others.len())
-            },
-            names.join(", "),
-        ));
     }
-    match &plan.push {
-        Some(push) => {
-            let guard = if push.seen.is_some() {
-                crate::i18n::text("repo-workflows-dco-fix-preview-1cc2b37b")
-            } else {
-                crate::i18n::text("repo-workflows-dco-fix-preview-b12258fd")
-            };
-            text.push_str(&format!(
-                "\nThen force-pushes it to {} with a lease: {guard}.\n\nCtrl+Z puts the \
-                 commits as they were back, on the remote and here.",
-                push.label()
-            ));
-        }
-        None => text.push_str(
-            "\nThe branch has no remote branch: nothing is pushed. Pushing it later replaces \
-             the old commits there (a force push).\n\nCtrl+Z puts the commits as they were back.",
-        ),
-    }
-    text
+    crate::i18n::message(
+        "repo-workflows-dco-whole-preview",
+        &[
+            ("count", (plan.commits.len()).into()),
+            ("branch", (plan.branch.as_str()).into()),
+            ("base", (super::short(&plan.base)).into()),
+            ("who", (who).into()),
+            ("unsigned", (unsigned.len()).into()),
+            ("commits", (commits).into()),
+            ("more", (unsigned.len().saturating_sub(8)).into()),
+            ("others", (others.len()).into()),
+            ("authors", (names.join(", ")).into()),
+            (
+                "push",
+                (if plan.push.is_some() { "yes" } else { "no" }).into(),
+            ),
+            (
+                "remote",
+                (plan
+                    .push
+                    .as_ref()
+                    .map(signoff::PushTarget::label)
+                    .unwrap_or_default())
+                .into(),
+            ),
+            (
+                "seen",
+                (if plan.push.as_ref().is_some_and(|p| p.seen.is_some()) {
+                    "yes"
+                } else {
+                    "no"
+                })
+                .into(),
+            ),
+        ],
+    )
 }
 
 /// The action that asks to sign off the checked-out branch's commits since `base`, while it is
@@ -404,4 +392,61 @@ pub(crate) fn plan_fix(base: &str, head: &str) -> Action {
         base: base.to_owned(),
         head: head.to_owned(),
     })
+}
+#[cfg(test)]
+mod fluent_preview_tests {
+    use super::*;
+    #[test]
+    fn fluent_partition_dco_actual_preview_keeps_raw_labels_authors_and_numeric_plan() {
+        let plan = Plan {
+            branch: "feature/ß".into(),
+            head: "abcdef1234567890".into(),
+            base: "12345678abcdef00".into(),
+            commits: (0..1234)
+                .map(|index| Signed {
+                    hash: format!("{index:016x}"),
+                    summary: "Opaque subject 日本語".into(),
+                    author: "Other Author / ß".into(),
+                    email: "other@example.test".into(),
+                    merge: false,
+                    bot: false,
+                    signed: false,
+                })
+                .collect(),
+            push: None,
+        };
+        let raw = plan.clone();
+        for language in ["en-US", "de"] {
+            crate::i18n::set_language(language);
+            let body = fix_preview(&plan, "Me <me@example.test>", "me@example.test");
+            assert!(body.contains("feature/ß") && body.contains("12345678"));
+            assert!(body.contains("Signed-off-by: Me <me@example.test>"));
+            assert!(body.contains("Opaque subject 日本語") && body.contains("Other Author / ß"));
+            assert!(body.contains(if language == "de" {
+                "1.234 Commits"
+            } else {
+                "1,234 commits"
+            }));
+            assert!(body.contains(if language == "de" {
+                "1.226 weitere"
+            } else {
+                "1,226 more"
+            }));
+            assert!(body.contains(if language == "de" {
+                "nur fort, wenn Sie dazu berechtigt sind"
+            } else {
+                "Only go ahead if you may"
+            }));
+            assert!(body.contains(if language == "de" {
+                "nichts gepusht"
+            } else {
+                "nothing is pushed"
+            }));
+            assert_eq!(fix_label(&plan), "Sign off the commits of feature/ß");
+            assert_eq!(plan, raw);
+            assert_eq!(plan.unsigned().len(), 1234);
+            assert_eq!(plan.by_others("me@example.test").len(), 1234);
+        }
+        crate::i18n::set_language("en-US");
+    }
 }

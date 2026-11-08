@@ -1174,7 +1174,7 @@ repo-workflows-dco-fix-button-344ac70e = Commits des Branches signieren …
 
 repo-workflows-dco-fix-button-6d181602 = Checken Sie zuerst { $details-head-branch-1 } aus oder öffnen Sie den Branch in einem Worktree. Signiert werden die Commits des ausgecheckten Branches am neuesten Stand des Pull Requests.
 
-repo-workflows-dco-fix-dialog-1a8aeebd = Signieren und pushen
+repo-workflows-dco-fix-dialog-1a8aeebd = Mit Sign-off versehen, dann Push prüfen
 
 repo-workflows-dco-fix-dialog-6ce6ab1f = Signieren
 
@@ -7487,4 +7487,28 @@ repo-workflows-fence-violation-line = { "  " }{ $path } ({ $how ->
         [untracked] nicht versioniert
        *[ignored] von Git ignoriert
     }; Grenze: { $pattern })
+
+repo-workflows-dco-whole-preview = Schreibt { $count ->
+        [one] den Commit
+       *[other] die { $count } Commits
+    } von { $branch } seit { $base } um (rebase --signoff) und ergänzt "Signed-off-by: { $who }", wo diese Zeile fehlt. Die DCO-Prüfung lehnt derzeit { $unsigned ->
+        [one] einen davon ab
+       *[other] { $unsigned } davon ab
+    }:
+    { $commits }{ $more ->
+        [0] { "" }
+       *[other] { "  • und " }{ $more } weitere{ "\u000A" }
+    }{ $others ->
+        [0] { "" }
+        [one] { "\u000AEiner davon stammt von " }{ $authors }: Sie werden dessen Committer und bestätigen ihn mit Ihrem Sign-off. Fahren Sie nur fort, wenn Sie dazu berechtigt sind.{ "\u000A" }
+       *[other] { "\u000A" }{ $others } davon stammen von { $authors }: Sie werden deren Committer und bestätigen sie mit Ihrem Sign-off. Fahren Sie nur fort, wenn Sie dazu berechtigt sind.{ "\u000A" }
+    }{ $push ->
+        [yes] { "\u000ADanach öffnet sich die Push-Vorprüfung für die mit Sign-off versehenen Commits an " }{ $remote } mit einer Lease: { $seen ->
+            [yes] Der Push wird abgelehnt, wenn dort seit dem letzten Abruf jemand gepusht hat
+           *[no] Der Push wird abgelehnt, wenn dieser Branch dort bereits existiert
+        }. Prüfen und genehmigen Sie diesen Push gesondert.
+    
+    Strg+Z stellt die lokalen Commits wieder her. Bereits veröffentlichter Remote-Verlauf kann nur durch einen eigenen geprüften Push wiederhergestellt werden.
+       *[no] { "\u000ADer Branch hat keinen Remote-Branch: Es wird nichts gepusht. Ein späterer Push ersetzt dort die alten Commits (Force-Push).\u000A\u000AStrg+Z stellt die vorherigen Commits wieder her." }
+    }
 
