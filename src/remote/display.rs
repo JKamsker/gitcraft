@@ -6,6 +6,8 @@
 
 use crate::i18n::{message, text};
 
+mod composition;
+
 // Exact application-owned diagnostics, source-bound in the handoff inventory. Shared
 // helper spellings intentionally resolve to one ID; unknown external text stays opaque.
 const KNOWN: &[(&str, &str, Option<u32>)] = &[
@@ -1495,7 +1497,11 @@ fn render(raw: &str) -> Option<String> {
                     return Some(message(id, &[(name, number.into())]));
                 }
             } else {
-                return Some(message(id, &[(name, value.into())]));
+                let child = composition::envelope(id, value);
+                return Some(message(
+                    id,
+                    &[(name, child.as_deref().unwrap_or(value).into())],
+                ));
             }
         }
     }
@@ -1573,6 +1579,17 @@ fn two_arguments(raw: &str) -> Option<String> {
                     }
                 }
             }
+            if matches!(
+                id,
+                "interaction-remote-write-file" | "interaction-remote-scratch-folder"
+            ) {
+                let child = composition::filesystem(detail);
+                return Some(pair(
+                    id,
+                    ("host", host),
+                    ("detail", child.as_deref().unwrap_or(detail)),
+                ));
+            }
             return Some(pair(id, ("host", host), ("detail", detail)));
         }
     }
@@ -1603,7 +1620,10 @@ fn two_arguments(raw: &str) -> Option<String> {
         ),
     ] {
         if let Some((detail, proof)) = raw.split_once(separator) {
-            return Some(pair(id, ("detail", detail), ("proof", proof)));
+            return Some(
+                composition::native_proof(id, detail, proof)
+                    .unwrap_or_else(|| pair(id, ("detail", detail), ("proof", proof))),
+            );
         }
     }
     if let Some(body) = raw
