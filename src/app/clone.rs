@@ -154,6 +154,7 @@ impl App {
         }
         let url = form.url.trim().to_owned();
         let creds = (form.auth && !form.username.trim().is_empty()).then(|| git::Credentials {
+            scope: git::CredentialScope::for_url(form.url.trim(), form.username.trim()).ok(),
             username: form.username.trim().to_owned(),
             password: form.password.clone(),
         });
@@ -195,6 +196,11 @@ impl App {
                         .take()
                         .filter(|f| f.auth)
                         .map(|form| git::Credentials {
+                            scope: git::CredentialScope::for_url(
+                                form.url.trim(),
+                                form.username.trim(),
+                            )
+                            .ok(),
                             username: form.username.trim().to_owned(),
                             password: form.password,
                         });
@@ -211,6 +217,8 @@ impl App {
                     && root.as_ref() == Some(&repo.path)
                 {
                     repo.set_credentials(git::Credentials {
+                        scope: git::CredentialScope::for_url(form.url.trim(), form.username.trim())
+                            .ok(),
                         username: form.username.trim().to_owned(),
                         password: form.password,
                     });

@@ -217,18 +217,23 @@ impl Drop for TraceFile {
 /// error output, behind [`MARK`]. Without that folder, git just runs. Its first line names the
 /// command, for messages about it (`Request::what`).
 pub(super) fn traced_script(words: &str) -> String {
+    traced_script_with_program(words, "git")
+}
+/// The fixed selected executable for credential-bearing remote runners.
+pub(super) fn traced_script_with_program(words: &str, program: &str) -> String {
     format!(
         concat!(
-            ": git {words}\n",
+            ": {program} {words}\n",
             "t=\"${{T:+$T/hook-events}}\"\n",
-            "if [ -n \"$t\" ] && : >\"$t\" 2>/dev/null; then {var}=\"$t\" git {words}\n",
-            "else t=; git {words}; fi\n",
+            "if [ -n \"$t\" ] && : >\"$t\" 2>/dev/null; then {var}=\"$t\" {program} {words}\n",
+            "else t=; {program} {words}; fi\n",
             "r=$?\n",
             "if [ -n \"$t\" ]; then\n",
             "  printf '\\n%s\\n' '{mark}' >&2; grep -F '\"child_' \"$t\" >&2; rm -f \"$t\"\n",
             "fi\n",
             "exit $r",
         ),
+        program = program,
         var = TRACE_VAR,
         words = words,
         mark = MARK,

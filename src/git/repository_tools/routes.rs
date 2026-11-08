@@ -284,14 +284,24 @@ pub(crate) fn push_branch(
         return Err("Choose a push route first".into());
     }
     browser.snapshot.check(runner.repo)?;
-    runner.run(&[
-        "push",
-        "--porcelain",
-        "--recurse-submodules=check",
-        "--",
-        &b.push.remote,
-        &format!("{}:refs/heads/{}", b.oid, b.push.branch),
-    ])
+    let urls = text(
+        runner.repo,
+        &["remote", "get-url", "--push", "--all", "--", &b.push.remote],
+    )?;
+    browser.snapshot.check(runner.repo)?;
+    let mut output = String::new();
+    for url in urls.lines() {
+        super::remote_config::validate_url(url)?;
+        browser.snapshot.check_publication(runner.repo)?;
+        output.push_str(&runner.endpoint(
+            runner.repo,
+            url,
+            &b.push.remote,
+            &["push", "--porcelain", "--recurse-submodules=check", "--"],
+            &[&format!("{}:refs/heads/{}", b.oid, b.push.branch)],
+        )?);
+    }
+    Ok(output)
 }
 #[cfg(test)]
 mod tests {
@@ -410,7 +420,20 @@ pub(crate) fn prepare_force(repo: &Path, branch: &str, expected: &str) -> Result
     }
     super::remote_config::validate_url(urls[0])?;
     let destination = format!("refs/heads/{}", b.push.branch);
-    let advertised = text(repo, &["ls-remote", "--refs", "--", urls[0], &destination])?;
+    browser.snapshot.check(repo)?;
+    let control = crate::git::OpControl::new(|| {});
+    let runner = Runner {
+        repo,
+        control: &control,
+        credentials: None,
+    };
+    let advertised = runner.endpoint(
+        repo,
+        urls[0],
+        &b.push.remote,
+        &["ls-remote", "--refs", "--"],
+        &[&destination],
+    )?;
     let remote_commit = advertised
         .lines()
         .find_map(|l| {
@@ -432,16 +455,76 @@ pub(crate) fn prepare_force(repo: &Path, branch: &str, expected: &str) -> Result
 }
 pub(crate) fn force(runner: &Runner<'_>, plan: &Force) -> Result<String, String> {
     plan.snapshot.check(runner.repo)?;
-    runner.run(&[
-        "push",
-        "--porcelain",
-        "--recurse-submodules=check",
-        &format!(
-            "--force-with-lease={}:{}",
-            plan.destination, plan.remote_commit
-        ),
-        "--",
+    runner.endpoint(
+        runner.repo,
         &plan.url,
-        &format!("{}:{}", plan.commit, plan.destination),
-    ])
+        &plan.remote,
+        &[
+            "push",
+            "--porcelain",
+            "--recurse-submodules=check",
+            &format!(
+                "--force-with-lease={}:{}",
+                plan.destination, plan.remote_commit
+            ),
+            "--",
+        ],
+        &[&format!("{}:{}", plan.commit, plan.destination)],
+    )
+}
+
+/// Execute an explicit saved branch route through its once-resolved destinations.
+/// Called by the ordinary operation worker before the generic command path.
+pub(crate) fn run_plain_push(
+    repo: &Path,
+    args: &[&str],
+    credentials: Option<&crate::git::Credentials>,
+    control: Option<&std::sync::Arc<crate::git::OpControl>>,
+) -> Result<Option<String>, String> {
+    let Some(rewritten) = rewrite_plain_push(repo, args)? else {
+        return Ok(None);
+    };
+    let Some(at) = rewritten.iter().position(|a| a == "--") else {
+        return Ok(None);
+    };
+    if rewritten.len() != at + 3 {
+        return Err("Invalid saved branch route".into());
+    }
+    let snapshot = Snapshot::capture(repo)?;
+    if rewrite_plain_push(repo, args)?.as_ref() != Some(&rewritten) {
+        return Err("Saved push route changed while preparing".into());
+    }
+    let remote = &rewritten[at + 1];
+    let (source, destination) = rewritten[at + 2]
+        .split_once(':')
+        .ok_or("Invalid saved push refspec")?;
+    let commit = text(
+        repo,
+        &["rev-parse", "--verify", &format!("{source}^{{commit}}")],
+    )?;
+    let urls = text(
+        repo,
+        &["remote", "get-url", "--push", "--all", "--", remote],
+    )?;
+    if urls.lines().next().is_none() {
+        return Err("Saved push route has no destination".into());
+    }
+    snapshot.check(repo)?;
+    let owned = control.is_none().then(|| crate::git::OpControl::new(|| {}));
+    let runner = Runner {
+        repo,
+        control: control
+            .or(owned.as_ref())
+            .ok_or("Missing operation control")?,
+        credentials,
+    };
+    let before: Vec<&str> = rewritten[..=at].iter().map(String::as_str).collect();
+    let refspec = format!("{}:{destination}", commit.trim());
+    let mut output = String::new();
+    for url in urls.lines() {
+        super::remote_config::validate_url(url)?;
+        snapshot.check_publication(repo)?;
+        output.push_str(&runner.endpoint(repo, url, remote, &before, &[&refspec])?);
+    }
+    Ok(Some(output))
 }

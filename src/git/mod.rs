@@ -10,6 +10,8 @@ mod branch_health;
 mod bundles;
 #[cfg(test)]
 mod clone_tests;
+mod credential_scope;
+pub use credential_scope::*;
 mod command;
 mod commit_msg;
 mod commits;

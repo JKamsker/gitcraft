@@ -75,20 +75,27 @@ impl Runner<'_> {
         if self.control.is_cancelled() {
             return Err(git::CANCELLED.into());
         }
-        // The shell is Git's installed sh, including on Windows. Fixed source only; arguments
-        // remain separate argv elements. Strip inherited redirection on the repository machine.
-        let mut guarded = vec![
-            "-c",
-            "alias.gitcraft-repository-write=!f() { unset GIT_DIR GIT_COMMON_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_NAMESPACE GIT_REPLACE_REF_BASE GIT_SHALLOW_FILE GIT_CONFIG_COUNT GIT_CONFIG_PARAMETERS; git \"$@\"; }; f",
-            "gitcraft-repository-write",
-        ];
-        if self.credentials.is_some() {
-            guarded.extend(["-c", "credential.helper=!f() { test \"$1\" = get && printf 'username=%s\\npassword=%s\\n' \"$GITCRAFT_GIT_USERNAME\" \"$GITCRAFT_GIT_PASSWORD\"; }; f"]);
-        }
-        guarded.extend(args);
         let (result, record) =
-            git::run_watched_recorded(Some(repo), &guarded, self.credentials, false, self.control);
+            git::run_watched_recorded(Some(repo), args, None, false, self.control);
         self.control.record(record);
         result
+    }
+    pub fn endpoint(
+        &self,
+        repo: &Path,
+        url: &str,
+        remote: &str,
+        before: &[&str],
+        after: &[&str],
+    ) -> Result<String, String> {
+        git::command::repository_endpoint(
+            repo,
+            url,
+            remote,
+            before,
+            after,
+            self.credentials,
+            self.control,
+        )
     }
 }

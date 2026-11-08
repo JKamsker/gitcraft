@@ -176,6 +176,26 @@ pub fn run_watched_recorded(
     quiet: bool,
     control: &Arc<OpControl>,
 ) -> (Result<String, String>, Recorded) {
+    let extra = match extra_for(dir, args, creds, quiet) {
+        Ok(extra) => extra,
+        Err(e) => {
+            return (
+                Err(e.clone()),
+                Recorded::new(args, None, &e, creds, Instant::now()),
+            );
+        }
+    };
+    run_watched_extra_recorded(dir, args, creds, quiet, control, extra)
+}
+
+pub(in crate::git) fn run_watched_extra_recorded(
+    dir: Option<&Path>,
+    args: &[&str],
+    creds: Option<&Credentials>,
+    quiet: bool,
+    control: &Arc<OpControl>,
+    mut extra: Extra,
+) -> (Result<String, String>, Recorded) {
     let started = Instant::now();
     if control.is_cancelled() {
         let not_run = Recorded::new(args, None, "Not run: cancelled", creds, started);
@@ -192,7 +212,6 @@ pub fn run_watched_recorded(
         let rec = Recorded::new(&words, None, &e, creds, started);
         (Err(e), rec)
     };
-    let mut extra = extra_for(dir, creds, quiet);
     extra.trace_hooks = !quiet && crate::git::hooks::wants_trace(args);
     let trace = (dir.and_then(remote::parse).is_none() && extra.trace_hooks)
         .then(crate::git::hooks::TraceFile::new)

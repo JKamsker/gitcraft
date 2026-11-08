@@ -108,16 +108,18 @@ pub(super) fn credentials(
     ui.add_space(4.0);
     ui.label(
         RichText::new(
-            "Used for this tab until you close it. If git has a credential helper (such as Git \
-             Credential Manager), it saves them once they work.",
+            "Transient HTTPS sign-in requires Git 2.46 or newer on the repository machine. Used only for this endpoint and account; not automatically stored.",
         )
         .color(t.text_faint)
         .small(),
     );
     ui.add_space(8.0);
-    let valid = !username.trim().is_empty() && !password.is_empty();
+    let valid = url.starts_with("https://")
+        && crate::git::CredentialScope::for_url(url, username.trim()).is_ok()
+        && !password.is_empty();
     buttons(ui, "Sign in", valid, enter, || {
         Action::SignIn(crate::git::Credentials {
+            scope: crate::git::CredentialScope::for_url(url, username.trim()).ok(),
             username: username.trim().to_owned(),
             password: password.clone(),
         })

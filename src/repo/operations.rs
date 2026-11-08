@@ -357,6 +357,10 @@ fn run_step(
     quiet: bool,
     control: Option<&Arc<git::OpControl>>,
 ) -> Result<String, String> {
+    if let Some(result) = git::repository_tools::routes::run_plain_push(path, args, creds, control)?
+    {
+        return Ok(result);
+    }
     let routed = git::repository_tools::routes::rewrite_plain_push(path, args)?;
     let routed_args: Vec<&str> = routed
         .as_ref()

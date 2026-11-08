@@ -189,7 +189,7 @@ fn remote_tip(
     branch: &str,
 ) -> Result<Option<String>, String> {
     let name = format!("refs/heads/{branch}");
-    let out = runner.in_repo(repo, &["ls-remote", "--refs", "--", url, &name])?;
+    let out = runner.endpoint(repo, url, "", &["ls-remote", "--refs", "--"], &[&name])?;
     Ok(out.lines().find_map(|l| {
         l.split_once('\t')
             .filter(|(_, r)| *r == name)
@@ -220,15 +220,18 @@ fn advertised(runner: &Runner<'_>, node: &Dependency) -> Result<Vec<String>, Str
         std::process::id(),
         CHECKS.fetch_add(1, Ordering::Relaxed)
     );
-    let fetch = runner.in_repo(
+    let fetch = runner.endpoint(
         &node.repo,
+        &node.fetch_url,
+        &node.remote,
         &[
             "fetch",
             "--no-recurse-submodules",
             "--no-tags",
             "--no-write-fetch-head",
             "--",
-            &node.fetch_url,
+        ],
+        &[
             &format!("+refs/heads/*:{ns}/heads/*"),
             &format!("+refs/tags/*:{ns}/tags/*"),
         ],
@@ -437,15 +440,12 @@ pub(crate) fn publish(runner: &Runner<'_>, mut plan: Plan) -> Result<Plan, Strin
                     &node.repo,
                     &["check-ref-format", &format!("refs/heads/{}", node.target)],
                 )?;
-                runner.in_repo(
+                runner.endpoint(
                     &node.repo,
-                    &[
-                        "push",
-                        "--porcelain",
-                        "--",
-                        &node.push_url,
-                        &format!("{}:refs/heads/{}", node.source, node.target),
-                    ],
+                    &node.push_url,
+                    &node.remote,
+                    &["push", "--porcelain", "--"],
+                    &[&format!("{}:refs/heads/{}", node.source, node.target)],
                 )?;
                 if !reachable(runner, node)? {
                     return Err("Push succeeded, but the required commits are still unreachable from the named fetch URL. Parent publication stopped.".into());
@@ -464,14 +464,16 @@ pub(crate) fn publish(runner: &Runner<'_>, mut plan: Plan) -> Result<Plan, Strin
         Err("Parent not pushed because a submodule dependency failed".into())
     } else {
         plan.snapshot.check_publication(runner.repo)?;
-        runner.run(&[
-            "push",
-            "--porcelain",
-            "--recurse-submodules=check",
-            "--",
+        runner.endpoint(
+            runner.repo,
             &plan.parent_url,
-            &format!("{}:refs/heads/{}", plan.commit, plan.parent_branch),
-        ])
+            &plan.parent_remote,
+            &["push", "--porcelain", "--recurse-submodules=check", "--"],
+            &[&format!(
+                "{}:refs/heads/{}",
+                plan.commit, plan.parent_branch
+            )],
+        )
     });
     Ok(plan)
 }

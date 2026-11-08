@@ -207,6 +207,7 @@ fn a_background_fetch_is_kept_only_when_it_fails() {
 fn a_recorded_call_hides_its_secrets() {
     let dir = repo("secrets");
     let creds = git::Credentials {
+        scope: None,
         username: "ana".to_owned(),
         password: "s3cr3t-pass".to_owned(),
     };

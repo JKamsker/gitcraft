@@ -64,6 +64,8 @@ pub(super) fn with_profile(cmd: &mut Command, args: &[&str]) {
 
 use crate::remote::{self, Target};
 
+mod credential_policy;
+pub(crate) use credential_policy::*;
 mod watched;
 pub use watched::{CANCELLED, OpControl, run_watched, run_watched_recorded};
 
@@ -124,9 +126,13 @@ struct Ran {
 /// Options before the subcommand, and variables, a call is run with on top of [`GIT_ENV`].
 #[derive(Clone, Default)]
 pub(super) struct Extra {
+    /// Opt-in captured connection reads/recovery use the selected repository/profile,
+    /// not repository/config redirection inherited from the launching terminal.
+    normalize_repository: bool,
     output_limit: Option<usize>,
     stdout_file: Option<PathBuf>,
     pre: Vec<&'static str>,
+    owned_pre: Vec<String>,
     env: Vec<(&'static str, String)>,
     /// What git reads on its input; nothing when `None`.
     stdin: Option<Vec<u8>>,
@@ -202,12 +208,66 @@ pub(super) fn local_command(dir: Option<&Path>, extra: &Extra, args: &[&str]) ->
     if let Some(dir) = dir {
         cmd.arg("-C").arg(dir);
     }
-    cmd.args(&extra.pre);
+    apply_command_extras(cmd, dir, extra, args)
+}
+/// Apply the actual production argv/environment policy to an already selected command.
+/// Recording callers can provide a fixed executable without PATH discovery.
+pub(super) fn apply_command_extras(
+    mut cmd: Command,
+    dir: Option<&Path>,
+    extra: &Extra,
+    args: &[&str],
+) -> Command {
+    cmd.args(&extra.pre).args(&extra.owned_pre);
+    if dir.is_some() || extra.normalize_repository {
+        normalize_connection_command(&mut cmd, args);
+    }
     for (name, value) in &extra.env {
         cmd.env(name, value);
     }
+    if extra
+        .owned_pre
+        .iter()
+        .any(|arg| arg == "gitcraft-credential-transport")
+    {
+        let selected = cmd.get_program().to_owned();
+        cmd.env("GITCRAFT_GIT_ORIGINAL", selected);
+    }
     cmd.args(args);
     cmd
+}
+
+pub(super) const REPOSITORY_ENV_REMOVED: &[&str] = &[
+    "GIT_DIR",
+    "GIT_WORK_TREE",
+    "GIT_COMMON_DIR",
+    "GIT_INDEX_FILE",
+    "GIT_OBJECT_DIRECTORY",
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    "GIT_NAMESPACE",
+    "GIT_CONFIG",
+    "GIT_CONFIG_GLOBAL",
+    "GIT_CONFIG_SYSTEM",
+    "GIT_CONFIG_COUNT",
+    "GIT_CONFIG_PARAMETERS",
+    "GIT_CONFIG_NOSYSTEM",
+    "GIT_SHALLOW_FILE",
+    "GIT_REPLACE_REF_BASE",
+    "GIT_GRAFT_FILE",
+    "GIT_ATTR_SOURCE",
+];
+fn normalize_connection_command(cmd: &mut Command, args: &[&str]) {
+    for name in REPOSITORY_ENV_REMOVED {
+        cmd.env_remove(name);
+    }
+    for (name, _) in std::env::vars_os() {
+        let text = name.to_string_lossy();
+        if text.starts_with("GIT_CONFIG_KEY_") || text.starts_with("GIT_CONFIG_VALUE_") {
+            cmd.env_remove(name);
+        }
+    }
+    // Intentional immutable profile config is reinstalled after inherited config is removed.
+    with_profile(cmd, args);
 }
 
 /// The request that runs git with `args` in `target`'s folder, on its machine.
@@ -216,11 +276,31 @@ pub(super) fn remote_request(target: &Target, extra: &Extra, args: &[&str]) -> r
         .pre
         .iter()
         .copied()
+        .chain(extra.owned_pre.iter().map(String::as_str))
         .chain(args.iter().copied())
         .map(remote::sh_quote)
         .collect();
+    let credential_transport = extra
+        .owned_pre
+        .iter()
+        .any(|arg| arg == "gitcraft-credential-transport");
+    let pin = if credential_transport {
+        CREDENTIAL_REMOTE_PIN
+    } else {
+        ""
+    };
     let script = if extra.trace_hooks {
-        super::hooks::traced_script(&words.join(" "))
+        let program = if credential_transport {
+            "\"$GITCRAFT_GIT_ORIGINAL\""
+        } else {
+            "git"
+        };
+        format!(
+            "{pin}{}",
+            super::hooks::traced_script_with_program(&words.join(" "), program)
+        )
+    } else if credential_transport {
+        format!("{pin}exec \"$GITCRAFT_GIT_ORIGINAL\" {}", words.join(" "))
     } else {
         format!("exec git {}", words.join(" "))
     };
@@ -230,9 +310,20 @@ pub(super) fn remote_request(target: &Target, extra: &Extra, args: &[&str]) -> r
         env: GIT_ENV
             .iter()
             .map(|(n, v)| ((*n).to_owned(), (*v).to_owned()))
+            .chain(
+                (!user_global_config(args))
+                    .then(profile_config)
+                    .flatten()
+                    .map(|p| ("GIT_CONFIG_GLOBAL".into(), p.to_string_lossy().into_owned())),
+            )
             .chain(extra.env.iter().map(|(n, v)| ((*n).to_owned(), v.clone())))
             .collect(),
-        unset: GIT_ENV_REMOVED.iter().map(|n| (*n).to_owned()).collect(),
+        unset: GIT_ENV_REMOVED
+            .iter()
+            .copied()
+            .chain(REPOSITORY_ENV_REMOVED.iter().copied())
+            .map(str::to_owned)
+            .collect(),
         stdin: extra.stdin.clone(),
         // A tool stays open as long as the user works in it, apart from ordinary git reads.
         long: extra.tool || extra.long || goes_over_network(args),
@@ -675,14 +766,15 @@ pub fn run_naming_hooks(
 pub struct Credentials {
     pub username: String,
     pub password: String,
+    /// None is legacy/unbound state and is refused by all transient helpers.
+    pub scope: Option<super::CredentialScope>,
 }
 
-/// A credential helper that answers git's `get` from the environment, so the secret never shows
-/// up in a command line. git tries the user's own helpers first and, when the operation works,
-/// asks them to store what this one gave.
+/// A designated HTTP transport helper; explicit transient accounts replace ambient
+/// helpers and are never automatically stored. Secret values stay out of argv.
 /// `printf '%s'`, not `echo`: the `sh` git runs it with (dash…) would read backslashes in them
 /// as escapes (`CORP\nancy` broken in two lines, `\c` cutting the password short).
-const ENV_HELPER: &str = "credential.helper=!f() { test \"$1\" = get && printf 'username=%s\\npassword=%s\\n' \"$GITCRAFT_GIT_USERNAME\" \"$GITCRAFT_GIT_PASSWORD\"; }; f";
+const ENV_HELPER: &str = super::CREDENTIAL_HELPER;
 
 /// [`run`], answering a credential request with `creds` when given.
 pub fn run_with(
@@ -741,7 +833,7 @@ fn unattended_extra(unix: bool) -> Extra {
 /// Sets `cmd` to open no sign-in window (see [`unattended_extra`]).
 fn unattended(cmd: &mut Command) {
     let extra = unattended_extra(cfg!(unix));
-    cmd.args(&extra.pre);
+    cmd.args(&extra.pre).args(&extra.owned_pre);
     for (name, value) in extra.env {
         cmd.env(name, value);
     }
@@ -766,22 +858,24 @@ pub fn is_auth_error(err: &str) -> bool {
 
 /// What a call is run with on top of [`GIT_ENV`]: nobody asked to sign in when `quiet`,
 /// `creds` given to git when there are some.
-fn extra_for(dir: Option<&Path>, creds: Option<&Credentials>, quiet: bool) -> Extra {
+fn extra_for(
+    dir: Option<&Path>,
+    args: &[&str],
+    creds: Option<&Credentials>,
+    quiet: bool,
+) -> Result<Extra, String> {
     let mut extra = if quiet {
         unattended_extra(cfg!(unix) || dir.is_some_and(remote::is_remote))
     } else {
         Extra::default()
     };
     if let Some(c) = creds {
-        extra.pre.extend(["-c", ENV_HELPER]);
-        extra
-            .env
-            .push(("GITCRAFT_GIT_USERNAME", c.username.clone()));
-        extra
-            .env
-            .push(("GITCRAFT_GIT_PASSWORD", c.password.clone()));
+        extra.normalize_repository = true;
+        let policy = credential_command_policy(dir, c, args)?;
+        extra.owned_pre.extend(policy.arguments);
+        extra.env.extend(policy.environment);
     }
-    extra
+    Ok(extra)
 }
 
 fn run_inner_extra(
@@ -792,7 +886,7 @@ fn run_inner_extra(
     quiet: bool,
     timeout: Option<std::time::Duration>,
 ) -> Result<String, String> {
-    let mut extra = extra_for(dir, creds, quiet);
+    let mut extra = extra_for(dir, args, creds, quiet)?;
     extra.timeout = timeout;
     finish(execute(dir, &extra, args)?, args, ok)
 }
@@ -804,8 +898,10 @@ fn run_extra(
     creds: Option<&Credentials>,
     mut extra: Extra,
 ) -> Result<String, String> {
-    let credentials = extra_for(dir, creds, false);
+    let credentials = extra_for(dir, args, creds, false)?;
     extra.pre.extend(credentials.pre);
+    extra.owned_pre.extend(credentials.owned_pre);
+    extra.normalize_repository |= credentials.normalize_repository;
     extra.env.extend(credentials.env);
     finish(execute(dir, &extra, args)?, args, ok)
 }
@@ -829,7 +925,7 @@ fn run_inner(
     creds: Option<&Credentials>,
     quiet: bool,
 ) -> Result<String, String> {
-    let extra = extra_for(dir, creds, quiet);
+    let extra = extra_for(dir, args, creds, quiet)?;
     finish(execute(dir, &extra, args)?, args, ok)
 }
 
@@ -898,7 +994,15 @@ fn run_inner_recorded(
     quiet: bool,
 ) -> (Result<String, String>, Recorded) {
     let started = std::time::Instant::now();
-    let mut extra = extra_for(dir, creds, quiet);
+    let mut extra = match extra_for(dir, args, creds, quiet) {
+        Ok(extra) => extra,
+        Err(e) => {
+            return (
+                Err(e.clone()),
+                Recorded::new(args, None, &e, creds, started),
+            );
+        }
+    };
     extra.trace_hooks = !quiet && super::hooks::wants_trace(args);
     let out = match execute(dir, &extra, args) {
         Ok(out) => out,
@@ -993,7 +1097,8 @@ pub fn stored_credentials(url: &str) -> Option<Credentials> {
     if !out.status.success() {
         return None;
     }
-    parse_credentials(&String::from_utf8_lossy(&out.stdout))
+    let found = parse_credentials(&String::from_utf8_lossy(&out.stdout))?;
+    Credentials::for_url(url, found.username, found.password).ok()
 }
 
 /// The name and password in what `git credential fill` prints.
@@ -1004,7 +1109,11 @@ fn parse_credentials(out: &str) -> Option<Credentials> {
             .map(str::to_owned)
     };
     let (username, password) = (field("username")?, field("password")?);
-    (!password.is_empty()).then_some(Credentials { username, password })
+    (!password.is_empty()).then_some(Credentials {
+        username,
+        password,
+        scope: None,
+    })
 }
 
 /// Bounded, non-fetching preparation for opt-in local syntax comparison.
@@ -1166,39 +1275,19 @@ mod tests {
 
     /// What git gets from the helper is what was typed, backslashes (`DOMAIN\user`) included.
     #[test]
-    fn credentials_reach_git_as_typed() -> Result<(), String> {
+    fn credentials_preserve_typed_fields_without_authorizing_helper_only_use() -> Result<(), String>
+    {
         let (user, pass) = ("CORP\\nancy", "p\\c%s$x 'q\"");
-        let mut child = git_cmd()
-            // Only this helper: the user's own would answer first.
-            .args([
-                "-c",
-                "credential.helper=",
-                "-c",
-                ENV_HELPER,
-                "credential",
-                "fill",
-            ])
-            .env("GITCRAFT_GIT_USERNAME", user)
-            .env("GITCRAFT_GIT_PASSWORD", pass)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(|e| e.to_string())?;
-        if let Some(mut stdin) = child.stdin.take() {
-            stdin
-                .write_all(b"protocol=https\nhost=example.invalid\n\n")
-                .map_err(|e| e.to_string())?;
-        }
-        let out = child.wait_with_output().map_err(|e| e.to_string())?;
-        let text = String::from_utf8_lossy(&out.stdout);
+        let credentials =
+            Credentials::for_url("https://example.invalid/", user.into(), pass.into())?;
+        let environment = credentials.helper_environment()?;
+        assert!(environment.contains(&("GITCRAFT_GIT_USERNAME", user.into())));
+        assert!(environment.contains(&("GITCRAFT_GIT_PASSWORD", pass.into())));
         assert!(
-            out.status.success(),
-            "{}",
-            String::from_utf8_lossy(&out.stderr)
+            !environment
+                .iter()
+                .any(|(key, _)| *key == "GITCRAFT_CREDENTIAL_OWNER")
         );
-        assert!(text.contains(&format!("username={user}\n")), "{text}");
-        assert!(text.contains(&format!("password={pass}\n")), "{text}");
         Ok(())
     }
 
@@ -1310,40 +1399,32 @@ mod tests {
     }
 
     /// Credentials typed into the tab still answer a quiet operation.
+    #[cfg(unix)]
     #[test]
-    fn typed_credentials_answer_a_quiet_operation() -> Result<(), String> {
-        let mut cmd = git_cmd();
-        unattended(&mut cmd);
-        let mut child = cmd
-            .args([
-                "-c",
-                "credential.helper=",
-                "-c",
-                ENV_HELPER,
-                "credential",
-                "fill",
-            ])
-            .env("GITCRAFT_GIT_USERNAME", "nancy")
-            .env("GITCRAFT_GIT_PASSWORD", "secret")
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(|e| e.to_string())?;
-        if let Some(mut stdin) = child.stdin.take() {
-            stdin
-                .write_all(b"protocol=https\nhost=example.invalid\n\n")
-                .map_err(|e| e.to_string())?;
-        }
-        let out = child.wait_with_output().map_err(|e| e.to_string())?;
-        let text = String::from_utf8_lossy(&out.stdout);
-        assert!(
-            out.status.success(),
-            "{}",
-            String::from_utf8_lossy(&out.stderr)
+    fn quiet_transient_credentials_use_the_shared_transport_policy() -> Result<(), String> {
+        let credentials = Credentials::for_url(
+            "https://example.invalid/",
+            "nancy".into(),
+            "DUMMY_SECRET".into(),
+        )?;
+        let extra = extra_for(None, &["fetch", "origin"], Some(&credentials), true)?;
+        assert!(extra.normalize_repository);
+        assert_eq!(
+            extra.owned_pre.last().map(String::as_str),
+            Some("gitcraft-credential-transport")
         );
-        assert!(text.contains("username=nancy\n"), "{text}");
-        assert!(text.contains("password=secret\n"), "{text}");
+        assert!(
+            extra
+                .env
+                .contains(&("GITCRAFT_GIT_PASSWORD", "DUMMY_SECRET".into()))
+        );
+        assert!(!extra.owned_pre.join(" ").contains("DUMMY_SECRET"));
+        assert!(
+            !extra
+                .env
+                .iter()
+                .any(|(key, _)| *key == "GITCRAFT_CREDENTIAL_OWNER")
+        );
         Ok(())
     }
 
@@ -1357,5 +1438,167 @@ mod tests {
         );
         assert!(parse_credentials("protocol=https\nhost=x\n").is_none());
         assert!(parse_credentials("username=ana\npassword=\n").is_none());
+    }
+}
+
+/// Pin an already reviewed effective endpoint using a private remote. Git expands
+/// the private placeholder once; explicit pushurl disables pushInsteadOf. The
+/// effective address is never handed back as an unqualified remote/URL operand.
+fn repository_endpoint_extra(
+    repo: &Path,
+    address: &str,
+    original_remote: &str,
+    credentials: Option<&Credentials>,
+) -> Result<(Extra, String), String> {
+    static SEQUENCE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let id = SEQUENCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let alias = format!("gitcraft-endpoint-{}-{id}", std::process::id());
+    let placeholder = format!("gitcraft-pinned-address://{alias}");
+    let mut values = vec![
+        (format!("url.{address}.insteadOf"), placeholder.clone()),
+        (format!("remote.{alias}.url"), String::new()),
+        (format!("remote.{alias}.url"), placeholder.clone()),
+        (format!("remote.{alias}.pushurl"), String::new()),
+        (format!("remote.{alias}.pushurl"), placeholder.clone()),
+    ];
+    if !original_remote.is_empty() {
+        values.extend([
+            (format!("remote.{original_remote}.url"), String::new()),
+            (format!("remote.{original_remote}.url"), placeholder.clone()),
+            (format!("remote.{original_remote}.pushurl"), String::new()),
+            (format!("remote.{original_remote}.pushurl"), placeholder),
+        ]);
+    }
+    const VARS: [(&str, &str); 9] = [
+        ("GIT_CONFIG_KEY_0", "GIT_CONFIG_VALUE_0"),
+        ("GIT_CONFIG_KEY_1", "GIT_CONFIG_VALUE_1"),
+        ("GIT_CONFIG_KEY_2", "GIT_CONFIG_VALUE_2"),
+        ("GIT_CONFIG_KEY_3", "GIT_CONFIG_VALUE_3"),
+        ("GIT_CONFIG_KEY_4", "GIT_CONFIG_VALUE_4"),
+        ("GIT_CONFIG_KEY_5", "GIT_CONFIG_VALUE_5"),
+        ("GIT_CONFIG_KEY_6", "GIT_CONFIG_VALUE_6"),
+        ("GIT_CONFIG_KEY_7", "GIT_CONFIG_VALUE_7"),
+        ("GIT_CONFIG_KEY_8", "GIT_CONFIG_VALUE_8"),
+    ];
+    let mut extra = Extra {
+        normalize_repository: true,
+        ..Default::default()
+    };
+    extra
+        .env
+        .push(("GIT_CONFIG_COUNT", values.len().to_string()));
+    for ((key, value), (k, v)) in values.into_iter().zip(VARS) {
+        extra.env.extend([(k, key), (v, value)]);
+    }
+    if let Some(credentials) = credentials {
+        // Validate legacy/edited state even when this destination has another account.
+        credentials.helper_environment()?;
+        if credentials
+            .scope
+            .as_ref()
+            .is_some_and(|s| s.matches_url(address))
+        {
+            let policy = credential_command_policy(Some(repo), credentials, &[])?;
+            extra.owned_pre.extend(policy.arguments);
+            extra.env.extend(policy.environment);
+        }
+    }
+    Ok((extra, alias))
+}
+
+pub(in crate::git) fn repository_endpoint(
+    repo: &Path,
+    address: &str,
+    original_remote: &str,
+    before: &[&str],
+    after: &[&str],
+    credentials: Option<&Credentials>,
+    control: &std::sync::Arc<OpControl>,
+) -> Result<String, String> {
+    let (extra, alias) = repository_endpoint_extra(repo, address, original_remote, credentials)?;
+    let words: Vec<&str> = before
+        .iter()
+        .copied()
+        .chain(std::iter::once(alias.as_str()))
+        .chain(after.iter().copied())
+        .collect();
+    let (result, record) =
+        watched::run_watched_extra_recorded(Some(repo), &words, credentials, false, control, extra);
+    control.record(record);
+    result
+}
+
+#[cfg(test)]
+mod repository_endpoint_recording {
+    use super::*;
+    #[test]
+    fn reviewed_endpoint_and_account_survive_normalization_without_reinterpretation()
+    -> Result<(), String> {
+        let repo = Path::new("/recorded/repo");
+        let url = "https://host-a.invalid/team/repo";
+        let credentials = Credentials::for_url(url, "alice".into(), "DUMMY_A_TOKEN".into())?;
+        for address in [url, "https://host-b.invalid/team/repo", "origin"] {
+            let (extra, alias) =
+                repository_endpoint_extra(repo, address, "origin", Some(&credentials))?;
+            let args = ["push", "--porcelain", "--", &alias, "a:refs/heads/main"];
+            let cmd = apply_command_extras(
+                Command::new("/recorded/chosen/git"),
+                Some(repo),
+                &extra,
+                &args,
+            );
+            let env: std::collections::BTreeMap<_, _> = cmd.get_envs().collect();
+            let get = |k: &str| env.get(std::ffi::OsStr::new(k)).copied().flatten();
+            assert_eq!(get("GIT_CONFIG_COUNT"), Some(std::ffi::OsStr::new("9")));
+            assert_eq!(
+                get("GIT_CONFIG_KEY_0"),
+                Some(std::ffi::OsStr::new(&format!("url.{address}.insteadOf")))
+            );
+            assert_eq!(get("GIT_CONFIG_VALUE_0"), get("GIT_CONFIG_VALUE_2"));
+            assert_eq!(get("GIT_CONFIG_VALUE_2"), get("GIT_CONFIG_VALUE_4"));
+            assert_eq!(get("GIT_CONFIG_VALUE_4"), get("GIT_CONFIG_VALUE_8"));
+            for name in REPOSITORY_ENV_REMOVED {
+                if *name != "GIT_CONFIG_COUNT" && *name != "GIT_CONFIG_GLOBAL" {
+                    assert_eq!(env.get(std::ffi::OsStr::new(name)), Some(&None), "{name}");
+                }
+            }
+            assert_eq!(get("GITCRAFT_GIT_PASSWORD").is_some(), address == url);
+            if address == url {
+                assert_eq!(
+                    get("GITCRAFT_GIT_ORIGINAL"),
+                    Some(std::ffi::OsStr::new("/recorded/chosen/git"))
+                );
+            }
+            assert!(
+                !cmd.get_args()
+                    .any(|a| a.to_string_lossy().contains("DUMMY_A_TOKEN"))
+            );
+            let target = remote::Target {
+                host: remote::Host::Ssh("uncontacted.invalid".into()),
+                path: "/repo".into(),
+            };
+            let request = remote_request(&target, &extra, &args);
+            assert_eq!(
+                request.script.starts_with(CREDENTIAL_REMOTE_PIN),
+                address == url
+            );
+            assert!(request.unset.iter().any(|k| k == "GIT_CONFIG_COUNT"));
+            assert!(
+                request
+                    .env
+                    .contains(&("GIT_CONFIG_COUNT".into(), "9".into()))
+            );
+        }
+        let legacy = Credentials {
+            scope: None,
+            ..credentials.clone()
+        };
+        assert!(repository_endpoint_extra(repo, url, "origin", Some(&legacy)).is_err());
+        let edited = Credentials {
+            username: "bob".into(),
+            ..credentials
+        };
+        assert!(repository_endpoint_extra(repo, url, "origin", Some(&edited)).is_err());
+        Ok(())
     }
 }
