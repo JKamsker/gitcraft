@@ -130,6 +130,9 @@ pub(crate) fn build(data: &Impact, filter: &Filter, force: bool, t: &Tokens) -> 
     let mut laid = Laid::default();
     let mut symbols = filter.symbols(data);
     let mut refs = filter.refs(data);
+    // Every site referred to, drawn or not: those left out are counted against it.
+    let all_sites: std::collections::BTreeSet<usize> =
+        refs.iter().map(|&r| data.refs[r].site).collect();
     // The symbols referred to most, as many as there is room for, in their order.
     if symbols.len() > MAX_SYMBOLS {
         let mut by_refs: BTreeMap<usize, usize> = BTreeMap::new();
@@ -186,8 +189,8 @@ pub(crate) fn build(data: &Impact, filter: &Filter, force: bool, t: &Tokens) -> 
     }
     let mut sites: Vec<(usize, usize)> = per_site.into_iter().collect();
     sites.sort_by_key(|&(site, n)| (std::cmp::Reverse(n), site));
-    laid.hidden = sites.len().saturating_sub(MAX_SITES);
     sites.truncate(MAX_SITES);
+    laid.hidden = all_sites.len() - sites.len();
     // Code first, then tests: each column in the order of its files.
     sites.sort_by(|a, b| {
         let (x, y) = (&data.sites[a.0], &data.sites[b.0]);

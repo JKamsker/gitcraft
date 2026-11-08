@@ -235,8 +235,13 @@ pub(super) fn rows(
         egui::FontId::proportional(10.5),
         t.text_faint,
     );
-    // Not one result recorded: said once rather than as a row of question marks.
+    // Not one result: said once rather than as a row of question marks, and why.
     let no_results = tl.samples.iter().all(|s| s.verdict.is_none());
+    let none_said = if tl.tests_error.is_some() {
+        "test results unknown (couldn't be read)"
+    } else {
+        "no test results recorded"
+    };
     for (place, title) in places.iter().zip(titles) {
         // Clipped to its chart: a narrow one doesn't run into the next.
         painter.with_clip_rect(place.shrink2(vec2(1.0, 0.0))).text(
@@ -251,7 +256,7 @@ pub(super) fn rows(
             painter.with_clip_rect(*place).text(
                 strip.left_center() + vec2(2.0, 0.0),
                 Align2::LEFT_CENTER,
-                "no test results recorded",
+                none_said,
                 egui::FontId::proportional(10.0),
                 t.text_faint,
             );

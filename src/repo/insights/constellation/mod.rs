@@ -51,8 +51,6 @@ struct Built {
     graph: Graph,
     positions: Vec<Pos2>,
     provenance: Provenance,
-    /// Where the forge's pull requests and builds came from, and how freshly.
-    forge: String,
 }
 
 /// What the view asks for.
@@ -95,9 +93,8 @@ impl RepoTab {
         );
     }
 
-    /// What the tab last read of the forge, as the constellation takes it, and where it came
-    /// from.
-    fn constellation_forge(&self) -> (Forge, String) {
+    /// What the tab last read of the forge, as the constellation takes it.
+    fn constellation_forge(&self) -> Forge {
         let prs = self.prs_loaded.map(|_| {
             self.prs
                 .iter()
@@ -119,6 +116,13 @@ impl RepoTab {
                 .map(|(sha, s)| (sha.clone(), s.state))
                 .collect()
         });
+        Forge { prs, builds }
+    }
+
+    /// Where what the constellation has of the forge came from, and how long ago the tab read
+    /// it: said as it is drawn, so the age keeps up.
+    fn constellation_forge_note(&self) -> String {
+        let builds = self.ci_project().is_some();
         let mut said = Vec::new();
         match (self.prs_loaded, &self.pr_error) {
             (Some(at), _) => said.push(format!(
@@ -128,17 +132,17 @@ impl RepoTab {
             (None, Some(e)) => said.push(format!("pull requests: {e}")),
             (None, None) => said.push("pull requests: not read".to_owned()),
         }
-        match (&builds, &self.ci.error) {
-            (Some(_), Some(e)) => said.push(format!("builds partly read: {e}")),
-            (Some(_), None) => said.push("builds as the tab last read them".to_owned()),
-            (None, _) => said.push("builds: not read".to_owned()),
+        match (builds, &self.ci.error) {
+            (true, Some(e)) => said.push(format!("builds partly read: {e}")),
+            (true, None) => said.push("builds as the tab last read them".to_owned()),
+            (false, _) => said.push("builds: not read".to_owned()),
         }
-        (Forge { prs, builds }, said.join(" · "))
+        said.join(" · ")
     }
 
     /// Draws the constellation again from what was read, the forge and the disk sizes.
     fn constellation_build(&mut self) {
-        let (forge, forge_note) = self.constellation_forge();
+        let forge = self.constellation_forge();
         let forge_read = self.constellation_forge_read();
         let t = Tokens::default();
         let Some(view) = self.insights.as_mut() else {
@@ -176,7 +180,6 @@ impl RepoTab {
             graph,
             positions,
             provenance,
-            forge: forge_note,
         });
         state.forge_read = Some(forge_read);
     }
@@ -194,7 +197,18 @@ impl RepoTab {
             (self.prs_loaded.is_some(), &self.pr_error, &self.ci.error).hash(h);
         });
         for p in &self.prs {
-            sum = sum.wrapping_add(one(&|h| (p.number, &p.sha, &p.branch, p.draft).hash(h)));
+            sum = sum.wrapping_add(one(&|h| {
+                (
+                    p.number,
+                    &p.sha,
+                    &p.branch,
+                    &p.base,
+                    &p.title,
+                    p.draft,
+                    p.from_fork,
+                )
+                    .hash(h)
+            }));
         }
         for (sha, status) in &self.ci.by_sha {
             sum = sum.wrapping_add(one(&|h| (sha, status.state as u8).hash(h)));
@@ -297,6 +311,7 @@ impl RepoTab {
     pub(super) fn constellation_ui(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
         // Pull requests or builds read since it was drawn: drawn again with them.
         let forge_read = self.constellation_forge_read();
+        let forge_note = self.constellation_forge_note();
         let drawn = self.insights.as_ref().and_then(|v| {
             let state = &v.constellation;
             state.built.as_ref().map(|_| state.forge_read)
@@ -350,7 +365,7 @@ impl RepoTab {
         }
         let t = Tokens::get(ui.ctx());
         common::provenance(ui, &built.provenance);
-        ui.label(RichText::new(&built.forge).size(11.5).color(t.text_faint));
+        ui.label(RichText::new(forge_note).size(11.5).color(t.text_faint));
         legend(ui, &t);
         for note in &built.model.notes {
             ui.add(egui::Label::new(RichText::new(note).size(11.5).color(t.text_faint)).wrap());

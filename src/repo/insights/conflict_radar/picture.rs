@@ -445,9 +445,12 @@ pub(super) fn details(
                     }
                 } else {
                     ui.label(
-                        RichText::new("No merge-base: they share no history")
-                            .size(11.5)
-                            .color(t.text_dim),
+                        RichText::new(
+                            "No merge-base found: they share no history, or it couldn't be read \
+                             here (a shallow clone); read again to retry",
+                        )
+                        .size(11.5)
+                        .color(t.text_dim),
                     );
                 }
                 buttons(ui, acts);
