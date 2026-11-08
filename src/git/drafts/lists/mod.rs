@@ -65,6 +65,15 @@ fn entries(
 }
 fn state(ctx: &Context, active: &dyn Fn() -> bool) -> Result<(String, String, Lists), String> {
     let reference = format!("refs/gitcraft/changelists/{}/state", ctx.id);
+    if !ctx
+        .source(&["symbolic-ref", "-q", &reference], vec![], &[0, 1], active)?
+        .is_empty()
+    {
+        return Err(
+            "Changelist state must be a direct application ref; no state write was attempted"
+                .into(),
+        );
+    }
     let old = String::from_utf8(ctx.source(
         &["rev-parse", "--verify", "-q", &reference],
         vec![],
@@ -222,6 +231,9 @@ fn publish(
         .branch
         .as_deref()
         .ok_or("Check out a local branch first")?;
+    if !branch.starts_with("refs/heads/") {
+        return Err("Changelist publication requires a local branch".into());
+    }
     let head = view.source.head.as_deref().ok_or("No initial commit")?;
     let mut tx = "start\n".to_owned();
     if let Some(commit) = commit {
