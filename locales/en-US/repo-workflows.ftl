@@ -136,3 +136,31 @@ repo-workflows-repository_tools-start-send-e7b0c78d = Autosend opted-in plain ou
 repo-workflows-review_workflow-review-document-ui-7d9eb7ac = Close
 
 repo-workflows-review_workflow-show-c3812fc4 = Remove
+
+repo-workflows-dco-fix-dialog-1a8aeebd = Sign off, then review push
+
+repo-workflows-dco-fix-dialog-6ce6ab1f = Sign off
+
+repo-workflows-dco-whole-preview = Rewrites { $count ->
+        [one] the commit
+       *[other] the { $count } commits
+    } of { $branch } since { $base } (rebase --signoff), adding "Signed-off-by: { $who }" to each that does not have it. { $unsigned ->
+        [one] 1 of them is one
+       *[other] { $unsigned } of them are ones
+    } the DCO check refuses now:
+    { $commits }{ $more ->
+        [0] { "" }
+       *[other] { "  • and " }{ $more } more{ "\u000A" }
+    }{ $others ->
+        [0] { "" }
+        [one] { "\u000A1 of them is by " }{ $authors }: you become their committer, and your sign-off certifies them. Only go ahead if you may.{ "\u000A" }
+       *[other] { "\u000A" }{ $others } of them are by { $authors }: you become their committer, and your sign-off certifies them. Only go ahead if you may.{ "\u000A" }
+    }{ $push ->
+        [yes] { "\u000AThen opens push preflight for the signed-off commits to " }{ $remote } with a lease: { $seen ->
+            [yes] refused if someone pushed there since it was last fetched
+           *[no] refused if that branch exists there already
+        }. Review and approve that push separately.
+
+    Ctrl+Z restores the local commits. Restoring published remote history requires its own reviewed push.
+       *[no] { "\u000AThe branch has no remote branch: nothing is pushed. Pushing it later replaces the old commits there (a force push).\u000A\u000ACtrl+Z puts the commits as they were back." }
+    }

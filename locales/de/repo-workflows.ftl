@@ -136,3 +136,31 @@ repo-workflows-repository_tools-start-send-e7b0c78d = Automatischer Versand des 
 repo-workflows-review_workflow-review-document-ui-7d9eb7ac = Schließen
 
 repo-workflows-review_workflow-show-c3812fc4 = Entfernen
+
+repo-workflows-dco-fix-dialog-1a8aeebd = Mit Sign-off versehen, dann Push prüfen
+
+repo-workflows-dco-fix-dialog-6ce6ab1f = Signieren
+
+repo-workflows-dco-whole-preview = Schreibt { $count ->
+        [one] den Commit
+       *[other] die { $count } Commits
+    } von { $branch } seit { $base } um (rebase --signoff) und ergänzt "Signed-off-by: { $who }", wo diese Zeile fehlt. Die DCO-Prüfung lehnt derzeit { $unsigned ->
+        [one] einen davon ab
+       *[other] { $unsigned } davon ab
+    }:
+    { $commits }{ $more ->
+        [0] { "" }
+       *[other] { "  • und " }{ $more } weitere{ "\u000A" }
+    }{ $others ->
+        [0] { "" }
+        [one] { "\u000AEiner davon stammt von " }{ $authors }: Sie werden dessen Committer und bestätigen ihn mit Ihrem Sign-off. Fahren Sie nur fort, wenn Sie dazu berechtigt sind.{ "\u000A" }
+       *[other] { "\u000A" }{ $others } davon stammen von { $authors }: Sie werden deren Committer und bestätigen sie mit Ihrem Sign-off. Fahren Sie nur fort, wenn Sie dazu berechtigt sind.{ "\u000A" }
+    }{ $push ->
+        [yes] { "\u000ADanach öffnet sich die Push-Vorprüfung für die mit Sign-off versehenen Commits an " }{ $remote } mit einer Lease: { $seen ->
+            [yes] Der Push wird abgelehnt, wenn dort seit dem letzten Abruf jemand gepusht hat
+           *[no] Der Push wird abgelehnt, wenn dieser Branch dort bereits existiert
+        }. Prüfen und genehmigen Sie diesen Push gesondert.
+
+    Strg+Z stellt die lokalen Commits wieder her. Bereits veröffentlichter Remote-Verlauf kann nur durch einen eigenen geprüften Push wiederhergestellt werden.
+       *[no] { "\u000ADer Branch hat keinen Remote-Branch: Es wird nichts gepusht. Ein späterer Push ersetzt dort die alten Commits (Force-Push).\u000A\u000AStrg+Z stellt die vorherigen Commits wieder her." }
+    }
