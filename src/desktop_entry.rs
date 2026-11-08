@@ -112,14 +112,17 @@ static ACTIONS: std::sync::Mutex<Vec<crate::os_shell::MenuItem>> =
 
 /// What marks the user's own copy of the package's entry as written by gitcraft (one written by
 /// the user is never touched).
+#[cfg(any(target_os = "linux", test))]
 const OURS: &str = "X-Gitcraft-Actions=true";
 
 /// The entry of the package, which a copy of the user's own takes the place of.
+#[cfg(target_os = "linux")]
 const PACKAGE_ENTRY: &str = "/usr/share/applications/gitcraft.desktop";
 
 /// Puts `items` in the launcher's menu: the AppImage's entry, when it is in the applications
 /// menu; for the .deb or .rpm, a copy of the package's entry in the user's applications folder
 /// (which takes its place), unless the user has one of their own there.
+#[cfg(target_os = "linux")]
 pub fn set_actions(items: &[crate::os_shell::MenuItem]) {
     if let Ok(mut a) = ACTIONS.lock() {
         *a = items.to_vec();
@@ -157,6 +160,7 @@ pub fn set_actions(items: &[crate::os_shell::MenuItem]) {
 
 /// The desktop file the window belongs to, by its id: the AppImage's when its entry is in the
 /// menu, else the package's (or the user's copy of it, which has the same id).
+#[cfg(target_os = "linux")]
 pub fn desktop_id() -> &'static str {
     if appimage().is_some() && installed() {
         ENTRY
@@ -176,6 +180,7 @@ fn write_whole(path: &Path, text: &str) -> std::io::Result<()> {
 }
 
 /// The package's entry with `items` as its actions.
+#[cfg(any(target_os = "linux", test))]
 fn package_entry(items: &[crate::os_shell::MenuItem]) -> String {
     format!(
         "[Desktop Entry]\n\

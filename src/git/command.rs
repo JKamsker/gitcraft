@@ -873,12 +873,6 @@ pub struct Credentials {
     pub scope: Option<super::CredentialScope>,
 }
 
-/// A designated HTTP transport helper; explicit transient accounts replace ambient
-/// helpers and are never automatically stored. Secret values stay out of argv.
-/// `printf '%s'`, not `echo`: the `sh` git runs it with (dash…) would read backslashes in them
-/// as escapes (`CORP\nancy` broken in two lines, `\c` cutting the password short).
-const ENV_HELPER: &str = super::CREDENTIAL_HELPER;
-
 /// [`run`], answering a credential request with `creds` when given.
 pub fn run_with(
     dir: Option<&Path>,
@@ -2235,12 +2229,16 @@ mod reviewed_push_tests {
         );
         let configs = (0..10)
             .map(|i| {
-                (
-                    env[&format!("GIT_CONFIG_KEY_{i}")].clone().unwrap(),
-                    env[&format!("GIT_CONFIG_VALUE_{i}")].clone().unwrap(),
-                )
+                let value = |prefix| {
+                    let key = format!("{prefix}_{i}");
+                    env.get(&key)
+                        .and_then(Option::as_ref)
+                        .cloned()
+                        .ok_or_else(|| format!("missing {key}"))
+                };
+                Ok((value("GIT_CONFIG_KEY")?, value("GIT_CONFIG_VALUE")?))
             })
-            .collect::<Vec<_>>();
+            .collect::<Result<Vec<_>, String>>()?;
         let placeholder = format!("gitcraft-preflight-address://{alias}");
         for remote in [alias, "origin"] {
             for field in ["url", "pushurl"] {
@@ -2409,21 +2407,24 @@ mod reviewed_push_tests {
         Ok(())
     }
     #[test]
-    fn recording_refusal_only_relays_known_status_for_the_reviewed_ref() {
+    fn recording_refusal_only_relays_known_status_for_the_reviewed_ref() -> Result<(), String> {
         let source = "a".repeat(40);
         let destination = "refs/heads/main";
         let good = format!(
             "server secret should disappear\n!\t{source}:{destination}\t[rejected] (stale info)\n"
         );
-        let safe = reviewed_refusal(good.as_bytes(), &source, destination).unwrap();
+        let safe = reviewed_refusal(good.as_bytes(), &source, destination)
+            .ok_or("missing good refusal")?;
         assert!(!safe.contains("secret"));
         assert!(safe.ends_with("[rejected] (stale info)"));
         let hook =
             format!("!\t{source}:{destination}\t[remote rejected] (password=hidden-secret)\n");
-        let safe = reviewed_refusal(hook.as_bytes(), &source, destination).unwrap();
+        let safe = reviewed_refusal(hook.as_bytes(), &source, destination)
+            .ok_or("missing hook refusal")?;
         assert!(!safe.contains("hidden-secret"));
         assert!(safe.contains("[remote rejected]"));
         assert!(reviewed_refusal(good.as_bytes(), &source, "refs/heads/other").is_none());
+        Ok(())
     }
 }
 

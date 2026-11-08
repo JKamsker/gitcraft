@@ -1,7 +1,7 @@
 //! Explicit repository/host routing; selected Profile authentication is applied by cli.
 use super::super::{Forge, Hosting};
 use serde_json::Value;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
@@ -11,7 +11,6 @@ type Recording =
     std::sync::Arc<dyn Fn(&str, &str, Option<&Value>) -> Result<Value, String> + Send + Sync>;
 
 pub(super) struct Api {
-    pub repo: PathBuf,
     pub hosting: Hosting,
     pub context: crate::connections::Context,
     deadline: Instant,
@@ -20,7 +19,7 @@ pub(super) struct Api {
     pub record: Option<Recording>,
 }
 impl Api {
-    pub fn new(repo: &Path, hosting: &Hosting) -> Result<Self, String> {
+    pub fn new(_repo: &Path, hosting: &Hosting) -> Result<Self, String> {
         if hosting.forge != Forge::GitLab {
             return Err("This isn't a GitLab repository".into());
         }
@@ -28,7 +27,6 @@ impl Api {
             return Err(e);
         }
         Ok(Self {
-            repo: repo.to_owned(),
             hosting: hosting.clone(),
             context: crate::connections::current(),
             deadline: Instant::now() + Duration::from_secs(120),

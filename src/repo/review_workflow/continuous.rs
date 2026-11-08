@@ -597,24 +597,27 @@ mod tests {
             data.header = header.into();
             let mut acts = Vec::new();
             let mut rect = egui::Rect::NOTHING;
-            let mut render = |events| {
-                let mut output = ctx.run_ui(
-                    egui::RawInput {
-                        screen_rect: Some(egui::Rect::from_min_size(
-                            egui::Pos2::ZERO,
-                            egui::vec2(1000.0, 600.0),
-                        )),
-                        events,
-                        ..Default::default()
-                    },
-                    |ui| {
-                        rect = file_intro(ui, &key, &data, &mut acts).rect;
-                    },
-                );
-                output.textures_delta.clear();
-                output
+            let (output, rect) = {
+                let mut render = |events| {
+                    let mut output = ctx.run_ui(
+                        egui::RawInput {
+                            screen_rect: Some(egui::Rect::from_min_size(
+                                egui::Pos2::ZERO,
+                                egui::vec2(1000.0, 600.0),
+                            )),
+                            events,
+                            ..Default::default()
+                        },
+                        |ui| {
+                            rect = file_intro(ui, &key, &data, &mut acts).rect;
+                        },
+                    );
+                    output.textures_delta.clear();
+                    output
+                };
+                let output = render(Vec::new());
+                (output, rect)
             };
-            let output = render(Vec::new());
             let text = output
                 .shapes
                 .iter()
@@ -630,7 +633,6 @@ mod tests {
             assert!(text.contains(header), "{text}");
             assert!(text.contains("old.txt → new.txt"));
             assert!(text.contains("No textual hunks"));
-            drop(render);
             let at = rect.center();
             let mut output = ctx.run_ui(
                 egui::RawInput {

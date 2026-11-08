@@ -664,10 +664,10 @@ mod tests {
             }
         }
         assert!(route(&states, &sources, true).is_none());
-        if let Some(state) = states.iter_mut().find(|s| s.stages == [1, 0]) {
-            if let Some(o) = &mut state.observed {
-                o.code = Some(0);
-            }
+        if let Some(state) = states.iter_mut().find(|s| s.stages == [1, 0])
+            && let Some(o) = &mut state.observed
+        {
+            o.code = Some(0);
         }
         assert!(route(&states, &sources, true).is_some());
     }

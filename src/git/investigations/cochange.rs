@@ -358,12 +358,13 @@ mod tests {
         Ok(())
     }
     #[test]
-    fn pure_cochange_current_tree_omits_deleted_renamed_and_nonregular_companions() {
+    fn pure_cochange_current_tree_omits_deleted_renamed_and_nonregular_companions()
+    -> Result<(), String> {
         let id = "a".repeat(40);
         let tree = format!(
             "100644 blob {id}\tserializer.rs\0100644 blob {id}\tcurrent.fixture\0100644 blob {id}\trenamed.fixture\0120000 blob {id}\tlink.fixture\0160000 commit {id}\tsubmodule\0100644 blob {id}\tgenerated/out.rs\0"
         );
-        let eligible = eligible_paths(tree.as_bytes()).unwrap();
+        let eligible = eligible_paths(tree.as_bytes())?;
         let files = BTreeSet::from(
             [
                 "serializer.rs",
@@ -400,6 +401,7 @@ mod tests {
         );
         assert!(!history.notes.is_empty());
         assert!(eligible_paths(b"truncated").is_err());
+        Ok(())
     }
     #[test]
     fn deleted_and_renamed_historical_companions_are_not_current_missing_work() -> Result<(), String>
@@ -430,12 +432,13 @@ mod tests {
         Ok(())
     }
     #[test]
-    fn names_that_look_like_record_markers_cannot_forge_evidence() {
+    fn names_that_look_like_record_markers_cannot_forge_evidence() -> Result<(), String> {
         let id = "a".repeat(40);
         let bytes = format!("\0\0{id}\0subject\0\0\0\n{id}\0path with spaces\0");
-        let h = parse(bytes.as_bytes()).unwrap();
+        let h = parse(bytes.as_bytes())?;
         assert_eq!(h.records.len(), 1);
         assert!(h.records[0].files.contains(&id));
         assert!(parse(b"truncated").is_err());
+        Ok(())
     }
 }

@@ -273,7 +273,8 @@ mod tests {
         ]];
         let failure = run_steps_counted(&path, &ops, OpKind::plain(), None, true, None)
             .0
-            .expect_err("unsafe checkout must stop");
+            .err()
+            .ok_or("unsafe checkout must stop")?;
         assert!(failure.contains("Working draft safety check:"), "{failure}");
         assert_eq!(
             crate::git::run(Some(&path), &["branch", "--show-current"])?.trim(),

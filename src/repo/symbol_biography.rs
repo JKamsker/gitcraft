@@ -413,7 +413,7 @@ mod tests {
         shapes.iter().find_map(|s| visit(&s.shape, needle))
     }
     #[test]
-    fn timeline_pointer_steps_forward_and_back() {
+    fn timeline_pointer_steps_forward_and_back() -> Result<(), String> {
         let ctx = egui::Context::default();
         crate::theme::install_fonts(&ctx);
         let mut selected = 0;
@@ -449,7 +449,7 @@ mod tests {
                     break;
                 }
             }
-            let pos = pos.expect("scrub button painted");
+            let pos = pos.ok_or("scrub button painted")?;
             for pressed in [true, false] {
                 frame(
                     &mut selected,
@@ -466,5 +466,6 @@ mod tests {
             }
             assert_eq!(selected, expected);
         }
+        Ok(())
     }
 }

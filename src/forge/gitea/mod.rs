@@ -681,6 +681,16 @@ pub(super) fn ssh_key_api(hosting: &Hosting) -> Api {
     )
 }
 
+pub(super) fn history_api(hosting: &Hosting) -> Api {
+    Api::new(
+        "Gitea / Forgejo",
+        &hosting.web,
+        &hosting.host,
+        find_login(&hosting.web),
+    )
+    .on_refused_key(forget_login, &login_key(&hosting.web))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -787,14 +797,4 @@ mod tests {
         assert!(!same_server("http://codeberg.org", "https://codeberg.org"));
         assert!(!same_server("https://evil.example", "https://codeberg.org"));
     }
-}
-
-pub(super) fn history_api(hosting: &Hosting) -> Api {
-    Api::new(
-        "Gitea / Forgejo",
-        &hosting.web,
-        &hosting.host,
-        find_login(&hosting.web),
-    )
-    .on_refused_key(forget_login, &login_key(&hosting.web))
 }
