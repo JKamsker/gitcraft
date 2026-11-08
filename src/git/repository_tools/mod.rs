@@ -34,7 +34,10 @@ impl ReadOutput {
         }
         let message = String::from_utf8_lossy(&self.stderr).trim().to_owned();
         Err(if message.is_empty() {
-            format!("Repository metadata command failed ({:?})", self.code)
+            crate::i18n::message(
+                "backend-repository-metadata-command-failed-089f86",
+                &[("code", format!("{:?}", self.code).into())],
+            )
         } else {
             message
         })
@@ -115,7 +118,10 @@ pub(super) fn capture_with_timeout(
             None => crate::remote::exec(&target.host, &request),
         }?;
         if out.stdout.len() > cap {
-            return Err("Repository metadata exceeds the inspection limit".into());
+            return Err(crate::i18n::text(
+                "backend-repository-metadata-exceeds-the-inspection-limit-5d3406",
+            )
+            .into());
         }
         if crate::tasks::cancellation().is_cancelled()
             || control.as_ref().is_some_and(|c| c.is_cancelled())

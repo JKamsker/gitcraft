@@ -43,9 +43,19 @@ pub(crate) fn inspect(repo: &Path) -> Result<Storage, String> {
         != 1
         || common.trim() != git_dir
     {
-        Some("Migration refuses repositories with linked worktrees. Remove them with Git and reopen this guide.".into())
+        Some(
+            crate::i18n::text(
+                "backend-migration-refuses-repositories-with-linked-worktrees-remove-them-a777da",
+            )
+            .into(),
+        )
     } else if !migrates {
-        Some("This Git cannot migrate refs while preserving reflogs. Install a current Git (refs migrate was introduced in 2.46).".into())
+        Some(
+            crate::i18n::text(
+                "backend-this-git-cannot-migrate-refs-while-preserving-reflogs-install-a-c-8bf101",
+            )
+            .into(),
+        )
     } else {
         None
     };
@@ -63,7 +73,9 @@ pub(crate) fn migrate(
     target: &str,
 ) -> Result<String, String> {
     if !matches!(target, "files" | "reftable") || expected.format == target {
-        return Err("Choose a different supported ref format".into());
+        return Err(
+            crate::i18n::text("backend-choose-a-different-supported-ref-format-fa9436").into(),
+        );
     }
     expected.snapshot.check(runner.repo)?;
     if let Some(why) = &inspect(runner.repo)?.blocked {
@@ -87,7 +99,10 @@ pub(crate) fn migrate(
     )?;
     let after = inspect(runner.repo)?;
     if after.format != target || ref_witness(runner.repo)? != refs {
-        return Err("Migration completed but ref verification differs. Do not continue writing; inspect git refs verify and the migration output.".into());
+        return Err(crate::i18n::text(
+            "backend-migration-completed-but-ref-verification-differs-do-not-continue-1cba00",
+        )
+        .into());
     }
     let after_logs = text(
         runner.repo,
@@ -104,14 +119,16 @@ pub(crate) fn migrate(
     before.sort();
     after.sort();
     if before != after {
-        return Err(
-            "Migration changed reflog contents; inspect the repository before continuing.".into(),
-        );
+        return Err(crate::i18n::text(
+            "backend-migration-changed-reflog-contents-inspect-the-repository-before-c-fcb84c",
+        )
+        .into());
     }
     // Available together with modern migration; errors are reported rather than hidden.
     runner.run(&["refs", "verify", "--strict"])?;
-    Ok(format!(
-        "Migrated to {target}; refs and reflogs match, refs verify passed."
+    Ok(crate::i18n::message(
+        "backend-migrated-to-target-refs-and-reflogs-match-refs-verify-passed-09724a",
+        &[("target", (target).to_string().into())],
     ))
 }
 
@@ -136,7 +153,10 @@ fn verified_migration(
 fn ref_witness(repo: &Path) -> Result<Vec<super::all_refs::Reference>, String> {
     let (refs, fallback) = super::all_refs::references(repo)?;
     if fallback {
-        return Err("Migration requires root-ref enumeration for verification; update Git before continuing".into());
+        return Err(crate::i18n::text(
+            "backend-migration-requires-root-ref-enumeration-for-verification-update-g-675e0c",
+        )
+        .into());
     }
     Ok(refs)
 }

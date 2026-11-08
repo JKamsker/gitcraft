@@ -56,7 +56,9 @@ fn roots(repo: &Path) -> Result<String, String> {
     )?;
     let mut ids = BTreeSet::new();
     for row in out.lines() {
-        let (name, oid) = row.split_once('\0').ok_or("Invalid root ref record")?;
+        let (name, oid) = row
+            .split_once('\0')
+            .ok_or(crate::i18n::text("backend-invalid-root-ref-record-97e0e8"))?;
         if let Some(original) = name
             .strip_prefix("refs/replace/")
             .filter(|s| object::valid_oid(s))
@@ -64,7 +66,7 @@ fn roots(repo: &Path) -> Result<String, String> {
             ids.insert(original.to_owned());
         }
         if !object::valid_oid(oid) {
-            return Err("Unexpected root object ID".into());
+            return Err(crate::i18n::text("backend-unexpected-root-object-id-af416a").into());
         }
         ids.insert(oid.to_owned());
     }
@@ -106,11 +108,12 @@ fn roots(repo: &Path) -> Result<String, String> {
                 .split(|b| b.is_ascii_whitespace())
                 .filter(|s| !s.is_empty())
             {
-                let oid =
-                    std::str::from_utf8(oid).map_err(|_| "Legacy graft metadata is not UTF-8")?;
+                let oid = std::str::from_utf8(oid).map_err(|_| {
+                    crate::i18n::text("backend-legacy-graft-metadata-is-not-utf-8-e457c9")
+                })?;
                 if !object::valid_oid(oid) {
                     return Err(
-                        "Invalid legacy graft metadata; repair it before independence".into(),
+                        crate::i18n::text("backend-invalid-legacy-graft-metadata-repair-it-before-independence-740c36").into(),
                     );
                 }
                 ids.insert(oid.to_owned());
@@ -154,7 +157,10 @@ pub(crate) fn inspect(repo: &Path) -> Result<Sharing, String> {
     })?;
     let prepare = (|| {
         if remote::is_remote(repo) {
-            return Err("For independence, open this repository locally on its machine. This transport cannot retain ownership handles across SSH/WSL; the topology remains available here.".to_owned());
+            return Err(crate::i18n::text(
+                "backend-for-independence-open-this-repository-locally-on-its-machine-this-3bb2c6",
+            )
+            .to_owned());
         }
         if git != common
             || topology
@@ -164,13 +170,22 @@ pub(crate) fn inspect(repo: &Path) -> Result<Sharing, String> {
                 .count()
                 != 1
         {
-            return Err("This repository shares a Git directory with linked worktrees. Remove the linked worktrees before making a clone independent.".into());
+            return Err(crate::i18n::text(
+                "backend-this-repository-shares-a-git-directory-with-linked-worktrees-remo-cd2516",
+            )
+            .into());
         }
         if topology.alternates.as_ref().is_none_or(|s| s.is_empty()) {
-            return Err("This clone has no alternate object links to remove.".into());
+            return Err(crate::i18n::text(
+                "backend-this-clone-has-no-alternate-object-links-to-remove-bd3b73",
+            )
+            .into());
         }
         if topology.promisor {
-            return Err("Partial clones may have uncopied promised objects. Materialize them and remove the promisor configuration with Git before preparing independence.".into());
+            return Err(crate::i18n::text(
+                "backend-partial-clones-may-have-uncopied-promised-objects-materialize-the-58e5ce",
+            )
+            .into());
         }
         if !topology.warnings.is_empty()
             || topology
@@ -178,7 +193,10 @@ pub(crate) fn inspect(repo: &Path) -> Result<Sharing, String> {
                 .iter()
                 .any(|s| !s.available || s.error.is_some())
         {
-            return Err("Repair the missing, cyclic, HTTP or unreadable donors before preparing independence.".into());
+            return Err(crate::i18n::text(
+                "backend-repair-the-missing-cyclic-http-or-unreadable-donors-before-prepar-2a920e",
+            )
+            .into());
         }
         let repo = std::fs::canonicalize(repo).map_err(|e| e.to_string())?;
         let git = std::fs::canonicalize(&git).map_err(|e| e.to_string())?;
@@ -193,8 +211,9 @@ pub(crate) fn inspect(repo: &Path) -> Result<Sharing, String> {
             topology.alternates.as_deref().unwrap_or_default(),
         )?);
         let roots = roots(&repo).map_err(|e| {
-            format!(
-                "Independence requires Git 2.45+ with root ref enumeration and --no-lazy-fetch: {e}"
+            crate::i18n::message(
+                "backend-independence-requires-git-2-45-with-root-ref-enumeration-and-no-l-536432",
+                &[("detail", (e).to_string().into())],
             )
         })?;
         Ok(Plan {
@@ -231,7 +250,10 @@ impl Plan {
         self.check_state()?;
         let objects = self.repo.join(".git/objects");
         if self.topology != topology::read(&self.repo, &objects, &|| true)? {
-            return Err("Object borrowing topology changed; prepare again.".into());
+            return Err(crate::i18n::text(
+                "backend-object-borrowing-topology-changed-prepare-again-68de87",
+            )
+            .into());
         }
         Ok(())
     }
@@ -246,7 +268,10 @@ impl Plan {
                     &["reflog", "show", "--all", "--format=%gD%x00%H%x00%gs"],
                 )?
         {
-            return Err("Roots, index or reflogs changed; prepare independence again.".into());
+            return Err(crate::i18n::text(
+                "backend-roots-index-or-reflogs-changed-prepare-independence-again-288e0b",
+            )
+            .into());
         }
         Ok(())
     }
@@ -292,7 +317,7 @@ pub(crate) fn independent(runner: &Runner<'_>, plan: &Plan) -> Result<String, St
     let _lock = plan.ownership.lock()?;
     plan.check()?;
     if std::fs::canonicalize(runner.repo).map_err(|e| e.to_string())? != plan.repo {
-        return Err("Repository changed".into());
+        return Err(crate::i18n::text("backend-repository-changed-cc1fe0").into());
     }
     let census = binary(
         runner,
@@ -311,12 +336,15 @@ pub(crate) fn independent(runner: &Runner<'_>, plan: &Plan) -> Result<String, St
         32 << 20,
     )?;
     let required: BTreeSet<_> = String::from_utf8(census)
-        .map_err(|_| "Invalid object census")?
+        .map_err(|_| crate::i18n::text("backend-invalid-object-census-4acde6"))?
         .lines()
         .map(str::to_owned)
         .collect();
     if required.iter().any(|s| !object::valid_oid(s)) {
-        return Err("Some required objects are missing; the alternate was retained.".into());
+        return Err(crate::i18n::text(
+            "backend-some-required-objects-are-missing-the-alternate-was-retained-373c8a",
+        )
+        .into());
     }
     // A complete, non-thin pack includes reflog/index/private/root refs and original history.
     let pack = binary(
@@ -336,8 +364,9 @@ pub(crate) fn independent(runner: &Runner<'_>, plan: &Plan) -> Result<String, St
         128 << 20,
     )
     .map_err(|e| {
-        format!(
-            "Could not copy a complete pack (128 MiB staging limit); borrowing is retained: {e}"
+        crate::i18n::message(
+            "backend-could-not-copy-a-complete-pack-128-mib-staging-limit-borrowing-is-dec4ed",
+            &[("detail", (e).to_string().into())],
         )
     })?;
     let scratch = tempfile::Builder::new()
@@ -361,16 +390,16 @@ pub(crate) fn independent(runner: &Runner<'_>, plan: &Plan) -> Result<String, St
         pack.clone(),
         65536,
     )?)
-    .map_err(|_| "Invalid index-pack result")?;
+    .map_err(|_| crate::i18n::text("backend-invalid-index-pack-result-ba9ee9"))?;
     let hash = hash
         .split_whitespace()
         .last()
         .filter(|h| object::valid_oid(h))
-        .ok_or("Invalid pack hash")?;
+        .ok_or(crate::i18n::text("backend-invalid-pack-hash-86f617"))?;
     let index_path = scratch.path().join(format!("objects/pack/pack-{hash}.idx"));
-    let printed = index_path
-        .to_str()
-        .ok_or("Pack staging path is not UTF-8")?;
+    let printed = index_path.to_str().ok_or(crate::i18n::text(
+        "backend-pack-staging-path-is-not-utf-8-f2a6fb",
+    ))?;
     let rows = object::pack_rows(
         &String::from_utf8(binary(
             runner,
@@ -379,13 +408,16 @@ pub(crate) fn independent(runner: &Runner<'_>, plan: &Plan) -> Result<String, St
             Vec::new(),
             32 << 20,
         )?)
-        .map_err(|_| "Invalid pack verification")?,
+        .map_err(|_| crate::i18n::text("backend-invalid-pack-verification-3f4baa"))?,
     )?;
     if required.iter().any(|oid| !rows.contains_key(oid)) {
-        return Err("Independent pack is missing a required object; borrowing is retained.".into());
+        return Err(crate::i18n::text(
+            "backend-independent-pack-is-missing-a-required-object-borrowing-is-retain-ddbdea",
+        )
+        .into());
     }
-    let index =
-        object::files::read(&index_path, 32 << 20, &|| true)?.ok_or("Missing staged index")?;
+    let index = object::files::read(&index_path, 32 << 20, &|| true)?
+        .ok_or(crate::i18n::text("backend-missing-staged-index-0a7d28"))?;
     plan.check()?;
     let nonce = format!(
         "{}-{}",
@@ -395,8 +427,9 @@ pub(crate) fn independent(runner: &Runner<'_>, plan: &Plan) -> Result<String, St
             .map_err(|e| e.to_string())?
             .as_nanos()
     );
-    let receipt = format!(
-        "Verified pack .git/objects/pack/pack-{hash}.pack and .idx may remain; the alternate link has not been detached"
+    let receipt = crate::i18n::message(
+        "backend-verified-pack-git-objects-pack-pack-hash-pack-and-idx-may-remain-aa97d9",
+        &[("hash", (hash).to_string().into())],
     );
     plan.ownership
         .install(hash, &pack, &index, &nonce)
@@ -425,10 +458,13 @@ pub(crate) fn independent(runner: &Runner<'_>, plan: &Plan) -> Result<String, St
             &[],
             None,
         )?;
-        let lines = String::from_utf8(out).map_err(|_| "Invalid independent object proof")?;
+        let lines = String::from_utf8(out)
+            .map_err(|_| crate::i18n::text("backend-invalid-independent-object-proof-1dbe30"))?;
         if lines.lines().count() != required.len() || lines.lines().any(|s| s.ends_with(" missing"))
         {
-            return Err("Independent object proof failed".to_owned());
+            return Err(
+                crate::i18n::text("backend-independent-object-proof-failed-0a36c1").to_owned(),
+            );
         }
         plan.check_state()?;
         plan.ownership.current(false)?;
@@ -437,12 +473,20 @@ pub(crate) fn independent(runner: &Runner<'_>, plan: &Plan) -> Result<String, St
     })();
     if let Err(e) = proof {
         let restored = plan.ownership.restore(&backup);
-        return Err(format!(
-            "{e}. Alternate recovery: {restored:?}. Retained .git/objects/info/{backup}"
+        return Err(crate::i18n::message(
+            "backend-e-alternate-recovery-restored-retained-git-objects-info-backup-1386b4",
+            &[
+                ("detail", (e).to_string().into()),
+                ("restored", format!("{:?}", restored).into()),
+                ("backup", (backup).to_string().into()),
+            ],
         ));
     }
-    Ok(format!(
-        "Copied and independently verified {} required objects. Alternate link removed; donor repositories were not modified. Recovery metadata: .git/objects/info/{backup}",
-        required.len()
+    Ok(crate::i18n::message(
+        "backend-copied-and-independently-verified-required-objects-alternate-link-6fc4fd",
+        &[
+            ("count", (required.len()).to_string().into()),
+            ("backup", (backup).to_string().into()),
+        ],
     ))
 }

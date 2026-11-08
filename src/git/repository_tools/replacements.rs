@@ -19,8 +19,11 @@ pub(crate) struct Histories {
 pub(crate) fn read(repo: &Path) -> Result<Histories, String> {
     let cancel = crate::tasks::cancellation();
     let legacy_bytes = graft_bytes(repo, &|| !cancel.is_cancelled())?;
-    let legacy = String::from_utf8(legacy_bytes.clone().unwrap_or_default())
-        .map_err(|_| "Legacy graft metadata is not UTF-8; inspect info/grafts with Git")?;
+    let legacy = String::from_utf8(legacy_bytes.clone().unwrap_or_default()).map_err(|_| {
+        crate::i18n::text(
+            "backend-legacy-graft-metadata-is-not-utf-8-inspect-info-grafts-with-git-6b31da",
+        )
+    })?;
     let snapshot = Snapshot::capture(repo)?;
     let rows = text(
         repo,
@@ -33,11 +36,11 @@ pub(crate) fn read(repo: &Path) -> Result<Histories, String> {
     let mut replacements = Vec::new();
     for line in rows.lines() {
         let Some((name, effective)) = line.split_once(' ') else {
-            return Err("Invalid replace ref record".into());
+            return Err(crate::i18n::text("backend-invalid-replace-ref-record-cd1934").into());
         };
         let original = name
             .strip_prefix("refs/replace/")
-            .ok_or("Invalid replacement")?
+            .ok_or(crate::i18n::text("backend-invalid-replacement-5e7266"))?
             .to_owned();
         let parents = text(
             repo,
@@ -97,12 +100,20 @@ fn graft_bytes(repo: &Path, active: &dyn Fn() -> bool) -> Result<Option<Vec<u8>>
         64 * 1024,
         active,
     )
-    .map_err(|e| format!("Cannot inspect legacy info/grafts (64 KiB regular-file limit): {e}"))
+    .map_err(|e| {
+        crate::i18n::message(
+            "backend-cannot-inspect-legacy-info-grafts-64-kib-regular-file-limit-e-eb12d6",
+            &[("detail", (e).to_string().into())],
+        )
+    })
 }
 impl Histories {
     fn check(&self, runner: &Runner<'_>) -> Result<(), String> {
         if graft_bytes(runner.repo, &|| !runner.control.is_cancelled())? != self.legacy_bytes {
-            return Err("Legacy graft file changed; read a fresh history preview".into());
+            return Err(crate::i18n::text(
+                "backend-legacy-graft-file-changed-read-a-fresh-history-preview-4b0a8d",
+            )
+            .into());
         }
         self.snapshot.check(runner.repo)?;
         Ok(())
@@ -117,7 +128,10 @@ pub(crate) fn graft(
     history.check(runner)?;
     let resolve = |s: &str| -> Result<String, String> {
         if !super::object::valid_oid(s) {
-            return Err("Use full immutable commit IDs from the preview".into());
+            return Err(crate::i18n::text(
+                "backend-use-full-immutable-commit-ids-from-the-preview-dc9fbc",
+            )
+            .into());
         }
         Ok(text(
             runner.repo,
@@ -134,7 +148,7 @@ pub(crate) fn graft(
     let original = resolve(original)?;
     let parent = resolve(parent)?;
     if original == parent {
-        return Err("A commit cannot be its own parent".into());
+        return Err(crate::i18n::text("backend-a-commit-cannot-be-its-own-parent-afd6fc").into());
     }
     // Refuse cycles through the effective graph, including existing replacement joins.
     let ancestry = super::captured(
@@ -143,14 +157,22 @@ pub(crate) fn graft(
         None,
     )?;
     match ancestry.code {
-        Some(0) => return Err("This join would create a history cycle".into()),
+        Some(0) => {
+            return Err(
+                crate::i18n::text("backend-this-join-would-create-a-history-cycle-61ad82").into(),
+            );
+        }
         Some(1) => (),
         _ => return Err(ancestry.stderr),
     }
     history.check(runner)?;
     runner.run(&["replace", "--graft", &original, &parent])?;
-    Ok(format!(
-        "Temporary graft {original} → parent {parent}. Remove its replace ref to restore original history."
+    Ok(crate::i18n::message(
+        "backend-temporary-graft-original-parent-parent-remove-its-replace-ref-to-8d531b",
+        &[
+            ("original", (original).to_string().into()),
+            ("parent", (parent).to_string().into()),
+        ],
     ))
 }
 pub(crate) fn remove(
@@ -165,7 +187,9 @@ pub(crate) fn remove(
         .iter()
         .any(|r| r.original == original && r.effective == effective)
     {
-        return Err("Replacement is absent from the preview".into());
+        return Err(
+            crate::i18n::text("backend-replacement-is-absent-from-the-preview-b21d5f").into(),
+        );
     }
     runner.run(&[
         "update-ref",

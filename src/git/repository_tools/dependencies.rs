@@ -53,7 +53,9 @@ fn tree_links(repo: &Path, commit: &str) -> Result<BTreeMap<String, BTreeSet<Str
                 .components()
                 .any(|c| !matches!(c, std::path::Component::Normal(_)))
             {
-                return Err("Unsafe submodule path in Git tree".into());
+                return Err(
+                    crate::i18n::text("backend-unsafe-submodule-path-in-git-tree-bb14e4").into(),
+                );
             }
             links.entry(path.into()).or_default().insert(f[2].into());
         }
@@ -68,7 +70,12 @@ fn outgoing_links(
     let mut links = tree_links(repo, tip)?;
     let excluded = remote.map(|s| format!("^{s}"));
     if let Some(oid) = remote {
-        text(repo,&["cat-file","-e",&format!("{oid}^{{commit}}")]).map_err(|_|"Fetch the destination branch first; its tip is not available locally for dependency analysis".to_owned())?;
+        text(repo, &["cat-file", "-e", &format!("{oid}^{{commit}}")]).map_err(|_| {
+            crate::i18n::text(
+                "backend-fetch-the-destination-branch-first-its-tip-is-not-available-local-ed7eff",
+            )
+            .to_owned()
+        })?;
     }
     let mut args = vec![
         "--no-replace-objects",
@@ -92,17 +99,22 @@ fn outgoing_links(
         if !meta.starts_with(':') {
             continue;
         }
-        let path = rows.next().ok_or("Incomplete raw gitlink record")?;
+        let path = rows.next().ok_or(crate::i18n::text(
+            "backend-incomplete-raw-gitlink-record-c05320",
+        ))?;
         let f: Vec<_> = meta.split_whitespace().collect();
         if f.len() != 5 {
-            return Err("Invalid raw gitlink record".into());
+            return Err(crate::i18n::text("backend-invalid-raw-gitlink-record-a7d9f1").into());
         }
         if f[1] == "160000" {
             if Path::new(path)
                 .components()
                 .any(|c| !matches!(c, std::path::Component::Normal(_)))
             {
-                return Err("Unsafe submodule path in outgoing history".into());
+                return Err(crate::i18n::text(
+                    "backend-unsafe-submodule-path-in-outgoing-history-c9805c",
+                )
+                .into());
             }
             links.entry(path.into()).or_default().insert(f[3].into());
         }
@@ -146,9 +158,11 @@ pub(crate) fn read(repo: &Path) -> Result<Plan, String> {
         .branches
         .iter()
         .find(|b| b.name == branch)
-        .ok_or("Current branch is unborn")?;
+        .ok_or(crate::i18n::text("backend-current-branch-is-unborn-bb8a2b"))?;
     if route.push.remote.is_empty() {
-        return Err("Choose the parent's push route first".into());
+        return Err(
+            crate::i18n::text("backend-choose-the-parent-s-push-route-first-3f38ae").into(),
+        );
     }
     let urls = text(
         repo,
@@ -163,7 +177,10 @@ pub(crate) fn read(repo: &Path) -> Result<Plan, String> {
     )?;
     let urls: Vec<_> = urls.lines().collect();
     if urls.len() != 1 {
-        return Err("Dependency publication requires one explicit parent push URL; use a dedicated remote for this route".into());
+        return Err(crate::i18n::text(
+            "backend-dependency-publication-requires-one-explicit-parent-push-url-use-a83308",
+        )
+        .into());
     }
     super::remote_config::validate_url(urls[0])?;
     let dependencies = tree_links(repo, &route.oid)?
@@ -236,11 +253,14 @@ impl Advertisement {
         )?;
         let mut input = String::new();
         for row in rows.lines() {
-            let (name, oid) = row
-                .split_once(' ')
-                .ok_or("Invalid owned dependency ref record")?;
+            let (name, oid) = row.split_once(' ').ok_or(crate::i18n::text(
+                "backend-invalid-owned-dependency-ref-record-ba2eab",
+            ))?;
             if self.refs.get(name).map(String::as_str) != Some(oid) {
-                return Err("Dependency ref changed or is foreign; retained for inspection".into());
+                return Err(crate::i18n::text(
+                    "backend-dependency-ref-changed-or-is-foreign-retained-for-inspection-cab019",
+                )
+                .into());
             }
             input.push_str(&format!("delete {name} {oid}\n"));
         }
@@ -257,12 +277,20 @@ impl Advertisement {
         match (fetch, cleanup) {
             (Ok(_), Ok(())) => Ok(self.refs.values().cloned().collect()),
             (Err(e), Ok(())) => Err(e),
-            (fetch, Err(e)) => Err(format!(
-                "{}; owned-ref cleanup failed: {e}. Inspect retained namespace {} before retrying; no parent push was attempted",
-                fetch
-                    .err()
-                    .unwrap_or_else(|| "Dependency fetch completed".into()),
-                self.namespace
+            (fetch, Err(e)) => Err(crate::i18n::message(
+                "backend-owned-ref-cleanup-failed-e-inspect-retained-namespace-before-retr-594151",
+                &[
+                    (
+                        "fetch",
+                        (fetch
+                            .err()
+                            .unwrap_or_else(|| "Dependency fetch completed".into()))
+                        .to_string()
+                        .into(),
+                    ),
+                    ("detail", (e).to_string().into()),
+                    ("name", (self.namespace).to_string().into()),
+                ],
             )),
         }
     }
@@ -296,15 +324,20 @@ fn advertised(
     let mut specs = Vec::new();
     for row in rows.lines() {
         if specs.len() >= 256 {
-            return Err("More than 256 advertised dependency refs; narrow this remote before checking publication".into());
+            return Err(crate::i18n::text(
+                "backend-more-than-256-advertised-dependency-refs-narrow-this-remote-befor-a19fa4",
+            )
+            .into());
         }
-        let (oid, name) = row
-            .split_once('\t')
-            .ok_or("Invalid dependency advertisement")?;
+        let (oid, name) = row.split_once('\t').ok_or(crate::i18n::text(
+            "backend-invalid-dependency-advertisement-181a94",
+        ))?;
         if !super::object::valid_oid(oid)
             || !(name.starts_with("refs/heads/") || name.starts_with("refs/tags/"))
         {
-            return Err("Invalid advertised dependency ref".into());
+            return Err(
+                crate::i18n::text("backend-invalid-advertised-dependency-ref-61782b").into(),
+            );
         }
         let target = format!("{}/{}", owned.namespace, specs.len());
         specs.push(format!("+{oid}:{target}"));
@@ -333,13 +366,13 @@ fn advertised(
         owned.cleanup(|args, input| {
             let left = deadline.saturating_duration_since(std::time::Instant::now());
             if left.is_zero() {
-                return Err("Cleanup deadline reached".into());
+                return Err(crate::i18n::text("backend-cleanup-deadline-reached-65ec75").into());
             }
             String::from_utf8(
                 super::capture_with_timeout(&node.repo, args, input, 1 << 20, &[], None, left)?
                     .checked(&[0])?,
             )
-            .map_err(|_| "Invalid cleanup metadata".into())
+            .map_err(|_| crate::i18n::text("backend-invalid-cleanup-metadata-7bf0ec").into())
         })
     });
     let tips = owned.finish(fetch, cleanup)?;
@@ -376,13 +409,16 @@ fn inspect_node(
         .trim()
         .is_empty()
     {
-        return Err(
-            "Initialize this submodule first; Git currently resolves it as its parent repository"
-                .into(),
-        );
+        return Err(crate::i18n::text(
+            "backend-initialize-this-submodule-first-git-currently-resolves-it-as-its-569629",
+        )
+        .into());
     }
     if !node.remotes.contains(&node.remote) {
-        return Err("Choose a remote that collaborators can fetch from".into());
+        return Err(crate::i18n::text(
+            "backend-choose-a-remote-that-collaborators-can-fetch-from-2f32f5",
+        )
+        .into());
     }
     node.fetch_url = text(&node.repo, &["remote", "get-url", "--", &node.remote])?
         .trim_end_matches(['\n', '\r'])
@@ -393,7 +429,10 @@ fn inspect_node(
     )?;
     let urls: Vec<_> = urls.lines().collect();
     if urls.len() != 1 {
-        return Err("Choose a submodule remote with exactly one push URL".into());
+        return Err(crate::i18n::text(
+            "backend-choose-a-submodule-remote-with-exactly-one-push-url-9a7bdb",
+        )
+        .into());
     }
     node.push_url = urls[0].into();
     super::remote_config::validate_url(&node.fetch_url)?;
@@ -408,7 +447,10 @@ fn inspect_node(
         ],
     )?;
     if refs.lines().count() > 256 {
-        return Err("More than 256 candidate submodule branches; narrow the remote/branch selection before checking publication".into());
+        return Err(crate::i18n::text(
+            "backend-more-than-256-candidate-submodule-branches-narrow-the-remote-bran-3cb46d",
+        )
+        .into());
     }
     let mut source = None;
     for row in refs.lines() {
@@ -434,7 +476,7 @@ fn inspect_node(
             .iter()
             .next()
             .cloned()
-            .ok_or("No required commits")?;
+            .ok_or(crate::i18n::text("backend-no-required-commits-361500"))?;
         text(
             &node.repo,
             &["cat-file", "-e", &format!("{}^{{commit}}", node.source)],
@@ -451,7 +493,10 @@ fn inspect_node(
             node.target = branch;
         }
     } else if !node.published {
-        return Err("No local commit contains all required gitlinks. Open this submodule, merge its required commits, and check again".into());
+        return Err(crate::i18n::text(
+            "backend-no-local-commit-contains-all-required-gitlinks-open-this-submodul-006459",
+        )
+        .into());
     }
     node.snapshot = Some(Snapshot::capture(&node.repo)?);
     Ok(())
@@ -487,10 +532,10 @@ fn check_inner(runner: &Runner<'_>, mut plan: Plan) -> Result<Plan, String> {
             return Err(crate::git::CANCELLED.into());
         }
         if plan.dependencies.len() > 128 {
-            return Err(
-                "More than 128 submodule dependencies; narrow this publication before continuing"
-                    .into(),
-            );
+            return Err(crate::i18n::text(
+                "backend-more-than-128-submodule-dependencies-narrow-this-publication-befo-cc96d4",
+            )
+            .into());
         }
         let node = &mut plan.dependencies[index];
         let outcome = inspect_node(runner, node, &budget);
@@ -541,13 +586,18 @@ pub(crate) fn publish_children(runner: &Runner<'_>, plan: Plan) -> Result<Plan, 
 fn publish_inner(runner: &Runner<'_>, mut plan: Plan) -> Result<Plan, String> {
     let budget = super::ReadBudget::new(2048, std::time::Duration::from_secs(300));
     if !plan.checked || plan.dependencies.iter().any(|n| n.problem.is_some()) {
-        return Err("Check every dependency and resolve its problem before publishing".into());
+        return Err(crate::i18n::text(
+            "backend-check-every-dependency-and-resolve-its-problem-before-publishing-b3ab61",
+        )
+        .into());
     }
     plan.snapshot.check_publication(runner.repo)?;
     let failed = publish_in_order(&mut plan.dependencies, |node| {
         node.snapshot
             .as_ref()
-            .ok_or("Submodule snapshot missing")?
+            .ok_or(crate::i18n::text(
+                "backend-submodule-snapshot-missing-ae3935",
+            ))?
             .check_publication(&node.repo)?;
         if !reachable(runner, node, &budget)? {
             text(
@@ -562,20 +612,33 @@ fn publish_inner(runner: &Runner<'_>, mut plan: Plan) -> Result<Plan, String> {
                 &[&format!("{}:refs/heads/{}", node.source, node.target)],
             )?;
             if !reachable(runner, node, &budget)? {
-                return Err("Push succeeded, but the required commits are still unreachable from the named fetch URL. Parent publication stopped.".into());
+                return Err(crate::i18n::text("backend-push-succeeded-but-the-required-commits-are-still-unreachable-fro-fd4428").into());
             }
         }
-        Ok(format!(
-            "Required commits are published on {} ({})",
-            node.remote,
-            crate::git::redact(&node.fetch_url, None)
+        Ok(crate::i18n::message(
+            "backend-required-commits-are-published-on-0c6132",
+            &[
+                ("remote", (node.remote).to_string().into()),
+                (
+                    "crate",
+                    (crate::git::redact(&node.fetch_url, None))
+                        .to_string()
+                        .into(),
+                ),
+            ],
         ))
     });
     plan.parent_result = Some(if failed {
-        Err("Parent not pushed because a submodule dependency failed".into())
+        Err(crate::i18n::text(
+            "backend-parent-not-pushed-because-a-submodule-dependency-failed-e7344b",
+        )
+        .into())
     } else {
         plan.snapshot.check_publication(runner.repo)?;
-        Ok("Dependencies published; parent awaits push preflight and outgoing review".into())
+        Ok(crate::i18n::text(
+            "backend-dependencies-published-parent-awaits-push-preflight-and-outgoing-2a9d8d",
+        )
+        .into())
     });
     Ok(plan)
 }
@@ -588,7 +651,7 @@ fn publish_in_order(
     let mut failed = false;
     for node in dependencies {
         let outcome = if failed {
-            Err("Not pushed: an earlier dependency failed".into())
+            Err(crate::i18n::text("backend-not-pushed-an-earlier-dependency-failed-279cf5").into())
         } else {
             publish(node)
         };

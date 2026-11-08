@@ -61,13 +61,19 @@ impl Snapshot {
         now.refs = without_tracking(&now.refs);
         expected.refs = without_tracking(&expected.refs);
         if now != expected {
-            return Err("Source refs, worktree, repository or routing configuration changed. Prepare publication again.".into());
+            return Err(crate::i18n::text(
+                "backend-source-refs-worktree-repository-or-routing-configuration-changed-ef151e",
+            )
+            .into());
         }
         Ok(())
     }
     pub(crate) fn check(&self, repo: &Path) -> Result<(), String> {
         if *self != Self::capture(repo)? {
-            return Err("Repository, refs, configuration or worktree changed. Read a fresh preview before applying.".into());
+            return Err(crate::i18n::text(
+                "backend-repository-refs-configuration-or-worktree-changed-read-a-fresh-pr-6f6323",
+            )
+            .into());
         }
         Ok(())
     }

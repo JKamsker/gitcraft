@@ -25,7 +25,7 @@ pub(super) fn no_replace(source: &File, directory: &File, name: &str) -> io::Res
     {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
-            "Invalid owned metadata name",
+            crate::i18n::text("backend-invalid-owned-metadata-name-4c8f18"),
         ));
     }
     let wide = name.encode_utf16().collect::<Vec<_>>();
@@ -34,8 +34,12 @@ pub(super) fn no_replace(source: &File, directory: &File, name: &str) -> io::Res
     let bytes = (offset + (wide.len() + 1) * 2).max(std::mem::size_of::<FILE_RENAME_INFO>());
     let mut storage =
         vec![FILE_RENAME_INFO::default(); bytes.div_ceil(std::mem::size_of::<FILE_RENAME_INFO>())];
-    let size = u32::try_from(bytes)
-        .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "Rename metadata too large"))?;
+    let size = u32::try_from(bytes).map_err(|_| {
+        io::Error::new(
+            io::ErrorKind::InvalidInput,
+            crate::i18n::text("backend-rename-metadata-too-large-40ee73"),
+        )
+    })?;
     // SAFETY: defaulted FILE_RENAME_INFO storage has the required native alignment
     // and at least its fixed header plus the full UTF-16 name/NUL.
     // The structure's fields are scalar/union fields with valid zero representations.

@@ -29,12 +29,15 @@ impl Consent {
         credentials: Option<&git::Credentials>,
     ) -> Result<Self, String> {
         if context.error.is_some() || context.choices != profile.connections {
-            return Err("Selected connection/profile is inconsistent; reopen outbox in the selected profile".into());
+            return Err(crate::i18n::text(
+                "backend-selected-connection-profile-is-inconsistent-reopen-outbox-in-the-8ec5fa",
+            )
+            .into());
         }
         let principal = credentials
             .map(|credentials| {
                 let scope = credentials.scope.as_ref().ok_or(
-                    "Transient sign-in has no exact endpoint/account scope; sign in again",
+                    crate::i18n::text("backend-transient-sign-in-has-no-exact-endpoint-account-scope-sign-in-aga-254b8a"),
                 )?;
                 Ok::<_, String>((
                     scope.endpoint(),
@@ -51,7 +54,10 @@ impl Consent {
     }
     fn require(saved: Option<&Self>, selected: &Self) -> Result<(), String> {
         if saved != Some(selected) {
-            return Err("Selected profile/account differs from queued consent, or its legacy witness is missing; review the pinned commit and approve again".into());
+            return Err(crate::i18n::text(
+                "backend-selected-profile-account-differs-from-queued-consent-or-its-legac-c5b0c0",
+            )
+            .into());
         }
         Ok(())
     }
@@ -67,11 +73,14 @@ fn live_consents() -> &'static std::sync::Mutex<
 fn live_check(e: &Entry, context: &crate::connections::Context) -> Result<(), String> {
     if live_consents()
         .lock()
-        .map_err(|_| "Outbox live consent unavailable")?
+        .map_err(|_| crate::i18n::text("backend-outbox-live-consent-unavailable-67e2b9"))?
         .get(&(e.identity.clone(), e.id.clone()))
         .is_some_and(|saved| saved != context)
     {
-        return Err("Live queued connection/config lease changed; review and approve again".into());
+        return Err(crate::i18n::text(
+            "backend-live-queued-connection-config-lease-changed-review-and-approve-ag-d8c29b",
+        )
+        .into());
     }
     Ok(())
 }
@@ -125,14 +134,16 @@ fn routing(repo: &Path, source: &str) -> Result<(String, String, String, Vec<Str
         .branches
         .iter()
         .find(|b| b.name == source)
-        .ok_or("Queued source branch was removed")?;
+        .ok_or(crate::i18n::text(
+            "backend-queued-source-branch-was-removed-011ca9",
+        ))?;
     let urls = text(
         repo,
         &["remote", "get-url", "--push", "--all", "--", &b.push.remote],
     )?;
     let urls: Vec<_> = urls.lines().map(str::to_owned).collect();
     if urls.is_empty() {
-        return Err("Push route has no endpoint".into());
+        return Err(crate::i18n::text("backend-push-route-has-no-endpoint-03ad2d").into());
     }
     for url in &urls {
         validate_url(url)?;
@@ -162,7 +173,12 @@ pub(crate) fn read(repo: &Path) -> Result<View, String> {
             vec![],
             2 << 20,
         )?)
-        .map_err(|e| format!("Invalid outbox: {e}"))?
+        .map_err(|e| {
+            crate::i18n::message(
+                "backend-invalid-outbox-e-657eca",
+                &[("detail", (e).to_string().into())],
+            )
+        })?
     };
     let branch = git::run_ok_codes(
         Some(repo),
@@ -180,7 +196,10 @@ pub(crate) fn read(repo: &Path) -> Result<View, String> {
 fn save(repo: &Path, view: &View, pin: Option<&Entry>) -> Result<(), String> {
     let bytes = serde_json::to_vec(&view.queue).map_err(|e| e.to_string())?;
     if bytes.len() > 2 << 20 {
-        return Err("Outbox exceeds 2 MiB; remove old receipts first".into());
+        return Err(crate::i18n::text(
+            "backend-outbox-exceeds-2-mib-remove-old-receipts-first-22680d",
+        )
+        .into());
     }
     let oid = super::read(repo, &["hash-object", "-w", "--stdin"], bytes, 1024)?;
     let oid = std::str::from_utf8(&oid).map_err(|e| e.to_string())?.trim();
@@ -212,14 +231,19 @@ pub(crate) fn enqueue(
     let context = crate::connections::current();
     let consent = Consent::capture(profile, &context, credentials)?;
     if read(repo)?.version != expected.version {
-        return Err("Outbox changed; reopen it".into());
+        return Err(crate::i18n::text("backend-outbox-changed-reopen-it-014048").into());
     }
     if expected.queue.entries.len() >= 128 {
-        return Err("Outbox has 128 entries; remove old receipts first".into());
+        return Err(crate::i18n::text(
+            "backend-outbox-has-128-entries-remove-old-receipts-first-ecf056",
+        )
+        .into());
     }
     let source = &expected.branch;
     if source.is_empty() {
-        return Err("Check out a source branch before queueing".into());
+        return Err(
+            crate::i18n::text("backend-check-out-a-source-branch-before-queueing-74cb65").into(),
+        );
     }
     let commit = text(
         repo,
@@ -263,11 +287,18 @@ pub(crate) fn enqueue(
     save(repo, &view, Some(&entry))?;
     live_consents()
         .lock()
-        .map_err(|_| "Outbox saved; live consent lease could not be retained; review again")?
+        .map_err(|_| {
+            crate::i18n::text(
+                "backend-outbox-saved-live-consent-lease-could-not-be-retained-review-agai-1215d1",
+            )
+        })?
         .insert((entry.identity.clone(), entry.id.clone()), context);
-    Ok(format!(
-        "Queued {} at {}. Later commits are excluded.",
-        entry.source, entry.commit
+    Ok(crate::i18n::message(
+        "backend-queued-at-later-commits-are-excluded-cc2ded",
+        &[
+            ("source", (entry.source).to_string().into()),
+            ("commit", (entry.commit).to_string().into()),
+        ],
     ))
 }
 fn check(repo: &Path, e: &Entry) -> Result<(), String> {
@@ -279,7 +310,7 @@ fn check_source(repo: &Path, e: &Entry, pinned: bool) -> Result<(), String> {
         &["rev-parse", "--path-format=absolute", "--git-common-dir"],
     )? != e.identity
     {
-        return Err("Repository identity changed".into());
+        return Err(crate::i18n::text("backend-repository-identity-changed-2f0e64").into());
     }
     let (remote, destination, stamp, endpoints) = routing(repo, &e.source)?;
     if (remote, destination, stamp, endpoints)
@@ -290,9 +321,10 @@ fn check_source(repo: &Path, e: &Entry, pinned: bool) -> Result<(), String> {
             e.endpoints.clone(),
         )
     {
-        return Err(
-            "Destination, identity policy or routing changed; review and queue a new entry".into(),
-        );
+        return Err(crate::i18n::text(
+            "backend-destination-identity-policy-or-routing-changed-review-and-queue-a-9b7d3e",
+        )
+        .into());
     }
     let source = text(
         repo,
@@ -311,7 +343,12 @@ fn check_source(repo: &Path, e: &Entry, pinned: bool) -> Result<(), String> {
             source.trim(),
         ],
     )
-    .map_err(|_| "Source history was rewritten; review and queue a new entry".to_owned())?;
+    .map_err(|_| {
+        crate::i18n::text(
+            "backend-source-history-was-rewritten-review-and-queue-a-new-entry-22e255",
+        )
+        .to_owned()
+    })?;
     if pinned
         && text(
             repo,
@@ -324,7 +361,7 @@ fn check_source(repo: &Path, e: &Entry, pinned: bool) -> Result<(), String> {
         .trim()
             != e.commit
     {
-        return Err("Protected outbox commit changed".into());
+        return Err(crate::i18n::text("backend-protected-outbox-commit-changed-13fefd").into());
     }
     Ok(())
 }
@@ -333,7 +370,7 @@ fn entry<'a>(view: &'a View, id: &str) -> Result<&'a Entry, String> {
         .entries
         .iter()
         .find(|e| e.id == id)
-        .ok_or("Outbox entry disappeared".into())
+        .ok_or(crate::i18n::text("backend-outbox-entry-disappeared-e177dc").into())
 }
 pub(crate) fn prepare(
     repo: &Path,
@@ -373,9 +410,12 @@ fn prepare_with(
             .entries
             .iter_mut()
             .find(|e| e.id == id)
-            .ok_or("Entry disappeared")?;
+            .ok_or(crate::i18n::text("backend-entry-disappeared-c60598"))?;
         if !matches!(e.status, Status::Paused(_) | Status::Sending) {
-            return Err("Only paused or uncertain entries need renewed approval".into());
+            return Err(crate::i18n::text(
+                "backend-only-paused-or-uncertain-entries-need-renewed-approval-233504",
+            )
+            .into());
         }
         let (remote, destination, stamp, endpoints) = routing(repo, &e.source)?;
         e.reviewed_tip = text(
@@ -405,7 +445,10 @@ fn prepare_with(
         return Err(error);
     }
     if e.status != Status::Ready {
-        return Err("Entry is paused, in-flight or sent. Inspect its receipt; queue a new push explicitly if appropriate.".into());
+        return Err(crate::i18n::text(
+            "backend-entry-is-paused-in-flight-or-sent-inspect-its-receipt-queue-a-new-d6598c",
+        )
+        .into());
     }
     if let Err(error) = check(repo, e) {
         pause(repo, id, &error)?;
@@ -435,7 +478,10 @@ fn prepare_with(
         || plan.force
         || plan.deleting
     {
-        return Err("Preflight differs from the exact queued plain push".into());
+        return Err(crate::i18n::text(
+            "backend-preflight-differs-from-the-exact-queued-plain-push-8d6c3d",
+        )
+        .into());
     }
     Ok(Prepared {
         view,
@@ -454,7 +500,7 @@ fn pause(repo: &Path, id: &str, why: &str) -> Result<(), String> {
         .entries
         .iter_mut()
         .find(|e| e.id == id)
-        .ok_or("Entry disappeared")?;
+        .ok_or(crate::i18n::text("backend-entry-disappeared-c60598"))?;
     e.status = Status::Paused(git::redact(why, None));
     save(repo, &view, None)
 }
@@ -466,15 +512,15 @@ pub(crate) fn send(
 ) -> Result<String, String> {
     reviewed.check_plan(&p.plan)?;
     if crate::network::refused().is_some() {
-        return Err("Outbox remains queued while offline".into());
+        return Err(crate::i18n::text("backend-outbox-remains-queued-while-offline-7f7902").into());
     }
     let mut view = read(runner.repo)?;
     if view.version != p.view.version {
-        return Err("Outbox changed; review again".into());
+        return Err(crate::i18n::text("backend-outbox-changed-review-again-6c3b43").into());
     }
     let actual = entry(&view, &p.id)?;
     if p.review && (!matches!(actual.status, Status::Paused(_) | Status::Sending) || automatic) {
-        return Err("Renewed approval no longer applies".into());
+        return Err(crate::i18n::text("backend-renewed-approval-no-longer-applies-544f7d").into());
     }
     let e = if p.review {
         entry(&p.view, &p.id)?.clone()
@@ -482,7 +528,7 @@ pub(crate) fn send(
         actual.clone()
     };
     if e.status != Status::Ready {
-        return Err("This entry is no longer ready".into());
+        return Err(crate::i18n::text("backend-this-entry-is-no-longer-ready-35173b").into());
     }
     let selected = match Consent::capture(
         &p.plan.profile,
@@ -500,7 +546,10 @@ pub(crate) fn send(
             if p.context == crate::connections::current() && p.consent == selected {
                 Ok(())
             } else {
-                Err("Prepared connection changed; prepare and approve again".into())
+                Err(crate::i18n::text(
+                    "backend-prepared-connection-changed-prepare-and-approve-again-562fe9",
+                )
+                .into())
             }
         })
         .and_then(|_| {
@@ -518,9 +567,13 @@ pub(crate) fn send(
         pause(
             runner.repo,
             &e.id,
-            "Automatic plain send requires a clean preflight; review its findings and queue explicitly",
+            crate::i18n::text(
+                "backend-automatic-plain-send-requires-a-clean-preflight-review-its-findin-85a272",
+            ),
         )?;
-        return Err("Automatic send paused for preflight review".into());
+        return Err(
+            crate::i18n::text("backend-automatic-send-paused-for-preflight-review-e64ade").into(),
+        );
     }
     if let Err(error) = check(runner.repo, &e) {
         pause(runner.repo, &e.id, &error)?;
@@ -540,7 +593,11 @@ pub(crate) fn send(
     save(runner.repo, &view, None)?;
     live_consents()
         .lock()
-        .map_err(|_| "Sending intent saved; live consent unavailable, inspect before retry")?
+        .map_err(|_| {
+            crate::i18n::text(
+                "backend-sending-intent-saved-live-consent-unavailable-inspect-before-retr-cb5284",
+            )
+        })?
         .insert((e.identity.clone(), e.id.clone()), p.context.clone());
     let result = preflight::execute_bound_controlled(
         runner.repo,
@@ -555,28 +612,43 @@ pub(crate) fn send(
         .entries
         .iter_mut()
         .find(|e| e.id == p.id)
-        .ok_or("Push ended but entry changed; inspect the remote before another send")?;
+        .ok_or(crate::i18n::text(
+            "backend-push-ended-but-entry-changed-inspect-the-remote-before-another-se-875973",
+        ))?;
     match &result {
         Ok(output) => {
             e.status = Status::Sent;
             e.receipt = git::redact(output, None);
         }
         Err(error) => {
-            e.status=Status::Paused("Push rejected, cancelled or outcome uncertain. Inspect the destination before queueing again.".into());
+            e.status=Status::Paused(crate::i18n::text("backend-push-rejected-cancelled-or-outcome-uncertain-inspect-the-destinat-78d1f3").into());
             e.receipt = git::redact(error, None);
         }
     }
     let sent_commit = e.commit.clone();
-    save(runner.repo,&receipt,None).map_err(|_|"Push attempted, but receipt could not be saved. Inspect the destination; do not retry automatically".to_owned())?;
-    result.map(|_| format!("Published exact queued commit {sent_commit}"))
+    save(runner.repo, &receipt, None).map_err(|_| {
+        crate::i18n::text(
+            "backend-push-attempted-but-receipt-could-not-be-saved-inspect-the-destina-704969",
+        )
+        .to_owned()
+    })?;
+    result.map(|_| {
+        crate::i18n::message(
+            "backend-published-exact-queued-commit-sent-commit-04c0e8",
+            &[("sent_commit", (sent_commit).to_string().into())],
+        )
+    })
 }
 pub(crate) fn remove(repo: &Path, expected: &View, id: &str) -> Result<String, String> {
     if read(repo)?.version != expected.version {
-        return Err("Outbox changed; reopen it".into());
+        return Err(crate::i18n::text("backend-outbox-changed-reopen-it-014048").into());
     }
     let e = entry(expected, id)?;
     if e.status == Status::Sending {
-        return Err("Outcome uncertain: inspect the remote and retain this receipt; no retry or deletion is automatic".into());
+        return Err(crate::i18n::text(
+            "backend-outcome-uncertain-inspect-the-remote-and-retain-this-receipt-no-r-36e9d1",
+        )
+        .into());
     }
     let mut view = expected.clone();
     view.queue.entries.retain(|e| e.id != id);
@@ -584,7 +656,10 @@ pub(crate) fn remove(repo: &Path, expected: &View, id: &str) -> Result<String, S
     if let Ok(mut live) = live_consents().lock() {
         live.remove(&(e.identity.clone(), e.id.clone()));
     }
-    Ok("Removed queue entry; protected source commit is retained for recovery".into())
+    Ok(crate::i18n::text(
+        "backend-removed-queue-entry-protected-source-commit-is-retained-for-recov-91464b",
+    )
+    .into())
 }
 
 #[cfg(test)]

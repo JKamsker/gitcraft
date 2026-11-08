@@ -26,9 +26,10 @@ pub(crate) fn read(repo: &Path, namespace: &str) -> Result<Browser, String> {
         && (!namespace.starts_with("refs/")
             || namespace.contains(['\n', '\r', '\0', '*', '?', '[']))
     {
-        return Err(
-            "Choose a literal root ref (such as HEAD) or a ref/prefix beginning with refs/".into(),
-        );
+        return Err(crate::i18n::text(
+            "backend-choose-a-literal-root-ref-such-as-head-or-a-ref-prefix-beginning-b141c1",
+        )
+        .into());
     }
     let (refs, root_fallback) = references(repo)?;
     let selected: Vec<_> = refs
@@ -74,7 +75,7 @@ pub(crate) fn read(repo: &Path, namespace: &str) -> Result<Browser, String> {
             (tips.join("\n") + "\n").into_bytes(),
             1 << 20,
         )?)
-        .map_err(|_| "Ref history is not UTF-8")?
+        .map_err(|_| crate::i18n::text("backend-ref-history-is-not-utf-8-0af8d8"))?
     };
     Ok(Browser {
         refs,
@@ -98,7 +99,8 @@ pub(super) fn references(repo: &Path) -> Result<(Vec<Reference>, bool), String> 
     let out = if root_fallback {
         text(repo, &["for-each-ref", format])?
     } else {
-        String::from_utf8(output.checked(&[0])?).map_err(|_| "Ref metadata is not UTF-8")?
+        String::from_utf8(output.checked(&[0])?)
+            .map_err(|_| crate::i18n::text("backend-ref-metadata-is-not-utf-8-6ef259"))?
     };
     let mut refs: Vec<Reference> = out
         .lines()
@@ -149,7 +151,8 @@ pub(super) fn references(repo: &Path) -> Result<(Vec<Reference>, bool), String> 
         if output.code == Some(1) {
             continue;
         }
-        let oid = String::from_utf8(output.checked(&[0])?).map_err(|_| "Invalid root ref")?;
+        let oid = String::from_utf8(output.checked(&[0])?)
+            .map_err(|_| crate::i18n::text("backend-invalid-root-ref-86d86f"))?;
         let oid = oid.trim().to_owned();
         let kind = text(repo, &["cat-file", "-t", &oid])?.trim().to_owned();
         let symbolic =
