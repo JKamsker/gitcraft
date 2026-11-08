@@ -370,6 +370,7 @@ impl RepoTab {
 
     fn poll_as(&mut self, ctx: &egui::Context, shown: bool) {
         self.notice_connections(ctx);
+        self.local_ci.poll(ctx);
         self.shown = shown;
         if !shown || self.fs_pending.is_some() {
             self.discard_decrypted();

@@ -28,6 +28,7 @@ pub(crate) struct Options {
     pub cancel: Cancellation,
     pub cancelled: Option<Box<dyn Fn() -> bool + Send + Sync>>,
     pub stderr: Option<Chunk>,
+    pub stdout: Option<Chunk>,
     pub ready: Option<Box<dyn FnOnce() + Send>>,
     /// Stream stdout directly to a file instead of capturing it in memory.
     pub stdout_file: Option<std::fs::File>,
@@ -50,6 +51,7 @@ impl Default for Options {
             cancel: crate::tasks::cancellation(),
             cancelled: None,
             stderr: None,
+            stdout: None,
             ready: None,
             stdout_file: None,
             stop_remote: None,
@@ -496,7 +498,10 @@ async fn execute(
                 match result {
                     Ok(0) => out = None,
                     Ok(n) => {
-                        if ready { append(&mut stdout, &obuf[..n], options.output_limit, &mut stopped); }
+                        if ready {
+                            consume(&mut options.stdout, &obuf[..n], &mut stopped);
+                            append(&mut stdout, &obuf[..n], options.output_limit, &mut stopped);
+                        }
                         else {
                             for (i, &byte) in obuf[..n].iter().enumerate() {
                                 if byte == b'\n' {
@@ -511,6 +516,7 @@ async fn execute(
                                                 }
                                             });
                                         }
+                                        consume(&mut options.stdout, &obuf[i+1..n], &mut stopped);
                                         append(&mut stdout, &obuf[i+1..n], options.output_limit, &mut stopped);
                                         break;
                                     }
@@ -639,7 +645,10 @@ async fn execute(
                 result = async { match &mut out { Some(p) => p.read(&mut obuf).await, None => std::future::pending().await } } => {
                     match result {
                         Ok(0) | Err(_) => out = None,
-                        Ok(n) => if ready { append(&mut stdout, &obuf[..n], options.output_limit, &mut overflow); },
+                        Ok(n) => if ready {
+                            consume(&mut options.stdout, &obuf[..n], &mut overflow);
+                            append(&mut stdout, &obuf[..n], options.output_limit, &mut overflow);
+                        },
                     }
                 }
                 result = async { match &mut err { Some(p) => p.read(&mut ebuf).await, None => std::future::pending().await } } => {
@@ -692,6 +701,14 @@ async fn write_input<W: tokio::io::AsyncWrite + Unpin>(
     } else {
         pipe.flush().await?;
         Ok(true)
+    }
+}
+
+fn consume(callback: &mut Option<Chunk>, bytes: &[u8], stopped: &mut Option<String>) {
+    if let Some(callback) = callback
+        && std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| callback(bytes))).is_err()
+    {
+        *stopped = Some("process output callback panicked".into());
     }
 }
 

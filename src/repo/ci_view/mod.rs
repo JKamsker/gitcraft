@@ -121,6 +121,7 @@ impl CiView {
 impl RepoTab {
     /// Shows the builds of commit `sha` in the big area, run `run` first if it's given.
     pub(super) fn open_ci(&mut self, sha: String, run: Option<u64>, ctx: &egui::Context) {
+        self.local_ci_context_default();
         if self.conflict.is_some() || self.rebase.is_some() {
             let editor = if self.conflict.is_some() {
                 "conflict editor"
