@@ -304,7 +304,7 @@ impl AskPresentation {
                 body: crate::i18n::message(
                     "repo-workflows-agent-hard-reset-body",
                     &[
-                        ("target", (target).into()),
+                        ("target", (target.clone()).into()),
                         ("from", (from.clone()).into()),
                         ("to", (to.clone()).into()),
                         ("subject", (subject.clone()).into()),
@@ -335,7 +335,7 @@ impl AskPresentation {
                 body: crate::i18n::message(
                     "repo-workflows-agent-mixed-reset-body",
                     &[
-                        ("target", (target).into()),
+                        ("target", (target.clone()).into()),
                         ("from", (from.clone()).into()),
                         ("to", (to.clone()).into()),
                         ("subject", (subject.clone()).into()),
@@ -386,7 +386,7 @@ impl AskPresentation {
                 body: crate::i18n::message(
                     "repo-workflows-agent-delete-body",
                     &[
-                        ("name", (name).into()),
+                        ("name", (name.clone()).into()),
                         ("commit", (commit.clone()).into()),
                         ("subject", (subject.clone()).into()),
                         ("force", (if force { "yes" } else { "no" }).into()),
@@ -1434,7 +1434,7 @@ mod fluent_ask_receipt_tests {
                         assert_eq!(
                             shown.ask.undo_note,
                             if language == "de" {
-                                "Dies kann in gitcraft nicht rückgängig gemacht werden."
+                                "Dies lässt sich in gitcraft nicht rückgängig machen."
                             } else {
                                 RAW_NO_UNDO
                             }
