@@ -194,7 +194,10 @@ impl RepoTab {
 
     pub(super) fn commit(&mut self, ctx: &egui::Context) {
         if !self.work.conflicted.is_empty() {
-            self.status = Some((crate::i18n::text("repo-core-0351").to_owned(), true));
+            self.status = Some(crate::repo::Notice::plain((
+                crate::i18n::text("repo-core-0351").to_owned(),
+                true,
+            )));
             return;
         }
         // A restack's rebase goes on as the restack: the layers after it too.
@@ -226,7 +229,10 @@ impl RepoTab {
         }
         let summary = self.commit_summary.trim();
         if summary.is_empty() {
-            self.status = Some((crate::i18n::text("repo-core-0355").to_owned(), true));
+            self.status = Some(crate::repo::Notice::plain((
+                crate::i18n::text("repo-core-0355").to_owned(),
+                true,
+            )));
             return;
         }
         let mut commit = vec!["commit".to_owned()];
@@ -406,13 +412,13 @@ pub(super) fn checkout_pull_undo(
 
 /// Refuses (saying so in `status`) a branch or commit name git would read as an option: one
 /// from a remote or a pull request can be anything a ref name may be.
-pub(super) fn refuse_option_like(name: &str, status: &mut Option<(String, bool)>) -> bool {
+pub(super) fn refuse_option_like(name: &str, status: &mut Option<super::Notice>) -> bool {
     let bad = name.is_empty() || name.starts_with('-');
     if bad {
-        *status = Some((
+        *status = Some(super::Notice::plain((
             crate::i18n::message("repo-core-0369", &[("name", name.to_string().into())]),
             true,
-        ));
+        )));
     }
     bad
 }

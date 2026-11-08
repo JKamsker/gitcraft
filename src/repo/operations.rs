@@ -39,7 +39,7 @@ impl RepoTab {
             // Fetch, Pull and Push wait for it (see `running::Waiter`); anything else is not
             // started, and says so. A quiet one (the background fetch) just comes again later.
             if !quiet {
-                self.status = Some((
+                self.status = Some(crate::repo::Notice::plain((
                     crate::i18n::message(
                         "repo-core-2947",
                         &[
@@ -54,7 +54,7 @@ impl RepoTab {
                         ],
                     ),
                     true,
-                ));
+                )));
             }
             return;
         }
@@ -62,7 +62,7 @@ impl RepoTab {
         let ops = self.skip_hooks.push_steps(ops);
         if let Some(why) = offline_refusal(&ops) {
             if !quiet {
-                self.status = Some((
+                self.status = Some(crate::repo::Notice::plain((
                     crate::i18n::message(
                         "repo-core-2948",
                         &[
@@ -74,7 +74,7 @@ impl RepoTab {
                         ],
                     ),
                     true,
-                ));
+                )));
             }
             return;
         }
@@ -265,7 +265,7 @@ impl RepoTab {
             return;
         }
         if let Some(busy) = &self.busy_op {
-            self.status = Some((
+            self.status = Some(crate::repo::Notice::plain((
                 crate::i18n::message(
                     "repo-core-2950",
                     &[(
@@ -274,7 +274,7 @@ impl RepoTab {
                     )],
                 ),
                 true,
-            ));
+            )));
             return;
         }
         let challenge = self
@@ -284,7 +284,10 @@ impl RepoTab {
             .cloned();
         let Some(binding) = challenge.as_ref().and_then(|ticket| ticket.binding.clone()) else {
             self.invalidate_https_challenge();
-            self.status = Some((crate::i18n::text("repo-core-2951").into(), true));
+            self.status = Some(crate::repo::Notice::plain((
+                crate::i18n::text("repo-core-2951").into(),
+                true,
+            )));
             return;
         };
         if !challenge
@@ -331,7 +334,10 @@ impl RepoTab {
                     .as_ref()
                     .is_some_and(|scope| ticket.endpoints.iter().any(|url| scope.matches_url(url)))
         }) {
-            self.status = Some((crate::i18n::text("repo-core-2952").into(), true));
+            self.status = Some(crate::repo::Notice::plain((
+                crate::i18n::text("repo-core-2952").into(),
+                true,
+            )));
             return;
         }
         let Some(ticket) = challenge else {
@@ -339,7 +345,10 @@ impl RepoTab {
         };
         let Some(binding) = ticket.binding.clone() else {
             self.invalidate_https_challenge();
-            self.status = Some((crate::i18n::text("repo-core-2953").into(), true));
+            self.status = Some(crate::repo::Notice::plain((
+                crate::i18n::text("repo-core-2953").into(),
+                true,
+            )));
             return;
         };
         let selected = ticket.endpoints.iter().find(|url| {
@@ -353,7 +362,10 @@ impl RepoTab {
             return;
         }
         self.https_checking = true;
-        self.status = Some((crate::i18n::text("repo-core-2954").into(), false));
+        self.status = Some(crate::repo::Notice::plain((
+            crate::i18n::text("repo-core-2954").into(),
+            false,
+        )));
         let path = self.path.clone();
         self.then_or(
             ctx,
@@ -362,13 +374,16 @@ impl RepoTab {
             move || binding.verify(&path),
             move |tab, result, ctx| {
                 if !tab.https_ticket_current(&ticket) {
-                    tab.status = Some((crate::i18n::text("repo-core-2955").into(), true));
+                    tab.status = Some(crate::repo::Notice::plain((
+                        crate::i18n::text("repo-core-2955").into(),
+                        true,
+                    )));
                     return;
                 }
                 tab.https_checking = false;
                 if let Err(error) = result {
                     tab.invalidate_https_challenge();
-                    tab.status = Some((error, true));
+                    tab.status = Some(crate::repo::Notice::plain((error, true)));
                     return;
                 }
                 if let Some(binding) = ticket.binding
@@ -377,7 +392,10 @@ impl RepoTab {
                     match serde_json::to_string(&binding) {
                         Ok(json) => op.ops.insert(0, vec![EXPECT_HTTPS_ROUTE.into(), json]),
                         Err(_) => {
-                            tab.status = Some((crate::i18n::text("repo-core-2956").into(), true));
+                            tab.status = Some(crate::repo::Notice::plain((
+                                crate::i18n::text("repo-core-2956").into(),
+                                true,
+                            )));
                             return;
                         }
                     }
@@ -392,7 +410,7 @@ impl RepoTab {
             && let Some(op) = &self.last_op
         {
             // It would not start: say so, rather than drop it.
-            self.status = Some((
+            self.status = Some(crate::repo::Notice::plain((
                 crate::i18n::message(
                     "repo-core-2957",
                     &[
@@ -407,7 +425,7 @@ impl RepoTab {
                     ],
                 ),
                 true,
-            ));
+            )));
         } else {
             self.run_last_op_again(ctx);
         }
@@ -471,7 +489,7 @@ impl RepoTab {
                     && let Some(note) = tried_note(out)
                     && !quiet
                 {
-                    self.status = Some((
+                    self.status = Some(crate::repo::Notice::plain((
                         crate::i18n::message(
                             "repo-core-2959",
                             &[
@@ -483,9 +501,12 @@ impl RepoTab {
                             ],
                         ),
                         true,
-                    ));
+                    )));
                 } else if refresh == Refresh::All && !quiet {
-                    self.status = Some((format!("{label}: done"), false));
+                    self.status = Some(crate::repo::Notice::plain((
+                        format!("{label}: done"),
+                        false,
+                    )));
                 }
                 if label.contains("etch") {
                     self.note_fetched();
@@ -500,14 +521,17 @@ impl RepoTab {
             Err(e) if cancelled => {
                 self.open_when_done.take_if(|(l, _)| *l == label);
                 let left_locks = e.starts_with(&format!("{}, but", git::CANCELLED));
-                self.status = Some((format!("{label}: {e}"), left_locks));
+                self.status = Some(crate::repo::Notice::plain((
+                    format!("{label}: {e}"),
+                    left_locks,
+                )));
             }
             Err(e) if git::is_auth_error(e) && !quiet => {
                 self.agent_needs_sign_in(&label);
                 // Typed credentials that were refused are forgotten.
                 let typed = self.credentials.take().is_some();
                 let refused = typed || e.contains("401") || e.contains("403");
-                self.status = Some((
+                self.status = Some(crate::repo::Notice::plain((
                     crate::i18n::message(
                         "repo-core-2962",
                         &[(
@@ -516,12 +540,15 @@ impl RepoTab {
                         )],
                     ),
                     true,
-                ));
+                )));
                 // Only a URL reported by the failed step, or its captured destinations.
                 // An absent endpoint must never be replaced with the default fetch URL.
                 if crate::push_preflight::is_reviewed_auth_error(e) && auth_failure.is_none() {
                     self.invalidate_https_challenge();
-                    self.status = Some((crate::i18n::text("repo-core-2963").into(), true));
+                    self.status = Some(crate::repo::Notice::plain((
+                        crate::i18n::text("repo-core-2963").into(),
+                        true,
+                    )));
                 } else {
                     let failure =
                         auth_failure.unwrap_or_else(|| git::AuthFailure::from_error(e, &[]));
@@ -533,7 +560,7 @@ impl RepoTab {
                 self.open_when_done.take_if(|(l, _)| *l == label);
                 self.focus_wip = e.contains("CONFLICT") || e.contains("could not apply");
                 // A failed undo stays undoable: the timeline stays where it was.
-                self.status = Some((
+                self.status = Some(crate::repo::Notice::plain((
                     crate::i18n::message(
                         "repo-core-0270",
                         &[
@@ -545,7 +572,7 @@ impl RepoTab {
                         ],
                     ),
                     true,
-                ));
+                )));
                 if !quiet {
                     self.explain_failure(e, &label, ctx);
                 }
@@ -562,35 +589,36 @@ impl RepoTab {
             self.timeline_op_ended(&label, &kind, undo, ok, refresh, ctx);
         }
         if long && !quiet {
-            self.finished.push(match &result {
-                Ok(_) => (
-                    crate::i18n::message(
-                        "repo-core-2965",
-                        &[
-                            ("name", self.name.to_string().into()),
-                            (
-                                "label",
-                                crate::repo::messages::display_operation(&label).into(),
-                            ),
-                        ],
+            self.finished
+                .push(crate::repo::Notice::plain(match &result {
+                    Ok(_) => (
+                        crate::i18n::message(
+                            "repo-core-2965",
+                            &[
+                                ("name", self.name.to_string().into()),
+                                (
+                                    "label",
+                                    crate::repo::messages::display_operation(&label).into(),
+                                ),
+                            ],
+                        ),
+                        false,
                     ),
-                    false,
-                ),
-                Err(e) => (
-                    crate::i18n::message(
-                        "repo-core-2966",
-                        &[
-                            ("name", self.name.to_string().into()),
-                            (
-                                "label",
-                                crate::repo::messages::display_operation(&label).into(),
-                            ),
-                            ("e", headline(e).to_string().into()),
-                        ],
+                    Err(e) => (
+                        crate::i18n::message(
+                            "repo-core-2966",
+                            &[
+                                ("name", self.name.to_string().into()),
+                                (
+                                    "label",
+                                    crate::repo::messages::display_operation(&label).into(),
+                                ),
+                                ("e", headline(e).to_string().into()),
+                            ],
+                        ),
+                        true,
                     ),
-                    true,
-                ),
-            });
+                }));
         }
         self.fold_op_done(&label, &result, ctx);
         self.dco_op_done(&label, &result, ctx);

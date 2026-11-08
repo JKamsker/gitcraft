@@ -261,7 +261,10 @@ impl RepoTab {
             },
             |tab, result, ctx| {
                 if let Err(e) = result {
-                    tab.status = Some((format!("Review receipt: {e}"), true));
+                    tab.status = Some(crate::repo::Notice::plain((
+                        format!("Review receipt: {e}"),
+                        true,
+                    )));
                 }
                 tab.load_review_freshness(ctx);
             },

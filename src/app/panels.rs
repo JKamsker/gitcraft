@@ -14,6 +14,7 @@ pub(super) struct Toast {
     error: bool,
     until: Instant,
     update_go_back: Option<UpdateGoBack>,
+    notice: Option<crate::repo::Notice>,
 }
 
 /// Created only from the failed go_back_witnessed result; never inferred from toast text.
@@ -34,6 +35,7 @@ impl Toast {
             error,
             until: Instant::now() + Duration::from_secs(secs),
             update_go_back: None,
+            notice: None,
         }
     }
 
@@ -43,7 +45,22 @@ impl Toast {
         toast
     }
 
+    fn from_notice(notice: crate::repo::Notice) -> Self {
+        let mut toast = Self::new(notice.0.clone(), notice.1);
+        toast.notice = Some(notice);
+        toast
+    }
+
     fn display_text(&self) -> String {
+        if let Some(notice) = &self.notice {
+            return if notice.raw() == &(self.text.clone(), self.error) {
+                notice
+                    .projected()
+                    .unwrap_or_else(|| display_app_message(&self.text))
+            } else {
+                self.text.clone()
+            };
+        }
         match &self.update_go_back {
             Some(source)
                 if self.error
@@ -212,11 +229,11 @@ impl App {
             .chain(self.windows.parked.values_mut().flat_map(|w| &mut w.tabs))
         {
             let Tab::Repo(r) = tab else { continue };
-            for (text, error) in r.finished.drain(..) {
+            for notice in r.finished.drain(..) {
                 if !focused && self.settings.notifications {
-                    notify(&text);
+                    notify(&notice.projected().unwrap_or_else(|| notice.0.clone()));
                 }
-                self.toasts.push(Toast::new(text, error));
+                self.toasts.push(Toast::from_notice(notice));
             }
         }
     }
@@ -418,5 +435,53 @@ mod updater_toast_display_tests {
         mismatched.text = format!("Couldn't go back: {raw}");
         mismatched.error = false;
         assert_eq!(mismatched.display_text(), mismatched.text);
+    }
+}
+
+#[cfg(test)]
+mod notice_toast_tests {
+    use super::*;
+    use egui_kittest::{Harness, kittest::Queryable};
+
+    #[test]
+    fn actual_notice_toast_repaints_retained_source_and_preserves_raw_lifetime() {
+        let notice = crate::repo::Notice::authorship(
+            "topic: $(keep)".into(),
+            crate::authorship::branch::Figures::default(),
+        );
+        let raw = notice.raw().clone();
+        let toast = Toast::from_notice(notice);
+        let until = toast.until;
+        crate::i18n::set_language("en-US");
+        let fonts = std::cell::Cell::new(false);
+        let mut h = Harness::new_ui_state(
+            move |ui, toast: &mut Toast| {
+                if !fonts.replace(true) {
+                    theme::install_fonts(ui.ctx());
+                    return;
+                }
+                toast.label(ui);
+            },
+            toast,
+        );
+        h.run();
+        h.get_by_label("topic: $(keep) adds no lines since it left the base");
+        crate::i18n::set_language("de");
+        h.step();
+        h.get_by_label("topic: $(keep) fügt seit der Abzweigung von der Basis keine Zeilen hinzu.");
+        assert_eq!((&h.state().text, h.state().error), (&raw.0, raw.1));
+        assert_eq!(h.state().until, until);
+        assert!(h.state().update_go_back.is_none());
+        crate::i18n::set_language("en-US");
+        h.step();
+        h.get_by_label(&raw.0);
+        assert_eq!(h.state().notice.as_ref().map(|n| n.raw()), Some(&raw));
+        // A normal toast with identical text has no authorship receipt.
+        let plain = Toast::new(raw.0.clone(), raw.1);
+        crate::i18n::set_language("de");
+        assert_eq!(plain.display_text(), raw.0);
+        let toast = h.state_mut();
+        toast.text = "unrelated provider error".into();
+        assert_eq!(toast.display_text(), "unrelated provider error");
     }
 }

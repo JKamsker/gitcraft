@@ -176,9 +176,11 @@ impl RepoTab {
     /// The tab's latest message (an operation that failed, done from this window or not) at
     /// the foot of the window, where the toolbar showing it may be out of sight.
     fn popout_status(&self, ui: &mut Ui, panel: Panel) {
-        let Some((text, failed)) = &self.status else {
+        let Some(notice) = &self.status else {
             return;
         };
+        let (text, failed) = notice.raw();
+        let text = notice.projected().unwrap_or_else(|| text.clone());
         let t = Tokens::get(ui.ctx());
         egui::Panel::bottom(egui::Id::new(("popout-status", &self.path, panel)))
             .frame(
@@ -296,13 +298,13 @@ impl RepoTab {
                 if self.view_open(panel) {
                     self.popouts.pop_out(panel);
                 } else {
-                    self.status = Some((
+                    self.status = Some(crate::repo::Notice::plain((
                         crate::i18n::message(
                             "repo-core-4225",
                             &[("noun", panel.noun().to_string().into())],
                         ),
                         true,
-                    ));
+                    )));
                 }
             }
             Request::Dock(panel) => {
@@ -310,7 +312,10 @@ impl RepoTab {
             }
             Request::DockAll => {
                 if !self.popouts.dock_all() {
-                    self.status = Some((crate::i18n::text("repo-core-4226").to_owned(), true));
+                    self.status = Some(crate::repo::Notice::plain((
+                        crate::i18n::text("repo-core-4226").to_owned(),
+                        true,
+                    )));
                 }
             }
             // Its pop-out went when the action was noted (see `popout_intercept`).
@@ -325,7 +330,7 @@ impl RepoTab {
                 Ok(panel) => {
                     self.popouts.pop_out(panel);
                 }
-                Err(why) => self.status = Some((why.to_owned(), true)),
+                Err(why) => self.status = Some(crate::repo::Notice::plain((why.to_owned(), true))),
             },
         }
         ctx.request_repaint();

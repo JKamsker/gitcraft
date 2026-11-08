@@ -41,7 +41,7 @@ impl RepoTab {
         }
         // A submodule's change: `git apply` would say it did it, and change nothing.
         if let Err(e) = git::check_revertable(&data.header, path) {
-            self.status = Some((e, true));
+            self.status = Some(crate::repo::Notice::plain((e, true)));
             return;
         }
         let Some(patch) = diff::partial_patch(&data.header, &data.lines, lines, diff::Pick::Revert)
@@ -107,7 +107,7 @@ impl RepoTab {
         let Some(busy) = &self.busy_op else {
             return false;
         };
-        self.status = Some((
+        self.status = Some(crate::repo::Notice::plain((
             crate::i18n::message(
                 "repo-core-3313",
                 &[
@@ -122,7 +122,7 @@ impl RepoTab {
                 ],
             ),
             true,
-        ));
+        )));
         true
     }
 
@@ -135,7 +135,7 @@ impl RepoTab {
     ) {
         self.busy_op = None;
         self.op_started = None;
-        self.status = Some(match outcome {
+        self.status = Some(crate::repo::Notice::plain(match outcome {
             Ok((file, Reverted::Clean)) => {
                 // Applying the same patch forward brings the changes back.
                 // Whatever `apply.whitespace` says: the revert itself ignored it too.
@@ -199,7 +199,7 @@ impl RepoTab {
                 ),
                 true,
             ),
-        });
+        }));
         self.reload_status(ctx);
     }
 }

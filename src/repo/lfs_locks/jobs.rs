@@ -233,14 +233,14 @@ impl RepoTab {
             move || caught(|| work(&path, creds.as_ref())),
             move |tab, result, ctx| {
                 tab.lfs_locks.busy = None;
-                tab.status = Some(match &result {
+                tab.status = Some(crate::repo::Notice::plain(match &result {
                     Ok(()) if made_lockable => (
                         format!("{label}: done. Commit .gitattributes to share it."),
                         false,
                     ),
                     Ok(()) => (format!("{label}: done"), false),
                     Err(e) => (format!("{label} failed: {e}"), true),
-                });
+                }));
                 tab.lfs_locks.job_error = result.as_ref().err().map(|e| {
                     crate::i18n::message(
                         "repo-workflows-lfs_locks-lock-job-8336fbfe",

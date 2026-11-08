@@ -161,7 +161,7 @@ fn a_branch_is_assembled_from_the_page_and_an_attempt_is_built() {
     tab.terminals.clear();
     let note = (
         tab.bakeoff.view.as_ref().and_then(|v| v.note.clone()),
-        tab.status.clone(),
+        tab.status.as_deref().cloned(),
         tab.bakeoff.view.as_ref().map(|v| v.assembling),
     );
     let _ = std::fs::remove_dir_all(&root);

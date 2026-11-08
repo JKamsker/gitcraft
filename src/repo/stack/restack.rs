@@ -31,10 +31,10 @@ impl RepoTab {
             None => to_restack(&self.stacks.layers),
         };
         if layers.is_empty() {
-            self.status = Some((
+            self.status = Some(crate::repo::Notice::plain((
                 "Nothing to restack: every layer is on its parent's tip.".to_owned(),
                 false,
-            ));
+            )));
             return;
         }
         static IDS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
@@ -91,7 +91,10 @@ impl RepoTab {
         work: impl FnOnce(&Path) -> Result<Outcome, String> + Send + 'static,
     ) {
         if let Some(busy) = &self.busy_op {
-            self.status = Some((format!("{label}: run it again once {busy} is done"), true));
+            self.status = Some(crate::repo::Notice::plain((
+                format!("{label}: run it again once {busy} is done"),
+                true,
+            )));
             return;
         }
         self.busy_op = Some(label.to_owned());
@@ -123,14 +126,14 @@ impl RepoTab {
         match outcome {
             Outcome::Done(moved) => {
                 let n = moved.len();
-                self.status = Some((
+                self.status = Some(crate::repo::Notice::plain((
                     match n {
                         0 => "Restack: every branch was already on its parent's tip".to_owned(),
                         1 => "Restack: 1 branch moved · Ctrl+Z puts it back".to_owned(),
                         n => format!("Restack: {n} branches moved · Ctrl+Z puts them back"),
                     },
                     false,
-                ));
+                )));
                 if n > 0 {
                     let (undo, redo) = undo_steps(&moved);
                     self.push_undo(
@@ -147,7 +150,7 @@ impl RepoTab {
                 }
             }
             Outcome::Aborted(kept) => {
-                self.status = Some(if kept.is_empty() {
+                self.status = Some(crate::repo::Notice::plain(if kept.is_empty() {
                     (
                         "Restack aborted: every branch is back where it was".to_owned(),
                         false,
@@ -161,7 +164,7 @@ impl RepoTab {
                         ),
                         true,
                     )
-                });
+                }));
             }
             Outcome::Stopped {
                 branch, worktree, ..
@@ -170,19 +173,21 @@ impl RepoTab {
                     Some(wt) => format!(" in its worktree at {}", wt.display()),
                     None => String::new(),
                 };
-                self.status = Some((
+                self.status = Some(crate::repo::Notice::plain((
                     format!(
                         "Restack stopped at {branch} on conflicts: resolve them{place}, then \
                          Continue restack (or Abort restack)"
                     ),
                     true,
-                ));
+                )));
                 self.focus_wip = worktree.is_none();
             }
         }
-        if long && let Some((message, failed)) = self.status.clone() {
-            self.finished
-                .push((format!("{} · {message}", self.name), failed));
+        if long && let Some((message, failed)) = self.status.as_deref().cloned() {
+            self.finished.push(crate::repo::Notice::plain((
+                format!("{} · {message}", self.name),
+                failed,
+            )));
         }
         self.reload(ctx);
     }

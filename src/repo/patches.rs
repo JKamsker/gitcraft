@@ -31,7 +31,7 @@ impl RepoTab {
     }
 
     pub(super) fn patch_saved(&mut self, file: PathBuf, result: Result<(), String>) {
-        self.status = Some(match result {
+        self.status = Some(crate::repo::Notice::plain(match result {
             Ok(()) => (
                 crate::i18n::message(
                     "repo-core-3016",
@@ -43,7 +43,7 @@ impl RepoTab {
                 crate::i18n::message("repo-core-3017", &[("e", e.to_string().into())]),
                 true,
             ),
-        });
+        }));
     }
 
     /// Asks for a patch file and applies it, undoably.
@@ -144,10 +144,10 @@ impl RepoTab {
                         ("e", format!("{}", e).into()),
                     ],
                 );
-                self.status = Some((
+                self.status = Some(crate::repo::Notice::plain((
                     crate::i18n::message("repo-core-3025", &[("why", why.to_string().into())]),
                     true,
-                ));
+                )));
                 if dropped {
                     self.dropped_patch = DroppedPatch::Done(Err(why));
                 }
@@ -205,7 +205,7 @@ impl RepoTab {
             Ok(()) if dropped => self.dropped_patch = DroppedPatch::Running(label),
             Ok(()) => {}
             Err(e) => {
-                self.status = Some((
+                self.status = Some(crate::repo::Notice::plain((
                     crate::i18n::message(
                         "repo-core-0270",
                         &[
@@ -217,7 +217,7 @@ impl RepoTab {
                         ],
                     ),
                     true,
-                ));
+                )));
                 if dropped {
                     self.dropped_patch = DroppedPatch::Done(Err(e));
                 }

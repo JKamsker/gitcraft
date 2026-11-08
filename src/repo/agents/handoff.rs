@@ -85,7 +85,7 @@ impl RepoTab {
                         notes.append(&mut tray.notes);
                         tray.notes = notes;
                     }
-                    Err(e) => tab.status = Some((e, true)),
+                    Err(e) => tab.status = Some(crate::repo::Notice::plain((e, true))),
                 }
                 if std::mem::take(&mut tab.agents.tray.unsaved) {
                     tab.save_tray(ctx);
@@ -107,7 +107,7 @@ impl RepoTab {
             move || handoff::save_in_order(&repo, &notes, seq),
             |tab, result, _| {
                 if let Err(e) = result {
-                    tab.status = Some((e, true));
+                    tab.status = Some(crate::repo::Notice::plain((e, true)));
                 }
             },
         );
@@ -197,13 +197,13 @@ impl RepoTab {
     /// Types `message` (`what` it is) into the agent's terminal of this tab: whether it went.
     pub(super) fn send_to_agent(&mut self, message: &str, what: &str) -> bool {
         let Some(i) = self.agent_terminal() else {
-            self.status = Some((
+            self.status = Some(crate::repo::Notice::plain((
                 format!(
                     "No agent terminal in this worktree to send {what} to: start the agent \
                      (Start agent task…), or pick its terminal next to Send to agent"
                 ),
                 true,
-            ));
+            )));
             return false;
         };
         let Some(term) = self.terminals.get_mut(i) else {
@@ -214,7 +214,7 @@ impl RepoTab {
             Ok(()) => {
                 self.terminal_open = true;
                 self.active_terminal = i;
-                self.status = Some((
+                self.status = Some(crate::repo::Notice::plain((
                     crate::i18n::message(
                         "repo-workflows-agent-send-confirmation",
                         &[
@@ -223,14 +223,14 @@ impl RepoTab {
                         ],
                     ),
                     false,
-                ));
+                )));
                 true
             }
             Err(e) => {
-                self.status = Some((
+                self.status = Some(crate::repo::Notice::plain((
                     format!("Couldn't send {what} to the {label} terminal: {e}"),
                     true,
-                ));
+                )));
                 false
             }
         }

@@ -165,10 +165,10 @@ impl RepoTab {
             return self.leave_now(leave, ctx);
         }
         if let Some(busy) = &self.busy_op {
-            self.status = Some((
+            self.status = Some(crate::repo::Notice::plain((
                 format!("Checkout {}: wait for {busy} to finish", leave.label()),
                 true,
-            ));
+            )));
             return;
         }
         if self.detached.checking {
@@ -196,13 +196,13 @@ impl RepoTab {
                 // Something started meanwhile (a commit…): what was listed may be out of date,
                 // and the checkout wouldn't start anyway.
                 if let Some(busy) = &tab.busy_op {
-                    tab.status = Some((
+                    tab.status = Some(crate::repo::Notice::plain((
                         format!(
                             "Didn't check out {}: {busy} started meanwhile",
                             leave.label()
                         ),
                         true,
-                    ));
+                    )));
                     return;
                 }
                 match found {
@@ -217,14 +217,14 @@ impl RepoTab {
                         })))
                     }
                     Err(e) => {
-                        tab.status = Some((
+                        tab.status = Some(crate::repo::Notice::plain((
                             format!(
                                 "Didn't check out {}: couldn't list the commits it would \
                                  leave on no branch ({e})",
                                 leave.label()
                             ),
                             true,
-                        ))
+                        )))
                     }
                 }
             },
@@ -242,10 +242,10 @@ impl RepoTab {
 
     pub(super) fn detached_act(&mut self, act: DetachedAct, ctx: &egui::Context) {
         if let Some(busy) = &self.busy_op {
-            self.status = Some((
+            self.status = Some(crate::repo::Notice::plain((
                 format!("Wait for {busy} to finish, then check out again"),
                 true,
-            ));
+            )));
             return;
         }
         match act {

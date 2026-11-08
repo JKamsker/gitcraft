@@ -23,7 +23,10 @@ impl Ticket {
 impl RepoTab {
     pub(super) fn inspect_unbound_https(&mut self, urls: Vec<String>, ctx: &egui::Context) {
         self.invalidate_https_challenge();
-        self.status = Some((crate::i18n::text("repo-core-2803").into(), true));
+        self.status = Some(crate::repo::Notice::plain((
+            crate::i18n::text("repo-core-2803").into(),
+            true,
+        )));
         crate::settings::network_page::inspect_secondary(ctx, self.path.clone(), urls);
     }
     pub(super) fn https_ticket(&self, url: String) -> Ticket {
@@ -65,12 +68,18 @@ impl RepoTab {
         if failure.context != self.connection_context
             || failure.context != crate::connections::current()
         {
-            self.status = Some((crate::i18n::text("repo-core-2804").into(), true));
+            self.status = Some(crate::repo::Notice::plain((
+                crate::i18n::text("repo-core-2804").into(),
+                true,
+            )));
             return;
         }
         if failure.needs_separate_account() {
             self.invalidate_https_challenge();
-            self.status = Some((crate::i18n::text("repo-core-2805").into(), true));
+            self.status = Some(crate::repo::Notice::plain((
+                crate::i18n::text("repo-core-2805").into(),
+                true,
+            )));
             crate::settings::network_page::inspect_secondary(
                 ctx,
                 self.path.clone(),
@@ -80,7 +89,10 @@ impl RepoTab {
         }
         if failure.binding.is_none() {
             self.invalidate_https_challenge();
-            self.status = Some((crate::i18n::text("repo-core-2806").into(), true));
+            self.status = Some(crate::repo::Notice::plain((
+                crate::i18n::text("repo-core-2806").into(),
+                true,
+            )));
             return;
         }
         let (bound, foreign): (Vec<_>, Vec<_>) = failure.endpoints.into_iter().partition(|url| {
@@ -94,7 +106,10 @@ impl RepoTab {
             crate::settings::network_page::inspect_secondary(ctx, self.path.clone(), foreign);
         }
         if failure.endpoints.is_empty() {
-            self.status = Some((crate::i18n::text("repo-core-2807").into(), true));
+            self.status = Some(crate::repo::Notice::plain((
+                crate::i18n::text("repo-core-2807").into(),
+                true,
+            )));
             return;
         }
         let url = if failure.confirmed {
@@ -114,7 +129,7 @@ impl RepoTab {
     }
     pub(super) fn https_rejection_done(&mut self, ticket: Ticket, result: Result<(), String>) {
         if !self.https_ticket_current(&ticket) || !ticket.authorizes_endpoint(&ticket.url) {
-            self.finished.push((
+            self.finished.push(crate::repo::Notice::plain((
                 crate::i18n::message(
                     "repo-core-2808",
                     &[(
@@ -129,12 +144,15 @@ impl RepoTab {
                     )],
                 ),
                 result.is_err(),
-            ));
+            )));
             return;
         }
         match result {
             Ok(()) => {
-                self.status = Some((crate::i18n::text("repo-core-2810").into(), false));
+                self.status = Some(crate::repo::Notice::plain((
+                    crate::i18n::text("repo-core-2810").into(),
+                    false,
+                )));
                 let url = ticket.url.clone();
                 self.offer_https_signin(url, false);
                 if let Some(current) = &mut self.https_challenge {
@@ -142,13 +160,13 @@ impl RepoTab {
                 }
             }
             Err(e) => {
-                self.status = Some((
+                self.status = Some(crate::repo::Notice::plain((
                     crate::i18n::message(
                         "repo-core-2811",
                         &[("e", crate::diagnostics::crash::scrub(&e).to_string().into())],
                     ),
                     true,
-                ))
+                )))
             }
         }
     }

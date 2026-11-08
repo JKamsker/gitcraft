@@ -114,7 +114,7 @@ impl RepoTab {
             .and_then(|entry| empty_commit::undo_refusal(entry, &self.refs));
         let refused = refusal.is_some();
         if let Some(why) = refusal {
-            self.status = Some((why, true));
+            self.status = Some(crate::repo::Notice::plain((why, true)));
         }
         refused
     }
@@ -122,10 +122,10 @@ impl RepoTab {
     /// The changes row selected, the right pane open on it and the cursor in the summary.
     fn start_first_commit(&mut self, ctx: &egui::Context) {
         let Some(row) = self.commits.iter().position(|c| c.hash == WIP_HASH) else {
-            self.status = Some((
+            self.status = Some(crate::repo::Notice::plain((
                 crate::i18n::text("repo-workflows-guide-start-first-commit-881f72cb").to_owned(),
                 false,
-            ));
+            )));
             return;
         };
         self.close_pr();

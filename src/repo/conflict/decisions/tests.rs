@@ -159,7 +159,7 @@ fn the_same_conflict_comes_back_resolved_with_its_reason() -> Result<(), String>
     tab.prepare_decisions();
     tab.record_decisions("f.rs", &ctx);
     wait(&mut tab, &ctx, |tab| tab.status.is_some());
-    let kept = tab.status.clone();
+    let kept = tab.status.as_deref().cloned();
 
     // The same conflict, elsewhere in another file.
     let elsewhere = format!("0\n{FILE}");
@@ -193,7 +193,7 @@ fn the_same_conflict_comes_back_resolved_with_its_reason() -> Result<(), String>
     assert_eq!(ed.to_record("me", 1), Ok(Vec::new()));
     assert!(
         tab.status
-            .as_ref()
+            .as_deref()
             .is_some_and(|(s, _)| s.contains("Applied a decision"))
     );
     Ok(())

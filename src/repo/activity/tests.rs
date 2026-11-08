@@ -297,7 +297,7 @@ fn the_toolbar_message_opens_its_own_operation() {
     let failed = tab.status_entry();
     // Another operation after it: its message (none, for staging) is never tied to the
     // failed one's entry, nor the failed one's message to the newer entry.
-    let old_message = tab.status.clone();
+    let old_message = tab.status.as_deref().cloned();
     tab.run_ops(
         "Stage",
         ops(&[&["status"]]),
@@ -307,7 +307,7 @@ fn the_toolbar_message_opens_its_own_operation() {
     );
     finish(&mut tab, &ctx);
     let after = tab.status_entry();
-    tab.status = old_message;
+    tab.status = old_message.map(crate::repo::Notice::plain);
     let restored = tab.status_entry();
     let newest = tab.activity.entries().last().map(|e| e.id);
     let _ = std::fs::remove_dir_all(&dir);
@@ -315,7 +315,10 @@ fn the_toolbar_message_opens_its_own_operation() {
     assert_ne!(after, newest);
     assert_ne!(restored, newest);
     // A message no operation left opens nothing.
-    tab.status = Some(("Something else".to_owned(), true));
+    tab.status = Some(crate::repo::Notice::plain((
+        "Something else".to_owned(),
+        true,
+    )));
     assert_eq!(tab.status_entry(), None);
 }
 

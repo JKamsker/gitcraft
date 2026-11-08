@@ -389,7 +389,7 @@ fn work_starts_from_the_remotes_default_branch_as_it_is_now() {
     );
     let master = git_out(&dir, &["rev-parse", "origin/master"]);
     let current = git_out(&dir, &["branch", "--show-current"]);
-    let status = tab.status.clone();
+    let status = tab.status.as_deref().cloned();
     let pr_base = tab.issue_pull_request("21-x").map(|(_, _, base)| base);
     clean(&dir);
     assert_eq!((base.name.as_str(), base.known), ("dev", true));
@@ -416,7 +416,7 @@ fn offline_it_starts_from_the_branch_as_last_fetched_and_says_so() {
     start(&mut tab, &ctx, issue(22, "Y"), "22-y", false);
     let at = git_out(&dir, &["rev-parse", "22-y"]);
     let fetched = git_out(&dir, &["rev-parse", "origin/dev"]);
-    let status = tab.status.clone().unwrap_or_default();
+    let status = tab.status.as_deref().cloned().unwrap_or_default();
     let links = link::read(&dir).unwrap_or_default();
     clean(&dir);
     assert_eq!(at, fetched);

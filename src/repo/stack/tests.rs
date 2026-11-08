@@ -89,7 +89,7 @@ fn based_on_is_suggested_recorded_undone_and_redone() -> Result<(), String> {
     settle(&mut tab, &ctx, |_| true)?;
     assert!(
         tab.status
-            .as_ref()
+            .as_deref()
             .is_some_and(|(s, failed)| *failed && s.contains("based on it"))
     );
     assert!(!stack::recorded(repo.path())?.contains_key("schema"));
@@ -116,7 +116,7 @@ fn branches_without_history_in_common_are_refused() -> Result<(), String> {
         &ctx,
     );
     settle(&mut tab, &ctx, |t| t.status.is_some())?;
-    let status = tab.status.clone().unwrap_or_default();
+    let status = tab.status.as_deref().cloned().unwrap_or_default();
     assert!(
         status.1 && status.0.contains("no commit in common"),
         "{status:?}"
@@ -155,7 +155,7 @@ fn an_operation_that_cannot_start_says_so() -> Result<(), String> {
     let mut tab = open(&repo, &ctx)?;
     tab.busy_op = Some("Fetch".to_owned());
     tab.run_stack_op("Base a on main".to_owned(), Vec::new(), Vec::new(), &ctx);
-    let status = tab.status.clone().unwrap_or_default();
+    let status = tab.status.as_deref().cloned().unwrap_or_default();
     assert!(
         status.1 && status.0.contains("once Fetch is done"),
         "{status:?}"
@@ -230,7 +230,7 @@ fn restacking_from_the_tab_is_one_undo() -> Result<(), String> {
 
         tab.apply(Action::Undo, &ctx);
         settle(&mut tab, &ctx, |t| {
-            t.status.as_ref().is_some_and(|s| s.0.starts_with("Undo"))
+            t.status.as_deref().is_some_and(|s| s.0.starts_with("Undo"))
         })?;
         assert_eq!(
             (repo.tip("api")?, repo.tip("ui")?),
@@ -245,7 +245,7 @@ fn restacking_from_the_tab_is_one_undo() -> Result<(), String> {
         );
         tab.apply(Action::Redo, &ctx);
         settle(&mut tab, &ctx, |t| {
-            t.status.as_ref().is_some_and(|s| s.0.starts_with("Redo"))
+            t.status.as_deref().is_some_and(|s| s.0.starts_with("Redo"))
         })?;
         assert_eq!((repo.tip("api")?, repo.tip("ui")?), moved);
         assert_eq!(stack::recorded(repo.path())?, bases);
@@ -274,7 +274,7 @@ fn a_restack_stopped_on_conflicts_continues_or_aborts_from_the_tab() -> Result<(
         })?;
         restack_all(&mut tab, &ctx)?;
         settle(&mut tab, &ctx, |t| t.stacks.pending.is_some())?;
-        let status = tab.status.clone().unwrap_or_default();
+        let status = tab.status.as_deref().cloned().unwrap_or_default();
         assert!(
             status.1 && status.0.contains("stopped at api"),
             "{status:?}"
@@ -359,19 +359,19 @@ fn undoing_a_rebase_that_updated_dependent_branches_puts_them_back() -> Result<(
     };
     tab.apply(Action::Undo, &ctx);
     settle(&mut tab, &ctx, |t| {
-        t.status.as_ref().is_some_and(|s| s.0.starts_with("Undo"))
+        t.status.as_deref().is_some_and(|s| s.0.starts_with("Undo"))
     })?;
     assert_eq!(tips()?, before, "{:?}", tab.status);
     tab.apply(Action::Redo, &ctx);
     settle(&mut tab, &ctx, |t| {
-        t.status.as_ref().is_some_and(|s| s.0.starts_with("Redo"))
+        t.status.as_deref().is_some_and(|s| s.0.starts_with("Redo"))
     })?;
     assert!(is_ancestor(&repo, "main", "schema") && is_ancestor(&repo, "schema", "ui"));
     assert_eq!(repo.git(&["symbolic-ref", "--short", "HEAD"])?.trim(), "ui");
     // And undone again, after the redo.
     tab.apply(Action::Undo, &ctx);
     settle(&mut tab, &ctx, |t| {
-        t.status.as_ref().is_some_and(|s| s.0.starts_with("Undo"))
+        t.status.as_deref().is_some_and(|s| s.0.starts_with("Undo"))
     })?;
     assert_eq!(tips()?, before, "{:?}", tab.status);
     Ok(())
@@ -498,7 +498,7 @@ fn publishing_without_a_forge_says_so() -> Result<(), String> {
     settle(&mut tab, &ctx, |t| t.stacks.layer("api").is_some())?;
     tab.apply(Action::Stack(StackAct::OpenPublish("api".into())), &ctx);
     assert!(tab.stacks.publish.is_none());
-    let status = tab.status.clone().unwrap_or_default();
+    let status = tab.status.as_deref().cloned().unwrap_or_default();
     assert!(
         status.1 && status.0.contains("nowhere to publish"),
         "{status:?}"

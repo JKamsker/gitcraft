@@ -15,7 +15,10 @@ impl RepoTab {
         ctx: &egui::Context,
     ) {
         if let Some(problem) = command.problem() {
-            self.status = Some((format!("{}: {problem}", command.name.trim()), true));
+            self.status = Some(crate::repo::Notice::plain((
+                format!("{}: {problem}", command.name.trim()),
+                true,
+            )));
             return;
         }
         let named: Vec<(String, String)> = command
@@ -25,7 +28,10 @@ impl RepoTab {
             .map(|(p, a)| (p.variable.clone(), a.clone()))
             .collect();
         if let Some((name, _)) = named.iter().find(|(_, a)| a.contains('\0')) {
-            self.status = Some((format!("${name} can't hold a NUL character"), true));
+            self.status = Some(crate::repo::Notice::plain((
+                format!("${name} can't hold a NUL character"),
+                true,
+            )));
             return;
         }
         let repo = crate::remote::git_path(&self.path);
@@ -50,13 +56,13 @@ impl RepoTab {
     ) {
         let script = cc::captured_program(vars, command);
         let repo = self.path.clone();
-        self.finished.push((
+        self.finished.push(crate::repo::Notice::plain((
             crate::i18n::message(
                 "repo-workflows-custom_commands-run-custom-captured-5215b5ab",
                 &[("name", (name).clone().into())],
             ),
             false,
-        ));
+        )));
         self.then(
             ctx,
             move || crate::git::run_shell(&repo, &script),
@@ -71,7 +77,7 @@ impl RepoTab {
                         true,
                     ),
                 };
-                tab.finished.push(toast);
+                tab.finished.push(crate::repo::Notice::plain(toast));
             },
         );
     }

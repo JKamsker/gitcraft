@@ -177,10 +177,10 @@ impl RepoTab {
     /// Shows the doctor in the big area, at `section`.
     pub(super) fn open_doctor(&mut self, section: Section, ctx: &egui::Context) {
         if self.conflict.is_some() || self.rebase.is_some() {
-            self.status = Some((
+            self.status = Some(crate::repo::Notice::plain((
                 "Finish or close the conflict editor or the interactive rebase first".to_owned(),
                 true,
-            ));
+            )));
             return;
         }
         self.diff = None;
@@ -212,7 +212,10 @@ impl RepoTab {
             DoctorAct::Reload => self.load_doctor(ctx),
             DoctorAct::Run { label, ops } => {
                 if self.busy_op.is_some() {
-                    self.status = Some(("Wait for the running operation to end".to_owned(), true));
+                    self.status = Some(crate::repo::Notice::plain((
+                        "Wait for the running operation to end".to_owned(),
+                        true,
+                    )));
                     return;
                 }
                 if let Some(doctor) = &mut self.doctor {

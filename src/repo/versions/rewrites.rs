@@ -116,7 +116,7 @@ impl RepoTab {
         };
         let says_done = self
             .status
-            .as_ref()
+            .as_deref()
             .is_some_and(|(msg, err)| msg == done && !err);
         match kept {
             Ok(Some((rewrite, list))) => {
@@ -129,10 +129,10 @@ impl RepoTab {
             Ok(None) => {}
             // Done all the same; only the version from before couldn't be kept.
             Err(e) if says_done => {
-                self.status = Some((
+                self.status = Some(crate::repo::Notice::plain((
                     format!("{label}: done, but its earlier version couldn't be kept: {e}"),
                     true,
-                ));
+                )));
             }
             Err(_) => {}
         }
@@ -178,7 +178,7 @@ impl RepoTab {
         };
         let shown = self
             .status
-            .as_ref()
+            .as_deref()
             .is_some_and(|(msg, err)| msg == done && !err);
         if shown
             && ui

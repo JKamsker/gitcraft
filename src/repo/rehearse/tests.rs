@@ -198,7 +198,7 @@ fn applying_after_a_branch_moved_is_refused() -> Result<(), String> {
     let tip = repo.rev("feature")?;
     repo.git(&["branch", "-f", "main", "main~1"])?;
     act(&mut tab, &ctx, RehearseAct::Apply(RehearseKind::Merge))?;
-    let (said, bad) = tab.status.clone().ok_or("nothing said")?;
+    let (said, bad) = tab.status.as_deref().cloned().ok_or("nothing said")?;
     assert!(bad);
     assert!(said.starts_with("main moved since the rehearsal"), "{said}");
     assert_eq!(repo.rev("feature")?, tip);
@@ -219,7 +219,7 @@ fn applying_with_uncommitted_changes_is_refused() -> Result<(), String> {
     tab.reload(&ctx);
     settle(&mut tab, &ctx)?;
     act(&mut tab, &ctx, RehearseAct::Apply(RehearseKind::Rebase))?;
-    let (said, bad) = tab.status.clone().ok_or("nothing said")?;
+    let (said, bad) = tab.status.as_deref().cloned().ok_or("nothing said")?;
     assert!(bad);
     assert!(
         said.starts_with("Commit or stash your changes first"),

@@ -289,7 +289,7 @@ impl RepoTab {
         // Confirmed (a drop) while something started meanwhile (the background fetch): said,
         // not dropped without a word.
         if let Some(busy) = &self.busy_op {
-            self.status = Some((
+            self.status = Some(crate::repo::Notice::plain((
                 crate::i18n::message(
                     "repo-core-3199",
                     &[
@@ -302,7 +302,7 @@ impl RepoTab {
                     ],
                 ),
                 true,
-            ));
+            )));
             return;
         }
         let path = self.path.clone();
@@ -325,7 +325,9 @@ impl RepoTab {
             Ok(editor) => self.with_rebase_command(editor, ctx, move |tab, command, ctx| {
                 tab.quick_edit_ready(&label, command, ctx);
             }),
-            Err(e) => self.status = Some((format!("{label}: {e}"), true)),
+            Err(e) => {
+                self.status = Some(crate::repo::Notice::plain((format!("{label}: {e}"), true)))
+            }
         }
     }
 
@@ -339,7 +341,7 @@ impl RepoTab {
         match command {
             // Started while something else ran: say so rather than drop it.
             Ok(_) if self.busy_op.is_some() => {
-                self.status = Some((
+                self.status = Some(crate::repo::Notice::plain((
                     crate::i18n::message(
                         "repo-core-2452",
                         &[
@@ -358,7 +360,7 @@ impl RepoTab {
                         ],
                     ),
                     true,
-                ));
+                )));
             }
             // The todo list replaces the commits read: not one made since (in the terminal).
             Ok((command, head)) => self.run_undoable(
@@ -368,7 +370,9 @@ impl RepoTab {
                 Undo::HeadMove { mode: "--keep" },
                 ctx,
             ),
-            Err(e) => self.status = Some((format!("{label}: {e}"), true)),
+            Err(e) => {
+                self.status = Some(crate::repo::Notice::plain((format!("{label}: {e}"), true)))
+            }
         }
     }
 }

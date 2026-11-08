@@ -139,10 +139,10 @@ impl RepoTab {
                 }
                 Ok(_) => {}
                 Err(e) => {
-                    tab.status = Some((
+                    tab.status = Some(crate::repo::Notice::plain((
                         crate::i18n::message("repo-core-4120", &[("e", e.to_string().into())]),
                         true,
-                    ))
+                    )))
                 }
             },
         );
@@ -151,7 +151,7 @@ impl RepoTab {
     /// Runs the fold the dialog confirmed.
     pub(super) fn run_fold(&mut self, plan: Plan, ctx: &egui::Context) {
         if let Some(busy) = &self.busy_op {
-            self.status = Some((
+            self.status = Some(crate::repo::Notice::plain((
                 crate::i18n::message(
                     "repo-core-4121",
                     &[
@@ -163,7 +163,7 @@ impl RepoTab {
                     ],
                 ),
                 true,
-            ));
+            )));
             return;
         }
         // What is going on now, not when the dialog read it: a `git am` stopped since (which
@@ -178,7 +178,7 @@ impl RepoTab {
                 match state {
                     Ok(None) => tab.run_fold_now(plan, ctx),
                     Ok(Some(state)) => {
-                        tab.status = Some((
+                        tab.status = Some(crate::repo::Notice::plain((
                             crate::i18n::message(
                                 "repo-core-4122",
                                 &[
@@ -190,9 +190,14 @@ impl RepoTab {
                                 ],
                             ),
                             true,
-                        ));
+                        )));
                     }
-                    Err(e) => tab.status = Some((format!("{}: {e}", plan.label()), true)),
+                    Err(e) => {
+                        tab.status = Some(crate::repo::Notice::plain((
+                            format!("{}: {e}", plan.label()),
+                            true,
+                        )))
+                    }
                 }
             },
         );
@@ -201,13 +206,13 @@ impl RepoTab {
     /// Runs the fold, nothing being in progress.
     fn run_fold_now(&mut self, plan: Plan, ctx: &egui::Context) {
         if self.busy_op.is_some() {
-            self.status = Some((
+            self.status = Some(crate::repo::Notice::plain((
                 crate::i18n::message(
                     "repo-core-4124",
                     &[("label", plan.label().to_string().into())],
                 ),
                 true,
-            ));
+            )));
             return;
         }
         let label = plan.label();
@@ -220,7 +225,9 @@ impl RepoTab {
             Ok(editor) => self.with_rebase_command(editor, ctx, move |tab, command, ctx| {
                 tab.fold_ready(&plan, command, ctx);
             }),
-            Err(e) => self.status = Some((format!("{label}: {e}"), true)),
+            Err(e) => {
+                self.status = Some(crate::repo::Notice::plain((format!("{label}: {e}"), true)))
+            }
         }
     }
 
@@ -236,7 +243,7 @@ impl RepoTab {
         match command {
             // Started while something else ran: say so rather than drop it.
             Ok(_) if self.busy_op.is_some() => {
-                self.status = Some((
+                self.status = Some(crate::repo::Notice::plain((
                     crate::i18n::message(
                         "repo-core-2452",
                         &[
@@ -255,14 +262,16 @@ impl RepoTab {
                         ],
                     ),
                     true,
-                ));
+                )));
             }
             Ok((rebase, _)) => {
                 let (steps, undo) = plan.fold_steps(rebase);
                 self.fold.running = Some(plan.stopped());
                 self.run_undoable(&label, steps, Refresh::All, undo, ctx);
             }
-            Err(e) => self.status = Some((format!("{label}: {e}"), true)),
+            Err(e) => {
+                self.status = Some(crate::repo::Notice::plain((format!("{label}: {e}"), true)))
+            }
         }
     }
 
@@ -281,7 +290,7 @@ impl RepoTab {
             .putting_back
             .take_if(|r| put_back_label(r) == label)
         {
-            self.status = Some(match result {
+            self.status = Some(crate::repo::Notice::plain(match result {
                 Ok(_) => (
                     crate::i18n::message(
                         "repo-core-4125",
@@ -305,7 +314,7 @@ impl RepoTab {
                     ),
                     true,
                 ),
-            });
+            }));
             return;
         }
         if let Some(mut running) = self.fold.running.take_if(|r| r.label == label) {
@@ -323,7 +332,7 @@ impl RepoTab {
                 // The changes are in the fixup commit the rebase stopped on, not lost: say how
                 // to go on rather than only that it failed.
                 if e.contains("CONFLICT") || e.contains("could not apply") {
-                    self.status = Some((
+                    self.status = Some(crate::repo::Notice::plain((
                         crate::i18n::message(
                             "repo-core-4127",
                             &[(
@@ -332,7 +341,7 @@ impl RepoTab {
                             )],
                         ),
                         true,
-                    ));
+                    )));
                 }
                 // The status read the reload after this starts tells whether it stopped.
                 running.read = Some(self.reads + 1);
@@ -418,7 +427,7 @@ impl RepoTab {
         } else {
             self.remember_undo(&stopped.label, undo, ctx);
         }
-        self.status = Some((
+        self.status = Some(crate::repo::Notice::plain((
             crate::i18n::message(
                 "repo-core-4129",
                 &[(
@@ -427,7 +436,7 @@ impl RepoTab {
                 )],
             ),
             true,
-        ));
+        )));
     }
 
     /// The fold stopped in the rebase going on now: the branch is still the fixup commit on top
@@ -477,10 +486,10 @@ impl RepoTab {
             let action = match (ours, &tab.fold.stopped) {
                 (Ok(Some(fixup)), Some(stopped)) => fold_abort_dialog(stopped, &fixup),
                 (Err(e), _) => {
-                    tab.status = Some((
+                    tab.status = Some(crate::repo::Notice::plain((
                         crate::i18n::message("repo-core-4130", &[("e", e.to_string().into())]),
                         true,
-                    ));
+                    )));
                     return;
                 }
                 _ => abort_action(InProgress::Rebase),

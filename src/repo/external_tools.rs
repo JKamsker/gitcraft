@@ -115,7 +115,7 @@ impl RepoTab {
         } else {
             ""
         };
-        self.status = Some((
+        self.status = Some(crate::repo::Notice::plain((
             crate::i18n::message(
                 "repo-core-2459",
                 &[
@@ -129,7 +129,7 @@ impl RepoTab {
                 ],
             ),
             false,
-        ));
+        )));
         let repo = self.path.clone();
         self.then(
             ctx,
@@ -137,7 +137,7 @@ impl RepoTab {
             move |tab, result: Result<(), String>, ctx| {
                 match result {
                     Ok(()) => tab.clear_waiting(&file),
-                    Err(e) => tab.status = Some((e, true)),
+                    Err(e) => tab.status = Some(crate::repo::Notice::plain((e, true))),
                 }
                 tab.reload_status(ctx);
             },
@@ -150,13 +150,13 @@ impl RepoTab {
         let choice = Settings::get(ctx).merge_tool;
         let label = choice.label(Kind::Merge);
         let Some(open) = Merging::register(&self.path, &path) else {
-            self.status = Some((
+            self.status = Some(crate::repo::Notice::plain((
                 crate::i18n::message("repo-core-2460", &[("path", path.to_string().into())]),
                 true,
-            ));
+            )));
             return;
         };
-        self.status = Some((
+        self.status = Some(crate::repo::Notice::plain((
             crate::i18n::message(
                 "repo-core-2461",
                 &[
@@ -169,7 +169,7 @@ impl RepoTab {
                 ],
             ),
             false,
-        ));
+        )));
         let repo = self.path.clone();
         self.then(
             ctx,
@@ -197,7 +197,7 @@ impl RepoTab {
                 if self.conflict.as_ref().is_some_and(|ed| ed.path == path) {
                     self.conflict = None;
                 }
-                self.status = Some((
+                self.status = Some(crate::repo::Notice::plain((
                     crate::i18n::message(
                         "repo-core-2462",
                         &[
@@ -209,17 +209,19 @@ impl RepoTab {
                         ],
                     ),
                     false,
-                ));
+                )));
             }
-            Ok(MergeOutcome::Unresolved(why)) => self.status = Some((why, false)),
-            Err(e) => self.status = Some((e, true)),
+            Ok(MergeOutcome::Unresolved(why)) => {
+                self.status = Some(crate::repo::Notice::plain((why, false)))
+            }
+            Err(e) => self.status = Some(crate::repo::Notice::plain((e, true))),
         }
         self.reload_status(ctx);
     }
 
     /// Takes out the message that a tool on `file` is waited for, if it is still the one shown.
     fn clear_waiting(&mut self, file: &str) {
-        if self.status.as_ref().is_some_and(|(s, error)| {
+        if self.status.as_deref().is_some_and(|(s, error)| {
             !error
                 && s.starts_with(&crate::i18n::message(
                     "repo-core-2463",
@@ -324,7 +326,11 @@ mod tests {
     }
 
     fn status(tab: &RepoTab) -> String {
-        tab.status.clone().map(|(s, _)| s).unwrap_or_default()
+        tab.status
+            .as_deref()
+            .cloned()
+            .map(|(s, _)| s)
+            .unwrap_or_default()
     }
 
     #[test]
@@ -428,7 +434,7 @@ mod tests {
         tab.apply(Action::OpenInDiffTool(key), &ctx);
         let told = wait(&mut tab, &ctx, |t| {
             t.status
-                .as_ref()
+                .as_deref()
                 .is_some_and(|(s, error)| *error && s.contains("runs in a terminal"))
         });
         assert!(told, "{}", status(&tab));

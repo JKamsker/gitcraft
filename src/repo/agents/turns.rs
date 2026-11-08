@@ -52,15 +52,18 @@ impl RepoTab {
 
     pub(super) fn install_hooks(&mut self, ctx: &egui::Context) {
         let repo = self.path.clone();
-        self.status = Some(("Installing the agent hooks…".to_owned(), false));
+        self.status = Some(crate::repo::Notice::plain((
+            "Installing the agent hooks…".to_owned(),
+            false,
+        )));
         self.then(
             ctx,
             move || crate::agent::hooks::install(&repo),
             |tab, result, _| {
-                tab.status = Some(match result {
+                tab.status = Some(crate::repo::Notice::plain(match result {
                     Ok(said) => (said.join(" "), false),
                     Err(e) => (format!("The agent hooks weren't installed: {e}"), true),
-                });
+                }));
             },
         );
     }
@@ -73,7 +76,10 @@ impl RepoTab {
             |tab, result, _| {
                 tab.agents.turns_for = None;
                 if let Err(e) = result {
-                    tab.status = Some((format!("The turns weren't deleted: {e}"), true));
+                    tab.status = Some(crate::repo::Notice::plain((
+                        format!("The turns weren't deleted: {e}"),
+                        true,
+                    )));
                 }
             },
         );

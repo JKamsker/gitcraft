@@ -154,7 +154,10 @@ impl RepoTab {
         match read.links {
             Ok(links) => self.issue_work.links = links,
             Err(e) if self.status.is_none() && self.busy_op.is_none() => {
-                self.status = Some((format!("Couldn't read the branches' issues: {e}"), true));
+                self.status = Some(crate::repo::Notice::plain((
+                    format!("Couldn't read the branches' issues: {e}"),
+                    true,
+                )));
             }
             Err(_) => {}
         }
@@ -212,25 +215,28 @@ impl RepoTab {
             .as_ref()
             .is_some_and(|i| !i.selected(&crate::connections::current()))
         {
-            self.status = Some((
+            self.status = Some(crate::repo::Notice::plain((
                 "Tracker account changed; reload the issue source".into(),
                 true,
-            ));
+            )));
             return;
         }
 
         if let Some(busy) = &self.busy_op {
-            self.status = Some((
+            self.status = Some(crate::repo::Notice::plain((
                 format!("Start work on {}: wait for {busy}", issue.key()),
                 true,
-            ));
+            )));
             return;
         }
         let plan = self.issue_plan(issue.key(), branch, worktree);
         let start = match plan.start {
             Ok(start) => start,
             Err(why) => {
-                self.status = Some((format!("Start work on {}: {why}", issue.key()), true));
+                self.status = Some(crate::repo::Notice::plain((
+                    format!("Start work on {}: {why}", issue.key()),
+                    true,
+                )));
                 return;
             }
         };
@@ -532,14 +538,22 @@ impl RepoTab {
                 match result {
                     Ok(issue) => match &tab.busy_op {
                         Some(busy) => {
-                            tab.status = Some((format!("{label}: wait for {busy}"), true));
+                            tab.status = Some(crate::repo::Notice::plain((
+                                format!("{label}: wait for {busy}"),
+                                true,
+                            )));
                         }
                         None => {
                             let ops = link::write_ops(&branch, &IssueLink::of(&issue));
                             tab.run_ops(&label, ops, Refresh::All, OpKind::plain(), ctx);
                         }
                     },
-                    Err(e) => tab.status = Some((format!("{label} failed: {e}"), true)),
+                    Err(e) => {
+                        tab.status = Some(crate::repo::Notice::plain((
+                            format!("{label} failed: {e}"),
+                            true,
+                        )))
+                    }
                 }
             },
         );
@@ -556,7 +570,10 @@ impl RepoTab {
             move || link::unlink(&path, &target),
             move |tab, result, ctx| {
                 if let Err(e) = result {
-                    tab.status = Some((format!("Forget the issue of {branch} failed: {e}"), true));
+                    tab.status = Some(crate::repo::Notice::plain((
+                        format!("Forget the issue of {branch} failed: {e}"),
+                        true,
+                    )));
                 }
                 tab.reload(ctx);
             },

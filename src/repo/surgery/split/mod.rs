@@ -422,17 +422,23 @@ impl RepoTab {
     /// Reads commit `hash` and opens the split editor on it.
     pub(in crate::repo) fn open_split(&mut self, hash: String, ctx: &egui::Context) {
         if let Some(why) = self.surgery_refusal(&hash) {
-            self.status = Some((format!("Split commit: {why}"), true));
+            self.status = Some(crate::repo::Notice::plain((
+                format!("Split commit: {why}"),
+                true,
+            )));
             return;
         }
         if self.absorb.is_some() {
-            self.status = Some((
+            self.status = Some(crate::repo::Notice::plain((
                 "Split commit: close the staged fixes editor first".to_owned(),
                 true,
-            ));
+            )));
             return;
         }
-        self.status = Some((format!("Split commit: reading {}…", short(&hash)), false));
+        self.status = Some(crate::repo::Notice::plain((
+            format!("Split commit: reading {}…", short(&hash)),
+            false,
+        )));
         let path = self.path.clone();
         self.then(
             ctx,
@@ -446,7 +452,12 @@ impl RepoTab {
                     tab.file_view = None;
                     tab.split = Some(Box::new(SplitEditor::new(read)));
                 }
-                Err(e) => tab.status = Some((format!("Split commit: {e}"), true)),
+                Err(e) => {
+                    tab.status = Some(crate::repo::Notice::plain((
+                        format!("Split commit: {e}"),
+                        true,
+                    )))
+                }
             },
         );
     }

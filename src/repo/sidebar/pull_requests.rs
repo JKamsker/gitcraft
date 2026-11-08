@@ -339,13 +339,13 @@ impl RepoTab {
     ) {
         match self.pr_worktree_plan(number, branch, sha) {
             PrWorktree::Here => {
-                self.status = Some((
+                self.status = Some(crate::repo::Notice::plain((
                     crate::i18n::message(
                         "repo-core-3461",
                         &[("number", format!("{}", number).into())],
                     ),
                     false,
-                ));
+                )));
             }
             PrWorktree::Open(path) => {
                 self.open_request = Some(crate::repo::OpenRequest::Worktree(path));

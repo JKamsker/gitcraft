@@ -25,7 +25,10 @@ pub(super) fn act(tab: &mut RepoTab, act: Act, ctx: &egui::Context) -> Option<Ac
             let profile = crate::settings::Settings::get(ctx).profile();
             let context = crate::connections::current();
             if tab.connection_context != context {
-                tab.status = Some(("Connection changed; reopen outbox".into(), true));
+                tab.status = Some(crate::repo::Notice::plain((
+                    "Connection changed; reopen outbox".into(),
+                    true,
+                )));
                 return None;
             }
             tab.repository_tool_mutation("Queue exact push", false, ctx, move |r| {
@@ -56,17 +59,17 @@ pub(super) fn act(tab: &mut RepoTab, act: Act, ctx: &egui::Context) -> Option<Ac
                         p.ui_generation = Some(generation);
                         start_send(tab, Box::new(p), true, ctx);
                     }
-                    Err(error) => tab.status = Some((error, true)),
+                    Err(error) => tab.status = Some(crate::repo::Notice::plain((error, true))),
                 },
             );
         }
         Act::PrepareOutbox(id) | Act::ReviewOutbox(id) => {
             if tab.is_busy() || crate::network::refused().is_some() {
-                tab.status = Some((
+                tab.status = Some(crate::repo::Notice::plain((
                     "Go online and wait for the current operation before preparing an outbox push"
                         .into(),
                     true,
-                ));
+                )));
                 return None;
             }
             let repo = tab.path.clone();
@@ -155,10 +158,10 @@ fn start_send(tab: &mut RepoTab, p: Box<logic::Prepared>, automatic: bool, ctx: 
             )
         })
     {
-        tab.status = Some((
+        tab.status = Some(crate::repo::Notice::plain((
             "Prepared outbox profile/sign-in changed; prepare and approve again".into(),
             true,
-        ));
+        )));
         return;
     }
     let plan = p.plan.clone();

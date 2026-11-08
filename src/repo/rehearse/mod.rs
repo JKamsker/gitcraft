@@ -168,11 +168,17 @@ impl RepoTab {
         ctx: &egui::Context,
     ) {
         if self.rehearsing.going() {
-            self.status = Some(("A rehearsal is going on already".to_owned(), true));
+            self.status = Some(crate::repo::Notice::plain((
+                "A rehearsal is going on already".to_owned(),
+                true,
+            )));
             return;
         }
         let Some(branch) = self.refs.current.clone() else {
-            self.status = Some(("Check out a branch to rehearse with it".to_owned(), true));
+            self.status = Some(crate::repo::Notice::plain((
+                "Check out a branch to rehearse with it".to_owned(),
+                true,
+            )));
             return;
         };
         let command = command.filter(|c| !c.trim().is_empty());
@@ -247,7 +253,7 @@ impl RepoTab {
         };
         run.ended = true;
         if run.started.elapsed() > std::time::Duration::from_secs(4) {
-            self.finished.push((
+            self.finished.push(crate::repo::Notice::plain((
                 crate::i18n::message(
                     "repo-workflows-rehearse-rehearsals-ended-31373501",
                     &[
@@ -256,7 +262,7 @@ impl RepoTab {
                     ],
                 ),
                 false,
-            ));
+            )));
         }
     }
 
@@ -281,7 +287,10 @@ impl RepoTab {
             return;
         };
         if self.busy_op.is_some() {
-            self.status = Some(("Wait for the operation going on to finish".to_owned(), true));
+            self.status = Some(crate::repo::Notice::plain((
+                "Wait for the operation going on to finish".to_owned(),
+                true,
+            )));
             return;
         }
         let work = &self.work;
@@ -290,18 +299,18 @@ impl RepoTab {
             || work.in_progress.is_some()
             || work.unstaged.iter().any(|f| f.area != git::Area::Untracked);
         if changed {
-            self.status = Some((
+            self.status = Some(crate::repo::Notice::plain((
                 "Commit or stash your changes first: the rehearsal was of the commits alone"
                     .to_owned(),
                 true,
-            ));
+            )));
             return;
         }
         if self.refs.current.as_deref() != Some(run.branch.as_str()) {
-            self.status = Some((
+            self.status = Some(crate::repo::Notice::plain((
                 format!("{} is no longer checked out: rehearse again", run.branch),
                 true,
-            ));
+            )));
             return;
         }
         run.applying = true;
@@ -317,7 +326,7 @@ impl RepoTab {
                 };
                 run.applying = false;
                 if let Err(e) = checked {
-                    tab.status = Some((e, true));
+                    tab.status = Some(crate::repo::Notice::plain((e, true)));
                     return;
                 }
                 let other_ref = BranchRef {

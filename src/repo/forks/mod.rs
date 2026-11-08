@@ -173,7 +173,10 @@ impl RepoTab {
 
     fn checkout_fork(&mut self, number: u64, ctx: &Context) {
         let Some(info) = self.forks.of(number).cloned() else {
-            self.status = Some((format!("Where #{number} comes from isn't known yet"), true));
+            self.status = Some(crate::repo::Notice::plain((
+                format!("Where #{number} comes from isn't known yet"),
+                true,
+            )));
             return;
         };
         let locals: Vec<String> = self.refs.local.iter().map(|b| b.name.clone()).collect();
@@ -196,7 +199,7 @@ impl RepoTab {
                     ctx,
                 );
             }
-            Err(e) => self.status = Some((e, true)),
+            Err(e) => self.status = Some(crate::repo::Notice::plain((e, true))),
         }
     }
 
@@ -205,16 +208,19 @@ impl RepoTab {
             return;
         };
         let Some(upstream) = self.default_remote() else {
-            self.status = Some((
+            self.status = Some(crate::repo::Notice::plain((
                 "This repository has no remote to rebase onto".to_owned(),
                 true,
-            ));
+            )));
             return;
         };
         let repo = self.path.clone();
         let setup = self.forks.setup.clone();
         let creds = self.credentials.clone();
-        self.status = Some((format!("Fetching #{number}'s branch and its base…"), false));
+        self.status = Some(crate::repo::Notice::plain((
+            format!("Fetching #{number}'s branch and its base…"),
+            false,
+        )));
         self.then(
             ctx,
             move || {
@@ -241,7 +247,7 @@ impl RepoTab {
                     );
                     tab.forks.running = Some((label, plan));
                 }
-                Err(e) => tab.status = Some((e, true)),
+                Err(e) => tab.status = Some(crate::repo::Notice::plain((e, true))),
             },
         );
     }
@@ -282,7 +288,10 @@ impl RepoTab {
                 let ((steps, undo), unused, keep) = match found {
                     Ok(found) => found,
                     Err(e) => {
-                        tab.status = Some((format!("Couldn't read the remotes: {e}"), true));
+                        tab.status = Some(crate::repo::Notice::plain((
+                            format!("Couldn't read the remotes: {e}"),
+                            true,
+                        )));
                         return;
                     }
                 };
@@ -295,7 +304,10 @@ impl RepoTab {
                     )
                 };
                 if steps.is_empty() {
-                    tab.status = Some((format!("No fork remote can go{kept}"), false));
+                    tab.status = Some(crate::repo::Notice::plain((
+                        format!("No fork remote can go{kept}"),
+                        false,
+                    )));
                     return;
                 }
                 tab.dialog = Some(
@@ -357,13 +369,13 @@ impl RepoTab {
         // Chosen once: say what it means. Chosen again: go ahead.
         if self.forks.approve_armed != Some(number) {
             self.forks.approve_armed = Some(number);
-            self.status = Some((
+            self.status = Some(crate::repo::Notice::plain((
                 format!(
                     "Approving runs the contributor's code on your CI: look through #{number}'s \
                      changes first, then choose Approve and run again"
                 ),
                 false,
-            ));
+            )));
             return;
         }
         self.forks.approve_armed = None;
@@ -379,7 +391,10 @@ impl RepoTab {
         }
         let repo = self.path.clone();
         self.forks.approving = true;
-        self.status = Some((format!("Approving #{number}'s workflow runs…"), false));
+        self.status = Some(crate::repo::Notice::plain((
+            format!("Approving #{number}'s workflow runs…"),
+            false,
+        )));
         self.then(
             ctx,
             move || {
@@ -390,13 +405,13 @@ impl RepoTab {
             },
             move |tab, result, ctx| {
                 tab.forks.approving = false;
-                tab.status = Some(match result {
+                tab.status = Some(crate::repo::Notice::plain(match result {
                     Ok(()) => (format!("#{number}'s workflow runs are approved"), false),
                     Err(e) => (
                         format!("Couldn't approve #{number}'s workflow runs: {e}"),
                         true,
                     ),
-                });
+                }));
                 // Read again: they are running now.
                 tab.forks.read_for = None;
                 tab.refresh_ci(ctx);
@@ -428,12 +443,12 @@ impl RepoTab {
                 // the push is offered.
                 if conflicts {
                     tab.forks.after_conflict = Some(plan);
-                    tab.status = Some((
+                    tab.status = Some(crate::repo::Notice::plain((
                         "The rebase stopped on conflicts: resolve them and continue it, then \
                          gitcraft offers to push it (or abort it)"
                             .to_owned(),
                         true,
-                    ));
+                    )));
                     return;
                 }
                 // Stopped before the rebase: nothing rewritten to undo.
@@ -453,13 +468,13 @@ impl RepoTab {
                     ctx,
                 );
 
-                tab.status = Some((
+                tab.status = Some(crate::repo::Notice::plain((
                     format!(
                         "{} is rebased here, but not pushed to {}: Ctrl+Z puts it back as it was",
                         plan.local, plan.fork
                     ),
                     true,
-                ));
+                )));
                 if auth
                     && let Some(op) = &mut tab.last_op
                     && op.label == asked

@@ -583,12 +583,12 @@ fn reserve_folder(folder: &std::path::Path) -> Result<(), String> {
 impl RepoTab {
     pub(super) fn open_ssh_setup(&mut self, ctx: &egui::Context) {
         if self.practice.is_some() {
-            self.status=Some(("SSH setup is unavailable in Practice repositories; open a real repository to choose account/key actions.".into(),true));
+            self.status=Some(crate::repo::Notice::plain(("SSH setup is unavailable in Practice repositories; open a real repository to choose account/key actions.".into(),true)));
             return;
         }
         match State::new(self, ctx) {
             Ok(state) => self.ssh_setup = Some(state),
-            Err(error) => self.status = Some((error, true)),
+            Err(error) => self.status = Some(crate::repo::Notice::plain((error, true))),
         }
     }
     pub(super) fn ssh_setup_window(&mut self, ctx: &egui::Context) {

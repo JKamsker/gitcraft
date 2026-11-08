@@ -300,10 +300,10 @@ impl RepoTab {
             move || caught(|| work(&path)),
             move |tab, result, ctx| {
                 tab.unity.busy = None;
-                tab.status = Some(match result {
+                tab.status = Some(crate::repo::Notice::plain(match result {
                     Ok(()) => (done, false),
                     Err(e) => (format!("{failed}: {e}"), true),
-                });
+                }));
                 tab.unity.detected_for = None;
                 tab.reload_status(ctx);
             },
@@ -379,7 +379,10 @@ impl RepoTab {
         };
         let name = file.file_name().map(|n| n.to_string_lossy().to_lowercase());
         if !name.is_some_and(|n| n.starts_with("unityyamlmerge")) {
-            self.status = Some((format!("{} isn't UnityYAMLMerge", file.display()), true));
+            self.status = Some(crate::repo::Notice::plain((
+                format!("{} isn't UnityYAMLMerge", file.display()),
+                true,
+            )));
             return;
         }
         let value = file.to_string_lossy().into_owned();
@@ -398,10 +401,10 @@ impl RepoTab {
 
     fn register_driver(&mut self, ctx: &egui::Context) {
         let Some(tool) = self.unity.tool.clone() else {
-            self.status = Some((
+            self.status = Some(crate::repo::Notice::plain((
                 "UnityYAMLMerge wasn't found: choose it first".to_owned(),
                 true,
-            ));
+            )));
             return;
         };
         let done = crate::i18n::text("repo-workflows-unity-register-driver-57fdd53f").to_owned();
@@ -413,10 +416,10 @@ impl RepoTab {
     /// Lets UnityYAMLMerge solve the open conflict; its result goes into the conflict editor.
     fn smart_merge_conflict(&mut self, ctx: &egui::Context) {
         let Some(tool) = self.unity.tool.clone() else {
-            self.status = Some((
+            self.status = Some(crate::repo::Notice::plain((
                 "UnityYAMLMerge wasn't found: choose it in Unity set-up…".to_owned(),
                 true,
-            ));
+            )));
             return;
         };
         let Some(ed) = self.conflict.as_mut().filter(|ed| !ed.solving) else {
@@ -443,12 +446,12 @@ impl RepoTab {
         let text = match result {
             Ok(text) => text,
             Err(e) => {
-                self.status = Some((e, true));
+                self.status = Some(crate::repo::Notice::plain((e, true)));
                 return;
             }
         };
         let left = ed.take_solved(text);
-        self.status = Some(match left {
+        self.status = Some(crate::repo::Notice::plain(match left {
             0 => (
                 format!("UnityYAMLMerge merged {path}: check the result, then save"),
                 false,
@@ -457,7 +460,7 @@ impl RepoTab {
                 format!("UnityYAMLMerge left {n} conflicts in {path} to choose"),
                 false,
             ),
-        });
+        }));
     }
 
     /// The fixes for the `.meta` problems, each with its button's label: stage the missing

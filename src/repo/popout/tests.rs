@@ -377,11 +377,11 @@ fn popping_out_what_isnt_open_says_so() {
     let ctx = egui::Context::default();
     let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
     tab.apply(Action::Popout(Request::PopShown), &ctx);
-    let shown = tab.status.clone();
+    let shown = tab.status.as_deref().cloned();
     tab.apply(Action::Popout(Request::PopOut(Panel::Diff)), &ctx);
-    let diff = tab.status.clone();
+    let diff = tab.status.as_deref().cloned();
     tab.apply(Action::Popout(Request::DockAll), &ctx);
-    let dock = tab.status.clone();
+    let dock = tab.status.as_deref().cloned();
     // The interactive rebase takes the big area: what is under it doesn't pop out.
     tab.apply(
         Action::OpenCi {
@@ -396,7 +396,7 @@ fn popping_out_what_isnt_open_says_so() {
         Vec::new(),
     ));
     tab.apply(Action::Popout(Request::PopShown), &ctx);
-    let rebase = tab.status.clone();
+    let rebase = tab.status.as_deref().cloned();
     let _ = std::fs::remove_dir_all(&dir);
     assert!(matches!(shown, Some((m, true)) if m.starts_with("Nothing to pop out")));
     assert!(matches!(diff, Some((m, true)) if m == "There's no diff open"));

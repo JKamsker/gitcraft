@@ -415,7 +415,10 @@ impl RepoTab {
         };
         let reply = match result {
             Ok(_) => {
-                self.status = Some((format!("{}: {label}: done", running.agent), false));
+                self.status = Some(crate::repo::Notice::plain((
+                    format!("{}: {label}: done", running.agent),
+                    false,
+                )));
                 let how = if undoable {
                     crate::i18n::text("repo-workflows-agent-agent-op-done-d5e3a3af")
                 } else {

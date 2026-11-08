@@ -152,8 +152,13 @@ impl RepoTab {
     pub(super) fn run_key(&mut self, command: Command, ctx: &egui::Context) {
         match self.key_action(command) {
             Ok(Some(action)) => self.apply(action, ctx),
-            Ok(None) => self.status = Some((crate::i18n::text("repo-core-2870").into(), true)),
-            Err(why) => self.status = Some((why, true)),
+            Ok(None) => {
+                self.status = Some(crate::repo::Notice::plain((
+                    crate::i18n::text("repo-core-2870").into(),
+                    true,
+                )))
+            }
+            Err(why) => self.status = Some(crate::repo::Notice::plain((why, true))),
         }
     }
 
@@ -287,7 +292,7 @@ mod tests {
         let commit = tab.key_action(Command::Commit).err();
         let terminal = tab.key_action(Command::Terminal);
         tab.run_key(Command::StageAll, &ctx);
-        let shown = tab.status.clone();
+        let shown = tab.status.as_deref().cloned();
         let _ = std::fs::remove_dir_all(&dir);
         assert_eq!(fetch.as_deref(), Some("Push is still running"));
         assert_eq!(commit.as_deref(), Some("Push is still running"));
@@ -369,7 +374,7 @@ mod tests {
         let fetched = run(Some(&dir), &["log", "-1", "--format=%s", &tracking]);
         press(&mut tab, &ctx, Command::Pull);
         let pulled = run(Some(&dir), &["log", "-1", "--format=%s"]);
-        let failed = tab.status.clone().filter(|(_, err)| *err);
+        let failed = tab.status.as_deref().cloned().filter(|(_, err)| *err);
         for d in [&dir, &bare, &other] {
             let _ = std::fs::remove_dir_all(d);
         }

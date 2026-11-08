@@ -198,7 +198,10 @@ impl RepoTab {
             return;
         };
         if self.busy_op.is_some() && view.run.as_ref().is_none_or(|r| !r.running()) {
-            self.status = Some(("Wait for the operation running to end".to_owned(), true));
+            self.status = Some(crate::repo::Notice::plain((
+                "Wait for the operation running to end".to_owned(),
+                true,
+            )));
             return;
         }
         if view.run.is_none() {
@@ -242,7 +245,7 @@ impl RepoTab {
                 Some(why) => {
                     tab.busy_op = None;
                     tab.op_started = None;
-                    tab.status = Some((why, true));
+                    tab.status = Some(crate::repo::Notice::plain((why, true)));
                 }
             },
         );
@@ -348,11 +351,11 @@ impl RepoTab {
             Status::Failed(e) => Some((*step, e.clone())),
             _ => None,
         });
-        self.status = Some(match failed {
+        self.status = Some(crate::repo::Notice::plain(match failed {
             Some((step, e)) => (format!("{label}: {} failed: {e}", step.label()), true),
             None if run.finished() => (format!("Released {}", run.plan.tag), false),
             None => (format!("{label}: stopped"), false),
-        });
+        }));
         if let Some((entry, replace)) = remember {
             if replace {
                 self.replace_recent_undo(entry, ctx);
@@ -362,10 +365,11 @@ impl RepoTab {
         }
         let long = started.is_some_and(|t| t.elapsed() > std::time::Duration::from_secs(4));
         if long {
-            self.finished.push(match &self.status {
-                Some((text, failed)) => (format!("{} · {text}", self.name), *failed),
-                None => (format!("{} · {label}", self.name), false),
-            });
+            self.finished
+                .push(crate::repo::Notice::plain(match self.status.as_deref() {
+                    Some((text, failed)) => (format!("{} · {text}", self.name), *failed),
+                    None => (format!("{} · {label}", self.name), false),
+                }));
         }
         self.reload(ctx);
     }

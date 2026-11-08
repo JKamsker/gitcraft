@@ -469,11 +469,14 @@ impl RepoTab {
         work: impl FnOnce(&guard::Runner<'_>) -> Result<String, String> + Send + 'static,
     ) {
         if let Some(busy) = &self.busy_op {
-            self.status = Some((format!("{busy} is still running"), true));
+            self.status = Some(crate::repo::Notice::plain((
+                format!("{busy} is still running"),
+                true,
+            )));
             return;
         }
         if network && let Some(why) = crate::network::refused() {
-            self.status = Some((why.why().to_owned(), true));
+            self.status = Some(crate::repo::Notice::plain((why.why().to_owned(), true)));
             return;
         }
         let origin = match &self.dialog {
@@ -1002,7 +1005,12 @@ impl RepoTab {
                 {
                     match result {
                         Ok(editor) => state.result = Some(Ok(Data::Remote(editor))),
-                        Err(e) => tab.status = Some((format!("Remote preview: {e}"), true)),
+                        Err(e) => {
+                            tab.status = Some(crate::repo::Notice::plain((
+                                format!("Remote preview: {e}"),
+                                true,
+                            )))
+                        }
                     }
                 }
             },
@@ -1032,7 +1040,7 @@ impl RepoTab {
                             state.result = Some(Ok(Data::Publication(v)));
                             state.acknowledged = false;
                         }
-                        Err(e) => tab.status = Some((e, true)),
+                        Err(e) => tab.status = Some(crate::repo::Notice::plain((e, true))),
                     }
                 }
             },
@@ -1043,7 +1051,7 @@ impl RepoTab {
             return;
         }
         if let Some(pause) = crate::network::refused() {
-            self.status = Some((pause.why().into(), true));
+            self.status = Some(crate::repo::Notice::plain((pause.why().into(), true)));
             return;
         }
         let Some(Dialog::RepositoryTools(state)) = &self.dialog else {
@@ -1106,7 +1114,7 @@ impl RepoTab {
                 {
                     match result {
                         Ok(m) => state.result = Some(Ok(Data::Publication(m))),
-                        Err(e) => tab.status = Some((e, true)),
+                        Err(e) => tab.status = Some(crate::repo::Notice::plain((e, true))),
                     }
                 }
             },
@@ -1120,7 +1128,7 @@ impl RepoTab {
             return;
         }
         if let Some(pause) = crate::network::refused() {
-            self.status = Some((pause.why().into(), true));
+            self.status = Some(crate::repo::Notice::plain((pause.why().into(), true)));
             return;
         }
         let Some(Dialog::RepositoryTools(state)) = &self.dialog else {
@@ -1190,7 +1198,7 @@ impl RepoTab {
                             state.result = Some(Ok(Data::Dependencies(p)));
                             state.acknowledged = false;
                         }
-                        Err(e) => tab.status = Some((e, true)),
+                        Err(e) => tab.status = Some(crate::repo::Notice::plain((e, true))),
                     }
                 }
                 if let Some(parent) = parent
@@ -1200,7 +1208,7 @@ impl RepoTab {
                         || crate::connections::current() != context || tab.connection_context != context
                         || tab.https_generation != generation
                     {
-                        tab.status = Some(("Dependencies finished, but the parent repository, profile or sign-in changed. Prepare its push again.".into(), true));
+                        tab.status = Some(crate::repo::Notice::plain(("Dependencies finished, but the parent repository, profile or sign-in changed. Prepare its push again.".into(), true)));
                         return;
                     }
                     tab.review_prepared_push(parent, ctx);

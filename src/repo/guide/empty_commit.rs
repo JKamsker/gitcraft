@@ -88,12 +88,17 @@ impl RepoTab {
                     tab.dialog = Some(confirm_dialog(&branch));
                 }
                 Ok(_) => {
-                    tab.status = Some((
+                    tab.status = Some(crate::repo::Notice::plain((
                         "HEAD is detached: check out a branch to make the first commit on".into(),
                         true,
-                    ));
+                    )));
                 }
-                Err(e) => tab.status = Some((format!("{EMPTY_COMMIT_LABEL}: {e}"), true)),
+                Err(e) => {
+                    tab.status = Some(crate::repo::Notice::plain((
+                        format!("{EMPTY_COMMIT_LABEL}: {e}"),
+                        true,
+                    )))
+                }
             },
         );
     }

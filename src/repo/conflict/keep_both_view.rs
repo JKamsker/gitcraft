@@ -104,7 +104,7 @@ impl RepoTab {
                     },
                     ctx,
                 ),
-                Err(e) => tab.status = Some((e, true)),
+                Err(e) => tab.status = Some(crate::repo::Notice::plain((e, true))),
             },
         );
     }

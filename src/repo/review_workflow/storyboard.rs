@@ -535,7 +535,10 @@ impl RepoTab {
                 &mut self.pr_view,
                 self.remotes.iter().find(|r| &r.name == remote).cloned(),
             ) else {
-                self.status = Some(("Choose a configured storyboard sharing remote".into(), true));
+                self.status = Some(crate::repo::Notice::plain((
+                    "Choose a configured storyboard sharing remote".into(),
+                    true,
+                )));
                 return;
             };
             let (Some(Ok(d)), Some(Ok(f))) = (&v.details, &v.files) else {
@@ -544,7 +547,10 @@ impl RepoTab {
             if !current_files(self.pr_requests, v.files_request, &d.head_oid, &f.to)
                 || &d.head_oid != head
             {
-                self.status = Some(("Pull request changed; refresh the storyboard".into(), true));
+                self.status = Some(crate::repo::Notice::plain((
+                    "Pull request changed; refresh the storyboard".into(),
+                    true,
+                )));
                 return;
             }
             if publish
@@ -554,10 +560,10 @@ impl RepoTab {
                     .as_deref()
                     .is_some_and(|viewer| viewer.eq_ignore_ascii_case(&d.author))
             {
-                self.status = Some((
+                self.status = Some(crate::repo::Notice::plain((
                     "Only the pull request author publishes its storyboard".into(),
                     true,
-                ));
+                )));
                 return;
             }
             let (d, f, repo, creds) = (
@@ -618,10 +624,10 @@ impl RepoTab {
             return;
         };
         if !current_files(self.pr_requests, v.files_request, &d.head_oid, &f.to) {
-            self.status = Some((
+            self.status = Some(crate::repo::Notice::plain((
                 "Pull request files are refreshing; wait before arranging its storyboard".into(),
                 true,
-            ));
+            )));
             return;
         }
         let (d, f, path, request) = (
@@ -633,7 +639,10 @@ impl RepoTab {
         v.storyboard.request = request;
         let mutation = !matches!(act, StoryAct::Load);
         if mutation && v.storyboard.imported {
-            self.status = Some(("Load your local storyboard before editing".into(), true));
+            self.status = Some(crate::repo::Notice::plain((
+                "Load your local storyboard before editing".into(),
+                true,
+            )));
             return;
         }
         v.storyboard.imported = false;
@@ -644,10 +653,10 @@ impl RepoTab {
                 .as_deref()
                 .is_some_and(|v| v.eq_ignore_ascii_case(&d.author))
         {
-            self.status = Some((
+            self.status = Some(crate::repo::Notice::plain((
                 "Only the pull request author arranges this storyboard".into(),
                 true,
-            ));
+            )));
             return;
         }
         if mutation {

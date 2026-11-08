@@ -121,10 +121,10 @@ pub(super) fn act(tab: &mut RepoTab, act: Act, ctx: &egui::Context) -> Option<Ac
                     tab.https_generation,
                 )
             {
-                tab.status = Some((
+                tab.status = Some(crate::repo::Notice::plain((
                     "Prepared subtree profile/sign-in changed; prepare and approve again".into(),
                     true,
-                ));
+                )));
                 return None;
             }
             let plan = p.plan.clone();

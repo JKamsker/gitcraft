@@ -256,10 +256,10 @@ impl RepoTab {
 
     fn start_parallel(&mut self, setup: pb::Setup, ctx: &egui::Context) {
         if self.parallel.running() {
-            self.status = Some((
+            self.status = Some(crate::repo::Notice::plain((
                 "A parallel bisect is already running in this tab".to_owned(),
                 true,
-            ));
+            )));
             return;
         }
         self.status = None;
@@ -299,10 +299,12 @@ impl RepoTab {
         // owners must retain the typed outcome/receipt and resolve at final paint.
         let (message, failed) = outcome_message(&outcome, &view.machine.label());
         if long {
-            self.finished
-                .push((format!("{} · {message}", self.name), failed));
+            self.finished.push(crate::repo::Notice::plain((
+                format!("{} · {message}", self.name),
+                failed,
+            )));
         }
-        self.status = Some((message, failed));
+        self.status = Some(crate::repo::Notice::plain((message, failed)));
         if let Outcome::FirstBad(hash) = &outcome {
             self.goto(&hash.clone(), ctx);
         }
@@ -324,7 +326,10 @@ impl RepoTab {
             return;
         };
         if self.busy_op.is_some() {
-            self.status = Some(("Wait for the operation going on to finish".to_owned(), true));
+            self.status = Some(crate::repo::Notice::plain((
+                "Wait for the operation going on to finish".to_owned(),
+                true,
+            )));
             return;
         }
         let parents = self
@@ -350,10 +355,10 @@ impl RepoTab {
             |tab, result, ctx| {
                 tab.busy_op = None;
                 tab.op_started = None;
-                tab.status = Some(match result {
+                tab.status = Some(crate::repo::Notice::plain(match result {
                     Ok(_) => ("Marked in the bisect".to_owned(), false),
                     Err(e) => (format!("Mark in the bisect failed: {e}"), true),
-                });
+                }));
                 tab.reload(ctx);
             },
         );

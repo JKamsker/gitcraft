@@ -113,10 +113,10 @@ impl RepoTab {
             return;
         }
         if name.is_empty() || self.refs.local.iter().any(|b| b.name == name) {
-            self.status = Some((
+            self.status = Some(crate::repo::Notice::plain((
                 format!("Pick a name no branch has for the new branch (not “{name}”)"),
                 true,
-            ));
+            )));
             return;
         }
         let label = format!(
@@ -220,7 +220,7 @@ impl RepoTab {
         } else {
             label.to_owned()
         };
-        self.status = Some(status);
+        self.status = Some(crate::repo::Notice::plain(status));
         self.set_remove(Some(state));
         self.timeline_op_ended(&entry_label, &OpKind::plain(), undo, ok, Refresh::All, ctx);
         self.reload(ctx);
@@ -257,10 +257,10 @@ impl RepoTab {
                 tab.busy_op = None;
                 tab.op_started = None;
                 let ok = result.is_ok();
-                tab.status = Some(match result {
+                tab.status = Some(crate::repo::Notice::plain(match result {
                     Ok(()) => (format!("{label}: done"), false),
                     Err(e) => (format!("{label} failed: {e}"), true),
-                });
+                }));
                 if ok {
                     tab.set_remove(None);
                 }

@@ -83,10 +83,10 @@ impl RepoTab {
                 tab.reword_ready(&hash, command, ctx);
             }),
             Err(e) => {
-                self.status = Some((
+                self.status = Some(crate::repo::Notice::plain((
                     crate::i18n::message("repo-core-3322", &[("e", e.to_string().into())]),
                     true,
-                ))
+                )))
             }
         }
     }
@@ -115,7 +115,7 @@ impl RepoTab {
         match result {
             // Started while something else ran: say so rather than drop it.
             Ok(_) if self.busy_op.is_some() => {
-                self.status = Some((
+                self.status = Some(crate::repo::Notice::plain((
                     crate::i18n::message(
                         "repo-core-3323",
                         &[(
@@ -128,7 +128,7 @@ impl RepoTab {
                         )],
                     ),
                     true,
-                ));
+                )));
             }
             // The todo list replaces the commits read: not one made since.
             Ok((command, head)) => self.run_undoable(
@@ -139,10 +139,10 @@ impl RepoTab {
                 ctx,
             ),
             Err(e) => {
-                self.status = Some((
+                self.status = Some(crate::repo::Notice::plain((
                     crate::i18n::message("repo-core-3322", &[("e", e.to_string().into())]),
                     true,
-                ))
+                )))
             }
         }
     }
@@ -195,7 +195,7 @@ impl RepoTab {
     ) {
         match result {
             Ok(commits) if commits.is_empty() => {
-                self.status = Some((
+                self.status = Some(crate::repo::Notice::plain((
                     crate::i18n::message(
                         "repo-core-3324",
                         &[(
@@ -204,7 +204,7 @@ impl RepoTab {
                         )],
                     ),
                     true,
-                ));
+                )));
             }
             Ok(commits) => {
                 self.diff = None;
@@ -215,10 +215,10 @@ impl RepoTab {
                 self.rebase = Some(editor);
             }
             Err(e) => {
-                self.status = Some((
+                self.status = Some(crate::repo::Notice::plain((
                     crate::i18n::message("repo-core-3325", &[("e", e.to_string().into())]),
                     true,
-                ))
+                )))
             }
         }
     }
@@ -264,15 +264,18 @@ impl RepoTab {
                 let pinned = match result {
                     Ok(p) => p,
                     Err(e) => {
-                        tab.status = Some((
+                        tab.status = Some(crate::repo::Notice::plain((
                             crate::i18n::message("repo-core-3329", &[("e", e.to_string().into())]),
                             true,
-                        ));
+                        )));
                         return;
                     }
                 };
                 if tab.busy_op.is_some() || tab.refs.head != head || tab.same_branch() != guard {
-                    tab.status = Some((crate::i18n::text("repo-core-3330").into(), true));
+                    tab.status = Some(crate::repo::Notice::plain((
+                        crate::i18n::text("repo-core-3330").into(),
+                        true,
+                    )));
                     return;
                 }
                 let ask = git::PreviewAsk::rebase(&branch, &head, &pinned, upstream);
@@ -312,11 +315,11 @@ impl RepoTab {
             return;
         }
         if let Some(reason) = editor.moved(&self.refs.head) {
-            self.status = Some((reason, true));
+            self.status = Some(crate::repo::Notice::plain((reason, true)));
             return;
         }
         if let Err(reason) = editor.approve(&guard) {
-            self.status = Some((reason, true));
+            self.status = Some(crate::repo::Notice::plain((reason, true)));
             return;
         }
         let id = editor.id;
@@ -375,7 +378,10 @@ impl RepoTab {
             .as_ref()
             .is_some_and(|editor| editor.id == id && editor.approved(&guard, &self.refs.head))
         {
-            self.status = Some((crate::i18n::text("repo-core-3340").into(), true));
+            self.status = Some(crate::repo::Notice::plain((
+                crate::i18n::text("repo-core-3340").into(),
+                true,
+            )));
             return;
         }
         self.run_rebase(ctx);
@@ -394,16 +400,19 @@ impl RepoTab {
         // here against the last read, and again on disk right before it runs (that read can
         // lag a commit just made in the terminal by as long as a reload takes).
         if let Some(why) = editor.moved(&self.refs.head) {
-            self.status = Some((why, true));
+            self.status = Some(crate::repo::Notice::plain((why, true)));
             return;
         }
         if editor.has_approval() {
             if !editor.approved(&guard, &self.refs.head) {
-                self.status = Some((crate::i18n::text("repo-core-3341").into(), true));
+                self.status = Some(crate::repo::Notice::plain((
+                    crate::i18n::text("repo-core-3341").into(),
+                    true,
+                )));
                 return;
             }
         } else if let Err(reason) = editor.approve(&guard) {
-            self.status = Some((reason, true));
+            self.status = Some(crate::repo::Notice::plain((reason, true)));
             return;
         }
         let label = format!("Interactive rebase onto {}", editor.onto_label);
@@ -446,17 +455,23 @@ impl RepoTab {
         };
         editor.starting = false;
         if !editor.approved(&current_guard, &self.refs.head) {
-            self.status = Some((crate::i18n::text("repo-core-3343").into(), true));
+            self.status = Some(crate::repo::Notice::plain((
+                crate::i18n::text("repo-core-3343").into(),
+                true,
+            )));
             return;
         }
         let Some(retained_guard) = editor.branch_guard.clone() else {
-            self.status = Some((crate::i18n::text("repo-core-3344").into(), true));
+            self.status = Some(crate::repo::Notice::plain((
+                crate::i18n::text("repo-core-3344").into(),
+                true,
+            )));
             return;
         };
         match command {
             // Something else started while the files were written.
             Ok(_) if self.busy_op.is_some() => {
-                self.status = Some((
+                self.status = Some(crate::repo::Notice::plain((
                     crate::i18n::message(
                         "repo-core-3345",
                         &[(
@@ -465,11 +480,14 @@ impl RepoTab {
                         )],
                     ),
                     true,
-                ));
+                )));
             }
             Ok((command, head, refs)) => {
                 if head != editor.head {
-                    self.status = Some((crate::i18n::text("repo-core-3346").into(), true));
+                    self.status = Some(crate::repo::Notice::plain((
+                        crate::i18n::text("repo-core-3346").into(),
+                        true,
+                    )));
                     return;
                 }
                 let guards = [retained_guard.clone(), expect_ref_at("HEAD", &head)];
@@ -482,7 +500,7 @@ impl RepoTab {
                 };
                 self.run_undoable(label, steps, Refresh::All, undo, ctx);
             }
-            Err(e) => self.status = Some((e, true)),
+            Err(e) => self.status = Some(crate::repo::Notice::plain((e, true))),
         }
     }
 }
@@ -548,7 +566,7 @@ mod tests {
         assert!(tab.busy_op.is_none() && tab.last_op.is_none());
         assert!(
             tab.status
-                .as_ref()
+                .as_deref()
                 .is_some_and(|(s, _)| s.contains("changed"))
         );
         // The same branch change during asynchronous command preparation is also

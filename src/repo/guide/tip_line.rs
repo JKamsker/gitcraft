@@ -80,7 +80,7 @@ impl RepoTab {
         settings.tips = false;
         settings.set(ctx);
         self.guide.hints.close();
-        self.status = Some((TIPS_OFF.to_owned(), false));
+        self.status = Some(crate::repo::Notice::plain((TIPS_OFF.to_owned(), false)));
     }
 
     /// The first-time hint up, if any, with a button closing it (drawn right to left, left of
@@ -93,7 +93,7 @@ impl RepoTab {
             self.guide.hints.close();
             return;
         }
-        let failed = self.status.as_ref().is_some_and(|(_, err)| *err);
+        let failed = self.status.as_deref().is_some_and(|(_, err)| *err);
         if self.busy_op.is_some() || failed {
             return;
         }

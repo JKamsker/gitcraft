@@ -364,7 +364,12 @@ fn a_jump_refuses_once_a_branch_moved_since_it_was_read() {
     tab.toggle_timeline();
     tab.apply(Action::Timeline(TimelineAct::Jump(None)), &ctx);
     let ran = wait(&mut tab, &ctx, |t| t.busy_op.is_none() && !t.loading);
-    let status = tab.status.clone().map(|(s, _)| s).unwrap_or_default();
+    let status = tab
+        .status
+        .as_deref()
+        .cloned()
+        .map(|(s, _)| s)
+        .unwrap_or_default();
     let head = git::head(&dir);
     let _ = std::fs::remove_dir_all(&dir);
     assert!(ran);
@@ -406,7 +411,13 @@ fn back_to_back_operations_are_both_kept() {
         None
     } else {
         tab.undo(&ctx);
-        Some(tab.status.clone().map(|(s, _)| s).unwrap_or_default())
+        Some(
+            tab.status
+                .as_deref()
+                .cloned()
+                .map(|(s, _)| s)
+                .unwrap_or_default(),
+        )
     };
     let _ = std::fs::write(dir.join("b.txt"), "b");
     // The cached status may still show the first commit's staged file. Give
@@ -416,7 +427,7 @@ fn back_to_back_operations_are_both_kept() {
     tab.apply(Action::Commit, &ctx);
     let second_ran = tab.busy_op.is_some();
     assert!(wait(&mut tab, &ctx, settled));
-    let status = tab.status.clone();
+    let status = tab.status.as_deref().cloned();
     let labels: Vec<String> = tab
         .timeline
         .entries

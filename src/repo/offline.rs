@@ -228,7 +228,7 @@ mod tests {
             OpKind::plain(),
             &ctx,
         );
-        let fetch = (tab.busy_op.clone(), tab.status.clone());
+        let fetch = (tab.busy_op.clone(), tab.status.as_deref().cloned());
         tab.run_ops(
             "Tag",
             ops(&[&["tag", "t"]]),

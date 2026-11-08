@@ -348,23 +348,23 @@ impl RepoTab {
         + 'static,
     ) {
         if self.is_busy() || self.echo_push_pending() {
-            self.status = Some((
+            self.status = Some(crate::repo::Notice::plain((
                 "Wait for the current operation or reviewer echo before sending".into(),
                 true,
-            ));
+            )));
             return;
         }
         if Settings::get(ctx).profile() != plan.profile {
-            self.status = Some((
+            self.status = Some(crate::repo::Notice::plain((
                 "The prepared profile or identity policy changed; reopen push preflight".into(),
                 true,
-            ));
+            )));
             return;
         }
         let original = match crate::push_preflight::push_args(plan) {
             Ok(args) => args,
             Err(error) => {
-                self.status = Some((error, true));
+                self.status = Some(crate::repo::Notice::plain((error, true)));
                 return;
             }
         };
@@ -381,10 +381,10 @@ impl RepoTab {
                 || tab.connection_context != context
                 || tab.https_generation != generation
             {
-                tab.status = Some((
+                tab.status = Some(crate::repo::Notice::plain((
                     "Reviewed send profile, sign-in or repository changed; prepare again".into(),
                     true,
-                ));
+                )));
                 return;
             }
             send(
@@ -445,10 +445,10 @@ impl RepoTab {
         }
         if self.review_tools.echo.checking_push || self.review_tools.echo.pending_push.is_some() {
             self.review_tools.open = true;
-            self.status = Some((
+            self.status = Some(crate::repo::Notice::plain((
                 "Review or cancel the pending reviewer-echo operation first".into(),
                 true,
-            ));
+            )));
             return true;
         }
         let repo = self.path.clone();
@@ -516,7 +516,7 @@ impl RepoTab {
                     tab.run_ops_ex(&op.label,op.ops,op.refresh,op.kind,op.quiet,ctx);
                     tab.review_tools.echo.passed=None;
                 },
-                Err(e)=>{tab.status=Some((e.clone(),true));tab.review_tools.echo.error=Some(e);}
+                Err(e)=>{tab.status=Some(crate::repo::Notice::plain((e.clone(),true)));tab.review_tools.echo.error=Some(e);}
             }
         });
     }

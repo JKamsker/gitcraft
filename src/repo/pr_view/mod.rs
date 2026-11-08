@@ -98,7 +98,7 @@ impl RepoTab {
         // Those editors hold choices written nowhere yet, and take the big area until they're
         // done: the pull request waits rather than throwing them away.
         if let Some(why) = editor_in_the_way(self.conflict.is_some(), self.rebase.is_some()) {
-            self.status = Some((why.to_owned(), true));
+            self.status = Some(crate::repo::Notice::plain((why.to_owned(), true)));
             return;
         }
         self.tour = None;
@@ -249,7 +249,10 @@ impl RepoTab {
                                 Err(e) => {
                                     view.relocated = Default::default();
                                     view.relocated.error = Some(e.clone());
-                                    tab.status = Some((format!("Comment relocation: {e}"), true))
+                                    tab.status = Some(crate::repo::Notice::plain((
+                                        format!("Comment relocation: {e}"),
+                                        true,
+                                    )))
                                 }
                             }
                         }

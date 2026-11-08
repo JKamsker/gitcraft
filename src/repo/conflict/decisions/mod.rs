@@ -169,7 +169,7 @@ impl RepoTab {
             Act::Load => self.load_decisions(ctx),
             Act::Sync(remote, send) => {
                 let repo = self.path.clone();
-                self.status = Some((
+                self.status = Some(crate::repo::Notice::plain((
                     crate::i18n::message(
                         "repo-core-0486",
                         &[
@@ -187,15 +187,15 @@ impl RepoTab {
                         ],
                     ),
                     false,
-                ));
+                )));
                 self.then(
                     ctx,
                     move || store::sync(&repo, &remote, send),
                     |tab, said, _| {
-                        tab.status = Some(match said {
+                        tab.status = Some(crate::repo::Notice::plain(match said {
                             Ok(text) => (text, false),
                             Err(e) => (e, true),
-                        });
+                        }));
                     },
                 );
             }
@@ -232,7 +232,7 @@ impl RepoTab {
                         let found = keys.iter().map(|k| found.remove(k)).collect();
                         let applied = ed.take_offers(found);
                         if applied > 0 {
-                            tab.status = Some((
+                            tab.status = Some(crate::repo::Notice::plain((
                                 match applied {
                                     1 => crate::i18n::text("repo-core-0489").to_owned(),
                                     n => {
@@ -240,14 +240,14 @@ impl RepoTab {
                                     }
                                 },
                                 false,
-                            ));
+                            )));
                         }
                     }
                     Err(e) => {
                         // Not read: nothing offered, and not asked again for this editor.
                         ed.memo.offers = Some(Vec::new());
                         ed.memo.reading = false;
-                        tab.status = Some((e, true));
+                        tab.status = Some(crate::repo::Notice::plain((e, true)));
                     }
                 }
             },
@@ -275,7 +275,7 @@ impl RepoTab {
                 decisions,
             }),
             Err(e) => {
-                self.status = Some((e, true));
+                self.status = Some(crate::repo::Notice::plain((e, true)));
                 None
             }
         };
@@ -288,7 +288,10 @@ impl RepoTab {
             return;
         };
         if pending.run_tests {
-            self.status = Some((crate::i18n::text("repo-core-0491").to_owned(), false));
+            self.status = Some(crate::repo::Notice::plain((
+                crate::i18n::text("repo-core-0491").to_owned(),
+                false,
+            )));
         }
         let repo = self.path.clone();
         self.then(
@@ -316,7 +319,7 @@ impl RepoTab {
                     .map(|(t, _)| t)
                     .collect::<Vec<_>>()
                     .join(" · ");
-                tab.status = Some((text, failed));
+                tab.status = Some(crate::repo::Notice::plain((text, failed)));
             },
         );
     }

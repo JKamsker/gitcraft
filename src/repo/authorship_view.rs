@@ -144,7 +144,7 @@ impl RepoTab {
                         }
                     }
                     Ok(None) => {}
-                    Err(e) => tab.status = Some((e, true)),
+                    Err(e) => tab.status = Some(crate::repo::Notice::plain((e, true))),
                 }
                 if std::mem::take(&mut tab.authorship.again) {
                     tab.load_authorship(ctx);
@@ -218,10 +218,10 @@ impl RepoTab {
         let known = self.authorship.map.clone();
         let repo = self.path.clone();
         let name = branch.to_owned();
-        self.status = Some((
+        self.status = Some(crate::repo::Notice::plain((
             crate::i18n::message("repo-core-0197", &[("branch", branch.to_string().into())]),
             false,
-        ));
+        )));
         self.then(
             ctx,
             move || {
@@ -229,12 +229,12 @@ impl RepoTab {
                     crate::i18n::message("repo-core-0198", &[("name", name.to_string().into())])
                 })?;
                 authorship::branch::figures(&repo, &full, &base, &known, complete)
-                    .map(|f| f.headline(&name))
+                    .map(|f| (name, f))
             },
             |tab, said, _| {
                 tab.status = Some(match said {
-                    Ok(line) => (line, false),
-                    Err(e) => (e, true),
+                    Ok((branch, figures)) => super::Notice::authorship(branch, figures),
+                    Err(e) => super::Notice::plain((e, true)),
                 });
             },
         );
@@ -381,11 +381,11 @@ mod tests {
         // The branch's figures, said in the status line.
         tab.apply(Action::BranchAuthorship("agent/x".into()), &ctx);
         until(&mut tab, &ctx, |t| {
-            t.status.as_ref().is_some_and(|(s, _)| !s.ends_with('…'))
+            t.status.as_deref().is_some_and(|(s, _)| !s.ends_with('…'))
         })?;
         let said = tab
             .status
-            .as_ref()
+            .as_deref()
             .map(|(s, _)| s.clone())
             .unwrap_or_default();
         assert!(said.starts_with("agent/x: "), "{said}");

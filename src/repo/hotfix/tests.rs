@@ -133,7 +133,7 @@ fn a_hotfix_started_from_a_tag_is_finished_pushed_undone_and_redone() -> Result<
         crate::repo::push_preflight::test_support::approve(&mut tab, &ctx)?;
         wait(&mut tab, &ctx, |t| t.busy_op.is_none() && !t.loading);
         assert!(
-            tab.status.as_ref().is_some_and(|(_, failed)| !failed),
+            tab.status.as_deref().is_some_and(|(_, failed)| !failed),
             "{:?}",
             tab.status
         );
@@ -235,7 +235,12 @@ fn a_finish_that_stops_part_way_is_undoable() {
     });
     let develop_merged =
         git::resolve(&dir, "refs/heads/develop").ok() != Some(develop_before.clone());
-    let status = tab.status.clone().map(|(s, _)| s).unwrap_or_default();
+    let status = tab
+        .status
+        .as_deref()
+        .cloned()
+        .map(|(s, _)| s)
+        .unwrap_or_default();
     tab.undo(&ctx);
     settle(&mut tab, &ctx);
     let branch = git::run(Some(&dir), &["branch", "--show-current"]).unwrap_or_default();

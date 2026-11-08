@@ -272,13 +272,16 @@ impl RepoTab {
             },
             move |tab, (recipe, listed, hooks), ctx| {
                 if let Some(Err(e)) = hooks {
-                    tab.status = Some((
+                    tab.status = Some(crate::repo::Notice::plain((
                         format!("The agent checkpoint hooks weren't installed: {e}"),
                         true,
-                    ));
+                    )));
                 }
                 let recipe = recipe.unwrap_or_else(|e| {
-                    tab.status = Some((format!("The worktree setup recipe wasn't run: {e}"), true));
+                    tab.status = Some(crate::repo::Notice::plain((
+                        format!("The worktree setup recipe wasn't run: {e}"),
+                        true,
+                    )));
                     Recipe::default()
                 });
                 if let Some(listed) = listed {
@@ -308,7 +311,10 @@ impl RepoTab {
 
     fn start_agent_task(&mut self, new: start::NewTask, ctx: &egui::Context) {
         if self.busy_op.is_some() {
-            self.status = Some(("Wait for the running operation to finish".to_owned(), true));
+            self.status = Some(crate::repo::Notice::plain((
+                "Wait for the running operation to finish".to_owned(),
+                true,
+            )));
             return;
         }
         self.agents.dialog = None;
@@ -375,7 +381,10 @@ impl RepoTab {
             move |tab, result, _| match result {
                 Ok(()) => {
                     tab.agents.dialog = None;
-                    tab.status = Some(("Worktree setup recipe saved".to_owned(), false));
+                    tab.status = Some(crate::repo::Notice::plain((
+                        "Worktree setup recipe saved".to_owned(),
+                        false,
+                    )));
                 }
                 Err(e) => {
                     if let Some(AgentDialog::Recipe(form)) = &mut tab.agents.dialog {

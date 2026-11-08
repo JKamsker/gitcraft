@@ -188,7 +188,7 @@ fn the_doctor_waits_for_an_open_editor() -> Result<(), String> {
     tab.apply(Action::OpenDoctor(Section::Config), &ctx);
     let _ = std::fs::remove_dir_all(&dir);
     assert!(tab.doctor.is_none());
-    assert!(tab.status.as_ref().is_some_and(|(_, err)| *err));
+    assert!(tab.status.as_deref().is_some_and(|(_, err)| *err));
     Ok(())
 }
 

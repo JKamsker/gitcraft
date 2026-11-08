@@ -128,7 +128,10 @@ impl RepoTab {
             } else {
                 crate::i18n::text("repo-workflows-ci_view-open-ci-680d5c5f")
             };
-            self.status = Some((format!("Finish or close the {editor} first"), true));
+            self.status = Some(crate::repo::Notice::plain((
+                format!("Finish or close the {editor} first"),
+                true,
+            )));
             return;
         }
         self.diff = None;
@@ -288,10 +291,10 @@ impl RepoTab {
 
     /// A re-run or a cancel went through, or didn't.
     pub(super) fn ci_acted(&mut self, label: String, result: Result<(), String>) {
-        self.status = Some(match result {
+        self.status = Some(crate::repo::Notice::plain(match result {
             Ok(()) => (label, false),
             Err(e) => (format!("{label}: {e}"), true),
-        });
+        }));
         if let Some(view) = &mut self.ci_view {
             view.acting = false;
             view.next = Some(Instant::now() + AFTER_ACTING);

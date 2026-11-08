@@ -178,7 +178,10 @@ impl RepoTab {
     /// Reads commit `hash` and opens the editor to move some of its changes elsewhere.
     pub(in crate::repo) fn open_move(&mut self, hash: String, ctx: &egui::Context) {
         if let Some(why) = self.surgery_refusal(&hash) {
-            self.status = Some((format!("Move changes: {why}"), true));
+            self.status = Some(crate::repo::Notice::plain((
+                format!("Move changes: {why}"),
+                true,
+            )));
             return;
         }
         let line = quick_edit::first_parents(&self.commits, &self.index, &self.refs.head);
@@ -188,7 +191,10 @@ impl RepoTab {
         let targets = targets(&line, depth);
         // Neither a merge nor the first commit ended the line: its history isn't all loaded.
         let truncated = line.iter().all(|c| c.parents.len() == 1);
-        self.status = Some((format!("Move changes: reading {}…", short(&hash)), false));
+        self.status = Some(crate::repo::Notice::plain((
+            format!("Move changes: reading {}…", short(&hash)),
+            false,
+        )));
         let path = self.path.clone();
         self.then(
             ctx,
@@ -205,7 +211,12 @@ impl RepoTab {
                     }
                     tab.split = Some(Box::new(editor));
                 }
-                Err(e) => tab.status = Some((format!("Move changes: {e}"), true)),
+                Err(e) => {
+                    tab.status = Some(crate::repo::Notice::plain((
+                        format!("Move changes: {e}"),
+                        true,
+                    )))
+                }
             },
         );
     }

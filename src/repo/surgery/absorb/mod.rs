@@ -369,41 +369,47 @@ impl RepoTab {
     /// Reads what is staged and the branch's commits, and opens the absorb editor.
     pub(in crate::repo) fn open_absorb(&mut self, ctx: &egui::Context) {
         let Some(branch) = self.refs.current.clone() else {
-            self.status = Some((
+            self.status = Some(crate::repo::Notice::plain((
                 "Distribute staged fixes: HEAD is detached, check out a branch first".to_owned(),
                 true,
-            ));
+            )));
             return;
         };
         if let Some(state) = self.work.in_progress {
-            self.status = Some((in_progress_status(state), true));
+            self.status = Some(crate::repo::Notice::plain((
+                in_progress_status(state),
+                true,
+            )));
             return;
         }
         if self.work.staged.is_empty() {
-            self.status = Some((
+            self.status = Some(crate::repo::Notice::plain((
                 "Distribute staged fixes: nothing is staged, stage the fixes first".to_owned(),
                 true,
-            ));
+            )));
             return;
         }
         if self.split.is_some() || self.rebase.is_some() {
-            self.status = Some((
+            self.status = Some(crate::repo::Notice::plain((
                 "Distribute staged fixes: close the editor that is open first".to_owned(),
                 true,
-            ));
+            )));
             return;
         }
-        self.status = Some(("Distribute staged fixes: reading…".to_owned(), false));
+        self.status = Some(crate::repo::Notice::plain((
+            "Distribute staged fixes: reading…".to_owned(),
+            false,
+        )));
         let path = self.path.clone();
         self.then(
             ctx,
             move || read(&path, &branch),
             |tab, result, _| match result {
                 Ok(_) if tab.rebase.is_some() || tab.conflict.is_some() || tab.split.is_some() => {
-                    tab.status = Some((
+                    tab.status = Some(crate::repo::Notice::plain((
                         "Distribute staged fixes: another editor opened meanwhile".to_owned(),
                         true,
-                    ));
+                    )));
                 }
                 Ok(read) => {
                     tab.status = None;
@@ -411,7 +417,12 @@ impl RepoTab {
                     tab.file_view = None;
                     tab.absorb = Some(Box::new(AbsorbEditor::new(read)));
                 }
-                Err(e) => tab.status = Some((format!("Distribute staged fixes: {e}"), true)),
+                Err(e) => {
+                    tab.status = Some(crate::repo::Notice::plain((
+                        format!("Distribute staged fixes: {e}"),
+                        true,
+                    )))
+                }
             },
         );
     }

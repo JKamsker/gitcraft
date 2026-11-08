@@ -279,16 +279,19 @@ impl RepoTab {
             return;
         }
         let (Some(key), Some(pr)) = (self.pr_repo_key(), self.pr_head(number)) else {
-            self.status = Some((
+            self.status = Some(crate::repo::Notice::plain((
                 format!(
                     "What changed in #{number}: it isn't in the list of this repository's pull requests"
                 ),
                 true,
-            ));
+            )));
             return;
         };
         // It may fetch from the forge first: say so meanwhile.
-        self.status = Some((format!("Reading #{number}…"), false));
+        self.status = Some(crate::repo::Notice::plain((
+            format!("Reading #{number}…"),
+            false,
+        )));
         let (path, creds) = (self.path.clone(), self.credentials.clone());
         self.then(
             ctx,
@@ -296,13 +299,18 @@ impl RepoTab {
             move |tab, found, ctx| match found {
                 Ok(Found::Moved(since)) => tab.show_pr_since(since, ctx),
                 Ok(Found::First | Found::Same) => {
-                    tab.status = Some((
+                    tab.status = Some(crate::repo::Notice::plain((
                         format!("#{number} hasn't changed since you last looked"),
                         false,
-                    ));
+                    )));
                     tab.load_seen_heads(ctx);
                 }
-                Err(e) => tab.status = Some((format!("What changed in #{number}: {e}"), true)),
+                Err(e) => {
+                    tab.status = Some(crate::repo::Notice::plain((
+                        format!("What changed in #{number}: {e}"),
+                        true,
+                    )))
+                }
             },
         );
     }
@@ -324,7 +332,7 @@ impl RepoTab {
         }
         if self
             .status
-            .as_ref()
+            .as_deref()
             .is_some_and(|(s, _)| s.starts_with("Reading #"))
         {
             self.status = None;
@@ -356,10 +364,10 @@ impl RepoTab {
     fn seen_marked(&mut self, number: u64, marked: Result<(), String>) {
         if let Err(e) = marked {
             self.versions.seen_heads.remove(&number);
-            self.status = Some((
+            self.status = Some(crate::repo::Notice::plain((
                 format!("Couldn't remember the version of #{number} seen: {e}"),
                 true,
-            ));
+            )));
         }
     }
 
@@ -375,12 +383,12 @@ impl RepoTab {
             self.versions.since = None;
         }
         let (Some(key), Some(pr)) = (self.pr_repo_key(), self.pr_head(number)) else {
-            self.status = Some((
+            self.status = Some(crate::repo::Notice::plain((
                 format!(
                     "Mark as seen: #{number} isn't in the list of this repository's pull requests"
                 ),
                 true,
-            ));
+            )));
             return;
         };
         self.versions.seen_heads.insert(number, pr.head.clone());

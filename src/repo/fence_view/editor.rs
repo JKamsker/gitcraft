@@ -77,7 +77,7 @@ impl RepoTab {
                     // Nothing to edit from: closed, with why.
                     Err(e) => {
                         tab.fence.editor = None;
-                        tab.status = Some((e, true));
+                        tab.status = Some(crate::repo::Notice::plain((e, true)));
                     }
                 }
             },

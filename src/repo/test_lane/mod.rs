@@ -286,15 +286,18 @@ impl RepoTab {
 
     fn start_tests(&mut self, start: StartTests, ctx: &egui::Context) {
         if self.test_lane.running() {
-            self.status = Some((
+            self.status = Some(crate::repo::Notice::plain((
                 "Tests are running already: stop them first".to_owned(),
                 true,
-            ));
+            )));
             return;
         }
         let command = start.command.trim().to_owned();
         if command.is_empty() {
-            self.status = Some(("Type the command to test with".to_owned(), true));
+            self.status = Some(crate::repo::Notice::plain((
+                "Type the command to test with".to_owned(),
+                true,
+            )));
             return;
         }
         self.test_lane.last = Some(start.clone());
@@ -416,10 +419,13 @@ impl RepoTab {
         run.running.clear();
         let (message, failed) = ended_message(&run.range, &result);
         if run.started.elapsed() > LONG_RUN {
-            self.finished.push((format!("{name} · {message}"), failed));
+            self.finished.push(crate::repo::Notice::plain((
+                format!("{name} · {message}"),
+                failed,
+            )));
         }
         run.ended = Some(result);
-        self.status = Some((message, failed));
+        self.status = Some(crate::repo::Notice::plain((message, failed)));
         // What the run stored, and what the CLI may have meanwhile.
         self.read_test_lane(ctx);
     }

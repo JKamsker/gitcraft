@@ -178,7 +178,7 @@ impl RepoTab {
                     self.rebuild_graph_labels();
                     self.history_minimap.dirty = true;
                 }
-                Err(error) => self.status = Some((error, true)),
+                Err(error) => self.status = Some(crate::repo::Notice::plain((error, true))),
             }
         }
     }

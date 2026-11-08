@@ -198,7 +198,9 @@ impl RepoTab {
         self.then(
             ctx,
             move || links::resolve(&path, &remotes, &remote, &target),
-            move |tab, result, ctx| tab.status = Some(deliver(result, open, ctx)),
+            move |tab, result, ctx| {
+                tab.status = Some(crate::repo::Notice::plain(deliver(result, open, ctx)))
+            },
         );
     }
 }

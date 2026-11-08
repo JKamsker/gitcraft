@@ -1,6 +1,8 @@
 //! One open repository: its state, background git work and the view
 //! (branches on the left, commit graph or diff in the middle, commit detail / changes on the right).
 
+mod notice;
+pub(crate) use notice::Notice;
 mod actions;
 mod activity;
 pub(crate) mod agent;
@@ -492,7 +494,7 @@ pub struct RepoTab {
     network_failed: bool,
     /// The running operation moves the checkout: update the submodules after it, if asked to.
     update_submodules: bool,
-    status: Option<(String, bool)>,
+    status: Option<Notice>,
     branch_filter: String,
     /// Where a clicked jump mark wants the sidebar scrolled to.
     sidebar_jump: Option<f32>,
@@ -567,7 +569,7 @@ pub struct RepoTab {
     bakeoff: bakeoff::BakeoffState,
     /// Long operations that just ended, its own and its parked worktrees': (message, failed),
     /// for a notification each (taken by `App`).
-    pub finished: Vec<(String, bool)>,
+    pub finished: Vec<Notice>,
     /// The repository's own custom commands, and what the palette offers of them.
     custom: custom_commands::TabCommands,
 }

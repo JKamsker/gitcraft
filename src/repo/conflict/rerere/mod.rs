@@ -150,10 +150,10 @@ impl RepoTab {
                     // Not asked again on every reload: the switch says it.
                     Err(e) => {
                         tab.rerere.setup = Some(Setup::default());
-                        tab.status = Some((
+                        tab.status = Some(crate::repo::Notice::plain((
                             crate::i18n::message("repo-core-0671", &[("e", e.to_string().into())]),
                             true,
-                        ));
+                        )));
                     }
                 }
             },
@@ -200,7 +200,7 @@ impl RepoTab {
             }
             Err(e) => {
                 if generation == self.conflict_generation {
-                    self.status = Some((e, true));
+                    self.status = Some(crate::repo::Notice::plain((e, true)));
                 }
                 self.rerere.unopenable.insert(path);
             }
@@ -238,13 +238,13 @@ impl RepoTab {
             },
             move |tab, now, _| {
                 tab.rerere.busy = false;
-                tab.status = Some(match now {
+                tab.status = Some(crate::repo::Notice::plain(match now {
                     Ok(now) => {
                         tab.rerere.setup = Some(now);
                         (switched_message(now).to_owned(), false)
                     }
                     Err(e) => (format!("{failed}: {e}"), true),
-                });
+                }));
             },
         );
     }

@@ -76,7 +76,10 @@ impl RepoTab {
 
     fn same_preflight_profile(&mut self, plan: &Plan, ctx: &egui::Context) -> bool {
         if Settings::get(ctx).profile() != plan.profile {
-            self.status = Some((crate::i18n::text("repo-core-3107").into(), true));
+            self.status = Some(crate::repo::Notice::plain((
+                crate::i18n::text("repo-core-3107").into(),
+                true,
+            )));
             false
         } else {
             true
@@ -85,7 +88,10 @@ impl RepoTab {
 
     pub(super) fn submit_preflight(&mut self, plan: Plan, ctx: &egui::Context) {
         if self.busy_op.is_some() {
-            self.status = Some((crate::i18n::text("repo-core-3108").into(), true));
+            self.status = Some(crate::repo::Notice::plain((
+                crate::i18n::text("repo-core-3108").into(),
+                true,
+            )));
             return;
         }
         if !self.same_preflight_profile(&plan, ctx) {
@@ -95,7 +101,10 @@ impl RepoTab {
             .preflight_timeline
             .is_some_and(|at| at != self.timeline.current)
         {
-            self.status = Some((crate::i18n::text("repo-core-3109").into(), true));
+            self.status = Some(crate::repo::Notice::plain((
+                crate::i18n::text("repo-core-3109").into(),
+                true,
+            )));
             return;
         }
         let pending = self.preflight_pending.take().unwrap_or(super::PendingOp {
@@ -151,7 +160,10 @@ impl RepoTab {
 
     pub(super) fn preflight_messages(&mut self, plan: Plan, ctx: &egui::Context) {
         if !plan.is_current_branch() {
-            self.status = Some((crate::i18n::text("repo-core-3122").into(), true));
+            self.status = Some(crate::repo::Notice::plain((
+                crate::i18n::text("repo-core-3122").into(),
+                true,
+            )));
             return;
         }
         if !self.same_preflight_profile(&plan, ctx) {
@@ -238,7 +250,7 @@ impl RepoTab {
                     tab.diff = None;
                     tab.rebase = Some(editor);
                 }
-                Err(e) => tab.status = Some((e, true)),
+                Err(e) => tab.status = Some(crate::repo::Notice::plain((e, true))),
             },
         );
     }
@@ -930,7 +942,7 @@ mod tests {
         assert!(tab.busy_op.is_none());
         assert!(
             tab.status
-                .as_ref()
+                .as_deref()
                 .is_some_and(|(text, error)| *error && text.contains("profile"))
         );
         assert_eq!(f.receiver_head()?, before);

@@ -86,7 +86,7 @@ fn open(dir: &Path) -> (egui::Context, RepoTab) {
 
 /// Runs `action` as a click on it would, until it and the reload after it are done.
 fn run(tab: &mut RepoTab, ctx: &egui::Context, action: Action) {
-    let status = tab.status.clone();
+    let status = tab.status.as_deref().cloned();
     let completed = tab.activity.last().map(|entry| entry.id);
     tab.apply(action, ctx);
     // Some first read what they rewrite in the background.
@@ -95,7 +95,8 @@ fn run(tab: &mut RepoTab, ctx: &egui::Context, action: Action) {
     wait(tab, ctx, |t| {
         t.busy_op.is_some()
             || t.activity.last().map(|entry| entry.id) != completed
-            || (t.status != status && t.status.as_ref().is_some_and(|(_, failed)| *failed))
+            || (t.status.as_deref().cloned() != status
+                && t.status.as_deref().is_some_and(|(_, failed)| *failed))
     });
     settle(tab, ctx);
 }
@@ -284,7 +285,7 @@ fn a_fast_forward_refuses_once_its_branch_moved() {
     git_ok(&dir, &["switch", "-q", "main"]);
     choose(&mut tab, &ctx, &offers, "Fast-forward topic to main");
     let after = tip(&dir, "topic");
-    let failed = tab.status.as_ref().is_some_and(|(_, err)| *err);
+    let failed = tab.status.as_deref().is_some_and(|(_, err)| *err);
     let _ = std::fs::remove_dir_all(&dir);
     assert_eq!(after, own);
     assert!(failed);
@@ -397,12 +398,12 @@ fn a_commit_dropped_on_another_of_the_branch_is_squashed_into_it() {
     // from the squash while the following fixup is still preparing in the background.
     let receipt = format!(
         "{} (late receipt)",
-        tab.status.as_ref().map_or("", |(message, _)| message)
+        tab.status.as_deref().map_or("", |(message, _)| message)
     );
     assert!(
         tab.tx
             .send(crate::repo::Msg::Then(Box::new(move |tab, _| {
-                tab.status = Some((receipt, false));
+                tab.status = Some(crate::repo::Notice::plain((receipt, false)));
             })))
             .is_ok()
     );
@@ -463,7 +464,7 @@ fn a_fast_forward_refuses_once_its_branch_is_checked_out() {
     choose(&mut tab, &ctx, &offers, "Fast-forward topic to main");
     let after = tip(&dir, "topic");
     let staged = git_ok(&dir, &["diff", "--cached", "--name-only"]);
-    let failed = tab.status.as_ref().is_some_and(|(_, err)| *err);
+    let failed = tab.status.as_deref().is_some_and(|(_, err)| *err);
     let _ = std::fs::remove_dir_all(&dir);
     assert_eq!(after, before);
     assert!(staged.is_empty(), "{staged}");

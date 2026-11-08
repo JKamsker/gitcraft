@@ -623,7 +623,7 @@ mod tests {
         assert!(
             tab.postcards
                 .status
-                .as_ref()
+                .as_deref()
                 .is_some_and(|status| status.contains("Profile changed"))
         );
     }

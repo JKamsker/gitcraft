@@ -348,7 +348,7 @@ fn registry_palette_selected_copy_dispatches_and_unowned_contexts_are_absent() -
     tab.apply(Action::Key(Command::RebasePick), &ctx);
     assert!(
         tab.status
-            .as_ref()
+            .as_deref()
             .is_some_and(|(why, bad)| *bad && why.contains("owning view"))
     );
     Ok(())

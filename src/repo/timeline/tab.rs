@@ -368,18 +368,18 @@ impl RepoTab {
         };
         let done = self
             .status
-            .as_ref()
+            .as_deref()
             .and_then(|(s, failed)| (!failed).then_some(s.as_str()))
             .and_then(|s| s.strip_suffix(": done"))
             .map(str::to_owned);
         if let Some(label) = done {
-            self.status = Some((
+            self.status = Some(crate::repo::Notice::plain((
                 format!(
                     "{label}: done. {} (receipt in the timeline, Ctrl+Shift+Z)",
                     receipt.sentence()
                 ),
                 false,
-            ));
+            )));
         }
     }
 
@@ -441,7 +441,10 @@ impl RepoTab {
             return;
         }
         let Some(entry) = self.timeline.current_entry().cloned() else {
-            self.status = Some(("Nothing to undo".to_owned(), false));
+            self.status = Some(crate::repo::Notice::plain((
+                "Nothing to undo".to_owned(),
+                false,
+            )));
             return;
         };
         let label = format!("Undo {}", entry.label);
@@ -463,7 +466,10 @@ impl RepoTab {
             return;
         }
         let Some(entry) = self.timeline.redo_target().cloned() else {
-            self.status = Some(("Nothing to redo".to_owned(), false));
+            self.status = Some(crate::repo::Notice::plain((
+                "Nothing to redo".to_owned(),
+                false,
+            )));
             return;
         };
         let label = format!("Redo {}", entry.label);
@@ -493,14 +499,14 @@ impl RepoTab {
             .timeline
             .command_only_between(self.timeline.current, to)
         {
-            self.status = Some((
+            self.status = Some(crate::repo::Notice::plain((
                 format!(
                     "{label}: that would skip “{skipped}”, which moved no branch: step through it \
                      with {cmd}+Z / {cmd}+Y instead",
                     cmd = crate::manual::command()
                 ),
                 true,
-            ));
+            )));
             return;
         }
         self.restore(&label, &target, to, ctx);
@@ -516,16 +522,16 @@ impl RepoTab {
         if self.loading || !self.timeline.loaded {
             // Asked again on the next frame, until the read under way is in.
             self.queued.push(again);
-            self.status = Some((
+            self.status = Some(crate::repo::Notice::plain((
                 format!("{what}: waiting for the repository to be read again…"),
                 false,
-            ));
+            )));
         } else {
             // No read under way (the last one failed): it would wait for good.
-            self.status = Some((
+            self.status = Some(crate::repo::Notice::plain((
                 format!("{what}: the repository couldn't be read again; reload it (F5) first"),
                 true,
-            ));
+            )));
         }
         true
     }
@@ -566,7 +572,9 @@ impl RepoTab {
                 self.timeline.jump = Some((label.to_owned(), to));
                 self.run_ops(label, steps, Refresh::All, OpKind::plain(), ctx);
             }
-            Err(e) => self.status = Some((format!("{label}: {e}"), true)),
+            Err(e) => {
+                self.status = Some(crate::repo::Notice::plain((format!("{label}: {e}"), true)))
+            }
         }
     }
 
@@ -586,7 +594,9 @@ impl RepoTab {
         let label = format!("Put {branch} back at {}", crate::repo::short(commit));
         match snapshot::restore_steps(&now, &target, &self.other_worktree_branches()) {
             Ok(steps) => self.run_ops(&label, steps, Refresh::All, OpKind::plain(), ctx),
-            Err(e) => self.status = Some((format!("{label}: {e}"), true)),
+            Err(e) => {
+                self.status = Some(crate::repo::Notice::plain((format!("{label}: {e}"), true)))
+            }
         }
     }
 

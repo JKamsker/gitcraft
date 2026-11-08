@@ -12,7 +12,10 @@ pub(super) fn act(tab: &mut RepoTab, act: Act, ctx: &egui::Context) -> Option<Ac
             update_marks(tab, *review, None, ctx);
         }
         Act::PreviewInverse(review) if review.aggregate.is_some() => {
-            tab.status = Some(("Choose one saved turn to preview its inverse".into(), true));
+            tab.status = Some(crate::repo::Notice::plain((
+                "Choose one saved turn to preview its inverse".into(),
+                true,
+            )));
         }
         Act::PreviewInverse(review) => {
             let repo = tab.path.clone();
@@ -95,7 +98,7 @@ fn update_marks(
                         state.result = Some(Ok(Data::Turn(review)));
                         state.acknowledged = false;
                     }
-                    Err(error) => tab.status = Some((error, true)),
+                    Err(error) => tab.status = Some(crate::repo::Notice::plain((error, true))),
                 }
             }
         },

@@ -123,7 +123,7 @@ impl RepoTab {
             } else {
                 crate::i18n::text("repo-workflows-versions-open-versions-d5204b0d")
             };
-            self.status = Some((what.to_owned(), true));
+            self.status = Some(crate::repo::Notice::plain((what.to_owned(), true)));
             return;
         }
         self.versions.requests += 1;
@@ -217,7 +217,12 @@ impl RepoTab {
                         view.heading = Some(VersionHeading::Branches);
                     }
                 }
-                Err(e) => tab.status = Some((format!("Compare versions: {e}"), true)),
+                Err(e) => {
+                    tab.status = Some(crate::repo::Notice::plain((
+                        format!("Compare versions: {e}"),
+                        true,
+                    )))
+                }
             },
         );
     }

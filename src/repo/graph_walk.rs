@@ -185,7 +185,10 @@ impl RepoTab {
             }
             Some(next)
         } else {
-            self.status = Some((crate::i18n::text("repo-core-2748").into(), false));
+            self.status = Some(crate::repo::Notice::plain((
+                crate::i18n::text("repo-core-2748").into(),
+                false,
+            )));
             None
         }
     }
@@ -276,7 +279,7 @@ impl RepoTab {
                     self.topology = topology;
                     self.graph_narration.hash.clear();
                 }
-                Err(error) => self.status = Some((error, true)),
+                Err(error) => self.status = Some(crate::repo::Notice::plain((error, true))),
             }
         }
     }

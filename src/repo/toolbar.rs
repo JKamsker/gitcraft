@@ -606,11 +606,16 @@ impl RepoTab {
     fn op_status(&self, ui: &mut Ui, acts: &mut Vec<Action>) {
         let t = Tokens::get(ui.ctx());
         // While one runs, only a problem (one that couldn't wait for it) is worth showing.
-        if let Some((msg, is_err)) = &self.status
-            && (self.busy_op.is_none() || *is_err)
+        if let Some(notice) = &self.status
+            && (self.busy_op.is_none() || notice.1)
         {
+            let (msg, is_err) = notice.raw();
             let color = if *is_err { t.danger } else { t.text_dim };
-            let first_line = super::messages::display_status(&headline(msg));
+            let projected = notice.projected();
+            let first_line = projected
+                .as_deref()
+                .map(headline)
+                .unwrap_or_else(|| super::messages::display_status(&headline(msg)));
             let entry = self.status_entry();
             let mut label =
                 egui::Label::new(egui::RichText::new(first_line).color(color)).truncate();
@@ -618,7 +623,11 @@ impl RepoTab {
                 label = label.sense(egui::Sense::click());
             }
             let shown = ui.add(label).on_hover_ui(|ui| {
-                ui.label(super::messages::display_status(msg));
+                ui.label(
+                    projected
+                        .clone()
+                        .unwrap_or_else(|| super::messages::display_status(msg)),
+                );
                 if entry.is_some() {
                     ui.label(
                         egui::RichText::new(crate::i18n::text("repo-core-3687")).color(t.text_dim),

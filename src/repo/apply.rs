@@ -371,7 +371,7 @@ impl RepoTab {
                     &self.path,
                     &rel.to_string_lossy(),
                 )) {
-                    self.status = Some((e, true));
+                    self.status = Some(crate::repo::Notice::plain((e, true)));
                 }
             }
             Action::OpenInEditor(rel) => {
@@ -380,7 +380,7 @@ impl RepoTab {
                     &editor,
                     &crate::remote::join(&self.path, &rel.to_string_lossy()),
                 ) {
-                    self.status = Some((e, true));
+                    self.status = Some(crate::repo::Notice::plain((e, true)));
                 }
             }
             Action::OpenInDiffTool(key) => self.open_in_diff_tool(key, ctx),
@@ -672,7 +672,7 @@ impl RepoTab {
         ctx: &egui::Context,
     ) {
         match added {
-            Err(e) => self.status = Some((e, true)),
+            Err(e) => self.status = Some(crate::repo::Notice::plain((e, true))),
             Ok(added) => {
                 if tracked {
                     self.run_prepared(
@@ -709,7 +709,7 @@ impl RepoTab {
                             &[("pattern", pattern.to_string().into())],
                         )
                     };
-                    self.status = Some((msg, false));
+                    self.status = Some(crate::repo::Notice::plain((msg, false)));
                     self.reload_status(ctx);
                 }
             }
@@ -812,7 +812,10 @@ impl RepoTab {
             || self.load_error.is_some()
             || !current
         {
-            self.status = Some((crate::i18n::text("repo-core-0167").to_owned(), true));
+            self.status = Some(crate::repo::Notice::plain((
+                crate::i18n::text("repo-core-0167").to_owned(),
+                true,
+            )));
             return;
         }
         self.apply_picked(prepared.pick, &prepared.label, saved, ctx);
@@ -829,7 +832,7 @@ impl RepoTab {
         let patch = match saved {
             Ok(p) => p,
             Err(e) => {
-                self.status = Some((e, true));
+                self.status = Some(crate::repo::Notice::plain((e, true)));
                 return;
             }
         };
@@ -871,7 +874,7 @@ impl RepoTab {
                 (done, git::strip_state(&path))
             },
             move |tab, (result, state), ctx| {
-                tab.status = Some(match result {
+                tab.status = Some(crate::repo::Notice::plain(match result {
                     Ok(Some(command)) => {
                         let tool = if command == "nbstripout" {
                             "nbstripout"
@@ -900,7 +903,7 @@ impl RepoTab {
                         crate::i18n::message("repo-core-0175", &[("e", e.to_string().into())]),
                         true,
                     ),
-                });
+                }));
                 tab.reload_status(ctx);
                 tab.refresh_diff(ctx);
             },
@@ -926,7 +929,7 @@ impl RepoTab {
             return;
         };
         ed.solving = false;
-        self.status = Some(match result {
+        self.status = Some(crate::repo::Notice::plain(match result {
             Ok(text) => {
                 let before = ed.on_disk;
                 let left = ed.take_solved(text);
@@ -951,7 +954,7 @@ impl RepoTab {
                 (message, false)
             }
             Err(e) => (e, true),
-        });
+        }));
     }
 
     /// Writes the conflict editor's file and marks it resolved.
@@ -982,7 +985,7 @@ impl RepoTab {
                         Msg::ConflictSaved(path, saved)
                     });
                 }
-                Err(e) => self.status = Some((e, true)),
+                Err(e) => self.status = Some(crate::repo::Notice::plain((e, true))),
             }
             return;
         }
@@ -1013,7 +1016,7 @@ impl RepoTab {
             Err(e) => {
                 // Not saved: its decisions aren't kept.
                 self.decisions_pending = None;
-                self.status = Some((e, true));
+                self.status = Some(crate::repo::Notice::plain((e, true)));
             }
         }
     }
@@ -1032,7 +1035,7 @@ impl RepoTab {
         ctx: &egui::Context,
     ) {
         if let Some(busy) = &self.busy_op {
-            self.status = Some((
+            self.status = Some(crate::repo::Notice::plain((
                 crate::i18n::message(
                     "repo-core-0182",
                     &[
@@ -1044,7 +1047,7 @@ impl RepoTab {
                     ],
                 ),
                 true,
-            ));
+            )));
             return;
         }
         self.run_ops(label, ops, refresh, kind, ctx);

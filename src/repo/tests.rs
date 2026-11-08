@@ -135,7 +135,7 @@ fn an_interactive_rebase_does_not_start_once_the_branch_moved() {
     let _ = std::fs::remove_dir_all(&dir);
     assert!(tab.busy_op.is_none());
     assert!(tab.rebase.is_some());
-    assert!(tab.status.as_ref().is_some_and(|(_, err)| *err));
+    assert!(tab.status.as_deref().is_some_and(|(_, err)| *err));
 }
 
 #[test]
@@ -267,7 +267,7 @@ fn a_remote_branch_is_checked_out_under_its_name_on_the_remote() {
 fn names_git_would_read_as_options_are_not_checked_out() {
     let mut status = None;
     assert!(refuse_option_like("--orphan=x", &mut status));
-    assert!(status.is_some_and(|(_, err)| err));
+    assert!(status.is_some_and(|notice| notice.1));
     let mut status = None;
     assert!(!refuse_option_like("feature/-x", &mut status));
     assert!(!refuse_option_like("refs/tags/v1", &mut status));
@@ -468,7 +468,7 @@ fn merging_and_rebasing_onto_a_branch_ignores_a_tag_of_the_same_name() -> Result
         );
         std::thread::sleep(std::time::Duration::from_millis(10));
     }
-    let rebased = tab.status.clone().ok_or("no rebase result")?;
+    let rebased = tab.status.as_deref().cloned().ok_or("no rebase result")?;
     let rebased_onto = rev("HEAD~1");
     drop(tab);
     let _ = std::fs::remove_dir_all(&dir);
@@ -585,7 +585,12 @@ fn alias_authentication_text_cannot_authorize_retry_of_remaining_steps() -> Resu
         git::Credentials::for_url("https://fixture.invalid/team/repo", "u".into(), "p".into())?;
     tab.sign_in(creds, &ctx);
     finish(&mut tab, &ctx);
-    let status = tab.status.clone().map(|(s, _)| s).unwrap_or_default();
+    let status = tab
+        .status
+        .as_deref()
+        .cloned()
+        .map(|(s, _)| s)
+        .unwrap_or_default();
     let _ = std::fs::remove_dir_all(&dir);
     assert!(!asked);
     assert_eq!(kept, Some(push));
@@ -701,7 +706,7 @@ fn an_operation_that_panics_leaves_the_tab_idle() {
         std::panic::resume_unwind(Box::new("boom"))
     });
     finish(&mut tab, &ctx);
-    let op_status = tab.status.clone().map(|(s, _)| s);
+    let op_status = tab.status.as_deref().cloned().map(|(s, _)| s);
     // Work nothing waits for says so.
     tab.status = None;
     spawn(&tab.tx, &ctx, || {
@@ -714,7 +719,7 @@ fn an_operation_that_panics_leaves_the_tab_idle() {
         }
         std::thread::sleep(std::time::Duration::from_millis(5));
     }
-    let job_status = tab.status.clone().map(|(s, _)| s);
+    let job_status = tab.status.as_deref().cloned().map(|(s, _)| s);
     let _ = std::fs::remove_dir_all(&dir);
     assert!(tab.busy_op.is_none());
     assert_eq!(
@@ -740,7 +745,7 @@ fn a_drop_confirmed_while_busy_says_so() {
         },
         &ctx,
     );
-    let status = tab.status.clone();
+    let status = tab.status.as_deref().cloned();
     let _ = std::fs::remove_dir_all(&dir);
     assert_eq!(
         status,
@@ -785,7 +790,10 @@ fn dropped_patches_are_applied() {
     let diff_file = patches.join("change.DIFF");
     let _ = std::fs::write(&diff_file, &diff);
     // Something else on the status line already says it failed: no matter.
-    tab.status = Some(("Fetch failed: offline".to_owned(), true));
+    tab.status = Some(crate::repo::Notice::plain((
+        "Fetch failed: offline".to_owned(),
+        true,
+    )));
     let given = tab.apply_dropped_patch(diff_file.clone(), &ctx);
     // A second one while the first is applied is refused, not lost silently.
     let second = tab.apply_dropped_patch(diff_file.clone(), &ctx);
@@ -957,10 +965,10 @@ fn feature_failure_continuation_runs_when_a_queued_job_is_cancelled() -> Result<
         Err,
         || Ok::<_, String>(()),
         |tab, found, _| {
-            tab.status = Some((
+            tab.status = Some(crate::repo::Notice::plain((
                 found.err().unwrap_or_else(|| "cancelled work ran".into()),
                 true,
-            ));
+            )));
         },
     );
     let start = std::time::Instant::now();
@@ -968,7 +976,10 @@ fn feature_failure_continuation_runs_when_a_queued_job_is_cancelled() -> Result<
         tab.poll(&ctx);
         std::thread::sleep(std::time::Duration::from_millis(5));
     }
-    assert_eq!(tab.status, Some(("cancelled".into(), true)));
+    assert_eq!(
+        tab.status.as_deref().cloned(),
+        Some(("cancelled".into(), true))
+    );
     Ok(())
 }
 

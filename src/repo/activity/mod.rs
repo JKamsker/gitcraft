@@ -357,15 +357,14 @@ impl super::RepoTab {
     /// Ties the toolbar message the operation just left (by `op_done`) to its entry.
     pub(super) fn link_status(&mut self) {
         if let Some(id) = self.activity.pending_link.take() {
-            self.activity.status_link = self.status.as_ref().map(|(msg, _)| (msg.clone(), id));
+            self.activity.status_link = self.status.as_deref().map(|(msg, _)| (msg.clone(), id));
         }
     }
 
     /// The entry of the message the toolbar shows, when an operation left it.
     pub(super) fn status_entry(&self) -> Option<u64> {
-        let (msg, _) = self.status.as_ref()?;
+        let (msg, _) = self.status.as_deref()?;
         let (linked, id) = self.activity.status_link.as_ref()?;
         (linked == msg).then_some(*id)
     }
 }
-

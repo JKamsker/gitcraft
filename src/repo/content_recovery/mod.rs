@@ -127,10 +127,10 @@ impl RepoTab {
             |tab, result, ctx| {
                 tab.busy_op = None;
                 tab.op_started = None;
-                tab.status = Some(match result {
+                tab.status = Some(crate::repo::Notice::plain(match result {
                     Ok(s) => (s, false),
                     Err(e) => (format!("Content recovery: {e}"), true),
-                });
+                }));
                 tab.content_recovery.preview = None;
                 tab.reload(ctx);
             },

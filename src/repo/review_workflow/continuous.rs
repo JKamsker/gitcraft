@@ -140,7 +140,7 @@ impl RepoTab {
             format!(
                 "Hunk refused: {}",
                 self.status
-                    .as_ref()
+                    .as_deref()
                     .map(|s| s.0.as_str())
                     .unwrap_or("operation could not start")
             )

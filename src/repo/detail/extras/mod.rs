@@ -354,7 +354,7 @@ impl RepoTab {
                         if let Some(text) = written {
                             tab.extras.drafts.insert((hash, namespace), text);
                         }
-                        tab.status = Some((e, true));
+                        tab.status = Some(crate::repo::Notice::plain((e, true)));
                     }
                     return;
                 }

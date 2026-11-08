@@ -28,7 +28,10 @@ impl TourView {
 impl RepoTab {
     pub(super) fn open_tour(&mut self, refresh: bool, ctx: &egui::Context) {
         if self.conflict.is_some() || self.rebase.is_some() {
-            self.status = Some(("Finish or close the editor first".into(), true));
+            self.status = Some(crate::repo::Notice::plain((
+                "Finish or close the editor first".into(),
+                true,
+            )));
             return;
         }
         let _ = refresh;

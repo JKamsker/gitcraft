@@ -468,7 +468,12 @@ impl RepoTab {
                 let staged = request.mode == StashMode::Staged;
                 self.stash_job(label, ctx, move |path| run_push(path, args, head, staged));
             }
-            Err(e) => self.status = Some((format!("{label} failed: {e}"), true)),
+            Err(e) => {
+                self.status = Some(crate::repo::Notice::plain((
+                    format!("{label} failed: {e}"),
+                    true,
+                )))
+            }
         }
     }
 

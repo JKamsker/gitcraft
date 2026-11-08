@@ -100,10 +100,10 @@ fn a_rebase_keeps_both_versions_and_offers_to_compare_them() -> Result<(), Strin
     assert!(wait(&mut tab, &ctx, |t| t.versions.fresh.is_some()));
     let after = git(dir, &["rev-parse", "HEAD"])?;
     let main = git(dir, &["rev-parse", "main"])?;
-    assert!(wait(&mut tab, &ctx, |t| t.status.as_ref().is_some_and(
+    assert!(wait(&mut tab, &ctx, |t| t.status.as_deref().is_some_and(
         |(s, failed)| { !failed && s.ends_with("(receipt in the timeline, Ctrl+Shift+Z)") }
     )));
-    let status = tab.status.clone();
+    let status = tab.status.as_deref().cloned();
     assert_eq!(
         status,
         Some((

@@ -104,13 +104,13 @@ impl RepoTab {
                 self.scroll_to = Some(row);
             }
             None => {
-                self.status = Some((
+                self.status = Some(crate::repo::Notice::plain((
                     crate::i18n::message(
                         "repo-core-2900",
                         &[("hash", hash.get(..8).unwrap_or(hash).to_string().into())],
                     ),
                     true,
-                ));
+                )));
             }
         }
     }

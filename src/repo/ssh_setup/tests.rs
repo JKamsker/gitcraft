@@ -598,7 +598,7 @@ fn failed_open_wsl_unc_cannot_construct_a_local_setup_view() -> Result<(), Strin
             assert!(tab.ssh_setup.is_none() && tab.terminals.is_empty());
             assert!(
                 tab.status
-                    .as_ref()
+                    .as_deref()
                     .is_some_and(|(text, failed)| *failed && text.contains("machine is invalid"))
             );
         }

@@ -25,11 +25,11 @@ impl RepoTab {
     /// Previews publishing the pull requests of the stack `branch` is in (or at the bottom of).
     pub(super) fn open_publish(&mut self, branch: &str, ctx: &egui::Context) {
         let (Some(hosting), Some(_)) = (self.hosting.clone(), self.default_remote()) else {
-            self.status = Some((
+            self.status = Some(crate::repo::Notice::plain((
                 "This repository isn't on a forge gitcraft knows: there is nowhere to publish to."
                     .to_owned(),
                 true,
-            ));
+            )));
             return;
         };
         let Some(tree) = trees(&self.stacks.layers)
@@ -39,13 +39,13 @@ impl RepoTab {
             return;
         };
         if let Some(layer) = tree.rows.iter().map(|(_, l)| l).find(|l| l.parent_missing) {
-            self.status = Some((
+            self.status = Some(crate::repo::Notice::plain((
                 format!(
                     "{} is gone: pick what {} is based on first.",
                     layer.parent, layer.branch
                 ),
                 true,
-            ));
+            )));
             return;
         }
         let inputs: Vec<Input> = tree
@@ -95,7 +95,10 @@ impl RepoTab {
             return;
         };
         if let Some(busy) = &self.busy_op {
-            self.status = Some((format!("Publish: run it again once {busy} is done"), true));
+            self.status = Some(crate::repo::Notice::plain((
+                format!("Publish: run it again once {busy} is done"),
+                true,
+            )));
             return;
         }
         let noun = hosting.forge.noun();
@@ -157,7 +160,7 @@ impl RepoTab {
             .op_started
             .take()
             .is_some_and(|t| t.elapsed() > crate::repo::operations::LONG_OP);
-        self.status = Some(match &report.failed {
+        self.status = Some(crate::repo::Notice::plain(match &report.failed {
             None => (summary(noun, &report), false),
             Some((branch, e)) => (
                 format!(
@@ -167,10 +170,12 @@ impl RepoTab {
                 ),
                 true,
             ),
-        });
-        if long && let Some((message, failed)) = self.status.clone() {
-            self.finished
-                .push((format!("{} · {message}", self.name), failed));
+        }));
+        if long && let Some((message, failed)) = self.status.as_deref().cloned() {
+            self.finished.push(crate::repo::Notice::plain((
+                format!("{} · {message}", self.name),
+                failed,
+            )));
         }
         // Asked again now, whenever they were last.
         self.prs_loaded = None;

@@ -193,7 +193,10 @@ impl RepoTab {
 
     fn start_bisect(&mut self, bad: String, good: Option<String>, ctx: &egui::Context) {
         if let Some(why) = self.bisect_blocker() {
-            self.status = Some((format!("Can't start a bisect: {why}"), true));
+            self.status = Some(crate::repo::Notice::plain((
+                format!("Can't start a bisect: {why}"),
+                true,
+            )));
             return;
         }
         self.bisect_step("Start bisect", ctx, move |path| {
@@ -203,7 +206,10 @@ impl RepoTab {
 
     fn mark_bisect(&mut self, mark: Mark, rev: Option<String>, ctx: &egui::Context) {
         let Some(bisect) = self.bisect.state.clone() else {
-            self.status = Some(("No bisect is going on".to_owned(), true));
+            self.status = Some(crate::repo::Notice::plain((
+                "No bisect is going on".to_owned(),
+                true,
+            )));
             return;
         };
         let label = match (&rev, mark) {
@@ -247,10 +253,10 @@ impl RepoTab {
     ) {
         self.busy_op = None;
         self.op_started = None;
-        self.status = Some(match result {
+        self.status = Some(crate::repo::Notice::plain(match result {
             Ok(said) => (format!("{label}: {}", said_briefly(&said)), false),
             Err(e) => (format!("{label} failed: {e}"), true),
-        });
+        }));
         self.reload(ctx);
     }
 
@@ -350,11 +356,13 @@ impl RepoTab {
             .unwrap_or_default();
         let (message, failed) = run_message(&ended, &last_line, only_skipped);
         if run.started.elapsed() > LONG_RUN {
-            self.finished
-                .push((format!("{} · {message}", self.name), failed));
+            self.finished.push(crate::repo::Notice::plain((
+                format!("{} · {message}", self.name),
+                failed,
+            )));
         }
         run.ended = Some(ended);
-        self.status = Some((message, failed));
+        self.status = Some(crate::repo::Notice::plain((message, failed)));
         self.reload(ctx);
     }
 

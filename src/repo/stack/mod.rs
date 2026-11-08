@@ -192,7 +192,7 @@ impl RepoTab {
     /// first: the last read of the stacks may be older than an operation just run. Undoable.
     fn set_parent(&mut self, branch: String, parent: String, ctx: &egui::Context) {
         if let Some(problem) = self.parent_problem(&branch, &parent) {
-            self.status = Some((problem, true));
+            self.status = Some(crate::repo::Notice::plain((problem, true)));
             return;
         }
         let path = self.path.clone();
@@ -217,7 +217,7 @@ impl RepoTab {
                         ctx,
                     );
                 }
-                Err(e) => tab.status = Some((e, true)),
+                Err(e) => tab.status = Some(crate::repo::Notice::plain((e, true))),
             },
         );
     }
@@ -257,7 +257,12 @@ impl RepoTab {
                     stack::restore_ops(&branch, before.as_ref()),
                     ctx,
                 ),
-                Err(e) => tab.status = Some((format!("Couldn't read the stacks: {e}"), true)),
+                Err(e) => {
+                    tab.status = Some(crate::repo::Notice::plain((
+                        format!("Couldn't read the stacks: {e}"),
+                        true,
+                    )))
+                }
             },
         );
     }
@@ -272,7 +277,10 @@ impl RepoTab {
         ctx: &egui::Context,
     ) {
         if let Some(busy) = &self.busy_op {
-            self.status = Some((format!("{label}: run it again once {busy} is done"), true));
+            self.status = Some(crate::repo::Notice::plain((
+                format!("{label}: run it again once {busy} is done"),
+                true,
+            )));
             return;
         }
         self.run_undoable(

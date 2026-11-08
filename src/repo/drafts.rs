@@ -103,10 +103,10 @@ impl RepoTab {
         match crate::drafts::load(&self.path) {
             Ok(drafts) => self.put_back(drafts),
             Err(e) => {
-                self.status = Some((
+                self.status = Some(crate::repo::Notice::plain((
                     crate::i18n::message("repo-core-4076", &[("e", e.to_string().into())]),
                     true,
-                ));
+                )));
             }
         }
     }
@@ -141,10 +141,16 @@ impl RepoTab {
         match drafts.rebase.map(rebase_editor) {
             Some(Some(editor)) => {
                 self.rebase = Some(editor);
-                self.status = Some((crate::i18n::text("repo-core-4077").to_owned(), false));
+                self.status = Some(crate::repo::Notice::plain((
+                    crate::i18n::text("repo-core-4077").to_owned(),
+                    false,
+                )));
             }
             Some(None) => {
-                self.status = Some((crate::i18n::text("repo-core-4078").to_owned(), true));
+                self.status = Some(crate::repo::Notice::plain((
+                    crate::i18n::text("repo-core-4078").to_owned(),
+                    true,
+                )));
             }
             None => {}
         }

@@ -136,7 +136,10 @@ impl RepoTab {
 
     fn start_search(&mut self, spec: InteractionSpec, ctx: &egui::Context) {
         if self.interactions.going() {
-            self.status = Some((crate::i18n::text("repo-core-4153").to_owned(), true));
+            self.status = Some(crate::repo::Notice::plain((
+                crate::i18n::text("repo-core-4153").to_owned(),
+                true,
+            )));
             return;
         }
         self.interactions.searches += 1;
@@ -185,7 +188,7 @@ impl RepoTab {
         let stopped = matches!(&found, Err(e) if e == "stopped");
         if search.started.elapsed() > Duration::from_secs(4) && !stopped {
             let failed = found.is_err();
-            self.finished.push((
+            self.finished.push(crate::repo::Notice::plain((
                 crate::i18n::message(
                     "repo-core-4155",
                     &[
@@ -195,7 +198,7 @@ impl RepoTab {
                     ],
                 ),
                 failed,
-            ));
+            )));
         }
         search.ended = Some(found);
     }

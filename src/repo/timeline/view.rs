@@ -69,11 +69,11 @@ impl RepoTab {
             return;
         }
         if self.conflict.is_some() || self.rebase.is_some() {
-            self.status = Some((
+            self.status = Some(crate::repo::Notice::plain((
                 "Finish or close the conflict or the rebase editor first to see the timeline"
                     .to_owned(),
                 true,
-            ));
+            )));
             return;
         }
         self.diff = None;

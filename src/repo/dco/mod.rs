@@ -212,14 +212,14 @@ impl RepoTab {
                     },
                     |tab, result, _| {
                         if let Err(e) = result {
-                            tab.status = Some((
+                            tab.status = Some(crate::repo::Notice::plain((
                                 format!(
                                     "Couldn't save Sign off for this repository \
                                      (git config {}): {e}",
                                     signoff::SIGN_OFF_KEY
                                 ),
                                 true,
-                            ));
+                            )));
                         }
                     },
                 );
@@ -239,7 +239,7 @@ impl RepoTab {
                             tab.dialog = Some(fix_dialog(&plan, &who, &email));
                             tab.dco.running = Some(plan);
                         }
-                        Err(e) => tab.status = Some((e, true)),
+                        Err(e) => tab.status = Some(crate::repo::Notice::plain((e, true))),
                     },
                 );
             }
@@ -286,7 +286,7 @@ impl RepoTab {
         }
         if !kept {
             self.dco.review_after = None;
-            self.status = Some(("Local sign-off finished, but its rewrite or timeline commits could not be retained. Nothing was pushed; the local undo remains available.".into(), true));
+            self.status = Some(crate::repo::Notice::plain(("Local sign-off finished, but its rewrite or timeline commits could not be retained. Nothing was pushed; the local undo remains available.".into(), true)));
             return;
         }
         if rewrite {
@@ -339,7 +339,7 @@ impl RepoTab {
             };
             if plan.push.is_some() {
                 let Some(signed) = signed else {
-                    self.status = Some(("The local sign-off finished, but its rewritten commit was not captured. Choose Push again; nothing was sent.".into(), true));
+                    self.status = Some(crate::repo::Notice::plain(("The local sign-off finished, but its rewritten commit was not captured. Choose Push again; nothing was sent.".into(), true)));
                     return;
                 };
                 let repo = self.path.clone();
@@ -364,7 +364,7 @@ impl RepoTab {
                                 || tab.https_generation != generation || tab.busy_op.is_some()
                                 || tab.dialog.is_some() || tab.echo_push_pending()
                             {
-                                tab.status = Some(("The repository, sign-in or operation changed after local sign-off. Choose Push again; nothing was sent.".into(), true));
+                                tab.status = Some(crate::repo::Notice::plain(("The repository, sign-in or operation changed after local sign-off. Choose Push again; nothing was sent.".into(), true)));
                                 return;
                             }
                             match prepared {
@@ -375,7 +375,7 @@ impl RepoTab {
                                     // Busy/offline refusal must not constrain another push.
                                     tab.preflight_selection = None;
                                 },
-                                Err(error) => tab.status = Some((error, true)),
+                                Err(error) => tab.status = Some(crate::repo::Notice::plain((error, true))),
                             }
                         });
                     }),
@@ -406,7 +406,7 @@ impl RepoTab {
                 );
 
                 let push = plan.push.as_ref().map(signoff::PushTarget::label);
-                tab.status = Some((
+                tab.status = Some(crate::repo::Notice::plain((
                     format!(
                         "{}'s commits are signed off here, but not pushed{}: Ctrl+Z puts them \
                          back as they were",
@@ -414,7 +414,7 @@ impl RepoTab {
                         push.map(|p| format!(" to {p}")).unwrap_or_default()
                     ),
                     true,
-                ));
+                )));
             },
         );
     }

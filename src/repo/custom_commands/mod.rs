@@ -316,7 +316,7 @@ impl RepoTab {
                     &digest,
                 );
                 settings.set(ctx);
-                self.finished.push((
+                self.finished.push(crate::repo::Notice::plain((
                     crate::i18n::message(
                         "repo-workflows-custom_commands-custom-act-5bd548f5",
                         &[
@@ -325,7 +325,7 @@ impl RepoTab {
                         ],
                     ),
                     false,
-                ));
+                )));
             }
             CustomAct::FileRead(number, read) => {
                 if number > self.custom.read {
@@ -371,7 +371,8 @@ impl RepoTab {
                     &[("self-name-1", (self.name).clone().into())],
                 )
             };
-            self.finished.push((text, broken));
+            self.finished
+                .push(crate::repo::Notice::plain((text, broken)));
         }
         self.custom.announced = pending;
     }

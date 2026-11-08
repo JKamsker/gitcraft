@@ -540,7 +540,7 @@ impl RepoTab {
                         self.reload_compare(ctx);
                     }
                 }
-                Err(e) => self.status = Some((e, true)),
+                Err(e) => self.status = Some(crate::repo::Notice::plain((e, true))),
             },
             Msg::Detail(hash, result) => {
                 if self.detail_hash.as_deref() == Some(hash.as_str()) {
@@ -650,7 +650,7 @@ impl RepoTab {
                 }
             }
             Msg::Mergiraf(path, result) => self.mergiraf_done(path, result),
-            Msg::JobPanicked(e) => self.status = Some((e, true)),
+            Msg::JobPanicked(e) => self.status = Some(crate::repo::Notice::plain((e, true))),
             Msg::Then(then) => then(self, ctx),
             Msg::Search(query, code, result) => self.search_done(query, code, result, ctx),
             // Asked before the list asked for last (one read before a merge answering after

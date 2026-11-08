@@ -35,7 +35,10 @@ impl RepoTab {
             OwnersAct::Close => self.owners.lint = None,
             OwnersAct::Check => {
                 let Some(file) = self.owners.file.clone() else {
-                    self.status = Some(("This repository has no CODEOWNERS file".to_owned(), true));
+                    self.status = Some(crate::repo::Notice::plain((
+                        "This repository has no CODEOWNERS file".to_owned(),
+                        true,
+                    )));
                     return;
                 };
                 self.owners.lint_requests += 1;

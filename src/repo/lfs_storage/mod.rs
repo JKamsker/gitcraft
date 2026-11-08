@@ -374,14 +374,14 @@ impl RepoTab {
                 })
             },
             |tab, result, _| {
-                tab.status = Some(match result {
+                tab.status = Some(crate::repo::Notice::plain(match result {
                     Ok(include) => {
                         let names: Vec<String> =
                             include.iter().map(|p| git::pattern_label(p)).collect();
                         (format!("LFS now fetches only {}", names.join(", ")), false)
                     }
                     Err(e) => (format!("Could not set what LFS fetches: {e}"), true),
-                });
+                }));
                 if let Some(panel) = &mut tab.lfs_storage.panel {
                     panel.usage = None;
                 }

@@ -67,7 +67,10 @@ impl RepoTab {
                     self.working_drafts.error = Some(e.clone());
                     if reading_dialog {
                         self.dialog = None;
-                        self.status = Some((format!("Earlier versions: {e}"), true));
+                        self.status = Some(crate::repo::Notice::plain((
+                            format!("Earlier versions: {e}"),
+                            true,
+                        )));
                     }
                 }
             }

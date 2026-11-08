@@ -200,7 +200,7 @@ impl RepoTab {
                         tab.fence.write_error_context = c.write_error_context;
                         tab.fence.loaded = true;
                     }
-                    Err(e) => tab.status = Some((e, true)),
+                    Err(e) => tab.status = Some(crate::repo::Notice::plain((e, true))),
                 }
                 if std::mem::take(&mut tab.fence.again) {
                     tab.check_fence(ctx);
@@ -263,7 +263,10 @@ impl RepoTab {
             return Some(pass);
         }
         self.busy_op = Some("Checking against the agent fence".to_owned());
-        self.status = Some(("Checking against the agent fence…".to_owned(), false));
+        self.status = Some(crate::repo::Notice::plain((
+            "Checking against the agent fence…".to_owned(),
+            false,
+        )));
         let repo = self.path.clone();
         let display_tip = tip.clone();
         self.then(

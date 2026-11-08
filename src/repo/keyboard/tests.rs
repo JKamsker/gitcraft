@@ -674,7 +674,9 @@ fn delayed_patch_completion_cannot_apply_during_a_real_full_reload() -> Result<(
         t.git(&["diff", "--cached"])?.is_empty(),
         "a retained main-branch patch must never enter the other branch's index"
     );
-    assert!(matches!(&t.tab.status, Some((message, true)) if message.contains("Changes reloaded")));
+    assert!(
+        matches!(t.tab.status.as_deref(), Some((message, true)) if message.contains("Changes reloaded"))
+    );
     t.wait()?;
     assert_eq!(t.git(&["branch", "--show-current"])?.trim(), "other");
     assert!(t.git(&["diff", "--cached"])?.is_empty());
@@ -718,7 +720,9 @@ fn delayed_patch_completion_cannot_apply_after_an_actual_failed_full_reload() ->
         t.git(&["diff", "--cached"])?.is_empty(),
         "failed reloads must not revive retained patch ownership"
     );
-    assert!(matches!(&t.tab.status, Some((message, true)) if message.contains("Changes reloaded")));
+    assert!(
+        matches!(t.tab.status.as_deref(), Some((message, true)) if message.contains("Changes reloaded"))
+    );
     Ok(())
 }
 
@@ -764,6 +768,8 @@ fn session_transfer_rejects_delayed_patch_completion_without_changing_the_index(
     t.tab.picked_prepared(prepared, Ok(saved), &t.ctx);
     assert!(t.tab.busy_op.is_none());
     assert!(t.git(&["diff", "--cached"])?.is_empty());
-    assert!(matches!(&t.tab.status, Some((message, true)) if message.contains("Changes reloaded")));
+    assert!(
+        matches!(t.tab.status.as_deref(), Some((message, true)) if message.contains("Changes reloaded"))
+    );
     Ok(())
 }

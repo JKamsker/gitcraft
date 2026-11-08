@@ -363,7 +363,7 @@ fn a_rebase_step_this_version_does_not_know_is_not_guessed() {
     assert!(tab.rebase.is_none());
     assert!(
         tab.status
-            .as_ref()
+            .as_deref()
             .is_some_and(|(s, error)| *error && s.contains("another version"))
     );
 }

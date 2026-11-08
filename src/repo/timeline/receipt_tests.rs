@@ -151,7 +151,12 @@ fn receipt_of(dir: &Path, action: Action) -> (Option<Receipt>, String) {
             .get(id)
             .is_some_and(|e| e.label.contains('“') || e.receipt.is_some() || !e.files.is_empty())
     });
-    let status = tab.status.clone().map(|(s, _)| s).unwrap_or_default();
+    let status = tab
+        .status
+        .as_deref()
+        .cloned()
+        .map(|(s, _)| s)
+        .unwrap_or_default();
     // Written with it.
     wait(&mut tab, &ctx, |t| {
         store::load(&t.path).is_ok_and(|s| {

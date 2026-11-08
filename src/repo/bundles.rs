@@ -66,10 +66,10 @@ impl RepoTab {
             }
             Err(e) => {
                 self.dialog = None;
-                self.status = Some((
+                self.status = Some(crate::repo::Notice::plain((
                     crate::i18n::message("repo-core-0263", &[("e", e.to_string().into())]),
                     true,
-                ));
+                )));
             }
         }
     }
@@ -93,10 +93,10 @@ impl RepoTab {
             }
             Err(e) => {
                 self.dialog = None;
-                self.status = Some((
+                self.status = Some(crate::repo::Notice::plain((
                     crate::i18n::message("repo-core-0264", &[("e", e.to_string().into())]),
                     true,
-                ));
+                )));
             }
         }
     }
@@ -133,7 +133,7 @@ impl RepoTab {
     ) {
         self.busy_op = Some(label.clone());
         self.op_started = Some(Instant::now());
-        self.status = Some((format!("{label}…"), false));
+        self.status = Some(crate::repo::Notice::plain((format!("{label}…"), false)));
         // A previous operation's credential retry must not replay after a bundle failure.
         self.last_op = None;
         let failed_label = label.clone();
@@ -162,7 +162,7 @@ impl RepoTab {
         self.op_started = None;
         // Untrusted prerequisite descriptions are never interpreted as an authentication
         // request or used to retry a previous operation.
-        self.status = Some(match result {
+        self.status = Some(crate::repo::Notice::plain(match result {
             Ok(()) => (format!("{label}: done"), false),
             Err(e) => (
                 crate::i18n::message(
@@ -177,7 +177,7 @@ impl RepoTab {
                 ),
                 true,
             ),
-        });
+        }));
         match refresh {
             Refresh::All => self.reload(ctx),
             Refresh::Status => self.reload_status(ctx),
@@ -204,7 +204,7 @@ mod tests {
         assert!(tab.dialog.is_none());
         assert!(
             tab.status
-                .as_ref()
+                .as_deref()
                 .is_some_and(|(s, bad)| *bad && s.contains("cancelled"))
         );
     }
@@ -287,7 +287,7 @@ mod tests {
         ));
         assert!(
             tab.status
-                .as_ref()
+                .as_deref()
                 .is_some_and(|(message, failed)| *failed && message.contains("Push"))
         );
     }

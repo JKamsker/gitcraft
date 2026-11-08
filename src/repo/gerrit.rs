@@ -354,7 +354,7 @@ mod integration_tests {
         tab.commit(&ctx);
         settle(&mut tab, &ctx);
         assert_eq!(git::head(&path), amended);
-        assert!(tab.status.as_ref().is_some_and(|(_, failed)| *failed));
+        assert!(tab.status.as_deref().is_some_and(|(_, failed)| *failed));
         std::fs::remove_file(&hook).map_err(|e| e.to_string())?;
         tab.reword_commit(
             amended.clone(),
@@ -383,7 +383,7 @@ mod integration_tests {
         );
         settle(&mut tab, &ctx);
         assert_eq!(git::head(&path), reworded);
-        assert!(tab.status.as_ref().is_some_and(|(_, failed)| *failed));
+        assert!(tab.status.as_deref().is_some_and(|(_, failed)| *failed));
         run(&["checkout", "-qb", "external"])?;
         tab.amend = true;
         tab.commit_summary = "Must not move external".to_owned();
@@ -391,7 +391,7 @@ mod integration_tests {
         settle(&mut tab, &ctx);
         assert_eq!(git::head(&path), reworded);
         assert_eq!(git::resolve(&path, "main")?, reworded);
-        assert!(tab.status.as_ref().is_some_and(|(_, failed)| *failed));
+        assert!(tab.status.as_deref().is_some_and(|(_, failed)| *failed));
         drop(tab);
         let _ = std::fs::remove_dir_all(path);
         Ok(())

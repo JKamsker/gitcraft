@@ -600,7 +600,7 @@ impl RepoTab {
                 self.history.extend(fresh);
                 self.rebuild(ctx);
             }
-            Err(e) => self.status = Some((e, true)),
+            Err(e) => self.status = Some(crate::repo::Notice::plain((e, true))),
         }
     }
 

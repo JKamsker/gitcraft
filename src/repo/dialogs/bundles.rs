@@ -493,7 +493,7 @@ mod tests {
         assert!(tab.dialog.is_none());
         assert!(
             tab.status
-                .as_ref()
+                .as_deref()
                 .is_some_and(|(text, error)| *error && text.contains("Authentication failed"))
         );
         Ok(())

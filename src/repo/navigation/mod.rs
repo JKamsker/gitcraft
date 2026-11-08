@@ -256,10 +256,10 @@ impl RepoTab {
     /// change since staged or committed) are passed over, and said so.
     pub(super) fn navigate(&mut self, step: i32, ctx: &egui::Context) {
         if let Some(editor) = self.navigation_editor_open() {
-            self.status = Some((
+            self.status = Some(crate::repo::Notice::plain((
                 crate::i18n::message("repo-core-2923", &[("editor", editor.to_string().into())]),
                 true,
-            ));
+            )));
             return;
         }
         let mut passed = None;
@@ -276,7 +276,7 @@ impl RepoTab {
             }
         };
         if let Some(why) = passed {
-            self.status = Some((why, false));
+            self.status = Some(crate::repo::Notice::plain((why, false)));
         }
         if let Some(view) = view {
             self.restore_navigation(&view, ctx);
@@ -416,13 +416,13 @@ impl RepoTab {
         } else if self.has_more {
             self.goto(hash, ctx);
         } else {
-            self.status = Some((
+            self.status = Some(crate::repo::Notice::plain((
                 crate::i18n::message(
                     "repo-core-2927",
                     &[("hash", short(hash).to_string().into())],
                 ),
                 false,
-            ));
+            )));
         }
     }
 

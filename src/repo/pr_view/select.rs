@@ -18,17 +18,17 @@ struct Selection {
 impl RepoTab {
     pub(in crate::repo) fn select_pr(&mut self, number: u64, ctx: &egui::Context) {
         if let Some(why) = editor_in_the_way(self.conflict.is_some(), self.rebase.is_some()) {
-            self.status = Some((why.to_owned(), true));
+            self.status = Some(crate::repo::Notice::plain((why.to_owned(), true)));
             return;
         }
         let Some(pr) = self.prs.iter().find(|pr| pr.number == number).cloned() else {
             return;
         };
         let Some(target) = self.pr_target(&pr) else {
-            self.status = Some((
+            self.status = Some(crate::repo::Notice::plain((
                 "The pull request's branch is not available yet".to_owned(),
                 true,
-            ));
+            )));
             return;
         };
         self.leave_pages();

@@ -177,7 +177,9 @@ impl RepoTab {
             Ok(editor) => self.with_rebase_command(editor, ctx, move |tab, command, ctx| {
                 tab.commit_drop_ready(&label, command, ctx);
             }),
-            Err(e) => self.status = Some((format!("{label}: {e}"), true)),
+            Err(e) => {
+                self.status = Some(crate::repo::Notice::plain((format!("{label}: {e}"), true)))
+            }
         }
     }
 
@@ -191,7 +193,7 @@ impl RepoTab {
     ) {
         match command {
             Ok(_) if self.busy_op.is_some() => {
-                self.status = Some((
+                self.status = Some(crate::repo::Notice::plain((
                     crate::i18n::message(
                         "repo-core-2452",
                         &[
@@ -210,7 +212,7 @@ impl RepoTab {
                         ],
                     ),
                     true,
-                ));
+                )));
             }
             Ok((command, head)) => {
                 let steps = vec![self.same_branch(), expect_ref_at("HEAD", &head), command];
@@ -222,7 +224,9 @@ impl RepoTab {
                     ctx,
                 );
             }
-            Err(e) => self.status = Some((format!("{label}: {e}"), true)),
+            Err(e) => {
+                self.status = Some(crate::repo::Notice::plain((format!("{label}: {e}"), true)))
+            }
         }
     }
 }

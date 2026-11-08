@@ -171,7 +171,12 @@ impl RepoTab {
         // one picked.
         let remotes = self.remote_names();
         match remotes.len() {
-            0 => self.status = Some(("This repository has no remote to push to".to_owned(), true)),
+            0 => {
+                self.status = Some(crate::repo::Notice::plain((
+                    "This repository has no remote to push to".to_owned(),
+                    true,
+                )))
+            }
             1 => self.publish(&current, &remotes[0], label, done, ctx),
             _ => {
                 self.push_flow.banner = Some(Banner::NoUpstream {
@@ -406,13 +411,16 @@ impl RepoTab {
             // Older git ends a push some of whose refs were refused with success all the same.
             Ok(out) if refused(out).is_some() => {
                 let out = out.clone();
-                self.status = Some((format!("{label} refused: {}", out.trim()), true));
+                self.status = Some(crate::repo::Notice::plain((
+                    format!("{label} refused: {}", out.trim()),
+                    true,
+                )));
                 self.push_failed(attempt, &out, ctx);
             }
             Ok(_) => {
                 self.push_flow.banner = None;
                 if let Some(done) = attempt.done {
-                    self.status = Some((done, false));
+                    self.status = Some(crate::repo::Notice::plain((done, false)));
                 }
             }
             // Run again once signed in, and then taken in here again. Not a refusal whose
@@ -449,7 +457,10 @@ impl RepoTab {
             Err(e) if git::is_auth_error(e) => self.push_flow.then_push = Some(chain),
             Err(e) => {
                 let what = chain.after;
-                self.status = Some((format!("{what} failed, so nothing was pushed: {e}"), true));
+                self.status = Some(crate::repo::Notice::plain((
+                    format!("{what} failed, so nothing was pushed: {e}"),
+                    true,
+                )));
             }
             Ok(_) => {}
         }
@@ -504,7 +515,7 @@ impl RepoTab {
         let failed = |e: String| -> Msg {
             Msg::Then(Box::new(move |tab: &mut RepoTab, _: &egui::Context| {
                 tab.busy_op = None;
-                tab.status = Some((e, true));
+                tab.status = Some(crate::repo::Notice::plain((e, true)));
             }))
         };
         spawn_or(&self.tx, ctx, failed, move || {
@@ -519,7 +530,10 @@ impl RepoTab {
         self.busy_op = None;
         match checked {
             Ok(Checked::Rejected(r)) => {
-                self.status = Some((format!("Push refused: {}", banner::headline(&r)), true));
+                self.status = Some(crate::repo::Notice::plain((
+                    format!("Push refused: {}", banner::headline(&r)),
+                    true,
+                )));
                 self.push_flow.banner = Some(Banner::Rejected(r));
             }
             Ok(Checked::Gone {
@@ -527,7 +541,10 @@ impl RepoTab {
                 target,
                 publish,
             }) => {
-                self.status = Some((format!("Push refused: {} is gone", target.label()), true));
+                self.status = Some(crate::repo::Notice::plain((
+                    format!("Push refused: {} is gone", target.label()),
+                    true,
+                )));
                 self.push_flow.banner = Some(Banner::Gone {
                     branch,
                     target,
@@ -535,10 +552,10 @@ impl RepoTab {
                 });
             }
             Err(e) => {
-                self.status = Some((
+                self.status = Some(crate::repo::Notice::plain((
                     format!("Push refused, and the remote could not be checked: {e}"),
                     true,
-                ))
+                )))
             }
         }
         // The remote branch was fetched.

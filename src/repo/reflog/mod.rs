@@ -162,7 +162,10 @@ impl RepoTab {
             } else {
                 crate::i18n::text("repo-workflows-reflog-open-reflog-680d5c5f")
             };
-            self.status = Some((format!("Finish or close the {editor} first"), true));
+            self.status = Some(crate::repo::Notice::plain((
+                format!("Finish or close the {editor} first"),
+                true,
+            )));
             return;
         }
         let switched = self.reflog.as_ref().is_some_and(|v| v.source != source);
@@ -336,10 +339,10 @@ impl RepoTab {
             return;
         }
         if remote && view.ending.upgrade().is_some() {
-            self.status = Some((
+            self.status = Some(crate::repo::Notice::plain((
                 "The last scan is still ending on that machine; try again in a moment".to_owned(),
                 true,
-            ));
+            )));
             return;
         }
         let running = std::sync::Arc::new(());
