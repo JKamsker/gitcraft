@@ -5,7 +5,9 @@ use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
 type Wake = Arc<dyn Fn() + Send + Sync>;
+#[cfg(any(target_os = "macos", test))]
 const MAX_URL: usize = 4096;
+#[cfg(any(target_os = "macos", test))]
 const CAPACITY: usize = 64;
 
 #[derive(Default)]
@@ -16,6 +18,7 @@ struct UrlQueue {
 }
 
 impl UrlQueue {
+    #[cfg(any(target_os = "macos", test))]
     fn push(&mut self, url: Result<String, String>) -> Option<Wake> {
         let url = url.and_then(|url| {
             if url.len() > MAX_URL {

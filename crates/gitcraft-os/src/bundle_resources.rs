@@ -81,7 +81,11 @@ pub fn retire_bundle_keep(
             return Err(io::Error::last_os_error());
         }
         let current = unsafe { current.assume_init() };
-        if current.st_dev as u64 != meta.dev() || current.st_ino != meta.ino() {
+        #[cfg(target_os = "macos")]
+        let device = current.st_dev as u64;
+        #[cfg(not(target_os = "macos"))]
+        let device = current.st_dev;
+        if device != meta.dev() || current.st_ino != meta.ino() {
             return Err(io::Error::other("pack keep identity changed; retained"));
         }
         // SAFETY: same validated component in retained directory, after current content

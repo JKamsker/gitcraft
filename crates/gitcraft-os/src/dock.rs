@@ -1,15 +1,18 @@
 //! Dock presentation and a recording-friendly action queue. No application process is launched.
+#[cfg(any(target_os = "macos", test))]
 use crate::Progress;
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
 type Wake = Arc<dyn Fn() + Send + Sync>;
+#[cfg(any(target_os = "macos", test))]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct Presentation {
     pub badge: Option<&'static str>,
     pub fraction: Option<f32>,
     pub indeterminate: bool,
 }
+#[cfg(any(target_os = "macos", test))]
 impl Presentation {
     pub fn from(progress: Progress) -> Self {
         match progress {
@@ -44,6 +47,7 @@ struct Commands {
     wake: Option<Wake>,
 }
 impl Commands {
+    #[cfg(any(target_os = "macos", test))]
     fn push(&mut self, args: Vec<String>) -> Option<Wake> {
         if !self.pending.contains(&args) {
             if self.pending.len() < 64 {
