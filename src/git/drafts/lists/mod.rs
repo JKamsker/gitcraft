@@ -673,7 +673,7 @@ pub fn commit(
         .clear();
     capture_preserving_paths(
         repo,
-        crate::i18n::text("backend-before-committing-a-changelist-f40288"),
+        "Before committing a changelist",
         None,
         &list.paths.iter().cloned().collect::<Vec<_>>(),
         active,
@@ -845,9 +845,9 @@ pub fn shelve(
     capture_preserving_paths(
         repo,
         if restore {
-            crate::i18n::text("backend-before-unshelving-one-changelist-32b46b")
+            "Before unshelving one changelist"
         } else {
-            crate::i18n::text("backend-before-shelving-one-changelist-f97389")
+            "Before shelving one changelist"
         },
         None,
         &list.paths.iter().cloned().collect::<Vec<_>>(),

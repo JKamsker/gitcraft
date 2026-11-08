@@ -977,7 +977,7 @@ pub fn toggle(
     ));
     capture_preserving_paths(
         repo,
-        crate::i18n::text("backend-before-changing-virtual-branch-materialization-89d50c"),
+        "Before changing virtual branch materialization",
         None,
         &paths.iter().cloned().collect::<Vec<_>>(),
         active,

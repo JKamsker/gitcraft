@@ -306,7 +306,7 @@ pub fn restore(
     };
     let backup = capture_preserving(
         repo,
-        crate::i18n::text("backend-before-recovering-earlier-contents-dceabc"),
+        "Before recovering earlier contents",
         Some(&view.id),
         Some(&view.path),
         active,

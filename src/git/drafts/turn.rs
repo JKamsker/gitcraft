@@ -233,7 +233,7 @@ pub fn inverse_apply(
     verify()?;
     let backup = capture_preserving_paths(
         repo,
-        crate::i18n::text("backend-before-reverting-one-agent-turn-d74e04"),
+        "Before reverting one agent turn",
         None,
         &p.paths,
         active,
