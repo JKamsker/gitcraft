@@ -50,13 +50,19 @@ pub(crate) struct Selection {
 }
 fn revisions(include: &[String], exclude: &[String]) -> Result<Vec<u8>, String> {
     if include.len() + exclude.len() > MAX {
-        return Err("View scope exceeds 30000 pinned revision tips".into());
+        return Err(crate::i18n::text(
+            "backend-view-scope-exceeds-30000-pinned-revision-tips-8449b3",
+        )
+        .into());
     }
     let mut input = Vec::new();
     for (ids, prefix) in [(include, ""), (exclude, "^")] {
         for id in ids {
             if !oid(id) {
-                return Err("View has an invalid immutable commit ID".into());
+                return Err(crate::i18n::text(
+                    "backend-view-has-an-invalid-immutable-commit-id-a056f9",
+                )
+                .into());
             }
             input.extend_from_slice(format!("{prefix}{id}\n").as_bytes());
         }
@@ -76,12 +82,15 @@ fn walk(
     args.extend_from_slice(extra);
     args.push("--stdin");
     let out = reader.run(&args, revisions(include, exclude)?, &[0])?;
-    let text = std::str::from_utf8(&out).map_err(|_| "View returned invalid commit IDs")?;
+    let text = std::str::from_utf8(&out)
+        .map_err(|_| crate::i18n::text("backend-view-returned-invalid-commit-ids-b0f37f"))?;
     let mut ids = BTreeSet::new();
     let mut limited = false;
     for id in text.lines() {
         if !oid(id) {
-            return Err("View returned an invalid commit ID".into());
+            return Err(
+                crate::i18n::text("backend-view-returned-an-invalid-commit-id-2f6fa7").into(),
+            );
         }
         if ids.len() == MAX {
             limited = true;
@@ -98,9 +107,10 @@ fn mine(
     since: Option<i64>,
 ) -> Result<BTreeSet<String>, String> {
     if email.is_empty() || email.contains(['\0', '\n', '\r']) {
-        return Err(
-            "The current Git author email is unavailable; configure an author first".into(),
-        );
+        return Err(crate::i18n::text(
+            "backend-the-current-git-author-email-is-unavailable-configure-an-author-f-9036d9",
+        )
+        .into());
     }
     if ids.is_empty() {
         return Ok(BTreeSet::new());
@@ -125,18 +135,21 @@ fn mine(
             continue;
         }
         let [id, author, time] = record else {
-            return Err("Truncated author view metadata".into());
+            return Err(crate::i18n::text("backend-truncated-author-view-metadata-40594b").into());
         };
         let id = std::str::from_utf8(id)
-            .map_err(|_| "Invalid author-view object ID")?
+            .map_err(|_| crate::i18n::text("backend-invalid-author-view-object-id-4bf466"))?
             .trim_start_matches('\n');
         if !oid(id) || !ids.contains(id) {
-            return Err("Author view metadata does not match its pinned inputs".into());
+            return Err(crate::i18n::text(
+                "backend-author-view-metadata-does-not-match-its-pinned-inputs-a96848",
+            )
+            .into());
         }
         let time = std::str::from_utf8(time)
-            .map_err(|_| "Invalid author time")?
+            .map_err(|_| crate::i18n::text("backend-invalid-author-time-982ba5"))?
             .parse::<i64>()
-            .map_err(|_| "Invalid author time")?;
+            .map_err(|_| crate::i18n::text("backend-invalid-author-time-982ba5"))?;
         if *author == email.as_bytes() && since.is_none_or(|since| time >= since) {
             selected.insert(id.into());
         }
@@ -150,7 +163,7 @@ pub(crate) fn query(
     active: &dyn Fn() -> bool,
 ) -> Result<Selection, String> {
     if !preset.valid() {
-        return Err("Saved graph view is invalid".into());
+        return Err(crate::i18n::text("backend-saved-graph-view-is-invalid-299923").into());
     }
     (|| {
         let reader = Reader::new(repo, active);
@@ -158,7 +171,11 @@ pub(crate) fn query(
         let shallow = match shallow.trim_ascii() {
             b"true" => true,
             b"false" => false,
-            _ => return Err("Invalid shallow-history metadata".into()),
+            _ => {
+                return Err(
+                    crate::i18n::text("backend-invalid-shallow-history-metadata-49b3ec").into(),
+                );
+            }
         };
         let (commits, limited, mut explanation) = match &preset.kind {
             Kind::MyUnpushed => {
@@ -166,9 +183,9 @@ pub(crate) fn query(
                 (
                     mine(&reader, &ids, &scope.email, None)?,
                     limited,
-                    format!(
-                        "Commits authored as {} that are absent from every pinned remote-tracking branch",
-                        scope.email
+                    crate::i18n::message(
+                        "backend-commits-authored-as-that-are-absent-from-every-pinned-remote-trac-a6e40e",
+                        &[("email", (scope.email).to_string().into())],
                     ),
                 )
             }
@@ -182,9 +199,12 @@ pub(crate) fn query(
                 (
                     ancestors,
                     limited,
-                    format!(
-                        "My last {} days (author email {}) and their ancestors, within the visible graph scope",
-                        preset.days, scope.email
+                    crate::i18n::message(
+                        "backend-my-last-days-author-email-and-their-ancestors-within-the-visible-3110ea",
+                        &[
+                            ("days", (preset.days).to_string().into()),
+                            ("email", (scope.email).to_string().into()),
+                        ],
                     ),
                 )
             }
@@ -199,17 +219,19 @@ pub(crate) fn query(
                 (
                     ids,
                     limited,
-                    "The pinned anchor and descendants reachable from the visible graph tips"
+                    crate::i18n::text("backend-the-pinned-anchor-and-descendants-reachable-from-the-visible-grap-8882f3")
                         .into(),
                 )
             }
             Kind::MergesInto { branch } => {
-                let (actual, target) = scope
-                    .default_branch
-                    .as_ref()
-                    .ok_or("No default branch is available; choose a branch for this view")?;
+                let (actual, target) = scope.default_branch.as_ref().ok_or(crate::i18n::text(
+                    "backend-no-default-branch-is-available-choose-a-branch-for-this-view-994e46",
+                ))?;
                 if actual != branch {
-                    return Err("The selected default branch changed; update this view".into());
+                    return Err(crate::i18n::text(
+                        "backend-the-selected-default-branch-changed-update-this-view-f55f47",
+                    )
+                    .into());
                 }
                 let (ids, limited) = walk(
                     &reader,
@@ -220,15 +242,20 @@ pub(crate) fn query(
                 (
                     ids,
                     limited,
-                    format!("Merge commits on the first-parent history of {branch}"),
+                    crate::i18n::message(
+                        "backend-merge-commits-on-the-first-parent-history-of-branch-955b14",
+                        &[("branch", (branch).to_string().into())],
+                    ),
                 )
             }
         };
         if shallow {
-            explanation.push_str(" · shallow history: ancestry stops at the local boundary");
+            explanation.push_str(crate::i18n::text(
+                "backend-shallow-history-ancestry-stops-at-the-local-boundary-34d6dd",
+            ));
         }
         if !reader.active() {
-            return Err("Saved graph view cancelled".into());
+            return Err(crate::i18n::text("backend-saved-graph-view-cancelled-754f0e").into());
         }
         Ok(Selection {
             commits,

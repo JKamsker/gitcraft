@@ -505,7 +505,7 @@ fn parse_commit(oid: &str, bytes: &[u8]) -> Result<Commit, String> {
         if let Some(value) = line.strip_prefix(b"parent ") {
             let value = std::str::from_utf8(value).map_err(|_| "Invalid commit parent")?;
             if !valid_oid(value) || parents.len() >= 64 {
-                return Err("Invalid commit parents".into());
+                return Err(crate::i18n::text("backend-invalid-commit-parents-8430cf").into());
             }
             parents.push(value.to_owned());
         }

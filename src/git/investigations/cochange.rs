@@ -50,7 +50,7 @@ fn header(fields: &[&[u8]], i: usize) -> bool {
 }
 fn parse(bytes: &[u8]) -> Result<History, String> {
     if bytes.last() != Some(&0) {
-        return Err("Truncated coupling history".into());
+        return Err(crate::i18n::text("backend-truncated-coupling-history-08e2ce").into());
     }
     let fields = bytes.split(|b| *b == 0).collect::<Vec<_>>();
     let mut out = History::default();
@@ -61,10 +61,12 @@ fn parse(bytes: &[u8]) -> Result<History, String> {
                 i += 1;
                 continue;
             }
-            return Err("Malformed coupling history header".into());
+            return Err(
+                crate::i18n::text("backend-malformed-coupling-history-header-da52a5").into(),
+            );
         }
         let id = std::str::from_utf8(fields[i + 2])
-            .map_err(|_| "Invalid history ID")?
+            .map_err(|_| crate::i18n::text("backend-invalid-history-id-4032e7"))?
             .to_owned();
         let subject = String::from_utf8_lossy(fields[i + 3])
             .chars()
@@ -115,7 +117,10 @@ fn parse(bytes: &[u8]) -> Result<History, String> {
         files.retain(|p| !generated(p));
         out.records.push(Record { id, subject, files });
         if out.records.len() + out.skipped > COMMITS + 1 {
-            return Err("Coupling history exceeded commit budget".into());
+            return Err(crate::i18n::text(
+                "backend-coupling-history-exceeded-commit-budget-7115bf",
+            )
+            .into());
         }
     }
     Ok(out)
@@ -124,18 +129,21 @@ fn parse(bytes: &[u8]) -> Result<History, String> {
 // Deleted paths, old rename names, links and gitlinks cannot be actionable hints.
 fn eligible_paths(tree: &[u8]) -> Result<BTreeSet<String>, String> {
     if !tree.is_empty() && tree.last() != Some(&0) {
-        return Err("Truncated pinned coupling tree".into());
+        return Err(crate::i18n::text("backend-truncated-pinned-coupling-tree-55ab71").into());
     }
     let mut paths = BTreeSet::new();
     for entry in tree.split(|b| *b == 0).filter(|e| !e.is_empty()) {
         let tab = entry
             .iter()
             .position(|b| *b == b'\t')
-            .ok_or("Malformed pinned coupling tree")?;
-        let header = std::str::from_utf8(&entry[..tab]).map_err(|_| "Invalid pinned tree entry")?;
+            .ok_or(crate::i18n::text(
+                "backend-malformed-pinned-coupling-tree-53aa1d",
+            ))?;
+        let header = std::str::from_utf8(&entry[..tab])
+            .map_err(|_| crate::i18n::text("backend-invalid-pinned-tree-entry-619a6c"))?;
         let fields = header.split(' ').collect::<Vec<_>>();
         if fields.len() != 3 || !oid(fields[2]) {
-            return Err("Invalid pinned tree object".into());
+            return Err(crate::i18n::text("backend-invalid-pinned-tree-object-5fe12f").into());
         }
         if !matches!(fields[0], "100644" | "100755") || fields[1] != "blob" {
             continue;
@@ -167,12 +175,17 @@ fn retain_current_paths(history: &mut History, current: &BTreeSet<String>) {
         });
     }
     if !omitted.is_empty() {
-        history.notes.push(format!("{} historical paths are absent or ineligible at the pinned HEAD and omitted from actionable hints. Rename identities are not guessed.", omitted.len()));
+        history.notes.push(crate::i18n::message(
+            "backend-historical-paths-are-absent-or-ineligible-at-the-pinned-head-and-20710f",
+            &[("count", (omitted.len()).to_string().into())],
+        ));
     }
 }
 pub(crate) fn load(repo: &Path, head: &str, active: &dyn Fn() -> bool) -> Result<History, String> {
     if !oid(head) {
-        return Err("Coupling needs a pinned committed HEAD".into());
+        return Err(
+            crate::i18n::text("backend-coupling-needs-a-pinned-committed-head-b52e93").into(),
+        );
     }
     let reader = Reader::new(repo, active);
     let bytes = reader.run(
@@ -204,7 +217,10 @@ pub(crate) fn load(repo: &Path, head: &str, active: &dyn Fn() -> bool) -> Result
         .flat_map(|r| r.files.iter().cloned())
         .collect::<BTreeSet<_>>();
     if all.len() > 10000 {
-        return Err("Coupling history exceeds 10000 distinct paths".into());
+        return Err(crate::i18n::text(
+            "backend-coupling-history-exceeds-10000-distinct-paths-9c6163",
+        )
+        .into());
     }
     let mut input = Vec::new();
     for p in &all {
@@ -224,13 +240,41 @@ pub(crate) fn load(repo: &Path, head: &str, active: &dyn Fn() -> bool) -> Result
         &[0],
     );
     match attrs {
-        Ok(bytes)=>{
-            let fields=bytes.split(|b|*b==0).filter(|f|!f.is_empty()).collect::<Vec<_>>();
-            if fields.len()%3!=0{return Err("Malformed generated-file attributes".into());}
-            let mut excluded=BTreeSet::new();for triple in fields.chunks_exact(3){if matches!(triple[2],b"set"|b"true"){let path=std::str::from_utf8(triple[0]).map_err(|_|"Invalid attribute path")?;excluded.insert(path.to_owned());}}
-            history.records.retain_mut(|record|{let generated=record.files.intersection(&excluded).count();if generated*2>=record.files.len(){history.skipped+=1;return false;}record.files.retain(|p|!excluded.contains(p));true});
-        },
-        Err(_)=>history.notes.push("Generated attributes could not be read at this commit; known generated paths and commit subjects were excluded. Git 2.43+ supports pinned attribute queries.".into())
+        Ok(bytes) => {
+            let fields = bytes
+                .split(|b| *b == 0)
+                .filter(|f| !f.is_empty())
+                .collect::<Vec<_>>();
+            if fields.len() % 3 != 0 {
+                return Err(crate::i18n::text(
+                    "backend-malformed-generated-file-attributes-93ded7",
+                )
+                .into());
+            }
+            let mut excluded = BTreeSet::new();
+            for triple in fields.chunks_exact(3) {
+                if matches!(triple[2], b"set" | b"true") {
+                    let path = std::str::from_utf8(triple[0])
+                        .map_err(|_| crate::i18n::text("backend-invalid-attribute-path-83f4c3"))?;
+                    excluded.insert(path.to_owned());
+                }
+            }
+            history.records.retain_mut(|record| {
+                let generated = record.files.intersection(&excluded).count();
+                if generated * 2 >= record.files.len() {
+                    history.skipped += 1;
+                    return false;
+                }
+                record.files.retain(|p| !excluded.contains(p));
+                true
+            });
+        }
+        Err(_) => history.notes.push(
+            crate::i18n::text(
+                "backend-generated-attributes-could-not-be-read-at-this-commit-known-gener-7d30b4",
+            )
+            .into(),
+        ),
     }
     let tree = reader.run(
         &["ls-tree", "-r", "-z", "--full-tree", head, "--"],
@@ -240,11 +284,19 @@ pub(crate) fn load(repo: &Path, head: &str, active: &dyn Fn() -> bool) -> Result
     retain_current_paths(&mut history, &eligible_paths(&tree)?);
     if reader.run(&["rev-parse", "--is-shallow-repository"], vec![], &[0])? == b"true\n" {
         history.limited = true;
-        history
-            .notes
-            .push("Shallow repository: older cochanges are unavailable locally.".into());
+        history.notes.push(
+            crate::i18n::text(
+                "backend-shallow-repository-older-cochanges-are-unavailable-locally-298869",
+            )
+            .into(),
+        );
     }
-    history.notes.push("Sample: latest 600 nonmerge commits. Bulk changes (>20 files), generated commit subjects, generated paths and generated attributes are excluded. Only regular, nongenerated files present at the pinned HEAD are actionable. At least three shared changes and 60% source confidence are required; this is historical association, not proof of a missing change.".into());
+    history.notes.push(
+        crate::i18n::text(
+            "backend-sample-latest-600-nonmerge-commits-bulk-changes-20-files-generate-4548b0",
+        )
+        .into(),
+    );
     Ok(history)
 }
 pub(crate) fn rank(
