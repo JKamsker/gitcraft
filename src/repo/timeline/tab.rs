@@ -301,8 +301,10 @@ impl RepoTab {
             return;
         };
         let (path, key) = (self.path.clone(), store::key(&self.path));
-        self.then(
+        self.then_or(
             ctx,
+            false,
+            |error| (observe::Found::default(), Err(error)),
             move || {
                 let found = observe::find(&path, &entry);
                 let kept = snapshot::keep(

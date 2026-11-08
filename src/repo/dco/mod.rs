@@ -32,13 +32,15 @@ pub(crate) struct Dco {
     pr: Option<PrSignoffs>,
     /// The sign-off asked for in the dialog, or running: what a failed push leaves to undo.
     running: Option<Plan>,
-    /// Review starts after the local timeline receipt and GC retention have finished.
+    /// Review waits for both timeline GC retention and the separate rewrite-ref writer.
     review_after: Option<ReviewAfter>,
 }
 
 struct ReviewAfter {
     label: String,
     heads: (String, String),
+    timeline_kept: bool,
+    rewrite_kept: bool,
     then: Box<dyn FnOnce(&mut RepoTab, &Context) + Send>,
 }
 
@@ -238,22 +240,59 @@ impl RepoTab {
         }
     }
 
-    /// The timeline's existing worker has finished both receipt refs and GC retention.
-    /// Match the exact local rewrite, then hand back to normal push preflight once.
+    /// The timeline worker has completed its own diagnostic receipt and GC retention.
+    /// The separate versions worker must also finish before a push snapshot is captured.
     pub(super) fn dco_timeline_kept(&mut self, id: u64, kept: bool, ctx: &Context) {
         let Some(entry) = self.timeline.get(id) else {
             return;
         };
-        let Some(pending) = self.dco.review_after.take_if(|pending| {
-            entry.label == pending.label
-                && entry.undo.as_ref().and_then(|undo| undo.heads.as_ref()) == Some(&pending.heads)
-        }) else {
+        let Some(heads) = entry.undo.as_ref().and_then(|undo| undo.heads.clone()) else {
             return;
         };
-        if kept {
-            (pending.then)(self, ctx);
+        let label = entry.label.clone();
+        self.dco_retention_done(&label, &heads, false, kept, ctx);
+    }
+
+    /// Called by the actual versions::rewrite_kept completion, including failure/cancel.
+    pub(super) fn dco_rewrite_kept(
+        &mut self,
+        label: &str,
+        heads: &(String, String),
+        kept: bool,
+        ctx: &Context,
+    ) {
+        self.dco_retention_done(label, heads, true, kept, ctx);
+    }
+
+    fn dco_retention_done(
+        &mut self,
+        label: &str,
+        heads: &(String, String),
+        rewrite: bool,
+        kept: bool,
+        ctx: &Context,
+    ) {
+        let Some(pending) = &mut self.dco.review_after else {
+            return;
+        };
+        if pending.label != label || &pending.heads != heads {
+            return;
+        }
+        if !kept {
+            self.dco.review_after = None;
+            self.status = Some(("Local sign-off finished, but its rewrite or timeline commits could not be retained. Nothing was pushed; the local undo remains available.".into(), true));
+            return;
+        }
+        if rewrite {
+            pending.rewrite_kept = true;
         } else {
-            self.status = Some(("Local sign-off finished, but its timeline commits could not be retained. Nothing was pushed; the local undo remains available.".into(), true));
+            pending.timeline_kept = true;
+        }
+        if pending.timeline_kept
+            && pending.rewrite_kept
+            && let Some(pending) = self.dco.review_after.take()
+        {
+            (pending.then)(self, ctx);
         }
     }
 
@@ -273,6 +312,8 @@ impl RepoTab {
         let Some(plan) = self.dco.running.take_if(|plan| fix_label(plan) == label) else {
             return;
         };
+        // A stopped/new matching local operation cannot reuse a prior continuation.
+        self.dco.review_after = None;
         if result.is_ok() {
             // Keep the operation identity unchanged, and mark only its undo presentation.
             // op_done has already retained the worker's exact post-rewrite ref guards.
@@ -303,6 +344,8 @@ impl RepoTab {
                 self.dco.review_after = Some(ReviewAfter {
                     label: label.to_owned(),
                     heads: (plan.head.clone(), signed.clone()),
+                    timeline_kept: false,
+                    rewrite_kept: false,
                     then: Box::new(move |tab, ctx| {
                         tab.then_or(ctx, false, Err, move || {
                             let snapshot = crate::git::repository_tools::guard::Snapshot::capture(&repo)?;

@@ -350,6 +350,17 @@ fn recording_local_signoff_queues_review_only_after_success_and_keeps_its_origin
         let mut tab = RepoTab::new_deferred("/nonexistent/dco-completion-recording".into(), &ctx);
         tab.tx.cancel.cancel(); // no queued reader, command or process can execute
         tab.dco.running = Some(plan.clone());
+        if result.is_err() {
+            tab.dco.review_after = Some(super::ReviewAfter {
+                label: label.into(),
+                heads: (plan.head.clone(), "d".repeat(40)),
+                timeline_kept: true,
+                rewrite_kept: false,
+                then: Box::new(|_, _| {
+                    panic!("stale continuation resumed after failed local rewrite")
+                }),
+            });
+        }
         tab.timeline.awaiting = Awaiting::Ended {
             after_read: 0,
             then: Ended::New {
@@ -437,45 +448,177 @@ fn recording_local_signoff_queues_review_only_after_success_and_keeps_its_origin
                 redo_child: None,
                 receipt: None,
             });
-            let entered = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
-            let record = entered.clone();
-            tab.dco
-                .review_after
-                .as_mut()
-                .ok_or("Continuation lost")?
-                .then = Box::new(move |_, _| {
-                record.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-            });
-            tab.dco_timeline_kept(id + 1, true, &ctx);
-            assert!(
-                tab.dco.review_after.is_some(),
-                "unrelated retention cannot resume DCO"
-            );
-            assert_eq!(entered.load(std::sync::atomic::Ordering::SeqCst), 0);
-            tab.dco_timeline_kept(id, true, &ctx);
-            tab.dco_timeline_kept(id, true, &ctx);
-            assert!(tab.dco.review_after.is_none());
-            assert_eq!(entered.load(std::sync::atomic::Ordering::SeqCst), 1);
-            let record = entered.clone();
-            tab.dco.review_after = Some(super::ReviewAfter {
-                label: label.into(),
-                heads: (plan.head.clone(), "d".repeat(40)),
-                then: Box::new(move |_, _| {
-                    record.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                }),
-            });
-            tab.dco_timeline_kept(id, false, &ctx);
-            assert!(tab.dco.review_after.is_none());
-            assert_eq!(
-                entered.load(std::sync::atomic::Ordering::SeqCst),
-                1,
-                "failed retention cannot resume push review"
-            );
-            assert!(
-                tab.timeline
-                    .get(id)
-                    .is_some_and(|entry| entry.undo.is_some())
-            );
+            let mut unrelated_ids = Vec::new();
+            for field in ["label", "before", "after"] {
+                let mut other = tab.timeline.get(id).ok_or("Local entry missing")?.clone();
+                match field {
+                    "label" => other.label = "Sign off the commits of another".into(),
+                    "before" => {
+                        other.undo.as_mut().unwrap().heads.as_mut().unwrap().0 = "e".repeat(40)
+                    }
+                    _ => other.undo.as_mut().unwrap().heads.as_mut().unwrap().1 = "e".repeat(40),
+                }
+                unrelated_ids.push(tab.timeline.push(other));
+            }
+            let heads = (plan.head.clone(), "d".repeat(40));
+            let rewrite = git::Rewrite {
+                branch: plan.branch.clone(),
+                time: 0,
+                old: git::Series::new(&plan.base, &heads.0),
+                new: git::Series::new(&plan.base, &heads.1),
+            };
+            // These are the production completion entry points. Replacing only the
+            // continuation records the point where snapshot/preflight could first start.
+            let deliver_rewrite =
+                |tab: &mut RepoTab,
+                 label: &str,
+                 heads: &(String, String),
+                 kept: Result<Option<(git::Rewrite, Vec<git::Rewrite>)>, String>| {
+                    tab.rewrite_kept(
+                        label,
+                        &format!("{label}: done"),
+                        Some(heads.clone()),
+                        kept,
+                        &ctx,
+                    );
+                };
+            let unrelated = |tab: &mut RepoTab| {
+                tab.dco_timeline_kept(id + 100, true, &ctx);
+                for other_id in &unrelated_ids {
+                    tab.dco_timeline_kept(*other_id, true, &ctx);
+                    tab.dco_timeline_kept(*other_id, false, &ctx);
+                }
+                deliver_rewrite(
+                    tab,
+                    "Sign off the commits of another",
+                    &heads,
+                    Ok(Some((rewrite.clone(), Vec::new()))),
+                );
+                for other_heads in [
+                    ("e".repeat(40), heads.1.clone()),
+                    (heads.0.clone(), "e".repeat(40)),
+                ] {
+                    // A different writer's success or failure cannot satisfy or cancel us.
+                    deliver_rewrite(
+                        tab,
+                        label,
+                        &other_heads,
+                        Ok(Some((rewrite.clone(), Vec::new()))),
+                    );
+                    deliver_rewrite(tab, label, &other_heads, Err(git::CANCELLED.into()));
+                }
+            };
+            for (events, starts) in [
+                // Timeline wins, with rewrite deliberately held beyond repeated timeline
+                // and unrelated completions; the reverse order must behave identically.
+                (
+                    vec!["timeline", "timeline", "rewrite", "rewrite", "timeline"],
+                    1,
+                ),
+                (
+                    vec!["rewrite", "rewrite", "timeline", "timeline", "rewrite"],
+                    1,
+                ),
+                (vec!["timeline-fail", "rewrite", "timeline", "rewrite"], 0),
+                (vec!["rewrite-fail", "timeline", "rewrite", "timeline"], 0),
+                (vec!["timeline", "rewrite-fail", "rewrite", "timeline"], 0),
+                (vec!["rewrite", "timeline-fail", "timeline", "rewrite"], 0),
+                (vec!["rewrite-cancel", "timeline", "rewrite"], 0),
+                (vec!["timeline", "rewrite-cancel", "rewrite", "timeline"], 0),
+                (vec!["rewrite-none", "timeline", "rewrite"], 0),
+                (vec!["rewrite-wrong-proof", "timeline", "rewrite"], 0),
+                (vec!["rewrite-wrong-branch", "timeline", "rewrite"], 0),
+            ] {
+                let entered = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+                let record = entered.clone();
+                tab.dco.review_after = Some(super::ReviewAfter {
+                    label: label.into(),
+                    heads: heads.clone(),
+                    timeline_kept: false,
+                    rewrite_kept: false,
+                    then: Box::new(move |_, _| {
+                        record.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                    }),
+                });
+                unrelated(&mut tab);
+                assert!(tab.dco.review_after.is_some());
+                let (mut timeline_done, mut rewrite_done, mut failed) = (false, false, false);
+                for event in &events {
+                    match *event {
+                        "timeline" => {
+                            timeline_done = true;
+                            tab.dco_timeline_kept(id, true, &ctx);
+                        }
+                        "timeline-fail" => {
+                            failed = true;
+                            tab.dco_timeline_kept(id, false, &ctx);
+                        }
+                        "rewrite" => {
+                            rewrite_done = true;
+                            deliver_rewrite(
+                                &mut tab,
+                                label,
+                                &heads,
+                                Ok(Some((rewrite.clone(), Vec::new()))),
+                            );
+                        }
+                        "rewrite-fail" => {
+                            failed = true;
+                            deliver_rewrite(
+                                &mut tab,
+                                label,
+                                &heads,
+                                Err("retention failed".into()),
+                            );
+                        }
+                        "rewrite-cancel" => {
+                            failed = true;
+                            deliver_rewrite(&mut tab, label, &heads, Err(git::CANCELLED.into()));
+                        }
+                        "rewrite-none" => {
+                            failed = true;
+                            deliver_rewrite(&mut tab, label, &heads, Ok(None));
+                        }
+                        "rewrite-wrong-proof" | "rewrite-wrong-branch" => {
+                            failed = true;
+                            let mut wrong = rewrite.clone();
+                            if *event == "rewrite-wrong-proof" {
+                                wrong.new.tip = "e".repeat(40);
+                            } else {
+                                wrong.branch = "another".into();
+                            }
+                            deliver_rewrite(&mut tab, label, &heads, Ok(Some((wrong, Vec::new()))));
+                        }
+                        _ => unreachable!(),
+                    }
+                    let expected = usize::from(timeline_done && rewrite_done && !failed);
+                    assert_eq!(
+                        entered.load(std::sync::atomic::Ordering::SeqCst),
+                        expected,
+                        "no early/duplicate snapshot start: {events:?} after {event}"
+                    );
+                    if expected == 0 && !failed {
+                        assert!(tab.dco.review_after.is_some(), "first completion must wait");
+                    } else {
+                        assert!(
+                            tab.dco.review_after.is_none(),
+                            "completion/failure is single-use"
+                        );
+                    }
+                    unrelated(&mut tab);
+                    assert!(
+                        tab.dialog.is_none()
+                            && tab.busy_op.is_none()
+                            && tab.preflight_pending.is_none()
+                    );
+                    assert!(
+                        tab.timeline
+                            .get(id)
+                            .is_some_and(|entry| entry.undo.is_some())
+                    );
+                }
+                assert_eq!(entered.load(std::sync::atomic::Ordering::SeqCst), starts);
+            }
         } else {
             assert!(
                 tab.dco.review_after.is_none() && tab.preflight_after.is_none(),
