@@ -946,6 +946,14 @@ fn review14_confirmed_owned_rebase_executes_and_cleans_running() {
     drain_until(&mut tab, &ctx, |t| {
         t.busy_op.is_none() && !t.loading && !t.timeline.entries.is_empty()
     });
+    // Rebase is a local operation. Its undo is retained before the distinct push
+    // checklist is approved; a completed rewrite alone must not publish anything.
+    assert_eq!(git::resolve(&w.fork, "fix").unwrap_or_default(), p.seen);
+    assert_ne!(git::head(&w.me), p.head);
+    assert!(tab.timeline.entries.iter().any(|e| e.undo.is_some()));
+    let approved = crate::repo::push_preflight::test_support::approve(&mut tab, &ctx);
+    assert!(approved.is_ok(), "{approved:?}");
+    drain_until(&mut tab, &ctx, |t| t.busy_op.is_none() && !t.loading);
     assert!(tab.forks.running.is_none());
     assert_eq!(
         git::resolve(&w.fork, "fix").unwrap_or_default(),
@@ -1594,6 +1602,21 @@ fn review19_conflict_continuation_pins_its_tip_and_original_explicit_lease()
         let expected_local = git::head(&w.me);
         tab.dialog = None;
         tab.fork_act(super::ForkAct::ConfirmPush(scope.id), &ctx);
+        // The conflict confirmation leads to the same deliberate push checklist.
+        // A stale contributor lease may refuse during inspection; a local tip
+        // change must still refuse if its checklist reaches actual dispatch.
+        assert_eq!(
+            git::resolve(&w.fork, "fix")?,
+            if mode == "contributor-moved" {
+                expected_fork.clone()
+            } else {
+                p.seen.clone()
+            }
+        );
+        let approved = crate::repo::push_preflight::test_support::approve(&mut tab, &ctx);
+        if mode == "push" {
+            assert!(approved.is_ok(), "{approved:?}");
+        }
         drain_until(&mut tab, &ctx, |t| t.busy_op.is_none() && !t.loading);
         assert_eq!(git::head(&w.me), expected_local);
         assert_eq!(git::resolve(&w.fork, "fix")?, expected_fork);
