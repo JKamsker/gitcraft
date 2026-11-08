@@ -266,7 +266,8 @@ fn raw_unchanged(repo: &Path, dir: &Path) -> bool {
         return false;
     };
     let raw: std::collections::BTreeSet<&str> = parked.raw.iter().map(String::as_str).collect();
-    let mut tracked: std::collections::BTreeSet<&str> = paths.split('\0').filter(|p| !p.is_empty()).collect();
+    let mut tracked: std::collections::BTreeSet<&str> =
+        paths.split('\0').filter(|p| !p.is_empty()).collect();
     tracked.extend(raw.iter().copied());
     tracked.into_iter().all(|path| {
         if raw.contains(path) {

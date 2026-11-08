@@ -652,7 +652,10 @@ fn a_filtered_clean_file_is_also_kept_byte_exact() -> Result<(), String> {
     let parked = park(repo.path(), "clean-raw", &["a.txt".into()])?;
     assert!(parked.raw.contains(&"notes.txt".into()));
     bring_back(repo.path(), &parked)?;
-    assert_eq!(std::fs::read(repo.path().join("notes.txt")).unwrap(), b"notes\r\n");
+    assert_eq!(
+        std::fs::read(repo.path().join("notes.txt")).unwrap(),
+        b"notes\r\n"
+    );
     Ok(())
 }
 
