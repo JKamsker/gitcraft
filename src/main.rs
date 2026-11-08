@@ -42,6 +42,12 @@ fn main() -> eframe::Result {
             std::process::exit(1);
         }
     }
+    // LaunchServices delivers cold and warm gitcraft:// events through GetURL. Register
+    // before constructing/running the event loop; retain until it exits. The pinned winit
+    // backend does not install a GetURL handler or replace this Foundation registration.
+    #[cfg(target_os = "macos")]
+    let _native_urls = gitcraft_os::NativeUrlHandler::install()
+        .map_err(|message| eframe::Error::AppCreation(message.into()))?;
     app::warm_up();
     let options = eframe::NativeOptions {
         viewport: app::window_viewport()

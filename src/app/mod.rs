@@ -237,6 +237,8 @@ impl App {
         crate::remote::askpass::set_repaint(cc.egui_ctx.clone());
         // So do later starts' requests (see `crate::instance`).
         crate::instance::set_repaint(cc.egui_ctx.clone());
+        let native_ctx = cc.egui_ctx.clone();
+        gitcraft_os::set_native_url_wake(move || native_ctx.request_repaint());
         let saved: Saved = cc
             .storage
             .and_then(|s| eframe::get_value(s, eframe::APP_KEY))

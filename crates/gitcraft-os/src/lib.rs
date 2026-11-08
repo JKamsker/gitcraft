@@ -143,3 +143,10 @@ mod tests {
 mod account;
 #[cfg(unix)]
 pub use account::account_home;
+
+mod native_urls;
+pub use native_urls::{set_native_url_wake, take_native_urls};
+#[cfg(target_os = "macos")]
+mod macos_urls;
+#[cfg(target_os = "macos")]
+pub use macos_urls::NativeUrlHandler;
