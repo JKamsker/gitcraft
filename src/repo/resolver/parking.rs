@@ -340,6 +340,8 @@ impl RepoTab {
         };
         self.resolver.parked.retain(|p| p.id != parked.id);
         self.status = Some((format!("The {} is back, as it was", parked.what()), false));
+        // Its changes shown, as they were: conflicted and staged files.
+        self.resolver.reveal = Some((super::Reveal::Changes, Instant::now()));
         self.reload(ctx);
         let Some(run) = self.resolver.run.as_mut().filter(|r| r.id == parked.id) else {
             return;

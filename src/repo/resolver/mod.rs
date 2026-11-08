@@ -111,7 +111,20 @@ pub(crate) struct ResolverState {
     /// The merges put aside from this worktree (see `parking`).
     pub(in crate::repo) parked: Vec<Parked>,
     reading_parked: bool,
+    /// The row to select and scroll to once the graph has it: the merge just put aside, or
+    /// the changes of the one just brought back. Given up on after [`REVEAL_WITHIN`].
+    reveal: Option<(Reveal, Instant)>,
 }
+
+/// A row the tab is to show once the graph has it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum Reveal {
+    Parked(String),
+    Changes,
+}
+
+/// How long a row to reveal is waited for (a reload that never shows it).
+const REVEAL_WITHIN: Duration = Duration::from_secs(10);
 
 impl ResolverState {
     /// Whether a run is under way or waits for the user: another can't start.
@@ -377,6 +390,33 @@ impl RepoTab {
         );
     }
 
+    /// Selects and shows the row the tab was waiting to (see `ResolverState::reveal`), once
+    /// the graph read after the change has it.
+    fn resolver_reveal(&mut self, ctx: &egui::Context) {
+        let Some((want, since)) = self.resolver.reveal.clone() else {
+            return;
+        };
+        if since.elapsed() > REVEAL_WITHIN {
+            self.resolver.reveal = None;
+            return;
+        }
+        if self.loading {
+            return;
+        }
+        let row = match &want {
+            Reveal::Parked(id) => graph::parked_row_of(&self.commits, id),
+            Reveal::Changes => self
+                .commits
+                .iter()
+                .position(|c| c.hash == crate::repo::WIP_HASH),
+        };
+        if let Some(row) = row {
+            self.resolver.reveal = None;
+            self.select(row, ctx);
+            self.scroll_to = Some(row);
+        }
+    }
+
     /// Whether the run `id` is this tab's.
     pub(crate) fn resolver_owns(&self, id: &str) -> bool {
         self.resolver.run.as_ref().is_some_and(|r| r.id == id)
@@ -471,6 +511,7 @@ impl RepoTab {
                 ),
                 false,
             ));
+            self.resolver.reveal = Some((Reveal::Parked(parked.id.clone()), Instant::now()));
             self.reload(ctx);
         } else if let Some(why) = not_parked {
             self.status = Some((format!("Resolving in place: {why}"), false));
@@ -532,6 +573,7 @@ impl RepoTab {
     /// Every frame: an agent that ended has its files looked at; while one works, the card's
     /// clock moves.
     pub(super) fn resolver_frame(&mut self, ctx: &egui::Context) {
+        self.resolver_reveal(ctx);
         let Some(run) = &mut self.resolver.run else {
             return;
         };

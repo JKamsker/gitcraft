@@ -116,6 +116,14 @@ fn a_merge_put_aside_is_resolved_brought_back_and_applied() -> Result<(), String
             .any(|c| c.hash.starts_with("\u{0}parked:"))),
         "its row in the graph"
     );
+    // At the top, and shown: the user is left looking at it, not sent down to HEAD.
+    assert!(
+        wait(&mut h, |t| t.selected == Some(0)
+            && t.commits
+                .first()
+                .is_some_and(|c| c.hash.starts_with("\u{0}parked:"))),
+        "its row on top, selected"
+    );
 
     // The user goes elsewhere while the agent works; it ends, its work is kept and announced.
     repo.git(&["checkout", "-q", "other"])?;
@@ -145,6 +153,15 @@ fn a_merge_put_aside_is_resolved_brought_back_and_applied() -> Result<(), String
         wait(&mut h, |t| t.resolver.reviewing()
             && t.resolver.parked.is_empty()),
         "brought back and shown"
+    );
+    // The panel on the right shows its changes again (conflicted and staged files), not the
+    // commit looked at meanwhile.
+    assert!(
+        wait(&mut h, |t| t
+            .selected
+            .and_then(|i| t.commits.get(i))
+            .is_some_and(|c| c.hash == crate::repo::WIP_HASH)),
+        "its changes selected"
     );
     assert!(merging(&dir));
     assert_eq!(

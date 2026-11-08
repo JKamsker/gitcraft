@@ -591,22 +591,11 @@ impl RepoTab {
         }
         self.commits
             .reserve(self.history.len() + self.stashes.len());
-        // A merge put aside for an agent sits above its commit too (at the top when that
-        // commit isn't shown).
-        let mut parked_on = super::resolver::parked_rows(&self.resolver.parked);
-        let shown: std::collections::HashSet<&str> =
-            self.history.iter().map(|c| c.hash.as_str()).collect();
-        parked_on.retain(|head, rows| {
-            let keep = shown.contains(head.as_str());
-            if !keep {
-                self.commits.append(rows);
-            }
-            keep
-        });
+        // A merge put aside for an agent is something going on, as the changes are: at the top,
+        // its lane running down to the commit it was put aside on.
+        self.commits
+            .extend(super::resolver::parked_rows(&self.resolver.parked));
         for commit in &self.history {
-            if let Some(rows) = parked_on.remove(&commit.hash) {
-                self.commits.extend(rows);
-            }
             for stash in stashes_on.get(commit.hash.as_str()).into_iter().flatten() {
                 self.commits.push(Arc::new(Commit {
                     hash: stash.hash.clone(),

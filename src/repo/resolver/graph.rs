@@ -3,7 +3,6 @@
 //! works, a dot once it is done) and how far along the agent is. Clicking it shows the agent's
 //! card; its menu brings the merge back.
 
-use std::collections::HashMap;
 use std::sync::Arc;
 
 use egui::{Align2, Color32, Painter, Pos2, Rect, Stroke, Ui, pos2, vec2};
@@ -195,13 +194,15 @@ impl RepoTab {
     }
 }
 
-/// The graph rows of the merges `parked`, by the commit each goes right above.
-pub(in crate::repo) fn parked_rows(parked: &[Parked]) -> HashMap<String, Vec<Arc<Commit>>> {
-    let mut rows: HashMap<String, Vec<Arc<Commit>>> = HashMap::new();
-    for p in parked {
-        rows.entry(p.head.clone()).or_default().push(parked_row(p));
-    }
-    rows
+/// The graph rows of the merges `parked`, newest first (at the top of the graph).
+pub(in crate::repo) fn parked_rows(parked: &[Parked]) -> Vec<Arc<Commit>> {
+    parked.iter().rev().map(parked_row).collect()
+}
+
+/// The row of the parked merge `id` among `rows`.
+pub(in crate::repo) fn parked_row_of(rows: &[Arc<Commit>], id: &str) -> Option<usize> {
+    rows.iter()
+        .position(|c| c.hash.strip_prefix(PREFIX) == Some(id))
 }
 
 fn parked_row(p: &Parked) -> Arc<Commit> {
