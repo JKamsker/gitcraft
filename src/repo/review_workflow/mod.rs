@@ -6,7 +6,7 @@ mod store;
 pub(super) use anchors::{Relocations, relocate_threads};
 
 mod continuous;
-pub(super) use continuous::{ReviewAct, ReviewState};
+pub(super) use continuous::{ReviewAct, ReviewSource, ReviewState};
 mod freshness;
 pub(super) use freshness::{Freshness, FreshnessAct};
 

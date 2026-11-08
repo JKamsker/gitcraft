@@ -196,15 +196,15 @@ impl RepoTab {
             Some(Ok(files)) => {
                 self.review_all_button(
                     ui,
-                    files
-                        .files
-                        .iter()
-                        .map(|f| DiffKey::Range {
-                            from: files.from.clone(),
-                            to: Some(files.to.clone()),
-                            path: f.path.clone(),
-                        })
-                        .collect(),
+                    crate::repo::review_workflow::ReviewSource::PullRequest {
+                        number: view.number,
+                        url: view
+                            .details
+                            .as_ref()
+                            .and_then(|r| r.as_ref().ok())
+                            .map(|d| d.url.clone())
+                            .unwrap_or_default(),
+                    },
                     acts,
                 );
                 crate::repo::detail::files_header(ui, &files.files, None);

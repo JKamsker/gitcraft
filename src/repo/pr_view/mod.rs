@@ -33,6 +33,7 @@ pub(crate) struct PrView {
     /// The suggested change of each comment that has one the reader can see.
     pub(super) suggestions: HashMap<String, String>,
     pub(super) files: Option<Result<PrFiles, String>>,
+    pub(super) files_request: u64,
     pub(super) markdown: CommonMarkCache,
 }
 
@@ -110,6 +111,7 @@ impl RepoTab {
             thread_bodies: HashMap::new(),
             suggestions: HashMap::new(),
             files: None,
+            files_request: 0,
             markdown: CommonMarkCache::default(),
         });
         self.load_pr(ctx);
@@ -117,6 +119,7 @@ impl RepoTab {
 
     /// Reads the pull request shown (again). What is shown stays until the answer comes.
     pub(super) fn load_pr(&mut self, ctx: &egui::Context) {
+        self.invalidate_pr_document();
         self.pr_requests += 1;
         let request = self.pr_requests;
         let Some(view) = &mut self.pr_view else {
@@ -213,6 +216,7 @@ impl RepoTab {
             _ => None,
         };
         view.files = Some(result);
+        view.files_request = request;
         if let Some(details) = details.clone() {
             let path = self.path.clone();
             let base = view
@@ -247,6 +251,7 @@ impl RepoTab {
         }
         self.load_review_freshness(ctx);
         self.refresh_storyboard(ctx);
+        self.refresh_pr_document(ctx);
         let Some(view) = self.pr_view.as_mut() else {
             return;
         };

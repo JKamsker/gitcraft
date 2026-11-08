@@ -35,14 +35,10 @@ impl RepoTab {
             Some(Ok(d)) => {
                 self.review_all_button(
                     ui,
-                    d.files
-                        .iter()
-                        .map(|f| DiffKey::Range {
-                            from: d.from.clone(),
-                            to: d.to.clone(),
-                            path: f.path.clone(),
-                        })
-                        .collect(),
+                    crate::repo::review_workflow::ReviewSource::Comparison {
+                        from: d.from.clone(),
+                        to: d.to.clone(),
+                    },
                     acts,
                 );
                 files_header(ui, &d.files, None);

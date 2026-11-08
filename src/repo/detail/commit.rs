@@ -55,14 +55,7 @@ impl RepoTab {
 
         self.review_all_button(
             ui,
-            detail
-                .files
-                .iter()
-                .map(|f| DiffKey::Commit {
-                    hash: detail.hash.clone(),
-                    path: f.path.clone(),
-                })
-                .collect(),
+            crate::repo::review_workflow::ReviewSource::Commit(detail.hash.clone()),
             acts,
         );
         // On a forge, the commit's builds: how they went, if that's known.

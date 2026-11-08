@@ -20,13 +20,7 @@ impl RepoTab {
 
         self.review_all_button(
             ui,
-            self.work
-                .unstaged
-                .iter()
-                .chain(&self.work.staged)
-                .cloned()
-                .map(DiffKey::Work)
-                .collect(),
+            crate::repo::review_workflow::ReviewSource::Working,
             acts,
         );
         // The commit box stays at the bottom.
