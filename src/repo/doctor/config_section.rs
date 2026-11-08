@@ -59,13 +59,13 @@ pub(super) fn ui(ui: &mut Ui, state: &mut ConfigState, mut env: Env, acts: &mut 
         if (values.is_empty() && !state.show_unset)
             || (!filter.is_empty()
                 && !setting.key.to_lowercase().contains(&filter)
-                && !setting.about.to_lowercase().contains(&filter))
+                && !setting.about_label().to_lowercase().contains(&filter))
         {
             continue;
         }
         if setting.group != group {
             group = setting.group;
-            group_heading(ui, group);
+            group_heading(ui, setting.group_label());
         }
         setting_row(ui, state, setting, &values, &env, acts);
     }
@@ -111,7 +111,7 @@ fn setting_row(
                 winner.map(|o| o.shown_value()).unwrap_or(crate::i18n::text(
                     "repo-workflows-doctor-setting-row-8ffd7cc3"
                 )),
-                setting.about
+                setting.about_label()
             )
         },
         open,
@@ -161,7 +161,7 @@ fn setting_row(
     );
     let resp = resp
         .on_hover_cursor(egui::CursorIcon::PointingHand)
-        .on_hover_text(setting.about);
+        .on_hover_text(setting.about_label());
     if resp.clicked() {
         state.open = if open { None } else { Some(setting.key) };
         state.scope = None;
@@ -217,7 +217,7 @@ fn details(
     env: &Env,
     acts: &mut Vec<Action>,
 ) {
-    card(ui, setting.key, Some(setting.about), |ui| {
+    card(ui, setting.key, Some(setting.about_label()), |ui| {
         if values.is_empty() {
             faint(
                 ui,
@@ -524,7 +524,7 @@ mod accessibility_tests {
     #[test]
     fn config_disclosure_exposes_the_setting_and_keyboard_expansion() {
         let setting = &SETTINGS[0];
-        let label = format!("{}: Git default. {}", setting.key, setting.about);
+        let label = format!("{}: Git default. {}", setting.key, setting.about_label());
         let label = crate::a11y::labels::name(&label);
         let fonts = std::cell::Cell::new(false);
         let mut h = Harness::new_ui_state(

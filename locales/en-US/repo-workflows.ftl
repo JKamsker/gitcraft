@@ -237,7 +237,7 @@ repo-workflows-agents-cancel-only-19766ed6 = Cancel
 repo-workflows-agents-forget-turns-1d1d391e = The turns weren't deleted: { $e }
 
 repo-workflows-agents-hover-0b4191eb = Turn { $turn-number-1 } · { $when }
-    
+
     { $prompt }
 
 repo-workflows-agents-hover-eae937e9 = (no prompt recorded)
@@ -3620,7 +3620,7 @@ repo-workflows-parallel_bisect-progress-text-f0a2d01a = { " " }· testing 1
 repo-workflows-parallel_bisect-start-parallel-3450e92d = A parallel bisect is already running in this tab
 
 repo-workflows-parallel_bisect-warning-4e969ad3 = { $text }
-    
+
     The test said:
     { $shown }
 

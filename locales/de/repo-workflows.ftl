@@ -237,7 +237,7 @@ repo-workflows-agents-cancel-only-19766ed6 = Abbrechen
 repo-workflows-agents-forget-turns-1d1d391e = Die Durchgänge wurden nicht gelöscht: { $e }
 
 repo-workflows-agents-hover-0b4191eb = Durchgang { $turn-number-1 } · { $when }
-    
+
     { $prompt }
 
 repo-workflows-agents-hover-eae937e9 = (kein Prompt aufgezeichnet)
@@ -3620,7 +3620,7 @@ repo-workflows-parallel_bisect-progress-text-f0a2d01a = { " " }· ein Test läuf
 repo-workflows-parallel_bisect-start-parallel-3450e92d = In diesem Tab läuft bereits eine parallele Bisektion
 
 repo-workflows-parallel_bisect-warning-4e969ad3 = { $text }
-    
+
     Testausgabe:
     { $shown }
 
