@@ -132,6 +132,9 @@ pub(super) fn display(raw: &str) -> &str {
         "Zoom" => crate::i18n::text("interaction-settings-label-zoom"),
         "Settings" => crate::i18n::text("interaction-settings-label-settings"),
         "Search results" => crate::i18n::text("interaction-settings-label-search-results"),
+        "Connection doctor" => crate::i18n::text("interaction-accounts-doctor"),
+        "HTTPS accounts" => crate::i18n::text("interaction-accounts-https-accounts"),
+        "Repository network" => crate::i18n::text("interaction-accounts-repo-network"),
         _ => raw,
     }
 }
