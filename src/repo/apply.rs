@@ -261,6 +261,7 @@ impl RepoTab {
             Action::DeleteTag { name, target } => self.delete_tag(name, target, ctx),
             Action::Commit => self.commit(ctx),
             Action::Key(command) => self.run_key(command, ctx),
+            Action::CopyText(text) => ctx.copy_text(text),
             Action::FocusCommit => self.focus_commit(ctx),
             Action::Fetch => {
                 self.last_fetch = Instant::now();
@@ -331,10 +332,7 @@ impl RepoTab {
             Action::CloseTerminal(i) => self.close_terminal(i),
             Action::SelectTerminal(i) => self.active_terminal = i,
             Action::ToggleSearch => self.toggle_search(),
-            Action::FocusSearch => {
-                self.search.open = true;
-                self.search.focus = true;
-            }
+            Action::FocusSearch => self.focus_search(ctx),
             Action::SearchStep(d) => self.search_step(d, ctx),
             Action::CreatePr {
                 branch,

@@ -474,24 +474,37 @@ impl RepoTab {
         })
     }
 
+    /// Same selected-commit value for graph keyboard handling and palette dispatch.
+    pub(in crate::repo) fn graph_copy_text(
+        &self,
+        command: crate::keymap::Command,
+        i: usize,
+    ) -> Option<String> {
+        use crate::keymap::Command;
+        let commit = self.commits.get(i).filter(|c| c.hash != WIP_HASH)?;
+        match command {
+            Command::GraphCopyHash => Some(commit.hash.clone()),
+            Command::GraphCopyMessage => Some(commit.summary.clone()),
+            Command::GraphCopyBranch => self.copy_branch(i),
+            _ => None,
+        }
+    }
+
     /// Up and down select the row above or below the selected one.
     /// `ringed`: the row Tab reaches, where they start while nothing is selected.
     fn arrow_keys(&mut self, ui: &Ui, ringed: Option<usize>, acts: &mut Vec<Action>) {
         use crate::keymap::{self, Command};
         keymap::active(ui.ctx(), self.key_scopes(ui.ctx()));
-        if let Some(i) = self.selected.or(ringed)
-            && let Some(commit) = self.commits.get(i).filter(|c| c.hash != WIP_HASH)
-        {
-            let branch = self.copy_branch(i);
-            for (command, text) in [
-                (Command::GraphCopyHash, Some(commit.hash.as_str())),
-                (Command::GraphCopyMessage, Some(commit.summary.as_str())),
-                (Command::GraphCopyBranch, branch.as_deref()),
+        if let Some(i) = self.selected.or(ringed) {
+            for command in [
+                Command::GraphCopyHash,
+                Command::GraphCopyMessage,
+                Command::GraphCopyBranch,
             ] {
                 if keymap::take(ui.ctx(), command)
-                    && let Some(text) = text
+                    && let Some(text) = self.graph_copy_text(command, i)
                 {
-                    ui.ctx().copy_text(text.to_owned());
+                    ui.ctx().copy_text(text);
                 }
             }
         }

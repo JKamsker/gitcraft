@@ -43,6 +43,8 @@ pub(crate) enum Action {
     ContentPerform(std::sync::Arc<crate::git::recovery::Prepared>),
     /// What a key of the tab does (see [`crate::keymap`]), or why it can't now.
     Key(crate::keymap::Command),
+    /// A read-only clipboard payload resolved from the current selected commit.
+    CopyText(String),
     /// Show the changes and put the cursor in the commit summary.
     FocusCommit,
     /// Stop the operation running (one that goes over the network).
@@ -946,6 +948,10 @@ impl Action {
     pub(crate) fn key_command(&self) -> Option<Command> {
         Some(match self {
             Self::Key(command) => *command,
+            Self::Undo => Command::Undo,
+            Self::Redo => Command::Redo,
+            Self::ToggleSearch | Self::FocusSearch => Command::Search,
+            Self::ToggleTimeline => Command::Timeline,
             Self::Fetch => Command::Fetch,
             Self::Pull => Command::Pull,
             Self::Push => Command::Push,

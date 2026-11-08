@@ -38,6 +38,9 @@ impl RepoTab {
                     | Command::PreviousChange
                     | Command::NextChangeAlt
                     | Command::PreviousChangeAlt
+                    | Command::GraphCopyHash
+                    | Command::GraphCopyMessage
+                    | Command::GraphCopyBranch
             )
         {
             return Err(format!("{op} is still running"));
@@ -56,6 +59,14 @@ impl RepoTab {
             Command::Undo => Action::Undo,
             Command::Redo => Action::Redo,
             Command::Timeline => Action::ToggleTimeline,
+            Command::Reload => Action::Reload,
+            Command::GraphCopyHash | Command::GraphCopyMessage | Command::GraphCopyBranch => {
+                let text = self
+                    .selected
+                    .and_then(|i| self.graph_copy_text(command, i))
+                    .ok_or_else(|| "Select a loaded commit with this value first".to_owned())?;
+                Action::CopyText(text)
+            }
             Command::Search => Action::FocusSearch,
             Command::Back if self.nav.peek(-1).is_none() => return Err("No previous view".into()),
             Command::Forward if self.nav.peek(1).is_none() => return Err("No next view".into()),
@@ -132,7 +143,9 @@ impl RepoTab {
     pub(super) fn run_key(&mut self, command: Command, ctx: &egui::Context) {
         match self.key_action(command) {
             Ok(Some(action)) => self.apply(action, ctx),
-            Ok(None) => {}
+            Ok(None) => {
+                self.status = Some(("This command is available in its owning view".into(), true))
+            }
             Err(why) => self.status = Some((why, true)),
         }
     }

@@ -57,6 +57,20 @@ impl RepoTab {
         }
     }
 
+    /// The palette and key command search the same visible lines, or the commit graph.
+    pub(in crate::repo) fn focus_search(&mut self, ctx: &egui::Context) {
+        let panel = crate::repo::popout::Panel::Diff;
+        if self.find_in().is_some()
+            && (self.main_keys(ctx, panel)
+                || ctx.viewport_id() == crate::repo::popout::viewport_id(&self.path, panel))
+        {
+            self.find.show();
+        } else {
+            self.search.open = true;
+            self.search.focus = true;
+        }
+    }
+
     /// The find bar's keys, before the tab's own: Ctrl+F opens it where there's something to
     /// search (and is then not the commit search's), F3 / Shift+F3 and, with nothing else
     /// taking the keyboard, Enter / Shift+Enter step, Esc closes it. `free`: no dialog, no text
@@ -80,7 +94,7 @@ impl RepoTab {
             return;
         }
         if crate::keymap::take(ctx, crate::keymap::Command::Search) {
-            self.find.show();
+            self.focus_search(ctx);
         }
         if open {
             for command in crate::keymap::pressed(ctx, crate::keymap::Scope::Find) {
