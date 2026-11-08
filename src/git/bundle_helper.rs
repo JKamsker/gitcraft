@@ -8,7 +8,7 @@ pub(crate) fn program() -> Result<String, String> {
         .get_program()
         .to_str()
         .map(str::to_owned)
-        .ok_or_else(|| "Git path is not UTF-8".into())
+        .ok_or_else(|| crate::i18n::text("backend-git-path-is-not-utf-8-35d0c4").into())
 }
 
 pub(crate) fn entrypoint() -> i32 {

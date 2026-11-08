@@ -133,7 +133,7 @@ fn tool(
         if !body.is_empty() {
             patch(out, root, cwd, body, at, line);
         } else {
-            out.push(Step::new("Tool", crate::i18n::message("backend-apply-patch-transcript-line-line-unmapped-unsupported-recorded-pa-48a294", &[("line", (line).to_string().into())]),at));
+            out.push(Step::new(crate::i18n::text("backend-tool-2e53bd"), crate::i18n::message("backend-apply-patch-transcript-line-line-unmapped-unsupported-recorded-pa-48a294", &[("line", (line).to_string().into())]),at));
         }
         return;
     }
@@ -161,7 +161,7 @@ fn tool(
         };
         let allowed = matches!(name, "Edit" | "MultiEdit" | "Write");
         let mut step = Step::new(
-            "Tool",
+            crate::i18n::text("backend-tool-2e53bd"),
             crate::i18n::message(
                 "backend-name-transcript-line-line-01cffb",
                 &[
@@ -192,7 +192,7 @@ fn patch(out: &mut Vec<Step>, root: &Path, cwd: &str, patch: &str, at: Option<i6
             return;
         }
         let mut s = Step::new(
-            "Tool",
+            crate::i18n::text("backend-tool-2e53bd"),
             crate::i18n::message(
                 "backend-apply-patch-transcript-line-line-b3793d",
                 &[("line", (line).to_string().into())],
@@ -220,7 +220,7 @@ fn patch(out: &mut Vec<Step>, root: &Path, cwd: &str, patch: &str, at: Option<i6
             flush(out, &path, &mut before, &mut after);
             path.clear();
             let mut step = Step::new(
-                "Tool",
+                crate::i18n::text("backend-tool-2e53bd"),
                 crate::i18n::message(
                     "backend-apply-patch-deletion-transcript-line-line-unmapped-removed-bytes-a6920c",
                     &[("line", (line).to_string().into())],
@@ -376,7 +376,7 @@ fn records_from(
             if !t.is_empty() {
                 steps.push(Step::new(
                     if role == "user" {
-                        "Prompt"
+                        crate::i18n::text("backend-prompt-5c3912")
                     } else {
                         crate::i18n::text("backend-agent-summary-8351fe")
                     },
@@ -407,7 +407,7 @@ fn records_from(
             if !t.is_empty() {
                 steps.push(Step::new(
                     if payload_type == "user_message" {
-                        "Prompt"
+                        crate::i18n::text("backend-prompt-5c3912")
                     } else {
                         crate::i18n::text("backend-agent-summary-8351fe")
                     },

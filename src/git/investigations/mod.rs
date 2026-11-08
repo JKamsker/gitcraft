@@ -31,11 +31,9 @@ impl<'a> Reader<'a> {
             ok,
             &|| self.active(),
         )
-        .map_err(|e| {
-            e.replace(
-                "Draft",
-                crate::i18n::text("backend-history-investigation-1dfebe"),
-            )
+        .map_err(|e| match e.as_str() {
+            "Draft cancelled" => "History investigation cancelled".into(),
+            _ => e,
         })
     }
     /// The same immutable command policy is inspectable without starting Git.
