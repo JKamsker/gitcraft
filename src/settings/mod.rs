@@ -751,7 +751,14 @@ impl Settings {
                     }
                     for button in crate::app_buttons::AppButton::ALL {
                         let keywords = "button place move title bar bottom footer panel";
-                        card.row(button.label(), keywords, |ui| {
+                        // Row/search identities remain English; Card resolves the visible caption.
+                        let row_name = match button {
+                            crate::app_buttons::AppButton::Settings => "Settings",
+                            crate::app_buttons::AppButton::Palette => "Command palette",
+                            crate::app_buttons::AppButton::Theme => "Theme",
+                            crate::app_buttons::AppButton::Manual => "Manual",
+                        };
+                        card.row(row_name, keywords, |ui| {
                             let layout = self.button_layout.normalized();
                             let was = layout.place_of(button);
                             let mut place = was;

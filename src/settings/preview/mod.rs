@@ -54,7 +54,7 @@ impl Preview {
     ];
 
     fn title(self) -> &'static str {
-        match self {
+        super::labels::display(match self {
             Preview::Theme => "Theme",
             Preview::Accent => "Accent colour",
             Preview::Corners => "Corners",
@@ -69,57 +69,49 @@ impl Preview {
             Preview::LaneColors => "Lane colours",
             Preview::Pull => "Pull",
             Preview::Terminal => "Terminal",
-        }
+        })
     }
 
     fn explain(self, s: &Settings) -> String {
         match self {
-            Preview::Theme => "The colours of the whole window: tabs, panels, the graph, diffs \
-                               and the terminal. Point at a theme to see it here first."
-                .to_owned(),
-            Preview::Accent => "Buttons, selections, focused fields and links. Your own \
-                                colour, or the one the theme comes with."
-                .to_owned(),
-            Preview::Corners => "How round buttons, fields, pills and panels are.".to_owned(),
-            Preview::CodeColors => {
-                "Code in diffs and blame, coloured as your editor colours it.".to_owned()
-            }
-            Preview::Avatars => {
-                "Beside each commit's author in the graph and the details.".to_owned()
-            }
-            Preview::DiffLayout => "How a file's changes show: old and new in one column, or \
-                                    beside each other."
-                .to_owned(),
-            Preview::DiffContext => "Only the lines around each change, or the whole file with \
-                                     the changes in place."
-                .to_owned(),
-            Preview::FileList => "The changed files of a commit or the working tree.".to_owned(),
-            Preview::GraphRefs => format!(
-                "The room left of the graph for the branch and tag pills: {:.0} px. Names \
-                 longer than fits keep their {}; drag the column's edge in the \
-                 graph's header to change it there.",
-                s.refs_width,
-                if s.branch_names_keep_end {
-                    "end (…xyz)"
-                } else {
-                    "start (xyz…)"
+            Preview::Theme => crate::i18n::text("interaction-preview-theme").to_owned(),
+            Preview::Accent => crate::i18n::text("interaction-preview-accent").to_owned(),
+            Preview::Corners => crate::i18n::text("interaction-preview-corners").to_owned(),
+            Preview::CodeColors => crate::i18n::text("interaction-preview-code").to_owned(),
+            Preview::Avatars => crate::i18n::text("interaction-preview-avatars").to_owned(),
+            Preview::DiffLayout => crate::i18n::text("interaction-preview-diff-layout").to_owned(),
+            Preview::DiffContext => crate::i18n::text("interaction-preview-context").to_owned(),
+            Preview::FileList => crate::i18n::text("interaction-preview-files").to_owned(),
+            Preview::GraphRefs => crate::i18n::message(
+                "interaction-preview-refs",
+                &[
+                    ("width", s.refs_width.round().into()),
+                    (
+                        "part",
+                        if s.branch_names_keep_end {
+                            "end"
+                        } else {
+                            "start"
+                        }
+                        .into(),
+                    ),
+                ],
+            ),
+            Preview::GraphColumns => crate::i18n::text("interaction-preview-columns").to_owned(),
+            Preview::GraphLanes => crate::i18n::text("interaction-preview-lanes").to_owned(),
+            Preview::LaneColors => crate::i18n::text("interaction-preview-lane-colours").to_owned(),
+            Preview::Pull => match s.pull_mode {
+                crate::repo::pull::PullMode::Merge => {
+                    crate::i18n::text("interaction-preview-pull-merge").to_owned()
                 }
-            ),
-            Preview::GraphColumns => "The columns right of each commit's description. Their \
-                                      widths are dragged in the graph's header."
-                .to_owned(),
-            Preview::GraphLanes => "How far apart the graph's lanes are. Compact lanes keep a \
-                                    busy history's graph narrow."
-                .to_owned(),
-            Preview::LaneColors => {
-                "The colour of each lane of the graph, and of its pills.".to_owned()
-            }
-            Preview::Pull => format!(
-                "What the toolbar's Pull does when your branch and its remote have both moved \
-                 on: {}.",
-                s.pull_mode.label().to_lowercase()
-            ),
-            Preview::Terminal => "The integrated terminal, with the theme's colours.".to_owned(),
+                crate::repo::pull::PullMode::FastForwardOnly => {
+                    crate::i18n::text("interaction-preview-pull-fastforwardonly").to_owned()
+                }
+                crate::repo::pull::PullMode::Rebase => {
+                    crate::i18n::text("interaction-preview-pull-rebase").to_owned()
+                }
+            },
+            Preview::Terminal => crate::i18n::text("interaction-preview-terminal").to_owned(),
         }
     }
 
@@ -249,7 +241,7 @@ pub(super) fn panel(ui: &mut Ui, preview: Preview, settings: &Settings, current:
         .show(ui, |ui| {
             ui.set_width(ui.available_width());
             ui.label(
-                RichText::new("PREVIEW")
+                RichText::new(crate::i18n::text("interaction-preview-heading"))
                     .font(theme::semibold(10.5))
                     .color(t.text_faint),
             );
@@ -321,4 +313,98 @@ pub(super) const ABOVE_MAX_H: f32 = 300.0;
 fn area(ui: &mut Ui, width: f32, height: f32) -> egui::Rect {
     ui.allocate_exact_size(vec2(width, height), egui::Sense::hover())
         .0
+}
+
+#[cfg(test)]
+mod localization_tests {
+    use super::*;
+
+    fn texts(shape: &egui::Shape, found: &mut Vec<String>) {
+        match shape {
+            egui::Shape::Text(text) => found.push(text.galley.job.text.clone()),
+            egui::Shape::Vec(shapes) => {
+                for shape in shapes {
+                    texts(shape, found);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    #[test]
+    fn actual_inert_previews_paint_german_and_keep_sample_refs_commands_and_settings() {
+        crate::i18n::set_language("de");
+        let settings = Settings {
+            refs_width: 2000.0,
+            vscode_colors: false,
+            show_date: true,
+            show_when: true,
+            date_width: 250.0,
+            branch_names_keep_end: true,
+            ..Settings::default()
+        };
+        let saved = serde_json::to_value(&settings).unwrap();
+        let ctx = egui::Context::default();
+        ctx.run_ui(egui::RawInput::default(), |ui| {
+            crate::theme::install_fonts(ui.ctx());
+        })
+        .drop_without_applying_deltas();
+        let out = ctx.run_ui(
+            egui::RawInput {
+                screen_rect: Some(egui::Rect::from_min_size(
+                    egui::Pos2::ZERO,
+                    vec2(1500.0, 7000.0),
+                )),
+                ..Default::default()
+            },
+            |ui| {
+                ui.set_width(1400.0);
+                for preview in [
+                    Preview::GraphRefs,
+                    Preview::GraphColumns,
+                    Preview::GraphLanes,
+                    Preview::Terminal,
+                    Preview::Pull,
+                    Preview::CodeColors,
+                    Preview::Avatars,
+                    Preview::DiffLayout,
+                    Preview::DiffContext,
+                    Preview::FileList,
+                ] {
+                    panel(ui, preview, &settings, &ThemeId::new("pro"));
+                }
+            },
+        );
+        let mut found = Vec::new();
+        for shape in &out.shapes {
+            texts(&shape.shape, &mut found);
+        }
+        out.drop_without_applying_deltas();
+        for expected in [
+            "VORSCHAU",
+            "BESCHREIBUNG",
+            "Einstellungen mit Vorschau daneben",
+            "vor 5 Minuten",
+            "06.11.2026 um 14:02",
+            "git status --short",
+            "feature/settings-previews",
+            "Nebeneinander",
+            "In Ordnern",
+        ] {
+            assert!(
+                found.iter().any(|text| text.contains(expected)),
+                "missing {expected}: {found:?}"
+            );
+        }
+        assert!(Preview::GraphRefs.explain(&settings).contains("2.000 px"));
+        assert!(
+            Preview::GraphRefs
+                .explain(&settings)
+                .contains("ihr Ende (…xyz)")
+        );
+        assert_eq!(serde_json::to_value(&settings).unwrap(), saved);
+        crate::i18n::set_language("en-US");
+        assert!(Preview::GraphRefs.explain(&settings).contains("2,000 px"));
+        assert_eq!(Preview::DiffLayout.title(), "Diff layout");
+    }
 }

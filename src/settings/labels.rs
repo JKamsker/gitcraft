@@ -135,6 +135,8 @@ pub(super) fn display(raw: &str) -> &str {
         "Connection doctor" => crate::i18n::text("interaction-accounts-doctor"),
         "HTTPS accounts" => crate::i18n::text("interaction-accounts-https-accounts"),
         "Repository network" => crate::i18n::text("interaction-accounts-repo-network"),
+        "Command palette" => crate::i18n::text("interaction-presentation-palette"),
+        "Manual" => crate::i18n::text("interaction-presentation-manual"),
         _ => raw,
     }
 }
