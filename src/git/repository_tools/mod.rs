@@ -56,7 +56,8 @@ pub(super) fn captured(
     Ok(crate::git::Captured {
         code: out.code,
         raw: out.stdout.clone(),
-        stdout: String::from_utf8(out.stdout).map_err(|_| "Repository metadata is not UTF-8")?,
+        stdout: String::from_utf8(out.stdout)
+            .map_err(|_| crate::i18n::text("backend-repository-metadata-is-not-utf-8-aa6912"))?,
         stderr: String::from_utf8_lossy(&out.stderr).into_owned(),
     })
 }
@@ -66,7 +67,7 @@ pub(super) fn text_codes(
     accepted: &[i32],
 ) -> Result<String, String> {
     String::from_utf8(capture_with(repo, args, Vec::new(), 32 << 20, &[], None)?.checked(accepted)?)
-        .map_err(|_| "Repository metadata is not UTF-8".into())
+        .map_err(|_| crate::i18n::text("backend-repository-metadata-is-not-utf-8-aa6912").into())
 }
 pub(super) fn capture_with(
     repo: &std::path::Path,
@@ -225,8 +226,9 @@ impl ReadBudget {
         args: &[&str],
         control: Option<std::sync::Arc<crate::git::OpControl>>,
     ) -> Result<String, String> {
-        String::from_utf8(self.read(repo, args, control)?.checked(&[0])?)
-            .map_err(|_| "Repository metadata is not UTF-8".into())
+        String::from_utf8(self.read(repo, args, control)?.checked(&[0])?).map_err(|_| {
+            crate::i18n::text("backend-repository-metadata-is-not-utf-8-aa6912").into()
+        })
     }
 }
 #[cfg(test)]

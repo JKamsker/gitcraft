@@ -13,7 +13,7 @@ pub(crate) struct Snapshot {
 }
 pub(super) fn text(repo: &Path, args: &[&str]) -> Result<String, String> {
     String::from_utf8(super::read(repo, args, Vec::new(), 32 << 20)?)
-        .map_err(|_| "Repository metadata is not UTF-8".into())
+        .map_err(|_| crate::i18n::text("backend-repository-metadata-is-not-utf-8-aa6912").into())
 }
 impl Snapshot {
     #[cfg(test)]

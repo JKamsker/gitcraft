@@ -184,7 +184,7 @@ pub(crate) fn inspect(repo: &Path) -> Result<Sharing, String> {
         let git = std::fs::canonicalize(&git).map_err(|e| e.to_string())?;
         let format = line(&repo, &["rev-parse", "--show-object-format"])?;
         if !matches!(format.as_str(), "sha1" | "sha256") {
-            return Err("Unsupported object format".into());
+            return Err(crate::i18n::text("backend-unsupported-object-format-f8189c").into());
         }
         let ownership = Arc::new(held::Ownership::capture(
             &repo,

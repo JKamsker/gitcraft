@@ -145,7 +145,13 @@ fn unreachable_commits(repo: &Path, cancel: &Cancel) -> Result<Vec<String>, Stri
     if ended.code == Some(0) || !hashes.is_empty() {
         Ok(hashes)
     } else {
-        Err(failed(&said, &format!("exit status: {:?}", ended.code)))
+        Err(failed(
+            &said,
+            &crate::i18n::message(
+                "backend-exit-status-c02624",
+                &[("code", format!("{:?}", ended.code).into())],
+            ),
+        ))
     }
 }
 fn scan_completion(
@@ -161,7 +167,10 @@ fn scan_completion(
 fn failed(said: &str, status: &str) -> String {
     let said = said.trim();
     if said.is_empty() {
-        format!("git fsck failed ({status})")
+        crate::i18n::message(
+            "backend-git-fsck-failed-status-025abf",
+            &[("status", (status).to_string().into())],
+        )
     } else {
         said.to_owned()
     }

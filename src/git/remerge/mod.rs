@@ -109,10 +109,12 @@ fn remerge_args() -> Vec<&'static str> {
 pub fn remerge_unavailable(parents: usize) -> Option<String> {
     match parents {
         2 => None,
-        0 | 1 => Some("Not a merge: there is nothing it resolved".to_owned()),
-        n => Some(format!(
-            "An octopus merge ({n} parents): git can only redo merges of two parents, so it \
-             can't show what this one resolved"
+        0 | 1 => Some(
+            crate::i18n::text("backend-not-a-merge-there-is-nothing-it-resolved-6b84be").to_owned(),
+        ),
+        n => Some(crate::i18n::message(
+            "backend-an-octopus-merge-n-parents-git-can-only-redo-merges-of-two-parent-de1e27",
+            &[("count", (n).to_string().into())],
         )),
     }
 }
@@ -170,11 +172,22 @@ pub fn supports_remerge(version: &str) -> Result<(), String> {
     let (major, minor) = REMERGE_MIN_GIT;
     match parse_git_version(version) {
         Some(found) if found >= REMERGE_MIN_GIT => Ok(()),
-        Some((has_major, has_minor)) => Err(format!(
-            "Needs git {major}.{minor} or newer; this repository's git is {has_major}.{has_minor}"
+        Some((has_major, has_minor)) => Err(crate::i18n::message(
+            "backend-needs-git-major-minor-or-newer-this-repository-s-git-is-has-major-72ebe4",
+            &[
+                ("major", (major).to_string().into()),
+                ("minor", (minor).to_string().into()),
+                ("has_major", (has_major).to_string().into()),
+                ("has_minor", (has_minor).to_string().into()),
+            ],
         )),
-        None => Err(format!(
-            "Needs git {major}.{minor} or newer; could not tell the version from “{version}”"
+        None => Err(crate::i18n::message(
+            "backend-needs-git-major-minor-or-newer-could-not-tell-the-version-from-ve-c9cccb",
+            &[
+                ("major", (major).to_string().into()),
+                ("minor", (minor).to_string().into()),
+                ("version", (version).to_string().into()),
+            ],
         )),
     }
 }
@@ -182,24 +195,30 @@ pub fn supports_remerge(version: &str) -> Result<(), String> {
 /// An error of `git show --remerge-diff` as the user should read it.
 pub(super) fn explain(repo: &Path, err: &str) -> String {
     if err.contains("remerge-diff") && (err.contains("unrecognized") || err.contains("unknown")) {
-        return remerge_support(repo)
-            .err()
-            .unwrap_or_else(|| format!("This git can't show what a merge resolved: {err}"));
+        return remerge_support(repo).err().unwrap_or_else(|| {
+            crate::i18n::message(
+                "backend-this-git-can-t-show-what-a-merge-resolved-err-a2ad9f",
+                &[("detail", (err).to_string().into())],
+            )
+        });
     }
     if err.contains("temporary object directory") {
-        return "Could not redo the merge: git writes its objects to a temporary folder in the \
-                repository's .git/objects to do so, and can't write there (it is read-only for \
-                you)"
-            .to_owned();
+        return crate::i18n::text(
+            "backend-could-not-redo-the-merge-git-writes-its-objects-to-a-temporary-fo-f48f2c",
+        )
+        .to_owned();
     }
     if ["bad object", "unable to read", "missing", "could not read"]
         .iter()
         .any(|s| err.contains(s))
     {
-        return format!(
-            "Could not redo the merge: a parent (or a file of one) isn't in this clone; \
-             fetching more history may bring it ({err})"
+        return crate::i18n::message(
+            "backend-could-not-redo-the-merge-a-parent-or-a-file-of-one-isn-t-in-this-1a399f",
+            &[("detail", (err).to_string().into())],
         );
     }
-    format!("Could not redo the merge to compare it: {err}")
+    crate::i18n::message(
+        "backend-could-not-redo-the-merge-to-compare-it-err-9fa4bd",
+        &[("detail", (err).to_string().into())],
+    )
 }

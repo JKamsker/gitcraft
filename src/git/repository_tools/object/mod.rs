@@ -254,7 +254,7 @@ fn entries(repo: &Path, object: &Object, active: &dyn Fn() -> bool) -> Result<Ve
                 .map_err(|_| crate::i18n::text("backend-invalid-tree-metadata-1d2e46"))?;
             let f: Vec<_> = meta.split_whitespace().collect();
             if f.len() != 3 || !valid_oid(f[2]) {
-                return Err("Invalid tree object ID".into());
+                return Err(crate::i18n::text("backend-invalid-tree-object-id-58c8bf").into());
             }
             entries.push(Entry {
                 name: String::from_utf8_lossy(&record[tab + 1..]).into_owned(),
