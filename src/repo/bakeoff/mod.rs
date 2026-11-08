@@ -491,6 +491,7 @@ impl RepoTab {
         // Atomic observation only: no try_wait, process search or signals on UI.
         let terminals = self
             .terminals
+            .shells()
             .iter()
             .map(|terminal| terminal.output_lifetime())
             .collect::<Vec<_>>();

@@ -420,13 +420,16 @@ fn text_terminal_palette_modal_and_context_menu_own_their_keys() -> Result<(), S
     egui::Popup::close_all(&t.ctx);
     #[cfg(unix)]
     {
-        t.tab.start_terminal(
-            Some(crate::terminal::ShellSpec {
-                label: "test".to_owned(),
-                program: "sh".to_owned(),
-                args: vec![],
-            }),
-            None,
+        t.tab.terminals.apply(
+            crate::repo::terminals::TerminalAct::New {
+                shell: Some(crate::terminal::ShellSpec {
+                    label: "test".to_owned(),
+                    program: "sh".to_owned(),
+                    args: vec![],
+                }),
+                cwd: None,
+            },
+            &t.tab.path,
             &t.ctx,
         );
         t.frame(vec![]);

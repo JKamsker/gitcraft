@@ -5,6 +5,8 @@ gitcraft is a single Rust crate (plus the small `crates/gitcraft-os`) built on
 installed `git` command line, so a user's config, credentials and hooks apply as usual.
 
 - [Code layout](code-layout.md): where things live in `src/`.
+- [Architecture](architecture.md): ownership conventions, reproducible hotspot metrics,
+  lifecycle/operation inventories and the phased refactoring plan.
 - [CPU performance](cpu-performance.md) and the [workflow suite](cpu-workflows.md): reproducible
   CPU benchmarks, stack profiles and source-line coverage.
 - [Process orchestration](process-orchestration.md): subprocess limits, lifecycle handling and

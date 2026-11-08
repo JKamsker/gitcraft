@@ -2,7 +2,6 @@
 
 mod file_menu;
 mod file_row;
-mod terminal_tabs;
 
 use egui::{Align2, Color32, CornerRadius, Rect, Response, Sense, Ui, pos2, vec2};
 
@@ -12,7 +11,6 @@ pub use crate::a11y::{a11y, a11y_selected};
 pub(in crate::repo) use file_menu::selection_commands;
 pub use file_menu::{file_menu, file_menu_with};
 pub use file_row::{FileRowResponse, OwnerTag, RowExtra, badge_text, file_row, file_row_owned};
-pub use terminal_tabs::terminal_tabs;
 
 pub const ROW_H: f32 = 24.0;
 
@@ -121,7 +119,7 @@ pub fn chip(ui: &mut Ui, text: &str, color: Color32) -> Response {
 }
 
 /// A tab's shape: rounded at the top only.
-fn top_rounded(radius: u8) -> CornerRadius {
+pub(super) fn top_rounded(radius: u8) -> CornerRadius {
     CornerRadius {
         nw: radius,
         ne: radius,

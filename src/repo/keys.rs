@@ -3,6 +3,7 @@
 
 use super::{Action, Dialog, Refresh, RepoTab, WIP_HASH, ops};
 use crate::keymap::Command;
+use crate::repo::terminals::TerminalAct;
 use crate::settings::Settings;
 
 impl RepoTab {
@@ -92,7 +93,7 @@ impl RepoTab {
                 return Err(crate::i18n::text("repo-core-2868").into());
             }
             Command::NewBranch => Action::Dialog(Dialog::create_branch(&self.refs.head, "HEAD")),
-            Command::Terminal => Action::ToggleTerminal,
+            Command::Terminal => Action::Terminal(TerminalAct::Toggle),
             Command::StageAll if self.work.unstaged.is_empty() => {
                 return Err(crate::i18n::text("repo-core-0838").into());
             }
@@ -182,6 +183,7 @@ impl RepoTab {
 
 #[cfg(test)]
 mod tests {
+    use crate::repo::terminals::TerminalAct;
     use std::path::{Path, PathBuf};
     use std::time::Duration;
 
@@ -257,7 +259,7 @@ mod tests {
         );
         let terminal = matches!(
             tab.key_action(Command::Terminal),
-            Ok(Some(Action::ToggleTerminal))
+            Ok(Some(Action::Terminal(TerminalAct::Toggle)))
         );
         let window = tab.key_action(Command::NextTab);
         let _ = std::fs::remove_dir_all(&dir);
@@ -313,7 +315,10 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
         assert_eq!(fetch.as_deref(), Some("Push is still running"));
         assert_eq!(commit.as_deref(), Some("Push is still running"));
-        assert!(matches!(terminal, Ok(Some(Action::ToggleTerminal))));
+        assert!(matches!(
+            terminal,
+            Ok(Some(Action::Terminal(TerminalAct::Toggle)))
+        ));
         assert_eq!(shown, Some(("Push is still running".to_owned(), true)));
     }
 

@@ -1,10 +1,11 @@
 //! The terminal panel's tab strip.
 
+use crate::repo::terminals::TerminalAct;
 use egui::{Rect, Sense, Ui, pos2, vec2};
 
-use super::top_rounded;
 use crate::icons;
 use crate::repo::Action;
+use crate::repo::widgets::{self, top_rounded};
 use crate::terminal::Terminal;
 use crate::theme::{self, Tokens};
 
@@ -33,10 +34,10 @@ pub fn terminal_tabs(
     ui.add_space(4.0);
     let plus = icons::small_button(ui, "plus", crate::i18n::text("repo-core-0068"));
     if plus.clicked() {
-        acts.push(Action::NewTerminal {
+        acts.push(Action::Terminal(TerminalAct::New {
             shell: None,
             cwd: None,
-        });
+        }));
     }
     crate::menu_item::context(&plus)
         .style(crate::theme::menu_style)
@@ -53,7 +54,7 @@ pub fn terminal_tabs(
                 acts.push(Action::Popout(Request::Close(Panel::Terminal)));
             }
         } else if icons::small_button(ui, "x", crate::i18n::text("repo-core-3775")).clicked() {
-            acts.push(Action::ToggleTerminal);
+            acts.push(Action::Terminal(TerminalAct::Hide));
         }
         crate::repo::popout::button(ui, crate::repo::popout::Panel::Terminal, popped, acts);
     });
@@ -78,7 +79,7 @@ fn terminal_tab(
         ui.painter()
             .layout_no_wrap(label, font, if selected { t.text } else { t.text_dim });
     let (rect, resp) = ui.allocate_exact_size(vec2(galley.size().x + 44.0, 26.0), Sense::click());
-    super::a11y_selected(
+    widgets::a11y_selected(
         &resp,
         || {
             crate::i18n::message(
@@ -111,7 +112,7 @@ fn terminal_tab(
     let x = ui
         .interact(x_rect, resp.id.with("close"), Sense::click())
         .on_hover_text(crate::i18n::text("repo-core-3778"));
-    super::a11y(
+    widgets::a11y(
         &x,
         egui::WidgetType::Button,
         crate::i18n::text("repo-core-3779"),
@@ -121,9 +122,9 @@ fn terminal_tab(
     }
     icons::paint(ui, x_rect, "x", 11.0, t.text_faint);
     if x.clicked() {
-        acts.push(Action::CloseTerminal(i));
+        acts.push(Action::Terminal(TerminalAct::Close(i)));
     } else if resp.clicked() {
-        acts.push(Action::SelectTerminal(i));
+        acts.push(Action::Terminal(TerminalAct::Select(i)));
     }
 }
 
@@ -135,10 +136,10 @@ fn shell_items(ui: &mut Ui, acts: &mut Vec<Action>) {
             .show(ui)
             .clicked()
         {
-            acts.push(Action::NewTerminal {
+            acts.push(Action::Terminal(TerminalAct::New {
                 shell: Some(shell),
                 cwd: None,
-            });
+            }));
         }
     }
 }

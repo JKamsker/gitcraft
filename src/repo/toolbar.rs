@@ -1,6 +1,7 @@
 //! The tab's toolbar: undo / redo, remote and repository buttons, the current branch, and the
 //! status of the last operation.
 
+use crate::repo::terminals::TerminalAct;
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -402,11 +403,11 @@ impl RepoTab {
             crate::i18n::text("repo-core-3670"),
             Command::Terminal,
         ));
-        if self.terminal_open {
+        if self.terminals.is_open() {
             widgets::active_underline(ui, terminal.rect, t.accent);
         }
         if terminal.clicked() {
-            acts.push(Action::ToggleTerminal);
+            acts.push(Action::Terminal(TerminalAct::Toggle));
         }
         self.branch_bands_header(ui);
         let activity = icons::tool_button(ui, "list", "", true)

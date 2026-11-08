@@ -1,6 +1,7 @@
 //! Drawing the views of a repository tab that are popped out, the buttons that pop them out
 //! and bring them back, and what the tab's actions do to them.
 
+use crate::repo::terminals::TerminalAct;
 use egui::{Key, RichText, Ui, ViewportClass};
 
 use super::{Panel, Request, title, viewport_id, window};
@@ -86,7 +87,7 @@ impl RepoTab {
     fn view_open(&self, panel: Panel) -> bool {
         match panel {
             Panel::Diff => self.diff.is_some(),
-            Panel::Terminal => self.terminal_open,
+            Panel::Terminal => self.terminals.is_open(),
             Panel::Pr => self.pr_view.is_some(),
             Panel::Ci => self.ci_view.is_some(),
         }
@@ -102,8 +103,8 @@ impl RepoTab {
                 ),
                 None => crate::i18n::text("repo-core-2367").to_owned(),
             },
-            Panel::Terminal => match self.terminals.get(self.active_terminal) {
-                Some(term) if self.terminal_open => crate::i18n::message(
+            Panel::Terminal => match self.terminals.active() {
+                Some(term) if self.terminals.is_open() => crate::i18n::message(
                     "repo-core-4216",
                     &[("shell", term.shell.to_string().into())],
                 ),
@@ -289,8 +290,8 @@ impl RepoTab {
     pub(in crate::repo) fn popout_request(&mut self, request: Request, ctx: &egui::Context) {
         match request {
             Request::PopOut(Panel::Terminal) => {
-                if !self.terminal_open {
-                    self.toggle_terminal(ctx);
+                if !self.terminals.is_open() {
+                    self.terminals.toggle(&self.path, ctx);
                 }
                 self.popouts.pop_out(Panel::Terminal);
             }
@@ -323,7 +324,7 @@ impl RepoTab {
                 Panel::Diff => self.apply(Action::CloseDiff, ctx),
                 Panel::Pr => self.apply(Action::ClosePr, ctx),
                 Panel::Ci => self.apply(Action::CloseCi, ctx),
-                Panel::Terminal => self.terminal_open = false,
+                Panel::Terminal => self.terminals.hide(),
             },
             Request::Focus(panel) => self.focus_popout(panel, ctx),
             Request::PopShown => match self.shown_poppable() {
@@ -360,7 +361,9 @@ impl RepoTab {
     ) -> Option<Action> {
         self.popouts.note(&action, self.terminals.len());
         match action {
-            Action::ToggleTerminal if self.terminal_open && !self.docked(Panel::Terminal) => {
+            Action::Terminal(TerminalAct::Toggle)
+                if self.terminals.is_open() && !self.docked(Panel::Terminal) =>
+            {
                 self.focus_popout(Panel::Terminal, ctx);
                 None
             }
@@ -442,7 +445,7 @@ fn placeholder(ui: &mut Ui, panel: Panel, why: &str, acts: &mut Vec<Action>) {
         ui.horizontal(|ui| {
             if panel == Panel::Terminal && ui.button(crate::i18n::text("repo-core-4235")).clicked()
             {
-                acts.push(Action::ToggleTerminal);
+                acts.push(Action::Terminal(TerminalAct::Toggle));
             }
             if ui.button(crate::i18n::text("repo-core-4236")).clicked() {
                 acts.push(Action::Popout(Request::Dock(panel)));

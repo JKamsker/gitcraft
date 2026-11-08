@@ -2,6 +2,7 @@
 //! titles, and the windows themselves, natively (through a stand-in for eframe's renderer)
 //! and inside the main window.
 
+use crate::repo::terminals::TerminalAct;
 use std::cell::RefCell;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
@@ -77,8 +78,11 @@ fn only_closing_a_view_on_purpose_takes_its_window() {
         Some(Panel::Terminal)
     );
     // The last shell closed takes the terminal; one of several doesn't.
-    assert_eq!(closes(&Action::CloseTerminal(0), 1), Some(Panel::Terminal));
-    assert_eq!(closes(&Action::CloseTerminal(0), 2), None);
+    assert_eq!(
+        closes(&Action::Terminal(TerminalAct::Close(0)), 1),
+        Some(Panel::Terminal)
+    );
+    assert_eq!(closes(&Action::Terminal(TerminalAct::Close(0)), 2), None);
     // Selecting a commit closes the diff as a side effect: the window stays for the next.
     assert_eq!(closes(&Action::Select(3), 0), None);
     assert_eq!(closes(&Action::Popout(Request::Dock(Panel::Diff)), 0), None);
@@ -312,15 +316,15 @@ fn the_main_windows_keys_leave_a_popped_out_view_alone() {
     ctx.set_embed_viewports(true);
     assert!(tab.main_keys(&ctx, Panel::Ci));
     // The toolbar's Terminal raises a popped-out terminal rather than hiding it.
-    tab.terminal_open = true;
+    tab.terminals.opened(Err("launch failed".into()));
     tab.popouts.pop_out(Panel::Terminal);
-    tab.apply(Action::ToggleTerminal, &ctx);
-    let still_open = tab.terminal_open;
+    tab.apply(Action::Terminal(TerminalAct::Toggle), &ctx);
+    let still_open = tab.terminals.is_open();
     // Its window's close button hides it, and takes the pop-out.
     tab.apply(Action::Popout(Request::Close(Panel::Terminal)), &ctx);
     let _ = std::fs::remove_dir_all(&dir);
     assert!(still_open);
-    assert!(!tab.terminal_open);
+    assert!(!tab.terminals.is_open());
     assert!(tab.docked(Panel::Terminal));
 }
 
