@@ -129,6 +129,94 @@ impl Plan {
     }
 }
 
+/// Resolve the current tag validator's error only when it matches these exact inputs.
+/// Other messages retain their opaque detail through the finite release display adapter.
+pub(crate) fn display_problem(raw: &str, tag: &str, taken: &[String]) -> String {
+    let tag = tag.trim();
+    if super::tag_problem(tag, taken).as_deref() == Some(raw) {
+        if tag.is_empty() {
+            return text("interaction-release-tag-empty").to_owned();
+        }
+        let id = if taken.iter().any(|t| t == tag) {
+            "interaction-release-tag-taken"
+        } else {
+            "interaction-release-tag-invalid"
+        };
+        return message(id, &[("tag", tag.into())]);
+    }
+    display_error(raw)
+}
+
+/// Known release metadata/worker errors for paint. Raw producers and execution stay unchanged.
+pub(crate) fn display_error(raw: &str) -> String {
+    let id = match raw {
+        "Only the tip of the branch checked out can move the version in its files" => {
+            Some("interaction-release-note-tip")
+        }
+        "Commit or stash the changes to the files the version is in first" => {
+            Some("interaction-release-note-dirty")
+        }
+        "nothing to move" => Some("interaction-release-nothing"),
+        "no remote to push to" => Some("interaction-release-no-remote"),
+        "The repository isn't on a forge gitcraft knows" => {
+            Some("interaction-release-unknown-forge")
+        }
+        _ => None,
+    };
+    if let Some(id) = id {
+        return text(id).to_owned();
+    }
+    if let Some((branch, tail)) = raw.split_once(" isn't checked out at ")
+        && !branch.is_empty()
+        && !branch.chars().any(|c| c.is_whitespace() || c == ':')
+        && let Some(commit) = tail.strip_suffix(" any more: plan the release again")
+        && commit.len() == 8
+        && commit.bytes().all(|b| b.is_ascii_hexdigit())
+    {
+        return message(
+            "interaction-release-branch-moved",
+            &[("branch", branch.into()), ("commit", commit.into())],
+        );
+    }
+    if let Some(files) =
+        raw.strip_suffix(" changed since the release was planned: commit or stash that first")
+        && files.split(", ").all(manifest_file)
+    {
+        return message(
+            "interaction-release-files-changed",
+            &[("files", files.into())],
+        );
+    }
+    if let Some(file) = raw.strip_prefix("Couldn't find the version in ")
+        && manifest_file(file)
+    {
+        return message(
+            "interaction-release-version-missing",
+            &[("file", file.into())],
+        );
+    }
+    if let Some(tail) = raw.strip_prefix("Couldn't write ")
+        && let Some((file, reason)) = tail.split_once(": ")
+        && manifest_file(file)
+    {
+        return message(
+            "interaction-release-write-failed",
+            &[
+                ("file", file.into()),
+                ("reason", crate::git::display_error(reason).into()),
+            ],
+        );
+    }
+    crate::git::display_error(raw)
+}
+
+fn manifest_file(file: &str) -> bool {
+    matches!(
+        file,
+        "Cargo.toml" | "Cargo.lock" | "package.json" | "package-lock.json" | CHANGELOG
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -198,5 +286,73 @@ mod tests {
         assert!(!de[2].1.contains("Vorab-Release"));
         crate::i18n::set_language("en-US");
         assert_eq!(direct.display_preview(None), direct.preview(None));
+    }
+}
+
+#[cfg(test)]
+mod validation_localization_tests {
+    use super::*;
+
+    #[test]
+    fn actual_tag_validation_keeps_raw_results_and_only_renders_matching_current_inputs()
+    -> Result<(), String> {
+        crate::i18n::set_language("de");
+        let taken = vec!["v1.234.5-日本語".to_owned()];
+        for (tag, raw, de) in [
+            (" ", "Name the version", "Benenne die Version"),
+            (
+                "v1.234.5-日本語",
+                "v1.234.5-日本語 is a tag already",
+                "v1.234.5-日本語 ist bereits ein Tag",
+            ),
+            (
+                "invalid tag 日本語",
+                "invalid tag 日本語 can't be a tag's name",
+                "invalid tag 日本語 ist kein gültiger Tag-Name",
+            ),
+        ] {
+            let actual = super::super::tag_problem(tag, &taken).ok_or("missing raw validation")?;
+            assert_eq!(actual, raw);
+            assert_eq!(display_problem(&actual, tag, &taken), de);
+            assert_eq!(super::super::tag_problem(tag, &taken).as_deref(), Some(raw));
+        }
+        assert_eq!(
+            display_problem("foreign is a tag already", "v2", &taken),
+            "foreign is a tag already"
+        );
+        assert!(super::super::tag_problem("v2", &taken).is_none());
+        assert_eq!(
+            display_error("Couldn't write Cargo.toml: External diagnostic 日本語"),
+            "Cargo.toml konnte nicht geschrieben werden: External diagnostic 日本語"
+        );
+        assert_eq!(
+            display_error(
+                "topic-日本語 isn't checked out at abcdef12 any more: plan the release again"
+            ),
+            "topic-日本語 ist nicht mehr bei abcdef12 ausgecheckt: Plane das Release erneut"
+        );
+        assert_eq!(
+            display_error(
+                "Cargo.toml, CHANGELOG.md changed since the release was planned: commit or stash that first"
+            ),
+            "Cargo.toml, CHANGELOG.md wurden seit der Release-Planung geändert: Committe oder stashe zuerst diese Änderungen"
+        );
+        assert_eq!(
+            display_error("Couldn't find the version in package.json"),
+            "Die Version konnte in package.json nicht gefunden werden"
+        );
+        for raw in [
+            "Unknown provider error 日本語",
+            "Couldn't write external/path: output",
+            "external prose isn't checked out at opaque any more: plan the release again",
+        ] {
+            assert_eq!(display_error(raw), raw);
+        }
+        crate::i18n::set_language("en-US");
+        assert_eq!(
+            display_problem("Name the version", "", &taken),
+            "Name the version"
+        );
+        Ok(())
     }
 }

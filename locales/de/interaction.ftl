@@ -94,3 +94,27 @@ interaction-release-tag-version = { $kind ->
     }
 
 interaction-release-upload = Hängt { $files } daran an
+
+interaction-release-note-tip = Nur an der Spitze des ausgecheckten Branches kann die Version in den Dateien geändert werden
+
+interaction-release-note-dirty = Committe oder stashe zuerst die Änderungen an den Dateien mit der Versionsangabe
+
+interaction-release-nothing = keine Version zu ändern
+
+interaction-release-no-remote = kein Remote zum Pushen vorhanden
+
+interaction-release-unknown-forge = Das Repository liegt nicht auf einer Forge, die gitcraft kennt
+
+interaction-release-tag-empty = Benenne die Version
+
+interaction-release-tag-taken = { $tag } ist bereits ein Tag
+
+interaction-release-tag-invalid = { $tag } ist kein gültiger Tag-Name
+
+interaction-release-branch-moved = { $branch } ist nicht mehr bei { $commit } ausgecheckt: Plane das Release erneut
+
+interaction-release-files-changed = { $files } wurden seit der Release-Planung geändert: Committe oder stashe zuerst diese Änderungen
+
+interaction-release-version-missing = Die Version konnte in { $file } nicht gefunden werden
+
+interaction-release-write-failed = { $file } konnte nicht geschrieben werden: { $reason }

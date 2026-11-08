@@ -94,3 +94,27 @@ interaction-release-tag-version = { $kind ->
     }
 
 interaction-release-upload = Attaches { $files } to it
+
+interaction-release-note-tip = Only the tip of the branch checked out can move the version in its files
+
+interaction-release-note-dirty = Commit or stash the changes to the files the version is in first
+
+interaction-release-nothing = nothing to move
+
+interaction-release-no-remote = no remote to push to
+
+interaction-release-unknown-forge = The repository isn't on a forge gitcraft knows
+
+interaction-release-tag-empty = Name the version
+
+interaction-release-tag-taken = { $tag } is a tag already
+
+interaction-release-tag-invalid = { $tag } can't be a tag's name
+
+interaction-release-branch-moved = { $branch } isn't checked out at { $commit } any more: plan the release again
+
+interaction-release-files-changed = { $files } changed since the release was planned: commit or stash that first
+
+interaction-release-version-missing = Couldn't find the version in { $file }
+
+interaction-release-write-failed = Couldn't write { $file }: { $reason }

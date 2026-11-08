@@ -6,6 +6,7 @@
 
 pub(crate) mod conventional;
 mod display;
+pub(crate) use display::{display_error, display_problem};
 pub(crate) mod manifest;
 pub(crate) mod notes;
 #[cfg(test)]
