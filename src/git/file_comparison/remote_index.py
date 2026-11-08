@@ -55,24 +55,52 @@ def set_acl(fd, text):
         if lib.acl_set_fd_np(fd,acl,0x100) != 0: raise RuntimeError('Cannot preserve native index ACL')
     finally: lib.acl_free(acl)
 def xattrs(fd):
-    if sys.platform != 'darwin':
-        return [(os.fsencode(name),os.getxattr(fd,name)) for name in sorted(os.listxattr(fd))]
-    # CPython on macOS does not expose os.listxattr/getxattr. Use the shipped
-    # descriptor-based APIs directly, with size queries before every allocation.
-    lib=ctypes.CDLL('/usr/lib/libSystem.B.dylib',use_errno=True)
-    lib.flistxattr.argtypes=[ctypes.c_int,ctypes.c_void_p,ctypes.c_size_t,ctypes.c_int];lib.flistxattr.restype=ctypes.c_ssize_t
-    lib.fgetxattr.argtypes=[ctypes.c_int,ctypes.c_char_p,ctypes.c_void_p,ctypes.c_size_t,ctypes.c_uint,ctypes.c_int];lib.fgetxattr.restype=ctypes.c_ssize_t
-    size=lib.flistxattr(fd,None,0,0)
-    if size<0 or size>1024*1024: raise RuntimeError('Cannot bound native index attributes')
-    names=ctypes.create_string_buffer(max(1,size));count=lib.flistxattr(fd,names,size,0)
-    if count<0 or count>size: raise RuntimeError('Index attributes changed during listing')
-    result=[];total=0
-    for name in sorted(n for n in names.raw[:count].split(b'\0') if n):
-        size=lib.fgetxattr(fd,name,None,0,0,0);total+=len(name)+max(0,size)
-        if size<0 or total>1024*1024: raise RuntimeError('Native index attributes exceed 1 MiB')
-        value=ctypes.create_string_buffer(max(1,size));count=lib.fgetxattr(fd,name,value,size,0,0)
-        if count<0 or count>size: raise RuntimeError('Index attributes changed during reading')
-        result.append((name,value.raw[:count]))
+    # Native descriptor APIs on both platforms: os.getxattr allocates the complete
+    # value before returning, so it cannot enforce an aggregate allocation budget.
+    darwin = sys.platform == 'darwin'
+    if not darwin and not sys.platform.startswith('linux'):
+        raise RuntimeError('Full remote index attributes require Linux/WSL or macOS')
+    lib = ctypes.CDLL('/usr/lib/libSystem.B.dylib' if darwin else None, use_errno=True)
+    lib.flistxattr.argtypes = [ctypes.c_int, ctypes.c_void_p, ctypes.c_size_t] + ([ctypes.c_int] if darwin else [])
+    lib.flistxattr.restype = ctypes.c_ssize_t
+    lib.fgetxattr.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_void_p, ctypes.c_size_t] + ([ctypes.c_uint, ctypes.c_int] if darwin else [])
+    lib.fgetxattr.restype = ctypes.c_ssize_t
+    limit = 1024 * 1024
+    def listing():
+        size = lib.flistxattr(fd, None, 0, *([0] if darwin else []))
+        if size < 0 or size > limit: raise RuntimeError('Cannot bound native index attribute names')
+        names = ctypes.create_string_buffer(max(1, size))
+        count = lib.flistxattr(fd, names, size, *([0] if darwin else []))
+        if count != size: raise RuntimeError('Index attributes changed during listing')
+        raw = names.raw[:count]
+        if raw and not raw.endswith(b'\0'): raise RuntimeError('Malformed index attribute names')
+        names = raw[:-1].split(b'\0') if raw else []
+        if len(names) > 1024: raise RuntimeError('Index attribute count exceeds 1024')
+        if any(not name for name in names) or len(set(names)) != len(names):
+            raise RuntimeError('Malformed index attribute names')
+        return raw, sorted(names)
+    def get(name, buffer, size):
+        return lib.fgetxattr(fd, name, buffer, size, *([0, 0] if darwin else []))
+    raw, names = listing()
+    total = len(raw)
+    sizes = []
+    # Bound the complete listing/count and aggregate sizes before fetching ANY
+    # value. No oversized value is allocated, even transiently or on a failed read.
+    for name in names:
+        size = get(name, None, 0)
+        if size < 0: raise RuntimeError('Cannot establish native index attribute size')
+        total += size
+        if total > limit: raise RuntimeError('Native index attributes exceed 1 MiB')
+        sizes.append(size)
+    result = []
+    for name, size in zip(names, sizes):
+        if get(name, None, 0) != size: raise RuntimeError('Index attribute size changed before reading')
+        value = ctypes.create_string_buffer(max(1, size))
+        count = get(name, value, size)
+        if count != size or get(name, None, 0) != size:
+            raise RuntimeError('Index attributes changed during reading')
+        result.append((name, value.raw[:count]))
+    if listing() != (raw, names): raise RuntimeError('Index attribute names changed during reading')
     return result
 
 def set_xattr(fd,name,value):
