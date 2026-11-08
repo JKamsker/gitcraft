@@ -99,7 +99,7 @@ impl CommandLine {
             CommandLine::Words(words) => words
                 .iter()
                 .map(|w| {
-                    if w.contains([' ', '&', '|', '<', '>', '^', '(', ')']) {
+                    if w.contains([' ', '&', '|', '<', '>', '^', '(', ')', '=', ',', ';', '\'']) {
                         format!("\"{w}\"")
                     } else {
                         w.clone()
@@ -291,7 +291,7 @@ fn owned_completion(
 }
 
 /// The shell that runs `command` here.
-fn shell_here(command: &CommandLine) -> Command {
+pub(crate) fn shell_here(command: &CommandLine) -> Command {
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;

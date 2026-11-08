@@ -23,7 +23,7 @@ pub use keep_both_view::KeepBoth;
 use self::align::split_resolutions;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-enum Segment {
+pub(in crate::repo) enum Segment {
     Common(String),
     Conflict {
         ours: String,
@@ -116,7 +116,7 @@ fn is_marker(line: &str, kind: char) -> bool {
 
 /// Splits a file with conflict markers into common text and conflicts (diff3 bases kept).
 /// A conflict that never ends (no `>>>>>>>` before the end of the file) stays text.
-fn parse(text: &str) -> (Vec<Segment>, String, String) {
+pub(in crate::repo) fn parse(text: &str) -> (Vec<Segment>, String, String) {
     enum State {
         Common,
         Ours,
@@ -427,6 +427,11 @@ impl ConflictEditor {
     /// that can't be read is gone).
     pub fn changed_on_disk(&self, repo: &Path) -> bool {
         changed_on_disk(repo, &self.path, &self.opened) != Some(false)
+    }
+
+    /// Whether choices or edits were made here that aren't saved.
+    pub fn has_draft(&self) -> bool {
+        self.result != self.opened
     }
 
     /// The file as it was opened (for [`changed_on_disk`] in the background).

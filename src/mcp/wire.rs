@@ -86,6 +86,12 @@ pub enum WriteOp {
         /// `--force-with-lease`.
         force: bool,
     },
+    /// Not an operation: a resolving agent's report on its work (see `crate::resolver`), for
+    /// the tab that started the run `run`. Changes nothing.
+    Report {
+        run: String,
+        report: crate::resolver::report::Report,
+    },
 }
 
 impl WriteOp {

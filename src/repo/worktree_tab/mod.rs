@@ -167,6 +167,7 @@ impl RepoTab {
     fn work(&mut self) -> Unfinished {
         Unfinished {
             operation: self.busy_op.is_some()
+                || self.resolver.running()
                 || self.ssh_setup.as_ref().is_some_and(|s| s.running()),
             terminal: self.terminals.has_running(),
             commit_message: !self.commit_summary.trim().is_empty()
@@ -174,7 +175,7 @@ impl RepoTab {
                 || self.reword.is_some()
                 || self.note_being_written(),
             editor: self.rebase.is_some() || self.conflict.is_some() || self.has_postcard_draft(),
-            review: self.has_pr_draft(),
+            review: self.has_pr_draft() || self.resolver.waiting(),
         }
     }
 

@@ -19,6 +19,7 @@ impl RepoTab {
         self.start_deferred(&ctx);
         self.poll(&ctx);
         self.agents_frame(&ctx);
+        self.resolver_frame(&ctx);
         let t = Tokens::get(&ctx);
         if self.opening() {
             egui::CentralPanel::default()
@@ -116,11 +117,13 @@ impl RepoTab {
         if self.conflict.is_none() && self.rebase.is_none() {
             self.issue_card(ui, &mut acts);
         }
-        egui::CentralPanel::default()
+        let big_area = egui::CentralPanel::default()
             .frame(egui::Frame::new().fill(t.dock))
             .show(ui, |ui| {
                 let pane_rect = ui.max_rect().intersect(ui.clip_rect());
-                if self.file_comparison.is_some() {
+                if self.resolver.reviewing() {
+                    self.resolver_review_view(ui, &mut acts);
+                } else if self.file_comparison.is_some() {
                     self.file_comparison_view(ui, &mut acts);
                 } else if self.conflict.is_some() {
                     self.conflict_view(ui, &mut acts);
@@ -170,6 +173,7 @@ impl RepoTab {
                 self.keyboard_pane(ui, super::keyboard::Pane::Graph, pane_rect);
             });
 
+        self.resolver_card(&ctx, big_area.response.rect, &mut acts);
         self.drag_overlay(&ctx, &mut acts);
         self.dialogs(&ctx, &mut acts);
         self.keep_both_dialog(&ctx);
@@ -278,6 +282,10 @@ impl RepoTab {
             if esc && self.file_comparison.is_some() {
                 acts.push(Action::CloseFileComparison);
             } else if esc && self.close_drop_menu() {
+            } else if esc && self.resolver.reviewing() {
+                // Drawn over everything else of the big area (a conflict editor too): it
+                // closes first, and the editor under it stays as it is.
+                acts.push(Action::Resolver(super::resolver::ResolverAct::CloseReview));
             } else if esc && diff_keys && self.note_open(ctx) {
                 acts.push(Action::Agent(super::agents::AgentAct::Tray(
                     super::agents::TrayAct::Close,

@@ -102,16 +102,7 @@ impl ConflictEditor {
                         {
                             acts.push(Action::CloseDiff);
                         }
-                        if ui
-                            .button(crate::i18n::text("repo-core-0712"))
-                            .on_hover_text(crate::i18n::text("repo-core-0713"))
-                            .clicked()
-                        {
-                            acts.push(Action::Agent(crate::repo::agents::AgentAct::Send(
-                                self.for_agent(),
-                                crate::i18n::text("repo-core-0714"),
-                            )));
-                        }
+                        self.agent_menu(ui, acts);
                         if widgets::primary_button(
                             ui,
                             crate::i18n::text("repo-core-0715"),
@@ -130,6 +121,37 @@ impl ConflictEditor {
                     });
                 });
             });
+    }
+
+    /// _Agent_: have one resolve this file in the background (see `repo::resolver`), or type
+    /// its conflicts into the agent's terminal.
+    fn agent_menu(&self, ui: &mut Ui, acts: &mut Vec<Action>) {
+        ui.menu_button("Agent", |ui| {
+            if ui
+                .button("Resolve in background")
+                .on_hover_text(
+                    "An agent resolves this file in a private copy of the checkout while you go \
+                     on; you watch its progress, review what it did and apply it",
+                )
+                .clicked()
+            {
+                acts.push(Action::Resolver(crate::repo::resolver::ResolverAct::Start(
+                    Some(vec![self.path.clone()]),
+                )));
+                ui.close();
+            }
+            if ui
+                .button(crate::i18n::text("repo-core-0712"))
+                .on_hover_text(crate::i18n::text("repo-core-0713"))
+                .clicked()
+            {
+                acts.push(Action::Agent(crate::repo::agents::AgentAct::Send(
+                    self.for_agent(),
+                    crate::i18n::text("repo-core-0714"),
+                )));
+                ui.close();
+            }
+        });
     }
 
     /// Solve with UnityYAMLMerge, for a Unity YAML file of a Unity project.

@@ -63,6 +63,7 @@ mod tests {
             repo: r.path().into(),
             agent: "test".into(),
             link_dir: None,
+            run: None,
             wait: std::time::Duration::from_secs(1),
             cancelled: std::sync::Arc::new(|| false),
         };

@@ -14,7 +14,7 @@ use crate::remote;
 pub const SCRATCH_DIR: &str = "gitcraft-scratch";
 
 /// What the worktrees are made for: the first part of their names.
-const LABELS: [&str; 3] = ["test", "rehearse", "interaction"];
+const LABELS: [&str; 4] = ["test", "rehearse", "interaction", "resolve"];
 
 /// Numbers the worktrees this process makes.
 static MADE: AtomicU64 = AtomicU64::new(0);
@@ -88,6 +88,26 @@ impl Scratch {
     pub fn remove(mut self) -> Result<(), String> {
         self.removed = true;
         remove_worktree(&self.repo, &self.path)
+    }
+
+    /// Removes it now, trying `attempts` times `pause` apart while it can't be (a program that
+    /// worked in it may hold its folder a moment longer).
+    pub fn remove_retrying(
+        mut self,
+        attempts: u32,
+        pause: std::time::Duration,
+    ) -> Result<(), String> {
+        self.removed = true;
+        let mut tried = 1;
+        loop {
+            match remove_worktree(&self.repo, &self.path) {
+                Err(_) if tried < attempts => {
+                    tried += 1;
+                    std::thread::sleep(pause);
+                }
+                done => return done,
+            }
+        }
     }
 }
 

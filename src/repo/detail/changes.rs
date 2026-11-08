@@ -164,6 +164,9 @@ impl RepoTab {
                         {
                             acts.push(self.abort_for(state));
                         }
+                        if !self.work.conflicted.is_empty() {
+                            self.resolve_all_button(ui, acts);
+                        }
                     });
                 });
                 let hint = if restack.is_some() {
