@@ -980,6 +980,29 @@ mod tests {
                 .cards
                 .is_empty()
         );
+        // Reusing the same captured target must refresh the already populated cache,
+        // including a no-change fetch. Its old-OID guard must still refuse a stale writer.
+        assert_eq!(
+            oid(reviewer.path(), &cached_ref("example#1", &read_target))?,
+            latest
+        );
+        assert!(
+            fetch_board(reviewer.path(), "example#1", &read_target, None)?
+                .cards
+                .is_empty()
+        );
+        let cached = cached_ref("example#1", &read_target);
+        let transaction =
+            format!("start\nupdate {cached} {previous} {previous}\nprepare\ncommit\n");
+        assert!(
+            git::run_input(
+                Some(reviewer.path()),
+                &["update-ref", "--stdin"],
+                &transaction
+            )
+            .is_err()
+        );
+        assert_eq!(oid(reviewer.path(), &cached)?, latest);
         assert_eq!(author.tip("HEAD")?, base);
         assert_eq!(server.tip("HEAD")?, server_head);
         assert_eq!(reviewer.tip("HEAD")?, reviewer_head);
