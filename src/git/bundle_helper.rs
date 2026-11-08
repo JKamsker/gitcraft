@@ -190,6 +190,9 @@ mod recording_tests {
         assert_eq!(env[OsStr::new("GIT_NO_LAZY_FETCH")], Some("1".into()));
         assert!(!env.contains_key(OsStr::new("PATH")) && !env.contains_key(OsStr::new("SECRET")));
         assert!(REMOTE.contains("sys.platform != 'linux'"));
-        assert!(REMOTE.find("resource.setrlimit").unwrap() < REMOTE.find("os.execvpe").unwrap());
+        assert!(matches!(
+            (REMOTE.find("resource.setrlimit"), REMOTE.find("os.execvpe")),
+            (Some(limit), Some(exec)) if limit < exec
+        ));
     }
 }

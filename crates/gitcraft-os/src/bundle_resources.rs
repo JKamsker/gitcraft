@@ -81,7 +81,7 @@ pub fn retire_bundle_keep(
             return Err(io::Error::last_os_error());
         }
         let current = unsafe { current.assume_init() };
-        if current.st_dev as u64 != meta.dev() || current.st_ino as u64 != meta.ino() {
+        if current.st_dev as u64 != meta.dev() || current.st_ino != meta.ino() {
             return Err(io::Error::other("pack keep identity changed; retained"));
         }
         // SAFETY: same validated component in retained directory, after current content
@@ -285,10 +285,10 @@ fn windows_job() -> Result<std::os::windows::io::OwnedHandle, String> {
 mod recording_tests {
     use super::*;
     #[test]
-    fn keep_retirement_accepts_only_exact_pack_names_and_import_nonce() {
+    fn keep_retirement_accepts_only_exact_pack_names_and_import_nonce() -> std::io::Result<()> {
         let message = format!("gitcraft-bundle-keep-v1-{}", "b".repeat(32));
         for width in [40, 64] {
-            let (name, bytes) = keep_expected(&"a".repeat(width), &message).unwrap();
+            let (name, bytes) = keep_expected(&"a".repeat(width), &message)?;
             assert_eq!(name, format!("pack-{}.keep", "a".repeat(width)));
             assert_eq!(bytes, format!("{message}\n").into_bytes());
         }
@@ -303,9 +303,10 @@ mod recording_tests {
         ] {
             assert!(keep_expected(&"a".repeat(40), msg).is_err());
         }
+        Ok(())
     }
     #[test]
-    fn hard_limits_are_lowered_read_back_and_never_relaxed() {
+    fn hard_limits_are_lowered_read_back_and_never_relaxed() -> Result<(), String> {
         for old in [
             Limit {
                 soft: u64::MAX,
@@ -327,12 +328,12 @@ mod recording_tests {
                     state.set(v);
                     Ok(())
                 },
-            )
-            .unwrap();
+            )?;
             assert_eq!(state.get(), lowered(old, 64));
             assert!(state.get().soft <= old.soft && state.get().hard <= old.hard);
             assert_eq!(writes.get(), 1);
         }
+        Ok(())
     }
     #[test]
     fn refused_or_unconfirmed_limits_do_not_allow_dispatch() {
@@ -342,13 +343,18 @@ mod recording_tests {
         };
         assert!(install_limit(64, || Ok(old), |_| Err("refused".into())).is_err());
         assert!(install_limit(64, || Ok(old), |_| Ok(())).is_err());
+        let writes = std::cell::Cell::new(0);
         assert!(
             install_limit(
                 64,
                 || Err("unavailable".into()),
-                |_| panic!("must not write")
+                |_| {
+                    writes.set(writes.get() + 1);
+                    Err("must not write".into())
+                }
             )
             .is_err()
         );
+        assert_eq!(writes.get(), 0, "must not write");
     }
 }

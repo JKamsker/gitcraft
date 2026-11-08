@@ -504,7 +504,7 @@ mod recording_tests {
             Ok(match args[0] {
                 "rev-parse" => b"sha1\n".to_vec(),
                 "cat-file" => String::from_utf8(input)
-                    .unwrap()
+                    .map_err(|error| error.to_string())?
                     .lines()
                     .map(|l| format!("{} commit 10\n", l.trim_end_matches("^{commit}")))
                     .collect::<String>()
@@ -530,17 +530,18 @@ mod recording_tests {
         }]
     }
     #[test]
-    fn verification_never_publishes_and_import_uses_identical_pack_then_atomic_create() {
+    fn verification_never_publishes_and_import_uses_identical_pack_then_atomic_create()
+    -> Result<(), String> {
         let refs = refs();
         let mapped = vec![BundleRef {
             name: "refs/bundle-import/test/heads/main".into(),
             oid: refs[0].oid.clone(),
         }];
         let mut read = Recording::default();
-        pipeline(&mut read, b"PACK-recording", &refs, &[], &mapped, false).unwrap();
+        pipeline(&mut read, b"PACK-recording", &refs, &[], &mapped, false)?;
         assert!(!read.published && read.calls.iter().all(|(_, a, _)| a[0] != "update-ref"));
         let mut write = Recording::default();
-        pipeline(&mut write, b"PACK-recording", &refs, &[], &mapped, true).unwrap();
+        pipeline(&mut write, b"PACK-recording", &refs, &[], &mapped, true)?;
         let packs: Vec<_> = write
             .calls
             .iter()
@@ -548,16 +549,17 @@ mod recording_tests {
             .collect();
         assert_eq!(packs.len(), 2);
         assert_eq!(packs[0].2, packs[1].2);
-        let (_, args, input) = write.calls.last().unwrap();
+        let (_, args, input) = write.calls.last().ok_or("missing recorded publication")?;
         assert_eq!(args, &["update-ref", "--no-deref", "--stdin"]);
         assert_eq!(
-            String::from_utf8(input.clone()).unwrap(),
+            String::from_utf8(input.clone()).map_err(|error| error.to_string())?,
             format!(
                 "start\ncreate {} {}\nprepare\ncommit\n",
                 mapped[0].name, mapped[0].oid
             )
         );
         assert!(write.published);
+        Ok(())
     }
     #[test]
     fn failures_stale_targets_and_cleanup_uncertainty_cannot_become_success() {
@@ -568,8 +570,7 @@ mod recording_tests {
             };
             assert!(
                 pipeline(&mut backend, b"PACK", &refs(), &refs(), &refs(), true)
-                    .unwrap_err()
-                    .contains("unconfirmed")
+                    .is_err_and(|error| error.contains("unconfirmed"))
             );
             assert!(!backend.published);
         }
@@ -590,17 +591,18 @@ mod recording_tests {
                 Err("ledger retained".into()),
                 true
             )
-            .unwrap_err()
-            .contains("unconfirmed; quarantine cleanup failed: ledger retained")
+            .is_err_and(
+                |error| error.contains("unconfirmed; quarantine cleanup failed: ledger retained")
+            )
         );
         assert!(
             completed(Ok(()), Err("ref cleanup failed".into()), true)
-                .unwrap_err()
-                .starts_with("Ref publication completed")
+                .is_err_and(|error| error.starts_with("Ref publication completed"))
         );
     }
     #[test]
-    fn every_git_command_has_no_lazy_no_network_no_hooks_and_fixed_memory_policy() {
+    fn every_git_command_has_no_lazy_no_network_no_hooks_and_fixed_memory_policy()
+    -> Result<(), String> {
         let args = policy("/private/quarantine.git", "/private/no-hooks");
         assert_eq!(args[0], "--no-lazy-fetch");
         for flag in [
@@ -611,14 +613,16 @@ mod recording_tests {
         ] {
             assert!(args.iter().any(|a| a == flag));
         }
-        let words = wrapper(true, "\"/objects\"", &args).unwrap();
+        let words = wrapper(true, "\"/objects\"", &args)?;
         assert!(words.iter().any(|s| s.contains("resource.setrlimit")));
         assert!(words.iter().all(|s| !s.contains("${@:3}")));
+        Ok(())
     }
     #[test]
-    fn owned_keep_spans_object_checks_ref_prepare_commit_and_terminal_before_retirement() {
+    fn owned_keep_spans_object_checks_ref_prepare_commit_and_terminal_before_retirement()
+    -> Result<(), String> {
         let mut backend = Recording::default();
-        pipeline(&mut backend, b"PACK", &refs(), &refs(), &refs(), true).unwrap();
+        pipeline(&mut backend, b"PACK", &refs(), &refs(), &refs(), true)?;
         assert_eq!(
             backend.events,
             [
@@ -632,6 +636,7 @@ mod recording_tests {
             ]
         );
         assert!(backend.marker.is_none() && backend.published);
+        Ok(())
     }
     #[test]
     fn indexing_receipt_object_identity_and_publication_uncertainty_retain_keep() {
@@ -645,8 +650,7 @@ mod recording_tests {
                 backend
                     .marker
                     .as_deref()
-                    .unwrap()
-                    .starts_with("gitcraft-bundle-keep-v1-"),
+                    .is_some_and(|marker| marker.starts_with("gitcraft-bundle-keep-v1-")),
                 "{stage}"
             );
             assert!(!backend.events.contains(&"retire"), "{stage}");
@@ -666,8 +670,7 @@ mod recording_tests {
             };
             assert!(
                 pipeline(&mut backend, b"PACK", &refs(), &[], &refs(), true)
-                    .unwrap_err()
-                    .contains("another keep marker")
+                    .is_err_and(|error| error.contains("another keep marker"))
             );
             // Even coincidentally matching contents do not turn another creator's
             // `pack` receipt into our `keep` ownership receipt.
@@ -683,8 +686,8 @@ mod recording_tests {
                 stage: Some(stage),
                 ..Default::default()
             };
-            let error = pipeline(&mut backend, b"PACK", &refs(), &[], &refs(), true).unwrap_err();
-            assert!(error.starts_with("Ref publication completed"));
+            let error = pipeline(&mut backend, b"PACK", &refs(), &[], &refs(), true);
+            assert!(error.is_err_and(|error| error.starts_with("Ref publication completed")));
             assert!(backend.published && backend.marker.is_some());
             assert_eq!(backend.events.last(), Some(&"retire"));
         }
