@@ -41,6 +41,12 @@ public static class GitcraftNativePolicy {
     if (length == 0 || length > 1048576) throw new InvalidOperationException("Full native descriptor exceeds 1 MiB");
     byte[] raw = new byte[length]; Marshal.Copy(descriptor,raw,0,(int)length);
     RawSecurityDescriptor parsed = new RawSecurityDescriptor(raw,0);
+    // The resource manager recalculates these status bits when applying an otherwise
+    // identical ACL. Keep ACEs and the protected/unprotected state in the comparison.
+    const ControlFlags InheritanceStatus = ControlFlags.DiscretionaryAclAutoInheritRequired |
+      ControlFlags.SystemAclAutoInheritRequired | ControlFlags.DiscretionaryAclAutoInherited |
+      ControlFlags.SystemAclAutoInherited;
+    parsed.SetFlags(parsed.ControlFlags & ~InheritanceStatus);
     byte[] normalized = new byte[parsed.BinaryLength]; parsed.GetBinaryForm(normalized,0);
     return normalized;
   }
@@ -332,6 +338,9 @@ mod tests {
         assert!(SCRIPT.contains("GetNamedSecurityInfo(path,1,info"));
         assert!(SCRIPT.contains("SetNamedSecurityInfo(target,1,info|protection"));
         assert!(SCRIPT.contains("if ((info & 0x8) != 0) protection |="));
+        assert!(SCRIPT.contains("parsed.SetFlags(parsed.ControlFlags & ~InheritanceStatus);"));
+        assert!(SCRIPT.contains("ControlFlags.DiscretionaryAclProtected"));
+        assert!(SCRIPT.contains("ControlFlags.SystemAclProtected"));
         assert!(SCRIPT.contains("Array.Copy(BitConverter.GetBytes(info),snapshot,4)"));
         assert!(SCRIPT.contains("SeSecurityPrivilege"));
         assert!(!SCRIPT.contains("[IO.File]::GetAccessControl"));
