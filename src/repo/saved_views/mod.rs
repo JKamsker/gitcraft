@@ -63,10 +63,7 @@ impl Preferences {
             }
             Kind::Descendants { anchor } => crate::i18n::message(
                 "repo-workflows-saved_views-saved-graph-header-d2cb0f94",
-                &[(
-                    "super-super-short-anchor-1",
-                    super::super::short(anchor).into(),
-                )],
+                &[("super-super-short-anchor-1", super::short(anchor).into())],
             ),
             Kind::MergesInto { branch } => crate::i18n::message(
                 "repo-workflows-saved_views-saved-graph-header-b5bc2926",

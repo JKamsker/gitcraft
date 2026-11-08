@@ -309,7 +309,7 @@ impl State {
         let entries = match workflow.matrices(job) {
             Ok(entries) => entries,
             Err(e) => {
-                ui.colored_label(egui::Color32::YELLOW, self.display_result_error(e));
+                ui.colored_label(egui::Color32::YELLOW, e);
                 return;
             }
         };
@@ -339,7 +339,7 @@ impl State {
                 ));
             }
             Err(e) => {
-                ui.colored_label(egui::Color32::YELLOW, self.display_result_error(e));
+                ui.colored_label(egui::Color32::YELLOW, e);
                 return;
             }
         }
@@ -373,7 +373,7 @@ impl State {
                 ui.label(context.display());
             }
             Err(error) => {
-                ui.colored_label(egui::Color32::YELLOW, error.display());
+                ui.colored_label(egui::Color32::YELLOW, error);
             }
         }
         ui.label(crate::i18n::text(
