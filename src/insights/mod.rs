@@ -9,6 +9,7 @@
 
 pub mod churn;
 pub mod ci_path;
+pub mod conflict_radar;
 pub mod constellation;
 pub mod deploy;
 pub mod evolution;
