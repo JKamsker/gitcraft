@@ -266,3 +266,19 @@ interaction-standalone-use-local = Lokale Datei verwenden
 interaction-standalone-use-remote = Remote-Datei verwenden
 
 interaction-standalone-window-title = GitCraft-Dateiwerkzeuge
+
+# SF-R1-1: known helper diagnostics are localized at the Rust display envelope.
+
+interaction-standalone-helper-missing-paths = Metadatenpfade fehlen
+
+interaction-standalone-helper-named-streams = Benannte Datenströme können mit dem begrenzten Speicherprotokoll nicht erhalten werden
+
+interaction-standalone-helper-descriptor-limit = Der vollständige native Sicherheitsdeskriptor überschreitet 1 MiB
+
+interaction-standalone-helper-policy-differs = Die vollständige native Zugriffsrichtlinie weicht nach dem Kopieren ab
+
+interaction-standalone-helper-source-policy-changed = Die Zugriffsrichtlinie der Quelle hat sich beim Kopieren geändert
+
+interaction-standalone-helper-failure = Die begrenzten Windows-Zugriffsmetadaten konnten nicht erhalten werden: { $detail }
+
+interaction-standalone-helper-native-policy = Die vollständige Windows-Zugriffsrichtlinie ist nicht verfügbar (nativer Fehler { NUMBER($code, useGrouping: "false") }); der Zugriff auf SACL/Auditdaten erfordert möglicherweise SeSecurityPrivilege. Das Original muss unverändert bleiben.

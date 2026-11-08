@@ -266,3 +266,19 @@ interaction-standalone-use-local = Use Local file
 interaction-standalone-use-remote = Use Remote file
 
 interaction-standalone-window-title = GitCraft file tools
+
+# SF-R1-1: known helper diagnostics are localized at the Rust display envelope.
+
+interaction-standalone-helper-missing-paths = Missing metadata paths
+
+interaction-standalone-helper-named-streams = Named data streams cannot be preserved with the bounded save protocol
+
+interaction-standalone-helper-descriptor-limit = Full native descriptor exceeds 1 MiB
+
+interaction-standalone-helper-policy-differs = Full native policy differs after copy
+
+interaction-standalone-helper-source-policy-changed = Source policy changed during copy
+
+interaction-standalone-helper-failure = Could not preserve bounded Windows access metadata: { $detail }
+
+interaction-standalone-helper-native-policy = Full Windows policy unavailable (native error { NUMBER($code, useGrouping: "false") }); SACL/audit access may require SeSecurityPrivilege. Original must remain unchanged.

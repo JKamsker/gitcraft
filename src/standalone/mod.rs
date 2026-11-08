@@ -84,9 +84,10 @@ mod localization_tests {
                     vars.extend(variable.captures_iter(line).map(|c| c[1].to_owned()));
                 }
             }
-            assert_eq!(contract.len(), 122);
+            assert_eq!(contract.len(), 129);
             let mut bundle =
                 FluentBundle::new_concurrent(vec![locale.parse().map_err(|e| format!("{e}"))?]);
+            bundle.add_builtins().map_err(|e| format!("{e:?}"))?;
             bundle.set_use_isolating(false);
             bundle
                 .add_resource(resource)
@@ -96,11 +97,12 @@ mod localization_tests {
                 let args: Vec<_> = variables
                     .iter()
                     .map(|name| {
-                        let value = if matches!(name.as_str(), "count" | "installed" | "total") {
-                            FluentValue::from(2)
-                        } else {
-                            FluentValue::from("opaque ' $() & ü\n{}")
-                        };
+                        let value =
+                            if matches!(name.as_str(), "count" | "installed" | "total" | "code") {
+                                FluentValue::from(2)
+                            } else {
+                                FluentValue::from("opaque ' $() & ü\n{}")
+                            };
                         (name.as_str(), value)
                     })
                     .collect();
@@ -123,7 +125,7 @@ mod localization_tests {
                     assert_eq!(crate::i18n::text(id), expected);
                 } else if variables
                     .iter()
-                    .any(|n| !matches!(n.as_str(), "count" | "installed" | "total"))
+                    .any(|n| !matches!(n.as_str(), "count" | "installed" | "total" | "code"))
                 {
                     assert!(
                         expected.contains("opaque ' $() & ü\n{}"),
