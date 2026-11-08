@@ -1,0 +1,25 @@
+{
+  "commit": "9737efa031d96d6b79f75ee0ef507b4275573b7d",
+  "binaries": [
+    {
+      "binary": "/tmp/gitcraft-167-171/final-9737efa0/bin/gitcraft-3fe163d12211b9a2",
+      "sha256": "ae64cb0c82e2a74e533d1a172b465808926d1c6de67d7fac40c1cf40f6f6949a"
+    },
+    {
+      "binary": "/tmp/gitcraft-167-171/final-9737efa0/bin/gitcraft-130befab7ec1fec1",
+      "sha256": "a24cbf9cf269b139f523aadb4f67fdf91333b52e3a0c851d452f23d07eed89c4"
+    },
+    {
+      "binary": "/tmp/gitcraft-167-171/final-9737efa0/bin/checkpoint_cli-f74b6ccb8ad0c5e5",
+      "sha256": "cbcad39bf4f0ab546bf4efde6dfb03ca7a242349b50c15db2b50ec867194e16b"
+    },
+    {
+      "binary": "/tmp/gitcraft-167-171/final-9737efa0/bin/mcp_stdio-75a901363b46d695",
+      "sha256": "6f52cac728423f46c8e60c44df8ef5d96c400166022b8503f13e8e0dc8529f84"
+    },
+    {
+      "binary": "/tmp/gitcraft-167-171/final-9737efa0/bin/gitcraft_os-f792e6e5c14eb1c3",
+      "sha256": "6b8a0a4fbba1667df63f03913cdeb7ccfb27e14ac64d06bc18f5eb01eebf4fda"
+    }
+  ]
+}
