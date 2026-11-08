@@ -1,0 +1,7 @@
+{
+  "base": "1fcdb5acd0bb6c3f244f50ac00e18811d2adc804",
+  "protected_blocks": {
+    "complete_original_recent_raw_labels_parse_read_classifiers_workers_tests": "9ae85f6e94ee72a9d02d78389c90672c9bee9ca35ca9e3a501eedfe871e160f7",
+    "complete_original_home_recent_except_two_label_paint_calls": "be0f6bffe4b1ff9c2a0ead0204e43815f744ac39e22c103d2712ad839ba6d178"
+  }
+}

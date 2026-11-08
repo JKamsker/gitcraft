@@ -60,6 +60,27 @@ impl RecentStatus {
         }
     }
 
+    /// Current-locale presentation from typed state; label() remains raw and stable.
+    pub(super) fn display_label(&self) -> String {
+        match self {
+            Self::Repo { head, .. } => match head {
+                Head::Branch(branch) => branch.clone(),
+                Head::Unborn(branch) => crate::i18n::message(
+                    "interaction-recent-status-unborn",
+                    &[("branch", branch.as_str().into())],
+                ),
+                Head::Detached(hash) => crate::i18n::message(
+                    "interaction-recent-status-detached",
+                    &[("hash", hash.as_str().into())],
+                ),
+            },
+            Self::NotFound => crate::i18n::text("interaction-recent-status-missing").to_owned(),
+            Self::NotRepo => crate::i18n::text("interaction-recent-status-not-repo").to_owned(),
+            Self::TimedOut => crate::i18n::text("interaction-recent-status-timeout").to_owned(),
+            Self::Failed(_) => crate::i18n::text("interaction-recent-status-failed").to_owned(),
+        }
+    }
+
     /// Why it couldn't be read, for the label's tooltip.
     pub(super) fn reason(&self) -> Option<&str> {
         match self {
