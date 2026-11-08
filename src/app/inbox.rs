@@ -406,7 +406,7 @@ fn grouped(problems: &[&Problem]) -> Vec<String> {
     }
     groups
         .into_iter()
-        .map(|(p, at)| format!("{}: {}", at.join(", "), p.why))
+        .map(|(p, at)| format!("{}: {}", at.join(", "), forge_inbox::display_error(&p.why)))
         .collect()
 }
 
@@ -458,7 +458,7 @@ impl App {
         ui.with_layout(egui::Layout::top_down(egui::Align::Min), |ui| {
             ui.horizontal(|ui| {
                 ui.label(
-                    RichText::new("PULL REQUESTS FOR YOU")
+                    RichText::new(crate::i18n::text("interaction-home-inbox-heading"))
                         .font(theme::semibold(10.5))
                         .color(t.text_faint),
                 );
@@ -466,7 +466,7 @@ impl App {
                     ui.add(crate::spinner::Spinner::new().size(11.0));
                 }
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    let tip = "Ask again, every forge (connects to other machines)";
+                    let tip = crate::i18n::text("interaction-home-ask-again");
                     refresh = icons::small_button(ui, "refresh-cw", tip).clicked();
                 });
             });
@@ -483,12 +483,9 @@ impl App {
                 && self.inbox.asked_at.is_some()
             {
                 ui.label(
-                    RichText::new(
-                        "Nothing waits for you: no review asked of you, and yours have no \
-                         failing checks or comments you haven't seen.",
-                    )
-                    .color(t.text_faint)
-                    .small(),
+                    RichText::new(crate::i18n::text("interaction-home-all-clear"))
+                        .color(t.text_faint)
+                        .small(),
                 );
             }
             ui.spacing_mut().item_spacing.y = 2.0;
@@ -505,9 +502,12 @@ impl App {
             }
             if total > SHOWN {
                 let text = if self.inbox.show_all {
-                    "Show fewer".to_owned()
+                    crate::i18n::text("interaction-home-fewer").to_owned()
                 } else {
-                    format!("Show {} more", total - SHOWN)
+                    crate::i18n::message(
+                        "interaction-home-show-more",
+                        &[("count", (total - SHOWN).into())],
+                    )
                 };
                 if ui.link(RichText::new(text).small()).clicked() {
                     self.inbox.show_all = !self.inbox.show_all;
@@ -515,10 +515,10 @@ impl App {
             }
             let failed = grouped(&failed);
             if !failed.is_empty() {
-                let text = match failed.len() {
-                    1 => "Couldn't ask 1 forge: hover for why".to_owned(),
-                    n => format!("Couldn't ask {n} forges: hover for why"),
-                };
+                let text = crate::i18n::message(
+                    "interaction-home-ask-failed",
+                    &[("count", failed.len().into())],
+                );
                 ui.label(RichText::new(text).color(t.text_faint).small())
                     .on_hover_text(failed.join("\n\n"));
             }
@@ -526,7 +526,7 @@ impl App {
             unread.extend(self.inbox.cut.iter().cloned());
             if !unread.is_empty() {
                 ui.label(
-                    RichText::new("Not everything was read: hover for what")
+                    RichText::new(crate::i18n::text("interaction-home-unread"))
                         .color(t.text_faint)
                         .small(),
                 )
@@ -643,14 +643,17 @@ fn inbox_row(ui: &mut Ui, item: &Item, reasons: &[Reason], t: &Tokens) -> egui::
             .map(|reason| reason.label())
             .collect::<Vec<_>>()
             .join(", ");
-        format!(
-            "{} pull request {}: {}, by {}, {}. {}",
-            item.forge.name(),
-            item.pr.number,
-            item.pr.title,
-            item.pr.author,
-            item.pr.project,
-            reasons
+        crate::i18n::message(
+            "interaction-home-inbox-a11y",
+            &[
+                ("forge", item.forge.name().into()),
+                ("noun", item.forge.noun_label().into()),
+                ("number", item.pr.number.to_string().into()),
+                ("title", item.pr.title.as_str().into()),
+                ("author", item.pr.author.as_str().into()),
+                ("project", item.pr.project.as_str().into()),
+                ("reasons", reasons.into()),
+            ],
         )
     });
     if resp.hovered() {
@@ -700,10 +703,19 @@ fn inbox_row(ui: &mut Ui, item: &Item, reasons: &[Reason], t: &Tokens) -> egui::
     }
     let left = rect.left() + 40.0;
     let width = x - 4.0 - left;
-    let draft = if item.pr.draft { "Draft · " } else { "" };
     let title = one_line(
         ui,
-        format!("#{} {draft}{}", item.pr.number, item.pr.title),
+        crate::i18n::message(
+            if item.pr.draft {
+                "interaction-home-pr-draft-title"
+            } else {
+                "interaction-home-pr-title"
+            },
+            &[
+                ("number", item.pr.number.to_string().into()),
+                ("title", item.pr.title.as_str().into()),
+            ],
+        ),
         theme::medium(12.5),
         t.text,
         width,
@@ -724,9 +736,9 @@ fn inbox_row(ui: &mut Ui, item: &Item, reasons: &[Reason], t: &Tokens) -> egui::
     ui.painter()
         .galley(pos2(left, y + 8.0 - sub.size().y / 2.0), sub, t.text_faint);
     let how = if item.forge.has_pages() && item.repo.is_some() {
-        "Click to open it in its repository's tab"
+        crate::i18n::text("interaction-home-open-tab")
     } else {
-        "Click to open it in the browser"
+        crate::i18n::text("interaction-home-open-browser")
     };
     resp.on_hover_text(format!("{}\n{how}", item.pr.url))
         .on_hover_cursor(egui::CursorIcon::PointingHand)
@@ -986,5 +998,84 @@ mod accessibility_tests {
         h.key_press(egui::Key::Enter);
         h.run();
         assert!(*h.state());
+    }
+}
+
+#[cfg(test)]
+mod localization_tests {
+    use super::*;
+    use egui_kittest::{Harness, kittest::Queryable};
+
+    #[test]
+    fn german_actual_row_activates_with_opaque_title_number_and_identity() {
+        crate::i18n::set_language("de");
+        let item = Item {
+            repo: None,
+            forge: Forge::GitLab,
+            pr: InboxPr {
+                number: 1234,
+                title: "Fix 日本語".into(),
+                url: "https://literal-host/a/b/-/merge_requests/1234".into(),
+                author: "Jonas".into(),
+                project: "a/b".into(),
+                ..Default::default()
+            },
+        };
+        let fonts = std::cell::Cell::new(false);
+        let mut h = Harness::new_ui_state(
+            move |ui, opened: &mut bool| {
+                if !fonts.replace(true) {
+                    crate::theme::install_fonts(ui.ctx());
+                    return;
+                }
+                let t = Tokens::get(ui.ctx());
+                *opened |= inbox_row(
+                    ui,
+                    &item,
+                    &[Reason::ReviewRequested, Reason::NewComments(1234)],
+                    &t,
+                )
+                .clicked();
+                crate::a11y::end_frame(ui.ctx());
+                assert_eq!(item.forge.noun(), "merge request");
+                assert_eq!(
+                    item.pr.url,
+                    "https://literal-host/a/b/-/merge_requests/1234"
+                );
+            },
+            false,
+        );
+        h.run();
+        let label = "GitLab Merge Request 1234: Fix 日本語, von Jonas, a/b. Review angefordert, 1.234 neue Kommentare";
+        h.get_by_role_and_label(egui::accesskit::Role::Button, label);
+        h.key_press(egui::Key::Tab);
+        h.run();
+        assert!(h.get_by_label(label).is_focused());
+        h.key_press(egui::Key::Enter);
+        h.run();
+        assert!(*h.state());
+    }
+
+    #[test]
+    fn protocol_errors_are_grouped_raw_and_only_display_is_translated() {
+        crate::i18n::set_language("de");
+        let raw = "no Forgejo login known for codeberg.org: add one with `tea login add`";
+        let problem = Problem {
+            forge: Forge::Forgejo,
+            host: "codeberg.org".into(),
+            at: "Forgejo · codeberg.org".into(),
+            why: raw.into(),
+        };
+        assert!(forge_inbox::is_no_login(&problem.why));
+        assert!(forge_inbox::gives_up(&problem.why));
+        let shown = grouped(&[&problem]);
+        assert!(shown[0].contains("Für codeberg.org ist keine Forgejo-Anmeldung bekannt"));
+        assert_eq!(problem.why, raw);
+        assert!(forge_inbox::is_no_login(&problem.why));
+        assert!(forge_inbox::gives_up(&problem.why));
+        assert_eq!(
+            forge_inbox::display_error("HTTP 502 literal"),
+            "HTTP 502 literal"
+        );
     }
 }

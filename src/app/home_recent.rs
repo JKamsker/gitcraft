@@ -62,7 +62,7 @@ pub(super) fn search_ui(ui: &mut Ui, f: &mut RecentFilter, take_focus: bool) -> 
         ui.add(
             egui::TextEdit::singleline(&mut f.query)
                 .id(id)
-                .hint_text("Type to filter")
+                .hint_text(crate::i18n::text("interaction-home-filter"))
                 .desired_width(200.0)
                 // Esc stays with the field (it clears it), and so does the focus.
                 .event_filter(egui::EventFilter {
@@ -123,7 +123,7 @@ impl App {
         let mut keys = SearchKeys::default();
         ui.horizontal(|ui| {
             ui.label(
-                RichText::new("RECENT")
+                RichText::new(crate::i18n::text("interaction-home-recent"))
                     .font(theme::semibold(10.5))
                     .color(t.text_faint),
             );
@@ -141,9 +141,9 @@ impl App {
         if matches.is_empty() {
             ui.add_space(6.0);
             ui.label(
-                RichText::new(format!(
-                    "No recent repository matches “{}”",
-                    self.recent_filter.query.trim()
+                RichText::new(crate::i18n::message(
+                    "interaction-home-no-match",
+                    &[("query", self.recent_filter.query.trim().into())],
                 ))
                 .color(t.text_faint),
             );
@@ -296,8 +296,12 @@ fn recent_row(ui: &mut Ui, path: &Path, info: &RowInfo) -> (Option<RowClick>, bo
         let x_rect = Rect::from_center_size(pos2(rect.right() - 18.0, y), vec2(20.0, 20.0));
         let x = ui
             .interact(x_rect, forget_id, Sense::click())
-            .on_hover_text("Remove from list");
-        crate::repo::widgets::a11y(&x, egui::WidgetType::Button, "Remove from list");
+            .on_hover_text(crate::i18n::text("interaction-home-remove"));
+        crate::repo::widgets::a11y(
+            &x,
+            egui::WidgetType::Button,
+            crate::i18n::text("interaction-home-remove"),
+        );
         if x.hovered() {
             ui.painter().rect_filled(x_rect, t.radius_sm, t.pressed);
         }
@@ -358,7 +362,7 @@ fn first_line(
         p.circle_filled(dot, 3.5, t.warning);
         let hit = Rect::from_center_size(dot, vec2(12.0, 12.0));
         ui.interact(hit, egui::Id::new(("recent-dirty", path)), Sense::hover())
-            .on_hover_text("Uncommitted changes");
+            .on_hover_text(crate::i18n::text("interaction-home-dirty"));
         x += dot_w;
     }
     let Some(status) = status else { return };
