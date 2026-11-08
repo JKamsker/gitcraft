@@ -1,6 +1,7 @@
 //! The files in a package that is published already: a `.crate` or an npm tarball, both a gzip'd
 //! tar.
 
+use super::witness::Failure;
 use std::io::Read;
 
 /// How big a download is let be.
@@ -22,14 +23,16 @@ pub(crate) const fn max() -> u64 {
 /// The paths of the files in the gzip'd tar `bytes`, without their first folder (`app-1.2.3/`,
 /// `package/`).
 pub(crate) fn list(bytes: &[u8]) -> Result<Vec<String>, String> {
+    list_witnessed(bytes).map_err(Failure::into_raw)
+}
+
+pub(super) fn list_witnessed(bytes: &[u8]) -> Result<Vec<String>, Failure> {
     let mut tar = Vec::new();
     flate2::read::GzDecoder::new(bytes)
         .take(MAX + 1)
         .read_to_end(&mut tar)
-        .map_err(|e| format!("not a gzip'd archive: {e}"))?;
-    if tar.len() as u64 > MAX {
-        return Err(too_big());
-    }
+        .map_err(|e| gzip_failure(e.to_string()))?;
+    check_size(tar.len() as u64)?;
     let mut out = Vec::new();
     let mut at = 0;
     // A long name (GNU's `L` entry, or a pax `path`) for the entry that follows.
@@ -44,13 +47,13 @@ pub(crate) fn list(bytes: &[u8]) -> Result<Vec<String>, String> {
             let end = raw.iter().position(|b| *b == 0).unwrap_or(len);
             String::from_utf8_lossy(&raw[..end]).into_owned()
         };
-        let size = u64::from_str_radix(field(124, 12).trim(), 8)
-            .map_err(|_| "a damaged archive".to_owned())? as usize;
+        let size =
+            u64::from_str_radix(field(124, 12).trim(), 8).map_err(|_| damaged_failure())? as usize;
         let kind = header[156];
         let data = at + 512;
         let next = data + size.div_ceil(512) * 512;
         if next > tar.len() + 512 {
-            return Err("a damaged archive".to_owned());
+            return Err(damaged_failure());
         }
         let body = &tar[data..(data + size).min(tar.len())];
         match kind {
@@ -172,3 +175,25 @@ mod tests {
         assert!(list(&make("package", &[])).is_ok_and(|f| f.is_empty()));
     }
 }
+
+pub(super) fn check_size(size: u64) -> Result<(), Failure> {
+    if size > MAX {
+        return Err(Failure::ArchiveTooBig { raw: too_big() });
+    }
+    Ok(())
+}
+fn gzip_failure(detail: String) -> Failure {
+    Failure::ArchiveGzip {
+        raw: format!("not a gzip'd archive: {detail}"),
+        detail,
+    }
+}
+fn damaged_failure() -> Failure {
+    Failure::ArchiveDamaged {
+        raw: "a damaged archive".to_owned(),
+    }
+}
+
+#[cfg(test)]
+#[path = "archive/witness_tests.rs"]
+mod witness_tests;
