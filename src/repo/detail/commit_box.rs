@@ -144,7 +144,7 @@ impl RepoTab {
             && self.work.conflicted.is_empty();
         // Only from the message fields, so Ctrl+Enter in the terminal stays the shell's.
         let shortcut = (summary.has_focus() || body.has_focus())
-            && ui.input(|i| keymap::pressed(i, Scope::Repository).contains(&Command::Commit));
+            && keymap::pressed(ui.ctx(), Scope::Repository).contains(&Command::Commit);
         let resp = widgets::primary_button(ui, &label, can, ui.available_width());
         if (resp.clicked() || shortcut) && can {
             acts.push(Action::Commit);
@@ -152,7 +152,7 @@ impl RepoTab {
         if untouched {
             resp.on_hover_text("Edit the message first: it is still the template");
         } else {
-            resp.on_hover_text(keymap::label(Command::Commit));
+            resp.on_hover_text(keymap::label(ui.ctx(), Command::Commit));
         }
 
         ui.add_space(4.0);

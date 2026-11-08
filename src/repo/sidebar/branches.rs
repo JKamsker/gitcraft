@@ -164,7 +164,7 @@ impl RepoTab {
         } else if r.clicked() {
             acts.push(Action::SelectHash(b.target.clone()));
         }
-        egui::Popup::context_menu(&r)
+        crate::menu_item::context(&r)
             .style(crate::theme::menu_style)
             .show(|ui| self.branch_menu_items(ui, acts, b, idle));
     }
@@ -180,8 +180,10 @@ impl RepoTab {
         self.checkout_items(ui, acts, b, idle);
         if b.is_head
             && b.name.starts_with(&self.hotfix_prefix())
-            && ui
-                .add_enabled(idle, egui::Button::new("Finish hotfix…"))
+            && crate::menu_item::MenuItem::new("Finish hotfix…")
+                .icon("package")
+                .enabled(idle)
+                .show(ui)
                 .on_hover_text(
                     "Tags it, merges it back into the main branch (and the development one), \
                      deletes it and pushes it all, after showing what it will do",
@@ -202,8 +204,9 @@ impl RepoTab {
             && base.name != b.name
         {
             ui.separator();
-            if ui
-                .button(format!("Changes {} adds to {}", b.name, base.name))
+            if crate::menu_item::MenuItem::new(format!("Changes {} adds to {}", b.name, base.name))
+                .icon("command")
+                .show(ui)
                 .on_hover_text("What it changed since the two diverged, as a pull request shows it")
                 .clicked()
             {
@@ -220,24 +223,42 @@ impl RepoTab {
         self.publish_items(ui, acts, b, idle);
         self.stack_menu_items(ui, acts, b, idle);
         ui.separator();
-        if ui.button("Create branch here…").clicked() {
+        if crate::menu_item::MenuItem::new("Create branch here…")
+            .icon("git-branch-plus")
+            .show(ui)
+            .clicked()
+        {
             acts.push(Action::Dialog(Dialog::create_branch(&b.target, &b.name)));
         }
-        if ui.button("Create tag here…").clicked() {
+        if crate::menu_item::MenuItem::new("Create tag here…")
+            .icon("tag")
+            .show(ui)
+            .clicked()
+        {
             acts.push(Action::Dialog(Dialog::tag(
                 &b.target,
                 &b.name,
                 self.default_remote(),
             )));
         }
-        if ui.add_enabled(idle, egui::Button::new("Rename…")).clicked() {
+        if crate::menu_item::MenuItem::new("Rename…")
+            .icon("wrench")
+            .enabled(idle)
+            .show(ui)
+            .clicked()
+        {
             acts.push(Action::Dialog(Dialog::rename_branch(&b.name)));
         }
-        if ui.button("Copy name").clicked() {
+        if crate::menu_item::MenuItem::new("Copy name")
+            .icon("copy")
+            .show(ui)
+            .clicked()
+        {
             ui.ctx().copy_text(b.name.clone());
         }
-        if ui
-            .button("Show reflog")
+        if crate::menu_item::MenuItem::new("Show reflog")
+            .icon("history")
+            .show(ui)
             .on_hover_text(
                 "Where the branch has been: each commit it pointed at, and what moved it",
             )
@@ -249,8 +270,9 @@ impl RepoTab {
             menu.items(ui, "branch", &target, acts);
         }
         self.pin_item(ui, &b.name);
-        if ui
-            .button("How much agents wrote")
+        if crate::menu_item::MenuItem::new("How much agents wrote")
+            .icon("bot")
+            .show(ui)
             .on_hover_text(
                 "Of the lines this branch added since it left the main branch: how many agents \
                  wrote (as the commits record it), and how many of those people edited since",
@@ -280,7 +302,13 @@ impl RepoTab {
             .filter(|base| *base != b.name)
             .or_else(|| self.refs.current.clone().filter(|c| *c != b.name));
         ui.separator();
-        let button = ui.add_enabled(base.is_some(), egui::Button::new("Review this branch"));
+        let button = crate::menu_item::MenuItem::new("Review this branch")
+            .icon("git-pull-request")
+            .refused(
+                base.is_none()
+                    .then_some("No base branch is available for this review"),
+            )
+            .show(ui);
         let Some(base) = base else {
             button.on_disabled_hover_text("There is no other branch to review it against");
             return;
@@ -307,8 +335,9 @@ impl RepoTab {
         } else {
             "Pin to top"
         };
-        if ui
-            .button(label)
+        if crate::menu_item::MenuItem::new(label)
+            .icon("pin")
+            .show(ui)
             .on_hover_text("Pinned branches stay at the top of Local")
             .clicked()
         {
@@ -329,22 +358,29 @@ impl RepoTab {
             } else {
                 "Open its worktree in a tab"
             };
-            if ui.button(label).clicked() {
+            if crate::menu_item::MenuItem::new(label)
+                .icon("folder-git-2")
+                .show(ui)
+                .clicked()
+            {
                 acts.push(Action::OpenWorktree(wt.path.clone()));
             }
             return;
         }
-        if ui
-            .add_enabled(!b.is_head && idle, egui::Button::new("Check out"))
+        if crate::menu_item::MenuItem::new("Check out")
+            .icon("log-in")
+            .enabled(idle)
+            .refused(b.is_head.then_some("This commit is already checked out"))
+            .show(ui)
             .clicked()
         {
             acts.push(Action::Checkout(b.name.clone()));
         }
-        if ui
-            .add_enabled(
-                !b.is_head && idle,
-                egui::Button::new("Check out in a new worktree…"),
-            )
+        if crate::menu_item::MenuItem::new("Check out in a new worktree…")
+            .icon("folder-git-2")
+            .enabled(idle)
+            .refused(b.is_head.then_some("This commit is already checked out"))
+            .show(ui)
             .clicked()
         {
             acts.push(Action::Dialog(Dialog::add_worktree(
@@ -358,8 +394,10 @@ impl RepoTab {
     /// Push `b` (checked out or not), set what it tracks, and open or create its pull request.
     fn publish_items(&self, ui: &mut Ui, acts: &mut Vec<Action>, b: &Branch, idle: bool) {
         if let Some((to, push)) = self.push_branch(b)
-            && ui
-                .add_enabled(idle, egui::Button::new(format!("Push to {to}")))
+            && crate::menu_item::MenuItem::new(format!("Push to {to}"))
+                .icon("arrow-up-from-line")
+                .enabled(idle)
+                .show(ui)
                 .clicked()
         {
             acts.push(push);
@@ -371,8 +409,10 @@ impl RepoTab {
         }
         self.force_push_item(ui, acts, b, idle);
         if let Some(remote) = self.default_remote()
-            && ui
-                .add_enabled(idle, egui::Button::new("Set upstream…"))
+            && crate::menu_item::MenuItem::new("Set upstream…")
+                .icon("git-branch")
+                .enabled(idle)
+                .show(ui)
                 .clicked()
         {
             let (remote, name) = self
@@ -389,11 +429,10 @@ impl RepoTab {
             )));
         }
         if !b.upstream.is_empty()
-            && ui
-                .add_enabled(
-                    idle,
-                    egui::Button::new(format!("Stop tracking {}", b.upstream)),
-                )
+            && crate::menu_item::MenuItem::new(format!("Stop tracking {}", b.upstream))
+                .icon("git-branch")
+                .enabled(idle)
+                .show(ui)
                 .clicked()
         {
             acts.push(self.unset_upstream_action(b));
@@ -401,16 +440,19 @@ impl RepoTab {
         let Some(forge) = self.forge() else { return };
         match self.prs.iter().find(|p| p.branch == b.name) {
             Some(pr) => {
-                if ui
-                    .button(format!("Open {} #{}", forge.noun(), pr.number))
+                if crate::menu_item::MenuItem::new(format!("Open {} #{}", forge.noun(), pr.number))
+                    .icon("external-link")
+                    .show(ui)
                     .clicked()
                 {
                     acts.push(Action::OpenUrl(pr.url.clone()));
                 }
             }
             None => {
-                if ui
-                    .add_enabled(idle, egui::Button::new(format!("Create {}…", forge.noun())))
+                if crate::menu_item::MenuItem::new(format!("Create {}…", forge.noun()))
+                    .icon("external-link")
+                    .enabled(idle)
+                    .show(ui)
                     .clicked()
                 {
                     // A branch made for an issue: its title, closing it once merged, and into the
@@ -442,10 +484,10 @@ impl RepoTab {
         if self.remotes.is_empty() {
             return;
         }
-        let button = ui.add_enabled(
-            idle,
-            egui::Button::new("Force push via push route (with lease)…"),
-        );
+        let button = crate::menu_item::MenuItem::new("Force push via push route (with lease)…")
+            .icon("arrow-up-from-line")
+            .enabled(idle)
+            .show(ui);
         offer(&button, || GhostOp::ForcePush {
             branch: b.name.clone(),
         });
@@ -524,11 +566,10 @@ impl RepoTab {
         current: &str,
         idle: bool,
     ) {
-        if ui
-            .add_enabled(
-                idle,
-                egui::Button::new(format!("Fast-forward {current} to {}", b.name)),
-            )
+        if crate::menu_item::MenuItem::new(format!("Fast-forward {current} to {}", b.name))
+            .icon("arrow-right")
+            .enabled(idle)
+            .show(ui)
             .clicked()
         {
             acts.push(fast_forward_action(BranchRef::local(&b.name), current));
@@ -549,11 +590,10 @@ impl RepoTab {
         if rebase.clicked() {
             acts.push(rebase_action(BranchRef::local(&b.name), current));
         }
-        if ui
-            .add_enabled(
-                idle,
-                egui::Button::new(format!("Interactive rebase {current} onto {}…", b.name)),
-            )
+        if crate::menu_item::MenuItem::new(format!("Interactive rebase {current} onto {}…", b.name))
+            .icon("git-merge")
+            .enabled(idle)
+            .show(ui)
             .clicked()
         {
             acts.push(interactive_rebase_action(BranchRef::local(&b.name)));

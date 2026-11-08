@@ -77,8 +77,8 @@ pub(super) fn folder_error(folder: &Path, err: &str) -> String {
 }
 
 /// The repository tab of `repo` among `tabs`.
-fn repo_tab<'a>(tabs: &'a mut [Tab], repo: &Path) -> Option<&'a mut RepoTab> {
-    tabs.iter_mut().find_map(|t| match t {
+fn repo_tab<'a>(tabs: &'a mut [&mut Tab], repo: &Path) -> Option<&'a mut RepoTab> {
+    tabs.iter_mut().find_map(|t| match &mut **t {
         Tab::Repo(r) if r.path == repo => Some(&mut **r),
         _ => None,
     })
@@ -92,6 +92,32 @@ pub(super) struct PatchQueue {
     current: Option<(PathBuf, PathBuf)>,
 }
 
+/// The queue's session boundary also permits recording-only continuation tests.
+trait PatchTargets {
+    fn busy(&mut self, repo: &Path) -> Option<bool>;
+    fn outcome(&mut self, repo: &Path) -> Option<Result<(), String>>;
+    fn apply(&mut self, repo: &Path, file: &Path) -> Result<(), String>;
+}
+
+struct LiveTargets<'a, 'b> {
+    tabs: &'a mut [&'b mut Tab],
+    ctx: &'a egui::Context,
+}
+
+impl PatchTargets for LiveTargets<'_, '_> {
+    fn busy(&mut self, repo: &Path) -> Option<bool> {
+        repo_tab(self.tabs, repo).map(|tab| tab.dropped_patch_waits())
+    }
+    fn outcome(&mut self, repo: &Path) -> Option<Result<(), String>> {
+        repo_tab(self.tabs, repo).and_then(RepoTab::take_dropped_patch_outcome)
+    }
+    fn apply(&mut self, repo: &Path, file: &Path) -> Result<(), String> {
+        repo_tab(self.tabs, repo)
+            .ok_or_else(|| closed(file))?
+            .apply_dropped_patch(file.to_path_buf(), self.ctx)
+    }
+}
+
 impl PatchQueue {
     pub(super) fn push(&mut self, file: PathBuf, repo: PathBuf) {
         self.waiting.push_back((file, repo));
@@ -103,17 +129,26 @@ impl PatchQueue {
 
     /// Takes in how the patch being applied went and gives the next one to its tab, until one
     /// has to wait. Returns what to tell (each an error).
+    #[cfg(test)]
     pub(super) fn advance(&mut self, tabs: &mut [Tab], ctx: &egui::Context) -> Vec<String> {
+        self.advance_in(&mut tabs.iter_mut().collect::<Vec<_>>(), ctx)
+    }
+
+    fn advance_in(&mut self, tabs: &mut [&mut Tab], ctx: &egui::Context) -> Vec<String> {
+        self.advance_with(&mut LiveTargets { tabs, ctx })
+    }
+
+    fn advance_with(&mut self, targets: &mut impl PatchTargets) -> Vec<String> {
         let mut said = Vec::new();
         loop {
             if let Some((file, repo)) = self.current.clone() {
-                let Some(tab) = repo_tab(tabs, &repo) else {
+                let Some(busy) = targets.busy(&repo) else {
                     self.current = None;
                     said.push(closed(&file));
                     continue;
                 };
-                match tab.take_dropped_patch_outcome() {
-                    None if tab.dropped_patch_waits() => return said,
+                match targets.outcome(&repo) {
+                    None if busy => return said,
                     None | Some(Ok(())) => self.current = None,
                     Some(Err(e)) => {
                         self.current = None;
@@ -124,15 +159,15 @@ impl PatchQueue {
             let Some((file, repo)) = self.waiting.pop_front() else {
                 return said;
             };
-            let Some(tab) = repo_tab(tabs, &repo) else {
+            let Some(busy) = targets.busy(&repo) else {
                 said.push(closed(&file));
                 continue;
             };
-            if tab.dropped_patch_waits() {
+            if busy {
                 self.waiting.push_front((file, repo));
                 return said;
             }
-            match tab.apply_dropped_patch(file.clone(), ctx) {
+            match targets.apply(&repo, &file) {
                 Ok(()) => self.current = Some((file, repo)),
                 Err(e) => said.push(format!("{} wasn't applied: {e}", name_of(&file))),
             }
@@ -164,6 +199,78 @@ fn closed(file: &Path) -> String {
     )
 }
 
+#[cfg(test)]
+mod recording_tests {
+    use super::*;
+
+    struct Targets {
+        repo: PathBuf,
+        window: u8,
+        busy: bool,
+        outcomes: VecDeque<Result<(), String>>,
+        applied: Vec<(PathBuf, PathBuf, u8)>,
+        consumed: usize,
+    }
+
+    impl PatchTargets for Targets {
+        fn busy(&mut self, repo: &Path) -> Option<bool> {
+            (repo == self.repo).then_some(self.busy)
+        }
+        fn outcome(&mut self, _: &Path) -> Option<Result<(), String>> {
+            let result = self.outcomes.pop_front();
+            if result.is_some() {
+                self.consumed += 1;
+                self.busy = false;
+            }
+            result
+        }
+        fn apply(&mut self, repo: &Path, file: &Path) -> Result<(), String> {
+            self.applied
+                .push((repo.to_path_buf(), file.to_path_buf(), self.window));
+            self.busy = true;
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn hidden_continuations_wait_advance_once_and_follow_the_live_session() {
+        let repo = PathBuf::from("/recorded/session");
+        let mut targets = Targets {
+            repo: repo.clone(),
+            window: 1,
+            busy: true,
+            outcomes: VecDeque::new(),
+            applied: vec![],
+            consumed: 0,
+        };
+        let mut queue = PatchQueue::default();
+        queue.push("first.patch".into(), repo.clone());
+        queue.push("second.patch".into(), repo.clone());
+        assert!(queue.advance_with(&mut targets).is_empty());
+        assert!(targets.applied.is_empty());
+        targets.busy = false;
+        assert!(queue.advance_with(&mut targets).is_empty());
+        assert_eq!(targets.applied, [(repo.clone(), "first.patch".into(), 1)]);
+        targets.window = 2;
+        targets.outcomes.push_back(Ok(()));
+        assert!(queue.advance_with(&mut targets).is_empty());
+        assert_eq!(
+            targets.applied,
+            [
+                (repo.clone(), "first.patch".into(), 1),
+                (repo, "second.patch".into(), 2)
+            ]
+        );
+        assert_eq!(targets.consumed, 1);
+        assert!(queue.advance_with(&mut targets).is_empty());
+        assert_eq!(targets.applied.len(), 2);
+        targets.outcomes.push_back(Ok(()));
+        assert!(queue.advance_with(&mut targets).is_empty());
+        assert!(queue.is_empty());
+        assert_eq!(targets.consumed, 2);
+    }
+}
+
 impl App {
     /// Takes in what was dropped on the window and handles it: folders open, patches go to the
     /// repository tab they were dropped on. Shows a hint while files are dragged over it.
@@ -193,18 +300,27 @@ impl App {
                 )),
             }
         }
+        if hovered {
+            let on_repo = target.is_some();
+            drop_hint(ctx, on_repo);
+        }
+    }
+
+    /// Continuations belong to model ticks, including passes with no visible UI.
+    pub(super) fn advance_patches(&mut self, ctx: &egui::Context) {
         if !self.patches.is_empty() {
-            for msg in self.patches.advance(&mut self.tabs, ctx) {
+            let mut tabs = self
+                .tabs
+                .iter_mut()
+                .chain(self.windows.parked.values_mut().flat_map(|w| &mut w.tabs))
+                .collect::<Vec<_>>();
+            for msg in self.patches.advance_in(&mut tabs, ctx) {
                 self.toasts.push(Toast::new(msg, true));
             }
             if !self.patches.is_empty() {
                 // Its tab may be busy with something that doesn't wake the window when done.
                 ctx.request_repaint_after(Duration::from_millis(250));
             }
-        }
-        if hovered {
-            let on_repo = target.is_some();
-            drop_hint(ctx, on_repo);
         }
     }
 

@@ -33,7 +33,7 @@ const FEATURES: &[(&str, &[&str])] = &[
             "Copy diagnostics (at the top of this manual, or Help: Copy diagnostics in the palette) puts what a bug report needs on the clipboard: gitcraft's version and channel, the system, the graphics adapter, git, gh, glab and tea (with a login or not, never a token) and the git settings in effect, without your name, email, signing key, paths or home folder. Check it before posting.",
             "Drag a tab along the strip to reorder the tabs.",
             "What you type is kept, per repository, if gitcraft crashes or is closed: the commit message, unsent pull-request comments, reviews and replies, and an interactive rebase being set up come back when the repository is opened again. Each goes once committed, sent or started, or when you empty or cancel it. After a crash, gitcraft says so when it starts again. Nothing typed into a password or sign-in prompt is kept.",
-            "The main actions have keys: fetch, pull, push, stash, new branch, terminal, stage all and commit, and keys to go through the tabs (listed below, and in Settings → Keyboard shortcuts). Tooltips, the palette and menus show them. They do nothing while a text field or the terminal has the keyboard, so typing never runs one; only Ctrl+Enter in the commit message commits.",
+            "Cmd/Ctrl+1…9 select tabs; Cmd/Ctrl+Alt+1/2/3 focus the sidebar, graph and right pane. All registry keys can be changed or unbound in Settings, including multi-key chords. The main actions have keys: fetch, pull, push, stash, new branch, terminal, stage all and commit, and keys to go through the tabs (listed below, and in Settings → Keyboard shortcuts). Tooltips, the palette and menus show them. They do nothing while a text field or the terminal has the keyboard, so typing never runs one; only Ctrl+Enter in the commit message commits.",
             "A greyed-out menu entry says why under it.",
             "One window: started again while it runs (gitcraft <folder>, Open in gitcraft, the menu entry), gitcraft opens that folder in a tab of the window already open, or switches to its tab, and brings the window to the front (where the system won't allow that, its taskbar button flashes). Started without a folder, it just comes to the front.",
             "A repository with no commits shows its first steps in the graph: make the first commit, add a remote, publish.",
@@ -269,7 +269,7 @@ const FEATURES: &[(&str, &[&str])] = &[
             "A file or hunk that makes the checks weaker gets a “weakens checks” badge: it removes assertions or tests, skips, disables or focuses tests, adds an assertion that can't fail, loosens a tolerance, rewrites a snapshot wholesale, lets CI fail or removes a CI job, or adds --no-verify. Hover the badge for the lines that made it.",
             "History of these lines: select lines in a diff (drag over them, or click changed lines) or in a file (click, Shift+click or drag), then right-click (Ctrl+C copies them). It lists every commit up to that version that touched them, followed back through earlier edits and renames; click one to see only what it did to them.",
             "Switch a diff from Diff to File to read the whole file; tick View all files under a commit's files to list every file in it.",
-            "Ctrl+F in a diff, a file or a blame finds in it (in the graph it searches the commits): every match is marked, Enter and Shift+Enter (or F3 and Shift+F3) go to the next and previous one. Aa matches case, ab matches whole words only, .* takes the text as a regular expression.",
+            "Ctrl+F in a diff, a file or a blame finds in it (in the graph it searches the commits): every match is marked, Enter and Shift+Enter in the find field, or the configurable Find next/previous commands, step between matches. Aa matches case, ab matches whole words only, .* takes the text as a regular expression.",
             "Copy link to … and Open … on GitHub (GitLab, Forgejo, Gitea) in the menu of a commit, a branch or a file, and of a commit's diff lines (right-click a line, or select text for a range) or a file's lines at a commit (click one, Shift+click for a range, then right-click). Links to a commit, file or lines use the commit's hash; a branch's follows the branch. They go to the remote the checked-out (or right-clicked) branch tracks, else origin, else the one you pick; the status line warns when the commit or branch isn't on that remote yet.",
             "Some files can be read in a way of their own, with a button in the diff's header (click it again for the lines; staging stays there). A click on a part goes back to the lines, at its line (or the nearest one shown), and a file that can't be read that way shows the plain diff with a note saying why.",
             "Prose (the book button, for .md, .adoc, .rst and .txt): paragraphs wrapped to the pane; in an edited one the removed words are struck through on red and the added ones on green, and a paragraph only wrapped differently says re-wrapped. Long runs of unchanged paragraphs fold; click to show them.",
@@ -399,7 +399,6 @@ pub(crate) const SHORTCUTS: &[(&str, &[(&str, &str)])] = &[
     (
         "Keyboard navigation",
         &[
-            ("Alt+← / Alt+→", "Back / forward through recent views"),
             (
                 "Mouse back / forward",
                 "Back / forward through recent views",
@@ -420,8 +419,6 @@ pub(crate) const SHORTCUTS: &[(&str, &[(&str, &str)])] = &[
     (
         "Graph",
         &[
-            ("↑ / ↓", "Previous / next commit"),
-            ("Cmd+F", "Search commits"),
             ("Enter / Shift+Enter", "Next / previous search result"),
             ("↑ / ↓ then Tab or Enter", "Pick a search suggestion"),
             ("Cmd+click", "Compare with the selected commit"),
@@ -438,18 +435,6 @@ pub(crate) const SHORTCUTS: &[(&str, &[(&str, &str)])] = &[
         ],
     ),
     (
-        "Interactive rebase",
-        &[
-            (
-                "P / R / E / S / F / D",
-                "Pick, reword, edit, squash, fix up or drop the selected row",
-            ),
-            ("↑ / ↓", "Select the row above / below"),
-            ("Alt+↑ / Alt+↓", "Move the selected commit up / down"),
-            ("Esc", "Close the editor without rebasing"),
-        ],
-    ),
-    (
         "Changes",
         &[
             (
@@ -461,22 +446,15 @@ pub(crate) const SHORTCUTS: &[(&str, &[(&str, &str)])] = &[
                 "Pick lines of a file to link to (View file, or File in a commit's diff)",
             ),
             ("Cmd+click a file", "Pick it to stash (or unpick it)"),
-            ("F7 / Shift+F7", "Next / previous change in a diff"),
-            ("Alt+↓ / Alt+↑", "Next / previous change in a diff"),
-            ("Cmd+Z", "Undo"),
-            ("Cmd+Y", "Redo"),
-            ("Cmd+Shift+Z", "Timeline and undo tree"),
         ],
     ),
     (
         "Find in a diff, file or blame",
         &[
-            ("Cmd+F", "Find in the diff, file or blame shown"),
             (
                 "Enter / Shift+Enter",
                 "Next / previous match (while the find bar is open)",
             ),
-            ("F3 / Shift+F3", "Next / previous match"),
             ("Esc", "Close the find bar"),
         ],
     ),
@@ -490,28 +468,23 @@ pub(crate) const SHORTCUTS: &[(&str, &[(&str, &str)])] = &[
             ("Cmd+Shift+C", "Copy the selection"),
         ],
     ),
-    (
-        "Settings",
-        &[
-            ("Cmd+F", "Search the settings"),
-            ("Esc", "Clear the search"),
-            ("Alt+↑ / Alt+↓", "Previous / next page"),
-        ],
-    ),
 ];
 
 /// Every group of shortcuts, as the manual and Settings → Keyboard shortcuts list them: the
 /// window's and a repository tab's keys from [`crate::keymap`], then the views' own. Each row:
 /// the keys as [`key_combo`] draws them (Ctrl or Cmd already written), what they do.
-pub(crate) fn shortcut_groups() -> Vec<(&'static str, Vec<(String, &'static str)>)> {
+pub(crate) fn shortcut_groups(
+    ctx: &egui::Context,
+) -> Vec<(&'static str, Vec<(String, &'static str)>)> {
     let from_keymap = |rows: &[keymap::Row]| {
         rows.iter()
-            .map(|r| (keymap::row_keys(r), r.what))
+            .map(|r| (keymap::row_keys(ctx, r), r.what))
             .collect::<Vec<_>>()
     };
     let mut groups = vec![
         ("Window", from_keymap(keymap::WINDOW_ROWS)),
         ("Repository", from_keymap(keymap::REPOSITORY_ROWS)),
+        ("Contextual actions", from_keymap(keymap::LOCAL_ROWS)),
     ];
     groups.extend(SHORTCUTS.iter().map(|(title, keys)| {
         let keys = keys
@@ -555,7 +528,7 @@ pub fn ui(ui: &mut Ui) {
 
     ui.add_space(8.0);
     ui.separator();
-    for (title, keys) in shortcut_groups() {
+    for (title, keys) in shortcut_groups(ui.ctx()) {
         heading(ui, &format!("{title} shortcuts"));
         egui::Grid::new(("manual_keys", title))
             .num_columns(2)

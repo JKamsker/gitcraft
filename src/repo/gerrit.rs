@@ -56,7 +56,11 @@ impl RepoTab {
         acts: &mut Vec<Action>,
     ) {
         if let (Some(server), Some(id)) = (&self.gerrit, &commit.change_id)
-            && ui.button("Open Gerrit change").on_hover_text(id).clicked()
+            && crate::menu_item::MenuItem::new("Open Gerrit change")
+                .icon("eye")
+                .show(ui)
+                .on_hover_text(id)
+                .clicked()
         {
             acts.push(Action::OpenUrl(server.change_url(id)));
         }
@@ -425,11 +429,11 @@ mod integration_tests {
         assert!(tab.busy_op.is_none());
         assert!(tab.last_op.is_none());
         assert!(
-            !tab.additional_palette_items()
+            !tab.additional_palette_items(&ctx)
                 .iter()
                 .any(|(_, _, a)| matches!(a, Action::Sync))
         );
-        assert!(!tab.palette_items().iter().any(|i| matches!(
+        assert!(!tab.palette_items(&ctx).iter().any(|i| matches!(
             i.run,
             crate::repo::palette::PaletteRun::Action(Action::Sync)
         )));

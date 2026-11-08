@@ -46,6 +46,7 @@ impl App {
         let open = self
             .tabs
             .iter()
+            .chain(self.windows.parked.values().flat_map(|w| &w.tabs))
             .filter_map(|t| match t {
                 Tab::Repo(r) => Some(r.path.clone()),
                 Tab::Home | Tab::Settings => None,
@@ -78,6 +79,11 @@ impl App {
         let settings_open = self.tabs.iter().any(|t| matches!(t, Tab::Settings));
         let settings_active = matches!(self.tabs.get(self.active), Some(Tab::Settings));
         self.save_all_tabs();
+        // The root view is temporarily parked during a deferred callback; retain its slot
+        // for the callback to restore, then let it install the new profile in the root.
+        self.windows
+            .parked
+            .retain(|id, _| *id == egui::ViewportId::ROOT);
         self.tabs.clear();
         self.tab_drag = None;
         self.closed.clear();
@@ -123,7 +129,11 @@ impl App {
             ));
             return false;
         }
-        for tab in &mut self.tabs {
+        for tab in self
+            .tabs
+            .iter_mut()
+            .chain(self.windows.parked.values_mut().flat_map(|w| &mut w.tabs))
+        {
             if let Tab::Repo(r) = tab
                 && let Some(work) = r.unfinished_anywhere()
             {
@@ -260,7 +270,11 @@ impl App {
         if self.profile_git_seen != now {
             self.profile_git_seen = now;
             self.inbox = Default::default();
-            for tab in &mut self.tabs {
+            for tab in self
+                .tabs
+                .iter_mut()
+                .chain(self.windows.parked.values_mut().flat_map(|w| &mut w.tabs))
+            {
                 // One not read yet, or suspended, reads it when shown.
                 if let Tab::Repo(r) = tab {
                     r.notice_connections(ctx);

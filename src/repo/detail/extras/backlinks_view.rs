@@ -154,6 +154,15 @@ fn row(ui: &mut Ui, link: &Backlink) -> bool {
             link.date,
             link.text
         ));
+    // The root's action label and the interaction metadata describe this same button.
+    // Keep one name; a second widget_info call would overwrite its existing action label.
+    ui.ctx().accesskit_node_builder(resp.id, |node| {
+        node.set_description(crate::a11y::labels::join([
+            link.author.as_str(),
+            link.date.as_str(),
+            link.text.as_str(),
+        ]));
+    });
     if resp.hovered() {
         ui.painter().set(
             background,
@@ -178,6 +187,33 @@ mod tests {
             kind,
             text: "t".to_owned(),
         }
+    }
+
+    #[test]
+    fn linking_commit_has_a_name_and_keyboard_action() {
+        use egui_kittest::{Harness, kittest::Queryable};
+        let link = link(LinkKind::Revert);
+        let fonts = std::cell::Cell::new(false);
+        let mut h = Harness::new_ui_state(
+            move |ui, opened: &mut bool| {
+                if !fonts.replace(true) {
+                    crate::theme::install_fonts(ui.ctx());
+                    return;
+                }
+                *opened |= row(ui, &link);
+                crate::a11y::end_frame(ui.ctx());
+            },
+            false,
+        );
+        h.run();
+        let label = "Open changes in aaaaaaaa: s";
+        h.get_by_role_and_label(egui::accesskit::Role::Button, label);
+        h.key_press(egui::Key::Tab);
+        h.run();
+        assert!(h.get_by_label(label).is_focused());
+        h.key_press(egui::Key::Space);
+        h.run();
+        assert!(*h.state());
     }
 
     #[test]

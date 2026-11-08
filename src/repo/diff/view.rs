@@ -349,8 +349,19 @@ impl RepoTab {
         let (clicked, offset, jumped, seen) = (rows.clicked, rows.offset, rows.jumped, rows.seen);
         let wrap_offsets = rows.geometry.as_ref().map(|g| g.offsets.clone());
         self.find.saw(seen);
+        let hunk = if let Some(line) = clicked {
+            data.hunk_at(false, line)
+        } else if view.keyboard_hunk.is_none()
+            || (view.scroll - offset).abs() > 0.5
+            || jumped.is_some()
+        {
+            data.hunk_at(split, (offset / super::LINE_H) as usize + 3)
+        } else {
+            view.keyboard_hunk
+        };
 
         if let Some(view) = &mut self.diff {
+            view.keyboard_hunk = hunk;
             view.auto_opened.extend(auto_opened);
             view.text_sel = sel;
             view.scroll = offset;
@@ -369,6 +380,7 @@ impl RepoTab {
                 view.pick_line(i, shift);
             }
         }
+        self.keyboard_hunk(ui, acts);
     }
 
     /// Why the diff shown starts folded, while it does (a conflicted file never does, nor one
@@ -485,6 +497,7 @@ impl RepoTab {
                         ignorable,
                         (!view.structural.enabled).then_some(&view.key),
                         &links,
+                        false,
                         acts,
                         |ui, acts| {
                             self.lock_menu_items(ui, path, rev, acts);
@@ -870,10 +883,30 @@ fn view_options(
 
 /// The previous and next change buttons, laid out right to left.
 fn change_steps(ui: &mut Ui, acts: &mut Vec<Action>) {
-    if icons::small_button(ui, "arrow-down", "Next change (F7, Alt+↓)").clicked() {
+    if icons::small_button(
+        ui,
+        "arrow-down",
+        &format!(
+            "Next change ({} / {})",
+            crate::keymap::label(ui.ctx(), crate::keymap::Command::NextChange),
+            crate::keymap::label(ui.ctx(), crate::keymap::Command::NextChangeAlt)
+        ),
+    )
+    .clicked()
+    {
         acts.push(Action::DiffStep(1));
     }
-    if icons::small_button(ui, "arrow-up", "Previous change (Shift+F7, Alt+↑)").clicked() {
+    if icons::small_button(
+        ui,
+        "arrow-up",
+        &format!(
+            "Previous change ({} / {})",
+            crate::keymap::label(ui.ctx(), crate::keymap::Command::PreviousChange),
+            crate::keymap::label(ui.ctx(), crate::keymap::Command::PreviousChangeAlt)
+        ),
+    )
+    .clicked()
+    {
         acts.push(Action::DiffStep(-1));
     }
 }

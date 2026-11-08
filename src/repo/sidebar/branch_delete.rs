@@ -43,6 +43,7 @@ impl RepoTab {
                     .find(|r| r.name == b.upstream),
             );
         let delete = MenuItem::new("Delete…")
+            .icon("minus")
             .enabled(idle)
             .refused(refused)
             // The entry below, for the remote too, says the same reason.
@@ -75,6 +76,7 @@ impl RepoTab {
             return;
         };
         let both = MenuItem::new(format!("Delete locally and on {remote}…"))
+            .icon("minus")
             .enabled(idle)
             .refused(refused)
             .show(ui)

@@ -34,6 +34,7 @@ impl RepoTab {
             )
             .show(ui, |ui| self.commit_box(ui, acts));
 
+        self.keyboard_work_files(ui, acts);
         egui::ScrollArea::vertical()
             .id_salt("changes_scroll")
             .auto_shrink(false)
@@ -243,7 +244,10 @@ impl RepoTab {
         let id = egui::Id::new(("file-folder", self.repo_key(), tree));
         let rules = folding::Rules::from_settings(&Settings::get(ui.ctx()));
         let group = folding::split(ui, id, files, |f| &f.path, (&self.folding, &rules), acts);
-        let selected = |f: &&&StatusFile| self.open_key() == Some(&DiffKey::Work((**f).clone()));
+        let selected = |f: &&&StatusFile| {
+            self.open_key() == Some(&DiffKey::Work((**f).clone()))
+                || self.keyboard_file_selected(&DiffKey::Work((**f).clone()))
+        };
         let mut row = |ui: &mut Ui, indent, f: &StatusFile, acts: &mut Vec<Action>| {
             let click = self.work_row(ui, acts, f, indent, buttons);
             let opened = matches!(click, RowClick::Open);
@@ -300,7 +304,7 @@ impl RepoTab {
     ) -> RowClick {
         let key = DiffKey::Work(f.clone());
         let picked = &self.stash_picks.picked;
-        let selected = self.open_key() == Some(&key);
+        let selected = self.open_key() == Some(&key) || self.keyboard_file_selected(&key);
         let buttons = if self.busy_op.is_none() { buttons } else { &[] };
         let area = super::super::weakened_marks::area_of(f.area);
         let scope = crate::weakened::Scope::Work(area);
@@ -329,6 +333,10 @@ impl RepoTab {
             ui.separator();
             stash_menu_items(ui, &f.path, problem.as_deref(), picked, acts);
         };
+        self.keyboard_file_row(egui::Id::new("working-files"), &r.row, &key);
+        if r.row.clicked() || r.button.is_some() {
+            self.keyboard_select_file(egui::Id::new("working-files"), key.clone());
+        }
         super::super::weakened_marks::hover(ui, &r, flags);
         self.lock_badge(ui, &r.row, &f.path, (!buttons.is_empty(), selected));
         if f.code != 'D' {
@@ -344,6 +352,7 @@ impl RepoTab {
                 true,
                 Some(&key),
                 &links,
+                self.keyboard_file_selected(&key),
                 acts,
                 |ui, acts| {
                     self.lock_menu_items(ui, &f.path, None, acts);
@@ -353,7 +362,7 @@ impl RepoTab {
             );
         } else {
             // A deleted file has nothing to open, but can be stashed.
-            egui::Popup::context_menu(&r.row)
+            crate::menu_item::context(&r.row)
                 .style(theme::menu_style)
                 .show(|ui| stash_menu_items(ui, &f.path, problem.as_deref(), picked, acts));
         }

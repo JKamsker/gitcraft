@@ -76,6 +76,7 @@ mod https_recovery;
 mod interaction;
 pub(crate) mod issue_work;
 mod keep_submodules;
+pub(crate) mod keyboard;
 mod keys;
 mod layout;
 mod lfs_locks;
@@ -87,6 +88,7 @@ mod line_history_tests;
 mod load;
 mod local_ci;
 mod messages;
+pub(crate) use messages::mutation_key;
 mod nav_history;
 mod navigate;
 mod navigation;
@@ -206,6 +208,9 @@ pub struct RepoTab {
     reads: u64,
     /// The read the working tree shown comes from.
     work_read: u64,
+    work_pending: u64,
+    work_epoch: u64,
+    keyboard: std::cell::RefCell<keyboard::State>,
     /// The read the submodules shown come from.
     submodules_read: u64,
     /// The watcher came while the first read ran, which may have missed changes made before
@@ -600,6 +605,9 @@ impl RepoTab {
             life: lifecycle::Lifecycle::new(Instant::now()),
             reads: 0,
             work_read: 0,
+            work_pending: 0,
+            work_epoch: 0,
+            keyboard: Default::default(),
             submodules_read: 0,
             recheck_after_load: false,
             shown: true,
@@ -880,6 +888,13 @@ impl RepoTab {
     /// HTTPS credentials for this tab's git commands (from the clone that made it).
     pub fn set_credentials(&mut self, creds: git::Credentials) {
         self.credentials = Some(creds);
+    }
+
+    #[cfg(test)]
+    pub(crate) fn has_test_credentials(&self, username: &str, password: &str) -> bool {
+        self.credentials
+            .as_ref()
+            .is_some_and(|c| c.username == username && c.password == password)
     }
 }
 

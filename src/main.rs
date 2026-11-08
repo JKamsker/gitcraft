@@ -115,6 +115,18 @@ fn main() -> eframe::Result {
             std::process::exit(1);
         }
     }
+    // --quit is useful without a tray host. With no existing instance there is no window
+    // or background session to create.
+    if matches!(launch, Some(gitcraft::launch::Command::Quit)) {
+        return Ok(());
+    }
+    // LaunchServices delivers cold and warm gitcraft:// events through GetURL. Register
+    // before constructing/running the event loop; retain until it exits. The pinned winit
+    // backend does not install a GetURL handler or replace this Foundation registration.
+    #[cfg(target_os = "macos")]
+    let _native_urls = gitcraft_os::NativeUrlHandler::install()
+        .map_err(|message| eframe::Error::AppCreation(message.into()))?;
+
     app::install_panic_log();
     app::warm_up();
     let options = eframe::NativeOptions {
@@ -142,7 +154,11 @@ fn main() -> eframe::Result {
     let result = eframe::run_native(
         "gitcraft",
         options,
-        Box::new(|cc| Ok(Box::new(app::App::launched(cc, launch)))),
+        Box::new(|cc| {
+            Ok(Box::new(app::DesktopApp::new(app::App::launched(
+                cc, launch,
+            ))))
+        }),
     );
     app::after_exit();
     result

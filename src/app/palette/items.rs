@@ -93,15 +93,16 @@ impl Item {
 
 impl App {
     /// Every entry of the palette's first step.
-    pub(super) fn palette_entries(&self) -> Vec<Item> {
+    pub(super) fn palette_entries(&self, ctx: &egui::Context) -> Vec<Item> {
         let mut list = vec![
             Item::app("New tab", "app", AppCommand::NewTab)
-                .shortcut(&crate::keymap::label(crate::keymap::Command::NewTab)),
+                .shortcut(&crate::keymap::label(ctx, crate::keymap::Command::NewTab)),
         ];
         if !self.closed.is_empty() {
             list.push(
-                Item::app("Reopen closed tab", "app", AppCommand::ReopenTab)
-                    .shortcut(&crate::keymap::label(crate::keymap::Command::ReopenTab)),
+                Item::app("Reopen closed tab", "app", AppCommand::ReopenTab).shortcut(
+                    &crate::keymap::label(ctx, crate::keymap::Command::ReopenTab),
+                ),
             );
         }
         list.push(Item::app(
@@ -129,9 +130,9 @@ impl App {
                 AppCommand::ForgetSignIns,
             ),
             Item::app("Settings", "app", AppCommand::Settings)
-                .shortcut(&crate::keymap::label(crate::keymap::Command::Settings)),
+                .shortcut(&crate::keymap::label(ctx, crate::keymap::Command::Settings)),
             Item::app("Manual and keyboard shortcuts", "app", AppCommand::Manual)
-                .shortcut(&crate::keymap::label(crate::keymap::Command::Manual)),
+                .shortcut(&crate::keymap::label(ctx, crate::keymap::Command::Manual)),
         ]);
         for t in theme::themes().iter() {
             let hint = if t.dark() {
@@ -163,7 +164,7 @@ impl App {
                 AppCommand::Teleport,
             ));
             let mut repo_items: Vec<Item> = repo
-                .palette_items()
+                .palette_items(ctx)
                 .into_iter()
                 .map(Item::from_repo)
                 .collect();

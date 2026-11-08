@@ -107,8 +107,15 @@ impl RepoTab {
         ui.separator();
         match self.lfs_locks.lock_on(path) {
             Some(lock) if lock.theirs() => {
-                ui.add_enabled(false, egui::Button::new(lock_label(lock, git::now())));
-                if ui.button("LFS locks…").clicked() {
+                crate::menu_item::MenuItem::new(lock_label(lock, git::now()))
+                    .icon("lock")
+                    .refused(Some("Someone else holds this file’s lock"))
+                    .show(ui);
+                if crate::menu_item::MenuItem::new("LFS locks…")
+                    .icon("command")
+                    .show(ui)
+                    .clicked()
+                {
                     acts.push(Action::LfsLocks(LockAct::OpenPanel));
                 }
             }
@@ -120,7 +127,14 @@ impl RepoTab {
                 } else {
                     "Give the LFS lock back so others can push changes to the file"
                 };
-                let r = ui.add_enabled(!busy && !changed, egui::Button::new("Unlock"));
+                let r = crate::menu_item::MenuItem::new("Unlock")
+                    .icon("lock")
+                    .refused(if busy {
+                        Some("An LFS lock operation is running")
+                    } else {
+                        changed.then_some("Commit the file’s changes before unlocking it")
+                    })
+                    .show(ui);
                 if r.on_hover_text(tip).on_disabled_hover_text(tip).clicked() {
                     acts.push(Action::LfsLocks(LockAct::Unlock {
                         locks: vec![(lock.id.clone(), lock.path.clone())],
@@ -129,7 +143,10 @@ impl RepoTab {
                 }
             }
             None => {
-                let r = ui.add_enabled(!busy, egui::Button::new("Lock"));
+                let r = crate::menu_item::MenuItem::new("Lock")
+                    .icon("lock")
+                    .refused(busy.then_some("An LFS lock operation is running"))
+                    .show(ui);
                 if r.on_hover_text("Take the file's LFS lock: nobody else can push changes to it")
                     .clicked()
                 {

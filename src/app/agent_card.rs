@@ -20,7 +20,15 @@ impl App {
     /// Hands the requests that came in to the tabs of their repositories, or answers them.
     pub(super) fn agent_requests(&mut self, ctx: &egui::Context) {
         for incoming in crate::instance::take_agent_calls() {
-            route(self.settings.agent_writes, &mut self.tabs, incoming, ctx);
+            if let Some(window) = self.windows.parked.values_mut().find(|w| {
+                w.tabs
+                    .iter()
+                    .any(|t| matches!(t, Tab::Repo(r) if r.path.to_string_lossy() == incoming.repo))
+            }) {
+                route(self.settings.agent_writes, &mut window.tabs, incoming, ctx);
+            } else {
+                route(self.settings.agent_writes, &mut self.tabs, incoming, ctx);
+            }
         }
     }
 

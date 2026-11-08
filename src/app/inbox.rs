@@ -588,10 +588,14 @@ impl App {
             return;
         };
         let connecting = self.connecting_to(&opening.repo);
-        let tab = self.tabs.iter_mut().find_map(|t| match t {
-            super::Tab::Repo(r) if r.path == opening.repo => Some(r),
-            _ => None,
-        });
+        let tab = self
+            .tabs
+            .iter_mut()
+            .chain(self.windows.parked.values_mut().flat_map(|w| &mut w.tabs))
+            .find_map(|t| match t {
+                super::Tab::Repo(r) if r.path == opening.repo => Some(r),
+                _ => None,
+            });
         match tab {
             Some(tab) if tab.shows_pull_requests() => {
                 tab.queue(crate::repo::Action::OpenPr(opening.number));
@@ -627,7 +631,28 @@ fn one_line(ui: &Ui, text: String, font: FontId, color: Color32, width: f32) -> 
 
 /// One pull request: its number and title, its repository and author, and why it's here.
 fn inbox_row(ui: &mut Ui, item: &Item, reasons: &[Reason], t: &Tokens) -> egui::Response {
-    let (rect, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 40.0), Sense::click());
+    let (_, rect) = ui.allocate_space(vec2(ui.available_width(), 40.0));
+    let resp = ui.interact(
+        rect,
+        ui.id().with(("inbox-row", item.forge, &item.pr.url)),
+        Sense::click(),
+    );
+    crate::a11y::a11y(&resp, egui::WidgetType::Button, || {
+        let reasons = reasons
+            .iter()
+            .map(|reason| reason.label())
+            .collect::<Vec<_>>()
+            .join(", ");
+        format!(
+            "{} pull request {}: {}, by {}, {}. {}",
+            item.forge.name(),
+            item.pr.number,
+            item.pr.title,
+            item.pr.author,
+            item.pr.project,
+            reasons
+        )
+    });
     if resp.hovered() {
         ui.painter().rect_filled(rect, t.radius, t.hover);
     }
@@ -911,5 +936,55 @@ mod tests {
         assert_eq!(inbox.problems, [gone]);
         inbox.ask(Vec::new(), true, &ctx);
         assert!(inbox.given_up.is_empty());
+    }
+}
+
+#[cfg(test)]
+mod accessibility_tests {
+    use super::*;
+    use egui_kittest::{Harness, kittest::Queryable};
+    #[test]
+    fn inbox_exposes_forge_repository_author_and_reasons_and_activates() {
+        let item = Item {
+            repo: None,
+            forge: Forge::GitHub,
+            pr: InboxPr {
+                number: 42,
+                title: "Fix 日本語".into(),
+                url: "https://github.com/a/b/pull/42".into(),
+                author: "Jonas".into(),
+                project: "a/b".into(),
+                ..Default::default()
+            },
+        };
+        let fonts = std::cell::Cell::new(false);
+        let mut h = Harness::new_ui_state(
+            move |ui, opened: &mut bool| {
+                if !fonts.replace(true) {
+                    crate::theme::install_fonts(ui.ctx());
+                    return;
+                }
+                let t = Tokens::get(ui.ctx());
+                *opened |= inbox_row(
+                    ui,
+                    &item,
+                    &[Reason::ReviewRequested, Reason::ChecksFailing],
+                    &t,
+                )
+                .clicked();
+                crate::a11y::end_frame(ui.ctx());
+            },
+            false,
+        );
+        h.run();
+        let label =
+            "GitHub pull request 42: Fix 日本語, by Jonas, a/b. review requested, checks failing";
+        h.get_by_role_and_label(egui::accesskit::Role::Button, label);
+        h.key_press(egui::Key::Tab);
+        h.run();
+        assert!(h.get_by_label(label).is_focused());
+        h.key_press(egui::Key::Enter);
+        h.run();
+        assert!(*h.state());
     }
 }

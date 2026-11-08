@@ -19,7 +19,9 @@ mod search;
 pub(super) mod suggest;
 mod suggest_popup;
 
-use egui::{Align2, FontId, Key, Response, Sense, Ui, vec2};
+#[cfg(test)]
+use egui::Key;
+use egui::{Align2, FontId, Response, Sense, Ui, vec2};
 
 use super::actions::{BranchRef, compare_branches_action};
 use super::columns::{Cols, MIN_COL_W, MIN_GRAPH_W, MIN_REFS_W};
@@ -180,6 +182,7 @@ impl RepoTab {
         let keys_free =
             !ui.ctx().egui_wants_keyboard_input() || crate::a11y::list_has_focus(ui.ctx(), rows_id);
         if !ghost
+            && self.keyboard_graph_active()
             && keys_free
             && self.dialog.is_none()
             && self.package.is_none()
@@ -362,6 +365,7 @@ impl RepoTab {
                     if i == stop {
                         crate::a11y::list_stop(&resp, rows_id, self.selected == Some(i));
                     }
+                    self.keyboard_graph_focus(&resp);
                     if resp.clicked() {
                         // Ctrl+click: compare the selected commit with this one.
                         let compare = ui
@@ -471,27 +475,57 @@ impl RepoTab {
         })
     }
 
+    /// Same selected-commit value for graph keyboard handling and palette dispatch.
+    pub(in crate::repo) fn graph_copy_text(
+        &self,
+        command: crate::keymap::Command,
+        i: usize,
+    ) -> Option<String> {
+        use crate::keymap::Command;
+        let commit = self.commits.get(i).filter(|c| c.hash != WIP_HASH)?;
+        match command {
+            Command::GraphCopyHash => Some(commit.hash.clone()),
+            Command::GraphCopyMessage => Some(commit.summary.clone()),
+            Command::GraphCopyBranch => self.copy_branch(i),
+            _ => None,
+        }
+    }
+
     /// Up and down select the row above or below the selected one.
     /// `ringed`: the row Tab reaches, where they start while nothing is selected.
     fn arrow_keys(&mut self, ui: &Ui, ringed: Option<usize>, acts: &mut Vec<Action>) {
+        use crate::keymap::{self, Command};
+        keymap::active(ui.ctx(), self.key_scopes(ui.ctx()));
+        if let Some(i) = self.selected.or(ringed) {
+            for command in [
+                Command::GraphCopyHash,
+                Command::GraphCopyMessage,
+                Command::GraphCopyBranch,
+            ] {
+                if keymap::take(ui.ctx(), command)
+                    && let Some(text) = self.graph_copy_text(command, i)
+                {
+                    ui.ctx().copy_text(text);
+                }
+            }
+        }
+        let up = keymap::take(ui.ctx(), Command::GraphPrevious);
+        let down = keymap::take(ui.ctx(), Command::GraphNext);
+        let left = keymap::take(ui.ctx(), Command::GraphLeft);
+        let right = keymap::take(ui.ctx(), Command::GraphRight);
         if Settings::get(ui.ctx()).graph_lane_walk {
-            let direction = ui.input(|i| {
-                if !i.modifiers.is_none() {
-                    return None;
-                }
-                use crate::repo::graph_walk::Direction;
-                if i.key_pressed(Key::ArrowDown) {
-                    Some(Direction::Parent)
-                } else if i.key_pressed(Key::ArrowUp) {
-                    Some(Direction::Child)
-                } else if i.key_pressed(Key::ArrowRight) {
-                    Some(Direction::Merge)
-                } else if i.key_pressed(Key::ArrowLeft) {
-                    Some(Direction::Tip)
-                } else {
-                    None
-                }
-            });
+            use crate::repo::graph_walk::Direction;
+            let direction = if down {
+                Some(Direction::Parent)
+            } else if up {
+                Some(Direction::Child)
+            } else if right {
+                Some(Direction::Merge)
+            } else if left {
+                Some(Direction::Tip)
+            } else {
+                None
+            };
             if let Some(direction) = direction
                 && let Some(next) = self.graph_walk(direction, ringed, ui.ctx())
             {
@@ -500,15 +534,6 @@ impl RepoTab {
             }
             return;
         }
-        // Alt+↑ / Alt+↓ go from change to change of the diff shown below the graph.
-        let below = self.diff_beside_graph(ui.ctx());
-        let (up, down) = ui.input(|i| {
-            let plain = !(below && i.modifiers.alt);
-            (
-                plain && i.key_pressed(Key::ArrowUp),
-                plain && i.key_pressed(Key::ArrowDown),
-            )
-        });
         let current = self.selected.or(ringed).unwrap_or(0);
         let next = if self.graph_projection_displayed() && (up || down) {
             self.saved_views.next(current, down)
@@ -535,7 +560,7 @@ impl RepoTab {
             return;
         }
         if let Some(stash) = self.stash_at(i).and_then(|s| self.stashes.get(s)) {
-            egui::Popup::context_menu(resp)
+            crate::menu_item::context(resp)
                 .style(crate::theme::menu_style)
                 .show(|ui| super::sidebar::stash_menu(ui, acts, stash, idle));
             return;
@@ -627,10 +652,11 @@ fn loading_row(ui: &mut Ui, t: &Tokens) {
 
 /// Right-click menu of the changes row.
 fn wip_menu(resp: &Response, idle: bool, acts: &mut Vec<Action>) {
-    egui::Popup::context_menu(resp)
+    crate::menu_item::context(resp)
         .style(crate::theme::menu_style)
         .show(|ui| {
             if MenuItem::new("Stage all changes")
+                .icon("check")
                 .enabled(idle)
                 .keys(Command::StageAll)
                 .show(ui)
@@ -643,6 +669,7 @@ fn wip_menu(resp: &Response, idle: bool, acts: &mut Vec<Action>) {
                 });
             }
             if MenuItem::new("Stash changes…")
+                .icon("archive")
                 .enabled(idle)
                 .keys(Command::Stash)
                 .show(ui)
@@ -651,8 +678,10 @@ fn wip_menu(resp: &Response, idle: bool, acts: &mut Vec<Action>) {
                 acts.push(Action::Dialog(Dialog::stash()));
             }
             ui.separator();
-            if ui
-                .add_enabled(idle, egui::Button::new("Apply patch…"))
+            if crate::menu_item::MenuItem::new("Apply patch…")
+                .icon("file-diff")
+                .enabled(idle)
+                .show(ui)
                 .on_hover_text(APPLY_PATCH_TIP)
                 .clicked()
             {
@@ -675,15 +704,17 @@ pub(super) fn compare_items(
 ) {
     let name = branch.name;
     let current_ref = BranchRef::local(current);
-    if ui
-        .button(format!("Changes {name} adds to {current}"))
+    if crate::menu_item::MenuItem::new(format!("Changes {name} adds to {current}"))
+        .icon("command")
+        .show(ui)
         .on_hover_text("What it changed since the two diverged, as a pull request shows it")
         .clicked()
     {
         acts.push(compare_branches_action(current_ref, branch, true));
     }
-    if ui
-        .button(format!("Compare {current} with {name}"))
+    if crate::menu_item::MenuItem::new(format!("Compare {current} with {name}"))
+        .icon("file-diff")
+        .show(ui)
         .on_hover_text("Every difference between the two")
         .clicked()
     {
@@ -975,5 +1006,119 @@ mod tests {
         frame(&mut tab, Vec::new());
         assert!(opened, "the right-click opened no menu");
         assert!(!egui::Popup::is_any_open(&ctx));
+    }
+}
+
+#[cfg(test)]
+mod registry_tests {
+    use super::*;
+    #[test]
+    fn optional_graph_copy_commands_use_actual_selected_commit() {
+        use crate::keymap::{Command, Stroke};
+        let ctx = egui::Context::default();
+        let mut settings = Settings::default();
+        let commands = [
+            (Command::GraphCopyHash, Key::F8, "recorded-hash"),
+            (Command::GraphCopyMessage, Key::F9, "recorded message"),
+            (Command::GraphCopyBranch, Key::F10, "main"),
+        ];
+        for (command, key, _) in commands {
+            settings.key_bindings.insert(
+                command.id().into(),
+                vec![Stroke::new(key, egui::Modifiers::NONE)],
+            );
+        }
+        settings.put_for_test(&ctx);
+        let mut tab = RepoTab::new_deferred("/recorded/graph-copy".into(), &ctx);
+        tab.refs.local.push(git::Branch {
+            name: "main".into(),
+            target: "recorded-hash".into(),
+            is_head: true,
+            upstream: String::new(),
+            track: String::new(),
+        });
+        tab.commits = vec![std::sync::Arc::new(git::Commit {
+            hash: "recorded-hash".into(),
+            summary: "recorded message".into(),
+            refs: vec!["main".into()],
+            ..Default::default()
+        })];
+        tab.selected = Some(0);
+        for (_, key, expected) in commands {
+            let mut acts = Vec::new();
+            let out = ctx.run_ui(
+                egui::RawInput {
+                    events: vec![egui::Event::Key {
+                        key,
+                        physical_key: None,
+                        pressed: true,
+                        repeat: false,
+                        modifiers: egui::Modifiers::NONE,
+                    }],
+                    ..Default::default()
+                },
+                |ui| tab.arrow_keys(ui, None, &mut acts),
+            );
+            assert!(acts.is_empty());
+            assert!(
+                out.platform_output
+                    .commands
+                    .iter()
+                    .any(|c| matches!(c, egui::OutputCommand::CopyText(t) if t == expected))
+            );
+            out.drop_without_applying_deltas();
+        }
+    }
+
+    #[test]
+    fn configured_graph_movement_reaches_actual_selection_adapter() {
+        use crate::keymap::{Command, Stroke};
+        let ctx = egui::Context::default();
+        let mut settings = Settings {
+            graph_lane_walk: false,
+            ..Default::default()
+        };
+        settings.key_bindings.insert(
+            Command::GraphNext.id().into(),
+            vec![Stroke::new(Key::F8, egui::Modifiers::NONE)],
+        );
+        settings.put_for_test(&ctx);
+        let mut tab = RepoTab::new_deferred("/recorded/graph-registry".into(), &ctx);
+        tab.commits = (0..3)
+            .map(|i| {
+                std::sync::Arc::new(git::Commit {
+                    hash: i.to_string(),
+                    ..Default::default()
+                })
+            })
+            .collect();
+        tab.selected = Some(0);
+        for (key, expected) in [(Key::F8, true), (Key::ArrowDown, false)] {
+            let mut acts = Vec::new();
+            ctx.run_ui(
+                egui::RawInput {
+                    events: vec![
+                        egui::Event::Key {
+                            key,
+                            physical_key: Some(key),
+                            pressed: true,
+                            repeat: false,
+                            modifiers: egui::Modifiers::NONE,
+                        },
+                        egui::Event::Key {
+                            key,
+                            physical_key: Some(key),
+                            pressed: false,
+                            repeat: false,
+                            modifiers: egui::Modifiers::NONE,
+                        },
+                    ],
+                    ..Default::default()
+                },
+                |ui| tab.arrow_keys(ui, None, &mut acts),
+            )
+            .drop_without_applying_deltas();
+            assert_eq!(matches!(acts.as_slice(), [Action::Select(1)]), expected);
+        }
     }
 }

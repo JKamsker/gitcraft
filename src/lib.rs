@@ -63,6 +63,7 @@ mod terminal;
 mod theme;
 mod tour;
 mod trackers;
+mod tray;
 mod update;
 mod vscode_theme;
 mod weakened;

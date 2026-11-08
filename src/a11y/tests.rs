@@ -425,3 +425,60 @@ fn tab_reaches_a_button_shown_while_the_row_has_the_keyboard() {
     }
     assert_eq!(seen, ["row 0", "button 0", "row 1", "button 1"]);
 }
+
+#[test]
+fn disclosures_expose_expansion_and_panes_expose_a_role() {
+    let mut h = Harness::new_ui(|ui| {
+        let (_, r) = ui.allocate_exact_size(vec2(120.0, 24.0), Sense::click());
+        super::expanded(&r, "Configuration origins", true);
+        let (_, r) = ui.allocate_exact_size(vec2(120.0, 24.0), Sense::focusable_noninteractive());
+        super::pane(&r, "Files pane");
+        super::end_frame(ui.ctx());
+    });
+    h.run();
+    assert_eq!(
+        h.get_by_label("Configuration origins")
+            .accesskit_node()
+            .data()
+            .is_expanded(),
+        Some(true)
+    );
+    h.get_by_role_and_label(egui::accesskit::Role::Pane, "Files pane");
+}
+
+#[test]
+fn painted_focus_draws_an_accent_ring_inside_the_control() -> Result<(), String> {
+    let ctx = egui::Context::default();
+    let mut expected = None;
+    let out = ctx.run_ui(egui::RawInput::default(), |ui| {
+        let (_, r) = ui.allocate_exact_size(vec2(160.0, 30.0), Sense::click());
+        r.request_focus();
+        a11y(&r, WidgetType::Button, "Painted control");
+        expected = Some(r.rect.shrink(1.0));
+        super::end_frame(ui.ctx());
+    });
+    let rect = expected.ok_or("No painted control")?;
+    let accent = crate::theme::Tokens::get(&ctx).accent;
+    assert!(out.shapes.iter().any(|shape| matches!(&shape.shape, egui::Shape::Rect(r) if r.rect == rect && r.stroke.width == 2.0 && r.stroke.color == accent)));
+    out.drop_without_applying_deltas();
+    Ok(())
+}
+
+#[test]
+fn repository_controls_cannot_reorder_or_hide_spoken_names() {
+    assert_eq!(labels::clean("fix\u{202e}txt\u{202c}\0\u{200b}"), "fixtxt");
+    assert_eq!(labels::clean("שלום 日本語 Ünicode"), "שלום 日本語 Ünicode");
+}
+
+#[test]
+fn naming_a_custom_editor_preserves_its_exclusive_keyboard_ownership() {
+    let ctx = egui::Context::default();
+    ctx.run_ui(egui::RawInput::default(), |ui| {
+        let (_, r) = ui.allocate_exact_size(vec2(160.0, 30.0), Sense::click());
+        r.request_focus();
+        a11y(&r, WidgetType::TextEdit, "Terminal");
+        assert!(keyboard_taken(ui.ctx()));
+        super::end_frame(ui.ctx());
+    })
+    .drop_without_applying_deltas();
+}

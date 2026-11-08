@@ -169,20 +169,26 @@ fn session_menu(r: &egui::Response, session: &[Turn], acts: &mut Vec<Action>) {
         return;
     };
     let id = first.session.clone();
-    r.context_menu(|ui| {
-        if ui.button("Review everything since last looked…").clicked()
-            && let Some(action) = aggregate_action(session)
-        {
-            acts.push(action);
-        }
-        if ui
-            .button("Delete this session's turns")
-            .on_hover_text("The saved turns go; the files stay as they are")
-            .clicked()
-        {
-            acts.push(Action::Agent(AgentAct::ForgetTurns(id.clone())));
-        }
-    });
+    crate::menu_item::context(r)
+        .style(crate::theme::menu_style)
+        .show(|ui| {
+            if crate::menu_item::MenuItem::new("Review everything since last looked…")
+                .icon("file-diff")
+                .show(ui)
+                .clicked()
+                && let Some(action) = aggregate_action(session)
+            {
+                acts.push(action);
+            }
+            if crate::menu_item::MenuItem::new("Delete this session's turns")
+                .icon("minus")
+                .show(ui)
+                .on_hover_text("The saved turns go; the files stay as they are")
+                .clicked()
+            {
+                acts.push(Action::Agent(AgentAct::ForgetTurns(id.clone())));
+            }
+        });
 }
 
 fn turn_list(ui: &mut Ui, session: &[Turn], t: &Tokens, acts: &mut Vec<Action>) {
@@ -223,33 +229,44 @@ fn turn_chip(ui: &mut Ui, turn: &Turn, t: &Tokens, acts: &mut Vec<Action>) {
     if r.clicked() {
         acts.push(turn_diff(turn, &label));
     }
-    r.context_menu(|ui| {
-        if ui.button("Review hunks / revert only this turn…").clicked() {
-            acts.push(Action::RepositoryTools(
-                crate::repo::repository_tools::Act::Turn(
-                    turn.parent.clone(),
-                    turn.commit.clone(),
-                    turn.session.clone(),
-                ),
-            ));
-        }
-        if ui.button("What this turn changed").clicked() {
-            acts.push(turn_diff(turn, &label));
-        }
-        if ui
-            .button("Everything since this turn")
-            .on_hover_text("This turn against the files as they are now")
-            .clicked()
-        {
-            acts.push(Action::Compare {
-                base: turn.commit.clone(),
-                base_label: format!("after turn {}", turn.number),
-                target: None,
-                target_label: "now".to_owned(),
-                since_fork: false,
-            });
-        }
-    });
+    crate::menu_item::context(&r)
+        .style(crate::theme::menu_style)
+        .show(|ui| {
+            if crate::menu_item::MenuItem::new("Review hunks / revert only this turn…")
+                .icon("file-diff")
+                .show(ui)
+                .clicked()
+            {
+                acts.push(Action::RepositoryTools(
+                    crate::repo::repository_tools::Act::Turn(
+                        turn.parent.clone(),
+                        turn.commit.clone(),
+                        turn.session.clone(),
+                    ),
+                ));
+            }
+            if crate::menu_item::MenuItem::new("What this turn changed")
+                .icon("command")
+                .show(ui)
+                .clicked()
+            {
+                acts.push(turn_diff(turn, &label));
+            }
+            if crate::menu_item::MenuItem::new("Everything since this turn")
+                .icon("command")
+                .show(ui)
+                .on_hover_text("This turn against the files as they are now")
+                .clicked()
+            {
+                acts.push(Action::Compare {
+                    base: turn.commit.clone(),
+                    base_label: format!("after turn {}", turn.number),
+                    target: None,
+                    target_label: "now".to_owned(),
+                    since_fork: false,
+                });
+            }
+        });
 }
 
 fn hover(turn: &Turn) -> String {

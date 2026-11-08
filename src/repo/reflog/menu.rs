@@ -90,11 +90,20 @@ impl RepoTab {
     pub(super) fn reflog_menu_items(&self, ui: &mut Ui, pick: &Pick, acts: &mut Vec<Action>) {
         let idle = self.busy_op.is_none();
         let head = self.refs.head.as_str();
-        if ui.button("Create branch here…").clicked() {
+        if crate::menu_item::MenuItem::new("Create branch here…")
+            .icon("git-branch-plus")
+            .show(ui)
+            .clicked()
+        {
             acts.push(create_branch(pick));
         }
         self.recover_items(ui, pick, acts);
-        if self.graph_has(&pick.hash) && ui.button("Show in graph").clicked() {
+        if self.graph_has(&pick.hash)
+            && crate::menu_item::MenuItem::new("Show in graph")
+                .icon("command")
+                .show(ui)
+                .clicked()
+        {
             acts.push(Action::SelectHash(pick.hash.clone()));
         }
         ui.separator();
@@ -127,13 +136,16 @@ impl RepoTab {
         } else {
             None
         };
-        ui.add_enabled_ui(why.is_none(), |ui| {
-            ui.menu_button(format!("Reset {target} to here"), |ui| {
-                reset_items(ui, &rewrite, acts);
-            })
-            .response
-            .on_disabled_hover_text(why.unwrap_or(BUSY));
-        });
+        {
+            crate::menu_item::MenuItem::new(format!("Reset {target} to here"))
+                .icon("undo-2")
+                .refused(why)
+                .submenu(ui, |ui| {
+                    reset_items(ui, &rewrite, acts);
+                })
+                .response
+                .on_disabled_hover_text(why.unwrap_or(BUSY));
+        }
     }
 
     /// Apply (a dropped stash), cherry-pick, check out and copy, as buttons or menu entries.
@@ -141,8 +153,10 @@ impl RepoTab {
         let idle = self.busy_op.is_none();
         let head = self.refs.head.as_str();
         if pick.stash
-            && ui
-                .add_enabled(idle, egui::Button::new("Apply stash"))
+            && crate::menu_item::MenuItem::new("Apply stash")
+                .icon("archive")
+                .enabled(idle)
+                .show(ui)
                 .on_hover_text("Put its changes back on the working tree (git stash apply)")
                 .on_disabled_hover_text(BUSY)
                 .clicked()
@@ -150,19 +164,22 @@ impl RepoTab {
             acts.push(apply_stash(pick));
         }
         let why = no_cherry_pick(pick, head, self.in_head(pick));
-        if ui
-            .add_enabled(idle && why.is_none(), egui::Button::new("Cherry-pick"))
+        if crate::menu_item::MenuItem::new("Cherry-pick")
+            .icon("command")
+            .enabled(idle)
+            .refused(why)
+            .show(ui)
             .on_hover_text(CHERRY_PICK_TIP)
             .on_disabled_hover_text(why.unwrap_or(BUSY))
             .clicked()
         {
             acts.push(cherry_pick(pick));
         }
-        if ui
-            .add_enabled(
-                idle && pick.hash != head,
-                egui::Button::new("Check out (detached)"),
-            )
+        if crate::menu_item::MenuItem::new("Check out (detached)")
+            .icon("log-in")
+            .enabled(idle)
+            .refused((pick.hash == head).then_some("It is the commit checked out"))
+            .show(ui)
             .on_hover_text("Check out this commit, on no branch")
             .on_disabled_hover_text(if pick.hash == head {
                 "It is the commit checked out"
@@ -173,7 +190,11 @@ impl RepoTab {
         {
             acts.push(checkout(pick));
         }
-        if ui.button("Copy commit hash").clicked() {
+        if crate::menu_item::MenuItem::new("Copy commit hash")
+            .icon("copy")
+            .show(ui)
+            .clicked()
+        {
             ui.ctx().copy_text(pick.hash.clone());
         }
     }

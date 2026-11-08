@@ -38,7 +38,7 @@ pub fn terminal_tabs(
             cwd: None,
         });
     }
-    egui::Popup::context_menu(&plus)
+    crate::menu_item::context(&plus)
         .style(crate::theme::menu_style)
         .show(|ui| shell_items(ui, acts));
     let more = icons::small_button(ui, "chevron-down", "New terminal with…");
@@ -121,7 +121,11 @@ fn terminal_tab(
 /// One entry per shell found on this computer, each opening a new terminal with it.
 fn shell_items(ui: &mut Ui, acts: &mut Vec<Action>) {
     for shell in crate::terminal::available_shells() {
-        if ui.button(&shell.label).clicked() {
+        if crate::menu_item::MenuItem::new(&shell.label)
+            .icon("square-terminal")
+            .show(ui)
+            .clicked()
+        {
             acts.push(Action::NewTerminal {
                 shell: Some(shell),
                 cwd: None,

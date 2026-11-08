@@ -80,7 +80,7 @@ impl RepoTab {
             }
             paint_remote_header(ui, rect, &r, remote, branches.len(), expanded);
             let r = r.on_hover_text(&remote.url);
-            egui::Popup::context_menu(&r)
+            crate::menu_item::context(&r)
                 .style(crate::theme::menu_style)
                 .show(|ui| remote_menu_items(ui, acts, remote, idle));
             if !expanded {
@@ -133,7 +133,7 @@ impl RepoTab {
         } else if r.clicked() {
             acts.push(Action::SelectHash(b.target.clone()));
         }
-        egui::Popup::context_menu(&r)
+        crate::menu_item::context(&r)
             .style(crate::theme::menu_style)
             .show(|ui| self.remote_branch_menu_items(ui, acts, remote, short, b, idle));
     }
@@ -147,18 +147,19 @@ impl RepoTab {
         b: &Branch,
         idle: bool,
     ) {
-        if ui
-            .add_enabled(idle, egui::Button::new("Check out as local branch"))
+        if crate::menu_item::MenuItem::new("Check out as local branch")
+            .icon("log-in")
+            .enabled(idle)
+            .show(ui)
             .clicked()
         {
             acts.push(Action::CheckoutRemote(b.name.clone()));
         }
         if let Some(current) = self.refs.current.as_deref() {
-            if ui
-                .add_enabled(
-                    idle,
-                    egui::Button::new(format!("Fast-forward {current} to it")),
-                )
+            if crate::menu_item::MenuItem::new(format!("Fast-forward {current} to it"))
+                .icon("arrow-right")
+                .enabled(idle)
+                .show(ui)
                 .clicked()
             {
                 acts.push(fast_forward_action(BranchRef::remote(&b.name), current));
@@ -184,11 +185,19 @@ impl RepoTab {
             graph_view::compare_items(ui, acts, BranchRef::remote(&b.name), current);
             ui.separator();
         }
-        if ui.button("Create branch here…").clicked() {
+        if crate::menu_item::MenuItem::new("Create branch here…")
+            .icon("git-branch-plus")
+            .show(ui)
+            .clicked()
+        {
             acts.push(Action::Dialog(Dialog::create_branch(&b.target, &b.name)));
         }
         ui.separator();
-        if ui.button("Copy name").clicked() {
+        if crate::menu_item::MenuItem::new("Copy name")
+            .icon("copy")
+            .show(ui)
+            .clicked()
+        {
             ui.ctx().copy_text(b.name.clone());
         }
         if let Some((menu, target)) = self.branch_link_menu(&b.name) {
@@ -197,8 +206,10 @@ impl RepoTab {
         ui.separator();
         self.visibility_items(ui, acts, &remote_ref(&b.name), false);
         ui.separator();
-        if ui
-            .add_enabled(idle, egui::Button::new("Delete from remote…"))
+        if crate::menu_item::MenuItem::new("Delete from remote…")
+            .icon("minus")
+            .enabled(idle)
+            .show(ui)
             .clicked()
         {
             acts.push(Action::Dialog(
@@ -300,8 +311,10 @@ fn paint_remote_header(
 }
 
 fn remote_menu_items(ui: &mut Ui, acts: &mut Vec<Action>, remote: &Remote, idle: bool) {
-    if ui
-        .add_enabled(idle, egui::Button::new(format!("Fetch {}", remote.name)))
+    if crate::menu_item::MenuItem::new(format!("Fetch {}", remote.name))
+        .icon("cloud-download")
+        .enabled(idle)
+        .show(ui)
         .clicked()
     {
         acts.push(Action::Ops {
@@ -310,7 +323,12 @@ fn remote_menu_items(ui: &mut Ui, acts: &mut Vec<Action>, remote: &Remote, idle:
             refresh: Refresh::All,
         });
     }
-    if ui.add_enabled(idle, egui::Button::new("Edit…")).clicked() {
+    if crate::menu_item::MenuItem::new("Edit…")
+        .icon("wrench")
+        .enabled(idle)
+        .show(ui)
+        .clicked()
+    {
         acts.push(Action::Dialog(Dialog::remote(Some((
             remote.name.clone(),
             remote.url.clone(),
@@ -324,11 +342,20 @@ fn remote_menu_items(ui: &mut Ui, acts: &mut Vec<Action>, remote: &Remote, idle:
             crate::repo::repository_tools::Act::Remote(remote.name.clone()),
         ));
     }
-    if ui.button("Copy URL").clicked() {
+    if crate::menu_item::MenuItem::new("Copy URL")
+        .icon("copy")
+        .show(ui)
+        .clicked()
+    {
         ui.ctx().copy_text(remote.url.clone());
     }
     ui.separator();
-    if ui.add_enabled(idle, egui::Button::new("Remove…")).clicked() {
+    if crate::menu_item::MenuItem::new("Remove…")
+        .icon("minus")
+        .enabled(idle)
+        .show(ui)
+        .clicked()
+    {
         acts.push(Action::Dialog(Dialog::confirm(
             "Remove remote",
             format!(

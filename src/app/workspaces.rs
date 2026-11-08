@@ -675,7 +675,13 @@ fn workspace_row(
     state: Option<&RepoState>,
     t: &Tokens,
 ) -> Option<RowClick> {
-    let (rect, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 36.0), Sense::click());
+    let (_, rect) = ui.allocate_space(vec2(ui.available_width(), 36.0));
+    let resp = ui.interact(
+        rect,
+        ui.id().with(("workspace-repository", path)),
+        Sense::click(),
+    );
+    crate::a11y::a11y(&resp, egui::WidgetType::Button, || row_tooltip(path, state));
     let hovered = resp.hovered() || ui.rect_contains_pointer(rect);
     if resp.hovered() {
         ui.painter().rect_filled(rect, t.radius, t.hover);
@@ -718,11 +724,17 @@ fn workspace_row(
         t.text_faint,
     );
     let mut click = None;
-    if hovered {
+    if hovered
+        || crate::a11y::keyboard_on(&resp)
+        || ui.memory(|m| m.has_focus(resp.id.with("remove")))
+    {
         let x_rect = Rect::from_center_size(pos2(rect.right() - 12.0, y), vec2(20.0, 20.0));
         let x = ui
             .interact(x_rect, resp.id.with("remove"), Sense::click())
             .on_hover_text("Remove from the workspace");
+        crate::a11y::a11y(&x, egui::WidgetType::Button, || {
+            format!("Remove {} from the workspace", repo_name(path))
+        });
         if x.hovered() {
             ui.painter().rect_filled(x_rect, t.radius_sm, t.pressed);
         }

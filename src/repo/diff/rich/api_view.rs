@@ -76,7 +76,7 @@ fn row(ui: &mut Ui, t: &Tokens, c: &ApiChange, acts: &mut Vec<Action>) {
         t.text,
     );
     let label = format!("{} {}", c.endpoint, c.what);
-    resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, &label));
+    crate::a11y::a11y(&resp, egui::WidgetType::Button, &label);
     let place = match (c.old_line, c.new_line) {
         (_, Some(n)) => format!("Go to line {n}"),
         (Some(o), None) => format!("Go to line {o} of the file before the change"),

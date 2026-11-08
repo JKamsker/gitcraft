@@ -10,13 +10,16 @@ use super::{
     file_view, issue_work, ops, partial_stash, pr_review, quick_edit, reflog, timeline, versions,
 };
 use crate::git::{self, InProgress};
-use crate::keymap::{Command, label, written};
+use crate::keymap::{Command, label};
 use crate::terminal::ShellSpec;
 
 /// Everything the views ask for; applied after drawing so views only borrow the state.
 pub(crate) enum Action {
     LoadPromptSession(String),
     ShowPromptHunk(super::prompt_session::Hunk),
+    Keyboard(super::keyboard::Request),
+    KeyboardStep(i32),
+    FocusPane(super::keyboard::Pane),
     OpenLineDossier(Option<git::investigations::dossier::Seed>),
     CloseLineDossier,
     OpenSymbolBiography(Option<git::investigations::dossier::Seed>),
@@ -43,6 +46,8 @@ pub(crate) enum Action {
     RepositoryTools(super::repository_tools::Act),
     /// What a key of the tab does (see [`crate::keymap`]), or why it can't now.
     Key(crate::keymap::Command),
+    /// A read-only clipboard payload resolved from the current selected commit.
+    CopyText(String),
     /// Show the changes and put the cursor in the commit summary.
     FocusCommit,
     /// Stop the operation running (one that goes over the network).
@@ -198,6 +203,7 @@ pub(crate) enum Action {
     CloseTerminal(usize),
     SelectTerminal(usize),
     ToggleSearch,
+    FocusSearch,
     /// Open the checklist of stale or merged branches to delete.
     SelectStaleBranches,
     SearchStep(i32),
@@ -601,7 +607,10 @@ pub(super) fn abort_action(state: InProgress) -> Action {
 
 impl RepoTab {
     /// What the command palette offers for this repository.
-    pub(crate) fn additional_palette_items(&self) -> Vec<(String, String, Action)> {
+    pub(crate) fn additional_palette_items(
+        &self,
+        ctx: &egui::Context,
+    ) -> Vec<(String, String, Action)> {
         let mut items: Vec<(String, String, Action)> = vec![
             (
                 "DVC: Pull".into(),
@@ -628,8 +637,8 @@ impl RepoTab {
                 "files".into(),
                 Action::OpenFileComparison(super::file_comparison::Page::Matrix),
             ),
-            ("Fetch".into(), label(Command::Fetch), Action::Fetch),
-            ("Pull".into(), label(Command::Pull), Action::Pull),
+            ("Fetch".into(), label(ctx, Command::Fetch), Action::Fetch),
+            ("Pull".into(), label(ctx, Command::Pull), Action::Pull),
             (
                 if self.gerrit.is_some() {
                     "Push for review"
@@ -637,7 +646,7 @@ impl RepoTab {
                     "Push"
                 }
                 .into(),
-                label(Command::Push),
+                label(ctx, Command::Push),
                 Action::Push,
             ),
             (
@@ -698,31 +707,31 @@ impl RepoTab {
                 "absorb".into(),
                 Action::OpenAbsorb,
             ),
-            ("Undo".into(), written("Cmd+Z"), Action::Undo),
-            ("Redo".into(), written("Cmd+Y"), Action::Redo),
+            ("Undo".into(), label(ctx, Command::Undo), Action::Undo),
+            ("Redo".into(), label(ctx, Command::Redo), Action::Redo),
             (
                 "Timeline and undo tree".into(),
-                "Ctrl+Shift+Z".into(),
+                label(ctx, Command::Timeline),
                 Action::ToggleTimeline,
             ),
             (
                 "Stash changes…".into(),
-                label(Command::Stash),
+                label(ctx, Command::Stash),
                 Action::Dialog(Dialog::stash()),
             ),
             (
                 "Stage all changes".into(),
-                label(Command::StageAll),
+                label(ctx, Command::StageAll),
                 Action::Key(Command::StageAll),
             ),
             (
                 "Commit".into(),
-                label(Command::Commit),
+                label(ctx, Command::Commit),
                 Action::Key(Command::Commit),
             ),
             (
                 "Search commits".into(),
-                written("Cmd+F"),
+                label(ctx, Command::Search),
                 Action::ToggleSearch,
             ),
             (
@@ -737,7 +746,7 @@ impl RepoTab {
             ),
             (
                 "Toggle terminal".into(),
-                label(Command::Terminal),
+                label(ctx, Command::Terminal),
                 Action::ToggleTerminal,
             ),
             if crate::network::refused().is_some() {
@@ -766,7 +775,7 @@ impl RepoTab {
                     cwd: None,
                 },
             ),
-            ("Reload".into(), label(Command::Reload), Action::Reload),
+            ("Reload".into(), label(ctx, Command::Reload), Action::Reload),
             (
                 "Select stale or merged branches…".into(),
                 "branch".into(),
@@ -1009,7 +1018,7 @@ impl RepoTab {
             ));
             items.push((
                 "Create branch".into(),
-                label(Command::NewBranch),
+                label(ctx, Command::NewBranch),
                 Action::Dialog(Dialog::create_branch(&self.refs.head, "HEAD")),
             ));
             items.push((
@@ -1024,5 +1033,27 @@ impl RepoTab {
         items.extend(self.rehearse_palette_items());
         items.extend(self.custom_palette_items());
         items
+    }
+}
+
+impl Action {
+    /// Registry identity of actions that have a user-editable shortcut. Dynamic targets
+    /// remain in their action; a new-branch key always uses HEAD rather than the selection.
+    pub(crate) fn key_command(&self) -> Option<Command> {
+        Some(match self {
+            Self::Key(command) => *command,
+            Self::Undo => Command::Undo,
+            Self::Redo => Command::Redo,
+            Self::ToggleSearch | Self::FocusSearch => Command::Search,
+            Self::ToggleTimeline => Command::Timeline,
+            Self::Fetch => Command::Fetch,
+            Self::Pull => Command::Pull,
+            Self::Push => Command::Push,
+            Self::ToggleTerminal => Command::Terminal,
+            Self::Commit => Command::Commit,
+            Self::Reload => Command::Reload,
+            Self::Dialog(Dialog::Stash(_)) => Command::Stash,
+            _ => return None,
+        })
     }
 }

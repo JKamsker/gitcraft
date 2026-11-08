@@ -174,13 +174,22 @@ impl RepoTab {
         } else if r.clicked() {
             acts.push(Action::SelectPr(pr.number));
         }
-        egui::Popup::context_menu(&r)
+        crate::menu_item::context(&r)
             .style(crate::theme::menu_style)
             .show(|ui| {
-                if has_view && ui.button("Open").clicked() {
+                if has_view
+                    && crate::menu_item::MenuItem::new("Open")
+                        .icon("eye")
+                        .show(ui)
+                        .clicked()
+                {
                     acts.push(Action::OpenPr(pr.number));
                 }
-                if ui.button("Open in the browser").clicked() {
+                if crate::menu_item::MenuItem::new("Open in the browser")
+                    .icon("external-link")
+                    .show(ui)
+                    .clicked()
+                {
                     acts.push(Action::OpenUrl(pr.url.clone()));
                     if !has_view && !moved {
                         acts.push(Action::Versions(
@@ -190,8 +199,10 @@ impl RepoTab {
                 }
                 self.pr_since_items(ui, acts, pr);
                 self.pr_worktree_button(ui, acts, pr.number, &pr.branch, &pr.sha, idle, true);
-                if ui
-                    .add_enabled(idle, egui::Button::new(format!("Check out {}", pr.branch)))
+                if crate::menu_item::MenuItem::new(format!("Check out {}", pr.branch))
+                    .icon("log-in")
+                    .enabled(idle)
+                    .show(ui)
                     .clicked()
                 {
                     if self.refs.local.iter().any(|b| b.name == pr.branch) {
@@ -204,7 +215,11 @@ impl RepoTab {
                     }
                 }
                 self.fork_items(ui, acts, pr.number, idle, false);
-                if ui.button("Copy URL").clicked() {
+                if crate::menu_item::MenuItem::new("Copy URL")
+                    .icon("copy")
+                    .show(ui)
+                    .clicked()
+                {
                     ui.ctx().copy_text(pr.url.clone());
                 }
             });
@@ -278,6 +293,7 @@ impl RepoTab {
             // Why it can't open, under it; what it would do, on hover.
             let here = matches!(plan, PrWorktree::Here);
             MenuItem::new("Open in worktree")
+                .icon("folder-git-2")
                 .enabled(enabled || here)
                 .refused(here.then_some(tip.as_str()))
                 .show(ui)

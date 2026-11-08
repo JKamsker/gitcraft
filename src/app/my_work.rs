@@ -391,12 +391,15 @@ impl App {
         }
     }
 
+    pub(super) fn poll_my_work(&mut self, ctx: &egui::Context) {
+        for (machine, found) in self.my_work.poll(ctx) {
+            self.take_search(&machine, found);
+        }
+    }
+
     pub(super) fn my_work_ui(&mut self, ctx: &egui::Context) {
         if !self.my_work.open {
             return;
-        }
-        for (machine, found) in self.my_work.poll(ctx) {
-            self.take_search(&machine, found);
         }
         let t = Tokens::get(ctx);
         let frame = egui::Frame::new()

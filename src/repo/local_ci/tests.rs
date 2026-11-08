@@ -176,7 +176,7 @@ fn local_action_is_available_without_a_forge_and_output_is_reachable() {
     );
     assert!(tab.hosting.is_none());
     assert!(
-        tab.palette_items()
+        tab.palette_items(&ctx)
             .iter()
             .any(|item| item.label == "Run Actions locally…")
     );

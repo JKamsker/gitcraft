@@ -279,6 +279,11 @@ pub(super) fn drag_area(ui: &mut Ui, rect: Rect, name: &str) {
     }
     let id = egui::Id::new(("title-bar-drag", name));
     let resp = ui.interact(rect, id, Sense::click_and_drag());
+    crate::a11y::a11y(
+        &resp,
+        egui::WidgetType::Button,
+        "Window grip. Enter to maximize or restore; drag to move",
+    );
     moves_window(ui.ctx(), &resp);
 }
 
@@ -302,12 +307,19 @@ pub(super) fn handle(ui: &mut Ui, t: &Tokens) {
     }
     let tint = if resp.hovered() { t.text } else { t.text_faint };
     crate::icons::paint(ui, rect, "grip-vertical", 17.0, tint);
+    crate::a11y::a11y(
+        &resp,
+        egui::WidgetType::Button,
+        "Window grip. Enter to maximize or restore; drag to move",
+    );
     moves_window(ui.ctx(), &resp);
 }
 
 /// Dragged, `resp` moves the window; double-clicked, it maximizes or restores it.
 fn moves_window(ctx: &egui::Context, resp: &Response) {
-    if resp.double_clicked() {
+    if resp.double_clicked()
+        || resp.clicked() && resp.has_focus() && ctx.input(|i| !i.pointer.any_released())
+    {
         let maximized = window_state(ctx).maximized;
         ctx.send_viewport_cmd(egui::ViewportCommand::Maximized(!maximized));
     } else if resp.drag_started_by(egui::PointerButton::Primary) {
@@ -340,6 +352,7 @@ impl Caption {
 fn caption_button(ui: &mut Ui, t: &Tokens, kind: Caption, focused: bool) -> Response {
     let (rect, resp) =
         ui.allocate_exact_size(vec2(CAPTION_W, ui.available_height()), Sense::click());
+    crate::a11y::a11y(&resp, egui::WidgetType::Button, kind.tooltip());
     let pressed = resp.is_pointer_button_down_on();
     let hovered = resp.hovered() || pressed;
     let (fill, glyph) = match kind {

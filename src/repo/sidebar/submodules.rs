@@ -49,7 +49,7 @@ impl RepoTab {
             } else if r.double_clicked() && cloned {
                 acts.push(Action::OpenTab(crate::remote::join(&self.path, &sub.path)));
             }
-            egui::Popup::context_menu(&r)
+            crate::menu_item::context(&r)
                 .style(crate::theme::menu_style)
                 .show(|ui| self.submodule_menu_items(ui, acts, sub, idle, cloned));
         }
@@ -63,8 +63,10 @@ impl RepoTab {
         idle: bool,
         cloned: bool,
     ) {
-        if ui
-            .add_enabled(idle, egui::Button::new("Update"))
+        if crate::menu_item::MenuItem::new("Update")
+            .icon("command")
+            .enabled(idle)
+            .show(ui)
             .on_hover_text("Clone it if needed and check out the commit recorded for it")
             .clicked()
         {
@@ -79,6 +81,7 @@ impl RepoTab {
         }
         let folder = crate::remote::join(&self.path, &sub.path);
         if MenuItem::new("Open in a new tab")
+            .icon("folder-git-2")
             .refused((!cloned).then_some("Update it first to clone it"))
             .show(ui)
             .clicked()
@@ -92,17 +95,28 @@ impl RepoTab {
         } else {
             folder.is_dir()
         };
-        if ui
-            .add_enabled(revealable, egui::Button::new(reveal_label()))
+        if crate::menu_item::MenuItem::new(reveal_label())
+            .icon("folder-open")
+            .refused((!revealable).then_some("Update it first, or open it on its own machine"))
+            .show(ui)
             .clicked()
         {
             acts.push(Action::OpenPath(sub.path.clone().into()));
         }
         ui.separator();
-        if ui.button("Copy path").clicked() {
+        if crate::menu_item::MenuItem::new("Copy path")
+            .icon("copy")
+            .show(ui)
+            .clicked()
+        {
             ui.ctx().copy_text(sub.path.clone());
         }
-        if !sub.url.is_empty() && ui.button("Copy URL").clicked() {
+        if !sub.url.is_empty()
+            && crate::menu_item::MenuItem::new("Copy URL")
+                .icon("copy")
+                .show(ui)
+                .clicked()
+        {
             ui.ctx().copy_text(sub.url.clone());
         }
     }

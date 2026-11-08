@@ -1,7 +1,7 @@
 //! Teleport (a tab's menu, or the palette): the dialog that picks a machine and where the work
 //! goes there, and the teleport itself, run on a thread of its own (see `crate::teleport`).
 
-mod drag;
+pub(super) mod drag;
 mod view;
 pub(super) use drag::DragTargets;
 
@@ -418,8 +418,8 @@ impl App {
         self.teleport = Some(TeleportForm::new(source, known, ctx));
     }
 
-    /// The dialog, and the end of a teleport: its worktree opened in a tab.
-    pub(super) fn teleport_dialog(&mut self, ctx: &egui::Context) {
+    /// The end of a teleport, owned by its window even without a painting pass.
+    pub(super) fn poll_teleport(&mut self, ctx: &egui::Context) {
         let Some(form) = &mut self.teleport else {
             return;
         };
@@ -442,8 +442,13 @@ impl App {
                 }
                 Err(failed) => form.failed(failed),
             }
-            return;
         }
+    }
+
+    pub(super) fn teleport_dialog(&mut self, ctx: &egui::Context) {
+        let Some(form) = &mut self.teleport else {
+            return;
+        };
         if view::show(form, ctx) {
             self.teleport = None;
         }

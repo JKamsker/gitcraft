@@ -108,6 +108,9 @@ pub enum Dialog {
         base_label: String,
         focus: bool,
     },
+    KeyboardDiscard {
+        request: super::keyboard::Request,
+    },
     Confirm {
         title: String,
         body: String,
@@ -701,6 +704,18 @@ impl RepoTab {
                     stored.as_deref(),
                     focus,
                 ),
+                Dialog::KeyboardDiscard { request } => {
+                    let mut alternative = false;
+                    match confirm::confirm(ui, confirm::Asked {
+                        title: "Discard this hunk?",
+                        body: "This removes the current hunk from the working tree. Ctrl+Z restores it.",
+                        button: "Discard hunk", ops: &[], alternative: &None,
+                        refresh: Refresh::Status, undo: &Undo::None,
+                    }, &mut alternative, &mut WhatItDoes::default(), false) {
+                        Outcome::Done(_) => Outcome::Done(Box::new(Action::Keyboard(request.clone()))),
+                        outcome => outcome,
+                    }
+                }
                 Dialog::Confirm {
                     title,
                     body,

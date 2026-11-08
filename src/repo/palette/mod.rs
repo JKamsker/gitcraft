@@ -140,15 +140,34 @@ impl RepoTab {
 
     /// What the command palette offers for this repository: what can be done with the
     /// selection first, then the commands, then the verbs that pick a branch next.
-    pub(crate) fn palette_items(&self) -> Vec<PaletteItem> {
+    pub(crate) fn palette_items(&self, ctx: &egui::Context) -> Vec<PaletteItem> {
         let mut items = self.selection_items();
-        items.extend(self.command_items());
+        items.extend(self.command_items(ctx));
         items.extend(self.pick_items());
+        for command in crate::keymap::LOCAL_ROWS
+            .iter()
+            .chain(&crate::keymap::REPOSITORY_ROWS[..3])
+            .flat_map(|r| r.commands.iter().copied())
+        {
+            // A registered widget key is not automatically an executable palette action.
+            // Selection/find/rebase primitives stay with their view unless key_action owns
+            // an eligible target. Never publish an Action::Key that returns Ok(None).
+            if matches!(self.key_action(command), Ok(Some(_))) {
+                items.push(
+                    PaletteItem::action(
+                        command.title(),
+                        "keyboard selection",
+                        Action::Key(command),
+                    )
+                    .shortcut(&crate::keymap::label(ctx, command)),
+                );
+            }
+        }
         let mut labels: std::collections::HashSet<String> = items
             .iter()
             .map(|i| i.label.trim_end_matches('…').to_owned())
             .collect();
-        for (label, hint, action) in self.additional_palette_items() {
+        for (label, hint, action) in self.additional_palette_items(ctx) {
             if labels.insert(label.trim_end_matches('…').to_owned()) {
                 let item = if crate::keymap::is_keys(&hint) {
                     PaletteItem::action(label, "command", action).shortcut(&hint)
@@ -158,11 +177,27 @@ impl RepoTab {
                 items.push(item);
             }
         }
+        let mut commands = std::collections::HashSet::new();
+        items.retain_mut(|item| {
+            let PaletteRun::Action(action) = &item.run else {
+                return true;
+            };
+            let Some(command) = action.key_command() else {
+                return true;
+            };
+            if !commands.insert(command) {
+                return false;
+            }
+            let keys = crate::keymap::label(ctx, command);
+            item.shortcut = (!keys.is_empty()).then_some(keys);
+            item.run = PaletteRun::Action(Action::Key(command));
+            true
+        });
         items
     }
 
     /// The repository's commands, whatever is selected.
-    fn command_items(&self) -> Vec<PaletteItem> {
+    fn command_items(&self, ctx: &egui::Context) -> Vec<PaletteItem> {
         let mut items = vec![
             PaletteItem::action("Fetch", "remote", Action::Fetch),
             PaletteItem::action("Pull", "remote", Action::Pull),
@@ -202,10 +237,10 @@ impl RepoTab {
                 Action::Key(crate::keymap::Command::Commit),
             ),
             PaletteItem::action("Apply patch…", "patch", Action::ApplyPatch),
-            PaletteItem::action("Undo", "history", Action::Undo).shortcut("Ctrl+Z"),
-            PaletteItem::action("Redo", "history", Action::Redo).shortcut("Ctrl+Y"),
+            PaletteItem::action("Undo", "history", Action::Undo),
+            PaletteItem::action("Redo", "history", Action::Redo),
             PaletteItem::action("Stash changes", "stash", Action::Dialog(Dialog::stash())),
-            PaletteItem::action("Search commits", "graph", Action::ToggleSearch).shortcut("Ctrl+F"),
+            PaletteItem::action("Search", "graph or visible lines", Action::FocusSearch),
             PaletteItem::action("Toggle terminal", "terminal", Action::ToggleTerminal),
             PaletteItem::action(
                 "New terminal",
@@ -294,20 +329,14 @@ impl RepoTab {
             ));
         }
         for item in &mut items {
-            let command = match item.label.as_str() {
-                "Fetch" => Some(crate::keymap::Command::Fetch),
-                "Pull" => Some(crate::keymap::Command::Pull),
-                "Push" => Some(crate::keymap::Command::Push),
-                "Stash changes" => Some(crate::keymap::Command::Stash),
-                "Toggle terminal" => Some(crate::keymap::Command::Terminal),
-                "Stage all changes" => Some(crate::keymap::Command::StageAll),
-                "Commit" => Some(crate::keymap::Command::Commit),
-                "Create branch…" => Some(crate::keymap::Command::NewBranch),
-                "Reload" => Some(crate::keymap::Command::Reload),
+            let command = match &item.run {
+                PaletteRun::Action(action) => action.key_command(),
                 _ => None,
             };
             if let Some(command) = command {
-                item.shortcut = Some(crate::keymap::label(command));
+                item.shortcut = Some(crate::keymap::label(ctx, command));
+                // The palette and keyboard now share eligibility and operation dispatch.
+                item.run = PaletteRun::Action(Action::Key(command));
             }
         }
         items

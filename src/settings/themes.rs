@@ -46,6 +46,7 @@ pub fn theme_menu(ui: &mut Ui, current: &ThemeId) -> Option<ThemePick> {
                     let tokens = info.palette.tokens();
                     let (rect, resp) =
                         ui.allocate_exact_size(vec2(ui.available_width(), 26.0), Sense::click());
+                    crate::a11y::a11y_selected(&resp, &info.name, chosen);
                     if resp.hovered() {
                         ui.painter().rect_filled(rect, 0.0, t.hover);
                     }
@@ -185,6 +186,7 @@ fn gallery(ui: &mut Ui, f: &Filter, view: &mut SettingsView, tweaks: &theme::Twe
                     let tokens = info.tokens(tweaks);
                     preview::thumbnail(ui.painter(), thumb, &tokens);
                     let chosen = info.id == view.theme;
+                    crate::a11y::a11y_selected(&resp, &info.name, chosen);
                     if chosen {
                         ui.painter().rect_stroke(
                             thumb.expand(2.0),
@@ -436,6 +438,11 @@ impl Settings {
 /// A round swatch of `c`, ringed when `chosen`.
 fn swatch(ui: &mut Ui, c: Color32, chosen: bool, t: &Tokens) -> egui::Response {
     let (rect, resp) = ui.allocate_exact_size(vec2(22.0, 22.0), Sense::click());
+    crate::a11y::a11y_selected(
+        &resp,
+        || format!("Colour #{:02X}{:02X}{:02X}", c.r(), c.g(), c.b()),
+        chosen,
+    );
     let p = ui.painter();
     if chosen {
         p.circle_stroke(rect.center(), 10.5, Stroke::new(2.0, t.text));

@@ -46,6 +46,8 @@ pub struct SavedIdentity {
 pub struct Settings {
     /// Interface zoom (1.0 = 100 %).
     pub ui_scale: f32,
+    /// Stable action IDs mapped to zero (unbound) or up to four key strokes.
+    pub(crate) key_bindings: crate::keymap::Overrides,
     pub terminal_font: f32,
     /// Program of the default shell; empty = the platform's default.
     pub shell: String,
@@ -123,6 +125,8 @@ pub struct Settings {
     pub editor: String,
     /// Desktop notifications when a long operation ends while the window is in the background.
     pub notifications: bool,
+    /// Opt-in resident coordinator; native objects and hidden state are never persisted.
+    pub keep_running_in_tray: bool,
     /// Ask GitHub on every start whether a newer release exists.
     pub check_updates: bool,
     /// Which releases: the main ones, or also a build of every change to dev.
@@ -183,6 +187,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             ui_scale: 1.0,
+            key_bindings: Default::default(),
             terminal_font: 12.5,
             shell: String::new(),
             refs_width: DEFAULT_REFS_WIDTH,
@@ -226,6 +231,7 @@ impl Default for Settings {
             avatars: true,
             editor: "code".to_owned(),
             notifications: true,
+            keep_running_in_tray: false,
             check_updates: true,
             update_channel: Default::default(),
             download_updates: true,
@@ -486,6 +492,17 @@ impl Settings {
                             "When a long operation ends in the background",
                         );
                     });
+                    card.row("Resident watcher", "tray background close recent repositories notifications", |ui| {
+                        ui.checkbox(&mut self.keep_running_in_tray, "Keep gitcraft running when its window closes");
+                        ui.small("Keeps recent repositories fetched and reports new reviews, failed checks and default-branch changes. Uses this profile; offline and metered policies still apply.");
+                        if self.keep_running_in_tray {
+                            match crate::tray::status() {
+                                crate::tray::Availability::Ready => { ui.small("Tray icon available. Use its Show or Quit action."); }
+                                crate::tray::Availability::Fallback(why) => { ui.small(format!("Tray unavailable: {why}. Reopen from the launcher; Quit from the tab menu or gitcraft --quit.")); }
+                                _ => { ui.small("Starting the native tray item…"); }
+                            }
+                        }
+                    });
                     file_menu_rows(card);
                     card.row("Tips", "did you know hints help first time", |ui| {
                         self.tips_ui(ui);
@@ -736,10 +753,7 @@ impl Settings {
                         "Topology navigation",
                         "accessibility audio lanes graph parent child",
                         |ui| {
-                            ui.checkbox(
-                                &mut self.graph_lane_walk,
-                                "Walk graph topology with arrow keys",
-                            );
+                            ui.checkbox(&mut self.graph_lane_walk, "Walk graph topology");
                             ui.checkbox(
                                 &mut self.graph_sounds,
                                 "Soft sounds for merges and lane crossings",
@@ -1090,23 +1104,7 @@ impl Settings {
             Page::CustomCommands => custom_commands::page(self, ui, f),
             Page::Agents => self.agents_ui(ui, f),
             Page::Shortcuts => {
-                for (group, keys) in crate::manual::shortcut_groups() {
-                    section(ui, f, group, None, |card| {
-                        card.compact();
-                        for (combo, what) in &keys {
-                            card.full(&format!("{combo} {what} keys keyboard"), |ui| {
-                                ui.horizontal(|ui| {
-                                    let width = layout::label_width(ui);
-                                    let start = ui.cursor().left();
-                                    crate::manual::key_combo(ui, combo);
-                                    let used = ui.cursor().left() - start;
-                                    ui.add_space((width + 8.0 - used).max(8.0));
-                                    ui.label(RichText::new(*what).color(t.text_dim));
-                                });
-                            });
-                        }
-                    });
-                }
+                crate::keymap::editor::page(&mut self.key_bindings, ui);
             }
         }
     }

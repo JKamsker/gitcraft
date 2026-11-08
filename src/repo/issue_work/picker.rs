@@ -424,6 +424,11 @@ fn issue_row(ui: &mut Ui, issue: &Issue, chosen: bool) -> bool {
         ui.id().with(("issue-row", issue.identity())),
         egui::Sense::click(),
     );
+    crate::a11y::a11y_selected(
+        &response,
+        || format!("Issue {}: {}", issue.number, issue.title),
+        chosen,
+    );
     response
         .on_hover_cursor(egui::CursorIcon::PointingHand)
         .on_hover_text(&issue.url)

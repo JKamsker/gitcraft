@@ -116,6 +116,14 @@ impl RepoTab {
                     };
                     let code = change.map_or(' ', |f| f.status);
                     let r = widgets::file_row(ui, code, path, None, indent, shown(path), extra);
+                    self.keyboard_file_row(
+                        egui::Id::new(("all-files", &detail.hash)),
+                        &r.row,
+                        &crate::repo::DiffKey::Commit {
+                            hash: detail.hash.clone(),
+                            path: path.clone(),
+                        },
+                    );
                     // The checkout's files only, and not over a changed file's stats.
                     if change.is_none() && self.is_checkout(Some(&detail.hash)) {
                         self.pointer_mark(ui, &r.row, path, shown(path));
@@ -136,6 +144,7 @@ impl RepoTab {
                         false,
                         None,
                         &links,
+                        r.row.has_focus(),
                         acts,
                         locks,
                     );

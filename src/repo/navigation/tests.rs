@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use egui::{Event, Key, Modifiers, PointerButton, RawInput};
 
 use super::super::nav_history::NavHistory;
-use super::{View, nav_step, record};
+use super::{View, keyboard_step, nav_step, record};
 use crate::git;
 use crate::repo::file_view::{FileTab, FileView};
 use crate::repo::{Action, DiffKey, DiffView, RepoTab, WIP_HASH};
@@ -244,7 +244,7 @@ fn step_for(events: Vec<Event>, modifiers: Modifiers, keys: bool) -> Option<i32>
         ..Default::default()
     };
     let mut output = ctx.run_ui(input, |ui| {
-        step = ui.ctx().input(|i| nav_step(i, keys));
+        step = keyboard_step(ui.ctx(), keys).or_else(|| ui.ctx().input(nav_step));
     });
     output.textures_delta.clear();
     step

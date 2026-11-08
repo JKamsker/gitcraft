@@ -38,7 +38,7 @@ impl PullMode {
     }
 
     /// What the toolbar's Pull says it does.
-    pub fn tip(self) -> String {
+    pub fn tip(self, ctx: &egui::Context) -> String {
         let what = match self {
             PullMode::Merge => "Fast-forward the current branch, or merge when it has diverged",
             PullMode::FastForwardOnly => "Fast-forward the current branch",
@@ -46,7 +46,7 @@ impl PullMode {
         };
         format!(
             "{}\ngit {}\nRight-click or the arrow to choose",
-            crate::keymap::tip(what, crate::keymap::Command::Pull),
+            crate::keymap::tip(ctx, what, crate::keymap::Command::Pull),
             self.args().join(" ")
         )
     }
@@ -81,8 +81,10 @@ pub(super) fn pull_menu(ui: &mut Ui, acts: &mut Vec<Action>) {
     ui.separator();
     if ui
         .add(
-            egui::Button::new("Fetch all")
-                .shortcut_text(crate::keymap::label(crate::keymap::Command::Fetch)),
+            egui::Button::new("Fetch all").shortcut_text(crate::keymap::label(
+                ui.ctx(),
+                crate::keymap::Command::Fetch,
+            )),
         )
         .clicked()
     {

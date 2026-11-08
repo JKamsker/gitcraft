@@ -88,6 +88,10 @@ mailparse = "0.18"
 # Private, atomically created staging repositories for verified independent object packs.
 tempfile = "3"
 
+[target.'cfg(any(windows, target_os = "macos"))'.dependencies]
+# Created only after opt-in, in the running native event loop.
+tray-icon = { version = "=0.26.1", default-features = false }
+
 # Reading a repository's file without following a link swapped in on the way (safe_read.rs).
 [target.'cfg(unix)'.dependencies]
 rustix = { version = "1", features = ["fs", "process"] }
@@ -109,11 +113,14 @@ windows = { version = "0.62", features = ["Networking_Connectivity"] }
 raw-window-handle = "0.6"
 
 [target.'cfg(target_os = "linux")'.dependencies]
+# Direct availability callbacks support desktops without a StatusNotifierWatcher; no GTK.
+ksni = { version = "=0.3.7", default-features = false, features = ["blocking", "async-io"] }
 # The launcher's progress: a signal on the session bus (the version notify-rust uses).
 zbus = { version = "5", default-features = false, features = ["blocking-api", "async-io"] }
 
 [workspace]
 members = [".", "crates/gitcraft-os"]
+exclude = ["vendor/winit"]
 # `cargo test` and `cargo clippy` at the root check both.
 default-members = [".", "crates/gitcraft-os"]
 
@@ -178,6 +185,7 @@ rustix = { version = "1", features = ["time"] }
 
 # winit 0.30.13 with two Windows fixes for moving the window between monitors of different
 # scales: the fix of rust-windowing/winit#4341 (released only in 0.31) and a minimum size that
-# follows the scale. Branch `gitcraft/v0.30.13` of the fork; drop this once on winit 0.31.
+# follows the scale. Exact fork source is vendored with a narrow macOS Dock-menu hook;
+# see vendor/winit/PROVENANCE.json and GITCRAFT.md. Drop after an accepted upstream hook.
 [patch.crates-io]
-winit = { git = "https://github.com/JKamsker/winit", rev = "12fdcb03ef036f0fcb7fa26d19dd7395b1feb141" }
+winit = { path = "vendor/winit" }

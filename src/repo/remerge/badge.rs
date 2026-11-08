@@ -107,9 +107,7 @@ impl RepoTab {
             .interact(rect, ui.id().with(("remerge-badge", hash)), Sense::click())
             .on_hover_text(badge.tooltip());
         // Read out by screen readers (it is only painted).
-        resp.widget_info(|| {
-            egui::WidgetInfo::labeled(egui::WidgetType::Button, true, badge.tooltip())
-        });
+        crate::a11y::a11y(&resp, egui::WidgetType::Button, || badge.tooltip());
         // Not the warning colour: search matches are marked with that.
         let color = t.accent;
         let fill = if resp.hovered() { 0.30 } else { 0.18 };

@@ -90,11 +90,11 @@ impl RepoTab {
         acts: &mut Vec<Action>,
     ) {
         let refused = self.surgery_refusal(hash);
-        let button = ui
-            .add_enabled(
-                idle && refused.is_none(),
-                egui::Button::new("Split commit…"),
-            )
+        let button = crate::menu_item::MenuItem::new("Split commit…")
+            .icon("command")
+            .enabled(idle)
+            .refused(refused.as_deref())
+            .show(ui)
             .on_hover_text("Divide its changes between two or more new commits");
         let button = match &refused {
             Some(why) => button.on_disabled_hover_text(why),
@@ -103,11 +103,7 @@ impl RepoTab {
         if button.clicked() {
             acts.push(Action::OpenSplit(hash.to_owned()));
         }
-        let button = ui
-            .add_enabled(
-                idle && refused.is_none(),
-                egui::Button::new("Move changes to another commit…"),
-            )
+        let button = crate::menu_item::MenuItem::new("Move changes to another commit…").icon("command").enabled(idle).refused(refused.as_deref()).show(ui)
             .on_hover_text(
                 "Take some of its files, hunks or lines out, into another commit of the branch or the working changes",
             );

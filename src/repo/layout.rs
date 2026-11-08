@@ -32,6 +32,7 @@ impl RepoTab {
         self.owners_frame(&ctx);
         self.forks_frame(&ctx);
         self.hotfix_frame(&ctx);
+        self.keyboard_panes(&ctx);
         self.echo_frame(&ctx);
         self.intent_frame(&ctx);
         self.shortcuts(&ctx, &mut acts);
@@ -118,6 +119,7 @@ impl RepoTab {
         egui::CentralPanel::default()
             .frame(egui::Frame::new().fill(t.dock))
             .show(ui, |ui| {
+                let pane_rect = ui.max_rect().intersect(ui.clip_rect());
                 if self.file_comparison.is_some() {
                     self.file_comparison_view(ui, &mut acts);
                 } else if self.conflict.is_some() {
@@ -163,6 +165,7 @@ impl RepoTab {
                     }
                     self.graph_view(ui, &mut acts);
                 }
+                self.keyboard_pane(ui, super::keyboard::Pane::Graph, pane_rect);
             });
 
         self.drag_overlay(&ctx, &mut acts);
@@ -254,7 +257,7 @@ impl RepoTab {
         // Ctrl+F, Esc and the steps of the find bar, when a diff, file or blame is shown.
         self.find_keys(ctx, free_keys);
         if free_keys {
-            let commands = ctx.input(|i| keymap::pressed(i, keymap::Scope::Repository));
+            let commands = keymap::pressed(ctx, keymap::Scope::Repository);
             // While a commit's message is being edited, Ctrl+Enter saves it (the editor takes
             // the key also when nothing has the focus): it doesn't commit the changes too.
             let rewording = self.reword.is_some();
@@ -264,16 +267,7 @@ impl RepoTab {
                     .filter(|&c| !(rewording && c == keymap::Command::Commit))
                     .map(Action::Key),
             );
-            let (esc, undo, redo, tree, find) = ctx.input(|i| {
-                (
-                    i.key_pressed(Key::Escape),
-                    i.modifiers.command && !i.modifiers.shift && i.key_pressed(Key::Z),
-                    i.modifiers.command && i.key_pressed(Key::Y),
-                    i.modifiers.command && i.modifiers.shift && i.key_pressed(Key::Z),
-                    // Not with Shift: Ctrl+Shift+F fetches.
-                    i.modifiers.command && !i.modifiers.shift && i.key_pressed(Key::F),
-                )
-            });
+            let esc = ctx.input(|i| i.key_pressed(Key::Escape));
             let diff_keys = self.diff.is_some()
                 && (self.main_keys(ctx, Panel::Diff) || self.conflict.is_some());
             if esc && self.file_comparison.is_some() {
@@ -335,30 +329,13 @@ impl RepoTab {
             } else if esc && self.reflog.is_some() {
                 acts.push(Action::CloseReflog);
             }
-            let diff_shown = diff_keys
-                && self.conflict.is_none()
-                && self.rebase.is_none()
-                && self.split.is_none()
-                && self.absorb.is_none();
-            if let Some(delta) = ctx.input(change_step).filter(|_| diff_shown) {
-                acts.push(Action::DiffStep(delta));
+            for command in keymap::pressed(ctx, keymap::Scope::Changes) {
+                acts.push(Action::Key(command));
             }
-            if undo {
-                acts.push(Action::Undo);
-            }
-            if redo {
-                acts.push(Action::Redo);
-            }
-            if tree {
-                acts.push(Action::ToggleTimeline);
-            }
-            if find {
-                self.search.open = true;
-                self.search.focus = true;
-            }
-        } else if self.search.open
-            && ctx.input(|i| i.modifiers.command && !i.modifiers.shift && i.key_pressed(Key::F))
-        {
+        } else {
+            keymap::retain_allowed(ctx);
+        }
+        if !free_keys && self.search.open && keymap::take(ctx, keymap::Command::Search) {
             self.search.focus = true;
         }
     }
@@ -395,7 +372,9 @@ impl RepoTab {
                     }
                 });
                 if open {
+                    let pane_rect = ui.max_rect().intersect(ui.clip_rect());
                     self.sidebar(ui, acts);
+                    self.keyboard_pane(ui, super::keyboard::Pane::Sidebar, pane_rect);
                 } else {
                     let slid = widgets::slide_offset(ui, area.left(), false);
                     let below = app_buttons::folded_column(ui, Place::BottomLeft, slid);
@@ -437,7 +416,9 @@ impl RepoTab {
                     }
                 });
                 if open {
+                    let pane_rect = ui.max_rect().intersect(ui.clip_rect());
                     self.detail_panel(ui, acts);
+                    self.keyboard_pane(ui, super::keyboard::Pane::Detail, pane_rect);
                 } else {
                     let slid = widgets::slide_offset(ui, area.right(), true);
                     app_buttons::folded_column(ui, Place::BottomRight, slid);
@@ -449,19 +430,6 @@ impl RepoTab {
             settings.show_detail = show_detail;
             settings.set(&ctx);
         }
-    }
-}
-
-/// F7 or Alt+↓ for the next change of a diff (`1`), Shift+F7 or Alt+↑ for the previous one.
-pub(super) fn change_step(i: &egui::InputState) -> Option<i32> {
-    let alt = i.modifiers.alt && !i.modifiers.command;
-    if (i.key_pressed(Key::F7) && !i.modifiers.shift) || (alt && i.key_pressed(Key::ArrowDown)) {
-        Some(1)
-    } else if (i.key_pressed(Key::F7) && i.modifiers.shift) || (alt && i.key_pressed(Key::ArrowUp))
-    {
-        Some(-1)
-    } else {
-        None
     }
 }
 

@@ -157,6 +157,7 @@ pub(super) fn show(ui: &mut Ui, diff: &TableDiff, state: &mut RichState, acts: &
                             .interact(rect, ui.id().with(("table_fold", first)), Sense::click())
                             .on_hover_cursor(egui::CursorIcon::PointingHand)
                             .on_hover_text("Show them");
+                        crate::a11y::expanded(&resp, || format!("Show {label}"), false);
                         ui.painter().rect_filled(
                             rect,
                             0.0,
@@ -186,7 +187,7 @@ pub(super) fn show(ui: &mut Ui, diff: &TableDiff, state: &mut RichState, acts: &
 
 fn header(ui: &mut Ui, t: &Tokens, widths: &[f32], diff: &TableDiff, rect: Rect) {
     // Clicks on the header don't reach the row scrolled under it.
-    ui.interact(rect, ui.id().with("table_head"), Sense::click());
+    ui.interact(rect, ui.id().with("table_head"), Sense::CLICK);
     let p = ui.painter().clone();
     p.rect_filled(rect, 0.0, t.chrome);
     p.line_segment(
@@ -333,7 +334,7 @@ fn row(
         .or(r.old.as_ref())
         .map(|v| v.join(", "))
         .unwrap_or_default();
-    resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, &label));
+    crate::a11y::a11y(&resp, egui::WidgetType::Button, &label);
     let where_ = match (r.change, r.old_line, r.new_line) {
         (Change::Removed, Some(o), _) => format!("Go to line {o} of the file before the change"),
         (_, _, Some(n)) => format!("Go to line {n}"),
@@ -350,5 +351,35 @@ fn row(
             _ => (None, r.new_line),
         };
         acts.push(Action::DiffGoToLine { old, new });
+    }
+}
+
+#[cfg(test)]
+mod focus_tests {
+    use super::*;
+    use egui_kittest::{Harness, kittest::Queryable};
+
+    #[test]
+    fn header_blocks_pointer_without_adding_a_dead_keyboard_stop() {
+        let mut h = Harness::new_ui_state(
+            |ui, initialized: &mut bool| {
+                if !std::mem::replace(initialized, true) {
+                    crate::theme::install_fonts(ui.ctx());
+                    return;
+                }
+                ui.button("Before table").clicked();
+                let (rect, _) = ui.allocate_exact_size(vec2(200.0, ROW_H), Sense::hover());
+                header(ui, &Tokens::get(ui.ctx()), &[], &TableDiff::default(), rect);
+                ui.button("After table").clicked();
+            },
+            false,
+        );
+        h.run_steps(2);
+        h.key_press(egui::Key::Tab);
+        h.run();
+        assert!(h.get_by_label("Before table").is_focused());
+        h.key_press(egui::Key::Tab);
+        h.run();
+        assert!(h.get_by_label("After table").is_focused());
     }
 }

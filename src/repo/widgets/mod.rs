@@ -9,6 +9,7 @@ use egui::{Align2, Color32, CornerRadius, Rect, Response, Sense, Ui, pos2, vec2}
 use crate::theme::{self, Tokens};
 
 pub use crate::a11y::{a11y, a11y_selected};
+pub(in crate::repo) use file_menu::selection_commands;
 pub use file_menu::{file_menu, file_menu_with};
 pub use file_row::{FileRowResponse, OwnerTag, RowExtra, badge_text, file_row, file_row_owned};
 pub use terminal_tabs::terminal_tabs;

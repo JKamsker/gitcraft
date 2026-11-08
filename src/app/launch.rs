@@ -14,16 +14,30 @@ use crate::launch::{Command, Resolved, Then};
 /// Requests being made sense of, and those waiting for their repository's tab.
 #[derive(Default)]
 pub(super) struct Launching {
-    resolving: Vec<Receiver<Result<Resolved, String>>>,
+    resolving: Vec<(egui::ViewportId, Receiver<Result<Resolved, String>>)>,
     /// What to show once the tab of each folder is there (one elsewhere opens in the
     /// background).
     waiting: Vec<(PathBuf, Then)>,
 }
 
 impl App {
+    #[cfg(test)]
+    pub(super) fn recorded_launch_completion(&mut self, owner: egui::ViewportId, root: PathBuf) {
+        let (tx, rx) = channel();
+        let _ = tx.send(Ok(Resolved {
+            root,
+            then: Then::Nothing,
+        }));
+        self.launching.resolving.push((owner, rx));
+    }
+
     /// Starts carrying out `cmd`, its relative paths taken from `cwd`.
     pub(crate) fn launch(&mut self, cmd: Command, cwd: PathBuf, ctx: &egui::Context) {
         match cmd {
+            Command::Quit => {
+                self.quit(ctx);
+                return;
+            }
             Command::Clone => {
                 self.start_clone();
                 return;
@@ -49,6 +63,7 @@ impl App {
         let mut clones: Vec<Known> = self
             .tabs
             .iter()
+            .chain(self.windows.parked.values().flat_map(|w| &w.tabs))
             .filter_map(|t| match t {
                 Tab::Repo(r) => {
                     let remotes = r.remotes_read();
@@ -75,42 +90,68 @@ impl App {
             let _ = tx.send(crate::launch::resolve::resolve_among(&cmd, &cwd, &clones));
             ctx.request_repaint();
         });
-        self.launching.resolving.push(rx);
+        self.launching.resolving.push((self.windows.current, rx));
     }
 
     /// Takes in resolved requests, and shows what each asked for once its tab is open.
     pub(super) fn poll_launch(&mut self, ctx: &egui::Context) {
         let mut done = Vec::new();
-        self.launching.resolving.retain(|rx| match rx.try_recv() {
-            Ok(result) => {
-                done.push(result);
-                false
-            }
-            Err(TryRecvError::Empty) => true,
-            Err(TryRecvError::Disconnected) => false,
-        });
-        for result in done {
-            match result {
-                Ok(Resolved {
-                    then: Then::Clone(url),
-                    ..
-                }) => self.offer_clone(url),
-                Ok(resolved) => {
-                    if crate::remote::is_remote(&resolved.root) {
-                        self.open_repo(&resolved.root, ctx);
-                    } else {
-                        // Already the top folder, as tabs name it.
-                        self.open_root(resolved.root.clone(), ctx);
-                    }
-                    self.launching.waiting.push((resolved.root, resolved.then));
+        self.launching
+            .resolving
+            .retain(|(owner, rx)| match rx.try_recv() {
+                Ok(result) => {
+                    done.push((*owner, result));
+                    false
                 }
-                Err(e) => self.report(e),
-            }
+                Err(TryRecvError::Empty) => true,
+                Err(TryRecvError::Disconnected) => false,
+            });
+        for (owner, result) in done {
+            self.in_window(owner, |app| app.finish_launch(result, ctx));
         }
+        self.finish_waiting_launches(ctx);
+    }
+
+    fn finish_launch(&mut self, result: Result<Resolved, String>, ctx: &egui::Context) {
+        match result {
+            Ok(Resolved {
+                then: Then::Clone(url),
+                ..
+            }) => self.offer_clone(url),
+            Ok(resolved) => {
+                if crate::remote::is_remote(&resolved.root) {
+                    self.open_repo(&resolved.root, ctx);
+                } else {
+                    // Already the top folder, as tabs name it.
+                    self.open_root(resolved.root.clone(), ctx);
+                }
+                self.launching.waiting.push((resolved.root, resolved.then));
+            }
+            Err(e) => self.report(e),
+        }
+    }
+
+    fn finish_waiting_launches(&mut self, ctx: &egui::Context) {
         let waiting = std::mem::take(&mut self.launching.waiting);
         for (root, then) in waiting {
             match self.tab_of(&root) {
                 Some(i) => self.show_in(i, then),
+                None if self.focus_elsewhere(&root, ctx) => {
+                    let repo = self
+                        .windows
+                        .parked
+                        .values_mut()
+                        .flat_map(|w| &mut w.tabs)
+                        .find_map(|t| match t {
+                            Tab::Repo(r) if r.path == root => Some(r.as_mut()),
+                            _ => None,
+                        });
+                    if let Some(repo) = repo
+                        && let Some(error) = queue_then(repo, then)
+                    {
+                        self.toasts.push(Toast::new(error, true));
+                    }
+                }
                 // Elsewhere: still being reached (or that failed, and said so).
                 None if !self.connecting.is_empty() => self.launching.waiting.push((root, then)),
                 None => {}
@@ -125,19 +166,8 @@ impl App {
         let Some(Tab::Repo(repo)) = self.tabs.get_mut(i) else {
             return;
         };
-        if then != Then::Nothing && repo.editor_open() {
-            let name = repo.name.clone();
-            self.toasts.push(Toast::new(
-                format!(
-                    "{name}: finish or close the conflict or rebase editor first, then run the \
-                     command again"
-                ),
-                true,
-            ));
-            return;
-        }
-        for action in crate::launch::actions(then) {
-            repo.queue(action);
+        if let Some(error) = queue_then(repo, then) {
+            self.toasts.push(Toast::new(error, true));
         }
     }
 
@@ -146,4 +176,17 @@ impl App {
             .iter()
             .position(|t| matches!(t, Tab::Repo(r) if r.path == root))
     }
+}
+
+fn queue_then(repo: &mut crate::repo::RepoTab, then: Then) -> Option<String> {
+    if then != Then::Nothing && repo.editor_open() {
+        return Some(format!(
+            "{}: finish or close the conflict or rebase editor first, then run the command again",
+            repo.name
+        ));
+    }
+    for action in crate::launch::actions(then) {
+        repo.queue(action);
+    }
+    None
 }

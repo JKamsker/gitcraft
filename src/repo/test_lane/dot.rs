@@ -31,6 +31,7 @@ impl RepoTab {
         paint(ui, &t, center, half, state);
         let ran = self.test_lane.outputs.contains_key(tree);
         let tip = dot_tip(state, self.test_lane.command(), tree, ran);
+        crate::a11y::a11y(&resp, egui::WidgetType::Button, &tip);
         let clicked = resp.on_hover_text(tip).clicked();
         (clicked && ran).then(|| Action::TestLane(LaneAct::ShowOutput(tree.to_owned())))
     }
@@ -113,6 +114,7 @@ impl RepoTab {
         };
         let id = ui.id().with("test-lane-header");
         let resp = ui.interact(rect.expand(3.0), id, Sense::click());
+        crate::a11y::a11y(&resp, egui::WidgetType::Button, &tip);
         if resp.on_hover_text(tip).clicked() && !self.test_lane.running() {
             acts.push(self.test_dialog(None));
         }

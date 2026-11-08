@@ -158,7 +158,11 @@ impl App {
 
     /// Long operations that ended: a toast, and a desktop notification when away.
     pub(super) fn toast_finished(&mut self, focused: bool) {
-        for tab in &mut self.tabs {
+        for tab in self
+            .tabs
+            .iter_mut()
+            .chain(self.windows.parked.values_mut().flat_map(|w| &mut w.tabs))
+        {
             let Tab::Repo(r) = tab else { continue };
             for (text, error) in r.finished.drain(..) {
                 if !focused && self.settings.notifications {

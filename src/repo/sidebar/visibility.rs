@@ -30,6 +30,7 @@ impl RepoTab {
             "Show in the graph"
         };
         if MenuItem::new(hide)
+            .icon("eye-off")
             .refused(is_head.then_some("The checked-out branch is always shown"))
             .show(ui)
             .clicked()

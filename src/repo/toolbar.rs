@@ -50,7 +50,7 @@ impl RepoTab {
             widgets::toolbar_separator(ui);
             if icons::tool_button(ui, "refresh-cw", "", !self.loading)
                 .named("Reload (F5)")
-                .on_hover_text(keymap::tip("Reload", Command::Reload))
+                .on_hover_text(keymap::tip(ui.ctx(), "Reload", Command::Reload))
                 .clicked()
             {
                 acts.push(Action::Reload);
@@ -99,7 +99,7 @@ impl RepoTab {
     fn history_buttons(&self, ui: &mut Ui, idle: bool, acts: &mut Vec<Action>) {
         let undo = self.timeline.current_entry();
         let undo_tip = match undo {
-            Some(e) => step_tip("Undo", e, &keymap::written("Cmd+Z")),
+            Some(e) => step_tip("Undo", e, &keymap::label(ui.ctx(), keymap::Command::Undo)),
             None => "Nothing to undo".to_owned(),
         };
         let waits = self.waits_text();
@@ -134,7 +134,7 @@ impl RepoTab {
         }
         let redo = self.timeline.redo_target();
         let redo_tip = match redo {
-            Some(e) => step_tip("Redo", e, &keymap::written("Cmd+Y")),
+            Some(e) => step_tip("Redo", e, &keymap::label(ui.ctx(), keymap::Command::Redo)),
             None => "Nothing to redo".to_owned(),
         };
         if icons::tool_button(ui, "redo-2", "", idle && redo.is_some())
@@ -149,7 +149,10 @@ impl RepoTab {
             acts.push(Action::Redo);
         }
         if icons::tool_button(ui, "history", "", true)
-            .on_hover_text("Timeline and undo tree (Ctrl+Shift+Z)")
+            .on_hover_text(format!(
+                "Timeline and undo tree ({})",
+                keymap::label(ui.ctx(), keymap::Command::Timeline)
+            ))
             .clicked()
         {
             acts.push(Action::ToggleTimeline);
@@ -176,6 +179,7 @@ impl RepoTab {
         let fetched = format!(
             "{}\nLast fetched {} ago{waits}",
             keymap::tip(
+                ui.ctx(),
                 "Fetch all remotes (git fetch --all --prune)",
                 Command::Fetch
             ),
@@ -200,13 +204,13 @@ impl RepoTab {
         let mode = Settings::get(ui.ctx()).pull_mode;
         let pull = icons::tool_button_count(ui, "arrow-down-to-line", "Pull", behind, has_remote)
             .named(|| behind_ahead("Pull", behind, "behind"))
-            .on_hover_text(format!("{}{waits}", mode.tip()))
+            .on_hover_text(format!("{}{waits}", mode.tip(ui.ctx())))
             .on_disabled_hover_text(&off_why);
         crate::repo::ghost::offer(&pull, || crate::repo::ghost::GhostOp::Pull(mode));
         if pull.clicked() {
             acts.push(Action::Pull);
         }
-        egui::Popup::context_menu(&pull)
+        crate::menu_item::context(&pull)
             .style(crate::theme::menu_style)
             .show(|ui| pull_menu(ui, acts));
         let more = ui.add_enabled_ui(has_remote, |ui| {
@@ -236,6 +240,7 @@ impl RepoTab {
         let push = icons::tool_button_count(ui, "arrow-up-from-line", "Push", ahead, has_remote)
             .named(|| behind_ahead("Push", ahead, "ahead"))
             .on_hover_text(keymap::tip(
+                ui.ctx(),
                 "Push the current branch (publishes it if it has no upstream yet)",
                 Command::Push,
             ))
@@ -271,7 +276,11 @@ impl RepoTab {
         let head = self.refs.head.clone();
         let waits = self.waits_text();
         if icons::tool_button(ui, "git-branch-plus", "Branch", idle && !head.is_empty())
-            .on_hover_text(keymap::tip("Create a branch at HEAD", Command::NewBranch))
+            .on_hover_text(keymap::tip(
+                ui.ctx(),
+                "Create a branch at HEAD",
+                Command::NewBranch,
+            ))
             .on_disabled_hover_ui(|ui| self.why_not(ui, Command::NewBranch))
             .on_disabled_hover_text(match &waits {
                 _ if head.is_empty() => "No commit to branch from yet".to_owned(),
@@ -284,6 +293,7 @@ impl RepoTab {
         }
         if icons::tool_button(ui, "archive", "Stash", idle && !self.work.is_clean())
             .on_hover_text(keymap::tip(
+                ui.ctx(),
                 "Stash everything, staged changes, a snapshot, or picked files",
                 Command::Stash,
             ))
@@ -296,9 +306,12 @@ impl RepoTab {
         {
             acts.push(Action::Dialog(Dialog::stash()));
         }
-        let terminal = icons::tool_button(ui, "square-terminal", "Terminal", true).on_hover_text(
-            keymap::tip("Terminal in the repository folder", Command::Terminal),
-        );
+        let terminal =
+            icons::tool_button(ui, "square-terminal", "Terminal", true).on_hover_text(keymap::tip(
+                ui.ctx(),
+                "Terminal in the repository folder",
+                Command::Terminal,
+            ));
         if self.terminal_open {
             widgets::active_underline(ui, terminal.rect, t.accent);
         }
@@ -316,7 +329,10 @@ impl RepoTab {
         }
         let search = icons::tool_button(ui, "search", "", true)
             .named("Search commits")
-            .on_hover_text(format!("Search commits ({})", keymap::written("Cmd+F")));
+            .on_hover_text(format!(
+                "Search commits ({})",
+                keymap::label(ui.ctx(), keymap::Command::Search)
+            ));
         if self.search.open {
             widgets::active_underline(ui, search.rect, t.accent);
         }
@@ -362,6 +378,7 @@ impl RepoTab {
                     ui.close();
                 }
                 let browser = MenuItem::new("Open in browser")
+                    .icon("external-link")
                     .refused(page.is_none().then_some("No remote with a web page"))
                     .show(ui);
                 if let Some(url) = &page {
@@ -374,6 +391,7 @@ impl RepoTab {
                 let here = crate::remote::openable_here(&self.path);
                 let why = here.as_ref().err().map(String::as_str);
                 if MenuItem::new(reveal_label())
+                    .icon("folder-open")
                     .refused(why)
                     .explained_below(true)
                     .show(ui)
@@ -382,6 +400,7 @@ impl RepoTab {
                     acts.push(Action::OpenPath(PathBuf::new()));
                 }
                 if MenuItem::new("Open in editor")
+                    .icon("code")
                     .refused(why)
                     .show(ui)
                     .clicked()

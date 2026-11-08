@@ -72,21 +72,29 @@ pub(super) fn stash_menu_items(
 ) {
     if let Some(why) = problem {
         let why = crate::repo::dialogs::sentence(why);
-        ui.add_enabled(false, egui::Button::new("Stash this file…"))
+        crate::menu_item::MenuItem::new("Stash this file…")
+            .icon("archive")
+            .refused(Some(&why))
+            .show(ui)
             .on_disabled_hover_text(why);
         return;
     }
     let is_picked = picked.contains(path);
     if is_picked && picked.len() > 1 {
-        if ui
-            .button(format!("Stash the {} picked files…", picked.len()))
+        if crate::menu_item::MenuItem::new(format!("Stash the {} picked files…", picked.len()))
+            .icon("archive")
+            .show(ui)
             .clicked()
         {
             acts.push(Action::Dialog(Dialog::stash_files(
                 picked.iter().cloned().collect(),
             )));
         }
-    } else if ui.button("Stash this file…").clicked() {
+    } else if crate::menu_item::MenuItem::new("Stash this file…")
+        .icon("archive")
+        .show(ui)
+        .clicked()
+    {
         acts.push(Action::Dialog(Dialog::stash_files(vec![path.to_owned()])));
     }
     let pick = if is_picked {
@@ -94,7 +102,11 @@ pub(super) fn stash_menu_items(
     } else {
         format!("Pick to stash ({}+click)", crate::manual::command())
     };
-    if ui.button(pick).clicked() {
+    if crate::menu_item::MenuItem::new(pick)
+        .icon("command")
+        .show(ui)
+        .clicked()
+    {
         acts.push(Action::PickToStash(path.to_owned()));
     }
 }

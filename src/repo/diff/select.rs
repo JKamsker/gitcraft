@@ -42,6 +42,17 @@ pub(in crate::repo) struct TextSel {
 }
 
 impl TextSel {
+    pub(super) fn all(lines: &[DiffLine], side: Side) -> Option<Self> {
+        let mut shown = lines.iter().enumerate().filter(|(_, l)| side.shows(l.kind));
+        let (first, _) = shown.next()?;
+        let last = shown.next_back().map_or(first, |(i, _)| i);
+        Some(Self {
+            side,
+            anchor: (first, 0),
+            cursor: (last, usize::MAX),
+        })
+    }
+
     /// Whether it was made in the side-by-side view (`split`) or the unified one.
     pub(super) fn made_in(&self, split: bool) -> bool {
         (self.side == Side::Unified) != split
@@ -150,11 +161,16 @@ pub(super) fn copy_selection(
 ) {
     // Put together only when asked for: a selection can span thousands of lines.
     let selected_text = || sel.map(|s| s.text(lines, uncut)).filter(|s| !s.is_empty());
-    let copy = sel.is_some()
-        && !crate::a11y::keyboard_taken(ui.ctx())
-        && ui.input(|i| i.events.iter().any(|e| matches!(e, egui::Event::Copy)));
-    if copy && let Some(text) = selected_text() {
+    if crate::keymap::copy_requested(ui.ctx())
+        && let Some(text) = selected_text()
+    {
         ui.ctx().copy_text(text);
+    }
+    if !crate::a11y::keyboard_taken(ui.ctx())
+        && crate::keymap::take(ui.ctx(), crate::keymap::Command::SelectionHistory)
+        && let Ok(action) = history()
+    {
+        acts.push(action);
     }
     for resp in std::iter::once(drag).chain(picks) {
         lines_menu(resp, &selected_text, history, acts, &mut more);
@@ -169,12 +185,19 @@ fn lines_menu(
     acts: &mut Vec<crate::repo::Action>,
     more: &mut dyn FnMut(&mut Ui, &mut Vec<crate::repo::Action>),
 ) {
-    egui::Popup::context_menu(resp)
+    crate::menu_item::context(resp)
         .style(crate::theme::menu_style)
         .show(|ui| {
             let selected_text = selected_text();
-            if ui
-                .add_enabled(selected_text.is_some(), egui::Button::new("Copy"))
+            if crate::menu_item::MenuItem::new("Copy")
+                .icon("copy")
+                .keys(crate::keymap::Command::SelectionCopy)
+                .refused(
+                    selected_text
+                        .is_none()
+                        .then_some("Select text to copy first"),
+                )
+                .show(ui)
                 .clicked()
                 && let Some(text) = &selected_text
             {
@@ -216,18 +239,101 @@ fn lines_menu(
                         )));
                     }
 
-                    let b = ui.button("History of these lines").on_hover_text(
-                        "Every commit up to this version that changed the selected lines, \
+                    let b = crate::menu_item::MenuItem::new("History of these lines")
+                        .icon("history")
+                        .keys(crate::keymap::Command::SelectionHistory)
+                        .show(ui)
+                        .on_hover_text(
+                            "Every commit up to this version that changed the selected lines, \
                          followed back through earlier edits and renames",
-                    );
+                        );
                     if b.clicked() {
                         acts.push(action);
                     }
                 }
                 Err(why) => {
-                    ui.add_enabled(false, egui::Button::new("History of these lines"))
+                    crate::menu_item::MenuItem::new("History of these lines")
+                        .icon("history")
+                        .keys(crate::keymap::Command::SelectionHistory)
+                        .refused(Some(why))
+                        .show(ui)
                         .on_disabled_hover_text(why);
                 }
             }
         });
+}
+
+#[cfg(test)]
+mod registry_menu_tests {
+    use super::*;
+    use crate::keymap::{Command, Stroke};
+    use egui::{Key, Modifiers};
+    use egui_kittest::{
+        Harness,
+        kittest::{NodeT, Queryable},
+    };
+
+    #[test]
+    fn actual_selection_menu_shows_configured_keys_and_refusal() {
+        let mut h = Harness::new_ui_state(
+            |ui, installed: &mut bool| {
+                if !std::mem::replace(installed, true) {
+                    egui_extras::install_image_loaders(ui.ctx());
+                    let mut settings = crate::settings::Settings::default();
+                    for (cmd, key) in [
+                        (Command::SelectionCopy, Key::F8),
+                        (Command::SelectionHistory, Key::F9),
+                    ] {
+                        settings
+                            .key_bindings
+                            .insert(cmd.id().into(), vec![Stroke::new(key, Modifiers::NONE)]);
+                    }
+                    settings.put_for_test(ui.ctx());
+                }
+                let response = ui.button("Diff lines");
+                response.request_focus();
+                lines_menu(
+                    &response,
+                    &|| Some("selected".into()),
+                    &|| Err("No committed lines here"),
+                    &mut Vec::new(),
+                    &mut |_, _| {},
+                );
+            },
+            false,
+        );
+        h.run();
+        h.key_press_modifiers(Modifiers::SHIFT, Key::F10);
+        h.run();
+        h.get_by_label("Copy F8");
+        assert!(
+            h.get_by_label("History of these lines F9")
+                .accesskit_node()
+                .is_disabled()
+        );
+        h.get_by_label("No committed lines here");
+        fn texts(s: &egui::Shape, out: &mut Vec<String>) {
+            match s {
+                egui::Shape::Text(t) => out.push(t.galley.job.text.clone()),
+                egui::Shape::Vec(v) => {
+                    for s in v {
+                        texts(s, out);
+                    }
+                }
+                _ => {}
+            }
+        }
+        let mut labels = Vec::new();
+        for s in &h.output().shapes {
+            texts(&s.shape, &mut labels);
+        }
+        assert!(
+            labels.iter().any(|s| s == "F8"),
+            "actual Copy menu key: {labels:?}"
+        );
+        assert!(
+            labels.iter().any(|s| s == "F9"),
+            "actual History menu key: {labels:?}"
+        );
+    }
 }

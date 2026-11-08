@@ -125,6 +125,11 @@ impl<T> FoldGroup<'_, T> {
         let t = Tokens::get(ui.ctx());
         let (rect, resp) =
             ui.allocate_exact_size(vec2(ui.available_width(), ROW_H), Sense::click());
+        crate::a11y::expanded(
+            &resp,
+            || format!("{} generated or folded files", self.folded.len()),
+            open,
+        );
         let painter = ui.painter_at(rect);
         if resp.hovered() {
             painter.rect_filled(rect, 0.0, t.hover);

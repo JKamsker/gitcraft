@@ -67,13 +67,20 @@ impl RepoTab {
             }
             let r = title_row(ui, tree, self.forge().map(|f| f.noun()));
             if let Some(forge) = self.forge() {
-                egui::Popup::context_menu(&r)
+                crate::menu_item::context(&r)
                     .style(crate::theme::menu_style)
                     .show(|ui| {
-                        if ui
-                            .add_enabled(idle, egui::Button::new(format!("Publish its {}s…", forge.noun())))
-                            .on_hover_text("Preview each one's base and patch, then open or update them bottom-up")
-                            .clicked()
+                        if crate::menu_item::MenuItem::new(format!(
+                            "Publish its {}s…",
+                            forge.noun()
+                        ))
+                        .icon("external-link")
+                        .enabled(idle)
+                        .show(ui)
+                        .on_hover_text(
+                            "Preview each one's base and patch, then open or update them bottom-up",
+                        )
+                        .clicked()
                         {
                             acts.push(Action::Stack(StackAct::OpenPublish(tree.root.clone())));
                         }
@@ -314,7 +321,7 @@ impl RepoTab {
         } else if r.clicked() {
             acts.push(Action::SelectHash(branch.target.clone()));
         }
-        egui::Popup::context_menu(&r)
+        crate::menu_item::context(&r)
             .style(crate::theme::menu_style)
             .show(|ui| self.branch_menu_items(ui, acts, branch, idle));
     }
@@ -332,8 +339,9 @@ impl RepoTab {
         // Its own changes: since it forked from its parent, as its pull request will show them.
         if let Some(r) = recorded
             && self.refs.local.iter().any(|l| l.name == r.parent)
-            && ui
-                .button(format!("Changes {} adds to {}", b.name, r.parent))
+            && crate::menu_item::MenuItem::new(format!("Changes {} adds to {}", b.name, r.parent))
+                .icon("command")
+                .show(ui)
                 .on_hover_text("Its own commits in the stack: since it forked from its parent")
                 .clicked()
         {
@@ -347,8 +355,10 @@ impl RepoTab {
             Some(r) => format!("Now based on {}", r.parent),
             None => "The branch it is a layer on in a stack".to_owned(),
         };
-        if ui
-            .add_enabled(idle, egui::Button::new("This branch is based on…"))
+        if crate::menu_item::MenuItem::new("This branch is based on…")
+            .icon("git-branch-plus")
+            .enabled(idle)
+            .show(ui)
             .on_hover_text(hover)
             .clicked()
         {
@@ -356,28 +366,32 @@ impl RepoTab {
         }
         let on_it = dependents(&self.stacks.layers, &b.name).len();
         if on_it > 0
-            && ui
-                .add_enabled(
-                    idle && self.stacks.pending.is_none(),
-                    egui::Button::new(if on_it == 1 {
-                        "Restack the branch on it…".to_owned()
-                    } else {
-                        format!("Restack the {on_it} branches on it…")
-                    }),
-                )
-                .on_hover_text("Replay their own commits onto its new tip")
-                .on_disabled_hover_text("A restack is paused: continue or abort it in STACKS first")
-                .clicked()
+            && crate::menu_item::MenuItem::new(if on_it == 1 {
+                "Restack the branch on it…".to_owned()
+            } else {
+                format!("Restack the {on_it} branches on it…")
+            })
+            .icon("git-branch-plus")
+            .enabled(idle)
+            .refused(
+                self.stacks
+                    .pending
+                    .is_some()
+                    .then_some("A restack is paused: continue or abort it in STACKS first"),
+            )
+            .show(ui)
+            .on_hover_text("Replay their own commits onto its new tip")
+            .on_disabled_hover_text("A restack is paused: continue or abort it in STACKS first")
+            .clicked()
         {
             acts.push(Action::Stack(StackAct::OpenRestack(Some(b.name.clone()))));
         }
         if let Some(forge) = self.forge()
             && self.stacks.layer(&b.name).is_some()
-            && ui
-                .add_enabled(
-                    idle,
-                    egui::Button::new(format!("Publish its stack's {}s…", forge.noun())),
-                )
+            && crate::menu_item::MenuItem::new(format!("Publish its stack's {}s…", forge.noun()))
+                .icon("external-link")
+                .enabled(idle)
+                .show(ui)
                 .on_hover_text(
                     "Preview each one's base and patch, then open or update them bottom-up",
                 )
@@ -386,8 +400,10 @@ impl RepoTab {
             acts.push(Action::Stack(StackAct::OpenPublish(b.name.clone())));
         }
         if self.stacks.recorded.contains_key(&b.name)
-            && ui
-                .add_enabled(idle, egui::Button::new("Remove from its stack"))
+            && crate::menu_item::MenuItem::new("Remove from its stack")
+                .icon("minus")
+                .enabled(idle)
+                .show(ui)
                 .clicked()
         {
             acts.push(Action::Stack(StackAct::RemoveParent(b.name.clone())));

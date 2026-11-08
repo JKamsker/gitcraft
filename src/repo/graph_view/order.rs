@@ -44,6 +44,9 @@ pub(super) fn order_button(
     let resp = ui
         .interact(rect, ui.id().with("graph-order"), Sense::click())
         .on_hover_text("Order history, or show first parents only");
+    crate::a11y::a11y(&resp, egui::WidgetType::Button, || {
+        format!("Order history: {label}")
+    });
     if resp.hovered() {
         ui.painter()
             .rect_filled(rect, t.radius_sm, t.text_faint.gamma_multiply(0.12));

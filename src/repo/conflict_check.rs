@@ -577,13 +577,25 @@ impl RepoTab {
         op: Op,
         other: &str,
     ) -> Response {
+        let icon = match op {
+            Op::Merge | Op::Rebase => "git-merge",
+            Op::CherryPick => "git-branch",
+        };
+        let refused = (!enabled).then_some(if other == self.refs.head {
+            "This commit is already checked out"
+        } else {
+            "Another operation is running"
+        });
         if !enabled || self.refs.head.is_empty() || other == self.refs.head {
-            return ui.add_enabled(enabled, egui::Button::new(text));
+            return crate::menu_item::MenuItem::new(text)
+                .icon(icon)
+                .refused(refused)
+                .show(ui);
         }
         let key = Key::new(op, &self.refs.head, other);
         let check = self.conflict_checks.get(ui.ctx(), &self.path, key);
         // The entry and its mark on one line: the menu widens for them.
-        let mut button = egui::Button::new(text).wrap_mode(egui::TextWrapMode::Extend);
+        let mut button = crate::menu_item::MenuItem::new(text).icon(icon);
         if let Some((words, tone)) = label(op, &check) {
             let t = Tokens::get(ui.ctx());
             let color = match tone {
@@ -591,9 +603,10 @@ impl RepoTab {
                 Tone::Good => t.success,
                 Tone::Warn => t.warning,
             };
-            button = button.right_text(RichText::new(words).color(color).small());
+            button = button.annotation(RichText::new(words).color(color).small());
         }
-        ui.add(button)
+        button
+            .show(ui)
             .on_hover_text(tooltip(op, &check, !self.work.is_clean()))
     }
 

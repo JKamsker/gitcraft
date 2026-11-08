@@ -8,6 +8,7 @@
 mod focus;
 pub mod labels;
 pub mod motion;
+pub mod value;
 
 use egui::{Response, WidgetInfo, WidgetType};
 
@@ -48,7 +49,13 @@ impl<F: Fn() -> String> Label for F {
 pub fn a11y(resp: &Response, typ: WidgetType, label: impl Label) {
     let enabled = resp.enabled();
     resp.widget_info(|| WidgetInfo::labeled(typ, enabled, labels::name(&label.text())));
-    focus::note(resp);
+    focus::note(
+        resp,
+        matches!(
+            typ,
+            WidgetType::TextEdit | WidgetType::Slider | WidgetType::DragValue
+        ),
+    );
 }
 
 /// [`a11y`] for a row of a list that is selected or not (a commit, a palette entry), so a
@@ -63,7 +70,20 @@ pub fn a11y_selected(resp: &Response, label: impl Label, selected: bool) {
             labels::name(&label.text()),
         )
     });
-    focus::note(resp);
+    focus::note(resp, false);
+}
+
+/// A disclosure's semantics include its expanded state, not just its painted chevron.
+pub fn expanded(resp: &Response, label: impl Label, open: bool) {
+    a11y(resp, WidgetType::Button, label);
+    resp.ctx
+        .accesskit_node_builder(resp.id, |node| node.set_expanded(open));
+}
+
+pub fn pane(resp: &Response, label: impl Label) {
+    a11y(resp, WidgetType::Other, label);
+    resp.ctx
+        .accesskit_node_builder(resp.id, |node| node.set_role(egui::accesskit::Role::Pane));
 }
 
 /// [`a11y`] in a chain of a response's calls, for a button that only shows an icon: its name

@@ -116,12 +116,8 @@ impl RepoTab {
             Sense::click_and_drag(),
         );
         let coverage = lane_coverage(self.graph.width);
-        crate::a11y::a11y(
-            &response,
-            egui::WidgetType::Slider,
-            format!(
-                "Loaded history minimap. {coverage} Drag to scroll; arrow and Page Up/Down keys move the viewport. Blue HEAD, green tags, yellow search hits."
-            ),
+        let label = format!(
+            "Loaded history minimap. {coverage} Drag to scroll; arrow and Page Up/Down keys move the viewport. Blue HEAD, green tags, yellow search hits."
         );
         let p = ui.painter_at(rect);
         p.rect_filled(rect, 3.0, t.dock);
@@ -141,6 +137,7 @@ impl RepoTab {
             pos2(rect.right() - 4.0, rect.bottom() - 20.0),
         );
         if map.height() <= 0.0 || self.history_minimap.rows == 0 {
+            crate::a11y::value::slider(&response, label, 0.0, 0.0..=0.0, ROW_PITCH, true);
             return;
         }
         let n = self.history_minimap.bins.len();
@@ -184,7 +181,7 @@ impl RepoTab {
             ),
         );
         p.rect_stroke(visible, 1.0, Stroke::new(1.5, t.accent), StrokeKind::Inside);
-        let label = if self.has_more {
+        let footer_label = if self.has_more {
             "Older unloaded ↓"
         } else {
             "History ends"
@@ -196,7 +193,7 @@ impl RepoTab {
         p.text(
             pos2(rect.center().x, rect.bottom() - 3.0),
             Align2::CENTER_BOTTOM,
-            label,
+            footer_label,
             FontId::proportional(8.0),
             t.text_dim,
         );
@@ -244,6 +241,17 @@ impl RepoTab {
                 self.history_minimap.offset =
                     Some((offset + delta).clamp(0.0, (full_h - viewport).max(0.0)));
             }
+        }
+        if let Some(at) = crate::a11y::value::slider(
+            &response,
+            label,
+            self.history_minimap.offset.unwrap_or(offset),
+            0.0..=(full_h - viewport).max(0.0),
+            ROW_PITCH,
+            true,
+        ) {
+            self.history_minimap.offset = Some(at);
+            ui.ctx().request_repaint();
         }
         response.on_hover_text(format!("{} projected rows of loaded history. {coverage} Drag to scroll; focused: arrows or Page Up/Down. Blue: HEAD · green: tags · yellow: search hits · grey: collapsed context. {}",self.history_minimap.rows,if self.has_more {"Older history is not loaded; scrolling to the boundary loads another page."} else {"All available history is loaded."}));
     }
@@ -321,9 +329,11 @@ mod tests {
         assert_eq!(harness.state().history_minimap.offset, Some(300.0));
     }
     #[test]
-    fn actual_minimap_marks_loaded_refs_and_clicks_scroll_without_changing_selection() {
+    fn actual_minimap_marks_loaded_refs_and_clicks_scroll_without_changing_selection()
+    -> Result<(), String> {
         use std::sync::Arc;
         let ctx = crate::theme::test_paint::context();
+        ctx.enable_accesskit();
         let mut tab = RepoTab::new_deferred("/nonexistent/minimap-fixture".into(), &ctx);
         tab.commits = (0..100)
             .map(|i| {
@@ -361,14 +371,38 @@ mod tests {
         assert!(tab.history_minimap.bins[70].hit);
         let rect = Rect::from_min_size(egui::Pos2::ZERO, vec2(78.0, 400.0));
         let point = pos2(38.0, 300.0);
-        ctx.run_ui(
-            egui::RawInput {
-                screen_rect: Some(rect),
-                ..Default::default()
-            },
-            |ui| tab.history_minimap(ui, rect, 0.0, 300.0),
-        )
-        .drop_without_applying_deltas();
+        for has_more in [false, true] {
+            tab.has_more = has_more;
+            let output = ctx.run_ui(
+                egui::RawInput {
+                    screen_rect: Some(rect),
+                    ..Default::default()
+                },
+                |ui| tab.history_minimap(ui, rect, 0.0, 300.0),
+            );
+            let update = output
+                .platform_output
+                .accesskit_update
+                .as_ref()
+                .ok_or("No AccessKit update")?;
+            let (_, slider) = update
+                .nodes
+                .iter()
+                .find(|(_, node)| node.role() == egui::accesskit::Role::Slider)
+                .ok_or("No minimap Slider")?;
+            assert_eq!(
+                slider.label(),
+                Some(
+                    "Loaded history minimap. Drag to scroll; arrow and Page Up/Down keys move the viewport. Blue HEAD, green tags, yellow search hits."
+                )
+            );
+            assert_eq!(slider.numeric_value(), Some(0.0));
+            assert_eq!(
+                slider.max_numeric_value(),
+                Some(f64::from(100.0 * ROW_PITCH - 300.0))
+            );
+            output.drop_without_applying_deltas();
+        }
         for pressed in [true, false] {
             let events = vec![
                 egui::Event::PointerMoved(point),
@@ -395,6 +429,7 @@ mod tests {
                 .is_some_and(|offset| offset > 1500.0)
         );
         assert_eq!(tab.selected, Some(0));
+        Ok(())
     }
     #[test]
     fn endpoints_and_drag_anchor_respect_loaded_extent() {

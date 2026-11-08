@@ -362,7 +362,13 @@ impl RepoTab {
                 settings.set(ui.ctx());
             }
             if settings.graph_lane_walk {
-                ui.small("↓ first parent · ↑ child · → next descendant merge · ← branch tip");
+                ui.small(format!(
+                    "{} first parent · {} child · {} next descendant merge · {} branch tip",
+                    crate::keymap::label(ui.ctx(), crate::keymap::Command::GraphNext),
+                    crate::keymap::label(ui.ctx(), crate::keymap::Command::GraphPrevious),
+                    crate::keymap::label(ui.ctx(), crate::keymap::Command::GraphRight),
+                    crate::keymap::label(ui.ctx(), crate::keymap::Command::GraphLeft)
+                ));
                 if let Some(row) = self.selected {
                     let relations: Vec<_> = self
                         .topology

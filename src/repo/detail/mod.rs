@@ -53,6 +53,19 @@ impl RepoTab {
         key: impl Fn(&str) -> DiffKey,
     ) {
         let id = egui::Id::new(("file-folder", self.repo_key(), tree));
+        let keyboard_scope = match files.first().map(|f| key(&f.path)) {
+            Some(DiffKey::Commit { hash, .. }) => egui::Id::new((tree, hash)),
+            Some(DiffKey::Range { from, to, .. }) => egui::Id::new((tree, from, to)),
+            _ => egui::Id::new(tree),
+        };
+        self.keyboard_files(
+            ui,
+            (keyboard_scope, Some(id)),
+            files,
+            |f| f.path.as_str(),
+            |f| key(&f.path),
+            acts,
+        );
         let rules = folding::Rules::from_settings(&Settings::get(ui.ctx()));
         let group = folding::split(
             ui,
@@ -62,7 +75,9 @@ impl RepoTab {
             (&self.folding, &rules),
             acts,
         );
-        let selected = |f: &&&ChangedFile| self.open_key() == Some(&key(&f.path));
+        let selected = |f: &&&ChangedFile| {
+            self.open_key() == Some(&key(&f.path)) || self.keyboard_file_selected(&key(&f.path))
+        };
         let (scope, generation) = super::weakened_marks::scope_of(&key(""), self.work_read);
         let found = self.weakened.get(ui.ctx(), &self.path, scope, generation);
         let paths: Vec<&str> = files.iter().map(|f| f.path.as_str()).collect();
@@ -76,10 +91,11 @@ impl RepoTab {
                 &f.path,
                 f.old_path.as_deref(),
                 indent,
-                self.open_key() == Some(&key(&f.path)),
+                selected(&&f),
                 extra,
                 self.owner_tag(&f.path).as_ref(),
             );
+            self.keyboard_file_row(keyboard_scope, &r.row, &key(&f.path));
             super::weakened_marks::hover(ui, &r, flags);
             // A file the commit deleted isn't in it, and has nothing to link to.
             let links = || self.link_menu(None).filter(|_| f.status != 'D');
@@ -90,9 +106,11 @@ impl RepoTab {
                 false,
                 Some(&key(&f.path)),
                 &links,
+                self.keyboard_file_selected(&key(&f.path)),
                 acts,
             );
             if r.row.clicked() {
+                self.keyboard_select_file(keyboard_scope, key(&f.path));
                 acts.push(Action::OpenDiff(key(&f.path)));
                 acts.push(Action::UnfoldDiff);
             }

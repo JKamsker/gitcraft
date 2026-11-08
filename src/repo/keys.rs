@@ -6,11 +6,42 @@ use crate::keymap::Command;
 use crate::settings::Settings;
 
 impl RepoTab {
+    pub(crate) fn command_refusal(&self, command: Command) -> Option<String> {
+        match command.scope() {
+            crate::keymap::Scope::Graph if self.commits.is_empty() => {
+                Some("No history loaded".into())
+            }
+            crate::keymap::Scope::Rebase if self.rebase.is_none() => {
+                Some("No rebase editor is open".into())
+            }
+            crate::keymap::Scope::Rebase
+                if self.rebase.as_ref().is_some_and(|editor| editor.starting) =>
+            {
+                Some("The rebase is being prepared".into())
+            }
+            _ => self.key_action(command).err(),
+        }
+    }
+
     /// The action the key of `command` stands for here, or why it can't be done now, as the
     /// toolbar would say it. `None` for the window's keys, which aren't the tab's.
     pub(super) fn key_action(&self, command: Command) -> Result<Option<Action>, String> {
         if let Some(op) = &self.busy_op
-            && command != Command::Terminal
+            && !matches!(
+                command,
+                Command::Terminal
+                    | Command::Timeline
+                    | Command::Search
+                    | Command::Back
+                    | Command::Forward
+                    | Command::NextChange
+                    | Command::PreviousChange
+                    | Command::NextChangeAlt
+                    | Command::PreviousChangeAlt
+                    | Command::GraphCopyHash
+                    | Command::GraphCopyMessage
+                    | Command::GraphCopyBranch
+            )
         {
             return Err(format!("{op} is still running"));
         }
@@ -19,6 +50,30 @@ impl RepoTab {
             Command::Fetch | Command::Pull | Command::Push if self.remotes.is_empty() => {
                 return Err(no_remote());
             }
+            Command::Undo if self.timeline.current_entry().is_none() => {
+                return Err("Nothing to undo".into());
+            }
+            Command::Redo if self.timeline.redo_target().is_none() => {
+                return Err("Nothing to redo".into());
+            }
+            Command::Undo => Action::Undo,
+            Command::Redo => Action::Redo,
+            Command::Timeline => Action::ToggleTimeline,
+            Command::Reload => Action::Reload,
+            Command::GraphCopyHash | Command::GraphCopyMessage | Command::GraphCopyBranch => {
+                let text = self
+                    .selected
+                    .and_then(|i| self.graph_copy_text(command, i))
+                    .ok_or_else(|| "Select a loaded commit with this value first".to_owned())?;
+                Action::CopyText(text)
+            }
+            Command::Search => Action::FocusSearch,
+            Command::Back if self.nav.peek(-1).is_none() => return Err("No previous view".into()),
+            Command::Forward if self.nav.peek(1).is_none() => return Err("No next view".into()),
+            Command::Back => Action::Navigate(-1),
+            Command::Forward => Action::Navigate(1),
+            Command::NextChange | Command::NextChangeAlt => Action::DiffStep(1),
+            Command::PreviousChange | Command::PreviousChangeAlt => Action::DiffStep(-1),
             Command::Fetch => Action::Fetch,
             Command::Pull => Action::Pull,
             Command::Push => Action::Push,
@@ -42,17 +97,17 @@ impl RepoTab {
                 refresh: Refresh::Status,
             },
             Command::Commit => return self.commit_key().map(Some),
-            Command::NewTab
-            | Command::CloseTab
-            | Command::ReopenTab
-            | Command::NextTab
-            | Command::PreviousTab
-            | Command::GoToTab(_)
-            | Command::LastTab
-            | Command::Palette
-            | Command::Settings
-            | Command::Reload
-            | Command::Manual => return Ok(None),
+            Command::FocusSidebar => Action::FocusPane(super::keyboard::Pane::Sidebar),
+            Command::FocusGraph => Action::FocusPane(super::keyboard::Pane::Graph),
+            Command::FocusDetail => Action::FocusPane(super::keyboard::Pane::Detail),
+            Command::FileNext
+            | Command::FilePrevious
+            | Command::FileToggleStage
+            | Command::FileOpen
+            | Command::HunkStage
+            | Command::HunkUnstage
+            | Command::HunkDiscard => return self.keyboard_command(command).map(Some),
+            _ => return Ok(None),
         };
         Ok(Some(action))
     }
@@ -88,7 +143,9 @@ impl RepoTab {
     pub(super) fn run_key(&mut self, command: Command, ctx: &egui::Context) {
         match self.key_action(command) {
             Ok(Some(action)) => self.apply(action, ctx),
-            Ok(None) => {}
+            Ok(None) => {
+                self.status = Some(("This command is available in its owning view".into(), true))
+            }
             Err(why) => self.status = Some((why, true)),
         }
     }
@@ -211,7 +268,7 @@ mod tests {
         let mut tab = loaded(&dir, &ctx);
         for b in crate::keymap::BINDINGS {
             let resolved = tab.key_action(b.command);
-            let tabs = b.command.scope() == crate::keymap::Scope::Repository;
+            let tabs = b.command.scope() != crate::keymap::Scope::Window;
             match resolved {
                 Ok(Some(_)) => assert!(tabs, "{:?}", b.command),
                 Ok(None) => assert!(!tabs, "{:?}", b.command),

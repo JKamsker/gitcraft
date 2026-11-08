@@ -68,10 +68,13 @@ impl App {
     }
 
     fn repo_tabs(&self) -> impl Iterator<Item = &crate::repo::RepoTab> {
-        self.tabs.iter().filter_map(|tab| match tab {
-            Tab::Repo(r) => Some(&**r),
-            _ => None,
-        })
+        self.tabs
+            .iter()
+            .chain(self.windows.parked.values().flat_map(|w| &w.tabs))
+            .filter_map(|tab| match tab {
+                Tab::Repo(r) => Some(&**r),
+                _ => None,
+            })
     }
 
     fn all_drafts(&self) -> Vec<(PathBuf, RepoDrafts)> {
