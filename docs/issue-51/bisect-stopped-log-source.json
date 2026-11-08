@@ -34,6 +34,6 @@
       "sha256": "b7782d6f7a8db0b2547d82ecd5cdec8494ed1d52dc5398d017e2cd52a2695bd0"
     }
   },
-  "actual_runtime": "HELD until root suite finishes and application correction is pushed/remote-SHA verified",
+  "actual_runtime": "PASS: 8 exact local regressions at 21515616cac7fab68790c6e68352131f5d6ce883; see bisect-stopped-log-runtime.json; no broader release inferred",
   "root_source_comparison": "Unix retained-anchor production is identical at implementation_parent and root19. Root-only held env/endpoint fixtures are not needed for these local corrections and were not ported. Preserve root19 runner connections::inherit when integrating this semantic delta."
 }
