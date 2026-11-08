@@ -1,14 +1,15 @@
 use super::*;
 #[test]
-fn pure_prompt_timestamps_respect_offsets_fractional_seconds_and_calendar_bounds() {
+fn pure_prompt_timestamps_respect_offsets_fractional_seconds_and_calendar_bounds()
+-> Result<(), String> {
     assert_eq!(parse::stamp("1970-01-01T00:00:00Z"), Some(0));
     assert_eq!(
         parse::stamp("2026-11-08T01:30:12.123+01:00"),
         parse::stamp("2026-11-08T00:30:12Z")
     );
     assert_eq!(
-        parse::stamp("2024-02-29T23:59:59Z").unwrap() + 1,
-        parse::stamp("2024-03-01T00:00:00Z").unwrap()
+        parse::stamp("2024-02-29T23:59:59Z").ok_or("expected Some")? + 1,
+        parse::stamp("2024-03-01T00:00:00Z").ok_or("expected Some")?
     );
     for bad in [
         "2025-02-29T00:00:00Z",
@@ -19,6 +20,7 @@ fn pure_prompt_timestamps_respect_offsets_fractional_seconds_and_calendar_bounds
     ] {
         assert_eq!(parse::stamp(bad), None, "{bad}");
     }
+    Ok(())
 }
 #[test]
 fn pure_prompt_claude_allowlist_keeps_prompts_summaries_edits_and_excludes_tool_results_and_reasoning()
@@ -105,14 +107,15 @@ fn pure_prompt_credential_redaction_drops_multiline_keys_and_token_values_withou
 }
 
 #[test]
-fn pure_prompt_local_records_require_both_immutable_worktree_context_and_time_window() {
+fn pure_prompt_local_records_require_both_immutable_worktree_context_and_time_window()
+-> Result<(), String> {
     let bytes=br#"{"type":"user","cwd":"/synthetic/other","timestamp":"2026-11-08T00:00:00Z","message":{"role":"user","content":"foreign"}}
 {"type":"user","cwd":"/synthetic/root","timestamp":"2026-11-07T00:00:00Z","message":{"role":"user","content":"too early"}}
 {"type":"user","cwd":"/synthetic/root","timestamp":"2026-11-08T00:00:00Z","message":{"role":"user","content":"matching"}}
 {"type":"user","cwd":"/synthetic/root","timestamp":"invalid","message":{"role":"user","content":"unknown time"}}
 "#;
-    let start = parse::stamp("2026-11-07T23:00:00Z").unwrap();
-    let end = parse::stamp("2026-11-08T00:10:00Z").unwrap();
+    let start = parse::stamp("2026-11-07T23:00:00Z").ok_or("expected Some")?;
+    let end = parse::stamp("2026-11-08T00:10:00Z").ok_or("expected Some")?;
     let (s, _) = parse::records(
         bytes,
         Path::new("/synthetic/root"),
@@ -123,6 +126,7 @@ fn pure_prompt_local_records_require_both_immutable_worktree_context_and_time_wi
     );
     assert_eq!(s.len(), 1);
     assert_eq!(s[0].text, "matching");
+    Ok(())
 }
 
 #[test]
@@ -266,7 +270,8 @@ fn pure_prompt_r1_separate_changed_runs_exclude_another_steps_interior_hunk() {
 }
 
 #[test]
-fn pure_prompt_r1_ordinary_code_push_warns_conditionally_when_entire_integration_can_publish() {
+fn pure_prompt_r1_ordinary_code_push_warns_conditionally_when_entire_integration_can_publish()
+-> Result<(), String> {
     assert!(!checkpoint_publication(
         "refs/heads/main",
         "refs/heads/main",
@@ -274,10 +279,11 @@ fn pure_prompt_r1_ordinary_code_push_warns_conditionally_when_entire_integration
         "ordinary-code",
         ""
     ));
-    let warning = entire_automatic_notice(true, false).unwrap();
+    let warning = entire_automatic_notice(true, false).ok_or("expected Some")?;
     assert!(warning.contains("pre-push hook"));
     assert!(warning.contains("separate checkpoint remote"));
     assert!(warning.contains("If automatic"));
     assert!(entire_automatic_notice(true, true).is_none());
     assert!(entire_automatic_notice(false, false).is_none());
+    Ok(())
 }

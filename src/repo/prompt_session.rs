@@ -182,33 +182,33 @@ fn panel(ui: &mut egui::Ui, state: &mut State, hash: &str, acts: &mut Vec<Action
             return;
         }
     };
-    if let Some(hunk) = &state.hunk {
-        if hunk.commit == e.commit {
-            ui.strong(format!(
-                "Hunk {}:{}–{} ({})",
-                logic::redact(&hunk.path),
-                hunk.range.0,
-                hunk.range.1,
-                if hunk.old { "old" } else { "new" }
+    if let Some(hunk) = &state.hunk
+        && hunk.commit == e.commit
+    {
+        ui.strong(format!(
+            "Hunk {}:{}–{} ({})",
+            logic::redact(&hunk.path),
+            hunk.range.0,
+            hunk.range.1,
+            if hunk.old { "old" } else { "new" }
+        ));
+        if matching.is_empty() {
+            ui.label("No unique recorded edit snippet matches these commit lines. A session/time match alone is not hunk attribution.");
+        } else {
+            ui.label(format!(
+                "{} recorded content match(es); inspect each candidate step",
+                matching.len()
             ));
-            if matching.is_empty() {
-                ui.label("No unique recorded edit snippet matches these commit lines. A session/time match alone is not hunk attribution.");
-            } else {
-                ui.label(format!(
-                    "{} recorded content match(es); inspect each candidate step",
-                    matching.len()
-                ));
-                ui.horizontal_wrapped(|ui| {
-                    for (i, j) in &matching {
-                        if ui
-                            .button(format!("Session {}, step {}", i + 1, j + 1))
-                            .clicked()
-                        {
-                            state.jump = Some((*i, *j));
-                        }
+            ui.horizontal_wrapped(|ui| {
+                for (i, j) in &matching {
+                    if ui
+                        .button(format!("Session {}, step {}", i + 1, j + 1))
+                        .clicked()
+                    {
+                        state.jump = Some((*i, *j));
                     }
-                });
-            }
+                }
+            });
         }
     }
     egui::ScrollArea::vertical().id_salt("prompt-session-local").show(ui,|ui|{
@@ -242,10 +242,13 @@ fn panel(ui: &mut egui::Ui, state: &mut State, hash: &str, acts: &mut Vec<Action
 mod tests {
     use super::*;
     #[test]
-    fn pure_prompt_panel_hunk_jump_uses_recorded_range_and_read_action_pins_selected_oid() {
+    fn pure_prompt_panel_hunk_jump_uses_recorded_range_and_read_action_pins_selected_oid()
+    -> Result<(), String> {
         let hash = "a".repeat(40);
-        let mut state = State::default();
-        state.requested = Some(hash.clone());
+        let mut state = State {
+            requested: Some(hash.clone()),
+            ..Default::default()
+        };
         state.result = Some(Ok(Evidence {
             commit: hash.clone(),
             sessions: vec![logic::Session {
@@ -306,7 +309,7 @@ mod tests {
                 }
                 _ => None,
             })
-            .unwrap();
+            .ok_or("expected Some")?;
         out.textures_delta.clear();
         let mut out = ctx.run_ui(
             egui::RawInput {
@@ -331,7 +334,8 @@ mod tests {
         );
         out.textures_delta.clear();
         assert!(acts.iter().any(|a|matches!(a,Action::OpenPinnedFileLine(s)if s.commit==hash&&s.path=="file"&&s.line==5)));
-        state.hunk.as_mut().unwrap().commit = "b".repeat(40);
+        state.hunk.as_mut().ok_or("expected Some")?.commit = "b".repeat(40);
         assert!(matches(&state).is_empty());
+        Ok(())
     }
 }

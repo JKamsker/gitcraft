@@ -131,6 +131,7 @@ fn object(
 }
 pub(crate) fn redact(text: &str) -> String {
     static RE: OnceLock<regex::Regex> = OnceLock::new();
+    #[expect(clippy::expect_used, reason = "This fixed credential regex is validated by the pure redaction tests; preserve fail-closed initialization semantics")]
     let re=RE.get_or_init(||regex::Regex::new(r#"(?i)(?:password|passwd|secret|api[_-]?key|access[_-]?token|auth[_-]?token|authorization)\s*[:= ]\s*[\"']?\S{8,}|(?:ghp_|github_pat_|glpat-|sk-|sk_live_|xox[baprs]-|AKIA|AIza)[a-zA-Z0-9_\-]{12,}|[a-zA-Z0-9+/_=-]{48,}|[a-z][a-z0-9+.-]*://[^ /\s]+:[^ /\s]+@"#).expect("fixed credential pattern"));
     let mut private = false;
     let mut result = String::new();

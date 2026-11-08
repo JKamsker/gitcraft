@@ -342,14 +342,12 @@ fn parse_versions(input: &str) -> BTreeMap<String, String> {
             if let Some(version) = value
                 .strip_prefix(prefix)
                 .and_then(|s| s.split_ascii_whitespace().next())
+                && version.starts_with(|c: char| c.is_ascii_digit())
+                && version
+                    .bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || b".+-".contains(&b))
             {
-                if version.starts_with(|c: char| c.is_ascii_digit())
-                    && version
-                        .bytes()
-                        .all(|b| b.is_ascii_alphanumeric() || b".+-".contains(&b))
-                {
-                    result.insert(tool.into(), format!("{prefix}{version}"));
-                }
+                result.insert(tool.into(), format!("{prefix}{version}"));
             }
         }
     }
@@ -360,9 +358,11 @@ const TOOL_ALIAS: &str = "alias.gitcraft-machine-tools=!f() { for tool in git py
 mod tests {
     use super::*;
     #[test]
-    fn recording_collector_uses_fixed_queries_and_excludes_raw_command_and_versions_suffix() {
-        fn collect(flag: &str) -> MachineFacts {
-            collect_facts(Path::new("/synthetic/repo"), |args| {
+    fn recording_collector_uses_fixed_queries_and_excludes_raw_command_and_versions_suffix()
+    -> Result<(), String> {
+        fn collect(flag: &str) -> Result<MachineFacts, String> {
+            let mut unexpected = Vec::new();
+            let result = collect_facts(Path::new("/synthetic/repo"), |args| {
                 Ok(match args {
                     ["rev-parse", "--verify", "HEAD"] => format!("{}\n", "a".repeat(40)),
                     ["rev-parse", "--verify", "HEAD^{tree}"] => format!("{}\n", "b".repeat(40)),
@@ -399,21 +399,29 @@ mod tests {
                         "--format=%(objectname)",
                         "refs/notes/tests/default",
                     ] => String::new(),
-                    _ => panic!("Unexpected collector command: {args:?}"),
+                    _ => {
+                        unexpected.push(format!("{args:?}"));
+                        return Err(format!("Unexpected collector command: {args:?}"));
+                    }
                 }
                 .into_bytes())
-            })
-            .unwrap()
+            });
+            assert!(
+                unexpected.is_empty(),
+                "Unexpected collector commands: {unexpected:?}"
+            );
+            result
         }
-        let facts = collect("H");
+        let facts = collect("H")?;
         assert!(facts.clean);
         assert_eq!(facts.files[0].endings, "i/lf w/crlf attr/");
         assert_eq!(facts.versions["git"], "git version 2.50.1");
         assert!(facts.stored_test.is_none());
-        let json = serde_json::to_string(&facts).unwrap();
+        let json = serde_json::to_string(&facts).map_err(|error| error.to_string())?;
         assert!(!json.contains("secret-"));
-        assert!(!collect("h").clean); // assume-unchanged is not a verified checkout.
-        assert!(!collect("S").clean); // sparse/skip-worktree is not a verified checkout.
+        assert!(!collect("h")?.clean); // assume-unchanged is not a verified checkout.
+        assert!(!collect("S")?.clean); // sparse/skip-worktree is not a verified checkout.
+        Ok(())
     }
     fn sample() -> MachineFacts {
         MachineFacts {
@@ -453,7 +461,7 @@ mod tests {
         assert_eq!(compare_machine_content(&a, &b), ContentComparison::Changed);
     }
     #[test]
-    fn recording_index_comparison_keeps_modes_and_case_distinctions() {
+    fn recording_index_comparison_keeps_modes_and_case_distinctions() -> Result<(), String> {
         let files = parse_index(
             format!(
                 "100755 {} 0\tFile\0100644 {} 0\tfile\0",
@@ -462,13 +470,14 @@ mod tests {
             )
             .as_bytes(),
         )
-        .unwrap();
+        .map_err(|error| error.to_string())?;
         assert_eq!(files.len(), 2);
         assert_eq!(files[0].mode, "100755");
         assert_eq!(files[1].path, "file");
         assert!(parse_index(b"malformed\0").is_err());
         assert!(link_path("//wsl.localhost/Ubuntu/home/me/repo").is_ok());
         assert!(link_path("ssh://host/path\ncredential").is_err());
+        Ok(())
     }
     #[test]
     fn recording_machine_facts_never_admit_credentials_or_unknown_settings() {

@@ -394,7 +394,8 @@ mod tests {
         vec![args.iter().map(|s| (*s).into()).collect()]
     }
     #[test]
-    fn merge_pure_reviewed_echo_uses_exact_source_and_retains_dispatch_authorization() {
+    fn merge_pure_reviewed_echo_uses_exact_source_and_retains_dispatch_authorization()
+    -> Result<(), String> {
         let approved = vec![crate::push_preflight::APPROVED.into(), "prepared-id".into()];
         let original = vec![
             "push".into(),
@@ -403,11 +404,11 @@ mod tests {
             "original-remote".into(),
             format!("{}:refs/heads/main", "a".repeat(40)),
         ];
-        let evidence = evidence_steps(&[approved.clone()], |id| {
+        let evidence = evidence_steps(std::slice::from_ref(&approved), |id| {
             assert_eq!(id, "prepared-id");
             Ok(original.clone())
         })
-        .unwrap();
+        .map_err(|error| error.to_string())?;
         assert_eq!(evidence, [original]);
         let bound = bind_step(
             &approved,
@@ -415,13 +416,20 @@ mod tests {
         );
         assert_eq!(&bound[..2], approved);
         assert_eq!(&bound[2..], ["-c", "gitcraft.commandSource=retained"]);
-        assert!(contains_push(&[bound.clone()]));
+        assert!(contains_push(std::slice::from_ref(&bound)));
+        let looked_up = std::cell::Cell::new(false);
         assert!(
-            evidence_steps(&[bound], |_| panic!(
-                "must refuse nested evidence before lookup"
-            ))
+            evidence_steps(&[bound], |_| {
+                looked_up.set(true);
+                Err("must refuse nested evidence before lookup".into())
+            })
             .is_err()
         );
+        assert!(
+            !looked_up.get(),
+            "must refuse nested evidence before lookup"
+        );
+        Ok(())
     }
     #[test]
     fn r2_pure_echo_rejects_git_context_prefixes_and_retains_lease_options() {

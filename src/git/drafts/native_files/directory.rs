@@ -216,30 +216,6 @@ impl Directory {
             std::fs::hard_link(self.path.join(name), to.path.join(dest))
         }
     }
-    pub fn remove_file(&self, name: &OsStr) -> io::Result<()> {
-        check_name(name)?;
-        #[cfg(unix)]
-        {
-            rustix::fs::unlinkat(self.handle.as_file(), name, rustix::fs::AtFlags::empty())?;
-            Ok(())
-        }
-        #[cfg(not(unix))]
-        {
-            std::fs::remove_file(self.path.join(name))
-        }
-    }
-    pub fn remove_child(&self, name: &OsStr) -> io::Result<()> {
-        check_name(name)?;
-        #[cfg(unix)]
-        {
-            rustix::fs::unlinkat(self.handle.as_file(), name, rustix::fs::AtFlags::REMOVEDIR)?;
-            Ok(())
-        }
-        #[cfg(not(unix))]
-        {
-            std::fs::remove_dir(self.path.join(name))
-        }
-    }
 }
 fn check_name(name: &OsStr) -> io::Result<()> {
     let mut components = Path::new(name).components();

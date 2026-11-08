@@ -665,7 +665,8 @@ mod tests {
 mod lifecycle_tests {
     use super::*;
     #[test]
-    fn pure_bakeoff_unavailable_and_running_cells_offer_explicit_fresh_workspace_retry() {
+    fn pure_bakeoff_unavailable_and_running_cells_offer_explicit_fresh_workspace_retry()
+    -> Result<(), String> {
         for built in [Built::Unavailable, Built::Running] {
             let ctx = egui::Context::default();
             let mut act = None;
@@ -689,7 +690,8 @@ mod lifecycle_tests {
                 _ => None,
             });
             output.textures_delta.clear();
-            let position = position.expect("retry remains reachable without a completion receipt");
+            let position =
+                position.ok_or("retry remains reachable without a completion receipt")?;
             let mut output = ctx.run_ui(
                 egui::RawInput {
                     events: vec![
@@ -717,5 +719,6 @@ mod lifecycle_tests {
             output.textures_delta.clear();
             assert!(matches!(act, Some(BakeAct::Build(0))));
         }
+        Ok(())
     }
 }

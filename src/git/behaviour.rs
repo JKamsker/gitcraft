@@ -77,13 +77,14 @@ fn parse(bytes: &[u8]) -> Result<Vec<BehaviourCommit>, String> {
 mod tests {
     use super::*;
     #[test]
-    fn recording_timeline_metadata_requires_pinned_complete_identities() {
+    fn recording_timeline_metadata_requires_pinned_complete_identities() -> Result<(), String> {
         let one = format!("{}\t{}\tfirst\n", "a".repeat(40), "b".repeat(40));
-        let frames = parse(one.as_bytes()).unwrap();
+        let frames = parse(one.as_bytes()).map_err(|error| error.to_string())?;
         assert_eq!(frames[0].summary, "first");
         assert_eq!(frames[0].tree, "b".repeat(40));
         assert!(parse(b"short\tshort\tsubject").is_err());
         assert!(parse(one.repeat(33).as_bytes()).is_err());
         assert!(parse(b"").is_err());
+        Ok(())
     }
 }

@@ -12,42 +12,6 @@ pub(crate) struct AccessMetadata {
     #[cfg(windows)]
     descriptor: Vec<u8>,
 }
-impl AccessMetadata {
-    pub fn replacement_matches(&self, original: &Self) -> bool {
-        #[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
-        {
-            fn retained(name: &[u8]) -> bool {
-                !matches!(
-                    name,
-                    b"security.capability" | b"security.ima" | b"security.evm"
-                )
-            }
-            #[cfg(target_os = "macos")]
-            if self.acl != original.acl {
-                return false;
-            }
-            self.entries.iter().all(|(name, _)| retained(name))
-                && self
-                    .entries
-                    .iter()
-                    .eq(original.entries.iter().filter(|(name, _)| retained(name)))
-        }
-        #[cfg(windows)]
-        {
-            self == original
-        }
-        #[cfg(not(any(
-            target_os = "linux",
-            target_os = "android",
-            target_os = "macos",
-            windows
-        )))]
-        {
-            let _ = original;
-            false
-        }
-    }
-}
 
 pub(crate) fn read(file: &File, path: &Path) -> Result<AccessMetadata, String> {
     #[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]

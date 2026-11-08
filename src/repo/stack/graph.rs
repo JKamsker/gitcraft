@@ -115,7 +115,7 @@ mod tests {
     use crate::git::{Branch, stack::Layer};
 
     #[test]
-    fn graph_dependency_edges_keep_shared_tips_and_stale_layers_visible() {
+    fn graph_dependency_edges_keep_shared_tips_and_stale_layers_visible() -> Result<(), String> {
         let ctx = egui::Context::default();
         let mut tab = RepoTab::new_deferred("/nonexistent/stack-graph".into(), &ctx);
         for (branch, parent, behind) in [
@@ -166,7 +166,7 @@ mod tests {
                 clicked = Some(t.pos + t.galley.size() / 2.0);
             }
         }
-        let pos = clicked.expect("ui link is painted despite shared tip");
+        let pos = clicked.ok_or("ui link is painted despite shared tip")?;
         let input = egui::RawInput {
             events: vec![
                 egui::Event::PointerMoved(pos),
@@ -192,5 +192,6 @@ mod tests {
             acts.iter()
                 .any(|a| matches!(a, Action::SelectHash(h) if h == "same-tip"))
         );
+        Ok(())
     }
 }

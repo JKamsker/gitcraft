@@ -54,13 +54,13 @@ fn click(pos: egui::Pos2) -> Vec<egui::Event> {
     ]
 }
 #[test]
-fn subtree_pure_headless_acceptance_and_conflict_routes_are_reachable() {
+fn subtree_pure_headless_acceptance_and_conflict_routes_are_reachable() -> Result<(), String> {
     let ctx = egui::Context::default();
     let mut s = state(logic::View::subtree_test_view());
     let mut acts = vec![];
     let mut out = frame(&ctx, &mut s, &mut acts, vec![]);
     let pos =
-        text_pos(&out, "Accept this subtree update").expect("reviewed Ready import acceptance");
+        text_pos(&out, "Accept this subtree update").ok_or("reviewed Ready import acceptance")?;
     assert!(text_pos(&out, "Fetch registered branch").is_some());
     assert!(text_pos(&out, "Split committed folder history").is_some());
     out.textures_delta.clear();
@@ -76,9 +76,11 @@ fn subtree_pure_headless_acceptance_and_conflict_routes_are_reachable() {
     assert!(text_pos(&out, "Continue / inspect resolved candidate").is_some());
     assert!(text_pos(&out, "Accept this subtree update").is_none());
     out.textures_delta.clear();
+    Ok(())
 }
 #[test]
-fn subtree_pure_headless_split_requires_renewed_approval_and_pins_connection() {
+fn subtree_pure_headless_split_requires_renewed_approval_and_pins_connection() -> Result<(), String>
+{
     let ctx = egui::Context::default();
     let mut v = logic::View::subtree_test_view();
     v.state.candidates[0].kind = logic::Kind::Split;
@@ -86,18 +88,21 @@ fn subtree_pure_headless_split_requires_renewed_approval_and_pins_connection() {
     let mut s = state(v);
     let mut acts = vec![];
     let mut out = frame(&ctx, &mut s, &mut acts, vec![]);
-    let pos =
-        text_pos(&out, "Prepare a renewed publication review").expect("renewed publication route");
+    let pos = text_pos(&out, "Prepare a renewed publication review")
+        .ok_or("renewed publication route")?;
     out.textures_delta.clear();
     let mut out = frame(&ctx, &mut s, &mut acts, click(pos));
     out.textures_delta.clear();
     assert!(acts.iter().any(|a|matches!(a,Action::RepositoryTools(Act::SubtreePreparePush(_,id,true)) if id=="attempt-1")));
     let profile = crate::settings::profiles::UserProfile::default();
-    let mut context = crate::connections::Context::default();
-    context.choices = profile.connections.clone();
+    let context = crate::connections::Context {
+        choices: profile.connections.clone(),
+        ..Default::default()
+    };
     assert!(selection(&context, &profile, 7, &context, &profile, 7));
     assert!(!selection(&context, &profile, 7, &context, &profile, 8));
     let mut changed = profile.clone();
     changed.id = profile.id + 1;
     assert!(!selection(&context, &profile, 7, &context, &changed, 7));
+    Ok(())
 }

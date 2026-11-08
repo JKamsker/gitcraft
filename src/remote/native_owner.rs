@@ -212,17 +212,11 @@ impl Endpoint {
         }
         self.terminal().map(|_| ())
     }
-    pub(crate) fn retire(&self) -> Result<(), String> {
-        if !self.valid() {
-            return Err("invalid native endpoint".into());
-        }
-        gitcraft_os::retire_private_receipt(&self.path, |bytes| self.confirms(bytes))
-            .map_err(|e| e.to_string())
-    }
 }
 
 /// Start only the packaged helper; Command remains private until all safeguards are set.
 /// Capturing get_envs is specific to git's local_command, which never uses env_clear.
+#[cfg(test)]
 pub(crate) fn command(
     command: Command,
     record: &Path,

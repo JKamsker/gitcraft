@@ -76,10 +76,15 @@ mod tests {
         ])?;
         let result = super::super::call(&ATTRIBUTION, &ctx, &serde_json::Map::new())?;
         assert_eq!(result["who"], "mixed");
-        assert!(result["source"].as_str().unwrap().contains("trailer"));
+        assert!(
+            result["source"]
+                .as_str()
+                .ok_or("expected Some")?
+                .contains("trailer")
+        );
         let args = json!({"commit":oid});
         assert_eq!(
-            super::super::call(&ATTRIBUTION, &ctx, args.as_object().unwrap())?["who"],
+            super::super::call(&ATTRIBUTION, &ctx, args.as_object().ok_or("expected Some")?)?["who"],
             "unknown"
         );
         Ok(())

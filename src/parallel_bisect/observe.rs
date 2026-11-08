@@ -322,7 +322,7 @@ mod tests {
         assert_eq!(repeated(before, after), Observation::Inconsistent);
     }
     #[test]
-    fn recording_cache_is_bounded_and_keyed_by_copy_tree_command_and_mode() {
+    fn recording_cache_is_bounded_and_keyed_by_copy_tree_command_and_mode() -> Result<(), String> {
         let cache = Cache::default();
         let k = key();
         cache.put(k.clone(), Observation::Inconsistent);
@@ -350,7 +350,7 @@ mod tests {
             cache
                 .0
                 .lock()
-                .unwrap()
+                .map_err(|error| error.to_string())?
                 .iter()
                 .map(|(_, v)| v.bytes())
                 .sum::<usize>()
@@ -358,13 +358,14 @@ mod tests {
         );
         cache.clear();
         assert!(cache.get(&k).is_none());
+        Ok(())
     }
     #[test]
-    fn recording_output_and_cleanup_errors_remain_errors() {
+    fn recording_output_and_cleanup_errors_remain_errors() -> Result<(), String> {
         assert!(parse(Mode::Number, b"NaN").is_err());
         assert!(parse(Mode::Number, b"1 2").is_err());
         assert_eq!(
-            parse(Mode::Number, b" 1.25\n").unwrap(),
+            parse(Mode::Number, b" 1.25\n").map_err(|error| error.to_string())?,
             Value::Number(1.25)
         );
         assert!(parse(Mode::Text, &[255]).is_err());
@@ -374,21 +375,23 @@ mod tests {
             Err("primary ownership error".into()),
             Err("cleanup error".into()),
         )
-        .unwrap_err();
+        .err()
+        .ok_or("expected an error")?;
         assert!(error.contains("primary ownership error") && error.contains("cleanup error"));
         assert!(finish(Ok(Observation::Inconsistent), Err("cleanup failed".into())).is_err());
+        Ok(())
     }
     #[test]
-    fn recording_png_frames_compare_pixels_and_refuse_oversized_dimensions() {
+    fn recording_png_frames_compare_pixels_and_refuse_oversized_dimensions() -> Result<(), String> {
         use image::ImageEncoder;
-        fn png(width: u32, rgba: &[u8]) -> Vec<u8> {
+        fn png(width: u32, rgba: &[u8]) -> Result<Vec<u8>, String> {
             let mut bytes = Vec::new();
             image::codecs::png::PngEncoder::new(&mut bytes)
                 .write_image(rgba, width, 1, image::ExtendedColorType::Rgba8)
-                .unwrap();
-            bytes
+                .map_err(|error| error.to_string())?;
+            Ok(bytes)
         }
-        let a = parse(Mode::Png, &png(1, &[1, 2, 3, 255])).unwrap();
+        let a = parse(Mode::Png, &png(1, &[1, 2, 3, 255])?).map_err(|error| error.to_string())?;
         assert_eq!(
             a,
             Value::Png {
@@ -401,6 +404,7 @@ mod tests {
             repeated(a.clone(), a.clone()),
             Observation::Stable(a.into())
         );
-        assert!(parse(Mode::Png, &png(1025, &vec![0; 1025 * 4])).is_err());
+        assert!(parse(Mode::Png, &png(1025, &vec![0; 1025 * 4])?).is_err());
+        Ok(())
     }
 }

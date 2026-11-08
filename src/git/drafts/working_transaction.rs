@@ -54,8 +54,7 @@ fn replacement_needed(
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 fn native_apply(
     repo: &Path,
-    before: &Contents,
-    after: &Contents,
+    (before, after): (&Contents, &Contents),
     policies: &Policies,
     check: &dyn Fn() -> Result<(), String>,
     commit: &dyn Fn(&str) -> Result<CommitOutcome, String>,
@@ -176,8 +175,7 @@ pub(super) fn apply(
 ) -> Result<String, String> {
     apply_with_commit(
         repo,
-        before,
-        after,
+        (before, after),
         policies,
         check,
         &|_| Ok(CommitOutcome::Committed),
@@ -187,8 +185,7 @@ pub(super) fn apply(
 }
 pub(super) fn apply_with_commit(
     repo: &Path,
-    before: &Contents,
-    after: &Contents,
+    (before, after): (&Contents, &Contents),
     policies: &Policies,
     check: &dyn Fn() -> Result<(), String>,
     commit: &dyn Fn(&str) -> Result<CommitOutcome, String>,
@@ -199,8 +196,7 @@ pub(super) fn apply_with_commit(
     {
         native_apply(
             repo,
-            before,
-            after,
+            (before, after),
             policies,
             check,
             commit,
@@ -227,28 +223,30 @@ pub(super) fn apply_with_commit(
 #[cfg(test)]
 mod policy_noop_tests {
     use super::*;
-    fn policy(platform: &str, gid: u32) -> native_files::Policy {
+    fn policy(platform: &str, gid: u32) -> Result<native_files::Policy, String> {
         let mut value = serde_json::json!({"platform":platform,"mode":384,"uid":1,"gid":gid,"access":{"entries":[]}});
         #[cfg(target_os = "macos")]
         {
             value["access"]["acl"] = serde_json::json!([]);
         }
-        serde_json::from_value(value).unwrap()
+        serde_json::from_value(value).map_err(|error| error.to_string())
     }
     #[test]
     fn pure_native_equal_contents_still_require_supported_saved_policy_and_restore_policy_changes()
-    {
+    -> Result<(), String> {
         let target = Some(("100644".into(), b"same bytes".to_vec()));
-        let current: Policies = [("f".into(), policy(std::env::consts::OS, 10))].into();
-        let saved: Policies = [("f".into(), policy(std::env::consts::OS, 20))].into();
-        let desired = intended_policy("f", &target, &current, Some(&saved)).unwrap();
+        let current: Policies = [("f".into(), policy(std::env::consts::OS, 10)?)].into();
+        let saved: Policies = [("f".into(), policy(std::env::consts::OS, 20)?)].into();
+        let desired = intended_policy("f", &target, &current, Some(&saved))
+            .map_err(|error| error.to_string())?;
         assert!(replacement_needed(
             &target,
             &target,
             current.get("f"),
             desired.as_ref()
         ));
-        let equal = intended_policy("f", &target, &current, Some(&current)).unwrap();
+        let equal = intended_policy("f", &target, &current, Some(&current))
+            .map_err(|error| error.to_string())?;
         assert!(!replacement_needed(
             &target,
             &target,
@@ -258,12 +256,14 @@ mod policy_noop_tests {
         let missing = Policies::new();
         assert!(
             intended_policy("f", &target, &current, Some(&missing))
-                .unwrap_err()
+                .err()
+                .ok_or("expected an error")?
                 .contains("no saved full access policy")
         );
-        let unsupported: Policies = [("f".into(), policy("unsupported", 20))].into();
+        let unsupported: Policies = [("f".into(), policy("unsupported", 20)?)].into();
         assert!(intended_policy("f", &target, &current, Some(&unsupported)).is_err());
         // Metadata publication happens only after this required policy planning.
         // No filesystem/Git adapter is called by these equal-content regressions.
+        Ok(())
     }
 }

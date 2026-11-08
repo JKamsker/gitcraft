@@ -1142,7 +1142,8 @@ pub(crate) mod tests {
         }
     }
     #[test]
-    fn pure_deferred_ownership_requires_exact_repository_registration_and_backlink() {
+    fn pure_deferred_ownership_requires_exact_repository_registration_and_backlink()
+    -> Result<(), String> {
         let v = view();
         let s = &v.jobs.jobs[0].steps[0];
         let gd = v.common.join("worktrees/step-0");
@@ -1155,7 +1156,7 @@ pub(crate) mod tests {
                 gitfile.as_bytes(),
                 backlink.as_bytes()
             )
-            .unwrap(),
+            .map_err(|error| error.to_string())?,
             gd
         );
         for foreign in [
@@ -1177,6 +1178,7 @@ pub(crate) mod tests {
         assert!(
             ownership_paths(&v.common, &s.worktree, gitfile.as_bytes(), b"/other/.git\n").is_err()
         );
+        Ok(())
     }
     #[test]
     fn pure_deferred_metadata_refuses_unowned_paths_receipt_gaps_duplicate_layers_and_forward_parents()
@@ -1243,7 +1245,8 @@ pub(crate) mod tests {
         assert!(acceptance_allowed(&j, true).is_ok());
     }
     #[test]
-    fn pure_deferred_recording_enters_verified_cwd_before_git_and_keeps_paths_as_argv() {
+    fn pure_deferred_recording_enters_verified_cwd_before_git_and_keeps_paths_as_argv()
+    -> Result<(), String> {
         let mut v = view();
         let s = &mut v.jobs.jobs[0].steps[0];
         s.worktree = PathBuf::from("/private/synthetic/space ; $(not-executed)");
@@ -1256,7 +1259,8 @@ pub(crate) mod tests {
             link_identity: "2:35".into(),
             link_text: format!("gitdir: {}", metadata.display()),
         };
-        let command = owned_command(s, &binding, &binding, &["rebase", "--continue"]).unwrap();
+        let command = owned_command(s, &binding, &binding, &["rebase", "--continue"])
+            .map_err(|error| error.to_string())?;
         let shared = owned_command_at(
             &s.worktree,
             s.root_identity.as_deref(),
@@ -1264,13 +1268,13 @@ pub(crate) mod tests {
             &binding,
             &["rebase", "--continue"],
         )
-        .unwrap();
+        .map_err(|error| error.to_string())?;
         assert_eq!(
             command, shared,
             "concrete subtree adapter preserves the existing command contract"
         );
         assert_eq!(command[3], "1:32");
-        assert_eq!(command[4], s.worktree.to_str().unwrap());
+        assert_eq!(command[4], s.worktree.to_str().ok_or("expected Some")?);
         assert_eq!(&command[11..], ["rebase", "--continue"]);
         assert!(!command[1].contains("not-executed"));
         // Recording only: substitute the second observed link/registration without
@@ -1290,7 +1294,9 @@ pub(crate) mod tests {
             }
             assert!(dispatched.is_empty());
         }
-        let dispatch = OWNED_ALIAS.find("GIT_COMMON_DIR=/dev/fd/8 git").unwrap();
+        let dispatch = OWNED_ALIAS
+            .find("GIT_COMMON_DIR=/dev/fd/8 git")
+            .ok_or("expected Some")?;
         for guard in [
             "token .",
             "token /dev/fd/6",
@@ -1298,11 +1304,12 @@ pub(crate) mod tests {
             "token /dev/fd/7",
             "token /dev/fd/8",
         ] {
-            assert!(OWNED_ALIAS.find(guard).unwrap() < dispatch);
+            assert!(OWNED_ALIAS.find(guard).ok_or("expected Some")? < dispatch);
         }
         assert!(OWNED_ALIAS.contains("--git-dir=/dev/fd/7 --work-tree=."));
         assert!(!OWNED_ALIAS.contains("--git-dir=\"$metadata\""));
         assert!(!OWNED_ALIAS.contains("eval"));
+        Ok(())
     }
 }
 

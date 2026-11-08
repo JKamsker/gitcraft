@@ -448,6 +448,7 @@ pub fn clear_leftovers(repo: &Path) {
 }
 
 /// The folder for bisecting in `repo` (on `machine`): as the app names it, and as a path there.
+#[cfg(test)]
 pub fn base_for(repo: &Path, machine: &Machine) -> Result<(PathBuf, String), String> {
     let there = format!("{}/gitcraft-bisect-work", canonical_common(repo)?);
     Ok((machine.path(&there), there))

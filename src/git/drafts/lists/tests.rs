@@ -185,30 +185,34 @@ fn stale_list_preview_and_index_locks_fail_without_ref_or_file_changes() -> Resu
 }
 
 #[test]
-fn pure_state_snapshot_budget_stops_before_fifth_eight_mib_read_without_allocating_payloads() {
-    let mut b = SnapshotBudget::from_sizes([]).unwrap();
+fn pure_state_snapshot_budget_stops_before_fifth_eight_mib_read_without_allocating_payloads()
+-> Result<(), String> {
+    let mut b = SnapshotBudget::from_sizes([]).map_err(|error| error.to_string())?;
     let mut requested = Vec::new();
     for _ in 0..2000 {
         let Ok(allowance) = b.allowance() else {
             break;
         };
         requested.push(allowance);
-        b.retain(FILE_LIMIT).unwrap();
+        b.retain(FILE_LIMIT).map_err(|error| error.to_string())?;
     }
     assert_eq!(requested, vec![FILE_LIMIT; 4]);
     assert!(b.allowance().is_err());
     assert!(SnapshotBudget::from_sizes([usize::MAX, 1]).is_err());
-    let mut b = SnapshotBudget::from_sizes([TOTAL_LIMIT - 17]).unwrap();
-    assert_eq!(b.allowance().unwrap(), 17);
+    let mut b =
+        SnapshotBudget::from_sizes([TOTAL_LIMIT - 17]).map_err(|error| error.to_string())?;
+    assert_eq!(b.allowance().map_err(|error| error.to_string())?, 17);
     assert!(b.retain(18).is_err());
-    assert_eq!(b.allowance().unwrap(), 17);
-    b.retain(17).unwrap();
+    assert_eq!(b.allowance().map_err(|error| error.to_string())?, 17);
+    b.retain(17).map_err(|error| error.to_string())?;
     assert!(b.allowance().is_err());
     assert!(SnapshotBudget::from_sizes([TOTAL_LIMIT + 1]).is_err());
+    Ok(())
 }
 
 #[test]
-fn pure_state_unshelve_refuses_another_active_owner_before_restoring_contents() {
+fn pure_state_unshelve_refuses_another_active_owner_before_restoring_contents() -> Result<(), String>
+{
     let shelf = Shelf {
         access: BTreeMap::new(),
         permissions: BTreeMap::new(),
@@ -233,7 +237,9 @@ fn pure_state_unshelve_refuses_another_active_owner_before_restoring_contents() 
     let mut lists = Lists {
         lists: vec![a.clone(), b],
     };
-    let error = require_restore_ownership(&lists, &a).unwrap_err();
+    let error = require_restore_ownership(&lists, &a)
+        .err()
+        .ok_or("expected an error")?;
     assert!(error.contains("active changelist B"));
     assert!(lists.lists[0].shelf.is_some());
     assert!(lists.lists[1].paths.contains("f"));
@@ -243,6 +249,7 @@ fn pure_state_unshelve_refuses_another_active_owner_before_restoring_contents() 
     lists.lists[1].paths.insert("f".into());
     lists.lists[1].shelf = Some(shelf);
     assert!(require_restore_ownership(&lists, &a).is_ok());
+    Ok(())
 }
 
 #[test]
@@ -291,7 +298,8 @@ fn changelist_commit_preserves_unselected_intent_to_add_flag() -> Result<(), Str
 }
 
 #[test]
-fn pure_state_direct_ref_prepared_guard_covers_state_and_late_symbolic_destination() {
+fn pure_state_direct_ref_prepared_guard_covers_state_and_late_symbolic_destination()
+-> Result<(), String> {
     let refs = ["refs/gitcraft/changelists/work/state", "refs/heads/alpha"];
     let script = direct_ref_guard(refs);
     for reference in refs {
@@ -319,7 +327,7 @@ fn pure_state_direct_ref_prepared_guard_covers_state_and_late_symbolic_destinati
             continue;
         }
         if line.starts_with("update ") || line.starts_with("verify ") {
-            let reference = line.split_whitespace().nth(1).unwrap();
+            let reference = line.split_whitespace().nth(1).ok_or("expected Some")?;
             commands.push((reference, direct_next));
             direct_next = false;
         }
@@ -334,4 +342,5 @@ fn pure_state_direct_ref_prepared_guard_covers_state_and_late_symbolic_destinati
         ]
     );
     assert!(!tx.contains("refs/heads/victim"));
+    Ok(())
 }

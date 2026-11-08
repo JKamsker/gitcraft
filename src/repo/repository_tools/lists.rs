@@ -38,13 +38,13 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
     ui.horizontal(|ui| {
         ui.label("New list:");
         ui.text_edit_singleline(&mut state.query);
-        if ui.button("Create").clicked() {
-            if let Some(Ok(Data::Lists(v))) = &state.result {
-                acts.push(Action::RepositoryTools(Act::EditList(
-                    Box::new(v.clone()),
-                    logic::Edit::Create(state.query.clone(), String::new()),
-                )));
-            }
+        if ui.button("Create").clicked()
+            && let Some(Ok(Data::Lists(v))) = &state.result
+        {
+            acts.push(Action::RepositoryTools(Act::EditList(
+                Box::new(v.clone()),
+                logic::Edit::Create(state.query.clone(), String::new()),
+            )));
         }
     });
     if ui.button("Inspect state publication receipts").clicked() {

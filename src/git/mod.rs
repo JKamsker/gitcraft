@@ -186,6 +186,7 @@ fn not_an_option(rev: &str) -> Result<&str, String> {
 /// Clones `url` into `dest` (a folder of this machine or another one), followed through
 /// `control`: its progress reported there, and stopped on a cancel. A clone stopped so leaves
 /// no folder behind that wasn't there before.
+#[cfg(test)]
 pub fn clone(
     url: &str,
     dest: &Path,
