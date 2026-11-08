@@ -96,6 +96,10 @@ impl PartialEq for Snapshot {
 }
 impl Eq for Snapshot {}
 impl Snapshot {
+    #[cfg(unix)]
+    pub(super) fn identity_token(&self) -> Result<String, String> {
+        crate::git::recovery::native_file_identity(self.identity.as_file()).map(|id| id.0)
+    }
     pub(super) fn read(dir: &Directory, name: &str, limit: usize) -> Result<Option<Self>, String> {
         let file = match dir.read(OsStr::new(name)) {
             Ok(file) => file,

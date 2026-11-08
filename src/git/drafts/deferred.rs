@@ -314,14 +314,45 @@ fn safe_dir(path: &Path) -> Result<(), String> {
         Err(e) => Err(e.to_string()),
     }
 }
-// The fixed shell first enters and verifies the directory; Git inherits that cwd.
-// Renaming/replacing its old pathname afterwards cannot redirect relative work-tree
-// writes. Immutable argv supplies the previously checked source registration, so a
-// replaced candidate .git file cannot redirect Git into another repository.
-const OWNED_ALIAS: &str = r#"alias.gitcraft-owned-replay=!f() { pin=$1; path=$2; metadata=$3; shift 3; cd -P -- "$path" || exit 1; actual=$(LC_ALL=C stat -c '%d:%i' . 2>/dev/null || LC_ALL=C stat -f '%d:%i' .) || exit 1; [ "$actual" = "$pin" ] || exit 1; git --no-lazy-fetch --git-dir="$metadata" --work-tree=. "$@"; }; f"#;
-fn owned_command(s: &Step, metadata: &Path, args: &[&str]) -> Result<Vec<String>, String> {
+// Separate argv carries one validated metadata observation. The child captures
+// directory descriptors and verifies them against retained native handles before
+// dispatch. Git uses those descriptors; neither .git nor commondir is reparsed.
+const OWNED_ALIAS: &str = r#"alias.gitcraft-owned-replay=!f() { pin=$1; path=$2; metadata=$3; mpin=$4; common=$5; cpin=$6; lpin=$7; link=$8; shift 8; token() { LC_ALL=C stat -L -c '%d:%i' "$1" 2>/dev/null || LC_ALL=C stat -L -f '%d:%i' "$1"; }; cd -P -- "$path" || exit 1; [ "$(token .)" = "$pin" ] || exit 1; exec 6<.git || exit 1; [ "$(token /dev/fd/6)" = "$lpin" ] || exit 1; [ "$(cat /dev/fd/6)" = "$link" ] || exit 1; exec 7<"$metadata" || exit 1; [ "$(token /dev/fd/7)" = "$mpin" ] || exit 1; exec 8<"$common" || exit 1; [ "$(token /dev/fd/8)" = "$cpin" ] || exit 1; GIT_COMMON_DIR=/dev/fd/8 git --no-lazy-fetch --git-dir=/dev/fd/7 --work-tree=. "$@"; }; f"#;
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct DispatchBinding {
+    metadata: PathBuf,
+    metadata_identity: String,
+    common: PathBuf,
+    common_identity: String,
+    link_identity: String,
+    link_text: String,
+}
+struct Ownership {
+    binding: DispatchBinding,
+    root: native_files::Directory,
+    metadata: native_files::Directory,
+    common: native_files::Directory,
+    link: native_files::Snapshot,
+}
+impl Ownership {
+    fn unchanged(&self) -> bool {
+        self.root.unchanged()
+            && self.metadata.unchanged()
+            && self.common.unchanged()
+            && self.link.same_at(&self.root, ".git")
+    }
+}
+fn owned_command(
+    s: &Step,
+    binding: &DispatchBinding,
+    observed: &DispatchBinding,
+    args: &[&str],
+) -> Result<Vec<String>, String> {
     if !cfg!(unix) {
-        return Err("Deferred replay requires proven native Unix cwd ownership; no replay was dispatched on this platform".into());
+        return Err("Deferred replay requires native Unix descriptor ownership; no replay was dispatched on this platform".into());
+    }
+    if binding != observed {
+        return Err("Deferred metadata/link identity changed; no replay was dispatched".into());
     }
     let pin = s
         .root_identity
@@ -333,7 +364,15 @@ fn owned_command(s: &Step, metadata: &Path, args: &[&str]) -> Result<Vec<String>
         "gitcraft-owned-replay",
         pin,
         s.worktree.to_str().ok_or("Worktree path must be UTF-8")?,
-        metadata.to_str().ok_or("Metadata path must be UTF-8")?,
+        binding
+            .metadata
+            .to_str()
+            .ok_or("Metadata path must be UTF-8")?,
+        &binding.metadata_identity,
+        binding.common.to_str().ok_or("Common path must be UTF-8")?,
+        &binding.common_identity,
+        &binding.link_identity,
+        &binding.link_text,
     ]
     .into_iter()
     .chain(args.iter().copied())
@@ -341,21 +380,22 @@ fn owned_command(s: &Step, metadata: &Path, args: &[&str]) -> Result<Vec<String>
     .collect())
 }
 fn owned_run(r: &Runner<'_>, common: &Path, s: &Step, args: &[&str]) -> Result<String, String> {
-    owned(r.repo, common, s)?;
-    let gitfile = crate::safe_read::read_inside(&s.worktree, ".git", 8192)
-        .ok_or("Candidate Git link changed")?;
-    let gd = std::str::from_utf8(&gitfile)
-        .map_err(|_| "Invalid Git link")?
-        .trim_end_matches(['\r', '\n'])
-        .strip_prefix("gitdir: ")
-        .ok_or("Candidate Git link changed")?;
-    let words = owned_command(s, Path::new(gd), args)?;
+    let ownership = owned(r.repo, common, s)?;
+    let observed = filesystem_owned(common, s)?;
+    let words = owned_command(s, &ownership.binding, &observed.binding, args)?;
+    if !ownership.unchanged() {
+        return Err(
+            "Deferred metadata/link changed before dispatch; no replay was dispatched".into(),
+        );
+    }
     let result = run(
         r,
         r.repo,
         &words.iter().map(String::as_str).collect::<Vec<_>>(),
     );
-    filesystem_owned(common, s)?;
+    if !ownership.unchanged() {
+        return Err("Deferred ownership changed during replay; retained directory/metadata descriptors were used. Inspect candidate before continuing".into());
+    }
     result
 }
 fn run(r: &Runner<'_>, path: &Path, args: &[&str]) -> Result<String, String> {
@@ -524,42 +564,90 @@ fn root_identity(path: &Path) -> Result<String, String> {
     #[cfg(not(any(unix, windows)))]
     Err("Stable worktree directory identities are unavailable on this platform".into())
 }
-fn filesystem_owned(common: &Path, s: &Step) -> Result<(), String> {
-    if std::fs::canonicalize(&s.worktree).map_err(|e| e.to_string())? != s.worktree
-        || s.root_identity.as_deref() != Some(root_identity(&s.worktree)?.as_str())
-    {
-        return Err("Deferred worktree directory identity/path changed".into());
+#[cfg(unix)]
+fn filesystem_owned(common: &Path, s: &Step) -> Result<Ownership, String> {
+    use native_files::{Directory, Snapshot};
+    if std::fs::canonicalize(&s.worktree).map_err(|e| e.to_string())? != s.worktree {
+        return Err("Deferred worktree physical path changed".into());
     }
-    let gitfile = crate::safe_read::read_inside(&s.worktree, ".git", 8192)
-        .ok_or("Candidate Git link is missing, linked or oversized")?;
-    let raw = std::str::from_utf8(&gitfile).map_err(|_| "Invalid owned Git link")?;
-    let gitdir = PathBuf::from(
-        raw.trim_end_matches(['\r', '\n'])
+    let root = Directory::open(&s.worktree).map_err(|e| e.to_string())?;
+    if s.root_identity.as_deref()
+        != Some(
+            crate::git::recovery::native_file_identity(root.file())?
+                .0
+                .as_str(),
+        )
+    {
+        return Err("Deferred worktree identity changed".into());
+    }
+    let link = Snapshot::read(&root, ".git", 8192)?.ok_or("Candidate Git link missing")?;
+    let text = std::str::from_utf8(&link.bytes).map_err(|_| "Invalid owned Git link")?;
+    if text.contains('\0') {
+        return Err("Invalid owned Git link".into());
+    }
+    let path = PathBuf::from(
+        text.trim_end_matches(['\r', '\n'])
             .strip_prefix("gitdir: ")
             .ok_or("Candidate is not a linked worktree")?,
     );
-    let relative = gitdir
-        .strip_prefix(common)
-        .map_err(|_| "Candidate belongs to another repository")?;
-    let relative = relative.to_str().ok_or("Invalid candidate metadata path")?;
-    let backlink = crate::safe_read::read_inside(common, &format!("{relative}/gitdir"), 8192)
-        .ok_or("Candidate backlink is missing or linked")?;
-    let metadata = ownership_paths(common, &s.worktree, &gitfile, &backlink)?;
-    if std::fs::canonicalize(&metadata).map_err(|e| e.to_string())? != metadata {
-        return Err("Candidate registration identity changed".into());
+    // Validate its single registration component before opening its files.
+    ownership_paths(
+        common,
+        &s.worktree,
+        &link.bytes,
+        s.worktree
+            .join(".git")
+            .to_str()
+            .ok_or("Non UTF-8 worktree")?
+            .as_bytes(),
+    )?;
+    if std::fs::canonicalize(&path).map_err(|e| e.to_string())? != path
+        || std::fs::canonicalize(common).map_err(|e| e.to_string())? != common
+    {
+        return Err("Deferred metadata/common directory is linked".into());
     }
-    let commondir = crate::safe_read::read_inside(common, &format!("{relative}/commondir"), 8192)
-        .ok_or("Candidate common directory link is missing")?;
-    let common_text = std::str::from_utf8(&commondir)
-        .map_err(|_| "Invalid candidate common directory")?
+    let metadata = Directory::open(&path).map_err(|e| e.to_string())?;
+    let common_dir = Directory::open(common).map_err(|e| e.to_string())?;
+    let backlink =
+        Snapshot::read(&metadata, "gitdir", 8192)?.ok_or("Candidate backlink missing")?;
+    ownership_paths(common, &s.worktree, &link.bytes, &backlink.bytes)?;
+    let common_link = Snapshot::read(&metadata, "commondir", 8192)?
+        .ok_or("Candidate common directory link missing")?;
+    let common_text = std::str::from_utf8(&common_link.bytes)
+        .map_err(|_| "Invalid common link")?
         .trim_end_matches(['\r', '\n']);
-    if std::fs::canonicalize(metadata.join(common_text)).map_err(|e| e.to_string())? != common {
+    if std::fs::canonicalize(path.join(common_text)).map_err(|e| e.to_string())? != common {
         return Err("Candidate common directory changed".into());
     }
-    Ok(())
+    let binding = DispatchBinding {
+        metadata: path,
+        metadata_identity: crate::git::recovery::native_file_identity(metadata.file())?.0,
+        common: common.to_owned(),
+        common_identity: crate::git::recovery::native_file_identity(common_dir.file())?.0,
+        link_identity: link.identity_token()?,
+        link_text: text.trim_end_matches('\n').into(),
+    };
+    let owned = Ownership {
+        binding,
+        root,
+        metadata,
+        common: common_dir,
+        link,
+    };
+    if !owned.unchanged()
+        || !backlink.same_at(&owned.metadata, "gitdir")
+        || !common_link.same_at(&owned.metadata, "commondir")
+    {
+        return Err("Deferred ownership moved while observing it".into());
+    }
+    Ok(owned)
 }
-fn owned(repo: &Path, common: &Path, s: &Step) -> Result<(), String> {
-    filesystem_owned(common, s)?;
+#[cfg(not(unix))]
+fn filesystem_owned(_: &Path, _: &Step) -> Result<Ownership, String> {
+    Err("Deferred native descriptor ownership unavailable on this platform".into())
+}
+fn owned(repo: &Path, common: &Path, s: &Step) -> Result<Ownership, String> {
+    let ownership = filesystem_owned(common, s)?;
     let wt = git::worktree_list(repo, None)?
         .into_iter()
         .find(|w| w.path == s.worktree)
@@ -567,8 +655,13 @@ fn owned(repo: &Path, common: &Path, s: &Step) -> Result<(), String> {
     if wt.branch.is_some() {
         return Err("Deferred replay worktree is attached to a branch; detach it before continuing so no original branch is rewritten".into());
     }
-    // Repeat the cheap filesystem check after reading registrations.
-    filesystem_owned(common, s)
+    if !ownership.unchanged() {
+        return Err(
+            "Deferred ownership changed while reading registrations; no replay was dispatched"
+                .into(),
+        );
+    }
+    Ok(ownership)
 }
 fn acceptance_allowed(job: &Job, undo: bool) -> Result<(), String> {
     if job.busy {
@@ -1095,17 +1188,48 @@ pub(crate) mod tests {
         let s = &mut v.jobs.jobs[0].steps[0];
         s.worktree = PathBuf::from("/private/synthetic/space ; $(not-executed)");
         let metadata = Path::new("/private/synthetic/.git/worktrees/step-0");
-        let command = owned_command(s, metadata, &["rebase", "--continue"]).unwrap();
+        let binding = DispatchBinding {
+            metadata: metadata.into(),
+            metadata_identity: "2:34".into(),
+            common: v.common.clone(),
+            common_identity: "2:30".into(),
+            link_identity: "2:35".into(),
+            link_text: format!("gitdir: {}", metadata.display()),
+        };
+        let command = owned_command(s, &binding, &binding, &["rebase", "--continue"]).unwrap();
         assert_eq!(command[3], "1:32");
         assert_eq!(command[4], s.worktree.to_str().unwrap());
-        assert_eq!(&command[6..], ["rebase", "--continue"]);
+        assert_eq!(&command[11..], ["rebase", "--continue"]);
         assert!(!command[1].contains("not-executed"));
-        assert!(OWNED_ALIAS.find("cd -P").unwrap() < OWNED_ALIAS.find("stat -c").unwrap());
-        assert!(
-            OWNED_ALIAS.find(r#"[ "$actual" = "$pin" ]"#).unwrap()
-                < OWNED_ALIAS.find("git --no-lazy-fetch --git-dir=").unwrap()
-        );
-        assert!(OWNED_ALIAS.contains("--work-tree=."));
+        // Recording only: substitute the second observed link/registration without
+        // touching a filesystem or starting Git. No mutation command is produced.
+        for field in 0..5 {
+            let mut changed = binding.clone();
+            match field {
+                0 => changed.link_text = "gitdir: /foreign/.git".into(),
+                1 => changed.link_identity = "9:91".into(),
+                2 => changed.metadata = "/foreign/.git".into(),
+                3 => changed.metadata_identity = "9:92".into(),
+                _ => changed.common_identity = "9:93".into(),
+            }
+            let mut dispatched = Vec::new();
+            if let Ok(words) = owned_command(s, &binding, &changed, &["rebase", "--continue"]) {
+                dispatched.push(words);
+            }
+            assert!(dispatched.is_empty());
+        }
+        let dispatch = OWNED_ALIAS.find("GIT_COMMON_DIR=/dev/fd/8 git").unwrap();
+        for guard in [
+            "token .",
+            "token /dev/fd/6",
+            "cat /dev/fd/6",
+            "token /dev/fd/7",
+            "token /dev/fd/8",
+        ] {
+            assert!(OWNED_ALIAS.find(guard).unwrap() < dispatch);
+        }
+        assert!(OWNED_ALIAS.contains("--git-dir=/dev/fd/7 --work-tree=."));
+        assert!(!OWNED_ALIAS.contains("--git-dir=\"$metadata\""));
         assert!(!OWNED_ALIAS.contains("eval"));
     }
 }

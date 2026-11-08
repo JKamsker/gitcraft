@@ -16,7 +16,7 @@ pub(crate) struct Directory {
     _ancestors: Vec<File>,
 }
 impl Directory {
-    #[cfg(target_os = "macos")]
+    #[cfg(unix)]
     pub fn file(&self) -> &File {
         self.handle.as_file()
     }
