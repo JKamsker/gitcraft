@@ -1,0 +1,14 @@
+{
+  "base": "8340e4caf77268711b97ec27a38382d5f348aac6",
+  "unchanged_source_except_display_module_declaration": {
+    "src/app/teleport/mod.rs": "437799ae7e532db271ebb16b42f0828df2ec07e60a0bb56ee8fc90c6d7da3d4f",
+    "src/teleport/mod.rs": "f666af1c27aac5cdae2ba4d03e2f5f0b3ec2da7814c27c4e7a162baf2f5c314f",
+    "src/teleport/files.rs": "cb750d0778c9a3bac4025bcdc990fba56a5c1e936413989c33b0504f588a8bc9",
+    "src/teleport/land.rs": "cd6ab6ac15154122b3c5505cfb8be6a9f5442d3c16e3593d5ba09f104900a786",
+    "src/teleport/protocol.rs": "accfb268d7c0921715485e15877c46390802164d53e0f942c76d601c555897d1",
+    "src/teleport/source.rs": "607ab54ebf9908aba70e9d23343cd9a25d458601b140c0eec7fb40540beeefc9",
+    "src/teleport/urls.rs": "d733e469630368f63449d9d4bfafc7238af56ce09c5d81ad541a8be90af261fe",
+    "src/app/teleport/drag.rs:    fn new(": "d8fff07254ef817cfda545c566a97fdfaa0418a710f21ed62b160da941d515a1",
+    "src/app/teleport/drag.rs:fn drop_hit(": "143288d66aead668004919d60054068f9efaf19eda602594efc21019b5f9430e"
+  }
+}
