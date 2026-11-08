@@ -243,11 +243,27 @@ pub fn fsmonitor_state(value: &str, unix_there: bool) -> State {
 /// A speed-up the doctor suggests: why, whether it is on, and the commands that turn it on.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Suggestion {
+    /// Stable suggestion identity used for confirmation and special-case control decisions.
     pub title: &'static str,
     pub why: String,
     pub state: State,
     /// What turns it on, as git commands.
     pub ops: Vec<Vec<String>>,
+}
+
+impl Suggestion {
+    /// Translate only the displayed title; unknown caller-supplied identities stay opaque.
+    pub fn display_title(&self) -> &str {
+        let id = match self.title {
+            "Commit-graph" => "backend-health-commit-graph",
+            "Scheduled maintenance" => "backend-scheduled-maintenance-f688c9",
+            "File system monitor" => "backend-file-system-monitor-bd6322",
+            "Untracked cache" => "backend-untracked-cache-de0942",
+            "Pack the objects" => "backend-pack-the-objects-5a853d",
+            _ => return self.title,
+        };
+        crate::i18n::text(id)
+    }
 }
 
 fn ops(list: &[&[&str]]) -> Vec<Vec<String>> {
@@ -287,7 +303,7 @@ pub fn suggestions(h: &Health) -> Vec<Suggestion> {
     };
     let mut out = vec![
         Suggestion {
-            title: crate::i18n::text("backend-health-commit-graph"),
+            title: "Commit-graph",
             why: if h.shallow {
                 crate::i18n::text("backend-a-file-of-every-commit-s-parents-and-dates-that-makes-walking-his-c7c844")
                     .to_owned()
@@ -306,7 +322,7 @@ pub fn suggestions(h: &Health) -> Vec<Suggestion> {
             ]),
         },
         Suggestion {
-            title: crate::i18n::text("backend-scheduled-maintenance-f688c9"),
+            title: "Scheduled maintenance",
             why: crate::i18n::text(
                 "backend-git-maintenance-start-registers-the-repository-and-has-the-system-3c11ab",
             )
@@ -315,7 +331,7 @@ pub fn suggestions(h: &Health) -> Vec<Suggestion> {
             ops: ops(&[&["maintenance", "start"]]),
         },
         Suggestion {
-            title: crate::i18n::text("backend-file-system-monitor-bd6322"),
+            title: "File system monitor",
             why: crate::i18n::message(
                 if slow {
                     "backend-health-monitor-slow"
@@ -328,7 +344,7 @@ pub fn suggestions(h: &Health) -> Vec<Suggestion> {
             ops: ops(&[&["config", "--local", "core.fsmonitor", "true"]]),
         },
         Suggestion {
-            title: crate::i18n::text("backend-untracked-cache-de0942"),
+            title: "Untracked cache",
             why: crate::i18n::message(
                 "backend-health-untracked",
                 &[("status", status_note.as_str().into())],
@@ -343,7 +359,7 @@ pub fn suggestions(h: &Health) -> Vec<Suggestion> {
     ];
     if h.objects.loose > MANY_LOOSE || (h.objects.packs > 50 && !h.partial) {
         out.push(Suggestion {
-            title: crate::i18n::text("backend-pack-the-objects-5a853d"),
+            title: "Pack the objects",
             why: crate::i18n::message(
                 "backend-loose-objects-in-kib-and-packs-git-gc-packs-them-into-one-which-s-cc160c",
                 &[
@@ -441,5 +457,60 @@ mod tests {
         });
         assert_eq!(quiet.len(), 4);
         assert_eq!(quiet[0].state, State::On);
+    }
+}
+
+#[cfg(test)]
+mod backend_fluent_suggestion_identity_tests {
+    #[test]
+    fn backend_fluent_doctor_titles_keep_control_identity() {
+        use super::{Health, Objects, State, Suggestion, suggestions};
+        let health = Health {
+            objects: Objects {
+                loose: 5000,
+                ..Default::default()
+            },
+            fsmonitor: Some(State::Unsupported),
+            ..Default::default()
+        };
+        let raw = [
+            "Commit-graph",
+            "Scheduled maintenance",
+            "File system monitor",
+            "Untracked cache",
+            "Pack the objects",
+        ];
+        let german = [
+            "Commit-Graph",
+            "Geplante Wartung",
+            "Dateisystemmonitor",
+            "Cache unversionierter Dateien",
+            "Objekte packen",
+        ];
+        crate::i18n::set_language("en-US");
+        let operations: Vec<_> = suggestions(&health).into_iter().map(|s| s.ops).collect();
+        for language in ["en-US", "de"] {
+            crate::i18n::set_language(language);
+            for (index, suggestion) in suggestions(&health).iter().enumerate() {
+                assert_eq!(suggestion.title, raw[index]);
+                assert_eq!(suggestion.ops, operations[index]);
+                assert_eq!(
+                    suggestion.display_title(),
+                    if language == "de" {
+                        german[index]
+                    } else {
+                        raw[index]
+                    }
+                );
+            }
+            let unknown = Suggestion {
+                title: "opaque external title",
+                why: String::new(),
+                state: State::Off,
+                ops: Vec::new(),
+            };
+            assert_eq!(unknown.display_title(), unknown.title);
+        }
+        crate::i18n::set_language("en-US");
     }
 }
