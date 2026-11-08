@@ -62,8 +62,8 @@ pub fn no_tool_set(kind: Kind) -> String {
     crate::i18n::message(
         "backend-no-noun-tool-is-set-choose-one-in-settings-git-external-tools-or-cf8598",
         &[
-            ("noun", (noun).to_string().into()),
-            ("key", (key).to_string().into()),
+            ("noun", (kind.noun()).to_string().into()),
+            ("key", (kind.key()).to_string().into()),
         ],
     )
 }
