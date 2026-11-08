@@ -233,7 +233,7 @@ impl RepoTab {
         let mut prefs = preferred_cols(&settings, lanes);
         let available = ui.available_width();
         let mut cols = prefs.allocated(available, settings.description_space);
-        egui::ScrollArea::horizontal()
+        let scroll_geometry = egui::ScrollArea::horizontal()
             .id_salt("graph-horizontal")
             .auto_shrink(false)
             .show(ui, |ui| {
@@ -437,9 +437,6 @@ impl RepoTab {
                     }
                 });
                 ui.data_mut(|d| d.insert_temp(offset_id, out.state.offset.y));
-                if show_map && !ghost {
-                    self.history_minimap(ui, map_rect, out.state.offset.y, out.inner_rect.height());
-                }
                 if let Some(steps) = first_steps {
                     self.first_steps_view(ui, steps, acts);
                 }
@@ -478,7 +475,13 @@ impl RepoTab {
                         hovered_message.as_deref()
                     },
                 );
-            });
+                (out.state.offset.y, out.inner_rect.height())
+            })
+            .inner;
+        // The reserved minimap strip is a sibling of the horizontally clipped graph.
+        if show_map && !ghost {
+            self.history_minimap(ui, map_rect, scroll_geometry.0, scroll_geometry.1);
+        }
     }
 
     /// A row of the ghost graph, faded as what it is: a commit the operation would make, one

@@ -85,18 +85,7 @@ impl Settings {
         if ui.available_width() < 760.0 {
             ui.add_space(12.0);
             ui.horizontal_wrapped(|ui| {
-                egui::ComboBox::from_id_salt("settings-page-compact")
-                    .selected_text(view.page.title())
-                    .show_ui(ui, |ui| {
-                        for page in Page::ALL {
-                            if ui
-                                .selectable_value(&mut view.page, page, page.title())
-                                .clicked()
-                            {
-                                view.query.clear();
-                            }
-                        }
-                    });
+                compact_page_picker(ui, &mut view);
                 search_field(ui, &mut view.query);
             });
             let above = counts
@@ -470,5 +459,47 @@ mod registry_tests {
         }
         assert_ne!(view.page, before);
         assert!(ctx.memory(|memory| memory.has_focus(search_id())));
+    }
+}
+
+/// Paint localized captions while the selected enum and persistent salt stay stable.
+fn compact_page_picker(ui: &mut Ui, view: &mut View) {
+    egui::ComboBox::from_id_salt("settings-page-compact")
+        .selected_text(super::labels::display(view.page.title()))
+        .show_ui(ui, |ui| {
+            for page in Page::ALL {
+                if ui
+                    .selectable_value(&mut view.page, page, super::labels::display(page.title()))
+                    .clicked()
+                {
+                    view.query.clear();
+                }
+            }
+        });
+}
+
+#[cfg(test)]
+mod merge_regressions {
+    use super::*;
+    use egui_kittest::kittest::Queryable;
+
+    #[test]
+    fn compact_page_picker_repaints_both_languages_and_keeps_enum_selection() {
+        let mut h = egui_kittest::Harness::new_ui_state(compact_page_picker, View::default());
+        for language in ["en-US", "de", "en-US"] {
+            crate::i18n::set_language(language);
+            h.run();
+            h.get_by_label(super::super::labels::display(Page::General.title()))
+                .click();
+            h.run();
+            h.get_by_label(super::super::labels::display(Page::Appearance.title()))
+                .click();
+            h.run();
+            assert_eq!(h.state().page, Page::Appearance);
+            assert!(h.state().query.is_empty());
+            // Reset only the selection for the next locale, using the same Context and salt.
+            h.state_mut().page = Page::General;
+        }
+        crate::i18n::set_language("en-US");
     }
 }
