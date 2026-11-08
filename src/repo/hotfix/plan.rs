@@ -126,20 +126,23 @@ pub(crate) fn plan(repo: &Path, remote: Option<String>) -> Result<Finish, String
         .trim()
         .strip_prefix("refs/heads/")
         .filter(|b| b.starts_with(&names.prefix))
-        .ok_or_else(|| format!("Check out the hotfix branch ({}…) first", names.prefix))?
+        .ok_or_else(|| {
+            crate::i18n::message(
+                "repo-workflows-hotfix-plan-a798cdeb",
+                &[("names-prefix-1", (names.prefix).clone().into())],
+            )
+        })?
         .to_owned();
     let main_name = names
         .main
         .clone()
-        .ok_or("There is no main branch here (main, master, or git-flow's)")?;
+        .ok_or(crate::i18n::text("repo-workflows-hotfix-plan-97906966"))?;
     let dirty = git::run(
         Some(repo),
         &["status", "--porcelain", "--untracked-files=no"],
     )?;
     if !dirty.trim().is_empty() {
-        return Err(
-            "Commit or stash your changes first: finishing checks other branches out".into(),
-        );
+        return Err(crate::i18n::text("repo-workflows-hotfix-plan-e373acd0").into());
     }
     let config = |key: String| {
         git::run_ok_codes(Some(repo), &["config", "--get", &key], &[0, 1])
@@ -167,9 +170,9 @@ pub(crate) fn plan(repo: &Path, remote: Option<String>) -> Result<Finish, String
     for t in std::iter::once(&main).chain(develop.as_ref()) {
         let line = format!("branch refs/heads/{}", t.name);
         if worktrees.lines().any(|l| l == line) {
-            return Err(format!(
-                "{} is checked out in another worktree: check something else out there first",
-                t.name
+            return Err(crate::i18n::message(
+                "repo-workflows-hotfix-plan-eeb1f496",
+                &[("t-name-1", (t.name).clone().into())],
             ));
         }
     }
@@ -219,7 +222,10 @@ pub(crate) fn plan(repo: &Path, remote: Option<String>) -> Result<Finish, String
         })
         .collect();
     if changes.is_empty() {
-        return Err(format!("{branch} has no commits of its own to release"));
+        return Err(crate::i18n::message(
+            "repo-workflows-hotfix-plan-8f734f01",
+            &[("branch", (branch).clone().into())],
+        ));
     }
     let conflicts = std::iter::once(&main)
         .chain(develop.as_ref())
@@ -430,11 +436,15 @@ impl Finish {
                 let or = if *into == self.main.name {
                     ""
                 } else {
-                    ", or untick it"
+                    crate::i18n::text("repo-workflows-hotfix-problem-a56c91b5")
                 };
-                format!(
-                    "Merging it into {into} would stop on conflicts in {}: merge it by hand{or}",
-                    files.join(", ")
+                crate::i18n::message(
+                    "repo-workflows-hotfix-problem-0225cdbc",
+                    &[
+                        ("into", (into).clone().into()),
+                        ("files-join-1", (files.join(", ")).clone().into()),
+                        ("or", (or).clone().into()),
+                    ],
                 )
             })
     }
@@ -581,21 +591,34 @@ impl Finish {
         let h = &self.hotfix;
         let mut out = Vec::new();
         for t in self.targets(c).into_iter().rev() {
-            out.push(format!(
-                "Merges {} ({}) into {} (git merge --no-ff)",
-                h.name,
-                crate::repo::short(&h.head),
-                t.name
+            out.push(crate::i18n::message(
+                "repo-workflows-hotfix-preview-ab279563",
+                &[
+                    ("h-name-1", (h.name).clone().into()),
+                    (
+                        "crate-repo-short-h-head-2",
+                        (crate::repo::short(&h.head)).clone().into(),
+                    ),
+                    ("t-name-3", (t.name).clone().into()),
+                ],
             ));
         }
-        out.push(format!(
-            "Makes the {} tag {} on that merge into {}",
-            if c.sign { "signed" } else { "annotated" },
-            c.tag.trim(),
-            self.main.name
+        out.push(crate::i18n::message(
+            "repo-workflows-hotfix-preview-523cd105",
+            &[
+                (
+                    "if-c-sign-signed-else-annotated-1",
+                    (if c.sign { "signed" } else { "annotated" }).clone().into(),
+                ),
+                ("c-tag-trim-2", (c.tag.trim()).clone().into()),
+                ("self-main-name-3", (self.main.name).clone().into()),
+            ],
         ));
         if c.delete {
-            out.push(format!("Deletes {} here", h.name));
+            out.push(crate::i18n::message(
+                "repo-workflows-hotfix-preview-4aeab9fa",
+                &[("h-name-1", (h.name).clone().into())],
+            ));
         }
         if let Some(remote) = self.remote.as_deref().filter(|_| c.push) {
             let names: Vec<String> = self
@@ -608,9 +631,17 @@ impl Finish {
                         .to_owned()
                 })
                 .collect();
-            out.push(format!(
-                "Then pushes {} and the tag to {remote}, all or nothing (git push --atomic)",
-                names.join(" and ")
+            out.push(crate::i18n::message(
+                "repo-workflows-hotfix-preview-7df6bedd",
+                &[
+                    (
+                        "names-join-and-1",
+                        (names.join(crate::i18n::text("repo-workflows-hotfix-preview-e3ee915a")))
+                            .clone()
+                            .into(),
+                    ),
+                    ("remote", (remote).clone().into()),
+                ],
             ));
         }
         out

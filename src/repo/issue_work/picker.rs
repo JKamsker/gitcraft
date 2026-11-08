@@ -164,11 +164,14 @@ impl RepoTab {
 
 fn show(ui: &mut Ui, picker: &mut Picker, view: &View) -> Outcome {
     let t = Tokens::get(ui.ctx());
-    ui.label(RichText::new("Start work from an issue").font(theme::semibold(15.0)));
     ui.label(
-        RichText::new(format!(
-            "The open issues assigned to you on {}",
-            picker.forge
+        RichText::new(crate::i18n::text("repo-workflows-issue_work-show-fd3baaea"))
+            .font(theme::semibold(15.0)),
+    );
+    ui.label(
+        RichText::new(crate::i18n::message(
+            "repo-workflows-issue_work-show-8bd32aa3",
+            &[("picker-forge-1", (picker.forge).clone().into())],
         ))
         .color(t.text_dim),
     );
@@ -177,9 +180,16 @@ fn show(ui: &mut Ui, picker: &mut Picker, view: &View) -> Outcome {
     let mut start_now = false;
     let mut source = picker.source;
     egui::ComboBox::from_id_salt("issue-source")
-        .selected_text(source.map_or("Repository forge", |k| k.name()))
+        .selected_text(source.map_or(
+            crate::i18n::text("repo-workflows-issue_work-show-3a89bbe3"),
+            |k| k.name(),
+        ))
         .show_ui(ui, |ui| {
-            ui.selectable_value(&mut source, None, "Repository forge");
+            ui.selectable_value(
+                &mut source,
+                None,
+                crate::i18n::text("repo-workflows-issue_work-show-3a89bbe3"),
+            );
             for kind in crate::trackers::Kind::ALL {
                 ui.selectable_value(&mut source, Some(kind), kind.name());
             }
@@ -188,7 +198,7 @@ fn show(ui: &mut Ui, picker: &mut Picker, view: &View) -> Outcome {
         return Outcome::Source(source);
     }
     if picker.context != crate::connections::current() {
-        ui.label("Profile changed. Reload this source to start work.");
+        ui.label(crate::i18n::text("repo-workflows-issue_work-show-b6db3846"));
         return Outcome::Retry;
     }
 
@@ -196,7 +206,13 @@ fn show(ui: &mut Ui, picker: &mut Picker, view: &View) -> Outcome {
         None => {
             ui.horizontal(|ui| {
                 ui.add(crate::spinner::Spinner::new().size(16.0));
-                ui.label(RichText::new(format!("Asking {}…", picker.forge)).color(t.text_dim));
+                ui.label(
+                    RichText::new(crate::i18n::message(
+                        "repo-workflows-issue_work-show-b32a9827",
+                        &[("picker-forge-1", (picker.forge).clone().into())],
+                    ))
+                    .color(t.text_dim),
+                );
             });
         }
         Some(Err(e)) => {
@@ -211,7 +227,7 @@ fn show(ui: &mut Ui, picker: &mut Picker, view: &View) -> Outcome {
         }
         Some(Ok(list)) if list.is_empty() => {
             ui.label(
-                RichText::new("No open issue of this repository is assigned to you.")
+                RichText::new(crate::i18n::text("repo-workflows-issue_work-show-d3965ab6"))
                     .color(t.text_dim),
             );
         }
@@ -233,12 +249,20 @@ fn show(ui: &mut Ui, picker: &mut Picker, view: &View) -> Outcome {
             }),
             _,
         ) => Some(why.clone()),
-        (Some(_), Some(busy)) => Some(format!("Wait for {busy} to finish first")),
+        (Some(_), Some(busy)) => Some(crate::i18n::message(
+            "repo-workflows-issue_work-show-b37705f6",
+            &[("busy", (busy).clone().into())],
+        )),
         (Some(_), None) => None,
     };
     let ready = plan.is_some() && why_not.is_none();
     ui.horizontal(|ui| {
-        let start = widgets::primary_button(ui, "Start work", ready, 100.0);
+        let start = widgets::primary_button(
+            ui,
+            crate::i18n::text("repo-workflows-issue_work-show-6a7da0d2"),
+            ready,
+            100.0,
+        );
         let start = match &why_not {
             Some(why) => start.on_disabled_hover_text(why),
             None => start,
@@ -282,7 +306,9 @@ fn choose(ui: &mut Ui, picker: &mut Picker) -> bool {
     let t = Tokens::get(ui.ctx());
     let edit = ui.add(
         egui::TextEdit::singleline(&mut picker.filter)
-            .hint_text("Filter by number, title or label")
+            .hint_text(crate::i18n::text(
+                "repo-workflows-issue_work-choose-7dce44e8",
+            ))
             .desired_width(f32::INFINITY)
             .margin(egui::Margin::symmetric(8, 6)),
     );
@@ -327,7 +353,12 @@ fn choose(ui: &mut Ui, picker: &mut Picker) -> bool {
         .auto_shrink([false, true])
         .show(ui, |ui| {
             if shown.is_empty() {
-                ui.label(RichText::new("No issue matches the filter.").color(t.text_faint));
+                ui.label(
+                    RichText::new(crate::i18n::text(
+                        "repo-workflows-issue_work-choose-723dfd05",
+                    ))
+                    .color(t.text_faint),
+                );
             }
             for (index, issue) in picker
                 .list()
@@ -342,9 +373,9 @@ fn choose(ui: &mut Ui, picker: &mut Picker) -> bool {
         });
     if picker.list().len() >= ISSUES_MAX {
         ui.label(
-            RichText::new(format!(
-                "The first {ISSUES_MAX} came: an issue that isn't among them is found on the \
-                 forge's page."
+            RichText::new(crate::i18n::message(
+                "repo-workflows-issue_work-choose-561b5212",
+                &[("ISSUES-MAX", (ISSUES_MAX).clone().into())],
             ))
             .size(11.5)
             .color(t.text_faint),
@@ -380,10 +411,20 @@ fn choose(ui: &mut Ui, picker: &mut Picker) -> bool {
         picker.name = picker.name.replace(' ', "-");
     }
     ui.horizontal(|ui| {
-        ui.label(RichText::new("Work").color(t.text_dim));
-        if let Some(i) =
-            widgets::switch(ui, &["Here", "In a new worktree"], picker.worktree as usize)
-        {
+        ui.label(
+            RichText::new(crate::i18n::text(
+                "repo-workflows-issue_work-choose-104ab921",
+            ))
+            .color(t.text_dim),
+        );
+        if let Some(i) = widgets::switch(
+            ui,
+            &[
+                crate::i18n::text("repo-workflows-issue_work-choose-aa3b1760"),
+                crate::i18n::text("repo-workflows-issue_work-choose-e8f4aaee"),
+            ],
+            picker.worktree as usize,
+        ) {
             picker.worktree = i == 1;
         }
     });
@@ -437,7 +478,15 @@ fn issue_row(ui: &mut Ui, issue: &Issue, chosen: bool) -> bool {
     );
     crate::a11y::a11y_selected(
         &response,
-        || format!("Issue {}: {}", issue.number, issue.title),
+        || {
+            crate::i18n::message(
+                "repo-workflows-issue_work-issue-row-91765782",
+                &[
+                    ("issue-number-1", (issue.number).clone().into()),
+                    ("issue-title-2", (issue.title).clone().into()),
+                ],
+            )
+        },
         chosen,
     );
     response

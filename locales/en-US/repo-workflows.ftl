@@ -2577,15 +2577,331 @@ repo-workflows-guide-tip-bar-c1567088 = Next tip
 
 repo-workflows-guide-undo-refusal-6cb7f998 = { $name } is published: undoing the empty first commit would delete a branch the remote has. Commit on top of it instead.
 
+repo-workflows-history_activity-activity-view-04b6c8fb = Apply period
+
+repo-workflows-history_activity-activity-view-0e407d89 = Contributor statistics
+
+repo-workflows-history_activity-activity-view-101c65f2 =  · shallow clone (earlier history unavailable)
+
+repo-workflows-history_activity-activity-view-126236b2 = All scanned dates
+
+repo-workflows-history_activity-activity-view-1556feb2 = Author date
+
+repo-workflows-history_activity-activity-view-21819769 = From
+
+repo-workflows-history_activity-activity-view-4562ddd7 = Committer date
+
+repo-workflows-history_activity-activity-view-4a7fda65 = Refresh activity
+
+repo-workflows-history_activity-activity-view-4d167723 = Reached the 100,000 commit limit; counts are partial.
+
+repo-workflows-history_activity-activity-view-60b300fd = Activity calendar
+
+repo-workflows-history_activity-activity-view-6561da04 = Scanned dates: { $first } – { $last }
+
+repo-workflows-history_activity-activity-view-7c0879db = Snapshot of local/remote branches, tags and HEAD; refresh after changes. Stash and app-only refs are excluded.
+
+repo-workflows-history_activity-activity-view-7e33d4ef = Release to apply the selected period.
+
+repo-workflows-history_activity-activity-view-8efbb1ca = Close activity
+
+repo-workflows-history_activity-activity-view-956a51f6 = Group by
+
+repo-workflows-history_activity-activity-view-a20fa1bb = Scan more history
+
+repo-workflows-history_activity-activity-view-ab181f77 = History activity
+
+repo-workflows-history_activity-activity-view-ac3896c6 = Days use the timezone recorded on each commit. Date ranges include both endpoints.
+
+repo-workflows-history_activity-activity-view-afc6abac = Through
+
+repo-workflows-history_activity-activity-view-baa24799 = No commits in this repository.
+
+repo-workflows-history_activity-activity-view-cc4e9aaf = Cancel analysis
+
+repo-workflows-history_activity-activity-view-d402be35 = Stopped at the 64 MiB analysis limit; counts cover only the scanned commits.
+
+repo-workflows-history_activity-activity-view-e136531e = { $coverage } · { $history-commits-len-1 } unique commits · { $history-tips-2 } reference tips{ $if-history-shallow-shallow-clone-3 }
+
+repo-workflows-history_activity-activity-view-e23552d7 = Analyzing history… { $view-progress-load-ordering-rela-1 } commits read
+
+repo-workflows-history_activity-activity-view-e6f89512 = At the shallow boundary, files in the first available tree count as additions.
+
+repo-workflows-history_activity-activity-view-fd008e90 = All reachable history
+
+repo-workflows-history_activity-activity-view-fe26c97a = Partial history
+
+repo-workflows-history_activity-authors-626a79db = Show all authors
+
+repo-workflows-history_activity-authors-65845cf6 = No activity in this period.
+
+repo-workflows-history_activity-authors-6cbebfa2 = Active days
+
+repo-workflows-history_activity-authors-6e25b1da = Distinct paths touched, active days and first–last activity within the selected period.
+
+repo-workflows-history_activity-authors-76cb89fa = Authors follow Git’s current .mailmap. Renames touch the old and new paths; merge changes are compared with the first parent.
+
+repo-workflows-history_activity-authors-ce199c9e = Files touched
+
+repo-workflows-history_activity-authors-d09648c6 = Commits
+
+repo-workflows-history_activity-authors-d95082a2 = Author
+
+repo-workflows-history_activity-authors-e707bedf = Active period
+
+repo-workflows-history_activity-calendar-370eebba = { $month-year-1 }-{ $m }
+    { $n } commits
+
+repo-workflows-history_activity-calendar-58339f45 = Wed
+
+repo-workflows-history_activity-calendar-66dab40c = Fri
+
+repo-workflows-history_activity-calendar-6a276950 = Previous month
+
+repo-workflows-history_activity-calendar-74e53211 = Next month
+
+repo-workflows-history_activity-calendar-7da11212 = Thu
+
+repo-workflows-history_activity-calendar-91e33e3b = Previous year
+
+repo-workflows-history_activity-calendar-a21a5dc6 = Next year
+
+repo-workflows-history_activity-calendar-a54ddac5 = Browse months
+
+repo-workflows-history_activity-calendar-c60e09cb = { $day }
+    { $n } commits
+
+repo-workflows-history_activity-calendar-d1eb39b0 = Tue
+
+repo-workflows-history_activity-calendar-db18f17f = Sun
+
+repo-workflows-history_activity-calendar-f40d7f51 = Mon
+
+repo-workflows-history_activity-calendar-fdeb71b5 = Sat
+
+repo-workflows-history_activity-cancel-ddfe1c43 = Analysis cancelled. Refresh to try again.
+
+repo-workflows-history_activity-commits-640e56ec = { $selected-len-1 } commits in selected period
+
+repo-workflows-history_activity-commits-f0d98513 = Open commit detail
+
+repo-workflows-history_activity-history-activity-window-0ad38473 = Repository history activity
+
+repo-workflows-history_activity-open-activity-a6cb5dc1 = Finish or close the editor first
+
+repo-workflows-history_activity-page-1208ec01 = Previous page
+
+repo-workflows-history_activity-page-c08ac736 = Next page
+
+repo-workflows-history_activity-page-dbaceb71 = Page { $page-1-1 } of { $len-div-ceil-100-max-1-2 }
+
+repo-workflows-history_activity-requested-range-25f6acd0 = The start date must be on or before the end date
+
+repo-workflows-history_activity-requested-range-4d18caf5 = Use dates such as 2026-11-07
+
 repo-workflows-hotfix-cancel-19766ed6 = Cancel
+
+repo-workflows-hotfix-contents-08251562 = Signed
+
+repo-workflows-hotfix-contents-0e86de5c = This git can't tell beforehand whether the merges conflict (2.38 or later can): if one does, it stops there
+
+repo-workflows-hotfix-contents-0f2dabe6 = Another operation is running: wait for it
+
+repo-workflows-hotfix-contents-1503916a = Tag
+
+repo-workflows-hotfix-contents-296ee3d7 = Finish hotfix
+
+repo-workflows-hotfix-contents-3b7c3548 = The tag's notes (Markdown)
+
+repo-workflows-hotfix-contents-3d5a5069 = WHAT IT WILL DO
+
+repo-workflows-hotfix-contents-89b9dd15 = Ctrl+Z puts the branches and the tag back here as they were; what was pushed stays.
+
+repo-workflows-hotfix-contents-96176159 = Delete { $plan-hotfix-name-1 } here
+
+repo-workflows-hotfix-contents-9d164a95 = No development branch here (develop, or git-flow's)
+
+repo-workflows-hotfix-contents-a2e52e9b = Push to { $r }
+
+repo-workflows-hotfix-contents-ba6c71e9 = And into { $d-name-1 }
+
+repo-workflows-hotfix-contents-c2cdf43f = git tag -s, with your signing key; otherwise annotated
+
+repo-workflows-hotfix-contents-c5ecd20d = Push (this repository has no remote)
+
+repo-workflows-hotfix-contents-dd94532f =  since { $t }
+
+repo-workflows-hotfix-contents-f3077f1d = { $plan-hotfix-name-1 } · { $plan-changes-len-2 } change{ $if-plan-changes-len-1-else-s-3 }{ $plan-base-tag-as-deref-map-t-for-4 }
 
 repo-workflows-hotfix-contents-f5346a60 = Merged into { $plan-main-name-1 }
 
+repo-workflows-hotfix-hotfix-act-06b55025 = { $tag } isn't a version to start a hotfix from
+
+repo-workflows-hotfix-hotfix-op-done-5b11af18 =  — Ctrl+Z puts back what it did
+
+repo-workflows-hotfix-hotfix-op-done-fbdef87e = { $run-label-1 } (stopped part-way)
+
+repo-workflows-hotfix-plan-8f734f01 = { $branch } has no commits of its own to release
+
+repo-workflows-hotfix-plan-97906966 = There is no main branch here (main, master, or git-flow's)
+
+repo-workflows-hotfix-plan-a798cdeb = Check out the hotfix branch ({ $names-prefix-1 }…) first
+
+repo-workflows-hotfix-plan-e373acd0 = Commit or stash your changes first: finishing checks other branches out
+
+repo-workflows-hotfix-plan-eeb1f496 = { $t-name-1 } is checked out in another worktree: check something else out there first
+
+repo-workflows-hotfix-preview-4aeab9fa = Deletes { $h-name-1 } here
+
+repo-workflows-hotfix-preview-523cd105 = Makes the { $if-c-sign-signed-else-annotated-1 } tag { $c-tag-trim-2 } on that merge into { $self-main-name-3 }
+
+repo-workflows-hotfix-preview-7df6bedd = Then pushes { $names-join-and-1 } and the tag to { $remote }, all or nothing (git push --atomic)
+
+repo-workflows-hotfix-preview-ab279563 = Merges { $h-name-1 } ({ $crate-repo-short-h-head-2 }) into { $t-name-3 } (git merge --no-ff)
+
+repo-workflows-hotfix-preview-e3ee915a =  and 
+
+repo-workflows-hotfix-problem-0225cdbc = Merging it into { $into } would stop on conflicts in { $files-join-1 }: merge it by hand{ $or }
+
+repo-workflows-hotfix-problem-a56c91b5 = , or untick it
+
+repo-workflows-issue_work-card-1887e67c = as first read
+
+repo-workflows-issue_work-card-1c245f79 = Hide { $what }
+
+repo-workflows-issue_work-card-1e7fbd27 = Read the issue again: the card shows it as it was { $when }
+
+repo-workflows-issue_work-card-53611908 = on { $link-read-1 }
+
+repo-workflows-issue_work-card-57fa7fe2 = No acceptance criteria are recorded for this issue.
+
+repo-workflows-issue_work-card-5fa29511 = Show { $what }
+
+repo-workflows-issue_work-card-6d2189c3 = when work on it started
+
+repo-workflows-issue_work-card-7fe3e1e0 = Open the issue in the browser
+
+repo-workflows-issue_work-card-9b1e287d = as of { $link-read-1 }
+
+repo-workflows-issue_work-card-b9210e97 = The issue says nothing more than its title.
+
+repo-workflows-issue_work-card-fb6318e9 = Forget which issue this branch is for
+
+repo-workflows-issue_work-choose-104ab921 = Work
+
 repo-workflows-issue_work-choose-52656e81 = Branch
+
+repo-workflows-issue_work-choose-561b5212 = The first { $ISSUES-MAX } came: an issue that isn't among them is found on the forge's page.
+
+repo-workflows-issue_work-choose-723dfd05 = No issue matches the filter.
+
+repo-workflows-issue_work-choose-7dce44e8 = Filter by number, title or label
+
+repo-workflows-issue_work-choose-aa3b1760 = Here
+
+repo-workflows-issue_work-choose-e8f4aaee = In a new worktree
+
+repo-workflows-issue_work-issue-plan-0dd9c97f = { $branch } is the default branch: the work on an issue goes on a branch of its own
+
+repo-workflows-issue_work-issue-plan-1f8c993f = { $remote } is there: a branch tracking it, { $where- }.
+
+repo-workflows-issue_work-issue-plan-2bd468f0 = the repository has no commits yet: commit something to start work from
+
+repo-workflows-issue_work-issue-plan-38012887 = A new branch from { $said }, { $where- }.
+
+repo-workflows-issue_work-issue-plan-8dbd7c09 = { $branch } is for { $other-key-1 } already: starting makes it the branch of { $key } instead
+
+repo-workflows-issue_work-issue-plan-952a7458 = { $branch } is checked out here already: it's linked to { $key }.
+
+repo-workflows-issue_work-issue-plan-ae567fc0 = in a new worktree, { $folder-open-1 }
+
+repo-workflows-issue_work-issue-plan-b341ef66 = { $branch } is checked out in { $folder-open-1 } already: it's linked to { $key }, and that worktree opens.
+
+repo-workflows-issue_work-issue-plan-c9fafe01 = The working tree has changes: they go along to { $branch }, unless they'd be overwritten (then nothing is done)
+
+repo-workflows-issue_work-issue-plan-cf90f159 = { $branch } exists already: work goes on on it as it is, { $where- }.
+
+repo-workflows-issue_work-issue-plan-dbeefca3 = checked out here
+
+repo-workflows-issue_work-issue-row-91765782 = Issue { $issue-number-1 }: { $issue-title-2 }
+
+repo-workflows-issue_work-issue-start-point-212218a3 = { $tracking }, fetched first
+
+repo-workflows-issue_work-issue-start-point-3c20246c = HEAD ({ $super-short-self-refs-head-1 }): there's no { $name } here or on the remote to start from
+
+repo-workflows-issue_work-issue-start-point-497395b3 = { $name } (there is no remote)
+
+repo-workflows-issue_work-issue-start-point-ceee14ee = { $tracking } (the remote's default branch), fetched first
+
+repo-workflows-issue_work-issue-start-point-d844f1e9 = { $name } as it is here ({ $remote } has no { $name })
+
+repo-workflows-issue_work-name-problem-4b6fdeb4 = The branch needs a name
+
+repo-workflows-issue_work-name-problem-4be6bde2 = A branch's name can't have { $c } in it
+
+repo-workflows-issue_work-name-problem-5e1d1dfc = A branch's name can't start with -
+
+repo-workflows-issue_work-name-problem-64d737b0 = No part of a branch's name (between /) can end with .lock
+
+repo-workflows-issue_work-name-problem-72447597 = A branch's name can't have { $two } in it
+
+repo-workflows-issue_work-name-problem-7b27dd13 = { $name } is a name git keeps for itself
+
+repo-workflows-issue_work-name-problem-8e7a7abd = A branch's name can't end with .
+
+repo-workflows-issue_work-name-problem-b19e092f = No part of a branch's name (between /) can start with .
+
+repo-workflows-issue_work-name-problem-b9131e75 = A branch's name can't have control characters in it
+
+repo-workflows-issue_work-name-problem-e2570ee3 = A branch's name can't start or end with /, nor have // in it
+
+repo-workflows-issue_work-open-issue-picker-2a41bd2f = No repository forge detected. Select Jira or Linear above, or configure the repository remote
+
+repo-workflows-issue_work-open-issue-picker-3a89bbe3 = Repository forge
+
+repo-workflows-issue_work-refresh-issue-0c6fd7a6 = The repository forge is unavailable
+
+repo-workflows-issue_work-refresh-issue-8336fbfe = { $label } failed: { $e }
+
+repo-workflows-issue_work-refresh-issue-a0e9ad2a = { $label }: wait for { $busy }
 
 repo-workflows-issue_work-show-19766ed6 = Cancel
 
+repo-workflows-issue_work-show-3a89bbe3 = Repository forge
+
+repo-workflows-issue_work-show-6a7da0d2 = Start work
+
+repo-workflows-issue_work-show-8bd32aa3 = The open issues assigned to you on { $picker-forge-1 }
+
+repo-workflows-issue_work-show-b32a9827 = Asking { $picker-forge-1 }…
+
+repo-workflows-issue_work-show-b37705f6 = Wait for { $busy } to finish first
+
+repo-workflows-issue_work-show-b6db3846 = Profile changed. Reload this source to start work.
+
+repo-workflows-issue_work-show-d3965ab6 = No open issue of this repository is assigned to you.
+
 repo-workflows-issue_work-show-d8b8392e = Try again
+
+repo-workflows-issue_work-show-fd3baaea = Start work from an issue
+
+repo-workflows-issue_work-start-issue-563140a4 = Tracker account changed; reload the issue source
+
+repo-workflows-issue_work-start-issue-c14dd822 = Start work on { $issue-key-1 }: { $why }
+
+repo-workflows-issue_work-start-issue-e2b80c1b = Start work on { $issue-key-1 }: wait for { $busy }
+
+repo-workflows-issue_work-start-ops-4c405286 = couldn't fetch { $remote }, so it starts from { $remote }/{ $base } as last fetched
+
+repo-workflows-issue_work-take-issue-read-bbcbbb59 = Couldn't read the branches' issues: { $e }
+
+repo-workflows-issue_work-unlink-issue-6df1900e = Forget the issue of { $branch } failed: { $e }
+
+repo-workflows-issue_work-what-3e69f7c1 = the task list
+
+repo-workflows-issue_work-what-68e64f0f = the acceptance criteria
+
+repo-workflows-issue_work-what-734b09bc = the description
 
 repo-workflows-lfs_locks-unlock-buttons-19766ed6 = Cancel
 
@@ -3479,5 +3795,19 @@ repo-workflows-doctor-history-loaded = The graph loads { $page } commits at a ti
 repo-workflows-doctor-missing-hooks = This folder does not exist (or is not a folder): no hook runs.{ $custom ->
         [yes] { " Whatever set core.hooksPath (a hook manager?) is not installed. Run its install step or unset core.hooksPath." }
        *[no] { "" }
+    }
+
+repo-workflows-hotfix-change-summary = { $branch } · { $count ->
+        [one] One change
+       *[other] { $count } changes
+    }{ $has-base ->
+        [yes] { " since " }{ $base }
+       *[no] { "" }
+    }
+
+repo-workflows-history-calendar-day = { $day }
+    { $count ->
+        [one] { $count } commit
+       *[other] { $count } commits
     }
 

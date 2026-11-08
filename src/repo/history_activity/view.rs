@@ -12,53 +12,109 @@ impl RepoTab {
         let mut close = false;
         let t = Tokens::get(ui.ctx());
         ui.horizontal(|ui| {
-            ui.heading("History activity");
+            ui.heading(crate::i18n::text(
+                "repo-workflows-history_activity-activity-view-ab181f77",
+            ));
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                close = ui.button("Close activity").clicked();
-                refresh = ui.button("Refresh activity").clicked();
-                if view.loading && ui.button("Cancel analysis").clicked() {
+                close = ui
+                    .button(crate::i18n::text(
+                        "repo-workflows-history_activity-activity-view-8efbb1ca",
+                    ))
+                    .clicked();
+                refresh = ui
+                    .button(crate::i18n::text(
+                        "repo-workflows-history_activity-activity-view-4a7fda65",
+                    ))
+                    .clicked();
+                if view.loading
+                    && ui
+                        .button(crate::i18n::text(
+                            "repo-workflows-history_activity-activity-view-cc4e9aaf",
+                        ))
+                        .clicked()
+                {
                     view.cancel();
                 }
             });
         });
         ui.horizontal(|ui| {
-            ui.selectable_value(&mut view.page, Page::Calendar, "Activity calendar");
-            ui.selectable_value(&mut view.page, Page::Contributors, "Contributor statistics");
+            ui.selectable_value(
+                &mut view.page,
+                Page::Calendar,
+                crate::i18n::text("repo-workflows-history_activity-activity-view-60b300fd"),
+            );
+            ui.selectable_value(
+                &mut view.page,
+                Page::Contributors,
+                crate::i18n::text("repo-workflows-history_activity-activity-view-0e407d89"),
+            );
         });
         ui.horizontal_wrapped(|ui| {
-            ui.label("Group by");
+            ui.label(crate::i18n::text(
+                "repo-workflows-history_activity-activity-view-956a51f6",
+            ));
             query |= ui
-                .selectable_value(&mut view.clock, Clock::Author, "Author date")
+                .selectable_value(
+                    &mut view.clock,
+                    Clock::Author,
+                    crate::i18n::text("repo-workflows-history_activity-activity-view-1556feb2"),
+                )
                 .changed();
             query |= ui
-                .selectable_value(&mut view.clock, Clock::Committer, "Committer date")
+                .selectable_value(
+                    &mut view.clock,
+                    Clock::Committer,
+                    crate::i18n::text("repo-workflows-history_activity-activity-view-4562ddd7"),
+                )
                 .changed();
-            ui.label("From");
+            ui.label(crate::i18n::text(
+                "repo-workflows-history_activity-activity-view-21819769",
+            ));
             ui.add(
                 egui::TextEdit::singleline(&mut view.from)
                     .desired_width(92.0)
                     .hint_text("YYYY-MM-DD"),
             );
-            ui.label("Through");
+            ui.label(crate::i18n::text(
+                "repo-workflows-history_activity-activity-view-afc6abac",
+            ));
             ui.add(
                 egui::TextEdit::singleline(&mut view.through)
                     .desired_width(92.0)
                     .hint_text("YYYY-MM-DD"),
             );
-            query |= ui.button("Apply period").clicked();
-            if ui.button("All scanned dates").clicked() {
+            query |= ui
+                .button(crate::i18n::text(
+                    "repo-workflows-history_activity-activity-view-04b6c8fb",
+                ))
+                .clicked();
+            if ui
+                .button(crate::i18n::text(
+                    "repo-workflows-history_activity-activity-view-126236b2",
+                ))
+                .clicked()
+            {
                 view.from.clear();
                 view.through.clear();
                 query = true;
             }
         });
-        ui.label(RichText::new("Days use the timezone recorded on each commit. Date ranges include both endpoints.").small().color(t.text_dim));
+        ui.label(
+            RichText::new(crate::i18n::text(
+                "repo-workflows-history_activity-activity-view-ac3896c6",
+            ))
+            .small()
+            .color(t.text_dim),
+        );
         if view.loading {
             ui.horizontal(|ui| {
                 ui.add(crate::spinner::Spinner::new().size(16.0));
-                ui.label(format!(
-                    "Analyzing history… {} commits read",
-                    view.progress.load(Ordering::Relaxed)
+                ui.label(crate::i18n::message(
+                    "repo-workflows-history_activity-activity-view-e23552d7",
+                    &[(
+                        "view-progress-load-ordering-rela-1",
+                        (view.progress.load(Ordering::Relaxed)).clone().into(),
+                    )],
                 ));
             });
             ui.ctx()
@@ -69,39 +125,65 @@ impl RepoTab {
         }
         if let Some(history) = &view.history {
             let coverage = if history.more {
-                "Partial history"
+                crate::i18n::text("repo-workflows-history_activity-activity-view-fe26c97a")
             } else {
-                "All reachable history"
+                crate::i18n::text("repo-workflows-history_activity-activity-view-fd008e90")
             };
-            ui.label(format!(
-                "{coverage} · {} unique commits · {} reference tips{}",
-                history.commits.len(),
-                history.tips,
-                if history.shallow {
-                    " · shallow clone (earlier history unavailable)"
-                } else {
-                    ""
-                }
+            ui.label(crate::i18n::message(
+                "repo-workflows-history_activity-activity-view-e136531e",
+                &[
+                    ("coverage", (coverage).clone().into()),
+                    (
+                        "history-commits-len-1",
+                        (history.commits.len()).clone().into(),
+                    ),
+                    ("history-tips-2", (history.tips).clone().into()),
+                    (
+                        "if-history-shallow-shallow-clone-3",
+                        (if history.shallow {
+                            crate::i18n::text(
+                                "repo-workflows-history_activity-activity-view-101c65f2",
+                            )
+                        } else {
+                            ""
+                        })
+                        .clone()
+                        .into(),
+                    ),
+                ],
             ));
-            ui.label(RichText::new("Snapshot of local/remote branches, tags and HEAD; refresh after changes. Stash and app-only refs are excluded.").small().color(t.text_dim));
+            ui.label(
+                RichText::new(crate::i18n::text(
+                    "repo-workflows-history_activity-activity-view-7c0879db",
+                ))
+                .small()
+                .color(t.text_dim),
+            );
             if history.bytes_limited {
                 ui.colored_label(
                     t.text_dim,
-                    "Stopped at the 64 MiB analysis limit; counts cover only the scanned commits.",
+                    crate::i18n::text("repo-workflows-history_activity-activity-view-d402be35"),
                 );
             }
             if history.more
                 && !history.bytes_limited
                 && history.limit < 100_000
                 && ui
-                    .add_enabled(!view.loading, egui::Button::new("Scan more history"))
+                    .add_enabled(
+                        !view.loading,
+                        egui::Button::new(crate::i18n::text(
+                            "repo-workflows-history_activity-activity-view-a20fa1bb",
+                        )),
+                    )
                     .clicked()
             {
                 view.limit = (history.limit * 2).min(100_000);
                 refresh = true;
             }
             if history.more && history.limit >= 100_000 {
-                ui.label("Reached the 100,000 commit limit; counts are partial.");
+                ui.label(crate::i18n::text(
+                    "repo-workflows-history_activity-activity-view-4d167723",
+                ));
             }
         }
         if let Some(summary) = &view.summary
@@ -110,12 +192,18 @@ impl RepoTab {
                 summary.calendar.last_key_value(),
             )
         {
-            ui.label(format!("Scanned dates: {first} – {last}"));
+            ui.label(crate::i18n::message(
+                "repo-workflows-history_activity-activity-view-6561da04",
+                &[
+                    ("first", crate::i18n::date_iso(&first.to_string()).into()),
+                    ("last", crate::i18n::date_iso(&last.to_string()).into()),
+                ],
+            ));
         }
         if view.history.as_ref().is_some_and(|h| h.shallow) {
-            ui.label(
-                "At the shallow boundary, files in the first available tree count as additions.",
-            );
+            ui.label(crate::i18n::text(
+                "repo-workflows-history_activity-activity-view-e6f89512",
+            ));
         }
         ui.separator();
         let summary = view.summary.take();
@@ -124,7 +212,9 @@ impl RepoTab {
             .show(ui, |ui| {
                 let Some(summary) = &summary else { return };
                 if summary.calendar.is_empty() {
-                    ui.label("No commits in this repository.");
+                    ui.label(crate::i18n::text(
+                        "repo-workflows-history_activity-activity-view-baa24799",
+                    ));
                     return;
                 }
                 if view.page == Page::Calendar {
@@ -134,7 +224,9 @@ impl RepoTab {
                 }
                 ui.separator();
                 if view.drag.is_some() {
-                    ui.label("Release to apply the selected period.");
+                    ui.label(crate::i18n::text(
+                        "repo-workflows-history_activity-activity-view-7e33d4ef",
+                    ));
                 } else {
                     commits(ui, view, summary, acts);
                 }
@@ -159,23 +251,46 @@ fn calendar(ui: &mut egui::Ui, view: &mut Activity, summary: &Summary, t: &Token
         return false;
     };
     ui.horizontal(|ui| {
-        if ui.button("Previous month").clicked() {
+        if ui
+            .button(crate::i18n::text(
+                "repo-workflows-history_activity-calendar-6a276950",
+            ))
+            .clicked()
+        {
             month = month.shift_month(-1);
         }
         ui.label(format!("{:04}-{:02}", month.year, month.month));
-        if ui.button("Next month").clicked() {
+        if ui
+            .button(crate::i18n::text(
+                "repo-workflows-history_activity-calendar-74e53211",
+            ))
+            .clicked()
+        {
             month = month.shift_month(1);
         }
-        ui.checkbox(&mut view.months, "Browse months");
+        ui.checkbox(
+            &mut view.months,
+            crate::i18n::text("repo-workflows-history_activity-calendar-a54ddac5"),
+        );
     });
     view.month = Some(month);
     if view.months {
         ui.horizontal(|ui| {
-            if ui.button("Previous year").clicked() {
+            if ui
+                .button(crate::i18n::text(
+                    "repo-workflows-history_activity-calendar-91e33e3b",
+                ))
+                .clicked()
+            {
                 view.month = Some(month.shift_month(-12));
             }
             ui.label(month.year.to_string());
-            if ui.button("Next year").clicked() {
+            if ui
+                .button(crate::i18n::text(
+                    "repo-workflows-history_activity-calendar-a21a5dc6",
+                ))
+                .clicked()
+            {
                 view.month = Some(month.shift_month(12));
             }
         });
@@ -195,7 +310,17 @@ fn calendar(ui: &mut egui::Ui, view: &mut Activity, summary: &Summary, t: &Token
                     };
                     let n: usize = counts.range(first..=last).map(|(_, n)| n).sum();
                     if ui
-                        .button(format!("{:04}-{m:02}\n{n} commits", month.year))
+                        .button(crate::i18n::message(
+                            "repo-workflows-history_activity-calendar-370eebba",
+                            &[
+                                (
+                                    "month-year-1",
+                                    (format!("{:04}", month.year)).clone().into(),
+                                ),
+                                ("m", (format!("{:02}", m)).clone().into()),
+                                ("n", (n).clone().into()),
+                            ],
+                        ))
                         .clicked()
                     {
                         picked = Some((first, last));
@@ -219,7 +344,15 @@ fn calendar(ui: &mut egui::Ui, view: &mut Activity, summary: &Summary, t: &Token
         .num_columns(7)
         .spacing(vec2(4.0, 4.0))
         .show(ui, |ui| {
-            for day in ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] {
+            for day in [
+                crate::i18n::text("repo-workflows-history_activity-calendar-f40d7f51"),
+                crate::i18n::text("repo-workflows-history_activity-calendar-d1eb39b0"),
+                crate::i18n::text("repo-workflows-history_activity-calendar-58339f45"),
+                crate::i18n::text("repo-workflows-history_activity-calendar-7da11212"),
+                crate::i18n::text("repo-workflows-history_activity-calendar-66dab40c"),
+                crate::i18n::text("repo-workflows-history_activity-calendar-fdeb71b5"),
+                crate::i18n::text("repo-workflows-history_activity-calendar-db18f17f"),
+            ] {
                 ui.label(day);
             }
             ui.end_row();
@@ -242,9 +375,12 @@ fn calendar(ui: &mut egui::Ui, view: &mut Activity, summary: &Summary, t: &Token
                 let response = ui
                     .add_sized(
                         [66.0, 44.0],
-                        egui::Button::new(format!("{day}\n{n} commits"))
-                            .fill(fill)
-                            .sense(Sense::click_and_drag()),
+                        egui::Button::new(crate::i18n::message(
+                            "repo-workflows-history-calendar-day",
+                            &[("day", (day).into()), ("count", (n).into())],
+                        ))
+                        .fill(fill)
+                        .sense(Sense::click_and_drag()),
                     )
                     .on_hover_text(date.to_string());
                 if response.clicked() {
@@ -272,10 +408,16 @@ fn calendar(ui: &mut egui::Ui, view: &mut Activity, summary: &Summary, t: &Token
 }
 
 fn authors(ui: &mut egui::Ui, view: &mut Activity, summary: &Summary, t: &Tokens) {
+    ui.label(crate::i18n::text(
+        "repo-workflows-history_activity-authors-6e25b1da",
+    ));
     ui.label(
-        "Distinct paths touched, active days and first–last activity within the selected period.",
+        RichText::new(crate::i18n::text(
+            "repo-workflows-history_activity-authors-76cb89fa",
+        ))
+        .small()
+        .color(t.text_dim),
     );
-    ui.label(RichText::new("Authors follow Git’s current .mailmap. Renames touch the old and new paths; merge changes are compared with the first parent.").small().color(t.text_dim));
     let range = page(ui, "authors", summary.contributors.len());
     egui::ScrollArea::horizontal()
         .id_salt("activity_author_columns")
@@ -284,11 +426,11 @@ fn authors(ui: &mut egui::Ui, view: &mut Activity, summary: &Summary, t: &Tokens
                 .striped(true)
                 .show(ui, |ui| {
                     for s in [
-                        "Author",
-                        "Commits",
-                        "Files touched",
-                        "Active days",
-                        "Active period",
+                        crate::i18n::text("repo-workflows-history_activity-authors-d95082a2"),
+                        crate::i18n::text("repo-workflows-history_activity-authors-d09648c6"),
+                        crate::i18n::text("repo-workflows-history_activity-authors-ce199c9e"),
+                        crate::i18n::text("repo-workflows-history_activity-authors-6cbebfa2"),
+                        crate::i18n::text("repo-workflows-history_activity-authors-e707bedf"),
                     ] {
                         ui.strong(s);
                     }
@@ -313,9 +455,17 @@ fn authors(ui: &mut egui::Ui, view: &mut Activity, summary: &Summary, t: &Tokens
                 });
         });
     if summary.contributors.is_empty() {
-        ui.label("No activity in this period.");
+        ui.label(crate::i18n::text(
+            "repo-workflows-history_activity-authors-65845cf6",
+        ));
     }
-    if view.author.is_some() && ui.button("Show all authors").clicked() {
+    if view.author.is_some()
+        && ui
+            .button(crate::i18n::text(
+                "repo-workflows-history_activity-authors-626a79db",
+            ))
+            .clicked()
+    {
         view.author = None;
     }
 }
@@ -332,7 +482,10 @@ fn commits(ui: &mut egui::Ui, view: &Activity, summary: &Summary, acts: &mut Vec
                 .is_none_or(|(name, email)| c.name == *name && c.email == *email)
         })
         .collect();
-    ui.strong(format!("{} commits in selected period", selected.len()));
+    ui.strong(crate::i18n::message(
+        "repo-workflows-history_activity-commits-640e56ec",
+        &[("selected-len-1", (selected.len()).clone().into())],
+    ));
     let range = page(ui, "commits", selected.len());
     for commit in &selected[range] {
         let label = format!(
@@ -344,7 +497,9 @@ fn commits(ui: &mut egui::Ui, view: &Activity, summary: &Summary, acts: &mut Vec
         );
         if ui
             .button(label)
-            .on_hover_text("Open commit detail")
+            .on_hover_text(crate::i18n::text(
+                "repo-workflows-history_activity-commits-f0d98513",
+            ))
             .clicked()
         {
             acts.push(Action::ActivityCommit(commit.hash.clone()));
@@ -360,14 +515,33 @@ fn page(ui: &mut egui::Ui, name: &str, len: usize) -> std::ops::Range<usize> {
     ui.push_id(name, |ui| {
         ui.horizontal(|ui| {
             if ui
-                .add_enabled(page > 0, egui::Button::new("Previous page"))
+                .add_enabled(
+                    page > 0,
+                    egui::Button::new(crate::i18n::text(
+                        "repo-workflows-history_activity-page-1208ec01",
+                    )),
+                )
                 .clicked()
             {
                 page -= 1;
             }
-            ui.label(format!("Page {} of {}", page + 1, len.div_ceil(100).max(1)));
+            ui.label(crate::i18n::message(
+                "repo-workflows-history_activity-page-dbaceb71",
+                &[
+                    ("page-1-1", (page + 1).clone().into()),
+                    (
+                        "len-div-ceil-100-max-1-2",
+                        (len.div_ceil(100).max(1)).clone().into(),
+                    ),
+                ],
+            ));
             if ui
-                .add_enabled((page + 1) * 100 < len, egui::Button::new("Next page"))
+                .add_enabled(
+                    (page + 1) * 100 < len,
+                    egui::Button::new(crate::i18n::text(
+                        "repo-workflows-history_activity-page-c08ac736",
+                    )),
+                )
                 .clicked()
             {
                 page += 1;
@@ -376,4 +550,54 @@ fn page(ui: &mut egui::Ui, name: &str, len: usize) -> std::ops::Range<usize> {
     });
     ui.data_mut(|d| d.insert_temp(id, page));
     page * 100..((page + 1) * 100).min(len)
+}
+
+#[cfg(test)]
+mod fluent_calendar_tests {
+    use super::*;
+
+    #[test]
+    fn fluent_partition_calendar_renders_both_languages_without_changing_iso_range() {
+        use egui_kittest::{Harness, kittest::Queryable};
+        let date = Day {
+            year: 2026,
+            month: 1,
+            day: 1,
+        };
+        for (language, previous, day_label) in [
+            ("en-US", "Previous month", "1\n1 commit"),
+            ("de", "Vorheriger Monat", "1\n1 Commit"),
+        ] {
+            crate::i18n::set_language(language);
+            // No RepoTab constructor or reader is polled: all state is supplied.
+            let mut view = Activity::new(Page::Calendar);
+            view.range(date, date);
+            view.month = Some(date);
+            let mut summary = Summary::default();
+            summary.calendar.insert(date, 1);
+            let mut initialized = false;
+            let harness = Harness::new_ui_state(
+                move |ui, view| {
+                    if !initialized {
+                        crate::theme::install_fonts(ui.ctx());
+                        ui.ctx().request_discard("install supplied-state fonts");
+                        initialized = true;
+                        return;
+                    }
+                    let t = Tokens::get(ui.ctx());
+                    calendar(ui, view, &summary, &t);
+                },
+                view,
+            );
+            harness.get_by_label(previous);
+            harness.get_by_label(day_label);
+            assert_eq!(harness.state().from, "2026-01-01");
+            assert_eq!(harness.state().through, "2026-01-01");
+            assert_eq!(
+                harness.state().requested_range().map(|q| q.from),
+                Ok(Some(date))
+            );
+        }
+        crate::i18n::set_language("en-US");
+    }
 }

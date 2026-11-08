@@ -75,9 +75,10 @@ impl Activity {
             if s.is_empty() {
                 Ok(None)
             } else {
-                Day::parse(s)
-                    .map(Some)
-                    .ok_or("Use dates such as 2026-11-07".to_owned())
+                Day::parse(s).map(Some).ok_or(
+                    crate::i18n::text("repo-workflows-history_activity-requested-range-4d18caf5")
+                        .to_owned(),
+                )
             }
         };
         let query = Query {
@@ -86,7 +87,10 @@ impl Activity {
             through: parse(&self.through)?,
         };
         if matches!((query.from,query.through),(Some(a),Some(b))if a>b) {
-            return Err("The start date must be on or before the end date".into());
+            return Err(crate::i18n::text(
+                "repo-workflows-history_activity-requested-range-25f6acd0",
+            )
+            .into());
         }
         Ok(query)
     }
@@ -122,14 +126,18 @@ impl Activity {
         self.reader.cancel();
         self.generation.fetch_add(1, Ordering::Relaxed);
         self.loading = false;
-        self.error = Some("Analysis cancelled. Refresh to try again.".into());
+        self.error =
+            Some(crate::i18n::text("repo-workflows-history_activity-cancel-ddfe1c43").into());
     }
 }
 
 impl RepoTab {
     pub(super) fn open_activity(&mut self, page: Page, ctx: &egui::Context) {
         if self.conflict.is_some() || self.rebase.is_some() {
-            self.status = Some(("Finish or close the editor first".into(), true));
+            self.status = Some((
+                crate::i18n::text("repo-workflows-history_activity-open-activity-a6cb5dc1").into(),
+                true,
+            ));
             return;
         }
         self.diff = None;
@@ -205,11 +213,13 @@ impl RepoTab {
             return;
         }
         let mut open = true;
-        egui::Window::new("Repository history activity")
-            .id(egui::Id::new(("history-activity", &self.path)))
-            .open(&mut open)
-            .default_size(egui::vec2(780.0, 640.0))
-            .show(ctx, |ui| self.activity_view(ui, acts));
+        egui::Window::new(crate::i18n::text(
+            "repo-workflows-history_activity-history-activity-window-0ad38473",
+        ))
+        .id(egui::Id::new(("history-activity", &self.path)))
+        .open(&mut open)
+        .default_size(egui::vec2(780.0, 640.0))
+        .show(ctx, |ui| self.activity_view(ui, acts));
         if !open {
             self.history_activity = None;
         }

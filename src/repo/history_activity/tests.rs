@@ -98,7 +98,7 @@ fn calendar_and_contributors_buttons_change_the_actual_view_and_select_commit() 
             (tab, false),
         );
     harness.run();
-    harness.get_by_label("1\n1 commits").click();
+    harness.get_by_label("1\n1 commit").click();
     harness.run_steps(2);
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
     while harness
@@ -124,8 +124,8 @@ fn calendar_and_contributors_buttons_change_the_actual_view_and_select_commit() 
         harness.state().0.detail_hash.as_deref(),
         Some("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
     );
-    let start = harness.get_by_label("1\n1 commits").rect().center();
-    let end = harness.get_by_label("3\n1 commits").rect().center();
+    let start = harness.get_by_label("1\n1 commit").rect().center();
+    let end = harness.get_by_label("3\n1 commit").rect().center();
     harness.hover_at(start);
     harness.drag_at(start);
     harness.run_steps(1);

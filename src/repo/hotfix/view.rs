@@ -37,7 +37,10 @@ impl RepoTab {
 
 fn contents(ui: &mut Ui, view: &mut FinishView, room: f32, busy: bool, acts: &mut Vec<Action>) {
     let t = Tokens::get(ui.ctx());
-    ui.label(RichText::new("Finish hotfix").font(theme::semibold(15.0)));
+    ui.label(
+        RichText::new(crate::i18n::text("repo-workflows-hotfix-contents-296ee3d7"))
+            .font(theme::semibold(15.0)),
+    );
     let plan = match &view.plan {
         None => {
             ui.add(crate::spinner::Spinner::new());
@@ -53,15 +56,17 @@ fn contents(ui: &mut Ui, view: &mut FinishView, room: f32, busy: bool, acts: &mu
     };
     let c = &mut view.choices;
     ui.label(
-        RichText::new(format!(
-            "{} · {} change{}{}",
-            plan.hotfix.name,
-            plan.changes.len(),
-            if plan.changes.len() == 1 { "" } else { "s" },
-            plan.base_tag
-                .as_deref()
-                .map(|t| format!(" since {t}"))
-                .unwrap_or_default()
+        RichText::new(crate::i18n::message(
+            "repo-workflows-hotfix-change-summary",
+            &[
+                ("branch", (plan.hotfix.name.as_str()).into()),
+                ("count", (plan.changes.len()).into()),
+                (
+                    "has-base",
+                    (if plan.base_tag.is_some() { "yes" } else { "no" }).into(),
+                ),
+                ("base", (plan.base_tag.as_deref().unwrap_or("")).into()),
+            ],
         ))
         .color(t.text_dim),
     );
@@ -71,13 +76,19 @@ fn contents(ui: &mut Ui, view: &mut FinishView, room: f32, busy: bool, acts: &mu
         .auto_shrink([false, true])
         .show(ui, |ui| {
             ui.horizontal(|ui| {
-                ui.label(RichText::new("Tag").color(t.text_dim));
+                ui.label(
+                    RichText::new(crate::i18n::text("repo-workflows-hotfix-contents-1503916a"))
+                        .color(t.text_dim),
+                );
                 ui.add(egui::TextEdit::singleline(&mut c.tag).desired_width(140.0));
-                ui.checkbox(&mut c.sign, "Signed")
-                    .on_hover_text("git tag -s, with your signing key; otherwise annotated");
+                ui.checkbox(
+                    &mut c.sign,
+                    crate::i18n::text("repo-workflows-hotfix-contents-08251562"),
+                )
+                .on_hover_text(crate::i18n::text("repo-workflows-hotfix-contents-c2cdf43f"));
             });
             ui.label(
-                RichText::new("The tag's notes (Markdown)")
+                RichText::new(crate::i18n::text("repo-workflows-hotfix-contents-3b7c3548"))
                     .color(t.text_dim)
                     .small(),
             );
@@ -99,20 +110,35 @@ fn contents(ui: &mut Ui, view: &mut FinishView, room: f32, busy: bool, acts: &mu
             ));
             match &plan.develop {
                 Some(d) => {
-                    ui.checkbox(&mut c.develop, format!("And into {}", d.name));
+                    ui.checkbox(
+                        &mut c.develop,
+                        crate::i18n::message(
+                            "repo-workflows-hotfix-contents-ba6c71e9",
+                            &[("d-name-1", (d.name).clone().into())],
+                        ),
+                    );
                 }
                 None => {
                     ui.label(
-                        RichText::new("No development branch here (develop, or git-flow's)")
+                        RichText::new(crate::i18n::text("repo-workflows-hotfix-contents-9d164a95"))
                             .color(t.text_faint)
                             .small(),
                     );
                 }
             }
-            ui.checkbox(&mut c.delete, format!("Delete {} here", plan.hotfix.name));
+            ui.checkbox(
+                &mut c.delete,
+                crate::i18n::message(
+                    "repo-workflows-hotfix-contents-96176159",
+                    &[("plan-hotfix-name-1", (plan.hotfix.name).clone().into())],
+                ),
+            );
             let push = match &plan.remote {
-                Some(r) => format!("Push to {r}"),
-                None => "Push (this repository has no remote)".to_owned(),
+                Some(r) => crate::i18n::message(
+                    "repo-workflows-hotfix-contents-a2e52e9b",
+                    &[("r", (r).clone().into())],
+                ),
+                None => crate::i18n::text("repo-workflows-hotfix-contents-c5ecd20d").to_owned(),
             };
             ui.add_enabled(
                 plan.remote.is_some(),
@@ -120,17 +146,14 @@ fn contents(ui: &mut Ui, view: &mut FinishView, room: f32, busy: bool, acts: &mu
             );
             if plan.conflicts.is_none() {
                 ui.label(
-                    RichText::new(
-                        "This git can't tell beforehand whether the merges conflict (2.38 or \
-                         later can): if one does, it stops there",
-                    )
-                    .color(t.text_faint)
-                    .small(),
+                    RichText::new(crate::i18n::text("repo-workflows-hotfix-contents-0e86de5c"))
+                        .color(t.text_faint)
+                        .small(),
                 );
             }
             ui.add_space(6.0);
             ui.label(
-                RichText::new("WHAT IT WILL DO")
+                RichText::new(crate::i18n::text("repo-workflows-hotfix-contents-3d5a5069"))
                     .font(theme::semibold(10.5))
                     .color(t.text_faint),
             );
@@ -138,12 +161,9 @@ fn contents(ui: &mut Ui, view: &mut FinishView, room: f32, busy: bool, acts: &mu
                 ui.add(egui::Label::new(format!("{}. {text}", i + 1)).wrap());
             }
             ui.label(
-                RichText::new(
-                    "Ctrl+Z puts the branches and the tag back here as they were; what was \
-                     pushed stays.",
-                )
-                .color(t.text_faint)
-                .small(),
+                RichText::new(crate::i18n::text("repo-workflows-hotfix-contents-89b9dd15"))
+                    .color(t.text_faint)
+                    .small(),
             );
         });
     let problem = plan.problem(c);
@@ -152,12 +172,16 @@ fn contents(ui: &mut Ui, view: &mut FinishView, room: f32, busy: bool, acts: &mu
     }
     ui.add_space(8.0);
     ui.horizontal(|ui| {
-        let finish =
-            widgets::primary_button(ui, "Finish hotfix", problem.is_none() && !busy, 120.0);
+        let finish = widgets::primary_button(
+            ui,
+            crate::i18n::text("repo-workflows-hotfix-contents-296ee3d7"),
+            problem.is_none() && !busy,
+            120.0,
+        );
         if busy {
-            finish
-                .clone()
-                .on_disabled_hover_text("Another operation is running: wait for it");
+            finish.clone().on_disabled_hover_text(crate::i18n::text(
+                "repo-workflows-hotfix-contents-0f2dabe6",
+            ));
         }
         if finish.clicked() {
             acts.push(Action::Hotfix(HotfixAct::Finish));
