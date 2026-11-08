@@ -24,6 +24,14 @@ pub(super) struct Window {
     pub tabs: Vec<Tab>,
     active: usize,
     palette: Option<Palette>,
+    clone_form: Option<super::clone::CloneForm>,
+    remote_form: Option<super::remote_open::RemoteForm>,
+    teleport: Option<super::teleport::TeleportForm>,
+    repo_scan: Option<super::repo_scan::RepoScan>,
+    my_work: super::my_work::MyWork,
+    pick_on_start: bool,
+    error: Option<String>,
+    error_card: Option<crate::error_card::ErrorCard>,
     manual: bool,
     was_focused: bool,
     drag: Option<TabDrag>,
@@ -37,6 +45,7 @@ pub(super) struct Window {
     border: Option<bool>,
     parent: ViewportId,
     position: Option<Pos2>,
+    place_at_pixels: Option<Pos2>,
     size: Option<egui::Vec2>,
 }
 
@@ -46,6 +55,14 @@ impl Window {
             tabs,
             active: 0,
             palette: None,
+            clone_form: None,
+            remote_form: None,
+            teleport: None,
+            repo_scan: None,
+            my_work: Default::default(),
+            pick_on_start: false,
+            error: None,
+            error_card: None,
             manual: false,
             was_focused: false,
             drag: None,
@@ -59,6 +76,7 @@ impl Window {
             border: None,
             parent,
             position,
+            place_at_pixels: None,
             size: None,
         }
     }
@@ -69,6 +87,14 @@ impl Window {
         std::mem::swap(&mut self.tabs, &mut app.tabs);
         std::mem::swap(&mut self.active, &mut app.active);
         std::mem::swap(&mut self.palette, &mut app.palette);
+        std::mem::swap(&mut self.clone_form, &mut app.clone_form);
+        std::mem::swap(&mut self.remote_form, &mut app.remote_form);
+        std::mem::swap(&mut self.teleport, &mut app.teleport);
+        std::mem::swap(&mut self.repo_scan, &mut app.repo_scan);
+        std::mem::swap(&mut self.my_work, &mut app.my_work);
+        std::mem::swap(&mut self.pick_on_start, &mut app.pick_on_start);
+        std::mem::swap(&mut self.error, &mut app.error);
+        std::mem::swap(&mut self.error_card, &mut app.error_card);
         std::mem::swap(&mut self.manual, &mut app.manual_open);
         std::mem::swap(&mut self.was_focused, &mut app.was_focused);
         std::mem::swap(&mut self.drag, &mut app.tab_drag);
@@ -119,7 +145,12 @@ pub(super) struct Windows {
 
 /// eframe's root owns this coordinator. Deferred callbacks keep Weak references so closing
 /// the application releases sessions, terminals, watchers and callback captures normally.
-type WindowCache = Arc<Mutex<BTreeMap<ViewportId, Vec<(ViewportId, ViewportBuilder)>>>>;
+#[derive(Clone, Default)]
+struct Children {
+    full: Vec<(ViewportId, ViewportBuilder)>,
+    panels: Vec<(ViewportId, ViewportBuilder)>,
+}
+type WindowCache = Arc<Mutex<BTreeMap<ViewportId, Children>>>;
 
 pub struct DesktopApp {
     app: Arc<Mutex<App>>,
@@ -139,8 +170,9 @@ impl DesktopApp {
         if ctx.embed_viewports() {
             return;
         }
-        let specs = if let Ok(app) = owner.try_lock() {
-            app.windows
+        let (specs, paused) = if let Ok(app) = owner.try_lock() {
+            let full = app
+                .windows
                 .parked
                 .iter()
                 .filter(|(_, w)| w.parent == ctx.viewport_id())
@@ -151,36 +183,72 @@ impl DesktopApp {
                         .and_then(repo_path)
                         .map(|p| format!("{} — gitcraft", p.display()))
                         .unwrap_or_else(|| "gitcraft".into());
+                    let size = bounded_size(
+                        w.size.unwrap_or(egui::vec2(1200.0, 800.0)),
+                        ctx.input(|i| i.viewport().monitor_size),
+                    );
                     let mut b = super::window_viewport()
                         .with_title(title)
                         .with_app_id("gitcraft")
                         .with_icon(super::window_icon())
-                        .with_inner_size(w.size.unwrap_or(egui::vec2(1200.0, 800.0)))
-                        .with_min_inner_size([800.0, 500.0]);
+                        .with_inner_size(size)
+                        .with_min_inner_size(size.min(egui::vec2(800.0, 500.0)));
                     if let Some(position) = w.position {
                         b = b.with_position(position);
                     }
                     (id, b)
                 })
-                .collect::<Vec<_>>()
+                .collect::<Vec<_>>();
+            let tabs = if app.windows.current == ctx.viewport_id() {
+                Some(&app.tabs)
+            } else {
+                app.windows.parked.get(&ctx.viewport_id()).map(|w| &w.tabs)
+            };
+            let panels = tabs
+                .into_iter()
+                .flatten()
+                .filter_map(|tab| match tab {
+                    Tab::Repo(repo) => Some(repo.popout_window_specs()),
+                    _ => None,
+                })
+                .flatten()
+                .collect();
+            if let Ok(mut cached) = cache.lock() {
+                cached.retain(|id, _| {
+                    *id == ViewportId::ROOT
+                        || *id == app.windows.current
+                        || app.windows.parked.contains_key(id)
+                });
+            }
+            (Children { full, panels }, false)
         } else {
             // A native picker can run a nested AppKit event loop. Reentrant callbacks
             // must neither wait for their own coordinator nor prune existing windows.
-            cache
-                .lock()
-                .ok()
-                .and_then(|c| c.get(&ctx.viewport_id()).cloned())
-                .unwrap_or_default()
+            (
+                cache
+                    .lock()
+                    .ok()
+                    .and_then(|c| c.get(&ctx.viewport_id()).cloned())
+                    .unwrap_or_default(),
+                true,
+            )
         };
         if let Ok(mut cached) = cache.lock() {
             cached.insert(ctx.viewport_id(), specs.clone());
         }
-        for (id, builder) in specs {
+        for (id, builder) in specs.full {
             let weak = Arc::downgrade(owner);
             let cache = cache.clone();
             ctx.show_viewport_deferred(id, builder, move |ui, _| {
                 Self::child(&weak, &cache, id, ui)
             });
+        }
+        if paused {
+            // A nested native picker cannot borrow repository sessions. Redeclare the
+            // existing immediate panels as well, so egui retains their native windows.
+            for (id, builder) in specs.panels {
+                ctx.show_viewport_immediate(id, builder, |_, _| {});
+            }
         }
     }
 
@@ -196,15 +264,23 @@ impl DesktopApp {
             let Some(mut window) = app.windows.parked.remove(&id) else {
                 return;
             };
+            if let Some(pixels) = window.place_at_pixels.take() {
+                ctx.send_viewport_cmd(egui::ViewportCommand::OuterPosition(
+                    pixels / ctx.pixels_per_point(),
+                ));
+            }
             window.swap(&mut app);
             // Keep the root's sessions visible to persistence, handoff and progress reducers
             // during a child callback. Current sessions live only in app.tabs.
             app.windows.parked.insert(ViewportId::ROOT, window);
             app.windows.current = id;
             let profile = app.settings.active_profile;
-            if ctx.input(|i| i.viewport().close_requested()) {
+            if ctx.input(|i| i.viewport().close_requested()) && !app.window_has_dialog() {
                 app.return_window(ctx.clone());
             } else {
+                if ctx.input(|i| i.viewport().close_requested()) {
+                    ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
+                }
                 app.window_ui(ui, None);
             }
             let root = app.windows.parked.remove(&ViewportId::ROOT);
@@ -273,6 +349,74 @@ impl eframe::App for DesktopApp {
 }
 
 impl App {
+    /// Run a model completion against its initiating window, regardless of which
+    /// viewport polled it. A closed owner falls back to the root, never a repainting peer.
+    pub(super) fn in_window<R>(
+        &mut self,
+        requested: ViewportId,
+        work: impl FnOnce(&mut Self) -> R,
+    ) -> R {
+        let previous = self.windows.current;
+        let owner = if requested == previous || self.windows.parked.contains_key(&requested) {
+            requested
+        } else {
+            ViewportId::ROOT
+        };
+        if owner == previous {
+            return work(self);
+        }
+        let Some(mut view) = self.windows.parked.remove(&owner) else {
+            return work(self);
+        };
+        view.swap(self);
+        self.windows.parked.insert(previous, view);
+        self.windows.current = owner;
+        let result = work(self);
+        if let Some(mut view) = self.windows.parked.remove(&previous) {
+            view.swap(self);
+            self.windows.parked.insert(owner, view);
+        }
+        self.windows.current = previous;
+        result
+    }
+
+    pub(super) fn window_has_dialog(&self) -> bool {
+        self.clone_form.is_some()
+            || self.remote_form.is_some()
+            || self.teleport.is_some()
+            || self.repo_scan.is_some()
+            || self.my_work.open
+            || self.askpass_open()
+    }
+
+    pub(super) fn credentials_for(&mut self, path: &Path, credentials: crate::git::Credentials) {
+        if let Some(repo) = self
+            .tabs
+            .iter_mut()
+            .chain(self.windows.parked.values_mut().flat_map(|w| &mut w.tabs))
+            .find_map(|tab| match tab {
+                Tab::Repo(repo) if repo.path == path => Some(repo),
+                _ => None,
+            })
+        {
+            repo.set_credentials(credentials);
+        }
+    }
+
+    /// Poll window-owned continuation state even if none of its UI is painted.
+    pub(super) fn poll_window_models(&mut self, ctx: &egui::Context) {
+        let owners = std::iter::once(self.windows.current)
+            .chain(self.windows.parked.keys().copied())
+            .collect::<Vec<_>>();
+        for owner in owners {
+            self.in_window(owner, |app| {
+                app.poll_teleport(ctx);
+                app.poll_repo_scan();
+                app.poll_my_work(ctx);
+            });
+        }
+    }
+
     pub(super) fn restore_windows(&mut self, windows: Vec<SavedWindow>, ctx: &egui::Context) {
         let mut known = self
             .all_repo_paths()
@@ -297,7 +441,10 @@ impl App {
             let mut window = Window::new(
                 tabs,
                 ViewportId::ROOT,
-                saved.position.map(Pos2::from).filter(|p| p.is_finite()),
+                // The saved monitor may have been disconnected. Let the compositor
+                // place restored windows on an available monitor, rather than reuse
+                // an unverifiable absolute origin from a different scale/layout.
+                None,
             );
             window.active =
                 super::active_among_kept(&kept, saved.active).min(window.tabs.len() - 1);
@@ -416,9 +563,9 @@ impl App {
             }
             None => {
                 let id = self.next_window_id();
-                self.windows
-                    .parked
-                    .insert(id, Window::new(vec![tab], self.windows.current, position));
+                let mut window = Window::new(vec![tab], self.windows.current, None);
+                window.place_at_pixels = position;
+                self.windows.parked.insert(id, window);
                 id
             }
         };
@@ -465,20 +612,23 @@ impl App {
     pub(super) fn close_root_with_children(&mut self, ctx: &egui::Context) {
         if !self.windows.quit_requested
             && self.windows.current == ViewportId::ROOT
-            && !self.windows.parked.is_empty()
+            && (!self.windows.parked.is_empty() || self.window_has_dialog())
             && ctx.input(|i| i.viewport().close_requested())
         {
             ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
-            ctx.send_viewport_cmd(egui::ViewportCommand::Visible(false));
-            self.windows.root_hidden = true;
+            if !self.window_has_dialog() {
+                ctx.send_viewport_cmd(egui::ViewportCommand::Visible(false));
+                self.windows.root_hidden = true;
+            }
         }
     }
 
     pub(super) fn window_strip(&mut self, ctx: &egui::Context, strip: Rect) {
         if let Some(origin) = ctx.input(|i| i.viewport().inner_rect.map(|r| r.min)) {
-            self.windows
-                .strips
-                .insert(self.windows.current, strip.translate(origin.to_vec2()));
+            self.windows.strips.insert(
+                self.windows.current,
+                strip.translate(origin.to_vec2()) * ctx.pixels_per_point(),
+            );
         }
     }
 
@@ -498,7 +648,7 @@ impl App {
             return None;
         }
         let origin = ctx.input(|i| i.viewport().inner_rect.map(|r| r.min))?;
-        let desktop = pointer + origin.to_vec2();
+        let desktop = (pointer + origin.to_vec2()) * ctx.pixels_per_point();
         let target = drop_target(self.windows.current, desktop, &self.windows.strips);
         Some((target, desktop))
     }
@@ -509,6 +659,19 @@ fn show(ctx: &egui::Context, id: ViewportId) {
     ctx.send_viewport_cmd_to(id, egui::ViewportCommand::Minimized(false));
     ctx.send_viewport_cmd_to(id, egui::ViewportCommand::Focus);
     ctx.request_repaint_of(id);
+}
+
+fn bounded_size(size: egui::Vec2, monitor: Option<egui::Vec2>) -> egui::Vec2 {
+    let limit = monitor
+        .filter(|s| s.is_finite() && s.x > 128.0 && s.y > 128.0)
+        .map(|s| s - egui::vec2(64.0, 64.0))
+        .unwrap_or(egui::vec2(1920.0, 1080.0));
+    let minimum = egui::vec2(360.0, 240.0).min(limit);
+    if size.is_finite() {
+        size.clamp(minimum, limit)
+    } else {
+        egui::vec2(1200.0, 800.0).clamp(minimum, limit)
+    }
 }
 
 fn drop_target(
@@ -639,7 +802,7 @@ mod tests {
         assert_eq!(saved.open, [PathBuf::from("/virtual/alpha")]);
         assert_eq!(saved.windows.len(), 1);
         assert_eq!(saved.windows[0].open, [PathBuf::from("/virtual/beta")]);
-        assert_eq!(saved.windows[0].position, Some([-600.0, 10.0]));
+        assert_eq!(saved.windows[0].position, None);
         let old: super::super::Saved =
             ron::from_str("(open:[],active:0,recent:[])").map_err(|e| e.to_string())?;
         assert!(old.windows.is_empty());
@@ -823,7 +986,7 @@ mod tests {
             .next()
             .ok_or("drag did not detach")?;
         assert_eq!(identity(&window.tabs[0]), owned);
-        assert_eq!(window.position, Some(egui::pos2(260.0, 340.0)));
+        assert_eq!(window.place_at_pixels, Some(egui::pos2(260.0, 340.0)));
         Ok(())
     }
 
@@ -924,6 +1087,30 @@ mod tests {
         let owner = h.state().app.clone();
         let cache = h.state().cache.clone();
         let id = ViewportId::from_hash_of("reentrant-child");
+        let panel = crate::repo::popout::viewport_id(
+            Path::new("/virtual/panel-owner"),
+            crate::repo::popout::Panel::Diff,
+        );
+        {
+            let mut app = owner.lock().map_err(|e| e.to_string())?;
+            app.tabs = vec![deferred("/virtual/panel-owner", &ctx)];
+            if let Tab::Repo(repo) = &mut app.tabs[0] {
+                repo.set_test_popout(crate::repo::popout::Panel::Diff);
+            }
+        }
+        let seen = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
+        let recorded = seen.clone();
+        egui::Context::set_immediate_viewport_renderer(move |ctx, mut viewport| {
+            recorded.borrow_mut().push(viewport.ids.this);
+            let id = viewport.ids.this;
+            let mut raw = egui::RawInput {
+                viewport_id: id,
+                ..Default::default()
+            };
+            raw.viewports.entry(id).or_default();
+            ctx.run_ui(raw, |ui| (viewport.viewport_ui_cb)(ui))
+                .drop_without_applying_deltas();
+        });
         owner
             .lock()
             .map_err(|e| e.to_string())?
@@ -931,6 +1118,8 @@ mod tests {
             .parked
             .insert(id, Window::new(vec![Tab::Home], ViewportId::ROOT, None));
         let out = ctx.run_ui(egui::RawInput::default(), |ui| {
+            ui.ctx()
+                .show_viewport_immediate(panel, ViewportBuilder::default(), |_, _| {});
             DesktopApp::children(&owner, &cache, ui.ctx())
         });
         let cb = out
@@ -947,6 +1136,11 @@ mod tests {
             out.viewport_output.contains_key(&id),
             "a nested native event loop must not prune the live child"
         );
+        assert!(
+            out.viewport_output.contains_key(&panel),
+            "the immediate panel must survive the same reentrant pass"
+        );
+        assert_eq!(seen.borrow().iter().filter(|id| **id == panel).count(), 2);
         out.drop_without_applying_deltas();
         let mut raw = egui::RawInput {
             viewport_id: id,
@@ -975,7 +1169,7 @@ mod tests {
                         "ssh://fixture/second".into(),
                     ],
                     active: 1,
-                    position: Some([f32::NAN, 1.0]),
+                    position: Some([1_000_000.0, -1_000_000.0]),
                     size: Some([1.0, 0.0]),
                 },
                 SavedWindow {
@@ -1023,5 +1217,302 @@ mod tests {
         assert_eq!(drop_target(a, egui::pos2(100.0, 120.0), &strips), Some(b));
         assert_eq!(drop_target(a, egui::pos2(100.0, 300.0), &strips), None);
         assert_eq!(drop_target(a, egui::pos2(-100.0, 20.0), &strips), None);
+    }
+
+    #[test]
+    fn hidden_root_close_is_cancelled_in_logic_but_explicit_quit_is_not() -> Result<(), String> {
+        let h = harness();
+        let ctx = h.ctx.clone();
+        let mut app = h.state().app.lock().map_err(|e| e.to_string())?;
+        app.windows.parked.insert(
+            ViewportId::from_hash_of("child"),
+            Window::new(vec![Tab::Home], ViewportId::ROOT, None),
+        );
+        let mut raw = egui::RawInput::default();
+        let info = raw.viewports.entry(ViewportId::ROOT).or_default();
+        info.minimized = Some(true);
+        info.events.push(egui::ViewportEvent::Close);
+        let passes = ctx.cumulative_pass_nr();
+        let output = ctx.run_logic(&raw, |ctx| app.tick_model(ctx, None));
+        assert!(
+            output.viewport_commands[&ViewportId::ROOT]
+                .contains(&egui::ViewportCommand::CancelClose)
+        );
+        assert!(
+            output.viewport_commands[&ViewportId::ROOT]
+                .contains(&egui::ViewportCommand::Visible(false))
+        );
+        assert_eq!(ctx.cumulative_pass_nr(), passes);
+        app.windows.quit_requested = true;
+        let output = ctx.run_logic(&raw, |ctx| app.tick_model(ctx, None));
+        assert!(
+            !output
+                .viewport_commands
+                .get(&ViewportId::ROOT)
+                .is_some_and(|commands| commands.contains(&egui::ViewportCommand::CancelClose))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn clone_form_is_owned_by_its_window_when_a_peer_renders_first() -> Result<(), String> {
+        let h = harness();
+        let ctx = h.ctx.clone();
+        let mut app = h.state().app.lock().map_err(|e| e.to_string())?;
+        let child = ViewportId::from_hash_of("form-owner");
+        app.windows
+            .parked
+            .insert(child, Window::new(vec![Tab::Home], ViewportId::ROOT, None));
+        app.in_window(child, |app| {
+            app.start_clone();
+            app.set_clone_url("https://example.invalid/owner/repo");
+        });
+        assert!(!app.window_has_dialog());
+        let mut saw_peer_form = false;
+        ctx.run_ui(egui::RawInput::default(), |ui| {
+            app.clone_dialog(ui.ctx());
+            saw_peer_form = app.clone_form.is_some();
+            let count = app.tabs.len();
+            let blocked = app.window_has_dialog();
+            app.window_command(crate::keymap::Command::NewTab, blocked, ui.ctx());
+            assert_eq!(app.tabs.len(), count + 1);
+        })
+        .drop_without_applying_deltas();
+        assert!(!saw_peer_form);
+        app.in_window(child, |app| {
+            assert!(app.window_has_dialog());
+            assert_eq!(
+                app.clone_url().as_deref(),
+                Some("https://example.invalid/owner/repo")
+            );
+        });
+        assert!(!app.window_has_dialog());
+        assert!(matches!(app.tabs.last(), Some(Tab::Home)));
+        drop(app);
+        use egui_kittest::kittest::Queryable as _;
+        let owner = h.state().app.clone();
+        let mut initialized = false;
+        let mut child_ui = egui_kittest::Harness::new_ui_state(
+            |ui, owner: &mut Arc<Mutex<App>>| {
+                if !std::mem::replace(&mut initialized, true) {
+                    crate::theme::install_fonts(ui.ctx());
+                    egui_extras::install_image_loaders(ui.ctx());
+                    return;
+                }
+                if let Ok(mut app) = owner.lock() {
+                    app.in_window(child, |app| app.clone_dialog(ui.ctx()));
+                }
+            },
+            owner.clone(),
+        );
+        child_ui.run_steps(2);
+        child_ui.get_by_label("Clone repository");
+        child_ui.get_by_label("Cancel").click();
+        child_ui.run();
+        let app = owner.lock().map_err(|e| e.to_string())?;
+        assert!(app.windows.parked[&child].clone_form.is_none());
+        assert!(!app.window_has_dialog());
+        Ok(())
+    }
+
+    #[test]
+    fn recorded_completions_route_to_the_initiator_and_credentials_follow_parked_targets()
+    -> Result<(), String> {
+        #[derive(Clone, Copy)]
+        enum Completion {
+            Clone,
+            Connection,
+            Link,
+        }
+        for source in [Completion::Clone, Completion::Connection, Completion::Link] {
+            for poll_from_child in [false, true] {
+                let h = harness();
+                let ctx = h.ctx.clone();
+                let mut app = h.state().app.lock().map_err(|e| e.to_string())?;
+                let child = ViewportId::from_hash_of("completion-owner");
+                let root = PathBuf::from("/virtual/completion-target");
+                app.tabs = vec![Tab::Home];
+                app.windows.parked.insert(
+                    child,
+                    Window::new(
+                        vec![deferred(root.to_str().ok_or("path")?, &ctx), Tab::Home],
+                        ViewportId::ROOT,
+                        None,
+                    ),
+                );
+                app.windows.parked.get_mut(&child).ok_or("child")?.active = 1;
+                match source {
+                    Completion::Clone => app.recorded_clone_completion(child, root.clone()),
+                    Completion::Connection => {
+                        app.recorded_connection_completion(child, root.clone())
+                    }
+                    Completion::Link => app.recorded_launch_completion(child, root.clone()),
+                }
+                let poller = if poll_from_child {
+                    child
+                } else {
+                    ViewportId::ROOT
+                };
+                app.in_window(poller, |app| match source {
+                    Completion::Clone => app.poll_clone(&ctx),
+                    Completion::Connection => app.poll_connecting(&ctx),
+                    Completion::Link => app.poll_launch(&ctx),
+                });
+                assert_eq!(app.windows.parked[&child].active, 0);
+                assert!(
+                    matches!(&app.windows.parked[&child].tabs[0], Tab::Repo(repo) if repo.has_test_credentials("recorded-user", "recorded-secret") != matches!(source, Completion::Link))
+                );
+                assert!(matches!(app.tabs.first(), Some(Tab::Home)));
+                // A completion may find its target in a different live window.
+                app.recorded_connection_completion(ViewportId::ROOT, root.clone());
+                app.poll_connecting(&ctx);
+                assert!(
+                    matches!(&app.windows.parked[&child].tabs[0], Tab::Repo(repo) if repo.has_test_credentials("recorded-user", "recorded-secret"))
+                );
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn closed_owner_falls_back_to_root_not_the_polling_peer() -> Result<(), String> {
+        let h = harness();
+        let mut app = h.state().app.lock().map_err(|e| e.to_string())?;
+        let peer = ViewportId::from_hash_of("polling-peer");
+        app.windows
+            .parked
+            .insert(peer, Window::new(vec![Tab::Home], ViewportId::ROOT, None));
+        app.in_window(peer, |app| {
+            app.in_window(ViewportId::from_hash_of("closed-owner"), |app| {
+                assert_eq!(app.windows.current, ViewportId::ROOT);
+                app.error = Some("recorded result".into());
+            });
+            assert_eq!(app.windows.current, peer);
+            assert!(app.error.is_none());
+        });
+        assert_eq!(app.error.as_deref(), Some("recorded result"));
+        Ok(())
+    }
+
+    #[test]
+    fn hidden_logic_advances_the_patch_queue_without_a_paint_pass() -> Result<(), String> {
+        let h = harness();
+        let ctx = h.ctx.clone();
+        let mut app = h.state().app.lock().map_err(|e| e.to_string())?;
+        app.tabs = vec![Tab::Home];
+        app.patches
+            .push("recorded.patch".into(), "/no-live-session".into());
+        let before = app.toasts.len();
+        let _ = ctx.run_logic(&egui::RawInput::default(), |ctx| app.tick_model(ctx, None));
+        assert!(app.patches.is_empty());
+        assert_eq!(app.toasts.len(), before + 1);
+        let _ = ctx.run_logic(&egui::RawInput::default(), |ctx| app.tick_model(ctx, None));
+        assert_eq!(app.toasts.len(), before + 1);
+        Ok(())
+    }
+
+    #[test]
+    fn restored_bounds_delegate_placement_and_fit_the_available_monitor() {
+        assert_eq!(
+            bounded_size(egui::vec2(5000.0, 4000.0), Some(egui::vec2(1280.0, 720.0))),
+            egui::vec2(1216.0, 656.0)
+        );
+        assert_eq!(
+            bounded_size(egui::vec2(f32::NAN, 0.0), Some(egui::vec2(640.0, 480.0))),
+            egui::vec2(576.0, 416.0)
+        );
+    }
+
+    #[test]
+    fn mixed_dpi_strips_and_source_pointer_use_physical_desktop_pixels() -> Result<(), String> {
+        let h = harness();
+        let ctx = h.ctx.clone();
+        ctx.set_embed_viewports(false);
+        let mut app = h.state().app.lock().map_err(|e| e.to_string())?;
+        app.tabs = vec![deferred("/virtual/drag-source", &ctx)];
+        let peer = ViewportId::from_hash_of("two-times-scale");
+        app.windows
+            .parked
+            .insert(peer, Window::new(vec![Tab::Home], ViewportId::ROOT, None));
+        let mut raw = egui::RawInput {
+            viewport_id: peer,
+            ..Default::default()
+        };
+        let info = raw.viewports.entry(peer).or_default();
+        info.native_pixels_per_point = Some(2.0);
+        info.inner_rect = Some(Rect::from_min_size(
+            egui::pos2(800.0, 50.0),
+            egui::vec2(400.0, 300.0),
+        ));
+        app.windows.current = peer;
+        ctx.run_ui(raw, |ui| {
+            app.window_strip(
+                ui.ctx(),
+                Rect::from_min_size(Pos2::ZERO, egui::vec2(400.0, 20.0)),
+            )
+        })
+        .drop_without_applying_deltas();
+        assert_eq!(
+            app.windows.strips[&peer],
+            Rect::from_min_size(egui::pos2(1600.0, 100.0), egui::vec2(800.0, 40.0))
+        );
+        app.windows.current = ViewportId::ROOT;
+        let mut raw = egui::RawInput {
+            events: vec![egui::Event::PointerMoved(egui::pos2(1700.0, 120.0))],
+            ..Default::default()
+        };
+        let info = raw.viewports.entry(ViewportId::ROOT).or_default();
+        info.native_pixels_per_point = Some(1.0);
+        info.inner_rect = Some(Rect::from_min_size(Pos2::ZERO, egui::vec2(1200.0, 800.0)));
+        ctx.run_ui(raw, |ui| {
+            assert_eq!(
+                app.drop_window_target(
+                    0,
+                    Rect::from_min_size(Pos2::ZERO, egui::vec2(900.0, 40.0)),
+                    ui.ctx()
+                ),
+                Some((Some(peer), egui::pos2(1700.0, 120.0)))
+            );
+        })
+        .drop_without_applying_deltas();
+        Ok(())
+    }
+
+    #[test]
+    fn new_window_applies_physical_drop_position_using_its_actual_scale() -> Result<(), String> {
+        let h = harness();
+        let ctx = h.ctx.clone();
+        ctx.set_embed_viewports(false);
+        let owner = h.state().app.clone();
+        let id = ViewportId::from_hash_of("positioned-child");
+        let physical = egui::pos2(1700.0, 120.0);
+        let mut window = Window::new(vec![Tab::Home], ViewportId::ROOT, None);
+        window.place_at_pixels = Some(physical);
+        owner
+            .lock()
+            .map_err(|e| e.to_string())?
+            .windows
+            .parked
+            .insert(id, window);
+        let mut raw = egui::RawInput {
+            viewport_id: id,
+            ..Default::default()
+        };
+        raw.viewports.entry(id).or_default().native_pixels_per_point = Some(2.0);
+        let output = ctx.run_ui(raw, |ui| {
+            DesktopApp::child(&Arc::downgrade(&owner), &h.state().cache, id, ui)
+        });
+        assert!(
+            output.viewport_output[&id]
+                .commands
+                .contains(&egui::ViewportCommand::OuterPosition(physical / 2.0))
+        );
+        output.drop_without_applying_deltas();
+        assert!(
+            owner.lock().map_err(|e| e.to_string())?.windows.parked[&id]
+                .place_at_pixels
+                .is_none()
+        );
+        Ok(())
     }
 }

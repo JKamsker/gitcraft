@@ -60,7 +60,7 @@ pub(super) fn show(
 }
 
 /// The window as it is asked for every frame (a changed title is applied to it).
-fn builder(title: &str) -> ViewportBuilder {
+pub(super) fn builder(title: &str) -> ViewportBuilder {
     ViewportBuilder::default()
         .with_title(title)
         .with_app_id("gitcraft")

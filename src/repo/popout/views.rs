@@ -10,6 +10,25 @@ use crate::repo::{Action, RepoTab, pr_review};
 use crate::theme::Tokens;
 
 impl RepoTab {
+    #[cfg(test)]
+    pub(crate) fn set_test_popout(&mut self, panel: Panel) {
+        self.popouts.pop_out(panel);
+    }
+
+    /// Immutable declarations retained while a native nested event loop prevents
+    /// the coordinator from borrowing this session to draw its immediate panels.
+    pub(crate) fn popout_window_specs(&self) -> Vec<(egui::ViewportId, egui::ViewportBuilder)> {
+        self.popouts
+            .popped()
+            .map(|panel| {
+                (
+                    viewport_id(&self.path, panel),
+                    window::builder(&title(&self.name, &self.popout_subject(panel))),
+                )
+            })
+            .collect()
+    }
+
     /// Draws the windows of the views popped out of this tab, and carries out what is done in
     /// them. Called every frame for every repository tab after the tab shown is drawn (`shown`:
     /// this is that one), so switching tabs leaves the windows open; a tab closed stops calling

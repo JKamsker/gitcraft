@@ -592,10 +592,7 @@ impl App {
             },
         );
         // A focused text field or the terminal keeps these keys for itself.
-        let modal_open = self.clone_form.is_some()
-            || self.remote_form.is_some()
-            || self.teleport.is_some()
-            || self.my_work.open
+        let modal_open = self.window_has_dialog()
             || self.askpass_open()
             || self.palette.is_some()
             || self.manual_open
@@ -659,11 +656,7 @@ impl App {
     ) -> bool {
         use keymap::Command;
         // Not over a dialog that asks something (the clone, the remote one, ssh's question).
-        let asking = self.clone_form.is_some()
-            || self.remote_form.is_some()
-            || self.teleport.is_some()
-            || self.my_work.open
-            || self.askpass_open();
+        let asking = self.window_has_dialog() || self.askpass_open();
         match command {
             Command::Manual if !asking && self.palette.is_none() => {
                 self.manual_open = !self.manual_open;
@@ -721,6 +714,7 @@ impl App {
                     || self.clone_form.is_some()
                     || self.remote_form.is_some()
                     || self.teleport.is_some()
+                    || self.repo_scan.is_some()
                     || self.my_work.open
                     || asking;
                 // Its widgets' state (scroll offsets, text fields' undo, open menus) is its own:
@@ -753,6 +747,9 @@ impl App {
     /// Model work only: called by eframe even while the root has no painting pass, and
     /// by deferred children. Channel draining and service deadlines keep a single owner.
     fn tick_model(&mut self, ctx: &egui::Context, frame: Option<&eframe::Frame>) {
+        // eframe also accepts Close from logic-only passes of hidden/minimized roots.
+        self.close_root_with_children(ctx);
+        self.wake_askpass_owner(ctx);
         self.settings = Settings::get(ctx);
         crate::portable::set_credential_store(self.settings.portable_credential_store);
         crate::network::set_choices(self.settings.offline, self.settings.pause_on_metered);
@@ -764,6 +761,7 @@ impl App {
         self.poll_clone(ctx);
         self.poll_connecting(ctx);
         self.poll_launch(ctx);
+        self.poll_window_models(ctx);
         self.poll_update(ctx);
         self.poll_inbox_opening(ctx);
         self.agent_requests(ctx);
@@ -778,6 +776,7 @@ impl App {
                 r.poll_parked(ctx);
             }
         }
+        self.advance_patches(ctx);
         if let Some(frame) = frame {
             self.os_shell(ctx, frame);
         }
@@ -943,6 +942,10 @@ impl eframe::App for App {
 
     fn on_exit(&mut self) {
         self.stop_teleport();
+        let owners = self.windows.parked.keys().copied().collect::<Vec<_>>();
+        for owner in owners {
+            self.in_window(owner, Self::stop_teleport);
+        }
         self.close_drafts();
         crate::instance::closing();
     }

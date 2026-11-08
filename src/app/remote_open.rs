@@ -39,6 +39,7 @@ pub(super) struct RemoteForm {
 
 /// A repository on another machine being reached: where, and what came of it.
 pub(super) struct Connecting {
+    owner: egui::ViewportId,
     /// Where, as the start page says it.
     pub(super) label: String,
     rx: Receiver<Result<PathBuf, String>>,
@@ -155,6 +156,25 @@ impl RemoteForm {
 }
 
 impl App {
+    #[cfg(test)]
+    pub(super) fn recorded_connection_completion(
+        &mut self,
+        owner: egui::ViewportId,
+        root: PathBuf,
+    ) {
+        let (tx, rx) = channel();
+        let _ = tx.send(Ok(root));
+        self.connecting.push(Connecting {
+            owner,
+            label: "recorded".into(),
+            rx,
+            creds: Some(git::Credentials {
+                username: "recorded-user".into(),
+                password: "recorded-secret".into(),
+            }),
+        });
+    }
+
     pub(super) fn start_open_remote(&mut self, ctx: &egui::Context) {
         self.remote_form = Some(RemoteForm::new(ctx));
     }
@@ -195,7 +215,12 @@ impl App {
             self.toasts
                 .push(Toast::new(format!("Connecting to {label}…"), false));
         }
-        self.connecting.push(Connecting { label, rx, creds });
+        self.connecting.push(Connecting {
+            owner: self.windows.current,
+            label,
+            rx,
+            creds,
+        });
     }
 
     /// Opens the repositories reached since, each in its tab; says why one couldn't be.
@@ -203,25 +228,31 @@ impl App {
         let mut done = Vec::new();
         self.connecting.retain(|c| match c.rx.try_recv() {
             Ok(result) => {
-                done.push((result, c.creds.clone()));
+                done.push((c.owner, result, c.creds.clone()));
                 false
             }
             Err(std::sync::mpsc::TryRecvError::Empty) => true,
             Err(std::sync::mpsc::TryRecvError::Disconnected) => false,
         });
-        for (result, creds) in done {
-            match result {
-                Ok(root) => {
-                    self.open_root(root.clone(), ctx);
-                    if let Some(creds) = creds
-                        && let Some(Tab::Repo(repo)) = self.tabs.get_mut(self.active)
-                        && repo.path == root
-                    {
-                        repo.set_credentials(creds);
-                    }
+        for (owner, result, creds) in done {
+            self.in_window(owner, |app| app.finish_connection(result, creds, ctx));
+        }
+    }
+
+    pub(super) fn finish_connection(
+        &mut self,
+        result: Result<PathBuf, String>,
+        creds: Option<git::Credentials>,
+        ctx: &egui::Context,
+    ) {
+        match result {
+            Ok(root) => {
+                self.open_root(root.clone(), ctx);
+                if let Some(creds) = creds {
+                    self.credentials_for(&root, creds);
                 }
-                Err(e) => self.report(e),
             }
+            Err(e) => self.report(e),
         }
     }
 

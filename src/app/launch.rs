@@ -14,13 +14,23 @@ use crate::launch::{Command, Resolved, Then};
 /// Requests being made sense of, and those waiting for their repository's tab.
 #[derive(Default)]
 pub(super) struct Launching {
-    resolving: Vec<Receiver<Result<Resolved, String>>>,
+    resolving: Vec<(egui::ViewportId, Receiver<Result<Resolved, String>>)>,
     /// What to show once the tab of each folder is there (one elsewhere opens in the
     /// background).
     waiting: Vec<(PathBuf, Then)>,
 }
 
 impl App {
+    #[cfg(test)]
+    pub(super) fn recorded_launch_completion(&mut self, owner: egui::ViewportId, root: PathBuf) {
+        let (tx, rx) = channel();
+        let _ = tx.send(Ok(Resolved {
+            root,
+            then: Then::Nothing,
+        }));
+        self.launching.resolving.push((owner, rx));
+    }
+
     /// Starts carrying out `cmd`, its relative paths taken from `cwd`.
     pub(crate) fn launch(&mut self, cmd: Command, cwd: PathBuf, ctx: &egui::Context) {
         match cmd {
@@ -76,38 +86,48 @@ impl App {
             let _ = tx.send(crate::launch::resolve::resolve_among(&cmd, &cwd, &clones));
             ctx.request_repaint();
         });
-        self.launching.resolving.push(rx);
+        self.launching.resolving.push((self.windows.current, rx));
     }
 
     /// Takes in resolved requests, and shows what each asked for once its tab is open.
     pub(super) fn poll_launch(&mut self, ctx: &egui::Context) {
         let mut done = Vec::new();
-        self.launching.resolving.retain(|rx| match rx.try_recv() {
-            Ok(result) => {
-                done.push(result);
-                false
-            }
-            Err(TryRecvError::Empty) => true,
-            Err(TryRecvError::Disconnected) => false,
-        });
-        for result in done {
-            match result {
-                Ok(Resolved {
-                    then: Then::Clone(url),
-                    ..
-                }) => self.offer_clone(url),
-                Ok(resolved) => {
-                    if crate::remote::is_remote(&resolved.root) {
-                        self.open_repo(&resolved.root, ctx);
-                    } else {
-                        // Already the top folder, as tabs name it.
-                        self.open_root(resolved.root.clone(), ctx);
-                    }
-                    self.launching.waiting.push((resolved.root, resolved.then));
+        self.launching
+            .resolving
+            .retain(|(owner, rx)| match rx.try_recv() {
+                Ok(result) => {
+                    done.push((*owner, result));
+                    false
                 }
-                Err(e) => self.report(e),
-            }
+                Err(TryRecvError::Empty) => true,
+                Err(TryRecvError::Disconnected) => false,
+            });
+        for (owner, result) in done {
+            self.in_window(owner, |app| app.finish_launch(result, ctx));
         }
+        self.finish_waiting_launches(ctx);
+    }
+
+    fn finish_launch(&mut self, result: Result<Resolved, String>, ctx: &egui::Context) {
+        match result {
+            Ok(Resolved {
+                then: Then::Clone(url),
+                ..
+            }) => self.offer_clone(url),
+            Ok(resolved) => {
+                if crate::remote::is_remote(&resolved.root) {
+                    self.open_repo(&resolved.root, ctx);
+                } else {
+                    // Already the top folder, as tabs name it.
+                    self.open_root(resolved.root.clone(), ctx);
+                }
+                self.launching.waiting.push((resolved.root, resolved.then));
+            }
+            Err(e) => self.report(e),
+        }
+    }
+
+    fn finish_waiting_launches(&mut self, ctx: &egui::Context) {
         let waiting = std::mem::take(&mut self.launching.waiting);
         for (root, then) in waiting {
             match self.tab_of(&root) {

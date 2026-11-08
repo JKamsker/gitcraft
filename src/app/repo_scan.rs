@@ -305,6 +305,11 @@ enum ScanClick {
 }
 
 impl App {
+    pub(super) fn poll_repo_scan(&mut self) {
+        if let Some(scan) = &mut self.repo_scan {
+            scan.poll();
+        }
+    }
     /// Asks for a folder and starts scanning it.
     pub(super) fn start_repo_scan(&mut self, ctx: &egui::Context) {
         if let Some(dir) = rfd::FileDialog::new()
@@ -320,7 +325,6 @@ impl App {
         let Some(scan) = &mut self.repo_scan else {
             return;
         };
-        scan.poll();
         let t = Tokens::get(ctx);
         let frame = egui::Frame::new()
             .fill(t.card)

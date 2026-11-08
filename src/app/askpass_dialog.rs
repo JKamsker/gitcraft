@@ -20,13 +20,34 @@ pub(super) struct AskpassState {
 }
 
 impl App {
+    pub(super) fn wake_askpass_owner(&self, ctx: &egui::Context) {
+        if let Some(question) = askpass::pending()
+            && self.askpass.shown != Some(question.id)
+        {
+            for command in [
+                egui::ViewportCommand::Visible(true),
+                egui::ViewportCommand::Minimized(false),
+                egui::ViewportCommand::Focus,
+            ] {
+                ctx.send_viewport_cmd_to(egui::ViewportId::ROOT, command);
+            }
+            ctx.request_repaint_of(egui::ViewportId::ROOT);
+        }
+    }
+
     /// Whether ssh is asking something (the dialog takes the keyboard).
     pub(super) fn askpass_open(&self) -> bool {
-        self.askpass.shown.is_some()
+        self.askpass.shown.is_some() || askpass::pending().is_some()
     }
 
     /// Shows ssh's oldest question, if any, and sends the answer back.
     pub(super) fn askpass_dialog(&mut self, ctx: &egui::Context) {
+        // Authentication is deliberately application-modal: its shared SSH queue
+        // has no viewport identity. Only ROOT presents it; all shells block commands
+        // through askpass_open(), rather than racing to edit the same secret.
+        if self.windows.current != egui::ViewportId::ROOT {
+            return;
+        }
         for notice in askpass::take_notices() {
             self.toasts.push(Toast::new(notice, false));
         }

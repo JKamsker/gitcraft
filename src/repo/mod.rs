@@ -794,6 +794,13 @@ impl RepoTab {
     pub fn set_credentials(&mut self, creds: git::Credentials) {
         self.credentials = Some(creds);
     }
+
+    #[cfg(test)]
+    pub(crate) fn has_test_credentials(&self, username: &str, password: &str) -> bool {
+        self.credentials
+            .as_ref()
+            .is_some_and(|c| c.username == username && c.password == password)
+    }
 }
 
 /// A hash as the UI shows it: its first 8 characters.
