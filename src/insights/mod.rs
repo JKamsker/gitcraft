@@ -17,6 +17,7 @@ pub mod evolution;
 pub mod history;
 pub mod review_heat;
 pub mod ribbons;
+pub mod transform;
 
 /// Where what a view shows came from, and how far it can be trusted: shown above every view.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
