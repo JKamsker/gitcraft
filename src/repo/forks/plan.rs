@@ -210,7 +210,7 @@ pub(crate) fn checkout(
     if !info.cross {
         return Err(crate::i18n::message(
             "repo-workflows-forks-checkout-13fc08d7",
-            &[("info-number-1", (info.number).clone().into())],
+            &[("info-number-1", (info.number).to_string().into())],
         ));
     }
     if !info.maintainers_can_edit {
@@ -218,7 +218,7 @@ pub(crate) fn checkout(
             "repo-workflows-forks-checkout-625f9e12",
             &[
                 ("info-owner-1", (info.owner).clone().into()),
-                ("info-number-2", (info.number).clone().into()),
+                ("info-number-2", (info.number).to_string().into()),
             ],
         ));
     }
@@ -226,7 +226,7 @@ pub(crate) fn checkout(
         return Err(crate::i18n::message(
             "repo-workflows-forks-checkout-00c3592c",
             &[
-                ("info-number-1", (info.number).clone().into()),
+                ("info-number-1", (info.number).to_string().into()),
                 ("info-branch-2", (info.branch).clone().into()),
             ],
         ));
@@ -385,7 +385,7 @@ pub(crate) fn plan_rebase(
         crate::i18n::message(
             "repo-workflows-forks-plan-rebase-b597bd2f",
             &[
-                ("info-number-1", (info.number).clone().into()),
+                ("info-number-1", (info.number).to_string().into()),
                 ("info-owner-2", (info.owner).clone().into()),
             ],
         )
@@ -405,7 +405,7 @@ pub(crate) fn plan_rebase(
             crate::i18n::message(
                 "repo-workflows-forks-plan-rebase-a0b078e0",
                 &[
-                    ("info-number-1", (info.number).clone().into()),
+                    ("info-number-1", (info.number).to_string().into()),
                     ("info-owner-2", (info.owner).clone().into()),
                 ],
             )

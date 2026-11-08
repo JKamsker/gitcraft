@@ -61,7 +61,7 @@ impl RepoTab {
                                     if ui
                                         .link(crate::i18n::message(
                                             "repo-workflows-stack-graph-stacks-db1982a0",
-                                            &[("pr-number-1", (pr.number).clone().into())],
+                                            &[("pr-number-1", (pr.number).to_string().into())],
                                         ))
                                         .on_hover_text(&pr.title)
                                         .clicked()

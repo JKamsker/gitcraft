@@ -261,10 +261,7 @@ fn page_header(ui: &mut Ui, view: &PrView, popped: bool, acts: &mut Vec<Action>)
         Some(Ok(details)) => Some(details.url.clone()),
         _ => None,
     };
-    let title = crate::i18n::message(
-        "repo-workflows-pr_view-page-header-38cc20ee",
-        &[("view-number-1", (view.number).clone().into())],
-    );
+    let title = pull_request_title(view.number);
     let loading = view.loading;
     widgets::panel_header(ui, &title, |ui| {
         let tip = popout::close_tip(
@@ -697,5 +694,30 @@ fn commits(ui: &mut Ui, d: &PrDetails, signoffs: Option<&dco::PrSignoffs>) {
             ui.label(&commit.headline);
             ui.label(RichText::new(&commit.author).color(t.text_faint).small());
         });
+    }
+}
+
+fn pull_request_title(number: u64) -> String {
+    crate::i18n::message(
+        "repo-workflows-pr_view-page-header-38cc20ee",
+        &[("view-number-1", number.to_string().into())],
+    )
+}
+#[cfg(test)]
+mod fluent_provider_identifier_tests {
+    use super::*;
+    #[test]
+    fn fluent_partition_actual_pr_header_preserves_provider_identifier_while_counts_group() {
+        for language in ["en-US", "de", "en-US"] {
+            crate::i18n::set_language(language);
+            let title = pull_request_title(1234);
+            assert!(title.ends_with("#1234"));
+            assert!(!title.contains("1.234"));
+            assert!(!title.contains("1,234"));
+            assert_eq!(
+                crate::i18n::number(1234usize),
+                if language == "de" { "1.234" } else { "1,234" }
+            );
+        }
     }
 }

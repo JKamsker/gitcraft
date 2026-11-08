@@ -321,7 +321,7 @@ fn body(ui: &mut egui::Ui, view: &mut DriftView, acts: &mut Vec<Action>) -> Todo
             Ok(text) => crate::i18n::message(
                 "repo-workflows-drift_view-body-cdc38d02",
                 &[
-                    ("n", (n).clone().into()),
+                    ("n", (n).to_string().into()),
                     (
                         "text-lines-next-unwrap-or-defaul-1",
                         (text.lines().next().unwrap_or_default()).clone().into(),
@@ -331,7 +331,7 @@ fn body(ui: &mut egui::Ui, view: &mut DriftView, acts: &mut Vec<Action>) -> Todo
             Err(e) => crate::i18n::message(
                 "repo-workflows-drift_view-body-fa4f662d",
                 &[
-                    ("n", (n).clone().into()),
+                    ("n", (n).to_string().into()),
                     ("e", crate::drift::display::diagnostic(e).into()),
                 ],
             ),

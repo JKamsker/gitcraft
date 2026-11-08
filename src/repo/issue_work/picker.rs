@@ -482,7 +482,7 @@ fn issue_row(ui: &mut Ui, issue: &Issue, chosen: bool) -> bool {
             crate::i18n::message(
                 "repo-workflows-issue_work-issue-row-91765782",
                 &[
-                    ("issue-number-1", (issue.number).clone().into()),
+                    ("issue-number-1", (issue.number).to_string().into()),
                     ("issue-title-2", (issue.title).clone().into()),
                 ],
             )

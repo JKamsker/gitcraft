@@ -135,7 +135,7 @@ fn base_of(repo: &Path, pr: &PrHead, seen: Option<&Series>) -> Result<String, St
     }
     Err(crate::i18n::message(
         "repo-workflows-versions-base-of-e9c2679e",
-        &[("pr-number-1", (pr.number).clone().into())],
+        &[("pr-number-1", (pr.number).to_string().into())],
     ))
 }
 

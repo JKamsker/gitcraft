@@ -340,7 +340,7 @@ fn plan_row(
                 &[
                     ("noun", (noun).clone().into()),
                     ("plan-base-1", (plan.base).clone().into()),
-                    ("n", (n).clone().into()),
+                    ("n", (n).to_string().into()),
                 ],
             ),
             t.accent,
@@ -349,7 +349,7 @@ fn plan_row(
             crate::i18n::message(
                 "repo-workflows-stack-plan-row-1004d25d",
                 &[
-                    ("number", (number).clone().into()),
+                    ("number", (number).to_string().into()),
                     ("plan-base-1", (plan.base).clone().into()),
                     ("from", (from).clone().into()),
                 ],
@@ -359,14 +359,14 @@ fn plan_row(
         Step::Push(n) => (
             crate::i18n::message(
                 "repo-workflows-stack-plan-row-c5790350",
-                &[("n", (n).clone().into())],
+                &[("n", (n).to_string().into())],
             ),
             t.text_dim,
         ),
         Step::Merged(n) => (
             crate::i18n::message(
                 "repo-workflows-stack-plan-row-6a96cf4f",
-                &[("n", (n).clone().into())],
+                &[("n", (n).to_string().into())],
             ),
             t.text_faint,
         ),

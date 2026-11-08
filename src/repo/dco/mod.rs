@@ -71,7 +71,7 @@ impl Reason {
             ),
             Reason::FailingCheck(n) => crate::i18n::message(
                 "repo-workflows-dco-text-dc4915c9",
-                &[("n", (n).clone().into())],
+                &[("n", (n).to_string().into())],
             ),
         }
     }
