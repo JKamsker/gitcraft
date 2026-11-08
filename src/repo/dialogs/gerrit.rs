@@ -22,7 +22,7 @@ pub(super) fn review(
         &crate::i18n::message(
             "repo-core-1328",
             &[
-                ("min", (&head[..head.len().min(8)]).to_string().into()),
+                ("min", head[..head.len().min(8)].to_string().into()),
                 ("remote", remote.to_string().into()),
             ],
         ),

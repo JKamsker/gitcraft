@@ -361,7 +361,7 @@ impl Form {
                 if ui
                     .button(crate::i18n::message(
                         "repo-core-1178",
-                        &[("hash", (&self.commits[i].hash[..8]).to_string().into())],
+                        &[("hash", self.commits[i].hash[..8].to_string().into())],
                     ))
                     .clicked()
                 {
