@@ -412,8 +412,9 @@ mod fluent_confirmation_tests {
                 let expected_label = format!("Turn on: {}", titles[index].to_lowercase());
                 match action {
                     Action::Doctor(DoctorAct::Confirm(confirmation)) if index == 1 => {
+                        let (title, body, button) = confirmation.displayed();
                         assert_eq!(
-                            confirmation.title,
+                            title,
                             if language == "de" {
                                 "Wartung planen?"
                             } else {
@@ -421,15 +422,15 @@ mod fluent_confirmation_tests {
                             }
                         );
                         assert_eq!(
-                            confirmation.button,
+                            button,
                             if language == "de" {
                                 "Planen"
                             } else {
                                 "Schedule"
                             }
                         );
-                        assert!(confirmation.body.starts_with("git maintenance start "));
-                        assert!(confirmation.body.contains(if language == "de" {
+                        assert!(body.starts_with("git maintenance start "));
+                        assert!(body.contains(if language == "de" {
                             "trägt dieses Repository"
                         } else {
                             "adds this repository"
@@ -442,10 +443,7 @@ mod fluent_confirmation_tests {
                             "git maintenance unregister",
                             "git maintenance stop",
                         ] {
-                            assert!(
-                                confirmation.body.contains(literal),
-                                "missing literal {literal}"
-                            );
+                            assert!(body.contains(literal), "missing literal {literal}");
                         }
                         assert_eq!(confirmation.label, expected_label);
                         assert_eq!(confirmation.ops, expected_ops[index]);
@@ -486,5 +484,56 @@ mod fluent_confirmation_tests {
         }
         crate::i18n::set_language("en-US");
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod fluent_r1_maintenance_cache_tests {
+    use super::*;
+    #[test]
+    fn fluent_partition_r1_actual_maintenance_selection_retains_raw_control_and_cached_command_provenance()
+     {
+        let suggestions = health::suggestions(&Health::default());
+        let suggestion = suggestions
+            .iter()
+            .find(|s| s.title == "Scheduled maintenance")
+            .unwrap();
+        let commands: Vec<_> = suggestion
+            .ops
+            .iter()
+            .map(|op| format!("git {}", op.join(" ")))
+            .collect();
+        crate::i18n::set_language("de");
+        let Action::Doctor(DoctorAct::Confirm(confirm)) = turn_on_action(suggestion, &commands)
+        else {
+            panic!("maintenance must confirm")
+        };
+        let raw = (
+            confirm.title.clone(),
+            confirm.body.clone(),
+            confirm.button.clone(),
+            confirm.label.clone(),
+            confirm.ops.clone(),
+        );
+        assert_eq!(raw.0, "Schedule maintenance?");
+        assert_eq!(raw.3, "Turn on: scheduled maintenance");
+        for lang in ["de", "en-US", "de"] {
+            crate::i18n::set_language(lang);
+            let (title, body, button) = confirm.displayed();
+            assert_eq!(title == raw.0, lang == "en-US");
+            assert_eq!(button == raw.2, lang == "en-US");
+            assert!(body.starts_with(&commands.join(", ")));
+            assert_eq!(
+                (
+                    confirm.title.clone(),
+                    confirm.body.clone(),
+                    confirm.button.clone(),
+                    confirm.label.clone(),
+                    confirm.ops.clone()
+                ),
+                raw
+            );
+        }
+        crate::i18n::set_language("en-US");
     }
 }
