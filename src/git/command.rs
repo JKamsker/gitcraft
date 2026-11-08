@@ -484,7 +484,7 @@ fn execute_there(target: &Target, extra: &Extra, args: &[&str]) -> Result<Ran, S
     let out = remote::exec(&target.host, &remote_request(target, extra, args))?;
     // The folder is gone (or never was) on that machine.
     if out.code == 1 && remote::is_missing_folder(&out.stderr) {
-        return Err(missing_folder(&target));
+        return Err(missing_folder(target));
     }
     let (stderr, events) = if extra.trace_hooks {
         super::hooks::split_trace(&out.stderr)
