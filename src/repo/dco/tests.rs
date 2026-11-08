@@ -298,7 +298,7 @@ fn commits_on_the_remote_that_the_branch_hasnt_are_never_pushed_over() {
 /// Pushed meanwhile and not fetched: the lease refuses the push, the remote keeps their commit,
 /// and the rewrite done here is undoable all the same.
 #[test]
-fn a_refused_push_leaves_the_rewrite_undoable_here() {
+fn a_refused_push_leaves_the_rewrite_undoable_here() -> Result<(), String> {
     let (dir, bare) = pushed_branch("lease");
     let ctx = egui::Context::default();
     let mut tab = open(&dir, &ctx);
@@ -311,8 +311,6 @@ fn a_refused_push_leaves_the_rewrite_undoable_here() {
         &ctx,
     );
     wait(&mut tab, &ctx, |tab| tab.dialog.is_some());
-    // Someone else pushes to feat while the dialog is open.
-    let (other, theirs) = push_as_someone_else(&bare, "lease-other");
     // As the dialog's button does.
     if let Some(Dialog::Confirm {
         title, ops, undo, ..
@@ -328,7 +326,36 @@ fn a_refused_push_leaves_the_rewrite_undoable_here() {
             &ctx,
         );
     }
+    wait(&mut tab, &ctx, |tab| {
+        tab.busy_op.is_none() && tab.dialog.is_some()
+    });
+    let plan = crate::repo::push_preflight::test_support::review(&mut tab, &ctx)
+        .map_err(|e| format!("DCO push review before dispatch: {e}"))?;
+    assert_ne!(
+        git::head(&dir),
+        head,
+        "review must describe the rewritten source"
+    );
+    assert_eq!(missing_on(&dir, "HEAD"), 0);
+    assert_eq!(
+        git::resolve(&bare, "refs/heads/feat").ok().as_deref(),
+        Some(head.as_str())
+    );
+    assert_eq!(plan.head, git::head(&dir));
+    assert_eq!(plan.base.as_deref(), Some(head.as_str()));
+    // The receiver moves only after inspection; the actual server lease must refuse it.
+    let (other, theirs) = push_as_someone_else(&bare, "lease-other");
+    tab.apply(Action::SubmitPreflight(Box::new(plan)), &ctx);
     settle(&mut tab, &ctx);
+    assert!(
+        tab.activity
+            .entries
+            .back()
+            .is_some_and(|entry| matches!(&entry.outcome,
+        crate::repo::activity::Outcome::Failed(error) if error.contains("stale info"))),
+        "{:?}",
+        tab.activity.entries.back()
+    );
     wait(&mut tab, &ctx, |tab| {
         !tab.timeline.entries.iter().all(|e| e.undo.is_none())
     });
@@ -350,6 +377,7 @@ fn a_refused_push_leaves_the_rewrite_undoable_here() {
         "the rewrite is undoable"
     );
     assert_eq!(back, head);
+    Ok(())
 }
 
 #[test]
