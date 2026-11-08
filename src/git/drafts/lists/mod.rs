@@ -236,18 +236,12 @@ fn publish(
     }
     let head = view.source.head.as_deref().ok_or("No initial commit")?;
     let mut tx = "start\n".to_owned();
-    if let Some(commit) = commit {
-        tx.push_str(&format!("update HEAD {commit} {head}\n"));
-    } else {
-        tx.push_str(&format!(
-            "option no-deref\nsymref-verify HEAD {branch}\nverify {branch} {head}\n"
-        ));
-    }
+    tx.push_str(&format!("update HEAD {} {head}\n", commit.unwrap_or(head)));
     tx.push_str(&format!(
         "update {} {new} {old}\nprepare\ncommit\n",
         view.reference
     ));
-    if commit.is_some() {
+    {
         // Git locks symbolic HEAD and its referent natively. The fixed prepared hook
         // binds that referent, so a concurrent checkout cannot redirect the operation.
         let script = format!(
