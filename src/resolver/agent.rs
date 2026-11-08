@@ -2,7 +2,7 @@
 //! it is told, how it reaches gitcraft (`gitcraft mcp --run <id>`, whose `resolve_*` tools take
 //! its reports), and what of its output is shown as it works.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use serde_json::{Value, json};
 
@@ -65,14 +65,80 @@ pub fn claude_mcp_config(exe: &Path, dir: &Path, run: &str) -> Value {
     })
 }
 
-/// A TOML literal string (`'…'`), for Codex's `-c` settings; none can hold a `'`.
+/// A TOML literal string, for Codex's `-c` settings: `'…'`, or `'''…'''` for one with a `'` in
+/// it (`C:\Users\O'Brien`). Never a `"…"` one: `cmd` can't be handed a word with a `"` in it
+/// (see `CommandLine::cmd`). Neither can hold `'''` nor a control character.
 fn toml_literal(text: &str) -> Result<String, String> {
-    if text.contains(['\'', '\n', '\r']) {
+    if text.contains("'''") || text.chars().any(|c| c.is_control() && c != '\t') {
         return Err(format!(
-            "{text} can't be handed to Codex (it has a quote in it)"
+            "{text} can't be handed to Codex (it has ''' or a control character in it)"
         ));
     }
-    Ok(format!("'{text}'"))
+    Ok(if text.contains('\'') {
+        format!("'''{text}'''")
+    } else {
+        format!("'{text}'")
+    })
+}
+
+/// Codex's own settings file: `$CODEX_HOME/config.toml`, `~/.codex/config.toml` by default.
+fn codex_config() -> Option<PathBuf> {
+    let var = |name: &str| std::env::var_os(name).filter(|v| !v.is_empty());
+    if let Some(home) = var("CODEX_HOME") {
+        return Some(PathBuf::from(home).join("config.toml"));
+    }
+    let homes: &[&str] = if cfg!(windows) {
+        &["USERPROFILE", "HOME"]
+    } else {
+        &["HOME"]
+    };
+    let home = homes.iter().find_map(|h| var(h))?;
+    Some(PathBuf::from(home).join(".codex").join("config.toml"))
+}
+
+/// The MCP servers Codex's settings (`config`, its `config.toml`) name, but gitcraft.
+fn codex_servers(config: &str) -> Vec<String> {
+    let Ok(doc) = toml_edit::Document::parse(config) else {
+        // Codex can't read it either, and stops.
+        return Vec::new();
+    };
+    let Some(servers) = doc
+        .as_table()
+        .get("mcp_servers")
+        .and_then(toml_edit::Item::as_table_like)
+    else {
+        return Vec::new();
+    };
+    servers
+        .iter()
+        .map(|(name, _)| name.to_owned())
+        .filter(|name| name != "gitcraft")
+        .collect()
+}
+
+/// The `-c` settings that leave Codex gitcraft's MCP server only: each of the user's `servers`
+/// is turned off, as are plugins and apps, which bring servers of their own. They run outside
+/// its sandbox, as the user, and could reach the checkout. Codex takes a server's name in a
+/// setting only bare (`a-z`, `0-9`, `_`, `-`): one it couldn't be told to leave off is refused.
+fn codex_isolation(servers: &[String]) -> Result<Vec<String>, String> {
+    let mut settings = vec![
+        "features.plugins=false".to_owned(),
+        "features.apps=false".to_owned(),
+    ];
+    for name in servers {
+        let bare = !name.is_empty()
+            && name
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-'));
+        if !bare {
+            return Err(format!(
+                "Codex's MCP server \"{name}\" can't be turned off for the agent: rename it \
+                 (letters, digits, - and _), or pick Claude Code in Settings → AI"
+            ));
+        }
+        settings.push(format!("mcp_servers.{name}.enabled=false"));
+    }
+    Ok(settings)
 }
 
 /// The command line that runs `engine` headless. `mcp_file` is where Claude Code's MCP
@@ -115,29 +181,50 @@ pub fn command(
             w
         }
         Engine::Codex => {
-            let args: Result<Vec<String>, String> =
-                mcp_args(dir, run).iter().map(|a| toml_literal(a)).collect();
-            let mut w = words(&[
-                "codex",
-                "exec",
-                "--json",
-                "--sandbox",
-                "workspace-write",
-                "--color",
-                "never",
-            ]);
-            w.push("-c".to_owned());
-            w.push(format!(
-                "mcp_servers.gitcraft.command={}",
-                toml_literal(&exe.display().to_string())?
-            ));
-            w.push("-c".to_owned());
-            w.push(format!("mcp_servers.gitcraft.args=[{}]", args?.join(",")));
-            w.push("-".to_owned());
-            w
+            let config = codex_config().and_then(|f| std::fs::read_to_string(f).ok());
+            codex_words(
+                exe,
+                dir,
+                run,
+                &codex_servers(config.as_deref().unwrap_or("")),
+            )?
         }
     };
     Ok(CommandLine::Words(line))
+}
+
+/// Codex's command line, the user's MCP `servers` turned off for it.
+fn codex_words(
+    exe: &Path,
+    dir: &Path,
+    run: &str,
+    servers: &[String],
+) -> Result<Vec<String>, String> {
+    let args: Result<Vec<String>, String> =
+        mcp_args(dir, run).iter().map(|a| toml_literal(a)).collect();
+    let mut w: Vec<String> = [
+        "codex",
+        "exec",
+        "--json",
+        "--sandbox",
+        "workspace-write",
+        "--color",
+        "never",
+    ]
+    .map(str::to_owned)
+    .to_vec();
+    let mut settings = codex_isolation(servers)?;
+    settings.push(format!(
+        "mcp_servers.gitcraft.command={}",
+        toml_literal(&exe.display().to_string())?
+    ));
+    settings.push(format!("mcp_servers.gitcraft.args=[{}]", args?.join(",")));
+    for setting in settings {
+        w.push("-c".to_owned());
+        w.push(setting);
+    }
+    w.push("-".to_owned());
+    Ok(w)
 }
 
 /// How the agent reads git: Claude Code has no shell (see [`CLAUDE_TOOLS`]).

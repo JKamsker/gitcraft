@@ -45,16 +45,8 @@ fn claude_runs_headless_with_only_gitcraft_and_safe_tools() -> Result<(), String
 
 #[test]
 fn codex_is_given_gitcraft_on_its_command_line() -> Result<(), String> {
-    let line = command(
-        Engine::Codex,
-        Path::new("/bin/gitcraft"),
-        Path::new(DIR),
-        "r1",
-        Path::new("/unused"),
-    )?;
-    let CommandLine::Words(words) = &line else {
-        return Err("not words".into());
-    };
+    // Without the user's own Codex settings in the way (see the test after the next).
+    let words = codex_words(Path::new("/bin/gitcraft"), Path::new(DIR), "r1", &[])?;
     assert_eq!(words[..3], ["codex", "exec", "--json"]);
     assert!(words.contains(&"mcp_servers.gitcraft.command='/bin/gitcraft'".to_owned()));
     assert!(words.contains(&format!(
@@ -66,16 +58,60 @@ fn codex_is_given_gitcraft_on_its_command_line() -> Result<(), String> {
         "the prompt comes on its input"
     );
     // A path TOML can't hold is refused, not mangled.
-    assert!(
-        command(
-            Engine::Codex,
-            Path::new("/o'brien/gitcraft"),
-            Path::new(DIR),
-            "r",
-            Path::new("/u")
-        )
-        .is_err()
+    let quotes = Path::new("/a'''b/gitcraft");
+    assert!(codex_words(quotes, Path::new(DIR), "r", &[]).is_err());
+    Ok(())
+}
+
+/// A home folder with a `'` in it (`C:\Users\O'Brien`) is a TOML string Codex reads back as
+/// it is, with no `"` in it for `cmd` to trip on.
+#[test]
+fn a_path_with_an_apostrophe_reaches_codex_as_it_is() -> Result<(), String> {
+    let exe = r"C:\Users\O'Brien\gitcraft.exe";
+    let words = codex_words(Path::new(exe), Path::new(DIR), "r1", &[])?;
+    let command = words
+        .iter()
+        .find_map(|w| w.strip_prefix("mcp_servers.gitcraft.command="))
+        .ok_or("no command")?;
+    assert!(!command.contains('"'), "{command}");
+    let doc = toml_edit::Document::parse(format!("v = {command}")).map_err(|e| e.to_string())?;
+    assert_eq!(doc.as_table().get("v").and_then(|v| v.as_str()), Some(exe));
+    assert_eq!(toml_literal("it's''")?, "'''it's'''''");
+    let doc = toml_edit::Document::parse("v = '''it's'''''").map_err(|e| e.to_string())?;
+    assert_eq!(
+        doc.as_table().get("v").and_then(|v| v.as_str()),
+        Some("it's''")
     );
+    assert!(toml_literal("a\nb").is_err());
+    Ok(())
+}
+
+/// The user's own MCP servers run outside Codex's sandbox: the agent is left gitcraft's only.
+#[test]
+fn codex_is_left_no_mcp_server_but_gitcraft() -> Result<(), String> {
+    let config = "model = 'o3'\n[mcp_servers.files]\ncommand = 'fs'\n\
+                  [mcp_servers.gitcraft]\ncommand = 'gitcraft'\n\
+                  [mcp_servers.docs]\nurl = 'https://x'\n";
+    let servers = codex_servers(config);
+    assert_eq!(servers, ["files", "docs"]);
+    assert!(codex_servers("not toml [").is_empty());
+    let words = codex_words(Path::new("/bin/gitcraft"), Path::new(DIR), "r1", &servers)?;
+    for off in [
+        "mcp_servers.files.enabled=false",
+        "mcp_servers.docs.enabled=false",
+        "features.plugins=false",
+        "features.apps=false",
+    ] {
+        let at = words.iter().position(|w| w == off).ok_or(off)?;
+        assert_eq!(words[at - 1], "-c", "{off}");
+    }
+    assert!(
+        !words
+            .iter()
+            .any(|w| w.starts_with("mcp_servers.gitcraft.enabled"))
+    );
+    // One Codex couldn't be told to leave off stops the run rather than staying on.
+    assert!(codex_isolation(&["my.server".to_owned()]).is_err());
     Ok(())
 }
 
