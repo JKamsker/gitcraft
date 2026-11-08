@@ -29,6 +29,8 @@ pub struct OpControl {
     /// What each git call of the operation did so far, for the activity log.
     steps: Mutex<Vec<Recorded>>,
     auth_failure: Mutex<Option<super::AuthFailure>>,
+    /// Finite Gerrit witness owned by this operation, never a log-output cache.
+    stack_failure: Mutex<Option<crate::gerrit::StackFailure>>,
     /// Called whenever there is news (a repaint of the window).
     notify: Box<dyn Fn() + Send + Sync>,
 }
@@ -48,6 +50,7 @@ impl OpControl {
             progress: Mutex::new(None),
             steps: Mutex::new(Vec::new()),
             auth_failure: Mutex::new(None),
+            stack_failure: Mutex::new(None),
             notify: Box::new(notify),
         })
     }
@@ -87,6 +90,16 @@ impl OpControl {
     }
     pub(crate) fn auth_failure(&self) -> Option<super::AuthFailure> {
         self.auth_failure.lock().ok().and_then(|s| s.clone())
+    }
+
+    pub(crate) fn stack_checked(&self, source: Option<crate::gerrit::StackFailure>) {
+        if let Ok(mut stored) = self.stack_failure.lock() {
+            *stored = source;
+        }
+    }
+
+    pub(crate) fn stack_failure(&self) -> Option<crate::gerrit::StackFailure> {
+        self.stack_failure.lock().ok().and_then(|s| s.clone())
     }
 
     /// What the operation's git calls did, taken out (once it has ended).

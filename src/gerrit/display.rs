@@ -33,65 +33,139 @@ impl Server {
     }
 }
 
-/// Pass the successful `log --format=%H%x00%P%x00%B%x00` output captured by the
-/// same check_stack_with invocation. Never derive this context from an error suffix,
-/// rerun Git at paint, or supply a later refreshed log. Does not validate or change ops.
-pub(crate) fn stack_error(raw: &str, recorded_log: &str) -> String {
-    let mut ids = std::collections::HashSet::new();
-    for fields in recorded_log
-        .split('\0')
-        .collect::<Vec<_>>()
-        .as_chunks::<3>()
-        .0
-    {
-        let hash = fields[0].trim();
-        let Some(short) = hash.get(..hash.len().min(8)) else {
-            return raw.to_owned();
-        };
-        if fields[1].split_whitespace().count() > 1 {
-            if raw
-                == format!(
-                    "Merge commit {short} cannot be pushed with this review flow; rebase the series first"
-                )
-            {
-                return crate::i18n::message(
-                    "interaction-gerrit-merge",
-                    &[("commit", short.into())],
-                );
-            }
-            break;
-        }
-        match change_id(fields[2]) {
-            Err(why) => {
-                if raw
-                    == format!(
-                        "{short}: {why}. Install Gerrit's commit-msg hook from your server, then amend this commit to add its Change-Id."
-                    )
-                {
-                    return crate::i18n::message(
-                        "interaction-gerrit-hook",
-                        &[("commit", short.into()), ("reason", error(&why).into())],
-                    );
-                }
-                break;
-            }
-            Ok(id) if !ids.insert(id) => {
-                if raw
-                    == format!(
-                        "Two commits have the same Change-Id ({id}); each change needs its own"
-                    )
-                {
-                    return crate::i18n::message(
-                        "interaction-gerrit-duplicate",
-                        &[("id", id.into())],
-                    );
-                }
-                break;
-            }
-            Ok(_) => {}
-        }
+/// A finite owned projection of a failure witnessed by this stack check. Never retains
+/// commit messages or the successful log; its private fields cannot be rebound to text.
+#[derive(Clone, Debug)]
+pub(crate) struct StackFailure {
+    raw: String,
+    source: StackSource,
+}
+
+#[derive(Clone, Debug)]
+enum StackSource {
+    Fixed,
+    Merge(String),
+    Hook { commit: String, reason: String },
+    Duplicate(String),
+}
+
+impl StackFailure {
+    pub(crate) fn matching(self, raw: &str) -> Option<Self> {
+        (self.raw == raw).then_some(self)
     }
-    error(raw)
+
+    pub(crate) fn display(&self, raw: &str) -> Option<String> {
+        if self.raw != raw {
+            return None;
+        }
+        Some(match &self.source {
+            StackSource::Fixed => error(raw),
+            StackSource::Merge(commit) => crate::i18n::message(
+                "interaction-gerrit-merge",
+                &[("commit", commit.as_str().into())],
+            ),
+            StackSource::Hook { commit, reason } => crate::i18n::message(
+                "interaction-gerrit-hook",
+                &[
+                    ("commit", commit.as_str().into()),
+                    ("reason", error(reason).into()),
+                ],
+            ),
+            StackSource::Duplicate(id) => crate::i18n::message(
+                "interaction-gerrit-duplicate",
+                &[("id", id.as_str().into())],
+            ),
+        })
+    }
+
+    fn from_log(recorded_log: &str) -> Option<Self> {
+        let mut ids = std::collections::HashSet::new();
+        for fields in recorded_log
+            .split('\0')
+            .collect::<Vec<_>>()
+            .as_chunks::<3>()
+            .0
+        {
+            let hash = fields[0].trim();
+            let short = hash.get(..hash.len().min(8))?;
+            let (expected, source) = if fields[1].split_whitespace().count() > 1 {
+                (
+                    format!(
+                        "Merge commit {short} cannot be pushed with this review flow; rebase the series first"
+                    ),
+                    StackSource::Merge(short.to_owned()),
+                )
+            } else {
+                match change_id(fields[2]) {
+                    Err(why) => (
+                        format!(
+                            "{short}: {why}. Install Gerrit's commit-msg hook from your server, then amend this commit to add its Change-Id."
+                        ),
+                        StackSource::Hook {
+                            commit: short.to_owned(),
+                            reason: why,
+                        },
+                    ),
+                    Ok(id) if !ids.insert(id) => (
+                        format!(
+                            "Two commits have the same Change-Id ({id}); each change needs its own"
+                        ),
+                        StackSource::Duplicate(id.to_owned()),
+                    ),
+                    Ok(_) => continue,
+                }
+            };
+            return Some(Self {
+                raw: expected,
+                source,
+            });
+        }
+        None
+    }
+}
+
+/// Runs the unchanged validator exactly once. Only a successful log from that very
+/// invocation supplies dynamic context; a provider failure cannot impersonate it.
+pub(crate) fn check_stack_presented_with(
+    base: &str,
+    head: &str,
+    mut run: impl FnMut(&[&str]) -> Result<String, String>,
+) -> (Result<(), String>, Option<StackFailure>) {
+    let mut log_succeeded = false;
+    let mut witness = None;
+    let mut ancestor_failed = false;
+    let result = super::check_stack_with(base, head, |args| {
+        let result = run(args);
+        if args[0] == "log" {
+            if let Ok(out) = &result {
+                log_succeeded = true;
+                witness = StackFailure::from_log(out);
+            }
+        } else {
+            ancestor_failed = result.as_ref().is_err_and(|e| e != crate::git::CANCELLED);
+        }
+        result
+    });
+    let source = result.as_ref().err().and_then(|raw| {
+        if ancestor_failed
+            || (log_succeeded && raw == "There are no commits above the target branch to review")
+        {
+            Some(StackFailure {
+                raw: raw.clone(),
+                source: StackSource::Fixed,
+            })
+        } else {
+            witness.and_then(|source| source.matching(raw))
+        }
+    });
+    (result, source)
+}
+
+/// Legacy display API: context must be the successful log from the same invocation.
+pub(crate) fn stack_error(raw: &str, recorded_log: &str) -> String {
+    StackFailure::from_log(recorded_log)
+        .and_then(|source| source.display(raw))
+        .unwrap_or_else(|| error(raw))
 }
 
 #[cfg(test)]
