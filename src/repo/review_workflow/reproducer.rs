@@ -2,7 +2,7 @@
 //! The container receives no network, host credentials, or writable host mount.
 use super::{
     contracts::{self, Observation},
-    echo, store,
+    echo,
     tools::ToolsAct,
 };
 use crate::{
@@ -10,13 +10,16 @@ use crate::{
     repo::{Action, DiffKey, RepoTab},
     settings::Settings,
 };
-use base64::Engine;
 use serde::{Deserialize, Serialize};
 use std::{
-    path::{Path, PathBuf},
+    path::Path,
     sync::atomic::{AtomicU64, Ordering},
     time::{SystemTime, UNIX_EPOCH},
 };
+#[path = "reproducer_docker.rs"]
+mod containers;
+#[path = "reproducer_source.rs"]
+mod materialize;
 static IDS: AtomicU64 = AtomicU64::new(0);
 #[derive(Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) struct Case {
@@ -43,7 +46,7 @@ pub(crate) struct State {
     request: u64,
     busy: bool,
     cancel: ai::Cancel,
-    stop: git::RunStop,
+    stop: crate::tasks::Cancellation,
     error: Option<String>,
     report: Option<Report>,
 }
@@ -83,7 +86,7 @@ impl State {
 impl Drop for State {
     fn drop(&mut self) {
         self.cancel.cancel();
-        self.stop.stop();
+        self.stop.cancel();
     }
 }
 #[derive(Clone)]
@@ -95,148 +98,8 @@ pub(crate) enum Act {
     UseSelection,
     UseGenerated,
 }
-/// Pure recording plan, validated before any process can be started.
-struct Sandbox {
-    name: String,
-    token: String,
-    run: String,
-    cleanup: String,
-}
-fn sandbox(
-    source_dir: &str,
-    image: &str,
-    source: &str,
-    name: &str,
-    token: &str,
-) -> Result<Sandbox, String> {
-    if source_dir.contains([',', '\n', '\r']) {
-        return Err("Docker bind paths containing commas or newlines are unsupported".into());
-    }
-    if image.is_empty()
-        || image.starts_with('-')
-        || !image
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || "_./:@-".contains(c))
-    {
-        return Err("Choose a locally installed Rust container image by name or digest".into());
-    }
-    if !name.starts_with("gitcraft-reproducer-")
-        || !name.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
-        || !token.bytes().all(|b| b.is_ascii_hexdigit())
-        || token.len() != 32
-    {
-        return Err("Invalid owned-container identity".into());
-    }
-    if source.is_empty() || source.len() > 64 * 1024 {
-        return Err("The generated Rust integration test must be 1–65536 bytes".into());
-    }
-    let q = crate::remote::sh_quote;
-    let encoded = base64::engine::general_purpose::STANDARD.encode(source);
-    // timeout lives INSIDE the isolated PID namespace. It cannot select a host process.
-    let body = "set -eu; mkdir -p /work/project /work/cargo; for cache in registry git; do if [ -d /usr/local/cargo/$cache ]; then cp -R /usr/local/cargo/$cache /work/cargo/; fi; done; cp -R /source/. /work/project/; rm -f /work/project/.git; cd /work/project; mkdir -p tests; base64 -d > tests/gitcraft_reproducer.rs; exec cargo test --offline --test gitcraft_reproducer -- --nocapture";
-    let inside = format!(
-        "exec timeout --signal=TERM --kill-after=5s 120s sh -c {}",
-        q(body)
-    );
-
-    let words = vec![
-        "docker".to_owned(),
-        "run".into(),
-        "--rm".into(),
-        "--pull=never".into(),
-        "--name".into(),
-        name.into(),
-        "--label".into(),
-        format!("gitcraft.owner={token}"),
-        "--network=none".into(),
-        "--read-only".into(),
-        "--user=65534:65534".into(),
-        "--cap-drop=ALL".into(),
-        "--security-opt=no-new-privileges".into(),
-        "--pids-limit=128".into(),
-        "--memory=1g".into(),
-        "--cpus=2".into(),
-        "--tmpfs".into(),
-        "/work:rw,exec,nosuid,nodev,size=1g,mode=1777".into(),
-        "--mount".into(),
-        format!("type=bind,src={source_dir},dst=/source,readonly"),
-        "--env".into(),
-        "CARGO_HOME=/work/cargo".into(),
-        "--env".into(),
-        "RUSTUP_HOME=/usr/local/rustup".into(),
-        "-i".into(),
-        image.into(),
-        "sh".into(),
-        "-c".into(),
-        inside,
-    ];
-    let run = format!(
-        "printf %s {} | {}",
-        q(&encoded),
-        words.iter().map(|s| q(s)).collect::<Vec<_>>().join(" ")
-    );
-    let cleanup = format!(
-        "owner=$(docker inspect --format {} {} 2>/dev/null) || exit 0; [ \"$owner\" = {} ] || exit 73; docker rm --force {}",
-        q("{{ index .Config.Labels \"gitcraft.owner\" }}"),
-        q(name),
-        q(token),
-        q(name)
-    );
-    Ok(Sandbox {
-        name: name.into(),
-        token: token.into(),
-        run,
-        cleanup,
-    })
-}
-struct OwnedContainer {
-    repo: PathBuf,
-    plan: Sandbox,
-    removed: bool,
-}
-impl OwnedContainer {
-    fn cleanup(&mut self) -> Result<(), String> {
-        let out = git::run_shell(&self.repo, &self.plan.cleanup)?;
-        if out.code == 0 {
-            self.removed = true;
-            Ok(())
-        } else {
-            Err(format!(
-                "Container {} (owner {}) cleanup exited {}",
-                self.plan.name, self.plan.token, out.code
-            ))
-        }
-    }
-}
-impl Drop for OwnedContainer {
-    fn drop(&mut self) {
-        if self.removed {
-            return;
-        }
-        let (repo, script) = (self.repo.clone(), self.plan.cleanup.clone());
-        // A cancelled tab cannot launch its own cleanup. Schedule exact-owner cleanup on the
-        // shared pool with an independent token. The container also has a 125s internal limit.
-        if let Ok(pool) = crate::tasks::pool() {
-            let _ = pool.submit(
-                crate::tasks::Cancellation::default(),
-                crate::tasks::Priority::Interactive,
-                Some(repo.clone()),
-                Box::new(move || {
-                    let _ = git::run_shell(&repo, &script);
-                }),
-            );
-        }
-    }
-}
-fn run_one(
-    repo: &Path,
-    rev: &str,
-    case: &Case,
-    stop: &git::RunStop,
-) -> Result<(Observation, Option<String>), String> {
-    let scratch = git::Scratch::add_empty(repo, "test", rev)?;
-    scratch.checkout(rev)?;
-    let token = format!(
+fn token() -> String {
+    format!(
         "{:x}",
         md5::compute(format!(
             "{}:{}:{}",
@@ -247,108 +110,103 @@ fn run_one(
                 .unwrap_or(0),
             IDS.fetch_add(1, Ordering::Relaxed)
         ))
-    );
-    let name = format!("gitcraft-reproducer-{token}");
-    let plan = sandbox(
-        &crate::remote::git_path(&scratch.path),
-        &case.image,
-        &case.source,
-        &name,
-        &token,
-    )?;
-    let mut owned = OwnedContainer {
-        repo: repo.to_owned(),
-        plan,
-        removed: false,
-    };
-    let tree = git::run(Some(repo), &["rev-parse", &format!("{rev}^{{tree}}")])?
-        .trim()
-        .to_owned();
-    let result = contracts::observe(repo, rev, &tree, &owned.plan.run, stop);
-    let cleanup = owned.cleanup().err();
-    let scratch_cleanup = scratch.remove().err();
-    let mut observation = result?;
-    // Preserve a readable command identity, rather than presenting encoded test source as a
-    // user command. The complete source and immutable image input are in the same report.
-    observation.command = format!(
-        "Docker {} · cargo test --offline --test gitcraft_reproducer",
-        case.image
-    );
-    Ok((observation, cleanup.or(scratch_cleanup)))
+    )
 }
-fn run(repo: &Path, mut case: Case, stop: &git::RunStop) -> Result<Report, String> {
+fn run(repo: &Path, mut case: Case, stop: &crate::tasks::Cancellation) -> Result<Report, String> {
     if !case.approved {
         return Err("Inspect the source and explicitly approve sandbox execution first".into());
     }
-    case.base = contracts::resolve(repo, &case.base)?;
-    case.head = contracts::resolve(repo, &case.head)?;
-    // Validate all user-controlled plan inputs before any container/worktree side effects.
-    sandbox(
-        "/recording-only/source",
-        &case.image,
-        &case.source,
-        "gitcraft-reproducer-recording",
-        "0123456789abcdef0123456789abcdef",
-    )?;
-    let inspection = git::run_shell(
-        repo,
-        &format!(
-            "docker image inspect --format '{{{{.Id}}}}' {}",
-            crate::remote::sh_quote(&case.image)
-        ),
-    )?;
-    let image = String::from_utf8(inspection.stdout).map_err(|e| e.to_string())?;
-    let image = image.trim();
-    if inspection.code != 0
-        || !image
-            .strip_prefix("sha256:")
-            .is_some_and(|id| id.len() == 64 && id.bytes().all(|b| b.is_ascii_hexdigit()))
-    {
-        return Err("The selected image is not available locally. Preload a Rust image before running a sandbox; gitcraft never pulls images.".into());
+    if case.source.is_empty() || case.source.len() > 64 * 1024 {
+        return Err("The generated integration test must be 1–65536 bytes".into());
     }
-    case.image = image.to_owned();
-    for (role, rev) in [("base", &case.base), ("head", &case.head)] {
-        git::run(
-            Some(repo),
+    case.base = materialize::resolve(repo, &case.base)?;
+    case.head = materialize::resolve(repo, &case.head)?;
+    case.image = containers::image(repo, &case.image)?;
+    for rev in [&case.base, &case.head] {
+        materialize::text(
+            repo,
             &[
                 "update-ref",
-                &format!(
-                    "refs/gitcraft/reproducer-inputs/{:x}/{role}",
-                    md5::compute(format!("{}:{}:{}", case.base, case.head, case.source))
-                ),
+                &format!("refs/gitcraft/reproducer-inputs/{rev}"),
                 rev,
             ],
         )?;
     }
-    let (base, base_cleanup) = run_one(repo, &case.base, &case, stop)?;
-    if stop.stopped() {
-        return Err("Stopped after base execution; no head comparison was made".into());
-    }
-    let (head, head_cleanup) = run_one(repo, &case.head, &case, stop)?;
+    let base_tree = materialize::text(repo, &["rev-parse", &format!("{}^{{tree}}", case.base)])?
+        .trim()
+        .to_owned();
+    let head_tree = materialize::text(repo, &["rev-parse", &format!("{}^{{tree}}", case.head)])?
+        .trim()
+        .to_owned();
+    let (base, base_cleanup) = containers::run_one(repo, &case.base, &base_tree, &case, &token())?;
+    let mut cleanup = vec![base_cleanup];
+    let head = if stop.is_cancelled() {
+        Observation {
+            commit: case.head.clone(),
+            tree: head_tree.clone(),
+            command: "No head run after cancellation".into(),
+            code: None,
+            stopped: true,
+            lines: vec!["Stopped after base; no head comparison was made".into()],
+            machine: base.machine.clone(),
+        }
+    } else {
+        match containers::run_one(repo, &case.head, &head_tree, &case, &token()) {
+            Ok((head, evidence)) => {
+                cleanup.push(evidence);
+                head
+            }
+            Err(error) => Observation {
+                commit: case.head.clone(),
+                tree: head_tree,
+                command: "Head source preparation did not complete".into(),
+                code: None,
+                stopped: true,
+                lines: vec![error],
+                machine: base.machine.clone(),
+            },
+        }
+    };
     let report = Report {
         case,
         base,
         head,
-        cleanup: base_cleanup.into_iter().chain(head_cleanup).collect(),
+        cleanup: cleanup
+            .into_iter()
+            .filter(|e| e.result.starts_with("Cleanup needs attention"))
+            .map(|e| {
+                format!(
+                    "{} ({}) · {}",
+                    e.name,
+                    e.id.as_deref().unwrap_or("unknown ID"),
+                    e.result
+                )
+            })
+            .collect(),
     };
-    let text = serde_json::to_string(&report).map_err(|e| e.to_string())?;
-    store::save(
-        repo,
-        "reproducer-evidence",
-        &format!("{:x}", md5::compute(text)),
-        &report,
-    )?;
-    store::save(repo, "reproducer-evidence", "latest", &report)?;
+    // Stop cancels execution, not recording its partial observations and bounded cleanup.
+    crate::tasks::with_cancellation(crate::tasks::Cancellation::default(), || {
+        let text = serde_json::to_string(&report).map_err(|e| e.to_string())?;
+        materialize::save(
+            repo,
+            "reproducer-evidence",
+            &format!("{:x}", md5::compute(text)),
+            &report,
+        )?;
+        materialize::save(repo, "reproducer-evidence", "latest", &report)
+    })?;
     Ok(report)
 }
+
 impl RepoTab {
     pub(in crate::repo) fn reproducer_act(&mut self, act: Act, ctx: &egui::Context) {
         if matches!(act, Act::Stop) {
             self.review_tools.reproducer.cancel.cancel();
-            self.review_tools.reproducer.stop.stop();
+            self.review_tools.reproducer.stop.cancel();
             self.review_tools.reproducer.request += 1;
             self.review_tools.reproducer.busy = false;
             self.review_tools.reproducer.case.approved = false;
+            self.review_tools.reproducer.error = Some("Stop requested. Bounded cleanup and partial observations are preserved; load preserved observations after the worker finishes.".into());
             return;
         }
         if matches!(act, Act::UseGenerated) {
@@ -398,14 +256,14 @@ impl RepoTab {
         let input = s.case.clone();
         s.error = None;
         s.cancel = ai::Cancel::new();
-        s.stop = git::RunStop::default();
+        s.stop = self.tx.cancel.child();
         let (repo, settings, cancel, stop) = (
             self.path.clone(),
             Settings::get(ctx).ai,
             s.cancel.clone(),
             s.stop.clone(),
         );
-        self.then_or(ctx,true,Err,move||{
+        self.then_or(ctx,true,Err,move|| crate::tasks::with_cancellation(stop.clone(), || {
       match act{
         Act::Generate(mut case)=>{
            case.base=contracts::resolve(&repo,&case.base)?;case.head=contracts::resolve(&repo,&case.head)?;
@@ -415,12 +273,20 @@ impl RepoTab {
            let prompt=format!("Write ONLY a self-contained Rust integration test file for tests/gitcraft_reproducer.rs, to test the concrete objection below against BOTH revisions using exactly the same test. Use existing public APIs and existing dependencies. No commands, new dependencies, filesystem/network side effects, or Markdown. It runs offline in a container. Do not claim a bug: the human judges the observations. Objection: {}\nManifest:\n{}\nDiff of {} at line {}:\n{}",case.objection,manifest,case.path,case.line,patch);
            case.source=echo::model(&repo,&settings,&prompt,&cancel)?;case.approved=false;
            if case.source.len()>64*1024{return Err("The model produced more than 64KiB; narrow the objection".into());}
-           store::save(&repo,"reproducer-cases","latest",&case)?;Ok((Some(case),None))
+           materialize::save(&repo,"reproducer-cases","latest",&case)?;Ok((Some(case),None))
         },
         Act::Run(case)=>run(&repo,case,&stop).map(|report|(None,Some(report))),
-        Act::Load=>Ok((store::load::<Case>(&repo,"reproducer-cases","latest")?,store::load::<Report>(&repo,"reproducer-evidence","latest")?)),_=>Ok((None,None))
+        Act::Load=>{
+            let mut report = materialize::load::<Report>(&repo,"reproducer-evidence","latest")?;
+            if let Some(cleanup) = materialize::load::<containers::Cleanup>(&repo,"reproducer-cleanup","latest")? && cleanup.result.starts_with("Cleanup needs attention") {
+                let note = format!("Latest independent cleanup {} ({}) · {}", cleanup.name, cleanup.id.as_deref().unwrap_or("unknown ID"), cleanup.result);
+                if let Some(report) = &mut report { if !report.cleanup.contains(&note) { report.cleanup.push(note); } }
+                else { return Err(note); }
+            }
+            Ok((materialize::load::<Case>(&repo,"reproducer-cases","latest")?, report))
+        },_=>Ok((None,None))
       }
-   },move |tab,result,_| { tab.review_tools.reproducer.accept(request, &input, result); });
+   }),move |tab,result,_| { tab.review_tools.reproducer.accept(request, &input, result); });
     }
     pub(in crate::repo) fn reproducer_badge(&self, ui: &mut egui::Ui, key: &DiffKey) {
         if let Some(report) = &self.review_tools.reproducer.report
@@ -504,7 +370,8 @@ pub(super) fn show(ui: &mut egui::Ui, s: &mut State, acts: &mut Vec<Action>) {
     ui.add(
         egui::TextEdit::singleline(&mut c.image).hint_text("Preloaded Rust Docker image or digest"),
     );
-    ui.weak("Docker must be available on the repository's machine. Images are never pulled. The container has no network, no writable host mount, an unprivileged UID, resource limits, and a 120s internal timeout. Dependencies must already be vendored in the repository or preloaded in your image; cargo uses --offline.");
+    ui.weak("Source is streamed from raw Git trees/blobs without host checkout, hooks, filters or host extraction. Limits: UTF-8 safe paths, 20,000 files, 16MiB per blob, 128MiB total; submodule objects must already be initialized locally. Source export has a 60s preparation budget.");
+    ui.weak("Docker must be available on the repository's machine. Images are never pulled. The container has no network, no writable host mount, an unprivileged UID, resource limits, and a 120s internal timeout. The preloaded image must provide /bin/sh, GNU-compatible timeout, tar, cargo, mkdir and cp. Dependencies must already be vendored in the repository or preloaded in the image; cargo uses --offline.");
     let mut content = c.clone();
     content.approved = before.approved;
     if content != before {
@@ -564,6 +431,53 @@ pub(super) fn show(ui: &mut egui::Ui, s: &mut State, acts: &mut Vec<Action>) {
 mod tests {
     use super::*;
     #[test]
+    #[ignore = "R2 runtime hold: requires Docker and an explicitly preloaded Rust image; authored, not executed"]
+    fn r2_runtime_same_integration_test_observes_base_failure_head_success_without_host_checkout()
+    -> Result<(), String> {
+        let image = std::env::var("GITCRAFT_REPRODUCER_TEST_IMAGE").map_err(
+            |_| "Set GITCRAFT_REPRODUCER_TEST_IMAGE to an explicitly preloaded Rust image",
+        )?;
+        let r = git::stack::test_repo::TestRepo::new("reproducer-contained-observations")?;
+        r.commit(
+            "Cargo.toml",
+            r#"[package]
+name="fixture"
+version="0.1.0"
+edition="2021"
+"#,
+            "manifest",
+        )?;
+        let base = r.commit(
+            "src/lib.rs",
+            "pub fn behavior() -> bool { false }\n",
+            "base",
+        )?;
+        let head = r.commit("src/lib.rs", "pub fn behavior() -> bool { true }\n", "head")?;
+        let original = std::fs::read(r.path().join("src/lib.rs")).map_err(|e| e.to_string())?;
+        let report = run(
+            r.path(),
+            Case {
+                base,
+                head: head.clone(),
+                path: "src/lib.rs".into(),
+                source: "#[test] fn concrete() { assert!(fixture::behavior()); }".into(),
+                image,
+                approved: true,
+                ..Default::default()
+            },
+            &crate::tasks::Cancellation::default(),
+        )?;
+        assert_eq!(report.base.code, Some(101));
+        assert_eq!(report.head.code, Some(0));
+        assert!(report.cleanup.is_empty(), "{:?}", report.cleanup);
+        assert_eq!(r.tip("HEAD")?, head);
+        assert_eq!(
+            std::fs::read(r.path().join("src/lib.rs")).map_err(|e| e.to_string())?,
+            original
+        );
+        Ok(())
+    }
+    #[test]
     fn r2_pure_delayed_ai_completion_preserves_edited_form_and_cancelled_approval() {
         let original = Case {
             objection: "old objection".into(),
@@ -599,59 +513,5 @@ mod tests {
         state.accept(2, &original, Ok((Some(generated), None)));
         assert_eq!(state.case.source, "handwritten test");
         assert!(!state.case.approved);
-    }
-    #[test]
-    fn recorded_sandbox_plan_contains_real_containment_and_exact_owner_cleanup()
-    -> Result<(), String> {
-        let token = "0123456789abcdef0123456789abcdef";
-        let s = sandbox(
-            "/tmp/owned source",
-            "rust:1.95.0",
-            "#[test] fn repro() {}",
-            "gitcraft-reproducer-owned",
-            token,
-        )?;
-        for required in [
-            "--network=none",
-            "--read-only",
-            "--user=65534:65534",
-            "--cap-drop=ALL",
-            "--security-opt=no-new-privileges",
-            "--pids-limit=128",
-            "--memory=1g",
-            "--pull=never",
-            "readonly",
-            "cargo test --offline",
-            "timeout --signal=TERM",
-        ] {
-            assert!(s.run.contains(required), "missing {required}");
-        }
-        assert!(s.cleanup.contains("gitcraft.owner"));
-        assert!(s.cleanup.contains(token));
-        assert!(s.cleanup.contains("gitcraft-reproducer-owned"));
-        assert!(!s.cleanup.contains("ps "));
-        assert!(!s.cleanup.contains("kill "));
-        assert!(
-            sandbox(
-                "/tmp/a,b",
-                "rust:1.95.0",
-                "x",
-                "gitcraft-reproducer-owned",
-                token
-            )
-            .is_err()
-        );
-        assert!(
-            sandbox(
-                "/tmp/a",
-                "--privileged",
-                "x",
-                "gitcraft-reproducer-owned",
-                token
-            )
-            .is_err()
-        );
-        assert!(sandbox("/tmp/a", "rust:1.95.0", "x", "unowned", token).is_err());
-        Ok(())
     }
 }

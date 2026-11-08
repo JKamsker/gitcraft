@@ -44,6 +44,20 @@ pub(crate) fn cancellation() -> Cancellation {
     CURRENT.with(|slot| slot.borrow().clone().unwrap_or_default())
 }
 
+/// Bind existing process/remote APIs to this operation's cancellation token, restoring
+/// the worker's scope even if a call unwinds. Cleanup can use an independent bounded scope.
+pub(crate) fn with_cancellation<T>(cancel: Cancellation, work: impl FnOnce() -> T) -> T {
+    struct Restore(Option<Cancellation>);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            CURRENT.with(|slot| *slot.borrow_mut() = self.0.take());
+        }
+    }
+    let prior = CURRENT.with(|slot| slot.replace(Some(cancel)));
+    let _restore = Restore(prior);
+    work()
+}
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Priority {
     Interactive,
@@ -646,5 +660,25 @@ mod tests {
         );
         pool.shutdown();
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod r2_scope_tests {
+    use super::*;
+    #[test]
+    fn r2_pure_operation_cancellation_scope_restores_worker_and_bounds_independent_cleanup_scope() {
+        let worker = cancellation();
+        let operation = worker.child();
+        with_cancellation(operation.clone(), || {
+            operation.cancel();
+            assert!(cancellation().is_cancelled());
+            with_cancellation(Cancellation::default(), || {
+                assert!(!cancellation().is_cancelled())
+            });
+            assert!(cancellation().is_cancelled());
+        });
+        assert!(!worker.is_cancelled());
+        assert!(!cancellation().is_cancelled());
     }
 }
