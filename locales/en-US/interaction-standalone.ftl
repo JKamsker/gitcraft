@@ -255,7 +255,7 @@ interaction-standalone-usage = Usage:
     File tools open their own window and never discover a repository.
     Diff is read-only. Merge writes MERGED only after Save and finish.
     Exit: 0 completed, 1 cancelled, 2 usage/read/save failure.
-    Use -- before a repository name beginning with -. { "\u000A" }
+    Use -- before a repository name beginning with -.{ "\u000A" }
 
 interaction-standalone-use-base = Use Base file
 

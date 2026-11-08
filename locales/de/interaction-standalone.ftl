@@ -255,7 +255,7 @@ interaction-standalone-usage = Verwendung:
     Dateiwerkzeuge öffnen ein eigenes Fenster und suchen niemals nach einem Repository.
     Diff ist schreibgeschützt. Merge schreibt MERGED erst nach „Speichern und abschließen“.
     Exitcode: 0 abgeschlossen, 1 abgebrochen, 2 Fehler bei Aufruf, Lesen oder Speichern.
-    Verwende -- vor einem Repository-Namen, der mit - beginnt. { "\u000A" }
+    Verwende -- vor einem Repository-Namen, der mit - beginnt.{ "\u000A" }
 
 interaction-standalone-use-base = Base-Datei verwenden
 

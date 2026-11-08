@@ -97,7 +97,7 @@ mod localization_tests {
                     .iter()
                     .map(|name| {
                         let value = if matches!(name.as_str(), "count" | "installed" | "total") {
-                            FluentValue::from(1234)
+                            FluentValue::from(2)
                         } else {
                             FluentValue::from("opaque ' $() & ü\n{}")
                         };
