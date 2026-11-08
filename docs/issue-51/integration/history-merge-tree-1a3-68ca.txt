@@ -1,0 +1,78 @@
+7dc984295c10ebcee55be401f0c543296a007b9c
+100644 3c75b4f1286db9c528e00b2569e3286181e9abd9 1	src/forge/mod.rs
+100644 863bfef518b215b072444a104c0542288066f0d0 2	src/forge/mod.rs
+100644 cb26f6a4cc0537162b0ac4b7562b946d745091eb 3	src/forge/mod.rs
+100644 a1c0e9727257f8514ed856e289679be196e5893f 1	src/git/command.rs
+100644 ec23fd888ef0f66422bd369f13e744fde60e7e79 2	src/git/command.rs
+100644 2e7c349b89292f3865b793c7ab92f892c3745953 3	src/git/command.rs
+100644 5e944a802b6d31266ecfbed817cae0b667356ba6 2	src/git/command/credential_policy.rs
+100644 4140d6f52fa94552982b6e2721809d7dac28ac4e 3	src/git/command/credential_policy.rs
+100644 030fa2b21b2eea8c65c7b5762ebf38b9a4364798 2	src/git/credential_scope.rs
+100644 44b8ba616cec4d674f817375fc7bb4889d3da04c 3	src/git/credential_scope.rs
+100644 9fc83b50434916326115cd2cf6636cb3b68966eb 1	src/git/mod.rs
+100644 0e1ff978c90634a1afd6716d38f354c105333553 2	src/git/mod.rs
+100644 a979f4a4404f836c405b7003437cf9605bbec82f 3	src/git/mod.rs
+100644 a70dafb382c30bda460a9cab059b09941e3eaa46 1	src/lib.rs
+100644 d9c61e4cee09e9670903c9083c71be6a4c5bcd20 2	src/lib.rs
+100644 7baf88cdd80f31f741df1eabbcb3400330c13798 3	src/lib.rs
+100644 e8731919fea816698b1b97af76f081b5a07ddaba 1	src/repo/apply.rs
+100644 054d5774f8324d64d761a5916353347f3364b8e7 2	src/repo/apply.rs
+100644 f2988741d27507f302aea5129fa053184152afb4 3	src/repo/apply.rs
+100644 34656e69536e60e921c7046df41ed7d3dd2e575e 1	src/repo/dialogs/remote.rs
+100644 ca07be71addc304f3ac57f328dbc13ef95a1feee 2	src/repo/dialogs/remote.rs
+100644 72b98d8fafcd369f906b57ecdd014d0acbfc0b7a 3	src/repo/dialogs/remote.rs
+100644 d2450db2027fa6cd2dfe43a5ca5c052d1bde2715 1	src/repo/graph_view/mod.rs
+100644 6dd08b322e54561f82fd76f89e0a45130aece628 2	src/repo/graph_view/mod.rs
+100644 0f9d557eade285197d98562c4901d08172cef0fa 3	src/repo/graph_view/mod.rs
+100644 9544bfcda0e26e07da755fffc6a369a0660f6d80 1	src/repo/operations.rs
+100644 be50594d7173fcee45c6a79f6443c4c8908d3b26 2	src/repo/operations.rs
+100644 6f362f91de36e8340d91bd8d8720a495f9b4a293 3	src/repo/operations.rs
+100644 814d41ee7e6b863b42746a192c75c61b71c8df3d 1	src/repo/tests.rs
+100644 1f1eb1bbca833d85b8e2d03dadf85b50ab5cc096 2	src/repo/tests.rs
+100644 0caea036ccee6ab8292ae4bdeadf7771176524db 3	src/repo/tests.rs
+100644 1d9a5be66b271487b78e6729cc2d957b3ee6f4c8 1	src/settings/profiles.rs
+100644 bea32e0f9a57b06000844a706985a149f21c1c1c 2	src/settings/profiles.rs
+100644 c0d4d653a3a1dbc0d6073e90233df9d3d2b53c3d 3	src/settings/profiles.rs
+
+Auto-merging Cargo.lock
+Auto-merging Cargo.toml
+Auto-merging src/app/clone.rs
+Auto-merging src/forge/cli.rs
+Auto-merging src/forge/gitea/mod.rs
+Auto-merging src/forge/http.rs
+Auto-merging src/forge/mod.rs
+CONFLICT (content): Merge conflict in src/forge/mod.rs
+Auto-merging src/git/command.rs
+CONFLICT (content): Merge conflict in src/git/command.rs
+Auto-merging src/git/command/credential_policy.rs
+CONFLICT (add/add): Merge conflict in src/git/command/credential_policy.rs
+Auto-merging src/git/command/watched.rs
+Auto-merging src/git/credential_scope.rs
+CONFLICT (add/add): Merge conflict in src/git/credential_scope.rs
+Auto-merging src/git/diff.rs
+Auto-merging src/git/mod.rs
+CONFLICT (content): Merge conflict in src/git/mod.rs
+Auto-merging src/lib.rs
+CONFLICT (content): Merge conflict in src/lib.rs
+Auto-merging src/remote/fs.rs
+Auto-merging src/remote/mod.rs
+Auto-merging src/repo/actions.rs
+Auto-merging src/repo/apply.rs
+CONFLICT (content): Merge conflict in src/repo/apply.rs
+Auto-merging src/repo/dialogs/mod.rs
+Auto-merging src/repo/dialogs/remote.rs
+CONFLICT (content): Merge conflict in src/repo/dialogs/remote.rs
+Auto-merging src/repo/graph_view/mod.rs
+CONFLICT (content): Merge conflict in src/repo/graph_view/mod.rs
+Auto-merging src/repo/layout.rs
+Auto-merging src/repo/load.rs
+Auto-merging src/repo/messages.rs
+Auto-merging src/repo/mod.rs
+Auto-merging src/repo/operations.rs
+CONFLICT (content): Merge conflict in src/repo/operations.rs
+Auto-merging src/repo/tests.rs
+CONFLICT (content): Merge conflict in src/repo/tests.rs
+Auto-merging src/repo/timeline/view.rs
+Auto-merging src/settings/profile_page.rs
+Auto-merging src/settings/profiles.rs
+CONFLICT (content): Merge conflict in src/settings/profiles.rs
