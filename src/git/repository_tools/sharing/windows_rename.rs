@@ -101,3 +101,27 @@ pub(super) fn final_path(file: &std::fs::File) -> Option<std::path::PathBuf> {
     }
     None
 }
+
+/// Delete the actual owned temporary inode, never a freshly resolved pathname.
+#[allow(unsafe_code)]
+pub(super) fn discard(source: &File) -> io::Result<()> {
+    use windows_sys::Win32::Storage::FileSystem::{
+        FILE_DISPOSITION_INFO, FileDispositionInfo, SetFileInformationByHandle,
+    };
+    let mut info = FILE_DISPOSITION_INFO { DeleteFile: true };
+    // SAFETY: source remains live and was opened with DELETE access and no delete
+    // sharing. Windows reads this initialized fixed-size structure synchronously.
+    unsafe {
+        if SetFileInformationByHandle(
+            source.as_raw_handle(),
+            FileDispositionInfo,
+            (&mut info as *mut FILE_DISPOSITION_INFO).cast(),
+            std::mem::size_of::<FILE_DISPOSITION_INFO>() as u32,
+        ) == 0
+        {
+            Err(io::Error::last_os_error())
+        } else {
+            Ok(())
+        }
+    }
+}

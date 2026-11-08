@@ -128,6 +128,15 @@ pub(crate) fn prepare(repo: &Path, mut manager: Manager) -> Result<Manager, Stri
 }
 pub(crate) fn publish(
     runner: &Runner<'_>,
+    manager: Manager,
+    retry: bool,
+) -> Result<Manager, String> {
+    crate::tasks::with_cancellation(runner.control.cancellation(), || {
+        publish_inner(runner, manager, retry)
+    })
+}
+fn publish_inner(
+    runner: &Runner<'_>,
     mut manager: Manager,
     retry: bool,
 ) -> Result<Manager, String> {
@@ -152,20 +161,124 @@ pub(crate) fn publish(
             destination.result = Some(Err(e));
             continue;
         }
-        destination.result = Some(runner.run(&[
-            "push",
-            "--porcelain",
-            "--recurse-submodules=check",
-            "--",
+        destination.result = Some(runner.endpoint(
+            runner.repo,
             &destination.url,
-            &format!("{}:refs/heads/{}", plan.commit, plan.branch),
-        ]));
+            &destination.remote,
+            &["push", "--porcelain", "--recurse-submodules=check", "--"],
+            &[&format!("{}:refs/heads/{}", plan.commit, plan.branch)],
+        ));
     }
     Ok(manager)
 }
 #[cfg(test)]
 mod tests {
     use super::*;
+    // Compiled only under the runtime hold. The literal path "origin" must not
+    // be interpreted as the configured remote of the same name, on either URL.
+    #[test]
+    fn multiple_urls_include_literal_remote_names_without_reinterpretation() -> Result<(), String> {
+        let r = crate::git::fixture::Repo::new("publication-literal-source")?;
+        let commit = r.commit("one", &[])?;
+        let a = r.path().join("origin");
+        let b = r.path().join("second.git");
+        let decoy = r.path().join("decoy.git");
+        for path in [&a, &b, &decoy] {
+            std::fs::create_dir_all(path).map_err(|e| e.to_string())?;
+            crate::git::run(Some(path), &["init", "--bare"])?;
+        }
+        r.git(&["remote", "add", "origin", &decoy.to_string_lossy()])?;
+        r.git(&["remote", "add", "configured", "origin"])?;
+        r.git(&["config", "--add", "remote.configured.pushurl", "origin"])?;
+        r.git(&[
+            "config",
+            "--add",
+            "remote.configured.pushurl",
+            &b.to_string_lossy(),
+        ])?;
+        let control = crate::git::OpControl::new(|| {});
+        let runner = Runner {
+            repo: r.path(),
+            control: &control,
+            credentials: None,
+        };
+        let mut manager = read(r.path(), "hosts")?;
+        manager.selected = vec!["configured".into()];
+        save_group(&runner, &manager)?;
+        let manager = prepare(r.path(), read(r.path(), "hosts")?)?;
+        assert_eq!(
+            manager.plan.as_ref().ok_or("No plan")?.destinations.len(),
+            2
+        );
+        let result = publish(&runner, manager, false)?;
+        assert!(
+            result
+                .plan
+                .ok_or("No plan")?
+                .destinations
+                .iter()
+                .all(|d| matches!(d.result, Some(Ok(_))))
+        );
+        for path in [&a, &b] {
+            assert_eq!(
+                crate::git::run(Some(path), &["rev-parse", "refs/heads/main"])?.trim(),
+                commit
+            );
+        }
+        assert!(
+            crate::git::run(Some(&decoy), &["rev-parse", "--verify", "refs/heads/main"]).is_err()
+        );
+        Ok(())
+    }
+    // Owned-Git regression: compiled under the runtime hold, not executed.
+    #[test]
+    fn chained_push_rewrites_cannot_redirect_a_reviewed_publication() -> Result<(), String> {
+        let r = crate::git::fixture::Repo::new("publication-rewrite-source")?;
+        let commit = r.commit("one", &[])?;
+        let hosts = crate::git::fixture::Repo::new("publication-rewrite-hosts")?;
+        let a = hosts.path().join("a.git");
+        let b = hosts.path().join("b.git");
+        for path in [&a, &b] {
+            std::fs::create_dir_all(path).map_err(|e| e.to_string())?;
+            crate::git::run(Some(path), &["init", "--bare"])?;
+        }
+        r.git(&["remote", "add", "first", "publication-route://first"])?;
+        r.git(&[
+            "config",
+            &format!("url.{}.pushInsteadOf", a.display()),
+            "publication-route://first",
+        ])?;
+        r.git(&[
+            "config",
+            &format!("url.{}.pushInsteadOf", b.display()),
+            &a.to_string_lossy(),
+        ])?;
+        let control = crate::git::OpControl::new(|| {});
+        let runner = Runner {
+            repo: r.path(),
+            control: &control,
+            credentials: None,
+        };
+        let mut manager = read(r.path(), "hosts")?;
+        manager.selected = vec!["first".into()];
+        save_group(&runner, &manager)?;
+        let manager = prepare(r.path(), read(r.path(), "hosts")?)?;
+        assert_eq!(
+            manager.plan.as_ref().ok_or("No plan")?.destinations[0].url,
+            a.to_string_lossy()
+        );
+        let result = publish(&runner, manager, false)?;
+        assert!(matches!(
+            result.plan.ok_or("No plan")?.destinations[0].result,
+            Some(Ok(_))
+        ));
+        assert_eq!(
+            crate::git::run(Some(&a), &["rev-parse", "refs/heads/main"])?.trim(),
+            commit
+        );
+        assert!(crate::git::run(Some(&b), &["rev-parse", "--verify", "refs/heads/main"]).is_err());
+        Ok(())
+    }
     #[test]
     fn group_persists_reports_partial_failure_and_retries_only_failed() -> Result<(), String> {
         let r = crate::git::fixture::Repo::new("publication-source")?;

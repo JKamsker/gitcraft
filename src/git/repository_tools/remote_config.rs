@@ -118,7 +118,7 @@ fn map(pattern: &str, replacement: &str, value: &str) -> Option<String> {
     }
 }
 pub(crate) fn boolean(repo: &Path, key: &str, default: bool) -> Result<bool, String> {
-    let out = crate::git::run_captured(repo, &["config", "--bool", "--get", key], None)?;
+    let out = super::captured(repo, &["config", "--bool", "--get", key], None)?;
     match out.code {
         Some(0) => match out.stdout.trim() {
             "true" => Ok(true),
@@ -263,8 +263,7 @@ pub(crate) fn set_values(runner: &Runner<'_>, key: &str, values: &[String]) -> R
     } else {
         // --unset-all exits 5 when no local value exists. Do not confuse inherited values
         // with local overrides, and do not suppress genuine I/O/locking errors.
-        let local =
-            crate::git::run_captured(runner.repo, &["config", "--local", "--get-all", key], None)?;
+        let local = super::captured(runner.repo, &["config", "--local", "--get-all", key], None)?;
         match local.code {
             Some(0) => {
                 runner.run(&["config", "--local", "--unset-all", key])?;

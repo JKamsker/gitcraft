@@ -373,6 +373,7 @@ pub struct RepoTab {
     push_flow: push::PushFlow,
     plain_rebase_request: u64,
     preflight_pending: Option<PendingOp>,
+    preflight_selection: Option<git::repository_tools::routes::PreparedPush>,
     preflight_after: Option<(String, PendingOp)>,
     preflight_timeline: Option<Option<u64>>,
     /// HTTPS credentials typed in this session, used for every later git command of the tab.
@@ -709,6 +710,7 @@ impl RepoTab {
             push_flow: Default::default(),
             plain_rebase_request: 0,
             preflight_pending: None,
+            preflight_selection: None,
             preflight_after: None,
             preflight_timeline: None,
             credentials: None,

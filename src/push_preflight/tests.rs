@@ -975,6 +975,7 @@ fn merge_pure_reviewed_send_receipt_refuses_changed_exact_push() -> Result<(), S
         tracking_ref: None,
         lfs_config: vec![],
         receive_pack: "git-receive-pack".into(),
+        selection: None,
     };
     let receipt = ReviewedSend::from_echo(push_args(&plan)?, None);
     receipt.check_plan(&plan)?;

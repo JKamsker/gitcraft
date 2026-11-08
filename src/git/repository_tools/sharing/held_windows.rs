@@ -312,20 +312,49 @@ impl Ownership {
                 .custom_flags(NOFOLLOW)
                 .open(self.pack.join(&private))
                 .map_err(err)?;
-            source.write_all(bytes).map_err(err)?;
-            source.sync_all().map_err(err)?;
+            let write = source.write_all(bytes).and_then(|_| source.sync_all());
+            if let Err(e) = write {
+                let cleanup = rename::discard(&source);
+                return Err(err(format!(
+                    "{e}; owned temporary cleanup: {cleanup:?}; retained if cleanup failed: {}",
+                    self.pack.join(&private).display()
+                )));
+            }
             match rename::no_replace(&source, &directory, &name) {
                 Ok(()) => {
                     installed.push(Arc::new(source));
                 }
                 Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
-                    let existing = locked_read(&self.pack.join(&name))?;
-                    if read(&existing, 128 << 20)? != bytes {
-                        return Err(err("an existing pack differs and was not overwritten"));
+                    let existing = match locked_read(&self.pack.join(&name)) {
+                        Ok(existing) => existing,
+                        Err(e) => {
+                            let cleanup = rename::discard(&source);
+                            return Err(err(format!(
+                                "{e}; owned temporary cleanup: {cleanup:?}; retained if cleanup failed: {}",
+                                self.pack.join(&private).display()
+                            )));
+                        }
+                    };
+                    let comparison = read(&existing, 128 << 20);
+                    let cleanup = rename::discard(&source);
+                    if comparison.as_ref().is_err()
+                        || comparison.as_ref().is_ok_and(|v| v != bytes)
+                        || cleanup.is_err()
+                    {
+                        return Err(err(format!(
+                            "existing pack differs or cannot be verified; was not overwritten; owned temporary cleanup: {cleanup:?}; retained if cleanup failed: {}",
+                            self.pack.join(&private).display()
+                        )));
                     }
                     installed.push(Arc::new(existing));
                 }
-                Err(e) => return Err(err(e)),
+                Err(e) => {
+                    let cleanup = rename::discard(&source);
+                    return Err(err(format!(
+                        "{e}; owned temporary cleanup: {cleanup:?}; retained if cleanup failed: {}",
+                        self.pack.join(&private).display()
+                    )));
+                }
             }
         }
         self.current(true)

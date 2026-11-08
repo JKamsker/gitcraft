@@ -11,13 +11,13 @@ use std::path::{Component, Path, PathBuf};
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
 pub(crate) struct Store {
     pub path: PathBuf,
-    pub donor_of: Option<PathBuf>,
     pub available: bool,
     pub error: Option<String>,
 }
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
 pub(crate) struct Topology {
     pub stores: Vec<Store>,
+    pub edges: Vec<(PathBuf, PathBuf)>,
     pub worktrees: String,
     pub promisor: bool,
     pub alternates: Option<Vec<u8>>,
@@ -118,30 +118,35 @@ pub(crate) fn read(
     let alternates = files::read(&remote::join(primary, "info/alternates"), 64 * 1024, active)?;
     let mut topology = Topology {
         stores: Vec::new(),
+        edges: Vec::new(),
         worktrees,
         promisor,
         alternates,
         warnings: Vec::new(),
     };
-    let mut pending = vec![(normalize(primary), None)];
-    let mut seen = BTreeSet::new();
-    while let Some((path, parent)) = pending.pop() {
+    let mut pending = vec![(normalize(primary), None, Vec::new())];
+    let mut walk = Walk::default();
+    while let Some((path, parent, ancestors)) = pending.pop() {
         if !active() {
             return Err("Object inspection cancelled".into());
         }
-        if !seen.insert(path.clone()) {
-            topology.warnings.push(format!(
-                "Repeated or cyclic alternate: {}",
-                remote::display(&path)
-            ));
-            continue;
+        match walk.enter(&path, parent.as_deref(), &ancestors)? {
+            Visit::Cycle => {
+                topology
+                    .warnings
+                    .push(format!("Cyclic alternate: {}", remote::display(&path)));
+                continue;
+            }
+            Visit::Duplicate => continue,
+            Visit::New => (),
         }
+        let mut descendants = ancestors;
+        descendants.push(path.clone());
         if topology.stores.len() >= 16 {
             return Err("More than 16 object stores; inspect this topology with Git.".into());
         }
         let mut store = Store {
             path: path.clone(),
-            donor_of: parent,
             available: false,
             error: None,
         };
@@ -160,6 +165,7 @@ pub(crate) fn read(
                             Ok(donor) if !donor.is_empty() => pending.push((
                                 normalize(&remote::resolve(&path, &donor)),
                                 Some(path.clone()),
+                                descendants.clone(),
                             )),
                             Ok(_) => (),
                             Err(e) => {
@@ -186,7 +192,85 @@ pub(crate) fn read(
         }
         topology.stores.push(store);
     }
+    topology.edges = walk.edges.into_iter().collect();
     Ok(topology)
+}
+
+#[derive(Default)]
+struct Walk {
+    seen: BTreeSet<PathBuf>,
+    edges: BTreeSet<(PathBuf, PathBuf)>,
+}
+#[derive(Debug, PartialEq, Eq)]
+enum Visit {
+    New,
+    Duplicate,
+    Cycle,
+}
+impl Walk {
+    fn enter(
+        &mut self,
+        path: &Path,
+        parent: Option<&Path>,
+        ancestors: &[PathBuf],
+    ) -> Result<Visit, String> {
+        if let Some(parent) = parent {
+            self.edges.insert((parent.to_owned(), path.to_owned()));
+            if self.edges.len() > 256 {
+                return Err("More than 256 alternate edges; inspect this topology with Git".into());
+            }
+        }
+        if ancestors.iter().any(|p| p == path) {
+            return Ok(Visit::Cycle);
+        }
+        Ok(if self.seen.insert(path.to_owned()) {
+            Visit::New
+        } else {
+            Visit::Duplicate
+        })
+    }
+}
+#[cfg(test)]
+mod dag_pure {
+    use super::*;
+    #[test]
+    fn diamond_retains_both_edges_and_only_path_repetition_is_a_cycle() -> Result<(), String> {
+        let mut walk = Walk::default();
+        let a = PathBuf::from("a");
+        let b = PathBuf::from("b");
+        let c = PathBuf::from("c");
+        let d = PathBuf::from("d");
+        assert_eq!(walk.enter(&a, None, &[])?, Visit::New);
+        assert_eq!(
+            walk.enter(&b, Some(&a), std::slice::from_ref(&a))?,
+            Visit::New
+        );
+        assert_eq!(
+            walk.enter(&d, Some(&b), &[a.clone(), b.clone()])?,
+            Visit::New
+        );
+        assert_eq!(
+            walk.enter(&c, Some(&a), std::slice::from_ref(&a))?,
+            Visit::New
+        );
+        assert_eq!(
+            walk.enter(&d, Some(&c), &[a.clone(), c.clone()])?,
+            Visit::Duplicate
+        );
+        assert_eq!(walk.edges.len(), 4);
+        assert!(walk.edges.contains(&(b.clone(), d.clone())));
+        assert!(walk.edges.contains(&(c.clone(), d.clone())));
+        assert_eq!(
+            walk.enter(&d, Some(&c), &[a.clone(), c.clone()])?,
+            Visit::Duplicate
+        );
+        assert_eq!(walk.edges.len(), 4);
+        assert_eq!(
+            walk.enter(&a, Some(&d), &[a.clone(), b, d.clone()])?,
+            Visit::Cycle
+        );
+        Ok(())
+    }
 }
 
 #[cfg(test)]

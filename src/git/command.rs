@@ -103,6 +103,7 @@ pub(super) const REPOSITORY_ENV_REMOVED: &[&str] = &[
     "GIT_NAMESPACE",
     "GIT_SHALLOW_FILE",
     "GIT_REPLACE_REF_BASE",
+    "GIT_GRAFT_FILE",
     "GIT_CONFIG",
     "GIT_CONFIG_COUNT",
     "GIT_CONFIG_PARAMETERS",
@@ -177,6 +178,19 @@ pub(super) struct Extra {
     /// How long it may run on another machine before it is stopped there.
     timeout: Option<std::time::Duration>,
 }
+
+impl Extra {
+    /// Selected-repository inspection/mutation; owned private overrides are added
+    /// after normalization by the shared production command builders.
+    pub(in crate::git) fn repository() -> Self {
+        Self {
+            normalize_repository: true,
+            ..Self::default()
+        }
+    }
+}
+
+pub(in crate::git) use watched::run_watched_extra_recorded;
 
 /// How long a diff or merge tool started on another machine may stay open before it is stopped.
 const TOOL_FOR: std::time::Duration = std::time::Duration::from_secs(12 * 3600);
@@ -2880,6 +2894,262 @@ mod sparse_account_recording_tests {
                     Some(std::ffi::OsStr::new("--no-lazy-fetch"))
                 );
                 assert!(!cmd.get_envs().any(|(k, _)| k == "GITCRAFT_GIT_PASSWORD"));
+            }
+            Ok(())
+        })
+    }
+}
+
+/// Pin an already reviewed effective endpoint using a private remote. Git expands
+/// the private placeholder once; explicit pushurl disables pushInsteadOf. The
+/// effective address is never handed back as an unqualified remote/URL operand.
+fn repository_endpoint_extra(
+    repo: &Path,
+    address: &str,
+    original_remote: &str,
+    credentials: Option<&Credentials>,
+    original_args: &[&str],
+) -> Result<(Extra, String), String> {
+    static SEQUENCE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let id = SEQUENCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let alias = format!("gitcraft-endpoint-{}-{id}", std::process::id());
+    let placeholder = format!("gitcraft-pinned-address://{alias}");
+    let mut values = vec![
+        (format!("url.{address}.insteadOf"), placeholder.clone()),
+        (format!("remote.{alias}.url"), String::new()),
+        (format!("remote.{alias}.url"), placeholder.clone()),
+        (format!("remote.{alias}.pushurl"), String::new()),
+        (format!("remote.{alias}.pushurl"), placeholder.clone()),
+    ];
+    if !original_remote.is_empty() {
+        values.extend([
+            (format!("remote.{original_remote}.url"), String::new()),
+            (format!("remote.{original_remote}.url"), placeholder.clone()),
+            (format!("remote.{original_remote}.pushurl"), String::new()),
+            (format!("remote.{original_remote}.pushurl"), placeholder),
+        ]);
+    }
+    const VARS: [(&str, &str); 9] = [
+        ("GIT_CONFIG_KEY_0", "GIT_CONFIG_VALUE_0"),
+        ("GIT_CONFIG_KEY_1", "GIT_CONFIG_VALUE_1"),
+        ("GIT_CONFIG_KEY_2", "GIT_CONFIG_VALUE_2"),
+        ("GIT_CONFIG_KEY_3", "GIT_CONFIG_VALUE_3"),
+        ("GIT_CONFIG_KEY_4", "GIT_CONFIG_VALUE_4"),
+        ("GIT_CONFIG_KEY_5", "GIT_CONFIG_VALUE_5"),
+        ("GIT_CONFIG_KEY_6", "GIT_CONFIG_VALUE_6"),
+        ("GIT_CONFIG_KEY_7", "GIT_CONFIG_VALUE_7"),
+        ("GIT_CONFIG_KEY_8", "GIT_CONFIG_VALUE_8"),
+    ];
+    let mut extra = Extra {
+        normalize_repository: true,
+        timeout: Some(std::time::Duration::from_secs(120)),
+        output_limit: Some(1 << 20),
+        ..Default::default()
+    };
+    extra
+        .env
+        .push(("GIT_CONFIG_COUNT", values.len().to_string()));
+    for ((key, value), (k, v)) in values.into_iter().zip(VARS) {
+        extra.env.extend([(k, key), (v, value)]);
+    }
+    if let Some(credentials) = credentials {
+        // Validate legacy/edited state even when this destination has another account.
+        credentials.helper_environment()?;
+        if credentials
+            .scope
+            .as_ref()
+            .is_some_and(|s| s.matches_url(address))
+        {
+            let policy = credential_command_policy(Some(repo), credentials, original_args)?;
+            extra.owned_pre.extend(policy.arguments);
+            extra.env.extend(policy.environment);
+        }
+    }
+    Ok((extra, alias))
+}
+
+pub(in crate::git) fn repository_endpoint(
+    repo: &Path,
+    address: &str,
+    original_remote: &str,
+    before: &[&str],
+    after: &[&str],
+    credentials: Option<&Credentials>,
+    control: &std::sync::Arc<OpControl>,
+) -> Result<String, String> {
+    let (extra, alias) =
+        repository_endpoint_extra(repo, address, original_remote, credentials, before)?;
+    let words: Vec<&str> = before
+        .iter()
+        .copied()
+        .chain(std::iter::once(alias.as_str()))
+        .chain(after.iter().copied())
+        .collect();
+    let (result, record) =
+        watched::run_watched_extra_recorded(Some(repo), &words, credentials, false, control, extra);
+    control.record(record);
+    result
+}
+
+#[cfg(test)]
+mod repository_endpoint_recording {
+    use super::*;
+    #[test]
+    fn reviewed_endpoint_and_account_survive_normalization_without_reinterpretation()
+    -> Result<(), String> {
+        let repo = Path::new("/recorded/repo");
+        let url = "https://host-a.invalid/team/repo";
+        let credentials = Credentials::for_url(url, "alice".into(), "DUMMY_A_TOKEN".into())?;
+        for address in [url, "https://host-b.invalid/team/repo", "origin"] {
+            let (extra, alias) =
+                repository_endpoint_extra(repo, address, "origin", Some(&credentials), &["push"])?;
+            let args = ["push", "--porcelain", "--", &alias, "a:refs/heads/main"];
+            let mut selected = Command::new("/recorded/chosen/git");
+            clear_repository_environment(&mut selected);
+            let cmd = apply_command_extras(selected, None, &extra, &args);
+            let env: std::collections::BTreeMap<_, _> = cmd.get_envs().collect();
+            let get = |k: &str| env.get(std::ffi::OsStr::new(k)).copied().flatten();
+            assert_eq!(get("GIT_CONFIG_COUNT"), Some(std::ffi::OsStr::new("9")));
+            assert_eq!(
+                get("GIT_CONFIG_KEY_0"),
+                Some(std::ffi::OsStr::new(&format!("url.{address}.insteadOf")))
+            );
+            assert_eq!(get("GIT_CONFIG_VALUE_0"), get("GIT_CONFIG_VALUE_2"));
+            assert_eq!(get("GIT_CONFIG_VALUE_2"), get("GIT_CONFIG_VALUE_4"));
+            assert_eq!(get("GIT_CONFIG_VALUE_4"), get("GIT_CONFIG_VALUE_8"));
+            for name in REPOSITORY_ENV_REMOVED {
+                if *name != "GIT_CONFIG_COUNT" && *name != "GIT_CONFIG_GLOBAL" {
+                    assert_eq!(env.get(std::ffi::OsStr::new(name)), Some(&None), "{name}");
+                }
+            }
+            assert_eq!(get("GITCRAFT_GIT_PASSWORD").is_some(), address == url);
+            if address == url {
+                assert_eq!(
+                    get("GITCRAFT_GIT_ORIGINAL"),
+                    Some(std::ffi::OsStr::new("/recorded/chosen/git"))
+                );
+            }
+            assert!(
+                !cmd.get_args()
+                    .any(|a| a.to_string_lossy().contains("DUMMY_A_TOKEN"))
+            );
+            let target = remote::Target {
+                host: remote::Host::Ssh("uncontacted.invalid".into()),
+                path: "/repo".into(),
+            };
+            let request = remote_request(&target, &extra, &args);
+            assert_eq!(
+                request.script.starts_with(CREDENTIAL_REMOTE_PIN),
+                address == url
+            );
+            assert!(request.unset.iter().any(|k| k == "GIT_CONFIG_COUNT"));
+            assert!(
+                request
+                    .env
+                    .contains(&("GIT_CONFIG_COUNT".into(), "9".into()))
+            );
+        }
+        let legacy = Credentials {
+            scope: None,
+            ..credentials.clone()
+        };
+        assert!(repository_endpoint_extra(repo, url, "origin", Some(&legacy), &["push"]).is_err());
+        let edited = Credentials {
+            username: "bob".into(),
+            ..credentials
+        };
+        assert!(repository_endpoint_extra(repo, url, "origin", Some(&edited), &["push"]).is_err());
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod internals_merge_recording {
+    use super::*;
+    #[test]
+    fn root_unset_and_profile_precede_both_pinned_transport_environments() -> Result<(), String> {
+        let url = "https://fixture.invalid/team/repo";
+        let repo = Path::new("/recorded/repo");
+        let creds = Credentials::for_url(url, "alice".into(), "DUMMY_MERGE".into())?;
+        let context = crate::connections::Context {
+            git_config: Some("/recorded/initiating-profile".into()),
+            ..Default::default()
+        };
+        context.run(|| -> Result<(), String> {
+            let (internals, alias) =
+                repository_endpoint_extra(repo, url, "origin", Some(&creds), &["push"])?;
+            let reviewed = reviewed_push_extra(
+                repo,
+                &["push"],
+                PushTarget {
+                    address: url,
+                    alias: "reviewed-fixture",
+                    original_remote: "origin",
+                    skip_hooks: false,
+                    lfs_config: &[],
+                    lfs_objects: &[],
+                    receive_pack: "",
+                },
+                "/recorded/hooks".into(),
+                Some(&creds),
+            )?;
+            for (mut extra, count, endpoint_alias) in [
+                (internals, "9", alias.as_str()),
+                (reviewed, "10", "reviewed-fixture"),
+            ] {
+                extra.unset.extend(["GIT_INDEX_FILE", "GIT_CONFIG_COUNT"]);
+                extra.env.extend([
+                    ("GIT_INDEX_FILE", "/recorded/private-index".into()),
+                    ("GIT_DIR", "/recorded/command-source".into()),
+                ]);
+                let mut command = Command::new("/recorded/selected/git");
+                command
+                    .arg("-C")
+                    .arg(repo)
+                    .env("GIT_DIR", "/foreign")
+                    .env("GIT_CONFIG_COUNT", "99");
+                clear_repository_environment(&mut command);
+                let words = [
+                    "push",
+                    "--porcelain",
+                    "--",
+                    endpoint_alias,
+                    "a:refs/heads/dev",
+                ];
+                // All program/directory strings are inert. None avoids discovery
+                // and the native practice-registry probe during this recording.
+                let command = apply_command_extras(command, None, &extra, &words);
+                let env: std::collections::BTreeMap<_, _> = command.get_envs().collect();
+                let value = |key: &str| env.get(std::ffi::OsStr::new(key)).copied().flatten();
+                assert_eq!(value("GIT_CONFIG_COUNT"), Some(std::ffi::OsStr::new(count)));
+                assert_eq!(
+                    value("GIT_INDEX_FILE"),
+                    Some(std::ffi::OsStr::new("/recorded/private-index"))
+                );
+                assert_eq!(
+                    value("GIT_DIR"),
+                    Some(std::ffi::OsStr::new("/recorded/command-source"))
+                );
+                assert_eq!(
+                    value("GIT_CONFIG_GLOBAL"),
+                    Some(std::ffi::OsStr::new("/recorded/initiating-profile"))
+                );
+                assert_eq!(
+                    value("GITCRAFT_GIT_ORIGINAL"),
+                    Some(std::ffi::OsStr::new("/recorded/selected/git"))
+                );
+                assert_eq!(
+                    value("GITCRAFT_GIT_PASSWORD"),
+                    Some(std::ffi::OsStr::new("DUMMY_MERGE"))
+                );
+                assert_eq!(value("GIT_GRAFT_FILE"), None);
+                let argv: Vec<_> = command.get_args().collect();
+                assert!(argv.iter().any(|a| *a == "gitcraft-credential-transport"));
+                assert!(
+                    !argv
+                        .iter()
+                        .any(|a| a.to_string_lossy().contains("DUMMY_MERGE"))
+                );
             }
             Ok(())
         })

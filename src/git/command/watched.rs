@@ -162,6 +162,26 @@ pub fn run_watched_recorded(
     quiet: bool,
     control: &Arc<OpControl>,
 ) -> (Result<String, String>, Recorded) {
+    let extra = match extra_for(dir, args, creds, quiet) {
+        Ok(extra) => extra,
+        Err(e) => {
+            return (
+                Err(e.clone()),
+                Recorded::new(args, None, &e, creds, Instant::now()),
+            );
+        }
+    };
+    run_watched_extra_recorded(dir, args, creds, quiet, control, extra)
+}
+
+pub(in crate::git) fn run_watched_extra_recorded(
+    dir: Option<&Path>,
+    args: &[&str],
+    creds: Option<&Credentials>,
+    quiet: bool,
+    control: &Arc<OpControl>,
+    mut extra: Extra,
+) -> (Result<String, String>, Recorded) {
     let started = Instant::now();
     if control.is_cancelled() {
         let not_run = Recorded::new(args, None, "Not run: cancelled", creds, started);
@@ -177,10 +197,6 @@ pub fn run_watched_recorded(
     let failed = |e: String| {
         let rec = Recorded::new(&words, None, &e, creds, started);
         (Err(e), rec)
-    };
-    let mut extra = match extra_for(dir, args, creds, quiet) {
-        Ok(extra) => extra,
-        Err(e) => return failed(e),
     };
     let _source = match super::source::bind(&mut extra, dir, args) {
         Ok(source) => source,
@@ -296,6 +312,8 @@ fn follow_command(
     let reader = Arc::new(Mutex::new(ProgressReader::default()));
     let mut options = crate::processes::Options {
         background: true,
+        timeout: extra.timeout,
+        output_limit: extra.output_limit.unwrap_or(64 << 20),
         ..Default::default()
     };
     let command = match target {
@@ -304,7 +322,7 @@ fn follow_command(
                 &target.host,
                 &super::remote_request(target, extra, args),
             )?;
-            options.timeout = Some(remote::NETWORK_LIMIT);
+            options.timeout = extra.timeout.or(Some(remote::NETWORK_LIMIT));
             streaming.configure(&mut options)
         }
         None => local_command(dir, extra, args),

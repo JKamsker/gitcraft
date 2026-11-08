@@ -1,4 +1,4 @@
-use super::guard::{Runner, Snapshot, text};
+use super::guard::{Runner, Snapshot};
 use std::path::{Path, PathBuf};
 #[derive(Clone, Debug)]
 pub(crate) struct Candidate {
@@ -16,10 +16,38 @@ pub(crate) struct Conflict {
     pub theirs: String,
     pub graph: String,
     pub candidates: Vec<Candidate>,
+    pub candidates_limited: bool,
     pub head: String,
+    pub recording_blocker: Option<String>,
 }
-fn contains(repo: &Path, ancestor: &str, commit: &str) -> Result<bool, String> {
-    let out = crate::git::run_captured(
+fn canonical_commit(
+    oid: &str,
+    mut run: impl FnMut(&[&str]) -> Result<String, String>,
+) -> Result<String, String> {
+    if !super::object::valid_oid(oid) {
+        return Err("Use a full immutable submodule commit or tag object ID".into());
+    }
+    let commit = run(&[
+        "--no-replace-objects",
+        "rev-parse",
+        "--verify",
+        "--end-of-options",
+        &format!("{oid}^{{commit}}"),
+    ])?;
+    let commit = commit.trim();
+    if !super::object::valid_oid(commit) {
+        return Err("Submodule selection did not resolve to a commit ID".into());
+    }
+    Ok(commit.into())
+}
+fn contains(
+    budget: &super::ReadBudget,
+    control: Option<std::sync::Arc<crate::git::OpControl>>,
+    repo: &Path,
+    ancestor: &str,
+    commit: &str,
+) -> Result<bool, String> {
+    let out = budget.read(
         repo,
         &[
             "--no-replace-objects",
@@ -28,15 +56,17 @@ fn contains(repo: &Path, ancestor: &str, commit: &str) -> Result<bool, String> {
             ancestor,
             commit,
         ],
-        None,
+        control,
     )?;
     match out.code {
         Some(0) => Ok(true),
         Some(1) => Ok(false),
-        _ => Err(out.stderr),
+        _ => Err(String::from_utf8_lossy(&out.stderr).into_owned()),
     }
 }
 pub(crate) fn read(repo: &Path, path: &str) -> Result<Conflict, String> {
+    let budget = super::ReadBudget::new(400, std::time::Duration::from_secs(60));
+    let text = |repo: &Path, args: &[&str]| budget.text(repo, args, None);
     if path.is_empty()
         || Path::new(path)
             .components()
@@ -102,31 +132,33 @@ pub(crate) fn read(repo: &Path, path: &str) -> Result<Conflict, String> {
         &child,
         &[
             "for-each-ref",
+            "--count=101",
             "--contains",
             &ours,
             "--format=%(objectname)%00%(refname)",
         ],
     )?;
+    let candidates_limited = refs.lines().count() > 100;
     let mut candidates = Vec::new();
-    for row in refs.lines() {
+    for row in refs.lines().take(100) {
         let Some((oid, label)) = row.split_once('\0') else {
             continue;
         };
+        let oid = canonical_commit(oid, |args| text(&child, args))?;
         if candidates.iter().any(|c: &Candidate| c.oid == oid) {
             continue;
         }
-        if contains(&child, &ours, oid)? && contains(&child, &theirs, oid)? {
+        if contains(&budget, None, &child, &ours, &oid)?
+            && contains(&budget, None, &child, &theirs, &oid)?
+        {
             candidates.push(Candidate {
-                oid: oid.into(),
+                oid,
                 label: label.into(),
             });
         }
-        if candidates.len() >= 100 {
-            break;
-        }
     }
-    if contains(&child, &ours, &head)?
-        && contains(&child, &theirs, &head)?
+    if contains(&budget, None, &child, &ours, &head)?
+        && contains(&budget, None, &child, &theirs, &head)?
         && !candidates.iter().any(|c| c.oid == head)
     {
         candidates.push(Candidate {
@@ -171,7 +203,9 @@ pub(crate) fn read(repo: &Path, path: &str) -> Result<Conflict, String> {
         theirs,
         graph,
         candidates,
+        candidates_limited,
         head,
+        recording_blocker: super::submodule_index::blocker(repo),
     })
 }
 pub(crate) fn resolve(
@@ -179,24 +213,24 @@ pub(crate) fn resolve(
     conflict: &Conflict,
     oid: &str,
 ) -> Result<String, String> {
-    conflict.snapshot.check(runner.repo)?;
-    if text(
-        runner.repo,
-        &[
-            "--literal-pathspecs",
-            "ls-files",
-            "--unmerged",
-            "-z",
-            "--",
-            &conflict.path,
-        ],
-    )? != conflict.stages
-    {
-        return Err("Conflict stages changed. Reopen the submodule graph".into());
-    }
-    if !super::object::valid_oid(oid)
-        || !contains(&conflict.child, &conflict.ours, oid)?
-        || !contains(&conflict.child, &conflict.theirs, oid)?
+    let budget = super::ReadBudget::new(12, std::time::Duration::from_secs(60));
+    let text = |repo: &Path, args: &[&str]| budget.text(repo, args, Some(runner.control.clone()));
+    let oid = canonical_commit(oid, |args| text(&conflict.child, args))?;
+    if !super::object::valid_oid(&oid)
+        || !contains(
+            &budget,
+            Some(runner.control.clone()),
+            &conflict.child,
+            &conflict.ours,
+            &oid,
+        )?
+        || !contains(
+            &budget,
+            Some(runner.control.clone()),
+            &conflict.child,
+            &conflict.theirs,
+            &oid,
+        )?
     {
         return Err("Choose an existing submodule commit containing both ours and theirs".into());
     }
@@ -209,14 +243,9 @@ pub(crate) fn resolve(
             &format!("{oid}^{{commit}}"),
         ],
     )?;
-    runner.run(&[
-        "update-index",
-        "--add",
-        "--cacheinfo",
-        &format!("160000,{oid},{}", conflict.path),
-    ])?;
+    let evidence = super::submodule_index::record(runner, conflict, &oid)?;
     Ok(format!(
-        "Recorded submodule {} at {oid} in the parent index. The submodule checkout was not moved; commit the resolution in the parent when ready.",
+        "Recorded submodule {} at {oid} in the parent index. The submodule checkout was not moved; commit the resolution in the parent when ready. Retained index evidence: {evidence}",
         conflict.path
     ))
 }
@@ -246,7 +275,18 @@ mod tests {
             ])?
             .trim()
             .to_owned();
-        sub.git(&["update-ref", "refs/heads/resolved", &merged])?;
+        sub.git(&[
+            "tag",
+            "-a",
+            "resolved-tag",
+            "-m",
+            "annotated resolution",
+            &merged,
+        ])?;
+        let tag = sub
+            .git(&["rev-parse", "refs/tags/resolved-tag"])?
+            .trim()
+            .to_owned();
         let r = crate::git::fixture::Repo::new("sub-conflict-parent")?;
         r.git(&[
             "-c",
@@ -276,10 +316,89 @@ mod tests {
             credentials: None,
         };
         assert!(resolve(&runner, &conflict, &ours).is_err());
-        resolve(&runner, &conflict, &merged)?;
+        assert!(conflict.candidates.iter().all(|c| c.oid != tag));
+        // HELD actual-repository regression: a different writer resolves the
+        // public index after preparation and after the broad repository guard.
+        // The exact production publisher must refuse to overwrite that stage 0.
+        let index_path = r.path().join(".git/index");
+        let mut newer = None;
+        let stale = super::super::submodule_index::record_with_hook(
+            &runner,
+            &conflict,
+            &merged,
+            &mut |phase| {
+                if phase == super::super::submodule_index::Phase::BeforePublication {
+                    r.git(&[
+                        "update-index",
+                        "--add",
+                        "--cacheinfo",
+                        &format!("160000,{theirs},lib"),
+                    ])?;
+                    newer = Some(std::fs::read(&index_path).map_err(|e| e.to_string())?);
+                }
+                Ok(())
+            },
+        );
+        assert!(stale.is_err());
+        assert_eq!(
+            std::fs::read(&index_path).map_err(|e| e.to_string())?,
+            newer.ok_or("Competing stage-zero writer did not run")?
+        );
+        assert!(r.git(&["ls-files", "--stage", "lib"])?.contains(&theirs));
+        crate::git::run_input(
+            Some(r.path()),
+            &["update-index", "--index-info"],
+            &format!(
+                "0 {}\tlib\n160000 {base} 1\tlib\n160000 {ours} 2\tlib\n160000 {theirs} 3\tlib\n",
+                "0".repeat(40)
+            ),
+        )?;
+        let conflict = read(r.path(), "lib")?;
+        resolve(&runner, &conflict, &tag)?;
         assert!(r.git(&["ls-files", "--unmerged"])?.is_empty());
-        assert!(r.git(&["ls-files", "--stage", "lib"])?.contains(&merged));
+        let indexed = r.git(&["ls-files", "--stage", "lib"])?;
+        assert!(indexed.contains(&merged));
+        let indexed_oid = indexed.split_whitespace().nth(1).ok_or("No indexed OID")?;
+        assert_eq!(
+            crate::git::run(Some(&conflict.child), &["cat-file", "-t", indexed_oid])?.trim(),
+            "commit"
+        );
         assert!(resolve(&runner, &conflict, &merged).is_err());
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod canonical_pure {
+    use super::*;
+    #[test]
+    fn tag_object_selection_is_canonicalized_before_use() -> Result<(), String> {
+        let tag = "a".repeat(40);
+        let commit = "b".repeat(40);
+        let resolved = canonical_commit(&tag, |args| {
+            assert_eq!(
+                args,
+                [
+                    "--no-replace-objects",
+                    "rev-parse",
+                    "--verify",
+                    "--end-of-options",
+                    &format!("{tag}^{{commit}}")
+                ]
+            );
+            Ok(format!("{commit}\n"))
+        })?;
+        assert_eq!(resolved, commit);
+        let mut called = false;
+        assert!(
+            canonical_commit("HEAD", |_| {
+                called = true;
+                Err("Unexpected command".into())
+            })
+            .is_err()
+        );
+        assert!(!called);
+        assert!(canonical_commit(&tag, |_| Ok("not-a-commit".into())).is_err());
         Ok(())
     }
 }

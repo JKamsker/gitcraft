@@ -12,6 +12,7 @@ mod dependencies;
 use crate::git::repository_tools::dependencies as dependency;
 mod submodule_conflict;
 use crate::git::repository_tools::submodule_conflict as subconflict;
+mod push_continuation;
 mod routes;
 use crate::git::repository_tools::routes as routing;
 mod publication;
@@ -220,12 +221,7 @@ impl RepoTab {
                 return;
             }
             Act::ForceConfirmed(plan) => {
-                self.repository_tool_mutation(
-                    "Force push to confirmed push route",
-                    true,
-                    ctx,
-                    move |runner| routing::force(runner, &plan),
-                );
+                self.prepare_branch_review(None, Some(*plan), ctx);
                 return;
             }
             Act::SaveRoutes(browser, name) => {
@@ -238,12 +234,7 @@ impl RepoTab {
                 return;
             }
             Act::PushBranch(name, oid) => {
-                self.repository_tool_mutation(
-                    "Push branch via its push route",
-                    true,
-                    ctx,
-                    move |runner| routing::push_branch(runner, &name, &oid),
-                );
+                self.prepare_branch_review(Some((name, oid)), None, ctx);
                 return;
             }
             Act::SaveGroup(manager) => {
@@ -480,6 +471,10 @@ impl RepoTab {
             self.status = Some((why.why().to_owned(), true));
             return;
         }
+        let origin = match &self.dialog {
+            Some(Dialog::RepositoryTools(state)) => Some(state.id),
+            _ => None,
+        };
         let ops = super::ops(&[&[if network { "push" } else { "refs" }]]);
         let control = self.follow_op(&ops, false, ctx);
         self.busy_op = Some(label.into());
@@ -494,10 +489,12 @@ impl RepoTab {
             true,
             Err,
             move || {
-                work(&guard::Runner {
-                    repo: &repo,
-                    control: &control,
-                    credentials: credentials.as_ref(),
+                crate::tasks::with_cancellation(control.cancellation(), || {
+                    work(&guard::Runner {
+                        repo: &repo,
+                        control: &control,
+                        credentials: credentials.as_ref(),
+                    })
                 })
             },
             move |tab, result, ctx| {
@@ -510,9 +507,7 @@ impl RepoTab {
                     ctx,
                 );
                 // Drop snapshots after a mutation. A subsequent action must reread all guards.
-                if matches!(tab.dialog, Some(Dialog::RepositoryTools(_))) {
-                    tab.dialog = None;
-                }
+                retire_origin_dialog(&mut tab.dialog, origin);
             },
         );
     }
@@ -616,33 +611,7 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
         ui.label("Filter refs:");
         ui.text_edit_singleline(&mut state.filter);
     });
-    egui::ScrollArea::vertical()
-        .id_salt("all_refs")
-        .max_height(270.0)
-        .show(ui, |ui| {
-            for r in browser
-                .refs
-                .iter()
-                .filter(|r| r.name.contains(&state.filter))
-            {
-                ui.horizontal(|ui| {
-                    if ui.selectable_label(false, &r.name).clicked() {
-                        acts.push(Action::RepositoryTools(Act::AllRefs(r.name.clone())));
-                    }
-                    ui.monospace(&r.oid);
-                    ui.label(&r.kind);
-                    if !r.symbolic.is_empty() && ui.link(format!("→ {}", r.symbolic)).clicked() {
-                        acts.push(Action::RepositoryTools(Act::AllRefs(r.symbolic.clone())));
-                    }
-                    if ui.small_button("Inspect object").clicked() {
-                        acts.push(Action::RepositoryTools(Act::Object(r.oid.clone())));
-                    }
-                    if ui.small_button("Copy object").clicked() {
-                        ui.ctx().copy_text(r.oid.clone());
-                    }
-                });
-            }
-        });
+    refs_list(ui, &browser.refs, &state.filter, acts);
     ui.separator();
     ui.label("History (up to 200 commits)");
     egui::ScrollArea::both()
@@ -951,7 +920,7 @@ impl RepoTab {
         };
         let id = state.id;
         let label = if publish {
-            "Publish dependencies, then parent"
+            "Publish dependencies before parent review"
         } else {
             "Check submodule publication dependencies"
         };
@@ -961,6 +930,10 @@ impl RepoTab {
         self.last_op = None;
         self.timeline_op_started(false, super::Refresh::All);
         let repo = self.path.clone();
+        let expected_path = repo.clone();
+        let profile = crate::settings::Settings::get(ctx).profile();
+        let context = crate::connections::current();
+        let generation = self.https_generation;
         let credentials = self.credentials.clone();
         self.then_or(
             ctx,
@@ -973,12 +946,17 @@ impl RepoTab {
                     credentials: credentials.as_ref(),
                 };
                 if publish {
-                    dependency::publish(&runner, plan)
+                    dependency::publish_children(&runner, plan)
                 } else {
                     dependency::check(&runner, plan)
                 }
             },
             move |tab, result, ctx| {
+                let parent = if publish {
+                    result.as_ref().ok().and_then(push_continuation::parent_continuation)
+                } else {
+                    None
+                };
                 let outcome = result.as_ref().map_err(Clone::clone).and_then(|p| {
                     if p.parent_result.as_ref().is_some_and(Result::is_err) {
                         Err("Parent publication stopped; inspect per-repository outcomes".into())
@@ -1007,7 +985,110 @@ impl RepoTab {
                         Err(e) => tab.status = Some((e, true)),
                     }
                 }
+                if let Some(parent) = parent
+                    && matches!(&tab.dialog, Some(Dialog::RepositoryTools(state)) if state.id == id)
+                {
+                    if tab.path != expected_path || crate::settings::Settings::get(ctx).profile() != profile
+                        || crate::connections::current() != context || tab.connection_context != context
+                        || tab.https_generation != generation
+                    {
+                        tab.status = Some(("Dependencies finished, but the parent repository, profile or sign-in changed. Prepare its push again.".into(), true));
+                        return;
+                    }
+                    tab.review_prepared_push(parent, ctx);
+                }
             },
         );
+    }
+}
+
+fn retire_origin_dialog(dialog: &mut Option<Dialog>, origin: Option<u64>) {
+    if let Some(Dialog::RepositoryTools(state)) = dialog
+        && Some(state.id) == origin
+    {
+        *dialog = None;
+    }
+}
+fn refs_list(
+    ui: &mut egui::Ui,
+    refs: &[all_refs::Reference],
+    filter: &str,
+    acts: &mut Vec<Action>,
+) -> usize {
+    let filtered: Vec<_> = refs.iter().filter(|r| r.name.contains(filter)).collect();
+    let mut rendered = 0;
+    let height = ui
+        .text_style_height(&egui::TextStyle::Body)
+        .max(ui.spacing().interact_size.y);
+    egui::ScrollArea::vertical()
+        .id_salt("all_refs")
+        .max_height(270.0)
+        .show_rows(ui, height, filtered.len(), |ui, rows| {
+            for index in rows {
+                rendered += 1;
+                let r = filtered[index];
+                ui.horizontal(|ui| {
+                    if ui.selectable_label(false, &r.name).clicked() {
+                        acts.push(Action::RepositoryTools(Act::AllRefs(r.name.clone())));
+                    }
+                    ui.monospace(&r.oid);
+                    ui.label(&r.kind);
+                    if !r.symbolic.is_empty() && ui.link(format!("→ {}", r.symbolic)).clicked() {
+                        acts.push(Action::RepositoryTools(Act::AllRefs(r.symbolic.clone())));
+                    }
+                    if ui.small_button("Inspect object").clicked() {
+                        acts.push(Action::RepositoryTools(Act::Object(r.oid.clone())));
+                    }
+                    if ui.small_button("Copy object").clicked() {
+                        ui.ctx().copy_text(r.oid.clone());
+                    }
+                });
+            }
+        });
+    rendered
+}
+#[cfg(test)]
+mod ui_completion_pure {
+    use super::*;
+    fn dialog(id: u64) -> Option<Dialog> {
+        Some(Dialog::RepositoryTools(Box::new(State {
+            id,
+            query: String::new(),
+            result: None,
+            filter: String::new(),
+            tool: Tool::Refs,
+            acknowledged: false,
+            compatible: false,
+            parent: String::new(),
+            effective: true,
+        })))
+    }
+    #[test]
+    fn completion_does_not_close_a_newer_tools_dialog() {
+        let mut newer = dialog(2);
+        retire_origin_dialog(&mut newer, Some(1));
+        assert!(matches!(newer, Some(Dialog::RepositoryTools(ref s)) if s.id == 2));
+        retire_origin_dialog(&mut newer, None);
+        assert!(newer.is_some());
+        retire_origin_dialog(&mut newer, Some(2));
+        assert!(newer.is_none());
+    }
+    #[test]
+    fn all_refs_renders_only_visible_rows() {
+        let refs: Vec<_> = (0..10000)
+            .map(|i| all_refs::Reference {
+                name: format!("refs/gitcraft/{i}"),
+                oid: "a".repeat(40),
+                kind: "commit".into(),
+                symbolic: String::new(),
+            })
+            .collect();
+        let context = egui::Context::default();
+        let mut rendered = 0;
+        let mut output = context.run_ui(egui::RawInput::default(), |ui| {
+            rendered = refs_list(ui, &refs, "", &mut Vec::new());
+        });
+        output.textures_delta.clear();
+        assert!(rendered > 0 && rendered < 40, "rendered {rendered} rows");
     }
 }

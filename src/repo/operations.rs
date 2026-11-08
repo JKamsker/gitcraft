@@ -594,11 +594,6 @@ fn run_step(
     quiet: bool,
     control: Option<&Arc<git::OpControl>>,
 ) -> Result<String, String> {
-    let routed = git::repository_tools::routes::rewrite_plain_push(path, args)?;
-    let routed_args: Vec<&str> = routed
-        .as_ref()
-        .map_or_else(|| args.to_vec(), |v| v.iter().map(String::as_str).collect());
-    let args = routed_args.as_slice();
     let Some(control) = control else {
         return if quiet {
             git::run_unattended(Some(path), args, creds)
@@ -1269,6 +1264,61 @@ mod tests {
     use super::super::{OpKind, Undo, UndoEntry, ops};
     use super::{run_steps, stash_push_args};
     use crate::git;
+
+    #[test]
+    fn selected_continuation_recording_retains_actual_route_receipt_and_expect_retry()
+    -> Result<(), String> {
+        let route = git::repository_tools::routes::PushRoute {
+            branch: "topic".into(),
+            commit: "a".repeat(40),
+            remote: "publish-host".into(),
+            destination: "refs/heads/release".into(),
+            urls: vec!["https://publish.invalid/team/repo".into()],
+            lease: Some("b".repeat(40)),
+        };
+        let mut plan = crate::push_preflight::selected_continuation_recording::plan(&route);
+        plan.retain_selection(git::repository_tools::routes::PreparedPush {
+            snapshot: git::repository_tools::guard::Snapshot::recording(),
+            route: route.clone(),
+        })?;
+        let original = crate::push_preflight::push_args(&plan)?;
+        let binding: git::RouteBinding = serde_json::from_value(serde_json::json!({ "args":original, "routes":route.urls, "configuration":"recorded original route" })).map_err(|e| e.to_string())?;
+        let control = git::OpControl::new(|| {});
+        let receipt = crate::push_preflight::remember_auth_endpoint(&route.urls[0]);
+        let failed = super::run_reviewed_push(
+            &original,
+            |_| Ok(binding.clone()),
+            || Err(receipt.clone()),
+            Some(&control),
+        );
+        assert_eq!(failed, Err(receipt));
+        let failure = control
+            .auth_failure()
+            .ok_or("typed reviewed receipt missing")?;
+        assert_eq!(failure.binding, Some(binding.clone()));
+        assert_eq!(failure.endpoints, route.urls);
+        let mut ops = crate::push_preflight::approved_ops(plan);
+        let guard = ops[0].clone();
+        ops.insert(
+            0,
+            vec![
+                super::EXPECT_HTTPS_ROUTE.into(),
+                serde_json::to_string(&binding).map_err(|e| e.to_string())?,
+            ],
+        );
+        super::retain_unfinished(&mut ops, 1);
+        assert!(ops.contains(&guard));
+        let mut checked = 0;
+        super::check_https_routes(&ops, |actual| {
+            checked += 1;
+            assert_eq!(actual, &binding);
+            Ok(())
+        })?;
+        assert_eq!(checked, 1);
+        let approved = ops.last().ok_or("APPROVED continuation missing")?;
+        super::reviewed_operands(approved)?;
+        Ok(())
+    }
 
     fn recorded_route() -> Result<git::RouteBinding, String> {
         serde_json::from_value(serde_json::json!({
