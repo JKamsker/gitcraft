@@ -1478,6 +1478,9 @@ fn render(raw: &str) -> Option<String> {
         }
         _ => {}
     }
+    if let Some(value) = composition::owned_envelope(raw) {
+        return Some(value);
+    }
     if let Some(value) = two_arguments(raw) {
         return Some(value);
     }
@@ -1497,11 +1500,7 @@ fn render(raw: &str) -> Option<String> {
                     return Some(message(id, &[(name, number.into())]));
                 }
             } else {
-                let child = composition::envelope(id, value);
-                return Some(message(
-                    id,
-                    &[(name, child.as_deref().unwrap_or(value).into())],
-                ));
+                return Some(message(id, &[(name, value.into())]));
             }
         }
     }

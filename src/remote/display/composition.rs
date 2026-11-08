@@ -157,7 +157,7 @@ fn framed(raw: &str, child: fn(&str) -> Option<String>) -> Option<String> {
     child(body).map(|value| format!("{value}{newline}"))
 }
 
-pub(super) fn envelope(id: &str, raw: &str) -> Option<String> {
+fn envelope(id: &str, raw: &str) -> Option<String> {
     match id {
         "interaction-remote-owned-endpoint" => framed(raw, native),
         "interaction-remote-claim-helper" => framed(raw, |body| exact(body, CLAIM)),
@@ -165,6 +165,36 @@ pub(super) fn envelope(id: &str, raw: &str) -> Option<String> {
         "interaction-remote-cleanup-partial" if single_line(raw) => ledger(raw),
         _ => None,
     }
+}
+
+// Select the actual outer producer before looking for an inner proof separator.
+// Even an unknown child finishes here, keeping all of its bytes opaque instead of
+// allowing another top-level display rule to reinterpret the nested payload.
+pub(super) fn owned_envelope(raw: &str) -> Option<String> {
+    for (prefix, id) in [
+        (
+            "gitcraft owned endpoint: ",
+            "interaction-remote-owned-endpoint",
+        ),
+        (
+            "gitcraft workspace claim: ",
+            "interaction-remote-claim-helper",
+        ),
+        ("workspace claim unavailable: ", "interaction-remote-claim"),
+        (
+            "cleanup partial; external ledger retained: ",
+            "interaction-remote-cleanup-partial",
+        ),
+    ] {
+        if let Some(detail) = raw.strip_prefix(prefix) {
+            let child = envelope(id, detail);
+            return Some(message(
+                id,
+                &[("detail", child.as_deref().unwrap_or(detail).into())],
+            ));
+        }
+    }
+    None
 }
 
 pub(super) fn filesystem(raw: &str) -> Option<String> {
@@ -353,6 +383,8 @@ mod tests {
                 "invalid native request\n\n",
                 "invalid native request\r\n",
                 "Traceback:\nValueError: invalid native request",
+                "vendor; atomic cleanup proof unavailable: native terminal receipt unavailable",
+                "invalid native request; NotDispatched proof publication failed: vendor\nsecond line",
             ] {
                 let raw = format!("gitcraft owned endpoint: {detail}");
                 let prefix = if locale == "de" {
