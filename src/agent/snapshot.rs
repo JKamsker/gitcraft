@@ -54,12 +54,24 @@ fn copy(wt: &Path, from: &str, to: &str) -> bool {
         Some(target) => there(
             &target,
             &format!(
-                "cp -f -- {} {}",
+                "cp -p -f -- {} {}",
                 crate::remote::sh_quote(from),
                 crate::remote::sh_quote(to)
             ),
         ),
-        None => std::fs::copy(wt.join(from), wt.join(to)).is_ok(),
+        None => {
+            // An advanced index timestamp suppresses Git's racy-stat rehash for
+            // same-size edits in the original timestamp tick.
+            let copied = || -> std::io::Result<()> {
+                let modified = std::fs::metadata(wt.join(from))?.modified()?;
+                std::fs::copy(wt.join(from), wt.join(to))?;
+                std::fs::File::options()
+                    .write(true)
+                    .open(wt.join(to))?
+                    .set_times(std::fs::FileTimes::new().set_modified(modified))
+            };
+            copied().is_ok()
+        }
     }
 }
 
@@ -141,6 +153,46 @@ mod tests {
             .collect();
         let _ = std::fs::remove_dir_all(&dir);
         assert!(left.is_empty(), "no index left behind");
+        Ok(())
+    }
+}
+
+#[cfg(all(test, unix))]
+mod racy_index_tests {
+    #[test]
+    fn snapshots_rehash_same_size_edits_without_advancing_the_source_index() -> Result<(), String> {
+        let repo = crate::git::fixture::Repo::new("snapshot-racy-index")?;
+        let file = repo.path().join("file");
+        std::fs::write(&file, b"old\n").map_err(|e| e.to_string())?;
+        let tick = std::time::UNIX_EPOCH + std::time::Duration::from_secs(1_000_000);
+        let set_time = |path: &std::path::Path, time| -> Result<(), String> {
+            std::fs::File::options()
+                .write(true)
+                .open(path)
+                .and_then(|f| f.set_times(std::fs::FileTimes::new().set_modified(time)))
+                .map_err(|e| e.to_string())
+        };
+        set_time(&file, tick)?;
+        repo.commit("base", &[])?;
+        repo.git(&["config", "core.trustctime", "false"])?;
+        repo.git(&["config", "core.checkStat", "minimal"])?;
+        let index = repo.path().join(".git/index");
+        let index_tick = tick - std::time::Duration::from_secs(1);
+        set_time(&index, index_tick)?;
+        let before = std::fs::read(&index).map_err(|e| e.to_string())?;
+        std::fs::write(&file, b"new\n").map_err(|e| e.to_string())?;
+        set_time(&file, tick)?;
+        for _ in 0..2 {
+            let tree = super::take(repo.path())?;
+            assert_eq!(repo.git(&["show", &format!("{tree}:file")])?, "new\n");
+        }
+        assert_eq!(std::fs::read(&index).map_err(|e| e.to_string())?, before);
+        assert_eq!(
+            std::fs::metadata(&index)
+                .and_then(|m| m.modified())
+                .map_err(|e| e.to_string())?,
+            index_tick
+        );
         Ok(())
     }
 }

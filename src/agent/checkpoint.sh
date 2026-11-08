@@ -52,7 +52,7 @@ rm -f -- "$gitcraft_prompts/$gitcraft_session"
 # The worktree as a tree, through an index of its own seeded from the worktree's.
 gitcraft_own=$(git rev-parse --git-path index)
 gitcraft_index=$(git rev-parse --git-path "gitcraft-checkpoint-$$.index")
-if ! cp -f -- "$gitcraft_own" "$gitcraft_index" 2>/dev/null; then
+if ! cp -p -f -- "$gitcraft_own" "$gitcraft_index" 2>/dev/null; then
   git rev-parse -q --verify HEAD >/dev/null && GIT_INDEX_FILE=$gitcraft_index git read-tree HEAD
 fi
 gitcraft_tree=
