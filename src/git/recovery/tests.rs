@@ -402,7 +402,28 @@ fn partial_promisor_search_does_not_download_or_call_network_helpers() -> Result
     assert_eq!(git::run(Some(&dest), &["show-ref"])?, refs);
     assert!(!dest.join(".git/index").exists());
     assert!(git::run(Some(&dest), &["cat-file", "-e", &oid]).is_err());
-    assert!(marker.exists(), "Positive control must attempt the helper");
+    assert!(
+        !marker.exists(),
+        "Ordinary object reads must also refuse lazy fetch"
+    );
+    // Exercise the trap only through an explicit fetch to this owned local origin.
+    assert!(
+        git::run(
+            Some(&dest),
+            &[
+                "fetch",
+                "--no-tags",
+                "--no-write-fetch-head",
+                "origin",
+                &oid
+            ],
+        )
+        .is_err()
+    );
+    assert!(
+        marker.exists(),
+        "Explicit local fetch positive control must attempt the helper"
+    );
     Ok(())
 }
 #[cfg(unix)]
