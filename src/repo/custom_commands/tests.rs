@@ -6,7 +6,9 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use super::{CustomAct, filled};
-use crate::custom_commands::{self as cc, CustomCommand, OutputTo, Placement, Prompt, Scope};
+#[cfg(unix)]
+use crate::custom_commands::OutputTo;
+use crate::custom_commands::{self as cc, CustomCommand, Placement, Prompt, Scope};
 use crate::git;
 use crate::repo::{Action, Dialog, RepoTab};
 use crate::settings::Settings;

@@ -257,7 +257,7 @@ mod flow_tests {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 mod integration_tests {
     use super::*;
     use crate::git;

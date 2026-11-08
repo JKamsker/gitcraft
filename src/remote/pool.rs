@@ -224,7 +224,7 @@ impl Pool {
     }
 
     /// For tests: `shell` as if it had been opened by the pool and left idle.
-    #[cfg(test)]
+    #[cfg(all(test, unix))]
     pub(super) fn add_idle(&self, shell: Shell) {
         let mut state = lock(&self.state);
         state.open += 1;
@@ -233,7 +233,7 @@ impl Pool {
 
     /// For tests: how many shells are open, whether a connection was tried and failed, and
     /// when the idle ones were last used.
-    #[cfg(test)]
+    #[cfg(all(test, unix))]
     pub(super) fn looks(&self) -> (usize, bool, Vec<Instant>) {
         let state = lock(&self.state);
         let used = state.idle.iter().map(|s| s.used).collect();
@@ -241,7 +241,7 @@ impl Pool {
     }
 
     /// Test synchronization after transport loss: every pooled client has exited.
-    #[cfg(test)]
+    #[cfg(all(test, unix))]
     pub(super) fn idle_shells_exited(&self) -> std::io::Result<bool> {
         let mut state = lock(&self.state);
         if state.connecting != 0 || state.idle.len() != state.open {

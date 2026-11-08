@@ -4,7 +4,7 @@ use std::cell::RefCell;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
-#[cfg(test)]
+#[cfg(all(test, unix))]
 use std::process::Stdio;
 use std::sync::{Arc, Mutex, RwLock, Weak};
 use std::time::Duration;

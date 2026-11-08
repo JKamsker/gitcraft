@@ -30,6 +30,7 @@ fn commit(dir: &Path, message: &str) -> Result<String, String> {
     Ok(run(Some(dir), &["rev-parse", "HEAD"])?.trim().to_owned())
 }
 
+#[cfg(unix)]
 fn ssh_keygen_available() -> bool {
     std::process::Command::new("ssh-keygen")
         .arg("-?")
@@ -38,6 +39,7 @@ fn ssh_keygen_available() -> bool {
 }
 
 /// A throwaway ed25519 key at `path` (and `path.pub`).
+#[cfg(unix)]
 fn keygen(path: &Path) -> Result<String, String> {
     let out = std::process::Command::new("ssh-keygen")
         .args(["-q", "-t", "ed25519", "-N", "", "-C", "throwaway", "-f"])

@@ -1672,7 +1672,7 @@ pub(crate) fn is_reviewed_auth_error(error: &str) -> bool {
     error.contains(AUTH_ENDPOINT)
 }
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 pub(super) fn recording_input(
     command: std::process::Command,
     input: Option<Vec<u8>>,

@@ -21,6 +21,10 @@ impl Directory {
         self.handle.as_file()
     }
     #[cfg(windows)]
+    #[allow(
+        dead_code,
+        reason = "Retained for Windows draft policy publication, which currently refuses unsupported full-policy restore"
+    )]
     pub fn stable_source(&self, name: &OsStr) -> io::Result<File> {
         use std::os::windows::fs::{MetadataExt, OpenOptionsExt};
         check_name(name)?;

@@ -196,12 +196,14 @@ fn workspace(parent: &Path) -> Result<PathBuf, String> {
             &[("detail", (e).to_string().into())],
         )
     })?;
-    let mut builder = std::fs::DirBuilder::new();
+    let builder = std::fs::DirBuilder::new();
     #[cfg(unix)]
-    {
+    let builder = {
         use std::os::unix::fs::DirBuilderExt;
+        let mut builder = builder;
         builder.mode(0o700);
-    }
+        builder
+    };
     for _ in 0..100 {
         let path = parent.join(format!(
             "gitcraft-cleanup-{}-{}",

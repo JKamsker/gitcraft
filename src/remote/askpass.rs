@@ -290,6 +290,7 @@ static SECURITY_EPOCH: AtomicU64 = AtomicU64::new(0);
 static HOST_EPOCHS: OnceLock<Mutex<HashMap<String, u64>>> = OnceLock::new();
 
 /// Invalidating a saved/rejected credential must not retain an authenticated transport.
+#[cfg(unix)]
 pub(super) fn security_epoch(host: &str) -> [u64; 2] {
     let host_epoch = HOST_EPOCHS
         .get()

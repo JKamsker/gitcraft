@@ -68,6 +68,7 @@ impl Policy {
     fn install(&self, _: &File, _: &Path) -> Result<(), String> {
         Err(crate::i18n::text("backend-native-policy-restoration-unavailable-3fe736").into())
     }
+    #[cfg(any(unix, test))]
     pub(super) fn validate(&self) -> Result<(), String> {
         if self.platform != std::env::consts::OS || self.mode > 0o7777 {
             return Err(crate::i18n::text(
@@ -77,6 +78,7 @@ impl Policy {
         }
         Ok(())
     }
+    #[cfg(any(unix, test))]
     pub(super) fn mode(&self) -> u32 {
         self.mode
     }

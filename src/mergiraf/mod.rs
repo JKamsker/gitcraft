@@ -361,9 +361,13 @@ pub(crate) fn solve_text(
         "gitcraft-weather-solve-{}-{nanos}",
         std::process::id()
     ));
-    let mut builder = std::fs::DirBuilder::new();
+    let builder = std::fs::DirBuilder::new();
     #[cfg(unix)]
-    std::os::unix::fs::DirBuilderExt::mode(&mut builder, 0o700);
+    let builder = {
+        let mut builder = builder;
+        std::os::unix::fs::DirBuilderExt::mode(&mut builder, 0o700);
+        builder
+    };
     builder.create(&dir).map_err(|e| e.to_string())?;
     let result = (|| {
         std::fs::write(dir.join(name), text).map_err(|e| e.to_string())?;

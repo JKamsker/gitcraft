@@ -72,7 +72,7 @@ pub(super) struct Shell {
 
 impl Shell {
     /// Observe this owned SSH client's exit without probing or sending a command.
-    #[cfg(test)]
+    #[cfg(all(test, unix))]
     pub(super) fn exited(&mut self) -> std::io::Result<bool> {
         self.child.observe().map(|status| status.is_some())
     }

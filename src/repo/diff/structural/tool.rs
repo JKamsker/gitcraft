@@ -6,7 +6,7 @@ use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 use base64::Engine;
 
 use crate::remote;
@@ -118,7 +118,7 @@ fn output(code: i32, stdout: Vec<u8>, stderr: Vec<u8>) -> Result<Vec<u8>, String
     Ok(stdout)
 }
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 pub(super) fn request(
     target: &remote::Target,
     path: &str,
@@ -177,12 +177,14 @@ impl Temp {
                 std::process::id(),
                 SEQ.fetch_add(1, Ordering::Relaxed)
             ));
-            let mut builder = std::fs::DirBuilder::new();
+            let builder = std::fs::DirBuilder::new();
             #[cfg(unix)]
-            {
+            let builder = {
                 use std::os::unix::fs::DirBuilderExt;
+                let mut builder = builder;
                 builder.mode(0o700);
-            }
+                builder
+            };
             match builder.create(&path) {
                 Ok(()) => {
                     let temp = Self(path);

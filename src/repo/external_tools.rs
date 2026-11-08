@@ -234,7 +234,7 @@ impl RepoTab {
 }
 
 /// The files a merge tool is open on now (for tests).
-#[cfg(test)]
+#[cfg(all(test, unix))]
 pub(super) fn merging() -> Vec<(PathBuf, String)> {
     MERGING.lock().map(|open| open.clone()).unwrap_or_default()
 }

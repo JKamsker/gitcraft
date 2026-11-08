@@ -1,5 +1,6 @@
 //! Extracted from reviewed fileviews 1535d831; serde added for durable shelf/undo policy.
 //! Exact bounded access-policy snapshots, independent of rename-sensitive ctime.
+#[cfg(unix)]
 use std::{fs::File, path::Path};
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -13,6 +14,7 @@ pub(crate) struct AccessMetadata {
     descriptor: Vec<u8>,
 }
 
+#[cfg(unix)]
 pub(crate) fn read(file: &File, path: &Path) -> Result<AccessMetadata, String> {
     #[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
     {
@@ -142,6 +144,7 @@ fn mac_acl(file: &File, path: &Path) -> Result<Vec<exacl::AclEntry>, String> {
 
 /// Restore a captured index policy only on an owned candidate, then verify the complete
 /// metadata. Failure leaves the original index in place.
+#[cfg(unix)]
 pub(crate) fn copy_index_policy(
     file: &File,
     path: &Path,

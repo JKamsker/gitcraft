@@ -23,12 +23,14 @@ impl Workspace {
                 std::process::id(),
                 NEXT.fetch_add(1, Ordering::Relaxed)
             ));
-            let mut mkdir = std::fs::DirBuilder::new();
+            let mkdir = std::fs::DirBuilder::new();
             #[cfg(unix)]
-            {
+            let mkdir = {
                 use std::os::unix::fs::DirBuilderExt;
+                let mut mkdir = mkdir;
                 mkdir.mode(0o700);
-            }
+                mkdir
+            };
             match mkdir.create(&path) {
                 Ok(()) => return Ok(Self(path)),
                 Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => (),

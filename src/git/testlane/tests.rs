@@ -3,6 +3,7 @@
 //! worktrees gone however the run ended.
 
 use std::sync::Mutex;
+#[cfg(unix)]
 use std::time::{Duration, Instant};
 
 use super::fixture::Repo;

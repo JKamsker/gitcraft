@@ -65,9 +65,13 @@ impl Receipt {
     }
 }
 fn mkdir(path: &Path) -> Result<(), String> {
-    let mut builder = std::fs::DirBuilder::new();
+    let builder = std::fs::DirBuilder::new();
     #[cfg(unix)]
-    std::os::unix::fs::DirBuilderExt::mode(&mut builder, 0o700);
+    let builder = {
+        let mut builder = builder;
+        std::os::unix::fs::DirBuilderExt::mode(&mut builder, 0o700);
+        builder
+    };
     builder
         .create(path)
         .map_err(|e| format!("Choose a new unused destination: {e}"))

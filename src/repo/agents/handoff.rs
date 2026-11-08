@@ -372,6 +372,7 @@ pub(crate) enum TrayAct {
 #[cfg(test)]
 impl Tray {
     /// As if the tray had been read: nothing kept for the worktree.
+    #[cfg(unix)]
     pub(super) fn loaded_for_tests(&mut self) {
         self.loaded = true;
     }

@@ -97,12 +97,14 @@ impl Scratch {
                     .as_nanos(),
                 NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
             ));
-            let mut builder = std::fs::DirBuilder::new();
+            let builder = std::fs::DirBuilder::new();
             #[cfg(unix)]
-            {
+            let builder = {
                 use std::os::unix::fs::DirBuilderExt;
+                let mut builder = builder;
                 builder.mode(0o700);
-            }
+                builder
+            };
             match builder.create(&path) {
                 Ok(()) => return Ok(Arc::new(Self(path))),
                 Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {}

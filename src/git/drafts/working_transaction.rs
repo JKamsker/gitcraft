@@ -1,11 +1,14 @@
 //! Working changes use retained parents, capture/inspect and create-only install or
 //! restore. All recovery entries remain addressable; Drop never mutates a public name.
-use super::native_files::{self, CommitOutcome, Policies};
+#[cfg(any(target_os = "macos", target_os = "linux", test))]
+use super::native_files;
+use super::native_files::{CommitOutcome, Policies};
 use super::*;
 pub(super) type Contents = BTreeMap<String, Option<(String, Vec<u8>)>>;
 
 // Resolve saved policy before the content no-op decision. Equal bytes can still
 // require a full-policy restore, and a legacy snapshot must not clear its metadata.
+#[cfg(any(target_os = "macos", target_os = "linux", test))]
 fn intended_policy(
     path: &str,
     target: &Option<(String, Vec<u8>)>,
@@ -48,6 +51,7 @@ fn intended_policy(
     }
     Ok(policy)
 }
+#[cfg(any(target_os = "macos", target_os = "linux", test))]
 fn replacement_needed(
     expected: &Option<(String, Vec<u8>)>,
     target: &Option<(String, Vec<u8>)>,

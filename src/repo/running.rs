@@ -241,10 +241,14 @@ pub(super) fn with_not_run(msg: &str, dropped: &Waiting) -> String {
 
 #[cfg(test)]
 mod tests {
-    use std::path::{Path, PathBuf};
+    #[cfg(unix)]
+    use std::path::Path;
+    use std::path::PathBuf;
     use std::time::{Duration, Instant};
 
-    use super::super::{Action, OpKind, Refresh, RepoTab, UndoEntry, ops};
+    #[cfg(unix)]
+    use super::super::UndoEntry;
+    use super::super::{Action, OpKind, Refresh, RepoTab, ops};
     use super::{Waiter, Waiting, with_not_run};
     use crate::git;
 

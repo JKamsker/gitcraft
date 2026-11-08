@@ -215,12 +215,14 @@ impl Hook {
             "gitcraft-push-ref-transaction-{}-{stamp}",
             std::process::id()
         ));
-        let mut builder = std::fs::DirBuilder::new();
+        let builder = std::fs::DirBuilder::new();
         #[cfg(unix)]
-        {
+        let builder = {
             use std::os::unix::fs::DirBuilderExt;
+            let mut builder = builder;
             builder.mode(0o700);
-        }
+            builder
+        };
         builder
             .create(&directory)
             .map_err(|_| "Could not create owned repair evidence")?;

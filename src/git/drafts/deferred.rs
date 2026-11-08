@@ -326,12 +326,14 @@ fn safe_dir(path: &Path) -> Result<(), String> {
         )
         .into()),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            let mut b = std::fs::DirBuilder::new();
+            let b = std::fs::DirBuilder::new();
             #[cfg(unix)]
-            {
+            let b = {
                 use std::os::unix::fs::DirBuilderExt;
+                let mut b = b;
                 b.mode(0o700);
-            }
+                b
+            };
             b.create(path).map_err(|e| e.to_string())
         }
         Err(e) => Err(e.to_string()),
@@ -606,6 +608,7 @@ pub fn start(
 }
 // Check filesystem provenance before asking Git to enter a retained candidate. A path
 // and a registration alone do not prove that its .git still belongs to this repository.
+#[cfg(any(unix, test))]
 fn ownership_paths(
     common: &Path,
     worktree: &Path,

@@ -293,12 +293,14 @@ fn private_dir(repo: &Path, active: &dyn Fn() -> bool) -> Result<PathBuf, String
             std::process::id(),
             ID.fetch_add(1, Ordering::Relaxed)
         ));
-        let mut builder = std::fs::DirBuilder::new();
+        let builder = std::fs::DirBuilder::new();
         #[cfg(unix)]
-        {
+        let builder = {
             use std::os::unix::fs::DirBuilderExt;
+            let mut builder = builder;
             builder.mode(0o700);
-        }
+            builder
+        };
         match builder.create(&path) {
             Ok(()) => {
                 std::fs::create_dir(path.join("hooks")).map_err(|e| e.to_string())?;

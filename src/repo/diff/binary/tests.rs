@@ -3,9 +3,11 @@
 use std::path::{Path, PathBuf};
 
 use super::extract::tests::{make_docx, make_pdf};
+use super::member_changes;
+#[cfg(unix)]
+use super::textconv_for;
 use super::view::size_change;
 use super::zip::{self, tests::make_zip};
-use super::{member_changes, textconv_for};
 use crate::git::{self, Area, DiffOptions, StatusFile};
 use crate::repo::DiffKey;
 use crate::repo::diff::line_diff::Edit;

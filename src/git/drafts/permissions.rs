@@ -1,5 +1,6 @@
 //! Keep access permissions when Git apply replaces a file. Never chmod a path by name.
 use super::*;
+#[cfg(unix)]
 use std::io::Read;
 pub(super) struct Pin {
     identity: crate::git::recovery::Identity,

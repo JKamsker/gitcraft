@@ -5,7 +5,7 @@
 use std::path::Path;
 use std::time::Duration;
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 use super::command::git_cmd;
 use super::command::{Extra, remote_request, repository_command};
 use crate::remote;
@@ -113,6 +113,7 @@ fn run_here(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(unix)]
     use std::time::Instant;
 
     fn scratch(name: &str) -> std::path::PathBuf {

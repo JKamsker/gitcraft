@@ -9,7 +9,7 @@ pub(crate) struct CredentialCommandPolicy {
 impl CredentialCommandPolicy {
     /// Custom local runners bind the executable they actually selected, before
     /// installing this environment. Shared Git runners perform this automatically.
-    #[cfg(test)]
+    #[cfg(all(test, unix))]
     pub fn bind_git(&mut self, selected: &Path) -> Result<(), String> {
         if !selected.is_absolute() {
             return Err(crate::i18n::text(

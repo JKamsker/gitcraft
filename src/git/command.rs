@@ -1544,6 +1544,7 @@ mod tests {
         assert_eq!(super::syntax_read_error(incidental.into()), incidental);
     }
     use std::io::Write;
+    #[cfg(unix)]
     use std::process::Stdio;
 
     use super::*;

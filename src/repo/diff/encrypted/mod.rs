@@ -88,7 +88,7 @@ impl Drop for State {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 pub(super) fn probe(repo: &Path, key: &DiffKey) -> bool {
     probe_checked(repo, key).unwrap_or(false)
 }
