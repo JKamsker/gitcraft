@@ -170,6 +170,9 @@ struct Headline {
 
 impl Headline {
     fn capture(error: &str, source: Option<StackFailure>) -> Self {
+        // Validate against the complete final error before selecting its headline.
+        // An appended/replaced error may share a first line without sharing provenance.
+        let source = source.and_then(|source| source.matching(error));
         let raw = raw_headline(error);
         let (label, body) = error.split_once(": ").unwrap_or(("", error));
         let count = body.lines().filter(|l| l.starts_with("CONFLICT")).count();

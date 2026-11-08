@@ -368,6 +368,12 @@ mod operation_presentation_tests {
         })
         .unwrap_err();
         assert!(control.stack_failure().is_some());
+        let changed = format!("{raw}\nprovider added opaque tail");
+        let finished =
+            Notice::operation_finished("repo", "Commit", &Err(changed), control.stack_failure());
+        crate::i18n::set_language("de");
+        assert!(finished.projected().unwrap().ends_with(&raw));
+        assert!(!finished.projected().unwrap().contains("commit-msg-Hook"));
         let forged = check_stack_captured("b", "h", Some(&control), |args| {
             if args[0] == "log" {
                 Err(raw.clone())

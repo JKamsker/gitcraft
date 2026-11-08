@@ -391,9 +391,13 @@ impl super::RepoTab {
             Err(e) => Outcome::Failed(crate::git::redact(e, password)),
         };
         let took = self.op_started.map(|t| t.elapsed()).unwrap_or_default();
-        let id =
-            self.activity
-                .push_presented(label, took, steps, outcome, background, presentation);
+        let id = match presentation {
+            Some(source) => {
+                self.activity
+                    .push_presented(label, took, steps, outcome, background, Some(source))
+            }
+            None => self.activity.push(label, took, steps, outcome, background),
+        };
         self.activity.pending_link = Some(id);
     }
 

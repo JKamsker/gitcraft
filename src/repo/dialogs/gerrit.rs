@@ -85,3 +85,58 @@ pub(super) fn review(
         },
     )
 }
+
+#[cfg(test)]
+mod warning_presentation_tests {
+    use super::*;
+    use crate::repo::push_preflight::core_guard_paint_tests::paint;
+
+    #[test]
+    fn actual_review_warning_paint_repaints_without_changing_raw_server_or_plan() {
+        let raw = "Invalid gitcraft.gerritUrl: use an HTTP(S) URL without credentials, query or fragment. Using the remote's web address; Gerrit review submission remains enabled.";
+        let server = crate::gerrit::Server {
+            remote: "origin".into(),
+            web: "https://review.invalid".into(),
+            project: "opaque $(project)".into(),
+            web_warning: Some(raw.into()),
+        };
+        let original = server.clone();
+        let hash = "a".repeat(40);
+        let targets = vec![("main".to_owned(), hash.clone())];
+        let mut target = "main".to_owned();
+        let mut topic = "opaque,submit%ready=yes".to_owned();
+        let plan =
+            crate::gerrit::review_ops(&server.remote, &target, &topic, &hash, &hash).unwrap();
+        let ctx = egui::Context::default();
+        for locale in ["en-US", "de", "en-US"] {
+            crate::i18n::set_language(locale);
+            let shown = paint(&ctx, |ui| {
+                assert!(matches!(
+                    review(
+                        ui,
+                        &server.remote,
+                        &hash,
+                        &targets,
+                        &mut target,
+                        &mut topic,
+                        false,
+                        server.web_warning.as_deref()
+                    ),
+                    Outcome::Open
+                ));
+            });
+            let expected = server.display_web_warning().unwrap();
+            assert!(shown.contains(&expected), "{shown}");
+            if locale == "de" {
+                assert_ne!(expected, raw);
+            } else {
+                assert_eq!(expected, raw);
+            }
+            assert_eq!(server, original);
+            assert_eq!(
+                crate::gerrit::review_ops(&server.remote, &target, &topic, &hash, &hash).unwrap(),
+                plan
+            );
+        }
+    }
+}
