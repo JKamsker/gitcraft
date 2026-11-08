@@ -55,13 +55,16 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
     }
     ui.label(format!("Submodule checkout: {}", c.head));
     ui.text_edit_singleline(&mut state.parent);
+    if let Some(why) = &c.recording_blocker {
+        ui.label(why);
+    }
     ui.checkbox(
         &mut state.acknowledged,
         "I reviewed the selected commit and want to record this parent resolution",
     );
     if ui
         .add_enabled(
-            state.acknowledged && !state.parent.is_empty(),
+            c.recording_blocker.is_none() && state.acknowledged && !state.parent.is_empty(),
             egui::Button::new("Record chosen submodule commit in parent"),
         )
         .clicked()

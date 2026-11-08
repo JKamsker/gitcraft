@@ -21,6 +21,7 @@ mod detached;
 mod diff;
 mod diff_algorithm;
 pub mod doctor;
+pub(crate) mod drafts;
 pub mod dry_run;
 pub mod errors;
 pub mod external_tool;

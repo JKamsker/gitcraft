@@ -96,7 +96,9 @@ pub(super) fn capture_with_timeout(
     timeout: std::time::Duration,
 ) -> Result<ReadOutput, String> {
     use crate::git::command;
-    if control.as_ref().is_some_and(|c| c.is_cancelled()) {
+    if crate::tasks::cancellation().is_cancelled()
+        || control.as_ref().is_some_and(|c| c.is_cancelled())
+    {
         return Err(crate::git::CANCELLED.into());
     }
     if let Some(target) = crate::remote::parse(repo) {
@@ -114,7 +116,9 @@ pub(super) fn capture_with_timeout(
         if out.stdout.len() > cap {
             return Err("Repository metadata exceeds the inspection limit".into());
         }
-        if control.as_ref().is_some_and(|c| c.is_cancelled()) {
+        if crate::tasks::cancellation().is_cancelled()
+            || control.as_ref().is_some_and(|c| c.is_cancelled())
+        {
             return Err(crate::git::CANCELLED.into());
         }
         return Ok(ReadOutput {
@@ -155,6 +159,7 @@ pub(crate) mod remote_config;
 pub(crate) mod replacements;
 pub(crate) mod routes;
 pub(crate) mod submodule_conflict;
+mod submodule_index;
 
 pub(crate) mod sharing;
 
