@@ -75,7 +75,7 @@ pub(super) fn header_menu(resp: &Response, settings: &Settings) {
                 &mut next.show_test_lane,
                 crate::i18n::text("repo-core-1020"),
             )
-            .on_hover_text(crate::repo::TEST_LANE_TIP);
+            .on_hover_text(crate::i18n::text(crate::repo::TEST_LANE_TIP));
             ui.separator();
             let mut fit = next.fit_visible_refs();
             if ui
