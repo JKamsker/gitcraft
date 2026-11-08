@@ -235,7 +235,7 @@ fn gallery(ui: &mut Ui, f: &Filter, view: &mut SettingsView, tweaks: &theme::Twe
                     }
                     let resp = resp
                         .on_hover_cursor(egui::CursorIcon::PointingHand)
-                        .on_hover_text(format!("{}\n{}", info.name, info.credit));
+                        .on_hover_text(format!("{}\n{}", info.name, theme_credit(info)));
                     if resp.clicked() && !chosen {
                         view.request = Some(ProfileRequest::Theme(info.id.clone()));
                     }
@@ -388,7 +388,7 @@ impl Settings {
                                 ui.ctx(),
                                 Err(crate::i18n::message(
                                     "interaction-preferences-not-imported",
-                                    &[("error", e.into())],
+                                    &[("error", theme::files::display_diagnostic(&e).into())],
                                 )),
                             ),
                         }
@@ -429,7 +429,7 @@ impl Settings {
                                 ui.ctx(),
                                 Err(crate::i18n::message(
                                     "interaction-preferences-not-saved",
-                                    &[("error", e.into())],
+                                    &[("error", theme::files::display_diagnostic(&e).into())],
                                 )),
                             ),
                         }
@@ -452,7 +452,7 @@ impl Settings {
                 }
                 for (file, why) in theme::theme_errors() {
                     ui.label(
-                        RichText::new(format!("{file}: {why}"))
+                        RichText::new(theme_file_error(&file, &why))
                             .color(t.warning)
                             .small(),
                     );
@@ -473,6 +473,25 @@ impl Settings {
             },
         );
     }
+}
+
+/// Only file-generated credit kinds are presentation; built-in attribution is opaque.
+fn theme_credit(info: &theme::ThemeInfo) -> String {
+    if info.group == Group::Yours {
+        theme::files::display_credit(&info.credit)
+    } else {
+        info.credit.clone()
+    }
+}
+
+fn theme_file_error(file: &str, raw: &str) -> String {
+    crate::i18n::message(
+        "interaction-theme-file-file-error",
+        &[
+            ("file", file.into()),
+            ("error", theme::files::display_diagnostic(raw).into()),
+        ],
+    )
 }
 
 /// A round swatch of `c`, ringed when `chosen`.
@@ -522,6 +541,32 @@ fn message(ctx: &egui::Context) -> Option<Result<String, String>> {
 mod localization_tests {
     use super::*;
     use egui_kittest::{Harness, kittest::Queryable};
+
+    #[test]
+    fn actual_theme_file_paint_helpers_keep_names_and_builtin_attribution_opaque() {
+        let mut info = theme::ThemeInfo {
+            id: ThemeId::file("Theme 色.json"),
+            name: "Theme 色".to_owned(),
+            credit: "Your theme · Author {$x}".to_owned(),
+            group: Group::Yours,
+            palette: theme::catalog::BUILTIN[0].palette(),
+        };
+        let original = info.clone();
+        crate::i18n::set_language("de");
+        assert_eq!(theme_credit(&info), "Eigenes Farbschema · Author {$x}");
+        assert_eq!(
+            theme_file_error("Theme 色.json", "not readable JSON"),
+            "Theme 色.json: kein lesbares JSON"
+        );
+        assert_eq!(info, original);
+        info.group = Group::Gitcraft;
+        assert_eq!(theme_credit(&info), info.credit);
+        crate::i18n::set_language("en-US");
+        assert_eq!(
+            theme_file_error("Theme 色.json", "not readable JSON"),
+            "Theme 色.json: not readable JSON"
+        );
+    }
 
     #[test]
     fn actual_colour_swatch_translates_name_and_retains_rgb_and_selection() {
