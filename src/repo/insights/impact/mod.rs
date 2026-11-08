@@ -28,6 +28,8 @@ pub(crate) struct State {
     /// What the graph is about, as picked; the selected commit (or else the branch) when
     /// `None`.
     ask: Option<Ask>,
+    /// What was last read: what the menu marks, whatever the selection is now.
+    read_ask: Option<Ask>,
     data: Slot<Arc<Impact>>,
     layout: Slot<Arc<Laid>>,
     filter: Filter,
@@ -172,6 +174,7 @@ impl RepoTab {
         };
         let state = &mut view.impact;
         let ask = state.ask.clone().unwrap_or(fallback);
+        state.read_ask = Some(ask.clone());
         let request = state.data.start();
         state.selected = None;
         self.insight_then(
@@ -263,7 +266,11 @@ impl RepoTab {
             return;
         };
         let (state, table) = (&view.impact, view.table);
-        let asked = state.ask.clone().unwrap_or(default_ask);
+        let asked = state
+            .read_ask
+            .clone()
+            .or_else(|| state.ask.clone())
+            .unwrap_or(default_ask);
         controls(ui, state, &subjects, &asked, acts);
         match common::slot_state(ui, &state.data, "the change and what refers to it") {
             SlotState::Retry => {
