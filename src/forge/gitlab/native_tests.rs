@@ -158,6 +158,7 @@ struct Recording {
     approvals_error: bool,
     overflow: bool,
     drift_on_diff: bool,
+    outdated: bool,
 }
 fn recording() -> (api::Api, std::sync::Arc<std::sync::Mutex<Recording>>) {
     let state = std::sync::Arc::new(std::sync::Mutex::new(Recording {
@@ -204,7 +205,11 @@ fn recording() -> (api::Api, std::sync::Arc<std::sync::Mutex<Recording>>) {
             if state.overflow {
                 Value::Array(vec![discussion(); 100])
             } else {
-                json!([discussion(),{"id":"conversation","individual_note":false,"notes":[{"id":50,"body":"Conversation topic","author":{"username":"work"},"resolvable":true,"resolved":false}]}])
+                let mut file = discussion();
+                if state.outdated {
+                    file["notes"][0]["position"]["head_sha"] = json!("d".repeat(40));
+                }
+                json!([file,{"id":"conversation","individual_note":false,"notes":[{"id":50,"body":"Conversation topic","author":{"username":"work"},"resolvable":true,"resolved":false}]}])
             }
         } else if plain.ends_with("/commits") {
             json!([{"id":"a".repeat(40),"title":"Change","author_name":"Author"}])
@@ -398,5 +403,34 @@ fn native_command_transform_uses_fixed_program_exact_authority_and_json_stdin() 
         )
         .is_err()
     );
+    Ok(())
+}
+
+#[test]
+fn outdated_discussion_writes_use_shown_id_and_current_revision_guards() -> Result<(), String> {
+    let (api, state) = recording();
+    state.lock().unwrap().outdated = true;
+    let shown = details::read(&api, 7)?;
+    let thread = &shown.extras.threads[0];
+    assert!(thread.outdated && thread.can_reply && thread.can_resolve);
+    let target = post::GitLabTarget::new(api, &shown).unwrap();
+    target.reply(&thread.id, "Reply to the original discussion")?;
+    target.set_resolved(&thread.id, true)?;
+    target.set_resolved(&thread.id, false)?;
+    {
+        let s = state.lock().unwrap();
+        assert_eq!(s.writes.len(), 3);
+        assert!(
+            s.writes[0]
+                .1
+                .ends_with("/discussions/thread-with-a-removed-line/notes")
+        );
+        assert_eq!(s.writes[1].2.as_ref().unwrap()["resolved"], true);
+        assert_eq!(s.writes[2].2.as_ref().unwrap()["resolved"], false);
+    }
+    state.lock().unwrap().mr["diff_refs"]["head_sha"] = json!("e".repeat(40));
+    assert!(target.set_resolved(&thread.id, true).is_err());
+    assert!(target.reply(&thread.id, "Stale page").is_err());
+    assert_eq!(state.lock().unwrap().writes.len(), 3);
     Ok(())
 }
