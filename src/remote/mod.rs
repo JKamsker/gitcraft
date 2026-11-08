@@ -24,6 +24,7 @@ mod ui_guard;
 mod vault;
 pub(crate) mod workspace_authority;
 pub(crate) mod workspace_claim;
+mod workspace_ledger;
 
 use std::path::{Path, PathBuf};
 

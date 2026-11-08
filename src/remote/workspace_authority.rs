@@ -85,6 +85,23 @@ pub(crate) fn record(endpoint: &[u8], authority: &WorkspaceAuthority) -> Result<
     }
     Ok(bytes)
 }
+pub(crate) fn bound_endpoint(name: &str, bytes: &[u8], anchor: &str) -> Result<Vec<u8>, String> {
+    if bytes.len() > 2048 {
+        return Err("oversized workspace owner".into());
+    }
+    let envelope: Envelope = serde_json::from_slice(bytes).map_err(|e| e.to_string())?;
+    let expected = WorkspaceAuthority {
+        root: "/synthetic".into(),
+        anchor: anchor.into(),
+        generation: envelope.generation.clone(),
+        mode: envelope.kind,
+    };
+    if envelope.v != 3 || envelope.anchor != anchor {
+        return Err("workspace owner anchor/version mismatch".into());
+    }
+    expected.record_name(&expected.root.join(name))?;
+    serde_json::to_vec(&envelope.endpoint).map_err(|e| e.to_string())
+}
 /// Preserve legacy raw v1/v2 records; v3 binding remains in the durable original bytes.
 /// The endpoint's own strict parser/authentication still determines stop authority.
 pub(crate) fn endpoint(bytes: &[u8]) -> Result<Vec<u8>, String> {

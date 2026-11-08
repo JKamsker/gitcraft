@@ -12,6 +12,7 @@ use std::time::{Duration, Instant};
 const MARKER: &[u8] = b"__GITCRAFT_NATIVE_OWNER__ ";
 const READY: &str = "__GITCRAFT_NATIVE_READY__";
 const PREFIX: &str = "gitcraft-native-owned-";
+const MAX_REQUEST: usize = 96 << 20;
 
 #[derive(Serialize, Deserialize)]
 enum Word {
@@ -62,6 +63,10 @@ struct Request {
     milliseconds: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     workspace: Option<super::workspace_authority::WorkspaceAuthority>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    input: Option<String>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    cleanup: bool,
 }
 
 #[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -132,7 +137,7 @@ impl Endpoint {
         }
         Ok(result)
     }
-    fn confirms(&self, bytes: &[u8]) -> bool {
+    pub(super) fn confirms(&self, bytes: &[u8]) -> bool {
         if bytes.len() > 4096 {
             return false;
         }
@@ -140,13 +145,28 @@ impl Endpoint {
             r.endpoint == *self && r.state == "stopped" && native_exit_code(r.code, cfg!(windows))
         })
     }
-    fn terminal(&self) -> Result<Vec<u8>, String> {
+    pub(super) fn terminal(&self) -> Result<Vec<u8>, String> {
         let bytes = crate::safe_read::read_inside(&self.path, "terminal", 4097)
             .ok_or("native terminal receipt unavailable")?;
         if !self.confirms(&bytes) {
             return Err("unconfirmed native terminal receipt".into());
         }
         Ok(bytes)
+    }
+    pub(super) fn retire_proven(&self, receipt: &[u8]) -> Result<(), String> {
+        if !self.valid() || !self.confirms(receipt) {
+            return Err("invalid cached native retirement proof".into());
+        }
+        let directory = match gitcraft_os::PrivateDirectory::open(&self.path) {
+            Ok(d) => d,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+            Err(e) => return Err(e.to_string()),
+        };
+        match directory.remove_checked("terminal", receipt) {
+            Ok(()) => Ok(()),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(e) => Err(e.to_string()),
+        }
     }
     pub(crate) fn stop(&self) -> Result<(), String> {
         if !self.valid() {
@@ -229,6 +249,8 @@ pub(crate) fn command_with_authority(
         record: record.into(),
         milliseconds: u64::try_from(limit.as_millis()).map_err(|e| e.to_string())?,
         workspace,
+        input: None,
+        cleanup: false,
     };
     let mut input = serde_json::to_vec(&request).map_err(|e| e.to_string())?;
     input.push(b'\n');
@@ -259,6 +281,26 @@ pub(crate) struct NativeCommand {
     endpoint: Arc<Mutex<Option<Endpoint>>>,
 }
 impl NativeCommand {
+    pub(crate) fn with_input(
+        mut self,
+        input: Option<&[u8]>,
+        cleanup: bool,
+    ) -> Result<Self, String> {
+        use base64::Engine;
+        if input.is_some_and(|b| b.len() > 64 << 20) {
+            return Err("native durable input exceeds 64 MiB".into());
+        }
+        let mut request: Request =
+            serde_json::from_slice(&self.input).map_err(|e| e.to_string())?;
+        request.input = input.map(|b| base64::engine::general_purpose::STANDARD.encode(b));
+        request.cleanup = cleanup;
+        self.input = serde_json::to_vec(&request).map_err(|e| e.to_string())?;
+        self.input.push(b'\n');
+        if self.input.len() > MAX_REQUEST {
+            return Err("native request exceeds 96 MiB".into());
+        }
+        Ok(self)
+    }
     pub(crate) fn configure(self, options: &mut crate::processes::Options) -> Command {
         options.native_controller = true;
         options.hold_input = true;
@@ -376,10 +418,10 @@ fn helper(fence: &mut Option<gitcraft_os::WorkspaceFence>) -> Result<i32, String
     let mut line = Vec::new();
     controller
         .by_ref()
-        .take(1 << 20)
+        .take(MAX_REQUEST as u64 + 1)
         .read_until(b'\n', &mut line)
         .map_err(|e| e.to_string())?;
-    if line.len() >= 1 << 20 || !line.ends_with(b"\n") {
+    if line.len() > MAX_REQUEST || !line.ends_with(b"\n") {
         return Err("invalid native request".into());
     }
     let request: Request = serde_json::from_slice(&line).map_err(|e| e.to_string())?;
@@ -388,6 +430,14 @@ fn helper(fence: &mut Option<gitcraft_os::WorkspaceFence>) -> Result<i32, String
         || request.milliseconds > 7 * 86400 * 1000
     {
         return Err("invalid native request identity/deadline".into());
+    }
+    if request.cleanup
+        && !request
+            .workspace
+            .as_ref()
+            .is_some_and(|a| a.mode == super::workspace_authority::FenceMode::Mutation)
+    {
+        return Err("cleanup requires full actual-machine mutation authority".into());
     }
     let cancel = crate::tasks::Cancellation::default();
     let eof = cancel.clone();
@@ -457,6 +507,7 @@ fn helper(fence: &mut Option<gitcraft_os::WorkspaceFence>) -> Result<i32, String
     } else {
         private_file(&request.record, &bytes)?;
     }
+    let mut cleanup_plan = None;
     let submitted = (|| {
         println!("\n{READY}");
         std::io::stdout().flush().map_err(|e| e.to_string())?;
@@ -466,10 +517,40 @@ fn helper(fence: &mut Option<gitcraft_os::WorkspaceFence>) -> Result<i32, String
             .and_then(|()| std::io::stderr().write_all(b"\n"))
             .and_then(|()| std::io::stderr().flush())
             .map_err(|e| e.to_string())?;
+        let input = if request.cleanup {
+            let authority = request
+                .workspace
+                .as_ref()
+                .ok_or("cleanup authority missing")?;
+            let plan =
+                super::workspace_ledger::NativePlan::prepare(authority, &request.record, || {
+                    !cancel.is_cancelled()
+                        && started.elapsed() < Duration::from_millis(request.milliseconds)
+                })?;
+            let input = plan.shell_proof();
+            command.args(plan.generations());
+            cleanup_plan = Some(plan);
+            Some(input)
+        } else {
+            use base64::Engine;
+            request
+                .input
+                .as_ref()
+                .map(|value| {
+                    if value.len() > ((64 << 20) + 2) / 3 * 4 {
+                        return Err("oversized native input".to_owned());
+                    }
+                    base64::engine::general_purpose::STANDARD
+                        .decode(value)
+                        .map_err(|e| e.to_string())
+                })
+                .transpose()?
+        };
         crate::processes::service()?.submit(
             command,
             crate::processes::Options {
                 cancel: cancel.clone(),
+                input,
                 timeout: Some(Duration::from_millis(request.milliseconds)),
                 ..Default::default()
             },
@@ -557,7 +638,21 @@ fn helper(fence: &mut Option<gitcraft_os::WorkspaceFence>) -> Result<i32, String
         }
         std::thread::sleep(Duration::from_millis(20));
     };
-    let (code, complete, stdout, stderr) = result;
+    let (mut code, mut complete, mut stdout, mut stderr) = result;
+    if let Some(plan) = cleanup_plan {
+        if code == 0 && complete {
+            match plan.complete() {
+                Ok(proof) => stdout = proof,
+                Err(error) => {
+                    code = 125;
+                    complete = false;
+                    stderr.extend_from_slice(
+                        format!("cleanup partial; external ledger retained: {error}").as_bytes(),
+                    );
+                }
+            }
+        }
+    }
     let bytes = terminal_receipt(&path, &endpoint, code, complete)?;
     // Mutation authority remains in this actual owner until target cleanup and durable
     // terminal proof; no parent-side lock lifetime is substituted for it.

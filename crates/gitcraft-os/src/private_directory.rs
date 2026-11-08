@@ -92,6 +92,32 @@ impl PrivateDirectory {
         }
         Ok(file)
     }
+    /// Check exact private bytes, then remove only a component of this retained directory.
+    pub fn remove_checked(&self, name: &str, expected: &[u8]) -> io::Result<()> {
+        use std::io::Read;
+        let file = self.open_file(name, PrivateFileMode::ReadDelete)?;
+        let mut actual = Vec::new();
+        (&file)
+            .take(expected.len() as u64 + 1)
+            .read_to_end(&mut actual)?;
+        if actual != expected {
+            return Err(io::Error::other("private entry changed; removal refused"));
+        }
+        #[cfg(unix)]
+        {
+            use std::{ffi::CString, os::fd::AsRawFd};
+            let name = CString::new(name)?;
+            // SAFETY: validated single component, pinned directory; never traverse parents.
+            if unsafe { libc::unlinkat(self.file.as_raw_fd(), name.as_ptr(), 0) } != 0 {
+                return Err(io::Error::last_os_error());
+            }
+            Ok(())
+        }
+        #[cfg(windows)]
+        {
+            self.retire_terminal(&file)
+        }
+    }
     #[cfg(unix)]
     fn open_relative(&self, name: &str, mode: PrivateFileMode) -> io::Result<File> {
         use std::ffi::CString;
