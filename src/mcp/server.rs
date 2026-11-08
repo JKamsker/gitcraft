@@ -73,6 +73,19 @@ fn offered(kind: Kind, run: bool) -> bool {
     }
 }
 
+/// The tools offered to an agent of a run (`run`) or not, as `tools/list` lists them.
+fn offered_tools(run: bool) -> Vec<&'static ToolDef> {
+    tools::all()
+        .into_iter()
+        .filter(|t| offered(t.kind, run))
+        .collect()
+}
+
+/// The tool `name` that `tools/call` runs: none that isn't offered, whatever its name.
+fn callable(name: &str, run: bool) -> Option<&'static ToolDef> {
+    tools::find(name).filter(|t| offered(t.kind, run))
+}
+
 /// The tool as MCP lists it.
 fn listed(def: &ToolDef) -> Tool {
     let schema = match (def.schema)() {
@@ -153,11 +166,9 @@ impl ServerHandler for Gitcraft {
         _request: Option<PaginatedRequestParams>,
         _context: RequestContext<RoleServer>,
     ) -> Result<ListToolsResult, ErrorData> {
-        let run = self.run.is_some();
         Ok(ListToolsResult::with_all_items(
-            tools::all()
+            offered_tools(self.run.is_some())
                 .into_iter()
-                .filter(|t| offered(t.kind, run))
                 .map(listed)
                 .collect(),
         ))
@@ -168,8 +179,7 @@ impl ServerHandler for Gitcraft {
         request: CallToolRequestParams,
         context: RequestContext<RoleServer>,
     ) -> Result<CallToolResponse, ErrorData> {
-        let Some(def) = tools::find(&request.name).filter(|t| offered(t.kind, self.run.is_some()))
-        else {
+        let Some(def) = callable(&request.name, self.run.is_some()) else {
             return Err(ErrorData::invalid_params(
                 format!("Unknown tool: {}", request.name),
                 None,
@@ -224,6 +234,23 @@ mod tests {
         assert!(offered(Kind::Report, true) && !offered(Kind::Report, false));
         assert!(!offered(Kind::Write, true) && offered(Kind::Write, false));
         assert!(!offered(Kind::Approve, true) && offered(Kind::Approve, false));
+        // What `tools/list` and `tools/call` go by.
+        let names = |run| {
+            offered_tools(run)
+                .iter()
+                .map(|t| t.name)
+                .collect::<Vec<_>>()
+        };
+        let (of_run, of_user) = (names(true), names(false));
+        assert!(of_run.contains(&"resolve_finish") && of_run.contains(&"conflicts"));
+        assert!(!of_user.contains(&"resolve_finish"));
+        for changing in ["commit", "stage", "push", "reset", "checkout"] {
+            assert!(!of_run.contains(&changing), "{changing}");
+            assert!(callable(changing, true).is_none(), "{changing}");
+            assert!(callable(changing, false).is_some(), "{changing}");
+        }
+        assert!(callable("resolve_step", false).is_none());
+        assert!(callable("log", true).is_some());
     }
 
     #[test]
