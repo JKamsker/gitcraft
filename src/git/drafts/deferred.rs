@@ -876,7 +876,19 @@ pub fn resume(r: &Runner<'_>, expected: &View, id: &str) -> Result<String, Strin
         if result.is_err() || !remaining.is_empty() || rebasing(&s.worktree)? {
             view.jobs.jobs[j].busy = false;
             view.jobs.jobs[j].notice = if remaining.is_empty() {
-                "Replay stopped. Inspect the owned worktree and continue explicitly; originals were retained".into()
+                let detail = result
+                    .as_ref()
+                    .err()
+                    .map(|error| {
+                        git::redact(error, None)
+                            .chars()
+                            .take(4000)
+                            .collect::<String>()
+                    })
+                    .unwrap_or_else(|| "Replay remains in progress".into());
+                format!(
+                    "Replay stopped: {detail}. Inspect the owned worktree and continue explicitly; originals were retained"
+                )
             } else {
                 format!(
                     "Conflicts waiting in {}. Resolve and stage them there, then Continue",
