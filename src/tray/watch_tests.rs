@@ -507,3 +507,92 @@ fn actual_queued_delivery_rechecks_profile_context_path_opt_in_preference_and_dr
     }
     Ok(())
 }
+
+#[test]
+fn german_watcher_transitions_and_live_status_preserve_protocol_and_delivery_ownership()
+-> Result<(), String> {
+    let _network = crate::network::test_pause::set(None);
+    let before = snapshot('a', false, Checks::Passing);
+    let mut after = snapshot('b', true, Checks::Failing);
+    after.advanced = Some(1234);
+    crate::i18n::set_language("en-US");
+    let english_keys: Vec<_> = transitions(&before, &after)
+        .into_iter()
+        .map(|n| n.key)
+        .collect();
+    let ctx = egui::Context::default();
+    let path = PathBuf::from("/recorded/private repo/$(literal)");
+    let mut watcher = Watcher::default();
+    let tick = |watcher: &mut Watcher| {
+        watcher.tick(
+            Inputs {
+                enabled: true,
+                profile: 1,
+                open: std::slice::from_ref(&path),
+                busy: &HashSet::new(),
+                recent: &[],
+                minutes: 10,
+                notifications_enabled: true,
+            },
+            &ctx,
+        )
+    };
+    tick(&mut watcher);
+    assert_eq!(watcher.status, "Watching 1 repository");
+    let owner = watcher
+        .deliveries
+        .get(&path)
+        .ok_or("missing delivery owner")?
+        .0
+        .clone();
+    crate::i18n::set_language("de");
+    tick(&mut watcher);
+    assert_eq!(watcher.status, "1 Repository wird überwacht");
+    assert!(
+        !owner.is_cancelled(),
+        "language does not retire profile/path delivery ownership"
+    );
+    let notices = transitions(&before, &after);
+    assert_eq!(
+        notices.iter().map(|n| n.key.clone()).collect::<Vec<_>>(),
+        english_keys
+    );
+    assert_eq!(notices[0].text, "main ist um 1.234 Commits vorgerückt");
+    assert_eq!(notices[1].text, "Review angefragt: #1 A change");
+    assert_eq!(notices[2].text, "Prüfungen fehlgeschlagen: #1 A change");
+    assert_eq!(
+        notices[3].text,
+        "Prüfungen des Standard-Branches fehlgeschlagen"
+    );
+    assert_eq!(
+        crate::network::Pause::Metered.label(),
+        "Getaktete Verbindung"
+    );
+    let mut probe = Recording {
+        calls: Vec::new(),
+        enabled: true,
+        before: "a".repeat(40),
+        after: "b".repeat(40),
+        missing_head: false,
+    };
+    observe(&mut probe, Some(&before))?;
+    assert_eq!(probe.calls[0], ["fetch", "--all", "--prune", "--quiet"]);
+    assert!(
+        probe
+            .calls
+            .iter()
+            .any(|args| args == &["symbolic-ref", "--quiet", "refs/remotes/origin/HEAD"])
+    );
+    watcher.queue_notification(&path, &notices[1].text);
+    for job in std::mem::take(&mut watcher.queued_notifications) {
+        job();
+    }
+    assert_eq!(
+        *watcher
+            .recorded_notifications
+            .lock()
+            .map_err(|e| e.to_string())?,
+        vec!["$(literal): Review angefragt: #1 A change"]
+    );
+    Ok(())
+}

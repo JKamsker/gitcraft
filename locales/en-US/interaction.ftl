@@ -129,3 +129,37 @@ interaction-control-this-desktop-has-no-available-tray-host-open-gitcraft-from-t
 interaction-control-save-and-quit-the-running-instance = Save and quit the running instance
 interaction-control-recent-repositories = Recent repositories
 interaction-control-gitcraft-repository-watcher = gitcraft — repository watcher
+interaction-watch-label-1 = Background network work is paused
+interaction-watch-label-2 = Background network work was paused
+interaction-watch-label-3 = Remote did not report a symbolic default branch
+interaction-watch-label-4 = Background work was stopped or paused
+interaction-watch-label-5 = Watcher deadline exceeded
+interaction-watch-label-6 = Watcher deadline exceeded; waiting for cancellation before retry
+interaction-watch-label-7 = Background job was cancelled
+interaction-watch-label-8 = Watcher paused: automatic fetch interval is zero
+interaction-watch-label-9 = Watcher disabled
+interaction-watch-label-10 = Default-branch checks failed
+interaction-watch-label-11 = gitcraft repository update
+interaction-watch-advance = { $count ->
+        [one] { $branch } moved 1 commit
+       *[other] { $branch } moved { $count } commits
+        }
+interaction-watch-review = Review requested: #{ $number } { $title }
+interaction-watch-checks = Checks failed: #{ $number } { $title }
+interaction-watch-branch-failed = Checks failed on { $branch }
+interaction-watch-unknown-default = Default branch is unknown: { $detail }
+interaction-watch-count = { $count ->
+        [one] Watching 1 repository
+       *[other] Watching { $count } repositories
+        }
+interaction-watch-retry = { $path }: { $detail } (will retry)
+interaction-watch-checking = Checking { $path }
+interaction-watch-repo-notice = { $repo }: { $text }
+interaction-watch-network-paused = { $reason } — background checks paused
+interaction-watch-no-host = No StatusNotifierWatcher: { $detail }
+interaction-network-label-1 = Offline
+interaction-network-label-2 = No connection
+interaction-network-label-3 = Metered network
+interaction-network-label-4 = Offline mode is on
+interaction-network-label-5 = The system reports no network connection
+interaction-network-label-6 = The network connection is metered

@@ -158,7 +158,10 @@ fn transitions(before: &Observation, after: &Observation) -> Vec<Notice> {
         let branch = new_ref.splitn(4, '/').nth(3).unwrap_or(new_ref);
         out.push(Notice {
             key: format!("repo:advance:{new_ref}:{new}"),
-            text: format!("{branch} moved {n} commit{}", if n == 1 { "" } else { "s" }),
+            text: crate::i18n::message(
+                "interaction-watch-advance",
+                &[("count", n.into()), ("branch", branch.into())],
+            ),
         });
     }
     if let (Some(old), Some(new)) = (&before.prs, &after.prs) {
@@ -167,7 +170,13 @@ fn transitions(before: &Observation, after: &Observation) -> Vec<Notice> {
             if pr.review_requested && prior.is_none_or(|p| !p.review_requested) {
                 out.push(Notice {
                     key: format!("review:{}:{}", pr.url, pr.updated),
-                    text: format!("Review requested: #{} {}", pr.number, pr.title),
+                    text: crate::i18n::message(
+                        "interaction-watch-review",
+                        &[
+                            ("number", pr.number.to_string().into()),
+                            ("title", pr.title.as_str().into()),
+                        ],
+                    ),
                 });
             }
             if pr.mine
@@ -176,7 +185,13 @@ fn transitions(before: &Observation, after: &Observation) -> Vec<Notice> {
             {
                 out.push(Notice {
                     key: format!("checks:{}:{}", pr.url, pr.updated),
-                    text: format!("Checks failed: #{} {}", pr.number, pr.title),
+                    text: crate::i18n::message(
+                        "interaction-watch-checks",
+                        &[
+                            ("number", pr.number.to_string().into()),
+                            ("title", pr.title.as_str().into()),
+                        ],
+                    ),
                 });
             }
         }
@@ -184,7 +199,7 @@ fn transitions(before: &Observation, after: &Observation) -> Vec<Notice> {
     if after.ci_failed == Some(true) && before.ci_failed == Some(false) {
         out.push(Notice {
             key: format!("repo:ci:{:?}", after.default),
-            text: "Default-branch checks failed".into(),
+            text: crate::i18n::text("interaction-watch-label-10").into(),
         });
     }
     if let (Some(old), Some(new)) = (&before.branch_checks, &after.branch_checks)
@@ -194,7 +209,10 @@ fn transitions(before: &Observation, after: &Observation) -> Vec<Notice> {
     {
         out.push(Notice {
             key: format!("repo:branch:{}:{}", new.name, new.sha),
-            text: format!("Checks failed on {}", new.name),
+            text: crate::i18n::message(
+                "interaction-watch-branch-failed",
+                &[("branch", new.name.as_str().into())],
+            ),
         });
     }
     out
@@ -254,13 +272,13 @@ trait Probe {
 }
 fn observe(probe: &mut impl Probe, before: Option<&Observation>) -> Result<Observation, String> {
     if !probe.may_run() {
-        return Err("Background network work is paused".into());
+        return Err(crate::i18n::text("interaction-watch-label-1").into());
     }
     // No transient Credentials object, shell interpolation, askpass or UI authentication.
     probe.git(&["fetch", "--all", "--prune", "--quiet"])?;
     let mut snapshot = Observation::default();
     if !probe.may_run() {
-        return Err("Background network work was paused".into());
+        return Err(crate::i18n::text("interaction-watch-label-2").into());
     }
     let remotes = probe.git(&["remote"])?;
     let remote = remotes
@@ -280,7 +298,7 @@ fn observe(probe: &mut impl Probe, before: Option<&Observation>) -> Result<Obser
             branch
                 .filter(|branch| !branch.is_empty())
                 .map(|branch| format!("refs/remotes/{remote}/{branch}"))
-                .ok_or_else(|| "Remote did not report a symbolic default branch".to_owned())
+                .ok_or_else(|| crate::i18n::text("interaction-watch-label-3").to_owned())
         });
         match reference {
             Ok(reference) => {
@@ -308,9 +326,10 @@ fn observe(probe: &mut impl Probe, before: Option<&Observation>) -> Result<Obser
                     }
                 }
             }
-            Err(why) => snapshot
-                .warnings
-                .push(format!("Default branch is unknown: {why}")),
+            Err(why) => snapshot.warnings.push(crate::i18n::message(
+                "interaction-watch-unknown-default",
+                &[("detail", why.into())],
+            )),
         }
     }
     if probe.may_run()
@@ -345,7 +364,7 @@ struct LiveProbe<'a> {
 impl Probe for LiveProbe<'_> {
     fn git(&mut self, args: &[&str]) -> Result<String, String> {
         if !self.may_run() {
-            return Err("Background work was stopped or paused".into());
+            return Err(crate::i18n::text("interaction-watch-label-4").into());
         }
         git::run_unattended_within(self.path, args, STEP_LIMIT)
     }
@@ -355,7 +374,7 @@ impl Probe for LiveProbe<'_> {
     }
     fn inbox(&mut self, hosting: &forge::Hosting) -> Result<Vec<InboxPr>, String> {
         if !self.may_run() {
-            return Err("Background work was stopped or paused".into());
+            return Err(crate::i18n::text("interaction-watch-label-4").into());
         }
         hosting
             .forge
@@ -374,7 +393,7 @@ impl Probe for LiveProbe<'_> {
     }
     fn ci_failed(&mut self, hosting: &forge::Hosting, sha: &str) -> Result<Option<bool>, String> {
         if !self.may_run() {
-            return Err("Background work was stopped or paused".into());
+            return Err(crate::i18n::text("interaction-watch-label-4").into());
         }
         let project = crate::ci::Project::of(hosting.forge, &git::remotes(self.path)?);
         let Some(project) = project else {
@@ -388,7 +407,7 @@ impl Probe for LiveProbe<'_> {
     }
     fn branch_checks(&mut self, hosting: &forge::Hosting) -> Result<Option<BranchChecks>, String> {
         if !self.may_run() {
-            return Err("Background work was stopped or paused".into());
+            return Err(crate::i18n::text("interaction-watch-label-4").into());
         }
         let remotes = git::remotes(self.path)?;
         let refs = git::refs(self.path)?;
@@ -400,7 +419,7 @@ impl Probe for LiveProbe<'_> {
         let mut errors = Vec::new();
         for project in plan.projects {
             if !self.may_run() {
-                return Err("Background work was stopped or paused".into());
+                return Err(crate::i18n::text("interaction-watch-label-4").into());
             }
             match crate::ci::statuses(self.path, &project, std::slice::from_ref(&plan.sha)) {
                 Ok(statuses) => {
@@ -437,6 +456,7 @@ pub(crate) struct Watcher {
     model: Model,
     running: Option<Running>,
     pub status: String,
+    status_language: u64,
     notified: BTreeMap<String, Instant>,
     // The watcher retains each delivery lifetime separately from the observation job.
     // Removing one path retires only its pending notifications; profile/opt-in/preference
@@ -475,6 +495,13 @@ impl Watcher {
             notifications_enabled,
         } = input;
         let now = Instant::now();
+        // Status is transient presentation, not observation/notification ownership. Refresh
+        // the current count/pause caption after a language change without restarting work.
+        let language = crate::i18n::generation();
+        if self.status_language != language {
+            self.status_language = language;
+            self.status.clear();
+        }
         let active = enabled && minutes > 0;
         let paths = if active {
             paths(open, recent)
@@ -508,11 +535,11 @@ impl Watcher {
         {
             self.model.finish(
                 &job.path,
-                Err("Watcher deadline exceeded".into()),
+                Err(crate::i18n::text("interaction-watch-label-5").into()),
                 now,
                 Duration::from_secs(u64::from(minutes.max(1)) * 60),
             );
-            self.status = "Watcher deadline exceeded; waiting for cancellation before retry".into();
+            self.status = crate::i18n::text("interaction-watch-label-6").into();
         }
         if let Some(job) = &mut self.running
             && (changed
@@ -530,10 +557,17 @@ impl Watcher {
                     if !job.stale {
                         self.status = match &result {
                             Ok(s) if !s.warnings.is_empty() => s.warnings.join("; "),
-                            Ok(_) => {
-                                format!("Watching {} repositories", self.model.subscriptions.len())
-                            }
-                            Err(why) => format!("{}: {why} (will retry)", job.path.display()),
+                            Ok(_) => crate::i18n::message(
+                                "interaction-watch-count",
+                                &[("count", self.model.subscriptions.len().into())],
+                            ),
+                            Err(why) => crate::i18n::message(
+                                "interaction-watch-retry",
+                                &[
+                                    ("path", job.path.display().to_string().into()),
+                                    ("detail", why.as_str().into()),
+                                ],
+                            ),
                         };
                         let notifications = self.model.finish(
                             &job.path,
@@ -544,13 +578,20 @@ impl Watcher {
                         self.notified
                             .retain(|_, sent| now.duration_since(*sent) < Duration::from_secs(300));
                         for notice in notifications {
-                            self.status = format!(
-                                "{}: {}",
-                                job.path
-                                    .file_name()
-                                    .unwrap_or(job.path.as_os_str())
-                                    .to_string_lossy(),
-                                notice.text
+                            self.status = crate::i18n::message(
+                                "interaction-watch-repo-notice",
+                                &[
+                                    (
+                                        "repo",
+                                        job.path
+                                            .file_name()
+                                            .unwrap_or(job.path.as_os_str())
+                                            .to_string_lossy()
+                                            .as_ref()
+                                            .into(),
+                                    ),
+                                    ("text", notice.text.as_str().into()),
+                                ],
                             );
                             let key = if notice.key.starts_with("repo:") {
                                 format!("{}:{}", job.path.display(), notice.key)
@@ -572,7 +613,7 @@ impl Watcher {
                     if !job.stale {
                         self.model.finish(
                             &job.path,
-                            Err("Background job was cancelled".into()),
+                            Err(crate::i18n::text("interaction-watch-label-7").into()),
                             now,
                             Duration::from_secs(60),
                         );
@@ -582,19 +623,22 @@ impl Watcher {
         }
         if !active {
             self.status = if enabled {
-                "Watcher paused: automatic fetch interval is zero"
+                crate::i18n::text("interaction-watch-label-8")
             } else {
-                "Watcher disabled"
+                crate::i18n::text("interaction-watch-label-9")
             }
             .into();
             return;
         }
         if self.status.is_empty() {
-            self.status = format!("Watching {} repositories", self.model.subscriptions.len());
+            self.status = crate::i18n::message(
+                "interaction-watch-count",
+                &[("count", self.model.subscriptions.len().into())],
+            );
         }
         let allowed = crate::network::background_may_run();
         if !allowed {
-            self.status = "Background network work is paused".into();
+            self.status = crate::i18n::text("interaction-watch-label-1").into();
         }
         // Keep old work until its cancellation/completion acknowledges; never overlap a new
         // profile's job with an old one. Queue capacity and mutation ownership remain shared.
@@ -609,18 +653,26 @@ impl Watcher {
             return;
         };
         let cancel = owner.0.clone();
-        let body = crate::app::resident_notification_body(&format!(
-            "{}: {text}",
-            path.file_name()
-                .unwrap_or(path.as_os_str())
-                .to_string_lossy()
+        let body = crate::app::resident_notification_body(&crate::i18n::message(
+            "interaction-watch-repo-notice",
+            &[
+                (
+                    "repo",
+                    path.file_name()
+                        .unwrap_or(path.as_os_str())
+                        .to_string_lossy()
+                        .as_ref()
+                        .into(),
+                ),
+                ("text", text.into()),
+            ],
         ));
         #[cfg(not(test))]
         {
             let job = notification_job(cancel.clone(), body, |body| {
                 let _ = notify_rust::Notification::new()
                     .appname("gitcraft")
-                    .summary("gitcraft repository update")
+                    .summary(crate::i18n::text("interaction-watch-label-11"))
                     .body(body)
                     .show();
             });
@@ -683,7 +735,10 @@ impl Watcher {
             );
             return;
         }
-        self.status = format!("Checking {}", path.display());
+        self.status = crate::i18n::message(
+            "interaction-watch-checking",
+            &[("path", path.display().to_string().into())],
+        );
         self.running = Some(Running {
             path,
             rx,

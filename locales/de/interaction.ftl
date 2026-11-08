@@ -129,3 +129,37 @@ interaction-control-this-desktop-has-no-available-tray-host-open-gitcraft-from-t
 interaction-control-save-and-quit-the-running-instance = Speichern und die laufende Instanz beenden
 interaction-control-recent-repositories = Zuletzt verwendete Repositorys
 interaction-control-gitcraft-repository-watcher = gitcraft — Repository-Überwachung
+interaction-watch-label-1 = Die Netzwerkaktivität im Hintergrund ist pausiert
+interaction-watch-label-2 = Die Netzwerkaktivität im Hintergrund wurde pausiert
+interaction-watch-label-3 = Das Remote hat keinen symbolischen Standard-Branch gemeldet
+interaction-watch-label-4 = Die Hintergrundarbeit wurde beendet oder pausiert
+interaction-watch-label-5 = Zeitlimit der Repository-Überwachung überschritten
+interaction-watch-label-6 = Zeitlimit der Repository-Überwachung überschritten; vor dem nächsten Versuch wird auf den Abbruch gewartet
+interaction-watch-label-7 = Der Hintergrundauftrag wurde abgebrochen
+interaction-watch-label-8 = Repository-Überwachung pausiert: Das Intervall für automatisches Abrufen ist null
+interaction-watch-label-9 = Repository-Überwachung deaktiviert
+interaction-watch-label-10 = Prüfungen des Standard-Branches fehlgeschlagen
+interaction-watch-label-11 = gitcraft: Repository-Aktualisierung
+interaction-watch-advance = { $count ->
+        [one] { $branch } ist um 1 Commit vorgerückt
+       *[other] { $branch } ist um { $count } Commits vorgerückt
+        }
+interaction-watch-review = Review angefragt: #{ $number } { $title }
+interaction-watch-checks = Prüfungen fehlgeschlagen: #{ $number } { $title }
+interaction-watch-branch-failed = Prüfungen auf { $branch } fehlgeschlagen
+interaction-watch-unknown-default = Standard-Branch ist unbekannt: { $detail }
+interaction-watch-count = { $count ->
+        [one] 1 Repository wird überwacht
+       *[other] { $count } Repositorys werden überwacht
+        }
+interaction-watch-retry = { $path }: { $detail } (wird erneut versucht)
+interaction-watch-checking = { $path } wird geprüft
+interaction-watch-repo-notice = { $repo }: { $text }
+interaction-watch-network-paused = { $reason } — Hintergrundprüfungen pausiert
+interaction-watch-no-host = Kein StatusNotifierWatcher: { $detail }
+interaction-network-label-1 = Offline
+interaction-network-label-2 = Keine Verbindung
+interaction-network-label-3 = Getaktete Verbindung
+interaction-network-label-4 = Der Offline-Modus ist aktiviert
+interaction-network-label-5 = Das System meldet keine Netzwerkverbindung
+interaction-network-label-6 = Die Netzwerkverbindung ist getaktet
