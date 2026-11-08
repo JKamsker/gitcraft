@@ -191,7 +191,7 @@ pub fn tree_after(repo: &Path, base: &str, patches: &[String]) -> Result<String,
                     crate::i18n::message(
                         "backend-patch-does-not-apply-e-cbf492",
                         &[
-                            ("count", (n + 1).to_string().into()),
+                            ("count", (n + 1).into()),
                             ("detail", (e).to_string().into()),
                         ],
                     )
