@@ -16,7 +16,7 @@ RepoTab::reviewed_send(&Plan, &egui::Context,
         + Send + 'static)
 ```
 
-The bridge runs the existing personal reviewer rulebook flow on APPROVED evidence resolved to the plan's original exact push. Findings/unknown evidence wait for the existing explicit advisory continuation; cancel drops the continuation. Before invoking it, the tab checks the original repository, full selected profile, immutable connection context and sign-in generation. It retains the actual CommandSource owner rather than resolving an expired opaque marker later. Existing ordinary-operation dispatch remains unchanged.
+The bridge runs the existing personal reviewer rulebook flow on APPROVED evidence resolved to the plan's original exact push. Findings/unknown evidence wait for the existing explicit advisory continuation; cancel drops the continuation. At entry the prepared plan must still match the full selected profile/identity policy. Before invoking the continuation, the tab again checks the original repository, full selected profile, immutable connection context and sign-in generation. It retains the actual CommandSource owner rather than resolving an expired opaque marker later. Existing ordinary-operation dispatch remains unchanged.
 
 The continuation starts the feature's normal background mutation worker. Backend publication uses:
 

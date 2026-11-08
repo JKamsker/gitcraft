@@ -354,6 +354,13 @@ impl RepoTab {
             ));
             return;
         }
+        if Settings::get(ctx).profile() != plan.profile {
+            self.status = Some((
+                "The prepared profile or identity policy changed; reopen push preflight".into(),
+                true,
+            ));
+            return;
+        }
         let original = match crate::push_preflight::push_args(plan) {
             Ok(args) => args,
             Err(error) => {
