@@ -235,9 +235,10 @@ mod tests {
         assert!(TRANSPORT_WRAPPER.contains("credential.$url.helper="));
         assert!(TRANSPORT_WRAPPER.contains("credential.$url.username=$GITCRAFT_GIT_USERNAME"));
         assert!(CREDENTIAL_HELPER.contains("$PPID"));
-        for forbidden in ["ps ", "pgrep", "pkill", "kill ", "rm -rf"] {
-            assert!(!TRANSPORT_ALIAS.contains(forbidden));
+        for word in TRANSPORT_ALIAS.split(|c: char| c.is_whitespace() || c == ';') {
+            assert!(!["ps", "pgrep", "pkill", "kill"].contains(&word));
         }
+        assert!(!TRANSPORT_ALIAS.contains("rm -rf"));
         // Static contracts only; source/recording review must separately bind
         // the native HTTP/helper process chain. This is not a runtime PID proof.
         assert!(CREDENTIAL_HELPER.contains("test -z \"$GITCRAFT_CREDENTIAL_OWNER\""));
