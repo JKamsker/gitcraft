@@ -915,7 +915,7 @@ fn operation_display(label: &str, depth: usize) -> String {
             ("(?s)^Revert\\ a\\ hunk\\ of\\ (.*?)\\ from\\ (.*?)$", "repo-core-3311", &[("path", false), ("hash", false)][..]),
             ("(?s)^Keep\\ both\\ versions\\ of\\ (.*?)$", "repo-core-0590", &[("path", false)][..]),
             ("(?s)^Revert\\ (.*?)\\ as\\ changed\\ in\\ (.*?)$", "repo-core-3309", &[("path", false), ("hash", false)][..]),
-            ("(?s)^Revert\\ ([0-9]+) line(.*?)\\ of\\ (.*?)\\ from\\ (.*?)$", "repo-core-3312", &[("n", true), ("s", false), ("path", false), ("hash", false)][..]),
+            ("(?s)^Revert\\ ([0-9]+) line(.*?)\\ of\\ (.*?)\\ from\\ (.*?)$", "repo-core-3312", &[("n", true), ("", false), ("path", false), ("hash", false)][..]),
             ("(?s)^(.*?)\\ \\(its\\ fixup!\\ commit\\)$", "repo-core-2538", &[("label", false)][..]),
             ("(?s)^Rebase\\ commit\\ (.*?),\\ (.*?),\\ (.*?),\\ (.*?)$", "repo-core-3249", &[("hash", false), ("summary", false), ("author", false), ("label", false)][..]),
             ("(?s)^Edit\\ the\\ message\\ of\\ (.*?)$", "repo-core-3321", &[("hash", false)][..]),
@@ -927,11 +927,11 @@ fn operation_display(label: &str, depth: usize) -> String {
             ("(?s)^Reset\\ (.*?)\\ to\\ here…$", "repo-core-2986", &[("target", false)][..]),
             ("(?s)^Create\\ tag\\ at\\ (.*?)…$", "repo-core-2992", &[("at", false)][..]),
             ("(?s)^Open\\ (.*?)\\ in\\ editor$", "repo-core-3001", &[("path", false)][..]),
-            ("(?s)^([0-9]+) picked\\ file(.*?)$", "repo-core-1498", &[("n", true), ("s", false)][..]),
+            ("(?s)^([0-9]+) picked\\ file(.*?)$", "repo-core-1498", &[("n", true), ("", false)][..]),
             ("(?s)^(.*?)\\ notes\\ “(.*?)”\\ (.*?)\\ (.*?)$", "repo-core-1100", &[("Push", false), ("namespace", false), ("", false), ("remote", false)][..]),
             ("(?s)^Rename\\ (.*?)\\ to\\ (.*?)$", "repo-core-1233", &[("old", false), ("new", false)][..]),
-            ("(?s)^Go\\ to\\ line\\ ([0-9]+)", "repo-core-2039", &[("n", true)][..]),
-            ("(?s)^(Stage|Unstage|Discard|Revert)\\ ([0-9]+) line(.*?)\\ of\\ (.*?)$", "repo-core-0164", &[("verb", false), ("n", true), ("s", false), ("path", false)][..]),
+            ("(?s)^Go\\ to\\ line\\ ([0-9]+)$", "repo-core-2039", &[("n", true)][..]),
+            ("(?s)^(Stage|Unstage|Discard|Revert)\\ ([0-9]+) line(.*?)\\ of\\ (.*?)$", "repo-core-0164", &[("verb", false), ("n", true), ("", false), ("path", false)][..]),
             ("(?s)^Fold\\ into\\ (.*?)$", "repo-core-2530", &[("hash", false)][..]),
             ("(?s)^(.*?)\\ worktree\\ (.*?)$", "repo-core-3595", &[("label", false), ("name", false)][..]),
             ("(?s)^Push\\ tag\\ (.*?)$", "repo-core-3541", &[("name", false)][..]),
@@ -948,7 +948,7 @@ fn operation_display(label: &str, depth: usize) -> String {
             ("(?s)^(.*?)\\ for\\ (.*?)$", "repo-core-0729", &[("label", false), ("path", false)][..]),
             ("(?s)^Open\\ (.*?)$", "repo-core-3003", &[("path", false)][..]),
             ("(?s)^Pop\\ (.*?)$", "repo-core-3512", &[("name", false)][..]),
-            ("(?s)^(.*?)\\ (.*?)\\ (.*?)\\ (.*?)$", "repo-core-2447", &[("verb", false), ("hash", false), ("word", false), ("target", false)][..]),
+            ("(?s)^(Move|Squash|Fixup)\\ (.*?)\\ (above|below|into)\\ (.*?)$", "repo-core-2447", &[("verb", false), ("hash", false), ("word", false), ("target", false)][..]),
             ("(?s)^(.*?)\\ (.*?)$", "repo-core-2999", &[("label", false), ("path", false)][..]),
         ].into_iter().map(|(pattern, id, args)| Template {
             pattern: regex::Regex::new(pattern).expect("fixed operation label pattern"),
@@ -962,11 +962,13 @@ fn operation_display(label: &str, depth: usize) -> String {
             };
             // A template whose leading value is another operation must recognize it.
             // This prevents generic label/path forms from translating custom commands.
-            if !matches!(template.id, "repo-core-0164" | "repo-core-2447")
-                && template
-                    .args
-                    .first()
-                    .is_some_and(|(name, _)| matches!(*name, "label" | "verb" | "Push"))
+            if !matches!(
+                template.id,
+                "repo-core-0164" | "repo-core-2447" | "repo-core-0387" | "repo-core-2659"
+            ) && template
+                .args
+                .first()
+                .is_some_and(|(name, _)| matches!(*name, "label" | "verb" | "Push"))
             {
                 let inner = captures.get(1).map_or("", |v| v.as_str());
                 if crate::i18n::language() == crate::i18n::Language::German
@@ -1005,6 +1007,30 @@ fn operation_display(label: &str, depth: usize) -> String {
 }
 /// Present a status without changing its stored operation/status identity.
 pub(crate) fn display_status(status: &str) -> String {
+    if let Some(rest) = status.strip_prefix(crate::git::CANCELLED) {
+        const PULL_NOTE: &str = "\nIf the pull had started merging or rebasing, that is left in progress: Abort in the toolbar goes back to where the branch was.";
+        let (body, pull) = rest
+            .strip_suffix(PULL_NOTE)
+            .map_or((rest, false), |body| (body, true));
+        let rendered = if body.is_empty() {
+            Some(crate::i18n::text("repo-core-cancelled").to_owned())
+        } else {
+            [(
+                "\nUntil it is deleted, git refuses to work in this repository. Delete it if no other git program is running here.", "one"
+            ), (
+                "\nUntil them are deleted, git refuses to work in this repository. Delete them if no other git program is running here.", "many"
+            )].into_iter().find_map(|(suffix, amount)| {
+                body.strip_prefix(", but git left ").and_then(|v| v.strip_suffix(suffix)).and_then(|v| v.strip_suffix(" behind"))
+                    .map(|locks| crate::i18n::message("repo-core-cancelled-locks", &[("locks", locks.into()), ("amount", amount.into())]))
+            })
+        };
+        if let Some(mut rendered) = rendered {
+            if pull {
+                rendered.push_str(crate::i18n::text("repo-core-4160"));
+            }
+            return rendered;
+        }
+    }
     let rendered = display_operation(status);
     if rendered != status {
         return rendered;
@@ -1016,5 +1042,116 @@ pub(crate) fn display_status(status: &str) -> String {
             crate::git::display_error(&crate::forge::inbox::display_error(detail))
         ),
         None => crate::git::display_error(&crate::forge::inbox::display_error(status)),
+    }
+}
+
+#[cfg(test)]
+mod fluent_presentation_tests {
+    use super::*;
+
+    #[test]
+    fn repository_operation_paint_preserves_control_labels_and_opaque_arguments() {
+        let path = "src/Commit 日本語.rs";
+        let raw = format!("Stage 1234 lines of {path}");
+        for language in ["en-US", "de"] {
+            crate::i18n::set_language(language);
+            let german = language == "de";
+            assert_eq!(
+                display_operation("Abort rebase"),
+                if german {
+                    "Rebase abbrechen"
+                } else {
+                    "Abort rebase"
+                }
+            );
+            assert_eq!(
+                display_operation("Continue merge"),
+                if german {
+                    "Merge fortsetzen"
+                } else {
+                    "Continue merge"
+                }
+            );
+            let rendered = display_operation(&raw);
+            assert_eq!(
+                rendered,
+                if german {
+                    format!("1.234 Zeilen von {path} bereitstellen")
+                } else {
+                    format!("Stage 1,234 lines of {path}")
+                }
+            );
+            assert_eq!(
+                display_operation("Stage 1 line of x"),
+                if german {
+                    "1 Zeile von x bereitstellen"
+                } else {
+                    "Stage 1 line of x"
+                }
+            );
+            assert_eq!(
+                display_operation("Fetch notes “Commit” from origin"),
+                if german {
+                    "Notizen „Commit“ von origin abrufen"
+                } else {
+                    "Fetch notes “Commit” from origin"
+                }
+            );
+            assert_eq!(
+                display_operation("Move aaaaaaaa above bbbbbbbb"),
+                if german {
+                    "aaaaaaaa vor bbbbbbbb verschieben"
+                } else {
+                    "Move aaaaaaaa above bbbbbbbb"
+                }
+            );
+            assert_eq!(
+                display_operation("Undo Sign off the commits of Commit/ü"),
+                if german {
+                    "Rückgängig: Commits von Commit/ü mit Signed-off-by versehen"
+                } else {
+                    "Undo Sign off the commits of Commit/ü"
+                }
+            );
+            for custom in [
+                "deploy --target=de",
+                "Abort deployment",
+                "Continue deployment",
+                "Undo deployment script",
+                "custom command with arguments",
+                "外部コマンド",
+            ] {
+                assert_eq!(display_operation(custom), custom);
+                assert_eq!(display_status(custom), custom);
+            }
+            assert!(raw.starts_with("Stage "));
+            assert_eq!(raw, format!("Stage 1234 lines of {path}"));
+            assert_eq!(
+                crate::repo::pull::PullMode::FastForwardOnly.args(),
+                &["pull", "--ff-only"]
+            );
+        }
+        crate::i18n::set_language("xx-unsupported");
+        assert_eq!(display_operation("Abort rebase"), "Abort rebase");
+        assert_eq!(
+            crate::i18n::text("repo-core-nonexistent-fallback-test"),
+            "repo-core-nonexistent-fallback-test"
+        );
+    }
+
+    #[test]
+    fn repository_status_paint_localizes_only_known_errors_and_preserves_raw_state() {
+        crate::i18n::set_language("de");
+        let raw = "Analysis cancelled";
+        assert_eq!(display_status(raw), crate::git::display_error(raw));
+        assert_ne!(display_status(raw), raw);
+        assert_eq!(
+            display_status("fatal: external provider message in English"),
+            "fatal: external provider message in English"
+        );
+        assert_eq!(display_status(crate::git::CANCELLED), "Abgebrochen");
+        assert_eq!(raw, "Analysis cancelled");
+        crate::i18n::set_language("en-US");
+        assert_eq!(display_status(crate::git::CANCELLED), crate::git::CANCELLED);
     }
 }

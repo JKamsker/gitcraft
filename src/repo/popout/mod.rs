@@ -36,9 +36,9 @@ impl Panel {
     /// What it is called in tooltips and messages.
     pub(crate) fn noun(self) -> &'static str {
         match self {
-            Panel::Diff => "diff",
-            Panel::Terminal => "terminal",
-            Panel::Pr => "pull request",
+            Panel::Diff => crate::i18n::text("repo-core-panel-diff"),
+            Panel::Terminal => crate::i18n::text("repo-core-panel-terminal"),
+            Panel::Pr => crate::i18n::text("repo-core-panel-pr"),
             Panel::Ci => crate::i18n::text("repo-core-4206"),
         }
     }

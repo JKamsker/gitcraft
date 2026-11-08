@@ -27,7 +27,10 @@ pub(in crate::repo::diff) fn binary_view(ui: &mut Ui, pair: &BinaryPair, id: &st
         .show(ui, |ui| {
             summary(ui, &t, pair);
             if let Some(e) = &pair.error {
-                ui.colored_label(t.danger, e);
+                ui.colored_label(
+                    t.danger,
+                    crate::git::display_error(&crate::forge::inbox::display_error(e)),
+                );
             }
             ui.add_space(10.0);
             let mut options: Vec<(Show, &str, bool)> = Vec::new();

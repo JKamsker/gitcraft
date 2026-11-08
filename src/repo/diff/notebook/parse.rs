@@ -34,6 +34,14 @@ pub enum CellKind {
 }
 
 impl CellKind {
+    pub(super) fn display_label(self) -> &'static str {
+        crate::i18n::text(match self {
+            Self::Code => "repo-core-cell-kind-code",
+            Self::Markdown => "repo-core-cell-kind-markdown",
+            Self::Raw => "repo-core-cell-kind-raw",
+        })
+    }
+
     pub fn label(self) -> &'static str {
         match self {
             CellKind::Code => "code",

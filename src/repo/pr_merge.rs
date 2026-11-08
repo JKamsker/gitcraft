@@ -114,8 +114,14 @@ pub(super) fn merge_box(ui: &mut Ui, draft: &mut PrDraft, d: &PrDetails, acts: &
                 &[
                     (
                         "name",
-                        format!("{}", d.forge.map_or("The forge", crate::forge::Forge::name))
-                            .into(),
+                        format!(
+                            "{}",
+                            d.forge.map_or(
+                                crate::i18n::text("repo-core-forge-fallback"),
+                                crate::forge::Forge::name
+                            )
+                        )
+                        .into(),
                     ),
                     ("head-branch", format!("{}", d.head_branch).into()),
                 ],
@@ -139,7 +145,10 @@ pub(super) fn merge_box(ui: &mut Ui, draft: &mut PrDraft, d: &PrDetails, acts: &
         }
     }
     if let Some(error) = draft.error_at(Place::Merge) {
-        ui.colored_label(t.danger, error);
+        ui.colored_label(
+            t.danger,
+            crate::git::display_error(&crate::forge::inbox::display_error(error)),
+        );
     }
     let (_, failed, running, _) = crate::pull_request::tally(&d.checks);
     if let Some(note) = checks_note(blocker.is_some(), &d.merge_state, failed, running) {

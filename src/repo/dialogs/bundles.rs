@@ -276,7 +276,12 @@ impl Form {
                                     }
                                 }
                                 Err(e) => {
-                                    ui.colored_label(t.danger, e);
+                                    ui.colored_label(
+                                        t.danger,
+                                        crate::git::display_error(
+                                            &crate::forge::inbox::display_error(e),
+                                        ),
+                                    );
                                 }
                             });
                     });
@@ -298,7 +303,10 @@ impl Form {
                     }
                 }
                 if let Some(error) = &self.error {
-                    ui.colored_label(t.danger, error);
+                    ui.colored_label(
+                        t.danger,
+                        crate::git::display_error(&crate::forge::inbox::display_error(error)),
+                    );
                 }
                 if self.active.is_some() {
                     ui.add(crate::spinner::Spinner::new());

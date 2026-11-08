@@ -13,7 +13,7 @@ pub(in crate::repo::diff) fn document(nb: &NotebookData, t: &Tokens) -> Document
                 "repo-core-1894",
                 &[
                     ("number", format!("{}", change.number).into()),
-                    ("status", format!("{:?}", change.status).into()),
+                    ("status", change.status.label().into()),
                 ],
             ),
             t.accent,
@@ -31,10 +31,15 @@ pub(in crate::repo::diff) fn document(nb: &NotebookData, t: &Tokens) -> Document
                             "label",
                             crate::repo::messages::display_operation(&label).into(),
                         ),
-                        ("label2", format!("{}", cell.kind.label()).into()),
+                        ("label2", format!("{}", cell.kind.display_label()).into()),
                         (
                             "execution-count",
-                            format!("{:?}", cell.execution_count).into(),
+                            cell.execution_count
+                                .map(crate::i18n::number)
+                                .unwrap_or_else(|| {
+                                    crate::i18n::text("repo-core-not-executed").to_owned()
+                                })
+                                .into(),
                         ),
                     ],
                 ),

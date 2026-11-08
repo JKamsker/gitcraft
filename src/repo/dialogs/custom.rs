@@ -189,7 +189,10 @@ fn review(ui: &mut Ui, repo: &str, file: &RepoFile) -> Outcome {
     let commands = match &file.commands {
         Ok(list) => list,
         Err(e) => {
-            ui.colored_label(t.danger, e);
+            ui.colored_label(
+                t.danger,
+                crate::git::display_error(&crate::forge::inbox::display_error(e)),
+            );
             ui.add_space(12.0);
             return if cancel_button(ui) {
                 Outcome::Cancel

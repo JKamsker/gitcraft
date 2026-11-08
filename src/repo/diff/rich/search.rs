@@ -32,7 +32,10 @@ pub(in crate::repo) fn document(diff: &RichDiff, t: &Tokens) -> Document {
         }
         RichDiff::Config(c) => {
             for entry in &c.entries {
-                doc.text(&format!("{} · {:?}", entry.path, entry.change), t.text);
+                doc.text(
+                    &format!("{} · {}", entry.path, entry.change.label()),
+                    t.text,
+                );
                 if let Some(old) = &entry.old {
                     doc.text(
                         &crate::i18n::message(
@@ -69,8 +72,10 @@ pub(in crate::repo) fn document(diff: &RichDiff, t: &Tokens) -> Document {
             for change in &a.changes {
                 doc.text(
                     &format!(
-                        "{} · {:?} · {}",
-                        change.endpoint, change.severity, change.what
+                        "{} · {} · {}",
+                        change.endpoint,
+                        change.severity.label(),
+                        change.what
                     ),
                     t.text,
                 );
@@ -80,9 +85,9 @@ pub(in crate::repo) fn document(diff: &RichDiff, t: &Tokens) -> Document {
             for change in &d.changes {
                 doc.text(
                     &format!(
-                        "{} · {:?} · {} → {}",
+                        "{} · {} · {} → {}",
                         change.name,
-                        change.change,
+                        change.change.label(),
                         change
                             .old
                             .as_deref()
@@ -134,7 +139,11 @@ pub(in crate::repo) fn document(diff: &RichDiff, t: &Tokens) -> Document {
                                 "column",
                                 format!(
                                     "{}",
-                                    column.old.as_ref().map_or("absent", |(_, s)| s.as_str())
+                                    column
+                                        .old
+                                        .as_ref()
+                                        .map_or(crate::i18n::text("repo-core-2228"), |(_, s)| s
+                                            .as_str())
                                 )
                                 .into(),
                             ),
@@ -142,7 +151,11 @@ pub(in crate::repo) fn document(diff: &RichDiff, t: &Tokens) -> Document {
                                 "column2",
                                 format!(
                                     "{}",
-                                    column.new.as_ref().map_or("absent", |(_, s)| s.as_str())
+                                    column
+                                        .new
+                                        .as_ref()
+                                        .map_or(crate::i18n::text("repo-core-2228"), |(_, s)| s
+                                            .as_str())
                                 )
                                 .into(),
                             ),

@@ -81,7 +81,10 @@ impl RepoTab {
             ui.add_space(8.0);
             ui.horizontal(|ui| {
                 ui.add_space(10.0);
-                ui.colored_label(t.danger, err);
+                ui.colored_label(
+                    t.danger,
+                    crate::git::display_error(&crate::forge::inbox::display_error(err)),
+                );
             });
             if self.terminals.is_empty() {
                 return;

@@ -59,8 +59,22 @@ pub(in crate::repo::diff) fn document(pair: &BinaryPair, t: &Tokens) -> Document
                     "repo-core-1571",
                     &[
                         ("name", format!("{}", member.name).into()),
-                        ("old", format!("{:?}", member.old).into()),
-                        ("new", format!("{:?}", member.new).into()),
+                        (
+                            "old",
+                            member
+                                .old
+                                .map(crate::git::human_size)
+                                .unwrap_or_else(|| crate::i18n::text("repo-core-2228").to_owned())
+                                .into(),
+                        ),
+                        (
+                            "new",
+                            member
+                                .new
+                                .map(crate::git::human_size)
+                                .unwrap_or_else(|| crate::i18n::text("repo-core-2228").to_owned())
+                                .into(),
+                        ),
                     ],
                 ),
                 t.text,

@@ -220,6 +220,9 @@ fn error(ui: &mut Ui, e: &str) {
     ui.add_space(12.0);
     ui.horizontal(|ui| {
         ui.add_space(12.0);
-        ui.colored_label(t.danger, e);
+        ui.colored_label(
+            t.danger,
+            crate::git::display_error(&crate::forge::inbox::display_error(e)),
+        );
     });
 }

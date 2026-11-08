@@ -517,32 +517,35 @@ pub(in crate::repo) fn reset_items(ui: &mut Ui, r: &Rewrite<'_>, acts: &mut Vec<
         (
             "--soft",
             "--soft",
-            crate::i18n::text("repo-core-0373"),
+            "Soft",
             crate::i18n::text("repo-core-0375"),
         ),
         (
             "--mixed",
             "--mixed",
-            crate::i18n::text("repo-core-0376"),
+            "Mixed",
             crate::i18n::text("repo-core-0378"),
         ),
         (
             "--keep",
             "--keep",
-            crate::i18n::text("repo-core-0380"),
+            "Keep",
             crate::i18n::text("repo-core-2657"),
         ),
         (
             "--hard",
             "--keep",
-            crate::i18n::text("repo-core-0383"),
+            "Hard",
             crate::i18n::text("repo-core-0385"),
         ),
     ] {
         let first = explain.split('.').next().unwrap_or(explain);
-        let button = crate::menu_item::MenuItem::new(format!("{label} — {first}"))
-            .icon("command")
-            .show(ui);
+        let button = crate::menu_item::MenuItem::new(format!(
+            "{} — {first}",
+            crate::repo::messages::display_operation(label)
+        ))
+        .icon("command")
+        .show(ui);
         if mode == "--hard" {
             offer(&button, || GhostOp::ResetHard {
                 to: hash.to_owned(),

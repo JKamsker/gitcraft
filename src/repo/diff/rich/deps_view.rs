@@ -36,23 +36,15 @@ pub(super) fn show(
                     .color(t.text),
                 );
                 let parts: Vec<String> = [
-                    (count(Change::Upgraded), crate::i18n::text("repo-core-2140")),
-                    (
-                        count(Change::Downgraded),
-                        crate::i18n::text("repo-core-2141"),
-                    ),
-                    (count(Change::Added), crate::i18n::text("repo-core-1702")),
-                    (count(Change::Removed), crate::i18n::text("repo-core-1703")),
-                    (licences, crate::i18n::text("repo-core-2142")),
+                    (count(Change::Upgraded), "repo-core-count-upgraded"),
+                    (count(Change::Downgraded), "repo-core-count-downgraded"),
+                    (count(Change::Added), "repo-core-count-added"),
+                    (count(Change::Removed), "repo-core-count-removed"),
+                    (licences, "repo-core-count-licenses"),
                 ]
                 .iter()
                 .filter(|(n, _)| *n > 0)
-                .map(|(n, what)| {
-                    crate::i18n::message(
-                        "repo-core-1911",
-                        &[("n", (n).into()), ("what", format!("{}", what).into())],
-                    )
-                })
+                .map(|(n, what)| crate::i18n::message(what, &[("count", (*n).into())]))
                 .collect();
                 let summary = if parts.is_empty() {
                     crate::i18n::text("repo-core-2143").to_owned()

@@ -126,7 +126,7 @@ impl RepoTab {
                         .any(|c| &c.hash == hash && c.parents.is_empty())
                 }) =>
             {
-                "First commit created"
+                "repo-core-0278"
             }
             Event::ReleaseTag { name, target }
                 if self
@@ -135,7 +135,7 @@ impl RepoTab {
                     .iter()
                     .any(|b| b.name == name && b.target == target) =>
             {
-                "Release tag created"
+                "repo-core-0279"
             }
             Event::Merge {
                 before,
@@ -149,7 +149,7 @@ impl RepoTab {
                     })
             }) =>
             {
-                "Merge completed"
+                "repo-core-0280"
             }
             _ => return,
         };
@@ -176,7 +176,7 @@ impl RepoTab {
         let t = crate::theme::Tokens::get(ui.ctx());
         egui::Panel::top("quiet_celebration").show(ui, |ui| {
             ui.horizontal(|ui| {
-                ui.colored_label(t.success, format!("✓ {label}"));
+                ui.colored_label(t.success, format!("✓ {}", crate::i18n::text(label)));
                 let (rect, _) =
                     ui.allocate_exact_size(egui::vec2(70.0, 18.0), egui::Sense::hover());
                 for dot in 0..6 {

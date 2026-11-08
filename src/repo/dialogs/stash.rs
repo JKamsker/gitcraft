@@ -185,7 +185,7 @@ pub(super) fn stash(
         );
     } else {
         let n = d.files.len();
-        let label = format!("{n} picked file{}", if n == 1 { "" } else { "s" });
+        let label = crate::i18n::message("repo-core-1498", &[("n", n.into())]);
         let hint = files_summary(&d.files);
         choice(ui, &mut d.choice, Choice::Files, &label, &hint, None, &t);
     }

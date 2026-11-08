@@ -455,8 +455,26 @@ repo-core-0613 = { $a ->
         [one] { $a } Zeile eingefügt
        *[other] { $a } Zeilen eingefügt
     }
-repo-core-0614 = alle { $r } Zeilen durch { $a } Zeilen ersetzt
-repo-core-0615 = { $a } Zeilen eingefügt, { $r } Zeilen gelöscht
+repo-core-0614 = { $r ->
+        [one] { $a ->
+        [one] die einzige Zeile durch { $a } Zeile ersetzt
+       *[other] die einzige Zeile durch { $a } Zeilen ersetzt
+    }
+       *[other] { $a ->
+        [one] alle { $r } Zeilen durch { $a } Zeile ersetzt
+       *[other] alle { $r } Zeilen durch { $a } Zeilen ersetzt
+    }
+    }
+repo-core-0615 = { $a ->
+        [one] { $r ->
+        [one] { $a } Zeile eingefügt, { $r } Zeile gelöscht
+       *[other] { $a } Zeile eingefügt, { $r } Zeilen gelöscht
+    }
+       *[other] { $r ->
+        [one] { $a } Zeilen eingefügt, { $r } Zeile gelöscht
+       *[other] { $a } Zeilen eingefügt, { $r } Zeilen gelöscht
+    }
+    }
 repo-core-0616 = dieser Konflikt stimmt nicht mit dem aus dem Index rekonstruierten überein (die Datei wurde möglicherweise inzwischen bearbeitet oder mit hier nicht wiederholbaren Optionen oder Merge-Treibern gemergt)
 repo-core-0617 = Index konnte nicht gelesen werden: { $e }
 repo-core-0618 = Der Index führt diese Datei nicht mehr als Konflikt
@@ -838,7 +856,10 @@ repo-core-1096 = Tags
 repo-core-1097 = Kein Branch enthält ihn, nur Tags.
 repo-core-1098 = Kein Branch oder Tag enthält ihn. Git kann ihn bei der Bereinigung löschen; zum Behalten einen Branch erstellen.
 repo-core-1099 = und { $hidden } weitere
-repo-core-1100 = { $Push } von Notizen „{ $namespace }“ { $to } { $remote }
+repo-core-1100 = { $Push ->
+        [Fetch] Notizen „{ $namespace }“ von { $remote } abrufen
+       *[Push] Notizen „{ $namespace }“ nach { $remote } pushen
+    }
 repo-core-1101 = von
 repo-core-1102 = an
 repo-core-1103 = keine in { $namespace }
@@ -1449,7 +1470,12 @@ repo-core-1932 = Ausgaben nachher
 repo-core-1935 = Traceback
 repo-core-1936 = (eine von gitcraft nicht darstellbare Ausgabe)
 repo-core-1937 = ({ $kinds }-Ausgabe)
-repo-core-1938 = Hunk { $verb }
+repo-core-1938 = { $verb ->
+        [Stage] Block bereitstellen
+        [Unstage] Block aus der Staging-Area nehmen
+        [Discard] Block verwerfen
+       *[Revert] Block rückgängig machen
+    }
 repo-core-1940 = Diesen Hunk vormerken. Zeilen anklicken, um nur einige vorzumerken (Shift+Klick für einen Bereich).
 repo-core-1941 = Vormerkung dieses Hunks aufheben. Zeilen anklicken, um sie nur für einige aufzuheben (Shift+Klick für einen Bereich).
 repo-core-1942 = Änderungen dieses Hunks verwerfen (Ctrl+Z stellt sie wieder her).
@@ -1756,7 +1782,14 @@ repo-core-2443 = unter
 repo-core-2444 = Zusammenfassen
 repo-core-2445 = in
 repo-core-2446 = Fixup
-repo-core-2447 = { $verb } { $hash } { $word } { $target }
+repo-core-2447 = { $verb ->
+        [Move] { $word ->
+            [above] { $hash } vor { $target } verschieben
+           *[below] { $hash } hinter { $target } verschieben
+        }
+        [Squash] { $hash } mit { $target } zusammenfassen
+       *[Fixup] { $hash } in { $target } einarbeiten
+    }
 repo-core-2448 = Nach diesem Commit folgten Merges, die dadurch eingeebnet würden
 repo-core-2449 = Nur Commits des ausgecheckten Branches lassen sich verschieben
 repo-core-2450 = bereits an dieser Stelle
@@ -3053,3 +3086,66 @@ repo-core-fold-staged = { $fixup ->
 
 repo-core-operation-dco = Commits von { $branch } mit Signed-off-by versehen
 repo-core-operation-dco-here = Commits von { $branch } mit Signed-off-by versehen (nur hier)
+repo-core-change-unchanged = Unverändert
+repo-core-change-added = Hinzugefügt
+repo-core-change-removed = Entfernt
+repo-core-change-modified = Geändert
+repo-core-change-changed = Geändert
+repo-core-change-reordered = Umgeordnet
+repo-core-change-breaking = Inkompatibel
+repo-core-change-upgraded = Aktualisiert
+repo-core-change-downgraded = Zurückgestuft
+repo-core-change-relicensed = Lizenz geändert
+repo-core-not-executed = nicht ausgeführt
+repo-core-count-changed = { $count } geändert
+repo-core-cells-changed = { $count ->
+        [one] { $count } Zelle geändert
+       *[other] { $count } Zellen geändert
+    }
+repo-core-count-added = { $count } hinzugefügt
+repo-core-cells-added = { $count ->
+        [one] { $count } Zelle hinzugefügt
+       *[other] { $count } Zellen hinzugefügt
+    }
+repo-core-count-removed = { $count } entfernt
+repo-core-cells-removed = { $count ->
+        [one] { $count } Zelle entfernt
+       *[other] { $count } Zellen entfernt
+    }
+repo-core-count-moved = { $count } verschoben
+repo-core-cells-moved = { $count ->
+        [one] { $count } Zelle verschoben
+       *[other] { $count } Zellen verschoben
+    }
+repo-core-count-upgraded = { $count } aktualisiert
+repo-core-cells-upgraded = { $count ->
+        [one] { $count } Zelle aktualisiert
+       *[other] { $count } Zellen aktualisiert
+    }
+repo-core-count-downgraded = { $count } zurückgestuft
+repo-core-cells-downgraded = { $count ->
+        [one] { $count } Zelle zurückgestuft
+       *[other] { $count } Zellen zurückgestuft
+    }
+repo-core-count-licenses = { $count } mit Lizenzangaben
+repo-core-cells-licenses = { $count ->
+        [one] { $count } Zelle mit Lizenzangaben
+       *[other] { $count } Zellen mit Lizenzangaben
+    }
+repo-core-picture-read-error = Das Bild konnte nicht gelesen werden: { $error }
+
+repo-core-table-old-line = Zu Zeile { $line } der Datei vor der Änderung springen
+repo-core-cancelled = Abgebrochen
+repo-core-cancelled-locks = Abgebrochen, aber Git hat { $locks } zurückgelassen.
+    { $amount ->
+        [one] Solange diese Sperrdatei existiert, verweigert Git die Arbeit in diesem Repository. Lösche sie, wenn hier kein anderes Git-Programm läuft.
+       *[many] Solange diese Sperrdateien existieren, verweigert Git die Arbeit in diesem Repository. Lösche sie, wenn hier kein anderes Git-Programm läuft.
+    }
+repo-core-forge-fallback = Die Hosting-Plattform
+repo-core-rebase-commit-accessible = Rebase-Commit { $hash }, { $summary }, { $author }, { $step }
+repo-core-cell-kind-code = Code
+repo-core-cell-kind-markdown = Markdown
+repo-core-cell-kind-raw = Rohtext
+repo-core-panel-diff = Diff
+repo-core-panel-terminal = Terminal
+repo-core-panel-pr = Pull-Request

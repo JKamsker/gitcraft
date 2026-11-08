@@ -21,6 +21,17 @@ pub enum Change {
     Reordered,
 }
 
+impl Change {
+    pub(super) fn label(self) -> &'static str {
+        crate::i18n::text(match self {
+            Self::Added => "repo-core-change-added",
+            Self::Removed => "repo-core-change-removed",
+            Self::Changed => "repo-core-change-changed",
+            Self::Reordered => "repo-core-change-reordered",
+        })
+    }
+}
+
 /// One difference, at a key path, with where it is on each side.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Entry {

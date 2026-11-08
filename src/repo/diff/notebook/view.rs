@@ -96,40 +96,24 @@ fn strip_box(ui: &mut Ui, t: &Tokens, strip: &StripState, acts: &mut Vec<Action>
 pub(super) fn summary(nb: &NotebookData) -> String {
     let count = |s: Status| nb.diff.cells.iter().filter(|c| c.status == s).count();
     let parts: Vec<String> = [
-        (count(Status::Modified), crate::i18n::text("repo-core-1704")),
-        (count(Status::Added), crate::i18n::text("repo-core-1702")),
-        (count(Status::Removed), crate::i18n::text("repo-core-1703")),
+        (
+            count(Status::Modified),
+            ("repo-core-cells-changed", "repo-core-count-changed"),
+        ),
+        (
+            count(Status::Added),
+            ("repo-core-cells-added", "repo-core-count-added"),
+        ),
+        (
+            count(Status::Removed),
+            ("repo-core-cells-removed", "repo-core-count-removed"),
+        ),
     ]
     .into_iter()
     .filter(|(n, _)| *n > 0)
     .enumerate()
-    .map(|(i, (n, what))| {
-        if i == 0 {
-            crate::i18n::message(
-                "repo-core-1909",
-                &[
-                    ("n", (n).into()),
-                    (
-                        "cells",
-                        format!(
-                            "{}",
-                            if n == 1 {
-                                crate::i18n::text("repo-core-1910")
-                            } else {
-                                "cells"
-                            }
-                        )
-                        .into(),
-                    ),
-                    ("what", format!("{}", what).into()),
-                ],
-            )
-        } else {
-            crate::i18n::message(
-                "repo-core-1911",
-                &[("n", (n).into()), ("what", format!("{}", what).into())],
-            )
-        }
+    .map(|(i, (n, (full, short)))| {
+        crate::i18n::message(if i == 0 { full } else { short }, &[("count", n.into())])
     })
     .collect();
     match (parts.is_empty(), nb.diff.metadata.is_some()) {
@@ -188,7 +172,7 @@ fn folded(ui: &mut Ui, t: &Tokens, unchanged: &mut Vec<&CellChange>) {
                         RichText::new(crate::i18n::message(
                             "repo-core-1919",
                             &[
-                                ("label", format!("{}", cell.kind.label()).into()),
+                                ("label", format!("{}", cell.kind.display_label()).into()),
                                 ("number", format!("{}", c.number).into()),
                             ],
                         ))
@@ -231,7 +215,9 @@ fn cell(ui: &mut Ui, t: &Tokens, c: &CellChange) {
                 if c.moved {
                     widgets::chip(ui, crate::i18n::text("repo-core-1920"), t.text_dim);
                 }
-                let kind = either.map_or(crate::i18n::text("repo-core-1910"), |c| c.kind.label());
+                let kind = either.map_or(crate::i18n::text("repo-core-1910"), |c| {
+                    c.kind.display_label()
+                });
                 ui.label(
                     RichText::new(crate::i18n::message(
                         "repo-core-1921",

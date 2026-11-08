@@ -157,3 +157,49 @@ mod tests {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod fluent_action_tests {
+    use super::*;
+
+    #[test]
+    fn reset_presentation_keeps_raw_title_guards_argv_and_undo_in_both_languages() {
+        let r = Rewrite {
+            hash: "target-hash",
+            short: "target",
+            summary: "Commit provider subject",
+            target: "Commit/日本語",
+            head: "expected-head",
+        };
+        for language in ["en-US", "de"] {
+            crate::i18n::set_language(language);
+            let Action::Dialog(Dialog::Confirm {
+                title,
+                body,
+                ops,
+                undo,
+                ..
+            }) = reset_action(&r, &RESET_MODES[2])
+            else {
+                panic!("reset must ask first")
+            };
+            assert_eq!(title, "Keep reset");
+            assert!(body.contains(r.target));
+            assert!(body.contains(r.summary));
+            assert_eq!(ops, reset_steps("--keep", r.hash, r.target, r.head));
+            assert_eq!(ops[0], expect_symref("HEAD", "refs/heads/Commit/日本語"));
+            assert_eq!(ops[1], expect_ref_at("HEAD", "expected-head"));
+            assert_eq!(ops[2], ["reset", "--keep", "target-hash"]);
+            assert_eq!(undo, Undo::HeadMove { mode: "--keep" });
+            assert_eq!(
+                crate::repo::messages::display_operation(&title),
+                if language == "de" {
+                    "Keep-Reset"
+                } else {
+                    "Keep reset"
+                }
+            );
+        }
+        crate::i18n::set_language("en-US");
+    }
+}

@@ -444,7 +444,7 @@ repo-core-0609 = { $k ->
     }
 repo-core-0610 = unchanged
 repo-core-0611 = { $r ->
-        [one] deleted the only line
+        [one] deleted all { $r } line
        *[other] deleted all { $r } lines
     }
 repo-core-0612 = { $r ->
@@ -455,8 +455,26 @@ repo-core-0613 = { $a ->
         [one] inserted { $a } line
        *[other] inserted { $a } lines
     }
-repo-core-0614 = replaced all { $r } lines with { $a } lines
-repo-core-0615 = inserted { $a } lines, deleted { $r } lines
+repo-core-0614 = { $r ->
+        [one] { $a ->
+        [one] replaced all { $r } line with { $a } line
+       *[other] replaced all { $r } line with { $a } lines
+    }
+       *[other] { $a ->
+        [one] replaced all { $r } lines with { $a } line
+       *[other] replaced all { $r } lines with { $a } lines
+    }
+    }
+repo-core-0615 = { $a ->
+        [one] { $r ->
+        [one] inserted { $a } line, deleted { $r } line
+       *[other] inserted { $a } line, deleted { $r } lines
+    }
+       *[other] { $r ->
+        [one] inserted { $a } lines, deleted { $r } line
+       *[other] inserted { $a } lines, deleted { $r } lines
+    }
+    }
 repo-core-0616 = this conflict doesn't match the one rebuilt from the index (the file may have been edited since, or merged with options or a merge driver that can't be repeated here)
 repo-core-0617 = could not read the index: { $e }
 repo-core-0618 = the index no longer has this file in conflict
@@ -838,7 +856,10 @@ repo-core-1096 = Tags
 repo-core-1097 = No branch has it, only tags.
 repo-core-1098 = No branch or tag has it. Git may delete it when it cleans up; create a branch to keep it.
 repo-core-1099 = and { $hidden } more
-repo-core-1100 = { $Push } notes “{ $namespace }” { $to } { $remote }
+repo-core-1100 = { $Push ->
+        [Fetch] Fetch notes “{ $namespace }” from { $remote }
+       *[Push] Push notes “{ $namespace }” to { $remote }
+    }
 repo-core-1101 = from
 repo-core-1102 = to
 repo-core-1103 = none in { $namespace }
@@ -3053,3 +3074,66 @@ repo-core-fold-staged = { $fixup ->
 
 repo-core-operation-dco = Sign off the commits of { $branch }
 repo-core-operation-dco-here = Sign off the commits of { $branch } (here only)
+repo-core-change-unchanged = Unchanged
+repo-core-change-added = Added
+repo-core-change-removed = Removed
+repo-core-change-modified = Modified
+repo-core-change-changed = Changed
+repo-core-change-reordered = Reordered
+repo-core-change-breaking = Breaking
+repo-core-change-upgraded = Upgraded
+repo-core-change-downgraded = Downgraded
+repo-core-change-relicensed = Relicensed
+repo-core-not-executed = not run
+repo-core-count-changed = { $count } changed
+repo-core-cells-changed = { $count ->
+        [one] { $count } cell changed
+       *[other] { $count } cells changed
+    }
+repo-core-count-added = { $count } added
+repo-core-cells-added = { $count ->
+        [one] { $count } cell added
+       *[other] { $count } cells added
+    }
+repo-core-count-removed = { $count } removed
+repo-core-cells-removed = { $count ->
+        [one] { $count } cell removed
+       *[other] { $count } cells removed
+    }
+repo-core-count-moved = { $count } moved
+repo-core-cells-moved = { $count ->
+        [one] { $count } cell moved
+       *[other] { $count } cells moved
+    }
+repo-core-count-upgraded = { $count } upgraded
+repo-core-cells-upgraded = { $count ->
+        [one] { $count } cell upgraded
+       *[other] { $count } cells upgraded
+    }
+repo-core-count-downgraded = { $count } downgraded
+repo-core-cells-downgraded = { $count ->
+        [one] { $count } cell downgraded
+       *[other] { $count } cells downgraded
+    }
+repo-core-count-licenses = { $count } with licences
+repo-core-cells-licenses = { $count ->
+        [one] { $count } cell with licences
+       *[other] { $count } cells with licences
+    }
+repo-core-picture-read-error = Could not read the picture: { $error }
+
+repo-core-table-old-line = Go to line { $line } of the file before the change
+repo-core-cancelled = cancelled
+repo-core-cancelled-locks = cancelled, but git left { $locks } behind
+    { $amount ->
+        [one] Until it is deleted, git refuses to work in this repository. Delete it if no other git program is running here.
+       *[many] Until them are deleted, git refuses to work in this repository. Delete them if no other git program is running here.
+    }
+repo-core-forge-fallback = The forge
+repo-core-rebase-commit-accessible = Rebase commit { $hash }, { $summary }, { $author }, { $step }
+repo-core-cell-kind-code = code
+repo-core-cell-kind-markdown = markdown
+repo-core-cell-kind-raw = raw
+repo-core-panel-diff = diff
+repo-core-panel-terminal = terminal
+repo-core-panel-pr = pull request

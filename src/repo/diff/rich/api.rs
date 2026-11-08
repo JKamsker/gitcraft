@@ -25,6 +25,15 @@ pub enum Severity {
     Added,
 }
 
+impl Severity {
+    pub(super) fn label(self) -> &'static str {
+        crate::i18n::text(match self {
+            Self::Breaking => "repo-core-change-breaking",
+            Self::Added => "repo-core-change-added",
+        })
+    }
+}
+
 /// One change, where it is: the endpoint it is about, what happened, and its line on each side.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ApiChange {

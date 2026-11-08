@@ -64,6 +64,18 @@ pub enum Change {
     Relicensed,
 }
 
+impl Change {
+    pub(super) fn label(self) -> &'static str {
+        crate::i18n::text(match self {
+            Self::Upgraded => "repo-core-change-upgraded",
+            Self::Downgraded => "repo-core-change-downgraded",
+            Self::Added => "repo-core-change-added",
+            Self::Removed => "repo-core-change-removed",
+            Self::Relicensed => "repo-core-change-relicensed",
+        })
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DepChange {
     pub change: Change,

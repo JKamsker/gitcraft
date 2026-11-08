@@ -861,9 +861,9 @@ fn cancelled_message(path: &Path, ops: &[Vec<String>], before: &[std::path::Path
         .collect();
     if !locks.is_empty() {
         let (them, are) = if locks.len() == 1 {
-            ("it", crate::i18n::text("repo-core-1323"))
+            ("it", "is")
         } else {
-            ("them", crate::i18n::text("repo-core-1324"))
+            ("them", "are")
         };
         msg.push_str(&format!(
             ", but git left {} behind\nUntil {them} {are} deleted, git refuses to work in this \
@@ -876,7 +876,10 @@ fn cancelled_message(path: &Path, ops: &[Vec<String>], before: &[std::path::Path
             && git::goes_over_network(&op.iter().map(String::as_str).collect::<Vec<_>>())
     });
     if pulls {
-        msg.push_str(crate::i18n::text("repo-core-4160"));
+        msg.push_str(
+            "\nIf the pull had started merging or rebasing, that is left in progress: Abort in \
+             the toolbar goes back to where the branch was.",
+        );
     }
     msg
 }

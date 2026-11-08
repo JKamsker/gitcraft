@@ -197,7 +197,10 @@ impl RepoTab {
         });
         ui.small(crate::i18n::text("repo-core-3626"));
         if let Some(error) = &self.symbols.error {
-            ui.colored_label(t.danger, error);
+            ui.colored_label(
+                t.danger,
+                crate::git::display_error(&crate::forge::inbox::display_error(error)),
+            );
         }
         match &self.symbols.result {
             Some(Answer::Choices(symbols)) => {

@@ -34,19 +34,14 @@ pub(super) fn show(ui: &mut Ui, diff: &ConfigDiff, acts: &mut Vec<Action>) {
                     crate::i18n::text("repo-core-2054").to_owned()
                 } else {
                     [
-                        (changed, crate::i18n::text("repo-core-1704")),
-                        (added, crate::i18n::text("repo-core-1702")),
-                        (removed, crate::i18n::text("repo-core-1703")),
-                        (moved, crate::i18n::text("repo-core-1920")),
+                        (changed, "repo-core-count-changed"),
+                        (added, "repo-core-count-added"),
+                        (removed, "repo-core-count-removed"),
+                        (moved, "repo-core-count-moved"),
                     ]
                     .iter()
                     .filter(|(n, _)| *n > 0)
-                    .map(|(n, what)| {
-                        crate::i18n::message(
-                            "repo-core-1911",
-                            &[("n", (n).into()), ("what", format!("{}", what).into())],
-                        )
-                    })
+                    .map(|(n, what)| crate::i18n::message(what, &[("count", (*n).into())]))
                     .collect::<Vec<_>>()
                     .join(" · ")
                 };

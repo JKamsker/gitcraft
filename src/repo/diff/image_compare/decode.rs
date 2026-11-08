@@ -21,7 +21,12 @@ pub struct Decoded {
 
 /// `bytes` decoded (PNG, JPEG, GIF, BMP, WebP), at full size, or why not.
 pub fn decode(bytes: &[u8]) -> Result<Picture, String> {
-    decode_picture(bytes).map_err(|e| format!("Could not read the picture: {e}"))
+    decode_picture(bytes).map_err(|e| {
+        crate::i18n::message(
+            "repo-core-picture-read-error",
+            &[("error", e.to_string().into())],
+        )
+    })
 }
 
 /// RGBA8 images can decode into the final, correctly aligned pixel allocation. Other colour

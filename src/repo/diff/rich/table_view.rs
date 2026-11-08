@@ -361,17 +361,16 @@ fn row(
         .unwrap_or_default();
     crate::a11y::a11y(&resp, egui::WidgetType::Button, &label);
     let where_ = match (r.change, r.old_line, r.new_line) {
-        (Change::Removed, Some(o), _) => format!("Go to line {o} of the file before the change"),
-        (_, _, Some(n)) => format!("Go to line {n}"),
+        (Change::Removed, Some(o), _) => {
+            crate::i18n::message("repo-core-table-old-line", &[("line", o.into())])
+        }
+        (_, _, Some(n)) => crate::i18n::message("repo-core-2039", &[("n", n.into())]),
         _ => String::new(),
     };
     let tip = if tip.is_empty() {
         where_
     } else {
-        crate::i18n::message(
-            "repo-core-2266",
-            &[("tip", tip.into()), ("where-", where_.into())],
-        )
+        format!("{tip}\n\n{where_}")
     };
     if resp.on_hover_text(tip).clicked() {
         let (old, new) = match r.change {
