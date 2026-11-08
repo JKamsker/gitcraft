@@ -67,7 +67,12 @@ pub(crate) fn show(
         layout.header_h + rows as f32 * layout.cell.y + 8.0,
     );
     let cursor_id = id.with("cursor");
-    let mut cursor: Option<(usize, usize)> = ui.data(|d| d.get_temp(cursor_id)).or(selected);
+    // Kept from an earlier frame, it may be past rows or columns since gone.
+    let mut cursor: Option<(usize, usize)> = ui
+        .data(|d| d.get_temp(cursor_id))
+        .or(selected)
+        .filter(|&(r, c)| r < rows && c < columns);
+    let selected = selected.filter(|&(r, c)| r < rows && c < columns);
     egui::ScrollArea::both()
         .id_salt(id)
         .auto_shrink([false, false])
@@ -313,5 +318,70 @@ fn paint_in(painter: &egui::Painter, rect: Rect, mark: Mark) {
         Mark::Fill(c) | Mark::Line(c, _) | Mark::Dotted(c) => {
             painter.circle_filled(rect.center(), rect.width().min(rect.height()) / 4.0, c);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// One frame of a grid of `rows` by 3, whose labels and cells refuse rows it hasn't.
+    fn frame(ctx: &egui::Context, events: Vec<egui::Event>, rows: usize) {
+        let input = egui::RawInput {
+            screen_rect: Some(Rect::from_min_size(Pos2::ZERO, vec2(800.0, 600.0))),
+            events,
+            ..Default::default()
+        };
+        ctx.run_ui(input, |ui| {
+            egui::CentralPanel::default().show(ui, |ui| {
+                show(
+                    ui,
+                    "shrinking",
+                    Layout::default(),
+                    (rows, 3),
+                    |r| {
+                        assert!(r < rows, "row label asked for row {r} of {rows}");
+                        format!("r{r}")
+                    },
+                    |c| format!("c{c}"),
+                    |r, c| {
+                        assert!(r < rows, "cell asked for row {r} of {rows}");
+                        Some(Cell {
+                            fill: Color32::RED,
+                            mark: None,
+                            tip: format!("{r},{c}"),
+                        })
+                    },
+                    None,
+                )
+            });
+        })
+        .drop_without_applying_deltas();
+    }
+
+    /// A row collapsed while the grid has the keyboard: the cursor, left on a row now gone, is
+    /// not asked for.
+    #[test]
+    fn the_cursor_doesnt_outlive_rows_that_are_gone() {
+        let ctx = egui::Context::default();
+        crate::theme::install_fonts(&ctx);
+        frame(&ctx, vec![], 8);
+        // The cell of row 6, column 0 (the panel's margin, the labels, the header).
+        let pos = pos2(8.0 + 220.0 + 8.0, 8.0 + 70.0 + 6.0 * 16.0 + 8.0);
+        let press = |pressed| egui::Event::PointerButton {
+            pos,
+            button: egui::PointerButton::Primary,
+            pressed,
+            modifiers: Default::default(),
+        };
+        frame(&ctx, vec![egui::Event::PointerMoved(pos)], 8);
+        frame(&ctx, vec![press(true)], 8);
+        frame(&ctx, vec![press(false)], 8);
+        frame(&ctx, vec![], 8);
+        assert!(
+            ctx.memory(|m| m.focused().is_some()),
+            "the grid has the keyboard"
+        );
+        frame(&ctx, vec![egui::Event::PointerMoved(pos2(700.0, 590.0))], 2);
     }
 }
