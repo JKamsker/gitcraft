@@ -33,7 +33,7 @@ impl Failure {
 }
 
 fn canonical_error(raw: &str) -> String {
-    crate::git::display_error(&crate::push_preflight::display::diagnostic(raw))
+    crate::git::display_error(raw)
 }
 
 #[derive(Clone, Debug)]
@@ -345,6 +345,42 @@ mod tests {
                 }
                 assert_eq!(retained.raw(), &raw);
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod opaque_provider_tests {
+    use super::*;
+    use crate::repo::Notice;
+
+    #[test]
+    fn generic_provider_lfs_suffixes_never_acquire_push_provenance() {
+        for raw in [
+            "provider opaque Git blob; consider Git LFS.",
+            "error: provider unknown Git blob; consider Git LFS.",
+            "provider first\nopaque Git blob; consider Git LFS.",
+        ] {
+            let source = Failure::capture(raw, None);
+            let status = Notice::operation(Status::Failed {
+                label: "Commit".into(),
+                error: source.clone(),
+            });
+            let result = Err(raw.to_owned());
+            let finished = Notice::operation_finished("repo", "Commit", &result, None);
+            let original_status = status.raw().clone();
+            let original_finished = finished.raw().clone();
+            for language in ["en-US", "de", "en-US"] {
+                crate::i18n::set_language(language);
+                assert_eq!(source.display(raw).as_deref(), Some(raw));
+                assert!(status.projected().unwrap_or_default().ends_with(raw));
+                assert_eq!(status.raw(), &original_status);
+                assert_eq!(finished.raw(), &original_finished);
+                if !raw.contains('\n') {
+                    assert!(finished.projected().unwrap_or_default().ends_with(raw));
+                }
+            }
+            assert_eq!(source.display("replacement"), None);
         }
     }
 }
