@@ -4,6 +4,53 @@ use super::native_files::{self, CommitOutcome, Policies};
 use super::*;
 pub(super) type Contents = BTreeMap<String, Option<(String, Vec<u8>)>>;
 
+// Resolve saved policy before the content no-op decision. Equal bytes can still
+// require a full-policy restore, and a legacy snapshot must not clear its metadata.
+fn intended_policy(
+    path: &str,
+    target: &Option<(String, Vec<u8>)>,
+    current: &Policies,
+    restored: Option<&Policies>,
+) -> Result<Option<native_files::Policy>, String> {
+    let policy = if target.is_some() && restored.is_some() {
+        let saved=restored.and_then(|saved|saved.get(path)).ok_or_else(||format!("{path} has no saved full access policy; legacy mode-only undo is unavailable; no file changed"))?;
+        saved.validate()?;
+        if let Some((mode, _)) = target
+            && (saved.mode() & 0o111 != 0) != (mode == "100755")
+        {
+            return Err(format!(
+                "{path} saved full policy conflicts with its Git mode; snapshot retained"
+            ));
+        }
+        Some(saved.clone())
+    } else {
+        current.get(path).map(|policy| {
+            target.as_ref().map_or_else(
+                || policy.clone(),
+                |(mode, _)| {
+                    if (policy.mode() & 0o111 != 0) == (mode == "100755") {
+                        policy.clone()
+                    } else {
+                        policy.with_git_mode(mode)
+                    }
+                },
+            )
+        })
+    };
+    if let Some(policy) = &policy {
+        policy.validate()?;
+    }
+    Ok(policy)
+}
+fn replacement_needed(
+    expected: &Option<(String, Vec<u8>)>,
+    target: &Option<(String, Vec<u8>)>,
+    current: Option<&native_files::Policy>,
+    intended: Option<&native_files::Policy>,
+) -> bool {
+    expected != target || current != intended
+}
+
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 fn native_apply(
     repo: &Path,
@@ -26,7 +73,10 @@ fn native_apply(
     for (path, target) in after {
         valid_path(path)?;
         let expected = before.get(path).ok_or("Missing before-file snapshot")?;
-        if expected == target {
+        let policy = intended_policy(path, target, policies, restored_policy)?;
+        if restored_policy.is_none()
+            && !replacement_needed(expected, target, policies.get(path), policy.as_ref())
+        {
             continue;
         }
         let (held, name) = crate::git::recovery::pinned_parent(
@@ -49,17 +99,13 @@ fn native_apply(
                 "{path} contents or full access policy changed since preview"
             ));
         }
-        let policy = restored_policy
-            .and_then(|p| p.get(path))
-            .or_else(|| old.as_ref().map(|s| &s.policy))
-            .cloned();
-        if target.is_some() && restored_policy.is_some_and(|saved| !saved.contains_key(path)) {
-            return Err(format!(
-                "{path} has no saved full access policy; legacy mode-only undo is unavailable; no file changed"
-            ));
-        }
-        if let Some(policy) = &policy {
-            policy.validate()?;
+        if !replacement_needed(
+            expected,
+            target,
+            old.as_ref().map(|snapshot| &snapshot.policy),
+            policy.as_ref(),
+        ) {
+            continue;
         }
         items.push(Replacement::prepare(
             directory,
@@ -67,7 +113,13 @@ fn native_apply(
             old,
             target.as_ref().map(|(_, bytes)| bytes.as_slice()),
             policy.as_ref(),
-            target.as_ref().map(|(mode, _)| mode.as_str()),
+            // A supplied full policy is already exact. Only a new file without
+            // policy needs the candidate's default mode adjusted to its Git mode.
+            if policy.is_none() {
+                target.as_ref().map(|(mode, _)| mode.as_str())
+            } else {
+                None
+            },
         )?);
     }
     let evidence = items
@@ -169,5 +221,49 @@ pub(super) fn apply_with_commit(
             active,
         );
         Err("Native working-folder publication is unavailable; no files changed".into())
+    }
+}
+
+#[cfg(test)]
+mod policy_noop_tests {
+    use super::*;
+    fn policy(platform: &str, gid: u32) -> native_files::Policy {
+        let mut value = serde_json::json!({"platform":platform,"mode":384,"uid":1,"gid":gid,"access":{"entries":[]}});
+        #[cfg(target_os = "macos")]
+        {
+            value["access"]["acl"] = serde_json::json!([]);
+        }
+        serde_json::from_value(value).unwrap()
+    }
+    #[test]
+    fn pure_native_equal_contents_still_require_supported_saved_policy_and_restore_policy_changes()
+    {
+        let target = Some(("100644".into(), b"same bytes".to_vec()));
+        let current: Policies = [("f".into(), policy(std::env::consts::OS, 10))].into();
+        let saved: Policies = [("f".into(), policy(std::env::consts::OS, 20))].into();
+        let desired = intended_policy("f", &target, &current, Some(&saved)).unwrap();
+        assert!(replacement_needed(
+            &target,
+            &target,
+            current.get("f"),
+            desired.as_ref()
+        ));
+        let equal = intended_policy("f", &target, &current, Some(&current)).unwrap();
+        assert!(!replacement_needed(
+            &target,
+            &target,
+            current.get("f"),
+            equal.as_ref()
+        ));
+        let missing = Policies::new();
+        assert!(
+            intended_policy("f", &target, &current, Some(&missing))
+                .unwrap_err()
+                .contains("no saved full access policy")
+        );
+        let unsupported: Policies = [("f".into(), policy("unsupported", 20))].into();
+        assert!(intended_policy("f", &target, &current, Some(&unsupported)).is_err());
+        // Metadata publication happens only after this required policy planning.
+        // No filesystem/Git adapter is called by these equal-content regressions.
     }
 }
