@@ -179,8 +179,7 @@ impl RepoTab {
                     "fetched target / root".into(),
                     commits,
                 );
-                editor.branch_guard =
-                    Some(super::operations::expect_symref("HEAD", &plan.branch));
+                editor.branch_guard = Some(super::operations::expect_symref("HEAD", &plan.branch));
                 // Autosquash matched fixups into their earlier target. Unmatched temporary
                 // subjects remain editable rather than silently dropping their changes.
                 let mut i = 0;
