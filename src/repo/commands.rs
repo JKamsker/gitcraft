@@ -287,7 +287,7 @@ impl RepoTab {
         let Some(remote) = self.default_remote() else {
             return;
         };
-        let label = format!("Create {}", hosting.forge.noun_label());
+        let label = format!("Create {}", hosting.forge.noun());
         self.busy_op = Some(label.clone());
         self.op_started = Some(Instant::now());
         // Signing in after this fails must not run some earlier operation again.

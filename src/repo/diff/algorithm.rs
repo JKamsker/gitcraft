@@ -78,7 +78,11 @@ pub(in crate::repo) fn algorithm_menu(
                 "repo-core-1561",
                 &[(
                     "label",
-                    format!("{}", current.map_or("git's default", DiffAlgorithm::label)).into(),
+                    format!(
+                        "{}",
+                        current.map_or(crate::i18n::text("repo-core-1562"), DiffAlgorithm::label)
+                    )
+                    .into(),
                 )],
             ));
     }
