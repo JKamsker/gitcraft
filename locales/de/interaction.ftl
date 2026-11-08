@@ -60,3 +60,85 @@ interaction-operation-fast-forward = { $branch } auf { $target } vorspulen
 interaction-settings-compact-tip = Spuren liegen enger beieinander und verkleinern die Graph-Spalte
 
 interaction-accounts-unnamed = Unbenanntes Profil
+
+interaction-custom-display-failed = { $name } fehlgeschlagen (Exitstatus { NUMBER($code) })
+
+interaction-custom-display-finished = { $name } abgeschlossen
+
+interaction-custom-display-index = Befehl { NUMBER($index) }
+
+interaction-custom-display-json = { $file } kann nicht gelesen werden: { $detail }
+
+interaction-custom-display-large = { $file } ist größer als { NUMBER($limit) } KiB und wird daher nicht gelesen
+
+interaction-custom-display-name = „{ $name }“
+
+interaction-custom-display-problem = { $file }: { $command }: { $problem }
+
+interaction-gerrit-amend-invalid = Ungültige Gerrit-Commit-Änderung
+
+interaction-gerrit-amend-message = Nachricht zum Ändern des Commits fehlt
+
+interaction-gerrit-ancestor = Der Zielbranch ist kein Vorfahr dieses Commits. Vor dem Push zur Prüfung abrufen und auf den Zielbranch rebasen.
+
+interaction-gerrit-choose = Ein Remote, einen abgerufenen Zielbranch und ein gültiges Thema wählen
+
+interaction-gerrit-duplicate = Zwei Commits haben dieselbe Change-Id ({ $id }); jede Änderung benötigt eine eigene
+
+interaction-gerrit-empty = Über dem Zielbranch gibt es keine Commits zur Prüfung
+
+interaction-gerrit-footer = Change-Id muss im letzten Trailer-Absatz stehen
+
+interaction-gerrit-format = Change-Id muss aus I gefolgt von 40 Hexadezimalziffern bestehen (nicht nur Nullen)
+
+interaction-gerrit-hook = { $commit }: { $reason }. Den commit-msg-Hook von Ihrem Gerrit-Server installieren und dann diesen Commit ändern, um seine Change-Id hinzuzufügen.
+
+interaction-gerrit-keep = Beim Ändern einer Gerrit-Änderung die ursprüngliche Change-Id beibehalten
+
+interaction-gerrit-merge = Merge-Commit { $commit } kann mit diesem Review-Ablauf nicht gepusht werden; zuerst die Serie rebasen
+
+interaction-gerrit-missing = Change-Id fehlt im Nachrichtenfuß
+
+interaction-gerrit-multiple = mehr als eine Change-Id im Nachrichtenfuß
+
+interaction-gerrit-one-line = Change-Id muss in eine Zeile passen
+
+interaction-gerrit-web = Ungültige gitcraft.gerritUrl: eine HTTP(S)-URL ohne Zugangsdaten, Abfrage oder Fragment verwenden. Die Webadresse des Remotes wird verwendet; Gerrit-Reviews können weiterhin eingereicht werden.
+
+interaction-preferences-bad-variable = „{ $variable }“ ist kein Variablenname: Großbuchstaben, Ziffern und _, beginnend mit einem Buchstaben
+
+interaction-preferences-built-in = ${ $variable } wird bereits von gitcraft gesetzt
+
+interaction-preferences-empty-line = Die Befehlszeile ist leer
+
+interaction-preferences-missing-name = Der Name fehlt
+
+interaction-preferences-nul = Enthält ein NUL-Zeichen
+
+interaction-preferences-reserved = ${ $variable } wird von der Shell oder Git verwendet; wähle einen anderen Namen
+
+interaction-preferences-twice = ${ $variable } wird zweimal abgefragt
+
+interaction-recipe-not-saved = Das Rezept wurde nicht gespeichert: { $problem }
+
+interaction-recipe-path = { $path }: { $reason }
+
+interaction-recipe-path-empty = leerer Pfad
+
+interaction-recipe-path-line = ein Pfad muss in einer Zeile stehen
+
+interaction-recipe-path-outside = ein Pfad darf den Worktree nicht verlassen (..)
+
+interaction-recipe-path-relative = einen Pfad innerhalb des Worktrees angeben, relativ zu dessen oberstem Ordner
+
+interaction-recipe-path-space = beginnt oder endet mit einem Leerzeichen
+
+interaction-recipe-path-whole = das ist der gesamte Worktree
+
+interaction-recipe-variable-duplicate = Variable „{ $name }“ wird zweimal gesetzt
+
+interaction-recipe-variable-line = Variable „{ $name }“: ein Wert muss in einer Zeile stehen
+
+interaction-recipe-variable-name = Variable „{ $name }“: Namen bestehen aus Buchstaben, Ziffern und _ und dürfen nicht mit einer Ziffer beginnen
+
+interaction-recipe-variable-reserved = Variable „{ $name }“: gitcraft setzt sie selbst; einen anderen Namen wählen

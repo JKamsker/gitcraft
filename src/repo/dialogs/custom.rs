@@ -189,10 +189,7 @@ fn review(ui: &mut Ui, repo: &str, file: &RepoFile) -> Outcome {
     let commands = match &file.commands {
         Ok(list) => list,
         Err(e) => {
-            ui.colored_label(
-                t.danger,
-                crate::git::display_error(&crate::forge::inbox::display_error(e)),
-            );
+            ui.colored_label(t.danger, file.display_error().unwrap_or_else(|| e.clone()));
             ui.add_space(12.0);
             return if cancel_button(ui) {
                 Outcome::Cancel
@@ -268,4 +265,43 @@ fn review(ui: &mut Ui, repo: &str, file: &RepoFile) -> Outcome {
             })
         },
     )
+}
+
+#[cfg(test)]
+mod contextual_review_tests {
+    use super::*;
+
+    #[test]
+    fn actual_trust_review_repaints_parser_errors_and_preserves_unreadable_lookalikes() {
+        let parsed = RepoFile::new(r#"{"commands":[{"name":"","command":"true"}]}"#.to_owned());
+        let raw = parsed.commands.as_ref().err().cloned().unwrap_or_default();
+        assert_eq!(raw, ".gitcraft/commands.json: Command 1: It has no name");
+        let unreadable = RepoFile::unreadable(raw.clone());
+        for (file, parser_origin) in [(parsed, true), (unreadable, false)] {
+            let original = file.clone();
+            let ctx = egui::Context::default();
+            for locale in ["en-US", "de", "en-US"] {
+                crate::i18n::set_language(locale);
+                let shown =
+                    crate::repo::push_preflight::core_guard_paint_tests::paint(&ctx, |ui| {
+                        assert!(matches!(
+                            review(ui, "opaque/repository, on/auf/1234", &file),
+                            Outcome::Open
+                        ));
+                    });
+                let expected = if locale == "de" && parser_origin {
+                    ".gitcraft/commands.json: Befehl 1: Der Name fehlt"
+                } else {
+                    raw.as_str()
+                };
+                assert!(shown.contains(expected), "{shown}");
+                if locale == "de" && parser_origin {
+                    assert!(!shown.contains(&raw), "{shown}");
+                }
+                assert_eq!(file, original);
+                assert_eq!(file.commands.as_ref().err(), Some(&raw));
+            }
+        }
+        crate::i18n::set_language("en-US");
+    }
 }

@@ -11,7 +11,9 @@ mod tests;
 
 use serde::{Deserialize, Serialize};
 
-pub use program::{Scope, captured_program, terminal_program, toast_text, variables};
+pub use program::{
+    Scope, captured_program, display_toast_text, terminal_program, toast_text, variables,
+};
 pub use repo_file::{
     FILE as REPO_FILE, MAX_BYTES as REPO_FILE_MAX, RepoFile, TrustedFile, is_trusted, trust,
 };
@@ -158,6 +160,57 @@ pub const BUILT_IN: [(&str, &str); 6] = [
     ),
     ("REPO", "the repository's folder, on its machine"),
 ];
+
+/// Localize only our finite validation messages. Raw validation/error identities stay unchanged.
+pub fn display_problem(raw: &str) -> String {
+    if raw == "It has no name" {
+        return crate::i18n::text("interaction-preferences-missing-name").to_owned();
+    }
+    if raw == "Its command line is empty" {
+        return crate::i18n::text("interaction-preferences-empty-line").to_owned();
+    }
+    if raw == "It contains a NUL character" {
+        return crate::i18n::text("interaction-preferences-nul").to_owned();
+    }
+    if let Some(variable) = raw.strip_prefix('“').and_then(|s| {
+        s.strip_suffix(
+            "” isn't a variable name: capital letters, digits and _, starting with a letter",
+        )
+    }) {
+        return crate::i18n::message(
+            "interaction-preferences-bad-variable",
+            &[("variable", variable.into())],
+        );
+    }
+    if let Some(variable) = raw
+        .strip_prefix('$')
+        .and_then(|s| s.strip_suffix(" is already set by gitcraft"))
+    {
+        return crate::i18n::message(
+            "interaction-preferences-built-in",
+            &[("variable", variable.into())],
+        );
+    }
+    if let Some(variable) = raw
+        .strip_prefix('$')
+        .and_then(|s| s.strip_suffix(" is used by the shell or git; pick another name"))
+    {
+        return crate::i18n::message(
+            "interaction-preferences-reserved",
+            &[("variable", variable.into())],
+        );
+    }
+    if let Some(variable) = raw
+        .strip_prefix('$')
+        .and_then(|s| s.strip_suffix(" is asked for twice"))
+    {
+        return crate::i18n::message(
+            "interaction-preferences-twice",
+            &[("variable", variable.into())],
+        );
+    }
+    raw.to_owned()
+}
 
 /// Variables a prompt can't be given: those the shell, git or gitcraft rely on (`PATH`,
 /// `IFS`, `HOME`…), which an answer would change for the whole command.

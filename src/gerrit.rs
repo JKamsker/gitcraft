@@ -5,6 +5,9 @@ use std::path::Path;
 
 use crate::git::{self, Remote};
 
+mod display;
+pub(crate) use display::{error as display_error, stack_error as display_stack_error};
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Server {
     pub remote: String,
