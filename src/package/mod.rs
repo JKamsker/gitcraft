@@ -3,6 +3,7 @@
 //! from the version already published.
 
 mod archive;
+pub(crate) mod display;
 pub(crate) mod check;
 mod run;
 #[cfg(test)]
