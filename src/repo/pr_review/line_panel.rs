@@ -393,7 +393,7 @@ pub(in crate::repo) fn paint_gutter_mark(
         painter.text(
             center,
             Align2::CENTER_CENTER,
-            count.to_string(),
+            crate::i18n::number(count),
             theme::medium(9.5),
             t.accent_text,
         );

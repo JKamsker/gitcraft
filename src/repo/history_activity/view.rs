@@ -259,7 +259,7 @@ fn calendar(ui: &mut egui::Ui, view: &mut Activity, summary: &Summary, t: &Token
         {
             month = month.shift_month(-1);
         }
-        ui.label(format!("{:04}-{:02}", month.year, month.month));
+        ui.label(month_heading(month));
         if ui
             .button(crate::i18n::text(
                 "repo-workflows-history_activity-calendar-74e53211",
@@ -382,7 +382,7 @@ fn calendar(ui: &mut egui::Ui, view: &mut Activity, summary: &Summary, t: &Token
                         .fill(fill)
                         .sense(Sense::click_and_drag()),
                     )
-                    .on_hover_text(date.to_string());
+                    .on_hover_text(crate::i18n::date_iso(&date.to_string()));
                 if response.clicked() {
                     picked = Some((date, date));
                 }
@@ -446,10 +446,14 @@ fn authors(ui: &mut egui::Ui, view: &mut Activity, summary: &Summary, t: &Tokens
                         {
                             view.author = Some(identity);
                         }
-                        ui.label(author.commits.to_string());
-                        ui.label(author.files.to_string());
-                        ui.label(author.days.to_string());
-                        ui.label(format!("{} – {}", author.first, author.last));
+                        ui.label(crate::i18n::number(author.commits));
+                        ui.label(crate::i18n::number(author.files));
+                        ui.label(crate::i18n::number(author.days));
+                        ui.label(format!(
+                            "{} – {}",
+                            crate::i18n::date_iso(&author.first.to_string()),
+                            crate::i18n::date_iso(&author.last.to_string())
+                        ));
                         ui.end_row();
                     }
                 });
@@ -490,7 +494,7 @@ fn commits(ui: &mut egui::Ui, view: &Activity, summary: &Summary, acts: &mut Vec
     for commit in &selected[range] {
         let label = format!(
             "{}  {}  {} · {}",
-            commit.day(view.query.clock),
+            crate::i18n::date_iso(&commit.day(view.query.clock).to_string()),
             commit.hash.get(..8).unwrap_or(&commit.hash),
             commit.subject,
             commit.name
@@ -596,6 +600,38 @@ mod fluent_calendar_tests {
             assert_eq!(
                 harness.state().requested_range().map(|q| q.from),
                 Ok(Some(date))
+            );
+        }
+        crate::i18n::set_language("en-US");
+    }
+}
+
+fn month_heading(month: Day) -> String {
+    crate::i18n::message(
+        "repo-workflows-calendar-month-heading",
+        &[
+            ("month", month.month.into()),
+            ("year", format!("{:04}", month.year).into()),
+        ],
+    )
+}
+#[cfg(test)]
+mod fluent_date_paint_tests {
+    use super::*;
+    #[test]
+    fn fluent_partition_actual_month_heading_preserves_iso_calendar_identity() {
+        let day = Day {
+            year: 2026,
+            month: 3,
+            day: 12,
+        };
+        for (lang, expected) in [("en-US", "March 2026"), ("de", "März 2026")] {
+            crate::i18n::set_language(lang);
+            assert_eq!(month_heading(day), expected);
+            assert_eq!(day.to_string(), "2026-03-12");
+            assert_eq!(
+                crate::i18n::number(1234usize),
+                if lang == "de" { "1.234" } else { "1,234" }
             );
         }
         crate::i18n::set_language("en-US");

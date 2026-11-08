@@ -199,7 +199,7 @@ fn grid(ui: &mut Ui, view: &Bakeoff, cmp: &Comparison, t: &Tokens, act: &mut Opt
                     .color(t.text_dim),
             );
             for c in &cmp.attempts {
-                ui.label(c.files.len().to_string());
+                ui.label(crate::i18n::number(c.files.len()));
             }
             ui.end_row();
             ui.label(

@@ -141,7 +141,7 @@ fn paint_cell(ui: &mut Ui, rect: Rect, cell: &Cell, id: egui::Id) -> egui::Respo
         Ok(pair) if pair.clean() => (t.success.gamma_multiply(0.18), String::new(), t.success),
         Ok(pair) => (
             t.danger.gamma_multiply(0.25),
-            pair.files.len().to_string(),
+            crate::i18n::number(pair.files.len()),
             readable(&t, t.danger),
         ),
         Err(_) => (

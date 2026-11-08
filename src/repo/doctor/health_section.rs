@@ -69,7 +69,7 @@ fn size_card(ui: &mut Ui, h: &Health) {
                         row(
                             ui,
                             crate::i18n::text("repo-workflows-doctor-size-card-d09648c6"),
-                            n.to_string(),
+                            crate::i18n::number(n),
                         );
                     }
                     row(
@@ -306,6 +306,7 @@ fn history_card(ui: &mut Ui, h: &Health, loading: &Loading) {
 }
 
 /// `n` with thin groups of three digits (100 000).
+#[cfg(test)]
 pub(super) fn group(n: u64) -> String {
     let digits = n.to_string();
     let mut out = String::new();
