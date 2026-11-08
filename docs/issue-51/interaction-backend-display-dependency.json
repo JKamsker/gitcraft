@@ -1,0 +1,84 @@
+{
+  "canonical_source_commit": "e88e0383d48e67b28be959c0b7a592d6aabdd3d2",
+  "scope": "Exact source blocks and six exact paired catalog entries only; canonical backend files win final integration. No backend control/argv/process policy changes.",
+  "blocks": [
+    {
+      "path": "src/forge/mod.rs",
+      "block_start": "    /// Localized presentation; `noun()` retains its existing protocol identity.",
+      "block_end_exclusive": "    /// The heading of the sidebar",
+      "sha256": "9b9ecd47adfbd6cd6b578d0c9c68ea262f93f2ad102a4a4a6021c96744ed8243"
+    },
+    {
+      "path": "src/forge/inbox.rs",
+      "block_start": "impl Reason {",
+      "block_end_exclusive": "/// How many comments by others came",
+      "sha256": "cdb4b1a2b83591326ace7fa1f4a25ab3689a75093fa7cd429123d3447a9e66ff"
+    },
+    {
+      "path": "src/forge/inbox.rs",
+      "block_start": "/// Resolve application-owned protocol errors only when presenting them.",
+      "block_end_exclusive": "/// The checks of GitHub",
+      "sha256": "c1775c525f31aa3a203f974279c3151319acdbfb7f00c29a042f0c3ef9e5546d"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "message": "backend-inbox-no-login",
+      "sha256": "aafb0f9c76f9475d8cd6f7f34b17c3d20ae55817b51184147d258a78ddca9ddb"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "message": "backend-noun-merge-request",
+      "sha256": "06944e35306bcb783459ec1df3b613678eab0ed599a2dfd120d111bbf9dbf2e9"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "message": "backend-noun-pull-request",
+      "sha256": "5466c7276b33987c7427547ea6faab43725a4aa58cde3ca51082c837a4c2625c"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "message": "backend-review-requested-4e499f",
+      "sha256": "85a0e0b24f256f0dcc31597522b21d7ee37bf7fb710d332eb36b93a72935c870"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "message": "backend-checks-failing-3a2f05",
+      "sha256": "d68499929225d907258e2664c7e7be8b50c9e94c1fae270f202238c437db80ec"
+    },
+    {
+      "path": "locales/en-US/backend.ftl",
+      "message": "backend-inbox-new-comments",
+      "sha256": "eb49b4341330c6ac7a80c798cd85165d18ad434a96571e5af4203213331878f3"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "message": "backend-inbox-no-login",
+      "sha256": "69b9d2b860413d69343718c51842d4955daf2cee2d6ce19082e41d70c92bf8e9"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "message": "backend-noun-merge-request",
+      "sha256": "3353544f9fdd936dc306468f11c0038cdaa5c9aaf942a7ded55c144047bdcdf3"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "message": "backend-noun-pull-request",
+      "sha256": "e7b19dd13652555de70a5207678dbb5394481e43c83b1f470ede5ae2cba8b568"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "message": "backend-review-requested-4e499f",
+      "sha256": "81af22fbc1f7f7842df6e07e35b44a017cfe7988b50ebfb0c2f5140fa5a28862"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "message": "backend-checks-failing-3a2f05",
+      "sha256": "35ea07bf6e1b03bf75027f8149d322376956886ad9e1c40d5f31e85a6a1f691e"
+    },
+    {
+      "path": "locales/de/backend.ftl",
+      "message": "backend-inbox-new-comments",
+      "sha256": "b5d7a4be251f1e43193da52b6115d1496491654fd5236907fcb04901cf4bb6fe"
+    }
+  ]
+}

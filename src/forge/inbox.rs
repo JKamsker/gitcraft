@@ -78,10 +78,13 @@ pub enum Reason {
 impl Reason {
     pub fn label(self) -> String {
         match self {
-            Reason::ReviewRequested => "review requested".to_owned(),
-            Reason::ChecksFailing => "checks failing".to_owned(),
-            Reason::NewComments(1) => "1 new comment".to_owned(),
-            Reason::NewComments(n) => format!("{n} new comments"),
+            Reason::ReviewRequested => {
+                crate::i18n::text("backend-review-requested-4e499f").to_owned()
+            }
+            Reason::ChecksFailing => crate::i18n::text("backend-checks-failing-3a2f05").to_owned(),
+            Reason::NewComments(n) => {
+                crate::i18n::message("backend-inbox-new-comments", &[("count", n.into())])
+            }
         }
     }
 }
@@ -136,6 +139,21 @@ pub fn gives_up(err: &str) -> bool {
 /// repositories only read from, so it's said quietly.
 pub fn is_no_login(err: &str) -> bool {
     err.starts_with("no ") && err.contains(" login known for ")
+}
+
+/// Resolve application-owned protocol errors only when presenting them. The original
+/// error remains available to retry/login control flow through `gives_up`/`is_no_login`.
+pub fn display_error(error: &str) -> String {
+    if let Some(rest) = error.strip_prefix("no ")
+        && let Some((forge, rest)) = rest.split_once(" login known for ")
+        && let Some((host, _)) = rest.split_once(": add one with `tea login add`")
+    {
+        return crate::i18n::message(
+            "backend-inbox-no-login",
+            &[("forge", forge.into()), ("host", host.into())],
+        );
+    }
+    error.to_owned()
 }
 
 /// The checks of GitHub's `statusCheckRollup`: check runs (`status`, `conclusion`) and commit
