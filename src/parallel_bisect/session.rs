@@ -232,8 +232,8 @@ fn prepared(
     out.step("Removing the worktrees…");
     if let Err(e) = ws.close() {
         out.send(Event::Warning(format!(
-            "The worktrees on {label} couldn't all be removed ({e}); the next parallel bisect \
-             there removes them."
+            "The worktrees on {label} couldn't all be removed ({e}); recovery evidence was retained. \
+             Resolve the reported ownership or removal failure before trying again."
         )));
     }
     result

@@ -4,7 +4,7 @@
 //! holds the worktrees, the test logs and what says who is using it. Outside the repository, so
 //! that what the tests build there isn't seen by the tab's watcher. Everything the bisect makes
 //! is in there (and under `refs/gitcraft-bisect/`), so taking it away is all the cleaning up
-//! there is: when the bisect ends however it ends, and when the next one starts after a crash
+//! there is: when the bisect ends however it ends, and when an authenticated recovery after a crash
 //! (or the tab opens).
 
 use std::path::{Path, PathBuf};
@@ -385,17 +385,53 @@ for f in "$b"/*.owner; do
   if [ "$value" != "$receipt" ]; then echo 'gitcraft: owner record replaced; workspace preserved' >&2; exit 1; fi
 done
 if IFS= read -r extra && [ -n "$extra" ]; then echo 'gitcraft: owner record missing; workspace preserved' >&2; exit 1; fi
-git worktree list --porcelain | sed -n 's/^worktree //p' | while IFS= read -r w; do
-  case $w in "$b"/*) git worktree remove --force --force "$w" >/dev/null 2>&1;; esac
-done
-rm -rf "$b"
-c=$(git rev-parse --git-common-dir) && for g in "$c"/worktrees/*/gitdir; do
+fail() { printf 'gitcraft: %s; endpoint artifacts retained\n' "$1" >&2; exit 1; }
+worktrees=$(git -c core.quotePath=false worktree list --porcelain) || fail 'cannot list worktrees'
+while IFS= read -r line; do
+  case $line in 'worktree "'*) fail 'quoted worktree path requires manual recovery';; esac
+done <<GITCRAFT_WORKTREES
+$worktrees
+GITCRAFT_WORKTREES
+while IFS= read -r line; do
+  case $line in 'worktree '*) w=${line#worktree }; case $w in "$b"/*)
+    git worktree remove --force --force "$w" >/dev/null || fail "cannot remove worktree $w";; esac;; esac
+done <<GITCRAFT_WORKTREES
+$worktrees
+GITCRAFT_WORKTREES
+remaining=$(git -c core.quotePath=false worktree list --porcelain) || fail 'cannot verify remaining worktrees'
+while IFS= read -r line; do
+  case $line in "worktree $b/"*) fail 'a bisect worktree remains registered';; esac
+done <<GITCRAFT_WORKTREES
+$remaining
+GITCRAFT_WORKTREES
+c=$(git rev-parse --git-common-dir) || fail 'cannot resolve worktree metadata'
+for g in "$c"/worktrees/*/gitdir; do
   [ -f "$g" ] || continue
-  case $(cat "$g") in "$b"/*) rm -rf "${g%/gitdir}";; esac
+  target=$(cat "$g") || fail 'cannot read worktree metadata'
+  case $target in "$b"/*)
+    rm -rf -- "${g%/gitdir}" || fail 'cannot remove bisect worktree metadata'
+    [ ! -e "${g%/gitdir}" ] && [ ! -L "${g%/gitdir}" ] || fail 'worktree metadata remains';;
+  esac
 done
-git for-each-ref --format='%(refname)' refs/gitcraft-bisect/ | while IFS= read -r r; do
-  case $r in refs/gitcraft-bisect/send-"$ours"-*) ;; *) git update-ref -d "$r";; esac
-done
+refs=$(git for-each-ref --format='%(refname) %(objectname)' refs/gitcraft-bisect/) || fail 'cannot list bisect refs'
+while IFS=' ' read -r r expected; do
+  [ -n "$r" ] || continue
+  case $r in refs/gitcraft-bisect/send-"$ours"-*) ;; *)
+    git update-ref -d "$r" "$expected" || fail "cannot remove unchanged ref $r";; esac
+done <<GITCRAFT_REFS
+$refs
+GITCRAFT_REFS
+remaining=$(git for-each-ref --format='%(refname)' refs/gitcraft-bisect/) || fail 'cannot verify remaining refs'
+while IFS= read -r r; do
+  [ -n "$r" ] || continue
+  case $r in refs/gitcraft-bisect/send-"$ours"-*) ;; *) fail "bisect ref remains: $r";; esac
+done <<GITCRAFT_REFS
+$remaining
+GITCRAFT_REFS
+[ ! -L "$b" ] || fail 'workspace became a symbolic link'
+rm -rf -- "$b" || fail "cannot remove workspace $b"
+[ ! -e "$b" ] && [ ! -L "$b" ] || fail 'workspace remains after removal'
+
 true"#;
 
 /// Claims `base` for this process's bisect, refusing one already claimed (another tab).
