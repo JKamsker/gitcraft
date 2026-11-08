@@ -1,0 +1,101 @@
+{
+  "application_commit": "e2c6bb0f211144033b58621e18804f9d81dfc066",
+  "state": "all final local gates passed; final GitHub CI pending",
+  "logs": [
+    {
+      "path": "acl-index.log.gz",
+      "sha256_raw": "dbe6e4c350a5ea6818314c8c97d5d7f37804b57df4288cc1057739c5a98f487c",
+      "sha256_archive": "7a7eedf581d0cdf3744b74fcdc1a8c706d268134898ddd3b9d7b79b0d2e7a33e"
+    },
+    {
+      "path": "acl-save.log.gz",
+      "sha256_raw": "b65c987664fac5de44e7be8dd71f0d6d7b4fb050c8a2f31410c6e4172e5c1585",
+      "sha256_archive": "2ee8dc64060f03116d8deb8aec38841a874033bee53d96053ae7303e5200b580"
+    },
+    {
+      "path": "build-tests.log.gz",
+      "sha256_raw": "eb494f56756927dcb3e7b8541a6d8c0b7e689ce4143d7d7e1b6725a9ea202e80",
+      "sha256_archive": "0381f58291944ccbf786accaa7bc325eb153bf1bb80df0efdd60c11f0f021711"
+    },
+    {
+      "path": "check.log.gz",
+      "sha256_raw": "5d4255060be028f8a29dac052e6608a3e83fa6c3877324b0472b99e49987ded2",
+      "sha256_archive": "67460d669c3dcf86e876e740f96e680def150a511f8ae516773f928b446e7b26"
+    },
+    {
+      "path": "clippy.log.gz",
+      "sha256_raw": "d37c96428a772f496284c5ffac7568a395fa998b0228936b88b004c64889eda9",
+      "sha256_archive": "95a19080080d877a94e66c69dbb10e9f1cee6d656d3c7a05fb0f25c0fbf2e33e"
+    },
+    {
+      "path": "doc-tests.log.gz",
+      "sha256_raw": "f2d0dfb87011c6e02aa43ada3a998d6e45201e31863feed259620a169aeb3515",
+      "sha256_archive": "1b0a79cb00ffb17fab67d0dbf436421c634647c2d17d5f764bab7f3e80e7dbb0"
+    },
+    {
+      "path": "fmt.log.gz",
+      "sha256_raw": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sha256_archive": "f61f27bd17de546264aa58f40f3aafaac7021e0ef69c17f6b1b4cd7664a037ec"
+    },
+    {
+      "path": "git250-reftable-refusal.log.gz",
+      "sha256_raw": "9f38354abe2f88bec52101098f45de68d8cc28627d3d4ec2405e6cfaedbdf1b2",
+      "sha256_archive": "6941d49e6b6c9b83ca51832d87995c17388b80693934e08be4ad44e911b48161"
+    },
+    {
+      "path": "recording-outcomes.log.gz",
+      "sha256_raw": "e0e0f3cd4f0d25f7887b432006a7cfb576c5aa8611eea16955f02160e061440d",
+      "sha256_archive": "cb2721e5b78598c9ad4c52a11bac733466798b1df9bdc8353b2825b979be9d57"
+    },
+    {
+      "path": "recording-resolver.log.gz",
+      "sha256_raw": "77272adb88978064493b76c99ea6e98f15426da113c01c5f987f0c96304ec3d6",
+      "sha256_archive": "6082b7819358f28616a96d51d9e31dcb555d9bf7fb996b7ccd48a1615f37ee98"
+    },
+    {
+      "path": "results.json.gz",
+      "sha256_raw": "4d7e9c4970f7c5de4b219af8c78528515cd7c8a3cf85c2a0d49ff3474928d738",
+      "sha256_archive": "437696fec2499010a10d25425255d2371bc215a2d6ecf30e6a4d457fa2fa48de"
+    },
+    {
+      "path": "runtime-checkpoint_cli-checkpoint_cli.log.gz",
+      "sha256_raw": "ee598fb971a7b6ecb81b45d803db38a67d71c429b09fe9991c3159aab2b73230",
+      "sha256_archive": "299427f55d4b42d26683353fde2dbbd4ddc715e5b51691bb424044d3768e2472"
+    },
+    {
+      "path": "runtime-gitcraft-lib.log.gz",
+      "sha256_raw": "acf12171c6fcde12b45bd2e7d20935ad53ab1cd4177a00ec6416baa6d557b22b",
+      "sha256_archive": "13002a5ab67d291a10104f6571acd71bbf866354175f56d4b4867587db7d1e46"
+    },
+    {
+      "path": "runtime-gitcraft-main.log.gz",
+      "sha256_raw": "df166913f47ff1f04202cae9b31df67ed272d692d99a0023a8117dc3029100dd",
+      "sha256_archive": "1082f535930d72fb065d9bd3b354598d85e5b222efdca05948f836b85a21e06a"
+    },
+    {
+      "path": "runtime-gitcraft_os-lib.log.gz",
+      "sha256_raw": "5b6fd6e103b7c7ca02658cb4a2232b48b7bd2af84efd80c9541ca144ad7cd1a6",
+      "sha256_archive": "12f195eb9649d308512fbc2cdad754d5f7829a0bb739da377c7ed0489e5fa77e"
+    },
+    {
+      "path": "runtime-mcp_stdio-mcp_stdio.log.gz",
+      "sha256_raw": "93ae96ee2608bb7162c0b58a7ab07e2596cd78b96d97c186617d63ac9a28f8bd",
+      "sha256_archive": "e6e6ccf4a1b8716a8dcdc39763384a74aeadf997f93749e8e4b728c9c63e9a75"
+    },
+    {
+      "path": "runtime-standalone_cli-standalone_cli.log.gz",
+      "sha256_raw": "39919ec76abb18e3b8175f781cd703640cbd87b673fd5df707f94d1406be5364",
+      "sha256_archive": "1de0754b40ea2a5d6c58f6f47d4d3046119aa7279325fffce6b8d51eadbccccd"
+    },
+    {
+      "path": "gitcraft-run-final.py.gz",
+      "sha256_raw": "6ecfd52605a601729bf56c38263fe14074c607eb39be99847b7edfdb2149b4d0",
+      "sha256_archive": "c1af62d78225ec8c83d3d62a88200167e21addb4b7bb759966abf0aede6d4416"
+    },
+    {
+      "path": "prior-a710a8f8-library-failures.log.gz",
+      "sha256_raw": "6430caf6477c340bf8e4cd38a654cc35ffe91d5ec3f771906dc3c617268bd92a",
+      "sha256_archive": "966353d876d9917172ed33c8b02455b207a5c4b33f0a43646a1845018dee0354"
+    }
+  ]
+}
