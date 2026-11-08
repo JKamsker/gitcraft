@@ -1,0 +1,8 @@
+{
+  "candidate": "12e7641c917d92482788f5f8a3449ffca425f83f",
+  "verdict": "SCOPED PASS four R1 implementation findings",
+  "evidence": "static plus independent pure/recording/manual-callback harness; no actual act/Docker/Git fixture",
+  "qualified_lint": "FAIL imported clone collapsible_if at this candidate; extra allowance only diagnostic PASS",
+  "runtime_hold": "UNCHANGED",
+  "whole_batch": "not complete; five integration ideas remain"
+}

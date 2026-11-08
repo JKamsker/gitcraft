@@ -1,0 +1,66 @@
+[
+  {
+    "source": "/tmp/gitcraft-51-act-review-r2.md",
+    "archive": "review.md",
+    "sha256": "e3ae35b666ef3f769ec3351a9ddf643b95d10b1cc0cc95b828f1f53ad7693a51"
+  },
+  {
+    "source": "/tmp/gitcraft-51-act-review-r2-evidence.json",
+    "archive": "manifest.json",
+    "sha256": "690815b8d98ab261d07d470b73f53a1537b6ab5e7341fe5e3ce14c494eacecb8"
+  },
+  {
+    "source": "/tmp/gitcraft-51-act-r1-corrected-12e7641c-0.log",
+    "archive": "00-gitcraft-51-act-r1-corrected-12e7641c-0.log.gz",
+    "sha256": "e759df79dfab5e3c21e59cc697091333fab91e3af9c95d6914736d8555329e24",
+    "compressed_sha256": "b6be94377fda2d3bd063288d77b3e838cbec6f02c8299eb6eb6d7dd31fafc76d"
+  },
+  {
+    "source": "/tmp/gitcraft-51-act-r1-corrected-12e7641c-1.log",
+    "archive": "01-gitcraft-51-act-r1-corrected-12e7641c-1.log.gz",
+    "sha256": "ac02256593777932da359ec18e387cdb2395dcbd3945b56b2916eeb3e16d7dcd",
+    "compressed_sha256": "d0016d5f30deefe16daf7bb69e40cce0bce648bbb3f68106a5c99f5a9e4c5c6c"
+  },
+  {
+    "source": "/tmp/gitcraft-51-act-r1-corrected-12e7641c-2.log",
+    "archive": "02-gitcraft-51-act-r1-corrected-12e7641c-2.log.gz",
+    "sha256": "9d2e351ae5d2e4f979ec066dd8081ceb372b1357c425a8b8998adfe76795d46c",
+    "compressed_sha256": "ca5429f2551ddacc1e594859d1ad52527edba83ec63f08d191f6ff3fc83cda8a"
+  },
+  {
+    "source": "/tmp/gitcraft-51-act-r2-static-checks.log",
+    "archive": "03-gitcraft-51-act-r2-static-checks.log.gz",
+    "sha256": "1de2401879309626f1fac42620fcb7dfac6241aabe6d452a3a4e8137aa3ba267",
+    "compressed_sha256": "c0f7169467dec902f36bed5319b53732881252c0d67a7dec1d9e1f53ff905f09"
+  },
+  {
+    "source": "/tmp/gitcraft-51-batch-b-act-r1-response.md",
+    "archive": "04-gitcraft-51-batch-b-act-r1-response.md.gz",
+    "sha256": "212fde16a9f9446723e1b661afde65e5effb9b229cf9085f720e46a98dcdfb76",
+    "compressed_sha256": "1f5bb88c424add493a24b9bb77321dc46d55cf27c85b962104263fc03c845a4b"
+  },
+  {
+    "source": "/tmp/gitcraft-act-r2-harness/Cargo.lock",
+    "archive": "05-Cargo.lock.gz",
+    "sha256": "977458a129bd8ca3be4b0cd68e852660ee3dd9649c1b3570fc3a5f8750c72127",
+    "compressed_sha256": "3cc6ac4d64be64c30a91c32768ef0979f7e0c25ce226a2c784c4f8a2dac9c283"
+  },
+  {
+    "source": "/tmp/gitcraft-act-r2-harness/Cargo.toml",
+    "archive": "06-Cargo.toml.gz",
+    "sha256": "3c70c0690c75a63d9fb7d8e3010ff17dc1f17f59a3f64c0ee4bdbb685a4cfea0",
+    "compressed_sha256": "debb9522c0a8c5624e161f175925d53c5ff3bb2e049898701023282dbb43231f"
+  },
+  {
+    "source": "/tmp/gitcraft-act-r2-harness/src/main.rs",
+    "archive": "07-main.rs.gz",
+    "sha256": "e576ec76ac8983c9c7b4c7d09783b6e43011e267b856e0e3976facd0ea905f10",
+    "compressed_sha256": "dbc5b112034d78b8d60ad26bc403464d879843b210fa5714f4fa7ea6b2d68134"
+  },
+  {
+    "source": "/tmp/gitcraft-act-r2-harness.log",
+    "archive": "08-gitcraft-act-r2-harness.log.gz",
+    "sha256": "f70baa0eeeaec7eeb0cf61b1d92a2c4ff0b4bafafb60967ae95179f8a3c4dce0",
+    "compressed_sha256": "f2609813d938f5fe3804436c7fd26f01e76bc29adf69c3abaaf49d361caea1b1"
+  }
+]
