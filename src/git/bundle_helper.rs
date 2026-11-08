@@ -64,6 +64,18 @@ fn run(args: Vec<OsString>) -> Result<i32, String> {
     // Establish the kernel limit before reading input or starting Git. This call never
     // occurs in the GUI; failure has no fallback that opens the incoming pack.
     let _resources = gitcraft_os::BundleResources::install()?;
+    if program == "--retire-owned-keep" {
+        let [hash, message] = rest else {
+            return Err("invalid keep retirement arguments".into());
+        };
+        gitcraft_os::retire_bundle_keep(
+            std::path::Path::new(alternate),
+            hash.to_str().ok_or("invalid keep hash")?,
+            message.to_str().ok_or("invalid keep message")?,
+        )
+        .map_err(|e| e.to_string())?;
+        return Ok(0);
+    }
     let mut command = Command::new(program);
     configure(&mut command, alternate, std::env::vars_os());
     command.args(rest);
@@ -126,6 +138,23 @@ env={k:v for k,v in os.environ.items() if not k.upper().startswith('GIT_')}
 env.update(GIT_CONFIG_NOSYSTEM='1',GIT_CONFIG_GLOBAL='/dev/null',GIT_CONFIG_SYSTEM='/dev/null',GIT_NO_REPLACE_OBJECTS='1',GIT_NO_LAZY_FETCH='1',GIT_TERMINAL_PROMPT='0')
 if alternate: env['GIT_ALTERNATE_OBJECT_DIRECTORIES']=alternate
 os.execvpe('git',['git']+sys.argv[2:],env)
+"#;
+
+/// Narrow post-publication cleanup, run through the same actual-machine fenced owner.
+/// No glob, scan, PID, or caller-chosen filename; a mismatching marker is retained.
+pub(crate) const RETIRE_KEEP_REMOTE: &str = r#"import os,stat,sys
+common,h,msg=sys.argv[1:]
+hexes='0123456789abcdef';prefix='gitcraft-bundle-keep-v1-'
+if len(h) not in (40,64) or any(c not in hexes for c in h) or not msg.startswith(prefix) or len(msg)!=len(prefix)+32 or any(c not in hexes for c in msg[len(prefix):]): raise RuntimeError('invalid keep ownership')
+d=os.open(common+'/objects/pack',os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
+name='pack-'+h+'.keep'
+f=os.open(name,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK,dir_fd=d)
+s=os.fstat(f)
+if not stat.S_ISREG(s.st_mode) or s.st_nlink!=1 or s.st_uid!=os.geteuid() or os.read(f,len(msg)+2)!=(msg+'\n').encode(): raise RuntimeError('keep ownership changed; retained')
+current=os.stat(name,dir_fd=d,follow_symlinks=False)
+if (current.st_dev,current.st_ino)!=(s.st_dev,s.st_ino): raise RuntimeError('keep identity changed; retained')
+os.unlink(name,dir_fd=d)
+os.close(f);os.close(d)
 "#;
 
 #[cfg(test)]

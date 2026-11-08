@@ -77,6 +77,39 @@ enum Store {
 trait Backend {
     fn git(&mut self, store: Store, args: &[&str], input: Vec<u8>) -> Result<Vec<u8>, String>;
     fn unchanged(&mut self) -> Result<(), String>;
+    fn keep_message(&mut self) -> Result<String, String>;
+    fn retire_keep(&mut self, keep: &Keep) -> Result<(), String>;
+}
+struct Keep {
+    hash: String,
+    message: String,
+}
+fn created_keep(output: &[u8], width: usize, message: String) -> Result<Keep, String> {
+    let text = std::str::from_utf8(output)
+        .map_err(|_| "Unconfirmed pack keep response; protection retained")?;
+    let (kind, hash) = text
+        .strip_suffix('\n')
+        .and_then(|s| s.split_once('\t'))
+        .ok_or("Unconfirmed pack keep response; protection retained")?;
+    if hash.len() != width
+        || !hash
+            .bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+    {
+        return Err("Unconfirmed pack hash; protection retained".into());
+    }
+    match kind {
+        "keep" => Ok(Keep {
+            hash: hash.into(),
+            message,
+        }),
+        // Git reports `pack` if --keep found an existing marker. Its owner could
+        // retire it during our transaction: neither borrow it nor remove it.
+        "pack" => Err(format!(
+            "This pack already has another keep marker (pack-{hash}.keep); it was left untouched and no refs were published. Inspect its owner/recovery evidence before retrying."
+        )),
+        _ => Err("Unconfirmed pack keep response; protection retained".into()),
+    }
 }
 fn pipeline(
     backend: &mut impl Backend,
@@ -141,20 +174,39 @@ fn pipeline(
     }
     // Reinstall the exact held pack under the same enforced memory limit. No Git URL,
     // transport, temporary source ref, force update or FETCH_HEAD is involved.
-    backend.git(Store::Destination, &index, pack.to_vec())?;
-    require_objects(backend, Store::Destination, prerequisites, true)?;
-    require_objects(backend, Store::Destination, refs, false)?;
-    backend.unchanged()?;
-    let mut transaction = String::from("start\n");
-    for r in mapped {
-        transaction.push_str(&format!("create {} {}\n", r.name, r.oid));
-    }
-    transaction.push_str("prepare\ncommit\n");
-    backend.git(
-        Store::Destination,
-        &["update-ref", "--no-deref", "--stdin"],
-        transaction.into_bytes(),
-    )?;
+    let message = backend.keep_message()?;
+    let keep_option = format!("--keep={message}");
+    let protected_index: Vec<_> = index
+        .iter()
+        .copied()
+        .chain([keep_option.as_str()])
+        .collect();
+    let receipt = backend
+        .git(Store::Destination, &protected_index, pack.to_vec())
+        .map_err(|e| format!("{e}; any created destination pack keep protection was retained"))?;
+    let keep = created_keep(&receipt, width, message)?;
+    // Deliberately no Drop/failure cleanup. Any lost terminal acknowledgement,
+    // malformed output, object-check or publication failure retains Git protection.
+    (|| {
+        require_objects(backend, Store::Destination, prerequisites, true)?;
+        require_objects(backend, Store::Destination, refs, false)?;
+        backend.unchanged()?;
+        let mut transaction = String::from("start\n");
+        for r in mapped {
+            transaction.push_str(&format!("create {} {}\n", r.name, r.oid));
+        }
+        transaction.push_str("prepare\ncommit\n");
+        backend.git(
+            Store::Destination,
+            &["update-ref", "--no-deref", "--stdin"],
+            transaction.into_bytes(),
+        )?;
+        Ok::<(), String>(())
+    })()
+    .map_err(|e| format!("{e}; owned pack-{}.keep retained", keep.hash))?;
+    // The existing owned Git call returned a successful, confirmed terminal outcome.
+    // Only now can refs protect these objects instead of this import's keep marker.
+    backend.retire_keep(&keep).map_err(|e| format!("Ref publication completed, but owned pack keep retirement failed (protection may remain): {e}"))?;
     Ok(())
 }
 fn require_objects(
@@ -204,6 +256,32 @@ struct Native<'a> {
     quarantine: String,
 }
 impl Backend for Native<'_> {
+    fn keep_message(&mut self) -> Result<String, String> {
+        let mut nonce = [0; 16];
+        gitcraft_os::random_bytes(&mut nonce).map_err(|e| e.to_string())?;
+        Ok(format!(
+            "gitcraft-bundle-keep-v1-{}",
+            nonce.iter().map(|b| format!("{b:02x}")).collect::<String>()
+        ))
+    }
+    fn retire_keep(&mut self, keep: &Keep) -> Result<(), String> {
+        let words = if remote::is_remote(&self.ws.repo) {
+            runner::sh_alias(
+                "gitcraft-bundle-retire",
+                "exec python3 -c \"$@\"",
+                &[
+                    crate::git::bundle_helper::RETIRE_KEEP_REMOTE,
+                    &self.common,
+                    &keep.hash,
+                    &keep.message,
+                ],
+            )
+        } else {
+            let args = vec![keep.hash.clone(), keep.message.clone()];
+            helper_words("--retire-owned-keep", &self.common, &args)?
+        };
+        self.execute(&words, vec![]).map(|_| ())
+    }
     fn unchanged(&mut self) -> Result<(), String> {
         if identity(&self.ws.repo)? != self.common {
             return Err("The destination repository changed; refs were not published".into());
@@ -230,6 +308,11 @@ impl Backend for Native<'_> {
         let mut command = policy(directory, &format!("{}/no-hooks", self.ws.base_there));
         command.extend(args.iter().map(|s| (*s).to_owned()));
         let words = wrapper(remote::is_remote(&self.ws.repo), &alternate, &command)?;
+        self.execute(&words, input)
+    }
+}
+impl Native<'_> {
+    fn execute(&self, words: &[String], input: Vec<u8>) -> Result<Vec<u8>, String> {
         let words: Vec<_> = words.iter().map(String::as_str).collect();
         let authority = self
             .ws
@@ -305,20 +388,31 @@ fn wrapper(there: bool, alternate: &str, args: &[String]) -> Result<Vec<String>,
         owned.push(alternate.to_owned());
         "command -v python3 >/dev/null 2>&1 || { echo 'Contained bundle import requires Python 3 on this Linux host; no pack was opened.' >&2; exit 78; }; exec python3 -c \"$@\""
     } else {
-        let exe = std::env::current_exe().map_err(|e| e.to_string())?;
-        #[cfg(windows)]
-        let exe = crate::app::strip_verbatim(exe);
-        let exe = exe
-            .to_str()
-            .ok_or("Application path is not UTF-8")?
-            .to_owned();
-        #[cfg(windows)]
-        let exe = exe.replace('\\', "/");
-        owned.push(exe);
-        owned.push(crate::git::bundle_helper::program()?);
-        owned.push(alternate.to_owned());
-        "helper=$1; git=$2; alternate=$3; shift 3; exec \"$helper\" --gitcraft-contained-git \"$git\" \"$alternate\" -- \"$@\""
+        return helper_words(&crate::git::bundle_helper::program()?, alternate, args);
     };
+    owned.extend_from_slice(args);
+    let borrowed: Vec<_> = owned.iter().map(String::as_str).collect();
+    Ok(runner::sh_alias(
+        "gitcraft-bundle-contained",
+        script,
+        &borrowed,
+    ))
+}
+fn helper_words(program: &str, alternate: &str, args: &[String]) -> Result<Vec<String>, String> {
+    let mut owned = Vec::new();
+    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    #[cfg(windows)]
+    let exe = crate::app::strip_verbatim(exe);
+    let exe = exe
+        .to_str()
+        .ok_or("Application path is not UTF-8")?
+        .to_owned();
+    #[cfg(windows)]
+    let exe = exe.replace('\\', "/");
+    owned.push(exe);
+    owned.push(program.into());
+    owned.push(alternate.to_owned());
+    let script = "helper=$1; git=$2; alternate=$3; shift 3; exec \"$helper\" --gitcraft-contained-git \"$git\" \"$alternate\" -- \"$@\"";
     owned.extend_from_slice(args);
     let borrowed: Vec<_> = owned.iter().map(String::as_str).collect();
     Ok(runner::sh_alias(
@@ -337,10 +431,30 @@ mod recording_tests {
         fail: Option<String>,
         changed: bool,
         published: bool,
+        marker: Option<String>,
+        preexisting: bool,
+        stage: Option<&'static str>,
+        events: Vec<&'static str>,
     }
     impl Backend for Recording {
+        fn keep_message(&mut self) -> Result<String, String> {
+            Ok(format!("gitcraft-bundle-keep-v1-{}", "b".repeat(32)))
+        }
+        fn retire_keep(&mut self, keep: &Keep) -> Result<(), String> {
+            assert!(self.published && self.events.contains(&"terminal"));
+            self.events.push("retire");
+            assert_eq!(keep.hash, "c".repeat(40));
+            if self.stage == Some("changed-marker") {
+                self.marker = Some("another-owner".into());
+            }
+            if self.stage == Some("retire") || self.marker.as_deref() != Some(&keep.message) {
+                return Err("marker ownership changed or cleanup unconfirmed; retained".into());
+            }
+            self.marker = None;
+            Ok(())
+        }
         fn unchanged(&mut self) -> Result<(), String> {
-            if self.changed {
+            if self.changed || (self.marker.is_some() && self.stage == Some("identity")) {
                 Err("destination moved".into())
             } else {
                 Ok(())
@@ -355,6 +469,38 @@ mod recording_tests {
             if self.fail.as_deref() == args.first().copied() {
                 return Err("owned cleanup unconfirmed".into());
             }
+            if store == Store::Destination && args[0] == "index-pack" {
+                let message = self.keep_message()?;
+                assert!(args.contains(&format!("--keep={message}").as_str()));
+                if self.preexisting {
+                    assert!(self.marker.is_some());
+                } else {
+                    assert!(self.marker.is_none());
+                    self.marker = Some(message);
+                }
+                self.events.push("protect");
+                if self.stage == Some("index") {
+                    return Err("index terminal unconfirmed".into());
+                }
+                if self.stage == Some("receipt") {
+                    return Ok(b"keep\tmalformed\n".to_vec());
+                }
+                return Ok(format!(
+                    "{}\t{}\n",
+                    if self.preexisting { "pack" } else { "keep" },
+                    "c".repeat(40)
+                )
+                .into_bytes());
+            }
+            if store == Store::Destination && args[0] == "cat-file" {
+                // Simulate independent repack attempts during separate object checks:
+                // this pack is still protected regardless of the Workspace fence.
+                assert!(self.marker.is_some());
+                self.events.push("check/repack");
+                if self.stage == Some("objects") {
+                    return Err("object check terminal unconfirmed".into());
+                }
+            }
             Ok(match args[0] {
                 "rev-parse" => b"sha1\n".to_vec(),
                 "cat-file" => String::from_utf8(input)
@@ -364,7 +510,13 @@ mod recording_tests {
                     .collect::<String>()
                     .into_bytes(),
                 "update-ref" => {
+                    assert!(self.marker.is_some());
+                    self.events.extend(["prepare/repack", "commit/repack"]);
                     self.published = true;
+                    if self.stage == Some("publication") {
+                        return Err("publication terminal unconfirmed".into());
+                    }
+                    self.events.push("terminal");
                     vec![]
                 }
                 _ => vec![],
@@ -462,5 +614,102 @@ mod recording_tests {
         let words = wrapper(true, "\"/objects\"", &args).unwrap();
         assert!(words.iter().any(|s| s.contains("resource.setrlimit")));
         assert!(words.iter().all(|s| !s.contains("${@:3}")));
+    }
+    #[test]
+    fn owned_keep_spans_object_checks_ref_prepare_commit_and_terminal_before_retirement() {
+        let mut backend = Recording::default();
+        pipeline(&mut backend, b"PACK", &refs(), &refs(), &refs(), true).unwrap();
+        assert_eq!(
+            backend.events,
+            [
+                "protect",
+                "check/repack",
+                "check/repack",
+                "prepare/repack",
+                "commit/repack",
+                "terminal",
+                "retire"
+            ]
+        );
+        assert!(backend.marker.is_none() && backend.published);
+    }
+    #[test]
+    fn indexing_receipt_object_identity_and_publication_uncertainty_retain_keep() {
+        for stage in ["index", "receipt", "objects", "identity", "publication"] {
+            let mut backend = Recording {
+                stage: Some(stage),
+                ..Default::default()
+            };
+            assert!(pipeline(&mut backend, b"PACK", &refs(), &refs(), &refs(), true).is_err());
+            assert!(
+                backend
+                    .marker
+                    .as_deref()
+                    .unwrap()
+                    .starts_with("gitcraft-bundle-keep-v1-"),
+                "{stage}"
+            );
+            assert!(!backend.events.contains(&"retire"), "{stage}");
+            assert_eq!(backend.published, stage == "publication");
+        }
+    }
+    #[test]
+    fn preexisting_keep_refuses_publication_and_is_never_retired_or_overwritten() {
+        for marker in [
+            "preexisting-owner".into(),
+            format!("gitcraft-bundle-keep-v1-{}", "b".repeat(32)),
+        ] {
+            let mut backend = Recording {
+                preexisting: true,
+                marker: Some(marker.clone()),
+                ..Default::default()
+            };
+            assert!(
+                pipeline(&mut backend, b"PACK", &refs(), &[], &refs(), true)
+                    .unwrap_err()
+                    .contains("another keep marker")
+            );
+            // Even coincidentally matching contents do not turn another creator's
+            // `pack` receipt into our `keep` ownership receipt.
+            assert_eq!(backend.marker.as_ref(), Some(&marker));
+            assert_eq!(backend.events, ["protect"]);
+            assert!(!backend.published);
+        }
+    }
+    #[test]
+    fn changed_marker_or_retirement_failure_preserves_marker_and_confirmed_publication() {
+        for stage in ["changed-marker", "retire"] {
+            let mut backend = Recording {
+                stage: Some(stage),
+                ..Default::default()
+            };
+            let error = pipeline(&mut backend, b"PACK", &refs(), &[], &refs(), true).unwrap_err();
+            assert!(error.starts_with("Ref publication completed"));
+            assert!(backend.published && backend.marker.is_some());
+            assert_eq!(backend.events.last(), Some(&"retire"));
+        }
+    }
+    #[test]
+    fn pack_keep_receipt_requires_one_exact_frame_and_matching_hash_width() {
+        let message = format!("gitcraft-bundle-keep-v1-{}", "b".repeat(32));
+        for width in [40, 64] {
+            assert!(
+                created_keep(
+                    format!("keep\t{}\n", "c".repeat(width)).as_bytes(),
+                    width,
+                    message.clone()
+                )
+                .is_ok()
+            );
+        }
+        for output in [
+            "",
+            "keep\t../pack\n",
+            &format!("keep\t{}\ntrailer", "c".repeat(40)),
+            &format!("keep\t{}\n", "C".repeat(40)),
+            &format!("keep\t{}\n", "c".repeat(64)),
+        ] {
+            assert!(created_keep(output.as_bytes(), 40, message.clone()).is_err());
+        }
     }
 }
