@@ -233,6 +233,7 @@ pub(super) fn traced_script_with_program(words: &str, program: &str) -> String {
             "fi\n",
             "exit $r",
         ),
+        program = program,
         var = TRACE_VAR,
         words = words,
         mark = MARK,
