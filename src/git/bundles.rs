@@ -236,6 +236,18 @@ pub(crate) fn check_bundle(
     prefix: &str,
     import: bool,
 ) -> Result<Vec<BundleRef>, String> {
+    check_bundle_with_presentation(repo, preview, selected, prefix, import, &mut None)
+}
+
+pub(crate) fn check_bundle_with_presentation(
+    repo: &Path,
+    preview: &BundlePreview,
+    selected: &BTreeSet<String>,
+    prefix: &str,
+    import: bool,
+    presentation: &mut Option<crate::parallel_bisect::presentation::Presentation>,
+) -> Result<Vec<BundleRef>, String> {
+    *presentation = None;
     let (refs, prerequisites) = checked_snapshot(preview)?;
     if no_lazy_fetch(repo)?.is_empty() {
         return Err(crate::i18n::text(
@@ -252,7 +264,7 @@ pub(crate) fn check_bundle(
             "backend-no-bundle-header-terminator-c6345c",
         ))?
         + 2;
-    crate::parallel_bisect::bundle::run(
+    crate::parallel_bisect::bundle::run_with_presentation(
         repo,
         &preview.repository,
         &preview.bytes[pack..],
@@ -260,6 +272,7 @@ pub(crate) fn check_bundle(
         &prerequisites,
         &mapped,
         import,
+        presentation,
     )?;
     Ok(mapped)
 }

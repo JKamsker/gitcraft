@@ -723,7 +723,7 @@ pub(crate) fn warning(raw: &str) -> String {
     diagnostic(raw)
 }
 
-fn machine_location(raw: &str) -> &str {
+pub(crate) fn machine_location(raw: &str) -> &str {
     if raw == "this computer" {
         i18n::text("interaction-bisect-machine-here-location")
     } else {
@@ -793,8 +793,8 @@ pub(crate) enum CleanupContext<'a> {
 /// Render only the supplied outer cleanup/keep statement, retaining both details verbatim.
 /// `raw` stays caller-owned for control, diagnostics and recovery. A mismatch returns it
 /// unchanged, so stale/wrong presentation metadata cannot replace the actual error.
-/// No producer currently retains these fields for its foreign UI consumer. Root must
-/// carry explicit context separately before using this seam; diagnostic(raw) cannot do it.
+/// Production captures owned snapshots in presentation.rs at the named source branches
+/// and carries them beside raw results/events. diagnostic(raw) never infers this context.
 pub(crate) fn cleanup_diagnostic(raw: &str, context: CleanupContext<'_>) -> String {
     let (expected, id, primary, name, detail) = match context {
         CleanupContext::BundleCompleted { primary, cleanup } => (

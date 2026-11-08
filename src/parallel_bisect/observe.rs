@@ -164,6 +164,18 @@ pub(crate) fn run(
     mode: Mode,
     timeout: Duration,
 ) -> Result<Observation, String> {
+    run_with_presentation(repo, hash, command, mode, timeout, &mut None)
+}
+
+pub(crate) fn run_with_presentation(
+    repo: &Path,
+    hash: &str,
+    command: &str,
+    mode: Mode,
+    timeout: Duration,
+    presentation: &mut Option<super::presentation::Presentation>,
+) -> Result<Observation, String> {
+    *presentation = None;
     if !matches!(hash.len(), 40 | 64) || !hash.bytes().all(|b| b.is_ascii_hexdigit()) {
         return Err("A pinned full commit ID is required".into());
     }
@@ -253,7 +265,9 @@ pub(crate) fn run(
         }
         Ok(repeated(values.remove(0), values.remove(0)))
     })();
-    finish(result, ws.close())
+    let mut cleanup_presentation = None;
+    let cleanup = ws.close_with_presentation(&mut cleanup_presentation);
+    finish_with_presentation(result, cleanup, presentation, cleanup_presentation)
 }
 fn successful(exit: git::Exit) -> Result<(), String> {
     if exit.code == Some(0) {
@@ -268,6 +282,29 @@ fn successful(exit: git::Exit) -> Result<(), String> {
         ))
     }
 }
+pub(crate) fn finish_with_presentation(
+    result: Result<Observation, String>,
+    cleanup: Result<(), String>,
+    presentation: &mut Option<super::presentation::Presentation>,
+    cleanup_presentation: Option<super::presentation::Presentation>,
+) -> Result<Observation, String> {
+    use super::presentation::{Cleanup, Presentation};
+    *presentation = match (&result, &cleanup) {
+        (Err(primary), Err(cleanup)) => Some(Presentation::capture(
+            format!("{primary}; workspace cleanup: {cleanup}"),
+            Cleanup::ObservationFinish {
+                primary: primary.clone(),
+                cleanup: cleanup.clone(),
+            },
+        )),
+        (Ok(_), Err(_)) => cleanup_presentation,
+        _ => None,
+    };
+    let result = finish(result, cleanup);
+    super::presentation::retain_error(&result, presentation);
+    result
+}
+
 fn finish(
     result: Result<Observation, String>,
     cleanup: Result<(), String>,

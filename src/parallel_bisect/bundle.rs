@@ -22,6 +22,29 @@ pub(crate) fn run(
     mapped: &[BundleRef],
     import: bool,
 ) -> Result<(), String> {
+    run_with_presentation(
+        repo,
+        expected,
+        pack,
+        refs,
+        prerequisites,
+        mapped,
+        import,
+        &mut None,
+    )
+}
+
+pub(crate) fn run_with_presentation(
+    repo: &Path,
+    expected: &str,
+    pack: &[u8],
+    refs: &[BundleRef],
+    prerequisites: &[BundleRef],
+    mapped: &[BundleRef],
+    import: bool,
+    presentation: &mut Option<super::presentation::Presentation>,
+) -> Result<(), String> {
+    *presentation = None;
     if !remote::is_remote(repo) && !cfg!(any(target_os = "linux", windows)) {
         return Err("This platform cannot establish enforced bundle memory limits. Import/unpack is supported on Linux (including SSH/WSL) and Windows; inspection and export remain available. No pack was opened.".into());
     }
@@ -43,9 +66,53 @@ pub(crate) fn run(
             quarantine: format!("{}/bundle-quarantine.git", ws.base_there),
             ws: &ws,
         };
-        pipeline(&mut backend, pack, refs, prerequisites, mapped, import)
+        pipeline_with_presentation(
+            &mut backend,
+            pack,
+            refs,
+            prerequisites,
+            mapped,
+            import,
+            presentation,
+        )
     })();
-    completed(result, ws.close(), import)
+    let mut cleanup_presentation = None;
+    let cleanup = ws.close_with_presentation(&mut cleanup_presentation);
+    completed_with_presentation(result, cleanup, import, presentation, cleanup_presentation)
+}
+
+pub(crate) fn completed_with_presentation(
+    result: Result<(), String>,
+    cleanup: Result<(), String>,
+    import: bool,
+    presentation: &mut Option<super::presentation::Presentation>,
+    cleanup_presentation: Option<super::presentation::Presentation>,
+) -> Result<(), String> {
+    use super::presentation::{Cleanup, Presentation};
+    let context = match (&result, &cleanup) {
+        (Err(primary), Err(cleanup)) => Some(Cleanup::BundleCompleted {
+            primary: primary.clone(),
+            cleanup: cleanup.clone(),
+        }),
+        _ => None,
+    };
+    let cleanup_only = result
+        .is_ok()
+        .then(|| cleanup.as_ref().err().cloned())
+        .flatten();
+    let result = completed(result, cleanup, import);
+    if let (Err(raw), Some(context)) = (&result, context) {
+        *presentation = Some(Presentation::capture(raw.clone(), context));
+    } else if let (Err(raw), Some(cleanup)) = (&result, cleanup_only) {
+        *presentation = Some(Presentation::completed(
+            raw.clone(),
+            import,
+            cleanup,
+            cleanup_presentation,
+        ));
+    }
+    super::presentation::retain_error(&result, presentation);
+    result
 }
 
 fn completed(
@@ -119,6 +186,27 @@ fn pipeline(
     mapped: &[BundleRef],
     import: bool,
 ) -> Result<(), String> {
+    pipeline_with_presentation(
+        backend,
+        pack,
+        refs,
+        prerequisites,
+        mapped,
+        import,
+        &mut None,
+    )
+}
+
+fn pipeline_with_presentation(
+    backend: &mut impl Backend,
+    pack: &[u8],
+    refs: &[BundleRef],
+    prerequisites: &[BundleRef],
+    mapped: &[BundleRef],
+    import: bool,
+    presentation: &mut Option<super::presentation::Presentation>,
+) -> Result<(), String> {
+    *presentation = None;
     let width = refs.first().ok_or("No advertised bundle refs")?.oid.len();
     let format = match width {
         40 => "sha1",
@@ -203,7 +291,7 @@ fn pipeline(
         )?;
         Ok::<(), String>(())
     })()
-    .map_err(|e| format!("{e}; owned pack-{}.keep retained", keep.hash))?;
+    .map_err(|e| keep_retained(e, &keep.hash, presentation))?;
     // The existing owned Git call returned a successful, confirmed terminal outcome.
     // Only now can refs protect these objects instead of this import's keep marker.
     backend.retire_keep(&keep).map_err(|e| format!("Ref publication completed, but owned pack keep retirement failed (protection may remain): {e}"))?;
@@ -772,4 +860,20 @@ mod execution_fluent_r1_tests {
         crate::i18n::set_language("en-US");
         Ok(())
     }
+}
+
+pub(crate) fn keep_retained(
+    primary: String,
+    hash: &str,
+    presentation: &mut Option<super::presentation::Presentation>,
+) -> String {
+    let raw = format!("{primary}; owned pack-{hash}.keep retained");
+    *presentation = Some(super::presentation::Presentation::capture(
+        raw.clone(),
+        super::presentation::Cleanup::BundleKeepRetained {
+            primary,
+            hash: hash.into(),
+        },
+    ));
+    raw
 }
