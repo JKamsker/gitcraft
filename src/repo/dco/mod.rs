@@ -9,7 +9,6 @@ mod view;
 
 use egui::Context;
 
-use super::state::PendingOp;
 use super::{Action, Dialog, OpKind, Refresh, RepoTab, Undo, UndoEntry};
 use crate::pull_request::CheckState;
 
@@ -33,6 +32,16 @@ pub(crate) struct Dco {
     pr: Option<PrSignoffs>,
     /// The sign-off asked for in the dialog, or running: what a failed push leaves to undo.
     running: Option<Plan>,
+    /// Review waits for both timeline GC retention and the separate rewrite-ref writer.
+    review_after: Option<ReviewAfter>,
+}
+
+struct ReviewAfter {
+    label: String,
+    heads: (String, String),
+    timeline_kept: bool,
+    rewrite_kept: bool,
+    then: Box<dyn FnOnce(&mut RepoTab, &Context) + Send>,
 }
 
 /// The commits of a pull request, with whether each is signed off.
@@ -231,14 +240,69 @@ impl RepoTab {
         }
     }
 
+    /// The timeline worker has completed its own diagnostic receipt and GC retention.
+    /// The separate versions worker must also finish before a push snapshot is captured.
+    pub(super) fn dco_timeline_kept(&mut self, id: u64, kept: bool, ctx: &Context) {
+        let Some(entry) = self.timeline.get(id) else {
+            return;
+        };
+        let Some(heads) = entry.undo.as_ref().and_then(|undo| undo.heads.clone()) else {
+            return;
+        };
+        let label = entry.label.clone();
+        self.dco_retention_done(&label, &heads, false, kept, ctx);
+    }
+
+    /// Called by the actual versions::rewrite_kept completion, including failure/cancel.
+    pub(super) fn dco_rewrite_kept(
+        &mut self,
+        label: &str,
+        heads: &(String, String),
+        kept: bool,
+        ctx: &Context,
+    ) {
+        self.dco_retention_done(label, heads, true, kept, ctx);
+    }
+
+    fn dco_retention_done(
+        &mut self,
+        label: &str,
+        heads: &(String, String),
+        rewrite: bool,
+        kept: bool,
+        ctx: &Context,
+    ) {
+        let Some(pending) = &mut self.dco.review_after else {
+            return;
+        };
+        if pending.label != label || &pending.heads != heads {
+            return;
+        }
+        if !kept {
+            self.dco.review_after = None;
+            self.status = Some(("Local sign-off finished, but its rewrite or timeline commits could not be retained. Nothing was pushed; the local undo remains available.".into(), true));
+            return;
+        }
+        if rewrite {
+            pending.rewrite_kept = true;
+        } else {
+            pending.timeline_kept = true;
+        }
+        if pending.timeline_kept
+            && pending.rewrite_kept
+            && let Some(pending) = self.dco.review_after.take()
+        {
+            (pending.then)(self, ctx);
+        }
+    }
+
     /// Whether the commit is made with `--signoff`.
     pub(super) fn signs_off(&self) -> bool {
         self.dco.signs_off()
     }
 
-    /// Takes in how an operation ended. When the sign-off of a branch failed after rewriting
-    /// it (its push was refused, or needs signing in), the rewrite is made undoable here, and
-    /// signing in pushes it.
+    /// A completed local sign-off opens a separate reviewed push. A stopped local rewrite
+    /// never queues that push; any completed local changes remain undoable here.
     pub(super) fn dco_op_done(
         &mut self,
         label: &str,
@@ -248,8 +312,71 @@ impl RepoTab {
         let Some(plan) = self.dco.running.take_if(|plan| fix_label(plan) == label) else {
             return;
         };
-        let Err(error) = result else { return };
-        let auth = crate::git::is_auth_error(error);
+        // A stopped/new matching local operation cannot reuse a prior continuation.
+        self.dco.review_after = None;
+        if result.is_ok() {
+            // Keep the operation identity unchanged, and mark only its undo presentation.
+            // op_done has already retained the worker's exact post-rewrite ref guards.
+            let signed = match &mut self.timeline.awaiting {
+                super::timeline::Awaiting::Ended {
+                    then:
+                        super::timeline::Ended::New {
+                            label: ended,
+                            undo: Some(undo),
+                        },
+                    ..
+                } if ended == label => {
+                    undo.label = format!("{label} (here only)");
+                    undo.heads.as_ref().map(|(_, after)| after.clone())
+                }
+                _ => None,
+            };
+            if plan.push.is_some() {
+                let Some(signed) = signed else {
+                    self.status = Some(("The local sign-off finished, but its rewritten commit was not captured. Choose Push again; nothing was sent.".into(), true));
+                    return;
+                };
+                let repo = self.path.clone();
+                let path = repo.clone();
+                let profile = crate::settings::Settings::get(ctx).profile();
+                let context = crate::connections::current();
+                let generation = self.https_generation;
+                self.dco.review_after = Some(ReviewAfter {
+                    label: label.to_owned(),
+                    heads: (plan.head.clone(), signed.clone()),
+                    timeline_kept: false,
+                    rewrite_kept: false,
+                    then: Box::new(move |tab, ctx| {
+                        tab.then_or(ctx, false, Err, move || {
+                            let snapshot = crate::git::repository_tools::guard::Snapshot::capture(&repo)?;
+                            let prepared = completed_push(&plan, signed, snapshot).ok_or("DCO push target disappeared")?;
+                            prepared.snapshot.check_publication(&repo)?;
+                            Ok(prepared)
+                        }, move |tab, prepared, ctx| {
+                            if tab.path != path || crate::settings::Settings::get(ctx).profile() != profile
+                                || crate::connections::current() != context || tab.connection_context != context
+                                || tab.https_generation != generation || tab.busy_op.is_some()
+                                || tab.dialog.is_some() || tab.echo_push_pending()
+                            {
+                                tab.status = Some(("The repository, sign-in or operation changed after local sign-off. Choose Push again; nothing was sent.".into(), true));
+                                return;
+                            }
+                            match prepared {
+                                Ok(prepared) => {
+                                    let ops = prepared.route.operations();
+                                    tab.preflight_selection = Some(prepared);
+                                    tab.run_ops_ex("Push the signed-off commits", ops, Refresh::All, OpKind::plain(), false, ctx);
+                                    // Busy/offline refusal must not constrain another push.
+                                    tab.preflight_selection = None;
+                                },
+                                Err(error) => tab.status = Some((error, true)),
+                            }
+                        });
+                    }),
+                });
+            }
+            return;
+        }
         let repo = self.path.clone();
         let local = format!("refs/heads/{}", plan.branch);
         self.then(
@@ -282,22 +409,30 @@ impl RepoTab {
                     ),
                     true,
                 ));
-                // Signing in pushes what is signed off now, not the whole rewrite again.
-                if auth
-                    && let Some(op) = &mut tab.last_op
-                    && op.label == fix_label(&plan)
-                {
-                    *op = PendingOp {
-                        label: format!("Push the signed-off commits of {}", plan.branch),
-                        ops: plan.push_steps(),
-                        refresh: Refresh::All,
-                        kind: OpKind::plain(),
-                        quiet: false,
-                    };
-                }
             },
         );
     }
+}
+
+/// Constrain normal preflight to the confirmed target and lease, using only the
+/// successfully completed local operation's captured commit. This grants no send.
+fn completed_push(
+    plan: &Plan,
+    signed: String,
+    snapshot: crate::git::repository_tools::guard::Snapshot,
+) -> Option<crate::git::repository_tools::routes::PreparedPush> {
+    let push = plan.push.as_ref()?;
+    Some(crate::git::repository_tools::routes::PreparedPush {
+        snapshot,
+        route: crate::git::repository_tools::routes::PushRoute {
+            branch: plan.branch.clone(),
+            commit: signed,
+            remote: push.remote.clone(),
+            destination: push.remote_ref.clone(),
+            urls: push.urls.clone(),
+            lease: Some(push.seen.clone().unwrap_or_default()),
+        },
+    })
 }
 
 /// What the sign-off of `plan` is called: the operation's label, and the dialog's title.
@@ -308,21 +443,20 @@ fn fix_label(plan: &Plan) -> String {
 /// The dialog that shows what signing off the branch does, and does it.
 fn fix_dialog(plan: &Plan, who: &str, email: &str) -> Dialog {
     let button = if plan.push.is_some() {
-        "Sign off and push"
+        "Sign off, then review push"
     } else {
         "Sign off"
     };
+    let mut local = plan.clone();
+    local.push = None;
     Dialog::confirm(
         &fix_label(plan),
         fix_preview(plan, who, email),
         button,
-        plan.steps(),
+        local.steps(),
         None,
     )
-    .undo(Undo::Custom {
-        undo: plan.undo_steps(),
-        redo: plan.redo_steps(),
-    })
+    .undo(Undo::HeadMove { mode: "--keep" })
     .refresh(Refresh::All)
 }
 
@@ -378,8 +512,9 @@ pub(crate) fn fix_preview(plan: &Plan, who: &str, email: &str) -> String {
                 "refused if that branch exists there already"
             };
             text.push_str(&format!(
-                "\nThen force-pushes it to {} with a lease: {guard}.\n\nCtrl+Z puts the \
-                 commits as they were back, on the remote and here.",
+                "\nThen opens push preflight for the signed-off commits to {} with a lease: {guard}. \
+                 Review and approve that push separately.\n\nCtrl+Z restores the local commits. \
+                 Restoring published remote history requires its own reviewed push.",
                 push.label()
             ));
         }

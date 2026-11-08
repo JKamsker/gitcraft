@@ -323,7 +323,7 @@ mod tests {
     /// Fetch, pull and push from the keys, against a remote in a folder with spaces: each
     /// shows on the remote or in the repository, not just in a status line.
     #[test]
-    fn fetch_pull_and_push_from_the_keys() {
+    fn fetch_pull_and_push_from_the_keys() -> Result<(), String> {
         let dir = repo("remote");
         let name = dir.file_name().unwrap_or_default().to_string_lossy();
         let bare = dir.with_file_name(format!("{name} remote.git"));
@@ -343,6 +343,9 @@ mod tests {
         let mut tab = loaded(&dir, &ctx);
 
         press(&mut tab, &ctx, Command::Push);
+        assert!(git::resolve(&bare, &format!("refs/heads/{branch}")).is_err());
+        super::super::push_preflight::test_support::approve(&mut tab, &ctx)?;
+        wait(&mut tab, &ctx, |t| t.busy_op.is_none() && !t.loading);
         let pushed = run(Some(&bare), &["log", "-1", "--format=%s", &branch]);
 
         // A commit made on the remote from elsewhere: fetch sees it, pull brings it in.
@@ -367,6 +370,7 @@ mod tests {
         assert_eq!(fetched.trim(), "from élsewhere ✓");
         assert_eq!(pulled.trim(), "from élsewhere ✓");
         assert_eq!(failed, None);
+        Ok(())
     }
 
     /// A merge whose conflicts were resolved back to HEAD's content has no changes, and the

@@ -216,14 +216,16 @@ pub(super) fn reduced_motion(ctx: &egui::Context) -> bool {
 mod tests {
     use super::*;
     #[test]
-    fn queued_push_and_its_failure_do_not_erase_successful_fetch_feedback() {
+    fn queued_push_and_its_failure_do_not_erase_successful_fetch_feedback() -> Result<(), String> {
+        let f = crate::push_preflight::tests::Fixture::new()?;
+        f.commit("outgoing.txt", "outgoing\n", "Outgoing")?;
         let ctx = egui::Context::default();
-        let mut tab = RepoTab::new_deferred("/nonexistent/queued-motion".into(), &ctx);
-        // Exercise real op_done -> after_op -> Push hooks with all task dispatch
-        // cancelled before submission. No subprocess or filesystem read is needed.
+        let mut tab = RepoTab::new_deferred(f.repo.clone(), &ctx);
+        // Retain synthetic fetch feedback while the queued push follows its real
+        // local preflight and approved dispatch, then fails its captured server lease.
+        tab.remotes = crate::git::remotes(&f.repo)?;
         tab.life.phase = super::super::lifecycle::Phase::Live;
         tab.loading = true; // delay the confirming reload
-        tab.tx.cancel.cancel();
         tab.refs.current = Some("main".into());
         tab.refs.local.push(crate::git::Branch {
             name: "main".into(),
@@ -243,16 +245,37 @@ mod tests {
             true,
             &ctx,
         );
-        assert_eq!(tab.busy_op.as_deref(), Some("Push"));
+        assert!(tab.busy_op.is_none());
+        assert!(matches!(
+            tab.dialog,
+            Some(super::super::Dialog::PushLoading { .. })
+        ));
         assert!(tab.graph_motion.pending.is_some());
-        tab.op_done(
-            "Push".into(),
-            Err("recorded failure".into()),
-            super::super::Refresh::All,
-            super::super::OpKind::plain(),
-            true,
-            &ctx,
+        let before = f.receiver_head()?;
+        let plan = super::super::push_preflight::test_support::review(&mut tab, &ctx)?;
+        assert_eq!(f.receiver_head()?, before, "review must not send");
+        let theirs = f.advance_receiver()?;
+        tab.apply(super::super::Action::SubmitPreflight(Box::new(plan)), &ctx);
+        super::super::push_preflight::test_support::wait_for(&mut tab, &ctx, |t| {
+            t.busy_op.is_none()
+        })?;
+        assert!(
+            tab.last_op
+                .as_ref()
+                .is_some_and(|op| op.ops.iter().any(|step| step
+                    .first()
+                    .is_some_and(|s| s == crate::push_preflight::APPROVED)))
         );
+        assert!(
+            tab.activity
+                .last()
+                .is_some_and(|entry| matches!(&entry.outcome,
+                super::super::activity::Outcome::Failed(error) if error.contains("stale info"))),
+            "{:?}",
+            tab.activity.last()
+        );
+        assert_eq!(f.receiver_head()?, theirs);
+
         assert!(tab.graph_motion.pending.is_some());
         tab.history.push(std::sync::Arc::new(crate::git::Commit {
             hash: "incoming".into(),
@@ -263,6 +286,7 @@ mod tests {
         tab.graph_motion_loaded(tab.reads + 1, &ctx);
         assert!(tab.graph_motion.new_commit("incoming"));
         assert!(tab.graph_motion.pending.is_none());
+        Ok(())
     }
     #[test]
     fn chained_successes_keep_earliest_refs_and_failed_fetch_adds_no_markers() {

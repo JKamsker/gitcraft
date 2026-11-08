@@ -945,13 +945,15 @@ mod tests {
             .find(|r| r.name == "team")
             .ok_or("remote")?;
         let target = sharing::Target::capture(author.path(), &observed)?;
-        publish_board(author.path(), "example#1", &board, &target, None)?;
+        publish_board(author.path(), "example#1", &board, &target, None)
+            .map_err(|e| format!("first publish: {e}"))?;
         let observed = git::remotes(reviewer.path())?
             .into_iter()
             .find(|r| r.name == "team")
             .ok_or("remote")?;
         let read_target = sharing::Target::capture(reviewer.path(), &observed)?;
-        let imported = fetch_board(reviewer.path(), "example#1", &read_target, None)?;
+        let imported = fetch_board(reviewer.path(), "example#1", &read_target, None)
+            .map_err(|e| format!("first fetch: {e}"))?;
         assert_eq!(imported.cards.len(), 1);
         assert_eq!(oid(reviewer.path(), &pinned)?, pinned);
         assert_eq!(
@@ -963,14 +965,44 @@ mod tests {
             "old invariant"
         );
         let previous = oid(server.path(), &shared_ref("example#1"))?;
-        publish_board(author.path(), "example#1", &Board::default(), &target, None)?;
+        // First publication updates the live cache; this target retains its private view.
+        // Report both witnesses if publication cannot refresh that cache.
+        let cached = cached_ref("example#1", &target);
+        let live_cache = oid(author.path(), &cached)?;
+        let captured_cache = target.fetched(&cached)?;
+        publish_board(author.path(), "example#1", &Board::default(), &target, None)
+            .map_err(|e| format!("second publish (live cache {live_cache}, private cache {captured_cache:?}): {e}"))?;
         let latest = oid(server.path(), &shared_ref("example#1"))?;
         assert!(git::is_ancestor(server.path(), &previous, &latest));
+        assert!(
+            fetch_board(reviewer.path(), "example#1", &read_target, None)
+                .map_err(|e| format!("second fetch: {e}"))?
+                .cards
+                .is_empty()
+        );
+        // Reusing the same captured target must refresh the already populated cache,
+        // including a no-change fetch. Its old-OID guard must still refuse a stale writer.
+        assert_eq!(
+            oid(reviewer.path(), &cached_ref("example#1", &read_target))?,
+            latest
+        );
         assert!(
             fetch_board(reviewer.path(), "example#1", &read_target, None)?
                 .cards
                 .is_empty()
         );
+        let cached = cached_ref("example#1", &read_target);
+        let transaction =
+            format!("start\nupdate {cached} {previous} {previous}\nprepare\ncommit\n");
+        assert!(
+            git::run_input(
+                Some(reviewer.path()),
+                &["update-ref", "--stdin"],
+                &transaction
+            )
+            .is_err()
+        );
+        assert_eq!(oid(reviewer.path(), &cached)?, latest);
         assert_eq!(author.tip("HEAD")?, base);
         assert_eq!(server.tip("HEAD")?, server_head);
         assert_eq!(reviewer.tip("HEAD")?, reviewer_head);

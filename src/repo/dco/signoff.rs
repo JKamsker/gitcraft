@@ -172,6 +172,8 @@ pub(crate) fn missing(list: &[Signed]) -> impl Iterator<Item = &Signed> {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct PushTarget {
     pub remote: String,
+    /// Push endpoints captured with the confirmed target.
+    pub urls: Vec<String>,
     /// `refs/heads/x` on the remote.
     pub remote_ref: String,
     /// The remote-tracking ref of it here (`refs/remotes/origin/x`), if there is one.
@@ -309,7 +311,15 @@ fn push_target(repo: &Path, branch: &str) -> Result<Option<PushTarget>, String> 
         .as_deref()
         .and_then(|t| git::resolve(repo, t).ok())
         .filter(|s| !s.is_empty());
+    let urls = git::run(
+        Some(repo),
+        &["remote", "get-url", "--push", "--all", "--", &remote],
+    )?
+    .lines()
+    .map(str::to_owned)
+    .collect();
     Ok(Some(PushTarget {
+        urls,
         remote,
         remote_ref,
         tracking,

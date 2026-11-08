@@ -2075,7 +2075,7 @@ pub(crate) fn push_preflight_with(
         },
     )?;
     let words: Vec<&str> = args.iter().map(String::as_str).collect();
-    let extra = reviewed_push_extra(
+    let mut extra = reviewed_push_extra(
         dir,
         &words,
         PushTarget {
@@ -2118,9 +2118,25 @@ pub(crate) fn push_preflight_with(
         )
         .into());
     }
+    // Preserve only Git's structured local hook identity/status. Arbitrary hook and
+    // server output remains private, as it can contain credentials or secrets.
+    let trace = (!remote::is_remote(dir))
+        .then(super::hooks::TraceFile::new)
+        .flatten();
+    if let Some(trace) = &trace {
+        extra.env.push((
+            super::hooks::TRACE_VAR,
+            trace.path().to_string_lossy().into_owned(),
+        ));
+    }
     let out = execute_preflight(dir, &extra, &words, control)?;
     if out.code == Some(0) {
         Ok(crate::i18n::text("backend-push-completed-5fccd0").into())
+    } else if let Some(hook) = trace.and_then(|trace| trace.failed_hook(&words)) {
+        Err(hook.explain(
+            "Hook output withheld because it can contain credentials or secrets.",
+            &words,
+        ))
     } else if is_auth_error(&String::from_utf8_lossy(&out.stderr)) {
         Err(
             crate::i18n::text("backend-authentication-failed-for-the-reviewed-push-target-75e906")

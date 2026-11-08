@@ -99,7 +99,20 @@ impl Target {
         prune: bool,
         creds: Option<&git::Credentials>,
     ) -> Result<(), String> {
-        let before = self.source.refs(root)?;
+        // The private ref view can lag behind a prior publication's live cache update.
+        // CAS must witness the destination being updated, before starting the transfer.
+        let before = git::run(
+            Some(repo),
+            &["for-each-ref", "--format=%(objectname) %(refname)", root],
+        )?
+        .lines()
+        .map(|line| {
+            let (oid, reference) = line
+                .split_once(' ')
+                .ok_or("Invalid artifact cache listing")?;
+            Ok((reference.to_owned(), oid.to_owned()))
+        })
+        .collect::<Result<Vec<_>, String>>()?;
         let mut args = vec!["fetch", "--no-tags", "--no-write-fetch-head"];
         if prune {
             args.push("--prune");
@@ -266,6 +279,18 @@ mod tests {
         assert!(transaction.ends_with("prepare\ncommit\n"));
         assert!(transaction.contains(&format!("update {root}new {new} {}", "0".repeat(40))));
         assert!(transaction.contains(&format!("delete {root}old {old}")));
+        // A refresh replaces an existing live cache ref, even when the transfer's
+        // captured private view originally had no such ref (or retained an older one).
+        let reference = format!("{root}same");
+        let refresh = cache_transaction(
+            root,
+            &[(reference.clone(), old.clone())],
+            &[(reference.clone(), new.clone())],
+        )?;
+        assert_eq!(
+            refresh,
+            format!("start\nupdate {reference} {new} {old}\nprepare\ncommit\n")
+        );
         assert!(
             cache_transaction(
                 root,

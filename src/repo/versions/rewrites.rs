@@ -55,13 +55,16 @@ impl RepoTab {
         };
         let path = self.path.clone();
         let done = format!("{label}: done");
-        self.then(
+        let heads = after.as_ref().map(|after| (before.clone(), after.clone()));
+        self.then_or(
             ctx,
+            false,
+            Err,
             move || {
                 let after = after.unwrap_or_else(|| git::head(&path));
                 keep_rewrite(&path, &before, &after, branch, onto.as_deref())
             },
-            move |tab, kept, _| tab.rewrite_kept(&op_label, &done, kept),
+            move |tab, kept, ctx| tab.rewrite_kept(&op_label, &done, heads, kept, ctx),
         );
     }
 
@@ -94,12 +97,23 @@ impl RepoTab {
             .and_then(|op| onto_of(&op.ops))
     }
 
-    fn rewrite_kept(
+    pub(in crate::repo) fn rewrite_kept(
         &mut self,
         label: &str,
         done: &str,
+        heads: Option<(String, String)>,
         kept: Result<Option<(git::Rewrite, Vec<git::Rewrite>)>, String>,
+        ctx: &egui::Context,
     ) {
+        // Only this exact worker's successfully retained rewrite can satisfy DCO.
+        let dco_kept = match (&heads, &kept) {
+            (Some((before, after)), Ok(Some((rewrite, _)))) => {
+                &rewrite.old.tip == before
+                    && &rewrite.new.tip == after
+                    && label == format!("Sign off the commits of {}", rewrite.branch)
+            }
+            _ => false,
+        };
         let says_done = self
             .status
             .as_ref()
@@ -121,6 +135,9 @@ impl RepoTab {
                 ));
             }
             Err(_) => {}
+        }
+        if let Some(heads) = heads {
+            self.dco_rewrite_kept(label, &heads, dco_kept, ctx);
         }
     }
 
