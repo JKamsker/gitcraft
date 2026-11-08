@@ -56,8 +56,8 @@ fn calendar_and_contributors_buttons_change_the_actual_view_and_select_commit() 
     use egui_kittest::{Harness, kittest::Queryable};
     let ctx = egui::Context::default();
     let mut tab = RepoTab::new_deferred("/nonexistent/activity-ui".into(), &ctx);
-    // The fixture supplies an already loaded view; sleeping tabs must not run its readers.
-    tab.life.phase = crate::repo::lifecycle::Phase::Live;
+    // Keep the synthetic tab deferred. Only the supplied history's filtering worker is
+    // polled below; repository discovery and other ambient readers have no fixture data.
     let first = Day::parse("2026-01-01").ok_or("date")?;
     let last = Day::parse("2026-01-03").ok_or("date")?;
     let records = [(first, "first", "a"), (last, "later", "b")]
@@ -78,7 +78,7 @@ fn calendar_and_contributors_buttons_change_the_actual_view_and_select_commit() 
     });
     let summary = activity::summarize(&history, Query::default(), &|| true)?;
     let mut view = Activity::new(Page::Calendar);
-    view.accept(0, Ok((history, summary)));
+    view.accept(0, Ok((history.clone(), summary)));
     tab.history_activity = Some(view);
     let mut harness = Harness::builder()
         .with_size(egui::vec2(1100.0, 1100.0))
@@ -88,11 +88,19 @@ fn calendar_and_contributors_buttons_change_the_actual_view_and_select_commit() 
                     crate::theme::install_fonts(ui.ctx());
                     state.1 = true;
                 }
-                state.0.poll(ui.ctx());
+                state.0.poll_history_activity(ui.ctx());
                 let mut acts = Vec::new();
                 state.0.activity_view(ui, &mut acts);
                 for action in acts {
+                    // Exercise real commit selection, but cancel its detail I/O before
+                    // submission: these synthetic hashes have no repository objects.
+                    let reads = state.0.tx.cancel.clone();
+                    if matches!(&action, crate::repo::Action::ActivityCommit(_)) {
+                        state.0.tx.cancel = reads.child();
+                        state.0.tx.cancel.cancel();
+                    }
                     state.0.apply(action, ui.ctx());
+                    state.0.tx.cancel = reads;
                 }
             },
             (tab, false),
@@ -112,6 +120,13 @@ fn calendar_and_contributors_buttons_change_the_actual_view_and_select_commit() 
         std::thread::sleep(std::time::Duration::from_millis(5));
         harness.run_steps(1);
     }
+    let settled = harness.state().0.history_activity.as_ref().ok_or("view")?;
+    assert!(!settled.loading, "activity filter did not finish");
+    assert!(settled.error.is_none(), "{:?}", settled.error);
+    assert!(Arc::ptr_eq(
+        settled.history.as_ref().ok_or("history")?,
+        &history
+    ));
     let view = harness.state().0.history_activity.as_ref().ok_or("view")?;
     assert_eq!(view.query.from, Some(first));
     assert_eq!(view.query.through, Some(first));
@@ -145,6 +160,13 @@ fn calendar_and_contributors_buttons_change_the_actual_view_and_select_commit() 
         std::thread::sleep(std::time::Duration::from_millis(5));
         harness.run_steps(1);
     }
+    let settled = harness.state().0.history_activity.as_ref().ok_or("view")?;
+    assert!(!settled.loading, "activity filter did not finish");
+    assert!(settled.error.is_none(), "{:?}", settled.error);
+    assert!(Arc::ptr_eq(
+        settled.history.as_ref().ok_or("history")?,
+        &history
+    ));
     let view = harness
         .state()
         .0
@@ -155,6 +177,30 @@ fn calendar_and_contributors_buttons_change_the_actual_view_and_select_commit() 
     assert_eq!(view.query.through, Some(last));
     harness.get_by_label("Browse months").click();
     harness.run();
+    harness.get_by_label("Previous year").click();
+    harness.run();
+    assert_eq!(
+        harness
+            .state()
+            .0
+            .history_activity
+            .as_ref()
+            .ok_or("year view")?
+            .month,
+        Day::parse("2025-01-01")
+    );
+    harness.get_by_label("Next year").click();
+    harness.run();
+    assert_eq!(
+        harness
+            .state()
+            .0
+            .history_activity
+            .as_ref()
+            .ok_or("year view")?
+            .month,
+        Day::parse("2026-01-01")
+    );
     harness.get_by_label("2026-01\n2 commits").click();
     harness.run_steps(2);
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
@@ -169,6 +215,13 @@ fn calendar_and_contributors_buttons_change_the_actual_view_and_select_commit() 
         std::thread::sleep(std::time::Duration::from_millis(5));
         harness.run_steps(1);
     }
+    let settled = harness.state().0.history_activity.as_ref().ok_or("view")?;
+    assert!(!settled.loading, "activity filter did not finish");
+    assert!(settled.error.is_none(), "{:?}", settled.error);
+    assert!(Arc::ptr_eq(
+        settled.history.as_ref().ok_or("history")?,
+        &history
+    ));
     assert_eq!(
         harness
             .state()
@@ -194,6 +247,13 @@ fn calendar_and_contributors_buttons_change_the_actual_view_and_select_commit() 
         std::thread::sleep(std::time::Duration::from_millis(5));
         harness.run_steps(1);
     }
+    let settled = harness.state().0.history_activity.as_ref().ok_or("view")?;
+    assert!(!settled.loading, "activity filter did not finish");
+    assert!(settled.error.is_none(), "{:?}", settled.error);
+    assert!(Arc::ptr_eq(
+        settled.history.as_ref().ok_or("history")?,
+        &history
+    ));
     assert_eq!(
         harness
             .state()
