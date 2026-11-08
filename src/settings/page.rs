@@ -481,7 +481,7 @@ fn compact_page_picker(ui: &mut Ui, view: &mut View) {
 #[cfg(test)]
 mod merge_regressions {
     use super::*;
-    use egui_kittest::kittest::Queryable;
+    use egui_kittest::kittest::{NodeT, Queryable};
 
     #[test]
     fn compact_page_picker_repaints_both_languages_and_keeps_enum_selection() {
