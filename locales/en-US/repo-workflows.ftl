@@ -1885,8 +1885,6 @@ repo-workflows-email-email-window-b0fcf938 = Additional recipients. b4 also deri
 
 repo-workflows-email-email-window-b28037e9 = Cc
 
-repo-workflows-email-email-window-b64a0d4f = Cancel operation
-
 repo-workflows-email-email-window-b8c5cd6e = Prepared branch read
 
 repo-workflows-email-email-window-bc346e4f = Enroll current branch
@@ -2951,9 +2949,13 @@ repo-workflows-lfs_locks-lock-job-36f5baee = { $label }: done
 
 repo-workflows-lfs_locks-lock-job-8336fbfe = { $label } failed: { $e }
 
+repo-workflows-lfs_locks-lock-label-2a59d59e = someone
+
 repo-workflows-lfs_locks-lock-label-398e9b81 = Locked by { $who } { $git-relative-time-at-now-1 }
 
 repo-workflows-lfs_locks-lock-label-6329feb6 = Locked by { $who }
+
+repo-workflows-lfs_locks-lock-label-bb0347a4 = you
 
 repo-workflows-lfs_locks-lock-list-1a9f2707 = None of the locks is yours.
 
@@ -3517,33 +3519,154 @@ repo-workflows-package-report-ui-fa5b38db = USUALLY SHIPPED, LEFT OUT
 
 repo-workflows-package-report-ui-fefc6039 = LOOKS SHIPPED BY ACCIDENT
 
+repo-workflows-parallel_bisect--1df5e96c = A parallel bisect is running: wait for it, or cancel it
+
 repo-workflows-parallel_bisect-hash-link-63633913 = Show this commit
+
+repo-workflows-parallel_bisect-mark-parallel-result-48f3588b = Mark in the bisect failed: { $e }
+
+repo-workflows-parallel_bisect-mark-parallel-result-e05d54d7 = Marked in the bisect
+
+repo-workflows-parallel_bisect-mark-parallel-result-e5e3ecc5 = Wait for the operation going on to finish
+
+repo-workflows-parallel_bisect-outcome-message-12d782ed = Parallel bisect: the bad end passes ({ $short-hash-1 } passes the test on { $machine })
+
+repo-workflows-parallel_bisect-outcome-message-323d18af = Parallel bisect: { $short-hash-1 } is the first bad commit
+
+repo-workflows-parallel_bisect-outcome-message-5f365ac7 = Parallel bisect: only skipped commits are left, the first bad commit is one of these { $hashes-len-1 }
+
+repo-workflows-parallel_bisect-outcome-message-9edd35e1 = Parallel bisect cancelled
+
+repo-workflows-parallel_bisect-outcome-message-a5f8e4f1 = Parallel bisect: the good end already fails ({ $short-hash-1 } fails the test on { $machine })
+
+repo-workflows-parallel_bisect-outcome-message-db128bb5 = Parallel bisect failed: { $e-lines-next-unwrap-or-default-1 }
+
+repo-workflows-parallel_bisect-parallel-act-b0e5ccdc = Stopping the tests…
+
+repo-workflows-parallel_bisect-parallel-banner-45515967 = Parallel bisect
+
+repo-workflows-parallel_bisect-parallel-banner-button-0afdf9b5 = Tests several commits at once between these marks, each in a worktree of its own, here, in WSL or over SSH
+
+repo-workflows-parallel_bisect-parallel-banner-button-2fe0d401 = Run in parallel…
+
+repo-workflows-parallel_bisect-parallel-banner-button-c3efc1be = Mark a good and a bad commit first
 
 repo-workflows-parallel_bisect-parallel-buttons-19766ed6 = Cancel
 
+repo-workflows-parallel_bisect-parallel-buttons-6e22ee66 = Stopping the tests and removing the worktrees…
+
 repo-workflows-parallel_bisect-parallel-buttons-7d9eb7ac = Close
+
+repo-workflows-parallel_bisect-parallel-buttons-920ea26f = Stops every test running and removes the worktrees
+
+repo-workflows-parallel_bisect-parallel-buttons-da3f866e = Marks the first bad commit bad and its parents good in the bisect going on, which then ends there too
 
 repo-workflows-parallel_bisect-parallel-buttons-e5e3ecc5 = Wait for the operation going on to finish
 
+repo-workflows-parallel_bisect-parallel-buttons-ec156be0 = Mark in the bisect
+
 repo-workflows-parallel_bisect-parallel-link-63633913 = Show this commit
+
+repo-workflows-parallel_bisect-parallel-mark-51062cd0 = May still be the first bad commit
+
+repo-workflows-parallel_bisect-parallel-mark-6215068d = Being tested on { $view-machine-1 }…
+
+repo-workflows-parallel_bisect-parallel-mark-bbf45cc1 = The first bad commit, as the parallel bisect found
+
+repo-workflows-parallel_bisect-parallel-mark-d81987fc = its tree was tested before
+
+repo-workflows-parallel_bisect-parallel-mark-f2395948 = { $capital-verdict-word-1 } in the parallel bisect ({ $how })
+
+repo-workflows-parallel_bisect-parallel-menu-items-7109f605 = Tests several commits at once, each in a worktree of its own (here, in WSL or over SSH), to find the first bad commit; the checkout isn't touched
+
+repo-workflows-parallel_bisect-parallel-menu-items-be3adae3 = Bisect in parallel from here…
+
+repo-workflows-parallel_bisect-parallel-outcome-25230d8d = Only skipped commits are left: the first bad commit is one of these { $hashes-len-1 }:
 
 repo-workflows-parallel_bisect-parallel-outcome-683768ab = and { $hashes-len-max-named-1 } more
 
+repo-workflows-parallel_bisect-parallel-outcome-7997ad5c = The good end already fails: { $short-hash-1 } fails the test on { $machine }, so there is nothing to look for after it. Check the command, or mark an older good commit.
+
 repo-workflows-parallel_bisect-parallel-outcome-8b3812c0 = First bad commit:
+
+repo-workflows-parallel_bisect-parallel-outcome-a804fbac = The bad end passes: { $short-hash-1 } passes the test on { $machine }, so the test doesn't show the problem there. Check the command.
+
+repo-workflows-parallel_bisect-parallel-outcome-ac8a5ffa = Cancelled: the tests were stopped and the worktrees removed.
+
+repo-workflows-parallel_bisect-parallel-palette-items-060e9182 = Parallel bisect: cancel
+
+repo-workflows-parallel_bisect-parallel-palette-items-a69bdd78 = Bisect in parallel…
+
+repo-workflows-parallel_bisect-poll-parallel-e34dd853 = { $self-name-1 } · { $message }
+
+repo-workflows-parallel_bisect-progress-text-0246004e = Round { $n }, about { $more } more
+
+repo-workflows-parallel_bisect-progress-text-575afe47 = { $n } of { $view-total-1 } commits left
+
+repo-workflows-parallel_bisect-progress-text-9879a77a = Round { $n }, about 1 more
+
+repo-workflows-parallel_bisect-progress-text-9c508bc4 = Getting ready
+
+repo-workflows-parallel_bisect-progress-text-a8c510c9 = 1 commit left
+
+repo-workflows-parallel_bisect-progress-text-b6c2fb65 = { $round } · { $left }{ $testing } · { $view-parallel-1 } at once on { $view-machine-2 }
+
+repo-workflows-parallel_bisect-progress-text-d4e57ece = Round { $n }, the last
+
+repo-workflows-parallel_bisect-progress-text-e6a71c30 = { " " }· testing { $n }
+
+repo-workflows-parallel_bisect-progress-text-f0a2d01a = { " " }· testing 1
+
+repo-workflows-parallel_bisect-start-parallel-3450e92d = A parallel bisect is already running in this tab
+
+repo-workflows-parallel_bisect-warning-4e969ad3 = { $text }
+    
+    The test said:
+    { $shown }
+
+repo-workflows-partial_stash-after-failed-push-26daff34 = git couldn't take the staged changes out of the working tree, perhaps because unstaged changes touch the same lines. Pick the files and stash them, or stash everything
+
+repo-workflows-partial_stash-after-failed-push-289207a8 = git can't take only the staged part of a binary file out of the working tree. Pick the files and stash them, or stash everything
+
+repo-workflows-partial_stash-after-failed-push-493b498c = git saved the stash ({ $super-short-now-1 }), then stopped. The changes are in that stash and may still be in the working tree too: check them before you pop or drop it (git said: { $one-line-e-2 })
+
+repo-workflows-partial_stash-after-failed-push-8f99c6b0 = nothing was stashed: { $why } (git said: { $one-line-e-1 })
+
+repo-workflows-partial_stash-everything-problem-63cc5481 = only untracked files have changes: tick Include untracked files
+
+repo-workflows-partial_stash-everything-problem-a7f01d16 = there are no changes to stash
+
+repo-workflows-partial_stash-files-problem-0a39f709 = { $paths-len-1 } files are too many to stash by name in one go (git's command line would be too long): pick fewer, or stash everything
+
+repo-workflows-partial_stash-files-problem-9175a257 = “{ $path }” has no changes any more: cancel and pick the files again
+
+repo-workflows-partial_stash-files-problem-bdb546dd = pick the files to stash first ({ $crate-manual-command-1 }+click them in the changes)
+
+repo-workflows-partial_stash-push-args-0a7314b3 = a snapshot isn't made with git stash push
+
+repo-workflows-partial_stash-push-args-e90b2782 = nothing is staged
+
+repo-workflows-partial_stash-row-problem-140ed58d = the deletion of “{ $path }” is staged, which git can't stash by file name: unstage it first, or stash only what is staged
+
+repo-workflows-partial_stash-row-problem-78f72f91 = “{ $old }” → “{ $path }” is a staged rename, which git can't stash by file name: unstage it first, or stash only what is staged
+
+repo-workflows-partial_stash-row-problem-a2071523 = “{ $path }” has conflicts: resolve them first
+
+repo-workflows-partial_stash-run-push-a7f01d16 = there are no changes to stash
+
+repo-workflows-partial_stash-run-push-e90b2782 = nothing is staged
+
+repo-workflows-partial_stash-run-snapshot-63cc5481 = only untracked files have changes: tick Include untracked files
+
+repo-workflows-partial_stash-run-snapshot-f67020b0 = there are no changes to save
+
+repo-workflows-partial_stash-stash-8336fbfe = { $label } failed: { $e }
 
 repo-workflows-pr_review-verdict-buttons-eb1a70e3 = Discard
 
 repo-workflows-pr_view-dismiss-box-19766ed6 = Cancel
 
-repo-workflows-pr_view-entry-header-48845bff = Dismiss
-
-repo-workflows-push-dismiss-48845bff = Dismiss
-
 repo-workflows-push-rejected-683768ab = and { $r-behind-named-1 } more
-
-repo-workflows-reflog-recover-items-4c49fdb6 = Cherry-pick
-
-repo-workflows-reflog-reflog-menu-items-916e34d4 = Show in graph
 
 repo-workflows-reflog-scanning-19766ed6 = Cancel
 
@@ -4436,4 +4559,21 @@ repo-workflows-lfs-force-unlock-confirmation = { $count ->
         [one] Click again to force: its owner loses the lock.
        *[other] Click again to force: the owners lose their { $count } locks.
     }
+
+repo-workflows-parallel-machine-here = this computer
+
+repo-workflows-parallel-progress = { $round ->
+        [0] Getting ready
+       *[other] Round { $round }, { $more ->
+            [0] the last
+            [one] about 1 more
+           *[other] about { $more } more
+        }
+    } · { $left ->
+        [one] 1 commit left
+       *[other] { $left } of { $total } commits left
+    }{ $testing ->
+        [0] { "" }
+       *[other] { " · testing " }{ $testing }
+    } · { $parallel } at once on { $machine }
 

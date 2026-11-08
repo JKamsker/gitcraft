@@ -54,7 +54,7 @@ pub(super) struct Parallel {
 
 /// What the banner and the graph show of a parallel bisect.
 pub(super) struct View {
-    machine: String,
+    machine: Machine,
     parallel: usize,
     /// What it is doing, before the rounds (or after them, while clearing up).
     step: Option<String>,
@@ -86,9 +86,16 @@ pub(super) struct Tested {
 }
 
 impl View {
+    fn machine_label(&self) -> String {
+        match &self.machine {
+            Machine::Here => crate::i18n::text("repo-workflows-parallel-machine-here").to_owned(),
+            Machine::There(_) => self.machine.label(),
+        }
+    }
+
     fn new(setup: &pb::Setup) -> Self {
         Self {
-            machine: setup.machine.label(),
+            machine: setup.machine.clone(),
             parallel: setup.parallel,
             step: None,
             round: 0,
@@ -227,7 +234,10 @@ impl RepoTab {
                     && view.running()
                 {
                     view.cancelling = true;
-                    view.step = Some("Stopping the tests…".to_owned());
+                    view.step = Some(
+                        crate::i18n::text("repo-workflows-parallel_bisect-parallel-act-b0e5ccdc")
+                            .to_owned(),
+                    );
                 }
             }
             ParallelAct::Close => {
@@ -243,7 +253,8 @@ impl RepoTab {
     fn start_parallel(&mut self, setup: pb::Setup, ctx: &egui::Context) {
         if self.parallel.running() {
             self.status = Some((
-                "A parallel bisect is already running in this tab".to_owned(),
+                crate::i18n::text("repo-workflows-parallel_bisect-start-parallel-3450e92d")
+                    .to_owned(),
                 true,
             ));
             return;
@@ -279,10 +290,18 @@ impl RepoTab {
         };
         self.parallel.handle = None;
         let long = view.started.elapsed() > LONG_RUN;
-        let (message, failed) = outcome_message(&outcome, &view.machine);
+        let (message, failed) = outcome_message(&outcome, &view.machine_label());
         if long {
-            self.finished
-                .push((format!("{} · {message}", self.name), failed));
+            self.finished.push((
+                crate::i18n::message(
+                    "repo-workflows-parallel_bisect-poll-parallel-e34dd853",
+                    &[
+                        ("self-name-1", (self.name).clone().into()),
+                        ("message", (message).clone().into()),
+                    ],
+                ),
+                failed,
+            ));
         }
         self.status = Some((message, failed));
         if let Outcome::FirstBad(hash) = &outcome {
@@ -306,7 +325,11 @@ impl RepoTab {
             return;
         };
         if self.busy_op.is_some() {
-            self.status = Some(("Wait for the operation going on to finish".to_owned(), true));
+            self.status = Some((
+                crate::i18n::text("repo-workflows-parallel_bisect-mark-parallel-result-e5e3ecc5")
+                    .to_owned(),
+                true,
+            ));
             return;
         }
         let parents = self
@@ -333,8 +356,20 @@ impl RepoTab {
                 tab.busy_op = None;
                 tab.op_started = None;
                 tab.status = Some(match result {
-                    Ok(_) => ("Marked in the bisect".to_owned(), false),
-                    Err(e) => (format!("Mark in the bisect failed: {e}"), true),
+                    Ok(_) => (
+                        crate::i18n::text(
+                            "repo-workflows-parallel_bisect-mark-parallel-result-e05d54d7",
+                        )
+                        .to_owned(),
+                        false,
+                    ),
+                    Err(e) => (
+                        crate::i18n::message(
+                            "repo-workflows-parallel_bisect-mark-parallel-result-48f3588b",
+                            &[("e", (e).clone().into())],
+                        ),
+                        true,
+                    ),
                 });
                 tab.reload(ctx);
             },
@@ -372,37 +407,51 @@ impl RepoTab {
 fn outcome_message(outcome: &Outcome, machine: &str) -> (String, bool) {
     match outcome {
         Outcome::FirstBad(hash) => (
-            format!("Parallel bisect: {} is the first bad commit", short(hash)),
+            crate::i18n::message(
+                "repo-workflows-parallel_bisect-outcome-message-323d18af",
+                &[("short-hash-1", (short(hash)).clone().into())],
+            ),
             false,
         ),
         Outcome::OneOf(hashes) => (
-            format!(
-                "Parallel bisect: only skipped commits are left, the first bad commit is one of \
-                 these {}",
-                hashes.len()
+            crate::i18n::message(
+                "repo-workflows-parallel_bisect-outcome-message-5f365ac7",
+                &[("hashes-len-1", (hashes.len()).clone().into())],
             ),
             false,
         ),
         Outcome::GoodEndFails { hash, .. } => (
-            format!(
-                "Parallel bisect: the good end already fails ({} fails the test on {machine})",
-                short(hash)
+            crate::i18n::message(
+                "repo-workflows-parallel_bisect-outcome-message-a5f8e4f1",
+                &[
+                    ("short-hash-1", (short(hash)).clone().into()),
+                    ("machine", (machine).clone().into()),
+                ],
             ),
             true,
         ),
         Outcome::BadEndPasses { hash, .. } => (
-            format!(
-                "Parallel bisect: the bad end passes ({} passes the test on {machine})",
-                short(hash)
+            crate::i18n::message(
+                "repo-workflows-parallel_bisect-outcome-message-12d782ed",
+                &[
+                    ("short-hash-1", (short(hash)).clone().into()),
+                    ("machine", (machine).clone().into()),
+                ],
             ),
             true,
         ),
-        Outcome::Cancelled => ("Parallel bisect cancelled".to_owned(), false),
+        Outcome::Cancelled => (
+            crate::i18n::text("repo-workflows-parallel_bisect-outcome-message-9edd35e1").to_owned(),
+            false,
+        ),
         // Its first line: what follows (a test's output) shows on the banner's hover.
         Outcome::Failed(e) => (
-            format!(
-                "Parallel bisect failed: {}",
-                e.lines().next().unwrap_or_default()
+            crate::i18n::message(
+                "repo-workflows-parallel_bisect-outcome-message-db128bb5",
+                &[(
+                    "e-lines-next-unwrap-or-default-1",
+                    (e.lines().next().unwrap_or_default()).clone().into(),
+                )],
             ),
             true,
         ),

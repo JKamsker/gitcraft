@@ -136,12 +136,7 @@ impl RepoTab {
             ));
             if state.pending.is_some() {
                 ui.add(crate::spinner::Spinner::new());
-                if ui
-                    .button(crate::i18n::text(
-                        "repo-workflows-email-email-window-b64a0d4f",
-                    ))
-                    .clicked()
-                {
+                if ui.button("Cancel operation").clicked() {
                     acts.push(Action::Email(Act::Cancel));
                 }
             }

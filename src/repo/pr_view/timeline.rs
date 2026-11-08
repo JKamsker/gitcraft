@@ -181,11 +181,7 @@ fn entry_header(
         if let Some(review) = &entry.review_id
             && d.state == "OPEN"
             && d.extras.can_write()
-            && ui
-                .small_button(crate::i18n::text(
-                    "repo-workflows-pr_view-entry-header-48845bff",
-                ))
-                .clicked()
+            && ui.small_button("Dismiss").clicked()
         {
             acts.push(Action::Pr(PrAct::StartDismiss(review.clone())));
         }

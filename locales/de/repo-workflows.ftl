@@ -1885,8 +1885,6 @@ repo-workflows-email-email-window-b0fcf938 = Zusätzliche Empfänger. b4 ermitte
 
 repo-workflows-email-email-window-b28037e9 = Cc
 
-repo-workflows-email-email-window-b64a0d4f = Vorgang abbrechen
-
 repo-workflows-email-email-window-b8c5cd6e = Vorbereiteten Branch gelesen
 
 repo-workflows-email-email-window-bc346e4f = Aktuellen Branch registrieren
@@ -2727,7 +2725,7 @@ repo-workflows-hotfix-contents-dd94532f = { " " }seit { $t }
 
 repo-workflows-hotfix-contents-f3077f1d = { $plan-hotfix-name-1 } · { $plan-changes-len-2 } Änderung{ $if-plan-changes-len-1-else-s-3 }{ $plan-base-tag-as-deref-map-t-for-4 }
 
-repo-workflows-hotfix-contents-f5346a60 = Nach { $plan-main-name-1 } gemergt
+repo-workflows-hotfix-contents-f5346a60 = Gemergt nach { $plan-main-name-1 }
 
 repo-workflows-hotfix-hotfix-act-06b55025 = { $tag } ist keine Version, von der aus ein Hotfix erstellt werden kann
 
@@ -2951,9 +2949,13 @@ repo-workflows-lfs_locks-lock-job-36f5baee = { $label }: abgeschlossen
 
 repo-workflows-lfs_locks-lock-job-8336fbfe = { $label } fehlgeschlagen: { $e }
 
+repo-workflows-lfs_locks-lock-label-2a59d59e = jemandem
+
 repo-workflows-lfs_locks-lock-label-398e9b81 = Von { $who } gesperrt { $git-relative-time-at-now-1 }
 
 repo-workflows-lfs_locks-lock-label-6329feb6 = Von { $who } gesperrt
+
+repo-workflows-lfs_locks-lock-label-bb0347a4 = Ihnen
 
 repo-workflows-lfs_locks-lock-list-1a9f2707 = Keine der Sperren gehört Ihnen.
 
@@ -3177,7 +3179,7 @@ repo-workflows-line_dossier-line-dossier-view-6fe17b05 = Commit anzeigen
 
 repo-workflows-line_dossier-line-dossier-view-74b10c62 = Zeilendossier
 
-repo-workflows-line_dossier-line-dossier-view-82a9c46f = Committen
+repo-workflows-line_dossier-line-dossier-view-82a9c46f = Commit
 
 repo-workflows-line_dossier-line-dossier-view-9a2e3782 = Änderungen ausschließlich am Leerraum erkannt. Vor der Auswahl einer zu ignorierenden Revision den gesamten Commit prüfen.
 
@@ -3517,33 +3519,154 @@ repo-workflows-package-report-ui-fa5b38db = ÜBLICHERWEISE ENTHALTEN, FEHLT HIER
 
 repo-workflows-package-report-ui-fefc6039 = MÖGLICHERWEISE VERSEHENTLICH ENTHALTEN
 
+repo-workflows-parallel_bisect--1df5e96c = Eine parallele Bisektion läuft. Warten oder abbrechen.
+
 repo-workflows-parallel_bisect-hash-link-63633913 = Diesen Commit anzeigen
+
+repo-workflows-parallel_bisect-mark-parallel-result-48f3588b = Markieren in der Bisektion fehlgeschlagen: { $e }
+
+repo-workflows-parallel_bisect-mark-parallel-result-e05d54d7 = In der Bisektion markiert
+
+repo-workflows-parallel_bisect-mark-parallel-result-e5e3ecc5 = Warten, bis der laufende Vorgang abgeschlossen ist
+
+repo-workflows-parallel_bisect-outcome-message-12d782ed = Parallele Bisektion: Der fehlerhafte Endpunkt besteht ({ $short-hash-1 } besteht den Test auf { $machine })
+
+repo-workflows-parallel_bisect-outcome-message-323d18af = Parallele Bisektion: { $short-hash-1 } ist der erste fehlerhafte Commit
+
+repo-workflows-parallel_bisect-outcome-message-5f365ac7 = Parallele Bisektion: Nur übersprungene Commits bleiben. Der erste fehlerhafte Commit ist einer dieser { $hashes-len-1 }
+
+repo-workflows-parallel_bisect-outcome-message-9edd35e1 = Parallele Bisektion abgebrochen
+
+repo-workflows-parallel_bisect-outcome-message-a5f8e4f1 = Parallele Bisektion: Der fehlerfreie Endpunkt schlägt bereits fehl ({ $short-hash-1 } besteht den Test auf { $machine } nicht)
+
+repo-workflows-parallel_bisect-outcome-message-db128bb5 = Parallele Bisektion fehlgeschlagen: { $e-lines-next-unwrap-or-default-1 }
+
+repo-workflows-parallel_bisect-parallel-act-b0e5ccdc = Tests werden beendet …
+
+repo-workflows-parallel_bisect-parallel-banner-45515967 = Parallele Bisektion
+
+repo-workflows-parallel_bisect-parallel-banner-button-0afdf9b5 = Testet hier, in WSL oder über SSH mehrere Commits zwischen diesen Markierungen gleichzeitig in eigenen Worktrees
+
+repo-workflows-parallel_bisect-parallel-banner-button-2fe0d401 = Parallel ausführen …
+
+repo-workflows-parallel_bisect-parallel-banner-button-c3efc1be = Zuerst einen fehlerfreien und einen fehlerhaften Commit markieren
 
 repo-workflows-parallel_bisect-parallel-buttons-19766ed6 = Abbrechen
 
+repo-workflows-parallel_bisect-parallel-buttons-6e22ee66 = Tests werden beendet und Worktrees entfernt …
+
 repo-workflows-parallel_bisect-parallel-buttons-7d9eb7ac = Schließen
 
-repo-workflows-parallel_bisect-parallel-buttons-e5e3ecc5 = Warten Sie, bis der laufende Vorgang abgeschlossen ist
+repo-workflows-parallel_bisect-parallel-buttons-920ea26f = Beendet alle laufenden Tests und entfernt die Worktrees
+
+repo-workflows-parallel_bisect-parallel-buttons-da3f866e = Markiert den ersten fehlerhaften Commit als fehlerhaft und seine Eltern als fehlerfrei. Die laufende Bisektion endet damit ebenfalls dort.
+
+repo-workflows-parallel_bisect-parallel-buttons-e5e3ecc5 = Warten, bis der laufende Vorgang abgeschlossen ist
+
+repo-workflows-parallel_bisect-parallel-buttons-ec156be0 = In der Bisektion markieren
 
 repo-workflows-parallel_bisect-parallel-link-63633913 = Diesen Commit anzeigen
 
+repo-workflows-parallel_bisect-parallel-mark-51062cd0 = Kann noch der erste fehlerhafte Commit sein
+
+repo-workflows-parallel_bisect-parallel-mark-6215068d = Wird auf { $view-machine-1 } getestet …
+
+repo-workflows-parallel_bisect-parallel-mark-bbf45cc1 = Der erste fehlerhafte Commit laut paralleler Bisektion
+
+repo-workflows-parallel_bisect-parallel-mark-d81987fc = Der Dateibaum wurde bereits getestet
+
+repo-workflows-parallel_bisect-parallel-mark-f2395948 = { $capital-verdict-word-1 } in der parallelen Bisektion ({ $how })
+
+repo-workflows-parallel_bisect-parallel-menu-items-7109f605 = Testet mehrere Commits gleichzeitig in eigenen Worktrees (hier, in WSL oder über SSH), um den ersten fehlerhaften Commit zu finden. Der Checkout bleibt unverändert.
+
+repo-workflows-parallel_bisect-parallel-menu-items-be3adae3 = Von hier aus parallel halbieren …
+
+repo-workflows-parallel_bisect-parallel-outcome-25230d8d = Nur übersprungene Commits bleiben. Der erste fehlerhafte Commit ist einer dieser { $hashes-len-1 }:
+
 repo-workflows-parallel_bisect-parallel-outcome-683768ab = und { $hashes-len-max-named-1 } weitere
 
+repo-workflows-parallel_bisect-parallel-outcome-7997ad5c = Schon der fehlerfreie Endpunkt schlägt fehl: { $short-hash-1 } besteht den Test auf { $machine } nicht. Danach gibt es nichts zu suchen. Den Befehl prüfen oder einen älteren fehlerfreien Commit markieren.
+
 repo-workflows-parallel_bisect-parallel-outcome-8b3812c0 = Erster fehlerhafter Commit:
+
+repo-workflows-parallel_bisect-parallel-outcome-a804fbac = Der fehlerhafte Endpunkt besteht: { $short-hash-1 } besteht den Test auf { $machine }. Der Test zeigt das Problem dort also nicht. Den Befehl prüfen.
+
+repo-workflows-parallel_bisect-parallel-outcome-ac8a5ffa = Abgebrochen. Die Tests wurden beendet und die Worktrees entfernt.
+
+repo-workflows-parallel_bisect-parallel-palette-items-060e9182 = Parallele Bisektion: abbrechen
+
+repo-workflows-parallel_bisect-parallel-palette-items-a69bdd78 = Parallel halbieren …
+
+repo-workflows-parallel_bisect-poll-parallel-e34dd853 = { $self-name-1 } · { $message }
+
+repo-workflows-parallel_bisect-progress-text-0246004e = Runde { $n }, ungefähr { $more } weitere
+
+repo-workflows-parallel_bisect-progress-text-575afe47 = { $n } von { $view-total-1 } Commits verbleiben
+
+repo-workflows-parallel_bisect-progress-text-9879a77a = Runde { $n }, ungefähr eine weitere
+
+repo-workflows-parallel_bisect-progress-text-9c508bc4 = Vorbereitung
+
+repo-workflows-parallel_bisect-progress-text-a8c510c9 = Ein Commit verbleibt
+
+repo-workflows-parallel_bisect-progress-text-b6c2fb65 = { $round } · { $left }{ $testing } · { $view-parallel-1 } gleichzeitig auf { $view-machine-2 }
+
+repo-workflows-parallel_bisect-progress-text-d4e57ece = Runde { $n }, die letzte
+
+repo-workflows-parallel_bisect-progress-text-e6a71c30 = { " " }· { $n } Tests laufen
+
+repo-workflows-parallel_bisect-progress-text-f0a2d01a = { " " }· ein Test läuft
+
+repo-workflows-parallel_bisect-start-parallel-3450e92d = In diesem Tab läuft bereits eine parallele Bisektion
+
+repo-workflows-parallel_bisect-warning-4e969ad3 = { $text }
+    
+    Testausgabe:
+    { $shown }
+
+repo-workflows-partial_stash-after-failed-push-26daff34 = Git konnte die vorgemerkten Änderungen nicht aus dem Arbeitsverzeichnis entfernen. Möglicherweise betreffen nicht vorgemerkte Änderungen dieselben Zeilen. Dateien auswählen und stashen oder alles stashen.
+
+repo-workflows-partial_stash-after-failed-push-289207a8 = Git kann den vorgemerkten Teil einer Binärdatei nicht einzeln aus dem Arbeitsverzeichnis entfernen. Dateien auswählen und stashen oder alles stashen.
+
+repo-workflows-partial_stash-after-failed-push-493b498c = Git hat den Stash ({ $super-short-now-1 }) gespeichert und danach angehalten. Die Änderungen liegen im Stash und möglicherweise weiterhin im Arbeitsverzeichnis. Vor dem Anwenden oder Löschen prüfen (Git meldete: { $one-line-e-2 }).
+
+repo-workflows-partial_stash-after-failed-push-8f99c6b0 = Nichts wurde gestasht: { $why } (Git meldete: { $one-line-e-1 })
+
+repo-workflows-partial_stash-everything-problem-63cc5481 = Nur unversionierte Dateien sind geändert. „Unversionierte Dateien einschließen“ aktivieren.
+
+repo-workflows-partial_stash-everything-problem-a7f01d16 = Es gibt keine Änderungen zum Stashen
+
+repo-workflows-partial_stash-files-problem-0a39f709 = { $paths-len-1 } Dateien sind zu viele für einen Stash nach Namen (die Git-Befehlszeile wäre zu lang). Weniger Dateien auswählen oder alles stashen.
+
+repo-workflows-partial_stash-files-problem-9175a257 = „{ $path }“ hat keine Änderungen mehr. Abbrechen und die Dateien erneut auswählen.
+
+repo-workflows-partial_stash-files-problem-bdb546dd = Zuerst die zu stashenden Dateien auswählen ({ $crate-manual-command-1 }+Klick auf die Änderungen)
+
+repo-workflows-partial_stash-push-args-0a7314b3 = Eine Momentaufnahme wird nicht mit git stash push erstellt
+
+repo-workflows-partial_stash-push-args-e90b2782 = Nichts ist vorgemerkt
+
+repo-workflows-partial_stash-row-problem-140ed58d = Die Löschung von „{ $path }“ ist vorgemerkt. Git kann sie nicht nach Dateinamen stashen. Zuerst die Vormerkung entfernen oder nur die vorgemerkten Änderungen stashen.
+
+repo-workflows-partial_stash-row-problem-78f72f91 = „{ $old }“ → „{ $path }“ ist eine vorgemerkte Umbenennung. Git kann sie nicht nach Dateinamen stashen. Zuerst die Vormerkung entfernen oder nur die vorgemerkten Änderungen stashen.
+
+repo-workflows-partial_stash-row-problem-a2071523 = „{ $path }“ hat Konflikte. Diese zuerst lösen.
+
+repo-workflows-partial_stash-run-push-a7f01d16 = Es gibt keine Änderungen zum Stashen
+
+repo-workflows-partial_stash-run-push-e90b2782 = Nichts ist vorgemerkt
+
+repo-workflows-partial_stash-run-snapshot-63cc5481 = Nur unversionierte Dateien sind geändert. „Unversionierte Dateien einschließen“ aktivieren.
+
+repo-workflows-partial_stash-run-snapshot-f67020b0 = Es gibt keine Änderungen zum Speichern
+
+repo-workflows-partial_stash-stash-8336fbfe = { $label } fehlgeschlagen: { $e }
 
 repo-workflows-pr_review-verdict-buttons-eb1a70e3 = Verwerfen
 
 repo-workflows-pr_view-dismiss-box-19766ed6 = Abbrechen
 
-repo-workflows-pr_view-entry-header-48845bff = Schließen
-
-repo-workflows-push-dismiss-48845bff = Schließen
-
 repo-workflows-push-rejected-683768ab = und { $r-behind-named-1 } weitere
-
-repo-workflows-reflog-recover-items-4c49fdb6 = Cherry-Pick
-
-repo-workflows-reflog-reflog-menu-items-916e34d4 = Im Graphen anzeigen
 
 repo-workflows-reflog-scanning-19766ed6 = Abbrechen
 
@@ -4436,4 +4559,22 @@ repo-workflows-lfs-force-unlock-confirmation = { $count ->
         [one] Erneut klicken, um die Freigabe zu erzwingen. Der Inhaber verliert die Sperre.
        *[other] Erneut klicken, um die Freigabe zu erzwingen. Die Inhaber verlieren ihre { $count } Sperren.
     }
+
+repo-workflows-parallel-machine-here = diesem Rechner
+
+repo-workflows-parallel-progress = { $round ->
+        [0] Vorbereitung
+       *[other] Runde { $round }, { $more ->
+            [0] die letzte
+            [one] ungefähr eine weitere
+           *[other] ungefähr { $more } weitere
+        }
+    } · { $left ->
+        [one] Ein Commit verbleibt
+       *[other] { $left } von { $total } Commits verbleiben
+    }{ $testing ->
+        [0] { "" }
+        [one] { " · ein Test läuft" }
+       *[other] { " · " }{ $testing } Tests laufen
+    } · { $parallel } gleichzeitig auf { $machine }
 

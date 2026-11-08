@@ -163,8 +163,10 @@ impl LockState {
 /// "Locked by Ana 2 days ago", "Locked by you just now".
 pub(in crate::repo) fn lock_label(lock: &LfsLock, now: i64) -> String {
     let who = match lock.ours {
-        Some(true) => "you",
-        _ if lock.owner.is_empty() => "someone",
+        Some(true) => crate::i18n::text("repo-workflows-lfs_locks-lock-label-bb0347a4"),
+        _ if lock.owner.is_empty() => {
+            crate::i18n::text("repo-workflows-lfs_locks-lock-label-2a59d59e")
+        }
         _ => lock.owner.as_str(),
     };
     match lock.locked_at {
@@ -292,5 +294,36 @@ impl RepoTab {
                 tab.read_locks(git::Asked::Background, ctx);
             },
         );
+    }
+}
+
+#[cfg(test)]
+mod fluent_identity_tests {
+    use super::*;
+    #[test]
+    fn fluent_partition_lfs_lock_display_preserves_raw_push_classification() {
+        let lock = LfsLock {
+            id: "server-id".into(),
+            path: "Art/My File.psd".into(),
+            owner: "Opaque Owner".into(),
+            locked_at: None,
+            ours: None,
+        };
+        for (language, displayed) in [
+            ("en-US", "Locked by Opaque Owner"),
+            ("de", "Von Opaque Owner gesperrt"),
+        ] {
+            crate::i18n::set_language(language);
+            assert_eq!(lock_label(&lock, 0), displayed);
+            assert!(pushes_current("Push topic to origin", Some("topic")));
+            assert!(!pushes_current("Push tag v1 to origin", Some("topic")));
+            assert!(!pushes_current(
+                "external arbitrary operation",
+                Some("topic")
+            ));
+            assert_eq!(lock.id, "server-id");
+            assert_eq!(lock.path, "Art/My File.psd");
+        }
+        crate::i18n::set_language("en-US");
     }
 }

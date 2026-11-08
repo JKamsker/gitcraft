@@ -399,10 +399,7 @@ fn primary(ui: &mut Ui, label: &str, tip: &str, enabled: bool, clicked: impl FnO
 }
 
 fn dismiss(ui: &mut Ui, acts: &mut Vec<Action>) {
-    if ui
-        .button(crate::i18n::text("repo-workflows-push-dismiss-48845bff"))
-        .clicked()
-    {
+    if ui.button("Dismiss").clicked() {
         acts.push(Action::PushFlow(PushAct::Dismiss));
     }
 }
