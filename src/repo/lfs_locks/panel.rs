@@ -87,7 +87,10 @@ fn header(ui: &mut Ui, t: &Tokens, state: &LockState, acts: &mut Vec<Action>) ->
             }
         });
     });
-    for e in [&state.error, &state.job_error].into_iter().flatten() {
+    if let Some(e) = &state.error {
+        ui.add(egui::Label::new(RichText::new(state.display_read_error(e)).color(t.danger)).wrap());
+    }
+    if let Some(e) = &state.job_error {
         ui.add(egui::Label::new(RichText::new(e).color(t.danger)).wrap());
     }
     if let Some(busy) = &state.busy {

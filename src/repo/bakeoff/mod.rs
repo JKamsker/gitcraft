@@ -45,6 +45,7 @@ pub(crate) struct Bakeoff {
     polled: Option<Instant>,
     assembling: bool,
     note: Option<(String, bool)>,
+    note_presentation: Option<(String, BakeNote)>,
     /// Numbers the comparisons asked for: an older answer doesn't replace a newer one.
     request: u64,
     /// The attempts' trees the picks were made for.
@@ -124,6 +125,7 @@ impl Bakeoff {
             polled: None,
             assembling: false,
             note: None,
+            note_presentation: None,
             request: next_request(),
             picked_trees: Vec::new(),
             rows: Vec::new(),
@@ -180,13 +182,7 @@ impl RepoTab {
                 {
                     view.confirm_close = true;
                     let n = view.picks.len();
-                    view.note = Some((
-                        crate::i18n::message(
-                            "repo-workflows-bakeoff-unassembled",
-                            &[("count", (n).into())],
-                        ),
-                        true,
-                    ));
+                    view.remember_note(BakeNote::Unassembled { count: n }, true);
                 } else {
                     self.bakeoff.view = None;
                 }
@@ -286,11 +282,7 @@ impl RepoTab {
                     let trees: Vec<String> = new.attempts.iter().map(|a| a.tree.clone()).collect();
                     if trees != view.picked_trees {
                         if !view.picks.is_empty() {
-                            view.note = Some((
-                                crate::i18n::text("repo-workflows-bakeoff-load-bakeoff-c6f043db")
-                                    .to_owned(),
-                                true,
-                            ));
+                            view.remember_note(BakeNote::Changed, true);
                         }
                         view.picks.clear();
                         view.picked_trees = trees;
@@ -370,24 +362,19 @@ impl RepoTab {
                     && view.request == request
                 {
                     view.assembling = false;
+                    view.note_presentation = None;
                     view.note = Some(match &result {
                         Ok((branch, commit)) => {
                             view.made = Some(commit.clone());
                             // Another go at it needs a name of its own.
                             view.branch = next_name(branch);
-                            (
-                                crate::i18n::message(
-                                    "repo-workflows-bakeoff-assemble-c7f55e42",
-                                    &[
-                                        ("branch", (branch).clone().into()),
-                                        (
-                                            "crate-repo-short-commit-1",
-                                            (crate::repo::short(commit)).clone().into(),
-                                        ),
-                                    ],
-                                ),
-                                false,
-                            )
+                            let note = BakeNote::Made {
+                                branch: branch.clone(),
+                                commit: crate::repo::short(commit).into(),
+                            };
+                            let raw = note.raw();
+                            view.note_presentation = Some((raw.clone(), note));
+                            (raw, false)
                         }
                         Err(e) => (e.clone(), true),
                     });
@@ -418,10 +405,7 @@ impl RepoTab {
         let base = comparison.base.clone();
         let request = view.request;
         if command.is_empty() {
-            view.note = Some((
-                crate::i18n::text("repo-workflows-bakeoff-build-c18d3706").to_owned(),
-                true,
-            ));
+            view.remember_note(BakeNote::CommandMissing, true);
             return;
         }
         let name = view
@@ -491,6 +475,7 @@ impl RepoTab {
                     if let Some(view) = &mut tab.bakeoff.view
                         && view.request == request
                     {
+                        view.note_presentation = None;
                         view.note = Some((e, true));
                         if let Some(slot) = view.builds.get_mut(n) {
                             *slot = Some(Built::Unavailable);
@@ -596,6 +581,7 @@ impl Bakeoff {
             }
             Err(error) => {
                 self.builds[n] = Some(Built::Unavailable);
+                self.note_presentation = None;
                 self.note = Some((error, true));
             }
         }
@@ -730,6 +716,98 @@ mod fluent_kind_tests {
                 assert_eq!(side.kind() != "unchanged", !patch.is_empty());
                 assert_eq!(side.patch, patch);
             }
+        }
+        crate::i18n::set_language("en-US");
+    }
+}
+
+#[derive(Clone)]
+enum BakeNote {
+    Unassembled { count: usize },
+    Changed,
+    CommandMissing,
+    Made { branch: String, commit: String },
+}
+impl BakeNote {
+    fn raw(&self) -> String {
+        match self {
+            Self::Unassembled { count } => format!(
+                "{count} file{} picked and not assembled: close again to drop them",
+                if *count == 1 { "" } else { "s" }
+            ),
+            Self::Changed => "Picks cleared: the attempts changed since they were made".into(),
+            Self::CommandMissing => "Type the command that builds the project first".into(),
+            Self::Made { branch, commit } => format!("Made {branch} at {commit}"),
+        }
+    }
+    fn display(&self) -> String {
+        match self {
+            Self::Unassembled { count } => crate::i18n::message(
+                "repo-workflows-bakeoff-unassembled",
+                &[("count", (*count).into())],
+            ),
+            Self::Changed => {
+                crate::i18n::text("repo-workflows-bakeoff-load-bakeoff-c6f043db").into()
+            }
+            Self::CommandMissing => {
+                crate::i18n::text("repo-workflows-bakeoff-build-c18d3706").into()
+            }
+            Self::Made { branch, commit } => crate::i18n::message(
+                "repo-workflows-bakeoff-assemble-c7f55e42",
+                &[
+                    ("branch", branch.as_str().into()),
+                    ("crate-repo-short-commit-1", commit.as_str().into()),
+                ],
+            ),
+        }
+    }
+}
+impl Bakeoff {
+    fn remember_note(&mut self, note: BakeNote, error: bool) {
+        let raw = note.raw();
+        self.note = Some((raw.clone(), error));
+        self.note_presentation = Some((raw, note));
+    }
+    fn display_note(&self, raw: &str) -> String {
+        match &self.note_presentation {
+            Some((old, note)) if old == raw => note.display(),
+            _ => raw.into(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod fluent_r1_note_tests {
+    use super::*;
+    #[test]
+    fn fluent_partition_r1_bakeoff_same_note_keeps_picks_request_and_opaque_branch() {
+        for note in [
+            BakeNote::Unassembled { count: 1234 },
+            BakeNote::Changed,
+            BakeNote::CommandMissing,
+            BakeNote::Made {
+                branch: "raw/{$x}:日本語".into(),
+                commit: "1234abcd".into(),
+            },
+        ] {
+            crate::i18n::set_language("de");
+            let mut view = Bakeoff::new(vec![], "printf raw".into());
+            view.remember_note(note, true);
+            let raw = view.note.clone().unwrap().0;
+            let request = view.request;
+            for lang in ["de", "en-US", "de"] {
+                crate::i18n::set_language(lang);
+                if lang == "de" {
+                    assert_ne!(view.display_note(&raw), raw);
+                }
+                assert_eq!(view.note.as_ref().unwrap().0, raw);
+                assert_eq!(view.request, request);
+                assert_eq!(view.build_command, "printf raw");
+                assert!(view.picks.is_empty());
+                assert!(!view.assembling);
+            }
+            view.note_presentation = None;
+            assert_eq!(view.display_note(&raw), raw);
         }
         crate::i18n::set_language("en-US");
     }

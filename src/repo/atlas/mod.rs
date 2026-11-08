@@ -64,9 +64,7 @@ impl RepoTab {
             if s.trim().is_empty() {
                 Ok(None)
             } else {
-                Day::parse(s).map(Some).ok_or(crate::i18n::text(
-                    "repo-workflows-atlas-read-atlas-02c42736",
-                ))
+                Day::parse(s).map(Some).ok_or("Use YYYY-MM-DD dates")
             }
         };
         let query = match (parse(&view.from), parse(&view.through)) {
@@ -78,8 +76,7 @@ impl RepoTab {
                 }
             }
             _ => {
-                view.error =
-                    Some(crate::i18n::text("repo-workflows-atlas-read-atlas-67b18cbf").into());
+                view.error = Some(invalid_range_error());
                 return;
             }
         };
@@ -780,5 +777,36 @@ mod tests {
         assert_eq!(file.path, "src/a");
         assert_eq!(file.rev, Some("a".repeat(40)));
         Ok(())
+    }
+}
+
+fn invalid_range_error() -> String {
+    "Use YYYY-MM-DD dates, with start on or before end".into()
+}
+
+#[cfg(test)]
+mod fluent_r1_cache_tests {
+    use super::*;
+    #[test]
+    fn fluent_partition_r1_atlas_cached_validation_keeps_inputs_and_page() {
+        crate::i18n::set_language("de");
+        let mut state = State::default();
+        state.from = "raw bad date".into();
+        state.through = "2026-01-01".into();
+        state.error = Some(invalid_range_error());
+        let raw = state.error.clone().unwrap();
+        state.page = 7;
+        for lang in ["de", "en-US", "de"] {
+            crate::i18n::set_language(lang);
+            assert_eq!(
+                crate::repo::activity::display_workflow_error(&raw) == raw,
+                lang == "en-US"
+            );
+            assert_eq!(state.error.as_ref(), Some(&raw));
+            assert_eq!(state.from, "raw bad date");
+            assert_eq!(state.page, 7);
+            assert!(!state.reader.busy());
+        }
+        crate::i18n::set_language("en-US");
     }
 }

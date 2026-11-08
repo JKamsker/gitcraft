@@ -150,9 +150,8 @@ impl RepoTab {
                 }
                 crate::forge::history::lookup(
                     &repo,
-                    &hosting.ok_or(crate::i18n::text(
-                        "repo-workflows-line_dossier-poll-line-dossier-45e16671",
-                    ))?,
+                    &hosting
+                        .ok_or("No supported forge remote; commit history remains available")?,
                     &query,
                     active,
                 )
@@ -179,9 +178,7 @@ impl RepoTab {
                                 if old.cards.len() >= 256
                                     || bytes.saturating_add(card.text.len()) > 32 * 1024 * 1024
                                 {
-                                    history.stopped = crate::i18n::text(
-                                        "repo-workflows-line_dossier-poll-line-dossier-1cd553a8",
-                                    )
+                                    history.stopped = "Dossier display reached256versions or32MiB; start a separate trace to inspect earlier history"
                                     .into();
                                     history.continuation = None;
                                     history.alternatives.clear();
@@ -292,5 +289,38 @@ impl RepoTab {
             .summary_reader
             .queue(move |active| summary::run(&path, &settings, &cards, active));
         ctx.request_repaint();
+    }
+}
+
+#[cfg(test)]
+mod fluent_r1_cache_tests {
+    use super::*;
+    #[test]
+    fn fluent_partition_r1_dossier_cached_error_summary_and_evidence_keep_raw_source() {
+        let mut state = State::default();
+        state.open = true;
+        state.path = "raw: {$x}/日本語".into();
+        state.line = 1234;
+        state.error = Some("History read cancelled".into());
+        state.summary = Some(Err("History worker panicked".into()));
+        state.evidence = Some(Err("History worker stopped".into()));
+        for lang in ["de", "en-US", "de"] {
+            crate::i18n::set_language(lang);
+            for raw in [
+                state.error.as_ref().unwrap(),
+                state.summary.as_ref().unwrap().as_ref().unwrap_err(),
+                state.evidence.as_ref().unwrap().as_ref().unwrap_err(),
+            ] {
+                assert_eq!(
+                    crate::repo::activity::display_workflow_error(raw) == *raw,
+                    lang == "en-US"
+                );
+            }
+            assert_eq!(state.path, "raw: {$x}/日本語");
+            assert_eq!(state.line, 1234);
+            assert!(state.open);
+            assert!(!state.reader.busy());
+        }
+        crate::i18n::set_language("en-US");
     }
 }

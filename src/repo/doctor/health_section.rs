@@ -246,15 +246,22 @@ fn turn_on_action(s: &Suggestion, commands: &[String]) -> Action {
     let label = format!("Turn on: {}", s.title.to_lowercase());
     if s.title == "Scheduled maintenance" {
         return Action::Doctor(DoctorAct::Confirm(Confirm {
-            title: crate::i18n::text("repo-workflows-doctor-turn-on-action-3c97132f").to_owned(),
-            body: crate::i18n::message(
-                "repo-workflows-doctor-turn-on-action-7cde0a5e",
-                &[("commands-join-1", (commands.join(", ")).clone().into())],
+            title: "Schedule maintenance?".to_owned(),
+            body: format!(
+                "{} adds this repository to maintenance.repo in your own global git config, sets \
+                 maintenance.auto=false and maintenance.strategy=incremental in its config, and \
+                 schedules git to run in the background: every hour it fetches from the \
+                 remotes into refs/prefetch. The scheduled runs read your own global config, \
+                 not a gitcraft profile's. git maintenance unregister undoes it for this \
+                 repository (and git config --unset maintenance.auto brings automatic gc \
+                 back); git maintenance stop removes the schedule for every repository.",
+                commands.join(", ")
             ),
-            button: crate::i18n::text("repo-workflows-doctor-turn-on-action-f4830a1d").to_owned(),
+            button: "Schedule".to_owned(),
             label,
             ops: s.ops.clone(),
-        }));
+            presentation: None,
+} .with_presentation(super::ConfirmKind::Maintenance { commands: commands.join(", ") })));
     }
     Action::Doctor(DoctorAct::Run {
         label,

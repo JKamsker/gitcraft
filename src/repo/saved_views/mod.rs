@@ -18,6 +18,8 @@ struct Preferences {
     version: u32,
     saved: Vec<Preset>,
     active: Option<Preset>,
+    #[serde(default)]
+    generated_active: Option<Preset>,
 }
 impl Default for Preferences {
     fn default() -> Self {
@@ -25,6 +27,7 @@ impl Default for Preferences {
             version: 1,
             saved: Vec::new(),
             active: None,
+            generated_active: None,
         }
     }
 }
@@ -38,7 +41,38 @@ impl Preferences {
         if self.active.as_ref().is_some_and(|p| !p.valid()) {
             self.active = None;
         }
+        if self.active.as_ref() != self.generated_active.as_ref() {
+            self.generated_active = None;
+        }
         self
+    }
+    fn active_caption(&self) -> String {
+        let Some(active) = &self.active else {
+            return crate::i18n::text("repo-workflows-saved_views-saved-graph-header-0b3db67d")
+                .into();
+        };
+        if self.generated_active.as_ref() != Some(active) {
+            return active.name.clone();
+        }
+        match &active.kind {
+            Kind::MyUnpushed => {
+                crate::i18n::text("repo-workflows-saved_views-saved-graph-header-5f0d0c04").into()
+            }
+            Kind::RecentAncestors => {
+                crate::i18n::text("repo-workflows-saved_views-saved-graph-header-a5d2f076").into()
+            }
+            Kind::Descendants { anchor } => crate::i18n::message(
+                "repo-workflows-saved_views-saved-graph-header-d2cb0f94",
+                &[(
+                    "super-super-short-anchor-1",
+                    super::super::short(anchor).into(),
+                )],
+            ),
+            Kind::MergesInto { branch } => crate::i18n::message(
+                "repo-workflows-saved_views-saved-graph-header-b5bc2926",
+                &[("b-name-1", branch.as_str().into())],
+            ),
+        }
     }
 }
 enum Answer {
@@ -269,5 +303,76 @@ impl RepoTab {
             git::investigations::page(&repo, &tips, skip, order, git::LOG_PAGE, active)
                 .map(|page| Answer::Page(generation, page))
         });
+    }
+}
+
+#[cfg(test)]
+mod fluent_r1_preset_tests {
+    use super::*;
+    #[test]
+    fn fluent_partition_r1_generated_preset_origin_persists_and_legacy_user_names_stay_opaque() {
+        for (name, kind) in [
+            ("My unpushed work", Kind::MyUnpushed),
+            ("My recent changes + dependencies", Kind::RecentAncestors),
+            (
+                "Descendants of aaaaaaaa",
+                Kind::Descendants {
+                    anchor: "a".repeat(40),
+                },
+            ),
+            (
+                "Only merges into raw/main",
+                Kind::MergesInto {
+                    branch: "raw/main".into(),
+                },
+            ),
+        ] {
+            let preset = Preset {
+                name: name.into(),
+                kind,
+                days: 30,
+            };
+            let original = Preferences {
+                active: Some(preset.clone()),
+                generated_active: Some(preset.clone()),
+                ..Default::default()
+            };
+            let encoded = serde_json::to_string(&original).unwrap();
+            let restored: Preferences = serde_json::from_str(&encoded).unwrap();
+            let mut first = None;
+            for lang in ["de", "en-US", "de"] {
+                crate::i18n::set_language(lang);
+                let caption = restored.active_caption();
+                if lang == "de" {
+                    assert_ne!(caption, name);
+                    if let Some(first) = &first {
+                        assert_eq!(&caption, first);
+                    } else {
+                        first = Some(caption);
+                    }
+                } else {
+                    assert_eq!(caption, name);
+                }
+                assert_eq!(restored.active.as_ref(), Some(&preset));
+                assert_eq!(serde_json::to_string(&restored).unwrap(), encoded);
+            }
+            for custom in [name, "Meine ungepushten Änderungen", "My unpushed work"] {
+                let mut user = restored.clone();
+                user.active.as_mut().unwrap().name = custom.into();
+                user.generated_active = None;
+                for lang in ["de", "en-US", "de"] {
+                    crate::i18n::set_language(lang);
+                    assert_eq!(user.active_caption(), custom);
+                }
+                let mut legacy = serde_json::to_value(&user).unwrap();
+                legacy.as_object_mut().unwrap().remove("generated_active");
+                let legacy: Preferences = serde_json::from_value(legacy).unwrap();
+                assert_eq!(legacy.active_caption(), custom);
+            }
+            let mut mismatch = restored;
+            mismatch.active.as_mut().unwrap().days += 1;
+            assert_eq!(mismatch.active_caption(), name);
+        }
+        crate::i18n::set_language("en-US");
     }
 }

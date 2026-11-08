@@ -6,7 +6,7 @@ use std::time::Duration;
 
 use egui::{RichText, Ui};
 
-use super::{Running, coverage, elapsed};
+use super::{MessageNote, Running, elapsed};
 use crate::ai::detect::{self, Look};
 use crate::ai::prompt::split_message;
 use crate::ai::{self, AiTool, Answer, Question, RunError};
@@ -219,6 +219,7 @@ impl RepoTab {
             return;
         }
         self.ai.writing = None;
+        self.ai.note_presentation = None;
         let answer = match answer {
             Ok(answer) => answer,
             Err(RunError::Cancelled) => return,
@@ -229,13 +230,19 @@ impl RepoTab {
         };
         let (summary, body) = split_message(&answer.text);
         if summary.is_empty() {
-            self.ai.note = Some((
-                crate::i18n::text("repo-workflows-ai-message-answered-00f5dcad").to_owned(),
-                true,
-            ));
+            self.ai.remember_message_note(MessageNote::Empty, true);
             return;
         }
-        self.ai.note = coverage(answer.files, answer.left_out).map(|n| (n, false));
+        self.ai.note = None;
+        if answer.left_out > 0 {
+            self.ai.remember_message_note(
+                MessageNote::Coverage {
+                    files: answer.files,
+                    left_out: answer.left_out,
+                },
+                false,
+            );
+        }
         if self.commit_summary.trim().is_empty() && self.commit_body.trim().is_empty() {
             self.commit_summary = summary;
             self.commit_body = body;
@@ -268,7 +275,14 @@ impl RepoTab {
             let mut dismissed = false;
             ui.horizontal(|ui| {
                 let color = if *error { t.danger } else { t.text_faint };
-                ui.add(egui::Label::new(RichText::new(text).color(color).small()).wrap());
+                ui.add(
+                    egui::Label::new(
+                        RichText::new(self.ai.display_message_note(text))
+                            .color(color)
+                            .small(),
+                    )
+                    .wrap(),
+                );
                 dismissed = icons::small_button(
                     ui,
                     "x",

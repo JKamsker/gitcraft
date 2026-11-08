@@ -757,7 +757,10 @@ fn assemble_bar(ui: &mut Ui, view: &mut Bakeoff, t: &Tokens, act: &mut Option<Ba
             ui.add(crate::spinner::Spinner::new().size(14.0));
         }
         if let Some((note, error)) = &view.note {
-            ui.colored_label(if *error { t.danger } else { t.success }, note);
+            ui.colored_label(
+                if *error { t.danger } else { t.success },
+                view.display_note(note),
+            );
         }
         if view.made.is_some()
             && ui

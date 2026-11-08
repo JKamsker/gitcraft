@@ -70,15 +70,12 @@ impl RepoTab {
                 let how = if result.is_some_and(|r| r.cached) {
                     crate::i18n::text("repo-workflows-parallel_bisect-parallel-mark-d81987fc")
                 } else {
-                    "tested"
+                    crate::i18n::text("repo-workflows-r1-tested")
                 };
                 let mut said = crate::i18n::message(
                     "repo-workflows-parallel_bisect-parallel-mark-f2395948",
                     &[
-                        (
-                            "capital-verdict-word-1",
-                            (capital(verdict.word())).clone().into(),
-                        ),
+                        ("capital-verdict-word-1", display_verdict(*verdict).into()),
                         ("how", (how).clone().into()),
                     ],
                 );
@@ -130,4 +127,43 @@ fn capital(word: &str) -> String {
         .next()
         .map(|c| c.to_uppercase().chain(chars).collect())
         .unwrap_or_default()
+}
+
+fn display_verdict(verdict: Verdict) -> &'static str {
+    crate::i18n::text(match verdict {
+        Verdict::Good => "repo-workflows-r1-verdict-good",
+        Verdict::Bad => "repo-workflows-r1-verdict-bad",
+        Verdict::Skip => "repo-workflows-r1-verdict-skip",
+        Verdict::TimedOut => "repo-workflows-r1-verdict-timeout",
+    })
+}
+
+#[cfg(test)]
+mod fluent_r1_word_tests {
+    use super::*;
+    #[test]
+    fn fluent_partition_r1_fixed_verdict_display_preserves_raw_classifier_words() {
+        for (verdict, raw, en, de) in [
+            (Verdict::Good, "good", "Good", "Gut"),
+            (Verdict::Bad, "bad", "Bad", "Schlecht"),
+            (Verdict::Skip, "skip", "Skip", "Übersprungen"),
+            (
+                Verdict::TimedOut,
+                "timed out",
+                "Timed out",
+                "Zeitlimit überschritten",
+            ),
+        ] {
+            for lang in ["de", "en-US", "de"] {
+                crate::i18n::set_language(lang);
+                assert_eq!(verdict.word(), raw);
+                assert_eq!(display_verdict(verdict), if lang == "de" { de } else { en });
+                assert_eq!(
+                    crate::i18n::text("repo-workflows-r1-tested"),
+                    if lang == "de" { "getestet" } else { "tested" }
+                );
+            }
+        }
+        crate::i18n::set_language("en-US");
+    }
 }

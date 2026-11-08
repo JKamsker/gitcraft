@@ -367,7 +367,7 @@ impl RepoTab {
             }
             if entry.is_some_and(|e| e.origin == Origin::Outside) {
                 let galley = ui.painter().layout_no_wrap(
-                    "elsewhere".to_owned(),
+                    crate::i18n::text("repo-workflows-r1-elsewhere").to_owned(),
                     theme::medium(10.5),
                     t.warning,
                 );

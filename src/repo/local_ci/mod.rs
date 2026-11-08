@@ -17,7 +17,7 @@ pub(crate) enum Act {
     Cancel,
 }
 enum Reply {
-    Catalog(Result<(Vec<Workflow>, Vec<String>), String>),
+    Catalog(Result<(Vec<Workflow>, Vec<run::CatalogFailure>), run::CatalogFailure>),
     Finished(Result<String, String>),
 }
 struct Pending {
@@ -27,7 +27,7 @@ struct Pending {
 }
 pub(super) struct State {
     workflows: Vec<Workflow>,
-    errors: Vec<String>,
+    errors: Vec<run::CatalogFailure>,
     workflow: usize,
     event: usize,
     job: usize,
@@ -42,6 +42,7 @@ pub(super) struct State {
     trust: bool,
     pending: Option<Pending>,
     result: Option<Result<String, String>>,
+    result_presentation: Option<(String, run::CatalogFailure)>,
     log: Arc<Mutex<run::Log>>,
     provenance: Option<String>,
 }
@@ -64,6 +65,7 @@ impl Default for State {
             trust: false,
             pending: None,
             result: None,
+            result_presentation: None,
             log: Arc::default(),
             provenance: None,
         }
@@ -79,10 +81,7 @@ impl State {
         };
         if pending.context != connections::current() {
             self.pending = None;
-            self.result = Some(Err(crate::i18n::text(
-                "repo-workflows-local_ci-poll-93b6c091",
-            )
-            .into()));
+            self.remember_catalog_failure(run::CatalogFailure::Stale);
             return;
         }
         match pending.reply.try_recv() {
@@ -100,17 +99,17 @@ impl State {
                             self.trust = false;
                             self.result = None;
                         }
-                        Err(e) => self.result = Some(Err(e)),
+                        Err(e) => self.remember_catalog_failure(e),
                     },
-                    Reply::Finished(result) => self.result = Some(result),
+                    Reply::Finished(result) => {
+                        self.result_presentation = None;
+                        self.result = Some(result);
+                    }
                 }
             }
             Err(mpsc::TryRecvError::Disconnected) => {
                 self.pending = None;
-                self.result = Some(Err(crate::i18n::text(
-                    "repo-workflows-local_ci-poll-3b4f1312",
-                )
-                .into()));
+                self.remember_catalog_failure(run::CatalogFailure::Ended);
             }
             Err(mpsc::TryRecvError::Empty) => {
                 ctx.request_repaint_after(std::time::Duration::from_millis(100));
@@ -155,7 +154,10 @@ impl State {
                     context: connections::current(),
                 });
             }
-            Err(e) => self.result = Some(Err(e)),
+            Err(e) => {
+                self.result_presentation = None;
+                self.result = Some(Err(e));
+            }
         }
     }
     fn ui(&mut self, ui: &mut egui::Ui, acts: &mut Vec<Action>, remotes: &[crate::git::Remote]) {
@@ -206,10 +208,7 @@ impl State {
             }
         });
         for error in &self.errors {
-            ui.colored_label(
-                egui::Color32::YELLOW,
-                crate::repo::activity::display_workflow_error(&error),
-            );
+            ui.colored_label(egui::Color32::YELLOW, error.display());
         }
         if let Some(result) = &self.result {
             match result {
@@ -217,10 +216,7 @@ impl State {
                     ui.label(s);
                 }
                 Err(e) => {
-                    ui.colored_label(
-                        egui::Color32::LIGHT_RED,
-                        crate::repo::activity::display_workflow_error(&e),
-                    );
+                    ui.colored_label(egui::Color32::LIGHT_RED, self.display_result_error(e));
                 }
             }
         }
@@ -313,10 +309,7 @@ impl State {
         let entries = match workflow.matrices(job) {
             Ok(entries) => entries,
             Err(e) => {
-                ui.colored_label(
-                    egui::Color32::YELLOW,
-                    crate::repo::activity::display_workflow_error(&e),
-                );
+                ui.colored_label(egui::Color32::YELLOW, self.display_result_error(e));
                 return;
             }
         };
@@ -346,10 +339,7 @@ impl State {
                 ));
             }
             Err(e) => {
-                ui.colored_label(
-                    egui::Color32::YELLOW,
-                    crate::repo::activity::display_workflow_error(&e),
-                );
+                ui.colored_label(egui::Color32::YELLOW, self.display_result_error(e));
                 return;
             }
         }
@@ -383,10 +373,7 @@ impl State {
                 ui.label(context.display());
             }
             Err(error) => {
-                ui.colored_label(
-                    egui::Color32::YELLOW,
-                    crate::repo::activity::display_workflow_error(&error),
-                );
+                ui.colored_label(egui::Color32::YELLOW, error.display());
             }
         }
         ui.label(crate::i18n::text(
@@ -514,7 +501,7 @@ impl RepoTab {
             Act::Load => {
                 let path = self.path.clone();
                 self.local_ci.submit(&self._jobs.0, ctx, None, move || {
-                    Reply::Catalog(run::read_catalog(&path))
+                    Reply::Catalog(run::read_catalog_with_witness(&path))
                 });
             }
             Act::Run => {
@@ -598,5 +585,19 @@ impl RepoTab {
     pub(super) fn local_ci_ui(&mut self, ui: &mut egui::Ui, acts: &mut Vec<Action>) {
         self.local_ci_context_default();
         self.local_ci.ui(ui, acts, &self.remotes);
+    }
+}
+
+impl State {
+    fn remember_catalog_failure(&mut self, failure: run::CatalogFailure) {
+        let raw = failure.raw();
+        self.result = Some(Err(raw.clone()));
+        self.result_presentation = Some((raw, failure));
+    }
+    fn display_result_error(&self, raw: &str) -> String {
+        match &self.result_presentation {
+            Some((old, failure)) if old == raw => failure.display(),
+            _ => crate::repo::activity::display_workflow_error(raw),
+        }
     }
 }

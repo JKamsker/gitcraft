@@ -132,34 +132,29 @@ fn manual_card(
 /// The question asked before clearing `files`' flags.
 fn clear(files: &[Flagged]) -> Action {
     let (label, what) = match files {
-        [one] => (
-            crate::i18n::message(
-                "repo-workflows-doctor-clear-7f76d2cf",
-                &[("one-path-1", (one.path).clone().into())],
-            ),
-            one.path.clone(),
-        ),
+        [one] => (format!("Clear the flag of {}", one.path), one.path.clone()),
         _ => (
-            crate::i18n::message(
-                "repo-workflows-doctor-clear-e318945b",
-                &[("files-len-1", (files.len()).clone().into())],
-            ),
-            crate::i18n::message(
-                "repo-workflows-doctor-clear-ac70d25c",
-                &[("files-len-1", (files.len()).clone().into())],
-            ),
+            format!("Clear the flags of {} files", files.len()),
+            format!("{} files", files.len()),
         ),
     };
-    Action::Doctor(DoctorAct::Confirm(Confirm {
-        title: crate::i18n::text("repo-workflows-doctor-clear-909d7fba").to_owned(),
-        body: crate::i18n::message(
-            "repo-workflows-doctor-clear-ae587a37",
-            &[("what", (what).clone().into())],
-        ),
-        button: crate::i18n::text("repo-workflows-doctor-clear-83b12c22").to_owned(),
-        label,
-        ops: flags::clear_ops(files),
-    }))
+    Action::Doctor(DoctorAct::Confirm(
+        Confirm {
+            title: "Clear the flags?".to_owned(),
+            body: format!(
+                "Git will look at {what} again: local edits show under Changes, where Discard \
+             would throw them away. Which files were flagged isn't kept, so this can't be \
+             undone here."
+            ),
+            button: "Clear".to_owned(),
+            label,
+            ops: flags::clear_ops(files),
+            presentation: None,
+        }
+        .with_presentation(super::ConfirmKind::Clear {
+            paths: files.iter().map(|f| f.path.clone()).collect(),
+        }),
+    ))
 }
 
 /// What sparse-checkout leaves out.
@@ -207,5 +202,75 @@ fn more(ui: &mut Ui, total: usize) {
             .italics()
             .color(Tokens::get(ui.ctx()).text_faint),
         );
+    }
+}
+
+#[cfg(test)]
+mod fluent_r1_confirmation_tests {
+    use super::*;
+    use egui_kittest::{Harness, kittest::Queryable};
+    #[test]
+    fn fluent_partition_r1_cached_doctor_confirmation_repaints_without_changing_label_or_argv() {
+        let files: Vec<_> = (0..1234)
+            .map(|i| Flagged {
+                path: format!("raw/{i}.txt"),
+                flag: Flag::AssumeUnchanged,
+            })
+            .collect();
+        crate::i18n::set_language("de");
+        let Action::Doctor(DoctorAct::Confirm(confirm)) = clear(&files) else {
+            panic!("actual clear must confirm")
+        };
+        assert_eq!(confirm.label, "Clear the flags of 1234 files");
+        let ops = confirm.ops.clone();
+        let raw = (
+            confirm.title.clone(),
+            confirm.body.clone(),
+            confirm.button.clone(),
+        );
+        let mut h = Harness::new_ui_state(
+            |ui, state: &mut (super::super::Confirm, Vec<Action>)| {
+                let (t, b, button) = state.0.displayed();
+                super::super::page::ask(
+                    ui,
+                    &t,
+                    &b,
+                    &button,
+                    crate::i18n::text("repo-workflows-doctor-confirm-modal-19766ed6"),
+                    |yes| Action::Doctor(DoctorAct::Answer(yes)),
+                    &mut state.1,
+                );
+            },
+            (confirm, Vec::new()),
+        );
+        for lang in ["de", "en-US", "de"] {
+            crate::i18n::set_language(lang);
+            h.run();
+            let (title, body, button) = h.state().0.displayed();
+            h.get_by_label(&title);
+            h.get_by_label(&body);
+            h.get_by_label(&button);
+            assert_eq!(h.state().0.ops, ops);
+            assert_eq!(h.state().0.label, "Clear the flags of 1234 files");
+            assert_eq!(
+                (
+                    h.state().0.title.clone(),
+                    h.state().0.body.clone(),
+                    h.state().0.button.clone()
+                ),
+                raw
+            );
+            assert!(h.state().1.is_empty());
+            if lang == "de" {
+                assert!(body.contains("1.234"));
+            }
+        }
+        h.get_by_label(&h.state().0.displayed().2).click();
+        h.run();
+        assert!(matches!(
+            h.state().1.as_slice(),
+            [Action::Doctor(DoctorAct::Answer(true))]
+        ));
+        crate::i18n::set_language("en-US");
     }
 }

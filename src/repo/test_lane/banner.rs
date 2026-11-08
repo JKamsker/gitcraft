@@ -50,8 +50,9 @@ impl RepoTab {
                     match &self.test_lane.run {
                         Some(run) => self.run_status(ui, run, acts),
                         None => {
-                            let e = self.test_lane.error.as_deref().unwrap_or_default();
-                            ui.add(egui::Label::new(RichText::new(e).color(t.danger)).truncate())
+                            let raw = self.test_lane.error.as_deref().unwrap_or_default();
+                            let e = self.test_lane.display_read_error(raw);
+                            ui.add(egui::Label::new(RichText::new(&e).color(t.danger)).truncate())
                                 .on_hover_text(e);
                         }
                     }

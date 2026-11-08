@@ -7634,3 +7634,20 @@ repo-workflows-calendar-month-heading = { $month ->
         [11] November
        *[12] December
     } { $year }
+
+repo-workflows-r1-choose = choose
+repo-workflows-r1-you = you
+repo-workflows-r1-locked = locked
+repo-workflows-r1-done = done
+repo-workflows-r1-unknown = unknown
+repo-workflows-r1-commented = commented
+repo-workflows-r1-moved = moved
+repo-workflows-r1-changed = changed
+repo-workflows-r1-added = added
+repo-workflows-r1-dropped = dropped
+repo-workflows-r1-elsewhere = elsewhere
+repo-workflows-r1-tested = tested
+repo-workflows-r1-verdict-good = Good
+repo-workflows-r1-verdict-bad = Bad
+repo-workflows-r1-verdict-skip = Skip
+repo-workflows-r1-verdict-timeout = Timed out

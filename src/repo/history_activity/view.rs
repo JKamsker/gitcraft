@@ -121,7 +121,10 @@ impl RepoTab {
                 .request_repaint_after(std::time::Duration::from_millis(100));
         }
         if let Some(error) = &view.error {
-            ui.colored_label(t.danger, error);
+            ui.colored_label(
+                t.danger,
+                crate::repo::activity::display_workflow_error(error),
+            );
         }
         if let Some(history) = &view.history {
             let coverage = if history.more {

@@ -140,7 +140,7 @@ fn labels(ui: &mut Ui, view: &VersionsView) {
 fn mark(pair: &Pair, sides: bool, t: &Tokens) -> (&'static str, Color32, &'static str) {
     match pair.kind {
         PairKind::Same if pair.moved => (
-            "moved",
+            crate::i18n::text("repo-workflows-r1-moved"),
             t.accent,
             crate::i18n::text("repo-workflows-versions-mark-493229a6"),
         ),
@@ -155,7 +155,7 @@ fn mark(pair: &Pair, sides: bool, t: &Tokens) -> (&'static str, Color32, &'stati
             crate::i18n::text("repo-workflows-versions-mark-c4cdd5dd"),
         ),
         PairKind::Changed => (
-            "changed",
+            crate::i18n::text("repo-workflows-r1-changed"),
             t.warning,
             crate::i18n::text("repo-workflows-versions-mark-6194c18b"),
         ),
@@ -165,7 +165,7 @@ fn mark(pair: &Pair, sides: bool, t: &Tokens) -> (&'static str, Color32, &'stati
             crate::i18n::text("repo-workflows-versions-mark-a1c7e1f3"),
         ),
         PairKind::Added => (
-            "added",
+            crate::i18n::text("repo-workflows-r1-added"),
             t.success,
             crate::i18n::text("repo-workflows-versions-mark-1162b77f"),
         ),
@@ -175,7 +175,7 @@ fn mark(pair: &Pair, sides: bool, t: &Tokens) -> (&'static str, Color32, &'stati
             crate::i18n::text("repo-workflows-versions-mark-a31c61c4"),
         ),
         PairKind::Dropped => (
-            "dropped",
+            crate::i18n::text("repo-workflows-r1-dropped"),
             t.danger,
             crate::i18n::text("repo-workflows-versions-mark-aa470a25"),
         ),
@@ -362,5 +362,36 @@ fn interdiff(ui: &mut Ui, pair: &Pair, data: Option<&Result<diff::DiffData, Stri
             let mut inner = ui.new_child(egui::UiBuilder::new().max_rect(rect));
             diff::interdiff_rows(&mut inner, data, id);
         }
+    }
+}
+
+#[cfg(test)]
+mod fluent_r1_mark_tests {
+    use super::*;
+    #[test]
+    fn fluent_partition_r1_series_marker_words_repaint_without_mutating_pair_identity() {
+        let ctx = egui::Context::default();
+        let t = Tokens::get(&ctx);
+        for (kind, moved, en, de) in [
+            (PairKind::Same, true, "moved", "verschoben"),
+            (PairKind::Changed, false, "changed", "geändert"),
+            (PairKind::Added, false, "added", "hinzugefügt"),
+            (PairKind::Dropped, false, "dropped", "entfernt"),
+        ] {
+            let pair = Pair {
+                kind,
+                moved,
+                old: None,
+                new: None,
+                body: vec!["opaque patch;\nraw".into()],
+            };
+            let original = pair.clone();
+            for lang in ["de", "en-US", "de"] {
+                crate::i18n::set_language(lang);
+                assert_eq!(mark(&pair, false, &t).0, if lang == "de" { de } else { en });
+                assert_eq!(pair, original);
+            }
+        }
+        crate::i18n::set_language("en-US");
     }
 }

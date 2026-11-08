@@ -13,8 +13,13 @@ pub(super) struct Boundary {
     pub old_mode: Option<String>,
     pub new_mode: Option<String>,
     pub reason: Option<String>,
+    binary_reason: bool,
 }
 impl Boundary {
+    pub fn display_reason(&self) -> Option<String> {
+        self.reason.as_ref().map(|raw| if self.binary_reason && raw == "Binary or non-UTF8 versions: compare the byte preview; line staging is unavailable" { crate::i18n::text("repo-workflows-file_comparison-boundary-26efe746").into() } else { raw.clone() })
+    }
+
     pub fn writable(&self) -> bool {
         self.reason.is_none()
             && (self.old_mode.is_some() || self.new_mode.is_some())
@@ -90,13 +95,16 @@ pub(super) fn boundary(
     active: &dyn Fn() -> bool,
 ) -> Result<Boundary, String> {
     let header = files::patch_header(path, before.mode.as_deref(), after.mode.as_deref());
+    let binary_reason = before.warning.is_none()
+        && after.warning.is_none()
+        && (before.text().is_none() || after.text().is_none());
     let reason = before
         .warning
         .clone()
         .or_else(|| after.warning.clone())
         .or_else(|| {
             (before.text().is_none() || after.text().is_none()).then(|| {
-                crate::i18n::text("repo-workflows-file_comparison-boundary-26efe746").into()
+                "Binary or non-UTF8 versions: compare the byte preview; line staging is unavailable".into()
             })
         });
     if reason.is_some() {
@@ -108,12 +116,13 @@ pub(super) fn boundary(
             old_mode: before.mode.clone(),
             new_mode: after.mode.clone(),
             reason,
+            binary_reason,
         });
     }
     let a = before.text().unwrap_or_default();
     let b = after.text().unwrap_or_default();
     if a.split_inclusive('\n').count() > 20_000 || b.split_inclusive('\n').count() > 20_000 {
-        return Err(crate::i18n::text("repo-workflows-file_comparison-boundary-e44610d7").into());
+        return Err("More than 20,000 lines in a version; use the normal patch view".into());
     }
     let body = if before.bytes == after.bytes {
         String::new()
@@ -167,15 +176,10 @@ pub(super) fn boundary(
         )?
         .complete()?;
         if !matches!(output.status.code(), Some(0 | 1)) {
-            return Err(
-                crate::i18n::text("repo-workflows-file_comparison-boundary-b861cbb0").into(),
-            );
+            return Err("Git could not align these raw versions".into());
         }
-        let text = String::from_utf8(output.stdout)
-            .map_err(|_| crate::i18n::text("repo-workflows-file_comparison-boundary-5421cc1b"))?;
-        let start = text.find("@@ ").ok_or(crate::i18n::text(
-            "repo-workflows-file_comparison-boundary-6732715f",
-        ))?;
+        let text = String::from_utf8(output.stdout).map_err(|_| "The raw patch is not UTF-8")?;
+        let start = text.find("@@ ").ok_or("Git could not produce a raw text patch for these differing bytes; use the normal patch view")?;
         text[start..].to_owned()
     };
     let full = format!("{header}{body}");
@@ -189,6 +193,7 @@ pub(super) fn boundary(
         old_mode: before.mode.clone(),
         new_mode: after.mode.clone(),
         reason: None,
+        binary_reason: false,
     })
 }
 
@@ -301,4 +306,42 @@ fn align(
         }
     }
     result
+}
+
+#[cfg(test)]
+mod fluent_r1_boundary_tests {
+    use super::*;
+    #[test]
+    fn fluent_partition_r1_binary_boundary_keeps_raw_reason_and_provider_lookalike_opaque() {
+        crate::i18n::set_language("de");
+        let before = Version {
+            mode: Some("100644".into()),
+            oid: None,
+            bytes: vec![0, 255],
+            warning: None,
+        };
+        let after = Version {
+            bytes: vec![0, 1],
+            ..before.clone()
+        };
+        let bound = boundary("raw/1234.bin", &before, &after, &|| true).unwrap();
+        let raw = bound.reason.clone().unwrap();
+        let provider = Version {
+            warning: Some(raw.clone()),
+            ..before.clone()
+        };
+        let external = boundary("raw/1234.bin", &provider, &after, &|| true).unwrap();
+        for lang in ["de", "en-US", "de"] {
+            crate::i18n::set_language(lang);
+            assert_eq!(
+                bound.display_reason().as_deref() == Some(raw.as_str()),
+                lang == "en-US"
+            );
+            assert_eq!(bound.reason.as_ref(), Some(&raw));
+            assert!(!bound.writable());
+            assert_eq!(external.display_reason().as_ref(), Some(&raw));
+            assert_eq!(bound.old_mode.as_deref(), Some("100644"));
+        }
+        crate::i18n::set_language("en-US");
+    }
 }

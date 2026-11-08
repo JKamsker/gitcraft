@@ -38,6 +38,7 @@ pub(super) struct State {
     rebuild: bool,
     pending: Option<Pending>,
     result: String,
+    result_presentation: Option<(String, LocalResult)>,
 }
 /// The worker retains the terminal until UI acknowledgement. Stale/expired results are
 /// disposed by that worker, so a rejected callback never kills/waits for a child on egui.
@@ -89,6 +90,7 @@ impl RepoTab {
             }
             match pending.rx.try_recv() {
                 Ok(reply) => {
+                    state.result_presentation = None;
                     let mutation = pending.mutation;
                     state.pending = None;
                     if mutation {
@@ -100,10 +102,7 @@ impl RepoTab {
                         state.config = None;
                         state.binding = None;
                         state.checked = false;
-                        state.result = crate::i18n::text(
-                            "repo-workflows-devcontainer-devcontainer-window-7cb7e0b2",
-                        )
-                        .into();
+                        state.remember_result(LocalResult::ProfileChanged);
                     } else {
                         match reply {
                             Ok(Reply::Config(config)) => {
@@ -111,22 +110,14 @@ impl RepoTab {
                                     state.open = true;
                                 }
                                 state.config = config;
-                                state.result = if state.config.is_some() {
-                                    crate::i18n::text(
-                                        "repo-workflows-devcontainer-devcontainer-window-a79d7c99",
-                                    )
+                                state.remember_result(if state.config.is_some() {
+                                    LocalResult::Detected
                                 } else {
-                                    crate::i18n::text(
-                                        "repo-workflows-devcontainer-devcontainer-window-22f9e7ca",
-                                    )
-                                }
-                                .into();
+                                    LocalResult::Missing
+                                });
                             }
                             Ok(Reply::Started(binding)) => {
-                                state.result = crate::i18n::text(
-                                    "repo-workflows-devcontainer-devcontainer-window-d66d64d1",
-                                )
-                                .into();
+                                state.remember_result(LocalResult::Started);
                                 state.binding = Some(binding);
                             }
                             Ok(Reply::Editor(result)) => state.result = result,
@@ -141,23 +132,12 @@ impl RepoTab {
                                     self.active_terminal = self.terminals.len() - 1;
                                     self.terminal_error = None;
                                     self.terminal_open = true;
-                                    state.result = crate::i18n::text(
-                                        "repo-workflows-devcontainer-devcontainer-window-bbd55e3e",
-                                    )
-                                    .into();
+                                    state.remember_result(LocalResult::TerminalOpened);
                                 } else {
-                                    state.result = crate::i18n::text(
-                                        "repo-workflows-devcontainer-devcontainer-window-4564ef3d",
-                                    )
-                                    .into();
+                                    state.remember_result(LocalResult::TerminalExpired);
                                 }
                             }
-                            Err(error) => {
-                                state.result = crate::i18n::message(
-                                    "repo-workflows-devcontainer-devcontainer-window-d8db68fe",
-                                    &[("error", (error).clone().into())],
-                                )
-                            }
+                            Err(error) => state.result = error,
                         }
                     }
                 }
@@ -166,10 +146,7 @@ impl RepoTab {
                         self.busy_op = None;
                     }
                     state.pending = None;
-                    state.result = crate::i18n::text(
-                        "repo-workflows-devcontainer-devcontainer-window-0c79d376",
-                    )
-                    .into();
+                    state.remember_result(LocalResult::WorkerEnded);
                 }
                 Err(mpsc::TryRecvError::Empty) => {
                     ctx.request_repaint_after(std::time::Duration::from_millis(100))
@@ -217,10 +194,7 @@ impl RepoTab {
                     acts.push(Action::Devcontainer(Act::Cancel));
                 }
             }
-            ui.add(
-                egui::Label::new(crate::repo::activity::display_workflow_error(&state.result))
-                    .selectable(true),
-            );
+            state.result_ui(ui);
             ui.add_enabled_ui(state.pending.is_none() && self.busy_op.is_none(), |ui| {
                 if ui
                     .button(crate::i18n::text(
@@ -451,11 +425,113 @@ impl RepoTab {
                     context: connections::current(),
                     mutation,
                 });
-                state.result =
-                    crate::i18n::text("repo-workflows-devcontainer-devcontainer-act-5474eef8")
-                        .into();
+                state.remember_result(LocalResult::Running);
             }
-            Err(error) => state.result = error,
+            Err(error) => {
+                state.result_presentation = None;
+                state.result = error;
+            }
         }
+    }
+}
+
+#[derive(Clone)]
+enum LocalResult {
+    ProfileChanged,
+    Detected,
+    Missing,
+    Started,
+    TerminalOpened,
+    TerminalExpired,
+    WorkerEnded,
+    Running,
+}
+impl LocalResult {
+    fn raw(&self) -> String {
+        match self {
+Self::ProfileChanged => "Profile changed or operation cancelled. A created container may remain; inspect its displayed worktree labels before retrying.".into(),
+Self::Detected => "Configuration detected; review it before starting".into(),
+Self::Missing => "No .devcontainer/devcontainer.json detected. Remote worktrees require the CLI on their own machine; this integration supports local worktrees.".into(),
+Self::Started => "Environment started and its worktree mount/ownership checked".into(),
+Self::TerminalOpened => "Opened /bin/sh inside the displayed container".into(),
+Self::TerminalExpired => "Terminal handoff expired or was cancelled; open it again".into(),
+Self::WorkerEnded => "Worker ended or was cancelled. A container may remain; inspect this worktree's labels before retrying.".into(),
+Self::Running => "Working…".into(),
+}
+    }
+    fn display(&self) -> String {
+        crate::i18n::text(match self {
+            Self::ProfileChanged => "repo-workflows-devcontainer-devcontainer-window-7cb7e0b2",
+            Self::Detected => "repo-workflows-devcontainer-devcontainer-window-a79d7c99",
+            Self::Missing => "repo-workflows-devcontainer-devcontainer-window-22f9e7ca",
+            Self::Started => "repo-workflows-devcontainer-devcontainer-window-d66d64d1",
+            Self::TerminalOpened => "repo-workflows-devcontainer-devcontainer-window-bbd55e3e",
+            Self::TerminalExpired => "repo-workflows-devcontainer-devcontainer-window-4564ef3d",
+            Self::WorkerEnded => "repo-workflows-devcontainer-devcontainer-window-0c79d376",
+            Self::Running => "repo-workflows-devcontainer-devcontainer-act-5474eef8",
+        })
+        .into()
+    }
+}
+
+impl State {
+    fn remember_result(&mut self, note: LocalResult) {
+        let raw = note.raw();
+        self.result = raw.clone();
+        self.result_presentation = Some((raw, note));
+    }
+    fn display_result(&self) -> String {
+        match &self.result_presentation {
+            Some((raw, note)) if raw == &self.result => note.display(),
+            _ => crate::repo::activity::display_workflow_error(&self.result),
+        }
+    }
+}
+
+impl State {
+    fn result_ui(&self, ui: &mut egui::Ui) {
+        ui.add(egui::Label::new(self.display_result()).selectable(true));
+    }
+}
+
+#[cfg(test)]
+mod fluent_r1_result_tests {
+    use super::*;
+    use egui_kittest::{Harness, kittest::Queryable};
+    #[test]
+    fn fluent_partition_r1_devcontainer_same_retained_state_repaints_without_work_or_consent_change()
+     {
+        for note in [
+            LocalResult::Detected,
+            LocalResult::Missing,
+            LocalResult::Started,
+            LocalResult::TerminalOpened,
+            LocalResult::TerminalExpired,
+            LocalResult::ProfileChanged,
+            LocalResult::WorkerEnded,
+            LocalResult::Running,
+        ] {
+            crate::i18n::set_language("de");
+            let mut state = State::default();
+            state.trust = true;
+            state.remember_result(note);
+            let raw = state.result.clone();
+            let mut h = Harness::new_ui_state(|ui, state: &mut State| state.result_ui(ui), state);
+            for lang in ["de", "en-US", "de"] {
+                crate::i18n::set_language(lang);
+                h.run();
+                h.get_by_label(&h.state().display_result());
+                assert_eq!(h.state().display_result() == raw, lang == "en-US");
+                assert_eq!(h.state().result, raw);
+                assert!(h.state().trust);
+                assert!(h.state().pending.is_none());
+            }
+            h.state_mut().result_presentation = None;
+            for lang in ["de", "en-US"] {
+                crate::i18n::set_language(lang);
+                assert_eq!(h.state().display_result(), raw);
+            }
+        }
+        crate::i18n::set_language("en-US");
     }
 }

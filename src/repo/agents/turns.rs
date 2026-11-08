@@ -223,18 +223,9 @@ fn turn_list(ui: &mut Ui, session: &[Turn], t: &Tokens, acts: &mut Vec<Action>) 
 fn turn_diff(turn: &Turn, label: &str) -> Action {
     Action::Compare {
         base: turn.parent.clone(),
-        base_label: crate::i18n::message(
-            "repo-workflows-agents-turn-diff-dc601e7b",
-            &[("turn-number-1", (turn.number).clone().into())],
-        ),
+        base_label: format!("before turn {}", turn.number),
         target: Some(turn.commit.clone()),
-        target_label: crate::i18n::message(
-            "repo-workflows-agents-turn-diff-9021b8b9",
-            &[
-                ("turn-number-1", (turn.number).clone().into()),
-                ("label", (label).clone().into()),
-            ],
-        ),
+        target_label: format!("turn {}: {label}", turn.number),
         since_fork: false,
     }
 }
@@ -293,13 +284,9 @@ fn turn_chip(ui: &mut Ui, turn: &Turn, t: &Tokens, acts: &mut Vec<Action>) {
             {
                 acts.push(Action::Compare {
                     base: turn.commit.clone(),
-                    base_label: crate::i18n::message(
-                        "repo-workflows-agents-turn-chip-60c8b8ae",
-                        &[("turn-number-1", (turn.number).clone().into())],
-                    ),
+                    base_label: format!("after turn {}", turn.number),
                     target: None,
-                    target_label: crate::i18n::text("repo-workflows-agents-turn-chip-ed5eb9a3")
-                        .to_owned(),
+                    target_label: "now".to_owned(),
                     since_fork: false,
                 });
             }

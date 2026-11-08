@@ -39,53 +39,7 @@ fn strings(value: &Yaml) -> Result<Vec<String>, String> {
     Ok(values)
 }
 pub(super) fn parse(file: String, source: String) -> Result<Workflow, String> {
-    if source.len() > MAX {
-        return Err(crate::i18n::text("repo-workflows-local_ci-parse-29e871ff").into());
-    }
-    let mut parser = Parser::new(source.chars());
-    let mut depth = 0usize;
-    let mut count = 0usize;
-    loop {
-        let (event, _) = parser.next_token().map_err(|e| e.to_string())?;
-        count += 1;
-        match event {
-            Event::Alias(_) => {
-                return Err(crate::i18n::text("repo-workflows-local_ci-parse-be534029").into());
-            }
-            Event::MappingStart(..) | Event::SequenceStart(..) => depth += 1,
-            Event::MappingEnd | Event::SequenceEnd => depth = depth.saturating_sub(1),
-            Event::StreamEnd => break,
-            _ => {}
-        }
-        if depth > 64 || count > 100_000 {
-            return Err(crate::i18n::text("repo-workflows-local_ci-parse-922bc165").into());
-        }
-    }
-    let mut docs = YamlLoader::load_from_str(&source).map_err(|e| e.to_string())?;
-    if docs.len() != 1 {
-        return Err(crate::i18n::text("repo-workflows-local_ci-parse-4e3ad741").into());
-    }
-    let yaml = docs.remove(0);
-    let events = strings(&yaml["on"])?;
-    let jobs = yaml["jobs"]
-        .as_hash()
-        .ok_or(crate::i18n::text("repo-workflows-local_ci-parse-a0a33130"))?
-        .keys()
-        .map(text)
-        .collect::<Vec<_>>();
-    if events.is_empty() || jobs.is_empty() {
-        return Err(crate::i18n::text("repo-workflows-local_ci-parse-96d73183").into());
-    }
-    if jobs.iter().any(|s| s.starts_with('-') || s.contains("${{")) {
-        return Err(crate::i18n::text("repo-workflows-local_ci-parse-598eb5d3").into());
-    }
-    Ok(Workflow {
-        file,
-        source,
-        events,
-        jobs,
-        yaml,
-    })
+    parse_with_witness(file, source).map_err(|failure| failure.display())
 }
 fn map() -> Yaml {
     Yaml::Hash(Default::default())
@@ -321,5 +275,126 @@ mod fluent_model_tests {
         }
         crate::i18n::set_language("en-US");
         Ok(())
+    }
+}
+
+pub(super) fn parse_with_witness(file: String, source: String) -> Result<Workflow, ParseFailure> {
+    if source.len() > MAX {
+        return Err(ParseFailure::TooLarge.into());
+    }
+    let mut parser = Parser::new(source.chars());
+    let mut depth = 0usize;
+    let mut count = 0usize;
+    loop {
+        let (event, _) = parser.next_token().map_err(|e| e.to_string())?;
+        count += 1;
+        match event {
+            Event::Alias(_) => {
+                return Err(ParseFailure::Aliases.into());
+            }
+            Event::MappingStart(..) | Event::SequenceStart(..) => depth += 1,
+            Event::MappingEnd | Event::SequenceEnd => depth = depth.saturating_sub(1),
+            Event::StreamEnd => break,
+            _ => {}
+        }
+        if depth > 64 || count > 100_000 {
+            return Err(ParseFailure::StructureLimit.into());
+        }
+    }
+    let mut docs = YamlLoader::load_from_str(&source).map_err(|e| e.to_string())?;
+    if docs.len() != 1 {
+        return Err(ParseFailure::Documents.into());
+    }
+    let yaml = docs.remove(0);
+    let events = strings_with_witness(&yaml["on"])?;
+    let jobs = yaml["jobs"]
+        .as_hash()
+        .ok_or(ParseFailure::NoJobs)?
+        .keys()
+        .map(text)
+        .collect::<Vec<_>>();
+    if events.is_empty() || jobs.is_empty() {
+        return Err(ParseFailure::NoSelection.into());
+    }
+    if jobs.iter().any(|s| s.starts_with('-') || s.contains("${{")) {
+        return Err(ParseFailure::InvalidJob.into());
+    }
+    Ok(Workflow {
+        file,
+        source,
+        events,
+        jobs,
+        yaml,
+    })
+}
+
+fn strings_with_witness(value: &Yaml) -> Result<Vec<String>, ParseFailure> {
+    let values = match value {
+        Yaml::String(s) => vec![s.clone()],
+        Yaml::Array(a) => a.iter().map(text).collect(),
+        Yaml::Hash(h) => h.keys().map(text).collect(),
+        Yaml::Null | Yaml::BadValue => Vec::new(),
+        _ => return Err(ParseFailure::ExpectedNames.into()),
+    };
+    if values
+        .iter()
+        .any(|s| s.is_empty() || s.starts_with('-') || s.contains("${{"))
+    {
+        return Err(ParseFailure::DynamicNames.into());
+    }
+    Ok(values)
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) enum ParseFailure {
+    Opaque(String),
+    TooLarge,
+    Aliases,
+    StructureLimit,
+    Documents,
+    NoJobs,
+    NoSelection,
+    InvalidJob,
+    ExpectedNames,
+    DynamicNames,
+}
+impl From<String> for ParseFailure {
+    fn from(raw: String) -> Self {
+        Self::Opaque(raw)
+    }
+}
+impl ParseFailure {
+    pub fn raw(&self) -> String {
+        match self { Self::Opaque(s)=>s.clone(),
+Self::TooLarge => "Workflow exceeds 1 MiB".into(),
+Self::Aliases => "YAML aliases are not supported by the local selector; open this workflow in act directly".into(),
+Self::StructureLimit => "Workflow structure exceeds the selector's limits".into(),
+Self::Documents => "Expected one workflow document".into(),
+Self::NoJobs => "Workflow has no jobs mapping".into(),
+Self::NoSelection => "Workflow has no selectable events/jobs".into(),
+Self::InvalidJob => "Invalid job id".into(),
+Self::ExpectedNames => "Expected a string, list or mapping".into(),
+Self::DynamicNames => "Dynamic or invalid event/job names cannot be selected locally".into(),
+}
+    }
+    pub fn display(&self) -> String {
+        match self {
+            Self::Opaque(s) => s.clone(),
+            Self::TooLarge => crate::i18n::text("repo-workflows-local_ci-parse-29e871ff").into(),
+            Self::Aliases => crate::i18n::text("repo-workflows-local_ci-parse-be534029").into(),
+            Self::StructureLimit => {
+                crate::i18n::text("repo-workflows-local_ci-parse-922bc165").into()
+            }
+            Self::Documents => crate::i18n::text("repo-workflows-local_ci-parse-4e3ad741").into(),
+            Self::NoJobs => crate::i18n::text("repo-workflows-local_ci-parse-a0a33130").into(),
+            Self::NoSelection => crate::i18n::text("repo-workflows-local_ci-parse-96d73183").into(),
+            Self::InvalidJob => crate::i18n::text("repo-workflows-local_ci-parse-598eb5d3").into(),
+            Self::ExpectedNames => {
+                crate::i18n::text("repo-workflows-local_ci-strings-d5611771").into()
+            }
+            Self::DynamicNames => {
+                crate::i18n::text("repo-workflows-local_ci-strings-5c665142").into()
+            }
+        }
     }
 }

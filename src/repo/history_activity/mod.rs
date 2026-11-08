@@ -75,10 +75,9 @@ impl Activity {
             if s.is_empty() {
                 Ok(None)
             } else {
-                Day::parse(s).map(Some).ok_or(
-                    crate::i18n::text("repo-workflows-history_activity-requested-range-4d18caf5")
-                        .to_owned(),
-                )
+                Day::parse(s)
+                    .map(Some)
+                    .ok_or("Use dates such as 2026-11-07".to_owned())
             }
         };
         let query = Query {
@@ -87,10 +86,7 @@ impl Activity {
             through: parse(&self.through)?,
         };
         if matches!((query.from,query.through),(Some(a),Some(b))if a>b) {
-            return Err(crate::i18n::text(
-                "repo-workflows-history_activity-requested-range-25f6acd0",
-            )
-            .into());
+            return Err("The start date must be on or before the end date".into());
         }
         Ok(query)
     }
@@ -126,8 +122,7 @@ impl Activity {
         self.reader.cancel();
         self.generation.fetch_add(1, Ordering::Relaxed);
         self.loading = false;
-        self.error =
-            Some(crate::i18n::text("repo-workflows-history_activity-cancel-ddfe1c43").into());
+        self.error = Some("Analysis cancelled. Refresh to try again.".into());
     }
 }
 
@@ -230,5 +225,36 @@ impl RepoTab {
             self.stash_view = None;
             self.load_detail(hash, ctx);
         }
+    }
+}
+
+#[cfg(test)]
+mod fluent_r1_cache_tests {
+    use super::*;
+    #[test]
+    fn fluent_partition_r1_activity_cached_range_and_cancel_errors_keep_generation_and_query() {
+        crate::i18n::set_language("de");
+        let mut state = Activity::new(Page::Calendar);
+        state.from = "bad date".into();
+        state.error = Some(state.requested_range().unwrap_err());
+        for cancel in [false, true] {
+            if cancel {
+                state.cancel();
+            }
+            let raw = state.error.clone().unwrap();
+            let generation = state.generation.load(Ordering::Relaxed);
+            for lang in ["de", "en-US", "de"] {
+                crate::i18n::set_language(lang);
+                assert_eq!(
+                    crate::repo::activity::display_workflow_error(&raw) == raw,
+                    lang == "en-US"
+                );
+                assert_eq!(state.error.as_ref(), Some(&raw));
+                assert_eq!(state.generation.load(Ordering::Relaxed), generation);
+                assert_eq!(state.from, "bad date");
+                assert!(!state.reader.busy());
+            }
+        }
+        crate::i18n::set_language("en-US");
     }
 }

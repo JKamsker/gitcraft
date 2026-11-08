@@ -332,6 +332,62 @@ impl super::RepoTab {
 /// Finite workflow-owned control errors: presentation only; unknown diagnostics remain opaque.
 pub(in crate::repo) fn display_workflow_error(error: &str) -> String {
     match error {
+        "Use YYYY-MM-DD dates" => {
+            crate::i18n::text("repo-workflows-atlas-read-atlas-02c42736").to_owned()
+        }
+        "Use YYYY-MM-DD dates, with start on or before end" => {
+            crate::i18n::text("repo-workflows-atlas-read-atlas-67b18cbf").to_owned()
+        }
+        "Use dates such as 2026-11-07" => {
+            crate::i18n::text("repo-workflows-history_activity-requested-range-4d18caf5").to_owned()
+        }
+        "The start date must be on or before the end date" => {
+            crate::i18n::text("repo-workflows-history_activity-requested-range-25f6acd0").to_owned()
+        }
+        "Analysis cancelled. Refresh to try again." => {
+            crate::i18n::text("repo-workflows-history_activity-cancel-ddfe1c43").to_owned()
+        }
+        "No supported forge remote; commit history remains available" => {
+            crate::i18n::text("repo-workflows-line_dossier-poll-line-dossier-45e16671").to_owned()
+        }
+        "Dossier display reached256versions or32MiB; start a separate trace to inspect earlier history" => {
+            crate::i18n::text("repo-workflows-line_dossier-poll-line-dossier-1cd553a8").to_owned()
+        }
+        "Trace cancelled" => {
+            crate::i18n::text("repo-workflows-line_dossier-line-dossier-view-a8198076").to_owned()
+        }
+        "Repository changed. Refresh the file view." => {
+            crate::i18n::text("repo-workflows-file_comparison-invalidate-81f92ce0").to_owned()
+        }
+        "Invalid comparison sides" => {
+            crate::i18n::text("repo-workflows-file_comparison-prepare-da3978aa").to_owned()
+        }
+        "Binary or non-UTF8 versions: compare the byte preview; line staging is unavailable" => {
+            crate::i18n::text("repo-workflows-file_comparison-boundary-26efe746").to_owned()
+        }
+        "More than 20,000 lines in a version; use the normal patch view" => {
+            crate::i18n::text("repo-workflows-file_comparison-boundary-e44610d7").to_owned()
+        }
+        "Git could not align these raw versions" => {
+            crate::i18n::text("repo-workflows-file_comparison-boundary-b861cbb0").to_owned()
+        }
+        "The raw patch is not UTF-8" => {
+            crate::i18n::text("repo-workflows-file_comparison-boundary-5421cc1b").to_owned()
+        }
+        "Git could not produce a raw text patch for these differing bytes; use the normal patch view" => {
+            crate::i18n::text("repo-workflows-file_comparison-boundary-6732715f").to_owned()
+        }
+        "Comparison cancelled. Refresh to try again." => {
+            crate::i18n::text("repo-workflows-file_comparison-file-comparison-view-725513de")
+                .to_owned()
+        }
+        "No key, agent, account or network action has run. Choose each step explicitly." => {
+            crate::i18n::text("repo-workflows-ssh_setup-new-8633c172").to_owned()
+        }
+        "Setup worker stopped; no later result will be applied." => {
+            crate::i18n::text("repo-workflows-ssh_setup-poll-380743c6").to_owned()
+        }
+
         "Cancelled before starting" => {
             crate::i18n::text("repo-workflows-local_ci-submit-84f8f92f").to_owned()
         }

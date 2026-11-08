@@ -410,15 +410,9 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
                         {
                             acts.push(Action::Compare {
                                 base: s.old.clone(),
-                                base_label: crate::i18n::message(
-                                    "repo-workflows-repository_tools-show-507eaa08",
-                                    &[("s-branch-1", (s.branch).clone().into())],
-                                ),
+                                base_label: format!("original {}", s.branch),
                                 target: Some(new.clone()),
-                                target_label: crate::i18n::message(
-                                    "repo-workflows-repository_tools-show-7bd990ec",
-                                    &[("s-branch-1", (s.branch).clone().into())],
-                                ),
+                                target_label: format!("candidate {}", s.branch),
                                 since_fork: false,
                             });
                         }

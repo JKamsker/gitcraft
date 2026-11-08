@@ -112,6 +112,7 @@ fn the_doctor_reads_settings_and_clears_flags_through_the_tab() -> Result<(), St
         // Asked first: nothing runs until the answer, and a no runs nothing.
         let ask = || {
             Action::Doctor(DoctorAct::Confirm(super::Confirm {
+                presentation: None,
                 title: "Clear?".into(),
                 body: String::new(),
                 button: "Clear".into(),

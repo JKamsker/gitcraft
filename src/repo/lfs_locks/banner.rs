@@ -53,9 +53,9 @@ impl RepoTab {
         if !(buttons && (hovered || selected)) {
             let t = Tokens::get(ui.ctx());
             let color = lock_color(&t, lock);
-            let galley = ui
-                .painter()
-                .layout_no_wrap(short_owner(lock), theme::medium(10.5), color);
+            let galley =
+                ui.painter()
+                    .layout_no_wrap(display_short_owner(lock), theme::medium(10.5), color);
             let w = galley.size().x + 26.0;
             let pill = Rect::from_center_size(
                 pos2(rect.right() - 8.0 - w / 2.0, rect.center().y),
@@ -226,7 +226,7 @@ impl RepoTab {
                 many => {
                     let names: Vec<String> = many
                         .iter()
-                        .map(|l| format!("{} ({})", l.path, short_owner(l)))
+                        .map(|l| format!("{} ({})", l.path, display_short_owner(l)))
                         .collect();
                     crate::i18n::message(
                         "repo-workflows-lfs_locks-lock-banners-2737026b",
@@ -384,5 +384,51 @@ mod tests {
             "jonathan.sm…"
         );
         assert_eq!(short_owner(&lock("ÄÖÜäöüßéèêë", None)), "ÄÖÜäöüßéèêë");
+    }
+}
+
+fn display_short_owner(lock: &LfsLock) -> String {
+    match lock.ours {
+        Some(true) => crate::i18n::text("repo-workflows-r1-you").into(),
+        _ if lock.owner.is_empty() => crate::i18n::text("repo-workflows-r1-locked").into(),
+        _ => short_owner(lock),
+    }
+}
+
+#[cfg(test)]
+mod fluent_r1_owner_tests {
+    use super::*;
+    #[test]
+    fn fluent_partition_r1_short_lock_owner_keeps_provider_words_opaque() {
+        let ours = LfsLock {
+            id: "raw-id".into(),
+            path: "raw/path".into(),
+            owner: "you".into(),
+            locked_at: None,
+            ours: Some(true),
+        };
+        let named = LfsLock {
+            ours: Some(false),
+            ..ours.clone()
+        };
+        let unknown = LfsLock {
+            owner: String::new(),
+            ours: None,
+            ..ours.clone()
+        };
+        for lang in ["de", "en-US", "de"] {
+            crate::i18n::set_language(lang);
+            assert_eq!(short_owner(&ours), "you");
+            assert_eq!(
+                display_short_owner(&ours),
+                if lang == "de" { "Sie" } else { "you" }
+            );
+            assert_eq!(display_short_owner(&named), "you");
+            assert_eq!(
+                display_short_owner(&unknown),
+                if lang == "de" { "gesperrt" } else { "locked" }
+            );
+        }
+        crate::i18n::set_language("en-US");
     }
 }
