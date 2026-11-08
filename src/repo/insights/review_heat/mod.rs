@@ -17,10 +17,6 @@ use crate::insights::review_heat::{self as heat, Heat, Seen, SeenMark};
 use crate::repo::{Action, DiffKey, RepoTab, short};
 use crate::theme::Tokens;
 
-/// How many times a diff opened at a line is waited for, a frame or so apart, before the line
-/// is given up on.
-const JUMP_TRIES: u32 = 400;
-
 /// What the view keeps.
 #[derive(Default)]
 pub(crate) struct State {
@@ -55,16 +51,19 @@ impl RepoTab {
         self.insights.as_mut().map(|v| &mut v.review_heat)
     }
 
-    /// The pull request to show when none was picked: the one whose page is open, else the
-    /// checked-out branch's.
+    /// The pull request to show when none was picked: the one whose page the insights were
+    /// opened over, else the checked-out branch's.
     fn review_heat_default(&self) -> Option<u64> {
-        self.pr_view.as_ref().map(|v| v.number).or_else(|| {
-            let current = self.refs.current.as_deref()?;
-            self.prs
-                .iter()
-                .find(|p| p.branch == current && !p.from_fork)
-                .map(|p| p.number)
-        })
+        let shown = self.pr_view.as_ref().map(|v| v.number);
+        shown
+            .or(self.insights.as_ref().and_then(|v| v.pr))
+            .or_else(|| {
+                let current = self.refs.current.as_deref()?;
+                self.prs
+                    .iter()
+                    .find(|p| p.branch == current && !p.from_fork)
+                    .map(|p| p.number)
+            })
     }
 
     /// Reads what the view shows (again).
@@ -143,31 +142,22 @@ impl RepoTab {
                 }
                 self.open_diff(key.clone(), ctx);
                 if let Some(at) = at {
-                    self.review_heat_jump(key, at, 0, ctx);
+                    self.review_heat_jump(key, at);
                 }
             }
         }
     }
 
-    /// Scrolls the diff of `key`, once it is read, to line `at` (old side or not, number).
-    /// Until then it is looked at again in a moment.
-    fn review_heat_jump(&mut self, key: DiffKey, at: (bool, u32), tries: u32, ctx: &egui::Context) {
+    /// Scrolls the diff of `key` to line `at` (old side or not, number), now or once it is
+    /// read.
+    fn review_heat_jump(&mut self, key: DiffKey, at: (bool, u32)) {
         let Some(view) = self.diff.as_mut().filter(|d| d.key == key) else {
             return;
         };
         match &view.data {
-            Some(Ok(data)) => {
-                view.jump_line = line_index(&data.lines, at);
-            }
+            Some(Ok(data)) => view.jump_line = crate::repo::state::line_at(&data.lines, at),
             Some(Err(_)) => {}
-            None if tries < JUMP_TRIES => {
-                self.then(
-                    ctx,
-                    || std::thread::sleep(std::time::Duration::from_millis(15)),
-                    move |tab, (), ctx| tab.review_heat_jump(key, at, tries + 1, ctx),
-                );
-            }
-            None => {}
+            None => view.pending_line = Some(at),
         }
     }
 
@@ -282,27 +272,6 @@ impl RepoTab {
 
 /// The diff line (by its place) showing line `n` of the old side (`old`) or the new one; the
 /// nearest when the diff doesn't show it.
-fn line_index(lines: &[crate::repo::diff::DiffLine], (old, n): (bool, u32)) -> Option<usize> {
-    use crate::repo::diff::Kind;
-    let number = |l: &crate::repo::diff::DiffLine| {
-        if old {
-            l.old
-        } else if l.kind == Kind::Del {
-            None
-        } else {
-            l.new
-        }
-    };
-    lines.iter().position(|l| number(l) == Some(n)).or_else(|| {
-        lines
-            .iter()
-            .enumerate()
-            .filter_map(|(i, l)| Some((number(l)?.abs_diff(n), i)))
-            .min()
-            .map(|(_, i)| i)
-    })
-}
-
 /// The line above the grid: which pull request (a menu of the others), opening it, and every
 /// file's hunks shown or hidden.
 fn bar(ui: &mut Ui, state: &State, prs: &[(u64, String)], acts: &mut Vec<Action>) {

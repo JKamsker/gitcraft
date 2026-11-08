@@ -144,6 +144,9 @@ pub(crate) struct InsightsView {
     pub(crate) table: bool,
     /// The views read once already: showing one again doesn't read it again.
     loaded: HashSet<Kind>,
+    /// The pull request the big area showed when the page was opened over it, which the
+    /// views about a change take for theirs.
+    pub(crate) pr: Option<u64>,
     pub(super) impact: impact::State,
     pub(super) ci_path: ci_path::State,
     pub(super) constellation: constellation::State,
@@ -164,6 +167,7 @@ impl InsightsView {
             kind,
             table: false,
             loaded: HashSet::new(),
+            pr: None,
             impact: Default::default(),
             ci_path: Default::default(),
             constellation: Default::default(),
@@ -251,6 +255,7 @@ impl RepoTab {
             self.status = Some((format!("Finish or close the {editor} first"), true));
             return;
         }
+        let pr = self.pr_view.as_ref().map(|v| v.number);
         // The page takes the big area: what was open over it closes.
         self.diff = None;
         self.file_view = None;
@@ -264,6 +269,9 @@ impl RepoTab {
             .insights
             .get_or_insert_with(|| Box::new(InsightsView::new(kind)));
         view.kind = kind;
+        if pr.is_some() {
+            view.pr = pr;
+        }
         if view.loaded.insert(kind) {
             self.load_insight(kind, ctx);
         }

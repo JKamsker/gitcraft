@@ -149,6 +149,8 @@ pub(crate) struct DiffView {
     pub(super) at_change: Option<(usize, f32)>,
     /// A line (by its index in the diff) to scroll to on the next frame.
     pub(super) jump_line: Option<usize>,
+    /// A line (old side or not, its number) to scroll to once the diff is read.
+    pub(super) pending_line: Option<(bool, u32)>,
     /// The moved block whose two places are shown together.
     pub(super) moved: Option<diff::moved_view::Opened>,
     /// Unchanged lines opened from their folds (by their number on the new side), opened again
@@ -178,6 +180,28 @@ pub(crate) struct DiffView {
     pub(super) scroll_to: Option<f32>,
 }
 
+/// The index of line `n` of the old side (`old`) or the new one among `lines`, or of the line
+/// numbered nearest to it when that one isn't shown.
+pub(super) fn line_at(lines: &[diff::DiffLine], (old, n): (bool, u32)) -> Option<usize> {
+    let number = |l: &diff::DiffLine| {
+        if old {
+            l.old
+        } else if l.kind == diff::Kind::Del {
+            None
+        } else {
+            l.new
+        }
+    };
+    lines.iter().position(|l| number(l) == Some(n)).or_else(|| {
+        lines
+            .iter()
+            .enumerate()
+            .filter_map(|(i, l)| Some((number(l)?.abs_diff(n), i)))
+            .min()
+            .map(|(_, i)| i)
+    })
+}
+
 /// Numbers the diff reads of every tab, so no two diffs ever wait for the same number.
 static DIFF_REQUESTS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
@@ -201,6 +225,7 @@ impl DiffView {
             jump: None,
             at_change: None,
             jump_line: None,
+            pending_line: None,
             moved: None,
             revealed: Default::default(),
             auto_opened: Default::default(),
@@ -242,6 +267,9 @@ impl DiffView {
         self.text_sel = None;
         self.at_change = None;
         self.jump_line = None;
+        if let (Some(at), Some(Ok(data))) = (self.pending_line.take(), &self.data) {
+            self.jump_line = line_at(&data.lines, at);
+        }
         // The blocks are found again, numbered anew.
         self.moved = None;
         self.reopen();
