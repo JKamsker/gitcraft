@@ -33,7 +33,7 @@
     }
   },
   "inert_scope": "Production sequence callbacks injected with preparation success and NotFound/PermissionDenied/EIO/cleanup-unknown failures; late missing/nonregular/permission/EIO read failures, recovery uncertainty and normal output. No subprocess or filesystem fault injection.",
-  "actual_runtime": "Not yet run: preserve/push/remote verify first; only four affected exact bisect tests authorized.",
+  "actual_runtime": "PASS: four exact affected local macOS bisect tests at49ee74ba7505d4c49e798271af4797dc92463280; see bisect-prepared-log-runtime.json; no wider acceptance.",
   "prior_evidence": "b7de0442 echo-only PASS and historical215 eight PASS retained at their exact candidates; no new combined all-pass inference.",
   "integration": "Keep root runner connections::inherit and accepted root context changes; apply semantic delta only."
 }
