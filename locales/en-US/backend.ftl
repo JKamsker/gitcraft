@@ -69,3 +69,69 @@ backend-symbol-parsing-cancelled-9fccaf = Symbol parsing cancelled
 backend-symbol-parsing-cancelled-or-exceeded-structural-budget-b3ef57 = Symbol parsing cancelled or exceeded structural budget
 backend-symbol-parsing-cancelled-or-exceeded-two-seconds-901d02 = Symbol parsing cancelled or exceeded two seconds
 backend-working-folder-publication-cancelled-a8f541 = Working-folder publication cancelled
+
+backend-contained-bundle-error = Contained bundle Git: { $detail }
+
+backend-helper-display-06729de987 = invalid keep ownership
+
+backend-helper-display-124d998466 = Safe index reads require Perl with Fcntl no-follow support on the repository machine
+
+backend-helper-display-18d2a159d4 = Safe remote staging requires Python 3 standard-library no-follow file and ACL APIs; install python3 on the repository machine
+
+backend-helper-display-219d77f375 = DVC is not installed on this repository machine
+
+backend-helper-display-286c0e8cfe = Bundle unpacking requires Linux hard address-space limits on this host; no pack was opened.
+
+backend-helper-display-3135c24fb2 = Unsupported MD5 capability
+
+backend-helper-display-389db1e9f2 = invalid resource helper arguments
+
+backend-helper-display-46b86a42f2 = invalid keep message
+
+backend-helper-display-4b3bf71f7e = keep identity changed; retained
+
+backend-helper-display-50ca4f5bd0 = invalid keep retirement arguments
+
+backend-helper-display-7f609a6911 = Git did not return an exit code
+
+backend-helper-display-8322e87d24 = stopped
+
+backend-helper-display-8b47045eb7 = cancelled
+
+backend-helper-display-a3db0ebabc = keep ownership changed; retained
+
+backend-helper-display-b26048e0e2 = Create-only recovery needs GNU ln or Perl
+
+backend-helper-display-bcc9225eef = Unsupported resource helper platform
+
+backend-helper-display-c1a950664d = Input exceeds 128 MiB
+
+backend-helper-display-d353a99eb4 = Cancelled
+
+backend-helper-display-f0c58d1c8d = hard resource limit not confirmed
+
+backend-helper-display-f29ce072ac = File comparison requires md5sum (Linux/WSL) or md5 (macOS)
+
+backend-helper-display-f7df6fb542 = History investigation cancelled
+
+backend-helper-display-f833fa6387 = invalid keep hash
+
+backend-native-fallback-08b2647385 = ambiguous upstream short name
+
+backend-native-fallback-1b16d9cfdb = symbolic reference requires Git
+
+backend-native-fallback-3369979818 = feature disabled
+
+backend-native-fallback-35c9ca76bd = tracking graph exceeds native bound
+
+backend-native-fallback-850e897a1e = unsupported upstream namespace
+
+backend-native-fallback-bd13f61f25 = local upstream requires Git
+
+backend-native-fallback-c1ee10596f = remote display requires Git
+
+backend-native-fallback-c3d2b99ca7 = legacy or rewritten remote
+
+backend-native-fallback-d81c296d75 = remote has no fetch URL
+
+backend-native-fallback-e1e6d89f7b = non-commit branch requires Git
