@@ -516,6 +516,9 @@ impl RepoTab {
     pub(in crate::repo) fn story_act(&mut self, act: StoryAct, ctx: &egui::Context) {
         if let StoryAct::OpenCode { commit, path, line } = act {
             self.review_document.open = false;
+            self.dossier.close();
+            self.symbols.close();
+            self.file_comparison = None;
             // A line card describes the full pinned file, including unchanged/out-of-hunk
             // lines. Its logical line stays on this view until accepted file data is painted.
             self.open_file_view(path, Some(commit), FileTab::File, ctx);
