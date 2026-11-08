@@ -211,7 +211,10 @@ fn cancel_only(ui: &mut Ui) -> Option<AgentAct> {
 #[cfg(test)]
 mod fluent_recipe_consumer_tests {
     use super::*;
-    use egui_kittest::{Harness, kittest::Queryable};
+    use egui_kittest::{
+        Harness,
+        kittest::{NodeT, Queryable},
+    };
 
     #[test]
     fn fluent_partition_actual_recipe_form_retains_submitted_context_and_raw_save_action() {
