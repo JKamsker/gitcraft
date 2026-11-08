@@ -1,4 +1,4 @@
-//! The banner under the tabs when a newer release is out: "Update now" once it is downloaded.
+//! The banner under the tabs when a newer release is out: crate::i18n::text("interaction-dialogs-update-now") once it is downloaded.
 
 use std::path::Path;
 
@@ -29,40 +29,59 @@ impl App {
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
                     icons::inline(ui, "cloud-download", 16.0, t.accent);
-                    let what = if found.parked.is_some() {
-                        "is downloaded, ready to install"
-                    } else {
-                        "is out"
-                    };
-                    ui.label(format!(
-                        "gitcraft {} {what} (you have {}).",
-                        release.version,
-                        update::CURRENT
+                    ui.label(crate::i18n::message(
+                        "interaction-dialogs-update-state",
+                        &[
+                            ("version", release.version.as_str().into()),
+                            ("current", update::CURRENT.into()),
+                            (
+                                "state",
+                                if found.parked.is_some() {
+                                    "ready"
+                                } else {
+                                    "out"
+                                }
+                                .into(),
+                            ),
+                        ],
                     ));
                     if let Some(error) = &self.update_error {
-                        ui.label(RichText::new(error).color(t.danger));
+                        ui.label(RichText::new(crate::git::display_error(error)).color(t.danger));
                     }
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if icons::small_button(ui, "x", "Not now: ask again on the next start")
-                            .clicked()
+                        if icons::small_button(
+                            ui,
+                            "x",
+                            crate::i18n::text("interaction-dialogs-not-now"),
+                        )
+                        .clicked()
                         {
                             self.update_later = true;
                         }
-                        if ui.button("Skip this version").clicked() {
+                        if ui
+                            .button(crate::i18n::text("interaction-dialogs-skip"))
+                            .clicked()
+                        {
                             self.skipped_version = release.version.clone();
                             self.update = None;
                         }
-                        if ui.button("Release notes").clicked() {
+                        if ui
+                            .button(crate::i18n::text("interaction-dialogs-release-notes"))
+                            .clicked()
+                        {
                             let _ = open::that_detached(&release.url);
                         }
                         let (label, tip) = match found.parked {
                             Some(_) => (
-                                "Update now",
-                                "Restart gitcraft as the new version; the open tabs stay",
+                                crate::i18n::text("interaction-dialogs-update-now"),
+                                crate::i18n::text("interaction-dialogs-restart"),
                             ),
                             // It couldn't be downloaded, or this copy of gitcraft can't replace
                             // itself (a package's, or in a folder of the administrator's).
-                            None => ("Download", "Open the release page"),
+                            None => (
+                                crate::i18n::text("interaction-dialogs-download"),
+                                crate::i18n::text("interaction-dialogs-release-page"),
+                            ),
                         };
                         let button = egui::Button::new(
                             RichText::new(label)
@@ -104,7 +123,10 @@ impl App {
                 ctx.send_viewport_cmd(egui::ViewportCommand::Close);
             }
             Err(e) => self.toasts.push(super::panels::Toast::new(
-                format!("Couldn't go back: {e}"),
+                crate::i18n::message(
+                    "interaction-dialogs-go-back",
+                    &[("error", crate::git::display_error(&e).into())],
+                ),
                 true,
             )),
         }

@@ -33,7 +33,7 @@ impl App {
     pub(super) fn copy_diagnostics(&mut self, ctx: &egui::Context) {
         if self.diagnostics.is_some() {
             self.toasts.push(Toast::new(
-                "Diagnostics are still being collected".to_owned(),
+                crate::i18n::text("interaction-dialogs-collecting").to_owned(),
                 false,
             ));
             return;
@@ -67,7 +67,7 @@ impl App {
         }
         self.diagnostics = Some(rx);
         self.toasts.push(Toast::new(
-            "Collecting diagnostics (asking git, gh, glab, tea)…".to_owned(),
+            crate::i18n::text("interaction-dialogs-collect").to_owned(),
             false,
         ));
     }
@@ -79,13 +79,18 @@ impl App {
                 Ok(text) => {
                     stage_report(ctx, &text);
                     self.diagnostics = None;
-                    self.toasts.push(Toast::new("Diagnostics copied locally. Review and redact the report before opening an issue.".into(), false));
+                    self.toasts.push(Toast::new(
+                        crate::i18n::text("interaction-dialogs-copied").into(),
+                        false,
+                    ));
                 }
                 Err(std::sync::mpsc::TryRecvError::Empty) => {}
                 Err(std::sync::mpsc::TryRecvError::Disconnected) => {
                     self.diagnostics = None;
-                    self.toasts
-                        .push(Toast::new("Collecting diagnostics failed".into(), true));
+                    self.toasts.push(Toast::new(
+                        crate::i18n::text("interaction-dialogs-failed").into(),
+                        true,
+                    ));
                 }
             }
         }
@@ -111,21 +116,43 @@ fn review_ui(ctx: &egui::Context) {
     };
     let mut open = true;
     let mut close = false;
-    egui::Window::new("Review diagnostics locally").id(review_id()).open(&mut open)
-        .default_size([720.0, 540.0]).show(ctx, |ui| {
-            ui.label("Nothing has been sent. Review and remove private content, including panic messages. Opening the issue sends this edited report to GitHub in the URL; you can also keep only the local clipboard copy.");
-            egui::ScrollArea::vertical().max_height(380.0).show(ui, |ui| {
-                ui.add(egui::TextEdit::multiline(&mut review.text).desired_width(f32::INFINITY).desired_rows(18));
-            });
+    egui::Window::new(crate::i18n::text("interaction-dialogs-review"))
+        .id(review_id())
+        .open(&mut open)
+        .default_size([720.0, 540.0])
+        .show(ctx, |ui| {
+            ui.label(crate::i18n::text("interaction-dialogs-review-help"));
+            egui::ScrollArea::vertical()
+                .max_height(380.0)
+                .show(ui, |ui| {
+                    ui.add(
+                        egui::TextEdit::multiline(&mut review.text)
+                            .desired_width(f32::INFINITY)
+                            .desired_rows(18),
+                    );
+                });
             ui.horizontal(|ui| {
-                if ui.button("Copy reviewed diagnostics").clicked() { ctx.copy_text(diagnostics::sanitize_report(&review.text)); }
-                if ui.button("Open issue with reviewed diagnostics").clicked() {
+                if ui
+                    .button(crate::i18n::text("interaction-dialogs-copy-reviewed"))
+                    .clicked()
+                {
+                    ctx.copy_text(diagnostics::sanitize_report(&review.text));
+                }
+                if ui
+                    .button(crate::i18n::text("interaction-dialogs-open-reviewed"))
+                    .clicked()
+                {
                     let report = diagnostics::sanitize_report(&review.text);
                     ctx.copy_text(report.clone());
                     ctx.open_url(egui::OpenUrl::new_tab(diagnostics::issue_url(&report)));
                     close = true;
                 }
-                if ui.button("Keep local and close").clicked() { close = true; }
+                if ui
+                    .button(crate::i18n::text("interaction-dialogs-keep-local"))
+                    .clicked()
+                {
+                    close = true;
+                }
             });
         });
     if open && !close {
@@ -136,6 +163,38 @@ fn review_ui(ctx: &egui::Context) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn actual_local_review_translates_without_sending_or_rewriting_report_content() {
+        use egui_kittest::{Harness, kittest::Queryable};
+        crate::i18n::set_language("de");
+        let fonts = std::cell::Cell::new(false);
+        let mut h = Harness::new_ui(move |ui| {
+            if !fonts.replace(true) {
+                crate::theme::install_fonts(ui.ctx());
+                return;
+            }
+            if ui
+                .ctx()
+                .data(|d| d.get_temp::<Review>(review_id()))
+                .is_none()
+            {
+                stage_report(
+                    ui.ctx(),
+                    "core.editor = (configured; value withheld)\nopaque 日本語",
+                );
+            }
+            review_ui(ui.ctx());
+        });
+        h.run();
+        h.get_by_label("Diagnosedaten lokal prüfen");
+        h.get_by_label("Geprüfte Diagnosedaten kopieren").click();
+        h.run();
+        let report = h.ctx.data(|d| d.get_temp::<Review>(review_id())).unwrap();
+        assert!(report.text.contains("opaque 日本語"));
+        assert!(report.text.contains("(configured; value withheld)"));
+        crate::i18n::set_language("en-US");
+    }
+
     #[test]
     fn collecting_diagnostics_cannot_open_a_browser_before_local_review() {
         let ctx = egui::Context::default();

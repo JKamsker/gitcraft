@@ -90,140 +90,208 @@ impl App {
     }
 
     fn askpass_modal(&mut self, ctx: &egui::Context, question: &Question) -> Option<Answer> {
-        let t = Tokens::get(ctx);
-        let frame = egui::Frame::new()
-            .fill(t.card)
-            .stroke(Stroke::new(1.0, t.field_border))
-            .corner_radius(t.radius_lg)
-            .inner_margin(egui::Margin::same(18))
-            .shadow(ctx.global_style().visuals.window_shadow);
-        let state = &mut self.askpass;
-        let mut answer = None;
-        let resp = egui::Modal::new(egui::Id::new(("askpass", question.id)))
-            .frame(frame)
-            .backdrop_color(egui::Color32::from_black_alpha(110))
-            .show(ctx, |ui| {
-                ui.set_width(480.0);
-                let title = match question.kind {
-                    Kind::TrustHost => "Trust this host?",
-                    _ => "Sign in",
-                };
-                ui.label(RichText::new(title).font(theme::semibold(15.0)));
-                ui.label(RichText::new(&question.host).color(t.text_dim).small());
-                ui.add_space(10.0);
-                if question.forgotten {
-                    ui.colored_label(
-                        t.danger,
-                        "The saved password wasn't accepted, and is forgotten.",
-                    );
-                    ui.add_space(6.0);
-                }
-                ui.label(&question.prompt);
-                ui.add_space(10.0);
-                let enter = ui.input(|i| i.key_pressed(Key::Enter));
-                match question.kind {
-                    Kind::Secret => {
-                        let field = ui.add(
-                            egui::TextEdit::singleline(&mut state.typed)
-                                .password(true)
-                                .desired_width(f32::INFINITY)
-                                .margin(egui::Margin::symmetric(8, 6)),
-                        );
-                        if std::mem::take(&mut state.focus) {
-                            field.request_focus();
-                        }
-                        ui.add_space(8.0);
-                        if crate::portable::credential_store() {
-                            ui.checkbox(&mut state.remember, "Remember connection")
-                                .on_hover_text(REMEMBER_HINT);
-                        } else {
-                            // A portable copy set to leave nothing on this computer.
-                            state.remember = false;
-                            ui.label(
-                                RichText::new(
-                                    "Asked again after a restart: this portable copy doesn't \
-                                     use the credential store (Settings → General).",
-                                )
-                                .color(t.text_dim)
-                                .small(),
-                            );
-                        }
-                        ui.add_space(12.0);
-                        ui.horizontal(|ui| {
-                            if crate::repo::primary_button(ui, "Sign in", true, 90.0).clicked()
-                                || enter
-                            {
-                                let typed = std::mem::take(&mut state.typed);
-                                answer = Some(if state.remember {
-                                    Answer::Remember(typed)
-                                } else {
-                                    Answer::Give(typed)
-                                });
-                            }
-                            if ui
-                                .add(egui::Button::new("Cancel").min_size(vec2(80.0, 30.0)))
-                                .clicked()
-                            {
-                                answer = Some(Answer::Decline);
-                            }
-                        });
-                    }
-                    Kind::TrustHost | Kind::Confirm => {
-                        let (yes, word) = match question.kind {
-                            Kind::TrustHost => ("Trust and connect", "yes"),
-                            _ => ("OK", ""),
-                        };
-                        ui.horizontal(|ui| {
-                            if crate::repo::primary_button(ui, yes, true, 140.0).clicked() {
-                                answer = Some(Answer::Give(word.to_owned()));
-                            }
-                            if ui
-                                .add(egui::Button::new("Cancel").min_size(vec2(80.0, 30.0)))
-                                .clicked()
-                            {
-                                answer = Some(if question.kind == Kind::TrustHost {
-                                    Answer::Give("no".to_owned())
-                                } else {
-                                    Answer::Decline
-                                });
-                            }
-                        });
-                    }
-                    Kind::Notice => {}
-                }
-            });
-        if answer.is_none() && resp.should_close() {
-            answer = Some(match question.kind {
-                Kind::TrustHost => Answer::Give("no".to_owned()),
-                _ => Answer::Decline,
-            });
-        }
-        answer
+        askpass_modal(ctx, &mut self.askpass, question)
     }
 }
 
-/// Where "Remember connection" keeps it.
-const REMEMBER_HINT: &str = if cfg!(windows) {
-    concat!(
-        "Saved encrypted in Windows Credential Manager, so it isn't asked again after a ",
-        "restart. Forget it from the command palette (Ctrl+P): Forget saved SSH sign-ins."
+/// The actual modal, separate from its OS question/answer queue.
+fn askpass_modal(
+    ctx: &egui::Context,
+    state: &mut AskpassState,
+    question: &Question,
+) -> Option<Answer> {
+    let t = Tokens::get(ctx);
+    let frame = egui::Frame::new()
+        .fill(t.card)
+        .stroke(Stroke::new(1.0, t.field_border))
+        .corner_radius(t.radius_lg)
+        .inner_margin(egui::Margin::same(18))
+        .shadow(ctx.global_style().visuals.window_shadow);
+    let mut answer = None;
+    let resp = egui::Modal::new(egui::Id::new(("askpass", question.id)))
+        .frame(frame)
+        .backdrop_color(egui::Color32::from_black_alpha(110))
+        .show(ctx, |ui| {
+            ui.set_width(480.0);
+            let title = match question.kind {
+                Kind::TrustHost => crate::i18n::text("interaction-dialogs-trust-host"),
+                _ => crate::i18n::text("interaction-dialogs-sign-in"),
+            };
+            ui.label(RichText::new(title).font(theme::semibold(15.0)));
+            ui.label(RichText::new(&question.host).color(t.text_dim).small());
+            ui.add_space(10.0);
+            if question.forgotten {
+                ui.colored_label(t.danger, crate::i18n::text("interaction-dialogs-forgotten"));
+                ui.add_space(6.0);
+            }
+            ui.label(&question.prompt);
+            ui.add_space(10.0);
+            let enter = ui.input(|i| i.key_pressed(Key::Enter));
+            match question.kind {
+                Kind::Secret => {
+                    let field = ui.add(
+                        egui::TextEdit::singleline(&mut state.typed)
+                            .password(true)
+                            .desired_width(f32::INFINITY)
+                            .margin(egui::Margin::symmetric(8, 6)),
+                    );
+                    if std::mem::take(&mut state.focus) {
+                        field.request_focus();
+                    }
+                    ui.add_space(8.0);
+                    if crate::portable::credential_store() {
+                        ui.checkbox(
+                            &mut state.remember,
+                            crate::i18n::text("interaction-dialogs-remember"),
+                        )
+                        .on_hover_text(remember_hint(ui.ctx()));
+                    } else {
+                        // A portable copy set to leave nothing on this computer.
+                        state.remember = false;
+                        ui.label(
+                            RichText::new(crate::i18n::text("interaction-dialogs-portable"))
+                                .color(t.text_dim)
+                                .small(),
+                        );
+                    }
+                    ui.add_space(12.0);
+                    ui.horizontal(|ui| {
+                        if crate::repo::primary_button(
+                            ui,
+                            crate::i18n::text("interaction-dialogs-sign-in"),
+                            true,
+                            90.0,
+                        )
+                        .clicked()
+                            || enter
+                        {
+                            let typed = std::mem::take(&mut state.typed);
+                            answer = Some(if state.remember {
+                                Answer::Remember(typed)
+                            } else {
+                                Answer::Give(typed)
+                            });
+                        }
+                        if ui
+                            .add(
+                                egui::Button::new(crate::i18n::text("interaction-dialogs-cancel"))
+                                    .min_size(vec2(80.0, 30.0)),
+                            )
+                            .clicked()
+                        {
+                            answer = Some(Answer::Decline);
+                        }
+                    });
+                }
+                Kind::TrustHost | Kind::Confirm => {
+                    let (yes, word) = match question.kind {
+                        Kind::TrustHost => (crate::i18n::text("interaction-dialogs-trust"), "yes"),
+                        _ => (crate::i18n::text("interaction-dialogs-ok"), ""),
+                    };
+                    ui.horizontal(|ui| {
+                        if crate::repo::primary_button(ui, yes, true, 140.0).clicked() {
+                            answer = Some(Answer::Give(word.to_owned()));
+                        }
+                        if ui
+                            .add(
+                                egui::Button::new(crate::i18n::text("interaction-dialogs-cancel"))
+                                    .min_size(vec2(80.0, 30.0)),
+                            )
+                            .clicked()
+                        {
+                            answer = Some(if question.kind == Kind::TrustHost {
+                                Answer::Give("no".to_owned())
+                            } else {
+                                Answer::Decline
+                            });
+                        }
+                    });
+                }
+                Kind::Notice => {}
+            }
+        });
+    if answer.is_none() && resp.should_close() {
+        answer = Some(match question.kind {
+            Kind::TrustHost => Answer::Give("no".to_owned()),
+            _ => Answer::Decline,
+        });
+    }
+    answer
+}
+
+/// Resolve platform prose and the configured palette shortcut when the help is shown.
+fn remember_hint(ctx: &egui::Context) -> String {
+    let store = crate::i18n::text(if cfg!(windows) {
+        "interaction-dialogs-store-win"
+    } else if cfg!(target_os = "macos") {
+        "interaction-dialogs-store-mac"
+    } else {
+        "interaction-dialogs-store-linux"
+    });
+    crate::i18n::message(
+        "interaction-dialogs-remember-hint",
+        &[
+            ("store", store.into()),
+            (
+                "palette",
+                crate::keymap::tip(
+                    ctx,
+                    crate::i18n::text("interaction-presentation-palette"),
+                    crate::keymap::Command::Palette,
+                )
+                .into(),
+            ),
+        ],
     )
-} else if cfg!(target_os = "macos") {
-    concat!(
-        "Saved encrypted in the macOS Keychain, so it isn't asked again after a restart. ",
-        "Forget it from the command palette (Cmd+P): Forget saved SSH sign-ins."
-    )
-} else {
-    concat!(
-        "Saved encrypted in your keyring (Secret Service: GNOME Keyring, KWallet), so it ",
-        "isn't asked again after a restart. Forget it from the command palette (Ctrl+P): ",
-        "Forget saved SSH sign-ins."
-    )
-};
+}
 
 enum Answer {
     Give(String),
     /// Give it, and keep it for good.
     Remember(String),
     Decline,
+}
+
+#[cfg(test)]
+mod localization_tests {
+    use super::*;
+    use egui_kittest::{Harness, kittest::Queryable};
+
+    #[test]
+    fn actual_host_trust_dialog_localizes_buttons_but_answers_literal_ssh_protocol() {
+        crate::i18n::set_language("de");
+        let fonts = std::cell::Cell::new(false);
+        let mut h = Harness::new_ui_state(
+            move |ui, state: &mut (AskpassState, Option<String>)| {
+                if !fonts.replace(true) {
+                    crate::theme::install_fonts(ui.ctx());
+                    return;
+                }
+                let question = Question {
+                    id: 17,
+                    host: "ssh 日本語".into(),
+                    prompt: "external SSH fingerprint SHA256:abc".into(),
+                    kind: Kind::TrustHost,
+                    forgotten: false,
+                };
+                if let Some(Answer::Give(answer)) = askpass_modal(ui.ctx(), &mut state.0, &question)
+                {
+                    state.1 = Some(answer);
+                }
+            },
+            (AskpassState::default(), None),
+        );
+        h.run();
+        h.get_by_label("Diesem Host vertrauen?");
+        h.get_by_label("external SSH fingerprint SHA256:abc");
+        h.get_by_label("Vertrauen und verbinden").click();
+        h.run();
+        assert_eq!(h.state().1.as_deref(), Some("yes"));
+        h.get_by_label("Abbrechen").click();
+        h.run();
+        assert_eq!(h.state().1.as_deref(), Some("no"));
+        crate::i18n::set_language("en-US");
+        h.step();
+        h.get_by_label("Trust this host?");
+    }
 }

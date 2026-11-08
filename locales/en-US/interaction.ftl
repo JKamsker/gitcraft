@@ -961,3 +961,44 @@ interaction-preview-code-mismatch = { $theme } is { $mode ->
        *[light] light
     }: gitcraft's colours meanwhile
 interaction-preview-unchanged = … 120 lines unchanged
+interaction-dialogs-agent = { $agent } wants to:
+interaction-dialogs-repo = In { $repository }
+interaction-dialogs-ghost = Ghost preview
+interaction-dialogs-leaving = Leaving: { $commit }
+interaction-dialogs-commands = Commands:
+interaction-dialogs-denied = Denied automatically in { $remaining } if you don't answer. Esc denies.
+interaction-dialogs-approve = Approve
+interaction-dialogs-deny = Deny
+interaction-dialogs-trust-host = Trust this host?
+interaction-dialogs-sign-in = Sign in
+interaction-dialogs-forgotten = The saved password wasn't accepted, and is forgotten.
+interaction-dialogs-remember = Remember connection
+interaction-dialogs-portable = Asked again after a restart: this portable copy doesn't use the credential store (Settings → General).
+interaction-dialogs-cancel = Cancel
+interaction-dialogs-trust = Trust and connect
+interaction-dialogs-ok = OK
+interaction-dialogs-remember-hint = Saved encrypted in { $store }, so it isn't asked again after a restart. Forget it from the { $palette }: Forget saved SSH sign-ins.
+interaction-dialogs-store-mac = the macOS Keychain
+interaction-dialogs-store-win = Windows Credential Manager
+interaction-dialogs-store-linux = your keyring (Secret Service: GNOME Keyring, KWallet)
+interaction-dialogs-collecting = Diagnostics are still being collected
+interaction-dialogs-collect = Collecting diagnostics (asking git, gh, glab, tea)…
+interaction-dialogs-copied = Diagnostics copied locally. Review and redact the report before opening an issue.
+interaction-dialogs-failed = Collecting diagnostics failed
+interaction-dialogs-review = Review diagnostics locally
+interaction-dialogs-review-help = Nothing has been sent. Review and remove private content, including panic messages. Opening the issue sends this edited report to GitHub in the URL; you can also keep only the local clipboard copy.
+interaction-dialogs-copy-reviewed = Copy reviewed diagnostics
+interaction-dialogs-open-reviewed = Open issue with reviewed diagnostics
+interaction-dialogs-keep-local = Keep local and close
+interaction-dialogs-update-state = gitcraft { $version } { $state ->
+        [ready] is downloaded, ready to install
+       *[out] is out
+    } (you have { $current }).
+interaction-dialogs-not-now = Not now: ask again on the next start
+interaction-dialogs-skip = Skip this version
+interaction-dialogs-release-notes = Release notes
+interaction-dialogs-update-now = Update now
+interaction-dialogs-restart = Restart gitcraft as the new version; the open tabs stay
+interaction-dialogs-download = Download
+interaction-dialogs-release-page = Open the release page
+interaction-dialogs-go-back = Couldn't go back: { $error }

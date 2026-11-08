@@ -961,3 +961,44 @@ interaction-preview-code-mismatch = { $theme } ist { $mode ->
        *[light] hell
     }; vorübergehend gitcraft-eigene Farben
 interaction-preview-unchanged = … 120 unveränderte Zeilen
+interaction-dialogs-agent = { $agent } möchte Folgendes tun:
+interaction-dialogs-repo = In { $repository }
+interaction-dialogs-ghost = Vorschau der Auswirkungen
+interaction-dialogs-leaving = Wird verlassen: { $commit }
+interaction-dialogs-commands = Befehle:
+interaction-dialogs-denied = Ohne Antwort wird die Anfrage in { $remaining } automatisch abgelehnt. Esc lehnt ab.
+interaction-dialogs-approve = Genehmigen
+interaction-dialogs-deny = Ablehnen
+interaction-dialogs-trust-host = Diesem Host vertrauen?
+interaction-dialogs-sign-in = Anmelden
+interaction-dialogs-forgotten = Das gespeicherte Passwort wurde nicht akzeptiert und vergessen.
+interaction-dialogs-remember = Verbindung merken
+interaction-dialogs-portable = Nach einem Neustart wird erneut gefragt: Diese portable Kopie verwendet keinen Zugangsdaten-Speicher (Einstellungen → Allgemein).
+interaction-dialogs-cancel = Abbrechen
+interaction-dialogs-trust = Vertrauen und verbinden
+interaction-dialogs-ok = OK
+interaction-dialogs-remember-hint = Wird verschlüsselt in { $store } gespeichert, damit nach einem Neustart nicht erneut gefragt wird. Entfernen über { $palette }: Gespeicherte SSH-Anmeldungen vergessen.
+interaction-dialogs-store-mac = dem macOS-Schlüsselbund
+interaction-dialogs-store-win = der Windows-Anmeldeinformationsverwaltung
+interaction-dialogs-store-linux = deinem Schlüsselbund (Secret Service: GNOME Keyring, KWallet)
+interaction-dialogs-collecting = Diagnosedaten werden noch gesammelt
+interaction-dialogs-collect = Diagnosedaten werden gesammelt (git, gh, glab und tea werden abgefragt)…
+interaction-dialogs-copied = Diagnosedaten lokal kopiert. Prüfe den Bericht und entferne private Angaben, bevor du ein Issue öffnest.
+interaction-dialogs-failed = Sammeln der Diagnosedaten fehlgeschlagen
+interaction-dialogs-review = Diagnosedaten lokal prüfen
+interaction-dialogs-review-help = Es wurde nichts gesendet. Prüfe den Inhalt und entferne private Angaben, auch aus Panic-Meldungen. Beim Öffnen des Issues wird dieser bearbeitete Bericht in der URL an GitHub gesendet; du kannst auch nur die lokale Zwischenablagekopie behalten.
+interaction-dialogs-copy-reviewed = Geprüfte Diagnosedaten kopieren
+interaction-dialogs-open-reviewed = Issue mit geprüften Diagnosedaten öffnen
+interaction-dialogs-keep-local = Lokal behalten und schließen
+interaction-dialogs-update-state = gitcraft { $version } { $state ->
+        [ready] wurde heruntergeladen und ist bereit zur Installation
+       *[out] ist verfügbar
+    } (du verwendest { $current }).
+interaction-dialogs-not-now = Nicht jetzt: beim nächsten Start erneut fragen
+interaction-dialogs-skip = Diese Version überspringen
+interaction-dialogs-release-notes = Versionshinweise
+interaction-dialogs-update-now = Jetzt aktualisieren
+interaction-dialogs-restart = gitcraft mit der neuen Version neu starten; offene Tabs bleiben erhalten
+interaction-dialogs-download = Herunterladen
+interaction-dialogs-release-page = Veröffentlichungsseite öffnen
+interaction-dialogs-go-back = Zurückwechseln fehlgeschlagen: { $error }
