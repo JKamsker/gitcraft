@@ -76,6 +76,14 @@ impl Forge {
         self.provider().noun()
     }
 
+    /// Localized presentation; `noun()` retains its existing protocol identity.
+    pub fn noun_label(self) -> &'static str {
+        crate::i18n::text(match self {
+            Forge::GitLab => "backend-noun-merge-request",
+            _ => "backend-noun-pull-request",
+        })
+    }
+
     /// The heading of the sidebar's list.
     pub fn list_title(self) -> &'static str {
         match self.noun() {
