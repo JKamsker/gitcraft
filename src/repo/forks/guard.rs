@@ -7,7 +7,10 @@ use std::sync::{
 
 use serde::{Deserialize, Serialize};
 
-use crate::{forge::Hosting, git};
+use crate::{
+    forge::{Forge, Hosting},
+    git,
+};
 
 #[derive(Clone)]
 pub(in crate::repo) struct Scope {
@@ -184,12 +187,15 @@ impl Destination {
 }
 const MARK: &str = "\0fork-destination";
 pub(in crate::repo) fn is_guard(step: &[String]) -> bool {
-    matches!(step, [mark, _] if mark == MARK)
+    matches!(step, [mark, _] if mark == MARK || mark == CHECKOUT_MARK)
 }
 /// Rechecked before every real step, including immediately before a force push. These
 /// checks also survive retry and persisted undo/redo; no Git command receives the marker.
 pub(in crate::repo) fn check(repo: &Path, steps: &[Vec<String>]) -> Result<(), String> {
-    for step in steps.iter().filter(|s| is_guard(s)) {
+    for step in steps
+        .iter()
+        .filter(|s| matches!(s.as_slice(), [mark, _] if mark == MARK))
+    {
         let expected: Destination = serde_json::from_str(&step[1]).map_err(|e| e.to_string())?;
         if Destination::read(repo, &expected.name).as_ref() != Ok(&expected) {
             return Err(format!(
@@ -199,6 +205,118 @@ pub(in crate::repo) fn check(repo: &Path, steps: &[Vec<String>]) -> Result<(), S
         }
     }
     Ok(())
+}
+
+/// Unlike a Scope, this guard travels in the persisted checkout undo/redo commands.
+/// A removed new remote may be recreated only by its captured remote-add step.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub(super) struct CheckoutDestination {
+    name: String,
+    advertised: String,
+    new: bool,
+    forge: String,
+    host: String,
+    web: String,
+    path: String,
+    initial: Option<Destination>,
+}
+const CHECKOUT_MARK: &str = "\0fork-checkout";
+impl CheckoutDestination {
+    pub fn new(name: &str, advertised: &str, new: bool, hosting: &Hosting) -> Self {
+        Self {
+            name: name.into(),
+            advertised: advertised.into(),
+            new,
+            forge: hosting.forge.key().into(),
+            host: hosting.host.clone(),
+            web: hosting.web.clone(),
+            path: hosting.path.clone(),
+            initial: None,
+        }
+    }
+    pub fn step(&self) -> Vec<String> {
+        vec![
+            CHECKOUT_MARK.into(),
+            serde_json::to_string(self).unwrap_or_default(),
+        ]
+    }
+    fn hosting(&self) -> Result<Hosting, String> {
+        Ok(Hosting {
+            forge: Forge::from_key(&self.forge).ok_or("Unknown saved checkout forge")?,
+            host: self.host.clone(),
+            web: self.web.clone(),
+            path: self.path.clone(),
+        })
+    }
+}
+
+pub(in crate::repo) struct CheckoutReplay {
+    destination: CheckoutDestination,
+    may_create: bool,
+}
+impl CheckoutReplay {
+    pub fn read(ops: &[Vec<String>], saved_label: Option<&str>) -> Result<Option<Self>, String> {
+        let Some(step) = ops
+            .iter()
+            .find(|s| matches!(s.as_slice(), [mark, _] if mark == CHECKOUT_MARK))
+        else {
+            // Pre-guard timeline entries have the checkout action's original label but
+            // lack the identity and effective URLs needed to replay it safely.
+            let legacy = saved_label
+                .and_then(|s| s.strip_prefix("Check out #"))
+                .and_then(|s| s.split_once(" to push to "))
+                .is_some_and(|(number, _)| number.parse::<u64>().is_ok());
+            return if legacy {
+                Err("This saved fork checkout has no captured destination; check out the pull request again".into())
+            } else {
+                Ok(None)
+            };
+        };
+        let destination: CheckoutDestination =
+            serde_json::from_str(&step[1]).map_err(|e| e.to_string())?;
+        if saved_label.is_some() && destination.initial.is_none() {
+            return Err("The saved fork checkout has no initial effective destination; check out the pull request again".into());
+        }
+        let may_create = destination.new && ops.iter().any(|s| matches!(s.as_slice(), [remote, add, dash, name, url]
+            if remote == "remote" && add == "add" && dash == "--" && name == &destination.name && url == &destination.advertised));
+        Ok(Some(Self {
+            destination,
+            may_create,
+        }))
+    }
+    pub fn check(&mut self, repo: &Path) -> Result<(), String> {
+        let d = &mut self.destination;
+        let present = git::remotes(repo)?.iter().any(|r| r.name == d.name);
+        if !present {
+            return if self.may_create {
+                Ok(())
+            } else {
+                Err("The saved fork remote is missing; check out the pull request again".into())
+            };
+        }
+        self.may_create = false;
+        let now = Destination::read(repo, &d.name)?;
+        let hosting = d.hosting()?;
+        now.validate(Some(&hosting), false)?;
+        now.validate(Some(&hosting), true)?;
+        if let Some(initial) = &d.initial {
+            if &now != initial {
+                return Err(
+                    "The saved fork destination changed; check out the pull request again".into(),
+                );
+            }
+        } else {
+            d.initial = Some(now);
+        }
+        Ok(())
+    }
+    pub fn bind(&self, ops: &mut [Vec<String>]) {
+        for step in ops {
+            if matches!(step.as_slice(), [mark, _] if mark == CHECKOUT_MARK) {
+                *step = self.destination.step();
+            }
+        }
+    }
 }
 
 /// Filled only from the source OID of a push this worker completed. Persisting the

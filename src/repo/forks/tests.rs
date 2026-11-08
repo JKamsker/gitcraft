@@ -1693,3 +1693,511 @@ fn review19_auth_retry_pushes_only_the_recorded_rewrite_with_an_explicit_lease()
     assert_eq!(git::resolve(&w.fork, "fix")?, p.head);
     Ok(())
 }
+
+#[cfg(unix)]
+fn push_window(mode: &str) -> Result<(), Box<dyn std::error::Error>> {
+    use std::os::unix::fs::PermissionsExt;
+    let w = World::new(&format!("review20-{mode}-push-window"));
+    let p = rebase_ready(&w);
+    let mut kind = normal(p.undo_steps(), p.redo_steps());
+    let mut steps = p.steps();
+    if mode != "normal" {
+        let (result, done) = run_steps(&w.me, &steps, kind, None);
+        assert!(result.is_ok(), "{result:?}");
+        let entry = persisted(custom(done).ok_or("missing completed rebase")?)?;
+        if mode == "redo" {
+            let (result, undone) = run_steps(&w.me, &entry.undo.clone(), OpKind::Undo(entry), None);
+            assert!(result.is_ok(), "{result:?}");
+            let OpKind::Undo(entry) = undone else {
+                return Err("missing undone entry".into());
+            };
+            let entry = persisted(entry)?;
+            steps = entry.redo.clone();
+            kind = OpKind::Redo(entry);
+        } else {
+            steps = entry.undo.clone();
+            kind = OpKind::Undo(entry);
+        }
+    }
+    let ready = w.root.join("hook-ready");
+    let release = w.root.join("hook-release");
+    let quote = |p: &Path| format!("'{}'", arg(p).replace('\'', "'\\''"));
+    let hook = format!(
+        "#!/bin/sh\n: > {}\ni=0\nwhile [ ! -f {} ] && [ \"$i\" -lt 1500 ]; do\n i=$((i+1))\n sleep 0.01\ndone\n[ -f {} ]\n",
+        quote(&ready),
+        quote(&release),
+        quote(&release)
+    );
+    let hook_path = w.me.join(".git/hooks/pre-push");
+    std::fs::write(&hook_path, hook)?;
+    std::fs::set_permissions(&hook_path, std::fs::Permissions::from_mode(0o700))?;
+    let me = w.me.clone();
+    let worker = std::thread::spawn(move || run_steps(&me, &steps, kind, None));
+    for _ in 0..1000 {
+        if ready.exists() {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    // Release even on setup failure: only this owned Git child can wait on these files.
+    if !ready.exists() {
+        std::fs::write(&release, "release")?;
+        let _ = worker.join();
+        return Err("owned pre-push hook never became ready".into());
+    }
+    let rewritten = git::head(&w.me);
+    commit(&w.me, "external-during-push.txt");
+    let external = git::head(&w.me);
+    std::fs::write(&release, "release")?;
+    let (result, done) = worker.join().map_err(|_| "owned push worker panicked")?;
+    std::fs::remove_file(hook_path)?;
+    if mode == "undo" {
+        assert!(
+            result.is_err(),
+            "undo reset a branch changed while pushing: {result:?}"
+        );
+        assert_eq!(git::head(&w.me), external);
+        assert_eq!(git::resolve(&w.fork, "fix")?, p.head);
+        return Ok(());
+    }
+    assert!(result.is_ok(), "{result:?}");
+    assert_eq!(
+        git::resolve(&w.fork, "fix")?,
+        rewritten,
+        "the push itself uses pinned R"
+    );
+    assert_eq!(git::head(&w.me), external);
+    let entry = if mode == "normal" {
+        custom(done).ok_or("missing normal undo")?
+    } else {
+        let OpKind::Redo(entry) = done else {
+            return Err("missing redo result".into());
+        };
+        entry
+    };
+    let entry = persisted(entry)?;
+    let result = run_steps(&w.me, &entry.undo.clone(), OpKind::Undo(entry), None).0;
+    assert!(
+        result.is_err(),
+        "undo accepted external C after a pinned R push: {result:?}"
+    );
+    assert_eq!(git::head(&w.me), external);
+    assert_eq!(git::resolve(&w.fork, "fix")?, rewritten);
+    Ok(())
+}
+#[cfg(unix)]
+#[test]
+fn review20_normal_push_cannot_bind_local_undo_to_a_commit_created_in_its_hook()
+-> Result<(), Box<dyn std::error::Error>> {
+    push_window("normal")
+}
+#[cfg(unix)]
+#[test]
+fn review20_redo_push_cannot_bind_local_undo_to_a_commit_created_in_its_hook()
+-> Result<(), Box<dyn std::error::Error>> {
+    push_window("redo")
+}
+#[cfg(unix)]
+#[test]
+fn review20_undo_cannot_reset_a_commit_created_in_its_push_hook()
+-> Result<(), Box<dyn std::error::Error>> {
+    push_window("undo")
+}
+
+#[cfg(unix)]
+fn web_checkout(
+    w: &World,
+) -> Result<(plan::Checkout, super::guard::Scope), Box<dyn std::error::Error>> {
+    use crate::forge::{Forge, Hosting};
+    use std::os::unix::fs::PermissionsExt;
+    let primary = git::Remote {
+        name: "origin".into(),
+        url: "https://github.com/acme/app.git".into(),
+    };
+    run(&w.me, &["remote", "set-url", "origin", &primary.url]);
+    run(
+        &w.me,
+        &[
+            "config",
+            "url.git@github.com:ann/.insteadOf",
+            "https://github.com/ann/",
+        ],
+    );
+    let quote = |p: &Path| format!("'{}'", arg(p).replace('\'', "'\\''"));
+    let ssh = w.root.join("checkout-owned-ssh");
+    std::fs::write(
+        &ssh,
+        format!(
+            "#!/bin/sh\nallowed=no\nfor arg do\n [ \"$arg\" = \"git-upload-pack 'ann/app.git'\" ] && allowed=yes\ndone\n[ \"$allowed\" = yes ] || exit 97\nexec git-upload-pack {}\n",
+            quote(&w.fork)
+        ),
+    )?;
+    std::fs::set_permissions(&ssh, std::fs::Permissions::from_mode(0o700))?;
+    run(&w.me, &["config", "core.sshCommand", &quote(&ssh)]);
+    run(&w.me, &["config", "ssh.variant", "ssh"]);
+    let h = Hosting {
+        forge: Forge::GitHub,
+        host: "github.com".into(),
+        web: "https://github.com".into(),
+        path: "acme/app".into(),
+    };
+    let mut info = w.info();
+    info.clone_https = "https://github.com/ann/app.git".into();
+    info.clone_ssh = "git@github.com:ann/app.git".into();
+    let p = plan::checkout(
+        &info,
+        std::slice::from_ref(&primary),
+        &w.setup(),
+        &["main".into()],
+        "main",
+        Some(&h),
+    )?;
+    let fork = Hosting {
+        path: "ann/app".into(),
+        ..h.clone()
+    };
+    let scope = super::guard::Scope::new(1, h, primary).with_fork(
+        p.remote.clone(),
+        p.url.clone(),
+        fork,
+        p.new_remote,
+    );
+    Ok((p, scope))
+}
+#[cfg(unix)]
+#[test]
+fn review20_checkout_redo_rejects_a_new_wrong_repository_rewrite_without_scope()
+-> Result<(), Box<dyn std::error::Error>> {
+    let w = World::new("review20-redo-checkout");
+    let evil = World::new("review20-other-repository");
+    let (p, scope) = web_checkout(&w)?;
+    let (result, done, _) = crate::repo::operations::run_steps_guarded(
+        &w.me,
+        &p.steps,
+        normal(p.undo, p.steps.clone()),
+        None,
+        false,
+        None,
+        Some(&scope),
+    );
+    assert!(result.is_ok(), "{result:?}");
+    drop(scope);
+    let entry = persisted(custom(done).ok_or("missing checkout undo")?)?;
+    let (result, done) = run_steps(&w.me, &entry.undo.clone(), OpKind::Undo(entry), None);
+    assert!(result.is_ok(), "{result:?}");
+    let OpKind::Undo(entry) = done else {
+        return Err("missing undone checkout".into());
+    };
+    let entry = persisted(entry)?;
+    run(
+        &w.me,
+        &["config", "--unset", "url.git@github.com:ann/.insteadOf"],
+    );
+    run(
+        &w.me,
+        &[
+            "config",
+            &format!("url.{}.insteadOf", arg(&evil.fork)),
+            "https://github.com/ann/app.git",
+        ],
+    );
+    let before = git::head(&w.me);
+    let result = run_steps(&w.me, &entry.redo.clone(), OpKind::Redo(entry), None).0;
+    assert!(
+        result.is_err(),
+        "checkout redo accepted a wrong repository: {result:?}"
+    );
+    assert_eq!(git::head(&w.me), before);
+    assert!(git::resolve(&w.me, "refs/heads/fix").is_err());
+    assert!(git::resolve(&w.me, "refs/remotes/ann/fix").is_err());
+    assert!(git::run(Some(&w.me), &["config", "--get", "remote.ann.gitcraftFork"]).is_err());
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn review20_checkout_canonical_rewrite_roundtrips_without_scope()
+-> Result<(), Box<dyn std::error::Error>> {
+    let w = World::new("review20-valid-replay");
+    let (p, scope) = web_checkout(&w)?;
+    let (result, done, _) = crate::repo::operations::run_steps_guarded(
+        &w.me,
+        &p.steps,
+        normal(p.undo, p.steps.clone()),
+        None,
+        false,
+        None,
+        Some(&scope),
+    );
+    assert!(result.is_ok(), "{result:?}");
+    drop(scope);
+    let mut entry = persisted(custom(done).ok_or("missing checkout undo")?)?;
+    for _ in 0..2 {
+        let (result, done) = run_steps(&w.me, &entry.undo.clone(), OpKind::Undo(entry), None);
+        assert!(result.is_ok(), "{result:?}");
+        assert_eq!(run(&w.me, &["branch", "--show-current"]).trim(), "main");
+        assert!(git::remotes(&w.me)?.iter().all(|r| r.name != "ann"));
+        let OpKind::Undo(undone) = done else {
+            return Err("missing checkout undo result".into());
+        };
+        entry = persisted(undone)?;
+        let (result, done) = run_steps(&w.me, &entry.redo.clone(), OpKind::Redo(entry), None);
+        assert!(result.is_ok(), "{result:?}");
+        assert_eq!(git::head(&w.me), w.info().sha);
+        assert_eq!(
+            run(&w.me, &["remote", "get-url", "ann"]).trim(),
+            "git@github.com:ann/app.git"
+        );
+        let OpKind::Redo(redone) = done else {
+            return Err("missing checkout redo result".into());
+        };
+        entry = persisted(redone)?;
+    }
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn review20_checkout_undo_rejects_push_url_changes_and_missing_remotes_before_checkout()
+-> Result<(), Box<dyn std::error::Error>> {
+    let w = World::new("review20-undo-destinations");
+    let (p, scope) = web_checkout(&w)?;
+    let (result, done, _) = crate::repo::operations::run_steps_guarded(
+        &w.me,
+        &p.steps,
+        normal(p.undo, p.steps.clone()),
+        None,
+        false,
+        None,
+        Some(&scope),
+    );
+    assert!(result.is_ok(), "{result:?}");
+    drop(scope);
+    let entry = persisted(custom(done).ok_or("missing checkout undo")?)?;
+    let head = git::head(&w.me);
+    run(
+        &w.me,
+        &[
+            "config",
+            "remote.ann.pushurl",
+            "https://github.com:444/ann/app.git",
+        ],
+    );
+    let result = run_steps(&w.me, &entry.undo, OpKind::Undo(entry.clone()), None).0;
+    assert!(result.is_err(), "{result:?}");
+    assert_eq!(run(&w.me, &["branch", "--show-current"]).trim(), "fix");
+    assert_eq!(git::head(&w.me), head);
+    run(&w.me, &["remote", "remove", "ann"]);
+    let result = run_steps(
+        &w.me,
+        &entry.undo.clone(),
+        OpKind::Undo(persisted(entry)?),
+        None,
+    )
+    .0;
+    assert!(result.is_err(), "{result:?}");
+    assert_eq!(run(&w.me, &["branch", "--show-current"]).trim(), "fix");
+    assert_eq!(git::head(&w.me), head);
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn review20_checkout_redo_retry_retains_the_initial_effective_destination_pin()
+-> Result<(), Box<dyn std::error::Error>> {
+    use std::os::unix::fs::PermissionsExt;
+    let w = World::new("review20-replay-retry");
+    let (p, scope) = web_checkout(&w)?;
+    let (result, done, _) = crate::repo::operations::run_steps_guarded(
+        &w.me,
+        &p.steps,
+        normal(p.undo, p.steps.clone()),
+        None,
+        false,
+        None,
+        Some(&scope),
+    );
+    assert!(result.is_ok(), "{result:?}");
+    drop(scope);
+    let entry = persisted(custom(done).ok_or("missing checkout undo")?)?;
+    let (result, done) = run_steps(&w.me, &entry.undo.clone(), OpKind::Undo(entry), None);
+    assert!(result.is_ok(), "{result:?}");
+    let OpKind::Undo(entry) = done else {
+        return Err("missing undone checkout".into());
+    };
+    let entry = persisted(entry)?;
+    let original_ssh = run(&w.me, &["config", "core.sshCommand"]);
+    let failure = w.root.join("owned-auth-failure");
+    let recording = w.root.join("retry-recording");
+    let quote = |p: &Path| format!("'{}'", arg(p).replace('\'', "'\\''"));
+    std::fs::write(
+        &failure,
+        format!(
+            "#!/bin/sh\nprintf failed >> {}\necho 'fatal: Authentication failed' >&2\nexit 1\n",
+            quote(&recording)
+        ),
+    )?;
+    std::fs::set_permissions(&failure, std::fs::Permissions::from_mode(0o700))?;
+    run(&w.me, &["config", "core.sshCommand", &quote(&failure)]);
+    let ops = entry.redo.clone();
+    let (result, kind, stopped) = crate::repo::operations::run_steps_counted(
+        &w.me,
+        &ops,
+        OpKind::Redo(entry),
+        None,
+        false,
+        None,
+    );
+    assert!(
+        result.as_ref().is_err_and(|e| git::is_auth_error(e)),
+        "{result:?}"
+    );
+    assert_eq!(std::fs::read_to_string(&recording)?, "failed");
+    let ctx = egui::Context::default();
+    let mut tab = crate::repo::RepoTab::new_deferred(w.me.clone(), &ctx);
+    tab.last_op = Some(crate::repo::PendingOp {
+        label: "Retry checkout".into(),
+        ops,
+        refresh: crate::repo::Refresh::All,
+        kind,
+        quiet: false,
+    });
+    tab.keep_unfinished(stopped);
+    let retry = tab.last_op.take().ok_or("missing checkout retry")?;
+    // Canonical SSH spelling, but changed after the initial effective URLs were pinned.
+    run(
+        &w.me,
+        &[
+            "config",
+            "remote.ann.pushurl",
+            "ssh://git@github.com/ann/app.git",
+        ],
+    );
+    let result = run_steps(&w.me, &retry.ops, retry.kind.clone(), None).0;
+    assert!(result.is_err(), "{result:?}");
+    assert_eq!(
+        std::fs::read_to_string(&recording)?,
+        "failed",
+        "changed destination was refused before retrying fetch"
+    );
+    assert!(git::resolve(&w.me, "refs/heads/fix").is_err());
+    run(&w.me, &["config", "--unset", "remote.ann.pushurl"]);
+    run(&w.me, &["remote", "remove", "ann"]);
+    let result = run_steps(&w.me, &retry.ops, retry.kind.clone(), None).0;
+    assert!(
+        result.is_err(),
+        "a retry may not silently replace a removed remote: {result:?}"
+    );
+    run(
+        &w.me,
+        &["remote", "add", "ann", "https://github.com/ann/app.git"],
+    );
+    run(&w.me, &["config", "core.sshCommand", original_ssh.trim()]);
+    let result = run_steps(&w.me, &retry.ops, retry.kind, None).0;
+    assert!(result.is_ok(), "{result:?}");
+    assert_eq!(git::head(&w.me), w.info().sha);
+    Ok(())
+}
+
+#[test]
+fn review20_saved_checkout_guard_preserves_authority_prefix_and_gitlab_case()
+-> Result<(), Box<dyn std::error::Error>> {
+    use crate::forge::{Forge, Hosting};
+    for forge in Forge::ALL {
+        let w = World::new(&format!("review20-saved-identity-{}", forge.key()));
+        let h = Hosting {
+            forge,
+            host: "forge.example".into(),
+            web: "https://forge.example:4000/proxy".into(),
+            path: "Group/Repo".into(),
+        };
+        run(
+            &w.me,
+            &[
+                "remote",
+                "add",
+                "ann",
+                "https://forge.example:4000/proxy/Group/Repo.git",
+            ],
+        );
+        for (url, valid) in [
+            ("https://forge.example:4000/proxy/Group/Repo.git", true),
+            ("ssh://git@forge.example:2222/Group/Repo.git", true),
+            ("https://forge.example:3000/proxy/Group/Repo.git", false),
+            ("https://forge.example:4000/Group/Repo.git", false),
+            ("https://forge.example:4000/PROXY/Group/Repo.git", false),
+            (
+                "https://forge.example:4000/proxy/group/repo.git",
+                forge != Forge::GitLab,
+            ),
+        ] {
+            run(&w.me, &["remote", "set-url", "ann", url]);
+            let guard = super::guard::CheckoutDestination::new("ann", url, false, &h).step();
+            let steps = vec![
+                guard,
+                vec!["config".into(), "gitcraft.fixtureRan".into(), "true".into()],
+            ];
+            let steps: Vec<Vec<String>> = serde_json::from_str(&serde_json::to_string(&steps)?)?;
+            let result = run_steps(&w.me, &steps, OpKind::plain(), None).0;
+            assert_eq!(result.is_ok(), valid, "{forge:?} {url}: {result:?}");
+            let ran = git::run(Some(&w.me), &["config", "--get", "gitcraft.fixtureRan"]);
+            assert_eq!(ran.is_ok(), valid);
+            if valid {
+                run(&w.me, &["config", "--unset", "gitcraft.fixtureRan"]);
+            }
+        }
+    }
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn review20_legacy_saved_checkout_without_identity_is_refused_before_replay()
+-> Result<(), Box<dyn std::error::Error>> {
+    let w = World::new("review20-legacy-checkout");
+    let (p, scope) = web_checkout(&w)?;
+    let (result, done, _) = crate::repo::operations::run_steps_guarded(
+        &w.me,
+        &p.steps,
+        normal(p.undo, p.steps.clone()),
+        None,
+        false,
+        None,
+        Some(&scope),
+    );
+    assert!(result.is_ok(), "{result:?}");
+    drop(scope);
+    let mut entry = persisted(custom(done).ok_or("missing checkout undo")?)?;
+    // Reconstruct the old on-disk record: it had the action label and plain commands.
+    entry.label = "Check out #7 to push to ann".into();
+    let mut legacy = entry.clone();
+    for ops in [&mut legacy.undo, &mut legacy.redo] {
+        ops.retain(|s| s.first().is_none_or(|m| m != "\0fork-checkout"));
+    }
+    let legacy = persisted(legacy)?;
+    let head = git::head(&w.me);
+    let result = run_steps(
+        &w.me,
+        &legacy.undo.clone(),
+        OpKind::Undo(legacy.clone()),
+        None,
+    )
+    .0;
+    assert!(result.is_err(), "{result:?}");
+    assert_eq!(git::head(&w.me), head);
+    assert_eq!(run(&w.me, &["branch", "--show-current"]).trim(), "fix");
+    let (result, done) = run_steps(&w.me, &entry.undo.clone(), OpKind::Undo(entry), None);
+    assert!(result.is_ok(), "{result:?}");
+    let OpKind::Undo(undone) = done else {
+        return Err("missing guarded undo result".into());
+    };
+    entry = persisted(undone)?;
+    let before = git::head(&w.me);
+    let result = run_steps(&w.me, &legacy.redo.clone(), OpKind::Redo(legacy), None).0;
+    assert!(result.is_err(), "{result:?}");
+    assert_eq!(git::head(&w.me), before);
+    assert!(git::remotes(&w.me)?.iter().all(|r| r.name != "ann"));
+    let result = run_steps(&w.me, &entry.redo.clone(), OpKind::Redo(entry), None).0;
+    assert!(result.is_ok(), "{result:?}");
+    Ok(())
+}
