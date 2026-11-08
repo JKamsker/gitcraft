@@ -350,9 +350,9 @@ impl LaneColors {
 
     pub fn label(self) -> &'static str {
         match self {
-            LaneColors::Theme => "The theme's colours",
-            LaneColors::Classic => "Classic",
-            LaneColors::ColorBlind => "Colour-blind safe",
+            LaneColors::Theme => crate::i18n::text("interaction-presentation-lane-theme"),
+            LaneColors::Classic => crate::i18n::text("interaction-presentation-lane-classic"),
+            LaneColors::ColorBlind => crate::i18n::text("interaction-presentation-lane-colorblind"),
         }
     }
 }

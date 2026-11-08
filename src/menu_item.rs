@@ -132,7 +132,7 @@ impl<'a> MenuItem<'a> {
     fn explanation(&self, ui: &mut Ui) {
         let refused = self
             .refused
-            .or((!self.enabled).then_some("Another operation is running"));
+            .or((!self.enabled).then_some(crate::i18n::text("interaction-presentation-busy")));
         if let Some(why) = refused.filter(|why| self.explained && !why.is_empty()) {
             reason(ui, why);
         }

@@ -43,8 +43,8 @@ impl Channel {
 
     pub fn label(self) -> &'static str {
         match self {
-            Channel::Main => "Main (releases)",
-            Channel::Dev => "Dev (a build of every change)",
+            Channel::Main => crate::i18n::text("interaction-presentation-releases"),
+            Channel::Dev => crate::i18n::text("interaction-presentation-dev"),
         }
     }
 }

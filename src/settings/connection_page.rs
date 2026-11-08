@@ -272,7 +272,7 @@ fn account_check(
         ui.label(
             RichText::new(match result {
                 Ok(value) => value,
-                Err(error) => error,
+                Err(error) => crate::git::display_error(&error),
             })
             .small(),
         );
@@ -284,6 +284,40 @@ fn account_check(
 mod localization_tests {
     use super::*;
     use egui_kittest::{Harness, kittest::Queryable};
+
+    #[test]
+    fn recorded_account_error_is_translated_only_at_actual_paint() {
+        crate::i18n::set_language("de");
+        let fonts = std::cell::Cell::new(false);
+        let mut h = Harness::new_ui_state(
+            move |ui, account: &mut Account| {
+                if !fonts.replace(true) {
+                    crate::theme::install_fonts(ui.ctx());
+                    return;
+                }
+                let id = egui::Id::new(("profile-account-check", 17_u64, "glab", account.clone()));
+                ui.ctx().data_mut(|d| {
+                    d.insert_temp(
+                        id,
+                        Check {
+                            result: Some(Err("Account check cancelled.".into())),
+                            ..Check::default()
+                        },
+                    )
+                });
+                account_check(ui, 17, "glab", account);
+                let raw = ui.ctx().data(|d| d.get_temp::<Check>(id)).unwrap();
+                assert_eq!(raw.result, Some(Err("Account check cancelled.".into())));
+                assert!(!raw.running);
+            },
+            Account::default(),
+        );
+        h.run();
+        h.get_by_label("Kontoprüfung abgebrochen.");
+        crate::i18n::set_language("en-US");
+        h.step();
+        h.get_by_label("Account check cancelled.");
+    }
 
     #[test]
     fn inert_account_fields_translate_and_keep_account_and_cli_identity() {
