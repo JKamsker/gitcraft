@@ -122,7 +122,7 @@ impl Facts {
             .current
             .as_deref()
             .and_then(|c| self.local(c))
-            .ok_or_else(|| crate::i18n::text("repo-workflows-ghost-current-7776bacf").to_owned())
+            .ok_or_else(|| "HEAD is detached: check out a branch first".to_owned())
     }
 
     /// Where `b` pushes and pulls, when it tracks a branch that is still there.

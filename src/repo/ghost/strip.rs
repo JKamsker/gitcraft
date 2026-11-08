@@ -83,7 +83,9 @@ impl RepoTab {
                                 "repo-workflows-ghost-ghost-strip-f637d899",
                                 &[(
                                     "sentence-one-line-why-1",
-                                    (sentence(one_line(why))).clone().into(),
+                                    (sentence(one_line(&super::plan::display_preview_text(why))))
+                                        .clone()
+                                        .into(),
                                 )],
                             ),
                         );
@@ -107,10 +109,20 @@ impl RepoTab {
 /// What `outcome` does, a line each.
 fn outcome_lines(ui: &mut Ui, t: &Tokens, o: &Outcome) {
     if let Some(why) = &o.refused {
-        alert(ui, t, t.danger, &sentence(why));
+        alert(
+            ui,
+            t,
+            t.danger,
+            &sentence(&super::plan::display_preview_text(why)),
+        );
     }
     for warning in &o.warnings {
-        alert(ui, t, t.warning, warning);
+        alert(
+            ui,
+            t,
+            t.warning,
+            &super::plan::display_preview_text(warning),
+        );
     }
     if let Some(c) = &o.conflict {
         let what = match &c.commit {
@@ -220,7 +232,7 @@ fn outcome_lines(ui: &mut Ui, t: &Tokens, o: &Outcome) {
         None => {}
     }
     for note in &o.notes {
-        dim(ui, t, note);
+        dim(ui, t, &super::plan::display_preview_text(note));
     }
     if let Some(engine) = o.engine {
         ui.label(

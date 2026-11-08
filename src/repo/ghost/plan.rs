@@ -141,16 +141,20 @@ impl Ctx<'_> {
         // git looks at the working tree first, even when there is nothing to replay.
         if self.facts.dirty {
             if self.config_set("rebase.autoStash") {
-                out.notes
-                    .push(crate::i18n::text("repo-workflows-ghost-rebase-e550da8a").to_owned());
+                out.notes.push(
+                    "Uncommitted changes are stashed first and put back after (rebase.autoStash)."
+                        .to_owned(),
+                );
             } else {
-                out.refused =
-                    Some(crate::i18n::text("repo-workflows-ghost-rebase-b1f8a147").to_owned());
+                out.refused = Some(
+                    "the rebase refuses to start with uncommitted changes: commit or stash them first"
+                        .to_owned(),
+                );
             }
         }
         if dry_run::is_ancestor(self.repo, &onto_oid, head) {
             out.notes
-                .push(crate::i18n::text("repo-workflows-ghost-rebase-1f963916").to_owned());
+                .push("Already up to date: nothing to replay, nothing changes.".to_owned());
             return Ok(out);
         }
         self.check()?;
@@ -182,7 +186,7 @@ impl Ctx<'_> {
             let from = now.branches.get(name).cloned().filter(|s| !s.is_empty());
             let to = state.branches.get(name).cloned().filter(|s| !s.is_empty());
             if to.as_ref().is_some_and(|s| !git::investigations::oid(s)) {
-                return Err(crate::i18n::text("repo-workflows-ghost-timeline-48223518").into());
+                return Err("Invalid timeline commit ID".into());
             }
             out.moves.push(RefMove {
                 full: local_ref(name),
@@ -218,7 +222,7 @@ impl Ctx<'_> {
             .chain(std::iter::once("HEAD".into()))
             .collect();
         let hashes = dry_run::unreachable_bounded(&reader, &old, &new, &moved, LOST_LIMIT + 1)
-            .map_err(|_| crate::i18n::text("repo-workflows-ghost-timeline-5a1baa67").to_owned())?;
+            .map_err(|_| "Timeline preview is incomplete: required local history is missing or the bounded read stopped. Hover never downloads objects.".to_owned())?;
         out.lost_more = hashes.len() > LOST_LIMIT;
         let listed = &hashes[..hashes.len().min(LOST_LIMIT)];
         out.lost = reader.commits(listed)?;
@@ -230,17 +234,16 @@ impl Ctx<'_> {
         if !now.head.is_empty() && !state.head.is_empty() {
             match reader.diff_files(&now.head, &state.head) {
                 Ok(files) => out.files = Some(files),
-                Err(_) => out
-                    .warnings
-                    .push(crate::i18n::text("repo-workflows-ghost-timeline-18df3f5f").into()),
+                Err(_) => out.warnings.push("File-change preview is incomplete: required blobs are unavailable locally or the bounded read stopped. No objects were downloaded.".into()),
             }
         }
         if self.facts.dirty {
-            out.warnings
-                .push(crate::i18n::text("repo-workflows-ghost-timeline-6f3d9015").into());
+            out.warnings.push("Uncommitted changes are preserved with --keep; a conflicting checkout will refuse the jump.".into());
         }
-        out.notes
-            .push(crate::i18n::text("repo-workflows-ghost-timeline-c25867a7").into());
+        out.notes.push(
+            "Saved refs keep earlier states recoverable. This preview moves no refs or files."
+                .into(),
+        );
         Ok(out)
     }
 
@@ -271,8 +274,10 @@ impl Ctx<'_> {
         out.files = Some(reversed(git::diff_files(self.repo, &to, None)?));
         if self.facts.dirty {
             out.discards_work = true;
-            out.warnings
-                .push(crate::i18n::text("repo-workflows-ghost-reset-hard-3126bbde").to_owned());
+            out.warnings.push(
+                "Uncommitted changes to these files are thrown away, and can't be brought back."
+                    .to_owned(),
+            );
         }
         Ok(out)
     }
@@ -280,18 +285,18 @@ impl Ctx<'_> {
     fn pull(&self, mode: PullMode) -> Result<Outcome, String> {
         let branch = self.facts.current()?;
         let up = self.facts.upstream(branch).ok_or_else(|| {
-            crate::i18n::message(
-                "repo-workflows-ghost-pull-f53705f4",
-                &[("branch-name-1", (branch.name).clone().into())],
+            format!(
+                "{} tracks no branch on a remote: nothing to pull",
+                branch.name
             )
         })?;
         let mut out = Outcome::default();
         // Never the network from a hover: asking the remote can hang, ask for a passphrase or
         // a key's touch, or download a lot, for a pointer passing by. What the last fetch
         // brought (the background fetch keeps it recent) stands for what the pull fetches.
-        out.notes.push(crate::i18n::message(
-            "repo-workflows-ghost-pull-9045dbaa",
-            &[("up-remote-1", (up.remote).clone().into())],
+        out.notes.push(format!(
+            "As of the last fetch of {}: what was pushed there since isn't shown.",
+            up.remote
         ));
         let head = branch.target.clone();
         let tracking = up.tracking.target.clone();
@@ -299,7 +304,7 @@ impl Ctx<'_> {
         self.check()?;
         if dry_run::is_ancestor(self.repo, &new, &head) {
             out.notes
-                .push(crate::i18n::text("repo-workflows-ghost-pull-dd489c0a").to_owned());
+                .push("Already up to date: the branch has everything its remote has.".to_owned());
             return Ok(out);
         }
         if dry_run::is_ancestor(self.repo, &head, &new) {
@@ -309,7 +314,7 @@ impl Ctx<'_> {
                 to: Some(new.clone()),
             });
             out.notes
-                .push(crate::i18n::text("repo-workflows-ghost-pull-c7917d08").to_owned());
+                .push("Fast-forward: the branch moves to its remote's commit.".to_owned());
             self.check()?;
             let moved = [
                 local_ref(&branch.name),
@@ -327,18 +332,23 @@ impl Ctx<'_> {
         }
         match mode {
             PullMode::FastForwardOnly => {
-                out.refused = Some(diverged_pull(
-                    &branch.name,
-                    &up.tracking.name,
-                    new != tracking,
+                let fetched = if new != tracking {
+                    format!(" (only {} moves, with what it fetches)", up.tracking.name)
+                } else {
+                    String::new()
+                };
+                out.refused = Some(format!(
+                    "{} and {} have diverged, so a fast-forward-only pull refuses{fetched}",
+                    branch.name, up.tracking.name
                 ));
                 Ok(out)
             }
             PullMode::Merge => self.pull_merge(branch, &up, &new, out),
             PullMode::Rebase => {
                 if self.facts.dirty {
-                    out.notes
-                        .push(crate::i18n::text("repo-workflows-ghost-pull-3a19c0c2").to_owned());
+                    out.notes.push(
+                        "Uncommitted changes are stashed first and put back after.".to_owned(),
+                    );
                 }
                 let base = self.pull_rebase_base(&up, &new, &head);
                 self.check()?;
@@ -453,18 +463,14 @@ impl Ctx<'_> {
     }
 
     fn force_push(&self, name: &str) -> Result<Outcome, String> {
-        let branch = self.facts.local(name).ok_or_else(|| {
-            crate::i18n::message(
-                "repo-workflows-ghost-force-push-a9c01edc",
-                &[("name", (name).clone().into())],
-            )
-        })?;
-        let up = self.facts.upstream(branch).ok_or_else(|| {
-            crate::i18n::message(
-                "repo-workflows-ghost-force-push-f06fee94",
-                &[("name", (name).clone().into())],
-            )
-        })?;
+        let branch = self
+            .facts
+            .local(name)
+            .ok_or_else(|| format!("there is no branch {name} here"))?;
+        let up = self
+            .facts
+            .upstream(branch)
+            .ok_or_else(|| format!("{name} tracks no branch on a remote"))?;
         let (old, new) = (up.tracking.target.clone(), branch.target.clone());
         let tracking = format!("refs/remotes/{}", up.tracking.name);
         let mut out = Outcome {
@@ -484,25 +490,23 @@ impl Ctx<'_> {
             .into_iter()
             .collect();
         if out.lost.is_empty() {
-            out.notes.push(crate::i18n::message(
-                "repo-workflows-ghost-force-push-c637c04f",
-                &[("up-tracking-name-1", (up.tracking.name).clone().into())],
+            out.notes.push(format!(
+                "{} loses nothing: a plain push would do.",
+                up.tracking.name
             ));
         }
-        out.notes.push(crate::i18n::message(
-            "repo-workflows-ghost-force-push-2d4460fd",
-            &[("up-remote-1", (up.remote).clone().into())],
+        out.notes.push(format!(
+            "As of the last fetch of {}: with the lease, the push is refused if someone pushed since.",
+            up.remote
         ));
         Ok(out)
     }
 
     fn delete_branch(&self, name: &str, remote: bool) -> Result<Outcome, String> {
-        let branch = self.facts.local(name).ok_or_else(|| {
-            crate::i18n::message(
-                "repo-workflows-ghost-delete-branch-a9c01edc",
-                &[("name", (name).clone().into())],
-            )
-        })?;
+        let branch = self
+            .facts
+            .local(name)
+            .ok_or_else(|| format!("there is no branch {name} here"))?;
         let up = self.facts.upstream(branch);
         let mut out = Outcome {
             moves: vec![RefMove {
@@ -530,16 +534,12 @@ impl Ctx<'_> {
         let merged = dry_run::is_ancestor(self.repo, &branch.target, into);
         if !merged {
             let what = if up.is_some() {
-                crate::i18n::text("repo-workflows-ghost-delete-branch-dde58e5a")
+                "its upstream"
             } else {
-                crate::i18n::text("repo-workflows-ghost-delete-branch-fadd1b38")
+                "the checked-out branch"
             };
-            out.warnings.push(crate::i18n::message(
-                "repo-workflows-ghost-delete-branch-26d05fbc",
-                &[
-                    ("name", (name).clone().into()),
-                    ("what", (what).clone().into()),
-                ],
+            out.warnings.push(format!(
+                "{name} isn't merged into {what}: Delete refuses unless Force (-D) is ticked, which leaves its own commits on no branch."
             ));
         }
         Ok(out)
@@ -548,9 +548,8 @@ impl Ctx<'_> {
     fn drop_commit(&self, hash: &str) -> Result<Outcome, String> {
         let branch = self.facts.current()?;
         let hash = git::resolve(self.repo, hash)?;
-        let parent = git::resolve(self.repo, &format!("{hash}^")).map_err(|_| {
-            crate::i18n::text("repo-workflows-ghost-drop-commit-da2d4ead").to_owned()
-        })?;
+        let parent = git::resolve(self.repo, &format!("{hash}^"))
+            .map_err(|_| "the first commit has no parent to rebase from".to_owned())?;
         let tip = local_ref(&branch.name);
         let range = format!("{hash}..{tip}");
         let picks: Vec<String> = git::run(
@@ -577,7 +576,7 @@ impl Ctx<'_> {
             ],
         )?;
         if merges.trim() != "0" {
-            return Err(crate::i18n::text("repo-workflows-ghost-drop-commit-181a54e0").to_owned());
+            return Err("merges came after the commit, which this would flatten".to_owned());
         }
         let mut out = Outcome {
             dropped: git::commits_of(self.repo, std::slice::from_ref(&hash))?
@@ -587,7 +586,7 @@ impl Ctx<'_> {
         };
         if self.facts.dirty {
             out.notes
-                .push(crate::i18n::text("repo-workflows-ghost-drop-commit-3a19c0c2").to_owned());
+                .push("Uncommitted changes are stashed first and put back after.".to_owned());
         }
         self.rewrite(
             &Rewrite {
@@ -609,16 +608,16 @@ impl Ctx<'_> {
     fn rewrite(&self, w: &Rewrite<'_>, out: &mut Outcome) -> Result<(), String> {
         let tip = local_ref(&w.branch.name);
         if w.picks.len() > PICKS_LIMIT {
-            return Err(crate::i18n::message(
-                "repo-workflows-ghost-rewrite-c84070ef",
-                &[
-                    ("w-picks-len-1", (w.picks.len()).clone().into()),
-                    ("PICKS-LIMIT", (PICKS_LIMIT).clone().into()),
-                ],
+            return Err(format!(
+                "{} commits to replay, too many to preview (at most {PICKS_LIMIT})",
+                w.picks.len()
             ));
         }
         if self.config_set("rebase.rebaseMerges") && self.has_merges(w.base, &tip)? {
-            return Err(crate::i18n::text("repo-workflows-ghost-rewrite-3d8b966c").to_owned());
+            return Err(
+                "rebase.rebaseMerges is set and merges are among the commits: git keeps them, which the preview can't replay yet"
+                    .to_owned(),
+            );
         }
         let replay = dry_run::replay(
             self.repo,
@@ -659,7 +658,15 @@ impl Ctx<'_> {
         out.created = copies;
         let dropped = steps.iter().filter(|s| s.copy.is_none()).count();
         if dropped > 0 {
-            out.notes.push(dropped_note(dropped));
+            out.notes.push(format!(
+                "{dropped} commit{} dropped: {} already there.",
+                if dropped == 1 { " is" } else { "s are" },
+                if dropped == 1 {
+                    "its change is"
+                } else {
+                    "their changes are"
+                }
+            ));
         }
         let stop = match (&replay.stop, emptied) {
             (_, Some(i)) => Some((i, replay.steps[i].original.clone(), Vec::new())),
@@ -668,9 +675,9 @@ impl Ctx<'_> {
         };
         if let Some((step, commit, files)) = stop {
             let why = if files.is_empty() {
-                crate::i18n::text("repo-workflows-ghost-rewrite-3477e4cb")
+                "The rebase stops there, asking whether to keep the commit that became empty; the branch doesn't move yet."
             } else {
-                crate::i18n::text("repo-workflows-ghost-rewrite-e69265a2")
+                "The rebase stops there until the conflicts are resolved; the branch doesn't move yet."
             };
             out.conflict = Some(Conflict {
                 step: step + 1,
@@ -683,9 +690,8 @@ impl Ctx<'_> {
                 || short(&replay.onto).to_owned(),
                 |c| short(&c.hash).to_owned(),
             );
-            out.notes.push(crate::i18n::message(
-                "repo-workflows-ghost-rewrite-fb29af2f",
-                &[("waits", (waits).clone().into())],
+            out.notes.push(format!(
+                "Meanwhile HEAD is detached at {waits}, mid-rebase."
             ));
             return Ok(());
         }
@@ -730,9 +736,9 @@ impl Ctx<'_> {
             .filter(|c| rewritten.contains(c.hash.as_str()))
             .count();
         if replay.engine == Engine::Scratch {
-            out.notes.push(crate::i18n::message(
-                "repo-workflows-ghost-rewrite-af60968a",
-                &[("self-version-1", self.version.to_string().into())],
+            out.notes.push(format!(
+                "The files that change aren't listed: git {} replays in a scratch clone.",
+                self.version
             ));
         } else {
             self.check()?;
@@ -838,6 +844,206 @@ pub(crate) fn describe(c: &Commit) -> String {
     format!("{} {}", short(&c.hash), c.summary)
 }
 
+/// Paint only finite original preview notes/errors; cached outcomes remain raw.
+pub(super) fn display_preview_text(raw: &str) -> String {
+    match raw {
+        "Uncommitted changes are stashed first and put back after (rebase.autoStash)." => {
+            return crate::i18n::text("repo-workflows-ghost-rebase-e550da8a").to_owned();
+        }
+        "the rebase refuses to start with uncommitted changes: commit or stash them first" => {
+            return crate::i18n::text("repo-workflows-ghost-rebase-b1f8a147").to_owned();
+        }
+        "Already up to date: nothing to replay, nothing changes." => {
+            return crate::i18n::text("repo-workflows-ghost-rebase-1f963916").to_owned();
+        }
+        "Invalid timeline commit ID" => {
+            return crate::i18n::text("repo-workflows-ghost-timeline-48223518").to_owned();
+        }
+        "Timeline preview is incomplete: required local history is missing or the bounded read stopped. Hover never downloads objects." => {
+            return crate::i18n::text("repo-workflows-ghost-timeline-5a1baa67").to_owned();
+        }
+        "File-change preview is incomplete: required blobs are unavailable locally or the bounded read stopped. No objects were downloaded." => {
+            return crate::i18n::text("repo-workflows-ghost-timeline-18df3f5f").to_owned();
+        }
+        "Uncommitted changes are preserved with --keep; a conflicting checkout will refuse the jump." => {
+            return crate::i18n::text("repo-workflows-ghost-timeline-6f3d9015").to_owned();
+        }
+        "Saved refs keep earlier states recoverable. This preview moves no refs or files." => {
+            return crate::i18n::text("repo-workflows-ghost-timeline-c25867a7").to_owned();
+        }
+        "Uncommitted changes to these files are thrown away, and can't be brought back." => {
+            return crate::i18n::text("repo-workflows-ghost-reset-hard-3126bbde").to_owned();
+        }
+        "Already up to date: the branch has everything its remote has." => {
+            return crate::i18n::text("repo-workflows-ghost-pull-dd489c0a").to_owned();
+        }
+        "Fast-forward: the branch moves to its remote's commit." => {
+            return crate::i18n::text("repo-workflows-ghost-pull-c7917d08").to_owned();
+        }
+        "Uncommitted changes are stashed first and put back after." => {
+            return crate::i18n::text("repo-workflows-ghost-pull-3a19c0c2").to_owned();
+        }
+        "its upstream" => {
+            return crate::i18n::text("repo-workflows-ghost-delete-branch-dde58e5a").to_owned();
+        }
+        "the checked-out branch" => {
+            return crate::i18n::text("repo-workflows-ghost-delete-branch-fadd1b38").to_owned();
+        }
+        "the first commit has no parent to rebase from" => {
+            return crate::i18n::text("repo-workflows-ghost-drop-commit-da2d4ead").to_owned();
+        }
+        "merges came after the commit, which this would flatten" => {
+            return crate::i18n::text("repo-workflows-ghost-drop-commit-181a54e0").to_owned();
+        }
+        "rebase.rebaseMerges is set and merges are among the commits: git keeps them, which the preview can't replay yet" => {
+            return crate::i18n::text("repo-workflows-ghost-rewrite-3d8b966c").to_owned();
+        }
+        "The rebase stops there, asking whether to keep the commit that became empty; the branch doesn't move yet." => {
+            return crate::i18n::text("repo-workflows-ghost-rewrite-3477e4cb").to_owned();
+        }
+        "The rebase stops there until the conflicts are resolved; the branch doesn't move yet." => {
+            return crate::i18n::text("repo-workflows-ghost-rewrite-e69265a2").to_owned();
+        }
+        _ => {}
+    }
+    if let Some(rest) = raw
+        .strip_prefix("")
+        .and_then(|s| s.strip_suffix(" tracks no branch on a remote: nothing to pull"))
+    {
+        let value0 = rest;
+        return crate::i18n::message(
+            "repo-workflows-ghost-pull-f53705f4",
+            &[("branch-name-1", value0.into())],
+        );
+    }
+    if let Some(rest) = raw
+        .strip_prefix("As of the last fetch of ")
+        .and_then(|s| s.strip_suffix(": what was pushed there since isn't shown."))
+    {
+        let value0 = rest;
+        return crate::i18n::message(
+            "repo-workflows-ghost-pull-9045dbaa",
+            &[("up-remote-1", value0.into())],
+        );
+    }
+    if let Some(rest) = raw
+        .strip_prefix("there is no branch ")
+        .and_then(|s| s.strip_suffix(" here"))
+    {
+        let value0 = rest;
+        return crate::i18n::message(
+            "repo-workflows-ghost-force-push-a9c01edc",
+            &[("name", value0.into())],
+        );
+    }
+    if let Some(rest) = raw
+        .strip_prefix("")
+        .and_then(|s| s.strip_suffix(" tracks no branch on a remote"))
+    {
+        let value0 = rest;
+        return crate::i18n::message(
+            "repo-workflows-ghost-force-push-f06fee94",
+            &[("name", value0.into())],
+        );
+    }
+    if let Some(rest) = raw
+        .strip_prefix("")
+        .and_then(|s| s.strip_suffix(" loses nothing: a plain push would do."))
+    {
+        let value0 = rest;
+        return crate::i18n::message(
+            "repo-workflows-ghost-force-push-c637c04f",
+            &[("up-tracking-name-1", value0.into())],
+        );
+    }
+    if let Some(rest) = raw.strip_prefix("As of the last fetch of ").and_then(|s| {
+        s.strip_suffix(": with the lease, the push is refused if someone pushed since.")
+    }) {
+        let value0 = rest;
+        return crate::i18n::message(
+            "repo-workflows-ghost-force-push-2d4460fd",
+            &[("up-remote-1", value0.into())],
+        );
+    }
+    if let Some(rest) = raw.strip_prefix("").and_then(|s| s.strip_suffix(": Delete refuses unless Force (-D) is ticked, which leaves its own commits on no branch.")) {
+        if let Some((value0, value1)) = rest.split_once(" isn't merged into ") {
+            let value1 = match value1 { "its upstream" => crate::i18n::text("repo-workflows-ghost-delete-branch-dde58e5a"), "the checked-out branch" => crate::i18n::text("repo-workflows-ghost-delete-branch-fadd1b38"), _ => return raw.to_owned() };
+            return crate::i18n::message("repo-workflows-ghost-delete-branch-26d05fbc", &[("name", value0.into()), ("what", value1.into())]);
+        }
+    }
+    if let Some(rest) = raw.strip_prefix("").and_then(|s| s.strip_suffix(")")) {
+        if let Some((value0, value1)) =
+            rest.split_once(" commits to replay, too many to preview (at most ")
+        {
+            let Ok(value0) = value0.parse::<u64>() else {
+                return raw.to_owned();
+            };
+            let Ok(value1) = value1.parse::<u64>() else {
+                return raw.to_owned();
+            };
+            return crate::i18n::message(
+                "repo-workflows-ghost-rewrite-c84070ef",
+                &[
+                    ("w-picks-len-1", value0.into()),
+                    ("PICKS-LIMIT", value1.into()),
+                ],
+            );
+        }
+    }
+    if let Some(rest) = raw
+        .strip_prefix("Meanwhile HEAD is detached at ")
+        .and_then(|s| s.strip_suffix(", mid-rebase."))
+    {
+        let value0 = rest;
+        return crate::i18n::message(
+            "repo-workflows-ghost-rewrite-fb29af2f",
+            &[("waits", value0.into())],
+        );
+    }
+    if let Some(rest) = raw
+        .strip_prefix("The files that change aren't listed: git ")
+        .and_then(|s| s.strip_suffix(" replays in a scratch clone."))
+    {
+        let value0 = rest;
+        return crate::i18n::message(
+            "repo-workflows-ghost-rewrite-af60968a",
+            &[("self-version-1", value0.into())],
+        );
+    }
+    if let Some((count, rest)) = raw.split_once(' ') {
+        if let Ok(count) = count.parse::<usize>() {
+            if (count == 1 && rest == "commit is dropped: its change is already there.")
+                || (count != 1 && rest == "commits are dropped: their changes are already there.")
+            {
+                return dropped_note(count);
+            }
+        }
+    }
+    if let Some((branch, tail)) = raw.split_once(" and ") {
+        if !branch.chars().any(char::is_whitespace) {
+            if let Some(tracking) =
+                tail.strip_suffix(" have diverged, so a fast-forward-only pull refuses")
+            {
+                if !tracking.chars().any(char::is_whitespace) {
+                    return diverged_pull(branch, tracking, false);
+                }
+            }
+            if let Some((tracking, fetched)) =
+                tail.split_once(" have diverged, so a fast-forward-only pull refuses (only ")
+            {
+                if !tracking.chars().any(char::is_whitespace)
+                    && fetched == format!("{tracking} moves, with what it fetches)")
+                {
+                    return diverged_pull(branch, tracking, true);
+                }
+            }
+        }
+    }
+    if raw == "HEAD is detached: check out a branch first" {
+        return crate::i18n::text("repo-workflows-ghost-current-7776bacf").to_owned();
+    }
+    crate::repo::activity::display_workflow_error(raw)
+}
 fn diverged_pull(branch: &str, tracking: &str, fetched: bool) -> String {
     crate::i18n::message(
         "repo-workflows-ghost-diverged-pull",
