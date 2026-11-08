@@ -502,6 +502,11 @@ pub(super) fn run_steps_guarded(
     control: Option<&Arc<git::OpControl>>,
     fork_scope: Option<&super::forks::guard::Scope>,
 ) -> (Result<String, String>, OpKind, usize) {
+    if let Some(scope) = fork_scope {
+        scope.reset_rewrite();
+    }
+    let guarded_fork = ops.iter().any(|op| super::forks::guard::is_guard(op));
+    let mut pushed = Vec::new();
     // Undoing a HEAD move resets the branch checked out now: after a checkout or a commit made
     // elsewhere since, that would throw away commits that aren't the operation's.
     let expected = match &kind {
@@ -566,7 +571,38 @@ pub(super) fn run_steps_guarded(
             }
             continue;
         }
-        let args: Vec<&str> = op.iter().map(String::as_str).collect();
+        let prepared = match super::forks::guard::prepare_push(
+            path,
+            op,
+            guarded_fork,
+            fork_scope.and_then(|s| s.rewrite()).as_ref(),
+        ) {
+            Ok(prepared) => prepared,
+            Err(e) => {
+                result = Err(e);
+                stopped = i;
+                break;
+            }
+        };
+        let actual = prepared
+            .as_ref()
+            .map_or(op.as_slice(), |(args, _)| args.as_slice());
+        // Recheck immediately before invoking rebase. A rejected plan never owns a rewrite.
+        let rebasing = fork_scope.is_some()
+            && matches!(op.as_slice(), [c, config, rebase, _] if c == "-c" && config == "rebase.updateRefs=false" && rebase == "rebase");
+        let rewrite_before = if rebasing {
+            if let Err(e) = check_expected(path, ops, control) {
+                result = Err(e);
+                stopped = i;
+                break;
+            }
+            git::run(Some(path), &["symbolic-ref", "-q", "HEAD"])
+                .ok()
+                .map(|branch| (branch.trim().to_owned(), git::head(path)))
+        } else {
+            None
+        };
+        let args: Vec<&str> = actual.iter().map(String::as_str).collect();
         if let Some(folder) = crate::agent::added_worktree(op)
             && let Err(e) = if control.is_some_and(|c| c.is_cancelled()) {
                 Err(git::CANCELLED.to_owned())
@@ -588,6 +624,32 @@ pub(super) fn run_steps_guarded(
             }
             run_step(path, &args, creds, quiet, control)
         })();
+        if let Some((branch, before)) = rewrite_before
+            && let Some(scope) = fork_scope
+        {
+            scope.record_rewrite(super::forks::guard::Rewrite {
+                tip: git::resolve(path, &branch).unwrap_or_default(),
+                branch,
+                before,
+                conflicts: result
+                    .as_ref()
+                    .err()
+                    .is_some_and(|e| e.contains("CONFLICT") || e.contains("could not apply")),
+            });
+        }
+        // Capture a newly added remote's effective destinations at the creating step,
+        // before any further configuration, fetch or branch mutation can run.
+        if result.is_ok()
+            && matches!(op.as_slice(), [remote, add, ..] if remote == "remote" && add == "add")
+            && let Some(scope) = fork_scope
+        {
+            result = scope.check_remote(path).map(|()| String::new());
+        }
+        if result.is_ok()
+            && let Some((_, done)) = prepared
+        {
+            pushed.push(done);
+        }
         if result.is_err() {
             stopped = i;
             break;
@@ -617,16 +679,19 @@ pub(super) fn run_steps_guarded(
         // The way back expects the refs where this left them.
         OpKind::Normal(Undo::Custom { mut undo, redo }, before) if result.is_ok() => {
             fill_expected(path, &mut undo);
+            super::forks::guard::bind_leases(&mut undo, &pushed);
             OpKind::Normal(Undo::Custom { undo, redo }, before)
         }
         OpKind::Undo(mut entry) if result.is_ok() => {
             fill_expected(path, &mut entry.redo);
+            super::forks::guard::bind_leases(&mut entry.redo, &pushed);
             OpKind::Undo(entry)
         }
         // Redone with nothing to stash, the undo keeps expecting the stash it popped, and so
         // refuses rather than pop an older one.
         OpKind::Redo(mut entry) if result.is_ok() && !no_stash => {
             fill_expected(path, &mut entry.undo);
+            super::forks::guard::bind_leases(&mut entry.undo, &pushed);
             OpKind::Redo(entry)
         }
         other => other,
