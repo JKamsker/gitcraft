@@ -472,6 +472,11 @@ fn a_refused_push_leaves_the_rewrite_undoable_here() -> Result<(), String> {
     let signed = git::head(&dir);
     assert_ne!(signed, head);
     if let Some(Dialog::PushError(error)) = &tab.dialog {
+        let now = crate::git::repository_tools::guard::Snapshot::capture(&dir)?;
+        eprintln!(
+            "DCO snapshot before: {:?}\nafter: {now:?}",
+            tab.dco.prepared_snapshot
+        );
         return Err(format!(
             "DCO fresh checklist refused after local rewrite: {error}"
         ));

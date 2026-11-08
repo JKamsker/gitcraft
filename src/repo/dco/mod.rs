@@ -32,6 +32,8 @@ pub(crate) struct Dco {
     pr: Option<PrSignoffs>,
     /// The sign-off asked for in the dialog, or running: what a failed push leaves to undo.
     running: Option<Plan>,
+    #[cfg(test)]
+    prepared_snapshot: Option<crate::git::repository_tools::guard::Snapshot>,
 }
 
 /// The commits of a pull request, with whether each is signed off.
@@ -291,6 +293,8 @@ impl RepoTab {
                     }
                     match prepared {
                         Ok(prepared) => {
+                            #[cfg(test)]
+                            { tab.dco.prepared_snapshot = Some(prepared.snapshot.clone()); }
                             let ops = prepared.route.operations();
                             tab.preflight_selection = Some(prepared);
                             tab.run_ops_ex("Push the signed-off commits", ops, Refresh::All, OpKind::plain(), false, ctx);
