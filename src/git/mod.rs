@@ -10,6 +10,7 @@ mod backlinks;
 mod bisect;
 mod branch_health;
 mod bundles;
+pub(crate) mod cleanup;
 mod clone_options;
 #[cfg(test)]
 mod clone_tests;

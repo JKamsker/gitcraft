@@ -43,3 +43,43 @@ The owned real-Git clone/consent fixture is authored and compile-only while held
 
 Validation receipt with immutable commits/log hashes is supplied separately in
 `/tmp/gitcraft-51-orchestration`; compile/pure gates do not imply runtime approval.
+
+## #37.12 fresh-clone filter-repo cleanup
+
+Graph tools → Clean history in a fresh clone is a reachable local-only wizard.
+Capability detection and execution use the shared bounded managed Git runner,
+with a tab-owned cancellation token and serialized mutation task. The source is
+never rewritten: an exclusively created output folder contains a fresh mirror
+cloned with `--no-local --no-hardlinks` and empty hooks/templates. No filter-repo
+`--force` or source override is offered. The owned clone/maps remain after error
+or cancellation; no recursive cleanup can delete pre-existing output.
+
+Configuration is limited to 32 literal paths and 32 literal text replacements,
+4096 bytes per field and 64 KiB total. Traversal/control paths and rule delimiters
+are rejected. Rules are written to a newly created file (0600 inside a 0700
+folder on Unix), removed through RAII after rewrite, and hidden in diagnostics.
+Windows uses inherited ACLs; users must choose a private output parent. Source
+inspection of [filter-repo's parser and blob replacement code](https://github.com/newren/git-filter-repo/blob/main/git-filter-repo)
+confirmed last-delimiter parsing and binary-blob exclusion; regex/glob/callback
+execution is deliberately not exposed.
+
+The report includes added/deleted/rewritten refs, `fsck --full --no-reflogs`,
+removed-path history checks and residual literal pickaxe searches. These are
+bounded checks, not an assertion that all secrets are gone. The source mirror's
+origin is removed before returning the final ref report. Execution has bounded
+output (4 MiB) and stage deadlines (up to 600 seconds); timeout/cancel retains the
+owned partial result for inspection.
+
+A separate button opens publication/revocation guidance. The wizard never writes
+an external remote. It directs deliberate per-ref publication through the existing
+guarded publisher or terminal after review/coordination and secret revocation.
+No competing publisher is added. Messages, binary blobs, historical rename names,
+LFS assets, forks/caches and forge-managed refs require the disclosed extra review.
+
+Three pure tests cover literal bounded configuration, complete ref deltas and
+failed-check/redaction semantics. A headless test renders the actual result and
+requires a click before publishing/revocation guidance appears, including failed-
+check warnings. Their source invokes no App/RepoTab discovery or process/filesystem
+fixture. A real owned filter-repo fixture checks source preservation, rewritten
+content, path removal, ref changes and replacement-file cleanup; it is compile-only
+under the hold and requires installed git-filter-repo when explicitly executed.

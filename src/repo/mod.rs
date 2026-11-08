@@ -21,6 +21,7 @@ mod bundles;
 mod celebration;
 mod ci_status;
 mod ci_view;
+mod cleanup;
 mod cochanges;
 mod collision_view;
 pub(crate) mod columns;
@@ -458,6 +459,7 @@ pub struct RepoTab {
     graph_narration: graph_walk::Narration,
     postcards: postcards::State,
     growth: Option<growth::State>,
+    cleanup: Option<cleanup::State>,
     sparse: Option<sparse::State>,
     atlas: Option<atlas::State>,
     history_activity: Option<history_activity::Activity>,
@@ -743,6 +745,7 @@ impl RepoTab {
             graph_narration: Default::default(),
             postcards: Default::default(),
             growth: None,
+            cleanup: None,
             sparse: None,
             atlas: None,
             history_activity: None,
