@@ -1,0 +1,315 @@
+{
+  "review_delta": {
+    "base": "31f9cb2d8f166e51d641bd6ffe41e764cdffad05",
+    "application": "ce2667323664d829cc1d809449c8e012d5d39508",
+    "tree": "df6fbb1aa293cc47b02d600aaa0a2859debb9bd3",
+    "commits": [
+      {
+        "sha": "befdb0934afd857f30096058d65fbd1409127446",
+        "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>",
+        "committer": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>"
+      },
+      {
+        "sha": "5e94ce4a5f9e290b79fefa30b28aebde6c5b9aed",
+        "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>",
+        "committer": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>"
+      },
+      {
+        "sha": "2d1c1fe2e4261d1a5238f81a6ffea20ebef08b42",
+        "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>",
+        "committer": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>"
+      },
+      {
+        "sha": "ce2667323664d829cc1d809449c8e012d5d39508",
+        "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>",
+        "committer": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>"
+      }
+    ],
+    "write_remote": "https://github.com/JKamsker/gitcraft",
+    "remote_branch": "refs/heads/t3/clone-cleanup-backlink",
+    "verified_remote_sha": "ce2667323664d829cc1d809449c8e012d5d39508"
+  },
+  "inputs": [
+    {
+      "path": "/tmp/gitcraft-51-clone-cleanup-backlinks-review-r1.md",
+      "sha256": "6d4c28e8169975ab5b71ab372987e531b22993fd41b7055ec80f219816f79605"
+    },
+    {
+      "path": "/tmp/gitcraft-51-clone-cleanup-backlinks-review-r1-manifest.json",
+      "sha256": "20abb0e73cdbedf9406b6d694b1a0f79736607a1b745a470a204c62dc3cd6e76"
+    },
+    {
+      "path": "docs/issue-51/source-issues.json",
+      "sha256": "713daf634bf99d73adbe5cdbc4517e92bdc77561b8137d429779abda029305a7"
+    }
+  ],
+  "responses": [
+    {
+      "finding": "CLONE-R1-1",
+      "source": [
+        "src/repo/sparse.rs",
+        "src/git/clone_options.rs"
+      ],
+      "response": "Apply captures tab credentials; consented mutation uses accepted run_with. Metadata/no-consent omit explicit credentials; profile and no-lazy restoration preserved. Fixed-command recording passed; UI capture inspected, no tab constructor/runtime."
+    },
+    {
+      "finding": "CLONE-R1-2",
+      "source": [
+        "src/git/clone_options/patterns.rs",
+        "src/git/clone_options.rs"
+      ],
+      "response": "1 MiB regular UTF-8 descriptor read, no-follow/nonblocking, before/after metadata and pathname checks (accepted native handle identity on Windows), cap+1 read, explicit type/cap/capability refusal and missing-as-empty handling. Remote python3 request is bounded and fail-closed. Prior sparse definition inputs are rechecked. Pure bounds/refusal/stale cases passed; real filesystem/remote execution held."
+    },
+    {
+      "finding": "CLEANUP-R1-1",
+      "source": [
+        "src/git/cleanup.rs",
+        "src/repo/cleanup.rs"
+      ],
+      "response": "Residual Git argv is fixed rev-list/cat-file; patterns remain memory-only. Linear literal byte scan caps 20000 objects/4 MiB per blob/16 MiB total. Skipped binaries, failures and cap/malformed/truncated input remain unverified. Both-field synthetic argv canaries and budget/redaction cases passed; private rule retirement unchanged."
+    }
+  ],
+  "source": [
+    {
+      "path": "docs/issue-51/implementation/clone-cleanup-backlink-r1.md",
+      "sha256": "51e2b9969da6a0190332c06c10454f1deb16442f57d84a296962951f8e7dbb2d",
+      "git_blob": "efa0cd0593541fd6516ebcbf352e495900eeca06"
+    },
+    {
+      "path": "src/git/cleanup.rs",
+      "sha256": "9e17874f4b54733c1013ec44b1e226107127a7a5c38bea55fceb7e0c7bc68a37",
+      "git_blob": "c037cabef6b46185a0e1541f8af3b3d5e0181e2c"
+    },
+    {
+      "path": "src/git/clone_options.rs",
+      "sha256": "8b4497d91e21ba274c2769c648090ea0bc6c013143899681e6de5312e445e808",
+      "git_blob": "a760d9b97c45825ca9e13ad6a9999d46a6634930"
+    },
+    {
+      "path": "src/git/clone_options/patterns.rs",
+      "sha256": "0ecc20d2f1092ce9343b017fc526fd370969edba389833475ff4c60b32f56711",
+      "git_blob": "f61d5ae52e2bc5e5ac4512cf53e3810b9f92647b"
+    },
+    {
+      "path": "src/git/command.rs",
+      "sha256": "c8d6ff63692d9697c803c25c11cf27818a388a1ce802f00c7d3500c058f60972",
+      "git_blob": "cac1f05a4f2be5e45cd9e75a376c5ca8db1c0662"
+    },
+    {
+      "path": "src/repo/cleanup.rs",
+      "sha256": "286f1753a9885959d9009368fa0f0bbb26a75de9d6fe6d024cc43ba223f7ad62",
+      "git_blob": "82db6017d9e43c1973992a1c5cf8ba9dffdbec12"
+    },
+    {
+      "path": "src/repo/sparse.rs",
+      "sha256": "45557caed99f8bfc8b15daba8f92141902cd846d62ee453c15e2e146a7e03a08",
+      "git_blob": "0c24b9bf0044d4ba64bd0d6e2967ecb65b52a26a"
+    }
+  ],
+  "gates": [
+    {
+      "name": "fmt",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "fmt",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 2.22,
+      "log": "/tmp/gitcraft-51-orchestration/clone-cleanup-r1-ce266732/fmt.log",
+      "path": "/tmp/gitcraft-51-orchestration/clone-cleanup-r1-ce266732/fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "check-all-targets",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "check",
+        "--all-targets"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 4.78,
+      "log": "/tmp/gitcraft-51-orchestration/clone-cleanup-r1-ce266732/check-all-targets.log",
+      "path": "/tmp/gitcraft-51-orchestration/clone-cleanup-r1-ce266732/check-all-targets.log",
+      "sha256": "8862404631fce290932ac688bf3184db40b12737cd07b2d36b60722cbf6745f9"
+    },
+    {
+      "name": "compile-tests-no-run",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--no-run"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 9.48,
+      "log": "/tmp/gitcraft-51-orchestration/clone-cleanup-r1-ce266732/compile-tests-no-run.log",
+      "path": "/tmp/gitcraft-51-orchestration/clone-cleanup-r1-ce266732/compile-tests-no-run.log",
+      "sha256": "dc30557a4f6c11f59dfe386059d02813eda8344f9b0e749582ba29135ae6a0d5"
+    },
+    {
+      "name": "clone-pure",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--lib",
+        "git::clone_options::tests::",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 1.37,
+      "log": "/tmp/gitcraft-51-orchestration/clone-cleanup-r1-ce266732/clone-pure.log",
+      "path": "/tmp/gitcraft-51-orchestration/clone-cleanup-r1-ce266732/clone-pure.log",
+      "sha256": "baf39c07d8ea52ebe1ba78375199c03a9c04cb07601eafff0a6f6e2702052339"
+    },
+    {
+      "name": "patterns-pure",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--lib",
+        "git::clone_options::patterns::pure_tests::",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.22,
+      "log": "/tmp/gitcraft-51-orchestration/clone-cleanup-r1-ce266732/patterns-pure.log",
+      "path": "/tmp/gitcraft-51-orchestration/clone-cleanup-r1-ce266732/patterns-pure.log",
+      "sha256": "ab41fa551f2600bc40feaf02de9d062e9316459777e9a895a0d6c796c8125ac6"
+    },
+    {
+      "name": "sparse-account-recording",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--lib",
+        "git::command::sparse_account_recording_tests::",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.22,
+      "log": "/tmp/gitcraft-51-orchestration/clone-cleanup-r1-ce266732/sparse-account-recording.log",
+      "path": "/tmp/gitcraft-51-orchestration/clone-cleanup-r1-ce266732/sparse-account-recording.log",
+      "sha256": "918f3107a1a8fbb2c8eb81394032f95dfb5b7bac40c9c7635e0dc830ff8edf6d"
+    },
+    {
+      "name": "cleanup-pure",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--lib",
+        "git::cleanup::tests::",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.24,
+      "log": "/tmp/gitcraft-51-orchestration/clone-cleanup-r1-ce266732/cleanup-pure.log",
+      "path": "/tmp/gitcraft-51-orchestration/clone-cleanup-r1-ce266732/cleanup-pure.log",
+      "sha256": "02b6b0072c9948357a65780b550fd931fb1b340d245f6d69c084f506439e81fb"
+    },
+    {
+      "name": "download-policy-recording",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--lib",
+        "git::command::download_policy_recording_tests::",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.21,
+      "log": "/tmp/gitcraft-51-orchestration/clone-cleanup-r1-ce266732/download-policy-recording.log",
+      "path": "/tmp/gitcraft-51-orchestration/clone-cleanup-r1-ce266732/download-policy-recording.log",
+      "sha256": "d48174b5909e08683e6804edfa5c9feccdad5819bf68ac72dcd5954647cd1fcc"
+    },
+    {
+      "name": "cleanup-headless",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--lib",
+        "repo::cleanup::headless_tests::",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.23,
+      "log": "/tmp/gitcraft-51-orchestration/clone-cleanup-r1-ce266732/cleanup-headless.log",
+      "path": "/tmp/gitcraft-51-orchestration/clone-cleanup-r1-ce266732/cleanup-headless.log",
+      "sha256": "1be24f16e540e64f06d44fe91c2beffd8167985cb09f2bea46c64e84fc89ff2a"
+    },
+    {
+      "name": "clippy-all-targets",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "clippy",
+        "--all-targets",
+        "--message-format=json",
+        "--",
+        "-D",
+        "warnings",
+        "-A",
+        "dead_code"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 30.05,
+      "log": "/tmp/gitcraft-51-orchestration/clone-cleanup-r1-ce266732/clippy-all-targets.log",
+      "path": "/tmp/gitcraft-51-orchestration/clone-cleanup-r1-ce266732/clippy-all-targets.log",
+      "sha256": "0b3271c877e96be32fd1ee4166502c61258a0faece1a536824e9197a1cecdeb0"
+    }
+  ],
+  "selected_tests_passed": 15,
+  "lint_analysis": {
+    "path": "/tmp/gitcraft-51-orchestration/clone-cleanup-r1-ce266732/clippy-analysis.json",
+    "sha256": "3f8d48116c6f587d5352df35559805c47726b50ec3efc6217f22e4f3c3f09158"
+  },
+  "prior_attempts": [
+    {
+      "application": "2d1c1fe2e4261d1a5238f81a6ffea20ebef08b42",
+      "status": "15 selected cases/fmt/check/compile passed; lint failed with inherited 127; superseded by exact final candidate gates after Windows identity strengthening",
+      "execution": {
+        "path": "/tmp/gitcraft-51-orchestration/clone-cleanup-r1-2d1c1fe2/execution.json",
+        "sha256": "8604b853cb96f0e6f5f7234272f88f458830990b66df6a0bf9ea2bbbb6392af5"
+      }
+    },
+    {
+      "application": "befdb0934afd857f30096058d65fbd1409127446",
+      "status": "check failed: mkfifoat unavailable on macOS; corrected in next preserved commit",
+      "log": {
+        "path": "/tmp/gitcraft-51-orchestration/clone-cleanup-r1-befdb093/check-all-targets.log",
+        "sha256": "39423a211312cd17e505143b6e97632badcf90070502e8280b0e0c8c1f68b206"
+      }
+    },
+    {
+      "application": "5e94ce4a5f9e290b79fefa30b28aebde6c5b9aed",
+      "status": "intermediate check passed with a formatter-only working-tree change; not claimed as exact immutable application evidence; superseded by final gates",
+      "log": {
+        "path": "/tmp/gitcraft-51-orchestration/clone-cleanup-r1-5e94ce4a/check-all-targets.log",
+        "sha256": "c58f25bcf4a1c35d36579d2ef691f61845803d089c3026a840dffba011eea9ea"
+      }
+    }
+  ],
+  "runtime_hold": true,
+  "limits": [
+    "No program-under-test Git/helper/filter-repo/network/native/process/cancel/timeout/filesystem/race/FIFO fixture execution, broad suite, CI, PR, publishing or subagent.",
+    "Compile-only native macOS target. Linux-only FIFO fixture block is authored but not compiled/executed here. No Windows/Linux or remote-python runtime certification.",
+    "Remote sparse metadata requires python3 and no-follow/nonblocking support; absence fails closed. Metadata comparison is not a filesystem transaction after the final check.",
+    "Residual scans omit commit/tag messages and external/LFS copies; NUL in first 8192 bytes is the binary heuristic. Skips/budgets/errors produce unverified checks, never proof all secrets are gone.",
+    "Backlink source and prior scoped SOURCE PASS unchanged. Shared credential/history APIs, supervisor, publishers and other owners WIP are unchanged.",
+    "Clippy all-targets fails with 127 inherited diagnostics, zero on changed lines; final combined strict lint remains with root. No blanket lint allowance introduced."
+  ]
+}

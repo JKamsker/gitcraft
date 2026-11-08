@@ -40,5 +40,9 @@ The authored FIFO fixture block requires Linux (`rustix::mkfifoat` is unavailabl
 on Apple); it is neither compiled nor executed by this macOS target.
 No runtime clearance, CI, PR, external publication, supervisor change, shared
 credential-policy fork or publisher is part of this delta. All generated evidence
-stays outside the repository; a later plain JSON receipt binds gates and source
-hashes to the preserved application commit. Gates are pending at this source unit.
+stays outside the repository. The [plain JSON receipt](clone-cleanup-backlink-r1-validation.json)
+binds source and log hashes to application `ce2667323664d829cc1d809449c8e012d5d39508`:
+formatting, all-target checking, compile-only test builds and 15 selected audited
+cases passed. All-target Clippy with `-D warnings -A dead_code` failed with 127
+inherited diagnostics and none on changed lines; it is not a lint pass. The final
+receipt commit changes documentation only and reuses those exact application gates.
