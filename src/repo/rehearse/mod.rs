@@ -79,14 +79,15 @@ impl Rehearsing {
 
 /// The menu entry that opens the dialog to rehearse with `other`.
 pub(crate) fn rehearse_item(ui: &mut egui::Ui, acts: &mut Vec<Action>, other: BranchRef<'_>) {
-    if crate::menu_item::MenuItem::new("Rehearse merge or rebase…")
-        .icon("git-merge")
-        .show(ui)
-        .on_hover_text(
-            "Plays it through in a scratch worktree first: where it stops, which files \
-             conflict, whether the tests pass. Nothing of yours changes.",
-        )
-        .clicked()
+    if crate::menu_item::MenuItem::new(crate::i18n::text(
+        "repo-workflows-rehearse-rehearse-item-c336cc0b",
+    ))
+    .icon("git-merge")
+    .show(ui)
+    .on_hover_text(crate::i18n::text(
+        "repo-workflows-rehearse-rehearse-item-3b9a692a",
+    ))
+    .clicked()
     {
         acts.push(Action::Rehearse(RehearseAct::Open {
             other: other.name.to_owned(),
@@ -108,8 +109,14 @@ impl RepoTab {
         }
         let remote = !self.refs.local.iter().any(|b| b.name == base);
         vec![(
-            format!("Rehearse merge or rebase of {current} with {base}…"),
-            "rehearse dry run try preview".to_owned(),
+            crate::i18n::message(
+                "repo-workflows-rehearse-rehearse-palette-items-d8875572",
+                &[
+                    ("current", (current).clone().into()),
+                    ("base", (base).clone().into()),
+                ],
+            ),
+            crate::i18n::text("repo-workflows-rehearse-rehearse-palette-items-50b0742f").to_owned(),
             Action::Rehearse(RehearseAct::Open {
                 other: base,
                 remote,
@@ -211,7 +218,12 @@ impl RepoTab {
                 let played = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                     git::rehearse(&path, &spec, &stop)
                 }))
-                .unwrap_or_else(|_| Err("Internal error: the rehearsal stopped".to_owned()));
+                .unwrap_or_else(|_| {
+                    Err(
+                        crate::i18n::text("repo-workflows-rehearse-start-rehearsal-3fdfbad4")
+                            .to_owned(),
+                    )
+                });
                 let _ = tx.send(Msg::Then(Box::new(move |tab, _| {
                     tab.rehearsed(id, kind, played);
                 })));
@@ -235,8 +247,16 @@ impl RepoTab {
         };
         run.ended = true;
         if run.started.elapsed() > std::time::Duration::from_secs(4) {
-            self.finished
-                .push((format!("{name} · rehearsal of {} done", run.branch), false));
+            self.finished.push((
+                crate::i18n::message(
+                    "repo-workflows-rehearse-rehearsals-ended-31373501",
+                    &[
+                        ("name", (name).clone().into()),
+                        ("run-branch-1", (run.branch).clone().into()),
+                    ],
+                ),
+                false,
+            ));
         }
     }
 

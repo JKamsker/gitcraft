@@ -158,9 +158,9 @@ impl RepoTab {
     pub(super) fn open_reflog(&mut self, source: Source, ctx: &egui::Context) {
         if self.conflict.is_some() || self.rebase.is_some() {
             let editor = if self.conflict.is_some() {
-                "conflict editor"
+                crate::i18n::text("repo-workflows-reflog-open-reflog-d509b2ee")
             } else {
-                "interactive rebase"
+                crate::i18n::text("repo-workflows-reflog-open-reflog-680d5c5f")
             };
             self.status = Some((format!("Finish or close the {editor} first"), true));
             return;

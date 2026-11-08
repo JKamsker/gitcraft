@@ -4027,11 +4027,263 @@ repo-workflows-pr_view-timeline-b7cba957 = Noch keine Kommentare.
 
 repo-workflows-pr_view-timeline-e72570a1 = Zeilenkommentare konnten nicht gelesen werden: { $e }
 
+repo-workflows-push-apart-b578bb02 = Unerwartete Antwort von git rev-list: { $out }
+
+repo-workflows-push-chain-step-ended-dfa32698 = { $what } fehlgeschlagen. Daher wurde nichts gepusht: { $e }
+
+repo-workflows-push-check-67e345ac = { $target-label-1 } wurde während des Fetches verschoben. Erneut prüfen.
+
+repo-workflows-push-check-remote-9a7c53eb = { $what } wird geprüft
+
+repo-workflows-push-check-remote-d6f3f0c2 = das Remote
+
+repo-workflows-push-dismiss-48845bff = Ausblenden
+
+repo-workflows-push-force-dialog-1d502fc3 = Force-Push
+
+repo-workflows-push-no-upstream-86cb1261 = Ein Remote zum Veröffentlichen wählen. { $branch } wird ihm dort folgen.
+
+repo-workflows-push-no-upstream-9ab92941 = { $branch } ist noch auf keinem Remote
+
+repo-workflows-push-no-upstream-d32eee95 = Auf { $remote } veröffentlichen
+
+repo-workflows-push-pick-target-acf19d61 = { $branch } pusht nach { $remote }, das nicht zu den Remotes dieses Repositorys gehört
+
+repo-workflows-push-pull-buttons-43992a40 = { $mode-label-1 }, dann pushen
+
+repo-workflows-push-pull-buttons-5e584d52 = Mergen, dann pushen
+
+repo-workflows-push-pull-buttons-aca90f08 = Pull ist auf ausschließliches Fast-Forward eingestellt. Damit lassen sich auseinanderlaufende Branches nicht verbinden.
+
+repo-workflows-push-pull-buttons-ca69dd73 = Pullen, dann pushen
+
+repo-workflows-push-pull-buttons-dc0810af = Rebasen, dann pushen
+
+repo-workflows-push-push-act-ebd6e3a6 = { $r-branch-1 } von { $r-target-label-2 } gepullt und gepusht
+
+repo-workflows-push-push-banner-04e6949e = Branch erstellen …
+
+repo-workflows-push-push-banner-39525827 = Der Zielbranch von { $branch } wurde auf { $target-remote-1 } gelöscht. Erneut pushen, um ihn dort anzulegen.
+
+repo-workflows-push-push-banner-7361cc7b = { $target-label-1 } ist nicht mehr vorhanden
+
+repo-workflows-push-push-banner-bb23a164 = Hier einen Branch erstellen oder einen auschecken, dann pushen.
+
+repo-workflows-push-push-banner-e2a4155b = Erneut pushen
+
+repo-workflows-push-push-banner-e4671d42 = HEAD ist losgelöst. Es gibt keinen Branch zum Pushen.
+
+repo-workflows-push-push-labelled-4933a6c9 = Dieses Repository hat kein Remote zum Pushen
+
+repo-workflows-push-push-op-ended-79357f2e = { $label } verweigert: { $out-trim-1 }
+
+repo-workflows-push-push-target-1b9119c5 = { $branch } hat kein gitcraft bekanntes Push-Remote
+
+repo-workflows-push-refused-457efe53 = Meldung kopieren
+
+repo-workflows-push-refused-d5689de7 = Das Remote hat selbst abgelehnt, etwa wegen eines Hooks oder Branchschutzes. Ein Force-Push umgeht dies nicht. Git meldete:
+
+repo-workflows-push-refused-ff02e2eb = Das Remote hat den Push von { $branch } verweigert
+
+repo-workflows-push-rejected-04b2194e = Force-Push mit Lease …
+
+repo-workflows-push-rejected-0db0e893 = { $mode-label-1 }; es wird nichts gepusht
+
+repo-workflows-push-rejected-2c2c46aa = Fragt vorher nach und nennt die dabei entfernten Commits
+
 repo-workflows-push-rejected-683768ab = und { $r-behind-named-1 } weitere
+
+repo-workflows-push-rejected-9e1d29fb = Den entfernten Branch fetchen und erneut zählen
+
+repo-workflows-push-rejected-ab020f51 = { $r-target-label-1 } pullen
+
+repo-workflows-push-rejected-e2a4155b = Erneut pushen
+
+repo-workflows-push-rejected-fb7099ad = Erneut prüfen
+
+repo-workflows-push-remote-checked-205a41fa = Push verweigert: { $target-label-1 } ist nicht mehr vorhanden
+
+repo-workflows-push-remote-checked-3bbec358 = Push verweigert: { $banner-headline-r-1 }
+
+repo-workflows-push-remote-checked-c6e528c9 = Push verweigert und Remote konnte nicht geprüft werden: { $e }
+
+repo-workflows-push-sync-027fe2bd = Sync: { $current } gepullt und gepusht
+
+repo-workflows-push-sync-5ca83b4b = Sync: { $current } veröffentlicht (es gab nichts zu pullen)
+
+repo-workflows-reflog--1af58b4f = Ein Vorgang läuft
+
+repo-workflows-reflog--41e8eb8b = Seine Änderungen als neuen Commit auf den ausgecheckten Stand anwenden
+
+repo-workflows-reflog-lost-list-625e19f0 = Nichts verloren. Jeder Commit ist über einen Branch, ein Tag oder einen Stash erreichbar.
+
+repo-workflows-reflog-lost-row-379fcead = { $c-hash-1 }
+    { $c-summary-2 }
+    Von { $c-author-3 }, committet { $c-date-4 } ({ $git-relative-time-c-time-now-5 })
+
+repo-workflows-reflog-no-cherry-pick-439c2b34 = Ein Merge-Commit wird im Terminal mit Auswahl seines Eltern-Commits (-m) per Cherry-Pick übernommen
+
+repo-workflows-reflog-no-cherry-pick-4788af31 = Dies ist der ausgecheckte Commit
+
+repo-workflows-reflog-no-cherry-pick-832424d9 = Der ausgecheckte Stand enthält ihn bereits
+
+repo-workflows-reflog-no-cherry-pick-f9c0aa5a = Ein gelöschter Stash. Stattdessen anwenden.
+
+repo-workflows-reflog-not-scanned-e1899125 = Findet Commits, die kein Branch, Tag oder Stash mehr erreicht, auch nach Ablauf ihres Reflogs: Überreste von Resets, gelöschten Branches oder Rebases und gelöschte Stashes. Sie bleiben bis zur Bereinigung durch git gc erhalten. Bei großen Repositorys dauert die Suche länger.
+
+repo-workflows-reflog-not-scanned-faab01a6 = Verlorene Commits suchen
+
+repo-workflows-reflog-open-reflog-680d5c5f = interaktiven Rebase
+
+repo-workflows-reflog-open-reflog-991ae978 = Zuerst den { $editor } abschließen oder schließen
+
+repo-workflows-reflog-open-reflog-d509b2ee = Konflikteditor
+
+repo-workflows-reflog-recover-items-008c67fe = Stash anwenden
+
+repo-workflows-reflog-recover-items-468e2d34 = Seine Änderungen wieder ins Arbeitsverzeichnis übernehmen (git stash apply)
+
+repo-workflows-reflog-recover-items-4788af31 = Dies ist der ausgecheckte Commit
+
+repo-workflows-reflog-recover-items-4c49fdb6 = Cherry-Pick
+
+repo-workflows-reflog-recover-items-614692c1 = Diesen Commit ohne Branch auschecken
+
+repo-workflows-reflog-recover-items-61e6a768 = Commit-Hash kopieren
+
+repo-workflows-reflog-recover-items-6be4594f = Losgelöst auschecken
+
+repo-workflows-reflog-ref-picker-c2e6cb5f = Reflog von HEAD oder einem lokalen Branch
+
+repo-workflows-reflog-reflog-bar-3d04584d = Erneut suchen
+
+repo-workflows-reflog-reflog-bar-83f07529 = Reflog erneut lesen
+
+repo-workflows-reflog-reflog-bar-961b2a04 = Schließen (Esc)
+
+repo-workflows-reflog-reflog-bar-abd5e345 = Reflog
+
+repo-workflows-reflog-reflog-bar-ec09fe01 = Verlorene Commits
+
+repo-workflows-reflog-reflog-buttons-a369afe1 = Ein neuer Branch bei diesem Commit. Sonst ändert sich nichts. Auch per Doppelklick möglich.
+
+repo-workflows-reflog-reflog-buttons-aa1b2809 = Hier Branch erstellen …
+
+repo-workflows-reflog-reflog-buttons-d47d7cb0 = Mehr
+
+repo-workflows-reflog-reflog-contents-7e0b72b2 = Einen Eintrag auswählen, um seinen Commit zu sehen. „Hier Branch erstellen“ stellt ihn wieder her.
+
+repo-workflows-reflog-reflog-contents-92034002 = Einen Commit auswählen, um ihn zu sehen. „Hier Branch erstellen“ stellt ihn wieder her.
+
+repo-workflows-reflog-reflog-list-31d0c09c = Kein Reflog für { $name }. Git führt ihn ab der Erstellung eines Branches, sofern core.logAllRefUpdates nicht deaktiviert ist. HEAD hat vor dem ersten Commit keinen Reflog.
+
+repo-workflows-reflog-reflog-menu-items-22e4b72a = { $target } auf diesen Stand zurücksetzen
+
+repo-workflows-reflog-reflog-menu-items-4188c300 = Noch nichts ausgecheckt
+
+repo-workflows-reflog-reflog-menu-items-4788af31 = Dies ist der ausgecheckte Commit
+
+repo-workflows-reflog-reflog-menu-items-916e34d4 = Im Graphen anzeigen
+
+repo-workflows-reflog-reflog-menu-items-aa1b2809 = Hier Branch erstellen …
 
 repo-workflows-reflog-scanning-19766ed6 = Abbrechen
 
+repo-workflows-reflog-scanning-7ed409a6 = Alle Objekte werden nach unerreichbaren Commits durchsucht … { $secs } s
+
+repo-workflows-reflog-start-scan-7a1d64fe = Der letzte Suchlauf endet noch auf diesem Rechner. Gleich erneut versuchen.
+
+repo-workflows-rehearse-apply-rehearsal-b09a6f3f = Änderungen zuerst committen oder stashen. Der Probelauf betraf nur die Commits.
+
+repo-workflows-rehearse-apply-rehearsal-d63206ac = { $run-branch-1 } ist nicht mehr ausgecheckt. Probelauf wiederholen.
+
+repo-workflows-rehearse-apply-rehearsal-e5e3ecc5 = Warten, bis der laufende Vorgang abgeschlossen ist
+
+repo-workflows-rehearse-card-5dd72467 = Kein Probelauf. Angehalten.
+
+repo-workflows-rehearse-card-612ffc5c = Warten …
+
+repo-workflows-rehearse-card-958a566f = Probelauf fehlgeschlagen: { $e }
+
+repo-workflows-rehearse-compare-line-16ca6f02 = Beide erzeugen dieselben Dateien.
+
+repo-workflows-rehearse-compare-line-cd991a2e = Sie erzeugen unterschiedliche Dateien.
+
+repo-workflows-rehearse-heading-52968e32 = Rebase von { $branch } auf { $other }
+
+repo-workflows-rehearse-heading-e812253e = { $other } nach { $branch } mergen
+
+repo-workflows-rehearse-outcome-07564e65 = Führt den Vorgang tatsächlich aus, nachdem geprüft wurde, dass kein Branch verschoben wurde
+
+repo-workflows-rehearse-outcome-2a75fa8b = Jetzt rebasen
+
+repo-workflows-rehearse-outcome-687392eb = { "  " }… und { $conflicts-len-max-files-1 } weitere
+
+repo-workflows-rehearse-outcome-ae00a254 = Führt den Vorgang tatsächlich aus und hält an derselben Stelle an, damit Sie die Konflikte lösen können
+
+repo-workflows-rehearse-outcome-fed7ed2e = Jetzt mergen
+
+repo-workflows-rehearse-played-line-2704eda1 = Ein Konflikt
+
+repo-workflows-rehearse-played-line-31877584 = Läuft konfliktfrei durch: ein Commit
+
+repo-workflows-rehearse-played-line-357eba9b = Nichts zu tun. Der Branch enthält bereits alles.
+
+repo-workflows-rehearse-played-line-3fb21e29 = { $n } Konflikte
+
+repo-workflows-rehearse-played-line-6b8c28e6 = Läuft konfliktfrei durch: ein Merge-Commit mit einem eingebrachten Commit
+
+repo-workflows-rehearse-played-line-6fc15496 = Hält mit { $files } an
+
+repo-workflows-rehearse-played-line-78e91cc7 = Läuft durch: Fast-Forward auf { $short-tip-1 }
+
+repo-workflows-rehearse-played-line-9a2020a6 = Hält bei Commit { $step } von { $of } ({ $what }) an: { $files }
+
+repo-workflows-rehearse-played-line-a969dd77 = Läuft durch: Der Branch wird ohne erneut anzuwendende Commits darauf verschoben
+
+repo-workflows-rehearse-played-line-cc3a8109 = Läuft konfliktfrei durch: ein Merge-Commit mit { $n } eingebrachten Commits
+
+repo-workflows-rehearse-played-line-da976bc1 = Schlägt fehl: { $e }
+
+repo-workflows-rehearse-played-line-e270e3ca = Läuft konfliktfrei durch: { $n } Commits
+
+repo-workflows-rehearse-rehearsals-ended-31373501 = { $name } · Probelauf von { $run-branch-1 } abgeschlossen
+
+repo-workflows-rehearse-rehearse-item-3b9a692a = Spielt den Vorgang zuerst in einem temporären Worktree durch: Haltepunkte, Konfliktdateien und Testergebnisse. Ihre Daten bleiben unverändert.
+
+repo-workflows-rehearse-rehearse-item-c336cc0b = Merge oder Rebase probeweise ausführen …
+
+repo-workflows-rehearse-rehearse-palette-items-50b0742f = Probe Probelauf Versuch Vorschau
+
+repo-workflows-rehearse-rehearse-palette-items-d8875572 = Merge oder Rebase von { $current } mit { $base } probeweise ausführen …
+
+repo-workflows-rehearse-rehearse-window-13b34c20 = Es wurde nichts geändert. Die tatsächliche Ausführung prüft zuerst, dass kein Branch verschoben wurde. Strg+Z macht sie rückgängig.
+
+repo-workflows-rehearse-rehearse-window-25ffbf44 = Probelauf läuft …
+
+repo-workflows-rehearse-rehearse-window-bbe85741 = Wird beendet …
+
 repo-workflows-rehearse-rehearse-window-cae7d57b = Stoppen
+
+repo-workflows-rehearse-rehearse-window-fcc1b928 = Probelauf: { $run-branch-1 } mit { $run-other-2 }
+
+repo-workflows-rehearse-start-rehearsal-252af634 = Einen Branch auschecken, um damit einen Probelauf zu machen
+
+repo-workflows-rehearse-start-rehearsal-3fdfbad4 = Interner Fehler: Der Probelauf wurde angehalten
+
+repo-workflows-rehearse-start-rehearsal-bbfc5a1d = Ein Probelauf läuft bereits
+
+repo-workflows-rehearse-tested-line-246783da = `{ $command }` nicht ausgeführt: { $why }
+
+repo-workflows-rehearse-tested-line-26bf178a = `{ $command }` schlägt fehl (gespeichertes Ergebnis)
+
+repo-workflows-rehearse-tested-line-437947b9 = `{ $command }` schlägt fehl (Exit-Code { $code })
+
+repo-workflows-rehearse-tested-line-4deabe28 = `{ $command }` besteht
+
+repo-workflows-rehearse-tested-line-ebe78b3a = `{ $command }` schlägt fehl (durch Signal beendet)
+
+repo-workflows-rehearse-tested-line-ff964b6a = `{ $command }` besteht (gespeichertes Ergebnis)
 
 repo-workflows-release-close-button-7d9eb7ac = Schließen
 
@@ -4964,4 +5216,52 @@ repo-workflows-pr-pending-comment-count = { $count ->
 repo-workflows-postcard-contributor = Mitwirkender { $index }
 
 repo-workflows-postcard-shortened-contributor = { $label } [Mitwirkender { $index }]
+
+repo-workflows-push-commits = { $count ->
+        [one] ein Commit
+       *[other] { $count } Commits
+    }
+
+repo-workflows-push-headline = { $clear ->
+        [yes] { $remote } enthält jetzt nichts, das Ihnen fehlt. Erneut pushen.
+       *[no] { $remote } enthält { $count ->
+            [one] einen Commit, der Ihnen fehlt
+           *[other] { $count } Commits, die Ihnen fehlen
+        }
+    }
+
+repo-workflows-push-explanation = { $moved ->
+        [yes] { $remote } hat sich seit der letzten Prüfung erneut geändert. Daher wurde nichts überschrieben. { "" }
+       *[no] { "" }
+    }{ $shape ->
+        [clear] Zwischenzeitlich wurde möglicherweise von anderswo gepusht.
+        [behind] Ihr Branch { $branch } liegt nur zurück und hat nichts Eigenes zum Pushen. Mit Pull aufholen.
+        [diverged] Ihr Branch { $branch } enthält { $ahead ->
+            [one] einen Commit, den { $remote } nicht enthält
+           *[other] { $ahead } Commits, die { $remote } nicht enthält
+        }. Beide haben sich weiterentwickelt. Pull mit anschließendem Push verbindet sie. Ein Force-Push ersetzt den Stand auf { $remote }.
+        [back] Ihr Branch { $branch } wurde hier nach dem Push zurückgesetzt, etwa durch Rückgängigmachen eines Commits oder einen Reset. { $behind ->
+            [one] Pull würde den Commit zurückholen. Ein Force-Push entfernt ihn aus { $remote }.
+           *[other] Pull würde die { $behind } Commits zurückholen. Ein Force-Push entfernt sie aus { $remote }.
+        }
+       *[rewritten] Ihr Branch { $branch } wurde hier nach dem Push umgeschrieben, etwa durch Amend oder Rebase, und enthält stattdessen { $ahead ->
+            [one] einen neuen Commit
+           *[other] { $ahead } neue Commits
+        }. { $behind ->
+            [one] Pull würde den alten Commit neben den neuen zurückholen. Ein Force-Push ersetzt ihn.
+           *[other] Pull würde die { $behind } alten Commits neben den neuen zurückholen. Ein Force-Push ersetzt sie.
+        }
+    }
+
+repo-workflows-push-force-body = Ein Force-Push ersetzt { $remote } durch Ihren Branch { $branch } ({ $local }). { $count ->
+        [one] Dieser Commit liegt auf { $remote }, aber nicht auf Ihrem Branch { $branch }. Er wird aus { $remote } entfernt. Klone, die ihn bereits haben, behalten ihn:
+       *[other] Diese { $count } Commits liegen auf { $remote }, aber nicht auf Ihrem Branch { $branch }. Sie werden aus { $remote } entfernt. Klone, die sie bereits haben, behalten sie:
+    }
+
+        { $commits }{ $more ->
+        [0] { "" }
+       *[other] { "\u000A    und " }{ $more } weitere
+    }
+
+    Wenn sich { $remote } seit der Prüfung von { $remote-commit } oder Ihr Branch { $branch } von { $local } wegbewegt hat, wird nichts gepusht (--force-with-lease).
 

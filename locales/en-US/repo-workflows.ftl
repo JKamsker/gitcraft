@@ -4027,11 +4027,263 @@ repo-workflows-pr_view-timeline-b7cba957 = No comments yet.
 
 repo-workflows-pr_view-timeline-e72570a1 = Comments on lines couldn't be read: { $e }
 
+repo-workflows-push-apart-b578bb02 = unexpected answer from git rev-list: { $out }
+
+repo-workflows-push-chain-step-ended-dfa32698 = { $what } failed, so nothing was pushed: { $e }
+
+repo-workflows-push-check-67e345ac = { $target-label-1 } moved while it was being fetched: check again
+
+repo-workflows-push-check-remote-9a7c53eb = Checking { $what }
+
+repo-workflows-push-check-remote-d6f3f0c2 = the remote
+
+repo-workflows-push-dismiss-48845bff = Dismiss
+
+repo-workflows-push-force-dialog-1d502fc3 = Force push
+
+repo-workflows-push-no-upstream-86cb1261 = Choose a remote to publish it on; { $branch } will track it there.
+
+repo-workflows-push-no-upstream-9ab92941 = { $branch } isn't on any remote yet
+
+repo-workflows-push-no-upstream-d32eee95 = Publish to { $remote }
+
+repo-workflows-push-pick-target-acf19d61 = { $branch } pushes to { $remote }, which is not one of this repository's remotes
+
+repo-workflows-push-pull-buttons-43992a40 = { $mode-label-1 }, then push
+
+repo-workflows-push-pull-buttons-5e584d52 = Merge, then push
+
+repo-workflows-push-pull-buttons-aca90f08 = Pull is set to fast-forward only, which can't join branches that diverged
+
+repo-workflows-push-pull-buttons-ca69dd73 = Pull, then push
+
+repo-workflows-push-pull-buttons-dc0810af = Rebase, then push
+
+repo-workflows-push-push-act-ebd6e3a6 = { $r-branch-1 } pulled from { $r-target-label-2 } and pushed
+
+repo-workflows-push-push-banner-04e6949e = Create branch…
+
+repo-workflows-push-push-banner-39525827 = The branch { $branch } pushes to was deleted on { $target-remote-1 }. Push again to create it there.
+
+repo-workflows-push-push-banner-7361cc7b = { $target-label-1 } is gone
+
+repo-workflows-push-push-banner-bb23a164 = Create a branch here (or check one out), then push it.
+
+repo-workflows-push-push-banner-e2a4155b = Push again
+
+repo-workflows-push-push-banner-e4671d42 = HEAD is detached: there is no branch to push
+
+repo-workflows-push-push-labelled-4933a6c9 = This repository has no remote to push to
+
+repo-workflows-push-push-op-ended-79357f2e = { $label } refused: { $out-trim-1 }
+
+repo-workflows-push-push-target-1b9119c5 = { $branch } pushes to no remote gitcraft knows
+
+repo-workflows-push-refused-457efe53 = Copy message
+
+repo-workflows-push-refused-d5689de7 = The remote said no itself (a hook or a branch protection, for example); force pushing won't get past that. What git said:
+
+repo-workflows-push-refused-ff02e2eb = The remote refused the push of { $branch }
+
+repo-workflows-push-rejected-04b2194e = Force push (with lease)…
+
+repo-workflows-push-rejected-0db0e893 = { $mode-label-1 }; nothing is pushed
+
+repo-workflows-push-rejected-2c2c46aa = Asks first, naming the commits it removes
+
 repo-workflows-push-rejected-683768ab = and { $r-behind-named-1 } more
+
+repo-workflows-push-rejected-9e1d29fb = Fetch the remote branch and count again
+
+repo-workflows-push-rejected-ab020f51 = Pull { $r-target-label-1 }
+
+repo-workflows-push-rejected-e2a4155b = Push again
+
+repo-workflows-push-rejected-fb7099ad = Check again
+
+repo-workflows-push-remote-checked-205a41fa = Push refused: { $target-label-1 } is gone
+
+repo-workflows-push-remote-checked-3bbec358 = Push refused: { $banner-headline-r-1 }
+
+repo-workflows-push-remote-checked-c6e528c9 = Push refused, and the remote could not be checked: { $e }
+
+repo-workflows-push-sync-027fe2bd = Sync: { $current } pulled and pushed
+
+repo-workflows-push-sync-5ca83b4b = Sync: { $current } published (it had nothing to pull)
+
+repo-workflows-reflog--1af58b4f = An operation is running
+
+repo-workflows-reflog--41e8eb8b = Apply its changes on top of what is checked out, as a new commit
+
+repo-workflows-reflog-lost-list-625e19f0 = Nothing lost: every commit is on a branch, a tag or a stash.
+
+repo-workflows-reflog-lost-row-379fcead = { $c-hash-1 }
+    { $c-summary-2 }
+    By { $c-author-3 }, committed { $c-date-4 } ({ $git-relative-time-c-time-now-5 })
+
+repo-workflows-reflog-no-cherry-pick-439c2b34 = A merge commit is cherry-picked from the terminal, choosing its parent (-m)
+
+repo-workflows-reflog-no-cherry-pick-4788af31 = It is the commit checked out
+
+repo-workflows-reflog-no-cherry-pick-832424d9 = What is checked out has it already
+
+repo-workflows-reflog-no-cherry-pick-f9c0aa5a = A dropped stash: apply it instead
+
+repo-workflows-reflog-not-scanned-e1899125 = Finds the commits no branch, tag or stash reaches any more, even once their reflog has expired: what a reset, a deleted branch or a rebase left behind, and dropped stashes. They stay until git gc prunes them. On a big repository this takes a while.
+
+repo-workflows-reflog-not-scanned-faab01a6 = Find lost commits
+
+repo-workflows-reflog-open-reflog-680d5c5f = interactive rebase
+
+repo-workflows-reflog-open-reflog-991ae978 = Finish or close the { $editor } first
+
+repo-workflows-reflog-open-reflog-d509b2ee = conflict editor
+
+repo-workflows-reflog-recover-items-008c67fe = Apply stash
+
+repo-workflows-reflog-recover-items-468e2d34 = Put its changes back on the working tree (git stash apply)
+
+repo-workflows-reflog-recover-items-4788af31 = It is the commit checked out
+
+repo-workflows-reflog-recover-items-4c49fdb6 = Cherry-pick
+
+repo-workflows-reflog-recover-items-614692c1 = Check out this commit, on no branch
+
+repo-workflows-reflog-recover-items-61e6a768 = Copy commit hash
+
+repo-workflows-reflog-recover-items-6be4594f = Check out (detached)
+
+repo-workflows-reflog-ref-picker-c2e6cb5f = HEAD's reflog, or a local branch's
+
+repo-workflows-reflog-reflog-bar-3d04584d = Scan again
+
+repo-workflows-reflog-reflog-bar-83f07529 = Read the reflog again
+
+repo-workflows-reflog-reflog-bar-961b2a04 = Close (Esc)
+
+repo-workflows-reflog-reflog-bar-abd5e345 = Reflog
+
+repo-workflows-reflog-reflog-bar-ec09fe01 = Lost commits
+
+repo-workflows-reflog-reflog-buttons-a369afe1 = A new branch at this commit; nothing else changes (also a double-click)
+
+repo-workflows-reflog-reflog-buttons-aa1b2809 = Create branch here…
+
+repo-workflows-reflog-reflog-buttons-d47d7cb0 = More
+
+repo-workflows-reflog-reflog-contents-7e0b72b2 = Select an entry to see its commit; Create branch here gets it back
+
+repo-workflows-reflog-reflog-contents-92034002 = Select a commit to see it; Create branch here gets it back
+
+repo-workflows-reflog-reflog-list-31d0c09c = No reflog for { $name }. git keeps one from when a branch is made (unless core.logAllRefUpdates is off); HEAD has none before the first commit.
+
+repo-workflows-reflog-reflog-menu-items-22e4b72a = Reset { $target } to here
+
+repo-workflows-reflog-reflog-menu-items-4188c300 = Nothing is checked out yet
+
+repo-workflows-reflog-reflog-menu-items-4788af31 = It is the commit checked out
+
+repo-workflows-reflog-reflog-menu-items-916e34d4 = Show in graph
+
+repo-workflows-reflog-reflog-menu-items-aa1b2809 = Create branch here…
 
 repo-workflows-reflog-scanning-19766ed6 = Cancel
 
+repo-workflows-reflog-scanning-7ed409a6 = Looking through every object for commits nothing reaches… { $secs } s
+
+repo-workflows-reflog-start-scan-7a1d64fe = The last scan is still ending on that machine; try again in a moment
+
+repo-workflows-rehearse-apply-rehearsal-b09a6f3f = Commit or stash your changes first: the rehearsal was of the commits alone
+
+repo-workflows-rehearse-apply-rehearsal-d63206ac = { $run-branch-1 } is no longer checked out: rehearse again
+
+repo-workflows-rehearse-apply-rehearsal-e5e3ecc5 = Wait for the operation going on to finish
+
+repo-workflows-rehearse-card-5dd72467 = Not rehearsed: stopped
+
+repo-workflows-rehearse-card-612ffc5c = Waiting…
+
+repo-workflows-rehearse-card-958a566f = Couldn't rehearse: { $e }
+
+repo-workflows-rehearse-compare-line-16ca6f02 = Both give the same files.
+
+repo-workflows-rehearse-compare-line-cd991a2e = They give different files.
+
+repo-workflows-rehearse-heading-52968e32 = Rebase { $branch } onto { $other }
+
+repo-workflows-rehearse-heading-e812253e = Merge { $other } into { $branch }
+
+repo-workflows-rehearse-outcome-07564e65 = Does it for real, once it has checked that neither branch moved
+
+repo-workflows-rehearse-outcome-2a75fa8b = Rebase now
+
+repo-workflows-rehearse-outcome-687392eb = { "  " }… and { $conflicts-len-max-files-1 } more
+
+repo-workflows-rehearse-outcome-ae00a254 = Does it for real: it stops at the same place, for you to solve the conflicts
+
+repo-workflows-rehearse-outcome-fed7ed2e = Merge now
+
+repo-workflows-rehearse-played-line-2704eda1 = 1 conflict
+
+repo-workflows-rehearse-played-line-31877584 = Goes through cleanly: 1 commit
+
+repo-workflows-rehearse-played-line-357eba9b = Nothing to do: the branch has it all already
+
+repo-workflows-rehearse-played-line-3fb21e29 = { $n } conflicts
+
+repo-workflows-rehearse-played-line-6b8c28e6 = Goes through cleanly: a merge commit, bringing in 1 commit
+
+repo-workflows-rehearse-played-line-6fc15496 = Stops with { $files }
+
+repo-workflows-rehearse-played-line-78e91cc7 = Goes through: a fast-forward to { $short-tip-1 }
+
+repo-workflows-rehearse-played-line-9a2020a6 = Stops at commit { $step } of { $of } ({ $what }): { $files }
+
+repo-workflows-rehearse-played-line-a969dd77 = Goes through: the branch moves onto it, no commit to replay
+
+repo-workflows-rehearse-played-line-cc3a8109 = Goes through cleanly: a merge commit, bringing in { $n } commits
+
+repo-workflows-rehearse-played-line-da976bc1 = Fails: { $e }
+
+repo-workflows-rehearse-played-line-e270e3ca = Goes through cleanly: { $n } commits
+
+repo-workflows-rehearse-rehearsals-ended-31373501 = { $name } · rehearsal of { $run-branch-1 } done
+
+repo-workflows-rehearse-rehearse-item-3b9a692a = Plays it through in a scratch worktree first: where it stops, which files conflict, whether the tests pass. Nothing of yours changes.
+
+repo-workflows-rehearse-rehearse-item-c336cc0b = Rehearse merge or rebase…
+
+repo-workflows-rehearse-rehearse-palette-items-50b0742f = rehearse dry run try preview
+
+repo-workflows-rehearse-rehearse-palette-items-d8875572 = Rehearse merge or rebase of { $current } with { $base }…
+
+repo-workflows-rehearse-rehearse-window-13b34c20 = Nothing was changed. Doing it now checks first that neither branch moved; Ctrl+Z undoes it.
+
+repo-workflows-rehearse-rehearse-window-25ffbf44 = Rehearsing…
+
+repo-workflows-rehearse-rehearse-window-bbe85741 = Stopping…
+
 repo-workflows-rehearse-rehearse-window-cae7d57b = Stop
+
+repo-workflows-rehearse-rehearse-window-fcc1b928 = Rehearsal: { $run-branch-1 } with { $run-other-2 }
+
+repo-workflows-rehearse-start-rehearsal-252af634 = Check out a branch to rehearse with it
+
+repo-workflows-rehearse-start-rehearsal-3fdfbad4 = Internal error: the rehearsal stopped
+
+repo-workflows-rehearse-start-rehearsal-bbfc5a1d = A rehearsal is going on already
+
+repo-workflows-rehearse-tested-line-246783da = `{ $command }` not run: { $why }
+
+repo-workflows-rehearse-tested-line-26bf178a = `{ $command }` fails (a stored result)
+
+repo-workflows-rehearse-tested-line-437947b9 = `{ $command }` fails (exit code { $code })
+
+repo-workflows-rehearse-tested-line-4deabe28 = `{ $command }` passes
+
+repo-workflows-rehearse-tested-line-ebe78b3a = `{ $command }` fails (ended by a signal)
+
+repo-workflows-rehearse-tested-line-ff964b6a = `{ $command }` passes (a stored result)
 
 repo-workflows-release-close-button-7d9eb7ac = Close
 
@@ -4963,4 +5215,55 @@ repo-workflows-pr-pending-comment-count = { $count ->
 repo-workflows-postcard-contributor = Contributor { $index }
 
 repo-workflows-postcard-shortened-contributor = { $label } [contributor { $index }]
+
+repo-workflows-push-commits = { $count ->
+        [one] 1 commit
+       *[other] { $count } commits
+    }
+
+repo-workflows-push-headline = { $clear ->
+        [yes] { $remote } has nothing you don't have now: push again
+       *[no] { $remote } has { $count ->
+            [one] 1 commit
+           *[other] { $count } commits
+        } you don't have
+    }
+
+repo-workflows-push-explanation = { $moved ->
+        [yes] { $remote } changed again since it was last checked, so nothing was overwritten. { "" }
+       *[no] { "" }
+    }{ $shape ->
+        [clear] It may have been pushed from elsewhere meanwhile.
+        [behind] Your { $branch } is only behind it, with nothing of its own to push: pull to catch up.
+        [diverged] Your { $branch } has { $ahead ->
+            [one] 1 commit
+           *[other] { $ahead } commits
+        } that { $remote } doesn't have: both moved on. Pull, then push joins them; a force push replaces what is on { $remote }.
+        [back] Your { $branch } was moved back here (a commit undone, a reset) after { $behind ->
+            [one] it was pushed. Pulling would bring it back; a force push removes it from { $remote }.
+           *[other] they were pushed. Pulling would bring them back; a force push removes them from { $remote }.
+        }
+       *[rewritten] Your { $branch } was rewritten here (amended or rebased) after { $behind ->
+            [one] that commit was pushed, and has { $ahead ->
+            [one] 1 commit
+           *[other] { $ahead } commits
+        } in its place. Pulling would bring the old one back beside the new; a force push replaces it.
+           *[other] those commits were pushed, and has { $ahead ->
+            [one] 1 commit
+           *[other] { $ahead } commits
+        } in their place. Pulling would bring the old ones back beside the new; a force push replaces them.
+        }
+    }
+
+repo-workflows-push-force-body = Force pushing will replace { $remote } with your { $branch } ({ $local }). { $count ->
+        [one] This commit is on { $remote } but not on your { $branch }; it will be removed from { $remote } (clones that already have it keep it):
+       *[other] These { $count } commits are on { $remote } but not on your { $branch }; they will be removed from { $remote } (clones that already have them keep them):
+    }
+
+        { $commits }{ $more ->
+        [0] { "" }
+       *[other] { "\u000A    and " }{ $more } more
+    }
+
+    If { $remote } has moved from { $remote-commit } since it was checked, or your { $branch } from { $local }, nothing is pushed (--force-with-lease).
 
