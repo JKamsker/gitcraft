@@ -1075,8 +1075,8 @@ fn hard_ask(repo: &Path, here: &Here, hash: &str, target: &str) -> Ask {
     let left = commits_between(repo, hash, &here.head);
     Ask::from_presentation(AskPresentation::HardReset {
         target: target.to_owned(),
-        from: short(&here.head),
-        to: short(hash),
+        from: short(&here.head).to_owned(),
+        to: short(hash).to_owned(),
         subject: summary(repo, hash),
         lost,
         left,
@@ -1093,8 +1093,8 @@ fn mixed_ask(repo: &Path, here: &Here, hash: &str, target: &str) -> Result<Optio
     }
     Ok(Some(Ask::from_presentation(AskPresentation::MixedReset {
         target: target.to_owned(),
-        from: short(&here.head),
-        to: short(hash),
+        from: short(&here.head).to_owned(),
+        to: short(hash).to_owned(),
         subject: summary(repo, hash),
         files,
     })))
@@ -1181,7 +1181,7 @@ fn rewrite(repo: &Path, here: &Here, commit: &str, edit: Edit) -> Result<Plan, S
     };
     let ask = (edit == Edit::Drop).then(|| {
         Ask::from_presentation(AskPresentation::Drop {
-            commit: short(&hash),
+            commit: short(&hash).to_owned(),
             subject: summary(repo, &hash),
             branch: branch.clone(),
             after,
@@ -1231,7 +1231,7 @@ fn delete_branch(repo: &Path, here: &Here, name: &str, force: bool) -> Result<Pl
         },
         ask: Some(Ask::from_presentation(AskPresentation::DeleteBranch {
             name: name.to_owned(),
-            commit: short(&target),
+            commit: short(&target).to_owned(),
             subject: summary(repo, &target),
             force,
         })),
