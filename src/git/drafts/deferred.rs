@@ -317,7 +317,18 @@ fn safe_dir(path: &Path) -> Result<(), String> {
 // Separate argv carries one validated metadata observation. The child captures
 // directory descriptors and verifies them against retained native handles before
 // dispatch. Git uses those descriptors; neither .git nor commondir is reparsed.
-const OWNED_ALIAS: &str = r#"alias.gitcraft-owned-replay=!f() { pin=$1; path=$2; metadata=$3; mpin=$4; common=$5; cpin=$6; lpin=$7; link=$8; shift 8; token() { LC_ALL=C stat -L -c '%d:%i' "$1" 2>/dev/null || LC_ALL=C stat -L -f '%d:%i' "$1"; }; cd -P -- "$path" || exit 1; [ "$(token .)" = "$pin" ] || { printf "%s\n" "Owned replay root identity/content mismatch" >&2; exit 1; }; exec 6<.git || exit 1; [ "$(token /dev/fd/6)" = "$lpin" ] || { printf "%s\n" "Owned replay git-link identity/content mismatch" >&2; exit 1; }; [ "$(cat /dev/fd/6)" = "$link" ] || { printf "%s\n" "Owned replay git-link-content identity/content mismatch" >&2; exit 1; }; exec 7<"$metadata" || exit 1; [ "$(token /dev/fd/7)" = "$mpin" ] || { printf "%s\n" "Owned replay metadata identity/content mismatch" >&2; exit 1; }; exec 8<"$common" || exit 1; [ "$(token /dev/fd/8)" = "$cpin" ] || { printf "%s\n" "Owned replay common identity/content mismatch" >&2; exit 1; }; GIT_COMMON_DIR=/dev/fd/8 git --no-lazy-fetch --git-dir=/dev/fd/7 --work-tree=. "$@"; }; f"#;
+// BSD stat with no operand uses fstat(STDIN_FILENO); stat("/dev/fd/N")
+// observes the Darwin descriptor-filesystem entry instead of the held inode.
+// Keep platform selection compile-time and pass the already-open handle on stdin.
+macro_rules! owned_alias {
+    ($fd_stat:literal) => {
+        concat!(r#"alias.gitcraft-owned-replay=!f() { pin=$1; path=$2; metadata=$3; mpin=$4; common=$5; cpin=$6; lpin=$7; link=$8; shift 8; token() { LC_ALL=C stat -L -c '%d:%i' "$1" 2>/dev/null || LC_ALL=C stat -L -f '%d:%i' "$1"; }; token_fd() { "#, $fd_stat, r#"; }; cd -P -- "$path" || exit 1; [ "$(token .)" = "$pin" ] || { printf "%s\n" "Owned replay root identity/content mismatch" >&2; exit 1; }; exec 6<.git || exit 1; [ "$(token_fd <&6)" = "$lpin" ] || { printf "%s\n" "Owned replay git-link identity/content mismatch" >&2; exit 1; }; [ "$(cat <&6)" = "$link" ] || { printf "%s\n" "Owned replay git-link-content identity/content mismatch" >&2; exit 1; }; exec 7<"$metadata" || exit 1; [ "$(token_fd <&7)" = "$mpin" ] || { printf "%s\n" "Owned replay metadata identity/content mismatch" >&2; exit 1; }; exec 8<"$common" || exit 1; [ "$(token_fd <&8)" = "$cpin" ] || { printf "%s\n" "Owned replay common identity/content mismatch" >&2; exit 1; }; GIT_COMMON_DIR=/dev/fd/8 git --no-lazy-fetch --git-dir=/dev/fd/7 --work-tree=. "$@"; }; f"#)
+    };
+}
+#[cfg(target_os = "macos")]
+const OWNED_ALIAS: &str = owned_alias!("LC_ALL=C stat -L -f '%d:%i'");
+#[cfg(not(target_os = "macos"))]
+const OWNED_ALIAS: &str = owned_alias!("LC_ALL=C stat -L -c '%d:%i' /dev/stdin");
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct DispatchBinding {
     metadata: PathBuf,
@@ -1305,10 +1316,10 @@ pub(crate) mod tests {
         let dispatch = OWNED_ALIAS.find("GIT_COMMON_DIR=/dev/fd/8 git").unwrap();
         for guard in [
             "token .",
-            "token /dev/fd/6",
-            "cat /dev/fd/6",
-            "token /dev/fd/7",
-            "token /dev/fd/8",
+            "token_fd <&6",
+            "cat <&6",
+            "token_fd <&7",
+            "token_fd <&8",
         ] {
             assert!(OWNED_ALIAS.find(guard).unwrap() < dispatch);
         }
