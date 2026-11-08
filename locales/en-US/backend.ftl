@@ -192,3 +192,41 @@ backend-file-system-monitor-bd6322 = File system monitor
 backend-untracked-cache-de0942 = Untracked cache
 
 backend-pack-the-objects-5a853d = Pack the objects
+
+backend-a-scratch-clone-in-the-temporary-folder-3c56aa = a scratch clone in the temporary folder
+
+backend-bad-is-not-a-commit-id-e58577 = { $bad } is not a commit id
+
+backend-commit-is-not-a-commit-9e1c80 = { $commit } is not a commit
+
+backend-could-not-make-a-scratch-clone-e-94509c = could not make a scratch clone: { $detail }
+
+backend-first-in-a-scratch-clone-e-5541cd = { $first }; in a scratch clone: { $detail }
+
+backend-git-commit-tree-said-made-c61f36 = git commit-tree said: { $made }
+
+backend-git-merge-tree-in-memory-565553 = git merge-tree, in memory
+
+backend-git-merge-tree-said-9223d7 = git merge-tree said: { $detail }
+
+backend-git-replay-in-memory-a8f3e8 = git replay, in memory
+
+backend-git-replay-needs-a-branch-f898a0 = git replay needs a branch
+
+backend-git-replay-s-commits-don-t-match-the-originals-b428f7 = git replay's commits don't match the originals
+
+backend-invalid-local-reachability-output-108ac6 = Invalid local reachability output
+
+backend-is-a-first-commit-with-nothing-to-replay-from-b32065 = { $commit } is a first commit, with nothing to replay from
+
+backend-nothing-was-replayed-0e02b4 = nothing was replayed
+
+backend-oid-has-no-tree-0ea71d = { $oid } has no tree
+
+backend-old-or-new-is-not-a-commit-id-acc42a = { $old } or { $new } is not a commit id
+
+backend-the-commits-aren-t-a-plain-range-b0cf7b = the commits aren't a plain range
+
+backend-this-is-a-partial-clone-working-it-out-would-download-files-from-7e1a13 = this is a partial clone: working it out would download files from the remote
+
+backend-unknown-git-version-757618 = unknown git version: { $printed }
