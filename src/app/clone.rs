@@ -271,7 +271,7 @@ impl App {
         match result {
             Err(_) if cancelled => {
                 self.clone_failed = false;
-                self.error = Some(format!("Clone into {}: cancelled", dest.display()));
+                self.error = Some(format!("Clone into {}: cancelled", dest.display()).into());
             }
             // On another machine, it opens once reached again, the credentials along.
             Ok(_) if crate::remote::is_remote(&dest) => {
@@ -316,11 +316,11 @@ impl App {
                     form.password.clear();
                     self.clone_form = Some(form);
                 }
-                None => self.error = Some(format!("Clone failed: {e}")),
+                None => self.error = Some(format!("Clone failed: {e}").into()),
             },
             Err(e) => {
                 self.clone_failed = true;
-                self.error = Some(format!("Clone failed: {e}"));
+                self.error = Some(format!("Clone failed: {e}").into());
             }
         }
         self.cloning_form = None;

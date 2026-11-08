@@ -390,7 +390,7 @@ impl App {
             );
             self.toasts
                 .push(super::panels::Toast::new(msg.clone(), true));
-            self.error = Some(msg);
+            self.error = Some(msg.into());
         }
     }
 

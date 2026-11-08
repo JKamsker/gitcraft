@@ -31,7 +31,7 @@ pub(super) struct Window {
     repo_scan: Option<super::repo_scan::RepoScan>,
     my_work: super::my_work::MyWork,
     pick_on_start: bool,
-    error: Option<String>,
+    error: Option<super::AppError>,
     error_card: Option<crate::error_card::ErrorCard>,
     manual: bool,
     was_focused: bool,
