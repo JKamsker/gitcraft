@@ -1,0 +1,55 @@
+{
+  "candidate": "b7de0442961fee60a44cf8925eec9f0c668b7dcd",
+  "private": "/private/tmp/gitcraft51-ai-echo-owned-6mssbn8b",
+  "scope": "Only this exact echo testcase was run at b7de0442. Earlier eight passes remain bound to21515616; no new combined all-pass or STOPPED_LOG review acceptance inferred.",
+  "stock_template": "/opt/homebrew/share/git-core/templates",
+  "stock_hooks": [
+    "applypatch-msg.sample",
+    "commit-msg.sample",
+    "fsmonitor-watchman.sample",
+    "post-update.sample",
+    "pre-applypatch.sample",
+    "pre-commit.sample",
+    "pre-merge-commit.sample",
+    "pre-push.sample",
+    "pre-rebase.sample",
+    "pre-receive.sample",
+    "prepare-commit-msg.sample",
+    "push-to-checkout.sample",
+    "sendemail-validate.sample",
+    "update.sample"
+  ],
+  "adapter_sha256": "60c1c5982b70e3780c901f46a0b2d1337521d38b2757ae3ffadcf0403c03ea17",
+  "results": [
+    {
+      "name": "ai::ask::tests::a_tool_that_reads_nothing_still_answers",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "ai::ask::tests::a_tool_that_reads_nothing_still_answers",
+        "--",
+        "--exact",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "exit": 0,
+      "pass": true,
+      "seconds": 19.146,
+      "log": "/private/tmp/gitcraft51-ai-echo-owned-6mssbn8b/01.log",
+      "sha256": "278c7d3e1aa250f4b28a5f7cc31be7802f3f76a98e182f6464881e37a33e9bc2"
+    }
+  ],
+  "finding": "Independent delta reviewer P2: a broad assertion replacement at215 accidentally changed the unrelated echo-only unread-input success fixture.",
+  "correction": "Restore exactly the original success assertion in a_tool_that_reads_nothing_still_answers. The tool only echoes fix: x; no inherited-open output is expected.",
+  "source_sha256": {
+    "src/ai/ask/tests.rs": "482e6a5043e85166acd94b43ab0926054535b0b2d6a044d92899cbd0f78e70c0"
+  },
+  "delta": "b7de0442 changes one test assertion line only; no production process/STOPPED_LOG change.",
+  "environment": "Fresh private physical HOME/TMP/XDG/Git config; same adapter boundaries as the earlier finite eight cases; stock sample-only templates; CARGO_BUILD_JOBS=2; external opt-ins cleared.",
+  "preservation": "Exact Jonas author/committer; pushed JKamsker/gitcraft t3/safe-process-supervision and remote b7de0442961fee60a44cf8925eec9f0c668b7dcd verified before running.",
+  "receipt_source_sha256": "e97955716b1e2e0b4eeab1b90736bf516e1b8b259199d2588ac38d8fdbc011e3"
+}
