@@ -53,38 +53,78 @@ pub fn report(
     settings: Option<&Result<Vec<String>, String>>,
     home: &str,
 ) -> String {
-    let mut out = String::from("### gitcraft diagnostics\n\n");
+    let system = system();
+    let panic = crash::last();
+    let recent = crash::recent();
+    report_body(
+        facts,
+        git,
+        tools,
+        settings,
+        home,
+        (&system, panic.as_deref(), &recent),
+    )
+}
+
+fn report_body(
+    facts: &Facts,
+    git: &str,
+    tools: &[crate::forge::ToolReport],
+    settings: Option<&Result<Vec<String>, String>>,
+    home: &str,
+    evidence: (&str, Option<&str>, &[String]),
+) -> String {
+    let (system, panic, recent) = evidence;
+    let mut out = format!(
+        "### {}\n\n",
+        crate::i18n::text("interaction-diagnostics-title")
+    );
     let mut line = |label: &str, value: &str| out.push_str(&format!("- **{label}:** {value}\n"));
     line(
         "gitcraft",
-        &format!("{} ({} channel)", crate::update::CURRENT, facts.channel),
+        &crate::i18n::message(
+            "interaction-diagnostics-channel",
+            &[
+                ("version", crate::update::CURRENT.into()),
+                ("channel", facts.channel.as_str().into()),
+            ],
+        ),
     );
-    line("System", &system());
+    line(crate::i18n::text("interaction-diagnostics-system"), system);
     line(
-        "Graphics",
+        crate::i18n::text("interaction-diagnostics-graphics"),
         facts
             .adapter
             .as_deref()
-            .unwrap_or("not known (no wgpu adapter)"),
+            .unwrap_or(crate::i18n::text("interaction-diagnostics-unknown-adapter")),
     );
-    line("git", git);
+    line("git", &display_git(git));
     if let Some((active, queued)) = crate::tasks::counts() {
         line(
-            "Background jobs",
-            &format!(
-                "{active}/{} active, {queued}/{} queued (peak {})",
-                crate::tasks::WORKERS,
-                crate::tasks::QUEUE_CAPACITY,
-                crate::tasks::peak_queued().unwrap_or(0)
+            crate::i18n::text("interaction-diagnostics-jobs"),
+            &crate::i18n::message(
+                "interaction-diagnostics-jobs-count",
+                &[
+                    ("active", active.into()),
+                    ("workers", crate::tasks::WORKERS.into()),
+                    ("queued", queued.into()),
+                    ("capacity", crate::tasks::QUEUE_CAPACITY.into()),
+                    ("peak", crate::tasks::peak_queued().unwrap_or(0).into()),
+                ],
             ),
         );
     }
     if let Some(counts) = crate::processes::counts() {
         line(
-            "Managed processes",
-            &format!(
-                "{} active, {} queued, {} started, peak {}",
-                counts.active, counts.queued, counts.spawned, counts.peak
+            crate::i18n::text("interaction-diagnostics-processes"),
+            &crate::i18n::message(
+                "interaction-diagnostics-process-count",
+                &[
+                    ("active", counts.active.into()),
+                    ("queued", counts.queued.into()),
+                    ("started", counts.spawned.into()),
+                    ("peak", counts.peak.into()),
+                ],
             ),
         );
     }
@@ -93,8 +133,15 @@ pub fn report(
     let fallback: u64 = operations.iter().map(|m| m.fallback_calls).sum();
     let cli: u64 = operations.iter().map(|m| m.subprocesses).sum();
     line(
-        "Git read backend",
-        &format!("{native} native reads, {fallback} read fallbacks, {cli} CLI invocations"),
+        crate::i18n::text("interaction-diagnostics-backend"),
+        &crate::i18n::message(
+            "interaction-diagnostics-backend-count",
+            &[
+                ("native", native.into()),
+                ("fallback", fallback.into()),
+                ("cli", cli.into()),
+            ],
+        ),
     );
     for operation in operations.iter().filter(|m| m.fallback_calls > 0) {
         let reasons = operation
@@ -103,51 +150,134 @@ pub fn report(
             .map(|(reason, count)| format!("{reason}: {count}"))
             .collect::<Vec<_>>()
             .join(", ");
-        line(&format!("Git {} fallback", operation.operation), &reasons);
+        line(
+            &crate::i18n::message(
+                "interaction-diagnostics-backend-fallback",
+                &[("operation", operation.operation.as_str().into())],
+            ),
+            &reasons,
+        );
     }
     for t in tools {
         // glab can only tell by asking its server: offline reads as a failed check.
-        let (yes, no) = if t.tool == "glab" {
-            ("auth status ok", "auth status failed")
-        } else {
-            ("signed in", "not signed in")
-        };
         let state = match (&t.version, t.signed_in) {
-            (None, _) => "not found (or didn't answer)".to_owned(),
-            (Some(v), Some(true)) => format!("{v}, {yes}"),
-            (Some(v), Some(false)) => format!("{v}, {no}"),
-            (Some(v), None) => format!("{v}, sign-in not known"),
+            (None, _) => crate::i18n::text("interaction-diagnostics-missing-tool").to_owned(),
+            (Some(version), signed) => {
+                let id = match signed {
+                    Some(true) if t.tool == "glab" => "interaction-diagnostics-auth-ok",
+                    Some(false) if t.tool == "glab" => "interaction-diagnostics-auth-failed",
+                    Some(true) => "interaction-diagnostics-signed-in",
+                    Some(false) => "interaction-diagnostics-signed-out",
+                    None => "interaction-diagnostics-auth-unknown",
+                };
+                crate::i18n::message(id, &[("version", version.as_str().into())])
+            }
         };
         line(t.tool, &state);
     }
     match settings {
-        None => out.push_str("\nNo repository open: no git settings.\n"),
+        None => out.push_str(&format!(
+            "\n{}\n",
+            crate::i18n::text("interaction-diagnostics-no-repo")
+        )),
         // The error names paths and machines: left out.
-        Some(Err(_)) => out.push_str("\nGit settings: could not be read.\n"),
-        Some(Ok(rows)) if rows.is_empty() => {
-            out.push_str("\nGit settings: none of the reported ones is set.\n")
-        }
+        Some(Err(_)) => out.push_str(&format!(
+            "\n{}\n",
+            crate::i18n::text("interaction-diagnostics-settings-failed")
+        )),
+        Some(Ok(rows)) if rows.is_empty() => out.push_str(&format!(
+            "\n{}\n",
+            crate::i18n::text("interaction-diagnostics-settings-empty")
+        )),
         Some(Ok(rows)) => {
-            out.push_str("\nGit settings in effect (value · scope · file name):\n\n```\n");
+            out.push_str(&format!(
+                "\n{}\n\n```\n",
+                crate::i18n::text("interaction-diagnostics-settings-heading")
+            ));
             for row in rows {
-                out.push_str(row);
+                out.push_str(&display_setting_row(row));
                 out.push('\n');
             }
             out.push_str("```\n");
         }
     }
-    if let Some(panic) = crash::last() {
-        out.push_str("\nLast panic (local log; paths and known secret forms redacted):\n\n");
-        out.push_str(&panic);
+    if let Some(panic) = panic {
+        out.push_str(&format!(
+            "\n{}\n\n",
+            crate::i18n::text("interaction-diagnostics-panic-heading")
+        ));
+        out.push_str(panic);
         out.push('\n');
     }
-    out.push_str("\nRecent operations (arguments, output and paths omitted):\n");
-    for row in crash::recent() {
+    out.push_str(&format!(
+        "\n{}\n",
+        crate::i18n::text("interaction-diagnostics-recent-heading")
+    ));
+    for row in recent {
         out.push_str("- ");
-        out.push_str(&row);
+        out.push_str(row);
         out.push('\n');
     }
     sanitize_report(&redact_users(&redact_home(&out, home)))
+}
+
+fn display_git(raw: &str) -> String {
+    raw.strip_prefix("not found (")
+        .and_then(|s| s.strip_suffix(')'))
+        .map(|detail| {
+            crate::i18n::message(
+                "interaction-diagnostics-git-missing",
+                &[("detail", crate::git::display_error(detail).into())],
+            )
+        })
+        .unwrap_or_else(|| raw.to_owned())
+}
+
+fn display_setting_row(raw: &str) -> String {
+    let id = match raw {
+        "# repository on this machine" => Some("interaction-diagnostics-repository-here"),
+        "# repository on another machine (WSL or SSH)" => {
+            Some("interaction-diagnostics-repository-there")
+        }
+        _ => None,
+    };
+    if let Some(id) = id {
+        return crate::i18n::text(id).to_owned();
+    }
+    let Some((key, rest)) = raw.split_once(" = ") else {
+        return raw.to_owned();
+    };
+    let Some(setting) = SETTINGS
+        .iter()
+        .find(|s| s.key == key && !PERSONAL.iter().any(|p| p.eq_ignore_ascii_case(key)))
+    else {
+        return raw.to_owned();
+    };
+    let parts: Vec<_> = rest.split(" · ").collect();
+    let [value, scope, file] = parts.as_slice() else {
+        return raw.to_owned();
+    };
+    let value = if *value == "(configured; value withheld)" {
+        crate::i18n::text("interaction-diagnostics-withheld-value")
+    } else if setting.choices.contains(value) {
+        *value
+    } else {
+        return raw.to_owned();
+    };
+    let scope = match *scope {
+        "System" => crate::i18n::text("interaction-diagnostics-scope-system"),
+        "Global" => crate::i18n::text("interaction-diagnostics-scope-global"),
+        "Repository" => crate::i18n::text("interaction-diagnostics-scope-local"),
+        "Worktree" => crate::i18n::text("interaction-diagnostics-scope-worktree"),
+        "Command line" => crate::i18n::text("interaction-diagnostics-scope-command"),
+        _ => return raw.to_owned(),
+    };
+    let file = match *file {
+        "(origin filename withheld)" => crate::i18n::text("interaction-diagnostics-withheld-file"),
+        "config" | ".gitconfig" | "gitconfig" => *file,
+        _ => return raw.to_owned(),
+    };
+    format!("{key} = {value} · {scope} · {file}")
 }
 
 /// The settings of the doctor's allowlist in effect in `repo`, but the personal ones: `key =
@@ -323,7 +453,7 @@ mod tests {
             rows,
             [
                 "pull.rebase = false · Repository · config",
-                "core.editor = (a path) · Global · .gitconfig"
+                "core.editor = (configured; value withheld) · Global · .gitconfig"
             ]
         );
         let tools = [
@@ -433,18 +563,25 @@ pub(crate) fn sanitize_report(text: &str) -> String {
 
 /// A bounded prefilled issue URL. Full diagnostics remain on the clipboard.
 pub(crate) fn issue_url(report: &str) -> String {
-    let mut body = String::from("Please describe what happened and how to reproduce it.\n\n");
+    let mut body = format!(
+        "{}\n\n",
+        crate::i18n::text("interaction-diagnostics-issue-prompt")
+    );
     let report = sanitize_report(report);
     for line in report.lines() {
         if encode(&(body.clone() + line)).len() > 6500 {
-            body.push_str("\n[Remaining diagnostics are on the clipboard.]\n");
+            body.push_str(&format!(
+                "\n{}\n",
+                crate::i18n::text("interaction-diagnostics-issue-rest")
+            ));
             break;
         }
         body.push_str(line);
         body.push('\n');
     }
     format!(
-        "https://github.com/JKamsker/gitcraft/issues/new?title=Bug%20report&body={}",
+        "https://github.com/JKamsker/gitcraft/issues/new?title={}&body={}",
+        encode(crate::i18n::text("interaction-diagnostics-issue-title")),
         encode(&body)
     )
 }
@@ -492,5 +629,166 @@ mod privacy_regression_tests {
         }
         assert!(rows.contains("core.editor = (configured; value withheld)"));
         assert!(!issue_url("panic token=FIXTURE_PANIC_SECRET").contains("FIXTURE_PANIC_SECRET"));
+    }
+}
+
+#[cfg(test)]
+mod localization_tests {
+    use super::*;
+
+    #[test]
+    fn actual_supplied_report_body_localizes_statuses_and_preserves_raw_rows_logs_and_redaction() {
+        let facts = Facts {
+            channel: "dev".into(),
+            adapter: Some("opaque GPU 日本語".into()),
+            repo: None,
+        };
+        let origins = config::parse_origins(
+            "global\0file:/home/fixture/.gitconfig\0core.editor\nenv TOKEN=FIXTURE_SECRET editor\0local\0file:.git/config\0pull.rebase\nfalse\0",
+        );
+        let mut rows = settings_rows(&origins);
+        rows.insert(0, "# repository on this machine".into());
+        let original_rows = rows.clone();
+        let settings = Ok(rows);
+        let tools = [
+            crate::forge::ToolReport {
+                tool: "gh",
+                version: Some("gh version opaque".into()),
+                signed_in: Some(true),
+            },
+            crate::forge::ToolReport {
+                tool: "glab",
+                version: Some("glab opaque".into()),
+                signed_in: Some(false),
+            },
+            crate::forge::ToolReport {
+                tool: "tea",
+                version: None,
+                signed_in: None,
+            },
+            crate::forge::ToolReport {
+                tool: "extra",
+                version: Some("opaque version".into()),
+                signed_in: None,
+            },
+        ];
+        let panic = "raw log marker /home/fixture/private token=FIXTURE_TOKEN";
+        let recent = vec!["git push [arguments and paths redacted] · exit 0 · 12 ms".to_owned()];
+        crate::i18n::set_language("de");
+        let de = report_body(
+            &facts,
+            "git version opaque",
+            &tools,
+            Some(&settings),
+            "/home/fixture",
+            ("recorded system", Some(panic), &recent),
+        );
+        for text in [
+            "### gitcraft-Diagnose",
+            "Kanal dev",
+            "Grafik",
+            "opaque GPU 日本語",
+            "gh version opaque, angemeldet",
+            "glab opaque, Prüfung des Anmeldestatus fehlgeschlagen",
+            "**tea:** nicht gefunden (oder keine Antwort)",
+            "opaque version, Anmeldung unbekannt",
+            "# Repository auf diesem Rechner",
+            "core.editor = (konfiguriert; Wert zurückgehalten) · Global · .gitconfig",
+            "pull.rebase = false · Repository · config",
+            "Letzte Panic",
+            "Letzte Vorgänge",
+            "git push [arguments and paths redacted] · exit 0 · 12 ms",
+        ] {
+            assert!(de.contains(text), "missing {text}: {de}");
+        }
+        for secret in [
+            "FIXTURE_SECRET",
+            "FIXTURE_TOKEN",
+            "/home/fixture",
+            "env TOKEN=",
+        ] {
+            assert!(!de.contains(secret), "{de}");
+        }
+        assert_eq!(settings.as_ref().ok(), Some(&original_rows));
+        assert_eq!(tools[0].version.as_deref(), Some("gh version opaque"));
+        let empty = report_body(
+            &facts,
+            "not found (opaque external detail)",
+            &[],
+            None,
+            "",
+            ("recorded system", None, &[]),
+        );
+        assert!(empty.contains("nicht gefunden (opaque external detail)"));
+        assert!(empty.contains("Kein Repository geöffnet: keine Git-Einstellungen."));
+        let failed = Err("ssh://user@host/private/FIXTURE_UNKNOWN".to_owned());
+        let failure = report_body(
+            &facts,
+            "git",
+            &[],
+            Some(&failed),
+            "",
+            ("recorded system", None, &[]),
+        );
+        assert!(failure.contains("Git-Einstellungen konnten nicht gelesen werden."));
+        assert!(!failure.contains("FIXTURE_UNKNOWN"));
+        let no_rows = Ok(vec![]);
+        assert!(
+            report_body(
+                &facts,
+                "git",
+                &[],
+                Some(&no_rows),
+                "",
+                ("recorded system", None, &[])
+            )
+            .contains("Keine der aufgeführten Einstellungen ist gesetzt.")
+        );
+        crate::i18n::set_language("en-US");
+        let en = report_body(
+            &facts,
+            "git version opaque",
+            &tools,
+            Some(&settings),
+            "/home/fixture",
+            ("recorded system", None, &recent),
+        );
+        assert!(en.starts_with("### gitcraft diagnostics\n\n"));
+        assert!(en.contains("dev channel"));
+        assert!(en.contains("gh version opaque, signed in"));
+        for row in &original_rows {
+            assert_eq!(display_setting_row(row), *row);
+        }
+        for unknown in [
+            "opaque external row 日本語",
+            "core.editor = unknown · Global · .gitconfig",
+            "core.editor = (configured; value withheld) · Unknown · .gitconfig",
+        ] {
+            assert_eq!(display_setting_row(unknown), unknown);
+        }
+    }
+
+    #[test]
+    fn actual_issue_url_keeps_protocol_and_encoded_data_while_localizing_human_title_prompt_and_limit_notice()
+     {
+        crate::i18n::set_language("de");
+        let report = "opaque 日本語 & ?\n".repeat(5000);
+        let original = report.clone();
+        let url = issue_url(&report);
+        assert!(url.starts_with(
+            "https://github.com/JKamsker/gitcraft/issues/new?title=Fehlerbericht&body="
+        ));
+        assert!(url.contains(&encode(
+            "Bitte beschreibe, was passiert ist und wie es sich reproduzieren lässt."
+        )));
+        assert!(url.contains(&encode(
+            "[Die übrigen Diagnosedaten befinden sich in der Zwischenablage.]"
+        )));
+        assert!(url.contains("%26") && url.len() < 7200 && !url.contains('\n'));
+        assert_eq!(report, original);
+        crate::i18n::set_language("en-US");
+        let en = issue_url("opaque & ?");
+        assert!(en.contains("title=Bug%20report&body=Please%20describe"));
+        assert!(en.contains("opaque%20%26%20%3F"));
     }
 }

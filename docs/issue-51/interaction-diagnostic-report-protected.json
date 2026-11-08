@@ -1,0 +1,16 @@
+{
+  "base": "93f345d30eac63c4d25bc32b14e7c93fa342b8a7",
+  "protected_blocks": {
+    "tool_collection": "8275c0092bf3a8929a7ed824273a75ce4b534e43d6ce81767ada25b95fc8370a",
+    "settings_origins_and_allowlist": "e87d33c8a895ac406d71f3a5c654d0e3d0bc316fb128e9f63cde9f932e142689",
+    "system_and_redaction": "d2a3022c6d9d58707265f78bc66162cba2d23c4c67b66bd7f4d77219defc105a",
+    "sanitize": "2f24f1aeac6bb8e79867d113344c1f74b3cce90a68baeb5bdf196d1c9d34eabe",
+    "percent_encoding": "3011d56820261703ff747f536bd067274211ae98a71a124799357b7e6eabddee"
+  },
+  "protected_files": {
+    "src/diagnostics/crash.rs": "4f21cacdca6a5754cf9d72d033dd70a8fc4318b8f0a387d624c1eac0a6a004bc",
+    "src/git/doctor/config.rs": "7eae92105a76cbaf0d04f7e1294f914576571a8bd3e050e479e94c6de41a839a",
+    "src/app/diagnostics.rs": "bcea963d8b362839cb3fb5bdb68ccec006a57032ddc3c117b251209c0cb02181"
+  },
+  "test_only_dependency": "799db3c5a4529aefb8564e5ade4eaaea22508558 expected core.editor redaction correction retained; production producer already matches stronger value withholding"
+}
