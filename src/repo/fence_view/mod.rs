@@ -220,8 +220,12 @@ impl RepoTab {
         if self.busy_op.is_some() {
             return Some(pass);
         }
-        self.busy_op = Some("Checking against the agent fence".to_owned());
-        self.status = Some(("Checking against the agent fence…".to_owned(), false));
+        self.busy_op =
+            Some(crate::i18n::text("repo-workflows-fence_view-fence-gate-6b730ef5").to_owned());
+        self.status = Some((
+            crate::i18n::text("repo-workflows-fence_view-fence-gate-2b8e4f3b").to_owned(),
+            false,
+        ));
         let repo = self.path.clone();
         self.then(
             ctx,
@@ -272,8 +276,14 @@ impl RepoTab {
                     &errors,
                 );
                 tab.dialog = Some(
-                    Dialog::confirm(&format!("{label}{PAST}"), body, "Merge anyway", ops, None)
-                        .undo(undo),
+                    Dialog::confirm(
+                        &format!("{label}{PAST}"),
+                        body,
+                        crate::i18n::text("repo-workflows-fence_view-fence-gate-214a3091"),
+                        ops,
+                        None,
+                    )
+                    .undo(undo),
                 );
             },
         );
@@ -302,7 +312,10 @@ pub(crate) fn list_violations(found: &[Violation]) -> String {
         .map(|v| format!("  {} ({}; fence: {})", v.path, v.how.label(), v.pattern))
         .collect();
     if found.len() > LISTED {
-        out.push(format!("  and {} more", found.len() - LISTED));
+        out.push(crate::i18n::message(
+            "repo-workflows-fence_view-list-violations-a6d5a69b",
+            &[("found-len-listed-1", (found.len() - LISTED).clone().into())],
+        ));
     }
     out.join("\n")
 }
@@ -314,7 +327,13 @@ fn confirm_body(
     errors: &[String],
 ) -> String {
     let mut body = match worktree {
-        Some(wt) => format!("{branch} (checked out in the worktree {wt})"),
+        Some(wt) => crate::i18n::message(
+            "repo-workflows-fence_view-confirm-body-e537b5dc",
+            &[
+                ("branch", (branch).clone().into()),
+                ("wt", (wt).clone().into()),
+            ],
+        ),
         None => branch.to_owned(),
     };
     if !found.is_empty() {

@@ -44,28 +44,43 @@ impl LinkMenu {
         };
         if let [one] = self.choices.as_slice() {
             let tip = match target {
-                Target::Branch { .. } => format!(
-                    "The branch's page on {} ({}): it follows the branch as it moves",
-                    one.remote, one.place
+                Target::Branch { .. } => crate::i18n::message(
+                    "repo-workflows-forge_link-items-ea6a597e",
+                    &[
+                        ("one-remote-1", (one.remote).clone().into()),
+                        ("one-place-2", (one.place).clone().into()),
+                    ],
                 ),
-                _ => format!(
-                    "A permanent link (by the commit's hash), on {} ({})",
-                    one.remote, one.place
+                _ => crate::i18n::message(
+                    "repo-workflows-forge_link-items-6bb03074",
+                    &[
+                        ("one-remote-1", (one.remote).clone().into()),
+                        ("one-place-2", (one.place).clone().into()),
+                    ],
                 ),
             };
-            if crate::menu_item::MenuItem::new(format!("Copy link to {what}"))
-                .icon("copy")
-                .show(ui)
-                .on_hover_text(&tip)
-                .clicked()
+            if crate::menu_item::MenuItem::new(crate::i18n::message(
+                "repo-workflows-forge_link-items-a5232678",
+                &[("what", (what).clone().into())],
+            ))
+            .icon("copy")
+            .show(ui)
+            .on_hover_text(&tip)
+            .clicked()
             {
                 acts.push(ask(&one.remote, false));
             }
-            if crate::menu_item::MenuItem::new(format!("Open {what} on {}", one.forge))
-                .icon("external-link")
-                .show(ui)
-                .on_hover_text(&tip)
-                .clicked()
+            if crate::menu_item::MenuItem::new(crate::i18n::message(
+                "repo-workflows-forge_link-items-78bef62f",
+                &[
+                    ("what", (what).clone().into()),
+                    ("one-forge-1", (one.forge).clone().into()),
+                ],
+            ))
+            .icon("external-link")
+            .show(ui)
+            .on_hover_text(&tip)
+            .clicked()
             {
                 acts.push(ask(&one.remote, true));
             }
@@ -73,18 +88,24 @@ impl LinkMenu {
         }
         for open in [false, true] {
             let label = if open {
-                format!("Open {what} on")
+                crate::i18n::message(
+                    "repo-workflows-forge_link-items-44c5ece2",
+                    &[("what", (what).clone().into())],
+                )
             } else {
-                format!("Copy link to {what}")
+                crate::i18n::message(
+                    "repo-workflows-forge_link-items-a5232678",
+                    &[("what", (what).clone().into())],
+                )
             };
             crate::menu_item::MenuItem::new(label)
                 .icon("command")
                 .submenu(ui, |ui| {
                     for c in &self.choices {
                         let text = format!("{} ({})", c.remote, c.place);
-                        let tip = format!(
-                            "On {}. The branch tracks no remote and there is no origin: pick one",
-                            c.forge
+                        let tip = crate::i18n::message(
+                            "repo-workflows-forge_link-items-55932e34",
+                            &[("c-forge-1", (c.forge).clone().into())],
                         );
                         let b = crate::menu_item::MenuItem::new(text)
                             .icon("command")
@@ -199,29 +220,52 @@ fn deliver(result: Result<Link, String>, open: bool, ctx: &egui::Context) -> (St
     let link = match result {
         Ok(link) => link,
         Err(e) => {
-            let what = if open { "Open link" } else { "Copy link" };
+            let what = if open {
+                crate::i18n::text("repo-workflows-forge_link-deliver-aab63f85")
+            } else {
+                crate::i18n::text("repo-workflows-forge_link-deliver-dbf362d4")
+            };
             return (format!("{what}: {e}"), true);
         }
     };
     let done = if open {
         if !crate::pull_request::is_web_url(&link.url) {
-            return (format!("Not a web address: {}", link.url), true);
-        }
-        if let Err(e) = open::that_detached(&link.url) {
             return (
-                format!("Couldn't open the browser for {}: {e}", link.url),
+                crate::i18n::message(
+                    "repo-workflows-forge_link-deliver-f9eecf25",
+                    &[("link-url-1", (link.url).clone().into())],
+                ),
                 true,
             );
         }
-        "Opened"
+        if let Err(e) = open::that_detached(&link.url) {
+            return (
+                crate::i18n::message(
+                    "repo-workflows-forge_link-deliver-5add4905",
+                    &[
+                        ("link-url-1", (link.url).clone().into()),
+                        ("e", (e).to_string().into()),
+                    ],
+                ),
+                true,
+            );
+        }
+        crate::i18n::text("repo-workflows-forge_link-deliver-b19fb8d1")
     } else {
         ctx.copy_text(link.url.clone());
-        "Copied"
+        crate::i18n::text("repo-workflows-forge_link-deliver-8d525e5f")
     };
     // The warning before the address, which is long and would push it out of sight.
     match link.warning {
         Some(warning) => (
-            format!("{done} the link, but {warning}: {}", link.url),
+            crate::i18n::message(
+                "repo-workflows-forge_link-deliver-c5e2849f",
+                &[
+                    ("done", (done).clone().into()),
+                    ("warning", (warning).clone().into()),
+                    ("link-url-1", (link.url).clone().into()),
+                ],
+            ),
             true,
         ),
         None => (format!("{done} {}", link.url), false),

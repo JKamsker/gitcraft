@@ -142,19 +142,15 @@ impl RepoTab {
 
 fn body(ui: &mut egui::Ui, editor: &mut FenceEditor, write_errors: &[String]) -> (bool, bool) {
     let t = Tokens::get(ui.ctx());
-    ui.label(RichText::new("Agent fence").font(theme::semibold(15.0)));
+    ui.label(
+        RichText::new(crate::i18n::text("repo-workflows-fence_view-body-803f082f"))
+            .font(theme::semibold(15.0)),
+    );
     ui.add_space(4.0);
     ui.label(
-        RichText::new(format!(
-            "Paths agents must stay out of, one per line, in .gitignore's syntax without \
-             exceptions (secrets/, .env, *.pem, /Cargo.lock), any case. Saved in this \
-             repository's git config, shared by its worktrees, and written into each \
-             worktree's Claude Code deny rules ({}, kept out of git), now and for worktrees \
-             added later. Rules can leak, so every linked worktree is checked too: one whose \
-             commits, changes, untracked or ignored files touch the fence (or that can't be \
-             checked) turns red. A merge, fast-forward or rebase onto any branch is checked \
-             first and asks when its commits or its worktree touched the fence.",
-            fence::CLAUDE
+        RichText::new(crate::i18n::message(
+            "repo-workflows-fence_view-body-d1953461",
+            &[("fence-claude-1", (fence::CLAUDE).clone().into())],
         ))
         .size(12.0)
         .color(t.text_dim),
@@ -172,30 +168,40 @@ fn body(ui: &mut egui::Ui, editor: &mut FenceEditor, write_errors: &[String]) ->
     ui.add_enabled_ui(!editor.saving, |ui| {
         ui.checkbox(
             &mut editor.targets.cursor,
-            format!("Also write {}", fence::CURSOR),
+            crate::i18n::message(
+                "repo-workflows-fence_view-body-c408ae8c",
+                &[("fence-cursor-1", (fence::CURSOR).clone().into())],
+            ),
         )
-        .on_hover_text(
-            "A block of its own; a file the repository may track, so it shows as changed",
-        );
+        .on_hover_text(crate::i18n::text("repo-workflows-fence_view-body-d10df00e"));
         ui.checkbox(
             &mut editor.targets.agents_md,
-            format!("Also write a section of {} (Codex)", fence::AGENTS),
+            crate::i18n::message(
+                "repo-workflows-fence_view-body-98912c89",
+                &[("fence-agents-1", (fence::AGENTS).clone().into())],
+            ),
         )
-        .on_hover_text(
-            "A section of its own; a file the repository usually tracks, so it shows as changed",
-        );
+        .on_hover_text(crate::i18n::text("repo-workflows-fence_view-body-b31ba75f"));
     });
     ui.add_space(8.0);
     let mut save = false;
     let mut close = false;
     ui.horizontal(|ui| {
-        if crate::repo::primary_button(ui, "Save and write to agents", !editor.saving, 190.0)
-            .clicked()
+        if crate::repo::primary_button(
+            ui,
+            crate::i18n::text("repo-workflows-fence_view-body-a8aa1101"),
+            !editor.saving,
+            190.0,
+        )
+        .clicked()
         {
             save = true;
         }
         if ui
-            .add_enabled(!editor.saving, egui::Button::new("Add suggestions"))
+            .add_enabled(
+                !editor.saving,
+                egui::Button::new(crate::i18n::text("repo-workflows-fence_view-body-b42a9a6f")),
+            )
             .on_hover_text(fence::SUGGESTED.join("  "))
             .clicked()
         {
@@ -216,9 +222,12 @@ fn body(ui: &mut egui::Ui, editor: &mut FenceEditor, write_errors: &[String]) ->
     if !write_errors.is_empty() {
         ui.add_space(8.0);
         ui.label(
-            RichText::new(format!(
-                "Not written into every worktree's configs:\n{}",
-                write_errors.join("\n")
+            RichText::new(crate::i18n::message(
+                "repo-workflows-fence_view-body-cac5a24a",
+                &[(
+                    "write-errors-join-n-1",
+                    (write_errors.join("\n")).clone().into(),
+                )],
             ))
             .size(12.0)
             .color(t.danger),
@@ -266,7 +275,10 @@ fn save(
         )
     } else {
         (
-            format!("Saved, but not everywhere:\n{}", errors.join("\n")),
+            crate::i18n::message(
+                "repo-workflows-fence_view-save-7bfa9a3b",
+                &[("errors-join-n-1", (errors.join("\n")).clone().into())],
+            ),
             true,
         )
     }

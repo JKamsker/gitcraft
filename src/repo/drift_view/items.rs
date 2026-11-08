@@ -14,9 +14,15 @@ pub(super) fn report(ui: &mut Ui, view: &DriftView, report: &Report, acts: &mut 
     let t = Tokens::get(ui.ctx());
     let task = view.task_text();
     let lead = if task.trim().is_empty() {
-        "No task to go by: write one above (or link an issue) to tell the folders apart.".to_owned()
+        crate::i18n::text("repo-workflows-drift_view-report-57f4cf0a").to_owned()
     } else {
-        format!("Asked: {}", task.lines().next().unwrap_or_default())
+        crate::i18n::message(
+            "repo-workflows-drift_view-report-3ecc0ca7",
+            &[(
+                "task-lines-next-unwrap-or-defaul-1",
+                (task.lines().next().unwrap_or_default()).clone().into(),
+            )],
+        )
     };
     ui.label(RichText::new(lead).size(12.0).color(t.text_dim));
     ui.label(RichText::new(report.headline()).font(theme::semibold(13.0)));
@@ -32,11 +38,14 @@ fn sections(ui: &mut Ui, view: &DriftView, report: &Report, acts: &mut Vec<Actio
     if report.judged {
         section(
             ui,
-            &format!("Folders the task doesn't mention ({})", unrelated.len()),
+            &crate::i18n::message(
+                "repo-workflows-drift_view-sections-1bb434ba",
+                &[("unrelated-len-1", (unrelated.len()).clone().into())],
+            ),
             |ui| {
                 for folder in unrelated.iter().take(LISTED) {
                     let name = if folder.path.is_empty() {
-                        "(top level)"
+                        crate::i18n::text("repo-workflows-drift_view-sections-4cf1b0e4")
                     } else {
                         folder.path.as_str()
                     };
@@ -52,10 +61,22 @@ fn sections(ui: &mut Ui, view: &DriftView, report: &Report, acts: &mut Vec<Actio
     }
     section(
         ui,
-        &format!("New dependencies ({})", report.dependencies.len()),
+        &crate::i18n::message(
+            "repo-workflows-drift_view-sections-14063185",
+            &[(
+                "report-dependencies-len-1",
+                (report.dependencies.len()).clone().into(),
+            )],
+        ),
         |ui| {
             for dep in report.dependencies.iter().take(LISTED) {
-                let label = format!("{}  in {}", dep.name, dep.manifest);
+                let label = crate::i18n::message(
+                    "repo-workflows-drift_view-sections-819e9567",
+                    &[
+                        ("dep-name-1", (dep.name).clone().into()),
+                        ("dep-manifest-2", (dep.manifest).clone().into()),
+                    ],
+                );
                 item(
                     ui,
                     view,
@@ -69,7 +90,13 @@ fn sections(ui: &mut Ui, view: &DriftView, report: &Report, acts: &mut Vec<Actio
     );
     section(
         ui,
-        &format!("Public signatures changed ({})", report.signatures.len()),
+        &crate::i18n::message(
+            "repo-workflows-drift_view-sections-a8299dbd",
+            &[(
+                "report-signatures-len-1",
+                (report.signatures.len()).clone().into(),
+            )],
+        ),
         |ui| {
             for sig in report.signatures.iter().take(LISTED) {
                 let label = format!("{}:{}  {}", sig.path, sig.line, sig.text);
@@ -102,7 +129,10 @@ fn sections(ui: &mut Ui, view: &DriftView, report: &Report, acts: &mut Vec<Actio
     });
     section(
         ui,
-        &format!("Every file changed ({})", report.files.len()),
+        &crate::i18n::message(
+            "repo-workflows-drift_view-sections-619bb740",
+            &[("report-files-len-1", (report.files.len()).clone().into())],
+        ),
         |ui| {
             for file in report.files.iter().take(LISTED * 5) {
                 item(ui, view, report, file, std::slice::from_ref(file), acts);
@@ -131,15 +161,18 @@ fn item(
         .first()
         .is_some_and(|f| view.diff_key(report, f).is_none());
     let tip = if elsewhere {
-        "Not committed in that worktree: opens it, where its changes are".to_owned()
+        crate::i18n::text("repo-workflows-drift_view-item-518baa09").to_owned()
     } else if files.len() > 1 {
         let mut tip: Vec<&str> = files.iter().map(String::as_str).take(12).collect();
         if files.len() > 12 {
             tip.push("…");
         }
-        format!("Opens:\n{}", tip.join("\n"))
+        crate::i18n::message(
+            "repo-workflows-drift_view-item-d91938be",
+            &[("tip-join-n-1", (tip.join("\n")).clone().into())],
+        )
     } else {
-        "Opens its diff".to_owned()
+        crate::i18n::text("repo-workflows-drift_view-item-bccfdf69").to_owned()
     };
     if ui
         .selectable_label(false, label)

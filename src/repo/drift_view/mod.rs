@@ -136,7 +136,10 @@ impl RepoTab {
                 let issue = drift::task::issue_number(&branch, &task).map(|n| {
                     let text = match forge {
                         Some(forge) => drift::task::issue_text(forge, &repo, n),
-                        None => Err("The repository's forge isn't known".to_owned()),
+                        None => Err(crate::i18n::text(
+                            "repo-workflows-drift_view-measure-drift-27f1506d",
+                        )
+                        .to_owned()),
                     };
                     (n, text)
                 });
@@ -191,7 +194,10 @@ impl RepoTab {
                     match saved {
                         Ok(task) => {
                             view.saved = task;
-                            view.said = Some("Saved beside the worktree's git data".to_owned());
+                            view.said = Some(
+                                crate::i18n::text("repo-workflows-drift_view-save-task-a40b28e7")
+                                    .to_owned(),
+                            );
                         }
                         Err(e) => view.said = Some(e),
                     }
@@ -287,8 +293,17 @@ fn body(ui: &mut egui::Ui, view: &mut DriftView, acts: &mut Vec<Action>) -> Todo
         .clone()
         .unwrap_or_else(|| "detached".to_owned());
     ui.label(
-        RichText::new(format!("Scope drift: {} ({branch})", view.worktree.name()))
-            .font(theme::semibold(15.0)),
+        RichText::new(crate::i18n::message(
+            "repo-workflows-drift_view-body-a8164b33",
+            &[
+                (
+                    "view-worktree-name-1",
+                    (view.worktree.name()).clone().into(),
+                ),
+                ("branch", (branch).clone().into()),
+            ],
+        ))
+        .font(theme::semibold(15.0)),
     );
     ui.add_space(6.0);
     ui.label(
@@ -299,15 +314,24 @@ fn body(ui: &mut egui::Ui, view: &mut DriftView, acts: &mut Vec<Action>) -> Todo
         egui::TextEdit::multiline(&mut view.task)
             .desired_rows(3)
             .desired_width(f32::INFINITY)
-            .hint_text("What the agent was asked to do (kept with the worktree, never committed)"),
+            .hint_text(crate::i18n::text("repo-workflows-drift_view-body-65fb660d")),
     );
     if let Some((n, issue)) = &view.issue {
         let line = match issue {
-            Ok(text) => format!(
-                "Linked issue #{n}: {}",
-                text.lines().next().unwrap_or_default()
+            Ok(text) => crate::i18n::message(
+                "repo-workflows-drift_view-body-cdc38d02",
+                &[
+                    ("n", (n).clone().into()),
+                    (
+                        "text-lines-next-unwrap-or-defaul-1",
+                        (text.lines().next().unwrap_or_default()).clone().into(),
+                    ),
+                ],
             ),
-            Err(e) => format!("Linked issue #{n}: {e}"),
+            Err(e) => crate::i18n::message(
+                "repo-workflows-drift_view-body-fa4f662d",
+                &[("n", (n).clone().into()), ("e", (e).clone().into())],
+            ),
         };
         let note = if view.task.trim().is_empty() {
             " (used as the task)"
@@ -323,10 +347,16 @@ fn body(ui: &mut egui::Ui, view: &mut DriftView, acts: &mut Vec<Action>) -> Todo
     ui.horizontal(|ui| {
         let dirty = view.task != view.saved;
         todo.save = ui
-            .add_enabled(dirty && !view.busy, egui::Button::new("Save task"))
+            .add_enabled(
+                dirty && !view.busy,
+                egui::Button::new(crate::i18n::text("repo-workflows-drift_view-body-42a9eb31")),
+            )
             .clicked();
         todo.measure = ui
-            .add_enabled(!view.busy, egui::Button::new("Measure again"))
+            .add_enabled(
+                !view.busy,
+                egui::Button::new(crate::i18n::text("repo-workflows-drift_view-body-31794226")),
+            )
             .clicked();
         if view.busy {
             ui.add(crate::spinner::Spinner::new());
@@ -350,12 +380,11 @@ fn body(ui: &mut egui::Ui, view: &mut DriftView, acts: &mut Vec<Action>) -> Todo
                 todo.ask = ui
                     .add_enabled(
                         !view.asking,
-                        egui::Button::new("Ask a coding agent (optional)"),
+                        egui::Button::new(crate::i18n::text(
+                            "repo-workflows-drift_view-body-3e453620",
+                        )),
                     )
-                    .on_hover_text(
-                        "Runs claude -p (or codex exec) here with the task and the paths, no \
-                         file contents, and shows which items it thinks the task doesn't need",
-                    )
+                    .on_hover_text(crate::i18n::text("repo-workflows-drift_view-body-e039d62e"))
                     .clicked();
                 if view.asking {
                     ui.add(crate::spinner::Spinner::new());

@@ -45,14 +45,19 @@ impl RepoTab {
                 ui.horizontal(|ui| {
                     icons::inline(ui, "eye", 14.0, t.accent);
                     ui.label(
-                        RichText::new(format!("Preview: {title}"))
-                            .font(theme::semibold(12.5))
-                            .color(t.text),
+                        RichText::new(crate::i18n::message(
+                            "repo-workflows-ghost-ghost-strip-c4a8b8f8",
+                            &[("title", (title).clone().into())],
+                        ))
+                        .font(theme::semibold(12.5))
+                        .color(t.text),
                     );
                     ui.label(
-                        RichText::new("nothing has been done")
-                            .size(11.5)
-                            .color(t.text_faint),
+                        RichText::new(crate::i18n::text(
+                            "repo-workflows-ghost-ghost-strip-a81f72de",
+                        ))
+                        .size(11.5)
+                        .color(t.text_faint),
                     );
                     if matches!(state, Strip::Working(_)) {
                         ui.add(crate::spinner::Spinner::new().size(12.0));
@@ -60,14 +65,24 @@ impl RepoTab {
                 });
                 match state {
                     Strip::Working(_) => {
-                        dim(ui, &t, "Working out what it would do…");
+                        dim(
+                            ui,
+                            &t,
+                            crate::i18n::text("repo-workflows-ghost-ghost-strip-d0c20bfd"),
+                        );
                     }
                     Strip::Failed(_, why) => {
                         alert(
                             ui,
                             &t,
                             t.danger,
-                            &format!("Can't preview it. {}", sentence(one_line(why))),
+                            &crate::i18n::message(
+                                "repo-workflows-ghost-ghost-strip-f637d899",
+                                &[(
+                                    "sentence-one-line-why-1",
+                                    (sentence(one_line(why))).clone().into(),
+                                )],
+                            ),
                         );
                     }
                     Strip::Ready(_, outcome) => outcome_lines(ui, &t, outcome),
@@ -76,9 +91,14 @@ impl RepoTab {
                     dim(
                         ui,
                         &t,
-                        &format!(
-                            "↑ {} above the rows in view.",
-                            plural(above, "new commit is", "new commits are")
+                        &crate::i18n::message(
+                            "repo-workflows-ghost-ghost-strip-b69b3d5d",
+                            &[(
+                                "plural-above-new-commit-is-new-c-1",
+                                (plural(above, "new commit is", "new commits are"))
+                                    .clone()
+                                    .into(),
+                            )],
                         ),
                     );
                 }
@@ -96,18 +116,26 @@ fn outcome_lines(ui: &mut Ui, t: &Tokens, o: &Outcome) {
     }
     if let Some(c) = &o.conflict {
         let what = match &c.commit {
-            Some(commit) => format!(
-                "Stops at step {} of {} ({})",
-                c.step,
-                c.of,
-                describe(commit)
+            Some(commit) => crate::i18n::message(
+                "repo-workflows-ghost-outcome-lines-7728bdcc",
+                &[
+                    ("c-step-1", (c.step).clone().into()),
+                    ("c-of-2", (c.of).clone().into()),
+                    ("describe-commit-3", (describe(commit)).clone().into()),
+                ],
             ),
-            None => "The merge stops".to_owned(),
+            None => crate::i18n::text("repo-workflows-ghost-outcome-lines-193731dd").to_owned(),
         };
         let why = if c.files.is_empty() {
-            "the commit becomes empty".to_owned()
+            crate::i18n::text("repo-workflows-ghost-outcome-lines-f0e05d95").to_owned()
         } else {
-            format!("conflicts in {}", listed(&c.files, |f| f.clone()))
+            crate::i18n::message(
+                "repo-workflows-ghost-outcome-lines-f93fde8f",
+                &[(
+                    "listed-c-files-f-f-clone-1",
+                    (listed(&c.files, |f| f.clone())).clone().into(),
+                )],
+            )
         };
         alert(ui, t, t.danger, &format!("{what}, {why}."));
     }
@@ -115,7 +143,13 @@ fn outcome_lines(ui: &mut Ui, t: &Tokens, o: &Outcome) {
         line(
             ui,
             t.text,
-            &format!("Drops {} — {}", describe(dropped), dropped.author),
+            &crate::i18n::message(
+                "repo-workflows-ghost-outcome-lines-b8d8f166",
+                &[
+                    ("describe-dropped-1", (describe(dropped)).clone().into()),
+                    ("dropped-author-2", (dropped.author).clone().into()),
+                ],
+            ),
         );
     }
     let fetched = o.created.len() - o.copies;
@@ -124,18 +158,37 @@ fn outcome_lines(ui: &mut Ui, t: &Tokens, o: &Outcome) {
         made.push(plural(o.copies, "new commit", "new commits"));
     }
     if fetched > 0 {
-        made.push(format!(
-            "{} from the remote",
-            plural(fetched, "commit", "commits")
+        made.push(crate::i18n::message(
+            "repo-workflows-ghost-outcome-lines-dfa9e9b6",
+            &[(
+                "plural-fetched-commit-commits-1",
+                (plural(fetched, "commit", "commits")).clone().into(),
+            )],
         ));
     }
     for m in &o.moves {
         let name = m.full.strip_prefix("refs/heads/").unwrap_or(&m.full);
         let name = name.strip_prefix("refs/remotes/").unwrap_or(name);
         made.push(match (&m.from, &m.to) {
-            (_, None) => format!("{name} is deleted"),
-            (Some(from), Some(to)) => format!("{name} moves {} → {}", short(from), shown(to)),
-            (None, Some(to)) => format!("{name} is made at {}", shown(to)),
+            (_, None) => crate::i18n::message(
+                "repo-workflows-ghost-outcome-lines-91af17db",
+                &[("name", (name).clone().into())],
+            ),
+            (Some(from), Some(to)) => crate::i18n::message(
+                "repo-workflows-ghost-outcome-lines-ce73844c",
+                &[
+                    ("name", (name).clone().into()),
+                    ("short-from-1", (short(from)).clone().into()),
+                    ("shown-to-2", (shown(to)).clone().into()),
+                ],
+            ),
+            (None, Some(to)) => crate::i18n::message(
+                "repo-workflows-ghost-outcome-lines-81deb64d",
+                &[
+                    ("name", (name).clone().into()),
+                    ("shown-to-1", (shown(to)).clone().into()),
+                ],
+            ),
         });
     }
     if !made.is_empty() {
@@ -148,13 +201,24 @@ fn outcome_lines(ui: &mut Ui, t: &Tokens, o: &Outcome) {
         Some(files) if !files.is_empty() => line(
             ui,
             t.text_dim,
-            &format!(
-                "Files of the working tree that change ({}): {}",
-                files.len(),
-                listed(files, |f| format!("{} {}", f.status, f.path))
+            &crate::i18n::message(
+                "repo-workflows-ghost-outcome-lines-4b54308f",
+                &[
+                    ("files-len-1", (files.len()).clone().into()),
+                    (
+                        "listed-files-f-format-f-status-f-2",
+                        (listed(files, |f| format!("{} {}", f.status, f.path)))
+                            .clone()
+                            .into(),
+                    ),
+                ],
             ),
         ),
-        Some(_) => dim(ui, t, "No file of the working tree changes."),
+        Some(_) => dim(
+            ui,
+            t,
+            crate::i18n::text("repo-workflows-ghost-outcome-lines-02e3b1f7"),
+        ),
         None => {}
     }
     for note in &o.notes {
@@ -162,9 +226,12 @@ fn outcome_lines(ui: &mut Ui, t: &Tokens, o: &Outcome) {
     }
     if let Some(engine) = o.engine {
         ui.label(
-            RichText::new(format!("Worked out with {}", engine.describe()))
-                .size(10.5)
-                .color(t.text_faint),
+            RichText::new(crate::i18n::message(
+                "repo-workflows-ghost-outcome-lines-820df962",
+                &[("engine-describe-1", (engine.describe()).clone().into())],
+            ))
+            .size(10.5)
+            .color(t.text_faint),
         );
     }
 }
@@ -173,7 +240,10 @@ fn outcome_lines(ui: &mut Ui, t: &Tokens, o: &Outcome) {
 /// made them.
 fn lost_line(ui: &mut Ui, t: &Tokens, o: &Outcome) {
     let count = if o.lost_more {
-        format!("more than {} commits", o.lost.len())
+        crate::i18n::message(
+            "repo-workflows-ghost-lost-line-50788b96",
+            &[("o-lost-len-1", (o.lost.len()).clone().into())],
+        )
     } else {
         plural(o.lost.len(), "commit", "commits")
     };
@@ -181,7 +251,13 @@ fn lost_line(ui: &mut Ui, t: &Tokens, o: &Outcome) {
     let (color, text) = if o.from_remote {
         (
             t.warning,
-            format!("Leaving the remote's branch ({count}): {names}"),
+            crate::i18n::message(
+                "repo-workflows-ghost-lost-line-02717c8c",
+                &[
+                    ("count", (count).clone().into()),
+                    ("names", (names).clone().into()),
+                ],
+            ),
         )
     } else if o.replaced == o.lost.len() && !o.lost_more {
         let originals = if o.replaced == 1 {
@@ -191,18 +267,38 @@ fn lost_line(ui: &mut Ui, t: &Tokens, o: &Outcome) {
         };
         (
             t.text_dim,
-            format!("Replaced by new copies ({count}; {originals} left on no branch): {names}"),
+            crate::i18n::message(
+                "repo-workflows-ghost-lost-line-2cd6d050",
+                &[
+                    ("count", (count).clone().into()),
+                    ("originals", (originals).clone().into()),
+                    ("names", (names).clone().into()),
+                ],
+            ),
         )
     } else if o.replaced > 0 {
         (
             t.warning,
-            format!(
-                "Left on no branch ({count}, {} of them replaced by new copies): {names}",
-                o.replaced
+            crate::i18n::message(
+                "repo-workflows-ghost-lost-line-8ccbdaa0",
+                &[
+                    ("count", (count).clone().into()),
+                    ("o-replaced-1", (o.replaced).clone().into()),
+                    ("names", (names).clone().into()),
+                ],
             ),
         )
     } else {
-        (t.warning, format!("Left on no branch ({count}): {names}"))
+        (
+            t.warning,
+            crate::i18n::message(
+                "repo-workflows-ghost-lost-line-811bd7ca",
+                &[
+                    ("count", (count).clone().into()),
+                    ("names", (names).clone().into()),
+                ],
+            ),
+        )
     };
     line(ui, color, &text);
 }
@@ -210,7 +306,7 @@ fn lost_line(ui: &mut Ui, t: &Tokens, o: &Outcome) {
 /// A commit as the strip names where a ref goes.
 fn shown(hash: &str) -> String {
     if hash == super::plan::GHOST_MERGE {
-        "a merge commit".to_owned()
+        crate::i18n::text("repo-workflows-ghost-shown-4ef6715c").to_owned()
     } else {
         short(hash).to_owned()
     }
@@ -254,7 +350,10 @@ fn plural(n: usize, one: &str, many: &str) -> String {
 fn listed<T>(items: &[T], name: impl Fn(&T) -> String) -> String {
     let mut names: Vec<String> = items.iter().take(LISTED).map(name).collect();
     if items.len() > LISTED {
-        names.push(format!("and {} more", items.len() - LISTED));
+        names.push(crate::i18n::message(
+            "repo-workflows-ghost-listed-683768ab",
+            &[("items-len-listed-1", (items.len() - LISTED).clone().into())],
+        ));
     }
     names.join(", ")
 }

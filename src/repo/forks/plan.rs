@@ -208,21 +208,27 @@ pub(crate) fn checkout(
     previous: &str,
 ) -> Result<Checkout, String> {
     if !info.cross {
-        return Err(format!(
-            "#{}'s branch is in this repository: check it out as any branch",
-            info.number
+        return Err(crate::i18n::message(
+            "repo-workflows-forks-checkout-13fc08d7",
+            &[("info-number-1", (info.number).clone().into())],
         ));
     }
     if !info.maintainers_can_edit {
-        return Err(format!(
-            "{} doesn't let maintainers push to #{}'s branch",
-            info.owner, info.number
+        return Err(crate::i18n::message(
+            "repo-workflows-forks-checkout-625f9e12",
+            &[
+                ("info-owner-1", (info.owner).clone().into()),
+                ("info-number-2", (info.number).clone().into()),
+            ],
         ));
     }
     if !plain_branch(&info.branch) {
-        return Err(format!(
-            "#{}'s branch name ({}) can't be used as it is",
-            info.number, info.branch
+        return Err(crate::i18n::message(
+            "repo-workflows-forks-checkout-00c3592c",
+            &[
+                ("info-number-1", (info.number).clone().into()),
+                ("info-branch-2", (info.branch).clone().into()),
+            ],
         ));
     }
     let origin = remotes
@@ -236,9 +242,9 @@ pub(crate) fn checkout(
         info.clone_https.clone()
     };
     if url.is_empty() {
-        return Err(format!(
-            "The forge didn't say where {}'s fork is",
-            info.owner
+        return Err(crate::i18n::message(
+            "repo-workflows-forks-checkout-43a1fda6",
+            &[("info-owner-1", (info.owner).clone().into())],
         ));
     }
     let (remote, new_remote) = match fork_remote(info, remotes) {
@@ -300,9 +306,14 @@ pub(crate) fn checkout(
     .into_iter()
     .find(|n| free(n))
     .ok_or_else(|| {
-        format!(
-            "{}, {}/{} and pr-{} are all branches here already",
-            info.branch, info.owner, info.branch, info.number
+        crate::i18n::message(
+            "repo-workflows-forks-checkout-d005bf20",
+            &[
+                ("info-branch-1", (info.branch).clone().into()),
+                ("info-owner-2", (info.owner).clone().into()),
+                ("info-branch-3", (info.branch).clone().into()),
+                ("info-number-4", (info.number).clone().into()),
+            ],
         )
     })?;
     steps.push(strings(&["checkout", "-b", &local, "--track", &tracking]));
@@ -371,9 +382,12 @@ pub(crate) fn plan_rebase(
 ) -> Result<Rebase, String> {
     let remotes = git::remotes(repo)?;
     let fork = fork_remote(info, &remotes).ok_or_else(|| {
-        format!(
-            "Check out #{}'s branch to push to {} first: no remote is their fork",
-            info.number, info.owner
+        crate::i18n::message(
+            "repo-workflows-forks-plan-rebase-b597bd2f",
+            &[
+                ("info-number-1", (info.number).clone().into()),
+                ("info-owner-2", (info.owner).clone().into()),
+            ],
         )
     })?;
     let full = git::run_ok_codes(Some(repo), &["symbolic-ref", "-q", "HEAD"], &[0, 1])?;
@@ -388,9 +402,12 @@ pub(crate) fn plan_rebase(
         .pushing_to(&fork, &info.branch)
         .filter(|b| b.name == local)
         .ok_or_else(|| {
-            format!(
-                "Check out #{}'s branch to push to {} first",
-                info.number, info.owner
+            crate::i18n::message(
+                "repo-workflows-forks-plan-rebase-a0b078e0",
+                &[
+                    ("info-number-1", (info.number).clone().into()),
+                    ("info-owner-2", (info.owner).clone().into()),
+                ],
             )
         })?;
     let dirty = git::run(
@@ -398,7 +415,7 @@ pub(crate) fn plan_rebase(
         &["status", "--porcelain", "--untracked-files=no"],
     )?;
     if !dirty.trim().is_empty() {
-        return Err("Commit or stash your changes first: this rebases the branch".to_owned());
+        return Err(crate::i18n::text("repo-workflows-forks-plan-rebase-e28bbaf9").to_owned());
     }
     let tracking = format!("refs/remotes/{fork}/{}", info.branch);
     let onto = format!("refs/remotes/{upstream}/{}", info.base);
@@ -435,9 +452,13 @@ pub(crate) fn plan_rebase(
     }
     let behind = count(repo, &format!("{head}..{onto}"))?;
     if behind == 0 {
-        return Err(format!(
-            "{local} already has every commit of {upstream}/{}",
-            info.base
+        return Err(crate::i18n::message(
+            "repo-workflows-forks-plan-rebase-6ccf1bc5",
+            &[
+                ("local", (local).clone().into()),
+                ("upstream", (upstream).clone().into()),
+                ("info-base-1", (info.base).clone().into()),
+            ],
         ));
     }
     Ok(Rebase {
@@ -455,8 +476,13 @@ pub(crate) fn plan_rebase(
 fn count(repo: &Path, range: &str) -> Result<usize, String> {
     git::run(Some(repo), &["rev-list", "--count", range, "--"])?
         .trim()
-        .parse()
-        .map_err(|e| format!("unexpected count: {e}"))
+        .parse::<usize>()
+        .map_err(|e| {
+            crate::i18n::message(
+                "repo-workflows-forks-count-082131a5",
+                &[("e", e.to_string().into())],
+            )
+        })
 }
 
 impl Rebase {

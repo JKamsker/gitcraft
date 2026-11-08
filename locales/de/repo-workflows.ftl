@@ -1781,17 +1781,801 @@ repo-workflows-doctor-verdict-c3b9d549 = Diese Datei existiert hier nicht. Die R
 
 repo-workflows-doctor-verdict-f0d742e1 = Versioniert; die letzte passende Regel ist diese !-Regel.
 
+repo-workflows-drift_view-body-31794226 = Erneut messen
+
+repo-workflows-drift_view-body-3e453620 = Coding-Agent befragen (optional)
+
+repo-workflows-drift_view-body-42a9eb31 = Aufgabe speichern
+
 repo-workflows-drift_view-body-4bc74b21 = Aufgabe
+
+repo-workflows-drift_view-body-65fb660d = Die Aufgabe des Agenten (beim Worktree gespeichert, nie committet)
 
 repo-workflows-drift_view-body-7d9eb7ac = Schließen
 
+repo-workflows-drift_view-body-a8164b33 = Abweichung vom Aufgabenbereich: { $view-worktree-name-1 } ({ $branch })
+
+repo-workflows-drift_view-body-cdc38d02 = Verknüpftes Issue #{ $n }: { $text-lines-next-unwrap-or-defaul-1 }
+
+repo-workflows-drift_view-body-e039d62e = Führt claude -p oder codex exec hier mit Aufgabe und Pfaden ohne Dateiinhalte aus und zeigt, welche Einträge laut Agent nicht benötigt werden
+
+repo-workflows-drift_view-body-fa4f662d = Verknüpftes Issue #{ $n }: { $e }
+
+repo-workflows-drift_view-item-518baa09 = In diesem Worktree nicht committet. Öffnet den Worktree mit seinen Änderungen.
+
+repo-workflows-drift_view-item-bccfdf69 = Öffnet den Diff
+
+repo-workflows-drift_view-item-d91938be = Öffnet:
+    { $tip-join-n-1 }
+
+repo-workflows-drift_view-measure-drift-27f1506d = Die Forge des Repositorys ist unbekannt
+
+repo-workflows-drift_view-report-3ecc0ca7 = Aufgabe: { $task-lines-next-unwrap-or-defaul-1 }
+
+repo-workflows-drift_view-report-57f4cf0a = Keine Aufgabenbeschreibung vorhanden. Schreiben Sie oben eine oder verknüpfen Sie ein Issue, um die Ordner einzuordnen.
+
+repo-workflows-drift_view-save-task-a40b28e7 = Neben den Git-Daten des Worktrees gespeichert
+
+repo-workflows-drift_view-sections-14063185 = Neue Abhängigkeiten ({ $report-dependencies-len-1 })
+
+repo-workflows-drift_view-sections-1bb434ba = Von der Aufgabe nicht erwähnte Ordner ({ $unrelated-len-1 })
+
+repo-workflows-drift_view-sections-4cf1b0e4 = (oberste Ebene)
+
+repo-workflows-drift_view-sections-619bb740 = Alle geänderten Dateien ({ $report-files-len-1 })
+
+repo-workflows-drift_view-sections-819e9567 = { $dep-name-1 } in { $dep-manifest-2 }
+
+repo-workflows-drift_view-sections-a8299dbd = Geänderte öffentliche Signaturen ({ $report-signatures-len-1 })
+
+repo-workflows-email-apply-61c57973 = Ungültiger Mailboxpfad
+
+repo-workflows-email-compare-6921220f = Committen oder stashen Sie zuerst die Worktree-Änderungen
+
+repo-workflows-email-compare-b5921a15 = Worktree-HEAD, Branch, Änderungen, Konfiguration oder ausgewähltes Profil geändert. Lesen Sie den Stand beziehungsweise die Vorschau erneut.
+
+repo-workflows-email-email-act-3eece223 = Empfänger geändert. Erstellen Sie eine neue Vorschau.
+
+repo-workflows-email-email-act-5474eef8 = Wird ausgeführt …
+
+repo-workflows-email-email-act-84f8f92f = Vor dem Start abgebrochen
+
+repo-workflows-email-email-act-c19c9f05 = E-Mail-Patches · b4
+
+repo-workflows-email-email-act-fa043d04 = Nicht registriert oder b4 nicht verfügbar: { $e }
+
+repo-workflows-email-email-window-035719bf = Vorherige gesendete Message-ID
+
+repo-workflows-email-email-window-03712771 = Empfangen und prüfen
+
+repo-workflows-email-email-window-1219b3d1 = Nummerierte Revision setzen
+
+repo-workflows-email-email-window-15173718 = Serie mit b4 abrufen
+
+repo-workflows-email-email-window-179e0bb7 = Public-Inbox-HTTPS-URL oder Message-ID
+
+repo-workflows-email-email-window-1e3943ad = Vorbereiteten Branch und Anschreiben lesen
+
+repo-workflows-email-email-window-2a42475c = Vorschau ohne E-Mail-Versand erstellt
+
+repo-workflows-email-email-window-2e516d68 = Revision
+
+repo-workflows-email-email-window-381b0db7 = Erstellen und überarbeiten
+
+repo-workflows-email-email-window-3d343b32 = Ausgehende Vorschau erstellen (ohne Versand)
+
+repo-workflows-email-email-window-49077514 = Revision (0 = neueste)
+
+repo-workflows-email-email-window-54194499 = Mir ist bewusst, dass die b4-Vorbereitung diesen Branch und seine Metadaten umschreiben kann
+
+repo-workflows-email-email-window-54cdddfe = Vorschau und Versand
+
+repo-workflows-email-email-window-582e1946 = Anschreiben mit b4 speichern
+
+repo-workflows-email-email-window-624d6ba0 = Serie abgerufen. Prüfen Sie Anschreiben, Patches und Trailer vor dem Anwenden.
+
+repo-workflows-email-email-window-632693ae = { $error }
+    Prüfen Sie nach Abbruch oder Teilausführung Git, b4 und E-Mail-Zustand vor einem neuen Versuch. Konflikte beim Anwenden verwenden die vorhandenen Vorgangsaktionen „Fortsetzen“ und „Abbrechen“.
+
+repo-workflows-email-email-window-6ad695fc = Ich habe alle Empfänger und Nachrichten geprüft und möchte echte E-Mails senden
+
+repo-workflows-email-email-window-8c1d9c9f = Profil geändert. Vorgang abgebrochen. Prüfen Sie vor einem neuen Versuch Repository und E-Mail-Zustand.
+
+repo-workflows-email-email-window-8c3ad598 = Benötigt den unterstützten b4-Quellbuild ce4c1158 (0.17-dev), installiert mit seinem Python-Einstiegspunkt in einer virtuellen Umgebung auf diesem Rechner. Der Python-Helfer verwendet den isolierten Modus; reine user-site-/PYTHONPATH-Installationen werden nicht unterstützt. Andere Builds werden bis zur Vertragsprüfung abgelehnt. Verwendet b4s eingerichtete Identität, Public-Inbox und Versandtransport. gitcraft exportiert keine Zugangsdaten.
+
+repo-workflows-email-email-window-99fe2a7b = Der Versand erzeugt Date-, Message-ID- und Signaturheader neu. Empfänger, Betreff und decodierte MIME-Inhalte werden gegen diese Vorschau geprüft. b4s Verhalten für erfolgreiche Versand-Tags und Überarbeitungen gilt. Fehlgeschlagene native Vorprüfungen oder unbekannte Rückfragen brechen ab. Nur die abschließende Versandbestätigung wird durch diese ausdrückliche Freigabe beantwortet.
+
+repo-workflows-email-email-window-9cb42639 = Für HEAD { $received-snapshot-head-1 } abgerufen · { $received-messages-len-2 } Patches
+
+repo-workflows-email-email-window-b0fcf938 = Zusätzliche Empfänger. b4 ermittelt Empfänger auch aus Anschreiben, Konfiguration und Review-Trailern. Prüfen Sie unten jede erzeugte Nachricht.
+
+repo-workflows-email-email-window-b28037e9 = Cc
+
 repo-workflows-email-email-window-b64a0d4f = Vorgang abbrechen
+
+repo-workflows-email-email-window-b8c5cd6e = Vorbereiteten Branch gelesen
+
+repo-workflows-email-email-window-bc346e4f = Aktuellen Branch registrieren
+
+repo-workflows-email-email-window-c19c9f05 = E-Mail-Patches · b4
+
+repo-workflows-email-email-window-c6755006 = Worker beendet oder abgebrochen. Prüfen Sie vor einem neuen Versuch Repository und E-Mail-Zustand. E-Mails könnten bereits zugestellt sein.
+
+repo-workflows-email-email-window-c962be80 = Abzweigpunkt
+
+repo-workflows-email-email-window-d9adba22 = Anschreiben
+
+repo-workflows-email-email-window-e6884e31 = Geprüfte Serie über b4 senden
+
+repo-workflows-email-email-window-e6ec08b2 = Gesendete Serie überarbeiten
+
+repo-workflows-email-email-window-e70c5648 = Geprüfte Serie anwenden (git am --3way)
+
+repo-workflows-email-email-window-f4b06ef6 = An
+
+repo-workflows-email-guard-d353a99e = Abgebrochen
+
+repo-workflows-email-interpreter-409abb66 = Installiertes b4 benötigt ein Python-Skript als Einstiegspunkt
+
+repo-workflows-email-interpreter-d5e7d057 = Nicht unterstützter b4-Einstiegspunkt. Verwenden Sie den Python-Einstiegspunkt des unterstützten Quellbuilds.
+
+repo-workflows-email-interpreter-fdf4c44a = b4-Einstiegspunkt hat keine Python-Shebang
+
+repo-workflows-email-invoke-b4-8728290f = Installieren Sie b4 in einem absoluten ausführbaren PATH-Verzeichnis (Python-Virtualenv wird unterstützt)
+
+repo-workflows-email-invoke-b4-c9d943f4 = Installierter b4-Einstiegspunkt kann nicht gelesen werden: { $e }
+
+repo-workflows-email-mailbox-10ff6da2 = Serie überschreitet 32 MiB
+
+repo-workflows-email-mailbox-52374212 = Git-am-Mailboxumschlag von b4 erwartet
+
+repo-workflows-email-mailbox-ede3c4f9 = Mehr als 1024 Nachrichten
+
+repo-workflows-email-messages-07ed6ccf = E-Mail
+
+repo-workflows-email-messages-1edf47d5 = Betreff:
+
+repo-workflows-email-messages-8e0d8018 = Nachricht { $index-1-1 } · { $message-headers-lines-find-l-l-s-2 }
+
+repo-workflows-email-messages-a6252664 = Rohe RFC822-Nachricht
+
+repo-workflows-email-new-21656993 = Privates E-Mail-Verzeichnis kann nicht angelegt werden
+
+repo-workflows-email-parse-8107bb41 = E-Mail überschreitet 32 MiB
+
+repo-workflows-email-parse-ff511962 = E-Mail hat keinen Subject-Header
+
+repo-workflows-email-parse-ff6e2278 = Unvollständiger mbox-Umschlag
+
+repo-workflows-email-parts-18af1d8d = [{ $mail-ctype-mimetype-1 }-Anhang: { $raw-len-2 } decodierte Bytes]
+
+repo-workflows-email-parts-93b357ba = MIME-Verschachtelung überschreitet 24 Ebenen
+
+repo-workflows-email-prepare-7fa1230f = Positive Revisionsnummer erwartet
+
+repo-workflows-email-prepare-ad82832b = Unbekannte Vorbereitungsaktion
+
+repo-workflows-email-prepare-b8cd601f = Geben Sie eine Abzweigpunkt-Revision ein
+
+repo-workflows-email-prepare-d287cfde = Revision muss positiv sein
+
+repo-workflows-email-preview-2345df14 = Begrenzte ausgehende Nachricht kann nicht gelesen werden
+
+repo-workflows-email-preview-7a897da3 = Ungültiger ausgehender Dateiname
+
+repo-workflows-email-preview-ca11bd96 = Mehr als 1024 ausgehende Nachrichten
+
+repo-workflows-email-preview-d135ecfa = Ausgehende Serie überschreitet 32 MiB
+
+repo-workflows-email-preview-ff2f2c5c = b4 hat keine ausgehenden Nachrichten erzeugt
+
+repo-workflows-email-receive-3b985b29 = Begrenzte Mailbox kann nicht gelesen werden
+
+repo-workflows-email-receive-4350d1be = b4 hat keine Mailbox erzeugt
+
+repo-workflows-email-receive-61e11166 = Ungültiger Mailboxname
+
+repo-workflows-email-receive-7fcd485d = Nicht-UTF-8-Ausgabedateiname von b4
+
+repo-workflows-email-receive-9820d0e4 = Begrenztes Anschreiben kann nicht gelesen werden
+
+repo-workflows-email-receive-b0772e5b = b4 hat mehrere Mailboxen erzeugt. Wählen Sie eine einzelne Serie.
+
+repo-workflows-email-recipients-5fb6b41e = Ungültige Empfängerliste
+
+repo-workflows-email-recipients-c706c00a = Leere Empfängerliste
+
+repo-workflows-email-recipients-e0cee753 = Empfängerliste: { $e }
+
+repo-workflows-email-reroll-id-17d9d618 = Unausgeglichene Message-ID-Klammern
+
+repo-workflows-email-reroll-id-bbeca305 = Verwenden Sie die vorherige gesendete Message-ID, keine URL
+
+repo-workflows-email-send-9753828b = Versand meldete keinen Erfolg: { $e }. Einige E-Mails könnten bereits zugestellt sein. Prüfen Sie vor einem neuen Versuch b4 und den E-Mail-Zustand.
+
+repo-workflows-email-send-a590b131 = b4 meldet erfolgreichen Versand. Prüfen Sie vor einem weiteren Versand die nativen Versand-Tags und die Revision.
+    { $output }
+
+repo-workflows-email-send-reviewed-e9663ecb = Ausgehende Empfänger oder Inhalte geändert. Erstellen Sie vor dem Versand eine neue Vorschau.
+
+repo-workflows-email-snapshot-2627ca9e = .b4-config muss im Worktree lesbar und höchstens 1 MiB groß sein
+
+repo-workflows-email-snapshot-a55ce185 = E-Mail-Patches benötigen derzeit einen lokalen Worktree und den dort installierten unterstützten b4-Quellbuild ce4c1158 (0.17-dev)
+
+repo-workflows-email-source-034af213 = Geben Sie eine Public-Inbox-HTTPS-URL oder Message-ID ein
+
+repo-workflows-email-source-51ea03e4 = Inbox-URL darf keine Zugangsdaten enthalten
+
+repo-workflows-email-source-60f601ea = HTTPS-URL oder Message-ID erwartet
 
 repo-workflows-fence_view-body-7d9eb7ac = Schließen
 
+repo-workflows-fence_view-body-803f082f = Agent-Schutzgrenze
+
+repo-workflows-fence_view-body-98912c89 = Zusätzlich einen Abschnitt in { $fence-agents-1 } schreiben (Codex)
+
+repo-workflows-fence_view-body-a8aa1101 = Speichern und an Agenten schreiben
+
+repo-workflows-fence_view-body-b31ba75f = Eigener Abschnitt in einer üblicherweise versionierten Datei, die dadurch als geändert erscheint
+
+repo-workflows-fence_view-body-b42a9a6f = Vorschläge hinzufügen
+
+repo-workflows-fence_view-body-c408ae8c = Zusätzlich { $fence-cursor-1 } schreiben
+
+repo-workflows-fence_view-body-cac5a24a = Nicht in die Konfigurationen aller Worktrees geschrieben:
+    { $write-errors-join-n-1 }
+
+repo-workflows-fence_view-body-d10df00e = Eigener Block in einer möglicherweise versionierten Datei, die dadurch als geändert erscheint
+
+repo-workflows-fence_view-body-d1953461 = Für Agenten gesperrte Pfade, einer pro Zeile, in .gitignore-Syntax ohne Ausnahmen (secrets/, .env, *.pem, /Cargo.lock), unabhängig von Großschreibung. In der Git-Konfiguration dieses Repositorys gespeichert und von seinen Worktrees geteilt. Die Regeln werden jetzt und für künftige Worktrees in die Claude-Code-Sperrregeln geschrieben ({ $fence-claude-1 }, von Git ausgeschlossen). Da Regeln umgangen werden können, wird jeder verknüpfte Worktree geprüft. Berühren seine Commits, Änderungen oder unversionierten beziehungsweise ignorierten Dateien die Grenze oder scheitert die Prüfung, wird er rot. Merge, Fast-Forward und Rebase prüfen zuerst, ob Branch-Commits oder Worktree die Grenze berührt haben, und fragen dann nach.
+
+repo-workflows-fence_view-confirm-body-e537b5dc = { $branch } (im Worktree { $wt } ausgecheckt)
+
+repo-workflows-fence_view-fence-gate-214a3091 = Trotzdem mergen
+
+repo-workflows-fence_view-fence-gate-2b8e4f3b = Agent-Schutzgrenze wird geprüft …
+
+repo-workflows-fence_view-fence-gate-6b730ef5 = Gegen Agent-Schutzgrenze prüfen
+
+repo-workflows-fence_view-list-violations-a6d5a69b =   und { $found-len-listed-1 } weitere
+
+repo-workflows-fence_view-save-7bfa9a3b = Gespeichert, aber nicht überall:
+    { $errors-join-n-1 }
+
+repo-workflows-file_comparison-assemble-1641af0b = Mehr als 50.000 Patch-Zeilen. Vergleichen Sie einen kleineren Bereich.
+
+repo-workflows-file_comparison-assemble-56abde67 = Vergleich verschobenen Codes abgebrochen
+
+repo-workflows-file_comparison-boundary-26efe746 = Binär- oder Nicht-UTF-8-Versionen: Vergleichen Sie die Bytevorschau. Zeilenweises Vormerken ist nicht verfügbar.
+
+repo-workflows-file_comparison-boundary-5421cc1b = Der rohe Patch ist kein UTF-8-Text
+
+repo-workflows-file_comparison-boundary-6732715f = Git konnte für diese unterschiedlichen Bytes keinen rohen Textpatch erstellen. Verwenden Sie die normale Patch-Ansicht.
+
+repo-workflows-file_comparison-boundary-b861cbb0 = Git konnte diese Rohversionen nicht ausrichten
+
+repo-workflows-file_comparison-boundary-button-033f86f9 = Aus Staging-Area entfernen
+
+repo-workflows-file_comparison-boundary-button-0cadc525 = { $text } Lupenzeile { $index-1-1 }
+
+repo-workflows-file_comparison-boundary-button-de838855 = Vormerken
+
+repo-workflows-file_comparison-boundary-e44610d7 = Mehr als 20.000 Zeilen in einer Version. Verwenden Sie die normale Patch-Ansicht.
+
+repo-workflows-file_comparison-comparison-pick-28dc27ab = { $pick-verb-1 } { $snapshot-spec-path-2 } aus der Staging-Lupe
+
+repo-workflows-file_comparison-file-comparison-view-04166b68 = Dateien bilden Zeilen, fixierte Branch-Commits die Spalten. V-Markierungen kennzeichnen gleiche Bytes auch über Zeilen hinweg. Fehlende Zellen und Dateimodi bleiben getrennt. Klicken Sie zwei Zellen für einen Inhaltsvergleich an.
+
+repo-workflows-file_comparison-file-comparison-view-103acf25 = Drei Versionen lesen
+
+repo-workflows-file_comparison-file-comparison-view-1e2e1383 = Branches auswählen ({ $state-selected-len-1 } ausgewählt, höchstens 8)
+
+repo-workflows-file_comparison-file-comparison-view-21819769 = Von
+
+repo-workflows-file_comparison-file-comparison-view-22d5cf54 = Rohe Stände · nach Repository-Änderungen aktualisieren · keine automatischen Downloads
+
+repo-workflows-file_comparison-file-comparison-view-2ad51b3c = Dateiübergreifend verschobener Code
+
+repo-workflows-file_comparison-file-comparison-view-2d2cd49c = Vorgemerkte Verschiebungen
+
+repo-workflows-file_comparison-file-comparison-view-327070c2 = HEAD → vorgemerkt → Arbeitskopie. Merken Sie Zeilen an beiden Grenzen vor oder entfernen Sie diese daraus. Aktualisieren Sie bei Dateiänderungen. Binärdateien und Dateien mit Git-Konvertierungen sind hier schreibgeschützt.
+
+repo-workflows-file_comparison-file-comparison-view-3f64b850 = Dateiansicht aktualisieren
+
+repo-workflows-file_comparison-file-comparison-view-40379eb3 = Normalen Patch öffnen
+
+repo-workflows-file_comparison-file-comparison-view-50009ce1 = Datei
+
+repo-workflows-file_comparison-file-comparison-view-51d4ac7c = Commit → Arbeitskopie
+
+repo-workflows-file_comparison-file-comparison-view-5fa4365c = Unveränderliche Versionen werden gelesen …
+
+repo-workflows-file_comparison-file-comparison-view-725513de = Vergleich abgebrochen. Aktualisieren Sie die Ansicht für einen neuen Versuch.
+
 repo-workflows-file_comparison-file-comparison-view-74ccd433 = Ordner
 
-repo-workflows-file_comparison-file-comparison-view-82a9c46f = Committen
+repo-workflows-file_comparison-file-comparison-view-7b8bea18 = Dateiansicht schließen
+
+repo-workflows-file_comparison-file-comparison-view-82a9c46f = Commit
+
+repo-workflows-file_comparison-file-comparison-view-86154135 = Dateimigrationen suchen
+
+repo-workflows-file_comparison-file-comparison-view-89fa7940 = Nach / Commit
+
+repo-workflows-file_comparison-file-comparison-view-90e2e8fa = Dateiversionen über Branches
+
+repo-workflows-file_comparison-file-comparison-view-aa2b8150 = Git erkennt Umbenennungen und Kopien ab 50 % Ähnlichkeit unter höchstens 2.000 Kandidaten. Merken Sie umgeordnete Dateien zuerst vor, um neue Arbeitsdateinamen einzuschließen. Inhaltsänderungen öffnen sich getrennt von der Verschiebung.
+
+repo-workflows-file_comparison-file-comparison-view-ca74fb37 = Vergleich abbrechen
+
+repo-workflows-file_comparison-file-comparison-view-d1d29085 = Arbeitskopie
+
+repo-workflows-file_comparison-file-comparison-view-daec459a = Vorgemerkt
+
+repo-workflows-file_comparison-file-comparison-view-dfc3916d = Verschobenen Code suchen
+
+repo-workflows-file_comparison-file-comparison-view-edc82098 = Dateimigrationskarte
+
+repo-workflows-file_comparison-file-comparison-view-efa19808 = Commit-Verschiebungen
+
+repo-workflows-file_comparison-file-comparison-view-f08307c5 = Vergleicht gelöschte und hinzugefügte Blöcke über versionierte Dateien. Leerraum an Zeilenrändern wird ignoriert. Merken Sie neue Dateien zuerst vor. Begrenzt auf 300 Dateien, 50.000 Zeilen und 40 Sekunden. Verschlüsselte Dateien sind ausgeschlossen.
+
+repo-workflows-file_comparison-file-comparison-view-f2473f24 = Zwischen Commits
+
+repo-workflows-file_comparison-file-comparison-view-f315d745 = Repository-Wurzel
+
+repo-workflows-file_comparison-file-comparison-view-f4b06ef6 = Nach
+
+repo-workflows-file_comparison-file-comparison-view-fb60b8e0 = Staging-Lupe mit drei Zuständen
+
+repo-workflows-file_comparison-file-comparison-view-fdc19d89 = Branchversionen vergleichen
+
+repo-workflows-file_comparison-invalidate-81f92ce0 = Repository geändert. Aktualisieren Sie die Dateiansicht.
+
+repo-workflows-file_comparison-lens-3a1781b9 = Lange Zeilen sind bei 2.000 Zeichen gekürzt. Grenzaktionen verwenden die vollständige Rohzeile. Verwenden Sie den normalen Patch zur Prüfung.
+
+repo-workflows-file_comparison-lens-4902e29c = Die Arbeitskopie entspricht HEAD, aber der nächste Commit ändert diese Datei trotzdem. Arbeitsänderungen nehmen die vorgemerkte Änderung zurück.
+
+repo-workflows-file_comparison-lens-6e60c4a1 = Gesamte Grenze aus der Staging-Area entfernen
+
+repo-workflows-file_comparison-lens-75673075 = ← aus Staging-Area entfernen
+
+repo-workflows-file_comparison-lens-8f600488 = Gesamte Grenze vormerken
+
+repo-workflows-file_comparison-lens-92bc93d0 = ← vormerken
+
+repo-workflows-file_comparison-lens-b72fb6c1 = nimmt vorgemerkte Änderung zurück
+
+repo-workflows-file_comparison-lens-bfae8a90 = HEAD verwendet { $previous }. Das Entfernen von Inhalten aus der Staging-Area behält die vorgemerkte Verschiebung. Ändern Sie die Verschiebung selbst im normalen Patch.
+
+repo-workflows-file_comparison-lens-d1d29085 = Arbeitskopie
+
+repo-workflows-file_comparison-lens-daec459a = Vorgemerkt
+
+repo-workflows-file_comparison-matrix-50009ce1 = Datei
+
+repo-workflows-file_comparison-matrix-6be36ca4 = Fehlt
+
+repo-workflows-file_comparison-matrix-c81d97c3 = { $label }
+    Fixiert: { $c-oid-1 }
+
+repo-workflows-file_comparison-matrix-ebfcc1d5 = { $data-paths-len-1 } Dateien · nach der ersten eine weitere Zelle auswählen
+
+repo-workflows-file_comparison-migration-06869a99 = Ähnlichkeit unbekannt
+
+repo-workflows-file_comparison-migration-208e67e7 = { $m-before-name-1 } → { $m-after-name-2 } · { $if-m-copy-copy-else-rename-3 } { $m-similarity-map-s-format-s-unwr-4 }
+
+repo-workflows-file_comparison-migration-3064d79a = Umbenennung
+
+repo-workflows-file_comparison-migration-35255dde = Git-Erkennungswarnung (einige Verschiebungen bleiben eventuell unbekannt): { $warning }
+
+repo-workflows-file_comparison-migration-41aec147 = { $data-moves-len-1 } Umbenennungen/Kopien · { $data-other-changes-2 } andere Änderungen
+
+repo-workflows-file_comparison-migration-a419e1f7 = Keine von Git erkannten Umbenennungen oder Kopien. Hinzugefügte oder gelöschte Pfade gelten nicht automatisch als Verschiebungen.
+
+repo-workflows-file_comparison-migration-e21f935f = Kopie
+
+repo-workflows-file_comparison-open-file-comparison-a6cb5dc1 = Schließen oder beenden Sie zuerst den Editor
+
+repo-workflows-file_comparison-paths-28803ea3 = Lösen Sie Konflikte vor der Analyse verschobenen Codes
+
+repo-workflows-file_comparison-paths-58fb2d6a = Änderungsstatus fehlt
+
+repo-workflows-file_comparison-paths-59a504f9 = { $files-display-path-path-1 }: Nicht-UTF-8-Pfad übersprungen
+
+repo-workflows-file_comparison-paths-ae3de607 = Unerwarteter Dateiänderungsstatus
+
+repo-workflows-file_comparison-paths-d4097e54 = Mehr als 300 geänderte Dateien. Vergleichen Sie einen kleineren Bereich.
+
+repo-workflows-file_comparison-paths-e3561990 = Unvollständige Liste geänderter Dateien
+
+repo-workflows-file_comparison-prepare-da3978aa = Ungültige Vergleichsseiten
+
+repo-workflows-file_comparison-read-0378d2b4 = Vorgemerkte Änderungen · HEAD → Index
+
+repo-workflows-file_comparison-read-259fd376 = HEAD während der Analyse geändert. Aktualisieren Sie die Ansicht.
+
+repo-workflows-file_comparison-read-3fbe0e2d = Unbekannte Quelle für verschobenen Code
+
+repo-workflows-file_comparison-read-431f5828 = Analyse verschobenen Codes abgebrochen oder länger als 40 Sekunden
+
+repo-workflows-file_comparison-read-5e3dd301 = Commit { $oid-8-1 } · erster Elterncommit
+
+repo-workflows-file_comparison-read-6289d4ba = { $files-display-path-path-as-bytes-1 }: verschlüsselter Inhalt ausgeschlossen
+
+repo-workflows-file_comparison-read-6adc8019 = Dateiinhalt während der Analyse geändert. Aktualisieren Sie die Ansicht.
+
+repo-workflows-file_comparison-read-a6767f12 = Geänderte Patches überschreiten 6 MiB. Vergleichen Sie einen kleineren Bereich.
+
+repo-workflows-file_comparison-read-bf031806 = { $oid-8-1 } → Arbeitskopie (versionierte Dateien)
+
+repo-workflows-file_comparison-read-f42f63e5 = { $files-display-path-path-as-bytes-1 }: Nicht-UTF-8-Patch übersprungen
+
+repo-workflows-file_comparison-read-fc054b54 = Betroffene Pfade während der Analyse geändert. Aktualisieren Sie die Ansicht.
+
+repo-workflows-file_comparison-read-fcc615d7 = Arbeitskopie · Index → Arbeitskopie (versionierte Dateien)
+
+repo-workflows-file_comparison-show-70bfd7fb = Zeilenumbruch
+
+repo-workflows-file_comparison-show-pair-06ebe02e = Bytevorschau (erste 512 Bytes pro Seite; vollständige Größen stehen oben)
+
+repo-workflows-file_comparison-show-pair-2f04c026 = Keine Inhaltsänderungen: identische Bytes. Namen, Vorhandensein und Dateimodi bleiben getrennt.
+
+repo-workflows-file_comparison-show-pair-7b68fe55 = Nachher
+
+repo-workflows-file_comparison-show-pair-98154a15 = Nur Inhaltsänderungen
+
+repo-workflows-file_comparison-show-pair-9bb72500 = Vorher
+
+repo-workflows-file_comparison-show-pair-e3ccb1fe = Vorher: { $pair-versions-0-label-1 } · Nachher: { $pair-versions-1-label-2 }
+
+repo-workflows-file_comparison-view-4699e093 = { $if-side-0-source-else-destinatio-1 } { $l-label-2 } öffnen
+
+repo-workflows-file_comparison-view-746eb9db = { $data-locations-len-1 } dateiübergreifend verschobene Blöcke · gemeinsame M-Markierungen verbinden beide Stellen
+
+repo-workflows-file_comparison-view-8bb733fc = M{ $i-1-1 } · Verschoben nach …
+
+repo-workflows-file_comparison-view-a47d33a8 = Keine dateiübergreifenden Verschiebungen gefunden (mindestens 20 Buchstaben oder Ziffern). Verschiebungen innerhalb einer Datei bleiben im normalen Patch.
+
+repo-workflows-file_comparison-view-b8b66b62 = unverändert / neu eingerückt
+
+repo-workflows-file_comparison-view-baa2bc90 = beim Verschieben bearbeitet
+
+repo-workflows-forge_link-deliver-5add4905 = Browser konnte für { $link-url-1 } nicht geöffnet werden: { $e }
+
+repo-workflows-forge_link-deliver-8d525e5f = Kopiert
+
+repo-workflows-forge_link-deliver-aab63f85 = Link öffnen
+
+repo-workflows-forge_link-deliver-b19fb8d1 = Geöffnet
+
+repo-workflows-forge_link-deliver-c5e2849f = Link { $done }, aber { $warning }: { $link-url-1 }
+
+repo-workflows-forge_link-deliver-dbf362d4 = Link kopieren
+
+repo-workflows-forge_link-deliver-f9eecf25 = Keine Webadresse: { $link-url-1 }
+
+repo-workflows-forge_link-items-44c5ece2 = { $what } öffnen auf
+
+repo-workflows-forge_link-items-55932e34 = Auf { $c-forge-1 }. Der Branch verfolgt kein Remote und es gibt kein origin. Wählen Sie eines aus.
+
+repo-workflows-forge_link-items-6bb03074 = Dauerhafter Link über den Commit-Hash auf { $one-remote-1 } ({ $one-place-2 })
+
+repo-workflows-forge_link-items-78bef62f = { $what } auf { $one-forge-1 } öffnen
+
+repo-workflows-forge_link-items-a5232678 = Link zu { $what } kopieren
+
+repo-workflows-forge_link-items-ea6a597e = Die Branchseite auf { $one-remote-1 } ({ $one-place-2 }). Sie folgt dem Branch bei Änderungen.
+
+repo-workflows-forks-allow-edits-6bb2bbb0 = Bearbeitung durch Maintainer erlauben
+
+repo-workflows-forks-allow-edits-9e60d9b6 = Commits von Mitgliedern erlauben, die in den Zielbranch mergen dürfen
+
+repo-workflows-forks-allow-edits-ddc30ba0 = Bearbeitung durch Maintainer erlauben
+
+repo-workflows-forks-approve-runs-282082c7 = Workflow-Läufe von #{ $number } konnten nicht freigegeben werden: { $e }
+
+repo-workflows-forks-approve-runs-2f659b28 = Workflow-Läufe von #{ $number } werden freigegeben …
+
+repo-workflows-forks-approve-runs-a151ad19 = Workflow-Läufe von #{ $number } freigegeben
+
+repo-workflows-forks-approve-runs-a77eca22 = Die Freigabe führt den Code des Mitwirkenden auf Ihrer CI aus. Prüfen Sie zuerst die Änderungen von #{ $number } und wählen Sie dann „Freigeben und erneut ausführen“.
+
+repo-workflows-forks-badges-42d0a9e0 = Bearbeitung erlaubt
+
+repo-workflows-forks-badges-84e3eb92 = wartet auf Freigabe
+
+repo-workflows-forks-badges-aea3a983 = { $info-owner-1 } erlaubt Maintainern den Push auf den Branch { $info-branch-2 }. Wählen Sie im Menü „Auschecken zum Pushen nach { $info-owner-3 }“.
+
+repo-workflows-forks-badges-e3d8fbdd = Erster Beitrag von { $info-owner-1 } zu diesem Repository
+
+repo-workflows-forks-checkout-00c3592c = Der Branchname von #{ $info-number-1 } ({ $info-branch-2 }) kann nicht unverändert verwendet werden
+
+repo-workflows-forks-checkout-13fc08d7 = Der Branch von #{ $info-number-1 } liegt in diesem Repository. Checken Sie ihn wie einen normalen Branch aus.
+
+repo-workflows-forks-checkout-43a1fda6 = Die Forge hat den Ort des Forks von { $info-owner-1 } nicht angegeben
+
+repo-workflows-forks-checkout-625f9e12 = { $info-owner-1 } erlaubt Maintainern keinen Push auf den Branch von #{ $info-number-2 }
+
+repo-workflows-forks-checkout-d005bf20 = { $info-branch-1 }, { $info-owner-2 }/{ $info-branch-3 } und pr-{ $info-number-4 } existieren hier bereits als Branches
+
+repo-workflows-forks-checkout-fork-5ecb3bac = Die Herkunft von #{ $number } ist noch unbekannt
+
+repo-workflows-forks-checkout-fork-abaaf4c3 = #{ $number } auschecken, um nach { $info-owner-1 } zu pushen
+
+repo-workflows-forks-count-082131a5 = Unerwartete Anzahl: { $e }
+
+repo-workflows-forks-fork-items-2b48edeb = Checken Sie zuerst den Branch von { $info-owner-1 } zum Rück-Pushen aus
+
+repo-workflows-forks-fork-items-3450c709 = Rebase auf { $info-base-1 } und Push nach { $info-owner-2 }
+
+repo-workflows-forks-fork-items-6c1751f8 = { $info-owner-1 } erlaubt Maintainern keinen Push nach { $info-branch-2 }. Bitten Sie um die Aktivierung von „{ $allow-edits-self-forge-3 }“.
+
+repo-workflows-forks-fork-items-7e44168f = Bereits eingerichtet: Push geht an den Branch { $info-owner-1 } von { $info-branch-2 }
+
+repo-workflows-forks-fork-items-9862a39c = Der Branch kann nicht zum Pushen ausgecheckt werden. Sein Repository existiert nicht mehr.
+
+repo-workflows-forks-fork-items-99b20173 = Freigeben und ausführen ({ $waiting }) …
+
+repo-workflows-forks-fork-items-9e40421a = { $b-name-1 } auschecken (pusht nach { $info-owner-2 })
+
+repo-workflows-forks-fork-items-a0b3b5ed = Ruft { $info-base-1 } und den Branch von { $info-owner-2 } ab, führt einen Rebase auf { $info-base-3 } aus und pusht dann mit Lease zurück, nachdem die Auswirkungen angezeigt wurden
+
+repo-workflows-forks-fork-items-a33fed38 = Fügt den Fork von { $info-owner-1 } als Remote hinzu, sofern noch nicht vorhanden, checkt den Branch { $info-branch-2 } mit Tracking aus und setzt pushRemote für Rück-Pushes. Ctrl+Z macht dies rückgängig.
+
+repo-workflows-forks-fork-items-afc89aab = Gibt Workflow-Läufe des neuesten Commits frei, die dann fremden Code auf Ihrer CI ausführen. Prüfen Sie zuerst die Änderungen.
+
+repo-workflows-forks-fork-items-bdee4479 = Fork wurde gelöscht
+
+repo-workflows-forks-fork-items-c8fd7141 = Zum Pushen nach { $info-owner-1 } auschecken
+
+repo-workflows-forks-forks-op-done-8287ad6b = { $plan-local-1 } ist hier rebasiert, aber nicht nach { $plan-fork-2 } gepusht. Ctrl+Z stellt den vorherigen Stand wieder her.
+
+repo-workflows-forks-forks-op-done-9c338e90 = Der Rebase hat bei Konflikten angehalten. Lösen Sie diese und setzen Sie ihn fort. gitcraft bietet danach den Push an. Alternativ können Sie abbrechen.
+
+repo-workflows-forks-offer-push-after-conflict-731ce7ed = Pushen
+
+repo-workflows-forks-offer-push-after-conflict-dcc709d6 = Der Rebase ist abgeschlossen. Force-Push von { $plan-local-1 } auf den Branch { $plan-fork-2 } von { $plan-branch-3 } mit Lease. Wird abgelehnt, falls seit dem Abruf dorthin gepusht wurde. Ctrl+Z stellt den fremden Branch wieder her (und das nächste Ctrl+Z Ihren).
+
+repo-workflows-forks-plan-fork-rebase-1abac341 = Dieses Repository hat kein Remote als Rebase-Ziel
+
+repo-workflows-forks-plan-fork-rebase-a3647cfa = Rebase und Push
+
+repo-workflows-forks-plan-fork-rebase-ac71056e = Branch und Basis von #{ $number } werden abgerufen …
+
+repo-workflows-forks-plan-rebase-6ccf1bc5 = { $local } enthält bereits alle Commits von { $upstream }/{ $info-base-1 }
+
+repo-workflows-forks-plan-rebase-a0b078e0 = Checken Sie zuerst den Branch von #{ $info-number-1 } für Pushes nach { $info-owner-2 } aus
+
+repo-workflows-forks-plan-rebase-b597bd2f = Checken Sie zuerst den Branch von #{ $info-number-1 } für Pushes nach { $info-owner-2 } aus. Kein Remote ist dessen Fork.
+
+repo-workflows-forks-plan-rebase-e28bbaf9 = Committen oder stashen Sie zuerst Ihre Änderungen. Dies führt einen Rebase des Branches aus.
+
+repo-workflows-forks-plan-tidy-a7e148ae = Unbenutzte Fork-Remotes entfernen
+
+repo-workflows-forks-plan-tidy-adf73b14 = Remotes konnten nicht gelesen werden: { $e }
+
+repo-workflows-forks-plan-tidy-b732e7ba = Entfernt die von gitcraft für Forks hinzugefügten Remotes, von denen kein Branch mehr pullt oder zu denen er pusht: { $unused-join-1 }, samt Remote-Tracking-Branches. Ctrl+Z fügt sie wieder hinzu (für ihre Branches erneut abrufen).{ $kept }
+
+repo-workflows-forks-plan-tidy-c3812fc4 = Entfernen
+
+repo-workflows-forks-plan-tidy-da56e1d6 = Kein Fork-Remote kann entfernt werden{ $kept }
+
+repo-workflows-ghost-approval-preview-1426bc08 = { $files-len-1 } Arbeitsdateien ändern sich
+
+repo-workflows-ghost-approval-preview-675d236b = Verwirft uncommittete Arbeitsänderungen
+
+repo-workflows-ghost-approval-preview-70be46e5 = Liste zurückbleibender Commits bei 200 gekürzt
+
+repo-workflows-ghost-approval-preview-e74a52f6 = Hält bei Schritt { $conflict-step-1 } an: { $conflict-files-join-2 }
+
+repo-workflows-ghost-current-7776bacf = HEAD ist losgelöst. Checken Sie zuerst einen Branch aus.
+
+repo-workflows-ghost-delete-branch-26d05fbc = { $name } ist nicht in { $what } gemergt. Löschen wird ohne „Erzwingen (-D)“ abgelehnt. Mit Erzwingen bleiben seine eigenen Commits ohne Branch zurück.
+
+repo-workflows-ghost-delete-branch-a9c01edc = Hier gibt es keinen Branch { $name }
+
+repo-workflows-ghost-delete-branch-dde58e5a = seinen Upstream
+
+repo-workflows-ghost-delete-branch-fadd1b38 = den ausgecheckten Branch
+
+repo-workflows-ghost-drop-commit-181a54e0 = Nach dem Commit kamen Merges, die dieser Vorgang einebnen würde
+
+repo-workflows-ghost-drop-commit-3a19c0c2 = Uncommittete Änderungen werden zuerst gestasht und danach wiederhergestellt.
+
+repo-workflows-ghost-drop-commit-da2d4ead = Der erste Commit hat keinen Elterncommit für einen Rebase
+
+repo-workflows-ghost-force-push-2d4460fd = Stand des letzten Abrufs von { $up-remote-1 }. Mit Lease wird der Push abgelehnt, wenn seitdem jemand gepusht hat.
+
+repo-workflows-ghost-force-push-a9c01edc = Hier gibt es keinen Branch { $name }
+
+repo-workflows-ghost-force-push-c637c04f = { $up-tracking-name-1 } verliert nichts. Ein normaler Push würde ausreichen.
+
+repo-workflows-ghost-force-push-f06fee94 = { $name } verfolgt keinen Remote-Branch
+
+repo-workflows-ghost-ghost-strip-a81f72de = Es wurde nichts ausgeführt
+
+repo-workflows-ghost-ghost-strip-b69b3d5d = ↑ { $plural-above-new-commit-is-new-c-1 } oberhalb der sichtbaren Zeilen.
+
+repo-workflows-ghost-ghost-strip-c4a8b8f8 = Vorschau: { $title }
+
+repo-workflows-ghost-ghost-strip-d0c20bfd = Auswirkungen werden ermittelt …
+
+repo-workflows-ghost-ghost-strip-f637d899 = Vorschau nicht möglich. { $sentence-one-line-why-1 }
+
+repo-workflows-ghost-listed-683768ab = und { $items-len-listed-1 } weitere
+
+repo-workflows-ghost-lost-line-02717c8c = Verlässt den Remote-Branch ({ $count }): { $names }
+
+repo-workflows-ghost-lost-line-2cd6d050 = Durch neue Kopien ersetzt ({ $count }; Originale: { $originals } ohne Branch): { $names }
+
+repo-workflows-ghost-lost-line-50788b96 = mehr als { $o-lost-len-1 } Commits
+
+repo-workflows-ghost-lost-line-811bd7ca = Ohne Branch zurückgelassen ({ $count }): { $names }
+
+repo-workflows-ghost-lost-line-8ccbdaa0 = Ohne Branch zurückgelassen ({ $count }, davon { $o-replaced-1 } durch neue Kopien ersetzt): { $names }
+
+repo-workflows-ghost-outcome-lines-02e3b1f7 = Keine Arbeitsdatei ändert sich.
+
+repo-workflows-ghost-outcome-lines-193731dd = Der Merge hält an
+
+repo-workflows-ghost-outcome-lines-4b54308f = Geänderte Arbeitsdateien ({ $files-len-1 }): { $listed-files-f-format-f-status-f-2 }
+
+repo-workflows-ghost-outcome-lines-7728bdcc = Hält bei Schritt { $c-step-1 } von { $c-of-2 } an ({ $describe-commit-3 })
+
+repo-workflows-ghost-outcome-lines-81deb64d = { $name } wird bei { $shown-to-1 } erstellt
+
+repo-workflows-ghost-outcome-lines-820df962 = Ermittelt mit { $engine-describe-1 }
+
+repo-workflows-ghost-outcome-lines-91af17db = { $name } wird gelöscht
+
+repo-workflows-ghost-outcome-lines-b8d8f166 = Verwirft { $describe-dropped-1 } — { $dropped-author-2 }
+
+repo-workflows-ghost-outcome-lines-ce73844c = { $name } wird verschoben: { $short-from-1 } → { $shown-to-2 }
+
+repo-workflows-ghost-outcome-lines-dfa9e9b6 = { $plural-fetched-commit-commits-1 } vom Remote
+
+repo-workflows-ghost-outcome-lines-f0e05d95 = Der Commit wird leer
+
+repo-workflows-ghost-outcome-lines-f93fde8f = Konflikte in { $listed-c-files-f-f-clone-1 }
+
+repo-workflows-ghost-pull-3a19c0c2 = Uncommittete Änderungen werden zuerst gestasht und danach wiederhergestellt.
+
+repo-workflows-ghost-pull-9045dbaa = Stand des letzten Abrufs von { $up-remote-1 }. Spätere Pushes werden nicht angezeigt.
+
+repo-workflows-ghost-pull-c7917d08 = Fast-Forward: Der Branch wird auf den Remote-Commit verschoben.
+
+repo-workflows-ghost-pull-dd489c0a = Bereits aktuell. Der Branch enthält alles vom Remote.
+
+repo-workflows-ghost-pull-f53705f4 = { $branch-name-1 } verfolgt keinen Remote-Branch. Nichts zu pullen.
+
+repo-workflows-ghost-rebase-1f963916 = Bereits aktuell. Nichts erneut anzuwenden, keine Änderungen.
+
+repo-workflows-ghost-rebase-b1f8a147 = Der Rebase startet nicht mit uncommitteten Änderungen. Committen oder stashen Sie diese zuerst.
+
+repo-workflows-ghost-rebase-e550da8a = Uncommittete Änderungen werden zuerst gestasht und danach wiederhergestellt (rebase.autoStash).
+
+repo-workflows-ghost-reset-hard-3126bbde = Uncommittete Änderungen dieser Dateien gehen unwiderruflich verloren.
+
+repo-workflows-ghost-rewrite-3477e4cb = Der Rebase hält dort an und fragt, ob der leer gewordene Commit erhalten bleiben soll. Der Branch bewegt sich noch nicht.
+
+repo-workflows-ghost-rewrite-3d8b966c = rebase.rebaseMerges ist gesetzt und die Commits enthalten Merges. Git behält diese, die Vorschau kann sie noch nicht erneut anwenden.
+
+repo-workflows-ghost-rewrite-af60968a = Geänderte Dateien werden nicht aufgelistet. Git { $self-version-1 } wendet die Commits in einem Scratch-Klon erneut an.
+
+repo-workflows-ghost-rewrite-c84070ef = { $w-picks-len-1 } Commits erneut anzuwenden. Zu viele für die Vorschau (höchstens { $PICKS-LIMIT }).
+
+repo-workflows-ghost-rewrite-e69265a2 = Der Rebase hält dort bis zur Konfliktlösung an. Der Branch bewegt sich noch nicht.
+
+repo-workflows-ghost-rewrite-fb29af2f = HEAD ist währenddessen mitten im Rebase bei { $waits } losgelöst.
+
+repo-workflows-ghost-shown-4ef6715c = ein Merge-Commit
+
+repo-workflows-ghost-timeline-18df3f5f = Dateiänderungsvorschau unvollständig: Erforderliche Blobs fehlen lokal oder das begrenzte Lesen wurde beendet. Keine Objekte wurden heruntergeladen.
+
+repo-workflows-ghost-timeline-48223518 = Ungültige Timeline-Commit-ID
+
+repo-workflows-ghost-timeline-5a1baa67 = Timeline-Vorschau unvollständig: Erforderlicher lokaler Verlauf fehlt oder das begrenzte Lesen wurde beendet. Darüberfahren lädt nie Objekte herunter.
+
+repo-workflows-ghost-timeline-6f3d9015 = Uncommittete Änderungen bleiben mit --keep erhalten. Ein kollidierender Checkout verweigert den Sprung.
+
+repo-workflows-ghost-timeline-c25867a7 = Gespeicherte Referenzen halten frühere Zustände wiederherstellbar. Diese Vorschau bewegt weder Referenzen noch Dateien.
+
+repo-workflows-ghost-title-20596011 = Rückgängig-Baum: { $label }
+
+repo-workflows-ghost-title-2d281f6b = Rebase von { $current } auf { $label }
+
+repo-workflows-ghost-title-62fc0c1a = { $branch } löschen
+
+repo-workflows-ghost-title-ae583650 = { $current } hart auf { $short-to-1 } zurücksetzen
+
+repo-workflows-ghost-title-b193a29c = Force-Push von { $branch }
+
+repo-workflows-ghost-title-baaedb85 = { $mode-label-1 } in { $current }
+
+repo-workflows-ghost-title-c58e3395 = { $branch } hier und auf dem Remote löschen
+
+repo-workflows-ghost-title-fc4198eb = Commit { $short-hash-1 } verwerfen
+
+repo-workflows-guide--21dad442 = Tipps ausgeschaltet. Einstellungen → Allgemein → Tipps schaltet sie wieder ein.
+
+repo-workflows-guide--2ee88cd5 = Erster Commit erforderlich
+
+repo-workflows-guide--b77d9539 = Setzen Sie zuerst Namen und E-Mail-Adresse (Einstellungen → Profil oder git config user.name / user.email)
+
+repo-workflows-guide--b7acfeab = Tipps und erste Hinweise ausschalten (Einstellungen → Allgemein → Tipps schaltet sie wieder ein)
+
+repo-workflows-guide-ask-empty-commit-348d9f75 = HEAD ist losgelöst. Checken Sie einen Branch für den ersten Commit aus.
+
+repo-workflows-guide-confirm-dialog-82a9c46f = Committen
+
+repo-workflows-guide-confirm-dialog-91b6a6f9 = Leeren Commit namens „{ $EMPTY-COMMIT-MESSAGE }“ auf { $name } erstellen? Dadurch erhält das Repository einen Branch zum Veröffentlichen und als Ausgangspunkt weiterer Branches. Bis zur Veröffentlichung können Sie dies rückgängig machen.
+
+repo-workflows-guide-first-commit-step-02da0750 = Noch nichts zu committen. Dateien im Repository-Ordner erscheinen automatisch oben im Graphen. Alternativ können Sie mit einem leeren Commit beginnen.
+
+repo-workflows-guide-first-commit-step-37bb706f = Ihre Dateien sind bereit. Schreiben Sie eine Zusammenfassung und committen Sie sie.
+
+repo-workflows-guide-first-commit-step-6221ab4e = Ein Commit ohne Dateien: „{ $EMPTY-COMMIT-MESSAGE }“
+
+repo-workflows-guide-first-commit-step-9416811c = Leeren Commit erstellen …
+
+repo-workflows-guide-first-commit-step-cfa86831 = Nachricht schreiben
+
+repo-workflows-guide-first-commit-step-d0ee469e = Öffnet die Änderungen rechts an der Commit-Zusammenfassung
+
+repo-workflows-guide-first-commit-step-e2f5a327 = Ersten Commit erstellen
+
+repo-workflows-guide-first-commit-step-ed251864 = Erledigt.
+
+repo-workflows-guide-first-steps-3c4e21be = Fügen Sie zuerst ein Remote hinzu
+
+repo-workflows-guide-first-steps-76a2896d = Checken Sie zuerst einen Branch aus
+
+repo-workflows-guide-first-steps-view-a5b4a2a3 = Bis zum erneuten Öffnen dieses Repositorys ausgeblendet
+
+repo-workflows-guide-first-steps-view-d4b85ef0 = Diese Schritte ausblenden
+
+repo-workflows-guide-header-5cec6b07 = Dieses Repository hat noch keine Commits
+
+repo-workflows-guide-header-a9174a7c = Drei Schritte für den Start:
+
+repo-workflows-guide-header-bb24101f = Nächste Schritte für dieses Repository
+
+repo-workflows-guide-header-cd9905c0 = Bisher nur auf diesem Rechner:
+
+repo-workflows-guide-hint-status-2c0ee188 = Tipp schließen
+
+repo-workflows-guide-publish-step-2ce79937 = Branch zum Remote pushen und verfolgen, damit Push und Pull direkt funktionieren.
+
+repo-workflows-guide-publish-step-859390eb = Veröffentlichen
+
+repo-workflows-guide-publish-step-93d6376b = { $b } zum Remote pushen und verfolgen, damit Push und Pull direkt funktionieren.
+
+repo-workflows-guide-publish-step-ed251864 = Erledigt.
+
+repo-workflows-guide-remote-step-06906287 = Veröffentlichungsziel, etwa ein neues leeres Repository auf einer Forge.
+
+repo-workflows-guide-remote-step-25a81e6a = Erledigt: { $remotes-join-1 }.
+
+repo-workflows-guide-remote-step-d20b3285 = Remote hinzufügen …
+
+repo-workflows-guide-remote-step-ecd12a48 = Remote hinzufügen
+
+repo-workflows-guide-start-first-commit-881f72cb = Noch nichts zu committen. Fügen Sie Dateien im Repository-Ordner hinzu oder ändern Sie welche.
+
+repo-workflows-guide-text-414ed52e = Tipp: { $cmd }+Klick auf einen weiteren Commit vergleicht die beiden
+
+repo-workflows-guide-text-aa7b18c5 = Tipp: „Solo“ im Branchmenü zeigt nur diesen Branch
+
+repo-workflows-guide-text-c09ad9f4 = Tipp: F7 oder Alt+↓ springt zur nächsten Änderung, Shift+F7 oder Alt+↑ zur vorherigen
+
+repo-workflows-guide-text-e94f4321 = Tipp: Doppelklick auf eine Branch-Pille checkt den Branch aus
+
+repo-workflows-guide-tip-bar-3e9b3541 = Schon gewusst?
+
+repo-workflows-guide-tip-bar-c1567088 = Nächster Tipp
+
+repo-workflows-guide-undo-refusal-6cb7f998 = { $name } ist veröffentlicht. Das Rückgängigmachen des leeren ersten Commits würde einen auch auf dem Remote vorhandenen Branch löschen. Erstellen Sie stattdessen darauf weitere Commits.
 
 repo-workflows-hotfix-cancel-19766ed6 = Abbrechen
 

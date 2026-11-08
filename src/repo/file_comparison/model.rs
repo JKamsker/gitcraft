@@ -90,7 +90,15 @@ pub(super) fn boundary(
     active: &dyn Fn() -> bool,
 ) -> Result<Boundary, String> {
     let header = files::patch_header(path, before.mode.as_deref(), after.mode.as_deref());
-    let reason=before.warning.clone().or_else(||after.warning.clone()).or_else(||(before.text().is_none()||after.text().is_none()).then(||"Binary or non-UTF8 versions: compare the byte preview; line staging is unavailable".into()));
+    let reason = before
+        .warning
+        .clone()
+        .or_else(|| after.warning.clone())
+        .or_else(|| {
+            (before.text().is_none() || after.text().is_none()).then(|| {
+                crate::i18n::text("repo-workflows-file_comparison-boundary-26efe746").into()
+            })
+        });
     if reason.is_some() {
         return Ok(Boundary {
             lines: Vec::new(),
@@ -105,7 +113,7 @@ pub(super) fn boundary(
     let a = before.text().unwrap_or_default();
     let b = after.text().unwrap_or_default();
     if a.split_inclusive('\n').count() > 20_000 || b.split_inclusive('\n').count() > 20_000 {
-        return Err("More than 20,000 lines in a version; use the normal patch view".into());
+        return Err(crate::i18n::text("repo-workflows-file_comparison-boundary-e44610d7").into());
     }
     let body = if before.bytes == after.bytes {
         String::new()
@@ -159,12 +167,15 @@ pub(super) fn boundary(
         )?
         .complete()?;
         if !matches!(output.status.code(), Some(0 | 1)) {
-            return Err("Git could not align these raw versions".into());
+            return Err(
+                crate::i18n::text("repo-workflows-file_comparison-boundary-b861cbb0").into(),
+            );
         }
-        let text = String::from_utf8(output.stdout).map_err(|_| "The raw patch is not UTF-8")?;
-        let start = text.find("@@ ").ok_or(
-            "Git could not produce a raw text patch for these differing bytes; use the normal patch view",
-        )?;
+        let text = String::from_utf8(output.stdout)
+            .map_err(|_| crate::i18n::text("repo-workflows-file_comparison-boundary-5421cc1b"))?;
+        let start = text.find("@@ ").ok_or(crate::i18n::text(
+            "repo-workflows-file_comparison-boundary-6732715f",
+        ))?;
         text[start..].to_owned()
     };
     let full = format!("{header}{body}");

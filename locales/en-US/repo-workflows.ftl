@@ -1781,17 +1781,801 @@ repo-workflows-doctor-verdict-c3b9d549 = There is no such file here: the rules a
 
 repo-workflows-doctor-verdict-f0d742e1 = Tracked, and the last rule that matches it is this ! rule.
 
+repo-workflows-drift_view-body-31794226 = Measure again
+
+repo-workflows-drift_view-body-3e453620 = Ask a coding agent (optional)
+
+repo-workflows-drift_view-body-42a9eb31 = Save task
+
 repo-workflows-drift_view-body-4bc74b21 = Task
+
+repo-workflows-drift_view-body-65fb660d = What the agent was asked to do (kept with the worktree, never committed)
 
 repo-workflows-drift_view-body-7d9eb7ac = Close
 
+repo-workflows-drift_view-body-a8164b33 = Scope drift: { $view-worktree-name-1 } ({ $branch })
+
+repo-workflows-drift_view-body-cdc38d02 = Linked issue #{ $n }: { $text-lines-next-unwrap-or-defaul-1 }
+
+repo-workflows-drift_view-body-e039d62e = Runs claude -p (or codex exec) here with the task and the paths, no file contents, and shows which items it thinks the task doesn't need
+
+repo-workflows-drift_view-body-fa4f662d = Linked issue #{ $n }: { $e }
+
+repo-workflows-drift_view-item-518baa09 = Not committed in that worktree: opens it, where its changes are
+
+repo-workflows-drift_view-item-bccfdf69 = Opens its diff
+
+repo-workflows-drift_view-item-d91938be = Opens:
+    { $tip-join-n-1 }
+
+repo-workflows-drift_view-measure-drift-27f1506d = The repository's forge isn't known
+
+repo-workflows-drift_view-report-3ecc0ca7 = Asked: { $task-lines-next-unwrap-or-defaul-1 }
+
+repo-workflows-drift_view-report-57f4cf0a = No task to go by: write one above (or link an issue) to tell the folders apart.
+
+repo-workflows-drift_view-save-task-a40b28e7 = Saved beside the worktree's git data
+
+repo-workflows-drift_view-sections-14063185 = New dependencies ({ $report-dependencies-len-1 })
+
+repo-workflows-drift_view-sections-1bb434ba = Folders the task doesn't mention ({ $unrelated-len-1 })
+
+repo-workflows-drift_view-sections-4cf1b0e4 = (top level)
+
+repo-workflows-drift_view-sections-619bb740 = Every file changed ({ $report-files-len-1 })
+
+repo-workflows-drift_view-sections-819e9567 = { $dep-name-1 }  in { $dep-manifest-2 }
+
+repo-workflows-drift_view-sections-a8299dbd = Public signatures changed ({ $report-signatures-len-1 })
+
+repo-workflows-email-apply-61c57973 = Invalid mailbox path
+
+repo-workflows-email-compare-6921220f = Commit or stash worktree changes first
+
+repo-workflows-email-compare-b5921a15 = Worktree HEAD, branch, changes, configuration or selected profile changed; read/preview again
+
+repo-workflows-email-email-act-3eece223 = Recipients changed; generate a new preview
+
+repo-workflows-email-email-act-5474eef8 = Working…
+
+repo-workflows-email-email-act-84f8f92f = Cancelled before starting
+
+repo-workflows-email-email-act-c19c9f05 = Email patches · b4
+
+repo-workflows-email-email-act-fa043d04 = Not enrolled or b4 unavailable: { $e }
+
+repo-workflows-email-email-window-035719bf = Previous sent Message-ID
+
+repo-workflows-email-email-window-03712771 = Receive and review
+
+repo-workflows-email-email-window-1219b3d1 = Set numbered revision
+
+repo-workflows-email-email-window-15173718 = Fetch series with b4
+
+repo-workflows-email-email-window-179e0bb7 = Public-inbox HTTPS URL or Message-ID
+
+repo-workflows-email-email-window-1e3943ad = Read prepared branch and cover
+
+repo-workflows-email-email-window-2a42475c = Preview generated without sending mail
+
+repo-workflows-email-email-window-2e516d68 = Revision
+
+repo-workflows-email-email-window-381b0db7 = Author and reroll
+
+repo-workflows-email-email-window-3d343b32 = Generate outgoing preview (no mail)
+
+repo-workflows-email-email-window-49077514 = Revision (0 = latest)
+
+repo-workflows-email-email-window-54194499 = I understand b4 preparation can rewrite this branch and change its metadata
+
+repo-workflows-email-email-window-54cdddfe = Preview and send
+
+repo-workflows-email-email-window-582e1946 = Save cover with b4
+
+repo-workflows-email-email-window-624d6ba0 = Series fetched; review the cover, patches and trailers before applying
+
+repo-workflows-email-email-window-632693ae = { $error }
+    If cancelled or partially completed, inspect Git/b4/mail state before retrying. Apply conflicts use the existing Continue/Abort operation controls.
+
+repo-workflows-email-email-window-6ad695fc = I reviewed every recipient and message and want to send real mail
+
+repo-workflows-email-email-window-8c1d9c9f = Profile changed. Operation cancelled; inspect repository and mail state before retrying.
+
+repo-workflows-email-email-window-8c3ad598 = Requires the supported b4 source build ce4c1158 (0.17-dev), installed with its Python entrypoint in a virtual environment on this machine. The Python helper uses isolated mode, so user-site/PYTHONPATH-only installs are unsupported. Other builds are refused until their contract is reviewed. Uses b4's configured identity, public-inbox and sending transport. No credentials are exported by gitcraft.
+
+repo-workflows-email-email-window-99fe2a7b = Sending regenerates volatile Date, Message-ID and signature headers. Recipients, subjects and decoded MIME content are checked against this preview. b4's successful-send tagging/reroll behavior applies. Native failed-preflight or unknown prompts abort; only the final send confirmation is answered by this explicit approval.
+
+repo-workflows-email-email-window-9cb42639 = Fetched for HEAD { $received-snapshot-head-1 } · { $received-messages-len-2 } patches
+
+repo-workflows-email-email-window-b0fcf938 = Additional recipients. b4 also derives recipients from its cover/configuration and review trailers; inspect every generated message below.
+
+repo-workflows-email-email-window-b28037e9 = Cc
+
 repo-workflows-email-email-window-b64a0d4f = Cancel operation
+
+repo-workflows-email-email-window-b8c5cd6e = Prepared branch read
+
+repo-workflows-email-email-window-bc346e4f = Enroll current branch
+
+repo-workflows-email-email-window-c19c9f05 = Email patches · b4
+
+repo-workflows-email-email-window-c6755006 = Worker ended or was cancelled. Inspect repository/mail state before retrying; mail may have been delivered.
+
+repo-workflows-email-email-window-c962be80 = Fork point
+
+repo-workflows-email-email-window-d9adba22 = Cover letter
+
+repo-workflows-email-email-window-e6884e31 = Send reviewed series through b4
+
+repo-workflows-email-email-window-e6ec08b2 = Reroll from sent series
+
+repo-workflows-email-email-window-e70c5648 = Apply reviewed series (git am --3way)
+
+repo-workflows-email-email-window-f4b06ef6 = To
+
+repo-workflows-email-guard-d353a99e = Cancelled
+
+repo-workflows-email-interpreter-409abb66 = Installed b4 must have a Python script entrypoint
+
+repo-workflows-email-interpreter-d5e7d057 = Unsupported b4 entrypoint; use the supported source build's Python entrypoint
+
+repo-workflows-email-interpreter-fdf4c44a = b4 entrypoint has no Python shebang
+
+repo-workflows-email-invoke-b4-8728290f = Install b4 in an absolute executable PATH directory (a Python virtual environment is supported)
+
+repo-workflows-email-invoke-b4-c9d943f4 = Cannot read installed b4 entrypoint: { $e }
+
+repo-workflows-email-mailbox-10ff6da2 = Series exceeds 32 MiB
+
+repo-workflows-email-mailbox-52374212 = Expected b4's git-am mailbox envelope
+
+repo-workflows-email-mailbox-ede3c4f9 = More than 1024 messages
+
+repo-workflows-email-messages-07ed6ccf = Mail
+
+repo-workflows-email-messages-1edf47d5 = Subject:
+
+repo-workflows-email-messages-8e0d8018 = Message { $index-1-1 } · { $message-headers-lines-find-l-l-s-2 }
+
+repo-workflows-email-messages-a6252664 = Raw RFC822 message
+
+repo-workflows-email-new-21656993 = Cannot allocate private mail directory
+
+repo-workflows-email-parse-8107bb41 = Mail exceeds 32 MiB
+
+repo-workflows-email-parse-ff511962 = Mail has no Subject header
+
+repo-workflows-email-parse-ff6e2278 = Incomplete mbox envelope
+
+repo-workflows-email-parts-18af1d8d = [{ $mail-ctype-mimetype-1 } attachment: { $raw-len-2 } decoded bytes]
+
+repo-workflows-email-parts-93b357ba = Mail MIME nesting exceeds 24 levels
+
+repo-workflows-email-prepare-7fa1230f = Expected a positive revision number
+
+repo-workflows-email-prepare-ad82832b = Unknown preparation action
+
+repo-workflows-email-prepare-b8cd601f = Enter a fork-point revision
+
+repo-workflows-email-prepare-d287cfde = Revision must be positive
+
+repo-workflows-email-preview-2345df14 = Cannot read bounded outgoing message
+
+repo-workflows-email-preview-7a897da3 = Invalid outgoing filename
+
+repo-workflows-email-preview-ca11bd96 = More than 1024 outgoing messages
+
+repo-workflows-email-preview-d135ecfa = Outgoing series exceeds 32 MiB
+
+repo-workflows-email-preview-ff2f2c5c = b4 produced no outgoing messages
+
+repo-workflows-email-receive-3b985b29 = Cannot read bounded mailbox
+
+repo-workflows-email-receive-4350d1be = b4 produced no mailbox
+
+repo-workflows-email-receive-61e11166 = Invalid mailbox name
+
+repo-workflows-email-receive-7fcd485d = Non-UTF8 b4 output filename
+
+repo-workflows-email-receive-9820d0e4 = Cannot read bounded cover letter
+
+repo-workflows-email-receive-b0772e5b = b4 produced several mailboxes; select a single series
+
+repo-workflows-email-recipients-5fb6b41e = Invalid recipient list
+
+repo-workflows-email-recipients-c706c00a = Empty recipient list
+
+repo-workflows-email-recipients-e0cee753 = Recipient list: { $e }
+
+repo-workflows-email-reroll-id-17d9d618 = Unbalanced Message-ID brackets
+
+repo-workflows-email-reroll-id-bbeca305 = Use the previous sent Message-ID, not a URL
+
+repo-workflows-email-send-9753828b = Send did not report success: { $e }. Some mail may already have been delivered. Inspect b4/mail state before retrying.
+
+repo-workflows-email-send-a590b131 = b4 reported a successful send. Inspect native sent tags and revision before sending again.
+    { $output }
+
+repo-workflows-email-send-reviewed-e9663ecb = Outgoing recipients or content changed; preview again before sending
+
+repo-workflows-email-snapshot-2627ca9e = .b4-config must be readable inside the worktree and at most 1 MiB
+
+repo-workflows-email-snapshot-a55ce185 = Email patches currently require a worktree on this machine and the supported b4 ce4c1158 (0.17-dev) source build installed there
+
+repo-workflows-email-source-034af213 = Enter a public-inbox HTTPS URL or Message-ID
+
+repo-workflows-email-source-51ea03e4 = Inbox URL cannot contain credentials
+
+repo-workflows-email-source-60f601ea = Expected a HTTPS URL or Message-ID
 
 repo-workflows-fence_view-body-7d9eb7ac = Close
 
+repo-workflows-fence_view-body-803f082f = Agent fence
+
+repo-workflows-fence_view-body-98912c89 = Also write a section of { $fence-agents-1 } (Codex)
+
+repo-workflows-fence_view-body-a8aa1101 = Save and write to agents
+
+repo-workflows-fence_view-body-b31ba75f = A section of its own; a file the repository usually tracks, so it shows as changed
+
+repo-workflows-fence_view-body-b42a9a6f = Add suggestions
+
+repo-workflows-fence_view-body-c408ae8c = Also write { $fence-cursor-1 }
+
+repo-workflows-fence_view-body-cac5a24a = Not written into every worktree's configs:
+    { $write-errors-join-n-1 }
+
+repo-workflows-fence_view-body-d10df00e = A block of its own; a file the repository may track, so it shows as changed
+
+repo-workflows-fence_view-body-d1953461 = Paths agents must stay out of, one per line, in .gitignore's syntax without exceptions (secrets/, .env, *.pem, /Cargo.lock), any case. Saved in this repository's git config, shared by its worktrees, and written into each worktree's Claude Code deny rules ({ $fence-claude-1 }, kept out of git), now and for worktrees added later. Rules can leak, so every linked worktree is checked too: one whose commits, changes, untracked or ignored files touch the fence (or that can't be checked) turns red. A merge, fast-forward or rebase onto any branch is checked first and asks when its commits or its worktree touched the fence.
+
+repo-workflows-fence_view-confirm-body-e537b5dc = { $branch } (checked out in the worktree { $wt })
+
+repo-workflows-fence_view-fence-gate-214a3091 = Merge anyway
+
+repo-workflows-fence_view-fence-gate-2b8e4f3b = Checking against the agent fence…
+
+repo-workflows-fence_view-fence-gate-6b730ef5 = Checking against the agent fence
+
+repo-workflows-fence_view-list-violations-a6d5a69b =   and { $found-len-listed-1 } more
+
+repo-workflows-fence_view-save-7bfa9a3b = Saved, but not everywhere:
+    { $errors-join-n-1 }
+
+repo-workflows-file_comparison-assemble-1641af0b = More than 50,000 patch lines. Compare a smaller range.
+
+repo-workflows-file_comparison-assemble-56abde67 = Moved-code comparison cancelled
+
+repo-workflows-file_comparison-boundary-26efe746 = Binary or non-UTF8 versions: compare the byte preview; line staging is unavailable
+
+repo-workflows-file_comparison-boundary-5421cc1b = The raw patch is not UTF-8
+
+repo-workflows-file_comparison-boundary-6732715f = Git could not produce a raw text patch for these differing bytes; use the normal patch view
+
+repo-workflows-file_comparison-boundary-b861cbb0 = Git could not align these raw versions
+
+repo-workflows-file_comparison-boundary-button-033f86f9 = Unstage
+
+repo-workflows-file_comparison-boundary-button-0cadc525 = { $text } lens row { $index-1-1 }
+
+repo-workflows-file_comparison-boundary-button-de838855 = Stage
+
+repo-workflows-file_comparison-boundary-e44610d7 = More than 20,000 lines in a version; use the normal patch view
+
+repo-workflows-file_comparison-comparison-pick-28dc27ab = { $pick-verb-1 } { $snapshot-spec-path-2 } from staging lens
+
+repo-workflows-file_comparison-file-comparison-view-04166b68 = Files are rows; pinned branch commits are columns. V-markers identify equal bytes, including across rows. Missing cells and file modes are separate. Click two cells to open their content diff.
+
+repo-workflows-file_comparison-file-comparison-view-103acf25 = Read three versions
+
+repo-workflows-file_comparison-file-comparison-view-1e2e1383 = Choose branches ({ $state-selected-len-1 } selected, maximum 8)
+
+repo-workflows-file_comparison-file-comparison-view-21819769 = From
+
+repo-workflows-file_comparison-file-comparison-view-22d5cf54 = Raw snapshots · refresh after repository changes · no automatic downloads
+
+repo-workflows-file_comparison-file-comparison-view-2ad51b3c = Code moved across files
+
+repo-workflows-file_comparison-file-comparison-view-2d2cd49c = Staged moves
+
+repo-workflows-file_comparison-file-comparison-view-327070c2 = HEAD → staged → working copy. Stage or unstage lines at either boundary; refresh if the file changes. Binary files and files requiring Git conversions stay read-only here.
+
+repo-workflows-file_comparison-file-comparison-view-3f64b850 = Refresh file view
+
+repo-workflows-file_comparison-file-comparison-view-40379eb3 = Open normal patch
+
+repo-workflows-file_comparison-file-comparison-view-50009ce1 = File
+
+repo-workflows-file_comparison-file-comparison-view-51d4ac7c = Commit → working copy
+
+repo-workflows-file_comparison-file-comparison-view-5fa4365c = Reading immutable versions…
+
+repo-workflows-file_comparison-file-comparison-view-725513de = Comparison cancelled. Refresh to try again.
+
 repo-workflows-file_comparison-file-comparison-view-74ccd433 = Folder
 
+repo-workflows-file_comparison-file-comparison-view-7b8bea18 = Close file view
+
 repo-workflows-file_comparison-file-comparison-view-82a9c46f = Commit
+
+repo-workflows-file_comparison-file-comparison-view-86154135 = Find file migrations
+
+repo-workflows-file_comparison-file-comparison-view-89fa7940 = To / commit
+
+repo-workflows-file_comparison-file-comparison-view-90e2e8fa = File versions across branches
+
+repo-workflows-file_comparison-file-comparison-view-aa2b8150 = Git detects renames/copies at 50% similarity, within 2,000 candidates. Stage reorganized files first to include newly named working files. Content edits open separately from the move.
+
+repo-workflows-file_comparison-file-comparison-view-ca74fb37 = Cancel comparison
+
+repo-workflows-file_comparison-file-comparison-view-d1d29085 = Working copy
+
+repo-workflows-file_comparison-file-comparison-view-daec459a = Staged
+
+repo-workflows-file_comparison-file-comparison-view-dfc3916d = Find moved code
+
+repo-workflows-file_comparison-file-comparison-view-edc82098 = File migration map
+
+repo-workflows-file_comparison-file-comparison-view-efa19808 = Commit moves
+
+repo-workflows-file_comparison-file-comparison-view-f08307c5 = Compare deleted and added blocks across tracked files; whitespace around lines is ignored. Stage newly created files first. Analysis is bounded to 300 files, 50,000 lines and 40 seconds; encrypted files are excluded.
+
+repo-workflows-file_comparison-file-comparison-view-f2473f24 = Between commits
+
+repo-workflows-file_comparison-file-comparison-view-f315d745 = Repository root
+
+repo-workflows-file_comparison-file-comparison-view-f4b06ef6 = To
+
+repo-workflows-file_comparison-file-comparison-view-fb60b8e0 = Three-state staging lens
+
+repo-workflows-file_comparison-file-comparison-view-fdc19d89 = Compare branch versions
+
+repo-workflows-file_comparison-invalidate-81f92ce0 = Repository changed. Refresh the file view.
+
+repo-workflows-file_comparison-lens-3a1781b9 = Long lines are abbreviated at 2,000 characters; boundary actions use the complete raw line. Use the normal patch to inspect it.
+
+repo-workflows-file_comparison-lens-4902e29c = Working copy matches HEAD, but the next commit still changes this file. Working edits undo the staged edit.
+
+repo-workflows-file_comparison-lens-6e60c4a1 = Unstage entire boundary
+
+repo-workflows-file_comparison-lens-75673075 = ← unstage
+
+repo-workflows-file_comparison-lens-8f600488 = Stage entire boundary
+
+repo-workflows-file_comparison-lens-92bc93d0 = ← stage
+
+repo-workflows-file_comparison-lens-b72fb6c1 = undoes staged
+
+repo-workflows-file_comparison-lens-bfae8a90 = HEAD uses { $previous }; content-only unstaging keeps the staged move. Change the move itself in the normal patch.
+
+repo-workflows-file_comparison-lens-d1d29085 = Working copy
+
+repo-workflows-file_comparison-lens-daec459a = Staged
+
+repo-workflows-file_comparison-matrix-50009ce1 = File
+
+repo-workflows-file_comparison-matrix-6be36ca4 = Missing
+
+repo-workflows-file_comparison-matrix-c81d97c3 = { $label }
+    Pinned { $c-oid-1 }
+
+repo-workflows-file_comparison-matrix-ebfcc1d5 = { $data-paths-len-1 } files · select another cell after the first
+
+repo-workflows-file_comparison-migration-06869a99 = similarity unknown
+
+repo-workflows-file_comparison-migration-208e67e7 = { $m-before-name-1 } → { $m-after-name-2 } · { $if-m-copy-copy-else-rename-3 } { $m-similarity-map-s-format-s-unwr-4 }
+
+repo-workflows-file_comparison-migration-3064d79a = Rename
+
+repo-workflows-file_comparison-migration-35255dde = Git detection warning (some moves may be unknown): { $warning }
+
+repo-workflows-file_comparison-migration-41aec147 = { $data-moves-len-1 } renames/copies · { $data-other-changes-2 } other changes
+
+repo-workflows-file_comparison-migration-a419e1f7 = No Git-detected renames or copies. Added/deleted paths are not assumed to be moves.
+
+repo-workflows-file_comparison-migration-e21f935f = Copy
+
+repo-workflows-file_comparison-open-file-comparison-a6cb5dc1 = Finish or close the editor first
+
+repo-workflows-file_comparison-paths-28803ea3 = Resolve conflicts before analyzing moved code
+
+repo-workflows-file_comparison-paths-58fb2d6a = Missing change status
+
+repo-workflows-file_comparison-paths-59a504f9 = { $files-display-path-path-1 }: non-UTF8 path skipped
+
+repo-workflows-file_comparison-paths-ae3de607 = Unexpected changed-file status
+
+repo-workflows-file_comparison-paths-d4097e54 = More than 300 changed files. Compare a smaller range.
+
+repo-workflows-file_comparison-paths-e3561990 = Incomplete changed-file list
+
+repo-workflows-file_comparison-prepare-da3978aa = Invalid comparison sides
+
+repo-workflows-file_comparison-read-0378d2b4 = Staged changes · HEAD → index
+
+repo-workflows-file_comparison-read-259fd376 = HEAD changed during analysis. Refresh.
+
+repo-workflows-file_comparison-read-3fbe0e2d = Unknown moved-code source
+
+repo-workflows-file_comparison-read-431f5828 = Moved-code analysis cancelled or exceeded 40 seconds
+
+repo-workflows-file_comparison-read-5e3dd301 = Commit { $oid-8-1 } · first parent
+
+repo-workflows-file_comparison-read-6289d4ba = { $files-display-path-path-as-bytes-1 }: encrypted content excluded
+
+repo-workflows-file_comparison-read-6adc8019 = File content changed during analysis. Refresh.
+
+repo-workflows-file_comparison-read-a6767f12 = Changed patches exceed 6 MiB. Compare a smaller range.
+
+repo-workflows-file_comparison-read-bf031806 = { $oid-8-1 } → working copy (tracked files)
+
+repo-workflows-file_comparison-read-f42f63e5 = { $files-display-path-path-as-bytes-1 }: non-UTF8 patch skipped
+
+repo-workflows-file_comparison-read-fc054b54 = Changed paths changed during analysis. Refresh.
+
+repo-workflows-file_comparison-read-fcc615d7 = Working copy · index → working copy (tracked files)
+
+repo-workflows-file_comparison-show-70bfd7fb = Wrap
+
+repo-workflows-file_comparison-show-pair-06ebe02e = Byte preview (first512 bytes per side; full sizes shown above)
+
+repo-workflows-file_comparison-show-pair-2f04c026 = No content edits: identical bytes. Names, presence and file modes remain separate.
+
+repo-workflows-file_comparison-show-pair-7b68fe55 = After
+
+repo-workflows-file_comparison-show-pair-98154a15 = Content edits only
+
+repo-workflows-file_comparison-show-pair-9bb72500 = Before
+
+repo-workflows-file_comparison-show-pair-e3ccb1fe = Before: { $pair-versions-0-label-1 } · After: { $pair-versions-1-label-2 }
+
+repo-workflows-file_comparison-view-4699e093 = Open { $if-side-0-source-else-destinatio-1 } { $l-label-2 }
+
+repo-workflows-file_comparison-view-746eb9db = { $data-locations-len-1 } blocks moved across files · shared M-markers pair both locations
+
+repo-workflows-file_comparison-view-8bb733fc = M{ $i-1-1 } · Moved to…
+
+repo-workflows-file_comparison-view-a47d33a8 = No cross-file moved blocks found (minimum 20 letters/digits). Same-file moves remain in the normal patch.
+
+repo-workflows-file_comparison-view-b8b66b62 = unchanged / re-indented
+
+repo-workflows-file_comparison-view-baa2bc90 = edited during move
+
+repo-workflows-forge_link-deliver-5add4905 = Couldn't open the browser for { $link-url-1 }: { $e }
+
+repo-workflows-forge_link-deliver-8d525e5f = Copied
+
+repo-workflows-forge_link-deliver-aab63f85 = Open link
+
+repo-workflows-forge_link-deliver-b19fb8d1 = Opened
+
+repo-workflows-forge_link-deliver-c5e2849f = { $done } the link, but { $warning }: { $link-url-1 }
+
+repo-workflows-forge_link-deliver-dbf362d4 = Copy link
+
+repo-workflows-forge_link-deliver-f9eecf25 = Not a web address: { $link-url-1 }
+
+repo-workflows-forge_link-items-44c5ece2 = Open { $what } on
+
+repo-workflows-forge_link-items-55932e34 = On { $c-forge-1 }. The branch tracks no remote and there is no origin: pick one
+
+repo-workflows-forge_link-items-6bb03074 = A permanent link (by the commit's hash), on { $one-remote-1 } ({ $one-place-2 })
+
+repo-workflows-forge_link-items-78bef62f = Open { $what } on { $one-forge-1 }
+
+repo-workflows-forge_link-items-a5232678 = Copy link to { $what }
+
+repo-workflows-forge_link-items-ea6a597e = The branch's page on { $one-remote-1 } ({ $one-place-2 }): it follows the branch as it moves
+
+repo-workflows-forks-allow-edits-6bb2bbb0 = Allow edits by maintainers
+
+repo-workflows-forks-allow-edits-9e60d9b6 = Allow commits from members who can merge to the target branch
+
+repo-workflows-forks-allow-edits-ddc30ba0 = Allow edits from maintainers
+
+repo-workflows-forks-approve-runs-282082c7 = Couldn't approve #{ $number }'s workflow runs: { $e }
+
+repo-workflows-forks-approve-runs-2f659b28 = Approving #{ $number }'s workflow runs…
+
+repo-workflows-forks-approve-runs-a151ad19 = #{ $number }'s workflow runs are approved
+
+repo-workflows-forks-approve-runs-a77eca22 = Approving runs the contributor's code on your CI: look through #{ $number }'s changes first, then choose Approve and run again
+
+repo-workflows-forks-badges-42d0a9e0 = can edit
+
+repo-workflows-forks-badges-84e3eb92 = awaiting approval
+
+repo-workflows-forks-badges-aea3a983 = { $info-owner-1 } lets maintainers push to their branch { $info-branch-2 }: Check out to push to { $info-owner-3 } in its menu
+
+repo-workflows-forks-badges-e3d8fbdd = { $info-owner-1 }'s first contribution to the repository
+
+repo-workflows-forks-checkout-00c3592c = #{ $info-number-1 }'s branch name ({ $info-branch-2 }) can't be used as it is
+
+repo-workflows-forks-checkout-13fc08d7 = #{ $info-number-1 }'s branch is in this repository: check it out as any branch
+
+repo-workflows-forks-checkout-43a1fda6 = The forge didn't say where { $info-owner-1 }'s fork is
+
+repo-workflows-forks-checkout-625f9e12 = { $info-owner-1 } doesn't let maintainers push to #{ $info-number-2 }'s branch
+
+repo-workflows-forks-checkout-d005bf20 = { $info-branch-1 }, { $info-owner-2 }/{ $info-branch-3 } and pr-{ $info-number-4 } are all branches here already
+
+repo-workflows-forks-checkout-fork-5ecb3bac = Where #{ $number } comes from isn't known yet
+
+repo-workflows-forks-checkout-fork-abaaf4c3 = Check out #{ $number } to push to { $info-owner-1 }
+
+repo-workflows-forks-count-082131a5 = unexpected count: { $e }
+
+repo-workflows-forks-fork-items-2b48edeb = Check out { $info-owner-1 }'s branch to push to them first
+
+repo-workflows-forks-fork-items-3450c709 = Rebase onto { $info-base-1 } and push to { $info-owner-2 }
+
+repo-workflows-forks-fork-items-6c1751f8 = { $info-owner-1 } doesn't let maintainers push to { $info-branch-2 }: ask them to tick “{ $allow-edits-self-forge-3 }”
+
+repo-workflows-forks-fork-items-7e44168f = Set up already: a push goes to { $info-owner-1 }'s { $info-branch-2 }
+
+repo-workflows-forks-fork-items-9862a39c = The branch can't be checked out to push to: its repository is gone
+
+repo-workflows-forks-fork-items-99b20173 = Approve and run ({ $waiting })…
+
+repo-workflows-forks-fork-items-9e40421a = Check out { $b-name-1 } (pushes to { $info-owner-2 })
+
+repo-workflows-forks-fork-items-a0b3b5ed = Fetches { $info-base-1 } and { $info-owner-2 }'s branch, rebases it onto { $info-base-3 }, then force-pushes it to them with a lease, after showing what it will do
+
+repo-workflows-forks-fork-items-a33fed38 = Adds { $info-owner-1 }'s fork as a remote (unless one is it already), checks their branch { $info-branch-2 } out tracking it, and sets the branch's pushRemote so that Push goes back to them. Ctrl+Z undoes it
+
+repo-workflows-forks-fork-items-afc89aab = Approves the workflow runs of its latest commit, which then run the contributor's code on your CI: look through its changes first
+
+repo-workflows-forks-fork-items-bdee4479 = Its fork was deleted
+
+repo-workflows-forks-fork-items-c8fd7141 = Check out to push to { $info-owner-1 }
+
+repo-workflows-forks-forks-op-done-8287ad6b = { $plan-local-1 } is rebased here, but not pushed to { $plan-fork-2 }: Ctrl+Z puts it back as it was
+
+repo-workflows-forks-forks-op-done-9c338e90 = The rebase stopped on conflicts: resolve them and continue it, then gitcraft offers to push it (or abort it)
+
+repo-workflows-forks-offer-push-after-conflict-731ce7ed = Push
+
+repo-workflows-forks-offer-push-after-conflict-dcc709d6 = The rebase is done. Force-pushes { $plan-local-1 } to { $plan-fork-2 }'s { $plan-branch-3 } with a lease: refused if they pushed there since it was fetched. Ctrl+Z puts their branch back as it was (and yours with the next Ctrl+Z).
+
+repo-workflows-forks-plan-fork-rebase-1abac341 = This repository has no remote to rebase onto
+
+repo-workflows-forks-plan-fork-rebase-a3647cfa = Rebase and push
+
+repo-workflows-forks-plan-fork-rebase-ac71056e = Fetching #{ $number }'s branch and its base…
+
+repo-workflows-forks-plan-rebase-6ccf1bc5 = { $local } already has every commit of { $upstream }/{ $info-base-1 }
+
+repo-workflows-forks-plan-rebase-a0b078e0 = Check out #{ $info-number-1 }'s branch to push to { $info-owner-2 } first
+
+repo-workflows-forks-plan-rebase-b597bd2f = Check out #{ $info-number-1 }'s branch to push to { $info-owner-2 } first: no remote is their fork
+
+repo-workflows-forks-plan-rebase-e28bbaf9 = Commit or stash your changes first: this rebases the branch
+
+repo-workflows-forks-plan-tidy-a7e148ae = Remove unused fork remotes
+
+repo-workflows-forks-plan-tidy-adf73b14 = Couldn't read the remotes: { $e }
+
+repo-workflows-forks-plan-tidy-b732e7ba = Removes the remotes gitcraft added for forks that no branch pulls from or pushes to any more: { $unused-join-1 }, with their remote-tracking branches. Ctrl+Z adds them back (fetch them for their branches).{ $kept }
+
+repo-workflows-forks-plan-tidy-c3812fc4 = Remove
+
+repo-workflows-forks-plan-tidy-da56e1d6 = No fork remote can go{ $kept }
+
+repo-workflows-ghost-approval-preview-1426bc08 = { $files-len-1 } working files change
+
+repo-workflows-ghost-approval-preview-675d236b = Discards uncommitted working changes
+
+repo-workflows-ghost-approval-preview-70be46e5 = Leaving-commit list is truncated at 200
+
+repo-workflows-ghost-approval-preview-e74a52f6 = Stops at step { $conflict-step-1 }: { $conflict-files-join-2 }
+
+repo-workflows-ghost-current-7776bacf = HEAD is detached: check out a branch first
+
+repo-workflows-ghost-delete-branch-26d05fbc = { $name } isn't merged into { $what }: Delete refuses unless Force (-D) is ticked, which leaves its own commits on no branch.
+
+repo-workflows-ghost-delete-branch-a9c01edc = there is no branch { $name } here
+
+repo-workflows-ghost-delete-branch-dde58e5a = its upstream
+
+repo-workflows-ghost-delete-branch-fadd1b38 = the checked-out branch
+
+repo-workflows-ghost-drop-commit-181a54e0 = merges came after the commit, which this would flatten
+
+repo-workflows-ghost-drop-commit-3a19c0c2 = Uncommitted changes are stashed first and put back after.
+
+repo-workflows-ghost-drop-commit-da2d4ead = the first commit has no parent to rebase from
+
+repo-workflows-ghost-force-push-2d4460fd = As of the last fetch of { $up-remote-1 }: with the lease, the push is refused if someone pushed since.
+
+repo-workflows-ghost-force-push-a9c01edc = there is no branch { $name } here
+
+repo-workflows-ghost-force-push-c637c04f = { $up-tracking-name-1 } loses nothing: a plain push would do.
+
+repo-workflows-ghost-force-push-f06fee94 = { $name } tracks no branch on a remote
+
+repo-workflows-ghost-ghost-strip-a81f72de = nothing has been done
+
+repo-workflows-ghost-ghost-strip-b69b3d5d = ↑ { $plural-above-new-commit-is-new-c-1 } above the rows in view.
+
+repo-workflows-ghost-ghost-strip-c4a8b8f8 = Preview: { $title }
+
+repo-workflows-ghost-ghost-strip-d0c20bfd = Working out what it would do…
+
+repo-workflows-ghost-ghost-strip-f637d899 = Can't preview it. { $sentence-one-line-why-1 }
+
+repo-workflows-ghost-listed-683768ab = and { $items-len-listed-1 } more
+
+repo-workflows-ghost-lost-line-02717c8c = Leaving the remote's branch ({ $count }): { $names }
+
+repo-workflows-ghost-lost-line-2cd6d050 = Replaced by new copies ({ $count }; { $originals } left on no branch): { $names }
+
+repo-workflows-ghost-lost-line-50788b96 = more than { $o-lost-len-1 } commits
+
+repo-workflows-ghost-lost-line-811bd7ca = Left on no branch ({ $count }): { $names }
+
+repo-workflows-ghost-lost-line-8ccbdaa0 = Left on no branch ({ $count }, { $o-replaced-1 } of them replaced by new copies): { $names }
+
+repo-workflows-ghost-outcome-lines-02e3b1f7 = No file of the working tree changes.
+
+repo-workflows-ghost-outcome-lines-193731dd = The merge stops
+
+repo-workflows-ghost-outcome-lines-4b54308f = Files of the working tree that change ({ $files-len-1 }): { $listed-files-f-format-f-status-f-2 }
+
+repo-workflows-ghost-outcome-lines-7728bdcc = Stops at step { $c-step-1 } of { $c-of-2 } ({ $describe-commit-3 })
+
+repo-workflows-ghost-outcome-lines-81deb64d = { $name } is made at { $shown-to-1 }
+
+repo-workflows-ghost-outcome-lines-820df962 = Worked out with { $engine-describe-1 }
+
+repo-workflows-ghost-outcome-lines-91af17db = { $name } is deleted
+
+repo-workflows-ghost-outcome-lines-b8d8f166 = Drops { $describe-dropped-1 } — { $dropped-author-2 }
+
+repo-workflows-ghost-outcome-lines-ce73844c = { $name } moves { $short-from-1 } → { $shown-to-2 }
+
+repo-workflows-ghost-outcome-lines-dfa9e9b6 = { $plural-fetched-commit-commits-1 } from the remote
+
+repo-workflows-ghost-outcome-lines-f0e05d95 = the commit becomes empty
+
+repo-workflows-ghost-outcome-lines-f93fde8f = conflicts in { $listed-c-files-f-f-clone-1 }
+
+repo-workflows-ghost-pull-3a19c0c2 = Uncommitted changes are stashed first and put back after.
+
+repo-workflows-ghost-pull-9045dbaa = As of the last fetch of { $up-remote-1 }: what was pushed there since isn't shown.
+
+repo-workflows-ghost-pull-c7917d08 = Fast-forward: the branch moves to its remote's commit.
+
+repo-workflows-ghost-pull-dd489c0a = Already up to date: the branch has everything its remote has.
+
+repo-workflows-ghost-pull-f53705f4 = { $branch-name-1 } tracks no branch on a remote: nothing to pull
+
+repo-workflows-ghost-rebase-1f963916 = Already up to date: nothing to replay, nothing changes.
+
+repo-workflows-ghost-rebase-b1f8a147 = the rebase refuses to start with uncommitted changes: commit or stash them first
+
+repo-workflows-ghost-rebase-e550da8a = Uncommitted changes are stashed first and put back after (rebase.autoStash).
+
+repo-workflows-ghost-reset-hard-3126bbde = Uncommitted changes to these files are thrown away, and can't be brought back.
+
+repo-workflows-ghost-rewrite-3477e4cb = The rebase stops there, asking whether to keep the commit that became empty; the branch doesn't move yet.
+
+repo-workflows-ghost-rewrite-3d8b966c = rebase.rebaseMerges is set and merges are among the commits: git keeps them, which the preview can't replay yet
+
+repo-workflows-ghost-rewrite-af60968a = The files that change aren't listed: git { $self-version-1 } replays in a scratch clone.
+
+repo-workflows-ghost-rewrite-c84070ef = { $w-picks-len-1 } commits to replay, too many to preview (at most { $PICKS-LIMIT })
+
+repo-workflows-ghost-rewrite-e69265a2 = The rebase stops there until the conflicts are resolved; the branch doesn't move yet.
+
+repo-workflows-ghost-rewrite-fb29af2f = Meanwhile HEAD is detached at { $waits }, mid-rebase.
+
+repo-workflows-ghost-shown-4ef6715c = a merge commit
+
+repo-workflows-ghost-timeline-18df3f5f = File-change preview is incomplete: required blobs are unavailable locally or the bounded read stopped. No objects were downloaded.
+
+repo-workflows-ghost-timeline-48223518 = Invalid timeline commit ID
+
+repo-workflows-ghost-timeline-5a1baa67 = Timeline preview is incomplete: required local history is missing or the bounded read stopped. Hover never downloads objects.
+
+repo-workflows-ghost-timeline-6f3d9015 = Uncommitted changes are preserved with --keep; a conflicting checkout will refuse the jump.
+
+repo-workflows-ghost-timeline-c25867a7 = Saved refs keep earlier states recoverable. This preview moves no refs or files.
+
+repo-workflows-ghost-title-20596011 = Undo tree: { $label }
+
+repo-workflows-ghost-title-2d281f6b = Rebase { $current } onto { $label }
+
+repo-workflows-ghost-title-62fc0c1a = Delete { $branch }
+
+repo-workflows-ghost-title-ae583650 = Hard reset of { $current } to { $short-to-1 }
+
+repo-workflows-ghost-title-b193a29c = Force push of { $branch }
+
+repo-workflows-ghost-title-baaedb85 = { $mode-label-1 } into { $current }
+
+repo-workflows-ghost-title-c58e3395 = Delete { $branch } here and on its remote
+
+repo-workflows-ghost-title-fc4198eb = Drop commit { $short-hash-1 }
+
+repo-workflows-guide--21dad442 = Tips turned off: Settings → General → Tips turns them back on
+
+repo-workflows-guide--2ee88cd5 = Needs the first commit
+
+repo-workflows-guide--b77d9539 = Set your name and email first (Settings → Profile, or git config user.name / user.email)
+
+repo-workflows-guide--b7acfeab = Turn off tips and first-time hints (Settings → General → Tips turns them back on)
+
+repo-workflows-guide-ask-empty-commit-348d9f75 = HEAD is detached: check out a branch to make the first commit on
+
+repo-workflows-guide-confirm-dialog-82a9c46f = Commit
+
+repo-workflows-guide-confirm-dialog-91b6a6f9 = Make an empty commit named “{ $EMPTY-COMMIT-MESSAGE }” on { $name }? It gives the repository a branch to publish and to start others from. You can undo it until it is published.
+
+repo-workflows-guide-first-commit-step-02da0750 = Nothing to commit yet: files put in the repository's folder show up at the top of the graph by themselves. Or start with an empty commit.
+
+repo-workflows-guide-first-commit-step-37bb706f = Your files are ready: write a summary and commit them.
+
+repo-workflows-guide-first-commit-step-6221ab4e = A commit with no files, “{ $EMPTY-COMMIT-MESSAGE }”
+
+repo-workflows-guide-first-commit-step-9416811c = Make an empty commit…
+
+repo-workflows-guide-first-commit-step-cfa86831 = Write the message
+
+repo-workflows-guide-first-commit-step-d0ee469e = Opens the changes in the right pane, at the commit summary
+
+repo-workflows-guide-first-commit-step-e2f5a327 = Make the first commit
+
+repo-workflows-guide-first-commit-step-ed251864 = Done.
+
+repo-workflows-guide-first-steps-3c4e21be = Add a remote first
+
+repo-workflows-guide-first-steps-76a2896d = Check out a branch first
+
+repo-workflows-guide-first-steps-view-a5b4a2a3 = Hidden until this repository is opened again
+
+repo-workflows-guide-first-steps-view-d4b85ef0 = Hide these steps
+
+repo-workflows-guide-header-5cec6b07 = This repository has no commits yet
+
+repo-workflows-guide-header-a9174a7c = Three steps to get it going:
+
+repo-workflows-guide-header-bb24101f = Next steps for this repository
+
+repo-workflows-guide-header-cd9905c0 = It is only on this machine so far:
+
+repo-workflows-guide-hint-status-2c0ee188 = Close the hint
+
+repo-workflows-guide-publish-step-2ce79937 = Push the branch to the remote and track it, so Push and Pull just work.
+
+repo-workflows-guide-publish-step-859390eb = Publish
+
+repo-workflows-guide-publish-step-93d6376b = Push { $b } to the remote and track it, so Push and Pull just work.
+
+repo-workflows-guide-publish-step-ed251864 = Done.
+
+repo-workflows-guide-remote-step-06906287 = Where it will be published, such as a new, empty repository on a forge.
+
+repo-workflows-guide-remote-step-25a81e6a = Done: { $remotes-join-1 }.
+
+repo-workflows-guide-remote-step-d20b3285 = Add a remote…
+
+repo-workflows-guide-remote-step-ecd12a48 = Add a remote
+
+repo-workflows-guide-start-first-commit-881f72cb = Nothing to commit yet: add or change files in the repository's folder
+
+repo-workflows-guide-text-414ed52e = Hint: { $cmd }+click another commit to compare the two
+
+repo-workflows-guide-text-aa7b18c5 = Hint: “Solo” in a branch's menu shows only that branch
+
+repo-workflows-guide-text-c09ad9f4 = Hint: F7 or Alt+↓ goes to the next change, Shift+F7 or Alt+↑ to the previous one
+
+repo-workflows-guide-text-e94f4321 = Hint: double-click a pill to check that branch out
+
+repo-workflows-guide-tip-bar-3e9b3541 = Did you know?
+
+repo-workflows-guide-tip-bar-c1567088 = Next tip
+
+repo-workflows-guide-undo-refusal-6cb7f998 = { $name } is published: undoing the empty first commit would delete a branch the remote has. Commit on top of it instead.
 
 repo-workflows-hotfix-cancel-19766ed6 = Cancel
 

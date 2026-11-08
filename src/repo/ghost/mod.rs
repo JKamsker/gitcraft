@@ -526,20 +526,28 @@ pub(in crate::repo) fn approval_preview(
     notes.extend(outcome.warnings);
     notes.extend(outcome.refused);
     if outcome.discards_work {
-        notes.push("Discards uncommitted working changes".into());
+        notes.push(crate::i18n::text("repo-workflows-ghost-approval-preview-675d236b").into());
     }
     if let Some(files) = outcome.files {
-        notes.push(format!("{} working files change", files.len()));
+        notes.push(crate::i18n::message(
+            "repo-workflows-ghost-approval-preview-1426bc08",
+            &[("files-len-1", (files.len()).clone().into())],
+        ));
     }
     if let Some(conflict) = outcome.conflict {
-        notes.push(format!(
-            "Stops at step {}: {}",
-            conflict.step,
-            conflict.files.join(", ")
+        notes.push(crate::i18n::message(
+            "repo-workflows-ghost-approval-preview-e74a52f6",
+            &[
+                ("conflict-step-1", (conflict.step).clone().into()),
+                (
+                    "conflict-files-join-2",
+                    (conflict.files.join(", ")).clone().into(),
+                ),
+            ],
         ));
     }
     if outcome.lost_more {
-        notes.push("Leaving-commit list is truncated at 200".into());
+        notes.push(crate::i18n::text("repo-workflows-ghost-approval-preview-70be46e5").into());
     }
     Ok(crate::repo::agent::preview::Preview {
         moves: outcome

@@ -173,7 +173,13 @@ impl RepoTab {
 
     fn checkout_fork(&mut self, number: u64, ctx: &Context) {
         let Some(info) = self.forks.of(number).cloned() else {
-            self.status = Some((format!("Where #{number} comes from isn't known yet"), true));
+            self.status = Some((
+                crate::i18n::message(
+                    "repo-workflows-forks-checkout-fork-5ecb3bac",
+                    &[("number", (number).clone().into())],
+                ),
+                true,
+            ));
             return;
         };
         let locals: Vec<String> = self.refs.local.iter().map(|b| b.name.clone()).collect();
@@ -184,7 +190,13 @@ impl RepoTab {
             .unwrap_or_else(|| self.refs.head.clone());
         match plan::checkout(&info, &self.remotes, &self.forks.setup, &locals, &previous) {
             Ok(plan) => {
-                let label = format!("Check out #{number} to push to {}", info.owner);
+                let label = crate::i18n::message(
+                    "repo-workflows-forks-checkout-fork-abaaf4c3",
+                    &[
+                        ("number", (number).clone().into()),
+                        ("info-owner-1", (info.owner).clone().into()),
+                    ],
+                );
                 self.run_undoable(
                     &label,
                     plan.steps.clone(),
@@ -206,7 +218,7 @@ impl RepoTab {
         };
         let Some(upstream) = self.default_remote() else {
             self.status = Some((
-                "This repository has no remote to rebase onto".to_owned(),
+                crate::i18n::text("repo-workflows-forks-plan-fork-rebase-1abac341").to_owned(),
                 true,
             ));
             return;
@@ -214,7 +226,13 @@ impl RepoTab {
         let repo = self.path.clone();
         let setup = self.forks.setup.clone();
         let creds = self.credentials.clone();
-        self.status = Some((format!("Fetching #{number}'s branch and its base…"), false));
+        self.status = Some((
+            crate::i18n::message(
+                "repo-workflows-forks-plan-fork-rebase-ac71056e",
+                &[("number", (number).clone().into())],
+            ),
+            false,
+        ));
         self.then(
             ctx,
             move || {
@@ -227,12 +245,17 @@ impl RepoTab {
                     let label = format!("Rebase #{} onto {} and push", info.number, info.base);
                     let body = rebase_preview(&info, &plan);
                     tab.dialog = Some(
-                        Dialog::confirm(&label, body, "Rebase and push", plan.steps(), None).undo(
-                            Undo::Custom {
-                                undo: plan.undo_steps(),
-                                redo: plan.redo_steps(),
-                            },
-                        ),
+                        Dialog::confirm(
+                            &label,
+                            body,
+                            crate::i18n::text("repo-workflows-forks-plan-fork-rebase-a3647cfa"),
+                            plan.steps(),
+                            None,
+                        )
+                        .undo(Undo::Custom {
+                            undo: plan.undo_steps(),
+                            redo: plan.redo_steps(),
+                        }),
                     );
                     tab.forks.running = Some((label, plan));
                 }
@@ -277,7 +300,13 @@ impl RepoTab {
                 let ((steps, undo), unused, keep) = match found {
                     Ok(found) => found,
                     Err(e) => {
-                        tab.status = Some((format!("Couldn't read the remotes: {e}"), true));
+                        tab.status = Some((
+                            crate::i18n::message(
+                                "repo-workflows-forks-plan-tidy-adf73b14",
+                                &[("e", (e).clone().into())],
+                            ),
+                            true,
+                        ));
                         return;
                     }
                 };
@@ -290,20 +319,26 @@ impl RepoTab {
                     )
                 };
                 if steps.is_empty() {
-                    tab.status = Some((format!("No fork remote can go{kept}"), false));
+                    tab.status = Some((
+                        crate::i18n::message(
+                            "repo-workflows-forks-plan-tidy-da56e1d6",
+                            &[("kept", (kept).clone().into())],
+                        ),
+                        false,
+                    ));
                     return;
                 }
                 tab.dialog = Some(
                     Dialog::confirm(
                         "Remove unused fork remotes",
-                        format!(
-                            "Removes the remotes gitcraft added for forks that no branch pulls \
-                             from or pushes to any more: {}, with their remote-tracking \
-                             branches. Ctrl+Z adds them back (fetch them for their \
-                             branches).{kept}",
-                            unused.join(", ")
+                        crate::i18n::message(
+                            "repo-workflows-forks-plan-tidy-b732e7ba",
+                            &[
+                                ("unused-join-1", (unused.join(", ")).clone().into()),
+                                ("kept", (kept).clone().into()),
+                            ],
                         ),
-                        "Remove",
+                        crate::i18n::text("repo-workflows-forks-plan-tidy-c3812fc4"),
                         steps.clone(),
                         None,
                     )
@@ -332,13 +367,15 @@ impl RepoTab {
         self.dialog = Some(
             Dialog::confirm(
                 &label,
-                format!(
-                    "The rebase is done. Force-pushes {} to {}'s {} with a lease: refused if \
-                     they pushed there since it was fetched. Ctrl+Z puts their branch back as \
-                     it was (and yours with the next Ctrl+Z).",
-                    plan.local, plan.fork, plan.branch
+                crate::i18n::message(
+                    "repo-workflows-forks-offer-push-after-conflict-dcc709d6",
+                    &[
+                        ("plan-local-1", (plan.local).clone().into()),
+                        ("plan-fork-2", (plan.fork).clone().into()),
+                        ("plan-branch-3", (plan.branch).clone().into()),
+                    ],
                 ),
-                "Push",
+                crate::i18n::text("repo-workflows-forks-offer-push-after-conflict-731ce7ed"),
                 plan.push_now(),
                 None,
             )
@@ -357,9 +394,9 @@ impl RepoTab {
         if self.forks.approve_armed != Some(number) {
             self.forks.approve_armed = Some(number);
             self.status = Some((
-                format!(
-                    "Approving runs the contributor's code on your CI: look through #{number}'s \
-                     changes first, then choose Approve and run again"
+                crate::i18n::message(
+                    "repo-workflows-forks-approve-runs-a77eca22",
+                    &[("number", (number).clone().into())],
                 ),
                 false,
             ));
@@ -378,7 +415,13 @@ impl RepoTab {
         }
         let repo = self.path.clone();
         self.forks.approving = true;
-        self.status = Some((format!("Approving #{number}'s workflow runs…"), false));
+        self.status = Some((
+            crate::i18n::message(
+                "repo-workflows-forks-approve-runs-2f659b28",
+                &[("number", (number).clone().into())],
+            ),
+            false,
+        ));
         self.then(
             ctx,
             move || {
@@ -390,9 +433,21 @@ impl RepoTab {
             move |tab, result, ctx| {
                 tab.forks.approving = false;
                 tab.status = Some(match result {
-                    Ok(()) => (format!("#{number}'s workflow runs are approved"), false),
+                    Ok(()) => (
+                        crate::i18n::message(
+                            "repo-workflows-forks-approve-runs-a151ad19",
+                            &[("number", (number).clone().into())],
+                        ),
+                        false,
+                    ),
                     Err(e) => (
-                        format!("Couldn't approve #{number}'s workflow runs: {e}"),
+                        crate::i18n::message(
+                            "repo-workflows-forks-approve-runs-282082c7",
+                            &[
+                                ("number", (number).clone().into()),
+                                ("e", (e).clone().into()),
+                            ],
+                        ),
                         true,
                     ),
                 });
@@ -428,9 +483,7 @@ impl RepoTab {
                 if conflicts {
                     tab.forks.after_conflict = Some(plan);
                     tab.status = Some((
-                        "The rebase stopped on conflicts: resolve them and continue it, then \
-                         gitcraft offers to push it (or abort it)"
-                            .to_owned(),
+                        crate::i18n::text("repo-workflows-forks-forks-op-done-9c338e90").to_owned(),
                         true,
                     ));
                     return;
@@ -453,9 +506,12 @@ impl RepoTab {
                 );
 
                 tab.status = Some((
-                    format!(
-                        "{} is rebased here, but not pushed to {}: Ctrl+Z puts it back as it was",
-                        plan.local, plan.fork
+                    crate::i18n::message(
+                        "repo-workflows-forks-forks-op-done-8287ad6b",
+                        &[
+                            ("plan-local-1", (plan.local).clone().into()),
+                            ("plan-fork-2", (plan.fork).clone().into()),
+                        ],
                     ),
                     true,
                 ));

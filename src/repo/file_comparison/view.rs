@@ -13,38 +13,77 @@ impl RepoTab {
         };
         let t = Tokens::get(ui.ctx());
         let title = match state.page {
-            Page::Migration => "File migration map",
-            Page::CodeMoves => "Code moved across files",
-            Page::Lens => "Three-state staging lens",
-            Page::Matrix => "File versions across branches",
+            Page::Migration => {
+                crate::i18n::text("repo-workflows-file_comparison-file-comparison-view-edc82098")
+            }
+            Page::CodeMoves => {
+                crate::i18n::text("repo-workflows-file_comparison-file-comparison-view-2ad51b3c")
+            }
+            Page::Lens => {
+                crate::i18n::text("repo-workflows-file_comparison-file-comparison-view-fb60b8e0")
+            }
+            Page::Matrix => {
+                crate::i18n::text("repo-workflows-file_comparison-file-comparison-view-90e2e8fa")
+            }
         };
         ui.horizontal_wrapped(|ui| {
             ui.heading(title);
-            if ui.button("Refresh file view").clicked() {
+            if ui
+                .button(crate::i18n::text(
+                    "repo-workflows-file_comparison-file-comparison-view-3f64b850",
+                ))
+                .clicked()
+            {
                 acts.push(Action::RefreshFileComparison);
             }
-            if state.loading && ui.button("Cancel comparison").clicked() {
+            if state.loading
+                && ui
+                    .button(crate::i18n::text(
+                        "repo-workflows-file_comparison-file-comparison-view-ca74fb37",
+                    ))
+                    .clicked()
+            {
                 state.generation.store(0, Ordering::Relaxed);
                 state.request = 0;
                 state.loading = false;
-                state.pair = Some(Err("Comparison cancelled. Refresh to try again.".into()));
+                state.pair = Some(Err(crate::i18n::text(
+                    "repo-workflows-file_comparison-file-comparison-view-725513de",
+                )
+                .into()));
             }
-            if ui.button("Close file view").clicked() {
+            if ui
+                .button(crate::i18n::text(
+                    "repo-workflows-file_comparison-file-comparison-view-7b8bea18",
+                ))
+                .clicked()
+            {
                 acts.push(Action::CloseFileComparison);
             }
         });
         ui.label(
-            RichText::new(
-                "Raw snapshots · refresh after repository changes · no automatic downloads",
-            )
+            RichText::new(crate::i18n::text(
+                "repo-workflows-file_comparison-file-comparison-view-22d5cf54",
+            ))
             .small()
             .color(t.text_dim),
         );
         match state.page {
             Page::CodeMoves => {
                 ui.horizontal_wrapped(|ui| {
-                    ui.selectable_value(&mut state.source, 0, "Staged");
-                    ui.selectable_value(&mut state.source, 3, "Working copy");
+                    ui.selectable_value(
+                        &mut state.source,
+                        0,
+                        crate::i18n::text(
+                            "repo-workflows-file_comparison-file-comparison-view-daec459a",
+                        ),
+                    );
+                    ui.selectable_value(
+                        &mut state.source,
+                        3,
+                        crate::i18n::text(
+                            "repo-workflows-file_comparison-file-comparison-view-d1d29085",
+                        ),
+                    );
                     ui.selectable_value(
                         &mut state.source,
                         1,
@@ -52,33 +91,76 @@ impl RepoTab {
                             "repo-workflows-file_comparison-file-comparison-view-82a9c46f",
                         ),
                     );
-                    ui.selectable_value(&mut state.source, 2, "Between commits");
-                    ui.selectable_value(&mut state.source, 4, "Commit → working copy");
+                    ui.selectable_value(
+                        &mut state.source,
+                        2,
+                        crate::i18n::text(
+                            "repo-workflows-file_comparison-file-comparison-view-f2473f24",
+                        ),
+                    );
+                    ui.selectable_value(
+                        &mut state.source,
+                        4,
+                        crate::i18n::text(
+                            "repo-workflows-file_comparison-file-comparison-view-51d4ac7c",
+                        ),
+                    );
                 });
                 ui.horizontal_wrapped(|ui| {
                     if matches!(state.source, 2 | 4) {
-                        ui.label("From");
+                        ui.label(crate::i18n::text(
+                            "repo-workflows-file_comparison-file-comparison-view-21819769",
+                        ));
                         ui.text_edit_singleline(&mut state.from);
                     }
                     if matches!(state.source, 1 | 2) {
-                        ui.label("To / commit");
+                        ui.label(crate::i18n::text(
+                            "repo-workflows-file_comparison-file-comparison-view-89fa7940",
+                        ));
                         ui.text_edit_singleline(&mut state.to);
                     }
-                    if ui.button("Find moved code").clicked() {
+                    if ui
+                        .button(crate::i18n::text(
+                            "repo-workflows-file_comparison-file-comparison-view-dfc3916d",
+                        ))
+                        .clicked()
+                    {
                         acts.push(Action::RefreshFileComparison);
                     }
                 });
-                ui.label("Compare deleted and added blocks across tracked files; whitespace around lines is ignored. Stage newly created files first. Analysis is bounded to 300 files, 50,000 lines and 40 seconds; encrypted files are excluded.");
+                ui.label(crate::i18n::text(
+                    "repo-workflows-file_comparison-file-comparison-view-f08307c5",
+                ));
             }
             Page::Migration => {
                 ui.horizontal_wrapped(|ui| {
-                    ui.selectable_value(&mut state.source, 0, "Staged moves");
-                    ui.selectable_value(&mut state.source, 1, "Commit moves");
-                    ui.selectable_value(&mut state.source, 2, "Between commits");
+                    ui.selectable_value(
+                        &mut state.source,
+                        0,
+                        crate::i18n::text(
+                            "repo-workflows-file_comparison-file-comparison-view-2d2cd49c",
+                        ),
+                    );
+                    ui.selectable_value(
+                        &mut state.source,
+                        1,
+                        crate::i18n::text(
+                            "repo-workflows-file_comparison-file-comparison-view-efa19808",
+                        ),
+                    );
+                    ui.selectable_value(
+                        &mut state.source,
+                        2,
+                        crate::i18n::text(
+                            "repo-workflows-file_comparison-file-comparison-view-f2473f24",
+                        ),
+                    );
                 });
                 ui.horizontal_wrapped(|ui| {
                     if state.source == 2 {
-                        ui.label("From");
+                        ui.label(crate::i18n::text(
+                            "repo-workflows-file_comparison-file-comparison-view-21819769",
+                        ));
                         ui.add(egui::TextEdit::singleline(&mut state.from).desired_width(140.));
                     }
                     if state.source != 0 {
@@ -87,33 +169,56 @@ impl RepoTab {
                                 "repo-workflows-file_comparison-file-comparison-view-82a9c46f",
                             )
                         } else {
-                            "To"
+                            crate::i18n::text(
+                                "repo-workflows-file_comparison-file-comparison-view-f4b06ef6",
+                            )
                         });
                         ui.add(egui::TextEdit::singleline(&mut state.to).desired_width(140.));
                     }
-                    if ui.button("Find file migrations").clicked() {
+                    if ui
+                        .button(crate::i18n::text(
+                            "repo-workflows-file_comparison-file-comparison-view-86154135",
+                        ))
+                        .clicked()
+                    {
                         acts.push(Action::RefreshFileComparison);
                     }
                 });
-                ui.label("Git detects renames/copies at 50% similarity, within 2,000 candidates. Stage reorganized files first to include newly named working files. Content edits open separately from the move.");
+                ui.label(crate::i18n::text(
+                    "repo-workflows-file_comparison-file-comparison-view-aa2b8150",
+                ));
             }
             Page::Lens => {
                 ui.horizontal_wrapped(|ui| {
-                    ui.label("File");
+                    ui.label(crate::i18n::text(
+                        "repo-workflows-file_comparison-file-comparison-view-50009ce1",
+                    ));
                     if ui
                         .add(egui::TextEdit::singleline(&mut state.path).desired_width(260.))
                         .changed()
                     {
                         state.previous = None;
                     }
-                    if ui.button("Read three versions").clicked() {
+                    if ui
+                        .button(crate::i18n::text(
+                            "repo-workflows-file_comparison-file-comparison-view-103acf25",
+                        ))
+                        .clicked()
+                    {
                         acts.push(Action::RefreshFileComparison);
                     }
-                    if ui.button("Open normal patch").clicked() {
+                    if ui
+                        .button(crate::i18n::text(
+                            "repo-workflows-file_comparison-file-comparison-view-40379eb3",
+                        ))
+                        .clicked()
+                    {
                         acts.push(Action::ComparisonNormalPatch);
                     }
                 });
-                ui.label("HEAD → staged → working copy. Stage or unstage lines at either boundary; refresh if the file changes. Binary files and files requiring Git conversions stay read-only here.");
+                ui.label(crate::i18n::text(
+                    "repo-workflows-file_comparison-file-comparison-view-327070c2",
+                ));
             }
             Page::Matrix => {
                 ui.horizontal_wrapped(|ui| {
@@ -122,22 +227,29 @@ impl RepoTab {
                     ));
                     ui.add(
                         egui::TextEdit::singleline(&mut state.folder)
-                            .hint_text("Repository root")
+                            .hint_text(crate::i18n::text(
+                                "repo-workflows-file_comparison-file-comparison-view-f315d745",
+                            ))
                             .desired_width(230.),
                     );
                     if ui
                         .add_enabled(
                             (2..=8).contains(&state.selected.len()),
-                            egui::Button::new("Compare branch versions"),
+                            egui::Button::new(crate::i18n::text(
+                                "repo-workflows-file_comparison-file-comparison-view-fdc19d89",
+                            )),
                         )
                         .clicked()
                     {
                         acts.push(Action::RefreshFileComparison);
                     }
                 });
-                egui::CollapsingHeader::new(format!(
-                    "Choose branches ({} selected, maximum 8)",
-                    state.selected.len()
+                egui::CollapsingHeader::new(crate::i18n::message(
+                    "repo-workflows-file_comparison-file-comparison-view-1e2e1383",
+                    &[(
+                        "state-selected-len-1",
+                        (state.selected.len()).clone().into(),
+                    )],
                 ))
                 .default_open(state.selected.len() < 2)
                 .show(ui, |ui| {
@@ -154,13 +266,17 @@ impl RepoTab {
                         }
                     });
                 });
-                ui.label("Files are rows; pinned branch commits are columns. V-markers identify equal bytes, including across rows. Missing cells and file modes are separate. Click two cells to open their content diff.");
+                ui.label(crate::i18n::text(
+                    "repo-workflows-file_comparison-file-comparison-view-04166b68",
+                ));
             }
         }
         if state.loading {
             ui.horizontal(|ui| {
                 ui.add(crate::spinner::Spinner::new().size(16.));
-                ui.label("Reading immutable versions…");
+                ui.label(crate::i18n::text(
+                    "repo-workflows-file_comparison-file-comparison-view-5fa4365c",
+                ));
             });
             ui.ctx()
                 .request_repaint_after(std::time::Duration::from_millis(100));
@@ -198,21 +314,26 @@ fn migration(
     acts: &mut Vec<Action>,
 ) {
     ui.label(&data.label);
-    ui.label(format!(
-        "{} renames/copies · {} other changes",
-        data.moves.len(),
-        data.other_changes
+    ui.label(crate::i18n::message(
+        "repo-workflows-file_comparison-migration-41aec147",
+        &[
+            ("data-moves-len-1", (data.moves.len()).clone().into()),
+            ("data-other-changes-2", (data.other_changes).clone().into()),
+        ],
     ));
     if let Some(warning) = &data.warning {
         ui.colored_label(
             t.warning,
-            format!("Git detection warning (some moves may be unknown): {warning}"),
+            crate::i18n::message(
+                "repo-workflows-file_comparison-migration-35255dde",
+                &[("warning", (warning).clone().into())],
+            ),
         );
     }
     if data.moves.is_empty() {
-        ui.label(
-            "No Git-detected renames or copies. Added/deleted paths are not assumed to be moves.",
-        );
+        ui.label(crate::i18n::text(
+            "repo-workflows-file_comparison-migration-a419e1f7",
+        ));
         return;
     }
     egui::ScrollArea::both()
@@ -222,14 +343,37 @@ fn migration(
             ui.set_min_width(600.);
             for i in range {
                 let m = &data.moves[i];
-                let label = format!(
-                    "{} → {} · {} {}",
-                    m.before.name(),
-                    m.after.name(),
-                    if m.copy { "Copy" } else { "Rename" },
-                    m.similarity
-                        .map(|s| format!("{s}%"))
-                        .unwrap_or_else(|| "similarity unknown".into())
+                let label = crate::i18n::message(
+                    "repo-workflows-file_comparison-migration-208e67e7",
+                    &[
+                        ("m-before-name-1", (m.before.name()).clone().into()),
+                        ("m-after-name-2", (m.after.name()).clone().into()),
+                        (
+                            "if-m-copy-copy-else-rename-3",
+                            (if m.copy {
+                                crate::i18n::text(
+                                    "repo-workflows-file_comparison-migration-e21f935f",
+                                )
+                            } else {
+                                crate::i18n::text(
+                                    "repo-workflows-file_comparison-migration-3064d79a",
+                                )
+                            })
+                            .clone()
+                            .into(),
+                        ),
+                        (
+                            "m-similarity-map-s-format-s-unwr-4",
+                            (m.similarity.map(|s| format!("{s}%")).unwrap_or_else(|| {
+                                crate::i18n::text(
+                                    "repo-workflows-file_comparison-migration-06869a99",
+                                )
+                                .into()
+                            }))
+                            .clone()
+                            .into(),
+                        ),
+                    ],
                 );
                 let (rect, response) = ui
                     .allocate_exact_size(vec2(ui.available_width().max(600.), 54.), Sense::click());
@@ -276,7 +420,11 @@ fn migration(
                     egui::Align2::CENTER_TOP,
                     format!(
                         "{} · {}",
-                        if m.copy { "Copy" } else { "Rename" },
+                        if m.copy {
+                            crate::i18n::text("repo-workflows-file_comparison-migration-e21f935f")
+                        } else {
+                            crate::i18n::text("repo-workflows-file_comparison-migration-3064d79a")
+                        },
                         m.similarity
                             .map(|s| format!("{s}%"))
                             .unwrap_or_else(|| "unknown".into())
@@ -320,9 +468,9 @@ fn matrix(
         .enumerate()
         .map(|(i, id)| (id, format!("V{}", i + 1)))
         .collect();
-    ui.label(format!(
-        "{} files · select another cell after the first",
-        data.paths.len()
+    ui.label(crate::i18n::message(
+        "repo-workflows-file_comparison-matrix-ebfcc1d5",
+        &[("data-paths-len-1", (data.paths.len()).clone().into())],
     ));
     egui::ScrollArea::both()
         .id_salt("branch_matrix")
@@ -330,7 +478,12 @@ fn matrix(
         .show(ui, |ui| {
             ui.set_min_width(220. + 150. * data.columns.len() as f32);
             ui.horizontal(|ui| {
-                ui.add_sized([220., 30.], egui::Label::new("File"));
+                ui.add_sized(
+                    [220., 30.],
+                    egui::Label::new(crate::i18n::text(
+                        "repo-workflows-file_comparison-matrix-50009ce1",
+                    )),
+                );
                 for c in &data.columns {
                     ui.add_sized(
                         [146., 30.],
@@ -361,7 +514,10 @@ fn matrix(
                                         markers.get(&e.oid).map(String::as_str).unwrap_or("?"),
                                         e.mode
                                     ),
-                                    None => "Missing".into(),
+                                    None => crate::i18n::text(
+                                        "repo-workflows-file_comparison-matrix-6be36ca4",
+                                    )
+                                    .into(),
                                 };
                                 let label =
                                     format!("{} | {} | {text}", files::display_path(path), c.label);
@@ -382,7 +538,13 @@ fn matrix(
                                     );
                                 crate::a11y::a11y(&response, egui::WidgetType::Button, &label);
                                 let clicked = response.clicked();
-                                response.on_hover_text(format!("{label}\nPinned {}", c.oid));
+                                response.on_hover_text(crate::i18n::message(
+                                    "repo-workflows-file_comparison-matrix-c81d97c3",
+                                    &[
+                                        ("label", (label).clone().into()),
+                                        ("c-oid-1", (c.oid).clone().into()),
+                                    ],
+                                ));
                                 if clicked {
                                     acts.push(Action::ComparisonCell {
                                         request: state.data_request,
@@ -415,17 +577,27 @@ fn lens(
             .unwrap_or("unborn")
     ));
     if let Some(previous) = &snapshot.spec.previous {
-        ui.label(format!("HEAD uses {previous}; content-only unstaging keeps the staged move. Change the move itself in the normal patch."));
+        ui.label(crate::i18n::message(
+            "repo-workflows-file_comparison-lens-bfae8a90",
+            &[("previous", (previous).clone().into())],
+        ));
     }
     if lens.undoing_staged {
-        ui.colored_label(t.warning,"Working copy matches HEAD, but the next commit still changes this file. Working edits undo the staged edit.");
+        ui.colored_label(
+            t.warning,
+            crate::i18n::text("repo-workflows-file_comparison-lens-4902e29c"),
+        );
     }
     if let Some(w) = &snapshot.staging_warning {
         ui.colored_label(t.warning, w);
     }
-    for (name, version) in ["HEAD", "Staged", "Working copy"]
-        .into_iter()
-        .zip(&snapshot.versions)
+    for (name, version) in [
+        "HEAD",
+        crate::i18n::text("repo-workflows-file_comparison-lens-daec459a"),
+        crate::i18n::text("repo-workflows-file_comparison-lens-d1d29085"),
+    ]
+    .into_iter()
+    .zip(&snapshot.versions)
     {
         ui.label(format!("{name}: {}", version.label()));
         if let Some(w) = &version.warning {
@@ -440,7 +612,16 @@ fn lens(
             .iter()
             .all(|v| v.warning.is_none() && v.mode.as_deref() != Some("160000"));
     ui.horizontal_wrapped(|ui| {
-        for (i, label) in [(0, "Unstage entire boundary"), (1, "Stage entire boundary")] {
+        for (i, label) in [
+            (
+                0,
+                crate::i18n::text("repo-workflows-file_comparison-lens-6e60c4a1"),
+            ),
+            (
+                1,
+                crate::i18n::text("repo-workflows-file_comparison-lens-8f600488"),
+            ),
+        ] {
             let part = &lens.boundaries[i];
             let changed = snapshot.versions[i].bytes != snapshot.versions[i + 1].bytes
                 || snapshot.versions[i].mode != snapshot.versions[i + 1].mode;
@@ -460,14 +641,40 @@ fn lens(
             ui.colored_label(t.text_dim, reason);
         }
     }
-    ui.label(RichText::new("Long lines are abbreviated at 2,000 characters; boundary actions use the complete raw line. Use the normal patch to inspect it.").small().color(t.text_dim));
+    ui.label(
+        RichText::new(crate::i18n::text(
+            "repo-workflows-file_comparison-lens-3a1781b9",
+        ))
+        .small()
+        .color(t.text_dim),
+    );
     let width = (ui.available_width() / 3. - 55.).max(180.);
     ui.horizontal(|ui| {
         ui.add_sized([width, 24.], egui::Label::new("HEAD"));
-        ui.add_sized([64., 24.], egui::Label::new("← unstage"));
-        ui.add_sized([width, 24.], egui::Label::new("Staged"));
-        ui.add_sized([64., 24.], egui::Label::new("← stage"));
-        ui.add_sized([width, 24.], egui::Label::new("Working copy"));
+        ui.add_sized(
+            [64., 24.],
+            egui::Label::new(crate::i18n::text(
+                "repo-workflows-file_comparison-lens-75673075",
+            )),
+        );
+        ui.add_sized(
+            [width, 24.],
+            egui::Label::new(crate::i18n::text(
+                "repo-workflows-file_comparison-lens-daec459a",
+            )),
+        );
+        ui.add_sized(
+            [64., 24.],
+            egui::Label::new(crate::i18n::text(
+                "repo-workflows-file_comparison-lens-92bc93d0",
+            )),
+        );
+        ui.add_sized(
+            [width, 24.],
+            egui::Label::new(crate::i18n::text(
+                "repo-workflows-file_comparison-lens-d1d29085",
+            )),
+        );
     });
     egui::ScrollArea::both()
         .id_salt("staging_lens_rows")
@@ -482,7 +689,10 @@ fn lens(
                     boundary_button(ui, state, row, (i, 1), allowed, &lens.boundaries[1], acts);
                     line_cell(ui, &row.text[2], width, row.undoes, t);
                     if row.undoes {
-                        ui.colored_label(t.warning, "undoes staged");
+                        ui.colored_label(
+                            t.warning,
+                            crate::i18n::text("repo-workflows-file_comparison-lens-b72fb6c1"),
+                        );
                     }
                 });
             }
@@ -498,8 +708,18 @@ fn boundary_button(
     acts: &mut Vec<Action>,
 ) {
     let (index, side) = position;
-    let text = if side == 0 { "Unstage" } else { "Stage" };
-    let label = format!("{text} lens row {}", index + 1);
+    let text = if side == 0 {
+        crate::i18n::text("repo-workflows-file_comparison-boundary-button-033f86f9")
+    } else {
+        crate::i18n::text("repo-workflows-file_comparison-boundary-button-de838855")
+    };
+    let label = crate::i18n::message(
+        "repo-workflows-file_comparison-boundary-button-0cadc525",
+        &[
+            ("text", (text).clone().into()),
+            ("index-1-1", (index + 1).clone().into()),
+        ],
+    );
     let enabled = allowed
         && part.reason.is_none()
         && !row.changes[side].is_empty()
@@ -531,23 +751,41 @@ fn line_cell(ui: &mut egui::Ui, text: &Option<String>, width: f32, undoes: bool,
     );
 }
 pub(super) fn show_pair(ui: &mut egui::Ui, pair: &model::Pair, t: &Tokens) {
-    ui.heading("Content edits only");
+    ui.heading(crate::i18n::text(
+        "repo-workflows-file_comparison-show-pair-98154a15",
+    ));
     ui.label(format!("{} → {}", pair.labels[0], pair.labels[1]));
-    ui.label(format!(
-        "Before: {} · After: {}",
-        pair.versions[0].label(),
-        pair.versions[1].label()
+    ui.label(crate::i18n::message(
+        "repo-workflows-file_comparison-show-pair-e3ccb1fe",
+        &[
+            (
+                "pair-versions-0-label-1",
+                (pair.versions[0].label()).clone().into(),
+            ),
+            (
+                "pair-versions-1-label-2",
+                (pair.versions[1].label()).clone().into(),
+            ),
+        ],
     ));
     if pair.versions[0].bytes == pair.versions[1].bytes {
-        ui.label(
-            "No content edits: identical bytes. Names, presence and file modes remain separate.",
-        );
+        ui.label(crate::i18n::text(
+            "repo-workflows-file_comparison-show-pair-2f04c026",
+        ));
         return;
     }
     if let Some(reason) = &pair.boundary.reason {
         ui.label(reason);
-        ui.label("Byte preview (first512 bytes per side; full sizes shown above)");
-        for (name, version) in ["Before", "After"].into_iter().zip(&pair.versions) {
+        ui.label(crate::i18n::text(
+            "repo-workflows-file_comparison-show-pair-06ebe02e",
+        ));
+        for (name, version) in [
+            crate::i18n::text("repo-workflows-file_comparison-show-pair-9bb72500"),
+            crate::i18n::text("repo-workflows-file_comparison-show-pair-7b68fe55"),
+        ]
+        .into_iter()
+        .zip(&pair.versions)
+        {
             ui.monospace(format!(
                 "{name}: {}",
                 version

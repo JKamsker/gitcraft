@@ -30,19 +30,50 @@ impl GhostOp {
     pub(crate) fn title(&self, refs: &Refs) -> String {
         let current = refs.current.as_deref().unwrap_or("HEAD");
         match self {
-            GhostOp::Timeline { label, .. } => format!("Undo tree: {label}"),
-            GhostOp::Rebase { label, .. } => format!("Rebase {current} onto {label}"),
-            GhostOp::ResetHard { to } => format!("Hard reset of {current} to {}", short(to)),
-            GhostOp::Pull(mode) => format!("{} into {current}", mode.label()),
-            GhostOp::ForcePush { branch } => format!("Force push of {branch}"),
+            GhostOp::Timeline { label, .. } => crate::i18n::message(
+                "repo-workflows-ghost-title-20596011",
+                &[("label", (label).clone().into())],
+            ),
+            GhostOp::Rebase { label, .. } => crate::i18n::message(
+                "repo-workflows-ghost-title-2d281f6b",
+                &[
+                    ("current", (current).clone().into()),
+                    ("label", (label).clone().into()),
+                ],
+            ),
+            GhostOp::ResetHard { to } => crate::i18n::message(
+                "repo-workflows-ghost-title-ae583650",
+                &[
+                    ("current", (current).clone().into()),
+                    ("short-to-1", (short(to)).clone().into()),
+                ],
+            ),
+            GhostOp::Pull(mode) => crate::i18n::message(
+                "repo-workflows-ghost-title-baaedb85",
+                &[
+                    ("mode-label-1", (mode.label()).clone().into()),
+                    ("current", (current).clone().into()),
+                ],
+            ),
+            GhostOp::ForcePush { branch } => crate::i18n::message(
+                "repo-workflows-ghost-title-b193a29c",
+                &[("branch", (branch).clone().into())],
+            ),
             GhostOp::DeleteBranch {
                 branch,
                 remote: false,
-            } => format!("Delete {branch}"),
-            GhostOp::DeleteBranch { branch, .. } => {
-                format!("Delete {branch} here and on its remote")
-            }
-            GhostOp::DropCommit { hash } => format!("Drop commit {}", short(hash)),
+            } => crate::i18n::message(
+                "repo-workflows-ghost-title-62fc0c1a",
+                &[("branch", (branch).clone().into())],
+            ),
+            GhostOp::DeleteBranch { branch, .. } => crate::i18n::message(
+                "repo-workflows-ghost-title-c58e3395",
+                &[("branch", (branch).clone().into())],
+            ),
+            GhostOp::DropCommit { hash } => crate::i18n::message(
+                "repo-workflows-ghost-title-fc4198eb",
+                &[("short-hash-1", (short(hash)).clone().into())],
+            ),
         }
     }
 }
@@ -91,7 +122,7 @@ impl Facts {
             .current
             .as_deref()
             .and_then(|c| self.local(c))
-            .ok_or_else(|| "HEAD is detached: check out a branch first".to_owned())
+            .ok_or_else(|| crate::i18n::text("repo-workflows-ghost-current-7776bacf").to_owned())
     }
 
     /// Where `b` pushes and pulls, when it tracks a branch that is still there.

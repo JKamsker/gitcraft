@@ -66,22 +66,29 @@ impl RepoTab {
                     state.trust = false;
                     state.confirm = false;
                     if stale {
-                        state.result = "Profile changed. Operation cancelled; inspect repository and mail state before retrying.".into();
+                        state.result =
+                            crate::i18n::text("repo-workflows-email-email-window-8c1d9c9f").into();
                     } else {
                         match reply {
                             Ok(Reply::Read(snapshot, info, cover)) => {
                                 state.snapshot = Some(snapshot);
                                 state.info = info;
                                 state.cover = cover;
-                                state.result = "Prepared branch read".into();
+                                state.result =
+                                    crate::i18n::text("repo-workflows-email-email-window-b8c5cd6e")
+                                        .into();
                             }
                             Ok(Reply::Received(received)) => {
                                 state.received = Some(received);
-                                state.result = "Series fetched; review the cover, patches and trailers before applying".into();
+                                state.result =
+                                    crate::i18n::text("repo-workflows-email-email-window-624d6ba0")
+                                        .into();
                             }
                             Ok(Reply::Preview(preview)) => {
                                 state.preview = Some(preview);
-                                state.result = "Preview generated without sending mail".into();
+                                state.result =
+                                    crate::i18n::text("repo-workflows-email-email-window-2a42475c")
+                                        .into();
                             }
                             Ok(Reply::Done(text)) => {
                                 state.result = text;
@@ -89,8 +96,9 @@ impl RepoTab {
                                 state.preview = None;
                             }
                             Err(error) => {
-                                state.result = format!(
-                                    "{error}\nIf cancelled or partially completed, inspect Git/b4/mail state before retrying. Apply conflicts use the existing Continue/Abort operation controls."
+                                state.result = crate::i18n::message(
+                                    "repo-workflows-email-email-window-632693ae",
+                                    &[("error", (error).clone().into())],
                                 );
                                 state.snapshot = None;
                                 state.preview = None;
@@ -102,7 +110,8 @@ impl RepoTab {
                 Err(mpsc::TryRecvError::Disconnected) => {
                     state.pending = None;
                     self.busy_op = None;
-                    state.result = "Worker ended or was cancelled. Inspect repository/mail state before retrying; mail may have been delivered.".into();
+                    state.result =
+                        crate::i18n::text("repo-workflows-email-email-window-c6755006").into();
                 }
                 Err(mpsc::TryRecvError::Empty) => {
                     ctx.request_repaint_after(std::time::Duration::from_millis(100))
@@ -114,39 +123,213 @@ impl RepoTab {
             return;
         }
         let mut open = true;
-        egui::Window::new("Email patches · b4").id(egui::Id::new(("email-patches", &self.path))).open(&mut open).default_width(760.0).vscroll(true).show(ctx, |ui| {
-            ui.label("Requires the supported b4 source build ce4c1158 (0.17-dev), installed with its Python entrypoint in a virtual environment on this machine. The Python helper uses isolated mode, so user-site/PYTHONPATH-only installs are unsupported. Other builds are refused until their contract is reviewed. Uses b4's configured identity, public-inbox and sending transport. No credentials are exported by gitcraft.");
-            if state.pending.is_some() { ui.add(crate::spinner::Spinner::new()); if ui.button(crate::i18n::text("repo-workflows-email-email-window-b64a0d4f")).clicked() { acts.push(Action::Email(Act::Cancel)); } }
+        egui::Window::new(crate::i18n::text(
+            "repo-workflows-email-email-window-c19c9f05",
+        ))
+        .id(egui::Id::new(("email-patches", &self.path)))
+        .open(&mut open)
+        .default_width(760.0)
+        .vscroll(true)
+        .show(ctx, |ui| {
+            ui.label(crate::i18n::text(
+                "repo-workflows-email-email-window-8c3ad598",
+            ));
+            if state.pending.is_some() {
+                ui.add(crate::spinner::Spinner::new());
+                if ui
+                    .button(crate::i18n::text(
+                        "repo-workflows-email-email-window-b64a0d4f",
+                    ))
+                    .clicked()
+                {
+                    acts.push(Action::Email(Act::Cancel));
+                }
+            }
             ui.label(&state.result);
             ui.add_enabled_ui(state.pending.is_none() && self.busy_op.is_none(), |ui| {
-                ui.heading("Receive and review");
-                ui.label("Public-inbox HTTPS URL or Message-ID"); ui.text_edit_singleline(&mut state.source);
-                ui.horizontal(|ui| { ui.label("Revision (0 = latest)"); ui.add(egui::DragValue::new(&mut state.receive_revision).range(0..=9999)); if ui.button("Fetch series with b4").clicked() { acts.push(Action::Email(Act::Receive)); } });
+                ui.heading(crate::i18n::text(
+                    "repo-workflows-email-email-window-03712771",
+                ));
+                ui.label(crate::i18n::text(
+                    "repo-workflows-email-email-window-179e0bb7",
+                ));
+                ui.text_edit_singleline(&mut state.source);
+                ui.horizontal(|ui| {
+                    ui.label(crate::i18n::text(
+                        "repo-workflows-email-email-window-49077514",
+                    ));
+                    ui.add(egui::DragValue::new(&mut state.receive_revision).range(0..=9999));
+                    if ui
+                        .button(crate::i18n::text(
+                            "repo-workflows-email-email-window-15173718",
+                        ))
+                        .clicked()
+                    {
+                        acts.push(Action::Email(Act::Receive));
+                    }
+                });
                 if let Some(received) = &state.received {
-                    ui.label(format!("Fetched for HEAD {} · {} patches", received.snapshot.head, received.messages.len()));
-                    egui::CollapsingHeader::new("Cover letter").default_open(true).show(ui, |ui| { ui.label(&received.cover); });
+                    ui.label(crate::i18n::message(
+                        "repo-workflows-email-email-window-9cb42639",
+                        &[
+                            (
+                                "received-snapshot-head-1",
+                                (received.snapshot.head).clone().into(),
+                            ),
+                            (
+                                "received-messages-len-2",
+                                (received.messages.len()).clone().into(),
+                            ),
+                        ],
+                    ));
+                    egui::CollapsingHeader::new(crate::i18n::text(
+                        "repo-workflows-email-email-window-d9adba22",
+                    ))
+                    .default_open(true)
+                    .show(ui, |ui| {
+                        ui.label(&received.cover);
+                    });
                     messages(ui, &received.messages, "received");
-                    if ui.button("Apply reviewed series (git am --3way)").clicked() { acts.push(Action::Email(Act::Apply)); }
+                    if ui
+                        .button(crate::i18n::text(
+                            "repo-workflows-email-email-window-e70c5648",
+                        ))
+                        .clicked()
+                    {
+                        acts.push(Action::Email(Act::Apply));
+                    }
                 }
-                ui.separator(); ui.heading("Author and reroll");
-                if ui.button("Read prepared branch and cover").clicked() { acts.push(Action::Email(Act::Read)); }
+                ui.separator();
+                ui.heading(crate::i18n::text(
+                    "repo-workflows-email-email-window-381b0db7",
+                ));
+                if ui
+                    .button(crate::i18n::text(
+                        "repo-workflows-email-email-window-1e3943ad",
+                    ))
+                    .clicked()
+                {
+                    acts.push(Action::Email(Act::Read));
+                }
                 ui.label(&state.info);
-                ui.checkbox(&mut state.trust, "I understand b4 preparation can rewrite this branch and change its metadata");
-                ui.horizontal(|ui| { ui.label("Fork point"); ui.text_edit_singleline(&mut state.forkpoint); if ui.add_enabled(state.trust && state.snapshot.is_some(), egui::Button::new("Enroll current branch")).clicked() { acts.push(Action::Email(Act::Enroll)); } });
-                ui.add(egui::TextEdit::multiline(&mut state.cover).desired_rows(8).desired_width(f32::INFINITY));
-                if ui.add_enabled(state.trust && state.snapshot.is_some(), egui::Button::new("Save cover with b4")).clicked() { acts.push(Action::Email(Act::Cover)); }
-                ui.horizontal(|ui| { ui.label("Revision"); ui.text_edit_singleline(&mut state.revision); if ui.add_enabled(state.trust && state.snapshot.is_some(), egui::Button::new("Set numbered revision")).clicked() { acts.push(Action::Email(Act::Revision)); } });
-                ui.horizontal(|ui| { ui.label("Previous sent Message-ID"); ui.text_edit_singleline(&mut state.previous); if ui.add_enabled(state.trust && state.snapshot.is_some(), egui::Button::new("Reroll from sent series")).clicked() { acts.push(Action::Email(Act::Reroll)); } });
-                ui.separator(); ui.heading("Preview and send");
-                ui.label("Additional recipients. b4 also derives recipients from its cover/configuration and review trailers; inspect every generated message below.");
-                ui.horizontal(|ui| { ui.label("To"); ui.text_edit_singleline(&mut state.to); });
-                ui.horizontal(|ui| { ui.label("Cc"); ui.text_edit_singleline(&mut state.cc); });
-                if ui.button("Generate outgoing preview (no mail)").clicked() { acts.push(Action::Email(Act::Preview)); }
+                ui.checkbox(
+                    &mut state.trust,
+                    crate::i18n::text("repo-workflows-email-email-window-54194499"),
+                );
+                ui.horizontal(|ui| {
+                    ui.label(crate::i18n::text(
+                        "repo-workflows-email-email-window-c962be80",
+                    ));
+                    ui.text_edit_singleline(&mut state.forkpoint);
+                    if ui
+                        .add_enabled(
+                            state.trust && state.snapshot.is_some(),
+                            egui::Button::new(crate::i18n::text(
+                                "repo-workflows-email-email-window-bc346e4f",
+                            )),
+                        )
+                        .clicked()
+                    {
+                        acts.push(Action::Email(Act::Enroll));
+                    }
+                });
+                ui.add(
+                    egui::TextEdit::multiline(&mut state.cover)
+                        .desired_rows(8)
+                        .desired_width(f32::INFINITY),
+                );
+                if ui
+                    .add_enabled(
+                        state.trust && state.snapshot.is_some(),
+                        egui::Button::new(crate::i18n::text(
+                            "repo-workflows-email-email-window-582e1946",
+                        )),
+                    )
+                    .clicked()
+                {
+                    acts.push(Action::Email(Act::Cover));
+                }
+                ui.horizontal(|ui| {
+                    ui.label(crate::i18n::text(
+                        "repo-workflows-email-email-window-2e516d68",
+                    ));
+                    ui.text_edit_singleline(&mut state.revision);
+                    if ui
+                        .add_enabled(
+                            state.trust && state.snapshot.is_some(),
+                            egui::Button::new(crate::i18n::text(
+                                "repo-workflows-email-email-window-1219b3d1",
+                            )),
+                        )
+                        .clicked()
+                    {
+                        acts.push(Action::Email(Act::Revision));
+                    }
+                });
+                ui.horizontal(|ui| {
+                    ui.label(crate::i18n::text(
+                        "repo-workflows-email-email-window-035719bf",
+                    ));
+                    ui.text_edit_singleline(&mut state.previous);
+                    if ui
+                        .add_enabled(
+                            state.trust && state.snapshot.is_some(),
+                            egui::Button::new(crate::i18n::text(
+                                "repo-workflows-email-email-window-e6ec08b2",
+                            )),
+                        )
+                        .clicked()
+                    {
+                        acts.push(Action::Email(Act::Reroll));
+                    }
+                });
+                ui.separator();
+                ui.heading(crate::i18n::text(
+                    "repo-workflows-email-email-window-54cdddfe",
+                ));
+                ui.label(crate::i18n::text(
+                    "repo-workflows-email-email-window-b0fcf938",
+                ));
+                ui.horizontal(|ui| {
+                    ui.label(crate::i18n::text(
+                        "repo-workflows-email-email-window-f4b06ef6",
+                    ));
+                    ui.text_edit_singleline(&mut state.to);
+                });
+                ui.horizontal(|ui| {
+                    ui.label(crate::i18n::text(
+                        "repo-workflows-email-email-window-b28037e9",
+                    ));
+                    ui.text_edit_singleline(&mut state.cc);
+                });
+                if ui
+                    .button(crate::i18n::text(
+                        "repo-workflows-email-email-window-3d343b32",
+                    ))
+                    .clicked()
+                {
+                    acts.push(Action::Email(Act::Preview));
+                }
                 if let Some(preview) = &state.preview {
                     messages(ui, &preview.messages, "outgoing");
-                    ui.label("Sending regenerates volatile Date, Message-ID and signature headers. Recipients, subjects and decoded MIME content are checked against this preview. b4's successful-send tagging/reroll behavior applies. Native failed-preflight or unknown prompts abort; only the final send confirmation is answered by this explicit approval.");
-                    ui.checkbox(&mut state.confirm, "I reviewed every recipient and message and want to send real mail");
-                    if ui.add_enabled(state.confirm, egui::Button::new("Send reviewed series through b4")).clicked() { acts.push(Action::Email(Act::Send)); }
+                    ui.label(crate::i18n::text(
+                        "repo-workflows-email-email-window-99fe2a7b",
+                    ));
+                    ui.checkbox(
+                        &mut state.confirm,
+                        crate::i18n::text("repo-workflows-email-email-window-6ad695fc"),
+                    );
+                    if ui
+                        .add_enabled(
+                            state.confirm,
+                            egui::Button::new(crate::i18n::text(
+                                "repo-workflows-email-email-window-e6884e31",
+                            )),
+                        )
+                        .clicked()
+                    {
+                        acts.push(Action::Email(Act::Send));
+                    }
                 }
             });
         });
@@ -172,8 +355,13 @@ impl RepoTab {
             Act::Read => Box::new(move || {
                 let snapshot = run::snapshot(&path)?;
                 // An unenrolled branch is still readable so it can be enrolled from this UI.
-                let info = run::b4(&path, &["prep".into(), "--show-info".into()])
-                    .unwrap_or_else(|e| format!("Not enrolled or b4 unavailable: {e}"));
+                let info =
+                    run::b4(&path, &["prep".into(), "--show-info".into()]).unwrap_or_else(|e| {
+                        crate::i18n::message(
+                            "repo-workflows-email-email-act-fa043d04",
+                            &[("e", (e).clone().into())],
+                        )
+                    });
                 let cover =
                     run::b4(&path, &["prep".into(), "--show-cover".into()]).unwrap_or_default();
                 Ok(Reply::Read(snapshot, info, cover))
@@ -205,7 +393,8 @@ impl RepoTab {
                 if model::recipients(&state.to, &state.cc).ok().as_ref()
                     != Some(&preview.recipients)
                 {
-                    state.result = "Recipients changed; generate a new preview".into();
+                    state.result =
+                        crate::i18n::text("repo-workflows-email-email-act-3eece223").into();
                     return;
                 }
                 state.confirm = false;
@@ -240,7 +429,10 @@ impl RepoTab {
                 tasks::Priority::Interactive,
                 Some(super::messages::mutation_key(&self.path)),
                 Some(Box::new(move || {
-                    let _ = cancelled.send(Err("Cancelled before starting".into()));
+                    let _ = cancelled.send(Err(crate::i18n::text(
+                        "repo-workflows-email-email-act-84f8f92f",
+                    )
+                    .into()));
                     failure_repaint.request_repaint();
                 })),
                 Box::new(move || {
@@ -252,13 +444,14 @@ impl RepoTab {
         });
         match submitted {
             Ok(()) => {
-                self.busy_op = Some("Email patches · b4".into());
+                self.busy_op =
+                    Some(crate::i18n::text("repo-workflows-email-email-act-c19c9f05").into());
                 state.pending = Some(Pending {
                     rx,
                     scope,
                     context: connections::current(),
                 });
-                state.result = "Working…".into();
+                state.result = crate::i18n::text("repo-workflows-email-email-act-5474eef8").into();
             }
             Err(e) => state.result = e,
         }
@@ -266,24 +459,37 @@ impl RepoTab {
 }
 fn messages(ui: &mut egui::Ui, messages: &[model::Message], salt: &str) {
     for (index, message) in messages.iter().enumerate() {
-        egui::CollapsingHeader::new(format!(
-            "Message {} · {}",
-            index + 1,
-            message
-                .headers
-                .lines()
-                .find(|l| l.starts_with("Subject:"))
-                .unwrap_or("Mail")
+        egui::CollapsingHeader::new(crate::i18n::message(
+            "repo-workflows-email-messages-8e0d8018",
+            &[
+                ("index-1-1", (index + 1).clone().into()),
+                (
+                    "message-headers-lines-find-l-l-s-2",
+                    (message
+                        .headers
+                        .lines()
+                        .find(|l| {
+                            l.starts_with(crate::i18n::text(
+                                "repo-workflows-email-messages-1edf47d5",
+                            ))
+                        })
+                        .unwrap_or(crate::i18n::text("repo-workflows-email-messages-07ed6ccf")))
+                    .clone()
+                    .into(),
+                ),
+            ],
         ))
         .id_salt((salt, index))
         .show(ui, |ui| {
             ui.monospace(&message.headers);
             ui.add(egui::Label::new(&message.body).selectable(true));
-            egui::CollapsingHeader::new("Raw RFC822 message")
-                .id_salt((salt, index, "raw"))
-                .show(ui, |ui| {
-                    ui.add(egui::Label::new(&message.raw).selectable(true));
-                });
+            egui::CollapsingHeader::new(crate::i18n::text(
+                "repo-workflows-email-messages-a6252664",
+            ))
+            .id_salt((salt, index, "raw"))
+            .show(ui, |ui| {
+                ui.add(egui::Label::new(&message.raw).selectable(true));
+            });
         });
     }
 }
