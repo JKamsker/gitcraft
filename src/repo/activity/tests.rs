@@ -360,3 +360,62 @@ fn fluent_partition_control_error_paint_preserves_raw_cancellation_and_opaque_di
     }
     crate::i18n::set_language("en-US");
 }
+
+/// Pure transport checks: no tab, worker, native object, subprocess or Git invocation.
+#[test]
+fn operation_source_is_retired_by_redaction_bounds_mismatch_and_plain_repeat() {
+    let mut log = ActivityLog::default();
+    let raw = "provider https://token@host.invalid/repo and SECRET";
+    let redacted = crate::git::redact(raw, Some("SECRET"));
+    assert_ne!(redacted, raw);
+    log.push_presented(
+        "Commit",
+        Duration::ZERO,
+        Vec::new(),
+        Outcome::Failed(redacted),
+        false,
+        Some(Failure::capture(raw, None)),
+    );
+    assert!(log.last().unwrap().failure_presentation.is_none());
+    let huge = "provider opaque\n".repeat(MAX_OUTPUT);
+    log.push_presented(
+        "Commit",
+        Duration::ZERO,
+        Vec::new(),
+        Outcome::Failed(huge.clone()),
+        false,
+        Some(Failure::capture(&huge, None)),
+    );
+    assert!(log.last().unwrap().failure_presentation.is_none());
+    assert!(
+        matches!(&log.last().unwrap().outcome, Outcome::Failed(kept) if kept != &huge && kept.len() < huge.len())
+    );
+    log.push_presented(
+        "Commit",
+        Duration::ZERO,
+        Vec::new(),
+        Outcome::Failed("different".into()),
+        false,
+        Some(Failure::capture(raw, None)),
+    );
+    assert!(log.last().unwrap().failure_presentation.is_none());
+    let id = log.push_presented(
+        "Fetch",
+        Duration::ZERO,
+        Vec::new(),
+        Outcome::Failed("opaque same".into()),
+        true,
+        Some(Failure::capture("opaque same", None)),
+    );
+    assert!(log.last().unwrap().failure_presentation.is_some());
+    let repeated = log.push(
+        "Fetch",
+        Duration::ZERO,
+        Vec::new(),
+        Outcome::Failed("opaque same".into()),
+        true,
+    );
+    assert_eq!(id, repeated);
+    assert_eq!(log.last().unwrap().repeats, 2);
+    assert!(log.last().unwrap().failure_presentation.is_none());
+}

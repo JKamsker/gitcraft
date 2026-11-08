@@ -3,6 +3,7 @@
 //! Plain replacements have no presentation receipt, even when their text happens to be
 //! identical. Classifiers, activity linkage and copy actions continue to read the raw tuple.
 
+pub(super) mod operation;
 mod parallel;
 
 use crate::authorship::branch::Figures;
@@ -21,6 +22,8 @@ enum Presentation {
         figures: Figures,
     },
     Parallel(parallel::Summary),
+    Operation(operation::Status),
+    OperationFinished(operation::Finished),
     Custom(crate::custom_commands::CapturedToast),
     CustomStarted(String),
     CustomStartFailed {
@@ -58,6 +61,26 @@ impl Notice {
             presentation: Some(Arc::new(Presentation::Parallel(
                 parallel::Summary::capture(outcome, machine, receipt),
             ))),
+        }
+    }
+
+    pub(super) fn operation(source: operation::Status) -> Self {
+        Self {
+            raw: source.raw(),
+            presentation: Some(Arc::new(Presentation::Operation(source))),
+        }
+    }
+
+    pub(super) fn operation_finished(
+        name: &str,
+        label: &str,
+        result: &Result<String, String>,
+        receipt: Option<crate::gerrit::StackFailure>,
+    ) -> Self {
+        let source = operation::Finished::capture(name, label, result, receipt);
+        Self {
+            raw: source.raw(),
+            presentation: Some(Arc::new(Presentation::OperationFinished(source))),
         }
     }
 
@@ -120,6 +143,8 @@ impl Presentation {
         match self {
             Self::Authorship { branch, figures } => figures.display_headline(branch),
             Self::Parallel(summary) => summary.display(),
+            Self::Operation(source) => source.display(),
+            Self::OperationFinished(source) => source.display(),
             Self::Custom(source) => source.display().0,
             Self::CustomStarted(name) => crate::i18n::message(
                 "repo-workflows-custom_commands-run-custom-captured-5215b5ab",

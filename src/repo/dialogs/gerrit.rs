@@ -29,7 +29,7 @@ pub(super) fn review(
         &t,
     );
     if let Some(warning) = web_warning {
-        ui.label(egui::RichText::new(warning).color(t.warning));
+        ui.label(egui::RichText::new(crate::gerrit::display_error(warning)).color(t.warning));
     }
     ui.label(crate::i18n::text("repo-core-1329"));
     egui::ComboBox::from_id_salt("gerrit-target")

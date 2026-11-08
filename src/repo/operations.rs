@@ -5,6 +5,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use super::messages::spawn_mutation;
+use super::notice::operation::{Failure, Status as OperationStatus};
 use super::toolbar::headline;
 use super::{Dialog, Msg, OpKind, PendingOp, Refresh, RepoTab, Undo, UndoEntry, ops};
 use crate::git;
@@ -468,8 +469,13 @@ impl RepoTab {
             self.network_failed = true;
         }
         let auth_failure = running.as_ref().and_then(|r| r.control.auth_failure());
+        let stack_failure = running.as_ref().and_then(|r| r.control.stack_failure());
         let steps = running.map(|r| r.control.take_steps()).unwrap_or_default();
-        self.log_activity(&label, &result, cancelled, quiet, steps);
+        let failure = result
+            .as_ref()
+            .err()
+            .map(|error| Failure::capture(error, stack_failure.clone()));
+        self.log_activity_presented(&label, &result, cancelled, quiet, steps, failure);
         let long = self
             .op_started
             .take()
@@ -489,24 +495,15 @@ impl RepoTab {
                     && let Some(note) = tried_note(out)
                     && !quiet
                 {
-                    self.status = Some(crate::repo::Notice::plain((
-                        crate::i18n::message(
-                            "repo-core-2959",
-                            &[
-                                (
-                                    "label",
-                                    crate::repo::messages::display_operation(&label).into(),
-                                ),
-                                ("note", note.to_string().into()),
-                            ],
-                        ),
-                        true,
-                    )));
+                    self.status = Some(crate::repo::Notice::operation(OperationStatus::Done {
+                        label: label.clone(),
+                        note: Some(note.to_owned()),
+                    }));
                 } else if refresh == Refresh::All && !quiet {
-                    self.status = Some(crate::repo::Notice::plain((
-                        format!("{label}: done"),
-                        false,
-                    )));
+                    self.status = Some(crate::repo::Notice::operation(OperationStatus::Done {
+                        label: label.clone(),
+                        note: None,
+                    }));
                 }
                 if label.contains("etch") {
                     self.note_fetched();
@@ -521,34 +518,27 @@ impl RepoTab {
             Err(e) if cancelled => {
                 self.open_when_done.take_if(|(l, _)| *l == label);
                 let left_locks = e.starts_with(&format!("{}, but", git::CANCELLED));
-                self.status = Some(crate::repo::Notice::plain((
-                    format!("{label}: {e}"),
+                self.status = Some(crate::repo::Notice::operation(OperationStatus::Cancelled {
+                    label: label.clone(),
+                    error: Failure::capture(e, None),
                     left_locks,
-                )));
+                }));
             }
             Err(e) if git::is_auth_error(e) && !quiet => {
                 self.agent_needs_sign_in(&label);
                 // Typed credentials that were refused are forgotten.
                 let typed = self.credentials.take().is_some();
                 let refused = typed || e.contains("401") || e.contains("403");
-                self.status = Some(crate::repo::Notice::plain((
-                    crate::i18n::message(
-                        "repo-core-2962",
-                        &[(
-                            "label",
-                            crate::repo::messages::display_operation(&label).into(),
-                        )],
-                    ),
-                    true,
-                )));
+                self.status = Some(crate::repo::Notice::operation(OperationStatus::SignIn {
+                    label: label.clone(),
+                }));
                 // Only a URL reported by the failed step, or its captured destinations.
                 // An absent endpoint must never be replaced with the default fetch URL.
                 if crate::push_preflight::is_reviewed_auth_error(e) && auth_failure.is_none() {
                     self.invalidate_https_challenge();
-                    self.status = Some(crate::repo::Notice::plain((
-                        crate::i18n::text("repo-core-2963").into(),
-                        true,
-                    )));
+                    self.status = Some(crate::repo::Notice::operation(
+                        OperationStatus::MissingSignInProof,
+                    ));
                 } else {
                     let failure =
                         auth_failure.unwrap_or_else(|| git::AuthFailure::from_error(e, &[]));
@@ -560,19 +550,10 @@ impl RepoTab {
                 self.open_when_done.take_if(|(l, _)| *l == label);
                 self.focus_wip = e.contains("CONFLICT") || e.contains("could not apply");
                 // A failed undo stays undoable: the timeline stays where it was.
-                self.status = Some(crate::repo::Notice::plain((
-                    crate::i18n::message(
-                        "repo-core-0270",
-                        &[
-                            (
-                                "label",
-                                crate::repo::messages::display_operation(&label).into(),
-                            ),
-                            ("e", e.to_string().into()),
-                        ],
-                    ),
-                    true,
-                )));
+                self.status = Some(crate::repo::Notice::operation(OperationStatus::Failed {
+                    label: label.clone(),
+                    error: Failure::capture(e, stack_failure.clone()),
+                }));
                 if !quiet {
                     self.explain_failure(e, &label, ctx);
                 }
@@ -589,36 +570,12 @@ impl RepoTab {
             self.timeline_op_ended(&label, &kind, undo, ok, refresh, ctx);
         }
         if long && !quiet {
-            self.finished
-                .push(crate::repo::Notice::plain(match &result {
-                    Ok(_) => (
-                        crate::i18n::message(
-                            "repo-core-2965",
-                            &[
-                                ("name", self.name.to_string().into()),
-                                (
-                                    "label",
-                                    crate::repo::messages::display_operation(&label).into(),
-                                ),
-                            ],
-                        ),
-                        false,
-                    ),
-                    Err(e) => (
-                        crate::i18n::message(
-                            "repo-core-2966",
-                            &[
-                                ("name", self.name.to_string().into()),
-                                (
-                                    "label",
-                                    crate::repo::messages::display_operation(&label).into(),
-                                ),
-                                ("e", headline(e).to_string().into()),
-                            ],
-                        ),
-                        true,
-                    ),
-                }));
+            self.finished.push(crate::repo::Notice::operation_finished(
+                &self.name,
+                &label,
+                &result,
+                stack_failure,
+            ));
         }
         self.fold_op_done(&label, &result, ctx);
         self.dco_op_done(&label, &result, ctx);
@@ -1279,6 +1236,20 @@ pub(super) fn is_expectation(op: &[String]) -> bool {
         || matches!(op, [mark, _] if mark == EXPECT_HTTPS_ROUTE)
 }
 
+/// Captures only the witness from the same validator invocation; no additional Git call.
+pub(super) fn check_stack_captured(
+    base: &str,
+    head: &str,
+    control: Option<&Arc<git::OpControl>>,
+    run: impl FnMut(&[&str]) -> Result<String, String>,
+) -> Result<(), String> {
+    let (result, source) = crate::gerrit::check_stack_presented_with(base, head, run);
+    if let Some(control) = control {
+        control.stack_checked(source);
+    }
+    result
+}
+
 fn check_expected(
     path: &Path,
     ops: &[Vec<String>],
@@ -1288,7 +1259,7 @@ fn check_expected(
         if let [mark, base, head] = op.as_slice()
             && mark == crate::gerrit::CHECK
         {
-            crate::gerrit::check_stack_with(base, head, |args| {
+            check_stack_captured(base, head, control, |args| {
                 if let Some(control) = control {
                     git::run_watched(Some(path), args, None, true, control)
                 } else {

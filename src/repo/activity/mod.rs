@@ -7,6 +7,7 @@ mod view;
 use std::collections::VecDeque;
 use std::time::{Duration, Instant};
 
+use super::notice::operation::Failure;
 use crate::git::Recorded;
 
 /// How many operations the log keeps; older ones are dropped.
@@ -45,9 +46,18 @@ pub(super) struct Entry {
     pub(super) background: bool,
     /// How many times in a row it failed the same way (a background fetch while offline).
     pub(super) repeats: u32,
+    /// Optional operation-owned source, retired if retained raw diagnostics change.
+    failure_presentation: Option<Failure>,
 }
 
 impl Entry {
+    fn display_error(&self, raw: &str) -> String {
+        self.failure_presentation
+            .as_ref()
+            .and_then(|source| source.display(raw))
+            .unwrap_or_else(|| display_workflow_error(raw))
+    }
+
     /// The whole entry as text, for the clipboard: each command, how it ended, its output.
     pub(super) fn as_text(&self) -> String {
         let mut text = format!(
@@ -97,9 +107,25 @@ impl ActivityLog {
         outcome: Outcome,
         background: bool,
     ) -> u64 {
+        self.push_presented(label, took, steps, outcome, background, None)
+    }
+
+    pub(in crate::repo) fn push_presented(
+        &mut self,
+        label: &str,
+        took: Duration,
+        steps: Vec<Recorded>,
+        outcome: Outcome,
+        background: bool,
+        presentation: Option<Failure>,
+    ) -> u64 {
         let outcome = match outcome {
             Outcome::Failed(why) => Outcome::Failed(bounded(&why)),
             other => other,
+        };
+        let presentation = match &outcome {
+            Outcome::Failed(raw) => presentation.and_then(|source| source.matching(raw)),
+            _ => None,
         };
         // The same background failure again (offline): counted, not added.
         if background
@@ -109,6 +135,8 @@ impl ActivityLog {
             && last.outcome == outcome
             && matches!(outcome, Outcome::Failed(_))
         {
+            // A repeated plain error replaces the old source even when raw text is equal.
+            last.failure_presentation = presentation;
             last.repeats += 1;
             last.at = Instant::now();
             last.took = took;
@@ -134,6 +162,7 @@ impl ActivityLog {
             outcome,
             background,
             repeats: 1,
+            failure_presentation: presentation,
         });
         while self.entries.len() > MAX_ENTRIES {
             self.entries.pop_front();
@@ -340,6 +369,18 @@ impl super::RepoTab {
         background: bool,
         steps: Vec<Recorded>,
     ) {
+        self.log_activity_presented(label, result, cancelled, background, steps, None);
+    }
+
+    pub(super) fn log_activity_presented(
+        &mut self,
+        label: &str,
+        result: &Result<String, String>,
+        cancelled: bool,
+        background: bool,
+        steps: Vec<Recorded>,
+        presentation: Option<Failure>,
+    ) {
         if background && result.is_ok() {
             return;
         }
@@ -350,7 +391,9 @@ impl super::RepoTab {
             Err(e) => Outcome::Failed(crate::git::redact(e, password)),
         };
         let took = self.op_started.map(|t| t.elapsed()).unwrap_or_default();
-        let id = self.activity.push(label, took, steps, outcome, background);
+        let id =
+            self.activity
+                .push_presented(label, took, steps, outcome, background, presentation);
         self.activity.pending_link = Some(id);
     }
 

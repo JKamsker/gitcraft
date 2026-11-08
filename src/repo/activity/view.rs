@@ -164,9 +164,7 @@ fn entry_ui(ui: &mut Ui, entry: &Entry, reveal: bool, t: &Tokens) {
     });
     let (_, header_resp, _) = header.body(|ui| {
         if let Outcome::Failed(why) = &entry.outcome {
-            ui.label(
-                RichText::new(crate::repo::activity::display_workflow_error(why)).color(t.danger),
-            );
+            ui.label(RichText::new(entry.display_error(why)).color(t.danger));
         }
         if entry.steps.is_empty() {
             ui.label(
@@ -222,5 +220,208 @@ fn ago(d: std::time::Duration) -> String {
             "repo-workflows-activity-ago-4d631fe4",
             &[("s-3600-1", (s / 3600).clone().into())],
         ),
+    }
+}
+
+#[cfg(test)]
+mod operation_presentation_tests {
+    use super::*;
+    use crate::repo::activity::{ActivityLog, Outcome};
+    use crate::repo::notice::operation::{Failure, Status};
+    use crate::repo::push_preflight::core_guard_paint_tests::paint;
+    use crate::repo::{Notice, operations::check_stack_captured};
+    use std::time::Duration;
+
+    #[test]
+    fn same_recording_stack_check_repaints_retained_status_finished_and_actual_activity() {
+        let hash = "a".repeat(40);
+        let other = "b".repeat(40);
+        let id = "I0123456789abcdef0123456789abcdef01234567";
+        let valid = format!("Subject\n\nChange-Id: {id}");
+        let cases = [
+            (
+                format!(
+                    "{hash}\0parent\0{}\0",
+                    "opaque commit message\n".repeat(800000)
+                ),
+                "commit-msg-Hook",
+            ),
+            (format!("{hash}\0first second\0{valid}\0"), "Merge-Commit"),
+            (
+                format!("{hash}\0parent\0{valid}\0{other}\0parent\0{valid}\0"),
+                "dieselbe Change-Id",
+            ),
+            (String::new(), "keine Commits"),
+        ];
+        for (log, german) in cases {
+            crate::i18n::set_language("de");
+            let control = crate::git::OpControl::new(|| {});
+            let mut commands = Vec::new();
+            let result = check_stack_captured("base", "head", Some(&control), |args| {
+                commands.push(args.iter().map(|s| s.to_string()).collect::<Vec<_>>());
+                Ok(if args[0] == "log" {
+                    log.clone()
+                } else {
+                    String::new()
+                })
+            });
+            let raw_error = result.unwrap_err();
+            assert_eq!(commands.len(), 2);
+            assert_eq!(commands[0], ["merge-base", "--is-ancestor", "base", "head"]);
+            assert_eq!(
+                commands[1],
+                [
+                    "log",
+                    "--no-show-signature",
+                    "--no-notes",
+                    "--encoding=UTF-8",
+                    "--format=%H%x00%P%x00%B%x00",
+                    "base..head",
+                    "--"
+                ]
+            );
+            let receipt = control
+                .stack_failure()
+                .expect("same operation's finite witness");
+            assert!(format!("{receipt:?}").len() < 1000);
+            let status = Notice::operation(Status::Failed {
+                label: "Commit".into(),
+                error: Failure::capture(&raw_error, Some(receipt.clone())),
+            });
+            let finished = Notice::operation_finished(
+                "repo $(opaque)",
+                "Commit",
+                &Err(raw_error.clone()),
+                Some(receipt.clone()),
+            );
+            let mut parked = vec![finished];
+            let mut queue = Vec::new();
+            queue.append(&mut parked);
+            let finished = queue.remove(0);
+            let status_raw = status.raw().clone();
+            let finished_raw = finished.raw().clone();
+            assert_eq!(status_raw, (format!("Commit failed: {raw_error}"), true));
+            assert_eq!(
+                finished_raw,
+                (format!("repo $(opaque) · Commit failed: {raw_error}"), true)
+            );
+            let failure = Failure::capture(&raw_error, Some(receipt));
+            let mut activity = ActivityLog::default();
+            let id = activity.push_presented(
+                "Commit",
+                Duration::from_secs(7),
+                Vec::new(),
+                Outcome::Failed(raw_error.clone()),
+                false,
+                Some(failure),
+            );
+            activity.status_link = Some((status_raw.0.clone(), id));
+            let link = activity.status_link.clone();
+            let ctx = egui::Context::default();
+            // Retire the operation-local carrier: retained values must own their source.
+            control.stack_checked(None);
+            assert!(control.stack_failure().is_none());
+            for locale in ["en-US", "de", "en-US"] {
+                crate::i18n::set_language(locale);
+                let entry = activity.last().unwrap();
+                let shown = paint(&ctx, |ui| entry_ui(ui, entry, true, &Tokens::get(ui.ctx())));
+                let error = entry.display_error(&raw_error);
+                assert!(shown.contains(&error), "{shown}");
+                if locale == "de" {
+                    assert!(error.contains(german), "{error}");
+                    assert!(status.projected().unwrap().contains(german));
+                    assert!(finished.projected().unwrap().contains(german));
+                } else {
+                    assert_eq!(error, raw_error);
+                    assert_eq!(status.projected().unwrap(), status_raw.0);
+                    assert_eq!(finished.projected().unwrap(), finished_raw.0);
+                }
+                assert_eq!(entry.outcome, Outcome::Failed(raw_error.clone()));
+                let mut plain = ActivityLog::default();
+                plain.push(
+                    "Commit",
+                    entry.took,
+                    Vec::new(),
+                    entry.outcome.clone(),
+                    false,
+                );
+                assert_eq!(entry.as_text(), plain.last().unwrap().as_text());
+                assert_eq!(status.raw(), &status_raw);
+                assert_eq!(finished.raw(), &finished_raw);
+                assert_eq!(activity.status_link, link);
+            }
+            assert_eq!(Notice::plain(status_raw).projected(), None);
+            assert_eq!(Notice::plain(finished_raw).projected(), None);
+        }
+    }
+
+    #[test]
+    fn provider_lookalikes_and_later_checks_never_acquire_or_reuse_a_stack_witness() {
+        let control = crate::git::OpControl::new(|| {});
+        let log = format!("{}\0parent\0Missing footer\0", "a".repeat(40));
+        let raw = check_stack_captured("b", "h", Some(&control), |args| {
+            Ok(if args[0] == "log" {
+                log.clone()
+            } else {
+                String::new()
+            })
+        })
+        .unwrap_err();
+        assert!(control.stack_failure().is_some());
+        let forged = check_stack_captured("b", "h", Some(&control), |args| {
+            if args[0] == "log" {
+                Err(raw.clone())
+            } else {
+                Ok(String::new())
+            }
+        });
+        assert_eq!(forged, Err(raw.clone()));
+        assert!(control.stack_failure().is_none());
+        for error in [
+            raw,
+            "Two commits have the same Change-Id (opaque); each change needs its own".into(),
+            "provider: missing Change-Id in the message footer\nCommit failed: $(opaque)".into(),
+        ] {
+            let status = Notice::operation(Status::Failed {
+                label: "Commit".into(),
+                error: Failure::capture(&error, None),
+            });
+            let mut log = ActivityLog::default();
+            log.push_presented(
+                "Commit",
+                Duration::ZERO,
+                Vec::new(),
+                Outcome::Failed(error.clone()),
+                false,
+                Some(Failure::capture(&error, None)),
+            );
+            for locale in ["en-US", "de", "en-US"] {
+                crate::i18n::set_language(locale);
+                assert!(status.projected().unwrap().ends_with(&error));
+                assert_eq!(log.last().unwrap().display_error(&error), error);
+            }
+        }
+        let mut commands = Vec::new();
+        let cancelled = check_stack_captured("b", "h", Some(&control), |args| {
+            commands.push(args[0].to_owned());
+            Err(crate::git::CANCELLED.into())
+        });
+        assert_eq!(cancelled, Err(crate::git::CANCELLED.into()));
+        assert_eq!(commands, ["merge-base"]);
+        assert!(control.stack_failure().is_none());
+        let failed = check_stack_captured("b", "h", Some(&control), |_| {
+            Err("provider details stay private".into())
+        });
+        let error = failed.unwrap_err();
+        let source = control.stack_failure().unwrap();
+        for locale in ["en-US", "de", "en-US"] {
+            crate::i18n::set_language(locale);
+            let shown = source.display(&error).unwrap();
+            if locale == "en-US" {
+                assert_eq!(shown, error);
+            } else {
+                assert_ne!(shown, error);
+            }
+        }
     }
 }
