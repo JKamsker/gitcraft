@@ -418,7 +418,7 @@ fn drain_until(
     ctx: &egui::Context,
     done: impl Fn(&crate::repo::RepoTab) -> bool,
 ) {
-    for _ in 0..300 {
+    for _ in 0..3000 {
         tab.poll(ctx);
         if done(tab) {
             return;
