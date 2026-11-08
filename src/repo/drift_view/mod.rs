@@ -330,7 +330,10 @@ fn body(ui: &mut egui::Ui, view: &mut DriftView, acts: &mut Vec<Action>) -> Todo
             ),
             Err(e) => crate::i18n::message(
                 "repo-workflows-drift_view-body-fa4f662d",
-                &[("n", (n).clone().into()), ("e", (e).clone().into())],
+                &[
+                    ("n", (n).clone().into()),
+                    ("e", crate::drift::display::diagnostic(e).into()),
+                ],
             ),
         };
 
@@ -405,15 +408,67 @@ fn body(ui: &mut egui::Ui, view: &mut DriftView, acts: &mut Vec<Action>) -> Todo
                     ui.label(RichText::new(answer).size(12.0).color(t.text_dim));
                 }
                 Some(Err(e)) => {
-                    ui.label(RichText::new(e).size(12.0).color(t.danger));
+                    ui.label(
+                        RichText::new(crate::drift::display::diagnostic(e))
+                            .size(12.0)
+                            .color(t.danger),
+                    );
                 }
                 None => {}
             }
         }
         Some(Err(e)) => {
-            ui.label(RichText::new(e).color(t.danger));
+            ui.label(RichText::new(crate::drift::display::diagnostic(e)).color(t.danger));
         }
         None => {}
     }
     todo
+}
+
+#[cfg(test)]
+mod fluent_guard_tests {
+    use super::*;
+    use egui_kittest::{Harness, kittest::Queryable};
+    #[test]
+    fn fluent_partition_drift_actual_paint_reprojects_cached_raw_results() -> Result<(), String> {
+        let raw = "There is no main branch commit to compare the worktree with";
+        let view = DriftView {
+            worktree: Worktree {
+                path: "/supplied/ß".into(),
+                branch: Some("feature/1234".into()),
+                ..Default::default()
+            },
+            base: "abc123".into(),
+            task: "User supplied task".into(),
+            saved: "User supplied task".into(),
+            issue: None,
+            report: Some(Err(raw.into())),
+            busy: false,
+            second_opinion: None,
+            asking: false,
+            said: None,
+            hidden: false,
+        };
+        let mut initialized = false;
+        let mut h = Harness::new_ui_state(
+            |ui, state: &mut DriftView| {
+                if !initialized {
+                    crate::theme::install_fonts(ui.ctx());
+                    initialized = true;
+                    ui.ctx().request_discard("install supplied fonts");
+                    return;
+                }
+                body(ui, state, &mut vec![]);
+            },
+            view,
+        );
+        for lang in ["en-US", "de", "en-US"] {
+            crate::i18n::set_language(lang);
+            h.run();
+            h.get_by_label(&crate::drift::display::diagnostic(raw));
+            assert_eq!(h.state().report, Some(Err(raw.into())));
+            assert_eq!(h.state().worktree.branch.as_deref(), Some("feature/1234"));
+        }
+        Ok(())
+    }
 }

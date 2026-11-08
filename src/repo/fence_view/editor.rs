@@ -236,7 +236,15 @@ fn body(ui: &mut egui::Ui, editor: &mut FenceEditor, write_errors: &[String]) ->
     if let Some((said, error)) = &editor.said {
         ui.add_space(8.0);
         let color = if *error { t.danger } else { t.text_dim };
-        ui.label(RichText::new(said).size(12.0).color(color));
+        ui.label(
+            RichText::new(if *error {
+                fence::display::diagnostic(said)
+            } else {
+                said.clone()
+            })
+            .size(12.0)
+            .color(color),
+        );
     }
     (save, close)
 }

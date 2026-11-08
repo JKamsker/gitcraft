@@ -310,7 +310,7 @@ fn body(ui: &mut Ui, view: &mut CollisionView, acts: &mut Vec<Action>) -> (bool,
         }
         Some(Err(e)) => {
             ui.add_space(10.0);
-            ui.colored_label(t.danger, e);
+            ui.colored_label(t.danger, collision::display::diagnostic(e));
         }
         None => {}
     }
@@ -370,4 +370,37 @@ fn pick_branches(ui: &mut Ui, view: &mut CollisionView) {
 /// Compares two branches of the matrix: what `b` adds since it left `a`.
 fn compare(a: &str, b: &str) -> Action {
     super::actions::compare_branches_action(BranchRef::local(a), BranchRef::local(b), true)
+}
+
+#[cfg(test)]
+mod fluent_guard_tests {
+    use super::*;
+    use egui_kittest::{Harness, kittest::Queryable};
+    #[test]
+    fn fluent_partition_collision_actual_error_paint_keeps_raw_result() -> Result<(), String> {
+        let raw = "The collision matrix needs git 2.38 or later (git merge-tree --write-tree)";
+        let mut view = CollisionView::new(&["feature/ß".into()], &[], "main");
+        view.result = Some(Err(raw.into()));
+        let mut initialized = false;
+        let mut h = Harness::new_ui_state(
+            |ui, state: &mut CollisionView| {
+                if !initialized {
+                    crate::theme::install_fonts(ui.ctx());
+                    initialized = true;
+                    ui.ctx().request_discard("install supplied fonts");
+                    return;
+                }
+                body(ui, state, &mut vec![]);
+            },
+            view,
+        );
+        for lang in ["en-US", "de", "en-US"] {
+            crate::i18n::set_language(lang);
+            h.run();
+            h.get_by_label(&collision::display::diagnostic(raw));
+            assert!(matches!(&h.state().result,Some(Err(e)) if e==raw && e.contains("needs git")));
+            assert_ne!(raw, collision::STOPPED);
+        }
+        Ok(())
+    }
 }

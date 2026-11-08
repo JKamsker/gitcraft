@@ -25,7 +25,7 @@ pub(super) fn report(ui: &mut Ui, view: &DriftView, report: &Report, acts: &mut 
         )
     };
     ui.label(RichText::new(lead).size(12.0).color(t.text_dim));
-    ui.label(RichText::new(report.headline()).font(theme::semibold(13.0)));
+    ui.label(RichText::new(report.display_headline()).font(theme::semibold(13.0)));
     ui.add_space(6.0);
     egui::ScrollArea::vertical()
         .id_salt("drift-items")

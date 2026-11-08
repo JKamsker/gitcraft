@@ -19,7 +19,7 @@ pub(super) fn results(ui: &mut Ui, m: &Matrix, order: &[Step], acts: &mut Vec<Ac
             readable(&t, t.warning),
             crate::i18n::message(
                 "repo-workflows-collision_view-results-45512235",
-                &[("e", (e).clone().into())],
+                &[("e", crate::collision::display::diagnostic(e).into())],
             ),
         );
         ui.add_space(6.0);
@@ -196,7 +196,7 @@ fn cell_tip(a: &str, b: &str, cell: &Cell) -> String {
             ));
             tip
         }
-        Err(e) => e.clone(),
+        Err(e) => crate::collision::display::diagnostic(e),
     }
 }
 
@@ -266,4 +266,26 @@ fn readable(t: &Tokens, color: egui::Color32) -> egui::Color32 {
 
 fn files(n: usize) -> String {
     crate::i18n::message("repo-workflows-collision-files", &[("count", (n).into())])
+}
+
+#[cfg(test)]
+mod fluent_guard_tests {
+    use super::*;
+    #[test]
+    fn fluent_partition_collision_actual_cell_tip_preserves_raw_classification() {
+        let raw = "The collision matrix needs git 2.38 or later (git merge-tree --write-tree)";
+        let cell: Cell = Err(raw.into());
+        for lang in ["en-US", "de"] {
+            crate::i18n::set_language(lang);
+            let tip = cell_tip("feature/1234", "target/ß", &cell);
+            assert_eq!(tip, crate::collision::display::diagnostic(raw));
+            assert_eq!(tip.contains("benötigt"), lang == "de");
+            assert!(cell.as_ref().is_err_and(|e| e.contains("needs git")));
+            assert_eq!(
+                cell_tip("a", "b", &Err("Provider opaque: ß\n1234".into())),
+                "Provider opaque: ß\n1234"
+            );
+        }
+        crate::i18n::set_language("en-US");
+    }
 }

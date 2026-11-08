@@ -215,7 +215,7 @@ impl RepoTab {
                     Some(Err(e)) => Err(e.clone()),
                     None => Ok(Vec::new()),
                 };
-                (w.name(), found)
+                (w.name(), found, crate::remote::display(&w.path))
             });
         if self.busy_op.is_some() {
             return Some(pass);
@@ -223,6 +223,7 @@ impl RepoTab {
         self.busy_op = Some("Checking against the agent fence".to_owned());
         self.status = Some(("Checking against the agent fence…".to_owned(), false));
         let repo = self.path.clone();
+        let display_tip = tip.clone();
         self.then(
             ctx,
             move || {
@@ -239,9 +240,9 @@ impl RepoTab {
                 let mut errors: Vec<String> = Vec::new();
                 match commits {
                     Ok(v) => found.extend(v),
-                    Err(e) => errors.push(e),
+                    Err(e) => errors.push(fence::display::check_diagnostic(&e, &display_tip)),
                 }
-                if let Some((_, wt)) = &worktree {
+                if let Some((_, wt, target)) = &worktree {
                     match wt {
                         Ok(v) => found.extend(
                             v.iter()
@@ -249,7 +250,7 @@ impl RepoTab {
                                 .cloned()
                                 .collect::<Vec<_>>(),
                         ),
-                        Err(e) => errors.push(e.clone()),
+                        Err(e) => errors.push(fence::display::check_diagnostic(e, target)),
                     }
                 }
                 if found.is_empty() && errors.is_empty() {
@@ -430,6 +431,30 @@ mod fluent_confirmation_tests {
                     }
                 }
             }
+        }
+        crate::i18n::set_language("en-US");
+    }
+}
+
+#[cfg(test)]
+mod fluent_guard_target_tests {
+    use super::*;
+    #[test]
+    fn fluent_partition_fence_supplied_target_preserves_punctuation_and_raw_gate_identity() {
+        let target = "/supplied/x against the agent fence: y/ß";
+        let raw = format!(
+            "Could not check {target} against the agent fence: there is no main branch to compare with"
+        );
+        for lang in ["en-US", "de"] {
+            crate::i18n::set_language(lang);
+            let errors = vec![fence::display::check_diagnostic(&raw, target)];
+            let body = confirm_body("refs/heads/ß", Some(target), &[], &errors);
+            assert!(body.contains(target));
+            assert_eq!(body.contains("kein Hauptbranch"), lang == "de");
+            assert_eq!(fence::display::diagnostic(&raw), raw);
+            assert_eq!(fence::display::check_diagnostic(&raw, "different"), raw);
+            assert!(format!("Merge refs/heads/ß{PAST}").ends_with(PAST));
+            assert_eq!(PAST, " (past the agent fence)");
         }
         crate::i18n::set_language("en-US");
     }
