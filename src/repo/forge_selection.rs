@@ -1,5 +1,9 @@
 //! The forge source is a UI preference, independent of Git's transport/upstream settings.
 use std::path::Path;
+use std::sync::{
+    Arc,
+    atomic::{AtomicU64, Ordering},
+};
 
 use serde::{Deserialize, Serialize};
 
@@ -25,7 +29,13 @@ impl Selection {
     }
 
     fn store(&self, ctx: &egui::Context, repo: &Path) {
-        ctx.data_mut(|d| d.insert_persisted(Self::id(repo), self.clone()));
+        ctx.data_mut(|d| {
+            if d.get_persisted::<Self>(Self::id(repo)).as_ref() != Some(self) {
+                d.get_temp_mut_or_default::<Arc<AtomicU64>>(lifetime_id(repo))
+                    .fetch_add(1, Ordering::SeqCst);
+            }
+            d.insert_persisted(Self::id(repo), self.clone());
+        });
     }
 
     fn reconcile(&mut self, remotes: &[Remote]) {
@@ -72,6 +82,22 @@ impl Selection {
             .or_else(|| hosts.iter().find(|(name, _)| name == "origin"))
             .or_else(|| hosts.first())
     }
+}
+
+fn lifetime_id(repo: &Path) -> egui::Id {
+    egui::Id::new(("primary-forge-lifetime", repo))
+}
+
+/// Shared by tabs of the same repository. Workers can notice a preference change
+/// before their tab next polls, including switching away and back between polls.
+pub(super) fn lifetime(ctx: &egui::Context, repo: &Path) -> (Arc<AtomicU64>, u64) {
+    ctx.data_mut(|d| {
+        let clock = d
+            .get_temp_mut_or_default::<Arc<AtomicU64>>(lifetime_id(repo))
+            .clone();
+        let read = clock.load(Ordering::SeqCst);
+        (clock, read)
+    })
 }
 
 impl RepoTab {

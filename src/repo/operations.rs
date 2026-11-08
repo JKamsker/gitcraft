@@ -548,6 +548,7 @@ pub(super) fn run_steps_guarded(
         if let Err(e) = fork_scope
             .map_or(Ok(()), |scope| scope.check_remote(path))
             .and_then(|()| super::forks::guard::check(path, ops))
+            .and_then(|()| fork_scope.map_or(Ok(()), |scope| scope.check()))
         {
             result = Err(e);
             stopped = i;
