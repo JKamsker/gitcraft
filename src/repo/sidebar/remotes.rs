@@ -47,12 +47,12 @@ impl RepoTab {
             Header {
                 key: "remotes",
                 icon: "cloud",
-                title: "REMOTES",
+                title: crate::i18n::text("repo-core-3480"),
                 count: self.remotes.len(),
                 default_open: true,
                 button: Some(Button {
                     icon: "plus",
-                    tooltip: "Add a remote…",
+                    tooltip: crate::i18n::text("repo-core-3481"),
                     action: idle.then(|| Action::Dialog(Dialog::remote(None))),
                 }),
             },
@@ -75,13 +75,22 @@ impl RepoTab {
             widgets::a11y(&r, egui::WidgetType::CollapsingHeader, || {
                 let count = labels::count(branches.len(), "branch", "branches");
                 let name = labels::with_notes(
-                    &format!("remote {}", remote.name),
+                    &crate::i18n::message(
+                        "repo-core-3484",
+                        &[("name", remote.name.to_string().into())],
+                    ),
                     &[
-                        (primary, "primary forge"),
-                        (hidden, "branches hidden in sidebar"),
+                        (
+                            primary,
+                            crate::i18n::text("dev-integration-ui-primary-note"),
+                        ),
+                        (
+                            hidden,
+                            crate::i18n::text("dev-integration-ui-sidebar-hidden"),
+                        ),
                         (
                             self.visibility.graph_remotes.contains(&remote.name),
-                            "branches hidden in graph",
+                            crate::i18n::text("dev-integration-ui-graph-hidden"),
                         ),
                     ],
                 );
@@ -103,22 +112,35 @@ impl RepoTab {
                     hidden,
                 },
             );
-            let r = r.on_hover_text(format!(
-                "{}\n{}{}{}\nRight-click for primary forge and branch visibility",
-                remote.name,
-                remote.url,
-                if primary {
-                    "\nPrimary forge: PRs, issues and builds"
-                } else {
-                    ""
-                },
-                if hidden {
-                    "\nBranches hidden in sidebar; right-click to show"
-                } else {
-                    ""
-                }
+            let r = r.on_hover_text(crate::i18n::message(
+                "dev-integration-ui-remote-tip",
+                &[
+                    ("name", remote.name.clone().into()),
+                    ("url", remote.url.clone().into()),
+                    (
+                        "primary",
+                        if primary {
+                            format!("\n{}", crate::i18n::text("dev-integration-ui-primary-tip"))
+                        } else {
+                            String::new()
+                        }
+                        .into(),
+                    ),
+                    (
+                        "hidden",
+                        if hidden {
+                            format!(
+                                "\n{}",
+                                crate::i18n::text("dev-integration-ui-sidebar-hidden-tip")
+                            )
+                        } else {
+                            String::new()
+                        }
+                        .into(),
+                    ),
+                ],
             ));
-            egui::Popup::context_menu(&r)
+            crate::menu_item::context(&r)
                 .style(crate::theme::menu_style)
                 .show(|ui| self.remote_menu_items(ui, acts, remote, idle));
             let menu_rect = Rect::from_center_size(
@@ -127,7 +149,10 @@ impl RepoTab {
             );
             let menu = ui.interact(menu_rect, r.id.with("actions"), egui::Sense::click());
             widgets::a11y(&menu, egui::WidgetType::Button, || {
-                format!("Remote actions for {}", remote.name)
+                crate::i18n::message(
+                    "dev-integration-ui-remote-actions",
+                    &[("name", remote.name.clone().into())],
+                )
             });
             icons::paint(
                 ui,
@@ -136,9 +161,9 @@ impl RepoTab {
                 13.0,
                 Tokens::get(ui.ctx()).text_faint,
             );
-            let menu = menu.on_hover_text(format!(
-                "Actions for {}: primary forge and branch visibility",
-                remote.name
+            let menu = menu.on_hover_text(crate::i18n::message(
+                "dev-integration-ui-remote-actions-tip",
+                &[("name", remote.name.clone().into())],
             ));
             egui::Popup::menu(&menu)
                 .style(crate::theme::menu_style)
@@ -185,16 +210,16 @@ impl RepoTab {
         let r = remote_row(ui, &full, row, has_pr, !shown);
         let r = self.branch_drag_drop(ui, r, &b.name, true, &b.target, acts);
         acts.extend(visibility::eye(ui, &r, &full, shown));
-        let r = r.on_hover_text(format!(
-            "{}\nDouble-click to check out, or drag onto a branch or a commit",
-            b.name
+        let r = r.on_hover_text(crate::i18n::message(
+            "repo-core-3485",
+            &[("name", b.name.to_string().into())],
         ));
         if r.double_clicked() && idle {
             acts.push(Action::CheckoutRemote(b.name.clone()));
         } else if r.clicked() {
             acts.push(Action::SelectHash(b.target.clone()));
         }
-        egui::Popup::context_menu(&r)
+        crate::menu_item::context(&r)
             .style(crate::theme::menu_style)
             .show(|ui| self.remote_branch_menu_items(ui, acts, remote, short, b, idle));
     }
@@ -208,30 +233,36 @@ impl RepoTab {
         b: &Branch,
         idle: bool,
     ) {
-        if ui
-            .add_enabled(idle, egui::Button::new("Check out as local branch"))
+        if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-3486"))
+            .icon("log-in")
+            .enabled(idle)
+            .show(ui)
             .clicked()
         {
             acts.push(Action::CheckoutRemote(b.name.clone()));
         }
         if let Some(current) = self.refs.current.as_deref() {
-            if ui
-                .add_enabled(
-                    idle,
-                    egui::Button::new(format!("Fast-forward {current} to it")),
-                )
-                .clicked()
+            if crate::menu_item::MenuItem::new(crate::i18n::message(
+                "repo-core-3487",
+                &[("current", current.to_string().into())],
+            ))
+            .icon("arrow-right")
+            .enabled(idle)
+            .show(ui)
+            .clicked()
             {
                 acts.push(fast_forward_action(BranchRef::remote(&b.name), current));
             }
-            let merge = format!("Merge into {current}");
+            let merge =
+                crate::i18n::message("repo-core-3488", &[("current", current.to_string().into())]);
             if self
                 .conflict_button(ui, merge, idle, Op::Merge, &b.target)
                 .clicked()
             {
                 acts.push(merge_action(BranchRef::remote(&b.name), current));
             }
-            let rebase = format!("Rebase {current} onto it");
+            let rebase =
+                crate::i18n::message("repo-core-3489", &[("current", current.to_string().into())]);
             let rebase = self.conflict_button(ui, rebase, idle, Op::Rebase, &b.target);
             offer(&rebase, || GhostOp::Rebase {
                 onto: BranchRef::remote(&b.name).full(),
@@ -245,11 +276,19 @@ impl RepoTab {
             graph_view::compare_items(ui, acts, BranchRef::remote(&b.name), current);
             ui.separator();
         }
-        if ui.button("Create branch here…").clicked() {
+        if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-2641"))
+            .icon("git-branch-plus")
+            .show(ui)
+            .clicked()
+        {
             acts.push(Action::Dialog(Dialog::create_branch(&b.target, &b.name)));
         }
         ui.separator();
-        if ui.button("Copy name").clicked() {
+        if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-3390"))
+            .icon("copy")
+            .show(ui)
+            .clicked()
+        {
             ui.ctx().copy_text(b.name.clone());
         }
         if let Some((menu, target)) = self.branch_link_menu(&b.name) {
@@ -258,17 +297,23 @@ impl RepoTab {
         ui.separator();
         self.visibility_items(ui, acts, &remote_ref(&b.name), false);
         ui.separator();
-        if ui
-            .add_enabled(idle, egui::Button::new("Delete from remote…"))
+        if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-3490"))
+            .icon("minus")
+            .enabled(idle)
+            .show(ui)
             .clicked()
         {
             acts.push(Action::Dialog(
                 Dialog::confirm(
                     "Delete remote branch",
-                    format!(
-                        "Delete “{short}” from {remote}? This changes the remote for everyone.",
+                    crate::i18n::message(
+                        "repo-core-3492",
+                        &[
+                            ("short", short.to_string().into()),
+                            ("remote", remote.to_string().into()),
+                        ],
                     ),
-                    "Delete",
+                    crate::i18n::text("repo-core-1115"),
                     // Only while it is where it was last fetched: commits pushed since are others'.
                     ops(&[&[
                         "push",
@@ -365,7 +410,10 @@ fn paint_remote_header(
         pos2(rect.left() + 54.0, y),
         Align2::LEFT_CENTER,
         if hidden {
-            format!("{} (hidden)", remote.name)
+            crate::i18n::message(
+                "dev-integration-ui-remote-hidden-caption",
+                &[("name", remote.name.clone().into())],
+            )
         } else {
             remote.name.clone()
         },
@@ -394,14 +442,14 @@ impl RepoTab {
             .iter()
             .any(|(name, _)| name == &remote.name);
         let label = if primary {
-            "Primary forge ✓"
+            crate::i18n::text("dev-integration-ui-primary-selected")
         } else {
-            "Set as primary forge"
+            crate::i18n::text("dev-integration-ui-primary-set")
         };
         let tip = if usable {
-            "Use this repository for PRs, issues, builds and default links. Does not change Git push/fetch settings."
+            crate::i18n::text("dev-integration-ui-primary-about")
         } else {
-            "This URL is not on a recognized forge. Configure gitcraft.forge for a self-hosted forge."
+            crate::i18n::text("dev-integration-ui-primary-unknown")
         };
         if ui
             .add_enabled(
@@ -410,7 +458,7 @@ impl RepoTab {
             )
             .on_hover_text(tip)
             .on_disabled_hover_text(if self.forge_change_blocked() {
-                "Wait for the running operation or review to finish"
+                crate::i18n::text("dev-integration-ui-primary-busy")
             } else {
                 tip
             })
@@ -422,7 +470,7 @@ impl RepoTab {
             && ui
                 .add_enabled(
                     !self.forge_change_blocked(),
-                    egui::Button::new("Use automatic forge selection"),
+                    egui::Button::new(crate::i18n::text("dev-integration-ui-primary-auto")),
                 )
                 .clicked()
         {
@@ -431,9 +479,9 @@ impl RepoTab {
         let sidebar_hidden = self.visibility.sidebar_remotes.contains(&remote.name);
         if ui
             .button(if sidebar_hidden {
-                "Show remote branches in sidebar"
+                crate::i18n::text("dev-integration-ui-show-sidebar")
             } else {
-                "Hide remote branches in sidebar"
+                crate::i18n::text("dev-integration-ui-hide-sidebar")
             })
             .clicked()
         {
@@ -443,20 +491,28 @@ impl RepoTab {
         }
         let graph_hidden = self.visibility.graph_remotes.contains(&remote.name);
         let label = if graph_hidden {
-            "Show remote branches in graph"
+            crate::i18n::text("dev-integration-ui-show-graph")
         } else {
-            "Hide remote branches in graph"
+            crate::i18n::text("dev-integration-ui-hide-graph")
         };
-        if ui.button(label)
-            .on_hover_text("Display only. Keeps local HEAD and soloed branches; fetching and upstreams are unchanged.")
+        if ui
+            .button(label)
+            .on_hover_text(crate::i18n::text("dev-integration-ui-visibility-only"))
             .clicked()
         {
-            acts.push(Action::BranchVisibility(Change::RemoteGraph(remote.name.clone())));
+            acts.push(Action::BranchVisibility(Change::RemoteGraph(
+                remote.name.clone(),
+            )));
         }
         ui.separator();
-        if ui
-            .add_enabled(idle, egui::Button::new(format!("Fetch {}", remote.name)))
-            .clicked()
+        if crate::menu_item::MenuItem::new(crate::i18n::message(
+            "repo-core-3495",
+            &[("name", remote.name.to_string().into())],
+        ))
+        .icon("cloud-download")
+        .enabled(idle)
+        .show(ui)
+        .clicked()
         {
             acts.push(Action::Ops {
                 label: format!("Fetch {}", remote.name),
@@ -464,29 +520,53 @@ impl RepoTab {
                 refresh: Refresh::All,
             });
         }
-        if ui.add_enabled(idle, egui::Button::new("Edit…")).clicked() {
+        if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-3497"))
+            .icon("wrench")
+            .enabled(idle)
+            .show(ui)
+            .clicked()
+        {
             acts.push(Action::Dialog(Dialog::remote(Some((
                 remote.name.clone(),
                 remote.url.clone(),
             )))));
         }
-        if ui.button("Copy URL").clicked() {
+        if ui
+            .add_enabled(idle, egui::Button::new(crate::i18n::text("repo-core-3498")))
+            .clicked()
+        {
+            acts.push(Action::RepositoryTools(
+                crate::repo::repository_tools::Act::Remote(remote.name.clone()),
+            ));
+        }
+        if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-3456"))
+            .icon("copy")
+            .show(ui)
+            .clicked()
+        {
             ui.ctx().copy_text(remote.url.clone());
             ui.close();
         }
         ui.separator();
-        if ui.add_enabled(idle, egui::Button::new("Remove…")).clicked() {
-            let confirmation = Dialog::confirm(
+        if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-3499"))
+            .icon("minus")
+            .enabled(idle)
+            .show(ui)
+            .clicked()
+        {
+            acts.push(Action::Dialog(Dialog::confirm(
                 "Remove remote",
-                format!(
-                    "Remove the remote “{}” ({})? Its branches disappear from this repository; nothing changes on the server.",
-                    remote.name, remote.url
+                crate::i18n::message(
+                    "repo-core-3501",
+                    &[
+                        ("name", remote.name.to_string().into()),
+                        ("url", remote.url.to_string().into()),
+                    ],
                 ),
-                "Remove",
+                crate::i18n::text("repo-core-0305"),
                 ops(&[&["remote", "remove", &remote.name]]),
                 None,
-            );
-            acts.push(Action::Dialog(confirmation));
+            )));
         }
         // Pointer clicks close a Popup automatically; keyboard activation must close too.
         if acts.len() != before {
@@ -502,10 +582,13 @@ fn remote_row(ui: &mut Ui, full: &str, row: LeafRow<'_>, has_pr: bool, hidden: b
     // Known by the branch, not its place: a fetch adds and prunes rows under an open menu.
     let (rect, resp) = widgets::keyed_row(ui, ROW_H, ("branch-row", full));
     widgets::a11y(&resp, egui::WidgetType::Button, || {
-        let name = format!("remote branch {}", labels::ref_name(full));
+        let name = crate::i18n::message(
+            "repo-core-2595",
+            &[("git-ref", labels::ref_name(full).to_string().into())],
+        );
         let notes = [
-            (has_pr, "has a pull request"),
-            (hidden, "hidden from the graph"),
+            (has_pr, crate::i18n::text("repo-core-3418")),
+            (hidden, crate::i18n::text("repo-core-3419")),
         ];
         labels::with_notes(&name, &notes)
     });

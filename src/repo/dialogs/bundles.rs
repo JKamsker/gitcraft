@@ -1,5 +1,6 @@
 use super::Outcome;
 use crate::git::{BundlePreview, BundleRef};
+use crate::parallel_bisect::presentation::{self, Presentation};
 use crate::repo::Action;
 use crate::theme::Tokens;
 use egui::Ui;
@@ -13,11 +14,11 @@ pub(super) fn export(
     idle: bool,
 ) -> Outcome {
     ui.set_width(650.0);
-    ui.heading("Export Git bundle");
+    ui.heading(crate::i18n::text("repo-core-1234"));
     if refs.is_empty() {
-        ui.label("This repository has no committed refs to export.");
+        ui.label(crate::i18n::text("repo-core-1235"));
     }
-    ui.label("Choose refs from this snapshot. The file is saved on this machine, including when the repository is on SSH / WSL.");
+    ui.label(crate::i18n::text("repo-core-1236"));
     egui::ScrollArea::vertical()
         .max_height(280.0)
         .id_salt("bundle_export_refs")
@@ -40,15 +41,15 @@ pub(super) fn export(
             }
         });
     ui.separator();
-    ui.label("Optional range: exclude history reachable from this base commit");
+    ui.label(crate::i18n::text("repo-core-1238"));
     ui.text_edit_singleline(base);
-    ui.label("Blank includes full reachable history. An incremental bundle requires the recipient to already have its prerequisite commits. Limit: 128 MiB; 2 minute Git deadline.");
+    ui.label(crate::i18n::text("repo-core-1239"));
     let mut outcome = Outcome::Open;
     ui.horizontal(|ui| {
         if ui
             .add_enabled(
                 !selected.is_empty() && idle,
-                egui::Button::new("Choose new output file…"),
+                egui::Button::new(crate::i18n::text("repo-core-1240")),
             )
             .clicked()
         {
@@ -61,59 +62,332 @@ pub(super) fn export(
                 base: base.clone(),
             }));
         }
-        if ui.button("Cancel").clicked() {
+        if ui.button(crate::i18n::text("repo-core-0443")).clicked() {
             outcome = Outcome::Cancel;
         }
     });
     outcome
 }
 
-pub(super) fn incoming(ui: &mut Ui, label: &str, preview: &BundlePreview) -> Outcome {
-    ui.set_width(720.0);
-    let t = Tokens::get(ui.ctx());
-    ui.heading("Inspect Git bundle");
-    ui.label(format!("Local file snapshot: {label}"));
-    ui.label("This preview does not import objects or refs. SSH / WSL verification uses a temporary copy on the repository machine.");
-    if let Some(error) = &preview.verification_error {
-        ui.colored_label(
-            t.danger,
-            format!("Header/prerequisite verification failed:\n{error}"),
-        );
-    } else {
-        ui.label(
-            "Git verified the header and prerequisites. Pack contents have not been validated.",
-        );
+enum Event {
+    Done(bool, Result<Vec<BundleRef>, String>),
+    DoneWithPresentation(bool, Result<Vec<BundleRef>, String>, Option<Presentation>),
+}
+pub struct Form {
+    repo: std::path::PathBuf,
+    label: String,
+    preview: BundlePreview,
+    selected: BTreeSet<String>,
+    prefix: String,
+    scope: crate::tasks::Scope,
+    active: Option<crate::tasks::Cancellation>,
+    tx: std::sync::mpsc::Sender<Event>,
+    rx: std::sync::mpsc::Receiver<Event>,
+    consent: bool,
+    confirm: bool,
+    verified: bool,
+    imported: Vec<BundleRef>,
+    error: Option<String>,
+    error_presentation: Option<Presentation>,
+}
+impl super::Dialog {
+    pub(in crate::repo) fn bundle_incoming(
+        repo: std::path::PathBuf,
+        token: crate::tasks::Cancellation,
+        label: String,
+        preview: BundlePreview,
+    ) -> Self {
+        let (tx, rx) = std::sync::mpsc::channel();
+        let selected = preview.refs.iter().map(|r| r.name.clone()).collect();
+        Self::BundleIncoming(Box::new(Form {
+            repo,
+            label,
+            preview,
+            selected,
+            prefix: "incoming".into(),
+            scope: crate::tasks::Scope(token),
+            active: None,
+            tx,
+            rx,
+            consent: false,
+            confirm: false,
+            verified: false,
+            imported: Vec::new(),
+            error: None,
+            error_presentation: None,
+        }))
     }
-    ui.collapsing(
-        format!("Prerequisites ({})", preview.prerequisites.len()),
-        |ui| {
-            if preview.prerequisites.is_empty() {
-                ui.label("None: full bundle");
+}
+impl Form {
+    fn start(&mut self, import: bool, ctx: &egui::Context) {
+        self.error_presentation = None;
+        let pool = match crate::tasks::pool() {
+            Ok(pool) => pool,
+            Err(e) => {
+                self.error = Some(e);
+                return;
             }
-            egui::ScrollArea::vertical()
-                .max_height(140.0)
-                .id_salt("bundle_prereqs")
-                .show(ui, |ui| {
-                    for r in &preview.prerequisites {
-                        ui.monospace(format!("{} {}", r.oid, r.name));
-                    }
+        };
+        let repo = self.repo.clone();
+        let preview = self.preview.clone();
+        let selected = self.selected.clone();
+        let prefix = self.prefix.clone();
+        let token = self.scope.0.child();
+        let tx = self.tx.clone();
+        let ctx = ctx.clone();
+        let failed_tx = tx.clone();
+        let failed_ctx = ctx.clone();
+        let key = Some(crate::repo::messages::mutation_key(&repo));
+        let result = pool.submit_cancellable(
+            token.clone(),
+            crate::tasks::Priority::Interactive,
+            key,
+            Some(Box::new(move || {
+                let _ = failed_tx.send(Event::Done(
+                    import,
+                    Err(crate::i18n::text("repo-core-1159").into()),
+                ));
+                failed_ctx.request_repaint();
+            })),
+            Box::new(move || {
+                let mut presentation = None;
+                let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    crate::git::check_bundle_with_presentation(
+                        &repo,
+                        &preview,
+                        &selected,
+                        &prefix,
+                        import,
+                        &mut presentation,
+                    )
+                }))
+                .unwrap_or_else(|_| {
+                    presentation = None;
+                    Err(crate::i18n::text("repo-core-1242").into())
                 });
-        },
-    );
-    ui.label("Incoming refs:");
-    egui::ScrollArea::vertical()
-        .max_height(300.0)
-        .id_salt("bundle_preview_refs")
-        .show(ui, |ui| {
-            for r in &preview.refs {
-                ui.monospace(format!("{} {}", r.oid, r.name));
+                presentation::retain_error(&result, &mut presentation);
+                let _ = tx.send(Event::DoneWithPresentation(import, result, presentation));
+                ctx.request_repaint();
+            }),
+        );
+        match result {
+            Ok(()) => {
+                self.active = Some(token);
+                self.error = None;
+                self.confirm = false;
             }
-        });
-    ui.label("Import is deferred until resource limits can safely contain unpacking untrusted data. Inspecting this file does not install its objects or refs.");
-    if ui.button("Close").clicked() {
-        Outcome::Cancel
-    } else {
-        Outcome::Open
+            Err(e) => self.error = Some(e.into()),
+        }
+    }
+    fn painted_error(&self, error: &str) -> String {
+        if self.error_presentation.is_some() {
+            presentation::error(error, self.error_presentation.as_ref())
+        } else {
+            crate::git::display_error(&crate::forge::inbox::display_error(error))
+        }
+    }
+    fn receive(&mut self) {
+        while let Ok(event) = self.rx.try_recv() {
+            let (import, result) = incoming(event, &mut self.error_presentation);
+            self.active = None;
+            // Preserve ownership/cleanup failures even after the user pressed Stop.
+            match result {
+                Ok(refs) if import => {
+                    self.imported = refs;
+                    self.error = None;
+                }
+                Ok(_) => {
+                    self.verified = true;
+                    self.error = None;
+                }
+                Err(e) => {
+                    self.error = Some(e);
+                    self.confirm = false;
+                }
+            }
+        }
+    }
+    pub(super) fn show(&mut self, ui: &mut Ui) -> Outcome {
+        self.receive();
+        ui.set_width(740.0);
+        let mut outcome = Outcome::Open;
+        let height = (ui.ctx().content_rect().height() - 100.0).max(180.0);
+        egui::ScrollArea::vertical()
+            .max_height(height)
+            .show(ui, |ui| {
+                let t = Tokens::get(ui.ctx());
+                ui.heading(crate::i18n::text("repo-core-1243"));
+                ui.label(crate::i18n::message(
+                    "repo-core-1244",
+                    &[(
+                        "label",
+                        crate::repo::messages::display_operation(&self.label).into(),
+                    )],
+                ));
+                ui.monospace(format!("SHA-256 {}", self.preview.digest));
+                ui.label(crate::i18n::text("repo-core-1246"));
+                if let Some(error) = &self.preview.verification_error {
+                    ui.colored_label(
+                        t.danger,
+                        crate::i18n::message(
+                            "repo-core-1247",
+                            &[("error", error.to_string().into())],
+                        ),
+                    );
+                }
+                ui.label(crate::i18n::text("repo-core-1248"));
+                ui.label(crate::i18n::text("repo-core-1249"));
+                let supported =
+                    crate::remote::is_remote(&self.repo) || cfg!(any(target_os = "linux", windows));
+                if !supported {
+                    ui.colored_label(t.danger, crate::i18n::text("repo-core-1251"));
+                }
+                ui.label(crate::i18n::text("repo-core-1252"));
+                ui.collapsing(
+                    crate::i18n::message(
+                        "repo-core-1253",
+                        &[("count", (self.preview.prerequisites.len()).into())],
+                    ),
+                    |ui| {
+                        if self.preview.prerequisites.is_empty() {
+                            ui.label(crate::i18n::text("repo-core-1254"));
+                        }
+                        for r in &self.preview.prerequisites {
+                            ui.monospace(format!("{} {}", r.oid, r.name));
+                        }
+                    },
+                );
+                let editable = self.active.is_none() && self.imported.is_empty();
+                let before = (self.prefix.clone(), self.selected.clone());
+                ui.add_enabled_ui(editable, |ui| {
+                    ui.label(crate::i18n::text("repo-core-1255"));
+                    ui.text_edit_singleline(&mut self.prefix);
+                    ui.label(crate::i18n::text("repo-core-1256"));
+                    egui::ScrollArea::vertical()
+                        .max_height(190.0)
+                        .id_salt("bundle_ref_selection")
+                        .show(ui, |ui| {
+                            for r in &self.preview.refs {
+                                let mut selected = self.selected.contains(&r.name);
+                                if ui
+                                    .checkbox(&mut selected, format!("{} · {}", r.name, r.oid))
+                                    .changed()
+                                {
+                                    if selected {
+                                        self.selected.insert(r.name.clone());
+                                    } else {
+                                        self.selected.remove(&r.name);
+                                    }
+                                }
+                            }
+                        });
+                });
+                if before != (self.prefix.clone(), self.selected.clone()) {
+                    self.confirm = false;
+                }
+                let mapping =
+                    crate::git::import_mapping(&self.preview.refs, &self.selected, &self.prefix);
+                egui::CollapsingHeader::new(crate::i18n::text("repo-core-1258"))
+                    .id_salt("Exact new refs (existing names refuse the transaction)")
+                    .default_open(true)
+                    .show(ui, |ui| {
+                        egui::ScrollArea::vertical()
+                            .max_height(160.0)
+                            .id_salt("bundle_exact_refs")
+                            .show(ui, |ui| match &mapping {
+                                Ok(refs) => {
+                                    for r in refs {
+                                        ui.monospace(format!("{} {}", r.oid, r.name));
+                                    }
+                                }
+                                Err(e) => {
+                                    ui.colored_label(
+                                        t.danger,
+                                        crate::git::display_error(
+                                            &crate::forge::inbox::display_error(e),
+                                        ),
+                                    );
+                                }
+                            });
+                    });
+                if self.verified {
+                    ui.label(crate::i18n::text("repo-core-1260"));
+                }
+                if !self.imported.is_empty() {
+                    ui.label(crate::i18n::text("repo-core-1261"));
+                    for r in &self.imported {
+                        ui.horizontal(|ui| {
+                            ui.monospace(&r.name);
+                            if ui
+                                .small_button(crate::i18n::text("repo-core-1262"))
+                                .clicked()
+                            {
+                                ui.ctx().copy_text(r.name.clone());
+                            }
+                        });
+                    }
+                }
+                if let Some(error) = &self.error {
+                    ui.colored_label(t.danger, self.painted_error(error));
+                }
+                if self.active.is_some() {
+                    ui.add(crate::spinner::Spinner::new());
+                    if ui.button(crate::i18n::text("repo-core-1263")).clicked()
+                        && let Some(token) = &self.active
+                    {
+                        token.cancel();
+                    }
+                } else if self.imported.is_empty() {
+                    ui.add_enabled_ui(supported && mapping.is_ok(), |ui| {
+                        ui.checkbox(&mut self.consent, crate::i18n::text("repo-core-1264"));
+                        if ui
+                            .add_enabled(
+                                self.consent,
+                                egui::Button::new(crate::i18n::text("repo-core-1265")),
+                            )
+                            .clicked()
+                        {
+                            self.start(false, ui.ctx());
+                        }
+                        ui.add_enabled_ui(self.verified, |ui| {
+                            ui.checkbox(
+                                &mut self.confirm,
+                                crate::i18n::message(
+                                    "repo-core-1266",
+                                    &[
+                                        ("count", (self.selected.len()).into()),
+                                        ("prefix", self.prefix.to_string().into()),
+                                    ],
+                                ),
+                            );
+                            if ui
+                                .add_enabled(
+                                    self.confirm,
+                                    egui::Button::new(crate::i18n::text("repo-core-1267")),
+                                )
+                                .clicked()
+                            {
+                                self.start(true, ui.ctx());
+                            }
+                        });
+                    });
+                }
+                if ui
+                    .button(if self.imported.is_empty() {
+                        crate::i18n::text("repo-core-0595")
+                    } else {
+                        crate::i18n::text("repo-core-1268")
+                    })
+                    .clicked()
+                {
+                    outcome = if self.imported.is_empty() {
+                        Outcome::Cancel
+                    } else {
+                        Outcome::Done(Box::new(Action::Reload))
+                    };
+                }
+            });
+        outcome
     }
 }
 
@@ -160,10 +434,12 @@ mod tests {
         let ctx = egui::Context::default();
         crate::theme::install_fonts(&ctx);
         let mut tab = RepoTab::new_deferred(root.clone(), &ctx);
-        tab.dialog = Some(Dialog::BundleIncoming {
-            label: "selected.bundle".into(),
-            preview: Box::new(preview),
-        });
+        tab.dialog = Some(Dialog::bundle_incoming(
+            root.clone(),
+            tab._jobs.0.child(),
+            "selected.bundle".into(),
+            preview,
+        ));
         let mut actions = Vec::new();
         let mut text = String::new();
         for frame in 0..3 {
@@ -197,8 +473,8 @@ mod tests {
             );
             output.textures_delta.clear();
         }
-        assert!(text.contains("Git verified the header"), "{text}");
-        assert!(text.contains("Import is deferred"), "{text}");
+        assert!(text.contains("Inspection checks the header"), "{text}");
+        assert!(text.contains("SHA-256"), "{text}");
         assert!(tab.dialog.is_none());
         assert!(actions.is_empty());
         assert_eq!(
@@ -217,9 +493,250 @@ mod tests {
         assert!(tab.dialog.is_none());
         assert!(
             tab.status
-                .as_ref()
+                .as_deref()
                 .is_some_and(|(text, error)| *error && text.contains("Authentication failed"))
         );
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod recording_import_ui_tests {
+    use super::*;
+    #[test]
+    fn confirmation_is_explicit_and_late_owned_cleanup_errors_survive_stop() -> Result<(), String> {
+        let oid = "a".repeat(40);
+        let bytes = format!("# v2 git bundle\n{oid} refs/heads/main\n\nPACK").into_bytes();
+        let preview = BundlePreview {
+            refs: vec![BundleRef {
+                name: "refs/heads/main".into(),
+                oid,
+            }],
+            prerequisites: vec![],
+            verification_error: None,
+            digest: crate::git::bundle_digest(&bytes),
+            bytes: std::sync::Arc::new(bytes),
+            repository: "/recording/common".into(),
+        };
+        let dialog = super::super::Dialog::bundle_incoming(
+            "/recording/repo".into(),
+            crate::tasks::Cancellation::default(),
+            "held.bundle".into(),
+            preview,
+        );
+        let super::super::Dialog::BundleIncoming(mut form) = dialog else {
+            return Err("wrong dialog".into());
+        };
+        assert!(!form.consent && !form.confirm && !form.verified && form.active.is_none());
+        let token = form.scope.0.child();
+        token.cancel();
+        form.active = Some(token);
+        form.tx
+            .send(Event::Done(
+                true,
+                Err("cancelled; owned cleanup unconfirmed; ledger retained".into()),
+            ))
+            .map_err(|error| error.to_string())?;
+        form.receive();
+        assert!(
+            form.error
+                .as_deref()
+                .is_some_and(|error| error.contains("owned cleanup unconfirmed"))
+        );
+        assert!(form.active.is_none() && form.imported.is_empty() && !form.confirm);
+        let ctx = egui::Context::default();
+        let input = egui::RawInput {
+            screen_rect: Some(egui::Rect::from_min_size(
+                egui::Pos2::ZERO,
+                egui::vec2(1000.0, 1400.0),
+            )),
+            ..Default::default()
+        };
+        let mut output = ctx.run_ui(input, |ui| {
+            assert!(matches!(form.show(ui), Outcome::Open));
+        });
+        output.textures_delta.clear();
+        assert!(form.active.is_none(), "rendering must not submit a job");
+        assert!(!form.consent && !form.confirm && !form.verified);
+        Ok(())
+    }
+}
+
+// The actual event-to-form receipt seam; raw errors stay in Form.error.
+fn incoming(
+    event: Event,
+    receipt: &mut Option<Presentation>,
+) -> (bool, Result<Vec<BundleRef>, String>) {
+    let (import, result, mut presentation) = match event {
+        Event::Done(import, result) => (import, result, None),
+        Event::DoneWithPresentation(import, result, presentation) => (import, result, presentation),
+    };
+    presentation::retain_error(&result, &mut presentation);
+    *receipt = presentation;
+    (import, result)
+}
+
+#[cfg(test)]
+mod execution_bridge_tests {
+    use super::*;
+    use crate::parallel_bisect::{bundle, close_finished};
+    fn form() -> Box<Form> {
+        let super::super::Dialog::BundleIncoming(form) = super::super::Dialog::bundle_incoming(
+            "/supplied/repo".into(),
+            Default::default(),
+            "supplied".into(),
+            BundlePreview {
+                refs: vec![],
+                prerequisites: vec![],
+                verification_error: None,
+                bytes: std::sync::Arc::new(vec![]),
+                digest: "opaque".into(),
+                repository: "opaque".into(),
+            },
+        ) else {
+            unreachable!()
+        };
+        form
+    }
+    #[test]
+    fn execution_bridge_bundle_captures_real_aggregates_through_event_form_and_paint()
+    -> Result<(), String> {
+        let primary =
+            "Contained Git failed (1): provider; quarantine cleanup failed: provider detail";
+        let cleanup = "cleanup; quarantine cleanup failed: repeated); $HOME {raw}\nunknown";
+        let mut receipt = None;
+        let mut cases = Vec::new();
+        let raw = bundle::completed_with_presentation(
+            Err(primary.into()),
+            Err(cleanup.into()),
+            false,
+            &mut receipt,
+            None,
+        )
+        .err()
+        .ok_or("aggregate")?;
+        cases.push((
+            raw,
+            receipt.take(),
+            "die Quarantäne konnte nicht bereinigt werden",
+        ));
+        let keep =
+            bundle::keep_retained(primary.into(), "opaque-hash; pack-user.keep", &mut receipt);
+        let raw = bundle::completed_with_presentation(Err(keep), Ok(()), true, &mut receipt, None)
+            .err()
+            .ok_or("keep")?;
+        cases.push((raw, receipt.take(), "die eigene Schutzmarkierung"));
+        let lease = close_finished(Err(primary.into()), Err(cleanup.into()), &mut receipt)
+            .err()
+            .ok_or("lease")?;
+        for import in [false, true] {
+            let raw = bundle::completed_with_presentation(
+                Ok(()),
+                Err(lease.clone()),
+                import,
+                &mut None,
+                receipt.clone(),
+            )
+            .err()
+            .ok_or("completion")?;
+            let mut output = None;
+            let result = bundle::completed_with_presentation(
+                Ok(()),
+                Err(lease.clone()),
+                import,
+                &mut output,
+                receipt.clone(),
+            );
+            assert_eq!(result, Err(raw.clone()));
+            cases.push((raw, output, "Freigabe der Besitzreservierung"));
+        }
+        // An outer aggregate replaces the keep receipt and keeps its primary opaque.
+        let keep = bundle::keep_retained(primary.into(), "hash", &mut receipt);
+        let raw = bundle::completed_with_presentation(
+            Err(keep.clone()),
+            Err(cleanup.into()),
+            true,
+            &mut receipt,
+            None,
+        )
+        .err()
+        .ok_or("outer")?;
+        cases.push((
+            raw,
+            receipt.take(),
+            "die Quarantäne konnte nicht bereinigt werden",
+        ));
+        for (raw, receipt, german) in cases {
+            let mut form = form();
+            form.tx
+                .send(Event::DoneWithPresentation(
+                    false,
+                    Err(raw.clone()),
+                    receipt.clone(),
+                ))
+                .map_err(|error| format!("{}: {error:?}", "inert channel"))?;
+            form.receive();
+            assert_eq!(form.error.as_deref(), Some(raw.as_str()));
+            let mut paints = Vec::new();
+            for locale in ["en-US", "de", "en-US"] {
+                crate::i18n::set_language(locale);
+                let painted = form.painted_error(form.error.as_deref().ok_or("raw state")?);
+                assert!(painted.contains(primary));
+                if locale == "de" {
+                    assert!(painted.contains(german), "{painted}");
+                }
+                paints.push(painted);
+            }
+            assert_eq!(paints[0], paints[2]);
+            assert_ne!(paints[0], paints[1]);
+            form.tx
+                .send(Event::DoneWithPresentation(
+                    false,
+                    Err("stale unrelated".into()),
+                    receipt,
+                ))
+                .map_err(|error| format!("{}: {error:?}", "channel"))?;
+            form.receive();
+            assert!(form.error_presentation.is_none());
+            form.tx
+                .send(Event::Done(false, Ok(vec![])))
+                .map_err(|error| format!("{}: {error:?}", "channel"))?;
+            form.receive();
+            assert!(form.error.is_none() && form.error_presentation.is_none());
+        }
+        for unknown in [
+            "provider text; workspace cleanup: provider detail",
+            "provider; quarantine cleanup failed: provider detail",
+            "provider; transfer cleanup: provider detail",
+            "provider; lease release: provider detail",
+            "provider; owned pack-hash.keep retained",
+        ] {
+            let mut receipt = None;
+            let result = bundle::completed_with_presentation(
+                Err(unknown.into()),
+                Ok(()),
+                false,
+                &mut receipt,
+                None,
+            );
+            let mut form = form();
+            form.tx
+                .send(Event::DoneWithPresentation(
+                    false,
+                    result.map(|()| vec![]),
+                    receipt,
+                ))
+                .map_err(|error| format!("{}: {error:?}", "channel"))?;
+            form.receive();
+            for locale in ["en-US", "de", "en-US"] {
+                crate::i18n::set_language(locale);
+                assert_eq!(
+                    form.painted_error(form.error.as_deref().ok_or("raw")?),
+                    unknown
+                );
+            }
+        }
+
         Ok(())
     }
 }

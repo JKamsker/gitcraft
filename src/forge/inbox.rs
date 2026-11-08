@@ -78,10 +78,13 @@ pub enum Reason {
 impl Reason {
     pub fn label(self) -> String {
         match self {
-            Reason::ReviewRequested => "review requested".to_owned(),
-            Reason::ChecksFailing => "checks failing".to_owned(),
-            Reason::NewComments(1) => "1 new comment".to_owned(),
-            Reason::NewComments(n) => format!("{n} new comments"),
+            Reason::ReviewRequested => {
+                crate::i18n::text("backend-review-requested-4e499f").to_owned()
+            }
+            Reason::ChecksFailing => crate::i18n::text("backend-checks-failing-3a2f05").to_owned(),
+            Reason::NewComments(n) => {
+                crate::i18n::message("backend-inbox-new-comments", &[("count", n.into())])
+            }
         }
     }
 }
@@ -138,6 +141,31 @@ pub fn is_no_login(err: &str) -> bool {
     err.starts_with("no ") && err.contains(" login known for ")
 }
 
+/// Resolve application-owned protocol errors only when presenting them. The original
+/// error remains available to retry/login control flow through `gives_up`/`is_no_login`.
+pub fn display_error(error: &str) -> String {
+    if let Some((tool, rest)) = error.split_once(" isn't signed in to ")
+        && matches!(tool, "gh" | "glab")
+        && let Some((host, command)) = rest.split_once(": `")
+        && command == format!("{tool} auth login --hostname {host}` to use it")
+    {
+        return crate::i18n::message(
+            "backend-tool-isn-t-signed-in-to-host-tool-auth-login-hostname-host-to-use-5c4b1b",
+            &[("tool", tool.into()), ("host", host.into())],
+        );
+    }
+    if let Some(rest) = error.strip_prefix("no ")
+        && let Some((forge, rest)) = rest.split_once(" login known for ")
+        && let Some((host, _)) = rest.split_once(": add one with `tea login add`")
+    {
+        return crate::i18n::message(
+            "backend-inbox-no-login",
+            &[("forge", forge.into()), ("host", host.into())],
+        );
+    }
+    error.to_owned()
+}
+
 /// The checks of GitHub's `statusCheckRollup`: check runs (`status`, `conclusion`) and commit
 /// statuses (`state`).
 pub(super) fn github_checks(rollup: Option<&Value>) -> Checks {
@@ -179,8 +207,12 @@ pub(super) fn status_checks(state: &str) -> Checks {
 /// `gh pr list --json number,title,url,author,isDraft,updatedAt[,statusCheckRollup,comments,
 /// reviews]`: those asked of you (`requested`), or yours.
 pub(super) fn parse_github(json: &str, requested: bool) -> Result<Vec<InboxPr>, String> {
-    let value: Value =
-        serde_json::from_str(json).map_err(|e| format!("unexpected gh output: {e}"))?;
+    let value: Value = serde_json::from_str(json).map_err(|e| {
+        crate::i18n::message(
+            "backend-unexpected-gh-output-e-0f36f8",
+            &[("detail", (e).to_string().into())],
+        )
+    })?;
     Ok(value
         .as_array()
         .map_or(&[][..], Vec::as_slice)
@@ -222,8 +254,12 @@ pub(super) fn parse_github(json: &str, requested: bool) -> Result<Vec<InboxPr>, 
 /// The list says nothing of pipelines, nor who wrote the notes it counts: those are read per
 /// merge request ([`gitlab_pipeline`], [`gitlab_notes`]).
 pub(super) fn parse_gitlab(json: &str, requested: bool) -> Result<Vec<InboxPr>, String> {
-    let value: Value =
-        serde_json::from_str(json).map_err(|e| format!("unexpected glab output: {e}"))?;
+    let value: Value = serde_json::from_str(json).map_err(|e| {
+        crate::i18n::message(
+            "backend-unexpected-glab-output-e-532f29",
+            &[("detail", (e).to_string().into())],
+        )
+    })?;
     Ok(value
         .as_array()
         .map_or(&[][..], Vec::as_slice)
@@ -300,7 +336,12 @@ pub(super) fn merged(lists: Vec<Vec<InboxPr>>) -> Vec<InboxPr> {
 /// "only the 50 latest asking your review were read", when a list came back as long as it
 /// was allowed to be.
 pub(super) fn cut_note(len: usize, max: usize, what: &str) -> Option<String> {
-    (len >= max).then(|| format!("only the {max} latest {what} were read"))
+    (len >= max).then(|| {
+        crate::i18n::message(
+            "backend-only-the-max-latest-what-were-read-d49e9d",
+            &[("max", max.into()), ("what", (what).to_string().into())],
+        )
+    })
 }
 
 #[cfg(test)]

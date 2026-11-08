@@ -70,13 +70,14 @@ struct Job {
     id: u64,
     key: Key,
     cancel: Arc<AtomicBool>,
+    _scope: crate::tasks::Scope,
 }
 
 struct Shown {
     key: Key,
     /// The history the view was laid out from (see `RepoTab::history_gen`).
     history: u64,
-    result: Arc<Result<Outcome, String>>,
+    result: Arc<Result<Outcome, PreviewFailure>>,
     view: Option<GhostView>,
     /// The view is in the tab's place while the graph draws (see [`Ghost::swap_in`]).
     swapped: bool,
@@ -219,14 +220,14 @@ impl Ghost {
         }
     }
 
-    fn cached(&self, key: &Key) -> Option<Arc<Result<Outcome, String>>> {
+    fn cached(&self, key: &Key) -> Option<Arc<Result<Outcome, PreviewFailure>>> {
         self.cache
             .iter()
             .find(|(k, _, _)| k == key)
             .map(|(_, _, r)| Arc::clone(r))
     }
 
-    fn remember(&mut self, key: Key, result: &Arc<Result<Outcome, String>>) {
+    fn remember(&mut self, key: Key, result: &Arc<Result<Outcome, PreviewFailure>>) {
         self.cache.retain(|(k, _, _)| *k != key);
         self.cache
             .push_front((key, Instant::now(), Arc::clone(result)));
@@ -235,14 +236,60 @@ impl Ghost {
 }
 
 /// An outcome worked out, or why it couldn't be.
-type Found = Arc<Result<Outcome, String>>;
+type Found = Arc<Result<Outcome, PreviewFailure>>;
+
+/// A retained failure's source; no String is ever inferred to be a backend-owned variant.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum PreviewFailure {
+    Backend(crate::git::dry_run::Failure),
+    RawPlan(String),
+}
+
+impl From<String> for PreviewFailure {
+    fn from(raw: String) -> Self {
+        Self::RawPlan(raw)
+    }
+}
+impl From<crate::git::dry_run::Failure> for PreviewFailure {
+    fn from(failure: crate::git::dry_run::Failure) -> Self {
+        Self::Backend(failure)
+    }
+}
+impl PreviewFailure {
+    pub(crate) fn raw(&self) -> String {
+        match self {
+            Self::Backend(failure) => failure.raw(),
+            Self::RawPlan(raw) => raw.clone(),
+        }
+    }
+    pub(crate) fn display(&self) -> String {
+        match self {
+            Self::Backend(failure) => failure.display(),
+            Self::RawPlan(raw) => plan::display_preview_text(raw),
+        }
+    }
+    fn is_cancelled(&self) -> bool {
+        match self {
+            Self::Backend(failure) => failure.is_cancelled(),
+            Self::RawPlan(raw) => raw == CANCELLED,
+        }
+    }
+    /// Existing String callers retain the backend's display-at-call compatibility boundary.
+    #[cfg(test)]
+    fn legacy(&self) -> String {
+        match self {
+            Self::Backend(failure) => failure.display(),
+            Self::RawPlan(raw) => raw.clone(),
+        }
+    }
+}
 
 /// What the strip shows.
 pub(crate) enum Strip<'a> {
     /// Worked out in the background.
     Working(String),
     Ready(String, &'a Outcome),
-    Failed(String, &'a str),
+    Failed(String, &'a PreviewFailure),
 }
 
 impl RepoTab {
@@ -287,6 +334,13 @@ impl RepoTab {
             return;
         }
         self.start_ghost(key, ctx);
+    }
+
+    pub(in crate::repo) fn timeline_ghost_active(&self) -> bool {
+        self.ghost
+            .hover
+            .as_ref()
+            .is_some_and(|(op, _)| matches!(op, GhostOp::Timeline { .. }))
     }
 
     /// The key `op`'s outcome is cached by.
@@ -337,10 +391,14 @@ impl RepoTab {
         self.ghost.jobs += 1;
         let id = self.ghost.jobs;
         let cancel = Arc::new(AtomicBool::new(false));
+        let scope = self.tx.cancel.child();
+        let mut sender = self.tx.clone();
+        sender.cancel = scope.clone();
         self.ghost.job = Some(Job {
             id,
             key: key.clone(),
             cancel: Arc::clone(&cancel),
+            _scope: crate::tasks::Scope(scope),
         });
         let cached = self.ghost.cached(&key);
         let facts = Facts {
@@ -353,28 +411,62 @@ impl RepoTab {
         let version = Arc::clone(&self.ghost.version);
         let history = self.history_gen;
         let op = key.op.clone();
-        self.then(
+        let failure_key = key.clone();
+        super::messages::spawn_or(
+            &sender,
             ctx,
+            move |error| {
+                super::Msg::Then(Box::new(move |tab, ctx| {
+                    tab.ghost_arrived(
+                        id,
+                        failure_key,
+                        history,
+                        Arc::new(Err(error.into())),
+                        None,
+                        ctx,
+                    );
+                }))
+            },
             move || {
                 let stop = || cancel.load(Ordering::Relaxed);
                 let result = cached.unwrap_or_else(|| {
                     Arc::new(
-                        git_version(&repo, &version)
-                            .and_then(|v| plan::plan(&repo, &op, &facts, v, &stop)),
+                        (if matches!(op, GhostOp::Timeline { .. }) {
+                            Ok(GitVersion(0, 0, 0))
+                        } else {
+                            git_version(&repo, &version)
+                        })
+                        .and_then(|v| plan::plan_with_witness(&repo, &op, &facts, v, &stop))
+                        .map(|mut outcome| {
+                            if matches!(op, GhostOp::Timeline { .. }) {
+                                let loaded: std::collections::HashSet<_> =
+                                    rows.iter().map(|c| c.hash.as_str()).collect();
+                                outcome
+                                    .created
+                                    .retain(|c| !loaded.contains(c.hash.as_str()));
+                            }
+                            outcome
+                        }),
                     )
                 });
-                let head_ref = facts
-                    .refs
-                    .current
-                    .as_deref()
-                    .map(|c| format!("refs/heads/{c}"));
+                let head_ref = match &op {
+                    GhostOp::Timeline { state, .. } => {
+                        (!state.branch.is_empty()).then(|| format!("refs/heads/{}", state.branch))
+                    }
+                    _ => facts
+                        .refs
+                        .current
+                        .as_deref()
+                        .map(|c| format!("refs/heads/{c}")),
+                };
                 let view = match (&*result, stop()) {
                     (Ok(outcome), false) => Some(view::build(&rows, outcome, head_ref.as_deref())),
                     _ => None,
                 };
-                (result, view)
+                super::Msg::Then(Box::new(move |tab, ctx| {
+                    tab.ghost_arrived(id, key, history, result, view, ctx)
+                }))
             },
-            move |tab, (result, view), ctx| tab.ghost_arrived(id, key, history, result, view, ctx),
         );
     }
 
@@ -383,11 +475,11 @@ impl RepoTab {
         id: u64,
         key: Key,
         history: u64,
-        result: Arc<Result<Outcome, String>>,
+        result: Arc<Result<Outcome, PreviewFailure>>,
         view: Option<GhostView>,
         ctx: &egui::Context,
     ) {
-        let cancelled = matches!(&*result, Err(e) if e == CANCELLED);
+        let cancelled = matches!(&*result, Err(e) if e.is_cancelled());
         // Only what was worked out: a failure may be passing (a machine not reachable).
         if result.is_ok() {
             self.ghost.remember(key.clone(), &result);
@@ -461,11 +553,11 @@ impl Ghost {
 fn git_version(
     repo: &std::path::Path,
     cache: &Mutex<Option<GitVersion>>,
-) -> Result<GitVersion, String> {
+) -> Result<GitVersion, PreviewFailure> {
     if let Some(v) = cache.lock().ok().and_then(|c| *c) {
         return Ok(v);
     }
-    let v = GitVersion::of(repo)?;
+    let v = GitVersion::of_with_witness(repo)?;
     if let Ok(mut c) = cache.lock() {
         *c = Some(v);
     }
@@ -474,3 +566,18 @@ fn git_version(
 
 #[cfg(test)]
 mod tests;
+
+pub(in crate::repo) fn approval_preview_with_witness(
+    repo: &std::path::Path,
+    op: &GhostOp,
+    facts: &op::Facts,
+    cancelled: &dyn Fn() -> bool,
+) -> Result<crate::repo::agent::preview::Preview, PreviewFailure> {
+    let version = GitVersion::of_with_witness(repo)?;
+    let outcome = plan::plan_with_witness(repo, op, facts, version, cancelled)?;
+    Ok(crate::repo::agent::preview::Preview::from_outcome(outcome))
+}
+
+pub(in crate::repo) fn display_preview_note(raw: &str) -> String {
+    plan::display_preview_text(raw)
+}

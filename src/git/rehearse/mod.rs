@@ -157,7 +157,12 @@ fn resolve(repo: &Path, rev: &str) -> Result<String, String> {
         ],
     )
     .map(|s| s.trim().to_owned())
-    .map_err(|_| format!("{} isn't a commit", short_ref(rev)))
+    .map_err(|_| {
+        crate::i18n::message(
+            "backend-isn-t-a-commit-293dc1",
+            &[("short_ref", (short_ref(rev)).to_string().into())],
+        )
+    })
 }
 
 /// `refs/heads/main` as people name it: `main`.
@@ -185,8 +190,12 @@ fn play_rebase(dir: &Path, pre: &[&str], tip: &str, onto: &str) -> Played {
             }
             Played::Failed(e)
         }
-        Ok(_) if rebase_in_progress(dir) => rebase_stop(dir)
-            .unwrap_or_else(|| Played::Failed("the rebase stopped for no reason git gave".into())),
+        Ok(_) if rebase_in_progress(dir) => rebase_stop(dir).unwrap_or_else(|| {
+            Played::Failed(
+                crate::i18n::text("backend-the-rebase-stopped-for-no-reason-git-gave-6a1fbf")
+                    .into(),
+            )
+        }),
         Ok(_) if head == tip => Played::UpToDate,
         Ok(_) => clean(dir, &head, onto),
     }
@@ -332,9 +341,17 @@ fn play_merge(dir: &Path, pre: &[&str], tip: &str, other: &str) -> Played {
 /// storing what it said as the test lane does.
 fn test_result(repo: &Path, dir: &Path, command: &str, played: &Played, stop: &RunStop) -> Tested {
     let tree = match played {
-        Played::UpToDate => return Tested::NotRun("nothing changes".to_owned()),
-        Played::Stopped { .. } => return Tested::NotRun("it stops on conflicts".to_owned()),
-        Played::Failed(_) => return Tested::NotRun("it failed".to_owned()),
+        Played::UpToDate => {
+            return Tested::NotRun(crate::i18n::text("backend-nothing-changes-795407").to_owned());
+        }
+        Played::Stopped { .. } => {
+            return Tested::NotRun(
+                crate::i18n::text("backend-it-stops-on-conflicts-7ff4cd").to_owned(),
+            );
+        }
+        Played::Failed(_) => {
+            return Tested::NotRun(crate::i18n::text("backend-it-failed-9c34df").to_owned());
+        }
         Played::FastForward { tree, .. } | Played::Clean { tree, .. } => tree,
     };
     if let Ok(known) = testlane::read_results(repo, testlane::DEFAULT_TEST)
@@ -386,9 +403,9 @@ pub fn unmoved(repo: &Path, rehearsal: &Rehearsal) -> Result<(), String> {
     // The operation acts on what is checked out: it must still be the branch rehearsed.
     let head = crate::git::run(Some(repo), &["symbolic-ref", "-q", "HEAD"]).unwrap_or_default();
     if head.trim() != spec.branch {
-        return Err(format!(
-            "{} is no longer checked out: rehearse again",
-            short_ref(&spec.branch)
+        return Err(crate::i18n::message(
+            "backend-is-no-longer-checked-out-rehearse-again-d63206",
+            &[("short_ref", (short_ref(&spec.branch)).to_string().into())],
         ));
     }
     for (rev, then) in [
@@ -400,12 +417,18 @@ pub fn unmoved(repo: &Path, rehearsal: &Rehearsal) -> Result<(), String> {
             let now = if now.is_empty() {
                 "gone".to_owned()
             } else {
-                format!("now at {}", short(&now))
+                crate::i18n::message(
+                    "backend-now-at-3b14e0",
+                    &[("now", (short(&now)).to_string().into())],
+                )
             };
-            return Err(format!(
-                "{} moved since the rehearsal (it was at {}, {now}): rehearse again",
-                short_ref(rev),
-                short(then)
+            return Err(crate::i18n::message(
+                "backend-moved-since-the-rehearsal-it-was-at-now-rehearse-again-bfec19",
+                &[
+                    ("short_ref", (short_ref(rev)).to_string().into()),
+                    ("then", (short(then)).to_string().into()),
+                    ("now", (now).to_string().into()),
+                ],
             ));
         }
     }

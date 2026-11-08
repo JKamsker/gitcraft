@@ -76,9 +76,9 @@ impl RepoTab {
         let mut settings = Settings::get(ui.ctx());
         let on = settings.diff_beside_graph;
         let tip = if on {
-            "Show the diff in place of the graph"
+            crate::i18n::text("repo-core-2414")
         } else {
-            "Show the diff below the graph"
+            crate::i18n::text("repo-core-2415")
         };
         let button = icons::small_button(ui, "panel-bottom", tip);
         if on {
@@ -94,6 +94,8 @@ impl RepoTab {
     /// Leaves a pull request's or a commit's builds page for the graph: a diff shown over it
     /// was one of its files, and goes with it rather than staying below the graph.
     pub(super) fn leave_pages(&mut self) {
+        self.file_comparison = None;
+        self.tour = None;
         self.versions.view = None;
         if (self.pr_view.is_some() || self.ci_view.is_some()) && self.conflict.is_none() {
             self.diff = None;

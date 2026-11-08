@@ -88,6 +88,53 @@ impl FailedHook {
     }
 }
 
+/// Render only the application-owned hook envelope. The hook's own output stays opaque.
+pub(super) fn display_failure(error: &str) -> Option<String> {
+    let (header, detail) = error.split_once('\n').unwrap_or((error, ""));
+    let (rest, marker, id) = if let Some(rest) = header.strip_prefix("it was done, but the ") {
+        (
+            rest,
+            " hook failed afterwards (exit code ",
+            "backend-it-was-done-but-the-name-hook-failed-afterwards-exit-code-code-ce81ed",
+        )
+    } else {
+        (
+            header.strip_prefix("the ")?,
+            " hook stopped it (exit code ",
+            "backend-the-name-hook-stopped-it-exit-code-code-cc1a4c",
+        )
+    };
+    let (name, code) = rest.strip_suffix(')')?.rsplit_once(marker)?;
+    if !STOPPING.contains(&name) && name != "post-checkout" {
+        return None;
+    }
+    code.parse::<i64>().ok()?;
+    let mut display = crate::i18n::message(id, &[("name", name.into()), ("code", code.into())]);
+    if !detail.is_empty() {
+        let (said, last) = detail.rsplit_once('\n').unwrap_or(("", detail));
+        let hint_id = match last {
+            "Tick Skip hooks in the commit box to commit once without them." => {
+                Some("backend-tick-skip-hooks-in-the-commit-box-to-commit-once-without-them-cab006")
+            }
+            "Right-click Push for Push, skipping hooks, to push once without it." => Some(
+                "backend-right-click-push-for-push-skipping-hooks-to-push-once-without-it-4b9ac1",
+            ),
+            _ => None,
+        };
+        display.push('\n');
+        if let Some(hint_id) = hint_id {
+            if !said.is_empty() {
+                display.push_str(said);
+                display.push('\n');
+            }
+            display.push_str(crate::i18n::text(hint_id));
+        } else {
+            display.push_str(detail);
+        }
+    }
+    Some(display)
+}
+
 /// Whether the git command `args` (options before the subcommand allowed) is one whose hooks
 /// are traced.
 pub(super) fn wants_trace(args: &[&str]) -> bool {
@@ -216,19 +263,25 @@ impl Drop for TraceFile {
 /// always absolute, removed with the shell however it ends), then passes them back after its
 /// error output, behind [`MARK`]. Without that folder, git just runs. Its first line names the
 /// command, for messages about it (`Request::what`).
+#[cfg(all(test, unix))]
 pub(super) fn traced_script(words: &str) -> String {
+    traced_script_with_program(words, "git")
+}
+/// The fixed selected executable for credential-bearing remote runners.
+pub(super) fn traced_script_with_program(words: &str, program: &str) -> String {
     format!(
         concat!(
-            ": git {words}\n",
+            ": {program} {words}\n",
             "t=\"${{T:+$T/hook-events}}\"\n",
-            "if [ -n \"$t\" ] && : >\"$t\" 2>/dev/null; then {var}=\"$t\" git {words}\n",
-            "else t=; git {words}; fi\n",
+            "if [ -n \"$t\" ] && : >\"$t\" 2>/dev/null; then {var}=\"$t\" {program} {words}\n",
+            "else t=; {program} {words}; fi\n",
             "r=$?\n",
             "if [ -n \"$t\" ]; then\n",
             "  printf '\\n%s\\n' '{mark}' >&2; grep -F '\"child_' \"$t\" >&2; rm -f \"$t\"\n",
             "fi\n",
             "exit $r",
         ),
+        program = program,
         var = TRACE_VAR,
         words = words,
         mark = MARK,
@@ -453,5 +506,48 @@ mod tests {
                 code: 4
             })
         );
+    }
+}
+
+#[cfg(test)]
+mod backend_fluent_identity_tests {
+    #[test]
+    fn backend_fluent_hook_keeps_toolbar_header_and_opaque_output() -> Result<(), String> {
+        let said =
+            "provider HTTP 409: the other hook stopped it (exit code 7)\n/refs/heads/de/main";
+        for locale in ["en-US", "de"] {
+            crate::i18n::set_language(locale);
+            for (name, args, prefix) in [
+                ("pre-commit", vec!["commit"], "the "),
+                ("pre-push", vec!["push"], "the "),
+                ("post-checkout", vec!["checkout"], "it was done, but the "),
+            ] {
+                let hook = super::FailedHook {
+                    name: name.into(),
+                    code: 1234,
+                };
+                let raw = hook.explain(said, &args);
+                let header = raw.lines().next().ok_or("missing hook header")?;
+                assert!(header.starts_with(prefix) && header.contains(" hook "));
+                assert!(raw.contains("exit code 1234)"));
+                assert!(raw.contains(said));
+                let display = crate::git::display_error(&raw);
+                assert!(display.contains(said));
+                if locale == "de" {
+                    assert!(display.contains("Hook") && display.contains("Exit-Code 1234"));
+                    assert_ne!(display, raw);
+                } else {
+                    assert_eq!(display, raw);
+                }
+            }
+            for opaque in [
+                "fatal: provider hook output",
+                "the unknown-provider hook stopped it (exit code 7)",
+            ] {
+                assert_eq!(crate::git::display_error(opaque), opaque);
+            }
+        }
+        crate::i18n::set_language("en-US");
+        Ok(())
     }
 }

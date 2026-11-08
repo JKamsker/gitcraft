@@ -108,7 +108,7 @@ pub fn find_interaction(
     progress: &(dyn Fn(SearchProgress) + Sync),
 ) -> Result<Interaction, String> {
     if spec.command.trim().is_empty() {
-        return Err("Type the command to test with".to_owned());
+        return Err(crate::i18n::text("backend-type-the-command-to-test-with-4b88f5").to_owned());
     }
     let base = merge_base(repo, &spec.a, &spec.b)?;
     let changes = changes_of(repo, &base, spec)?;
@@ -138,7 +138,9 @@ pub fn find_interaction(
     let found = found.map_err(|halt| match halt {
         Halt::Stopped => "stopped".to_owned(),
         Halt::Error(e) => e,
-        Halt::OutOfBudget => "out of tests before the checks were done".to_owned(),
+        Halt::OutOfBudget => {
+            crate::i18n::text("backend-out-of-tests-before-the-checks-were-done-3c9d48").to_owned()
+        }
     })?;
     Ok(Interaction {
         found,
@@ -162,11 +164,21 @@ fn merge_base(repo: &Path, a: &str, b: &str) -> Result<String, String> {
                 &format!("{rev}^{{commit}}"),
             ],
         )
-        .map_err(|_| format!("{rev} isn't a commit"))?;
+        .map_err(|_| {
+            crate::i18n::message(
+                "backend-rev-isn-t-a-commit-4663f7",
+                &[("rev", (rev).to_string().into())],
+            )
+        })?;
     }
     run(Some(repo), &["merge-base", "--end-of-options", a, b])
         .map(|s| s.trim().to_owned())
-        .map_err(|_| format!("{a} and {b} have no commit in common"))
+        .map_err(|_| {
+            crate::i18n::message(
+                "backend-a-and-b-have-no-commit-in-common-62f15a",
+                &[("a", (a).to_string().into()), ("b", (b).to_string().into())],
+            )
+        })
 }
 
 /// The commits of each branch since `base`, oldest first: `a`'s, then `b`'s.
@@ -179,9 +191,9 @@ fn changes_of(repo: &Path, base: &str, spec: &InteractionSpec) -> Result<Vec<Cha
             &["rev-list", "--count", "--min-parents=2", &range],
         )?;
         if merges.trim() != "0" {
-            return Err(format!(
-                "{rev} has merge commits since it diverged: only branches without merges can be \
-                 taken apart"
+            return Err(crate::i18n::message(
+                "backend-rev-has-merge-commits-since-it-diverged-only-branches-without-mer-012058",
+                &[("rev", (rev).to_string().into())],
             ));
         }
         let out = run(
@@ -198,16 +210,19 @@ fn changes_of(repo: &Path, base: &str, spec: &InteractionSpec) -> Result<Vec<Cha
             })
         }));
         if changes.len() == before {
-            return Err(format!(
-                "{rev} has no commits of its own since the two diverged"
+            return Err(crate::i18n::message(
+                "backend-rev-has-no-commits-of-its-own-since-the-two-diverged-3fb761",
+                &[("rev", (rev).to_string().into())],
             ));
         }
     }
     if changes.len() > MAX_CHANGES {
-        return Err(format!(
-            "the two branches have {} commits between them; at most {MAX_CHANGES} can be taken \
-             apart",
-            changes.len()
+        return Err(crate::i18n::message(
+            "backend-the-two-branches-have-commits-between-them-at-most-max-changes-ca-ed4e1b",
+            &[
+                ("count", (changes.len()).into()),
+                ("max_changes", (MAX_CHANGES).into()),
+            ],
         ));
     }
     Ok(changes)
@@ -388,12 +403,21 @@ impl Search<'_> {
             ],
             &[0],
         )
-        .map_err(|e| Halt::Error(format!("could not check out the base: {e}")))?;
+        .map_err(|e| {
+            Halt::Error(crate::i18n::message(
+                "backend-could-not-check-out-the-base-e-be0404",
+                &[("detail", (e).to_string().into())],
+            ))
+        })?;
         // What the last test left (its files that git doesn't ignore) would be in the way of a
         // commit adding them, or change what the next test sees; ignored ones (build output)
         // stay, as a build can reuse them.
-        git(&["clean", "-ffdq"], &[0])
-            .map_err(|e| Halt::Error(format!("could not clean the scratch worktree: {e}")))?;
+        git(&["clean", "-ffdq"], &[0]).map_err(|e| {
+            Halt::Error(crate::i18n::message(
+                "backend-could-not-clean-the-scratch-worktree-e-1d3043",
+                &[("detail", (e).to_string().into())],
+            ))
+        })?;
         if !subset.is_empty() {
             let mut args = vec![NO_HOOKS[0], NO_HOOKS[1], "-c", "commit.gpgSign=false"];
             if self.fallback_identity {

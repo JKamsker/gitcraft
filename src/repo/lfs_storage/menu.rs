@@ -51,9 +51,9 @@ impl RepoTab {
             t.text_faint.gamma_multiply(0.18),
         );
         icons::paint(ui, mark, "cloud-download", 12.0, t.text_dim);
-        row.clone().on_hover_text(
-            "Only its LFS pointer is here (not downloaded). Right-click → LFS: Download.",
-        );
+        row.clone().on_hover_text(crate::i18n::text(
+            "repo-workflows-lfs_storage-pointer-mark-efdc14b1",
+        ));
     }
 
     /// Download, Fetch only this folder and Track in LFS for `path`, in its menu; only for the
@@ -85,45 +85,64 @@ impl RepoTab {
         if state.only_pointer(path) {
             match download_action(&[path.to_owned()]) {
                 Ok(action) => {
-                    let r = ui
-                        .add_enabled(idle, egui::Button::new("LFS: Download"))
-                        .on_hover_text("Download this file's LFS object and check it out");
+                    let r = crate::menu_item::MenuItem::new(crate::i18n::text(
+                        "repo-workflows-lfs_storage-storage-menu-items-1de3e10c",
+                    ))
+                    .icon("cloud-download")
+                    .enabled(idle)
+                    .show(ui)
+                    .on_hover_text(crate::i18n::text(
+                        "repo-workflows-lfs_storage-storage-menu-items-e2cb4df2",
+                    ));
                     if r.clicked() {
                         acts.push(action);
                     }
                 }
                 Err(e) => {
-                    ui.add_enabled(false, egui::Button::new("LFS: Download"))
-                        .on_disabled_hover_text(e);
+                    crate::menu_item::MenuItem::new(crate::i18n::text(
+                        "repo-workflows-lfs_storage-storage-menu-items-1de3e10c",
+                    ))
+                    .icon("cloud-download")
+                    .refused(Some(&e))
+                    .show(ui)
+                    .on_disabled_hover_text(e);
                 }
             }
         }
         if in_lfs
             && let Some((dir, pattern)) = folder
-            && ui
-                .button(format!("LFS: Fetch only {dir}"))
-                .on_hover_text(
-                    "From now on git-lfs downloads only this folder (and any others set in LFS: \
-                     Storage…) on fetch, pull and checkout; other files stay pointers. Set in \
-                     this repository's config.",
-                )
-                .clicked()
+            && crate::menu_item::MenuItem::new(crate::i18n::message(
+                "repo-workflows-lfs_storage-storage-menu-items-5ed965af",
+                &[("dir", (dir).clone().into())],
+            ))
+            .icon("cloud-download")
+            .show(ui)
+            .on_hover_text(crate::i18n::text(
+                "repo-workflows-lfs_storage-storage-menu-items-ea226348",
+            ))
+            .clicked()
         {
             acts.push(Action::LfsStorage(StorageAct::FetchOnly(pattern)));
         }
         if let Some(pattern) = track {
             let label = if pattern.starts_with("*.") {
-                format!("Track {pattern} in LFS")
+                crate::i18n::message(
+                    "repo-workflows-lfs_storage-storage-menu-items-31a0cb12",
+                    &[("pattern", (pattern).clone().into())],
+                )
             } else {
-                format!("Track {path} in LFS")
+                crate::i18n::message(
+                    "repo-workflows-lfs_storage-storage-menu-items-4f441605",
+                    &[("path", (path).into())],
+                )
             };
-            let r = ui
-                .add_enabled(idle, egui::Button::new(label))
-                .on_hover_text(
-                    "git lfs track: writes the pattern to .gitattributes. Files already committed \
-                 stay ordinary git files until changed and staged again; commit .gitattributes \
-                 to share it.",
-                );
+            let r = crate::menu_item::MenuItem::new(label)
+                .icon("command")
+                .enabled(idle)
+                .show(ui)
+                .on_hover_text(crate::i18n::text(
+                    "repo-workflows-lfs_storage-storage-menu-items-1b8b17ee",
+                ));
             if r.clicked() {
                 acts.push(track_action(&pattern));
             }

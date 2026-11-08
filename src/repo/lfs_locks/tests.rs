@@ -296,7 +296,7 @@ fn locks_in_the_tab() -> Result<(), String> {
         &ctx,
     );
     wait(&mut tab, &ctx, idle);
-    let (status, failed) = tab.status.clone().unwrap_or_default();
+    let (status, failed) = tab.status.as_deref().cloned().unwrap_or_default();
     assert!(
         failed && status.starts_with("Unlock their art.psd failed: "),
         "{status}"

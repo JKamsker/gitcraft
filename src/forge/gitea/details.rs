@@ -158,6 +158,7 @@ pub(super) fn assemble(answers: &Answers, forge: Forge, web: &str) -> PrDetails 
         head_oid: head_oid.clone(),
         can_bypass_rules: false,
         threads,
+        ..Default::default()
     };
 
     let mut timeline: Vec<Entry> = answers
@@ -239,9 +240,11 @@ fn review_entry(v: &Value, web: &str) -> Option<Entry> {
     let dismissed = v.get("dismissed").and_then(Value::as_bool) == Some(true);
     let state = at(v, "/state");
     let verdict = match state {
-        "APPROVED" | "REQUEST_CHANGES" if dismissed => "had a review dismissed",
+        "APPROVED" | "REQUEST_CHANGES" if dismissed => {
+            crate::i18n::text("backend-had-a-review-dismissed-2ab8b3")
+        }
         "APPROVED" => "approved",
-        "REQUEST_CHANGES" => "requested changes",
+        "REQUEST_CHANGES" => crate::i18n::text("backend-requested-changes-7adfe7"),
         "COMMENT" if !body.trim().is_empty() => "reviewed",
         _ => return None,
     };

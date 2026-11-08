@@ -29,11 +29,11 @@ const PAD_Y: f32 = 8.0;
 fn summary(prose: &ProseDiff) -> Option<&'static str> {
     let all = |f: fn(&Part) -> bool| !prose.parts.is_empty() && prose.parts.iter().all(f);
     if prose.parts.is_empty() {
-        Some("The file is empty on both sides.")
+        Some(crate::i18n::text("repo-core-2205"))
     } else if all(|p| matches!(p, Part::Added { .. })) {
-        Some("The whole file is new.")
+        Some(crate::i18n::text("repo-core-2206"))
     } else if all(|p| matches!(p, Part::Removed { .. })) {
-        Some("The change deletes the whole file.")
+        Some(crate::i18n::text("repo-core-2207"))
     } else if all(|p| {
         matches!(
             p,
@@ -43,11 +43,9 @@ fn summary(prose: &ProseDiff) -> Option<&'static str> {
             }
         )
     }) {
-        Some(
-            "The words are as they were: only whitespace, blank lines or the file's name or mode changed.",
-        )
+        Some(crate::i18n::text("repo-core-2208"))
     } else if all(|p| matches!(p, Part::Kept { .. })) {
-        Some("The words are as they were: only how the lines are wrapped changed.")
+        Some(crate::i18n::text("repo-core-2209"))
     } else {
         None
     }
@@ -58,7 +56,12 @@ pub(super) fn show(ui: &mut Ui, prose: &ProseDiff, state: &mut RichState, acts: 
     let width = (ui.available_width() - 2.0 * MARGIN).clamp(200.0, CONTENT_W);
     let note = summary(prose);
     // A file all new or all gone needs no caption on each paragraph.
-    let captions = !matches!(note, Some(n) if n.starts_with("The whole") || n.contains("deletes"));
+    let captions = !(!prose.parts.is_empty()
+        && (prose.parts.iter().all(|p| matches!(p, Part::Added { .. }))
+            || prose
+                .parts
+                .iter()
+                .all(|p| matches!(p, Part::Removed { .. }))));
     let items = layout(&prose.parts, &state.opened);
     if state.heights.len() != items.len() || state.width != width {
         state.width = width;
@@ -169,9 +172,9 @@ pub(super) fn layout(parts: &[Part], opened: &std::collections::HashSet<usize>) 
 /// A fold of unchanged paragraphs; clicked, it opens.
 fn fold(ui: &mut Ui, t: &Tokens, rect: Rect, count: usize, run: usize) -> egui::Response {
     let label = if count == 1 {
-        "1 unchanged paragraph".to_owned()
+        crate::i18n::text("repo-core-2213").to_owned()
     } else {
-        format!("{count} unchanged paragraphs")
+        crate::i18n::message("repo-core-2214", &[("count", (count).into())])
     };
     let galley = ui
         .painter()
@@ -180,7 +183,7 @@ fn fold(ui: &mut Ui, t: &Tokens, rect: Rect, count: usize, run: usize) -> egui::
     let resp = ui
         .interact(r, ui.id().with(("prose_fold", run)), egui::Sense::click())
         .on_hover_cursor(egui::CursorIcon::PointingHand)
-        .on_hover_text("Show them");
+        .on_hover_text(crate::i18n::text("repo-core-2216"));
     let fill = if resp.hovered() { t.hover } else { t.card };
     ui.painter().rect_filled(r, t.radius_sm, fill);
     ui.painter().galley(
@@ -196,16 +199,16 @@ fn caption(part: &Part, captions: bool) -> Option<&'static str> {
     match part {
         Part::Kept {
             rewrapped: true, ..
-        } => Some("re-wrapped"),
+        } => Some(crate::i18n::text("repo-core-2217")),
         Part::Kept { .. } => None,
-        Part::Changed { .. } => Some("edited"),
-        Part::Removed { .. } => captions.then_some("removed"),
-        Part::Added { .. } => captions.then_some("added"),
+        Part::Changed { .. } => Some(crate::i18n::text("repo-core-2218")),
+        Part::Removed { .. } => captions.then_some(crate::i18n::text("repo-core-1703")),
+        Part::Added { .. } => captions.then_some(crate::i18n::text("repo-core-1702")),
     }
 }
 
 /// The text of a part, laid out to wrap within `width`.
-fn part_job(part: &Part, t: &Tokens, width: f32) -> LayoutJob {
+pub(super) fn part_job(part: &Part, t: &Tokens, width: f32) -> LayoutJob {
     let font = egui::FontId::proportional(14.0);
     let mut job = match part {
         Part::Kept { text, .. } => plain(text, &font, t.text_dim, false),
@@ -263,8 +266,10 @@ fn part(ui: &mut Ui, t: &Tokens, part: &Part, rect: Rect, captions: bool, acts: 
         );
     }
     let tip = match (old, new) {
-        (Some(o), None) => format!("Line {o} before the change: click to see the lines"),
-        (_, Some(n)) => format!("Line {n}: click to see the lines there"),
+        (Some(o), None) => {
+            crate::i18n::message("repo-core-2220", &[("o", format!("{}", o).into())])
+        }
+        (_, Some(n)) => crate::i18n::message("repo-core-2221", &[("n", (n).into())]),
         _ => String::new(),
     };
     let label = match part {
@@ -273,7 +278,7 @@ fn part(ui: &mut Ui, t: &Tokens, part: &Part, rect: Rect, captions: bool, acts: 
         }
         Part::Changed { words, .. } => words.iter().map(|(_, w)| w.as_str()).collect::<String>(),
     };
-    resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, &label));
+    crate::a11y::a11y(&resp, egui::WidgetType::Button, &label);
     if resp.on_hover_text(tip).clicked() {
         acts.push(Action::DiffGoToLine { old, new });
     }
@@ -298,7 +303,10 @@ fn cut(text: String) -> String {
         return text;
     }
     let mut s: String = text.chars().take(MAX_CHARS).collect();
-    s.push_str(&format!(" … ({} more characters)", total - MAX_CHARS));
+    s.push_str(&crate::i18n::message(
+        "repo-core-2222",
+        &[("MAX-CHARS", format!("{}", total - MAX_CHARS).into())],
+    ));
     s
 }
 
@@ -324,10 +332,32 @@ fn plain(text: &str, font: &egui::FontId, color: Color32, struck: bool) -> Layou
 /// An edited paragraph's words, each with what stood before it: kept ones plain, removed ones
 /// struck through on red, added ones on green.
 fn changed(words: &[(Change, String)], font: &egui::FontId, t: &Tokens) -> LayoutJob {
+    changed_with_limit(words, font, t, Some(MAX_CHARS))
+}
+pub(super) fn search_changed(words: &[(Change, String)], t: &Tokens) -> LayoutJob {
+    changed_with_limit(words, &egui::FontId::proportional(14.0), t, None)
+}
+fn append(job: &mut LayoutJob, text: &str, format: TextFormat) {
+    if let Some(last) = job.sections.last_mut()
+        && last.format == format
+        && last.byte_range.end.0 == job.text.len()
+    {
+        job.text.push_str(text);
+        last.byte_range.end = egui::text::ByteIndex(job.text.len());
+    } else {
+        job.append(text, 0.0, format);
+    }
+}
+fn changed_with_limit(
+    words: &[(Change, String)],
+    font: &egui::FontId,
+    t: &Tokens,
+    limit: Option<usize>,
+) -> LayoutJob {
     let mut job = LayoutJob::default();
     let mut shown = 0;
     for (change, word) in words {
-        if shown > MAX_CHARS {
+        if limit.is_some_and(|limit| shown > limit) {
             job.append(" …", 0.0, TextFormat::simple(font.clone(), t.text_faint));
             break;
         }
@@ -336,16 +366,16 @@ fn changed(words: &[(Change, String)], font: &egui::FontId, t: &Tokens) -> Layou
         let lead = word.len() - word.trim_start().len();
         let (space, body) = word.split_at(lead);
         if !space.is_empty() {
-            job.append(space, 0.0, TextFormat::simple(font.clone(), t.text));
+            append(&mut job, space, TextFormat::simple(font.clone(), t.text));
         }
         let (background, strike) = match change {
             Change::Kept => (Color32::TRANSPARENT, Stroke::NONE),
             Change::Removed => (t.danger.gamma_multiply(0.35), Stroke::new(1.0, t.text_dim)),
             Change::Added => (t.success.gamma_multiply(0.35), Stroke::NONE),
         };
-        job.append(
+        append(
+            &mut job,
             body,
-            0.0,
             TextFormat {
                 font_id: font.clone(),
                 color: t.text,

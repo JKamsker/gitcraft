@@ -24,7 +24,10 @@ pub(super) fn inbox(api: &Api, hosting: &Hosting) -> Result<Answer, String> {
     let me = api.get("user")?;
     let login = at(&me, "/login").to_owned();
     if login.is_empty() {
-        return Err(format!("{} didn't say who is logged in", api.name()));
+        return Err(crate::i18n::message(
+            "backend-didn-t-say-who-is-logged-in-d78e69",
+            &[("name", (api.name()).to_string().into())],
+        ));
     }
     let search = |filter: &str| {
         let endpoint = format!("repos/issues/search?type=pulls&state=open&{filter}=true");
@@ -33,8 +36,16 @@ pub(super) fn inbox(api: &Api, hosting: &Hosting) -> Result<Answer, String> {
     let asked = search("review_requested")?;
     let created = search("created")?;
     let mut cut: Vec<String> = [
-        inbox::cut_note(asked.len(), MAX_LISTED, "asking your review"),
-        inbox::cut_note(created.len(), MAX_LISTED, "of yours"),
+        inbox::cut_note(
+            asked.len(),
+            MAX_LISTED,
+            crate::i18n::text("backend-asking-your-review-3c3907"),
+        ),
+        inbox::cut_note(
+            created.len(),
+            MAX_LISTED,
+            crate::i18n::text("backend-of-yours-2a649f"),
+        ),
     ]
     .into_iter()
     .flatten()
@@ -46,9 +57,9 @@ pub(super) fn inbox(api: &Api, hosting: &Hosting) -> Result<Answer, String> {
     prs.sort_by_key(|p| std::cmp::Reverse(p.updated));
     let mine = prs.iter().filter(|p| p.mine).count();
     if mine > MAX_MINE {
-        cut.push(format!(
-            "the checks and comments of only the {MAX_MINE} latest of your {mine} pull requests \
-             were read"
+        cut.push(crate::i18n::message(
+            "backend-the-checks-and-comments-of-only-the-max-mine-latest-of-your-mine-cbdf30",
+            &[("max_mine", MAX_MINE.into()), ("mine", mine.into())],
         ));
     }
     for pr in prs.iter_mut().filter(|p| p.mine).take(MAX_MINE) {

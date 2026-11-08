@@ -2,6 +2,8 @@
 //! pair merged in memory with `git merge-tree`, each with the branch they land on, and the
 //! order to land them in with the fewest branches needing rework.
 
+pub mod display;
+
 mod matrix;
 mod merge_tree;
 mod order;

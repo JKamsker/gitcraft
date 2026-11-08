@@ -19,23 +19,36 @@ pub(super) fn section(
     let namespace = notes.namespace.clone().unwrap_or_default();
     let summary = match &notes.note {
         None => Summary::Loading,
-        Some(Err(_)) => Summary::Text("Could not be read".to_owned(), t.danger),
+        Some(Err(_)) => Summary::Text(crate::i18n::text("repo-core-1081").to_owned(), t.danger),
         Some(Ok(Some(text))) => Summary::Text(first_line(text), t.text_dim),
-        Some(Ok(None)) => Summary::Text(format!("none in {namespace}"), t.text_faint),
+        Some(Ok(None)) => Summary::Text(
+            crate::i18n::message(
+                "repo-core-1103",
+                &[("namespace", namespace.to_string().into())],
+            ),
+            t.text_faint,
+        ),
     };
     let has_note = matches!(notes.note, Some(Ok(Some(_))));
-    section::section(ui, "Notes", summary, has_note, None, |ui| {
-        namespace_picker(ui, notes, cmds);
-        if let Some(e) = &notes.error {
-            section::error(ui, e);
-        }
-        match notes.draft.take() {
-            Some(draft) => notes.draft = editor(ui, notes.saving, idle, draft, cmds),
-            None => note(ui, notes, idle, cmds),
-        }
-        ui.add_space(4.0);
-        share(ui, notes, remotes, idle, cmds);
-    });
+    section::section(
+        ui,
+        crate::i18n::text("repo-core-1104"),
+        summary,
+        has_note,
+        None,
+        |ui| {
+            namespace_picker(ui, notes, cmds);
+            if let Some(e) = &notes.error {
+                section::error(ui, e);
+            }
+            match notes.draft.take() {
+                Some(draft) => notes.draft = editor(ui, notes.saving, idle, draft, cmds),
+                None => note(ui, notes, idle, cmds),
+            }
+            ui.add_space(4.0);
+            share(ui, notes, remotes, idle, cmds);
+        },
+    );
 }
 
 /// The note's first line, for the header.
@@ -53,16 +66,23 @@ fn namespace_picker(ui: &mut Ui, notes: &mut Notes, cmds: &mut Vec<ExtrasCmd>) {
     let writing = notes.draft.is_some();
     let button = ui
         .add_enabled_ui(!writing, |ui| {
-            crate::icons::small_button(ui, "tag", &format!("Notes namespace: {current}"))
+            crate::icons::small_button(
+                ui,
+                "tag",
+                &crate::i18n::message(
+                    "dev-integration-ui-namespace-caption",
+                    &[("namespace", current.to_string().into())],
+                ),
+            )
         })
         .inner
-        .on_disabled_hover_text("Save or cancel the note first");
+        .on_disabled_hover_text(crate::i18n::text("repo-core-1105"));
     egui::Popup::menu(&button)
         .style(crate::theme::menu_style)
         .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
         .width((ui.ctx().content_rect().width() - 16.0).clamp(1.0, 240.0))
         .show(|ui| {
-            ui.label("Notes namespace");
+            ui.label(crate::i18n::text("dev-integration-ui-namespace"));
             // Reserve room for the creation controls, even in short scaled viewports.
             // Only the existing namespaces scroll; typing a new one stays in view.
             egui::ScrollArea::vertical()
@@ -79,16 +99,19 @@ fn namespace_picker(ui: &mut Ui, notes: &mut Notes, cmds: &mut Vec<ExtrasCmd>) {
                     }
                 });
             ui.separator();
-            ui.label("New namespace");
+            ui.label(crate::i18n::text("dev-integration-ui-new-namespace"));
             let field = ui.add(
                 egui::TextEdit::singleline(&mut notes.new_namespace)
-                    .hint_text("new namespace")
+                    .hint_text(crate::i18n::text("repo-core-1109"))
                     .desired_width(f32::INFINITY),
             );
             let typed = !notes.new_namespace.trim().is_empty();
             let enter = field.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
             if ui
-                .add_enabled(typed, egui::Button::new("Use namespace"))
+                .add_enabled(
+                    typed,
+                    egui::Button::new(crate::i18n::text("dev-integration-ui-use-namespace")),
+                )
                 .clicked()
                 || (enter && typed)
             {
@@ -103,12 +126,15 @@ fn note(ui: &mut Ui, notes: &mut Notes, idle: bool, cmds: &mut Vec<ExtrasCmd>) {
     let t = Tokens::get(ui.ctx());
     let busy = notes.saving;
     match &notes.note {
-        None => section::faint(ui, "Reading the note…"),
+        None => section::faint(ui, crate::i18n::text("repo-core-1111")),
         Some(Err(e)) => section::error(ui, e),
         Some(Ok(None)) => {
-            section::faint(ui, "No note on this commit in this namespace.");
+            section::faint(ui, crate::i18n::text("repo-core-1112"));
             if ui
-                .add_enabled(!busy, egui::Button::new("Add note"))
+                .add_enabled(
+                    !busy,
+                    egui::Button::new(crate::i18n::text("repo-core-1113")),
+                )
                 .clicked()
             {
                 notes.draft = Some(String::new());
@@ -126,22 +152,34 @@ fn note(ui: &mut Ui, notes: &mut Notes, idle: bool, cmds: &mut Vec<ExtrasCmd>) {
                 });
             ui.horizontal_wrapped(|ui| {
                 if notes.confirm_delete {
-                    ui.label(RichText::new("Delete this note?").color(t.danger));
+                    ui.label(RichText::new(crate::i18n::text("repo-core-1114")).color(t.danger));
                     if ui
-                        .add_enabled(!busy && idle, egui::Button::new("Delete"))
+                        .add_enabled(
+                            !busy && idle,
+                            egui::Button::new(crate::i18n::text("repo-core-1115")),
+                        )
                         .clicked()
                     {
                         cmds.push(ExtrasCmd::DeleteNote);
                     }
-                    if ui.button("Keep").clicked() {
+                    if ui.button(crate::i18n::text("repo-core-0380")).clicked() {
                         notes.confirm_delete = false;
                     }
                 } else {
-                    if ui.add_enabled(!busy, egui::Button::new("Edit")).clicked() {
+                    if ui
+                        .add_enabled(
+                            !busy,
+                            egui::Button::new(crate::i18n::text("repo-core-1116")),
+                        )
+                        .clicked()
+                    {
                         notes.draft = Some(text.trim_end().to_owned());
                     }
                     if ui
-                        .add_enabled(!busy, egui::Button::new("Delete…"))
+                        .add_enabled(
+                            !busy,
+                            egui::Button::new(crate::i18n::text("repo-core-1117")),
+                        )
                         .clicked()
                     {
                         notes.confirm_delete = true;
@@ -167,7 +205,7 @@ fn editor(
     let edit = ui.add_enabled(
         !saving,
         egui::TextEdit::multiline(&mut draft)
-            .hint_text("Findings, review context, build links…")
+            .hint_text(crate::i18n::text("repo-core-1118"))
             .desired_rows(4)
             .desired_width(f32::INFINITY),
     );
@@ -181,13 +219,17 @@ fn editor(
     ui.horizontal_wrapped(|ui| {
         // Not while an operation runs: a notes fetch or push would hold the same ref.
         let can_save = !saving && idle && !draft.trim().is_empty();
-        if widgets::primary_button(ui, "Save note", can_save, 90.0).clicked()
+        if widgets::primary_button(ui, crate::i18n::text("repo-core-1119"), can_save, 90.0)
+            .clicked()
             || (save_keys && can_save)
         {
             cmds.push(ExtrasCmd::SaveNote(draft.clone()));
         }
         if ui
-            .add_enabled(!saving, egui::Button::new("Cancel"))
+            .add_enabled(
+                !saving,
+                egui::Button::new(crate::i18n::text("repo-core-0443")),
+            )
             .clicked()
         {
             keep = false;
@@ -196,9 +238,9 @@ fn editor(
             ui.add(crate::spinner::Spinner::new().size(12.0));
         } else {
             ui.label(
-                RichText::new(format!(
-                    "{}+Enter saves · Esc cancels",
-                    crate::manual::command()
+                RichText::new(crate::i18n::message(
+                    "repo-core-1120",
+                    &[("command", crate::manual::command().to_string().into())],
                 ))
                 .small()
                 .color(t.text_faint),
@@ -217,7 +259,7 @@ fn share(
     cmds: &mut Vec<ExtrasCmd>,
 ) {
     if remotes.is_empty() {
-        section::faint(ui, "Add a remote to fetch or push notes.");
+        section::faint(ui, crate::i18n::text("repo-core-1121"));
         return;
     }
     let remote = notes
@@ -239,26 +281,49 @@ fn share(
                 }
             });
         let fetch = ui
-            .add_enabled_ui(idle, |ui| crate::icons::small_button(ui, "cloud-download", "Fetch notes"))
+            .add_enabled_ui(idle, |ui| {
+                crate::icons::small_button(
+                    ui,
+                    "cloud-download",
+                    crate::i18n::text("repo-core-1123"),
+                )
+            })
             .inner
-            .on_hover_text(format!(
-                "Gets the notes in “{namespace}” from {remote}. If you have notes here that {remote} doesn't, nothing is changed and the fetch stops: your notes are kept."
+            .on_hover_text(crate::i18n::message(
+                "repo-core-1124",
+                &[
+                    ("namespace", namespace.to_string().into()),
+                    ("remote", remote.to_string().into()),
+                ],
             ))
-            .on_disabled_hover_text("Wait for the operation running to end");
+            .on_disabled_hover_text(crate::i18n::text("repo-core-1125"));
         if fetch.clicked() {
             cmds.push(ExtrasCmd::FetchNotes(remote.clone()));
         }
         let has_notes = notes.existing.contains(&namespace);
         let push = ui
-            .add_enabled_ui(idle && has_notes, |ui| crate::icons::small_button(ui, "arrow-up-from-line", "Push notes"))
+            .add_enabled_ui(idle && has_notes, |ui| {
+                crate::icons::small_button(
+                    ui,
+                    "arrow-up-from-line",
+                    crate::i18n::text("repo-core-1126"),
+                )
+            })
             .inner
-            .on_hover_text(format!(
-                "Sends your notes in “{namespace}” to {remote}. If {remote} has notes you don't, the push is refused."
+            .on_hover_text(crate::i18n::message(
+                "repo-core-1127",
+                &[
+                    ("namespace", namespace.to_string().into()),
+                    ("remote", remote.to_string().into()),
+                ],
             ))
             .on_disabled_hover_text(if has_notes {
-                "Wait for the operation running to end".to_owned()
+                crate::i18n::text("repo-core-1125").to_owned()
             } else {
-                format!("No notes in “{namespace}” to push yet")
+                crate::i18n::message(
+                    "repo-core-1128",
+                    &[("namespace", namespace.to_string().into())],
+                )
             });
         if push.clicked() {
             cmds.push(ExtrasCmd::PushNotes(remote.clone()));

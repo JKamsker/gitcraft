@@ -36,7 +36,7 @@ pub(super) fn lfs_view(ui: &mut Ui, pair: &LfsPair) {
     ui.add_space(12.0);
     ui.vertical_centered(|ui| {
         ui.label(
-            RichText::new("Stored in Git LFS")
+            RichText::new(crate::i18n::text("repo-core-1854"))
                 .color(t.text_faint)
                 .small(),
         );
@@ -44,8 +44,16 @@ pub(super) fn lfs_view(ui: &mut Ui, pair: &LfsPair) {
     ui.add_space(6.0);
     ui.columns(2, |cols| {
         for (col, (label, side, missing)) in cols.iter_mut().zip([
-            ("Before", &pair.old, "(new file)"),
-            ("After", &pair.new, "(deleted)"),
+            (
+                crate::i18n::text("repo-core-1564"),
+                &pair.old,
+                crate::i18n::text("repo-core-1695"),
+            ),
+            (
+                crate::i18n::text("repo-core-1565"),
+                &pair.new,
+                crate::i18n::text("repo-core-1696"),
+            ),
         ]) {
             col.vertical_centered(|ui| {
                 ui.label(
@@ -64,9 +72,12 @@ pub(super) fn lfs_view(ui: &mut Ui, pair: &LfsPair) {
                             .split_once(':')
                             .map_or(&*pointer.oid, |(_, h)| h);
                         ui.label(
-                            RichText::new(format!("LFS object {}", oid.get(..12).unwrap_or(oid)))
-                                .color(t.text_faint)
-                                .small(),
+                            RichText::new(crate::i18n::message(
+                                "repo-core-1855",
+                                &[("oid", oid.get(..12).unwrap_or(oid).to_string().into())],
+                            ))
+                            .color(t.text_faint)
+                            .small(),
                         )
                         .on_hover_text(&pointer.oid);
                     }

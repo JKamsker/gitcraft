@@ -92,7 +92,7 @@ fn run(tab: &mut RepoTab, ctx: &egui::Context, action: Action) -> Result<(String
     wait(tab, ctx, |t| {
         t.busy_op.is_none() && !t.loading && t.queued.is_empty()
     })?;
-    Ok(tab.status.clone().unwrap_or_default())
+    Ok(tab.status.as_deref().cloned().unwrap_or_default())
 }
 
 fn revert_file(hash: &str, path: &str) -> Action {
@@ -431,7 +431,7 @@ fn lines_picked_stay_picked_when_another_operation_holds_the_revert_up() -> Resu
     }
     tab.busy_op = Some("Push".to_owned());
     tab.apply(revert_picked(picked.clone()), &ctx);
-    let (said, error) = tab.status.clone().unwrap_or_default();
+    let (said, error) = tab.status.as_deref().cloned().unwrap_or_default();
     assert!(error && said.contains("Push was still running"), "{said}");
     assert!(tab.diff.as_ref().is_some_and(|d| d.chosen == picked));
     assert_eq!(read(&dir, "b.txt")?, numbered(6, &[(2, "two")]));

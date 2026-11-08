@@ -33,9 +33,43 @@ pub struct Thread {
     pub more_comments: bool,
 }
 
+/// Native providers declare supported review operations; existing forge behavior defaults on.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ReviewFeatures {
+    pub pending: bool,
+    pub request_changes: bool,
+    pub approve: bool,
+    pub apply_suggestions: bool,
+}
+impl Default for ReviewFeatures {
+    fn default() -> Self {
+        Self {
+            pending: true,
+            request_changes: true,
+            approve: true,
+            apply_suggestions: true,
+        }
+    }
+}
+/// The immutable initiating account/profile context; never a hash of a mutable global login.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ConnectionBinding(crate::connections::Context);
+pub(crate) fn connection_binding() -> ConnectionBinding {
+    ConnectionBinding(crate::connections::current())
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct PrExtras {
     pub pr_id: String,
+    pub review_features: ReviewFeatures,
+    pub native_account: Option<String>,
+    /// Native merge policy is authoritative instead of GitHub-specific status strings.
+    pub native_policy: bool,
+    pub merge_blocker: Option<String>,
+    /// Native provider explicitly hands completion to its forge page.
+    pub merge_handoff: bool,
+    pub connection_binding: Option<ConnectionBinding>,
+    pub review_revision: Option<String>,
     pub viewer: Option<String>,
     pub permission: String,
     pub merge_allowed: bool,

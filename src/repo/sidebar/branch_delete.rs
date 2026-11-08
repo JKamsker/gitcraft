@@ -20,9 +20,9 @@ impl RepoTab {
             .iter()
             .any(|w| !w.current && w.branch.as_deref() == Some(b.name.as_str()));
         let why = if elsewhere {
-            "Checked out in another worktree"
+            crate::i18n::text("repo-core-3359")
         } else {
-            "Can't delete the checked-out branch"
+            crate::i18n::text("repo-core-3360")
         };
         let refused = (b.is_head || elsewhere).then_some(why);
         let local_ref = format!("refs/heads/{}", b.name);
@@ -42,7 +42,8 @@ impl RepoTab {
                     .flat_map(|(_, bs)| bs)
                     .find(|r| r.name == b.upstream),
             );
-        let delete = MenuItem::new("Delete…")
+        let delete = MenuItem::new(crate::i18n::text("repo-core-1117"))
+            .icon("minus")
             .enabled(idle)
             .refused(refused)
             // The entry below, for the remote too, says the same reason.
@@ -56,11 +57,11 @@ impl RepoTab {
             acts.push(Action::Dialog(
                 Dialog::confirm(
                     "Delete branch",
-                    format!("Delete the local branch “{}”?", b.name),
-                    "Delete",
+                    crate::i18n::message("repo-core-3362", &[("name", b.name.to_string().into())]),
+                    crate::i18n::text("repo-core-1115"),
                     guarded(ops(&[&["branch", "-d", "--", &b.name]])),
                     Some((
-                        "Force, even if it isn't merged (-D)".to_owned(),
+                        crate::i18n::text("repo-core-3363").to_owned(),
                         guarded(ops(&[&["branch", "-D", "--", &b.name]])),
                     )),
                 )
@@ -74,11 +75,21 @@ impl RepoTab {
         let Some(((remote, name), tracked)) = upstream else {
             return;
         };
-        let both = MenuItem::new(format!("Delete locally and on {remote}…"))
-            .enabled(idle)
-            .refused(refused)
-            .show(ui)
-            .on_hover_text(format!("Also delete {} from {remote}", b.upstream));
+        let both = MenuItem::new(crate::i18n::message(
+            "repo-core-3364",
+            &[("remote", remote.to_string().into())],
+        ))
+        .icon("minus")
+        .enabled(idle)
+        .refused(refused)
+        .show(ui)
+        .on_hover_text(crate::i18n::message(
+            "repo-core-3365",
+            &[
+                ("upstream", b.upstream.to_string().into()),
+                ("remote", remote.to_string().into()),
+            ],
+        ));
         offer(&both, || GhostOp::DeleteBranch {
             branch: b.name.clone(),
             remote: true,
@@ -97,17 +108,17 @@ impl RepoTab {
             acts.push(Action::Dialog(
                 Dialog::confirm(
                     "Delete branch locally and on the remote",
-                    format!(
-                        "Delete the local branch “{}” and “{name}” on {remote}? Deleting it \
-                         on the remote changes it for everyone.",
-                        b.name
+                    crate::i18n::message(
+                        "repo-core-3368",
+                        &[
+                            ("name", b.name.to_string().into()),
+                            ("name2", name.to_string().into()),
+                            ("remote", remote.to_string().into()),
+                        ],
                     ),
-                    "Delete both",
+                    crate::i18n::text("repo-core-3369"),
                     delete("-d"),
-                    Some((
-                        "Force, even if it isn't merged (-D)".to_owned(),
-                        delete("-D"),
-                    )),
+                    Some((crate::i18n::text("repo-core-3363").to_owned(), delete("-D"))),
                 )
                 .undo(Undo::Custom {
                     undo,

@@ -65,9 +65,9 @@ pub(crate) fn undo_refusal(entry: &UndoEntry, refs: &Refs) -> Option<String> {
         .flat_map(|(_, list)| list)
         .any(|r| r.target == branch.target);
     (!branch.upstream.is_empty() || on_remote).then(|| {
-        format!(
-            "{name} is published: undoing the empty first commit would delete a branch the \
-             remote has. Commit on top of it instead."
+        crate::i18n::message(
+            "repo-workflows-guide-undo-refusal-6cb7f998",
+            &[("name", (name).into())],
         )
     })
 }
@@ -88,12 +88,17 @@ impl RepoTab {
                     tab.dialog = Some(confirm_dialog(&branch));
                 }
                 Ok(_) => {
-                    tab.status = Some((
+                    tab.status = Some(crate::repo::Notice::plain((
                         "HEAD is detached: check out a branch to make the first commit on".into(),
                         true,
-                    ));
+                    )));
                 }
-                Err(e) => tab.status = Some((format!("{EMPTY_COMMIT_LABEL}: {e}"), true)),
+                Err(e) => {
+                    tab.status = Some(crate::repo::Notice::plain((
+                        format!("{EMPTY_COMMIT_LABEL}: {e}"),
+                        true,
+                    )))
+                }
             },
         );
     }
@@ -105,12 +110,14 @@ fn confirm_dialog(branch: &str) -> Dialog {
     let name = branch.strip_prefix("refs/heads/").unwrap_or(branch);
     Dialog::confirm(
         EMPTY_COMMIT_LABEL,
-        format!(
-            "Make an empty commit named “{EMPTY_COMMIT_MESSAGE}” on {name}? It gives the \
-             repository a branch to publish and to start others from. You can undo it until \
-             it is published."
+        crate::i18n::message(
+            "repo-workflows-guide-confirm-dialog-91b6a6f9",
+            &[
+                ("EMPTY-COMMIT-MESSAGE", (EMPTY_COMMIT_MESSAGE).into()),
+                ("name", (name).into()),
+            ],
         ),
-        "Commit",
+        crate::i18n::text("repo-workflows-guide-confirm-dialog-82a9c46f"),
         commit,
         None,
     )

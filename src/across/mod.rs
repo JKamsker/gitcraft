@@ -2,6 +2,8 @@
 //! WSL, over SSH). The window's parts that show it are in [`crate::app`].
 
 pub mod discover;
+mod display;
+pub use display::display_error;
 pub mod my_work;
 pub mod runner;
 pub mod workspaces;
@@ -119,6 +121,19 @@ pub fn short_reason(err: &str) -> &'static str {
     } else {
         "failed"
     }
+}
+
+/// Compact reason for painting; `short_reason` remains the stable classifier.
+pub fn display_reason(err: &str) -> &'static str {
+    crate::i18n::text(match short_reason(err) {
+        "needs a sign-in" => "interaction-workspace-reason-signin",
+        "timed out" => "interaction-workspace-reason-timeout",
+        "still busy" => "interaction-workspace-reason-busy",
+        "folder not found" => "interaction-workspace-reason-folder",
+        "not a repository" => "interaction-workspace-reason-repository",
+        "can't connect" => "interaction-workspace-reason-connection",
+        _ => "interaction-workspace-reason-failed",
+    })
 }
 
 #[cfg(test)]

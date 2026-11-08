@@ -87,11 +87,16 @@ pub(crate) fn menu_items(ui: &mut Ui, placement: Placement, scope: Scope, acts: 
     let scope = filled(scope, &published.defaults);
     for offered in here {
         let tip = match offered.source {
-            Source::Global => "Custom command (Settings)",
-            Source::Repository => "Custom command of this repository",
+            Source::Global => {
+                crate::i18n::text("repo-workflows-custom_commands-menu-items-8f4e08cd")
+            }
+            Source::Repository => {
+                crate::i18n::text("repo-workflows-custom_commands-menu-items-cb87a7d9")
+            }
         };
-        if ui
-            .button(offered.command.entry_label())
+        if crate::menu_item::MenuItem::new(offered.command.entry_label())
+            .icon("command")
+            .show(ui)
             .on_hover_text(tip)
             .clicked()
         {
@@ -99,13 +104,16 @@ pub(crate) fn menu_items(ui: &mut Ui, placement: Placement, scope: Scope, acts: 
         }
     }
     if published.review
-        && ui
-            .button("Review repository commands…")
-            .on_hover_text(format!(
-                "{} has commands not trusted yet (or can't be read): see them first",
-                cc::REPO_FILE
-            ))
-            .clicked()
+        && crate::menu_item::MenuItem::new(crate::i18n::text(
+            "repo-workflows-custom_commands-menu-items-b8af1810",
+        ))
+        .icon("eye")
+        .show(ui)
+        .on_hover_text(crate::i18n::message(
+            "repo-workflows-custom_commands-menu-items-7bbc1546",
+            &[("cc-repo-file-1", (cc::REPO_FILE).into())],
+        ))
+        .clicked()
     {
         acts.push(Action::Custom(CustomAct::Review));
     }
@@ -238,8 +246,12 @@ impl RepoTab {
             .filter(|o| o.command.placement == Placement::Palette)
             .map(|o| {
                 let hint = match o.source {
-                    Source::Global => "custom command",
-                    Source::Repository => "repository command",
+                    Source::Global => crate::i18n::text(
+                        "repo-workflows-custom_commands-custom-palette-items-cd972ec3",
+                    ),
+                    Source::Repository => crate::i18n::text(
+                        "repo-workflows-custom_commands-custom-palette-items-0841b1ff",
+                    ),
                 };
                 (
                     o.command.entry_label(),
@@ -250,7 +262,8 @@ impl RepoTab {
             .collect();
         if published.review {
             items.push((
-                "Review repository commands…".to_owned(),
+                crate::i18n::text("repo-workflows-custom_commands-custom-palette-items-b8af1810")
+                    .to_owned(),
                 cc::REPO_FILE.to_owned(),
                 Action::Custom(CustomAct::Review),
             ));
@@ -303,13 +316,16 @@ impl RepoTab {
                     &digest,
                 );
                 settings.set(ctx);
-                self.finished.push((
-                    format!(
-                        "{}: {commands} repository command(s) now offered",
-                        self.name
+                self.finished.push(crate::repo::Notice::plain((
+                    crate::i18n::message(
+                        "repo-workflows-custom_commands-custom-act-5bd548f5",
+                        &[
+                            ("self-name-1", (self.name).clone().into()),
+                            ("commands", (commands).into()),
+                        ],
                     ),
                     false,
-                ));
+                )));
             }
             CustomAct::FileRead(number, read) => {
                 if number > self.custom.read {
@@ -342,18 +358,21 @@ impl RepoTab {
                 .as_ref()
                 .is_some_and(|f| f.commands.is_err());
             let text = if broken {
-                format!(
-                    "{}: {} can't be used. Review repository commands… says why",
-                    self.name,
-                    cc::REPO_FILE
+                crate::i18n::message(
+                    "repo-workflows-custom_commands-custom-file-read-cbe7f164",
+                    &[
+                        ("self-name-1", (self.name).clone().into()),
+                        ("cc-repo-file-2", (cc::REPO_FILE).into()),
+                    ],
                 )
             } else {
-                format!(
-                    "{} has its own custom commands: review them (palette or a menu) to use them",
-                    self.name
+                crate::i18n::message(
+                    "repo-workflows-custom_commands-custom-file-read-4533a718",
+                    &[("self-name-1", (self.name).clone().into())],
                 )
             };
-            self.finished.push((text, broken));
+            self.finished
+                .push(crate::repo::Notice::plain((text, broken)));
         }
         self.custom.announced = pending;
     }
@@ -375,13 +394,28 @@ impl RepoTab {
 /// file that is a link or too large reads as none (it is checked there, in one round trip).
 fn read_file(repo: &std::path::Path) -> Result<Option<String>, String> {
     let max = cc::REPO_FILE_MAX as u64;
-    let cant = |e: &dyn std::fmt::Display| format!("{} can't be read: {e}", cc::REPO_FILE);
+    let cant = |e: &dyn std::fmt::Display| {
+        crate::i18n::message(
+            "repo-workflows-custom_commands-read-file-851cebee",
+            &[
+                ("cc-repo-file-1", (cc::REPO_FILE).into()),
+                ("e", (e).to_string().into()),
+            ],
+        )
+    };
     let bytes = match crate::remote::read_within(repo, cc::REPO_FILE, max) {
         Some(read) => read.map_err(|e| cant(&e))?,
         None => read_here(&repo.join(cc::REPO_FILE), max).map_err(|e| cant(&e))?,
     };
     bytes
-        .map(|b| String::from_utf8(b).map_err(|_| format!("{} isn't UTF-8 text", cc::REPO_FILE)))
+        .map(|b| {
+            String::from_utf8(b).map_err(|_| {
+                crate::i18n::message(
+                    "repo-workflows-custom_commands-read-file-55a45ca4",
+                    &[("cc-repo-file-1", (cc::REPO_FILE).into())],
+                )
+            })
+        })
         .transpose()
 }
 
@@ -394,15 +428,19 @@ fn read_here(path: &std::path::Path, max: u64) -> std::io::Result<Option<Vec<u8>
         Err(e) => return Err(e),
     };
     if meta.file_type().is_symlink() {
-        return Err(Error::other("it is a symbolic link"));
+        return Err(Error::other(crate::i18n::text(
+            "repo-workflows-custom_commands-read-here-f4fd09c1",
+        )));
     }
     if !meta.is_file() {
-        return Err(Error::other("it isn't a file"));
+        return Err(Error::other(crate::i18n::text(
+            "repo-workflows-custom_commands-read-here-50cdcf6c",
+        )));
     }
     if meta.len() > max {
-        return Err(Error::other(format!(
-            "it is larger than {} KiB",
-            max / 1024
+        return Err(Error::other(crate::i18n::message(
+            "repo-workflows-custom_commands-read-here-28b7ef24",
+            &[("max-1024-1", (max / 1024).into())],
         )));
     }
     std::fs::read(path).map(Some)

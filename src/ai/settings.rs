@@ -29,22 +29,22 @@ impl AiTool {
     /// How it is offered in a list.
     pub fn label(self) -> &'static str {
         match self {
-            AiTool::Off => "Off",
+            AiTool::Off => crate::i18n::text("interaction-tools-off"),
             AiTool::Claude => "Claude Code (claude -p)",
             AiTool::Codex => "Codex (codex exec)",
             AiTool::Copilot => "GitHub Copilot (gh copilot)",
-            AiTool::Custom => "Custom command",
+            AiTool::Custom => crate::i18n::text("interaction-tools-custom"),
         }
     }
 
     /// How a message names it: "Writing a message with claude…".
     pub fn short(self) -> &'static str {
         match self {
-            AiTool::Off => "no tool",
+            AiTool::Off => crate::i18n::text("interaction-tools-no-tool"),
             AiTool::Claude => "claude",
             AiTool::Codex => "codex",
             AiTool::Copilot => "gh copilot",
-            AiTool::Custom => "your command",
+            AiTool::Custom => crate::i18n::text("interaction-tools-your-command"),
         }
     }
 }

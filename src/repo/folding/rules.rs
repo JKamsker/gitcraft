@@ -52,11 +52,11 @@ impl FoldReason {
     /// The word that ends the folded line: _+12 −3, lockfile_.
     pub(in crate::repo) fn label(self) -> &'static str {
         match self {
-            FoldReason::Generated => "generated",
-            FoldReason::NoDiff => "marked -diff",
-            FoldReason::Lockfile => "lockfile",
-            FoldReason::Minified => "minified",
-            FoldReason::Pattern => "matches a pattern of Settings → Git → Diffs",
+            FoldReason::Generated => crate::i18n::text("repo-core-2577"),
+            FoldReason::NoDiff => crate::i18n::text("repo-core-2578"),
+            FoldReason::Lockfile => crate::i18n::text("repo-core-2546"),
+            FoldReason::Minified => crate::i18n::text("repo-core-2579"),
+            FoldReason::Pattern => crate::i18n::text("repo-core-2580"),
         }
     }
 }

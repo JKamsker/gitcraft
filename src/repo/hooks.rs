@@ -84,14 +84,13 @@ fn subcommand_at(step: &[String]) -> Option<usize> {
 
 /// The Push button's right-click menu: push once without the `pre-push` hook.
 pub(super) fn push_menu(push: &Response, acts: &mut Vec<Action>) {
-    egui::Popup::context_menu(push)
+    crate::menu_item::context(push)
         .style(crate::theme::menu_style)
         .show(|ui: &mut Ui| {
-            if ui
-                .button("Push, skipping hooks")
-                .on_hover_text(
-                    "Pushes once without running the pre-push hook (git push --no-verify)",
-                )
+            if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-0036"))
+                .icon("arrow-up-from-line")
+                .show(ui)
+                .on_hover_text(crate::i18n::text("repo-core-2801"))
                 .clicked()
             {
                 acts.push(Action::PushSkippingHooks);
@@ -263,7 +262,11 @@ mod tests {
         fn run(tab: &mut RepoTab, ctx: &egui::Context, act: Action) -> String {
             tab.apply(act, ctx);
             wait(tab, ctx, |t| t.busy_op.is_none() && !t.loading);
-            tab.status.clone().map(|(s, _)| s).unwrap_or_default()
+            tab.status
+                .as_deref()
+                .cloned()
+                .map(|(s, _)| s)
+                .unwrap_or_default()
         }
 
         #[test]
@@ -329,7 +332,7 @@ mod tests {
         }
 
         #[test]
-        fn a_failing_pre_push_hook_is_named_and_skip_hooks_pushes_once() {
+        fn a_failing_pre_push_hook_is_named_and_skip_hooks_pushes_once() -> Result<(), String> {
             let dir = repo("push");
             let remote =
                 dir.with_file_name(format!("gitcraft-hooks remote-{}.git", std::process::id()));
@@ -342,22 +345,72 @@ mod tests {
             failing_hook(&dir, "pre-push", "tests failed");
             let ctx = egui::Context::default();
             let mut tab = opened(&dir, &ctx);
-            let failed = run(&mut tab, &ctx, Action::Push);
+            tab.apply(Action::Push, &ctx);
+            let before = git::resolve(&remote, "refs/heads/main");
+            crate::repo::push_preflight::test_support::approve(&mut tab, &ctx)?;
+            wait(&mut tab, &ctx, |t| t.busy_op.is_none() && !t.loading);
+            let failed = tab
+                .status
+                .as_deref()
+                .cloned()
+                .map(|(s, _)| s)
+                .unwrap_or_default();
             let not_pushed = git::resolve(&remote, "refs/heads/main");
-            let skipped = run(&mut tab, &ctx, Action::PushSkippingHooks);
+            assert_eq!(not_pushed, before);
+            tab.apply(Action::PushSkippingHooks, &ctx);
+            crate::repo::push_preflight::test_support::approve(&mut tab, &ctx)?;
+            wait(&mut tab, &ctx, |t| t.busy_op.is_none() && !t.loading);
+            let skipped = tab
+                .status
+                .as_deref()
+                .cloned()
+                .map(|(s, _)| s)
+                .unwrap_or_default();
             let pushed = git::resolve(&remote, "refs/heads/main");
             let head = git::head(&dir);
             let ticked = tab.skip_hooks.push;
+            git_ok(
+                &dir,
+                &[
+                    "commit",
+                    "-q",
+                    "--allow-empty",
+                    "-m",
+                    "next push runs hooks",
+                ],
+            );
+            tab.reload(&ctx);
+            wait(&mut tab, &ctx, |t| !t.loading);
+            tab.apply(Action::Push, &ctx);
+            crate::repo::push_preflight::test_support::approve(&mut tab, &ctx)?;
+            wait(&mut tab, &ctx, |t| t.busy_op.is_none() && !t.loading);
+            let again = tab
+                .status
+                .as_deref()
+                .cloned()
+                .map(|(s, _)| s)
+                .unwrap_or_default();
+            assert!(again.contains("pre-push hook stopped it"), "{again}");
+            assert_eq!(git::resolve(&remote, "refs/heads/main"), pushed);
             let _ = std::fs::remove_dir_all(&dir);
             let _ = std::fs::remove_dir_all(&remote);
             assert!(
-                failed.contains("the pre-push hook stopped it (exit code 3)\ntests failed"),
+                failed.contains("the pre-push hook stopped it (exit code 3)\nHook output withheld"),
                 "{failed}"
+            );
+            assert!(
+                !failed.contains("tests failed"),
+                "hook output must remain private: {failed}"
+            );
+            assert!(
+                again.contains("exit code 3") && !again.contains("tests failed"),
+                "{again}"
             );
             assert_ne!(not_pushed.as_deref(), Ok(head.as_str()));
             assert_eq!(skipped, "Push: done");
             assert_eq!(pushed, Ok(head));
             assert!(!ticked);
+            Ok(())
         }
     }
 }

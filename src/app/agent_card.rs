@@ -20,7 +20,15 @@ impl App {
     /// Hands the requests that came in to the tabs of their repositories, or answers them.
     pub(super) fn agent_requests(&mut self, ctx: &egui::Context) {
         for incoming in crate::instance::take_agent_calls() {
-            route(self.settings.agent_writes, &mut self.tabs, incoming, ctx);
+            if let Some(window) = self.windows.parked.values_mut().find(|w| {
+                w.tabs
+                    .iter()
+                    .any(|t| matches!(t, Tab::Repo(r) if r.path.to_string_lossy() == incoming.repo))
+            }) {
+                route(self.settings.agent_writes, &mut window.tabs, incoming, ctx);
+            } else {
+                route(self.settings.agent_writes, &mut self.tabs, incoming, ctx);
+            }
         }
     }
 
@@ -99,23 +107,72 @@ fn card_ui(ui: &mut Ui, t: &Tokens, card: &CardView, name: &str, path: &str) -> 
         ui.add(icons::image("bot", 16.0, t.accent));
         // As the agent names itself: plain text, not styled as anything verified.
         ui.label(
-            RichText::new(format!("{} wants to:", card.agent))
-                .color(t.text)
-                .font(theme::medium(13.0)),
+            RichText::new(crate::i18n::message(
+                "interaction-dialogs-agent",
+                &[("agent", card.agent.as_str().into())],
+            ))
+            .color(t.text)
+            .font(theme::medium(13.0)),
         );
     });
     ui.add_space(4.0);
     ui.label(RichText::new(&card.ask.title).font(theme::semibold(15.0)));
     ui.label(
-        RichText::new(format!("In {name}"))
-            .color(t.text_faint)
-            .small(),
+        RichText::new(crate::i18n::message(
+            "interaction-dialogs-repo",
+            &[("repository", name.into())],
+        ))
+        .color(t.text_faint)
+        .small(),
     )
     .on_hover_text(path);
     ui.add_space(8.0);
     ui.add(egui::Label::new(&card.ask.body).wrap());
     ui.add_space(8.0);
-    ui.label(RichText::new("Commands:").color(t.text_dim).small());
+    if let Some(preview) = &card.preview {
+        egui::CollapsingHeader::new(crate::i18n::text("interaction-dialogs-ghost"))
+            .id_salt("approval-ghost-header")
+            .default_open(true)
+            .show(ui, |ui| {
+                egui::ScrollArea::vertical()
+                    .id_salt("approval-ghost")
+                    .max_height(170.0)
+                    .show(ui, |ui| {
+                        for (name, from, to) in &preview.moves {
+                            ui.label(RichText::new(name).strong());
+                            ui.horizontal_wrapped(|ui| {
+                                ui.colored_label(
+                                    t.text_dim,
+                                    format!("○ {}", crate::repo::short(from)),
+                                );
+                                ui.colored_label(t.accent, "→");
+                                ui.colored_label(
+                                    t.accent.gamma_multiply(0.75),
+                                    format!("◌ {}", crate::repo::short(to)),
+                                )
+                                .on_hover_text(format!("{from} → {to}"));
+                            });
+                        }
+                        for commit in &preview.leaving {
+                            ui.colored_label(
+                                t.warning,
+                                crate::i18n::message(
+                                    "interaction-dialogs-leaving",
+                                    &[("commit", commit.as_str().into())],
+                                ),
+                            );
+                        }
+                        for note in &preview.notes {
+                            ui.label(note);
+                        }
+                    });
+            });
+    }
+    ui.label(
+        RichText::new(crate::i18n::text("interaction-dialogs-commands"))
+            .color(t.text_dim)
+            .small(),
+    );
     egui::Frame::new()
         .fill(t.field)
         .corner_radius(t.radius_sm)
@@ -130,9 +187,9 @@ fn card_ui(ui: &mut Ui, t: &Tokens, card: &CardView, name: &str, path: &str) -> 
     let undo_color = if card.undoable { t.text_dim } else { t.warning };
     ui.add(egui::Label::new(RichText::new(&card.ask.undo_note).color(undo_color).small()).wrap());
     ui.label(
-        RichText::new(format!(
-            "Denied automatically in {} if you don't answer. Esc denies.",
-            countdown(card.left)
+        RichText::new(crate::i18n::message(
+            "interaction-dialogs-denied",
+            &[("remaining", countdown(card.left).into())],
         ))
         .color(t.text_faint)
         .small(),
@@ -147,7 +204,7 @@ fn card_ui(ui: &mut Ui, t: &Tokens, card: &CardView, name: &str, path: &str) -> 
         // Red only for what can't be undone.
         let fill = if card.undoable { t.accent } else { t.danger };
         let approve = egui::Button::new(
-            RichText::new("Approve")
+            RichText::new(crate::i18n::text("interaction-dialogs-approve"))
                 .color(egui::Color32::WHITE)
                 .font(theme::medium(12.5)),
         )
@@ -156,7 +213,10 @@ fn card_ui(ui: &mut Ui, t: &Tokens, card: &CardView, name: &str, path: &str) -> 
         if ui.add_enabled(armed, approve).clicked() {
             answer = Some(Answer::Approve);
         }
-        let deny = ui.add(egui::Button::new("Deny").min_size(egui::vec2(80.0, 30.0)));
+        let deny = ui.add(
+            egui::Button::new(crate::i18n::text("interaction-dialogs-deny"))
+                .min_size(egui::vec2(80.0, 30.0)),
+        );
         if deny.clicked() || ui.input(|i| i.key_pressed(egui::Key::Escape)) {
             answer = Some(Answer::Deny);
         }
@@ -169,6 +229,52 @@ mod tests {
     use super::*;
     use crate::mcp::wire::WriteOp;
     use crate::repo::RepoTab;
+
+    #[test]
+    fn actual_agent_card_translates_decision_and_retains_opaque_request_and_commands() {
+        use egui_kittest::{Harness, kittest::Queryable};
+        crate::i18n::set_language("de");
+        let card = CardView {
+            agent: "Agent 日本語".into(),
+            preview: None,
+            ask: crate::repo::agent::plan::Ask::opaque(
+                "user supplied title",
+                "user supplied body",
+                "opaque undo policy",
+            ),
+            commands: vec!["git push --force-with-lease origin main".into()],
+            undoable: false,
+            left: std::time::Duration::from_secs(65),
+            shown_for: std::time::Duration::from_secs(1),
+        };
+        let fonts = std::cell::Cell::new(false);
+        let mut h = Harness::new_ui_state(
+            move |ui, decided: &mut Option<bool>| {
+                if !fonts.replace(true) {
+                    crate::theme::install_fonts(ui.ctx());
+                    return;
+                }
+                let t = Tokens::get(ui.ctx());
+                if let Some(answer) = card_ui(ui, &t, &card, "repo 日本語", "/opaque/path") {
+                    *decided = Some(matches!(answer, Answer::Approve));
+                }
+            },
+            None,
+        );
+        h.run();
+        h.get_by_label("Agent 日本語 möchte Folgendes tun:");
+        h.get_by_label("git push --force-with-lease origin main");
+        h.get_by_label(
+            "Ohne Antwort wird die Anfrage in 1:05 automatisch abgelehnt. Esc lehnt ab.",
+        );
+        h.get_by_label("Ablehnen").click();
+        h.run();
+        assert_eq!(*h.state(), Some(false));
+        h.get_by_label("Genehmigen").click();
+        h.run();
+        assert_eq!(*h.state(), Some(true));
+        crate::i18n::set_language("en-US");
+    }
 
     /// What the window answers at once for a request about `repo`.
     fn routed(writes: bool, tabs: &mut [Tab], repo: &str) -> Option<Reply> {

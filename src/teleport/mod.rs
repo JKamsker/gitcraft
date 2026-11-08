@@ -13,6 +13,7 @@
 //! temporary ref and index here, the bundle and a half-made worktree there) is removed again,
 //! also when it fails.
 
+pub(crate) mod display;
 mod files;
 mod land;
 mod protocol;
@@ -188,6 +189,7 @@ pub enum Step {
 
 impl Step {
     /// What the dialog says meanwhile.
+    #[cfg(test)]
     pub fn label(self) -> String {
         match self {
             Step::Checking => "Checking both machines…".to_owned(),

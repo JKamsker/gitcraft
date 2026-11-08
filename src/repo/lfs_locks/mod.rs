@@ -28,6 +28,7 @@ pub(in crate::repo) struct LockState {
     read_ok: bool,
     /// Why the last read failed.
     error: Option<String>,
+    read_error: Option<ReadError>,
     /// The server has said it has no locks API: it isn't asked again in the background.
     unsupported: bool,
     /// A read is on its way: it was asked for when.
@@ -163,13 +164,27 @@ impl LockState {
 /// "Locked by Ana 2 days ago", "Locked by you just now".
 pub(in crate::repo) fn lock_label(lock: &LfsLock, now: i64) -> String {
     let who = match lock.ours {
-        Some(true) => "you",
-        _ if lock.owner.is_empty() => "someone",
+        Some(true) => crate::i18n::text("repo-workflows-lfs_locks-lock-label-bb0347a4"),
+        _ if lock.owner.is_empty() => {
+            crate::i18n::text("repo-workflows-lfs_locks-lock-label-2a59d59e")
+        }
         _ => lock.owner.as_str(),
     };
     match lock.locked_at {
-        Some(at) => format!("Locked by {who} {}", git::relative_time(at, now)),
-        None => format!("Locked by {who}"),
+        Some(at) => crate::i18n::message(
+            "repo-workflows-lfs_locks-lock-label-398e9b81",
+            &[
+                ("who", (who).into()),
+                (
+                    "git-relative-time-at-now-1",
+                    (git::relative_time(at, now)).clone().into(),
+                ),
+            ],
+        ),
+        None => crate::i18n::message(
+            "repo-workflows-lfs_locks-lock-label-6329feb6",
+            &[("who", (who).into())],
+        ),
     }
 }
 
@@ -280,5 +295,99 @@ impl RepoTab {
                 tab.read_locks(git::Asked::Background, ctx);
             },
         );
+    }
+}
+
+#[cfg(test)]
+mod fluent_identity_tests {
+    use super::*;
+    #[test]
+    fn fluent_partition_lfs_lock_display_preserves_raw_push_classification() {
+        let lock = LfsLock {
+            id: "server-id".into(),
+            path: "Art/My File.psd".into(),
+            owner: "Opaque Owner".into(),
+            locked_at: None,
+            ours: None,
+        };
+        for (language, displayed) in [
+            ("en-US", "Locked by Opaque Owner"),
+            ("de", "Von Opaque Owner gesperrt"),
+        ] {
+            crate::i18n::set_language(language);
+            assert_eq!(lock_label(&lock, 0), displayed);
+            let rendered = crate::repo::messages::display_operation("Push topic to origin");
+            assert_eq!(
+                rendered,
+                if language == "de" {
+                    "topic nach origin pushen"
+                } else {
+                    "Push topic to origin"
+                }
+            );
+            assert_eq!(
+                crate::repo::messages::display_operation("opaque external operation"),
+                "opaque external operation"
+            );
+            assert!(pushes_current("Push topic to origin", Some("topic")));
+            assert!(!pushes_current("Push tag v1 to origin", Some("topic")));
+            assert!(!pushes_current(
+                "external arbitrary operation",
+                Some("topic")
+            ));
+            assert_eq!(lock.id, "server-id");
+            assert_eq!(lock.path, "Art/My File.psd");
+        }
+        crate::i18n::set_language("en-US");
+    }
+}
+
+#[derive(Clone)]
+struct ReadError {
+    raw: String,
+    detail: String,
+}
+impl LockState {
+    fn remember_read_error(&mut self, detail: String) {
+        let e = &detail;
+        let raw = format!("Could not read the LFS locks: {e}");
+        self.error = Some(raw.clone());
+        self.read_error = Some(ReadError { raw, detail });
+    }
+    fn display_read_error(&self, raw: &str) -> String {
+        match &self.read_error {
+            Some(receipt) if receipt.raw == raw => crate::i18n::message(
+                "repo-workflows-lfs_locks-locks-read-05347473",
+                &[("e", receipt.detail.as_str().into())],
+            ),
+            _ => raw.to_owned(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod fluent_r1_read_tests {
+    use super::*;
+    #[test]
+    fn fluent_partition_r1_lfs_locks_cached_read_error_preserves_raw_detail_and_generation()
+    -> Result<(), String> {
+        let detail = "provider; ;\nHistory worker stopped: {$x} 日本語";
+        crate::i18n::set_language("de");
+        let mut state = LockState::default();
+        state.remember_read_error(detail.into());
+        let raw = state.error.clone().ok_or("missing test value")?;
+        for lang in ["de", "en-US", "de"] {
+            crate::i18n::set_language(lang);
+            let shown = state.display_read_error(&raw);
+            assert!(shown.contains(detail));
+            assert_eq!(shown == raw, lang == "en-US");
+            assert_eq!(state.error.as_ref(), Some(&raw));
+        }
+        state.read_error = None;
+        crate::i18n::set_language("de");
+        assert_eq!(state.display_read_error(&raw), raw);
+        crate::i18n::set_language("en-US");
+
+        Ok(())
     }
 }

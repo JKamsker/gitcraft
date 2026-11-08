@@ -29,13 +29,16 @@ impl RepoTab {
                             .font(theme::medium(12.0)),
                     );
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if ui.button("Clear").clicked() {
+                        if ui.button(crate::i18n::text("repo-core-1149")).clicked() {
                             acts.push(Action::ClearStashPicks);
                         }
                         let stash = ui
-                            .add_enabled(idle, egui::Button::new("Stash…"))
-                            .on_hover_text("Stash only the files picked")
-                            .on_disabled_hover_text("Wait for the current operation to finish");
+                            .add_enabled(
+                                idle,
+                                egui::Button::new(crate::i18n::text("repo-core-1150")),
+                            )
+                            .on_hover_text(crate::i18n::text("repo-core-1151"))
+                            .on_disabled_hover_text(crate::i18n::text("repo-core-1152"));
                         if stash.clicked() {
                             acts.push(Action::Dialog(Dialog::stash_files(
                                 picked.iter().cloned().collect(),
@@ -49,7 +52,7 @@ impl RepoTab {
 
 /// `3 files picked to stash`.
 fn picked_label(n: usize) -> String {
-    format!("{n} file{} picked to stash", if n == 1 { "" } else { "s" })
+    crate::i18n::message("repo-core-1153", &[("n", (n).into())])
 }
 
 /// The stash entries of the menu of the working-tree file `path`.
@@ -72,29 +75,47 @@ pub(super) fn stash_menu_items(
 ) {
     if let Some(why) = problem {
         let why = crate::repo::dialogs::sentence(why);
-        ui.add_enabled(false, egui::Button::new("Stash this file…"))
+        crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-1154"))
+            .icon("archive")
+            .refused(Some(&why))
+            .show(ui)
             .on_disabled_hover_text(why);
         return;
     }
     let is_picked = picked.contains(path);
     if is_picked && picked.len() > 1 {
-        if ui
-            .button(format!("Stash the {} picked files…", picked.len()))
-            .clicked()
+        if crate::menu_item::MenuItem::new(crate::i18n::message(
+            "repo-core-1155",
+            &[("count", (picked.len()).into())],
+        ))
+        .icon("archive")
+        .show(ui)
+        .clicked()
         {
             acts.push(Action::Dialog(Dialog::stash_files(
                 picked.iter().cloned().collect(),
             )));
         }
-    } else if ui.button("Stash this file…").clicked() {
+    } else if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-1154"))
+        .icon("archive")
+        .show(ui)
+        .clicked()
+    {
         acts.push(Action::Dialog(Dialog::stash_files(vec![path.to_owned()])));
     }
     let pick = if is_picked {
-        "Unpick (don't stash it)".to_owned()
+        crate::i18n::text("repo-core-1156").to_owned()
     } else {
-        format!("Pick to stash ({}+click)", crate::manual::command())
+        crate::i18n::message(
+            "repo-core-1157",
+            &[("command", crate::manual::command().to_string().into())],
+        )
     };
-    if ui.button(pick).clicked() {
+    if crate::menu_item::MenuItem::new(pick)
+        .icon("command")
+        .show(ui)
+        .clicked()
+    {
         acts.push(Action::PickToStash(path.to_owned()));
     }
 }

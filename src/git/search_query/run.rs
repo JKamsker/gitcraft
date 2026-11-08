@@ -89,9 +89,12 @@ fn failed(e: String) -> String {
     let e = e.trim();
     let e = e.strip_prefix("fatal: ").unwrap_or(e);
     if e.is_empty() {
-        "git could not search".to_owned()
+        crate::i18n::text("backend-git-could-not-search-e8a455").to_owned()
     } else {
-        format!("git could not search: {e}")
+        crate::i18n::message(
+            "backend-git-could-not-search-e-88585b",
+            &[("detail", (e).to_string().into())],
+        )
     }
 }
 

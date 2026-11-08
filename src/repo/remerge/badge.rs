@@ -29,9 +29,12 @@ impl RowBadge {
     /// The words on it, the full ones first, then the short ones for a narrow row.
     fn labels(self) -> [&'static str; 2] {
         match (self.conflicts > 0, self.edits > 0) {
-            (true, true) => ["resolved + edited", "resolved +"],
-            (true, false) => ["resolved"; 2],
-            _ => ["edited"; 2],
+            (true, true) => [
+                crate::i18n::text("repo-workflows-remerge-labels-2a19abbf"),
+                crate::i18n::text("repo-workflows-remerge-labels-25495f2e"),
+            ],
+            (true, false) => [crate::i18n::text("repo-workflows-remerge-labels-dc676b42"); 2],
+            _ => [crate::i18n::text("repo-workflows-remerge-labels-1fb9f409"); 2],
         }
     }
 
@@ -46,21 +49,22 @@ impl RowBadge {
 
     /// What hovering it says.
     pub(in crate::repo) fn tooltip(self) -> String {
-        let files = |n: usize| format!("{n} file{}", if n == 1 { "" } else { "s" });
         let mut parts = Vec::new();
         if self.conflicts > 0 {
-            parts.push(format!("conflicts resolved in {}", files(self.conflicts)));
-        }
-        if self.edits > 0 {
-            parts.push(format!(
-                "{} changed beyond that (by hand, or a merge made with other options)",
-                files(self.edits)
+            parts.push(crate::i18n::message(
+                "repo-workflows-remerge-conflicts",
+                &[("count", (self.conflicts).into())],
             ));
         }
-        format!(
-            "This merge differs from the one git makes of its parents: {}.\nClick to see what \
-             it resolved.",
-            parts.join("; ")
+        if self.edits > 0 {
+            parts.push(crate::i18n::message(
+                "repo-workflows-remerge-edits",
+                &[("count", (self.edits).into())],
+            ));
+        }
+        crate::i18n::message(
+            "repo-workflows-remerge-tooltip-01dbfcf2",
+            &[("parts-join-1", (parts.join("; ")).clone().into())],
         )
     }
 }
@@ -107,9 +111,7 @@ impl RepoTab {
             .interact(rect, ui.id().with(("remerge-badge", hash)), Sense::click())
             .on_hover_text(badge.tooltip());
         // Read out by screen readers (it is only painted).
-        resp.widget_info(|| {
-            egui::WidgetInfo::labeled(egui::WidgetType::Button, true, badge.tooltip())
-        });
+        crate::a11y::a11y(&resp, egui::WidgetType::Button, || badge.tooltip());
         // Not the warning colour: search matches are marked with that.
         let color = t.accent;
         let fill = if resp.hovered() { 0.30 } else { 0.18 };
@@ -118,6 +120,33 @@ impl RepoTab {
         if resp.clicked() {
             acts.push(Action::Select(i));
             acts.push(Action::ShowRemerge(true));
+        }
+    }
+}
+
+#[cfg(test)]
+mod fluent_badge_tests {
+    use super::*;
+    #[test]
+    fn fluent_partition_remerge_badge_uses_whole_plural_numeric_tooltip() {
+        for (lang, expected) in [("en-US", "1,234 files"), ("de", "1.234 Dateien")] {
+            crate::i18n::set_language(lang);
+            let badge = RowBadge {
+                conflicts: 1234,
+                edits: 1,
+            };
+            let tooltip = badge.tooltip();
+            assert!(tooltip.contains(expected), "{tooltip}");
+            assert!(tooltip.contains(if lang == "de" { "eine Datei" } else { "1 file" }));
+            assert_eq!(
+                badge.labels()[0],
+                if lang == "de" {
+                    "aufgelöst + bearbeitet"
+                } else {
+                    "resolved + edited"
+                }
+            );
+            assert_eq!((badge.conflicts, badge.edits), (1234, 1));
         }
     }
 }

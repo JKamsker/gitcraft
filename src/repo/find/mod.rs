@@ -7,6 +7,7 @@ mod keys;
 mod marks;
 mod matcher;
 mod order;
+pub(in crate::repo) mod rendered;
 mod scan;
 mod sources;
 #[cfg(test)]
@@ -46,6 +47,7 @@ impl Seen {
 /// The find bar of a repository's tab and its search.
 #[derive(Default)]
 pub(crate) struct Find {
+    rendered_document: Option<(String, rendered::Document)>,
     pub(crate) open: bool,
     /// Give the text field the keyboard on the next frame.
     pub(crate) focus: bool,
@@ -84,6 +86,7 @@ impl Find {
         self.open = false;
         self.focus = false;
         self.drop_results();
+        self.rendered_document = None;
     }
 
     /// Forgets the search: nothing shown has lines to search (an image, a spinner…).
@@ -158,7 +161,7 @@ impl Find {
             self.order_of = Some(of);
         }
         match layout {
-            Layout::Lines => {
+            Layout::Lines | Layout::Rendered(_) => {
                 let new = scan.found.get(self.ordered_lines..).unwrap_or_default();
                 self.order.extend(order::ordered(new, layout));
                 self.ordered_lines = scan.found.len();
@@ -314,15 +317,31 @@ impl Find {
             scan.done(),
             self.current.and_then(|h| self.position_of(&h)),
         ) {
-            (0, true, _) => "no results".to_owned(),
+            (0, true, _) => crate::i18n::text("repo-core-2723").to_owned(),
             (0, false, _) => {
                 let (at, of) = scan.progress();
-                format!("searching… {}%", at * 100 / of.max(1))
+                crate::i18n::message(
+                    "repo-core-4105",
+                    &[("max", format!("{}", at * 100 / of.max(1)).into())],
+                )
             }
-            (_, true, Some(i)) => format!("{} of {n}{more}", i + 1),
-            (_, false, Some(i)) => format!("{} of {n}…", i + 1),
-            (_, true, None) => format!("{n}{more} {}", results(n)),
-            (_, false, None) => format!("{n} {}…", results(n)),
+            (_, true, Some(i)) => crate::i18n::message(
+                "repo-core-4106",
+                &[
+                    ("i", format!("{}", i + 1).into()),
+                    ("n", (n).into()),
+                    ("more", more.to_string().into()),
+                ],
+            ),
+            (_, false, Some(i)) => crate::i18n::message(
+                "repo-core-4107",
+                &[("i", format!("{}", i + 1).into()), ("n", (n).into())],
+            ),
+            (_, true, None) => crate::i18n::message(
+                "repo-core-4108",
+                &[("n", (n).into()), ("more", more.to_string().into())],
+            ),
+            (_, false, None) => crate::i18n::message("repo-core-4109", &[("n", (n).into())]),
         };
         Some((text, false))
     }
@@ -341,11 +360,6 @@ impl Find {
     pub(crate) fn count(&self) -> usize {
         self.order.len()
     }
-}
-
-/// "result" or "results", for `n` of them.
-fn results(n: usize) -> &'static str {
-    if n == 1 { "result" } else { "results" }
 }
 
 /// The columns the first `chars` characters of `text` take: a tab four (as it is drawn).

@@ -32,49 +32,44 @@ pub(super) fn headline(r: &Rejection) -> String {
     }
 }
 
-/// `one` for a single commit, `many` for several.
-fn pick<'a>(n: u32, one: &'a str, many: &'a str) -> &'a str {
-    if n == 1 { one } else { many }
+fn display_headline(r: &Rejection) -> String {
+    crate::i18n::message(
+        "repo-workflows-push-headline",
+        &[
+            (
+                "clear",
+                (if r.shape == Shape::Clear { "yes" } else { "no" }).into(),
+            ),
+            ("remote", (r.target.label()).into()),
+            ("count", (r.behind).into()),
+        ],
+    )
 }
 
+/// `one` for a single commit, `many` for several.
 /// How the branch stands, after the headline.
 pub(super) fn explanation(r: &Rejection) -> String {
-    let (remote, branch) = (r.target.label(), &r.branch);
-    let moved = if r.moved {
-        format!("{remote} changed again since it was last checked, so nothing was overwritten. ")
-    } else {
-        String::new()
-    };
-    let n = r.behind;
-    let rest = match r.shape {
-        Shape::Clear => "It may have been pushed from elsewhere meanwhile.".to_owned(),
-        Shape::Behind => format!(
-            "Your {branch} is only behind it, with nothing of its own to push: pull to catch up."
-        ),
-        Shape::Diverged => format!(
-            "Your {branch} has {} that {remote} doesn't have: both moved on. Pull, then push \
-             joins them; a force push replaces what is on {remote}.",
-            commits(r.ahead)
-        ),
-        Shape::Rewritten if r.ahead == 0 => format!(
-            "Your {branch} was moved back here (a commit undone, a reset) after {} pushed. \
-             Pulling would bring {} back; a force push removes {} from {remote}.",
-            pick(n, "it was", "they were"),
-            pick(n, "it", "them"),
-            pick(n, "it", "them"),
-        ),
-        Shape::Rewritten => format!(
-            "Your {branch} was rewritten here (amended or rebased) after {} pushed, and has {} \
-             in {} place. Pulling would bring the old {} back beside the new; a force push \
-             replaces {}.",
-            pick(n, "that commit was", "those commits were"),
-            commits(r.ahead),
-            pick(n, "its", "their"),
-            pick(n, "one", "ones"),
-            pick(n, "it", "them"),
-        ),
-    };
-    format!("{moved}{rest}")
+    crate::i18n::message(
+        "repo-workflows-push-explanation",
+        &[
+            ("moved", (if r.moved { "yes" } else { "no" }).into()),
+            (
+                "shape",
+                (match r.shape {
+                    Shape::Clear => "clear",
+                    Shape::Behind => "behind",
+                    Shape::Diverged => "diverged",
+                    Shape::Rewritten if r.ahead == 0 => "back",
+                    Shape::Rewritten => "rewritten",
+                })
+                .into(),
+            ),
+            ("remote", (r.target.label()).into()),
+            ("branch", (r.branch.as_str()).into()),
+            ("ahead", (r.ahead).into()),
+            ("behind", (r.behind).into()),
+        ],
+    )
 }
 
 /// `abc1234  Fix the parser (Ann)`.
@@ -84,36 +79,29 @@ fn commit_line(c: &RemoteCommit) -> String {
 
 /// The confirmation's words: what the force push removes from the remote, and what guards it.
 pub(super) fn force_body(r: &Rejection) -> String {
-    let (remote, branch) = (r.target.label(), &r.branch);
-    let n = r.behind;
-    let mut body = format!(
-        "Force pushing will replace {remote} with your {branch} ({}). {} on {remote} but not \
-         on your {branch}; {} removed from {remote} (clones that already have {} keep {}):\n",
-        short(&r.local),
-        if n == 1 {
-            "This commit is".to_owned()
-        } else {
-            format!("These {n} commits are")
-        },
-        pick(n, "it will be", "they will be"),
-        pick(n, "it", "them"),
-        pick(n, "it", "them"),
-    );
-    for c in &r.missing {
-        body.push_str(&format!("\n    {}", commit_line(c)));
-    }
-    let listed = r.missing.len() as u32;
-    if n > listed {
-        body.push_str(&format!("\n    and {} more", n - listed));
-    }
     debug_assert!(r.missing.len() <= LISTED);
-    body.push_str(&format!(
-        "\n\nIf {remote} has moved from {} since it was checked, or your {branch} from {}, \
-         nothing is pushed (--force-with-lease).",
-        short(&r.remote),
-        short(&r.local)
-    ));
-    body
+    crate::i18n::message(
+        "repo-workflows-push-force-body",
+        &[
+            ("remote", (r.target.label()).into()),
+            ("branch", (r.branch.as_str()).into()),
+            ("local", (short(&r.local)).into()),
+            ("count", (r.behind).into()),
+            (
+                "commits",
+                (r.missing.iter().map(commit_line).collect::<Vec<_>>().join(
+                    "
+    ",
+                ))
+                .into(),
+            ),
+            (
+                "more",
+                (r.behind.saturating_sub(r.missing.len() as u32)).into(),
+            ),
+            ("remote-commit", (short(&r.remote)).into()),
+        ],
+    )
 }
 
 impl RepoTab {
@@ -152,35 +140,60 @@ impl RepoTab {
                             no_upstream(ui, branch, remotes, idle, acts)
                         }
                         Banner::Gone { branch, target, .. } => {
-                            text(ui, &format!("{} is gone", target.label()), true);
                             text(
                                 ui,
-                                &format!(
-                                    "The branch {branch} pushes to was deleted on {}. Push \
-                                     again to create it there.",
-                                    target.remote
+                                &crate::i18n::message(
+                                    "repo-workflows-push-push-banner-7361cc7b",
+                                    &[("target-label-1", (target.label()).clone().into())],
+                                ),
+                                true,
+                            );
+                            text(
+                                ui,
+                                &crate::i18n::message(
+                                    "repo-workflows-push-push-banner-39525827",
+                                    &[
+                                        ("branch", (branch).clone().into()),
+                                        ("target-remote-1", (target.remote).clone().into()),
+                                    ],
                                 ),
                                 false,
                             );
                             buttons(ui, |ui| {
-                                primary(ui, "Push again", "", idle, || {
-                                    acts.push(Action::PushFlow(PushAct::PushAgain))
-                                });
+                                primary(
+                                    ui,
+                                    crate::i18n::text("repo-workflows-push-push-banner-e2a4155b"),
+                                    "",
+                                    idle,
+                                    || acts.push(Action::PushFlow(PushAct::PushAgain)),
+                                );
                                 dismiss(ui, acts);
                             });
                         }
                         Banner::Detached => {
-                            text(ui, "HEAD is detached: there is no branch to push", true);
                             text(
                                 ui,
-                                "Create a branch here (or check one out), then push it.",
+                                crate::i18n::text("repo-workflows-push-push-banner-e4671d42"),
+                                true,
+                            );
+                            text(
+                                ui,
+                                crate::i18n::text("repo-workflows-push-push-banner-bb23a164"),
                                 false,
                             );
                             buttons(ui, |ui| {
                                 let can = idle && !head.is_empty();
-                                primary(ui, "Create branch…", "", can, || {
-                                    acts.push(Action::Dialog(Dialog::create_branch(&head, "HEAD")))
-                                });
+                                primary(
+                                    ui,
+                                    crate::i18n::text("repo-workflows-push-push-banner-04e6949e"),
+                                    "",
+                                    can,
+                                    || {
+                                        acts.push(Action::Dialog(Dialog::create_branch(
+                                            &head, "HEAD",
+                                        )))
+                                    },
+                                );
                                 dismiss(ui, acts);
                             });
                         }
@@ -192,7 +205,7 @@ impl RepoTab {
 
 fn rejected(ui: &mut Ui, r: &Rejection, idle: bool, acts: &mut Vec<Action>) {
     let t = Tokens::get(ui.ctx());
-    text(ui, &headline(r), true);
+    text(ui, &display_headline(r), true);
     text(ui, &explanation(r), false);
     for c in r.missing.iter().take(IN_BANNER) {
         ui.label(
@@ -204,22 +217,35 @@ fn rejected(ui: &mut Ui, r: &Rejection, idle: bool, acts: &mut Vec<Action>) {
     let named = r.missing.len().min(IN_BANNER) as u32;
     if r.behind > named && named > 0 {
         ui.label(
-            RichText::new(format!("and {} more", r.behind - named))
-                .size(11.5)
-                .color(t.text_faint),
+            RichText::new(crate::i18n::message(
+                "repo-workflows-push-rejected-683768ab",
+                &[("r-behind-named-1", (r.behind - named).into())],
+            ))
+            .size(11.5)
+            .color(t.text_faint),
         );
     }
     let mode = Settings::get(ui.ctx()).pull_mode;
     buttons(ui, |ui| {
         match r.shape {
             Shape::Clear => {
-                primary(ui, "Push again", "", idle, || {
-                    acts.push(Action::PushFlow(PushAct::PushAgain))
-                });
+                primary(
+                    ui,
+                    crate::i18n::text("repo-workflows-push-rejected-e2a4155b"),
+                    "",
+                    idle,
+                    || acts.push(Action::PushFlow(PushAct::PushAgain)),
+                );
             }
             Shape::Behind => {
-                let label = format!("Pull {}", r.target.label());
-                let tip = format!("{}; nothing is pushed", mode.label());
+                let label = crate::i18n::message(
+                    "repo-workflows-push-rejected-ab020f51",
+                    &[("r-target-label-1", (r.target.label()).clone().into())],
+                );
+                let tip = crate::i18n::message(
+                    "repo-workflows-push-rejected-0db0e893",
+                    &[("mode-label-1", (mode.label()).into())],
+                );
                 primary(ui, &label, &tip, idle, || {
                     acts.push(Action::PushFlow(PushAct::Pull))
                 });
@@ -227,8 +253,8 @@ fn rejected(ui: &mut Ui, r: &Rejection, idle: bool, acts: &mut Vec<Action>) {
             Shape::Diverged | Shape::Rewritten => {
                 // After a rewrite, replacing is what is most likely meant; else joining.
                 let rewritten = r.shape == Shape::Rewritten;
-                let force = "Force push (with lease)…";
-                let force_tip = "Asks first, naming the commits it removes";
+                let force = crate::i18n::text("repo-workflows-push-rejected-04b2194e");
+                let force_tip = crate::i18n::text("repo-workflows-push-rejected-2c2c46aa");
                 if rewritten {
                     primary(ui, force, force_tip, idle, || {
                         acts.push(Action::PushFlow(PushAct::ConfirmForce))
@@ -246,8 +272,11 @@ fn rejected(ui: &mut Ui, r: &Rejection, idle: bool, acts: &mut Vec<Action>) {
             }
         }
         if ui
-            .add_enabled(idle, egui::Button::new("Check again"))
-            .on_hover_text("Fetch the remote branch and count again")
+            .add_enabled(
+                idle,
+                egui::Button::new(crate::i18n::text("repo-workflows-push-rejected-fb7099ad")),
+            )
+            .on_hover_text(crate::i18n::text("repo-workflows-push-rejected-9e1d29fb"))
             .clicked()
         {
             acts.push(Action::PushFlow(PushAct::CheckAgain));
@@ -262,23 +291,24 @@ fn pull_buttons(ui: &mut Ui, mode: PullMode, first: bool, idle: bool, acts: &mut
     let ways: Vec<(String, Option<PullMode>, String)> = if mode == PullMode::FastForwardOnly {
         vec![
             (
-                "Merge, then push".to_owned(),
+                crate::i18n::text("repo-workflows-push-pull-buttons-5e584d52").to_owned(),
                 Some(PullMode::Merge),
-                "Pull is set to fast-forward only, which can't join branches that diverged"
-                    .to_owned(),
+                crate::i18n::text("repo-workflows-push-pull-buttons-aca90f08").to_owned(),
             ),
             (
-                "Rebase, then push".to_owned(),
+                crate::i18n::text("repo-workflows-push-pull-buttons-dc0810af").to_owned(),
                 Some(PullMode::Rebase),
-                "Pull is set to fast-forward only, which can't join branches that diverged"
-                    .to_owned(),
+                crate::i18n::text("repo-workflows-push-pull-buttons-aca90f08").to_owned(),
             ),
         ]
     } else {
         vec![(
-            "Pull, then push".to_owned(),
+            crate::i18n::text("repo-workflows-push-pull-buttons-ca69dd73").to_owned(),
             None,
-            format!("{}, then push", mode.label()),
+            crate::i18n::message(
+                "repo-workflows-push-pull-buttons-43992a40",
+                &[("mode-label-1", (mode.label()).into())],
+            ),
         )]
     };
     for (i, (label, way, tip)) in ways.into_iter().enumerate() {
@@ -301,13 +331,15 @@ fn refused(ui: &mut Ui, branch: &str, message: &str, acts: &mut Vec<Action>) {
     let t = Tokens::get(ui.ctx());
     text(
         ui,
-        &format!("The remote refused the push of {branch}"),
+        &crate::i18n::message(
+            "repo-workflows-push-refused-ff02e2eb",
+            &[("branch", (branch).into())],
+        ),
         true,
     );
     text(
         ui,
-        "The remote said no itself (a hook or a branch protection, for example); force pushing \
-         won't get past that. What git said:",
+        crate::i18n::text("repo-workflows-push-refused-d5689de7"),
         false,
     );
     egui::ScrollArea::vertical()
@@ -326,7 +358,9 @@ fn refused(ui: &mut Ui, branch: &str, message: &str, acts: &mut Vec<Action>) {
         });
     let mut copy = false;
     buttons(ui, |ui| {
-        copy = ui.button("Copy message").clicked();
+        copy = ui
+            .button(crate::i18n::text("repo-workflows-push-refused-457efe53"))
+            .clicked();
         dismiss(ui, acts);
     });
     if copy {
@@ -335,10 +369,20 @@ fn refused(ui: &mut Ui, branch: &str, message: &str, acts: &mut Vec<Action>) {
 }
 
 fn no_upstream(ui: &mut Ui, branch: &str, remotes: &[String], idle: bool, acts: &mut Vec<Action>) {
-    text(ui, &format!("{branch} isn't on any remote yet"), true);
     text(
         ui,
-        &format!("Choose a remote to publish it on; {branch} will track it there."),
+        &crate::i18n::message(
+            "repo-workflows-push-no-upstream-9ab92941",
+            &[("branch", (branch).into())],
+        ),
+        true,
+    );
+    text(
+        ui,
+        &crate::i18n::message(
+            "repo-workflows-push-no-upstream-86cb1261",
+            &[("branch", (branch).into())],
+        ),
         false,
     );
     buttons(ui, |ui| {
@@ -346,7 +390,10 @@ fn no_upstream(ui: &mut Ui, branch: &str, remotes: &[String], idle: bool, acts: 
         let mut sorted: Vec<&String> = remotes.iter().collect();
         sorted.sort_by_key(|r| *r != "origin");
         for (i, remote) in sorted.into_iter().enumerate() {
-            let label = format!("Publish to {remote}");
+            let label = crate::i18n::message(
+                "repo-workflows-push-no-upstream-d32eee95",
+                &[("remote", (remote).clone().into())],
+            );
             let mut act = || acts.push(Action::PushFlow(PushAct::Publish(remote.clone())));
             if i == 0 {
                 primary(ui, &label, "", idle, act);
@@ -396,7 +443,10 @@ fn primary(ui: &mut Ui, label: &str, tip: &str, enabled: bool, clicked: impl FnO
 }
 
 fn dismiss(ui: &mut Ui, acts: &mut Vec<Action>) {
-    if ui.button("Dismiss").clicked() {
+    if ui
+        .button(crate::i18n::text("repo-workflows-push-dismiss-48845bff"))
+        .clicked()
+    {
         acts.push(Action::PushFlow(PushAct::Dismiss));
     }
 }

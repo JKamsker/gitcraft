@@ -86,7 +86,7 @@ fn the_banner_shows_while_detached_and_offers_the_branch_left() {
     assert_eq!(back.as_deref(), Some("main"));
     assert_eq!(back_again.as_deref(), Some("feature/ünï"));
     assert!(!attached.detached_banner_shows());
-    assert!(banner::SAYS.contains("belong to no branch"));
+    assert!(crate::i18n::text(banner::SAYS).contains("belong to no branch"));
 }
 
 /// A bisect detaches HEAD and has a banner of its own: this one stays away meanwhile.
@@ -221,7 +221,12 @@ fn a_listing_that_answers_while_busy_does_nothing() {
     tab.apply(Action::Checkout("main".to_owned()), &ctx);
     tab.busy_op = Some("Commit".to_owned());
     let answered = wait(&mut tab, &ctx, |t| !t.detached.checking);
-    let status = tab.status.clone().map(|(s, _)| s).unwrap_or_default();
+    let status = tab
+        .status
+        .as_deref()
+        .cloned()
+        .map(|(s, _)| s)
+        .unwrap_or_default();
     let head = symbolic_head(&dir);
     let _ = std::fs::remove_dir_all(&dir);
     assert!(answered);

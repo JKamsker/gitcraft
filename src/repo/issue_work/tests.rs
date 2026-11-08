@@ -53,6 +53,8 @@ fn clean(dir: &Path) {
 
 fn issue(number: u64, title: &str) -> Issue {
     Issue {
+        tracker: None,
+        acceptance: None,
         number,
         title: title.into(),
         body:
@@ -387,7 +389,7 @@ fn work_starts_from_the_remotes_default_branch_as_it_is_now() {
     );
     let master = git_out(&dir, &["rev-parse", "origin/master"]);
     let current = git_out(&dir, &["branch", "--show-current"]);
-    let status = tab.status.clone();
+    let status = tab.status.as_deref().cloned();
     let pr_base = tab.issue_pull_request("21-x").map(|(_, _, base)| base);
     clean(&dir);
     assert_eq!((base.name.as_str(), base.known), ("dev", true));
@@ -414,7 +416,7 @@ fn offline_it_starts_from_the_branch_as_last_fetched_and_says_so() {
     start(&mut tab, &ctx, issue(22, "Y"), "22-y", false);
     let at = git_out(&dir, &["rev-parse", "22-y"]);
     let fetched = git_out(&dir, &["rev-parse", "origin/dev"]);
-    let status = tab.status.clone().unwrap_or_default();
+    let status = tab.status.as_deref().cloned().unwrap_or_default();
     let links = link::read(&dir).unwrap_or_default();
     clean(&dir);
     assert_eq!(at, fetched);
@@ -541,7 +543,7 @@ fn a_saved_upstream_issue_is_not_refreshed_or_closed_by_number_on_the_fork() {
     assert!(
         tab.status
             .as_ref()
-            .is_some_and(|(s, _)| s.contains("another forge repository"))
+            .is_some_and(|n| n.0.contains("another forge repository"))
     );
     if let Some(hosting) = &mut tab.hosting {
         hosting.path = "Vancete/gitcraft".into();
@@ -614,7 +616,7 @@ fn review13_cases() -> Vec<(crate::forge::Hosting, String, bool)> {
             (
                 "https://forgejo.example:4000/reviews",
                 "team/repo",
-                forge != Forge::GitLab,
+                !matches!(forge, Forge::GitLab | Forge::Azure | Forge::Bitbucket),
             ),
         ] {
             cases.push((h.clone(), format!("{base}/{path}/{marker}/7"), expected));
@@ -734,7 +736,7 @@ fn review13_refresh_cases(expected: bool, fixture: &str) {
             assert!(
                 tab.status
                     .as_ref()
-                    .is_some_and(|(s, _)| s.contains("another forge repository"))
+                    .is_some_and(|n| n.0.contains("another forge repository"))
             );
         }
     }
@@ -856,7 +858,7 @@ fn review14_queued_issue_start_from_previous_forge_is_refused() {
     assert!(
         tab.status
             .as_ref()
-            .is_some_and(|(s, _)| s.contains("another primary forge"))
+            .is_some_and(|n| n.0.contains("another primary forge"))
     );
     clean(&dir);
 }

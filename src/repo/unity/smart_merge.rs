@@ -107,11 +107,7 @@ pub(super) fn sh_tool(tool: &Path) -> String {
 /// tool (`git mergetool --tool=unityyamlmerge`), in its own config.
 pub(super) fn register(repo: &Path, tool: &Path) -> Result<(), String> {
     if crate::remote::is_remote(repo) {
-        return Err(
-            "UnityYAMLMerge runs on this computer; a repository elsewhere needs it set up on \
-             its own machine"
-                .to_owned(),
-        );
+        return Err(crate::i18n::text("repo-workflows-unity-register-b9569c8c").to_owned());
     }
     let t = sh_tool(tool);
     let settings = [
@@ -161,25 +157,38 @@ fn run_for(cmd: &mut Command, limit: std::time::Duration) -> Result<std::process
         .stdout(Stdio::null())
         .stderr(Stdio::piped())
         .spawn()
-        .map_err(|e| format!("Could not run UnityYAMLMerge: {e}"))?;
+        .map_err(|e| {
+            crate::i18n::message(
+                "repo-workflows-unity-run-for-1f1e4005",
+                &[("e", (e).to_string().into())],
+            )
+        })?;
     let started = std::time::Instant::now();
     loop {
         match child.try_wait() {
             Ok(Some(_)) => {
-                return child
-                    .wait_with_output()
-                    .map_err(|e| format!("UnityYAMLMerge: {e}"));
+                return child.wait_with_output().map_err(|e| {
+                    crate::i18n::message(
+                        "repo-workflows-unity-run-for-a1f34048",
+                        &[("e", (e).to_string().into())],
+                    )
+                });
             }
             Ok(None) if started.elapsed() > limit => {
                 let _ = child.kill();
                 let _ = child.wait();
-                return Err(format!(
-                    "UnityYAMLMerge didn't finish in {} s and was stopped",
-                    limit.as_secs()
+                return Err(crate::i18n::message(
+                    "repo-workflows-unity-run-for-ca1ae15d",
+                    &[("limit-as-secs-1", (limit.as_secs()).into())],
                 ));
             }
             Ok(None) => std::thread::sleep(std::time::Duration::from_millis(50)),
-            Err(e) => return Err(format!("UnityYAMLMerge: {e}")),
+            Err(e) => {
+                return Err(crate::i18n::message(
+                    "repo-workflows-unity-run-for-a1f34048",
+                    &[("e", (e).to_string().into())],
+                ));
+            }
         }
     }
 }
@@ -189,8 +198,18 @@ fn run_for(cmd: &mut Command, limit: std::time::Duration) -> Result<std::process
 /// itself is left as it is. Blocking: from a thread of its own.
 pub(super) fn solve(repo: &Path, path: &str, tool: &Path) -> Result<String, String> {
     let stage = |n: u8| git::run_bytes(Some(repo), &["show", &format!(":{n}:{path}")]);
-    let ours = stage(2).map_err(|e| format!("Could not read your version of {path}: {e}"))?;
-    let theirs = stage(3).map_err(|e| format!("Could not read their version of {path}: {e}"))?;
+    let ours = stage(2).map_err(|e| {
+        crate::i18n::message(
+            "repo-workflows-unity-solve-6ee66918",
+            &[("path", (path).into()), ("e", (e).to_string().into())],
+        )
+    })?;
+    let theirs = stage(3).map_err(|e| {
+        crate::i18n::message(
+            "repo-workflows-unity-solve-ac6f5e99",
+            &[("path", (path).into()), ("e", (e).to_string().into())],
+        )
+    })?;
     // Added on both sides: no common version, an empty one.
     let base = stage(1).unwrap_or_default();
     let nanos = std::time::SystemTime::now()
@@ -198,13 +217,23 @@ pub(super) fn solve(repo: &Path, path: &str, tool: &Path) -> Result<String, Stri
         .map(|d| d.as_nanos())
         .unwrap_or(0);
     let dir = std::env::temp_dir().join(format!("gitcraft-unity-{}-{nanos}", std::process::id()));
-    std::fs::create_dir_all(&dir).map_err(|e| format!("Could not copy {path}: {e}"))?;
+    std::fs::create_dir_all(&dir).map_err(|e| {
+        crate::i18n::message(
+            "repo-workflows-unity-solve-8c26b794",
+            &[("path", (path).into()), ("e", (e).to_string().into())],
+        )
+    })?;
     let result = (|| {
         let name = path.rsplit('/').next().unwrap_or("file");
         let files =
             ["base", "theirs", "ours", "merged"].map(|side| dir.join(format!("{side}.{name}")));
         for (file, bytes) in files.iter().zip([&base, &theirs, &ours, &ours]) {
-            std::fs::write(file, bytes).map_err(|e| format!("Could not copy {path}: {e}"))?;
+            std::fs::write(file, bytes).map_err(|e| {
+                crate::i18n::message(
+                    "repo-workflows-unity-solve-8c26b794",
+                    &[("path", (path).into()), ("e", (e).to_string().into())],
+                )
+            })?;
         }
         let mut cmd = Command::new(tool);
         crate::shell_path::apply(&mut cmd);
@@ -218,8 +247,12 @@ pub(super) fn solve(repo: &Path, path: &str, tool: &Path) -> Result<String, Stri
             cmd.args(["merge", "-p", "--fallback", "none"]).args(&files),
             SOLVE_FOR,
         )?;
-        let merged =
-            std::fs::read(&files[3]).map_err(|e| format!("UnityYAMLMerge left no result: {e}"))?;
+        let merged = std::fs::read(&files[3]).map_err(|e| {
+            crate::i18n::message(
+                "repo-workflows-unity-solve-f176e899",
+                &[("e", (e).to_string().into())],
+            )
+        })?;
         let text = String::from_utf8_lossy(&merged).into_owned();
         if out.status.success() || text.contains("<<<<<<<") {
             Ok(text)
@@ -227,8 +260,17 @@ pub(super) fn solve(repo: &Path, path: &str, tool: &Path) -> Result<String, Stri
             let said = String::from_utf8_lossy(&out.stderr);
             let said = said.lines().rev().map(str::trim).find(|l| !l.is_empty());
             Err(match said {
-                Some(line) => format!("UnityYAMLMerge: {line}"),
-                None => format!("UnityYAMLMerge could not merge {path} ({})", out.status),
+                Some(line) => crate::i18n::message(
+                    "repo-workflows-unity-solve-183ec676",
+                    &[("line", (line).into())],
+                ),
+                None => crate::i18n::message(
+                    "repo-workflows-unity-solve-ac1127b1",
+                    &[
+                        ("path", (path).into()),
+                        ("out-status-1", (out.status).to_string().into()),
+                    ],
+                ),
             })
         }
     })();

@@ -204,9 +204,13 @@ fn a_background_fetch_is_kept_only_when_it_fails() {
 /// What is recorded of a call has its secrets hidden: a token URL in its arguments and output,
 /// and the password typed into the tab.
 #[test]
-fn a_recorded_call_hides_its_secrets() {
+fn a_recorded_call_hides_its_secrets() -> Result<(), String> {
     let dir = repo("secrets");
     let creds = git::Credentials {
+        scope: Some(git::CredentialScope::for_url(
+            "https://example.invalid/o/r.git",
+            "ana",
+        )?),
         username: "ana".to_owned(),
         password: "s3cr3t-pass".to_owned(),
     };
@@ -237,6 +241,7 @@ fn a_recorded_call_hides_its_secrets() {
         "{}",
         listed.output
     );
+    Ok(())
 }
 
 /// A background fetch failing the same way again and again is one entry, counted.
@@ -292,7 +297,7 @@ fn the_toolbar_message_opens_its_own_operation() {
     let failed = tab.status_entry();
     // Another operation after it: its message (none, for staging) is never tied to the
     // failed one's entry, nor the failed one's message to the newer entry.
-    let old_message = tab.status.clone();
+    let old_message = tab.status.as_deref().cloned();
     tab.run_ops(
         "Stage",
         ops(&[&["status"]]),
@@ -302,7 +307,7 @@ fn the_toolbar_message_opens_its_own_operation() {
     );
     finish(&mut tab, &ctx);
     let after = tab.status_entry();
-    tab.status = old_message;
+    tab.status = old_message.map(crate::repo::Notice::plain);
     let restored = tab.status_entry();
     let newest = tab.activity.entries().last().map(|e| e.id);
     let _ = std::fs::remove_dir_all(&dir);
@@ -310,6 +315,134 @@ fn the_toolbar_message_opens_its_own_operation() {
     assert_ne!(after, newest);
     assert_ne!(restored, newest);
     // A message no operation left opens nothing.
-    tab.status = Some(("Something else".to_owned(), true));
+    tab.status = Some(crate::repo::Notice::plain((
+        "Something else".to_owned(),
+        true,
+    )));
     assert_eq!(tab.status_entry(), None);
+}
+
+#[test]
+fn fluent_partition_actual_activity_adapter_formats_numbers_and_preserves_commands() {
+    let args = [
+        "push",
+        "--force-with-lease=refs/heads/topic:abc",
+        "origin",
+        "refs/heads/topic:refs/heads/topic",
+    ]
+    .map(str::to_owned);
+    for (language, done, duration) in [("en-US", "done", "1.2 s"), ("de", "abgeschlossen", "1,2 s")]
+    {
+        crate::i18n::set_language(language);
+        assert_eq!(outcome_text(&Outcome::Done), done);
+        assert_eq!(seconds(Duration::from_millis(1200)), duration);
+        assert_eq!(
+            command_line(&args),
+            "git push --force-with-lease=refs/heads/topic:abc origin refs/heads/topic:refs/heads/topic"
+        );
+        assert_eq!(args[2], "origin");
+    }
+    crate::i18n::set_language("en-US");
+}
+
+#[test]
+fn fluent_partition_control_error_paint_preserves_raw_cancellation_and_opaque_diagnostics() {
+    let raw = "Moved-code comparison cancelled";
+    for (language, expected) in [
+        ("en-US", raw),
+        ("de", "Vergleich verschobenen Codes abgebrochen"),
+    ] {
+        crate::i18n::set_language(language);
+        assert_eq!(display_workflow_error(raw), expected);
+        assert_eq!(raw, "Moved-code comparison cancelled");
+        let external = "fatal: opaque external diagnostic refs/heads/topic --force";
+        assert_eq!(display_workflow_error(external), external);
+    }
+    crate::i18n::set_language("en-US");
+}
+
+/// Pure transport checks: no tab, worker, native object, subprocess or Git invocation.
+#[test]
+fn operation_source_is_retired_by_redaction_bounds_mismatch_and_plain_repeat() -> Result<(), String>
+{
+    let mut log = ActivityLog::default();
+    let raw = "provider https://token@host.invalid/repo and SECRET";
+    let redacted = crate::git::redact(raw, Some("SECRET"));
+    assert_ne!(redacted, raw);
+    log.push_presented(
+        "Commit",
+        Duration::ZERO,
+        Vec::new(),
+        Outcome::Failed(redacted),
+        false,
+        Some(Failure::capture(raw, None)),
+    );
+    assert!(
+        log.last()
+            .ok_or("expected recorded activity")?
+            .failure_presentation
+            .is_none()
+    );
+    let huge = "provider opaque\n".repeat(MAX_OUTPUT);
+    log.push_presented(
+        "Commit",
+        Duration::ZERO,
+        Vec::new(),
+        Outcome::Failed(huge.clone()),
+        false,
+        Some(Failure::capture(&huge, None)),
+    );
+    assert!(
+        log.last()
+            .ok_or("expected recorded activity")?
+            .failure_presentation
+            .is_none()
+    );
+    assert!(
+        matches!(&log.last().ok_or("expected recorded activity")?.outcome, Outcome::Failed(kept) if kept != &huge && kept.len() < huge.len())
+    );
+    log.push_presented(
+        "Commit",
+        Duration::ZERO,
+        Vec::new(),
+        Outcome::Failed("different".into()),
+        false,
+        Some(Failure::capture(raw, None)),
+    );
+    assert!(
+        log.last()
+            .ok_or("expected recorded activity")?
+            .failure_presentation
+            .is_none()
+    );
+    let id = log.push_presented(
+        "Fetch",
+        Duration::ZERO,
+        Vec::new(),
+        Outcome::Failed("opaque same".into()),
+        true,
+        Some(Failure::capture("opaque same", None)),
+    );
+    assert!(
+        log.last()
+            .ok_or("expected recorded activity")?
+            .failure_presentation
+            .is_some()
+    );
+    let repeated = log.push(
+        "Fetch",
+        Duration::ZERO,
+        Vec::new(),
+        Outcome::Failed("opaque same".into()),
+        true,
+    );
+    assert_eq!(id, repeated);
+    assert_eq!(log.last().ok_or("expected recorded activity")?.repeats, 2);
+    assert!(
+        log.last()
+            .ok_or("expected recorded activity")?
+            .failure_presentation
+            .is_none()
+    );
+    Ok(())
 }

@@ -255,7 +255,13 @@ impl ToolChoice {
     pub fn label(&self, kind: Kind) -> String {
         match self.preset {
             Some(p) => p.label().to_owned(),
-            None => format!("the {} tool set in git ({})", kind.noun(), kind.key()),
+            None => crate::i18n::message(
+                "backend-the-tool-set-in-git-05b37c",
+                &[
+                    ("kind", (kind.noun()).to_string().into()),
+                    ("kind2", (kind.key()).to_string().into()),
+                ],
+            ),
         }
     }
 }

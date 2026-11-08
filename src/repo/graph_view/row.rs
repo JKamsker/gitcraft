@@ -88,7 +88,19 @@ impl RepoTab {
         // Known by its commit, not its place: rows shift when a reload adds commits or the
         // changes row above them, and a menu opened on one must stay that commit's.
         let resp = ui.interact(rect, row_id(ui, &commit.hash), sense);
-        let label = || self.row_label(commit, viewport.now);
+        // WidgetInfo invokes its label closure while holding egui's context lock.
+        let walk_topology = crate::settings::Settings::get(ui.ctx()).graph_lane_walk;
+        let label = || {
+            let mut label = self.row_label(commit, viewport.now);
+            if walk_topology {
+                label.push_str(". ");
+                label.push_str(&self.graph_description(i));
+            }
+            if self.graph_motion.new_commit(&commit.hash) {
+                label.push_str(crate::i18n::text("repo-core-2701"));
+            }
+            label
+        };
         widgets::a11y_selected(&resp, label, self.selected == Some(i));
         let painter = ui.painter_at(rect);
         let mut hovered_message = None;
@@ -102,6 +114,16 @@ impl RepoTab {
             is_match,
             self.is_compared(commit, is_wip),
         );
+        if self.graph_motion.new_commit(&commit.hash) && !self.ghost.drawing() {
+            painter.rect_filled(
+                rect,
+                0.0,
+                t.accent
+                    .gamma_multiply(self.graph_motion.highlight(ui.ctx())),
+            );
+            let marker = egui::Rect::from_min_size(rect.left_top(), vec2(3.0, rect.height()));
+            painter.rect_filled(marker, 0.0, t.accent);
+        }
         let resp = match self.bisect_mark(&painter, &t, rect, &commit.hash) {
             Some(said) => resp.on_hover_text(said),
             None => resp,
@@ -121,7 +143,9 @@ impl RepoTab {
             gx,
             lane_w: lanes.width,
             node_x: graph_row.map(|r| lane_x(gx, r.col, lanes.width)),
-            color: graph_row.map(|r| t.lane(r.col)).unwrap_or(t.text_faint),
+            color: graph_row
+                .map(|r| t.lane(r.colours.get(&r.col).copied().unwrap_or(r.col)))
+                .unwrap_or(t.text_faint),
         };
 
         let (resp, pill) = self.refs_cell(ui, &painter, &row, resp, acts);
@@ -140,6 +164,16 @@ impl RepoTab {
             );
         } else {
             let ci = self.ci_status(&commit.hash);
+            let description_cell = cols.description(rect);
+            let mut badge_ui = ui.new_child(egui::UiBuilder::new().max_rect(description_cell));
+            badge_ui.set_clip_rect(description_cell.intersect(ui.clip_rect()));
+            let deferred = self.deferred_badge(
+                &mut badge_ui,
+                description_cell.left() + CELL_PAD,
+                row.mid(),
+                &commit.hash,
+                acts,
+            );
             let lane = if self.test_lane.visible { LANE_W } else { 0.0 };
             // With the lane, the CI dot's place is kept on every row, so the lane is straight.
             let dots = if lane > 0.0 || ci.is_some() {
@@ -155,7 +189,18 @@ impl RepoTab {
                 .remerge_badge(commit)
                 .and_then(|b| b.fit(&painter, room).map(|(label, w)| (b, label, w)));
             let badge_w = resolved.map_or(0.0, |(_, _, w)| w + 6.0);
-            let end = description(ui, &painter, &t, &row, is_match, dot_w + badge_w);
+            let end = description(
+                ui,
+                &painter.with_clip_rect(cols.description(rect)),
+                &t,
+                &row,
+                (
+                    is_match,
+                    self.graph_motion.new_commit(&commit.hash) && !self.ghost.drawing(),
+                ),
+                dot_w + badge_w,
+                deferred,
+            );
             if self.ghost.kind(i) == crate::repo::ghost::Kind::Going {
                 // Left on no ref by the operation a ghost run shows: struck through.
                 let x = row.gx + row.cols.graph + 6.0;
@@ -179,7 +224,10 @@ impl RepoTab {
                     t.accent_fg,
                 );
                 if link
-                    .on_hover_text(format!("Open Gerrit change {id}"))
+                    .on_hover_text(crate::i18n::message(
+                        "repo-core-2704",
+                        &[("id", id.to_string().into())],
+                    ))
                     .clicked()
                 {
                     acts.push(Action::OpenUrl(server.change_url(id)));
@@ -274,7 +322,7 @@ impl RepoTab {
         let r = painter.text(
             pos2(x, mid),
             Align2::LEFT_CENTER,
-            "Uncommitted changes",
+            crate::i18n::text("repo-core-2707"),
             font,
             t.text,
         );
@@ -311,18 +359,15 @@ impl RepoTab {
         let culprit = self.bisect.is_culprit(hash);
         let mark = self.bisect.mark_of(hash);
         let (color, said) = match (culprit, mark) {
-            (true, _) => (
-                t.danger,
-                "The first bad commit, as the bisect found".to_owned(),
-            ),
+            (true, _) => (t.danger, crate::i18n::text("repo-core-2710").to_owned()),
             (false, Some(mark)) => {
                 let word = match mark {
-                    git::Mark::Skip => "skipped",
+                    git::Mark::Skip => crate::i18n::text("repo-core-0292"),
                     _ => bisect.word(mark),
                 };
                 (
                     crate::repo::bisect::mark_color(t, mark),
-                    format!("Marked {word} in the bisect"),
+                    crate::i18n::message("repo-core-2711", &[("word", word.to_string().into())]),
                 )
             }
             (false, None) => return None,
@@ -385,12 +430,31 @@ fn description(
     painter: &Painter,
     t: &Tokens,
     row: &Row,
-    is_match: bool,
+    (is_match, new_commit): (bool, bool),
     reserved: f32,
+    prefix: f32,
 ) -> f32 {
     let (rect, mid) = (row.rect, row.mid());
-    let x = row.cols.description(rect).left() + CELL_PAD;
+    let mut x = row.cols.description(rect).left() + CELL_PAD + prefix;
     let text_right = row.cols.description(rect).right() - CELL_PAD - reserved;
+    if new_commit && text_right - x > 70.0 {
+        let marker = Rect::from_center_size(pos2(x + 13.0, mid), vec2(27.0, 17.0));
+        painter.rect_filled(marker, 3.0, t.card);
+        painter.rect_stroke(
+            marker,
+            3.0,
+            Stroke::new(1.0, t.accent),
+            egui::StrokeKind::Inside,
+        );
+        painter.text(
+            marker.center(),
+            Align2::CENTER_CENTER,
+            crate::i18n::text("dev-integration-ui-new-marker"),
+            FontId::proportional(10.0),
+            t.text,
+        );
+        x += 34.0;
+    }
     let font = if is_match {
         theme::medium(12.5)
     } else {
@@ -454,7 +518,7 @@ fn trailing_columns(
         ),
         (
             Bar::Date,
-            commit.date.clone(),
+            crate::i18n::date_iso(&commit.date),
             theme::mono(11.0),
             t.text_faint,
         ),
@@ -647,7 +711,7 @@ mod tests {
                                 state == 3,
                                 false,
                             );
-                            description(ui, painter, &t, &row, state == 3, 0.0);
+                            description(ui, painter, &t, &row, (state == 3, false), 0.0, 0.0);
                             row.rect = row.rect.translate(vec2(0.0, ROW_PITCH));
                             let background = row_background(
                                 painter,

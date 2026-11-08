@@ -121,9 +121,19 @@ pub(super) fn nul_list<P: AsRef<[u8]>>(paths: &[P]) -> Vec<u8> {
     out
 }
 
-/// A size as the dialog says it.
+/// A locale-independent size in raw transfer diagnostics; display localizes it separately.
 pub(super) fn size_label(bytes: u64) -> String {
-    crate::git::human_size(bytes)
+    if bytes < 1024 {
+        return format!("{bytes} B");
+    }
+    let units = ["KB", "MB", "GB", "TB"];
+    let mut value = bytes as f64 / 1024.0;
+    let mut unit = 0;
+    while value >= 1024.0 && unit < units.len() - 1 {
+        value /= 1024.0;
+        unit += 1;
+    }
+    format!("{value:.1} {}", units[unit])
 }
 
 /// The name of the source's temporary index, in its git folder.

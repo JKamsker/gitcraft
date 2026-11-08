@@ -44,9 +44,9 @@ impl Kept {
     /// "the acceptance criteria", for the card's tooltips.
     pub(crate) fn what(self) -> &'static str {
         match self {
-            Kept::Criteria => "the acceptance criteria",
-            Kept::Tasks => "the task list",
-            Kept::Description => "the description",
+            Kept::Criteria => crate::i18n::text("repo-workflows-issue_work-what-68e64f0f"),
+            Kept::Tasks => crate::i18n::text("repo-workflows-issue_work-what-3e69f7c1"),
+            Kept::Description => crate::i18n::text("repo-workflows-issue_work-what-734b09bc"),
         }
     }
 }
@@ -288,7 +288,7 @@ fn without_comments(text: &str) -> String {
 
 /// `text` cut to [`MAX_LINES`] lines and [`MAX_CHARS`] characters (on a character's
 /// boundary), marked as cut when it was.
-fn cap(text: &str) -> String {
+pub(super) fn cap(text: &str) -> String {
     let mut cut = false;
     let mut kept: String = text
         .lines()

@@ -411,8 +411,11 @@ fn real_openssh_reuses_concurrently_and_recovers() -> Result<(), Box<dyn std::er
         since.elapsed() < Duration::from_millis(1100),
         "independent commands must run concurrently"
     );
-    let stream = super::super::super::spawn(&host, &request("printf '%s' \"$SSH_CONNECTION\""))?
-        .wait_with_output()?;
+    let mut options = crate::processes::Options::default();
+    let command =
+        super::super::super::streaming_command(&host, &request("printf '%s' \"$SSH_CONNECTION\""))?
+            .configure(&mut options);
+    let stream = crate::processes::run(command, options)?.complete()?;
     assert!(stream.status.success());
     assert_eq!(String::from_utf8_lossy(&stream.stdout).trim(), first);
     // Preparing a streaming request must not reserve the pooled-shell startup gate
@@ -439,13 +442,13 @@ fn real_openssh_reuses_concurrently_and_recovers() -> Result<(), Box<dyn std::er
         let handles: Vec<_> = (0..12)
             .map(|_| {
                 scope.spawn(|| {
-                    super::super::super::spawn(
+                    let mut options = crate::processes::Options::default();
+                    let command = super::super::super::streaming_command(
                         &host,
                         &request("sleep 0.3; printf '%s' \"$SSH_CONNECTION\""),
-                    )
-                    .map_err(|e| e.to_string())?
-                    .wait_with_output()
-                    .map_err(|e| e.to_string())
+                    )?
+                    .configure(&mut options);
+                    crate::processes::run(command, options)?.complete()
                 })
             })
             .collect();
@@ -471,9 +474,23 @@ fn real_openssh_reuses_concurrently_and_recovers() -> Result<(), Box<dyn std::er
     );
     assert_eq!(connection("printf '%s' \"$SSH_CONNECTION\"")?, first);
     // Killing one streaming client closes only its channel, not the authenticated master.
-    let mut stream = super::super::super::spawn(&host, &request("sleep 30"))?;
-    stream.kill()?;
-    stream.wait()?;
+    let streaming = super::super::super::streaming_command(&host, &request("sleep 30"))?;
+    let lease = streaming.lease.clone();
+    let mut options = crate::processes::Options::default();
+    let command = streaming.configure(&mut options);
+    let ticket = crate::processes::service()?.submit(command, options)?;
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while lease.endpoint().is_none() && Instant::now() < deadline {
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    ticket.cancel();
+    let stopped = ticket.wait()?;
+    assert!(
+        stopped
+            .stopped
+            .as_ref()
+            .is_some_and(|reason| !reason.contains("unconfirmed"))
+    );
     assert_eq!(connection("printf '%s' \"$SSH_CONNECTION\"")?, first);
     let config = config(&dest).ok_or("no managed configuration")?;
     let effective = effective(&config.path, &dest)?;

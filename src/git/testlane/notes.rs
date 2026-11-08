@@ -158,9 +158,12 @@ pub fn write_result(
                 std::thread::sleep(std::time::Duration::from_millis(150 * u64::from(tries)));
             }
             Err(e) => {
-                return Err(format!(
-                    "could not store the result of {}: {e}",
-                    short(tree)
+                return Err(crate::i18n::message(
+                    "backend-could-not-store-the-result-of-e-96fea2",
+                    &[
+                        ("tree", (short(tree)).to_string().into()),
+                        ("detail", (e).to_string().into()),
+                    ],
                 ));
             }
         }

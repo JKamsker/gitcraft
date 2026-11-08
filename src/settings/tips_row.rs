@@ -8,20 +8,30 @@ use super::{Settings, layout};
 impl Settings {
     pub(super) fn tips_ui(&mut self, ui: &mut Ui) {
         ui.horizontal_wrapped(|ui| {
-            ui.checkbox(&mut self.tips, "Show tips").on_hover_text(
-                "A \u{201c}Did you know\u{201d} line under the graph, and a one-line hint the \
-                     first time you do something that has a shortcut",
-            );
+            ui.checkbox(
+                &mut self.tips,
+                crate::i18n::text("interaction-settings-tips-show"),
+            )
+            .on_hover_text(crate::i18n::text("interaction-settings-tips-tooltip"));
             let seen = self.seen_hints.len();
             if seen > 0 {
                 if ui
-                    .add_enabled(self.tips, egui::Button::new("Show the hints again"))
-                    .on_hover_text("The first-time hints already shown come back once more")
+                    .add_enabled(
+                        self.tips,
+                        egui::Button::new(crate::i18n::text("interaction-settings-hints-again")),
+                    )
+                    .on_hover_text(crate::i18n::text("interaction-settings-hints-again-tip"))
                     .clicked()
                 {
                     self.seen_hints.clear();
                 }
-                layout::note(ui, format!("{seen} hints seen"));
+                layout::note(
+                    ui,
+                    crate::i18n::message(
+                        "interaction-settings-hints-seen",
+                        &[("count", seen.into())],
+                    ),
+                );
             }
         });
     }

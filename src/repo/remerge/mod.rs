@@ -170,6 +170,7 @@ impl RepoTab {
 /// `work`'s answer, or an error should it panic: what waits for it (the batch running, the
 /// merge asked) is let go of either way.
 fn guarded<T>(work: impl FnOnce() -> Result<T, String>) -> Result<T, String> {
-    std::panic::catch_unwind(std::panic::AssertUnwindSafe(work))
-        .unwrap_or_else(|_| Err("Internal error while redoing the merge".to_owned()))
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(work)).unwrap_or_else(|_| {
+        Err(crate::i18n::text("repo-workflows-remerge-guarded-fff34faf").to_owned())
+    })
 }

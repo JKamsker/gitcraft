@@ -22,7 +22,7 @@ impl SignatureFormat {
             Self::Gpg => "GPG",
             Self::Ssh => "SSH",
             Self::X509 => "X.509",
-            Self::Other => "unknown kind",
+            Self::Other => crate::i18n::text("backend-unknown-kind-0b5f13"),
         }
     }
 
@@ -64,44 +64,48 @@ impl Verdict {
     /// The verdict in a few words, for the section's header.
     pub fn label(&self) -> &'static str {
         match self {
-            Self::Valid { trusted: true } => "Valid",
-            Self::Valid { trusted: false } => "Valid, key not trusted",
-            Self::Expired { key: false } => "Expired",
-            Self::Expired { key: true } => "Valid, key expired",
-            Self::Revoked => "Key revoked",
-            Self::Invalid => "Invalid",
-            Self::UnknownKey => "Unknown key",
-            Self::Unsigned => "Unsigned",
-            Self::NotChecked => "Not checked",
+            Self::Valid { trusted: true } => crate::i18n::text("backend-signature-valid"),
+            Self::Valid { trusted: false } => {
+                crate::i18n::text("backend-valid-key-not-trusted-c8446d")
+            }
+            Self::Expired { key: false } => crate::i18n::text("backend-signature-expired"),
+            Self::Expired { key: true } => crate::i18n::text("backend-valid-key-expired-46a105"),
+            Self::Revoked => crate::i18n::text("backend-key-revoked-697393"),
+            Self::Invalid => crate::i18n::text("backend-signature-invalid"),
+            Self::UnknownKey => crate::i18n::text("backend-unknown-key-158f66"),
+            Self::Unsigned => crate::i18n::text("backend-signature-unsigned"),
+            Self::NotChecked => crate::i18n::text("backend-not-checked-d16948"),
         }
     }
 
     /// What it means, in a sentence.
     pub fn explanation(&self) -> &'static str {
         match self {
-            Self::Valid { trusted: true } => "The signature is good and its key is trusted.",
-            Self::Valid { trusted: false } => {
-                "The signature is good, but its key isn't marked as trusted in your GPG keyring."
+            Self::Valid { trusted: true } => {
+                crate::i18n::text("backend-the-signature-is-good-and-its-key-is-trusted-a660a1")
             }
-            Self::Expired { key: false } => "The signature is good, but it has expired.",
-            Self::Expired { key: true } => {
-                "The signature is good, but the key it was made with has expired."
+            Self::Valid { trusted: false } => crate::i18n::text(
+                "backend-the-signature-is-good-but-its-key-isn-t-marked-as-trusted-in-your-208d2b",
+            ),
+            Self::Expired { key: false } => {
+                crate::i18n::text("backend-the-signature-is-good-but-it-has-expired-1de6ba")
             }
-            Self::Revoked => "The signature was made with a key that has since been revoked.",
-            Self::Invalid => {
-                "The signature does not match this commit: it was changed after signing, or the \
-                 signature is not genuine."
-            }
-            Self::UnknownKey => {
-                "This commit was signed with a key you don't have. For GPG, import the key \
-                 (gpg --recv-keys <key>); for SSH, add it to your allowed signers file \
-                 (gpg.ssh.allowedSignersFile). Then check again."
-            }
-            Self::Unsigned => "This commit has no signature.",
-            Self::NotChecked => {
-                "The signature could not be checked: git's output says why. Fix that, then \
-                 check again."
-            }
+            Self::Expired { key: true } => crate::i18n::text(
+                "backend-the-signature-is-good-but-the-key-it-was-made-with-has-expired-ed31a5",
+            ),
+            Self::Revoked => crate::i18n::text(
+                "backend-the-signature-was-made-with-a-key-that-has-since-been-revoked-236912",
+            ),
+            Self::Invalid => crate::i18n::text(
+                "backend-the-signature-does-not-match-this-commit-it-was-changed-after-sig-f7d9cf",
+            ),
+            Self::UnknownKey => crate::i18n::text(
+                "backend-this-commit-was-signed-with-a-key-you-don-t-have-for-gpg-import-t-bdfda3",
+            ),
+            Self::Unsigned => crate::i18n::text("backend-this-commit-has-no-signature-d8dfc7"),
+            Self::NotChecked => crate::i18n::text(
+                "backend-the-signature-could-not-be-checked-git-s-output-says-why-fix-that-731939",
+            ),
         }
     }
 }
@@ -127,8 +131,15 @@ const SEP: char = '\0';
 
 /// Checks the signature of `hash`. Unsigned commits are told without running any program.
 pub fn verify_signature(repo: &Path, hash: &str) -> Result<Signature, String> {
-    let object = run(Some(repo), &["cat-file", "commit", hash])
-        .map_err(|e| format!("Could not read commit {hash}: {e}"))?;
+    let object = run(Some(repo), &["cat-file", "commit", hash]).map_err(|e| {
+        crate::i18n::message(
+            "backend-could-not-read-commit-hash-e-3cd680",
+            &[
+                ("hash", (hash).to_string().into()),
+                ("detail", (e).to_string().into()),
+            ],
+        )
+    })?;
     let Some(signature) = signature_header(&object) else {
         return Ok(Signature {
             verdict: Verdict::Unsigned,
@@ -153,7 +164,12 @@ pub fn verify_signature(repo: &Path, hash: &str) -> Result<Signature, String> {
             hash,
         ],
     )
-    .map_err(|e| format!("Could not check the signature: {e}"))?;
+    .map_err(|e| {
+        crate::i18n::message(
+            "backend-could-not-check-the-signature-e-f33a08",
+            &[("detail", (e).to_string().into())],
+        )
+    })?;
     let mut sig = parse_check(&out, format)?;
     if sig.raw.trim().is_empty() {
         // git gave no output of the checking program: it couldn't run it, or had nothing to
@@ -211,7 +227,10 @@ pub(super) fn parse_check(out: &str, format: SignatureFormat) -> Result<Signatur
     let (Some(code), Some(signer), Some(key), Some(primary_key), Some(raw)) =
         (next(), next(), next(), next(), next())
     else {
-        return Err("Unexpected output from git while checking the signature".to_owned());
+        return Err(crate::i18n::text(
+            "backend-unexpected-output-from-git-while-checking-the-signature-b0a001",
+        )
+        .to_owned());
     };
     let raw = raw.trim_end().to_owned();
     let verdict = verdict(code.trim(), format, &signer, &raw);

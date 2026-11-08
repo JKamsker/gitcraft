@@ -1,0 +1,998 @@
+//! Cross-repository release planning and compatibility rehearsal. No publishing operations.
+use super::{
+    contracts::{self, Observation},
+    store,
+    tools::ToolsAct,
+};
+use crate::{
+    git,
+    repo::{Action, RepoTab},
+};
+use serde::{Deserialize, Serialize};
+use std::{
+    collections::{BTreeSet, VecDeque},
+    path::{Path, PathBuf},
+};
+#[derive(Clone, Serialize, Deserialize, Default)]
+struct Component {
+    name: String,
+    repo: String,
+    revisions: String,
+}
+#[derive(Clone, Serialize, Deserialize, Default)]
+struct Rule {
+    dependent: String,
+    at: usize,
+    prerequisite: String,
+    min: usize,
+    reason: String,
+}
+#[derive(Clone, Serialize, Deserialize, Default)]
+pub(crate) struct Plan {
+    components: Vec<Component>,
+    rules: Vec<Rule>,
+    command: String,
+    trusted: bool,
+}
+#[derive(Clone, Serialize, Deserialize)]
+struct Stage {
+    label: String,
+    commit: String,
+    tree: String,
+    // Missing provenance in older evidence must never reinterpret an explicit user label.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    generated_index: Option<usize>,
+}
+#[derive(Clone, Serialize, Deserialize)]
+struct Source {
+    name: String,
+    repo: PathBuf,
+    stages: Vec<Stage>,
+}
+#[derive(Clone, Serialize, Deserialize)]
+struct Combination {
+    stages: Vec<usize>,
+    allowed: bool,
+    observed: Option<Observation>,
+    error: Option<String>,
+}
+#[derive(Clone, Serialize, Deserialize)]
+struct Report {
+    sources: Vec<Source>,
+    rules: Vec<Rule>,
+    command: String,
+    states: Vec<Combination>,
+    route: Option<Vec<Vec<usize>>>,
+    tested: bool,
+    stopped: bool,
+    cleanup: Vec<String>,
+}
+#[derive(Default)]
+pub(crate) struct State {
+    plan: Plan,
+    busy: bool,
+    stop: git::RunStop,
+    report: Option<Report>,
+    error: Option<String>,
+}
+impl Drop for State {
+    fn drop(&mut self) {
+        self.stop.stop();
+    }
+}
+#[derive(Clone)]
+pub(crate) enum Act {
+    Save(Plan),
+    Load,
+    Plan(Plan),
+    Rehearse(Plan),
+    Stop,
+}
+fn valid_name(name: &str) -> bool {
+    !name.is_empty()
+        && name.as_bytes()[0].is_ascii_alphabetic()
+        && name.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
+}
+fn stage_input(line: &str, i: usize) -> (String, &str, Option<usize>) {
+    line.split_once('=')
+        .map_or((format!("Stage {i}"), line, Some(i)), |(a, b)| {
+            (a.trim().into(), b.trim(), None)
+        })
+}
+fn display_stage(stage: &Stage) -> String {
+    match stage.generated_index {
+        Some(stage) => crate::i18n::message(
+            "repo-workflows-review-raw-stage-i-53efae",
+            &[("stage", stage.into())],
+        ),
+        None => stage.label.clone(),
+    }
+}
+fn resolve(repo: &Path, plan: &Plan) -> Result<Vec<Source>, String> {
+    if !(2..=6).contains(&plan.components.len()) {
+        return Err("Add 2–6 repositories to the release board".into());
+    }
+    let machine = crate::remote::parse(repo).map(|t| t.host);
+    let mut names = BTreeSet::new();
+    let mut sources = vec![];
+    let mut combinations = 1usize;
+    for component in &plan.components {
+        if !valid_name(&component.name) || !names.insert(component.name.to_ascii_uppercase()) {
+            return Err("Component names must be unique ASCII identifiers, ignoring case".into());
+        }
+        let path = PathBuf::from(component.repo.trim());
+        if !path.is_absolute() && !crate::remote::is_remote(&path) {
+            return Err("Use absolute repository paths or encoded SSH/WSL paths".into());
+        }
+        if path.as_os_str().is_empty() {
+            return Err(format!("Choose the repository for {}", component.name));
+        }
+        if crate::remote::parse(&path).map(|t| t.host) != machine {
+            return Err("Rehearse linked repositories on the same machine; choose local copies or paths on one shared SSH/WSL host".into());
+        }
+        let mut stages = vec![];
+        for (i, line) in component
+            .revisions
+            .lines()
+            .map(str::trim)
+            .filter(|l| !l.is_empty())
+            .enumerate()
+        {
+            let (label, revision, generated_index) = stage_input(line, i);
+            let commit = contracts::resolve(&path, revision)?;
+            let tree = git::run(Some(&path), &["rev-parse", &format!("{commit}^{{tree}}")])?
+                .trim()
+                .to_owned();
+            stages.push(Stage {
+                label,
+                commit,
+                tree,
+                generated_index,
+            });
+        }
+        if !(2..=4).contains(&stages.len()) {
+            return Err(format!(
+                "{} needs 2–4 ordered stages: deployed, optional bridge, next",
+                component.name
+            ));
+        }
+        combinations = combinations
+            .checked_mul(stages.len())
+            .ok_or("Too many combinations")?;
+        if combinations > 256 {
+            return Err(
+                "More than 256 in-between combinations: split this release into smaller boards"
+                    .into(),
+            );
+        }
+        sources.push(Source {
+            name: component.name.clone(),
+            repo: path,
+            stages,
+        });
+    }
+    for rule in &plan.rules {
+        let dependent = sources
+            .iter()
+            .find(|s| s.name == rule.dependent)
+            .ok_or("A rule names an unknown dependent component")?;
+        let prerequisite = sources
+            .iter()
+            .find(|s| s.name == rule.prerequisite)
+            .ok_or("A rule names an unknown prerequisite component")?;
+        if rule.at == 0
+            || rule.at >= dependent.stages.len()
+            || rule.min == 0
+            || rule.min >= prerequisite.stages.len()
+        {
+            return Err(
+                "Rule stage thresholds must name non-deployed stages present on their components"
+                    .into(),
+            );
+        }
+    }
+    Ok(sources)
+}
+fn allowed(state: &[usize], sources: &[Source], rules: &[Rule]) -> bool {
+    rules.iter().all(|r| {
+        let a = sources.iter().position(|s| s.name == r.dependent);
+        let b = sources.iter().position(|s| s.name == r.prerequisite);
+        match (a, b) {
+            (Some(a), Some(b)) => state[a] < r.at || state[b] >= r.min,
+            _ => false,
+        }
+    })
+}
+fn combinations(sources: &[Source], rules: &[Rule]) -> Vec<Combination> {
+    let mut states = vec![vec![]];
+    for source in sources {
+        states = states
+            .into_iter()
+            .flat_map(|prefix| {
+                (0..source.stages.len()).map(move |stage| {
+                    let mut next = prefix.clone();
+                    next.push(stage);
+                    next
+                })
+            })
+            .collect();
+    }
+    states
+        .into_iter()
+        .map(|stages| Combination {
+            allowed: allowed(&stages, sources, rules),
+            stages,
+            observed: None,
+            error: None,
+        })
+        .collect()
+}
+fn route(states: &[Combination], sources: &[Source], tested: bool) -> Option<Vec<Vec<usize>>> {
+    let good: BTreeSet<_> = states
+        .iter()
+        .filter(|s| {
+            s.allowed
+                && s.error.is_none()
+                && (!tested
+                    || s.observed
+                        .as_ref()
+                        .is_some_and(|o| o.code == Some(0) && !o.stopped))
+        })
+        .map(|s| s.stages.clone())
+        .collect();
+    let start = vec![0; sources.len()];
+    let goal: Vec<_> = sources.iter().map(|s| s.stages.len() - 1).collect();
+    if !good.contains(&start) || !good.contains(&goal) {
+        return None;
+    }
+    let mut queue = VecDeque::from([vec![start.clone()]]);
+    let mut seen = BTreeSet::from([start]);
+    while let Some(path) = queue.pop_front() {
+        let at = path.last()?;
+        if at == &goal {
+            return Some(path);
+        }
+        for i in 0..sources.len() {
+            let mut next = at.clone();
+            next[i] += 1;
+            if next[i] < sources[i].stages.len()
+                && good.contains(&next)
+                && seen.insert(next.clone())
+            {
+                let mut path = path.clone();
+                path.push(next);
+                queue.push_back(path);
+            }
+        }
+    }
+    None
+}
+fn rehearse_state(
+    sources: &[Source],
+    state: &[usize],
+    command: &str,
+    stop: &git::RunStop,
+) -> Result<(Observation, Vec<String>), String> {
+    let mut scratches = vec![];
+    let mut vars = vec![];
+    for (source, &stage) in sources.iter().zip(state) {
+        if stop.stopped() {
+            return Err("Stopped before constructing the full combination".into());
+        }
+        let scratch =
+            git::Scratch::add_empty(&source.repo, "rehearse", &source.stages[stage].commit)?;
+        scratch.checkout(&source.stages[stage].commit)?;
+        let name = source.name.to_ascii_uppercase();
+        vars.push((
+            format!("GITCRAFT_COMPONENT_{name}"),
+            crate::remote::git_path(&scratch.path),
+        ));
+        vars.push((format!("GITCRAFT_STAGE_{name}"), stage.to_string()));
+        scratches.push(scratch);
+    }
+    let script = crate::custom_commands::captured_program(&vars, command);
+    let digest = format!(
+        "{:x}",
+        md5::compute(
+            sources
+                .iter()
+                .zip(state)
+                .map(|(s, &i)| format!("{}:{}", s.name, s.stages[i].tree))
+                .collect::<Vec<_>>()
+                .join("\n")
+        )
+    );
+    let result = contracts::observe(
+        &scratches[0].path,
+        &sources[0].stages[state[0]].commit,
+        &digest,
+        &script,
+        stop,
+    );
+    let cleanup = scratches
+        .into_iter()
+        .filter_map(|s| s.remove().err())
+        .collect();
+    let mut observation = result?;
+    observation.command = command.into();
+    Ok((observation, cleanup))
+}
+fn run(repo: &Path, plan: &Plan, tested: bool, stop: &git::RunStop) -> Result<Report, String> {
+    if tested && (!plan.trusted || plan.command.trim().is_empty()) {
+        return Err(
+            "Enter and explicitly trust your compatibility command before rehearsal".into(),
+        );
+    }
+    let sources = resolve(repo, plan)?;
+    let mut states = combinations(&sources, &plan.rules);
+    let mut cleanup = vec![];
+    if tested {
+        for source in &sources {
+            for (i, stage) in source.stages.iter().enumerate() {
+                git::run(
+                    Some(&source.repo),
+                    &[
+                        "update-ref",
+                        &format!(
+                            "refs/gitcraft/release-inputs/{:x}/{}/{i}",
+                            md5::compute(serde_json::to_string(plan).map_err(|e| e.to_string())?),
+                            source.name
+                        ),
+                        &stage.commit,
+                    ],
+                )?;
+            }
+        }
+        for state in &mut states {
+            if !state.allowed {
+                continue;
+            }
+            if stop.stopped() {
+                state.error = Some("Not tested: rehearsal stopped".into());
+                continue;
+            }
+            match rehearse_state(&sources, &state.stages, &plan.command, stop) {
+                Ok((observed, left)) => {
+                    state.observed = Some(observed);
+                    cleanup.extend(left);
+                }
+                Err(e) => state.error = Some(e),
+            }
+        }
+    }
+    let report = Report {
+        route: route(&states, &sources, tested),
+        sources,
+        rules: plan.rules.clone(),
+        command: plan.command.clone(),
+        states,
+        tested,
+        stopped: stop.stopped(),
+        cleanup,
+    };
+    let text = serde_json::to_string(&report).map_err(|e| e.to_string())?;
+    store::save(
+        repo,
+        "release-rehearsal-evidence",
+        &format!("{:x}", md5::compute(text)),
+        &report,
+    )?;
+    store::save(repo, "release-rehearsal-evidence", "latest", &report)?;
+    Ok(report)
+}
+impl RepoTab {
+    pub(in crate::repo) fn choreography_act(&mut self, act: Act, ctx: &egui::Context) {
+        if matches!(act, Act::Stop) {
+            self.review_tools.choreography.stop.stop();
+            return;
+        }
+        if self.review_tools.choreography.busy {
+            return;
+        }
+        self.review_tools.choreography.busy = true;
+        self.review_tools.choreography.stop = git::RunStop::default();
+        let (repo, stop) = (
+            self.path.clone(),
+            self.review_tools.choreography.stop.clone(),
+        );
+        self.then_or(
+            ctx,
+            true,
+            Err,
+            move || match act {
+                Act::Save(plan) => {
+                    store::save(&repo, "release-board", "plan", &plan)?;
+                    Ok((Some(plan), None))
+                }
+                Act::Load => Ok((
+                    store::load::<Plan>(&repo, "release-board", "plan")?,
+                    store::load::<Report>(&repo, "release-rehearsal-evidence", "latest")?,
+                )),
+                Act::Plan(plan) => run(&repo, &plan, false, &stop).map(|r| (None, Some(r))),
+                Act::Rehearse(plan) => run(&repo, &plan, true, &stop).map(|r| (None, Some(r))),
+                Act::Stop => Ok((None, None)),
+            },
+            |tab, result, _| {
+                let s = &mut tab.review_tools.choreography;
+                s.busy = false;
+                match result {
+                    Ok((plan, report)) => {
+                        s.error = None;
+                        if let Some(plan) = plan {
+                            s.plan = plan;
+                        }
+                        if report.is_some() {
+                            s.report = report;
+                        }
+                    }
+                    Err(e) => s.error = Some(e),
+                }
+            },
+        );
+    }
+}
+pub(super) fn show(ui: &mut egui::Ui, s: &mut State, repo: &Path, acts: &mut Vec<Action>) {
+    ui.heading(crate::i18n::text(
+        "repo-workflows-review-label-release-choreography-across-repositories-ebc4ee",
+    ));
+    ui.label(crate::i18n::text(
+        "repo-workflows-review-label-give-each-repository-deployed-optional-bridge-7a467e",
+    ));
+    let mut remove = None;
+    for (i, component) in s.plan.components.iter_mut().enumerate() {
+        ui.group(|ui| {
+            ui.horizontal(|ui| {
+                ui.label(crate::i18n::message(
+                    "repo-workflows-review-message-component-number-2d0dbb",
+                    &[("number", (i + 1).into())],
+                ));
+                if ui
+                    .small_button(crate::i18n::text(
+                        "repo-workflows-review_workflow-show-c3812fc4",
+                    ))
+                    .clicked()
+                {
+                    remove = Some(i);
+                }
+            });
+            ui.add(
+                egui::TextEdit::singleline(&mut component.name).hint_text(crate::i18n::text(
+                    "repo-workflows-review-label-identifier-e-g-backend-593c47",
+                )),
+            );
+            ui.add(
+                egui::TextEdit::singleline(&mut component.repo).hint_text(crate::i18n::text(
+                    "repo-workflows-review-label-repository-path-same-machine-as-this-board-1839cc",
+                )),
+            );
+            ui.label(crate::i18n::text(
+                "repo-workflows-review-label-ordered-stages-one-label-revision-per-line-fir-e2768b",
+            ));
+            ui.text_edit_multiline(&mut component.revisions);
+        });
+    }
+    if let Some(i) = remove {
+        s.plan.components.remove(i);
+    }
+    if ui
+        .button(crate::i18n::text(
+            "repo-workflows-review-label-add-repository-component-e7a69c",
+        ))
+        .clicked()
+    {
+        s.plan.components.push(Component {
+            repo: repo.to_string_lossy().into(),
+            ..Default::default()
+        });
+    }
+    let names: Vec<_> = s.plan.components.iter().map(|c| c.name.clone()).collect();
+    let mut remove = None;
+    for (i, rule) in s.plan.rules.iter_mut().enumerate() {
+        ui.group(|ui| {
+            ui.horizontal_wrapped(|ui| {
+                ui.label(crate::i18n::text("repo-workflows-review-label-when-cf9c7a"));
+                egui::ComboBox::from_id_salt(("rule-dependent", i))
+                    .selected_text(&rule.dependent)
+                    .show_ui(ui, |ui| {
+                        for n in &names {
+                            ui.selectable_value(&mut rule.dependent, n.clone(), n);
+                        }
+                    });
+                ui.label(crate::i18n::text("repo-workflows-review-label-reaches-stage-b0463b"));
+                ui.add(egui::DragValue::new(&mut rule.at).range(1..=3));
+                ui.label(crate::i18n::text("repo-workflows-review-label-require-c4d0cf"));
+                egui::ComboBox::from_id_salt(("rule-prerequisite", i))
+                    .selected_text(&rule.prerequisite)
+                    .show_ui(ui, |ui| {
+                        for n in &names {
+                            ui.selectable_value(&mut rule.prerequisite, n.clone(), n);
+                        }
+                    });
+                ui.label(crate::i18n::text("repo-workflows-review-label-at-least-stage-aeda37"));
+                ui.add(egui::DragValue::new(&mut rule.min).range(1..=3));
+                if ui.small_button(crate::i18n::text("repo-workflows-review-label-remove-rule-3fab73")).clicked() {
+                    remove = Some(i);
+                }
+            });
+            ui.add(
+                egui::TextEdit::singleline(&mut rule.reason)
+                    .hint_text(crate::i18n::text("repo-workflows-review-label-e-g-backend-supports-both-protocols-before-sdk-b4f54d")),
+            );
+        });
+    }
+    if let Some(i) = remove {
+        s.plan.rules.remove(i);
+    }
+    if ui
+        .button(crate::i18n::text(
+            "repo-workflows-review-label-add-ordering-compatibility-rule-e45b80",
+        ))
+        .clicked()
+    {
+        s.plan.rules.push(Rule {
+            at: 1,
+            min: 1,
+            ..Default::default()
+        });
+    }
+    ui.add(
+        egui::TextEdit::multiline(&mut s.plan.command).hint_text(crate::i18n::text(
+            "repo-workflows-review-label-compatibility-command-4b1ecc",
+        )),
+    );
+    ui.weak(crate::i18n::text(
+        "repo-workflows-review-label-the-command-receives-gitcraft-component-name-s-a6ca30",
+    ));
+    ui.checkbox(
+        &mut s.plan.trusted,
+        crate::i18n::text(
+            "repo-workflows-review-label-i-trust-this-compatibility-command-and-the-rep-46eb9c",
+        ),
+    );
+    ui.horizontal_wrapped(|ui| {
+        for (label, act) in [
+            (
+                crate::i18n::text("repo-workflows-review-label-save-board-3bbd88"),
+                Act::Save(s.plan.clone()),
+            ),
+            (
+                crate::i18n::text("repo-workflows-review-label-load-board-and-evidence-28df38"),
+                Act::Load,
+            ),
+            (
+                crate::i18n::text(
+                    "repo-workflows-review-label-plan-order-without-running-tests-47f369",
+                ),
+                Act::Plan(s.plan.clone()),
+            ),
+            (
+                crate::i18n::text(
+                    "repo-workflows-review-label-rehearse-every-permitted-combination-16276e",
+                ),
+                Act::Rehearse(s.plan.clone()),
+            ),
+        ] {
+            if ui.add_enabled(!s.busy, egui::Button::new(label)).clicked() {
+                acts.push(Action::ReviewTools(ToolsAct::Choreography(act)));
+            }
+        }
+        if s.busy
+            && ui
+                .button(crate::i18n::text(
+                    "repo-workflows-review-label-stop-rehearsal-1464d4",
+                ))
+                .clicked()
+        {
+            acts.push(Action::ReviewTools(ToolsAct::Choreography(Act::Stop)));
+        }
+    });
+    if let Some(e) = &s.error {
+        ui.label(crate::repo::messages::display_status(e));
+    }
+    if let Some(r) = &s.report {
+        ui.label(if r.tested {
+            crate::i18n::text(
+                "repo-workflows-review-label-observed-compatibility-under-your-recorded-com-8785b1",
+            )
+        } else {
+            crate::i18n::text(
+                "repo-workflows-review-label-candidate-plan-only-no-compatibility-test-exec-afa4f9",
+            )
+        });
+        if r.stopped {
+            ui.label(crate::i18n::text(
+                "repo-workflows-review-label-stopped-untested-combinations-cannot-establish-627b12",
+            ));
+        }
+        if let Some(route) = &r.route {
+            for pair in route.windows(2) {
+                if let Some(i) = pair[0].iter().zip(&pair[1]).position(|(a, b)| a != b) {
+                    let stage = &r.sources[i].stages[pair[1][i]];
+                    ui.label(format!(
+                        "{} → {} ({})",
+                        r.sources[i].name,
+                        display_stage(stage),
+                        crate::repo::short(&stage.commit)
+                    ));
+                }
+            }
+        } else {
+            ui.label(crate::i18n::text(
+                "repo-workflows-review-label-no-permitted-passing-release-order-was-establi-244ee9",
+            ));
+        }
+        egui::CollapsingHeader::new(crate::i18n::message("repo-workflows-review-message-count-one-one-combination-and-its-evidence-oth-e7b196", &[("count", (r.states.len()).into())]))
+        .id_salt("review-release-combination-evidence")
+        .show(ui, |ui| {
+            for combination in &r.states {
+                ui.group(|ui| {
+                    ui.monospace(
+                        r.sources
+                            .iter()
+                            .zip(&combination.stages)
+                            .map(|(source, &i)| {
+                                format!(
+                                    "{}={} ({})",
+                                    source.name,
+                                    display_stage(&source.stages[i]),
+                                    crate::repo::short(&source.stages[i].commit)
+                                )
+                            })
+                            .collect::<Vec<_>>()
+                            .join(" · "),
+                    );
+                    if !combination.allowed {
+                        ui.label(crate::i18n::text("repo-workflows-review-label-excluded-by-your-declared-ordering-rules-2c5680"));
+                    } else if let Some(error) = &combination.error {
+                        ui.label(crate::repo::messages::display_status(error));
+                    } else if let Some(observed) = &combination.observed {
+                        contracts::show_observation(ui, observed);
+                    } else {
+                        ui.label(crate::i18n::text("repo-workflows-review-label-not-tested-51e3a0"));
+                    }
+                });
+            }
+        });
+        for e in &r.cleanup {
+            ui.label(crate::i18n::message(
+                "repo-workflows-review-message-scratch-cleanup-needs-attention-detail-1b274a",
+                &[("detail", (crate::repo::messages::display_status(e)).into())],
+            ));
+        }
+    }
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn sources() -> Vec<Source> {
+        ["backend", "sdk"]
+            .iter()
+            .map(|name| Source {
+                name: (*name).into(),
+                repo: PathBuf::from("/recording"),
+                stages: (0..2)
+                    .map(|i| Stage {
+                        label: i.to_string(),
+                        commit: i.to_string(),
+                        tree: i.to_string(),
+                        generated_index: None,
+                    })
+                    .collect(),
+            })
+            .collect()
+    }
+    #[test]
+    fn rehearsed_cross_repo_behavior_derives_a_passing_order() -> Result<(), String> {
+        let backend = git::stack::test_repo::TestRepo::new("release-backend")?;
+        let sdk = git::stack::test_repo::TestRepo::new("release-sdk")?;
+        let b0 = backend.commit("backend.txt", "old\n", "deployed")?;
+        let b1 = backend.commit("backend.txt", "dual\n", "bridge")?;
+        let s0 = sdk.commit("sdk.txt", "old\n", "deployed")?;
+        let s1 = sdk.commit("sdk.txt", "new\n", "switch")?;
+        let plan=Plan{components:vec![
+            Component{name:"backend".into(),repo:backend.path().to_string_lossy().into(),revisions:format!("deployed={b0}\nbridge={b1}")},
+            Component{name:"sdk".into(),repo:sdk.path().to_string_lossy().into(),revisions:format!("deployed={s0}\nnext={s1}")}
+        ],rules:vec![],command:r#"test "$(cat "$GITCRAFT_COMPONENT_SDK/sdk.txt")" != new || test "$(cat "$GITCRAFT_COMPONENT_BACKEND/backend.txt")" = dual"#.into(),trusted:true};
+        let report = run(backend.path(), &plan, true, &git::RunStop::default())?;
+        assert_eq!(report.states.len(), 4);
+        assert_eq!(
+            report
+                .states
+                .iter()
+                .filter(|s| s.observed.as_ref().is_some_and(|o| o.code == Some(1)))
+                .count(),
+            1
+        );
+        assert_eq!(report.route, Some(vec![vec![0, 0], vec![1, 0], vec![1, 1]]));
+        assert_eq!(backend.tip("HEAD")?, b1);
+        assert_eq!(sdk.tip("HEAD")?, s1);
+        assert!(report.cleanup.is_empty());
+        Ok(())
+    }
+    #[test]
+    fn ordering_rules_and_observed_failures_control_the_route() {
+        let sources = sources();
+        let rules = vec![Rule {
+            dependent: "sdk".into(),
+            at: 1,
+            prerequisite: "backend".into(),
+            min: 1,
+            reason: "dual protocol first".into(),
+        }];
+        let mut states = combinations(&sources, &rules);
+        assert_eq!(
+            route(&states, &sources, false),
+            Some(vec![vec![0, 0], vec![1, 0], vec![1, 1]])
+        );
+        assert!(route(&states, &sources, true).is_none());
+        for s in &mut states {
+            if s.allowed {
+                s.observed = Some(Observation {
+                    commit: "pinned".into(),
+                    tree: "combination".into(),
+                    command: "integration".into(),
+                    code: Some(if s.stages == [1, 0] { 1 } else { 0 }),
+                    stopped: false,
+                    lines: vec![],
+                    machine: "recording".into(),
+                });
+            }
+        }
+        assert!(route(&states, &sources, true).is_none());
+        if let Some(state) = states.iter_mut().find(|s| s.stages == [1, 0])
+            && let Some(o) = &mut state.observed
+        {
+            o.code = Some(0);
+        }
+        assert!(route(&states, &sources, true).is_some());
+    }
+    #[test]
+    fn command_environment_names_cannot_inject_shell_syntax() {
+        assert!(valid_name("backend_v2"));
+        for bad in ["", "2sdk", "SDK;rm", "$(command)", "SDK-NEXT"] {
+            assert!(!valid_name(bad));
+        }
+    }
+}
+#[cfg(test)]
+mod fluent_review_tests {
+    use super::*;
+    use crate::repo::review_workflow::presentation_tests::{click, paint};
+
+    #[test]
+    fn fluent_review_choreography_actual_board_repaints_numeric_plurals_and_keeps_plan()
+    -> Result<(), String> {
+        let ctx = egui::Context::default();
+        let mut state = State::default();
+        state.plan.components.push(Component {
+            name: "backend{literal}".into(),
+            repo: "/opaque/Repo A".into(),
+            revisions: "deployed=refs/heads/main".into(),
+        });
+        state.report = Some(Report {
+            sources: vec![],
+            rules: vec![],
+            command: "printf 'keep argv'".into(),
+            states: vec![Combination {
+                stages: vec![],
+                allowed: true,
+                observed: None,
+                error: None,
+            }],
+            route: None,
+            tested: false,
+            stopped: false,
+            cleanup: vec![],
+        });
+        let before = serde_json::to_string(&state.plan).map_err(|e| e.to_string())?;
+        let mut acts = vec![];
+        for (locale, heading, count) in [
+            (
+                "en-US",
+                "Release choreography across repositories",
+                "One combination and its evidence",
+            ),
+            (
+                "de",
+                "Release-Choreografie über mehrere Repositorys",
+                "Eine Kombination und ihre Nachweise",
+            ),
+        ] {
+            crate::i18n::set_language(locale);
+            let text = paint(&ctx, |ui| {
+                show(ui, &mut state, Path::new("/opaque/Repo A"), &mut acts)
+            });
+            assert!(text.contains(heading) && text.contains(count), "{text}");
+            assert!(
+                text.contains("backend{literal}") && text.contains("deployed=refs/heads/main"),
+                "{text}"
+            );
+        }
+        state
+            .report
+            .as_mut()
+            .ok_or("report")?
+            .states
+            .push(Combination {
+                stages: vec![],
+                allowed: true,
+                observed: None,
+                error: None,
+            });
+        let text = paint(&ctx, |ui| {
+            show(ui, &mut state, Path::new("/opaque/Repo A"), &mut acts)
+        });
+        assert!(
+            text.contains("2 Kombinationen und ihre Nachweise"),
+            "{text}"
+        );
+        assert_eq!(
+            serde_json::to_string(&state.plan).map_err(|e| e.to_string())?,
+            before
+        );
+        click(&ctx, "Board speichern", |ui| {
+            show(ui, &mut state, Path::new("/opaque/Repo A"), &mut acts)
+        })?;
+        assert!(
+            matches!(acts.as_slice(), [Action::ReviewTools(ToolsAct::Choreography(Act::Save(plan)))] if plan.components[0].repo == "/opaque/Repo A")
+        );
+        Ok(())
+    }
+}
+#[cfg(test)]
+mod fluent_review_r1_tests {
+    use super::*;
+    use crate::repo::review_workflow::presentation_tests::{click, paint};
+
+    fn inert_stage(line: &str, i: usize) -> Stage {
+        let (label, revision, generated_index) = stage_input(line, i);
+        Stage {
+            label,
+            commit: revision.into(),
+            tree: format!("tree-{i}"),
+            generated_index,
+        }
+    }
+
+    #[test]
+    fn fluent_review_r1_stage_provenance_preserves_explicit_collisions_and_legacy_labels()
+    -> Result<(), String> {
+        for (locale, generated) in [("en-US", "Stage 1"), ("de", "Stufe 1")] {
+            crate::i18n::set_language(locale);
+            let stage = inert_stage("refs/heads/generated", 1);
+            assert_eq!(stage.label, "Stage 1");
+            assert_eq!(stage.commit, "refs/heads/generated");
+            assert_eq!(stage.generated_index, Some(1));
+            assert_eq!(display_stage(&stage), generated);
+            let reopened: Stage =
+                serde_json::from_str(&serde_json::to_string(&stage).map_err(|e| e.to_string())?)
+                    .map_err(|e| e.to_string())?;
+            assert_eq!(display_stage(&reopened), generated);
+            for label in ["Stage1", "Stage 1", "Custom {raw}", "Stufe 1"] {
+                let stage = inert_stage(&format!("{label}= refs/heads/opaque"), 1);
+                assert_eq!(stage.generated_index, None);
+                assert_eq!(stage.label, label);
+                assert_eq!(display_stage(&stage), label);
+                assert_eq!(stage.commit, "refs/heads/opaque");
+                let serialized = serde_json::to_string(&stage).map_err(|e| e.to_string())?;
+                assert!(!serialized.contains("generated_index"));
+            }
+            // Older reports cannot prove whether Stage 1 was generated or entered by a user.
+            let legacy: Stage =
+                serde_json::from_str(r#"{"label":"Stage 1","commit":"oid","tree":"tree"}"#)
+                    .map_err(|e| e.to_string())?;
+            assert_eq!(legacy.generated_index, None);
+            assert_eq!(display_stage(&legacy), "Stage 1");
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn fluent_review_r1_actual_route_evidence_and_count_header_retain_locale_state()
+    -> Result<(), String> {
+        let ctx = egui::Context::default();
+        let mut state = State::default();
+        state.report = Some(Report {
+            sources: vec![
+                Source {
+                    name: "backend".into(),
+                    repo: PathBuf::from("/opaque/backend"),
+                    stages: vec![inert_stage("base-oid", 0), inert_stage("next-oid", 1)],
+                },
+                Source {
+                    name: "custom".into(),
+                    repo: PathBuf::from("/opaque/custom"),
+                    stages: vec![
+                        inert_stage("Stage 1=userbase", 0),
+                        inert_stage("Stage1=usernext", 1),
+                    ],
+                },
+            ],
+            rules: vec![],
+            command: "Stage --opaque-command".into(),
+            states: vec![
+                Combination {
+                    stages: vec![0, 0],
+                    allowed: true,
+                    observed: None,
+                    error: None,
+                },
+                Combination {
+                    stages: vec![1, 1],
+                    allowed: true,
+                    observed: None,
+                    error: None,
+                },
+            ],
+            route: Some(vec![vec![0, 0], vec![1, 0], vec![1, 1]]),
+            tested: false,
+            stopped: false,
+            cleanup: vec![],
+        });
+        let before = serde_json::to_string(state.report.as_ref().ok_or("report")?)
+            .map_err(|e| e.to_string())?;
+        let mut acts = vec![];
+        crate::i18n::set_language("en-US");
+        let text = paint(&ctx, |ui| {
+            show(ui, &mut state, Path::new("/opaque"), &mut acts)
+        });
+        assert!(text.contains("backend → Stage 1 (next-oid)"), "{text}");
+        assert!(
+            !text.contains("backend=Stage 0"),
+            "evidence should start collapsed: {text}"
+        );
+        click(&ctx, "2 combinations and their evidence", |ui| {
+            show(ui, &mut state, Path::new("/opaque"), &mut acts)
+        })?;
+        for (locale, generated) in [("en-US", "Stage"), ("de", "Stufe"), ("en-US", "Stage")] {
+            crate::i18n::set_language(locale);
+            let text = paint(&ctx, |ui| {
+                show(ui, &mut state, Path::new("/opaque"), &mut acts)
+            });
+            assert!(
+                text.contains(&format!("backend → {generated} 1 (next-oid)")),
+                "{text}"
+            );
+            assert!(
+                text.contains(&format!("backend={generated} 0 (base-oid)")),
+                "evidence expansion lost: {text}"
+            );
+            assert!(
+                text.contains(&format!("backend={generated} 1 (next-oid)")),
+                "{text}"
+            );
+            assert!(
+                text.contains("custom → Stage1 (usernext)")
+                    && text.contains("custom=Stage 1 (userbase)")
+                    && text.contains("custom=Stage1 (usernext)"),
+                "explicit labels changed: {text}"
+            );
+        }
+        assert_eq!(
+            serde_json::to_string(state.report.as_ref().ok_or("report")?)
+                .map_err(|e| e.to_string())?,
+            before
+        );
+        state
+            .report
+            .as_mut()
+            .ok_or("report")?
+            .states
+            .push(Combination {
+                stages: vec![0, 0],
+                allowed: true,
+                observed: None,
+                error: None,
+            });
+        crate::i18n::set_language("de");
+        let text = paint(&ctx, |ui| {
+            show(ui, &mut state, Path::new("/opaque"), &mut acts)
+        });
+        assert!(
+            text.contains("3 Kombinationen und ihre Nachweise") && text.contains("backend=Stufe 0"),
+            "count change lost expansion: {text}"
+        );
+        assert!(acts.is_empty());
+        Ok(())
+    }
+}

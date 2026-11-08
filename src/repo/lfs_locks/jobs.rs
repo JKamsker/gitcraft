@@ -17,7 +17,10 @@ pub(super) fn caught<T>(work: impl FnOnce() -> Result<T, String>) -> Result<T, S
             .map(|s| (*s).to_owned())
             .or_else(|| p.downcast_ref::<String>().cloned())
             .unwrap_or_default();
-        Err(format!("Internal error: {said}"))
+        Err(crate::i18n::message(
+            "repo-workflows-lfs_locks-caught-ff2cd16f",
+            &[("said", (said).clone().into())],
+        ))
     })
 }
 
@@ -101,7 +104,7 @@ impl RepoTab {
             Err(e) => {
                 state.unsupported = unsupported(&e);
                 state.read_ok = false;
-                state.error = Some(format!("Could not read the LFS locks: {e}"));
+                state.remember_read_error(e);
             }
         }
         if let Some(panel) = &mut state.panel {
@@ -227,18 +230,20 @@ impl RepoTab {
             move || caught(|| work(&path, creds.as_ref())),
             move |tab, result, ctx| {
                 tab.lfs_locks.busy = None;
-                tab.status = Some(match &result {
+                tab.status = Some(crate::repo::Notice::plain(match &result {
                     Ok(()) if made_lockable => (
                         format!("{label}: done. Commit .gitattributes to share it."),
                         false,
                     ),
                     Ok(()) => (format!("{label}: done"), false),
                     Err(e) => (format!("{label} failed: {e}"), true),
+                }));
+                tab.lfs_locks.job_error = result.as_ref().err().map(|e| {
+                    crate::i18n::message(
+                        "repo-workflows-lfs_locks-lock-job-8336fbfe",
+                        &[("label", (label).clone().into()), ("e", (e).clone().into())],
+                    )
                 });
-                tab.lfs_locks.job_error = result
-                    .as_ref()
-                    .err()
-                    .map(|e| format!("{label} failed: {e}"));
                 if let Some(panel) = &mut tab.lfs_locks.panel {
                     panel.confirm_force = None;
                     if result.is_ok() {

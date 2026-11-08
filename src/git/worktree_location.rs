@@ -28,7 +28,10 @@ pub fn resolve_worktree_root(main: &Path, root: &str) -> Result<PathBuf, String>
     }
     let root = remote::folder_for_git(main, root)?;
     if root == "~" || root.starts_with("~/") {
-        return Err("Use a full path or a path relative to the main checkout".to_owned());
+        return Err(crate::i18n::text(
+            "backend-use-a-full-path-or-a-path-relative-to-the-main-checkout-b17a11",
+        )
+        .to_owned());
     }
     Ok(remote::resolve(main, &root))
 }
@@ -57,18 +60,24 @@ pub fn branch_worktree_folder(root: &Path, branch: &str) -> PathBuf {
 /// in the operation worker for manual worktrees, PRs, issues and agent tasks alike.
 pub fn prepare_worktree_folder(repo: &Path, folder: &str) -> Result<(), String> {
     let destination = remote::resolve(repo, folder);
-    let parent = destination
-        .parent()
-        .ok_or("The worktree needs a parent folder")?;
-    remote::create_dir_all(parent)
-        .map_err(|e| format!("Could not create worktree folders: {e}"))?;
+    let parent = destination.parent().ok_or(crate::i18n::text(
+        "backend-the-worktree-needs-a-parent-folder-e064c7",
+    ))?;
+    remote::create_dir_all(parent).map_err(|e| {
+        crate::i18n::message(
+            "backend-could-not-create-worktree-folders-e-e76d44",
+            &[("detail", (e).to_string().into())],
+        )
+    })?;
     // Resolve symlinks and `..` on the repository's machine, after the parents exist.
     let parent = canonical_dir(parent)?;
     let destination = remote::join(
         &parent,
         &destination
             .file_name()
-            .ok_or("The worktree needs a folder name")?
+            .ok_or(crate::i18n::text(
+                "backend-the-worktree-needs-a-folder-name-c43128",
+            ))?
             .to_string_lossy(),
     );
     let list = super::worktree_list(repo, None)?;
@@ -96,11 +105,20 @@ pub fn prepare_worktree_folder(repo: &Path, folder: &str) -> Result<(), String> 
         // creating a nested checkout that would otherwise show up as an untracked repository.
         super::run(
             Some(&wt.path),
-            &["check-ignore", "--no-index", "--quiet", "--", &format!("{folder}/")],
-        ).map_err(|_| format!(
-            "Could not ignore {folder}: check for a .gitignore rule that overrides local excludes. \
-             Ignore this folder in .gitignore or choose a root outside the checkout."
-        ))?;
+            &[
+                "check-ignore",
+                "--no-index",
+                "--quiet",
+                "--",
+                &format!("{folder}/"),
+            ],
+        )
+        .map_err(|_| {
+            crate::i18n::message(
+                "backend-could-not-ignore-folder-check-for-a-gitignore-rule-that-overrides-ee9cde",
+                &[("folder", (folder).to_string().into())],
+            )
+        })?;
     }
     Ok(())
 }
@@ -124,8 +142,15 @@ fn canonical_dir(dir: &Path) -> Result<PathBuf, String> {
             path.trim_end_matches(['\r', '\n']),
         ));
     }
-    dir.canonicalize()
-        .map_err(|e| format!("Could not resolve {}: {e}", dir.display()))
+    dir.canonicalize().map_err(|e| {
+        crate::i18n::message(
+            "backend-could-not-resolve-e-4029e3",
+            &[
+                ("path", (dir.display()).to_string().into()),
+                ("detail", (e).to_string().into()),
+            ],
+        )
+    })
 }
 
 /// Append a literal directory rule without rewriting existing ignore rules.
@@ -137,7 +162,10 @@ fn exclude_folder(repo: &Path, relative: &Path) -> Result<(), String> {
         .collect::<Vec<_>>()
         .join("/");
     if name.contains(['\r', '\n']) {
-        return Err("A worktree folder inside a checkout cannot contain a line break".to_owned());
+        return Err(crate::i18n::text(
+            "backend-a-worktree-folder-inside-a-checkout-cannot-contain-a-line-break-6f78d8",
+        )
+        .to_owned());
     }
     let mut pattern = String::from("/");
     for c in name.chars() {
@@ -152,7 +180,12 @@ fn exclude_folder(repo: &Path, relative: &Path) -> Result<(), String> {
     let text = match remote::read(&file) {
         Ok(text) => text,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Vec::new(),
-        Err(e) => return Err(format!("Could not read info/exclude: {e}")),
+        Err(e) => {
+            return Err(crate::i18n::message(
+                "backend-could-not-read-info-exclude-e-351b81",
+                &[("detail", (e).to_string().into())],
+            ));
+        }
     };
     if text
         .split(|b| *b == b'\n')
@@ -166,6 +199,10 @@ fn exclude_folder(repo: &Path, relative: &Path) -> Result<(), String> {
     if let Some(parent) = file.parent() {
         remote::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
-    remote::append(&file, addition.as_bytes())
-        .map_err(|e| format!("Could not write info/exclude: {e}"))
+    remote::append(&file, addition.as_bytes()).map_err(|e| {
+        crate::i18n::message(
+            "backend-could-not-write-info-exclude-e-7022a5",
+            &[("detail", (e).to_string().into())],
+        )
+    })
 }

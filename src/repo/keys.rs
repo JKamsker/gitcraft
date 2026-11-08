@@ -6,35 +6,99 @@ use crate::keymap::Command;
 use crate::settings::Settings;
 
 impl RepoTab {
+    pub(crate) fn command_refusal(&self, command: Command) -> Option<String> {
+        match command.scope() {
+            crate::keymap::Scope::Graph if self.commits.is_empty() => {
+                Some(crate::i18n::text("repo-core-2857").into())
+            }
+            crate::keymap::Scope::Rebase if self.rebase.is_none() => {
+                Some(crate::i18n::text("repo-core-2858").into())
+            }
+            crate::keymap::Scope::Rebase
+                if self.rebase.as_ref().is_some_and(|editor| editor.starting) =>
+            {
+                Some(crate::i18n::text("repo-core-2859").into())
+            }
+            _ => self.key_action(command).err(),
+        }
+    }
+
     /// The action the key of `command` stands for here, or why it can't be done now, as the
     /// toolbar would say it. `None` for the window's keys, which aren't the tab's.
     pub(super) fn key_action(&self, command: Command) -> Result<Option<Action>, String> {
         if let Some(op) = &self.busy_op
-            && command != Command::Terminal
+            && !matches!(
+                command,
+                Command::Terminal
+                    | Command::Timeline
+                    | Command::Search
+                    | Command::Back
+                    | Command::Forward
+                    | Command::NextChange
+                    | Command::PreviousChange
+                    | Command::NextChangeAlt
+                    | Command::PreviousChangeAlt
+                    | Command::GraphCopyHash
+                    | Command::GraphCopyMessage
+                    | Command::GraphCopyBranch
+            )
         {
-            return Err(format!("{op} is still running"));
+            return Err(crate::i18n::message(
+                "repo-core-2860",
+                &[("op", crate::repo::messages::display_operation(op).into())],
+            ));
         }
-        let no_remote = || "This repository has no remote".to_owned();
+        let no_remote = || crate::i18n::text("repo-core-2861").to_owned();
         let action = match command {
             Command::Fetch | Command::Pull | Command::Push if self.remotes.is_empty() => {
                 return Err(no_remote());
             }
+            Command::Undo if self.timeline.current_entry().is_none() => {
+                return Err(crate::i18n::text("repo-core-2862").into());
+            }
+            Command::Redo if self.timeline.redo_target().is_none() => {
+                return Err(crate::i18n::text("repo-core-2863").into());
+            }
+            Command::Undo => Action::Undo,
+            Command::Redo => Action::Redo,
+            Command::Timeline => Action::ToggleTimeline,
+            Command::Reload => Action::Reload,
+            Command::GraphCopyHash | Command::GraphCopyMessage | Command::GraphCopyBranch => {
+                let text = self
+                    .selected
+                    .and_then(|i| self.graph_copy_text(command, i))
+                    .ok_or_else(|| crate::i18n::text("repo-core-2864").to_owned())?;
+                Action::CopyText(text)
+            }
+            Command::Search => Action::FocusSearch,
+            Command::Back if self.nav.peek(-1).is_none() => {
+                return Err(crate::i18n::text("repo-core-2865").into());
+            }
+            Command::Forward if self.nav.peek(1).is_none() => {
+                return Err(crate::i18n::text("repo-core-2866").into());
+            }
+            Command::Back => Action::Navigate(-1),
+            Command::Forward => Action::Navigate(1),
+            Command::NextChange | Command::NextChangeAlt => Action::DiffStep(1),
+            Command::PreviousChange | Command::PreviousChangeAlt => Action::DiffStep(-1),
             Command::Fetch => Action::Fetch,
             Command::Pull => Action::Pull,
             Command::Push => Action::Push,
-            Command::Stash if self.work.is_clean() => return Err("No changes to stash".into()),
+            Command::Stash if self.work.is_clean() => {
+                return Err(crate::i18n::text("repo-core-2867").into());
+            }
             Command::Stash => Action::Dialog(Dialog::stash()),
             Command::NewBranch if self.refs.head.is_empty() => {
-                return Err("Make a first commit to branch from".into());
+                return Err(crate::i18n::text("repo-core-2868").into());
             }
             Command::NewBranch => Action::Dialog(Dialog::create_branch(&self.refs.head, "HEAD")),
             Command::Terminal => Action::ToggleTerminal,
             Command::StageAll if self.work.unstaged.is_empty() => {
-                return Err("Nothing to stage".into());
+                return Err(crate::i18n::text("repo-core-0838").into());
             }
             // `add -A` would mark them resolved, conflict markers and all.
             Command::StageAll if !self.work.conflicted.is_empty() => {
-                return Err("Resolve the conflicted files first".into());
+                return Err(crate::i18n::text("repo-core-0351").into());
             }
             Command::StageAll => Action::Ops {
                 label: "Stage all".into(),
@@ -42,17 +106,17 @@ impl RepoTab {
                 refresh: Refresh::Status,
             },
             Command::Commit => return self.commit_key().map(Some),
-            Command::NewTab
-            | Command::CloseTab
-            | Command::ReopenTab
-            | Command::NextTab
-            | Command::PreviousTab
-            | Command::GoToTab(_)
-            | Command::LastTab
-            | Command::Palette
-            | Command::Settings
-            | Command::Reload
-            | Command::Manual => return Ok(None),
+            Command::FocusSidebar => Action::FocusPane(super::keyboard::Pane::Sidebar),
+            Command::FocusGraph => Action::FocusPane(super::keyboard::Pane::Graph),
+            Command::FocusDetail => Action::FocusPane(super::keyboard::Pane::Detail),
+            Command::FileNext
+            | Command::FilePrevious
+            | Command::FileToggleStage
+            | Command::FileOpen
+            | Command::HunkStage
+            | Command::HunkUnstage
+            | Command::HunkDiscard => return self.keyboard_command(command).map(Some),
+            _ => return Ok(None),
         };
         Ok(Some(action))
     }
@@ -61,7 +125,7 @@ impl RepoTab {
     /// the message.
     fn commit_key(&self) -> Result<Action, String> {
         if !self.work.conflicted.is_empty() {
-            return Err("Resolve the conflicted files first".into());
+            return Err(crate::i18n::text("repo-core-0351").into());
         }
         // A rebase or patch stopped on conflicts: the commit continues it, with git's message.
         if self.work.in_progress.is_some_and(|s| s.continues()) {
@@ -71,14 +135,14 @@ impl RepoTab {
         // changes, and committing still concludes it.
         let concluding = self.work.in_progress.is_some();
         if self.work.is_clean() && !self.amend && !concluding {
-            return Err("Nothing to commit".into());
+            return Err(crate::i18n::text("repo-core-2869").into());
         }
         if self.commit_summary.trim().is_empty() {
             // The summary is in the changes' commit box: without the changes row, nowhere.
             return if self.index.contains_key(WIP_HASH) {
                 Ok(Action::FocusCommit)
             } else {
-                Err("Write a commit summary first".into())
+                Err(crate::i18n::text("repo-core-0355").into())
             };
         }
         Ok(Action::Commit)
@@ -88,8 +152,13 @@ impl RepoTab {
     pub(super) fn run_key(&mut self, command: Command, ctx: &egui::Context) {
         match self.key_action(command) {
             Ok(Some(action)) => self.apply(action, ctx),
-            Ok(None) => {}
-            Err(why) => self.status = Some((why, true)),
+            Ok(None) => {
+                self.status = Some(crate::repo::Notice::plain((
+                    crate::i18n::text("repo-core-2870").into(),
+                    true,
+                )))
+            }
+            Err(why) => self.status = Some(crate::repo::Notice::plain((why, true))),
         }
     }
 
@@ -211,7 +280,24 @@ mod tests {
         let mut tab = loaded(&dir, &ctx);
         for b in crate::keymap::BINDINGS {
             let resolved = tab.key_action(b.command);
-            let tabs = b.command.scope() == crate::keymap::Scope::Repository;
+            // Graph/rebase/search/selection/settings widgets own their registry commands.
+            // Reload also has a direct repository action behind its window shortcut.
+            let tabs = matches!(
+                b.command.scope(),
+                crate::keymap::Scope::Repository
+                    | crate::keymap::Scope::Changes
+                    | crate::keymap::Scope::Diff
+            ) || matches!(
+                b.command,
+                Command::Reload
+                    | Command::GraphCopyHash
+                    | Command::GraphCopyMessage
+                    | Command::GraphCopyBranch
+                    | Command::FileNext
+                    | Command::FilePrevious
+                    | Command::FileToggleStage
+                    | Command::FileOpen
+            );
             match resolved {
                 Ok(Some(_)) => assert!(tabs, "{:?}", b.command),
                 Ok(None) => assert!(!tabs, "{:?}", b.command),
@@ -223,7 +309,7 @@ mod tests {
         let commit = tab.key_action(Command::Commit).err();
         let terminal = tab.key_action(Command::Terminal);
         tab.run_key(Command::StageAll, &ctx);
-        let shown = tab.status.clone();
+        let shown = tab.status.as_deref().cloned();
         let _ = std::fs::remove_dir_all(&dir);
         assert_eq!(fetch.as_deref(), Some("Push is still running"));
         assert_eq!(commit.as_deref(), Some("Push is still running"));
@@ -266,7 +352,7 @@ mod tests {
     /// Fetch, pull and push from the keys, against a remote in a folder with spaces: each
     /// shows on the remote or in the repository, not just in a status line.
     #[test]
-    fn fetch_pull_and_push_from_the_keys() {
+    fn fetch_pull_and_push_from_the_keys() -> Result<(), String> {
         let dir = repo("remote");
         let name = dir.file_name().unwrap_or_default().to_string_lossy();
         let bare = dir.with_file_name(format!("{name} remote.git"));
@@ -286,6 +372,9 @@ mod tests {
         let mut tab = loaded(&dir, &ctx);
 
         press(&mut tab, &ctx, Command::Push);
+        assert!(git::resolve(&bare, &format!("refs/heads/{branch}")).is_err());
+        super::super::push_preflight::test_support::approve(&mut tab, &ctx)?;
+        wait(&mut tab, &ctx, |t| t.busy_op.is_none() && !t.loading);
         let pushed = run(Some(&bare), &["log", "-1", "--format=%s", &branch]);
 
         // A commit made on the remote from elsewhere: fetch sees it, pull brings it in.
@@ -302,7 +391,7 @@ mod tests {
         let fetched = run(Some(&dir), &["log", "-1", "--format=%s", &tracking]);
         press(&mut tab, &ctx, Command::Pull);
         let pulled = run(Some(&dir), &["log", "-1", "--format=%s"]);
-        let failed = tab.status.clone().filter(|(_, err)| *err);
+        let failed = tab.status.as_deref().cloned().filter(|(_, err)| *err);
         for d in [&dir, &bare, &other] {
             let _ = std::fs::remove_dir_all(d);
         }
@@ -310,6 +399,7 @@ mod tests {
         assert_eq!(fetched.trim(), "from élsewhere ✓");
         assert_eq!(pulled.trim(), "from élsewhere ✓");
         assert_eq!(failed, None);
+        Ok(())
     }
 
     /// A merge whose conflicts were resolved back to HEAD's content has no changes, and the

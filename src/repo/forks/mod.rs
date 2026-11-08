@@ -24,6 +24,7 @@ pub(in crate::repo) fn before_step(op: &[String]) {
     tests::before_step(op);
 }
 
+pub(crate) use guard::Scope as ExecutionScope;
 pub(crate) use plan::Setup;
 pub(crate) use view::paint_badges;
 
@@ -45,6 +46,8 @@ pub(crate) struct Forks {
     running: Option<(String, plan::Rebase)>,
     scope: Option<guard::Scope>,
     scope_label: Option<String>,
+    /// Only the local worker completion may schedule its separately reviewed push.
+    staged_rebase: Option<String>,
     /// A rebase that stopped on conflicts: once it is continued, its push is offered.
     after_conflict: Option<plan::Rebase>,
     /// The completed conflict continuation captured when offering its confirmation.
@@ -72,6 +75,14 @@ pub(crate) enum ForkAct {
 }
 
 impl Forks {
+    /// Consume a worker completion once; repeated delivery cannot record local
+    /// undo twice or schedule the same push preview again.
+    fn take_rebase_completion(&mut self, label: &str) -> Option<(bool, String, plan::Rebase)> {
+        let (asked, plan) = self.running.take_if(|(l, _)| l == label)?;
+        let staged = self.staged_rebase.take_if(|l| l == label).is_some();
+        Some((staged, asked, plan))
+    }
+
     /// What the forge said of pull request `number`.
     pub(crate) fn of(&self, number: u64) -> Option<&ForkInfo> {
         self.info.get(&number)
@@ -207,7 +218,10 @@ impl RepoTab {
 
     fn checkout_fork(&mut self, number: u64, ctx: &Context) {
         let Some(info) = self.forks.of(number).cloned() else {
-            self.status = Some((format!("Where #{number} comes from isn't known yet"), true));
+            self.status = Some(crate::repo::Notice::plain((
+                format!("Where #{number} comes from isn't known yet"),
+                true,
+            )));
             return;
         };
         let Some(hosting) = self.hosting.clone() else {
@@ -235,7 +249,7 @@ impl RepoTab {
             self.hosting.as_ref(),
         ) {
             Ok(plan) => {
-                let label = format!("Check out #{number} to push to {}", info.owner);
+                let label = checkout_operation_label(number, &info.owner);
                 let url = self
                     .remotes
                     .iter()
@@ -262,7 +276,7 @@ impl RepoTab {
                     ctx,
                 );
             }
-            Err(e) => self.status = Some((e, true)),
+            Err(e) => self.status = Some(crate::repo::Notice::plain((e, true))),
         }
     }
 
@@ -279,10 +293,10 @@ impl RepoTab {
             .filter(|r| hosting.matches_git_remote(&r.url))
             .cloned()
         else {
-            self.status = Some((
+            self.status = Some(crate::repo::Notice::plain((
                 "This repository has no remote to rebase onto".to_owned(),
                 true,
-            ));
+            )));
             return;
         };
         let repo = self.path.clone();
@@ -294,7 +308,10 @@ impl RepoTab {
         #[cfg(test)]
         let recorded = tests::take_plan_recording(&upstream.name);
         let work_scope = scope.clone();
-        self.status = Some((format!("Fetching #{number}'s branch and its base…"), false));
+        self.status = Some(crate::repo::Notice::plain((
+            format!("Fetching #{number}'s branch and its base…"),
+            false,
+        )));
         self.forge_then(
             ctx,
             move || {
@@ -319,10 +336,10 @@ impl RepoTab {
                         tab.forks.scope = None;
                         tab.forks.running = None;
                         tab.forks.scope_label = None;
-                        tab.status = Some((
+                        tab.status = Some(crate::repo::Notice::plain((
                             "The primary forge changed; plan the fork action again".into(),
                             true,
-                        ));
+                        )));
                     }
                     return;
                 }
@@ -332,19 +349,25 @@ impl RepoTab {
                         let label = format!("Rebase #{} onto {} and push", info.number, info.base);
                         let body = rebase_preview(&info, &plan);
                         tab.dialog = Some(
-                            Dialog::confirm(&label, body, "Rebase and push", plan.steps(), None)
-                                .instead_ops(super::Action::Fork(ForkAct::ConfirmRebase(scope.id)))
-                                .undo(Undo::Custom {
-                                    undo: plan.undo_steps(),
-                                    redo: plan.redo_steps(),
-                                }),
+                            Dialog::confirm(
+                                &label,
+                                body,
+                                crate::i18n::text("repo-workflows-forks-plan-fork-rebase-a3647cfa"),
+                                plan.steps(),
+                                None,
+                            )
+                            .instead_ops(super::Action::Fork(ForkAct::ConfirmRebase(scope.id)))
+                            .undo(Undo::Custom {
+                                undo: plan.undo_steps(),
+                                redo: plan.redo_steps(),
+                            }),
                         );
                         tab.forks.scope_label = Some(label.clone());
                         tab.forks.running = Some((label, plan));
                     }
                     Err(e) => {
                         tab.forks.scope = None;
-                        tab.status = Some((e, true));
+                        tab.status = Some(crate::repo::Notice::plain((e, true)));
                     }
                 }
             },
@@ -362,6 +385,7 @@ impl RepoTab {
             self.dialog = None;
         }
         self.forks.running = None;
+        self.forks.staged_rebase = None;
         self.forks.after_conflict = None;
         self.forks.push_tip = None;
         self.forks.scope_label = None;
@@ -382,10 +406,10 @@ impl RepoTab {
                 && self.remotes.iter().any(|r| r == &s.primary)
         });
         if !valid {
-            self.status = Some((
+            self.status = Some(crate::repo::Notice::plain((
                 "The primary forge changed; plan the fork action again".into(),
                 true,
-            ));
+            )));
             return;
         }
         let Some((label, plan)) = self.forks.running.clone() else {
@@ -401,7 +425,21 @@ impl RepoTab {
                 plan.push_now(tip),
             )
         } else {
-            (plan.steps(), plan.undo_steps(), plan.redo_steps())
+            // Never scan a push against the tip from before its local rewrite.
+            // OpDone records local undo first and then uses preflight_after to
+            // preview the worker-owned rewritten tip with the original fork lease.
+            if self.busy_op.is_some() {
+                return;
+            }
+            self.forks.staged_rebase = Some(label.clone());
+            self.run_ops(
+                &label,
+                plan.local_steps(),
+                Refresh::All,
+                OpKind::plain(),
+                ctx,
+            );
+            return;
         };
         self.run_undoable(
             &label,
@@ -436,11 +474,13 @@ impl RepoTab {
             .scope_label
             .as_ref()
             .is_some_and(|l| self.busy_op.as_ref() == Some(l));
+        let staged_rebase = active.then(|| self.forks.staged_rebase.take()).flatten();
         let running = active.then(|| self.forks.running.take()).flatten();
         let scope = active.then(|| self.forks.scope.take()).flatten();
         let scope_label = active.then(|| self.forks.scope_label.take()).flatten();
         self.forks = Forks {
             running,
+            staged_rebase,
             scope,
             scope_label,
             ..Forks::default()
@@ -489,7 +529,10 @@ impl RepoTab {
                 let ((steps, undo), unused, keep) = match found {
                     Ok(found) => found,
                     Err(e) => {
-                        tab.status = Some((format!("Couldn't read the remotes: {e}"), true));
+                        tab.status = Some(crate::repo::Notice::plain((
+                            format!("Couldn't read the remotes: {e}"),
+                            true,
+                        )));
                         return;
                     }
                 };
@@ -502,20 +545,17 @@ impl RepoTab {
                     )
                 };
                 if steps.is_empty() {
-                    tab.status = Some((format!("No fork remote can go{kept}"), false));
+                    tab.status = Some(crate::repo::Notice::plain((
+                        format!("No fork remote can go{kept}"),
+                        false,
+                    )));
                     return;
                 }
                 tab.dialog = Some(
                     Dialog::confirm(
                         "Remove unused fork remotes",
-                        format!(
-                            "Removes the remotes gitcraft added for forks that no branch pulls \
-                             from or pushes to any more: {}, with their remote-tracking \
-                             branches. Ctrl+Z adds them back (fetch them for their \
-                             branches).{kept}",
-                            unused.join(", ")
-                        ),
-                        "Remove",
+                        tidy_body(&unused, &keep),
+                        crate::i18n::text("repo-workflows-forks-plan-tidy-c3812fc4"),
                         steps.clone(),
                         None,
                     )
@@ -556,13 +596,15 @@ impl RepoTab {
         self.dialog = Some(
             Dialog::confirm(
                 &label,
-                format!(
-                    "The rebase is done. Force-pushes {} to {}'s {} with a lease: refused if \
-                     they pushed there since it was fetched. Ctrl+Z puts their branch back as \
-                     it was (and yours with the next Ctrl+Z).",
-                    plan.local, plan.fork, plan.branch
+                crate::i18n::message(
+                    "repo-workflows-forks-offer-push-after-conflict-dcc709d6",
+                    &[
+                        ("plan-local-1", (plan.local).clone().into()),
+                        ("plan-fork-2", (plan.fork).clone().into()),
+                        ("plan-branch-3", (plan.branch).clone().into()),
+                    ],
                 ),
-                "Push",
+                crate::i18n::text("repo-workflows-forks-offer-push-after-conflict-731ce7ed"),
                 plan.push_now(&tip),
                 None,
             )
@@ -583,13 +625,13 @@ impl RepoTab {
         // Chosen once: say what it means. Chosen again: go ahead.
         if self.forks.approve_armed != Some(number) {
             self.forks.approve_armed = Some(number);
-            self.status = Some((
+            self.status = Some(crate::repo::Notice::plain((
                 format!(
                     "Approving runs the contributor's code on your CI: look through #{number}'s \
                      changes first, then choose Approve and run again"
                 ),
                 false,
-            ));
+            )));
             return;
         }
         self.forks.approve_armed = None;
@@ -619,7 +661,10 @@ impl RepoTab {
         self.busy_op = Some(label);
         self.op_started = Some(Instant::now());
         self.forks.approving = true;
-        self.status = Some((format!("Approving #{number}'s workflow runs…"), false));
+        self.status = Some(crate::repo::Notice::plain((
+            format!("Approving #{number}'s workflow runs…"),
+            false,
+        )));
         let sender = self.forge_operation_sender();
         #[cfg(test)]
         let mut recorded = tests::take_approval_recording();
@@ -667,14 +712,23 @@ impl RepoTab {
         result: &Result<String, String>,
         ctx: &Context,
     ) {
-        let Some((asked, plan)) = self.forks.running.take_if(|(l, _)| l == label) else {
+        let Some((staged, asked, plan)) = self.forks.take_rebase_completion(label) else {
             if result.is_ok() && self.forks.scope_label.as_deref() == Some(label) {
                 self.forks.scope = None;
                 self.forks.scope_label = None;
             }
             return;
         };
-        let Err(error) = result else { return };
+        // Existing combined-plan recovery remains for already captured work; the
+        // new normal confirmation finishes its local-only stage here too.
+        if result.is_ok() && !staged {
+            return;
+        }
+        // Even an early failure/cancel has consumed this staged completion.
+        // A raw retry of its local-only argv would have no continuation owner.
+        if staged && self.last_op.as_ref().is_some_and(|op| op.label == asked) {
+            self.last_op = None;
+        }
         let scope = self.forks.scope.clone();
         let generation = self.forge_generation;
         if scope.as_ref().is_some_and(|s| s.check().is_err()) {
@@ -694,11 +748,11 @@ impl RepoTab {
                 && s.generation == self.forge_generation
                 && generation == self.forge_generation
         });
-        if rewrite.conflicts && current {
+        if rewrite.conflicts && current && result.is_err() {
             self.forks.after_conflict = Some(plan);
-            self.status = Some((
+            self.status = Some(crate::repo::Notice::plain((
                 "The rebase stopped on conflicts: resolve them and continue it, then gitcraft offers to push it (or abort it)".into(), true,
-            ));
+            )));
             return;
         }
         if rewrite.tip.is_empty() || rewrite.tip == plan.head {
@@ -716,17 +770,32 @@ impl RepoTab {
             },
             ctx,
         );
-        self.status = Some((
+        if staged
+            && plan
+                .reviewed_tip(&rewrite, result.is_ok(), current)
+                .is_some()
+        {
+            let pending = plan.push_pending(&rewrite.tip);
+            self.forks.scope_label = Some(pending.label.clone());
+            self.forks.running = Some((pending.label.clone(), plan));
+            self.last_op = None; // A retry must never re-run the completed local rewrite.
+            self.preflight_after = Some((asked, pending));
+            return;
+        }
+        self.status = Some(crate::repo::Notice::plain((
             format!(
                 "{} is rebased here, but not pushed to {}: Ctrl+Z puts it back as it was",
                 plan.local, plan.fork,
             ),
             true,
-        ));
-        if !current && self.last_op.as_ref().is_some_and(|o| o.label == asked) {
+        )));
+        if (staged || !current) && self.last_op.as_ref().is_some_and(|o| o.label == asked) {
             self.last_op = None;
         }
-        if crate::git::is_auth_error(error)
+        if !staged
+            && result
+                .as_ref()
+                .is_err_and(|error| crate::git::is_auth_error(error))
             && current
             && let Some(op) = &mut self.last_op
             && op.label == asked
@@ -757,13 +826,13 @@ fn approval_result(number: u64, result: Result<(), String>) -> super::Msg {
         tab.forks.scope = None;
         tab.forks.scope_label = None;
         tab.forks.approving = false;
-        tab.status = Some(match result {
+        tab.status = Some(crate::repo::Notice::plain(match result {
             Ok(()) => (format!("#{number}'s workflow runs are approved"), false),
             Err(e) => (
                 format!("Couldn't approve #{number}'s workflow runs: {e}"),
                 true,
             ),
-        });
+        }));
         tab.forks.read_for = None;
         tab.refresh_ci(ctx);
     }))
@@ -771,22 +840,223 @@ fn approval_result(number: u64, result: Result<(), String>) -> super::Msg {
 
 /// What the rebase dialog says it will do.
 fn rebase_preview(info: &ForkInfo, plan: &plan::Rebase) -> String {
-    format!(
-        "Rebases {} ({}'s branch {} of #{}) onto {}, which has {} commit{} it hasn't, then \
-         force-pushes it to {} (their fork) with a lease: refused if {} pushed there since it \
-         was fetched a moment ago.\n\nIf the rebase stops on conflicts, resolve them and \
-         continue it: gitcraft then offers to push it. Abort it, and nothing is pushed.\n\n\
-         Ctrl+Z puts the branch back as it was, on the fork and here.",
-        plan.local,
-        info.owner,
-        info.branch,
-        info.number,
-        plan.onto
-            .strip_prefix("refs/remotes/")
-            .unwrap_or(&plan.onto),
-        plan.behind,
-        if plan.behind == 1 { "" } else { "s" },
-        plan.fork,
-        info.owner,
+    crate::i18n::message(
+        "repo-workflows-fork-rebase-preview",
+        &[
+            ("local", (plan.local.as_str()).into()),
+            ("owner", (info.owner.as_str()).into()),
+            ("branch", (info.branch.as_str()).into()),
+            ("number", (info.number.to_string()).into()),
+            (
+                "onto",
+                (plan
+                    .onto
+                    .strip_prefix("refs/remotes/")
+                    .unwrap_or(&plan.onto))
+                .into(),
+            ),
+            ("behind", (plan.behind).into()),
+            ("fork", (plan.fork.as_str()).into()),
+        ],
     )
+}
+
+fn tidy_body(unused: &[String], keep: &[String]) -> String {
+    crate::i18n::message(
+        "repo-workflows-forks-tidy-complete-body",
+        &[
+            ("unused", unused.join(", ").into()),
+            ("kept", (if keep.is_empty() { "no" } else { "yes" }).into()),
+            ("names", keep.join(", ").into()),
+        ],
+    )
+}
+#[cfg(test)]
+mod fluent_tidy_tests {
+    use super::*;
+    #[test]
+    fn fluent_partition_forks_actual_tidy_preview_keeps_remote_names_opaque() {
+        for language in ["en-US", "de"] {
+            crate::i18n::set_language(language);
+            for keep in [vec![], vec!["fork/1234-ß".into()]] {
+                let body = tidy_body(&["unused/1234".into()], &keep);
+                assert!(body.contains("unused/1234"));
+                assert_eq!(body.contains("fork/1234-"), !keep.is_empty());
+                if !keep.is_empty() {
+                    assert!(body.contains(if language == "de" {
+                        "Behalten:"
+                    } else {
+                        "Kept:"
+                    }));
+                }
+            }
+        }
+        crate::i18n::set_language("en-US");
+    }
+}
+
+/// Dispatch identity; only the canonical repository paint map localizes its presentation.
+fn checkout_operation_label(number: u64, owner: &str) -> String {
+    format!("Check out #{number} to push to {owner}")
+}
+#[cfg(test)]
+mod fluent_checkout_identity_tests {
+    use super::*;
+    #[test]
+    fn fluent_partition_actual_fork_checkout_dispatch_keeps_opaque_pr_number_and_owner() {
+        for language in ["en-US", "de", "en-US"] {
+            crate::i18n::set_language(language);
+            let raw = checkout_operation_label(1234, "raw-owner/ß");
+            assert_eq!(raw, "Check out #1234 to push to raw-owner/ß");
+            let painted = crate::i18n::message(
+                "repo-workflows-forks-checkout-fork-abaaf4c3",
+                &[
+                    ("number", 1234u64.to_string().into()),
+                    ("info-owner-1", "raw-owner/ß".into()),
+                ],
+            );
+            assert!(painted.contains("#1234"));
+            assert!(painted.contains("raw-owner/ß"));
+            if language == "en-US" {
+                assert_eq!(painted, raw)
+            } else {
+                assert_ne!(painted, raw)
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod staged_recording_tests {
+    use super::*;
+
+    fn plan() -> plan::Rebase {
+        plan::Rebase {
+            local: "topic".into(),
+            fork: "fork".into(),
+            branch: "contributor".into(),
+            onto: "refs/remotes/origin/main".into(),
+            head: "a".repeat(40),
+            seen: "b".repeat(40),
+            tracking: "refs/remotes/fork/contributor".into(),
+            behind: 1,
+            destinations: vec![guard::Destination {
+                name: "fork".into(),
+                fetch: vec!["https://forge.invalid/person/repo".into()],
+                push: vec!["https://forge.invalid/person/repo".into()],
+            }],
+            base_head: "c".repeat(40),
+        }
+    }
+
+    /// Supplied operation state and snapshots only: no RepoTab, Git or runtime.
+    #[test]
+    fn recording_local_rewrite_precedes_exact_tip_review_and_has_separate_undo()
+    -> Result<(), String> {
+        let p = plan();
+        let local = p.local_steps();
+        assert!(
+            crate::push_preflight::validate_operations(&p.steps()).is_err(),
+            "the mixed-operation scanner restriction remains intact"
+        );
+        assert!(!crate::push_preflight::has_push(&local));
+        assert!(local.iter().any(|step| guard::is_guard(step)));
+        assert_eq!(
+            local.last(),
+            Some(&vec![
+                "-c".into(),
+                "rebase.updateRefs=false".into(),
+                "rebase".into(),
+                p.base_head.clone()
+            ])
+        );
+        let rewrite = guard::Rewrite {
+            branch: "refs/heads/topic".into(),
+            before: p.head.clone(),
+            tip: "d".repeat(40),
+            conflicts: false,
+        };
+        let label = "Rebase #7 onto main and push";
+        let mut forks = Forks {
+            running: Some((label.into(), p.clone())),
+            staged_rebase: Some(label.into()),
+            ..Forks::default()
+        };
+        assert!(forks.take_rebase_completion("unrelated").is_none());
+        let (staged, _, taken) = forks.take_rebase_completion(label).ok_or("lost stage")?;
+        assert!(staged);
+        assert!(
+            forks.take_rebase_completion(label).is_none(),
+            "completion/undo must be consumed once"
+        );
+        let tip = taken
+            .reviewed_tip(&rewrite, true, true)
+            .ok_or("valid rewrite refused")?;
+        let (undo, redo) = taken.local_undo(tip);
+        assert!(!crate::push_preflight::has_push(&undo));
+        assert!(!crate::push_preflight::has_push(&redo));
+        assert!(
+            undo.iter()
+                .any(|step| step
+                    == &super::super::operations::expect_ref_at("refs/heads/topic", tip))
+        );
+        let pending = taken.push_pending(tip);
+        crate::push_preflight::validate_operations(&pending.ops)?;
+        assert!(crate::push_preflight::has_push(&pending.ops));
+        assert!(
+            !pending
+                .ops
+                .iter()
+                .flatten()
+                .any(|word| word == "rebase" || word == "reset")
+        );
+        assert!(
+            pending
+                .ops
+                .iter()
+                .any(|step| step
+                    == &super::super::operations::expect_ref_at("refs/heads/topic", tip))
+        );
+        let push = pending.ops.last().ok_or("missing push")?;
+        assert!(push.contains(&format!(
+            "--force-with-lease=refs/heads/contributor:{}",
+            p.seen
+        )));
+        assert_eq!(push.last(), Some(&format!("{tip}:refs/heads/contributor")));
+        let OpKind::Normal(Undo::Custom { undo, redo }, _) = pending.kind else {
+            return Err("missing fork undo".into());
+        };
+        assert!(
+            undo.iter()
+                .flatten()
+                .any(|word| word.contains(guard::PUSHED_TIP))
+        );
+        assert!(!undo.iter().flatten().any(|word| word == "reset"));
+        assert_eq!(redo, pending.ops);
+        Ok(())
+    }
+
+    #[test]
+    fn recording_error_cancel_conflict_stale_or_unowned_rewrite_never_enters_review() {
+        let p = plan();
+        let rewrite = guard::Rewrite {
+            branch: "refs/heads/topic".into(),
+            before: p.head.clone(),
+            tip: "d".repeat(40),
+            conflicts: false,
+        };
+        assert!(p.reviewed_tip(&rewrite, false, true).is_none()); // includes failed and cancelled OpDone
+        assert!(p.reviewed_tip(&rewrite, true, false).is_none());
+        for change in 0..5 {
+            let mut invalid = rewrite.clone();
+            match change {
+                0 => invalid.conflicts = true,
+                1 => invalid.branch = "refs/heads/other".into(),
+                2 => invalid.before = "e".repeat(40),
+                3 => invalid.tip = p.head.clone(),
+                _ => invalid.tip.clear(),
+            }
+            assert!(p.reviewed_tip(&invalid, true, true).is_none());
+        }
+    }
 }

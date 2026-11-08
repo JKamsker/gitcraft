@@ -117,6 +117,7 @@ impl DiffKey {
 }
 
 pub(crate) struct DiffView {
+    pub(super) presentation_generation: u64,
     pub(super) key: DiffKey,
     pub(super) data: Option<Result<diff::DiffData, String>>,
     /// Changed lines clicked, to stage, unstage or discard only those.
@@ -139,6 +140,7 @@ pub(crate) struct DiffView {
     /// What the rich view keeps between frames.
     pub(super) rich_state: diff::rich::RichState,
     pub(super) structural: diff::structural::State,
+    pub(super) encrypted: diff::encrypted::State,
     /// What the rendered Markdown keeps between frames.
     pub(super) markdown: egui_commonmark::CommonMarkCache,
     /// How far the lines were scrolled down last frame.
@@ -147,8 +149,10 @@ pub(crate) struct DiffView {
     pub(super) jump: Option<usize>,
     /// The change jumped to last, and the scroll offset that left.
     pub(super) at_change: Option<(usize, f32)>,
+    pub(super) keyboard_hunk: Option<usize>,
     /// A line (by its index in the diff) to scroll to on the next frame.
     pub(super) jump_line: Option<usize>,
+    pub(super) pending_line_target: Option<(Option<u32>, Option<u32>)>,
     /// The moved block whose two places are shown together.
     pub(super) moved: Option<diff::moved_view::Opened>,
     /// Unchanged lines opened from their folds (by their number on the new side), opened again
@@ -159,11 +163,14 @@ pub(crate) struct DiffView {
     /// The latest read of this diff: only its answer is shown, so a slower answer to an older
     /// read (before the whitespace or whole-file setting changed…) can't replace it.
     pub(super) request: u64,
+    pub(super) data_request: u64,
     /// Opened from the history of some lines: only the part of the commit's diff that changed
     /// these lines of the file (as they are in the commit).
     pub(super) lines: Option<Vec<crate::git::LineRange>>,
     /// A folded file's lines (a lockfile…) were opened.
     pub(super) unfolded: bool,
+    pub(super) svg_source: bool,
+    pub(super) wrap_offsets: Option<std::sync::Arc<Vec<f32>>>,
     /// Where the view was when the diff was asked for again another way (another algorithm):
     /// put back at the top once the new reading arrives.
     pub(super) keep_place: Option<diff::Place>,
@@ -184,6 +191,7 @@ static DIFF_REQUESTS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU6
 impl DiffView {
     pub(super) fn new(key: DiffKey) -> Self {
         Self {
+            presentation_generation: crate::i18n::generation(),
             key,
             data: None,
             chosen: Default::default(),
@@ -196,17 +204,23 @@ impl DiffView {
             rich_load: 0,
             rich_state: Default::default(),
             structural: Default::default(),
+            encrypted: Default::default(),
             markdown: Default::default(),
             scroll: 0.0,
             jump: None,
             at_change: None,
+            keyboard_hunk: None,
             jump_line: None,
+            pending_line_target: None,
             moved: None,
             revealed: Default::default(),
             auto_opened: Default::default(),
             request: 0,
+            data_request: 0,
             lines: None,
             unfolded: false,
+            svg_source: false,
+            wrap_offsets: None,
             keep_place: None,
             restore: None,
             algorithm: None,
@@ -217,6 +231,7 @@ impl DiffView {
 
     /// Numbers a new read of this diff; from now on only its answer is shown.
     pub(super) fn next_request(&mut self) -> u64 {
+        self.encrypted.close();
         self.request = DIFF_REQUESTS.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
         self.request
     }
@@ -226,6 +241,8 @@ impl DiffView {
         if request != self.request {
             return;
         }
+        self.data_request = request;
+        self.keyboard_hunk = None;
         self.repairing = false;
         if result.is_ok() {
             self.restore = self.keep_place.take();
@@ -235,6 +252,7 @@ impl DiffView {
             (Some(Ok(data)), Some(open)) => diff::moved_view::Opened::place(data, open.block),
             _ => None,
         };
+        self.data_request = request;
         self.data = Some(result);
         // The lines may have moved.
         self.chosen.clear();
@@ -245,6 +263,17 @@ impl DiffView {
         // The blocks are found again, numbered anew.
         self.moved = None;
         self.reopen();
+        if let Some((old, new)) = self.pending_line_target.take()
+            && let Some(Ok(data)) = &self.data
+        {
+            self.jump_line = data.lines.iter().position(|l| {
+                if let Some(n) = new {
+                    l.kind != diff::Kind::Del && l.new == Some(n)
+                } else {
+                    old.is_some() && l.old == old
+                }
+            });
+        }
         self.moved = match (&self.data, place) {
             (Some(Ok(data)), Some(place)) => (0..data.moves.blocks.len())
                 .find(|&b| diff::moved_view::Opened::place(data, b) == Some(place))
@@ -289,6 +318,70 @@ pub(crate) struct Reword {
     pub fill: bool,
 }
 
+/// Transient provenance for fixed comparison captions emitted by the review UI.
+/// Raw labels remain the operation/data identity; unmarked user labels stay opaque.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum CompareCaption {
+    OriginalFix,
+    AdaptedFix,
+    BeforeTurn { number: u32 },
+    Turn { number: u32, label: String },
+    AfterTurn { number: u32 },
+    Now,
+    OriginalBranch { branch: String },
+    CandidateBranch { branch: String },
+}
+
+impl CompareCaption {
+    fn display(&self, raw: &str) -> String {
+        let expected = match self {
+            Self::OriginalFix => "Original fix".to_owned(),
+            Self::AdaptedFix => "Adapted fix".to_owned(),
+            Self::BeforeTurn { number } => format!("before turn {number}"),
+            Self::Turn { number, label } => format!("turn {number}: {label}"),
+            Self::AfterTurn { number } => format!("after turn {number}"),
+            Self::Now => "now".to_owned(),
+            Self::OriginalBranch { branch } => format!("original {branch}"),
+            Self::CandidateBranch { branch } => format!("candidate {branch}"),
+        };
+        if raw != expected {
+            return raw.to_owned();
+        }
+        match self {
+            Self::OriginalFix => {
+                crate::i18n::text("repo-workflows-review-label-original-fix-27d835").to_owned()
+            }
+            Self::AdaptedFix => {
+                crate::i18n::text("repo-workflows-review-raw-adapted-fix-194525").to_owned()
+            }
+            Self::BeforeTurn { number } => crate::i18n::message(
+                "repo-workflows-agents-turn-diff-dc601e7b",
+                &[("turn-number-1", number.to_string().into())],
+            ),
+            Self::Turn { number, label } => crate::i18n::message(
+                "repo-workflows-agents-turn-diff-9021b8b9",
+                &[
+                    ("turn-number-1", number.to_string().into()),
+                    ("label", label.as_str().into()),
+                ],
+            ),
+            Self::AfterTurn { number } => crate::i18n::message(
+                "repo-workflows-agents-turn-chip-60c8b8ae",
+                &[("turn-number-1", number.to_string().into())],
+            ),
+            Self::Now => crate::i18n::text("repo-workflows-agents-turn-chip-ed5eb9a3").to_owned(),
+            Self::OriginalBranch { branch } => crate::i18n::message(
+                "repo-workflows-repository_tools-show-507eaa08",
+                &[("s-branch-1", branch.as_str().into())],
+            ),
+            Self::CandidateBranch { branch } => crate::i18n::message(
+                "repo-workflows-repository_tools-show-7bd990ec",
+                &[("s-branch-1", branch.as_str().into())],
+            ),
+        }
+    }
+}
+
 /// Two points of history side by side in the right pane: a branch against another, a commit
 /// against the working tree…
 pub(crate) struct Compare {
@@ -297,6 +390,7 @@ pub(crate) struct Compare {
     /// `None`: the working tree.
     pub(super) target: Option<String>,
     pub(super) target_label: String,
+    pub(super) captions: [Option<CompareCaption>; 2],
     /// Only what the target changed since the two diverged (from their merge base), like a pull
     /// request shows it.
     pub(super) since_fork: bool,
@@ -316,15 +410,32 @@ pub(crate) struct CompareData {
 }
 
 impl Compare {
+    pub(super) fn display_base_label(&self) -> String {
+        self.captions[0].as_ref().map_or_else(
+            || self.base_label.clone(),
+            |kind| kind.display(&self.base_label),
+        )
+    }
+
+    pub(super) fn display_target_label(&self) -> String {
+        self.captions[1].as_ref().map_or_else(
+            || self.target_label.clone(),
+            |kind| kind.display(&self.target_label),
+        )
+    }
+
     /// How the comparison calls one of its two ends.
     pub(super) fn name_of(&self, rev: &str) -> Option<String> {
         let data = self.data.as_ref()?.as_ref().ok()?;
         if data.to.as_deref() == Some(rev) {
-            Some(self.target_label.clone())
+            Some(self.display_target_label())
         } else if data.from == rev && self.since_fork {
-            Some(format!("merge base {}", short(rev)))
+            Some(crate::i18n::message(
+                "repo-core-3619",
+                &[("rev", short(rev).to_string().into())],
+            ))
         } else if data.from == rev {
-            Some(self.base_label.clone())
+            Some(self.display_base_label())
         } else {
             None
         }
@@ -341,7 +452,7 @@ pub(super) struct Search {
     /// The query the results are for.
     pub(super) searched: String,
     pub(super) results: Vec<String>,
-    pub(super) matches: HashSet<String>,
+    pub(super) matches: std::sync::Arc<HashSet<String>>,
     pub(super) current: usize,
     pub(super) running: bool,
     pub(super) edited: Option<Instant>,

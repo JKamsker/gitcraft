@@ -85,7 +85,7 @@ impl RepoTab {
                         notes.append(&mut tray.notes);
                         tray.notes = notes;
                     }
-                    Err(e) => tab.status = Some((e, true)),
+                    Err(e) => tab.status = Some(crate::repo::Notice::plain((e, true))),
                 }
                 if std::mem::take(&mut tab.agents.tray.unsaved) {
                     tab.save_tray(ctx);
@@ -107,7 +107,7 @@ impl RepoTab {
             move || handoff::save_in_order(&repo, &notes, seq),
             |tab, result, _| {
                 if let Err(e) = result {
-                    tab.status = Some((e, true));
+                    tab.status = Some(crate::repo::Notice::plain((e, true)));
                 }
             },
         );
@@ -160,7 +160,10 @@ impl RepoTab {
             }
             TrayAct::SendNotes => {
                 let message = handoff::notes_message(&self.agents.tray.notes);
-                if self.send_to_agent(&message, "the notes") {
+                if self.send_to_agent(
+                    &message,
+                    crate::i18n::text("repo-workflows-agents-tray-act-78e896bb"),
+                ) {
                     self.agents.tray.notes.clear();
                     self.save_tray(ctx);
                 }
@@ -194,37 +197,40 @@ impl RepoTab {
     /// Types `message` (`what` it is) into the agent's terminal of this tab: whether it went.
     pub(super) fn send_to_agent(&mut self, message: &str, what: &str) -> bool {
         let Some(i) = self.agent_terminal() else {
-            self.status = Some((
+            self.status = Some(crate::repo::Notice::plain((
                 format!(
                     "No agent terminal in this worktree to send {what} to: start the agent \
                      (Start agent task…), or pick its terminal next to Send to agent"
                 ),
                 true,
-            ));
+            )));
             return false;
         };
         let Some(term) = self.terminals.get_mut(i) else {
             return false;
         };
         let label = term.shell.clone();
-        let them = if what.ends_with('s') { "them" } else { "it" };
         match term.paste_message(message) {
             Ok(()) => {
                 self.terminal_open = true;
                 self.active_terminal = i;
-                self.status = Some((
-                    format!(
-                        "Typed {what} into the {label} terminal: press Enter there to send {them}"
+                self.status = Some(crate::repo::Notice::plain((
+                    crate::i18n::message(
+                        "repo-workflows-agent-send-confirmation",
+                        &[
+                            ("what", (what).into()),
+                            ("terminal", (label.as_str()).into()),
+                        ],
                     ),
                     false,
-                ));
+                )));
                 true
             }
             Err(e) => {
-                self.status = Some((
+                self.status = Some(crate::repo::Notice::plain((
                     format!("Couldn't send {what} to the {label} terminal: {e}"),
                     true,
-                ));
+                )));
                 false
             }
         }
@@ -249,26 +255,42 @@ impl RepoTab {
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
                     ui.label(
-                        RichText::new(format!("NOTES FOR THE AGENT · {}", tray.notes.len()))
-                            .font(theme::semibold(10.5))
-                            .color(t.text_faint),
+                        RichText::new(crate::i18n::message(
+                            "repo-workflows-agents-tray-panel-1b67e032",
+                            &[("tray-notes-len-1", (tray.notes.len()).into())],
+                        ))
+                        .font(theme::semibold(10.5))
+                        .color(t.text_faint),
                     )
-                    .on_hover_text("Only here: they go to the agent's terminal, nowhere else");
+                    .on_hover_text(crate::i18n::text(
+                        "repo-workflows-agents-tray-panel-86de1f26",
+                    ));
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if crate::repo::primary_button(ui, "Send to agent", to.is_some(), 110.0)
-                            .on_hover_text("Types them into the agent's terminal as one message; then they're cleared")
-                            .on_disabled_hover_text(
-                                "No agent terminal here: start the agent (Start agent task…), or pick its terminal",
-                            )
-                            .clicked()
+                        if crate::repo::primary_button(
+                            ui,
+                            crate::i18n::text("repo-workflows-agents-tray-panel-77a860cb"),
+                            to.is_some(),
+                            110.0,
+                        )
+                        .on_hover_text(crate::i18n::text(
+                            "repo-workflows-agents-tray-panel-a2c648eb",
+                        ))
+                        .on_disabled_hover_text(crate::i18n::text(
+                            "repo-workflows-agents-tray-panel-366ec196",
+                        ))
+                        .clicked()
                         {
                             acts.push(tray_act(TrayAct::SendNotes));
                         }
                         self.terminal_choice(ui, to, acts);
                         let clear = if tray.confirm_clear {
-                            format!("Clear {} notes?", tray.notes.len())
+                            crate::i18n::message(
+                                "repo-workflows-agents-tray-panel-ae4eaa14",
+                                &[("tray-notes-len-1", (tray.notes.len()).into())],
+                            )
                         } else {
-                            "Clear".to_owned()
+                            crate::i18n::text("repo-workflows-agents-tray-panel-83b12c22")
+                                .to_owned()
                         };
                         if ui.button(clear).clicked() {
                             acts.push(tray_act(TrayAct::Clear));
@@ -281,7 +303,13 @@ impl RepoTab {
                     .show(ui, |ui| {
                         for (i, note) in tray.notes.iter().enumerate() {
                             ui.horizontal(|ui| {
-                                if crate::icons::small_button(ui, "x", "Take this note out").clicked() {
+                                if crate::icons::small_button(
+                                    ui,
+                                    "x",
+                                    crate::i18n::text("repo-workflows-agents-tray-panel-0451c67e"),
+                                )
+                                .clicked()
+                                {
                                     acts.push(tray_act(TrayAct::Remove(i)));
                                 }
                                 ui.label(
@@ -304,9 +332,14 @@ impl RepoTab {
         let labels: Vec<&str> = self.terminals.iter().map(|t| t.shell.as_str()).collect();
         let shown = to
             .and_then(|i| labels.get(i).copied())
-            .unwrap_or("no agent terminal");
+            .unwrap_or(crate::i18n::text(
+                "repo-workflows-agents-terminal-choice-f1f46570",
+            ));
         egui::ComboBox::from_id_salt("handoff-terminal")
-            .selected_text(format!("to {shown}"))
+            .selected_text(crate::i18n::message(
+                "repo-workflows-agents-terminal-choice-c0d8980e",
+                &[("shown", (shown).into())],
+            ))
             .show_ui(ui, |ui| {
                 for (i, label) in labels.iter().enumerate() {
                     if ui.selectable_label(to == Some(i), *label).clicked() {
@@ -315,7 +348,9 @@ impl RepoTab {
                 }
             })
             .response
-            .on_hover_text("The terminal the notes are typed into");
+            .on_hover_text(crate::i18n::text(
+                "repo-workflows-agents-terminal-choice-c22c5ccf",
+            ));
     }
 }
 
@@ -337,6 +372,7 @@ pub(crate) enum TrayAct {
 #[cfg(test)]
 impl Tray {
     /// As if the tray had been read: nothing kept for the worktree.
+    #[cfg(unix)]
     pub(super) fn loaded_for_tests(&mut self) {
         self.loaded = true;
     }
@@ -387,28 +423,43 @@ pub(in crate::repo) fn note_panel(
         )
         .show(ui, |ui| {
             ui.horizontal(|ui| {
-                let which = if target.side == DiffSide::Left {
-                    " (as it was)"
-                } else {
-                    ""
-                };
                 ui.label(
-                    RichText::new(format!(
-                        "Note for the agent · {}:{}{which}",
-                        target.path, target.line
+                    RichText::new(crate::i18n::message(
+                        "repo-workflows-agent-note-location",
+                        &[
+                            ("path", target.path.as_str().into()),
+                            ("line", target.line.into()),
+                            (
+                                "old",
+                                if target.side == DiffSide::Left {
+                                    "yes"
+                                } else {
+                                    "no"
+                                }
+                                .into(),
+                            ),
+                        ],
                     ))
                     .font(theme::mono(11.5))
                     .color(t.text_dim),
                 );
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if crate::icons::small_button(ui, "x", "Close (Esc)").clicked() {
+                    if crate::icons::small_button(
+                        ui,
+                        "x",
+                        crate::i18n::text("repo-workflows-agents-note-panel-961b2a04"),
+                    )
+                    .clicked()
+                    {
                         acts.push(tray_act(TrayAct::Close));
                     }
                 });
             });
             let edit = ui.add(
                 egui::TextEdit::multiline(&mut tray.text)
-                    .hint_text("What the agent should change here")
+                    .hint_text(crate::i18n::text(
+                        "repo-workflows-agents-note-panel-bb064d10",
+                    ))
                     .desired_rows(3)
                     .desired_width(f32::INFINITY),
             );
@@ -419,10 +470,17 @@ pub(in crate::repo) fn note_panel(
                 && ui.input(|i| i.modifiers.command && i.key_pressed(egui::Key::Enter));
             let valid = !tray.text.trim().is_empty();
             ui.horizontal(|ui| {
-                if crate::repo::primary_button(ui, "Add note", valid, 120.0)
-                    .on_hover_text(format!("{}+Enter", crate::manual::command()))
-                    .on_disabled_hover_text("Write the note first")
-                    .clicked()
+                if crate::repo::primary_button(
+                    ui,
+                    crate::i18n::text("repo-workflows-agents-note-panel-63565c04"),
+                    valid,
+                    120.0,
+                )
+                .on_hover_text(format!("{}+Enter", crate::manual::command()))
+                .on_disabled_hover_text(crate::i18n::text(
+                    "repo-workflows-agents-note-panel-4254e046",
+                ))
+                .clicked()
                     || submit && valid
                 {
                     acts.push(tray_act(TrayAct::Add {
@@ -431,9 +489,11 @@ pub(in crate::repo) fn note_panel(
                     }));
                 }
                 ui.label(
-                    RichText::new("Kept in this worktree until you send the notes to the agent")
-                        .small()
-                        .color(t.text_faint),
+                    RichText::new(crate::i18n::text(
+                        "repo-workflows-agents-note-panel-d065164e",
+                    ))
+                    .small()
+                    .color(t.text_faint),
                 );
             });
         });

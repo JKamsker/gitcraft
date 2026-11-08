@@ -49,12 +49,22 @@ pub fn parse(text: &str) -> Result<Node, String> {
         copies: MAX_ALIAS_COPIES,
         ..Builder::default()
     };
-    Parser::new_from_str(text)
-        .load(&mut b, true)
-        .map_err(|e| format!("line {}: {}", e.marker().line(), e.info()))?;
+    Parser::new_from_str(text).load(&mut b, true).map_err(|e| {
+        crate::i18n::message(
+            "repo-core-2281",
+            &[
+                ("line", format!("{}", e.marker().line()).into()),
+                ("info", e.info().to_string().into()),
+            ],
+        )
+    })?;
     if let Some(line) = b.too_deep {
-        return Err(format!(
-            "line {line}: nested deeper than {MAX_DEPTH} levels"
+        return Err(crate::i18n::message(
+            "repo-core-2282",
+            &[
+                ("line", (line).into()),
+                ("MAX-DEPTH", format!("{}", MAX_DEPTH).into()),
+            ],
         ));
     }
     Ok(match b.docs.len() {
@@ -177,7 +187,7 @@ impl MarkedEventReceiver for Builder {
                         n.clone()
                     }
                     _ => Node::Scalar {
-                        text: "(alias)".to_owned(),
+                        text: crate::i18n::text("repo-core-2299").to_owned(),
                         ty: Ty::Alias,
                     },
                 };

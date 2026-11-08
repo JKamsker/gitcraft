@@ -23,10 +23,10 @@ pub(crate) enum Place {
 impl Place {
     pub(super) fn explain(self) -> &'static str {
         match self {
-            Place::Above => "Reorder: it comes right after that commit",
-            Place::Below => "Reorder: it comes right before that commit",
-            Place::Squash => "Meld its changes into that commit, keeping both messages",
-            Place::Fixup => "Meld its changes into that commit, keeping that commit's message",
+            Place::Above => crate::i18n::text("repo-core-2433"),
+            Place::Below => crate::i18n::text("repo-core-2434"),
+            Place::Squash => crate::i18n::text("repo-core-2435"),
+            Place::Fixup => crate::i18n::text("repo-core-2436"),
         }
     }
 }
@@ -52,10 +52,34 @@ impl CommitDrop {
             cut(&self.target_summary, 36)
         );
         match self.place {
-            Place::Above => format!("Move {} above {target}", short(&self.hash)),
-            Place::Below => format!("Move {} below {target}", short(&self.hash)),
-            Place::Squash => format!("Squash {} into {target}", short(&self.hash)),
-            Place::Fixup => format!("Fixup {} into {target}", short(&self.hash)),
+            Place::Above => crate::i18n::message(
+                "repo-core-2437",
+                &[
+                    ("hash", short(&self.hash).to_string().into()),
+                    ("target", target.to_string().into()),
+                ],
+            ),
+            Place::Below => crate::i18n::message(
+                "repo-core-2438",
+                &[
+                    ("hash", short(&self.hash).to_string().into()),
+                    ("target", target.to_string().into()),
+                ],
+            ),
+            Place::Squash => crate::i18n::message(
+                "repo-core-2439",
+                &[
+                    ("hash", short(&self.hash).to_string().into()),
+                    ("target", target.to_string().into()),
+                ],
+            ),
+            Place::Fixup => crate::i18n::message(
+                "repo-core-2440",
+                &[
+                    ("hash", short(&self.hash).to_string().into()),
+                    ("target", target.to_string().into()),
+                ],
+            ),
         }
     }
 
@@ -87,11 +111,11 @@ fn cut(text: &str, n: usize) -> String {
 /// them).
 pub(super) fn plan(drop: &CommitDrop, commits: Vec<RebaseCommit>) -> Result<RebaseEditor, String> {
     if commits.iter().any(|c| c.merge) {
-        return Err("merges came after the commit, which this would flatten".to_owned());
+        return Err(crate::i18n::text("repo-core-2448").to_owned());
     }
     let mut editor = RebaseEditor::new(drop.base.clone(), short(&drop.base).to_owned(), commits);
     let entries = &mut editor.entries;
-    let missing = "only commits of the checked-out branch can be moved";
+    let missing = crate::i18n::text("repo-core-2449");
     let from = entries
         .iter()
         .position(|e| e.commit.hash == drop.hash)
@@ -118,7 +142,7 @@ pub(super) fn plan(drop: &CommitDrop, commits: Vec<RebaseCommit>) -> Result<Reba
     entries.insert(at, moved);
     let after: Vec<&str> = entries.iter().map(|e| e.commit.hash.as_str()).collect();
     if matches!(drop.place, Place::Above | Place::Below) && after == before {
-        return Err("it is there already".to_owned());
+        return Err(crate::i18n::text("repo-core-2450").to_owned());
     }
     if let Some(problem) = editor.problem() {
         return Err(problem);
@@ -153,7 +177,9 @@ impl RepoTab {
             Ok(editor) => self.with_rebase_command(editor, ctx, move |tab, command, ctx| {
                 tab.commit_drop_ready(&label, command, ctx);
             }),
-            Err(e) => self.status = Some((format!("{label}: {e}"), true)),
+            Err(e) => {
+                self.status = Some(crate::repo::Notice::plain((format!("{label}: {e}"), true)))
+            }
         }
     }
 
@@ -167,13 +193,26 @@ impl RepoTab {
     ) {
         match command {
             Ok(_) if self.busy_op.is_some() => {
-                self.status = Some((
-                    format!(
-                        "{label}: {} is still running, try again when it's done",
-                        self.busy_op.as_deref().unwrap_or_default()
+                self.status = Some(crate::repo::Notice::plain((
+                    crate::i18n::message(
+                        "repo-core-2452",
+                        &[
+                            (
+                                "label",
+                                crate::repo::messages::display_operation(label).into(),
+                            ),
+                            (
+                                "self",
+                                self.busy_op
+                                    .as_deref()
+                                    .unwrap_or_default()
+                                    .to_string()
+                                    .into(),
+                            ),
+                        ],
                     ),
                     true,
-                ));
+                )));
             }
             Ok((command, head)) => {
                 let steps = vec![self.same_branch(), expect_ref_at("HEAD", &head), command];
@@ -185,7 +224,9 @@ impl RepoTab {
                     ctx,
                 );
             }
-            Err(e) => self.status = Some((format!("{label}: {e}"), true)),
+            Err(e) => {
+                self.status = Some(crate::repo::Notice::plain((format!("{label}: {e}"), true)))
+            }
         }
     }
 }

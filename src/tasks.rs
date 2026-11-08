@@ -44,6 +44,18 @@ pub(crate) fn cancellation() -> Cancellation {
     CURRENT.with(|slot| slot.borrow().clone().unwrap_or_default())
 }
 
+/// Bind an inherited lifetime in a nested worker, restoring the previous token on unwind.
+pub(crate) fn with_cancellation<T>(cancel: Cancellation, work: impl FnOnce() -> T) -> T {
+    struct Restore(Option<Cancellation>);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            CURRENT.with(|slot| *slot.borrow_mut() = self.0.take());
+        }
+    }
+    let _restore = Restore(CURRENT.with(|slot| slot.replace(Some(cancel))));
+    work()
+}
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Priority {
     Interactive,
@@ -53,6 +65,7 @@ pub(crate) enum Priority {
 type Work = Box<dyn FnOnce() + Send>;
 struct Job {
     work: Work,
+    connections: crate::connections::Context,
     on_cancel: Option<Work>,
     cancel: Cancellation,
     priority: Priority,
@@ -162,6 +175,7 @@ impl Pool {
         }
         state.queue.push_back(Job {
             work,
+            connections: crate::connections::current(),
             on_cancel,
             cancel,
             priority,
@@ -283,7 +297,9 @@ fn worker(shared: Arc<Shared>) {
         CURRENT.with(|slot| *slot.borrow_mut() = Some(job.cancel.clone()));
         // Most callers supply an error continuation. Also contain panics from any other
         // caller so the fixed pool never silently loses a worker.
-        let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(job.work));
+        let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            job.connections.run(job.work)
+        }));
         CURRENT.with(|slot| *slot.borrow_mut() = None);
         let mut state = shared
             .state
@@ -646,5 +662,25 @@ mod tests {
         );
         pool.shutdown();
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod r2_scope_tests {
+    use super::*;
+    #[test]
+    fn r2_pure_operation_cancellation_scope_restores_worker_and_bounds_independent_cleanup_scope() {
+        let worker = cancellation();
+        let operation = worker.child();
+        with_cancellation(operation.clone(), || {
+            operation.cancel();
+            assert!(cancellation().is_cancelled());
+            with_cancellation(Cancellation::default(), || {
+                assert!(!cancellation().is_cancelled())
+            });
+            assert!(cancellation().is_cancelled());
+        });
+        assert!(!worker.is_cancelled());
+        assert!(!cancellation().is_cancelled());
     }
 }

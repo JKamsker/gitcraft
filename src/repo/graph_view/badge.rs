@@ -39,12 +39,39 @@ impl Badge {
     /// The pill as a screen reader says it, in a row's name: "branch dev, checked out".
     pub(super) fn spoken(&self) -> String {
         match self.kind {
-            BadgeKind::Tag => format!("tag {}", self.label),
-            BadgeKind::DetachedHead => "detached HEAD".to_owned(),
-            BadgeKind::PullRequest => format!("pull request branch {}", self.label),
-            BadgeKind::Branch if self.head => format!("branch {}, checked out", self.label),
-            BadgeKind::Branch if !self.local => format!("remote branch {}", self.git_ref()),
-            BadgeKind::Branch => format!("branch {}", self.label),
+            BadgeKind::Tag => crate::i18n::message(
+                "repo-core-2591",
+                &[(
+                    "label",
+                    crate::repo::messages::display_operation(&self.label).into(),
+                )],
+            ),
+            BadgeKind::DetachedHead => crate::i18n::text("repo-core-2592").to_owned(),
+            BadgeKind::PullRequest => crate::i18n::message(
+                "repo-core-2593",
+                &[(
+                    "label",
+                    crate::repo::messages::display_operation(&self.label).into(),
+                )],
+            ),
+            BadgeKind::Branch if self.head => crate::i18n::message(
+                "repo-core-2594",
+                &[(
+                    "label",
+                    crate::repo::messages::display_operation(&self.label).into(),
+                )],
+            ),
+            BadgeKind::Branch if !self.local => crate::i18n::message(
+                "repo-core-2595",
+                &[("git-ref", self.git_ref().to_string().into())],
+            ),
+            BadgeKind::Branch => crate::i18n::message(
+                "repo-core-2596",
+                &[(
+                    "label",
+                    crate::repo::messages::display_operation(&self.label).into(),
+                )],
+            ),
         }
     }
 
@@ -70,19 +97,28 @@ impl Badge {
 
     pub(super) fn describe(&self) -> String {
         match self.kind {
-            BadgeKind::Tag => format!("tag {}", self.label),
-            BadgeKind::DetachedHead => "HEAD (detached)".to_owned(),
-            BadgeKind::PullRequest => format!(
-                "{} — pull request branch (not fetched as a branch)",
-                self.label
+            BadgeKind::Tag => crate::i18n::message(
+                "repo-core-2591",
+                &[(
+                    "label",
+                    crate::repo::messages::display_operation(&self.label).into(),
+                )],
+            ),
+            BadgeKind::DetachedHead => crate::i18n::text("repo-core-2598").to_owned(),
+            BadgeKind::PullRequest => crate::i18n::message(
+                "repo-core-2599",
+                &[(
+                    "label",
+                    crate::repo::messages::display_operation(&self.label).into(),
+                )],
             ),
             BadgeKind::Branch => {
                 let mut places = Vec::new();
                 if self.local {
                     places.push(if self.head {
-                        "local, checked out".to_owned()
+                        crate::i18n::text("repo-core-2600").to_owned()
                     } else {
-                        "local".to_owned()
+                        crate::i18n::text("repo-core-2601").to_owned()
                     });
                 }
                 places.extend(self.remotes.iter().cloned());

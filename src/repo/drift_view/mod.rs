@@ -146,7 +146,10 @@ impl RepoTab {
                 let issue = drift::task::issue_number(&branch, &task).map(|n| {
                     let text = match &hosting {
                         Some(hosting) => drift::task::issue_text(hosting, &repo, n),
-                        None => Err("The repository's forge isn't known".to_owned()),
+                        None => Err(crate::i18n::text(
+                            "repo-workflows-drift_view-measure-drift-27f1506d",
+                        )
+                        .to_owned()),
                     };
                     (n, text)
                 });
@@ -201,7 +204,10 @@ impl RepoTab {
                     match saved {
                         Ok(task) => {
                             view.saved = task;
-                            view.said = Some("Saved beside the worktree's git data".to_owned());
+                            view.said = Some(
+                                crate::i18n::text("repo-workflows-drift_view-save-task-a40b28e7")
+                                    .to_owned(),
+                            );
                         }
                         Err(e) => view.said = Some(e),
                     }
@@ -295,45 +301,85 @@ fn body(ui: &mut egui::Ui, view: &mut DriftView, acts: &mut Vec<Action>) -> Todo
         .worktree
         .branch
         .clone()
-        .unwrap_or_else(|| "detached".to_owned());
+        .unwrap_or_else(|| crate::i18n::text("repo-workflows-paint-detached").to_owned());
     ui.label(
-        RichText::new(format!("Scope drift: {} ({branch})", view.worktree.name()))
-            .font(theme::semibold(15.0)),
+        RichText::new(crate::i18n::message(
+            "repo-workflows-drift_view-body-a8164b33",
+            &[
+                (
+                    "view-worktree-name-1",
+                    (view.worktree.name()).clone().into(),
+                ),
+                ("branch", (branch).clone().into()),
+            ],
+        ))
+        .font(theme::semibold(15.0)),
     );
     ui.add_space(6.0);
-    ui.label(RichText::new("Task").font(theme::medium(12.5)));
+    ui.label(
+        RichText::new(crate::i18n::text("repo-workflows-drift_view-body-4bc74b21"))
+            .font(theme::medium(12.5)),
+    );
     ui.add(
         egui::TextEdit::multiline(&mut view.task)
             .desired_rows(3)
             .desired_width(f32::INFINITY)
-            .hint_text("What the agent was asked to do (kept with the worktree, never committed)"),
+            .hint_text(crate::i18n::text("repo-workflows-drift_view-body-65fb660d")),
     );
     if let Some((n, issue)) = &view.issue {
         let line = match issue {
-            Ok(text) => format!(
-                "Linked issue #{n}: {}",
-                text.lines().next().unwrap_or_default()
+            Ok(text) => crate::i18n::message(
+                "repo-workflows-drift_view-body-cdc38d02",
+                &[
+                    ("n", (n).to_string().into()),
+                    (
+                        "text-lines-next-unwrap-or-defaul-1",
+                        (text.lines().next().unwrap_or_default()).into(),
+                    ),
+                ],
             ),
-            Err(e) => format!("Linked issue #{n}: {e}"),
+            Err(e) => crate::i18n::message(
+                "repo-workflows-drift_view-body-fa4f662d",
+                &[
+                    ("n", (n).to_string().into()),
+                    ("e", crate::drift::display::diagnostic(e).into()),
+                ],
+            ),
         };
-        let note = if view.task.trim().is_empty() {
-            " (used as the task)"
-        } else {
-            ""
-        };
+
         ui.label(
-            RichText::new(format!("{line}{note}"))
-                .size(12.0)
-                .color(t.text_dim),
+            RichText::new(crate::i18n::message(
+                "repo-workflows-drift-task-source",
+                &[
+                    ("line", (line.as_str()).into()),
+                    (
+                        "task",
+                        (if view.task.trim().is_empty() {
+                            "yes"
+                        } else {
+                            "no"
+                        })
+                        .into(),
+                    ),
+                ],
+            ))
+            .size(12.0)
+            .color(t.text_dim),
         );
     }
     ui.horizontal(|ui| {
         let dirty = view.task != view.saved;
         todo.save = ui
-            .add_enabled(dirty && !view.busy, egui::Button::new("Save task"))
+            .add_enabled(
+                dirty && !view.busy,
+                egui::Button::new(crate::i18n::text("repo-workflows-drift_view-body-42a9eb31")),
+            )
             .clicked();
         todo.measure = ui
-            .add_enabled(!view.busy, egui::Button::new("Measure again"))
+            .add_enabled(
+                !view.busy,
+                egui::Button::new(crate::i18n::text("repo-workflows-drift_view-body-31794226")),
+            )
             .clicked();
         if view.busy {
             ui.add(crate::spinner::Spinner::new());
@@ -342,7 +388,9 @@ fn body(ui: &mut egui::Ui, view: &mut DriftView, acts: &mut Vec<Action>) -> Todo
             ui.label(RichText::new(said).size(11.5).color(t.text_faint));
         }
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            todo.close = ui.button("Close").clicked();
+            todo.close = ui
+                .button(crate::i18n::text("repo-workflows-drift_view-body-7d9eb7ac"))
+                .clicked();
         });
     });
     ui.add_space(8.0);
@@ -355,12 +403,11 @@ fn body(ui: &mut egui::Ui, view: &mut DriftView, acts: &mut Vec<Action>) -> Todo
                 todo.ask = ui
                     .add_enabled(
                         !view.asking,
-                        egui::Button::new("Ask a coding agent (optional)"),
+                        egui::Button::new(crate::i18n::text(
+                            "repo-workflows-drift_view-body-3e453620",
+                        )),
                     )
-                    .on_hover_text(
-                        "Runs claude -p (or codex exec) here with the task and the paths, no \
-                         file contents, and shows which items it thinks the task doesn't need",
-                    )
+                    .on_hover_text(crate::i18n::text("repo-workflows-drift_view-body-e039d62e"))
                     .clicked();
                 if view.asking {
                     ui.add(crate::spinner::Spinner::new());
@@ -371,15 +418,67 @@ fn body(ui: &mut egui::Ui, view: &mut DriftView, acts: &mut Vec<Action>) -> Todo
                     ui.label(RichText::new(answer).size(12.0).color(t.text_dim));
                 }
                 Some(Err(e)) => {
-                    ui.label(RichText::new(e).size(12.0).color(t.danger));
+                    ui.label(
+                        RichText::new(crate::drift::display::diagnostic(e))
+                            .size(12.0)
+                            .color(t.danger),
+                    );
                 }
                 None => {}
             }
         }
         Some(Err(e)) => {
-            ui.label(RichText::new(e).color(t.danger));
+            ui.label(RichText::new(crate::drift::display::diagnostic(e)).color(t.danger));
         }
         None => {}
     }
     todo
+}
+
+#[cfg(test)]
+mod fluent_guard_tests {
+    use super::*;
+    use egui_kittest::{Harness, kittest::Queryable};
+    #[test]
+    fn fluent_partition_drift_actual_paint_reprojects_cached_raw_results() -> Result<(), String> {
+        let raw = "There is no main branch commit to compare the worktree with";
+        let view = DriftView {
+            worktree: Worktree {
+                path: "/supplied/ß".into(),
+                branch: Some("feature/1234".into()),
+                ..Default::default()
+            },
+            base: "abc123".into(),
+            task: "User supplied task".into(),
+            saved: "User supplied task".into(),
+            issue: None,
+            report: Some(Err(raw.into())),
+            busy: false,
+            second_opinion: None,
+            asking: false,
+            said: None,
+            hidden: false,
+        };
+        let mut initialized = false;
+        let mut h = Harness::new_ui_state(
+            |ui, state: &mut DriftView| {
+                if !initialized {
+                    crate::theme::install_fonts(ui.ctx());
+                    initialized = true;
+                    ui.ctx().request_discard("install supplied fonts");
+                    return;
+                }
+                body(ui, state, &mut vec![]);
+            },
+            view,
+        );
+        for lang in ["en-US", "de", "en-US"] {
+            crate::i18n::set_language(lang);
+            h.run();
+            h.get_by_label(&crate::drift::display::diagnostic(raw));
+            assert_eq!(h.state().report, Some(Err(raw.into())));
+            assert_eq!(h.state().worktree.branch.as_deref(), Some("feature/1234"));
+        }
+        Ok(())
+    }
 }

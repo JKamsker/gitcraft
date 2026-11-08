@@ -55,13 +55,16 @@ impl RepoTab {
         };
         let path = self.path.clone();
         let done = format!("{label}: done");
-        self.then(
+        let heads = after.as_ref().map(|after| (before.clone(), after.clone()));
+        self.then_or(
             ctx,
+            false,
+            Err,
             move || {
                 let after = after.unwrap_or_else(|| git::head(&path));
                 keep_rewrite(&path, &before, &after, branch, onto.as_deref())
             },
-            move |tab, kept, _| tab.rewrite_kept(&op_label, &done, kept),
+            move |tab, kept, ctx| tab.rewrite_kept(&op_label, &done, heads, kept, ctx),
         );
     }
 
@@ -94,15 +97,26 @@ impl RepoTab {
             .and_then(|op| onto_of(&op.ops))
     }
 
-    fn rewrite_kept(
+    pub(in crate::repo) fn rewrite_kept(
         &mut self,
         label: &str,
         done: &str,
+        heads: Option<(String, String)>,
         kept: Result<Option<(git::Rewrite, Vec<git::Rewrite>)>, String>,
+        ctx: &egui::Context,
     ) {
+        // Only this exact worker's successfully retained rewrite can satisfy DCO.
+        let dco_kept = match (&heads, &kept) {
+            (Some((before, after)), Ok(Some((rewrite, _)))) => {
+                &rewrite.old.tip == before
+                    && &rewrite.new.tip == after
+                    && label == format!("Sign off the commits of {}", rewrite.branch)
+            }
+            _ => false,
+        };
         let says_done = self
             .status
-            .as_ref()
+            .as_deref()
             .is_some_and(|(msg, err)| msg == done && !err);
         match kept {
             Ok(Some((rewrite, list))) => {
@@ -115,12 +129,15 @@ impl RepoTab {
             Ok(None) => {}
             // Done all the same; only the version from before couldn't be kept.
             Err(e) if says_done => {
-                self.status = Some((
+                self.status = Some(crate::repo::Notice::plain((
                     format!("{label}: done, but its earlier version couldn't be kept: {e}"),
                     true,
-                ));
+                )));
             }
             Err(_) => {}
+        }
+        if let Some(heads) = heads {
+            self.dco_rewrite_kept(label, &heads, dco_kept, ctx);
         }
     }
 
@@ -161,12 +178,16 @@ impl RepoTab {
         };
         let shown = self
             .status
-            .as_ref()
+            .as_deref()
             .is_some_and(|(msg, err)| msg == done && !err);
         if shown
             && ui
-                .small_button("Compare before / after")
-                .on_hover_text("The branch's commits before and after, side by side")
+                .small_button(crate::i18n::text(
+                    "repo-workflows-versions-fresh-rewrite-button-e6be1703",
+                ))
+                .on_hover_text(crate::i18n::text(
+                    "repo-workflows-versions-fresh-rewrite-button-fce3e9e3",
+                ))
                 .clicked()
         {
             acts.push(Action::Versions(VersionsAct::Rewrite(rewrite.clone())));
@@ -186,10 +207,15 @@ impl RepoTab {
         if let Some(rewrite) = rewrite {
             let when = git::relative_time(rewrite.time, git::now());
             if ui
-                .button("Compare before / after the last rewrite")
-                .on_hover_text(format!(
-                    "{} as it was before it was rewritten {when}, and after",
-                    b.name
+                .button(crate::i18n::text(
+                    "repo-workflows-versions-versions-items-a2e93753",
+                ))
+                .on_hover_text(crate::i18n::message(
+                    "repo-workflows-versions-versions-items-8e286a1d",
+                    &[
+                        ("b-name-1", (b.name).clone().into()),
+                        ("when", (when).clone().into()),
+                    ],
                 ))
                 .clicked()
             {
@@ -198,11 +224,16 @@ impl RepoTab {
         }
         if diverged
             && ui
-                .button(format!("Compare commits with {}", b.upstream))
-                .on_hover_text(format!(
-                    "Left, the commits only {} has; right, those only {} has; the same \
-                     change on both sides paired up",
-                    b.upstream, b.name
+                .button(crate::i18n::message(
+                    "repo-workflows-versions-versions-items-a0142396",
+                    &[("b-upstream-1", (b.upstream).clone().into())],
+                ))
+                .on_hover_text(crate::i18n::message(
+                    "repo-workflows-versions-versions-items-28feb7ce",
+                    &[
+                        ("b-upstream-1", (b.upstream).clone().into()),
+                        ("b-name-2", (b.name).clone().into()),
+                    ],
                 ))
                 .clicked()
         {
@@ -223,7 +254,10 @@ impl RepoTab {
             .latest_rewrite(current)
             .or_else(|| self.versions.rewrites.first())?;
         Some((
-            format!("Compare {} before / after its last rewrite", rewrite.branch),
+            crate::i18n::message(
+                "repo-workflows-versions-versions-palette-item-67f7dd27",
+                &[("rewrite-branch-1", (rewrite.branch).clone().into())],
+            ),
             "compare".into(),
             Action::Versions(VersionsAct::Rewrite(rewrite.clone())),
         ))

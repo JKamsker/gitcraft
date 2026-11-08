@@ -484,7 +484,7 @@ fn through_the_tab() -> Result<(), String> {
     tab.keep_both_stage(plan, &ctx);
     let refused = poll_until(&mut tab, &ctx, |tab| {
         tab.status
-            .as_ref()
+            .as_deref()
             .is_some_and(|(m, _)| m.contains("no longer in the conflict"))
     });
     let pic_kept = std::fs::read(dir.join("pic.gif"));

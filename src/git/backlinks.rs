@@ -33,10 +33,12 @@ impl LinkKind {
 
     pub fn label(&self) -> String {
         match self {
-            Self::Revert => "Reverts it".to_owned(),
-            Self::CherryPick => "Cherry-picked from it".to_owned(),
+            Self::Revert => crate::i18n::text("backend-reverts-it-358e92").to_owned(),
+            Self::CherryPick => {
+                crate::i18n::text("backend-cherry-picked-from-it-dcbff6").to_owned()
+            }
             Self::Trailer(key) => format!("{key}:"),
-            Self::Mention => "Mentions it".to_owned(),
+            Self::Mention => crate::i18n::text("backend-mentions-it-d6afd2").to_owned(),
         }
     }
 }
@@ -70,7 +72,10 @@ pub fn backlinks_scoped(
     excluded: &[String],
 ) -> Result<(Vec<Backlink>, bool), String> {
     let Some(probe) = hash.get(..MIN_MENTION) else {
-        return Err(format!("{hash} is not a commit hash"));
+        return Err(crate::i18n::message(
+            "backend-hash-is-not-a-commit-hash-f712e5",
+            &[("hash", (hash).to_string().into())],
+        ));
     };
     // git finds the messages with the hash's start; which of them really mention it (and how)
     // is read here. Every branch, remote branch and tag; not notes or stashes, whose
@@ -88,8 +93,12 @@ pub fn backlinks_scoped(
         "--format=%H%x00%an%x00%ad%x00%B%x00%x1e",
     ];
     args.extend(revisions.iter().map(String::as_str));
-    let out = run(Some(repo), &args)
-        .map_err(|e| format!("Could not search the history for mentions: {e}"))?;
+    let out = run(Some(repo), &args).map_err(|e| {
+        crate::i18n::message(
+            "backend-could-not-search-the-history-for-mentions-e-dd837b",
+            &[("detail", e.into())],
+        )
+    })?;
     let mut links: Vec<Backlink> = out
         .split('\x1e')
         .filter_map(|record| parse_record(record.trim_start_matches('\n'), hash))

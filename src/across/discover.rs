@@ -35,10 +35,19 @@ pub enum Machine {
 }
 
 impl Machine {
+    #[cfg(test)]
     pub fn label(&self) -> String {
         match self {
             Machine::Here => "This computer".to_owned(),
             Machine::There(host) => host.label(),
+        }
+    }
+
+    /// Selected-language prose only; `label` remains the grouping/control identity.
+    pub fn display_label(&self) -> String {
+        match self {
+            Self::Here => crate::i18n::text("interaction-my-work-this-computer").to_owned(),
+            Self::There(host) => host.label(),
         }
     }
 

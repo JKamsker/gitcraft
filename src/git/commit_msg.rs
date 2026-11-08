@@ -38,8 +38,15 @@ pub fn commit_template(repo: &Path) -> Result<Option<String>, String> {
         return Ok(None);
     }
     let file = remote::resolve(repo, printed);
-    let text = remote::read_to_string(&file)
-        .map_err(|e| format!("commit.template is set to {printed}, which can't be read: {e}"))?;
+    let text = remote::read_to_string(&file).map_err(|e| {
+        crate::i18n::message(
+            "backend-commit-template-is-set-to-printed-which-can-t-be-read-e-73bb4d",
+            &[
+                ("printed", (printed).to_string().into()),
+                ("detail", (e).to_string().into()),
+            ],
+        )
+    })?;
     let starts_blank = text
         .lines()
         .next()
@@ -119,7 +126,10 @@ pub fn prepare_commit_msg(
     )?;
     let mut lines = paths.lines();
     let (Some(hook), Some(msg)) = (lines.next(), lines.next()) else {
-        return Err("git didn't say where the repository's hooks are".to_owned());
+        return Err(crate::i18n::text(
+            "backend-git-didn-t-say-where-the-repository-s-hooks-are-7bc88b",
+        )
+        .to_owned());
     };
     let hook_file = remote::resolve(repo, hook);
     if !remote::try_is_file(&hook_file).map_err(|e| e.to_string())? {
@@ -130,8 +140,15 @@ pub fn prepare_commit_msg(
     if !seed.is_empty() && !seed.ends_with('\n') {
         seed.push('\n');
     }
-    remote::write(&msg_file, seed.as_bytes())
-        .map_err(|e| format!("Couldn't write {msg} for prepare-commit-msg: {e}"))?;
+    remote::write(&msg_file, seed.as_bytes()).map_err(|e| {
+        crate::i18n::message(
+            "backend-couldn-t-write-msg-for-prepare-commit-msg-e-9e63a5",
+            &[
+                ("msg", (msg).to_string().into()),
+                ("detail", (e).to_string().into()),
+            ],
+        )
+    })?;
     let mut args = vec![
         "hook",
         "run",
@@ -142,17 +159,28 @@ pub fn prepare_commit_msg(
     ];
     args.extend(source.args());
     run_timed(repo, &args, None, HOOK_LIMIT).map_err(hook_error)?;
-    let left = remote::read_to_string(&msg_file)
-        .map_err(|e| format!("Couldn't read what prepare-commit-msg left in {msg}: {e}"))?;
+    let left = remote::read_to_string(&msg_file).map_err(|e| {
+        crate::i18n::message(
+            "backend-couldn-t-read-what-prepare-commit-msg-left-in-msg-e-15b2a7",
+            &[
+                ("msg", (msg).to_string().into()),
+                ("detail", (e).to_string().into()),
+            ],
+        )
+    })?;
     strip_comments(repo, &left).map(Some)
 }
 
 /// What a failed `git hook run` says, in words a commit box can show.
 fn hook_error(err: String) -> String {
     if err.contains("is not a git command") || err.contains("unknown subcommand") {
-        "Running prepare-commit-msg needs git 2.36 or newer".to_owned()
+        crate::i18n::text("backend-running-prepare-commit-msg-needs-git-2-36-or-newer-11e13e")
+            .to_owned()
     } else {
-        format!("prepare-commit-msg failed: {}", first_lines(&err, 3))
+        crate::i18n::message(
+            "backend-prepare-commit-msg-failed-0cc53f",
+            &[("first_lines", (first_lines(&err, 3)).to_string().into())],
+        )
     }
 }
 
@@ -254,7 +282,15 @@ pub fn add_trailer(repo: &Path, message: &str, key: &str, value: &str) -> Result
         FILTER_LIMIT,
     )
     .map(|out| out.trim_end().to_owned())
-    .map_err(|e| format!("Couldn't add the {key} trailer: {e}"))
+    .map_err(|e| {
+        crate::i18n::message(
+            "backend-couldn-t-add-the-key-trailer-e-6d67a5",
+            &[
+                ("key", (key).to_string().into()),
+                ("detail", (e).to_string().into()),
+            ],
+        )
+    })
 }
 
 /// A character `text` doesn't have, for git to take as its comment character.

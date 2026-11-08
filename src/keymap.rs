@@ -2,7 +2,17 @@
 //! handlers, the manual, Settings → Keyboard shortcuts, the toolbar's tooltips, the palette and
 //! the menus all read, so none of them can say another key than the one that works.
 
-use egui::{InputState, Key, Modifiers};
+mod config;
+pub(crate) mod editor;
+mod resolver;
+mod selection;
+pub(crate) use selection::copy_requested;
+
+pub(crate) use config::{Overrides, Stroke};
+use egui::{Key, Modifiers};
+pub(crate) use resolver::{
+    active, cancel, owner, pressed, queued, restrict, retain_allowed, take, which_key,
+};
 
 /// What a key does.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -27,18 +37,129 @@ pub(crate) enum Command {
     Terminal,
     StageAll,
     Commit,
+    FocusSidebar,
+    FocusGraph,
+    FocusDetail,
+    FileNext,
+    FilePrevious,
+    FileToggleStage,
+    FileOpen,
+    HunkStage,
+    HunkUnstage,
+    HunkDiscard,
+    Undo,
+    Redo,
+    Timeline,
+    Search,
+    Back,
+    Forward,
+    NextChange,
+    PreviousChange,
+    NextChangeAlt,
+    PreviousChangeAlt,
+    GraphPrevious,
+    GraphNext,
+    GraphLeft,
+    GraphRight,
+    RebasePrevious,
+    RebaseNext,
+    RebaseMoveUp,
+    RebaseMoveDown,
+    RebasePick,
+    RebaseReword,
+    RebaseEdit,
+    RebaseSquash,
+    RebaseFixup,
+    RebaseDrop,
+    SettingsSearch,
+    SettingsPrevious,
+    SettingsNext,
+    FindNext,
+    FindPrevious,
+    SelectionCopy,
+    SelectionAll,
+    SelectionHistory,
+    GraphCopyHash,
+    GraphCopyMessage,
+    GraphCopyBranch,
+    FileHistory,
+    FileBlame,
+    FileContents,
+    FileCopyPath,
 }
 
 /// Where a key works: anywhere in the window, or in a repository tab.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum Scope {
     Window,
     Repository,
+    Files,
+    Diff,
+    Changes,
+    Graph,
+    Rebase,
+    Settings,
+    Find,
+    Selection,
+}
+
+impl Scope {
+    fn overlaps(self, other: Self) -> bool {
+        match (self, other) {
+            (Self::Window, _) | (_, Self::Window) => true,
+            (Self::Settings, scope) | (scope, Self::Settings) => scope == Self::Settings,
+            (
+                Self::Rebase,
+                Self::Files
+                | Self::Diff
+                | Self::Changes
+                | Self::Graph
+                | Self::Find
+                | Self::Selection,
+            )
+            | (
+                Self::Files
+                | Self::Diff
+                | Self::Changes
+                | Self::Graph
+                | Self::Find
+                | Self::Selection,
+                Self::Rebase,
+            )
+            | (Self::Files, Self::Diff | Self::Graph)
+            | (Self::Diff | Self::Graph, Self::Files) => false,
+            _ => true,
+        }
+    }
 }
 
 impl Command {
     pub(crate) fn scope(self) -> Scope {
         match self {
+            Command::FindNext | Command::FindPrevious => Scope::Find,
+            Command::SelectionCopy | Command::SelectionAll | Command::SelectionHistory => {
+                Scope::Selection
+            }
+            Command::GraphCopyHash
+            | Command::GraphCopyMessage
+            | Command::GraphCopyBranch
+            | Command::GraphPrevious
+            | Command::GraphNext
+            | Command::GraphLeft
+            | Command::GraphRight => Scope::Graph,
+            Command::RebasePrevious
+            | Command::RebaseNext
+            | Command::RebaseMoveUp
+            | Command::RebaseMoveDown
+            | Command::RebasePick
+            | Command::RebaseReword
+            | Command::RebaseEdit
+            | Command::RebaseSquash
+            | Command::RebaseFixup
+            | Command::RebaseDrop => Scope::Rebase,
+            Command::SettingsSearch | Command::SettingsPrevious | Command::SettingsNext => {
+                Scope::Settings
+            }
             Command::NewTab
             | Command::CloseTab
             | Command::ReopenTab
@@ -50,21 +171,161 @@ impl Command {
             | Command::Settings
             | Command::Reload
             | Command::Manual => Scope::Window,
-            Command::Fetch
+            Command::Undo
+            | Command::Redo
+            | Command::Timeline
+            | Command::Search
+            | Command::Back
+            | Command::Forward
+            | Command::Fetch
             | Command::Pull
             | Command::Push
             | Command::Stash
             | Command::NewBranch
             | Command::Terminal
             | Command::StageAll
-            | Command::Commit => Scope::Repository,
+            | Command::Commit
+            | Command::FocusSidebar
+            | Command::FocusGraph
+            | Command::FocusDetail => Scope::Repository,
+            Command::FileHistory
+            | Command::FileBlame
+            | Command::FileContents
+            | Command::FileCopyPath
+            | Command::FileNext
+            | Command::FilePrevious
+            | Command::FileToggleStage
+            | Command::FileOpen => Scope::Files,
+            Command::HunkStage | Command::HunkUnstage | Command::HunkDiscard => Scope::Diff,
+            Command::NextChange
+            | Command::PreviousChange
+            | Command::NextChangeAlt
+            | Command::PreviousChangeAlt => Scope::Changes,
         }
+    }
+
+    /// Stable IDs are persisted independently of translated labels.
+    pub(crate) fn id(self) -> &'static str {
+        match self {
+            Self::GraphCopyHash => "graph_copy_hash",
+            Self::GraphCopyMessage => "graph_copy_message",
+            Self::GraphCopyBranch => "graph_copy_branch",
+            Self::FileHistory => "file_history",
+            Self::FileBlame => "file_blame",
+            Self::FileContents => "file_contents",
+            Self::FileCopyPath => "file_copy_path",
+            Self::FindNext => "find_next",
+            Self::FindPrevious => "find_previous",
+            Self::SelectionCopy => "selection_copy",
+            Self::SelectionAll => "selection_all",
+            Self::SelectionHistory => "selection_history",
+            Self::Undo => "undo",
+            Self::Redo => "redo",
+            Self::Timeline => "timeline",
+            Self::Search => "search",
+            Self::Back => "back",
+            Self::Forward => "forward",
+            Self::NextChange => "next_change",
+            Self::PreviousChange => "previous_change",
+            Self::NextChangeAlt => "next_change_alternate",
+            Self::PreviousChangeAlt => "previous_change_alternate",
+            Self::GraphPrevious => "graph_previous",
+            Self::GraphNext => "graph_next",
+            Self::GraphLeft => "graph_left",
+            Self::GraphRight => "graph_right",
+            Self::RebasePrevious => "rebase_previous",
+            Self::RebaseNext => "rebase_next",
+            Self::RebaseMoveUp => "rebase_move_up",
+            Self::RebaseMoveDown => "rebase_move_down",
+            Self::RebasePick => "rebase_pick",
+            Self::RebaseReword => "rebase_reword",
+            Self::RebaseEdit => "rebase_edit",
+            Self::RebaseSquash => "rebase_squash",
+            Self::RebaseFixup => "rebase_fixup",
+            Self::RebaseDrop => "rebase_drop",
+            Self::SettingsSearch => "settings_search",
+            Self::SettingsPrevious => "settings_previous",
+            Self::SettingsNext => "settings_next",
+            Self::NewTab => "new_tab",
+            Self::CloseTab => "close_tab",
+            Self::ReopenTab => "reopen_tab",
+            Self::NextTab => "next_tab",
+            Self::PreviousTab => "previous_tab",
+            Self::LastTab => "last_tab",
+            Self::Palette => "palette",
+            Self::Settings => "settings",
+            Self::Reload => "reload",
+            Self::Manual => "manual",
+            Self::Fetch => "fetch",
+            Self::Pull => "pull",
+            Self::Push => "push",
+            Self::Stash => "stash",
+            Self::NewBranch => "new_branch",
+            Self::Terminal => "terminal",
+            Self::StageAll => "stage_all",
+            Self::Commit => "commit",
+            Self::FocusSidebar => "focus_sidebar",
+            Self::FocusGraph => "focus_graph",
+            Self::FocusDetail => "focus_detail",
+            Self::FileNext => "file_next",
+            Self::FilePrevious => "file_previous",
+            Self::FileToggleStage => "file_toggle_stage",
+            Self::FileOpen => "file_open",
+            Self::HunkStage => "hunk_stage",
+            Self::HunkUnstage => "hunk_unstage",
+            Self::HunkDiscard => "hunk_discard",
+            Self::GoToTab(1) => "tab_1",
+            Self::GoToTab(2) => "tab_2",
+            Self::GoToTab(3) => "tab_3",
+            Self::GoToTab(4) => "tab_4",
+            Self::GoToTab(5) => "tab_5",
+            Self::GoToTab(6) => "tab_6",
+            Self::GoToTab(7) => "tab_7",
+            Self::GoToTab(8) => "tab_8",
+            Self::GoToTab(_) => "invalid_tab",
+        }
+    }
+
+    pub(crate) fn title(self) -> &'static str {
+        WINDOW_ROWS
+            .iter()
+            .chain(REPOSITORY_ROWS)
+            .chain(LOCAL_ROWS)
+            .find(|r| r.commands.contains(&self))
+            .map_or_else(
+                || crate::i18n::text("interaction-key-action"),
+                |r| crate::i18n::text(r.what),
+            )
     }
 
     /// Whether holding the key down does it again: going through the tabs does, an operation
     /// started once doesn't.
     fn repeats(self) -> bool {
-        matches!(self, Command::NextTab | Command::PreviousTab)
+        matches!(
+            self,
+            Command::NextTab
+                | Command::PreviousTab
+                | Command::FileNext
+                | Command::FilePrevious
+                | Command::NextChange
+                | Command::PreviousChange
+                | Command::NextChangeAlt
+                | Command::PreviousChangeAlt
+                | Command::Back
+                | Command::Forward
+                | Command::GraphPrevious
+                | Command::GraphNext
+                | Command::GraphLeft
+                | Command::GraphRight
+                | Command::RebasePrevious
+                | Command::RebaseNext
+                | Command::RebaseMoveUp
+                | Command::RebaseMoveDown
+                | Command::SettingsPrevious
+                | Command::SettingsNext
+                | Command::FindNext
+                | Command::FindPrevious
+        )
     }
 }
 
@@ -120,59 +381,97 @@ pub(crate) const BINDINGS: &[Binding] = &[
     bind(Command::Terminal, CMD, Key::J),
     bind(Command::StageAll, CMD_SHIFT, Key::A),
     bind(Command::Commit, CMD, Key::Enter),
+    bind(Command::FocusSidebar, CMD.plus(Modifiers::ALT), Key::Num1),
+    bind(Command::FocusGraph, CMD.plus(Modifiers::ALT), Key::Num2),
+    bind(Command::FocusDetail, CMD.plus(Modifiers::ALT), Key::Num3),
+    bind(Command::FileNext, NONE, Key::J),
+    bind(Command::FilePrevious, NONE, Key::K),
+    bind(Command::FileToggleStage, NONE, Key::Space),
+    bind(Command::FileOpen, NONE, Key::Enter),
+    bind(Command::HunkStage, NONE, Key::S),
+    bind(Command::HunkUnstage, NONE, Key::U),
+    bind(Command::HunkDiscard, NONE, Key::D),
+    bind(Command::Undo, CMD, Key::Z),
+    bind(Command::Redo, CMD, Key::Y),
+    bind(Command::Timeline, CMD_SHIFT, Key::Z),
+    bind(Command::Search, CMD, Key::F),
+    bind(Command::Back, Modifiers::ALT, Key::ArrowLeft),
+    bind(Command::Forward, Modifiers::ALT, Key::ArrowRight),
+    bind(Command::NextChange, NONE, Key::F7),
+    bind(Command::PreviousChange, Modifiers::SHIFT, Key::F7),
+    bind(Command::NextChangeAlt, Modifiers::ALT, Key::ArrowDown),
+    bind(Command::PreviousChangeAlt, Modifiers::ALT, Key::ArrowUp),
+    bind(Command::GraphPrevious, NONE, Key::ArrowUp),
+    bind(Command::GraphNext, NONE, Key::ArrowDown),
+    bind(Command::GraphLeft, NONE, Key::ArrowLeft),
+    bind(Command::GraphRight, NONE, Key::ArrowRight),
+    bind(Command::RebasePrevious, NONE, Key::ArrowUp),
+    bind(Command::RebaseNext, NONE, Key::ArrowDown),
+    bind(Command::RebaseMoveUp, Modifiers::ALT, Key::ArrowUp),
+    bind(Command::RebaseMoveDown, Modifiers::ALT, Key::ArrowDown),
+    bind(Command::RebasePick, NONE, Key::P),
+    bind(Command::RebaseReword, NONE, Key::R),
+    bind(Command::RebaseEdit, NONE, Key::E),
+    bind(Command::RebaseSquash, NONE, Key::S),
+    bind(Command::RebaseFixup, NONE, Key::F),
+    bind(Command::RebaseDrop, NONE, Key::D),
+    bind(Command::SettingsSearch, CMD, Key::F),
+    bind(Command::SettingsPrevious, Modifiers::ALT, Key::ArrowUp),
+    bind(Command::SettingsNext, Modifiers::ALT, Key::ArrowDown),
+    bind(Command::FindNext, NONE, Key::F3),
+    bind(Command::FindPrevious, Modifiers::SHIFT, Key::F3),
+    bind(Command::SelectionCopy, CMD, Key::C),
+    bind(Command::SelectionAll, CMD, Key::A),
+];
+
+/// Optional actions appear in the same editor/manual registry and start unbound.
+pub(crate) const UNBOUND_COMMANDS: &[Command] = &[
+    Command::SelectionHistory,
+    Command::GraphCopyHash,
+    Command::GraphCopyMessage,
+    Command::GraphCopyBranch,
+    Command::FileHistory,
+    Command::FileBlame,
+    Command::FileContents,
+    Command::FileCopyPath,
 ];
 
 /// The command `key` with `modifiers` held does, if any.
+#[cfg(test)]
 pub(crate) fn find(key: Key, modifiers: Modifiers) -> Option<Command> {
     BINDINGS
         .iter()
-        .find(|b| b.key == key && modifiers.matches_exact(b.modifiers))
-        .map(|b| b.command)
-}
-
-/// The command of a key press: by the character the key types, else, for the tab keys, by
-/// where the digit is on the keyboard (on AZERTY the digits are typed with Shift, and the key
-/// under 4 reads as `'` without it).
-fn find_pressed(key: Key, physical: Option<Key>, modifiers: Modifiers) -> Option<Command> {
-    find(key, modifiers).or_else(|| {
-        physical
-            .and_then(|p| find(p, modifiers))
-            .filter(|c| matches!(c, Command::GoToTab(_) | Command::LastTab))
-    })
-}
-
-/// The commands of `scope` whose key was pressed this frame, in the order pressed.
-pub(crate) fn pressed(input: &InputState, scope: Scope) -> Vec<Command> {
-    input
-        .events
-        .iter()
-        .filter_map(|e| match e {
-            egui::Event::Key {
-                key,
-                physical_key,
-                pressed: true,
-                repeat,
-                modifiers,
-            } => find_pressed(*key, *physical_key, *modifiers).filter(|c| !*repeat || c.repeats()),
-            _ => None,
+        .find(|b| {
+            matches!(b.command.scope(), Scope::Window | Scope::Repository)
+                && b.key == key
+                && modifiers.matches_exact(b.modifiers)
         })
-        .filter(|c| c.scope() == scope)
-        .collect()
+        .map(|b| b.command)
 }
 
 /// The key of `command`, as the manual, the tooltips and the menus write it ("Ctrl+Shift+F", or
 /// "Cmd+Shift+F" on macOS). Empty for a command with no key.
-pub(crate) fn label(command: Command) -> String {
-    BINDINGS
-        .iter()
-        .find(|b| b.command == command)
-        .map(|b| combo(b.modifiers, b.key))
-        .unwrap_or_default()
+pub(crate) fn label(ctx: &egui::Context, command: Command) -> String {
+    config::effective(
+        &config::usable(&crate::settings::Settings::get(ctx).key_bindings),
+        command,
+    )
+    .iter()
+    .map(Stroke::label)
+    .collect::<Vec<_>>()
+    .join(" → ")
 }
 
 /// `text` followed by the key of `command` in brackets, for a tooltip.
-pub(crate) fn tip(text: &str, command: Command) -> String {
-    format!("{text} ({})", label(command))
+pub(crate) fn tip(ctx: &egui::Context, text: &str, command: Command) -> String {
+    {
+        let keys = label(ctx, command);
+        if keys.is_empty() {
+            text.to_owned()
+        } else {
+            format!("{text} ({keys})")
+        }
+    }
 }
 
 /// Keys written as the manual writes them ("Cmd+Z / Cmd+Y"), with Ctrl outside macOS.
@@ -228,12 +527,18 @@ const fn row(commands: &'static [Command], what: &'static str) -> Row {
 
 /// The manual's rows for the window's keys.
 pub(crate) const WINDOW_ROWS: &[Row] = &[
-    row(&[Command::NewTab], "New tab"),
-    row(&[Command::CloseTab], "Close the tab (or middle-click it)"),
-    row(&[Command::ReopenTab], "Reopen the tab closed last"),
+    row(&[Command::NewTab], "interaction-key-row-new-tab"),
+    row(
+        &[Command::CloseTab],
+        "interaction-key-row-close-the-tab-or-middle-click-it",
+    ),
+    row(
+        &[Command::ReopenTab],
+        "interaction-key-row-reopen-the-tab-closed-last",
+    ),
     row(
         &[Command::NextTab, Command::PreviousTab],
-        "Next / previous tab, wrapping around (Ctrl on macOS too)",
+        "interaction-key-row-next-previous-tab-wrapping-around-ctrl-on-macos-too",
     ),
     Row {
         commands: &[
@@ -247,52 +552,248 @@ pub(crate) const WINDOW_ROWS: &[Row] = &[
             Command::GoToTab(8),
         ],
         range: true,
-        what: "Go to tab 1 to 8",
+        what: "interaction-key-row-go-to-tab-1-to-8",
     },
-    row(&[Command::LastTab], "Go to the last tab"),
+    row(
+        &[Command::LastTab],
+        "interaction-key-row-go-to-the-last-tab",
+    ),
     row(
         &[Command::Palette],
-        "Command palette: every action and branch",
+        "interaction-key-row-command-palette-every-action-and-branch",
     ),
-    row(&[Command::Settings], "Settings"),
-    row(&[Command::Reload], "Reload the repository"),
-    row(&[Command::Manual], "This manual"),
+    row(&[Command::Settings], "interaction-key-row-settings"),
+    row(
+        &[Command::Reload],
+        "interaction-key-row-reload-the-repository",
+    ),
+    row(&[Command::Manual], "interaction-key-row-this-manual"),
 ];
 
 /// The manual's rows for a repository tab's keys. None works while a text field or the
 /// terminal has the keyboard.
 pub(crate) const REPOSITORY_ROWS: &[Row] = &[
-    row(&[Command::Fetch], "Fetch all remotes"),
-    row(&[Command::Pull], "Pull the current branch"),
-    row(&[Command::Push], "Push the current branch"),
-    row(&[Command::Stash], "Stash all changes…"),
-    row(&[Command::NewBranch], "Create a branch at HEAD"),
+    row(&[Command::Undo], "interaction-key-row-undo"),
+    row(&[Command::Redo], "interaction-key-row-redo"),
+    row(
+        &[Command::Timeline],
+        "interaction-key-row-timeline-and-undo-tree",
+    ),
+    row(
+        &[Command::Search],
+        "interaction-key-row-search-the-shown-diff-file-blame-or-commits",
+    ),
+    row(
+        &[Command::Back],
+        "interaction-key-row-back-through-recent-views",
+    ),
+    row(
+        &[Command::Forward],
+        "interaction-key-row-forward-through-recent-views",
+    ),
+    row(
+        &[Command::FocusSidebar],
+        "interaction-key-row-focus-the-sidebar",
+    ),
+    row(
+        &[Command::FocusGraph],
+        "interaction-key-row-focus-the-graph-or-diff",
+    ),
+    row(
+        &[Command::FocusDetail],
+        "interaction-key-row-focus-the-right-pane-and-its-files",
+    ),
+    row(&[Command::Fetch], "interaction-key-row-fetch-all-remotes"),
+    row(
+        &[Command::Pull],
+        "interaction-key-row-pull-the-current-branch",
+    ),
+    row(
+        &[Command::Push],
+        "interaction-key-row-push-the-current-branch",
+    ),
+    row(&[Command::Stash], "interaction-key-row-stash-all-changes"),
+    row(
+        &[Command::NewBranch],
+        "interaction-key-row-create-a-branch-at-head",
+    ),
     row(
         &[Command::Terminal],
-        "Show or hide the terminal (to hide it from inside, click outside it first)",
+        "interaction-key-row-show-or-hide-the-terminal-to-hide-it-from-inside-click-outside-it-first",
     ),
-    row(&[Command::StageAll], "Stage all changes"),
+    row(
+        &[Command::StageAll],
+        "interaction-key-row-stage-all-changes",
+    ),
     row(
         &[Command::Commit],
-        "Commit; with nothing staged, everything; with no summary yet, go to the message. In a note editor, save the note",
+        "interaction-key-row-commit-with-nothing-staged-everything-with-no-summary-yet-go-to-the-message",
+    ),
+];
+
+pub(crate) const LOCAL_ROWS: &[Row] = &[
+    row(
+        &[Command::GraphCopyHash],
+        "interaction-key-row-graph-copy-selected-commit-hash",
+    ),
+    row(
+        &[Command::GraphCopyMessage],
+        "interaction-key-row-graph-copy-selected-commit-message",
+    ),
+    row(
+        &[Command::GraphCopyBranch],
+        "interaction-key-row-graph-copy-selected-commit-s-first-branch",
+    ),
+    row(
+        &[Command::FileHistory],
+        "interaction-key-row-files-history-of-selected-file",
+    ),
+    row(
+        &[Command::FileBlame],
+        "interaction-key-row-files-blame-selected-file",
+    ),
+    row(
+        &[Command::FileContents],
+        "interaction-key-row-files-view-selected-file",
+    ),
+    row(
+        &[Command::FileCopyPath],
+        "interaction-key-row-files-copy-selected-path",
+    ),
+    row(&[Command::FindNext], "interaction-key-row-find-next-match"),
+    row(
+        &[Command::FindPrevious],
+        "interaction-key-row-find-previous-match",
+    ),
+    row(
+        &[Command::SelectionCopy],
+        "interaction-key-row-copy-selected-lines",
+    ),
+    row(
+        &[Command::SelectionAll],
+        "interaction-key-row-select-all-shown-lines",
+    ),
+    row(
+        &[Command::SelectionHistory],
+        "interaction-key-row-history-of-selected-lines",
+    ),
+    row(
+        &[Command::GraphPrevious],
+        "interaction-key-row-graph-previous-commit",
+    ),
+    row(
+        &[Command::GraphNext],
+        "interaction-key-row-graph-next-commit",
+    ),
+    row(
+        &[Command::GraphLeft],
+        "interaction-key-row-graph-lane-walk-jump-to-tip",
+    ),
+    row(
+        &[Command::GraphRight],
+        "interaction-key-row-graph-lane-walk-cycle-merge-parent",
+    ),
+    row(
+        &[Command::RebasePrevious],
+        "interaction-key-row-rebase-previous-row",
+    ),
+    row(
+        &[Command::RebaseNext],
+        "interaction-key-row-rebase-next-row",
+    ),
+    row(
+        &[Command::RebaseMoveUp],
+        "interaction-key-row-rebase-move-commit-up",
+    ),
+    row(
+        &[Command::RebaseMoveDown],
+        "interaction-key-row-rebase-move-commit-down",
+    ),
+    row(&[Command::RebasePick], "interaction-key-row-rebase-pick"),
+    row(
+        &[Command::RebaseReword],
+        "interaction-key-row-rebase-reword",
+    ),
+    row(&[Command::RebaseEdit], "interaction-key-row-rebase-edit"),
+    row(
+        &[Command::RebaseSquash],
+        "interaction-key-row-rebase-squash",
+    ),
+    row(&[Command::RebaseFixup], "interaction-key-row-rebase-fix-up"),
+    row(&[Command::RebaseDrop], "interaction-key-row-rebase-drop"),
+    row(
+        &[Command::SettingsSearch],
+        "interaction-key-row-settings-focus-search",
+    ),
+    row(
+        &[Command::SettingsPrevious],
+        "interaction-key-row-settings-previous-page",
+    ),
+    row(
+        &[Command::SettingsNext],
+        "interaction-key-row-settings-next-page",
+    ),
+    row(&[Command::NextChange], "interaction-key-row-next-change"),
+    row(
+        &[Command::PreviousChange],
+        "interaction-key-row-previous-change",
+    ),
+    row(
+        &[Command::NextChangeAlt],
+        "interaction-key-row-next-change-alternate-binding",
+    ),
+    row(
+        &[Command::PreviousChangeAlt],
+        "interaction-key-row-previous-change-alternate-binding",
+    ),
+    row(&[Command::FileNext], "interaction-key-row-next-file"),
+    row(
+        &[Command::FilePrevious],
+        "interaction-key-row-previous-file",
+    ),
+    row(
+        &[Command::FileToggleStage],
+        "interaction-key-row-stage-or-unstage-selected-file",
+    ),
+    row(
+        &[Command::FileOpen],
+        "interaction-key-row-open-selected-file-diff",
+    ),
+    row(
+        &[Command::HunkStage],
+        "interaction-key-row-stage-current-hunk",
+    ),
+    row(
+        &[Command::HunkUnstage],
+        "interaction-key-row-unstage-current-hunk",
+    ),
+    row(
+        &[Command::HunkDiscard],
+        "interaction-key-row-discard-current-hunk-confirmation",
     ),
 ];
 
 /// The keys of a manual row, as `manual::key_combo` draws them ("Ctrl+Tab / Ctrl+Shift+Tab").
-pub(crate) fn row_keys(row: &Row) -> String {
+pub(crate) fn row_keys(ctx: &egui::Context, row: &Row) -> String {
     match (row.range, row.commands.first(), row.commands.last()) {
-        (true, Some(&first), Some(&last)) => {
+        (true, Some(&first), Some(&last))
+            if row.commands.iter().all(|c| {
+                !crate::settings::Settings::get(ctx)
+                    .key_bindings
+                    .contains_key(c.id())
+            }) =>
+        {
             let last_key = BINDINGS
                 .iter()
                 .find(|b| b.command == last)
                 .map(|b| b.key.symbol_or_name())
                 .unwrap_or_default();
-            format!("{}…{last_key}", label(first))
+            format!("{}…{last_key}", label(ctx, first))
         }
         _ => row
             .commands
             .iter()
-            .map(|&c| label(c))
+            .map(|&c| label(ctx, c))
             .collect::<Vec<_>>()
             .join(" / "),
     }

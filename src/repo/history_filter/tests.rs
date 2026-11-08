@@ -139,7 +139,7 @@ fn tab_navigation_and_search_reveal_hidden_rows_without_changing_operational_par
     assert_eq!(tab.commits.len(), 2);
     assert_eq!(tab.commits[0].parents, ["hidden"]);
     assert_eq!(tab.history.len(), 4); // pagination uses raw history, never compacted rows.
-    tab.search.matches.insert("other".into());
+    Arc::make_mut(&mut tab.search.matches).insert("other".into());
     tab.goto("hidden", &ctx);
     assert_eq!(tab.selected_hash().as_deref(), Some("hidden"));
     assert!(tab.history_filter.revealed.is_empty());
@@ -353,5 +353,46 @@ fn real_first_parent_git_log_can_compact_a_matching_merge() -> Result<(), String
     assert!(!visible.iter().any(|c| c.hash == merge.hash));
     assert_eq!(graph[0].parents, [merge.parents[0].clone()]);
     let _ = std::fs::remove_dir_all(&dir);
+    Ok(())
+}
+
+#[test]
+fn filter_editor_repaints_languages_without_changing_rules_or_ref_patterns() -> Result<(), String> {
+    use egui_kittest::{Harness, kittest::Queryable};
+    let original = Rules {
+        names: "Alice 日本語\nT3 Code helper".into(),
+        emails: "literal@example.test".into(),
+        namespaces: "refs/opaque/*\nnot a ref 日本語".into(),
+        ..Rules::default()
+    };
+    for (language, title, invalid) in [
+        (
+            "en-US",
+            "Excluded author names",
+            "Ignored invalid ref patterns: not a ref 日本語",
+        ),
+        (
+            "de",
+            "Ausgeschlossene Autorennamen",
+            "Ungültige Referenzmuster ignoriert: not a ref 日本語",
+        ),
+        (
+            "en-US",
+            "Excluded author names",
+            "Ignored invalid ref patterns: not a ref 日本語",
+        ),
+    ] {
+        crate::i18n::set_language(language);
+        let mut h =
+            Harness::new_ui_state(|ui, rules: &mut Rules| edit(ui, rules), original.clone());
+        h.run();
+        h.query_by_label(title)
+            .ok_or("filter editor title missing")?;
+        h.query_by_label(invalid)
+            .ok_or("filter editor omitted raw invalid pattern")?;
+        assert_eq!(h.state(), &original);
+        assert_eq!(h.state().excludes(), ["refs/opaque/*"]);
+    }
+    crate::i18n::set_language("en-US");
     Ok(())
 }

@@ -19,8 +19,10 @@ const MAX_YEARS: u32 = 50;
 const LAST_YEAR: u32 = 2099;
 
 /// How dates are written, for the hints and the help.
-pub const DATE_FORMATS: &str = "2024-05-01, 2024-05, 2024, today, yesterday, or a time ago: \
-    12h, 3d, 2w, 6m (months), 1y";
+pub const DATE_FORMATS: &str = "backend-search-date-formats";
+pub fn date_formats() -> &'static str {
+    crate::i18n::text(DATE_FORMATS)
+}
 
 /// What `value` means as a date, or why it isn't one.
 pub fn git_date(value: &str) -> Result<GitDate, String> {
@@ -34,9 +36,14 @@ pub fn git_date(value: &str) -> Result<GitDate, String> {
         return Ok(GitDate { arg, day: None });
     }
     let (y, m, d) = day(&lower).ok_or_else(|| {
-        format!(
-            "“{value}” is not a date: write {DATE_FORMATS} (at most {MAX_YEARS} years back, \
-             days up to {LAST_YEAR})"
+        crate::i18n::message(
+            "backend-value-is-not-a-date-write-date-formats-at-most-max-years-years-ba-cd7a9d",
+            &[
+                ("value", (value).to_string().into()),
+                ("date_formats", date_formats().into()),
+                ("max_years", MAX_YEARS.into()),
+                ("last_year", (LAST_YEAR).to_string().into()),
+            ],
         )
     })?;
     Ok(GitDate {
@@ -109,12 +116,15 @@ pub fn date_suggestions() -> Vec<DateSuggestion> {
         .map_or(0, |d| d.as_secs());
     let (year, month, _) = civil_from_days((now / 86_400) as i64);
     let mut out: Vec<DateSuggestion> = [
-        ("today", "midnight today"),
-        ("yesterday", "midnight yesterday"),
-        ("1w", "one week ago"),
-        ("1m", "one month ago"),
-        ("3m", "three months ago"),
-        ("1y", "one year ago"),
+        ("today", crate::i18n::text("backend-midnight-today-28853e")),
+        (
+            "yesterday",
+            crate::i18n::text("backend-midnight-yesterday-e07876"),
+        ),
+        ("1w", crate::i18n::text("backend-one-week-ago-3a87bc")),
+        ("1m", crate::i18n::text("backend-one-month-ago-eafe1f")),
+        ("3m", crate::i18n::text("backend-three-months-ago-3b4730")),
+        ("1y", crate::i18n::text("backend-one-year-ago-120195")),
     ]
     .into_iter()
     .map(|(value, detail)| DateSuggestion {
@@ -124,11 +134,11 @@ pub fn date_suggestions() -> Vec<DateSuggestion> {
     .collect();
     out.push(DateSuggestion {
         value: format!("{year:04}-{month:02}-01"),
-        detail: "the start of this month".to_owned(),
+        detail: crate::i18n::text("backend-the-start-of-this-month-44ab43").to_owned(),
     });
     out.push(DateSuggestion {
         value: format!("{year:04}-01-01"),
-        detail: "the start of this year".to_owned(),
+        detail: crate::i18n::text("backend-the-start-of-this-year-942959").to_owned(),
     });
     out
 }

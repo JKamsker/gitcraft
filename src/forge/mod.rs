@@ -7,7 +7,10 @@
 //! - Forgejo and Gitea share one API, which gitcraft calls itself with the login `tea` (or git's
 //!   credential helper) already has for the host. See [`gitea`].
 
+mod azure;
+mod bitbucket;
 mod cli;
+pub(crate) mod cloud;
 pub(crate) use cli::tool_location;
 mod forks;
 pub(crate) use cli::{ToolReport, tool_report};
@@ -21,6 +24,7 @@ pub mod inbox;
 pub mod links;
 #[cfg(test)]
 mod routing_tests;
+pub(crate) mod ssh_keys;
 pub mod stack;
 #[cfg(test)]
 mod stack_tests;
@@ -39,10 +43,19 @@ pub enum Forge {
     GitLab,
     Forgejo,
     Gitea,
+    Azure,
+    Bitbucket,
 }
 
 impl Forge {
-    pub const ALL: [Forge; 4] = [Forge::GitHub, Forge::GitLab, Forge::Forgejo, Forge::Gitea];
+    pub const ALL: [Forge; 6] = [
+        Forge::GitHub,
+        Forge::GitLab,
+        Forge::Forgejo,
+        Forge::Gitea,
+        Forge::Azure,
+        Forge::Bitbucket,
+    ];
 
     /// The module that does the work.
     pub fn provider(self) -> &'static dyn Provider {
@@ -51,6 +64,8 @@ impl Forge {
             Forge::GitLab => &gitlab::GitLab,
             Forge::Forgejo => &gitea::FORGEJO,
             Forge::Gitea => &gitea::GITEA,
+            Forge::Azure => &azure::Azure,
+            Forge::Bitbucket => &bitbucket::Bitbucket,
         }
     }
 
@@ -64,11 +79,19 @@ impl Forge {
         self.provider().noun()
     }
 
+    /// Localized presentation; `noun()` retains its existing protocol identity.
+    pub fn noun_label(self) -> &'static str {
+        crate::i18n::text(match self {
+            Forge::GitLab => "backend-noun-merge-request",
+            _ => "backend-noun-pull-request",
+        })
+    }
+
     /// The heading of the sidebar's list.
     pub fn list_title(self) -> &'static str {
         match self.noun() {
-            "merge request" => "MERGE REQUESTS",
-            _ => "PULL REQUESTS",
+            "merge request" => crate::i18n::text("backend-merge-requests-6e2149"),
+            _ => crate::i18n::text("backend-pull-requests-334b28"),
         }
     }
 
@@ -84,6 +107,8 @@ impl Forge {
             Forge::GitLab => "gitlab",
             Forge::Forgejo => "forgejo",
             Forge::Gitea => "gitea",
+            Forge::Azure => "azure",
+            Forge::Bitbucket => "bitbucket",
         }
     }
 
@@ -161,8 +186,15 @@ fn parse_merged(
     pointers: [&str; 4],
     tool: &str,
 ) -> Result<Vec<MergedPullRequest>, String> {
-    let value: serde_json::Value =
-        serde_json::from_str(json).map_err(|e| format!("unexpected {tool} output: {e}"))?;
+    let value: serde_json::Value = serde_json::from_str(json).map_err(|e| {
+        crate::i18n::message(
+            "backend-unexpected-tool-output-e-50db44",
+            &[
+                ("tool", (tool).to_string().into()),
+                ("detail", (e).to_string().into()),
+            ],
+        )
+    })?;
     Ok(merged_items(
         value.as_array().map_or(&[][..], Vec::as_slice),
         pointers,
@@ -200,6 +232,9 @@ pub(crate) const ISSUES_MAX: usize = 100;
 /// An open issue assigned to the person signed in, to start work from.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Issue {
+    pub tracker: Option<crate::trackers::Identity>,
+    /// An explicitly selected tracker field takes precedence over description heuristics.
+    pub acceptance: Option<String>,
     /// Its number on the forge (GitLab's `iid`, the one `#N` means).
     pub number: u64,
     pub title: String,
@@ -207,6 +242,27 @@ pub struct Issue {
     pub body: String,
     pub url: String,
     pub labels: Vec<String>,
+}
+
+impl Issue {
+    /// Source-qualified stable key for UI interactions; tracker display numbers are not IDs.
+    pub(crate) fn identity(&self) -> String {
+        self.tracker.as_ref().map_or_else(
+            || serde_json::json!(["forge", self.url, self.number]).to_string(),
+            |i| serde_json::json!([i.kind, i.origin, i.id]).to_string(),
+        )
+    }
+    pub fn key(&self) -> String {
+        self.tracker
+            .as_ref()
+            .map_or_else(|| format!("#{}", self.number), |i| i.key.clone())
+    }
+    pub fn branch_name(&self) -> String {
+        self.tracker.as_ref().map_or_else(
+            || crate::repo::issue_work::issue_branch(self.number, &self.title),
+            |i| crate::repo::issue_work::tracker_branch(&i.key, &self.title),
+        )
+    }
 }
 
 /// Where a pull request stands.
@@ -285,14 +341,20 @@ pub trait Provider: Sync {
 
     /// The open issues of the repository assigned to the person signed in.
     fn assigned_issues(&self, _repo: &Path, _hosting: &Hosting) -> Result<Vec<Issue>, String> {
-        Err(format!("gitcraft can't list {}'s issues", self.name()))
+        Err(crate::i18n::message(
+            "backend-gitcraft-can-t-list-s-issues-0a6c81",
+            &[("name", (self.name()).to_string().into())],
+        ))
     }
 
     /// Issue `number` of the repository as it is now, to read its description again.
     fn issue(&self, _repo: &Path, _hosting: &Hosting, number: u64) -> Result<Issue, String> {
-        Err(format!(
-            "gitcraft can't read {}'s issue #{number}",
-            self.name()
+        Err(crate::i18n::message(
+            "backend-gitcraft-can-t-read-s-issue-number-6d6c88",
+            &[
+                ("name", (self.name()).to_string().into()),
+                ("number", (number).to_string().into()),
+            ],
         ))
     }
 
@@ -301,10 +363,12 @@ pub trait Provider: Sync {
     /// unasked, so it never asks for a password or a keyring: only logins already at hand.
     fn inbox(&self, repo: &Path, hosting: &Hosting) -> Result<inbox::Answer, String> {
         let _ = (repo, hosting);
-        Err(format!(
-            "gitcraft can't list the {}s waiting for you on {}",
-            self.noun(),
-            self.name()
+        Err(crate::i18n::message(
+            "backend-gitcraft-can-t-list-the-s-waiting-for-you-on-c02926",
+            &[
+                ("noun", (self.noun()).to_string().into()),
+                ("name", (self.name()).to_string().into()),
+            ],
         ))
     }
 
@@ -322,10 +386,12 @@ pub trait Provider: Sync {
     /// Where each open pull request's branch is (a fork or the repository itself), and what its
     /// author allows.
     fn forks(&self, _repo: &Path, _hosting: &Hosting) -> Result<Vec<ForkInfo>, String> {
-        Err(format!(
-            "{} can't say where its {}s come from",
-            self.name(),
-            self.noun()
+        Err(crate::i18n::message(
+            "backend-can-t-say-where-its-s-come-from-013949",
+            &[
+                ("name", (self.name()).to_string().into()),
+                ("noun", (self.noun()).to_string().into()),
+            ],
         ))
     }
 
@@ -336,9 +402,9 @@ pub trait Provider: Sync {
 
     /// Approves the workflow run `run`, which then runs.
     fn approve_run(&self, _repo: &Path, _hosting: &Hosting, _run: u64) -> Result<(), String> {
-        Err(format!(
-            "{} has no runs to approve from gitcraft",
-            self.name()
+        Err(crate::i18n::message(
+            "backend-has-no-runs-to-approve-from-gitcraft-635889",
+            &[("name", (self.name()).to_string().into())],
         ))
     }
 
@@ -349,7 +415,10 @@ pub trait Provider: Sync {
         _hosting: &Hosting,
         _new: &NewRelease,
     ) -> Result<String, String> {
-        Err(format!("gitcraft can't make releases on {}", self.name()))
+        Err(crate::i18n::message(
+            "backend-gitcraft-can-t-make-releases-on-16af5d",
+            &[("name", (self.name()).to_string().into())],
+        ))
     }
 
     /// Attaches `files` (of this machine) to the release of `tag`.
@@ -360,9 +429,9 @@ pub trait Provider: Sync {
         _tag: &str,
         _files: &[std::path::PathBuf],
     ) -> Result<(), String> {
-        Err(format!(
-            "gitcraft can't attach files to releases on {}",
-            self.name()
+        Err(crate::i18n::message(
+            "backend-gitcraft-can-t-attach-files-to-releases-on-c02ad8",
+            &[("name", (self.name()).to_string().into())],
         ))
     }
 }
@@ -462,9 +531,13 @@ fn detect_remote(
                 .then_some(Forge::GitLab)
         })?;
     // An SSH remote says nothing of the web server; `tea`'s login for the host does.
-    let web = match web_base(&remote.url) {
-        Some(web) => web,
-        None => tea_web(&host).unwrap_or_else(|| format!("https://{host}")),
+    let web = if forge == Forge::Azure {
+        "https://dev.azure.com".into()
+    } else {
+        match web_base(&remote.url) {
+            Some(web) => web,
+            None => tea_web(&host).unwrap_or_else(|| format!("https://{host}")),
+        }
     };
     Some(Hosting {
         forge,
@@ -538,6 +611,9 @@ fn without_port(authority: &str) -> &str {
 /// The web host and `owner/repo` path of a remote URL: `https://host/owner/repo.git`,
 /// `git@host:owner/repo.git` or `ssh://git@host[:port]/owner/repo`.
 pub fn location(url: &str) -> Option<(String, String)> {
+    if let Some(location) = azure::location(url) {
+        return Some(location);
+    }
     let url = url.trim();
     let (host, path) = match url.split_once("://") {
         Some((_, rest)) => {
@@ -568,6 +644,12 @@ pub fn location(url: &str) -> Option<(String, String)> {
 /// The web page of the repository at remote `url`: `https://github.com/owner/repo` for
 /// `git@github.com:owner/repo.git`. `None` for a local path, which has no page.
 pub fn web_url(url: &str) -> Option<String> {
+    if let Some((host, path)) = azure::location(url) {
+        return Some(format!(
+            "https://{host}/{}",
+            crate::pr_post::encode_path(&path)
+        ));
+    }
     let (host, path) = location(url)?;
     // `C:/repos/x` reads as host `c`; a host that serves pages has a domain.
     if !host.contains('.') {
@@ -585,8 +667,11 @@ pub(crate) fn tool(hosting: &Hosting, repo: &Path, args: &[&str]) -> Result<Stri
     let tool = match forge {
         Forge::GitHub => "gh",
         Forge::GitLab => "glab",
-        Forge::Forgejo | Forge::Gitea => {
-            return Err(format!("gitcraft has no tool for {}", forge.name()));
+        Forge::Forgejo | Forge::Gitea | Forge::Azure | Forge::Bitbucket => {
+            return Err(crate::i18n::message(
+                "backend-gitcraft-has-no-tool-for-c05ef1",
+                &[("name", (forge.name()).to_string().into())],
+            ));
         }
     };
     cli::run(tool, forge.noun(), repo, hosting, args)
@@ -621,18 +706,36 @@ pub(crate) fn ask_reviewers(
         .collect();
     match refused.as_slice() {
         [] => Ok(url),
-        [(who, why)] => Err(format!(
-            "Opened {url}, but couldn't ask {who} for a review: {}",
-            why.lines().next().unwrap_or_default()
+        [(who, why)] => Err(crate::i18n::message(
+            "backend-opened-url-but-couldn-t-ask-who-for-a-review-eded91",
+            &[
+                ("url", (url).to_string().into()),
+                ("who", (who).to_string().into()),
+                (
+                    "why",
+                    (why.lines().next().unwrap_or_default()).to_string().into(),
+                ),
+            ],
         )),
-        [(_, why), ..] => Err(format!(
-            "Opened {url}, but couldn't ask {} for a review: {}",
-            refused
-                .iter()
-                .map(|(w, _)| w.as_str())
-                .collect::<Vec<_>>()
-                .join(", "),
-            why.lines().next().unwrap_or_default()
+        [(_, why), ..] => Err(crate::i18n::message(
+            "backend-opened-url-but-couldn-t-ask-for-a-review-3afd5b",
+            &[
+                ("url", (url).to_string().into()),
+                (
+                    "refused",
+                    (refused
+                        .iter()
+                        .map(|(w, _)| w.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", "))
+                    .to_string()
+                    .into(),
+                ),
+                (
+                    "why",
+                    (why.lines().next().unwrap_or_default()).to_string().into(),
+                ),
+            ],
         )),
     }
 }
@@ -888,7 +991,9 @@ mod tests {
     fn a_repositorys_own_setting_wins() {
         let config = parse_config("gitcraft.forge gitea\ngitcraft.github.com.forge github\n");
         assert_eq!(choose("github.com", &config), Some(Forge::Gitea));
-        let nonsense = parse_config("gitcraft.forge bitbucket\n");
+        let bitbucket = parse_config("gitcraft.forge bitbucket\n");
+        assert_eq!(choose("github.com", &bitbucket), Some(Forge::Bitbucket));
+        let nonsense = parse_config("gitcraft.forge unknown-forge\n");
         assert_eq!(choose("github.com", &nonsense), Some(Forge::GitHub));
     }
 
@@ -988,3 +1093,8 @@ mod tests {
         );
     }
 }
+
+pub(crate) mod history;
+pub(crate) use gitea::{selected_tea_metadata, selected_tea_secret};
+
+pub(crate) use http::environment_proxy;

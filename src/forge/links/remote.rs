@@ -42,7 +42,7 @@ pub fn upstream_remote(upstream: &str, remotes: &[Remote]) -> Option<(String, St
 /// The name of the forge `remote` is on, for its menu entries: as `origin`'s detection
 /// (`hosting`) found it, else as the remote's host says; "the forge" when neither tells.
 pub fn forge_name(remote: &Remote, hosting: Option<&Hosting>) -> &'static str {
-    forge_of(remote, hosting).map_or("the forge", Forge::name)
+    forge_of(remote, hosting).map_or(crate::i18n::text("backend-the-forge-6550d0"), Forge::name)
 }
 
 fn forge_of(remote: &Remote, hosting: Option<&Hosting>) -> Option<Forge> {

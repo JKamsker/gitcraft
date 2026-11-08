@@ -18,15 +18,21 @@ pub(super) fn column_headers(ui: &Ui, t: &Tokens, header: Rect, cols: &Cols, gra
     let font = theme::semibold(10.5);
     use crate::repo::columns::Bar;
     let mut labels = vec![
-        (cols.cell(header, Bar::Refs), "BRANCH / TAG"),
+        (
+            cols.cell(header, Bar::Refs),
+            crate::i18n::text("repo-core-2612"),
+        ),
         (cols.cell(header, Bar::Graph), graph),
-        (cols.description(header), "DESCRIPTION"),
+        (
+            cols.description(header),
+            crate::i18n::text("repo-core-2613"),
+        ),
     ];
     for (bar, label) in [
-        (Bar::Hash, "COMMIT"),
-        (Bar::Author, "AUTHOR"),
-        (Bar::When, "WHEN"),
-        (Bar::Date, "DATE"),
+        (Bar::Hash, crate::i18n::text("repo-core-0893")),
+        (Bar::Author, crate::i18n::text("repo-core-2614")),
+        (Bar::When, crate::i18n::text("repo-core-2615")),
+        (Bar::Date, crate::i18n::text("repo-core-2616")),
     ] {
         if cols.width(bar) > 0.0 {
             labels.push((cols.cell(header, bar), label));
@@ -52,20 +58,23 @@ pub(super) fn column_headers(ui: &Ui, t: &Tokens, header: Rect, cols: &Cols, gra
 /// The header's right-click menu: which columns show, a compact graph column, and the widths
 /// back as they were at first.
 pub(super) fn header_menu(resp: &Response, settings: &Settings) {
-    egui::Popup::context_menu(resp)
+    crate::menu_item::context(resp)
         .style(theme::menu_style)
         .show(|ui| {
             let mut next = settings.clone();
-            ui.checkbox(&mut next.show_hash, "Commit");
-            ui.checkbox(&mut next.show_author, "Author");
-            ui.checkbox(&mut next.show_when, "When");
-            ui.checkbox(&mut next.show_date, "Date");
-            ui.checkbox(&mut next.show_test_lane, "Tests")
-                .on_hover_text(crate::repo::TEST_LANE_TIP);
+            ui.checkbox(&mut next.show_hash, crate::i18n::text("repo-core-0056"));
+            ui.checkbox(&mut next.show_author, crate::i18n::text("repo-core-1671"));
+            ui.checkbox(&mut next.show_when, crate::i18n::text("repo-core-2617"));
+            ui.checkbox(&mut next.show_date, crate::i18n::text("repo-core-2618"));
+            ui.checkbox(
+                &mut next.show_test_lane,
+                crate::i18n::text("repo-core-1020"),
+            )
+            .on_hover_text(crate::i18n::text(crate::repo::TEST_LANE_TIP));
             ui.separator();
             let mut fit = next.fit_visible_refs();
             if ui
-                .checkbox(&mut fit, "Fit visible branch / tag pills")
+                .checkbox(&mut fit, crate::i18n::text("repo-core-2619"))
                 .changed()
             {
                 next.auto_refs_width = fit;
@@ -75,26 +84,26 @@ pub(super) fn header_menu(resp: &Response, settings: &Settings) {
             }
             let mut compact = next.compact_graph;
             if ui
-                .checkbox(&mut compact, "Compact graph column")
-                .on_hover_text(settings::COMPACT_TIP)
+                .checkbox(&mut compact, crate::i18n::text("repo-core-2620"))
+                .on_hover_text(settings::compact_tip())
                 .changed()
             {
                 next.set_compact_graph(compact);
             }
-            if ui
-                .add_enabled(
-                    next.graph_width > 0.0,
-                    egui::Button::new("Fit graph column to its lanes"),
-                )
-                .on_hover_text("As double-clicking its border does")
+            if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-2621"))
+                .icon("command")
+                .refused((next.graph_width <= 0.0).then_some(crate::i18n::text("repo-core-2622")))
+                .show(ui)
+                .on_hover_text(crate::i18n::text("repo-core-2623"))
                 .clicked()
             {
                 next.graph_width = 0.0;
             }
             ui.separator();
-            if ui
-                .button("Reset columns")
-                .on_hover_text("Every column back to its first width")
+            if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-2624"))
+                .icon("undo-2")
+                .show(ui)
+                .on_hover_text(crate::i18n::text("repo-core-2625"))
                 .clicked()
             {
                 next.reset_columns();

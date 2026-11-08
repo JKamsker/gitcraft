@@ -3,6 +3,7 @@
 //! repository in WSL or over SSH is read there). Changing tools hand the operation to the
 //! window that has the repository open ([`write`]).
 
+mod attribution;
 mod forge;
 mod history;
 mod refs;
@@ -55,6 +56,7 @@ pub struct ToolDef {
 pub fn all() -> Vec<&'static ToolDef> {
     [
         history::TOOLS,
+        attribution::TOOLS,
         work::TOOLS,
         refs::TOOLS,
         forge::TOOLS,

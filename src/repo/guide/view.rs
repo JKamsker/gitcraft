@@ -56,10 +56,15 @@ impl RepoTab {
                                 if !steps.empty {
                                     ui.add_space(6.0);
                                     hide = ui
-                                        .link(RichText::new("Hide these steps").small())
-                                        .on_hover_text(
-                                            "Hidden until this repository is opened again",
+                                        .link(
+                                            RichText::new(crate::i18n::text(
+                                                "repo-workflows-guide-first-steps-view-d4b85ef0",
+                                            ))
+                                            .small(),
                                         )
+                                        .on_hover_text(crate::i18n::text(
+                                            "repo-workflows-guide-first-steps-view-a5b4a2a3",
+                                        ))
                                         .clicked();
                                 }
                             });
@@ -77,13 +82,13 @@ impl RepoTab {
 fn header(ui: &mut Ui, t: &Tokens, empty: bool) {
     let (title, sub) = if empty {
         (
-            "This repository has no commits yet",
-            "Three steps to get it going:",
+            crate::i18n::text("repo-workflows-guide-header-5cec6b07"),
+            crate::i18n::text("repo-workflows-guide-header-a9174a7c"),
         )
     } else {
         (
-            "Next steps for this repository",
-            "It is only on this machine so far:",
+            crate::i18n::text("repo-workflows-guide-header-bb24101f"),
+            crate::i18n::text("repo-workflows-guide-header-cd9905c0"),
         )
     };
     ui.label(
@@ -99,32 +104,46 @@ fn header(ui: &mut Ui, t: &Tokens, empty: bool) {
 /// Make the first commit: write the message of the changes there are, or make an empty one.
 fn first_commit_step(ui: &mut Ui, steps: FirstSteps, idle: bool, acts: &mut Vec<Action>) {
     let explain = match steps.first_commit {
-        StepState::Done => "Done.",
+        StepState::Done => crate::i18n::text("repo-workflows-guide-first-commit-step-ed251864"),
         _ if steps.nothing_to_commit => {
-            "Nothing to commit yet: files put in the repository's folder show up at the top of \
-             the graph by themselves. Or start with an empty commit."
+            crate::i18n::text("repo-workflows-guide-first-commit-step-02da0750")
         }
-        _ => "Your files are ready: write a summary and commit them.",
+        _ => crate::i18n::text("repo-workflows-guide-first-commit-step-37bb706f"),
     };
     let can = idle && steps.first_commit == StepState::Todo;
     step(
         ui,
         1,
-        "Make the first commit",
+        crate::i18n::text("repo-workflows-guide-first-commit-step-e2f5a327"),
         steps.first_commit,
         explain,
         |ui| {
             if steps.nothing_to_commit {
                 if ui
-                    .add_enabled(can, egui::Button::new("Make an empty commit…"))
-                    .on_hover_text(format!("A commit with no files, “{EMPTY_COMMIT_MESSAGE}”"))
+                    .add_enabled(
+                        can,
+                        egui::Button::new(crate::i18n::text(
+                            "repo-workflows-guide-first-commit-step-9416811c",
+                        )),
+                    )
+                    .on_hover_text(crate::i18n::message(
+                        "repo-workflows-guide-first-commit-step-6221ab4e",
+                        &[("EMPTY-COMMIT-MESSAGE", (EMPTY_COMMIT_MESSAGE).into())],
+                    ))
                     .clicked()
                 {
                     acts.push(Action::Guide(GuideAct::EmptyCommit));
                 }
-            } else if widgets::primary_button(ui, "Write the message", can, 0.0)
-                .on_hover_text("Opens the changes in the right pane, at the commit summary")
-                .clicked()
+            } else if widgets::primary_button(
+                ui,
+                crate::i18n::text("repo-workflows-guide-first-commit-step-cfa86831"),
+                can,
+                0.0,
+            )
+            .on_hover_text(crate::i18n::text(
+                "repo-workflows-guide-first-commit-step-d0ee469e",
+            ))
+            .clicked()
             {
                 acts.push(Action::Guide(GuideAct::StartCommit));
             }
@@ -140,19 +159,34 @@ fn remote_step(
     idle: bool,
     acts: &mut Vec<Action>,
 ) {
-    let done = format!("Done: {}.", remotes.join(", "));
+    let done = crate::i18n::message(
+        "repo-workflows-guide-remote-step-25a81e6a",
+        &[("remotes-join-1", (remotes.join(", ")).clone().into())],
+    );
     let explain = match state {
         StepState::Done => done.as_str(),
-        _ => "Where it will be published, such as a new, empty repository on a forge.",
+        _ => crate::i18n::text("repo-workflows-guide-remote-step-06906287"),
     };
-    step(ui, 2, "Add a remote", state, explain, |ui| {
-        if ui
-            .add_enabled(idle, egui::Button::new("Add a remote…"))
-            .clicked()
-        {
-            acts.push(Action::Dialog(Dialog::remote(None)));
-        }
-    });
+    step(
+        ui,
+        2,
+        crate::i18n::text("repo-workflows-guide-remote-step-ecd12a48"),
+        state,
+        explain,
+        |ui| {
+            if ui
+                .add_enabled(
+                    idle,
+                    egui::Button::new(crate::i18n::text(
+                        "repo-workflows-guide-remote-step-d20b3285",
+                    )),
+                )
+                .clicked()
+            {
+                acts.push(Action::Dialog(Dialog::remote(None)));
+            }
+        },
+    );
 }
 
 /// Publish: push the branch and track it.
@@ -164,24 +198,36 @@ fn publish_step(
     acts: &mut Vec<Action>,
 ) {
     let todo = match branch {
-        Some(b) => format!("Push {b} to the remote and track it, so Push and Pull just work."),
-        None => "Push the branch to the remote and track it, so Push and Pull just work.".into(),
+        Some(b) => crate::i18n::message(
+            "repo-workflows-guide-publish-step-93d6376b",
+            &[("b", (b).into())],
+        ),
+        None => crate::i18n::text("repo-workflows-guide-publish-step-2ce79937").into(),
     };
     let explain = match state {
-        StepState::Done => "Done.",
+        StepState::Done => crate::i18n::text("repo-workflows-guide-publish-step-ed251864"),
         _ => todo.as_str(),
     };
-    step(ui, 3, "Publish", state, explain, |ui| {
-        if ui
-            .add_enabled(
-                idle && state == StepState::Todo,
-                egui::Button::new("Publish"),
-            )
-            .clicked()
-        {
-            acts.push(Action::Push);
-        }
-    });
+    step(
+        ui,
+        3,
+        crate::i18n::text("repo-workflows-guide-publish-step-859390eb"),
+        state,
+        explain,
+        |ui| {
+            if ui
+                .add_enabled(
+                    idle && state == StepState::Todo,
+                    egui::Button::new(crate::i18n::text(
+                        "repo-workflows-guide-publish-step-859390eb",
+                    )),
+                )
+                .clicked()
+            {
+                acts.push(Action::Push);
+            }
+        },
+    );
 }
 
 /// One step: its number (a tick once done), title and explanation, and while it is to do its
@@ -226,7 +272,25 @@ fn step(
                 button(ui);
             }
             if let StepState::Blocked(reason) = state {
-                ui.label(RichText::new(reason).color(t.text_faint).small());
+                ui.label(
+                    RichText::new(match reason {
+                        super::first_steps::NEEDS_COMMIT => {
+                            crate::i18n::text("repo-workflows-guide--2ee88cd5")
+                        }
+                        super::first_steps::NEEDS_IDENTITY => {
+                            crate::i18n::text("repo-workflows-guide--b77d9539")
+                        }
+                        "Add a remote first" => {
+                            crate::i18n::text("repo-workflows-guide-first-steps-3c4e21be")
+                        }
+                        "Check out a branch first" => {
+                            crate::i18n::text("repo-workflows-guide-first-steps-76a2896d")
+                        }
+                        other => other,
+                    })
+                    .color(t.text_faint)
+                    .small(),
+                );
             }
         });
     });

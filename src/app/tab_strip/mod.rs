@@ -75,8 +75,12 @@ struct StripActions {
     close_worktree: bool,
     /// The tab closed last is to be opened again.
     reopen: bool,
+    quit: bool,
     /// The work of this repository tab is to be teleported.
     teleport: Option<PathBuf>,
+    window: Option<(usize, Option<egui::ViewportId>, Option<egui::Pos2>)>,
+
+    teleport_to: Option<(PathBuf, crate::teleport::Machine)>,
 }
 
 /// A tab's name, laid out, its colour, the tab's width, its worktree chip and how many of its
@@ -110,6 +114,8 @@ struct TabEnv<'a> {
     switcher_focus: &'a mut bool,
     t: &'a Tokens,
     actions: &'a mut StripActions,
+    windows: Vec<(egui::ViewportId, String)>,
+    can_detach: bool,
 }
 
 impl App {
@@ -123,6 +129,7 @@ impl App {
         let title_bar = super::title_bar::wanted(&self.settings);
         let strip = ui.available_rect_before_wrap();
         let strip = Rect::from_min_size(strip.min, vec2(strip.width(), TAB_H));
+        self.window_strip(ui.ctx(), strip);
         let right_to_left = egui::Layout::right_to_left(egui::Align::Center);
 
         // From the right: the caption buttons, the strip's own buttons against them and the
@@ -188,7 +195,7 @@ impl App {
                 ui.set_clip_rect(area.intersect(ui.clip_rect()));
                 // The strip is as tall as a tab however the tabs are scrolled.
                 ui.advance_cursor_after_rect(area);
-                self.tabs_row(ui, &t, &mut actions, &titles, row);
+                self.tabs_row(ui, &t, &mut actions, &titles, row, strip);
                 // The ends fade where more tabs are scrolled out of view.
                 let max = (total - area.width()).max(0.0);
                 if offset > 0.5 {
@@ -219,7 +226,17 @@ impl App {
             ui.scope_builder(
                 UiBuilder::new().max_rect(rect).layout(left_to_right),
                 |ui| {
-                    if icons::small_button(ui, "plus", "New tab (Ctrl+T)").clicked() {
+                    if icons::small_button(
+                        ui,
+                        "plus",
+                        &crate::keymap::tip(
+                            ui.ctx(),
+                            crate::i18n::text("interaction-tabs-new-tab"),
+                            crate::keymap::Command::NewTab,
+                        ),
+                    )
+                    .clicked()
+                    {
                         actions.add = true;
                     }
                 },
@@ -266,12 +283,20 @@ impl App {
         hidden: &[usize],
         actions: &mut StripActions,
     ) {
-        let tip = format!("New tab, and {} more tabs", hidden.len());
+        let tip = crate::i18n::message(
+            "interaction-tabs-overflow",
+            &[("count", hidden.len().into())],
+        );
         let resp = icons::small_button(ui, "chevron-down", &tip);
         egui::Popup::menu(&resp)
             .style(theme::menu_style)
             .show(|ui| {
-                if ui.button("New tab").on_hover_text("Ctrl+T").clicked() {
+                if crate::menu_item::MenuItem::new(crate::i18n::text("interaction-tabs-new-tab"))
+                    .icon("plus")
+                    .keys(crate::keymap::Command::NewTab)
+                    .show(ui)
+                    .clicked()
+                {
                     actions.add = true;
                 }
                 ui.separator();
@@ -294,6 +319,7 @@ impl App {
         actions: &mut StripActions,
         titles: &[Title],
         row: Rect,
+        strip: Rect,
     ) {
         let ctx = ui.ctx().clone();
         let n = titles.len();
@@ -306,18 +332,38 @@ impl App {
             let max = (row.right() - width(d.from)).max(row.left());
             Some((d.from, x.clamp(row.left(), max)))
         });
+        let source = self
+            .tab_drag
+            .and_then(|d| self.tabs.get(d.from))
+            .and_then(|tab| match tab {
+                Tab::Repo(repo) => Some(repo.path.clone()),
+                _ => None,
+            });
+        let teleported = self.teleport_drop_target(&ctx, source);
+        let accepted = teleported.is_some();
+        actions.teleport_to = teleported;
         let (place, slot) = places(row.left(), n, width, dragged);
         if let (Some((from, _)), Some(slot)) = (dragged, slot)
+            && !accepted
+            && !ctx.input(|i| i.key_pressed(egui::Key::Escape))
             && !ctx.input(|i| i.pointer.primary_down())
         {
-            actions.moved = Some((from, slot));
+            if let Some((target, position)) = self.drop_window_target(from, strip, &ctx) {
+                actions.window = Some((from, target, Some(position)));
+            } else {
+                actions.moved = Some((from, slot));
+            }
         }
 
         // The dragged tab is drawn last, over the others.
         let dragging = dragged.map(|(from, _)| from);
         let paint_order = (0..n).filter(|&j| Some(j) != dragging).chain(dragging);
         let ids = self.tab_ids();
+        let windows = self.window_targets();
+        let can_detach = self.windows.enabled && !ctx.embed_viewports();
         let mut env = TabEnv {
+            windows,
+            can_detach,
             active: self.active,
             dragging,
             can_reopen: !self.closed.is_empty(),
@@ -375,13 +421,21 @@ impl App {
             .map(|(i, tab)| {
                 let active = i == self.active;
                 let (title, chip, background): (String, Option<Chip>, usize) = match tab {
-                    Tab::Home => ("New tab".to_owned(), None, 0),
+                    Tab::Home => (
+                        crate::i18n::text("interaction-tabs-new-tab").to_owned(),
+                        None,
+                        0,
+                    ),
                     Tab::Repo(r) => {
                         let label = r.label(self.settings.worktrees_in_same_tab);
                         let chip = worktree_tab::chip_for(ui, &label, MAX_CHIP_W);
                         (label.repo, chip, r.background_work().len())
                     }
-                    Tab::Settings => ("Settings".to_owned(), None, 0),
+                    Tab::Settings => (
+                        crate::i18n::text("interaction-tabs-settings").to_owned(),
+                        None,
+                        0,
+                    ),
                 };
                 let font = if active {
                     theme::medium(12.5)
@@ -460,6 +514,16 @@ impl App {
     }
 
     fn apply_strip_actions(&mut self, actions: StripActions, ctx: &egui::Context) {
+        if actions.quit {
+            self.quit(ctx);
+            return;
+        }
+        if let Some((index, target, position)) = actions.window
+            && actions.close.is_none()
+        {
+            self.move_to_window(index, target, position, ctx);
+            return;
+        }
         if let Some(i) = actions.select {
             self.active = i;
         }
@@ -488,6 +552,9 @@ impl App {
         }
         if let Some(source) = actions.teleport {
             self.start_teleport(source, ctx);
+        }
+        if let Some((source, machine)) = actions.teleport_to {
+            self.prepare_teleport_drop(source, machine, ctx);
         }
         // Opened and closed after the strip is drawn.
         if actions.switch_to.is_some() {

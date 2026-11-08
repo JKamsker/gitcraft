@@ -77,7 +77,10 @@ pub fn parse(text: &str, sep: char) -> Result<Table, String> {
                     table.rows.push(std::mem::take(&mut row));
                     table.lines.push(row_line);
                     if cells > MAX_CELLS {
-                        return Err(format!("over {MAX_CELLS} cells"));
+                        return Err(crate::i18n::message(
+                            "repo-core-2237",
+                            &[("MAX-CELLS", format!("{}", MAX_CELLS).into())],
+                        ));
                     }
                 }
                 // A blank line is no row.
@@ -95,7 +98,10 @@ pub fn parse(text: &str, sep: char) -> Result<Table, String> {
         }
     }
     if quoted {
-        return Err(format!("line {quote_line}: a quoted cell that never ends"));
+        return Err(crate::i18n::message(
+            "repo-core-2238",
+            &[("quote-line", format!("{}", quote_line).into())],
+        ));
     }
     if started || !row.is_empty() || !cell.is_empty() {
         row.push(cell);
@@ -174,17 +180,28 @@ pub fn separator(path: &str) -> Option<(char, &'static str)> {
 
 /// Compares both sides of the table `path`.
 pub fn diff(path: &str, sides: &Sides) -> Result<TableDiff, String> {
-    let (sep, format) = separator(path).ok_or("not a table")?;
+    let (sep, format) = separator(path).ok_or(crate::i18n::text("repo-core-2244"))?;
     let read = |text: &Option<String>, side: &str| -> Result<Table, String> {
         text.as_deref()
             .map(|t| {
-                parse(t, sep)
-                    .map_err(|e| format!("the {format} {side} the change isn't valid ({e})"))
+                parse(t, sep).map_err(|e| {
+                    crate::i18n::message(
+                        "repo-core-2048",
+                        &[
+                            ("format", format.to_string().into()),
+                            ("side", side.to_string().into()),
+                            ("e", e.to_string().into()),
+                        ],
+                    )
+                })
             })
             .transpose()
             .map(Option::unwrap_or_default)
     };
-    let (old, new) = (read(&sides.old, "before")?, read(&sides.new, "after")?);
+    let (old, new) = (
+        read(&sides.old, crate::i18n::text("repo-core-2049"))?,
+        read(&sides.new, crate::i18n::text("repo-core-2050"))?,
+    );
     let columns = columns(&old, &new);
     let (rows, keyed) = rows(&old, &new, &columns);
     let widths = widths(&columns, &rows);
@@ -202,7 +219,10 @@ fn header(t: &Table) -> Vec<String> {
     let mut names: Vec<String> = t.rows.first().cloned().unwrap_or_default();
     let widest = t.rows.iter().map(Vec::len).max().unwrap_or(0);
     for k in names.len()..widest {
-        names.push(format!("(column {})", k + 1));
+        names.push(crate::i18n::message(
+            "repo-core-2245",
+            &[("k", format!("{}", k + 1).into())],
+        ));
     }
     names
 }

@@ -16,17 +16,20 @@ const GUTTER: f32 = 52.0;
 pub(in crate::repo::diff) fn show(ui: &mut Ui, data: &Structural) {
     let t = Tokens::get(ui.ctx());
     ui.label(
-        egui::RichText::new(format!("{} · syntax changes · read only", data.language))
-            .color(t.text_dim),
+        egui::RichText::new(crate::i18n::message(
+            "repo-core-2339",
+            &[("language", data.language.to_string().into())],
+        ))
+        .color(t.text_dim),
     );
     ui.label(
-        egui::RichText::new("Use the patch to stage changes and to see formatting edits.")
+        egui::RichText::new(crate::i18n::text("repo-core-2340"))
             .small()
             .color(t.text_faint),
     );
     if data.unchanged {
         ui.add_space(12.0);
-        ui.label("No syntax changes. Formatting can still differ in the patch.");
+        ui.label(crate::i18n::text("repo-core-2341"));
         return;
     }
     let char_w = ui
@@ -45,7 +48,13 @@ pub(in crate::repo::diff) fn show(ui: &mut Ui, data: &Structural) {
                 if index == 0 {
                     let (rect, _) =
                         ui.allocate_exact_size(vec2(half * 2.0, HEIGHT), Sense::hover());
-                    for (column, label) in ["Before", "After"].into_iter().enumerate() {
+                    for (column, label) in [
+                        crate::i18n::text("repo-core-1564"),
+                        crate::i18n::text("repo-core-1565"),
+                    ]
+                    .into_iter()
+                    .enumerate()
+                    {
                         ui.painter().text(
                             pos2(rect.left() + half * column as f32 + GUTTER, rect.center().y),
                             Align2::LEFT_CENTER,
@@ -64,7 +73,7 @@ pub(in crate::repo::diff) fn show(ui: &mut Ui, data: &Structural) {
                         ui.painter().text(
                             rect.left_center() + vec2(8.0, 0.0),
                             Align2::LEFT_CENTER,
-                            format!("Syntax change {n}"),
+                            crate::i18n::message("repo-core-2343", &[("n", (n).into())]),
                             theme::mono(11.0),
                             t.accent,
                         );

@@ -15,7 +15,7 @@ pub(super) fn section(
     let t = Tokens::get(ui.ctx());
     let summary = match signature {
         None => Summary::Loading,
-        Some(Err(_)) => Summary::Text("Could not be checked".to_owned(), t.danger),
+        Some(Err(_)) => Summary::Text(crate::i18n::text("repo-core-1134").to_owned(), t.danger),
         Some(Ok(sig)) => Summary::Text(headline(sig), verdict_color(&t, &sig.verdict)),
     };
     let mut again = false;
@@ -25,15 +25,15 @@ pub(super) fn section(
         Some(Err(_)) => true,
         None => false,
     };
-    let refresh = checkable.then_some(("Check the signature again", &mut again));
+    let refresh = checkable.then_some((crate::i18n::text("repo-core-1135"), &mut again));
     section::section(
         ui,
-        "Signature",
+        crate::i18n::text("repo-core-1136"),
         summary,
         false,
         refresh,
         |ui| match signature {
-            None => section::faint(ui, "Checking the signature…"),
+            None => section::faint(ui, crate::i18n::text("repo-core-1137")),
             Some(Err(e)) => section::error(ui, e),
             Some(Ok(sig)) => body(ui, sig),
         },
@@ -92,20 +92,30 @@ fn body(ui: &mut Ui, sig: &Signature) {
                 ui.end_row();
             };
             if let Some(format) = sig.format {
-                row(ui, "Kind", format.label(), false);
+                row(
+                    ui,
+                    crate::i18n::text("repo-core-1139"),
+                    format.label(),
+                    false,
+                );
             }
-            row(ui, "Signer", &sig.signer, false);
-            row(ui, "Key", &sig.key, true);
+            row(ui, crate::i18n::text("repo-core-1140"), &sig.signer, false);
+            row(ui, crate::i18n::text("repo-core-1141"), &sig.key, true);
             if sig.primary_key != sig.key {
-                row(ui, "Primary key", &sig.primary_key, true);
+                row(
+                    ui,
+                    crate::i18n::text("repo-core-1142"),
+                    &sig.primary_key,
+                    true,
+                );
             }
         });
     if sig.raw.trim().is_empty() {
         if sig.verdict == SignatureVerdict::NotChecked {
-            section::faint(ui, "git gave no output.");
+            section::faint(ui, crate::i18n::text("repo-core-1143"));
         }
     } else {
-        section::output_box(ui, "git's output", sig.raw.trim());
+        section::output_box(ui, crate::i18n::text("repo-core-1144"), sig.raw.trim());
     }
 }
 

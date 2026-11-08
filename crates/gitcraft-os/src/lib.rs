@@ -25,30 +25,38 @@ pub struct Link {
     pub tooltip: String,
 }
 
+mod close_file;
+pub use close_file::close_file;
+mod bundle_resources;
+pub use bundle_resources::{
+    BUNDLE_FILE_BYTES, BUNDLE_MEMORY_BYTES, BundleResources, retire_bundle_keep,
+};
+mod workspace_lock;
+pub use workspace_lock::{WorkspaceClaim, WorkspaceFence, WorkspaceGrant};
+mod private_directory;
+pub use private_directory::{PrivateDirectory, PrivateFileMode, file_identity};
+mod receipt_retirement;
+pub use receipt_retirement::retire_private_receipt;
+mod private;
+pub use private::{create_private_directory, detach_controller, random_bytes};
+mod bounded_input;
+pub use bounded_input::BoundedInput;
+mod controller_reaper;
+mod owned_child;
 #[cfg(windows)]
 mod process_job;
+#[cfg(any(windows, test))]
+mod suspended;
+#[cfg(unix)]
+mod unix_anchor;
 #[cfg(windows)]
 mod windows_shell;
-#[cfg(windows)]
-pub use process_job::{ProcessJob, supervise_suspended_process};
+pub use owned_child::OwnedChild;
 
-/// Stop a process group owned by the caller. A group already gone needs no cleanup.
-#[cfg(unix)]
-pub fn kill_process_group(pid: u32) -> std::io::Result<()> {
-    let pid = i32::try_from(pid).map_err(|_| std::io::Error::other("invalid process group"))?;
-    if pid <= 1 {
-        return Err(std::io::Error::other("invalid process group"));
-    }
-    // SAFETY: kill takes only integers, and a negative PID addresses this child's group.
-    if unsafe { libc::kill(-pid, libc::SIGKILL) } == 0 {
-        return Ok(());
-    }
-    let error = std::io::Error::last_os_error();
-    if error.raw_os_error() == Some(libc::ESRCH) {
-        Ok(())
-    } else {
-        Err(error)
-    }
+/// Retire this process's installed helper only after every process service has shut down.
+pub fn retire_process_helpers() {
+    #[cfg(unix)]
+    unix_anchor::retire();
 }
 
 /// Sets the progress the taskbar button of the window `hwnd` (its `HWND`, as a number) shows.
@@ -143,3 +151,19 @@ mod tests {
 mod account;
 #[cfg(unix)]
 pub use account::account_home;
+
+mod native_urls;
+pub use native_urls::{set_native_url_wake, take_native_urls};
+#[cfg(target_os = "macos")]
+mod macos_urls;
+#[cfg(target_os = "macos")]
+pub use macos_urls::NativeUrlHandler;
+
+mod dock;
+pub use dock::{set_native_dock_wake, take_native_dock_requests};
+#[cfg(target_os = "macos")]
+mod macos_dock;
+#[cfg(target_os = "macos")]
+pub use macos_dock::{
+    refresh as refresh_dock, set_menu as set_dock_menu, set_progress as set_dock_progress,
+};

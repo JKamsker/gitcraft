@@ -21,10 +21,12 @@ const CRITERIA: &str = "gitcraft-issue-criteria";
 const KEPT: &str = "gitcraft-issue-kept";
 /// The day the issue was read (`2026-11-06`): what the card shows is the issue as it was then.
 const READ: &str = "gitcraft-issue-read";
+const TRACKER: &str = "gitcraft-issue-source";
 
 /// The issue a branch is for, as it was when it was last read.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(crate) struct IssueLink {
+    pub tracker: Option<crate::trackers::Identity>,
     pub number: u64,
     pub title: String,
     pub url: String,
@@ -35,10 +37,19 @@ pub(crate) struct IssueLink {
 }
 
 impl IssueLink {
+    pub(crate) fn key(&self) -> String {
+        self.tracker
+            .as_ref()
+            .map_or_else(|| format!("#{}", self.number), |i| i.key.clone())
+    }
     /// The link to `issue`, read today.
     pub(crate) fn of(issue: &Issue) -> IssueLink {
-        let (kept, criteria) = super::criteria::extract(&issue.body);
+        let (kept, criteria) = issue.acceptance.as_ref().map_or_else(
+            || super::criteria::extract(&issue.body),
+            |field| (Kept::Criteria, super::criteria::cap(field.trim())),
+        );
         IssueLink {
+            tracker: issue.tracker.clone(),
             number: issue.number,
             title: issue.title.trim().to_owned(),
             url: issue.url.clone(),
@@ -52,7 +63,13 @@ impl IssueLink {
     /// and what closes the issue once it is merged (GitHub, GitLab, Forgejo and Gitea all read
     /// `Closes #N` so).
     pub(crate) fn pull_request_text(&self) -> (String, String) {
-        (self.title.clone(), format!("Closes #{}", self.number))
+        (
+            self.title.clone(),
+            self.tracker.as_ref().map_or_else(
+                || format!("Closes #{}", self.number),
+                |i| format!("Relates to {}: {}", i.key, self.url),
+            ),
+        )
     }
 }
 
@@ -88,6 +105,13 @@ pub(crate) fn write_ops(branch: &str, link: &IssueLink) -> Vec<Vec<String>> {
         (CRITERIA, link.criteria.clone()),
         (KEPT, link.kept.key().to_owned()),
         (READ, link.read.clone()),
+        (
+            TRACKER,
+            link.tracker
+                .as_ref()
+                .map(|t| serde_json::json!(t).to_string())
+                .unwrap_or_default(),
+        ),
     ]
     .into_iter()
     .map(|(key, value)| vec!["config".to_owned(), format!("branch.{branch}.{key}"), value])
@@ -98,7 +122,7 @@ pub(crate) fn write_ops(branch: &str, link: &IssueLink) -> Vec<Vec<String>> {
 /// card goes even if one of the rest can't be taken out. A setting that isn't there (taken out by
 /// hand, or a link from before it was kept) is no error: git says so with exit code 5.
 pub(crate) fn unlink(repo: &Path, branch: &str) -> Result<(), String> {
-    for key in [NUMBER, TITLE, URL, CRITERIA, KEPT, READ] {
+    for key in [NUMBER, TITLE, URL, CRITERIA, KEPT, READ, TRACKER] {
         let name = format!("branch.{branch}.{key}");
         git::run_ok_codes(Some(repo), &["config", "--unset", &name], &[0, 5])?;
     }
@@ -141,12 +165,16 @@ fn parse(out: &str) -> HashMap<String, IssueLink> {
             CRITERIA => link.criteria = value.to_owned(),
             KEPT => link.kept = Kept::from_key(value),
             READ => link.read = value.trim().to_owned(),
+            TRACKER => link.tracker = serde_json::from_str(value).ok(),
             _ => {}
         }
     }
     found
         .into_iter()
         .filter_map(|(branch, (number, link))| {
+            if number == Some(0) && link.tracker.is_none() {
+                return None;
+            }
             Some((
                 branch,
                 IssueLink {
@@ -205,8 +233,13 @@ pub(crate) fn start_ops(start: &Start, link: &IssueLink) -> Vec<Vec<String>> {
         ops.push(s(&["worktree", "prune"]));
     }
     if let Some((remote, base)) = &start.fetch {
-        let says =
-            format!("couldn't fetch {remote}, so it starts from {remote}/{base} as last fetched");
+        let says = crate::i18n::message(
+            "repo-workflows-issue_work-start-ops-4c405286",
+            &[
+                ("remote", (remote).clone().into()),
+                ("base", (base).clone().into()),
+            ],
+        );
         ops.push(try_step(&["fetch", remote, base], &says));
     }
     let (track, from) = match &start.source {
@@ -238,7 +271,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn reads_the_links_of_every_branch() {
+    fn reads_the_links_of_every_branch() -> Result<(), String> {
         let out = "branch.42-fix.gitcraft-issue\n42\0branch.42-fix.gitcraft-issue-title\nFix it\0\
                    branch.42-fix.gitcraft-issue-criteria\n- [ ] a\n- [x] b\0\
                    branch.42-fix.gitcraft-issue-kept\ntasks\0\
@@ -251,6 +284,7 @@ mod tests {
         assert_eq!(
             links.get("42-fix"),
             Some(&IssueLink {
+                tracker: None,
                 number: 42,
                 title: "Fix it".into(),
                 url: String::new(),
@@ -264,10 +298,55 @@ mod tests {
         // Written before gitcraft kept which part, and when.
         assert_eq!((release.kept, release.read.as_str()), (Kept::Criteria, ""));
         assert!(parse("").is_empty());
+        Ok(())
     }
 
     #[test]
-    fn closes_the_issue_from_the_pull_request() {
+    fn tracker_link_roundtrips_and_never_closes_a_forge_number() -> Result<(), String> {
+        let identity = crate::trackers::Identity {
+            kind: crate::trackers::Kind::Jira,
+            origin: "https://site.atlassian.net".into(),
+            account: "me@example.org".into(),
+            viewer: "account-id".into(),
+            id: "123".into(),
+            key: "APP-42".into(),
+        };
+        let link = IssueLink {
+            tracker: Some(identity),
+            number: 0,
+            title: "Fix".into(),
+            url: "https://site.atlassian.net/browse/APP-42".into(),
+            criteria: "- [ ] passes".into(),
+            ..Default::default()
+        };
+        let records = write_ops("app-42-fix", &link)
+            .iter()
+            .map(|a| format!("{}\n{}\0", a[1], a[2]))
+            .collect::<String>();
+        assert_eq!(parse(&records).get("app-42-fix"), Some(&link));
+        assert!(link.pull_request_text().1.starts_with("Relates to APP-42:"));
+        assert!(!link.pull_request_text().1.contains("#0"));
+        assert_eq!(
+            write_ops(
+                "app-42-fix",
+                &IssueLink {
+                    number: 42,
+                    ..Default::default()
+                }
+            )
+            .last()
+            .ok_or("missing branch operation")?[2],
+            ""
+        );
+        assert!(
+            parse("branch.bad.gitcraft-issue\n0\0branch.bad.gitcraft-issue-source\ninvalid\0")
+                .is_empty()
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn closes_the_issue_from_the_pull_request() -> Result<(), String> {
         let link = IssueLink {
             number: 42,
             title: "Fix login crash".into(),
@@ -277,19 +356,21 @@ mod tests {
             link.pull_request_text(),
             ("Fix login crash".to_owned(), "Closes #42".to_owned())
         );
+        Ok(())
     }
 
     #[test]
-    fn days_are_dates() {
+    fn days_are_dates() -> Result<(), String> {
         assert_eq!(civil_date(0), (1970, 1, 1));
         assert_eq!(civil_date(59), (1970, 3, 1));
         assert_eq!(civil_date(11_016), (2000, 2, 29));
         assert_eq!(civil_date(20_763), (2026, 11, 6));
         assert_eq!(today().len(), 10);
+        Ok(())
     }
 
     #[test]
-    fn the_steps_of_each_place() {
+    fn the_steps_of_each_place() -> Result<(), String> {
         let link = IssueLink {
             number: 1,
             ..Default::default()
@@ -319,6 +400,7 @@ mod tests {
                 "config branch.1-x.gitcraft-issue-criteria",
                 "config branch.1-x.gitcraft-issue-kept",
                 "config branch.1-x.gitcraft-issue-read",
+                "config branch.1-x.gitcraft-issue-source",
             ]
         );
         assert_eq!(
@@ -328,7 +410,7 @@ mod tests {
         let new_wt = firsts(&start(Place::NewWorktree("/w".into()), new.clone()));
         assert_eq!(new_wt[..2], ["worktree prune", "worktree add"]);
         assert!(!new_wt.iter().any(|op| op.starts_with("checkout")));
-        assert_eq!(firsts(&start(Place::Worktree, Source::Exists)).len(), 7);
+        assert_eq!(firsts(&start(Place::Worktree, Source::Exists)).len(), 8);
         // Fetched first, tried.
         let fetched = Start {
             fetch: Some(("origin".into(), "dev".into())),
@@ -337,5 +419,6 @@ mod tests {
         let ops = start_ops(&fetched, &link);
         assert_eq!(ops[0][2..], ["fetch", "origin", "dev"]);
         assert_eq!(ops[1][..3], ["checkout", "-b", "1-x"]);
+        Ok(())
     }
 }

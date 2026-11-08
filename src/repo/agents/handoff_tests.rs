@@ -104,7 +104,7 @@ fn the_tray_is_typed_into_the_agent_terminal_as_one_paste() {
     tab.apply(Action::Agent(AgentAct::Tray(TrayAct::SendNotes)), &ctx);
     let refused = tab
         .status
-        .as_ref()
+        .as_deref()
         .is_some_and(|(s, err)| *err && s.contains("doesn't take a pasted message"));
     let kept = tab.agents.tray.notes.len() == 1;
     tab.terminals.clear();

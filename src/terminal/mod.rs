@@ -1,6 +1,7 @@
 //! An integrated terminal: the user's shell in a pseudo-terminal (ConPTY on Windows), its output
 //! interpreted by `vt100` and painted with egui.
 
+pub(crate) mod display;
 mod keys;
 mod palette;
 mod shells;
@@ -60,6 +61,7 @@ pub struct Terminal {
     master: Box<dyn MasterPty + Send>,
     child: Box<dyn Child + Send + Sync>,
     exited: Arc<AtomicBool>,
+    exit_code: Option<u32>,
     /// The pass in which the terminal was last drawn ([`egui::Context::cumulative_pass_nr`]):
     /// output a terminal out of sight brings repaints the app only now and then.
     drawn: Arc<AtomicU64>,
@@ -75,6 +77,11 @@ pub struct Terminal {
 }
 
 impl Terminal {
+    /// Observation only: output EOF is not proof that every descendant finished.
+    pub(crate) fn output_lifetime(&self) -> Arc<AtomicBool> {
+        self.exited.clone()
+    }
+
     /// Starts `shell` in `cwd`.
     pub fn spawn(cwd: &Path, shell: &ShellSpec, ctx: &egui::Context) -> Result<Self, String> {
         let (rows, cols) = (24, 100);
@@ -100,6 +107,14 @@ impl Terminal {
         // The user's own PATH, relative folders and all: not the one for gitcraft's own tools.
         if let Some(path) = crate::shell_path::terminal_path() {
             cmd.env("PATH", path);
+        }
+        if crate::practice::is_repository(cwd) {
+            for name in crate::practice::ISOLATED_ENV_REMOVE {
+                cmd.env_remove(name);
+            }
+            for (name, value) in crate::practice::ISOLATED_ENV_SET {
+                cmd.env(name, value);
+            }
         }
         let child = pair
             .slave
@@ -178,6 +193,7 @@ impl Terminal {
             master: pair.master,
             child,
             exited,
+            exit_code: None,
             drawn,
             size: (rows, cols),
             scroll: 0,
@@ -205,11 +221,21 @@ impl Terminal {
         Ok(())
     }
 
+    pub(crate) fn exit_code(&mut self) -> Option<u32> {
+        if self.exit_code.is_none()
+            && let Ok(Some(status)) = self.child.try_wait()
+        {
+            self.exit_code = Some(status.exit_code());
+            self.exited.store(true, Ordering::Relaxed);
+        }
+        self.exit_code
+    }
     pub fn has_exited(&mut self) -> bool {
         if !self.exited.load(Ordering::Relaxed)
-            && let Ok(Some(_)) = self.child.try_wait()
+            && let Ok(Some(status)) = self.child.try_wait()
         {
             // ConPTY doesn't always end the read when the shell exits.
+            self.exit_code = Some(status.exit_code());
             self.exited.store(true, Ordering::Relaxed);
         }
         self.exited.load(Ordering::Relaxed)

@@ -113,10 +113,10 @@ impl RepoTab {
             return;
         }
         if name.is_empty() || self.refs.local.iter().any(|b| b.name == name) {
-            self.status = Some((
+            self.status = Some(crate::repo::Notice::plain((
                 format!("Pick a name no branch has for the new branch (not “{name}”)"),
                 true,
-            ));
+            )));
             return;
         }
         let label = format!(
@@ -131,8 +131,12 @@ impl RepoTab {
         let path = self.path.clone();
         let id = plan.id;
         let work = move || {
-            git::run(Some(&path), &["check-ref-format", "--branch", &name])
-                .map_err(|_| format!("“{name}” can't be a branch name"))?;
+            git::run(Some(&path), &["check-ref-format", "--branch", &name]).map_err(|_| {
+                crate::i18n::message(
+                    "repo-workflows-timeline-run-remove-d0ee0326",
+                    &[("name", (name).clone().into())],
+                )
+            })?;
             remove::replay(&path, &plan, &name)
         };
         self.run_job(ctx, work, move |tab, result, ctx| {
@@ -162,7 +166,13 @@ impl RepoTab {
                     redo: ops(&[&["branch", "--", &branch, &tip]]),
                     heads: None,
                 };
-                let status = format!("{label}: done, on the new branch {branch}");
+                let status = crate::i18n::message(
+                    "repo-workflows-timeline-remove-done-cd7d7755",
+                    &[
+                        ("label", (label).into()),
+                        ("branch", (branch).clone().into()),
+                    ],
+                );
                 let outcome = Outcome::Done { branch, tip };
                 let state = RemoveState::Finished {
                     id,
@@ -172,7 +182,10 @@ impl RepoTab {
                 (Some(undo), state, (status, false))
             }
             Ok(outcome @ Outcome::Conflict { .. }) => {
-                let status = format!("{label}: stopped on a conflict, resolve it in its worktree");
+                let status = crate::i18n::message(
+                    "repo-workflows-timeline-remove-done-ff66751a",
+                    &[("label", (label).into())],
+                );
                 let state = RemoveState::Finished {
                     id,
                     outcome,
@@ -181,7 +194,10 @@ impl RepoTab {
                 (None, state, (status, true))
             }
             Err(error) => {
-                let status = format!("{label} failed: {error}");
+                let status = crate::i18n::message(
+                    "repo-workflows-timeline-remove-done-0457f228",
+                    &[("label", (label).into()), ("error", (error).clone().into())],
+                );
                 (None, RemoveState::Failed { id, error }, (status, true))
             }
         };
@@ -194,11 +210,14 @@ impl RepoTab {
             }
         );
         let entry_label = if stopped {
-            format!("{label} (stopped on a conflict)")
+            crate::i18n::message(
+                "repo-workflows-timeline-remove-done-7da61c9b",
+                &[("label", (label).into())],
+            )
         } else {
             label.to_owned()
         };
-        self.status = Some(status);
+        self.status = Some(crate::repo::Notice::plain(status));
         self.set_remove(Some(state));
         self.timeline_op_ended(&entry_label, &OpKind::plain(), undo, ok, Refresh::All, ctx);
         self.reload(ctx);
@@ -235,10 +254,10 @@ impl RepoTab {
                 tab.busy_op = None;
                 tab.op_started = None;
                 let ok = result.is_ok();
-                tab.status = Some(match result {
+                tab.status = Some(crate::repo::Notice::plain(match result {
                     Ok(()) => (format!("{label}: done"), false),
                     Err(e) => (format!("{label} failed: {e}"), true),
-                });
+                }));
                 if ok {
                     tab.set_remove(None);
                 }

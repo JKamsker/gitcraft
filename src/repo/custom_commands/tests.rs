@@ -6,7 +6,9 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use super::{CustomAct, filled};
-use crate::custom_commands::{self as cc, CustomCommand, OutputTo, Placement, Prompt, Scope};
+#[cfg(unix)]
+use crate::custom_commands::OutputTo;
+use crate::custom_commands::{self as cc, CustomCommand, Placement, Prompt, Scope};
 use crate::git;
 use crate::repo::{Action, Dialog, RepoTab};
 use crate::settings::Settings;
@@ -141,6 +143,7 @@ fn a_repositorys_commands_wait_for_trust_and_are_asked_again_once_changed() {
     let said = |tab: &RepoTab| {
         tab.finished
             .iter()
+            .map(crate::repo::Notice::raw)
             .filter(|(t, _)| t.contains("has its own custom commands"))
             .count()
     };
@@ -315,7 +318,7 @@ fn run_to_toast(
     );
     // "Running…" first, then how it ended.
     wait(tab, ctx, |t| t.finished.len() >= 2);
-    tab.finished.get(1).cloned()
+    tab.finished.get(1).map(|n| n.raw().clone())
 }
 
 #[test]
@@ -385,7 +388,7 @@ fn a_command_that_asks_first_opens_its_dialog_and_runs_with_the_answers() {
         &ctx,
     );
     wait(&mut tab, &ctx, |t| t.finished.len() >= 2);
-    let toast = tab.finished.get(1).cloned();
+    let toast = tab.finished.get(1).map(|n| n.raw().clone());
     // A tag name with a space is refused by git: the toast says git's reason.
     let _ = std::fs::remove_dir_all(&dir);
     assert!(asked);

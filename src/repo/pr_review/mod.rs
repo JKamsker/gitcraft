@@ -5,6 +5,7 @@
 mod boxes;
 mod line_panel;
 mod lines;
+mod native_discussions;
 mod send;
 
 use egui::Ui;
@@ -39,6 +40,7 @@ pub(crate) enum PrAct {
     RemovePending(String),
     DiscardPending,
     Reply(String),
+    ReplyConversation(String),
     SetResolved(String, bool),
     ApplySuggestion {
         thread: String,
@@ -107,21 +109,33 @@ impl Posted {
     /// What the notice says once it went out.
     fn done(self) -> &'static str {
         match self {
-            Posted::Comment | Posted::LineNow => "Comment sent",
-            Posted::Review(Verdict::Comment) => "Review sent",
-            Posted::Review(Verdict::Approve) => "Pull request approved",
-            Posted::Review(Verdict::RequestChanges) => "Changes requested",
-            Posted::AddPending => "Added to your pending review",
-            Posted::RemovePending => "Removed from your pending review",
-            Posted::Discard => "Pending review discarded",
-            Posted::Reply { pending: false } => "Reply sent",
+            Posted::Comment | Posted::LineNow => {
+                crate::i18n::text("repo-workflows-pr_review-done-c5d097b5")
+            }
+            Posted::Review(Verdict::Comment) => {
+                crate::i18n::text("repo-workflows-pr_review-done-f85b4fdd")
+            }
+            Posted::Review(Verdict::Approve) => {
+                crate::i18n::text("repo-workflows-pr_review-done-5f96cd56")
+            }
+            Posted::Review(Verdict::RequestChanges) => {
+                crate::i18n::text("repo-workflows-pr_review-done-10a92a8a")
+            }
+            Posted::AddPending => crate::i18n::text("repo-workflows-pr_review-done-2e093165"),
+            Posted::RemovePending => crate::i18n::text("repo-workflows-pr_review-done-d8918a7e"),
+            Posted::Discard => crate::i18n::text("repo-workflows-pr_review-done-b5d3f2dd"),
+            Posted::Reply { pending: false } => {
+                crate::i18n::text("repo-workflows-pr_review-done-715f6d93")
+            }
             // Nobody else sees it until the review is sent.
-            Posted::Reply { pending: true } => "Reply added to your pending review",
-            Posted::Resolve(true) => "Thread resolved",
-            Posted::Resolve(false) => "Thread opened again",
-            Posted::Suggestion => "Suggestion committed to the branch",
-            Posted::Dismiss => "Review dismissed",
-            Posted::Merge => "Pull request merged",
+            Posted::Reply { pending: true } => {
+                crate::i18n::text("repo-workflows-pr_review-done-11c4a36e")
+            }
+            Posted::Resolve(true) => crate::i18n::text("repo-workflows-pr_review-done-0096e38c"),
+            Posted::Resolve(false) => crate::i18n::text("repo-workflows-pr_review-done-b51cb836"),
+            Posted::Suggestion => crate::i18n::text("repo-workflows-pr_review-done-a3dcb6a1"),
+            Posted::Dismiss => crate::i18n::text("repo-workflows-pr_review-done-71795437"),
+            Posted::Merge => crate::i18n::text("repo-workflows-pr_review-done-5f0f1f6d"),
         }
     }
 }

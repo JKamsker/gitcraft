@@ -65,10 +65,15 @@ impl ErrorCard {
                 .wrap(),
             );
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                let button = icons::small_button(ui, "x", "Close");
+                let button =
+                    icons::small_button(ui, "x", crate::i18n::text("interaction-error-close"));
                 // Named for screen readers (and tests): the icon has no text.
                 button.widget_info(|| {
-                    egui::WidgetInfo::labeled(egui::WidgetType::Button, true, "Close")
+                    egui::WidgetInfo::labeled(
+                        egui::WidgetType::Button,
+                        true,
+                        crate::i18n::text("interaction-error-close"),
+                    )
                 });
                 close = button.clicked();
             });
@@ -88,10 +93,20 @@ impl ErrorCard {
             None => {
                 ui.horizontal(|ui| {
                     ui.add(crate::spinner::Spinner::new());
-                    ui.label(RichText::new("Looking closer…").color(t.text_faint));
+                    ui.label(
+                        RichText::new(crate::i18n::text("interaction-error-looking"))
+                            .color(t.text_faint),
+                    );
                 });
             }
-            Some(Err(e)) => para(ui, &format!("Couldn't look closer: {e}"), t.danger),
+            Some(Err(e)) => para(
+                ui,
+                &crate::i18n::message(
+                    "interaction-error-look-error",
+                    &[("error", e.as_str().into())],
+                ),
+                t.danger,
+            ),
             Some(Ok(found)) => {
                 for note in &found.notes {
                     let color = if note.warn { t.warning } else { t.text };
@@ -103,18 +118,20 @@ impl ErrorCard {
                 }
             }
         }
-        egui::CollapsingHeader::new(RichText::new("What git said").color(t.text_faint))
-            .id_salt(("error_card_said", &self.dir))
-            .show(ui, |ui| {
-                ui.add(
-                    egui::Label::new(
-                        RichText::new(self.said.trim())
-                            .font(theme::mono(11.5))
-                            .color(t.text_dim),
-                    )
-                    .wrap(),
-                );
-            });
+        egui::CollapsingHeader::new(
+            RichText::new(crate::i18n::text("interaction-error-git-said")).color(t.text_faint),
+        )
+        .id_salt(("error_card_said", &self.dir))
+        .show(ui, |ui| {
+            ui.add(
+                egui::Label::new(
+                    RichText::new(self.said.trim())
+                        .font(theme::mono(11.5))
+                        .color(t.text_dim),
+                )
+                .wrap(),
+            );
+        });
     }
 
     /// The buttons of the stage the fix is at.
@@ -123,7 +140,7 @@ impl ErrorCard {
         let ctx = ui.ctx().clone();
         let mut event = None;
         let retry_button = |ui: &mut Ui, event: &mut Option<CardEvent>| {
-            if retry && button(ui, "Try again").clicked() {
+            if retry && button(ui, crate::i18n::text("interaction-error-retry")).clicked() {
                 *event = Some(CardEvent::Retry);
             }
         };
@@ -150,7 +167,7 @@ impl ErrorCard {
                     if primary_button(ui, label, true, 0.0).clicked() {
                         self.confirm(&ctx);
                     }
-                    if button(ui, "Cancel").clicked() {
+                    if button(ui, crate::i18n::text("interaction-error-cancel")).clicked() {
                         self.back(&ctx);
                     }
                 });
@@ -158,14 +175,19 @@ impl ErrorCard {
             Stage::Working => {
                 ui.horizontal(|ui| {
                     ui.add(crate::spinner::Spinner::new());
-                    ui.label(RichText::new("Working…").color(t.text_dim));
+                    ui.label(
+                        RichText::new(crate::i18n::text("interaction-error-working"))
+                            .color(t.text_dim),
+                    );
                 });
             }
             Stage::Done { what, undo } => {
                 ui.add(egui::Label::new(RichText::new(what).color(t.success)).wrap());
                 ui.horizontal(|ui| {
                     retry_button(ui, &mut event);
-                    if undo.is_some() && button(ui, "Undo").clicked() {
+                    if undo.is_some()
+                        && button(ui, crate::i18n::text("interaction-error-undo")).clicked()
+                    {
                         self.undo(&ctx);
                     }
                 });
@@ -175,7 +197,7 @@ impl ErrorCard {
             }
             Stage::Failed(e) => {
                 ui.add(egui::Label::new(RichText::new(e).color(t.danger)).wrap());
-                if button(ui, "Back").clicked() {
+                if button(ui, crate::i18n::text("interaction-error-back")).clicked() {
                     self.back(&ctx);
                 }
             }
@@ -191,8 +213,14 @@ impl ErrorCard {
         if let Some(what) = self.earlier().map(str::to_owned) {
             ui.add_space(4.0);
             ui.horizontal_wrapped(|ui| {
-                ui.label(RichText::new(format!("Earlier: {what}")).color(t.text_faint));
-                if button(ui, "Undo that").clicked() {
+                ui.label(
+                    RichText::new(crate::i18n::message(
+                        "interaction-error-earlier",
+                        &[("what", what.as_str().into())],
+                    ))
+                    .color(t.text_faint),
+                );
+                if button(ui, crate::i18n::text("interaction-error-undo-earlier")).clicked() {
                     self.undo_earlier(&ctx);
                 }
             });

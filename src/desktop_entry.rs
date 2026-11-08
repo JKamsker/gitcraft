@@ -112,14 +112,17 @@ static ACTIONS: std::sync::Mutex<Vec<crate::os_shell::MenuItem>> =
 
 /// What marks the user's own copy of the package's entry as written by gitcraft (one written by
 /// the user is never touched).
+#[cfg(any(target_os = "linux", test))]
 const OURS: &str = "X-Gitcraft-Actions=true";
 
 /// The entry of the package, which a copy of the user's own takes the place of.
+#[cfg(target_os = "linux")]
 const PACKAGE_ENTRY: &str = "/usr/share/applications/gitcraft.desktop";
 
 /// Puts `items` in the launcher's menu: the AppImage's entry, when it is in the applications
 /// menu; for the .deb or .rpm, a copy of the package's entry in the user's applications folder
 /// (which takes its place), unless the user has one of their own there.
+#[cfg(target_os = "linux")]
 pub fn set_actions(items: &[crate::os_shell::MenuItem]) {
     if let Ok(mut a) = ACTIONS.lock() {
         *a = items.to_vec();
@@ -157,6 +160,7 @@ pub fn set_actions(items: &[crate::os_shell::MenuItem]) {
 
 /// The desktop file the window belongs to, by its id: the AppImage's when its entry is in the
 /// menu, else the package's (or the user's copy of it, which has the same id).
+#[cfg(target_os = "linux")]
 pub fn desktop_id() -> &'static str {
     if appimage().is_some() && installed() {
         ENTRY
@@ -176,12 +180,14 @@ fn write_whole(path: &Path, text: &str) -> std::io::Result<()> {
 }
 
 /// The package's entry with `items` as its actions.
+#[cfg(any(target_os = "linux", test))]
 fn package_entry(items: &[crate::os_shell::MenuItem]) -> String {
+    let description = escape_value(crate::i18n::text("interaction-shell-prose-description"));
     format!(
         "[Desktop Entry]\n\
          Type=Application\n\
          Name=gitcraft\n\
-         Comment=A small visual git client\n\
+         Comment={description}\n\
          Exec=gitcraft %f\n\
          TryExec=gitcraft\n\
          Terminal=false\n\
@@ -228,12 +234,13 @@ fn write_entry(data: &Path, appimage: &Path) -> std::io::Result<()> {
 
 /// The entry that hands `gitcraft://` links to `appimage`.
 fn link_entry(appimage: &Path) -> String {
+    let description = escape_value(crate::i18n::text("interaction-shell-prose-links"));
     let exec = quote_exec(&appimage.to_string_lossy());
     format!(
         "[Desktop Entry]\n\
          Type=Application\n\
          Name=gitcraft links\n\
-         Comment=Opens gitcraft:// links from the browser in gitcraft\n\
+         Comment={description}\n\
          Exec={exec} %u\n\
          Terminal=false\n\
          NoDisplay=true\n\
@@ -244,13 +251,14 @@ fn link_entry(appimage: &Path) -> String {
 }
 
 fn entry(appimage: &Path) -> String {
+    let description = escape_value(crate::i18n::text("interaction-shell-prose-description"));
     let exec = quote_exec(&appimage.to_string_lossy());
     let actions = action_sections(&exec, &actions());
     format!(
         "[Desktop Entry]\n\
          Type=Application\n\
          Name=gitcraft\n\
-         Comment=A small visual git client\n\
+         Comment={description}\n\
          Exec={exec} %f\n\
          TryExec={}\n\
          Terminal=false\n\
@@ -373,5 +381,38 @@ mod tests {
         assert!(first.is_ok() && second.is_ok());
         assert_eq!(text, "two");
         assert_eq!(left, 1);
+    }
+}
+
+#[cfg(test)]
+mod localized_description_tests {
+    use super::*;
+    #[test]
+    fn actual_entry_generators_translate_only_human_comments_and_preserve_exec_protocol() {
+        let path = Path::new("/supplied/色 $x 100%/gitcraft.AppImage");
+        let render = || [package_entry(&[]), entry(path), link_entry(path)];
+        crate::i18n::set_language("en-US");
+        let english = render();
+        assert!(english[0].contains("Comment=A small visual git client\n"));
+        assert!(
+            english[2].contains("Comment=Opens gitcraft:// links from the browser in gitcraft\n")
+        );
+        crate::i18n::set_language("de");
+        let german = render();
+        assert!(german[0].contains("Comment=Ein kleiner visueller Git-Client\n"));
+        assert!(
+            german[2].contains("Comment=Öffnet gitcraft://-Links aus dem Browser in gitcraft\n")
+        );
+        let without_comment = |s: &str| {
+            s.lines()
+                .filter(|s| !s.starts_with("Comment="))
+                .collect::<Vec<_>>()
+                .join("\n")
+        };
+        for (en, de) in english.iter().zip(&german) {
+            assert_eq!(without_comment(en), without_comment(de));
+        }
+        crate::i18n::set_language("en-US");
+        assert_eq!(render(), english);
     }
 }

@@ -226,7 +226,7 @@ fn a_huge_file_is_searched_over_frames_not_in_one() {
     assert_eq!(find.count(), 40_000);
     assert_eq!(
         find.summary().map(|(s, _)| s),
-        Some("1 of 40000".to_owned())
+        Some("1 of 40,000".to_owned())
     );
 }
 
@@ -611,4 +611,66 @@ fn keys_typed_into_another_field_are_left_to_it() {
     ctx.memory_mut(|m| m.surrender_focus(egui::Id::new("other")));
     let ctrl_f = frame(&mut tab, key(Key::F, Modifiers::COMMAND).to_vec(), false);
     assert!(!kept(&ctrl_f, Key::F) && tab.find.focus);
+}
+
+#[test]
+fn actual_markdown_diff_opens_find_and_marks_rendered_content() {
+    let ctx = egui::Context::default();
+    crate::theme::install_fonts(&ctx);
+    let mut tab = RepoTab::new_deferred("/nonexistent/find-rendered-test".into(), &ctx);
+    let mut view = crate::repo::DiffView::new(DiffKey::Commit {
+        hash: "abc".into(),
+        path: "README.md".into(),
+    });
+    view.rendered = Some(Ok(crate::repo::diff::rendered::RenderedMd {
+        file: "# **Visible** words [label](https://hidden.example/secret)".into(),
+        blocks: vec![(
+            crate::repo::diff::rendered::Change::Added,
+            "# **Visible** words [label](https://hidden.example/secret)".into(),
+        )],
+        before: false,
+        images: Vec::new(),
+    }));
+    tab.diff = Some(view);
+    tab.diff_rendered = true;
+    assert!(tab.find_in().is_some());
+    tab.find.show();
+    tab.find.query.text = "Visible words".into();
+    for _ in 0..2 {
+        let output = ctx.run_ui(egui::RawInput::default(), |ui| {
+            tab.diff_view(ui, &mut Vec::new())
+        });
+        output.drop_without_applying_deltas();
+    }
+    assert_eq!(tab.find.count(), 1);
+    tab.find.query.text = "hidden.example".into();
+    let output = ctx.run_ui(egui::RawInput::default(), |ui| {
+        tab.diff_view(ui, &mut Vec::new())
+    });
+    output.drop_without_applying_deltas();
+    assert_eq!(tab.find.count(), 0);
+    let request = tab.diff.as_ref().map(|v| v.request);
+    if let Some(view) = &mut tab.diff {
+        view.rendered_load += 1;
+        view.rendered = Some(Ok(crate::repo::diff::rendered::RenderedMd {
+            file: "# Replacement visible words".into(),
+            blocks: vec![(
+                crate::repo::diff::rendered::Change::Added,
+                "# Replacement visible words".into(),
+            )],
+            before: false,
+            images: Vec::new(),
+        }));
+    }
+    tab.find.query.text = "Replacement".into();
+    let output = ctx.run_ui(egui::RawInput::default(), |ui| {
+        tab.diff_view(ui, &mut Vec::new())
+    });
+    output.drop_without_applying_deltas();
+    assert_eq!(request, tab.diff.as_ref().map(|v| v.request));
+    assert_eq!(
+        tab.find.count(),
+        1,
+        "accepted Markdown reread must replace the cached text under the same diff request"
+    );
 }

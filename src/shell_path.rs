@@ -74,9 +74,8 @@ fn system_dirs() -> Vec<PathBuf> {
 /// when it is a bare name (`bash`), as it is otherwise. A program started in the repository's
 /// folder and looked up through a PATH with relative entries could be one the repository
 /// brought; the terminal's shell is found here, its PATH left as the user's.
-#[cfg(unix)]
 pub fn resolve(program: &str) -> String {
-    if program.contains('/') {
+    if program.contains('/') || cfg!(windows) && program.contains('\\') {
         return program.to_owned();
     }
     executable(program).map_or_else(|| program.to_owned(), |p| p.display().to_string())
@@ -84,7 +83,6 @@ pub fn resolve(program: &str) -> String {
 
 /// A bare program's executable path, keeping non-UTF-8 folder names intact. Resolve against
 /// the same PATH passed to the child, so Unix can use posix_spawn even when PATH is changed.
-#[cfg(unix)]
 pub fn executable(program: &str) -> Option<PathBuf> {
     let own = std::env::var_os("PATH").unwrap_or_default();
     let dirs = path().unwrap_or(&own);
@@ -97,6 +95,24 @@ fn executable_in(program: &str, dirs: &std::ffi::OsStr) -> Option<PathBuf> {
         .filter(|d| d.is_absolute())
         .map(|d| d.join(program))
         .find(|p| p.is_file() && rustix::fs::access(p, rustix::fs::Access::EXEC_OK).is_ok())
+}
+
+/// Windows automatically appends `.exe` to bare executable names. Also retain exact
+/// script names (such as b4) for callers that inspect an interpreter wrapper themselves.
+#[cfg(windows)]
+fn executable_in(program: &str, dirs: &std::ffi::OsStr) -> Option<PathBuf> {
+    std::env::split_paths(dirs)
+        .filter(|dir| dir.is_absolute())
+        .find_map(|dir| {
+            let path = dir.join(program);
+            if path.extension().is_none() {
+                let exe = path.with_extension("exe");
+                if exe.is_file() {
+                    return Some(exe);
+                }
+            }
+            path.is_file().then_some(path)
+        })
 }
 
 /// Gives `cmd` that PATH.

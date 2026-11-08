@@ -19,6 +19,7 @@ impl Verdict {
     }
 
     /// "good", "bad", "skipped", "timed out": as a row's tooltip says it.
+    #[cfg(test)]
     pub fn word(self) -> &'static str {
         match self {
             Verdict::Good => "good",

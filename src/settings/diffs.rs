@@ -10,17 +10,16 @@ impl Settings {
             "Fold generated files",
             "lockfiles minified linguist-generated gitattributes collapse",
             |ui| {
-                ui.checkbox(&mut self.fold_generated, "Start them folded")
-                    .on_hover_text(
-                        "Files marked linguist-generated or -diff in .gitattributes, lockfiles \
-                         (Cargo.lock, package-lock.json, yarn.lock…) and minified files start \
-                         folded in file lists and diffs. One click opens them.",
-                    );
+                ui.checkbox(
+                    &mut self.fold_generated,
+                    crate::i18n::text("interaction-settings-generated"),
+                )
+                .on_hover_text(crate::i18n::text("interaction-settings-generated-tip"));
             },
         );
         card.row_hint(
             "Also fold",
-            "Glob patterns of your own",
+            crate::i18n::text("interaction-settings-fold-hint"),
             "fold patterns glob generated",
             |ui| {
                 ui.add_enabled(
@@ -29,11 +28,7 @@ impl Settings {
                         .hint_text("*.snap, dist/**")
                         .desired_width(layout::fit(ui, FIELD_WIDTH)),
                 )
-                .on_hover_text(
-                    "Separated by commas or spaces. A pattern without a / matches the file's \
-                     name; one with a / its whole path, where * stays within a folder and ** \
-                     goes through folders; one ending in / everything in that folder.",
-                );
+                .on_hover_text(crate::i18n::text("interaction-settings-fold-pattern-tip"));
             },
         );
         card.row(
@@ -41,10 +36,7 @@ impl Settings {
             "myers minimal patience histogram algorithm file type",
             |ui| {
                 if self.diff_algorithms.is_empty() {
-                    layout::note(
-                        ui,
-                        "git's default for every file type; pick one in a diff's header",
-                    );
+                    layout::note(ui, crate::i18n::text("interaction-settings-diff-default"));
                     return;
                 }
                 ui.vertical(|ui| {
@@ -52,7 +44,10 @@ impl Settings {
                     for (kind, algorithm) in &self.diff_algorithms {
                         ui.horizontal(|ui| {
                             ui.label(format!("{kind}: {}", algorithm.label()));
-                            if ui.small_button("Forget").clicked() {
+                            if ui
+                                .small_button(crate::i18n::text("interaction-settings-forget"))
+                                .clicked()
+                            {
                                 forget = Some(kind.clone());
                             }
                         });
@@ -60,7 +55,7 @@ impl Settings {
                     if let Some(kind) = forget {
                         self.diff_algorithms.remove(&kind);
                     }
-                    layout::note(ui, "Diffs read from now on use what is listed");
+                    layout::note(ui, crate::i18n::text("interaction-settings-diff-note"));
                 });
             },
         );

@@ -129,8 +129,8 @@ fn header(ui: &mut Ui, t: &Tokens, editor: &SplitEditor, acts: &mut Vec<Action>)
                 };
                 icons::inline(ui, icon, 16.0, t.icon);
                 let verb = match editor.mode {
-                    Mode::Split => "Split",
-                    Mode::Move(_) => "Move changes out of",
+                    Mode::Split => crate::i18n::text("repo-workflows-surgery-header-32afaa78"),
+                    Mode::Move(_) => crate::i18n::text("repo-workflows-surgery-header-08e79585"),
                 };
                 ui.label(
                     RichText::new(format!(
@@ -141,7 +141,13 @@ fn header(ui: &mut Ui, t: &Tokens, editor: &SplitEditor, acts: &mut Vec<Action>)
                     .font(theme::medium(13.0)),
                 );
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if icons::small_button(ui, "x", "Cancel (Esc)").clicked() {
+                    if icons::small_button(
+                        ui,
+                        "x",
+                        crate::i18n::text("repo-workflows-surgery-header-862c2324"),
+                    )
+                    .clicked()
+                    {
                         acts.push(Action::CloseSplit);
                     }
                 });
@@ -163,9 +169,15 @@ fn footer(ui: &mut Ui, t: &Tokens, editor: &mut SplitEditor, idle: bool, acts: &
             // of it in its tooltip.
             let moving = matches!(editor.mode, Mode::Move(_));
             let (check, run) = if moving {
-                ("Check move", "Move changes")
+                (
+                    crate::i18n::text("repo-workflows-surgery-footer-b5292604"),
+                    crate::i18n::text("repo-workflows-surgery-footer-42680e0d"),
+                )
             } else {
-                ("Check split", "Split commit")
+                (
+                    crate::i18n::text("repo-workflows-surgery-footer-11188750"),
+                    crate::i18n::text("repo-workflows-surgery-footer-df9d2856"),
+                )
             };
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if editor.checked.is_some() {
@@ -173,7 +185,12 @@ fn footer(ui: &mut Ui, t: &Tokens, editor: &mut SplitEditor, idle: bool, acts: &
                         acts.push(Action::RunSplit);
                     }
                     if ui
-                        .add_enabled(!editor.busy, egui::Button::new("Back"))
+                        .add_enabled(
+                            !editor.busy,
+                            egui::Button::new(crate::i18n::text(
+                                "repo-workflows-surgery-footer-76900f1b",
+                            )),
+                        )
                         .clicked()
                     {
                         editor.checked = None;
@@ -188,7 +205,10 @@ fn footer(ui: &mut Ui, t: &Tokens, editor: &mut SplitEditor, idle: bool, acts: &
                 {
                     acts.push(Action::CheckSplit);
                 }
-                if ui.button("Cancel").clicked() {
+                if ui
+                    .button(crate::i18n::text("repo-workflows-surgery-footer-19766ed6"))
+                    .clicked()
+                {
                     acts.push(Action::CloseSplit);
                 }
                 if editor.busy {
@@ -206,28 +226,41 @@ fn footer(ui: &mut Ui, t: &Tokens, editor: &mut SplitEditor, idle: bool, acts: &
 /// What the footer says, and in which colour.
 fn note(t: &Tokens, editor: &SplitEditor, problem: Option<(String, bool)>) -> (String, Color32) {
     match (&editor.error, problem, &editor.checked) {
-        (Some(e), _, _) if matches!(editor.mode, Mode::Move(_)) => {
-            (format!("Can't move them this way: {e}"), t.danger)
-        }
-        (Some(e), _, _) => (format!("Can't split it this way: {e}"), t.danger),
+        (Some(e), _, _) if matches!(editor.mode, Mode::Move(_)) => (
+            crate::i18n::message(
+                "repo-workflows-surgery-note-a227d3be",
+                &[("e", (e).clone().into())],
+            ),
+            t.danger,
+        ),
+        (Some(e), _, _) => (
+            crate::i18n::message(
+                "repo-workflows-surgery-note-e5a23195",
+                &[("e", (e).clone().into())],
+            ),
+            t.danger,
+        ),
         (None, Some((p, hint)), _) => (p, if hint { t.text_dim } else { t.danger }),
         (None, None, Some(_)) if matches!(editor.mode, Mode::Move(_)) => (
-            "Checked: what stays and what moves. Moving rewrites the branch from the older commit · Ctrl+Z undoes it".to_owned(),
+            crate::i18n::text("repo-workflows-surgery-note-85eaa81d").to_owned(),
             t.text_dim,
         ),
         (None, None, Some(c)) => (
-            format!(
-                "Checked: {} commits, together exactly the old one. Splitting replays the commits after it · Ctrl+Z undoes it",
-                c.trees.len().saturating_sub(1)
+            crate::i18n::message(
+                "repo-workflows-surgery-note-a3a06218",
+                &[(
+                    "c-trees-len-saturating-sub-1-1",
+                    (c.trees.len().saturating_sub(1)).into(),
+                )],
             ),
             t.text_dim,
         ),
         (None, None, None) if matches!(editor.mode, Mode::Move(_)) => (
-            "Check the move to see what stays in the commit and what moves".to_owned(),
+            crate::i18n::text("repo-workflows-surgery-note-4656ae85").to_owned(),
             t.text_dim,
         ),
         (None, None, None) => (
-            "Check the split to see each new commit's patch".to_owned(),
+            crate::i18n::text("repo-workflows-surgery-note-c96c4852").to_owned(),
             t.text_dim,
         ),
     }
@@ -245,11 +278,9 @@ fn groups(ui: &mut Ui, t: &Tokens, editor: &mut SplitEditor) {
                 ui.disable();
             }
             ui.label(
-                RichText::new(
-                    "Select a commit (or press its number), then click files, hunks or lines on the right to put them in it.",
-                )
-                .color(t.text_dim)
-                .small(),
+                RichText::new(crate::i18n::text("repo-workflows-surgery-groups-e87a043a"))
+                    .color(t.text_dim)
+                    .small(),
             );
             ui.add_space(6.0);
             let n = editor.groups.len();
@@ -262,8 +293,14 @@ fn groups(ui: &mut Ui, t: &Tokens, editor: &mut SplitEditor) {
                 ui.add_space(6.0);
             }
             if ui
-                .add_enabled(n < MAX_GROUPS, egui::Button::new("Add a commit"))
-                .on_disabled_hover_text(format!("At most {MAX_GROUPS} commits"))
+                .add_enabled(
+                    n < MAX_GROUPS,
+                    egui::Button::new(crate::i18n::text("repo-workflows-surgery-groups-25dc2988")),
+                )
+                .on_disabled_hover_text(crate::i18n::message(
+                    "repo-workflows-surgery-groups-536f4c75",
+                    &[("MAX-GROUPS", (MAX_GROUPS).into())],
+                ))
                 .clicked()
             {
                 editor.add_group();
@@ -303,10 +340,9 @@ fn group_card(
             chip(ui, t, g);
             let title = ui.add(
                 egui::Label::new(
-                    RichText::new(format!(
-                        "Commit {} · {count} change{}",
-                        g + 1,
-                        if count == 1 { "" } else { "s" }
+                    RichText::new(crate::i18n::message(
+                        "repo-workflows-surgery-group-summary",
+                        &[("index", (g + 1).into()), ("count", (count).into())],
                     ))
                     .font(theme::medium(12.5)),
                 )
@@ -317,11 +353,11 @@ fn group_card(
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 let heir = SplitEditor::heir(g);
                 let tip = if heir == g {
-                    "Take this commit out: its changes go to the one after it".to_owned()
+                    crate::i18n::text("repo-workflows-surgery-group-card-7aca66ea").to_owned()
                 } else {
-                    format!(
-                        "Take this commit out: its changes go to commit {}",
-                        heir + 1
+                    crate::i18n::message(
+                        "repo-workflows-surgery-group-card-45e7c009",
+                        &[("heir-1-1", (heir + 1).into())],
                     )
                 };
                 if n > 2 && icons::small_button(ui, "x", &tip).clicked() {
@@ -334,12 +370,16 @@ fn group_card(
         };
         let subject = ui.add(
             egui::TextEdit::singleline(&mut group.subject)
-                .hint_text("Summary (required)")
+                .hint_text(crate::i18n::text(
+                    "repo-workflows-surgery-group-card-77f7cfc2",
+                ))
                 .desired_width(f32::INFINITY),
         );
         let body = ui.add(
             egui::TextEdit::multiline(&mut group.body)
-                .hint_text("Description")
+                .hint_text(crate::i18n::text(
+                    "repo-workflows-surgery-group-card-526e0087",
+                ))
                 .desired_rows(2)
                 .desired_width(f32::INFINITY),
         );
@@ -356,9 +396,9 @@ fn destinations(ui: &mut Ui, t: &Tokens, editor: &mut SplitEditor) {
     };
     let mut picked = None;
     ui.label(
-        RichText::new(
-            "Click the files, hunks or lines to move on the right (chip 2; click again to keep them), then pick where they go.",
-        )
+        RichText::new(crate::i18n::text(
+            "repo-workflows-surgery-destinations-6f10c3fa",
+        ))
         .color(t.text_dim)
         .small(),
     );
@@ -376,8 +416,13 @@ fn destinations(ui: &mut Ui, t: &Tokens, editor: &mut SplitEditor) {
         ui.disable();
     }
     if ui
-        .selectable_label(m.dest == Some(Dest::Work), "Working changes (staged)")
-        .on_hover_text("Out of the commit, staged; their files must have no other changes")
+        .selectable_label(
+            m.dest == Some(Dest::Work),
+            crate::i18n::text("repo-workflows-surgery-destinations-b4861450"),
+        )
+        .on_hover_text(crate::i18n::text(
+            "repo-workflows-surgery-destinations-9b4ffd73",
+        ))
         .clicked()
     {
         picked = Some(Dest::Work);
@@ -394,18 +439,21 @@ fn destinations(ui: &mut Ui, t: &Tokens, editor: &mut SplitEditor) {
             for row in range {
                 if row == mine {
                     ui.label(
-                        RichText::new(format!("{}  this commit", short(&editor.hash)))
-                            .color(t.text_faint)
-                            .italics(),
+                        RichText::new(crate::i18n::message(
+                            "repo-workflows-surgery-destinations-9e3eee5d",
+                            &[("short-editor-hash-1", (short(&editor.hash)).into())],
+                        ))
+                        .color(t.text_faint)
+                        .italics(),
                     );
                     continue;
                 }
                 let i = if row < mine { row } else { row - 1 };
                 let Some(target) = m.targets.get(i) else {
                     ui.label(
-                        RichText::new(
-                            "Older commits aren't loaded yet: scroll the graph down to load them.",
-                        )
+                        RichText::new(crate::i18n::text(
+                            "repo-workflows-surgery-destinations-aea2bb52",
+                        ))
                         .color(t.text_faint)
                         .small(),
                     );
@@ -422,9 +470,9 @@ fn destinations(ui: &mut Ui, t: &Tokens, editor: &mut SplitEditor) {
         });
     if m.targets.is_empty() && !m.truncated {
         ui.label(
-            RichText::new(
-                "No other commit of the branch can take them: a merge or the first commit is next.",
-            )
+            RichText::new(crate::i18n::text(
+                "repo-workflows-surgery-destinations-a3863fa7",
+            ))
             .color(t.text_faint)
             .small(),
         );
@@ -441,9 +489,9 @@ fn changes(ui: &mut Ui, t: &Tokens, editor: &mut SplitEditor) {
     ui.horizontal(|ui| {
         ui.add_space(8.0);
         let lead = if matches!(editor.mode, Mode::Move(_)) {
-            "Clicks move to"
+            crate::i18n::text("repo-workflows-surgery-changes-a2e10493")
         } else {
-            "Clicks go to"
+            crate::i18n::text("repo-workflows-surgery-changes-d37a4bd0")
         };
         ui.label(RichText::new(lead).color(t.text_dim));
         chip(ui, t, active);
@@ -452,7 +500,7 @@ fn changes(ui: &mut Ui, t: &Tokens, editor: &mut SplitEditor) {
             .get(active)
             .map(|g| g.subject.trim())
             .filter(|s| !s.is_empty())
-            .unwrap_or("(no summary yet)");
+            .unwrap_or(crate::i18n::text("repo-workflows-surgery-changes-4a2b6fd2"));
         ui.add(egui::Label::new(RichText::new(subject).color(t.text)).truncate());
     });
     let rows = std::mem::take(&mut editor.rows);
@@ -522,6 +570,25 @@ fn draw_row(ui: &mut Ui, t: &Tokens, editor: &SplitEditor, row: Row) -> Option<C
             ui.painter()
                 .rect_filled(rect, 0.0, if resp.hovered() { t.hover } else { t.chrome });
             let folded = editor.folded.contains(&f);
+            crate::a11y::a11y(&resp, egui::WidgetType::Button, || {
+                crate::i18n::message(
+                    "repo-workflows-surgery-draw-row-b23760b8",
+                    &[
+                        ("file-path-1", (file.path).clone().into()),
+                        (
+                            "tip-editor-f-editor-units-get-f--2",
+                            (tip(
+                                editor,
+                                f,
+                                editor.units.get(f).map_or(&[], Vec::as_slice),
+                                crate::i18n::text("repo-workflows-surgery-draw-row-82048030"),
+                            ))
+                            .clone()
+                            .into(),
+                        ),
+                    ],
+                )
+            });
             let fold = icons::small_button(
                 ui,
                 if folded {
@@ -530,9 +597,9 @@ fn draw_row(ui: &mut Ui, t: &Tokens, editor: &SplitEditor, row: Row) -> Option<C
                     "chevron-down"
                 },
                 if folded {
-                    "Show its lines"
+                    crate::i18n::text("repo-workflows-surgery-draw-row-1b11239e")
                 } else {
-                    "Fold its lines"
+                    crate::i18n::text("repo-workflows-surgery-draw-row-5359fb45")
                 },
             );
             let mut owners: Vec<usize> = editor
@@ -554,21 +621,39 @@ fn draw_row(ui: &mut Ui, t: &Tokens, editor: &SplitEditor, row: Row) -> Option<C
             );
             if let Some(why) = file.whole {
                 ui.label(
-                    RichText::new(format!("whole file only: {why}"))
-                        .color(t.text_faint)
-                        .small(),
+                    RichText::new(crate::i18n::message(
+                        "repo-workflows-surgery-draw-row-f1e7c811",
+                        &[("why", (why).into())],
+                    ))
+                    .color(t.text_faint)
+                    .small(),
                 );
             }
             if fold.clicked() {
                 return Some(Click::Fold(f));
             }
             let units = editor.units.get(f).cloned().unwrap_or_default();
-            let resp = resp.on_hover_text(tip(editor, f, &units, "the whole file"));
+            let resp = resp.on_hover_text(tip(
+                editor,
+                f,
+                &units,
+                crate::i18n::text("repo-workflows-surgery-draw-row-82048030"),
+            ));
             resp.clicked().then_some(Click::File(f))
         }
         Row::Line(f, i) => {
             let file = editor.files.get(f)?;
             let line = file.lines.get(i)?;
+            crate::a11y::a11y(&resp, egui::WidgetType::Button, || {
+                crate::i18n::message(
+                    "repo-workflows-surgery-draw-row-5d5aa815",
+                    &[
+                        ("file-path-1", (file.path).clone().into()),
+                        ("i-1-2", (i + 1).into()),
+                        ("line-text-3", (line.text).clone().into()),
+                    ],
+                )
+            });
             let changed = matches!(line.kind, Kind::Add | Kind::Del);
             let whole = file.whole.is_some();
             let clickable = whole || changed || line.kind == Kind::Hunk;
@@ -611,11 +696,20 @@ fn draw_row(ui: &mut Ui, t: &Tokens, editor: &SplitEditor, row: Row) -> Option<C
                 .extend(),
             );
             let what = if whole {
-                Some(("the whole file", Click::File(f)))
+                Some((
+                    crate::i18n::text("repo-workflows-surgery-draw-row-82048030"),
+                    Click::File(f),
+                ))
             } else if line.kind == Kind::Hunk {
-                Some(("this hunk", Click::Hunk(f, i)))
+                Some((
+                    crate::i18n::text("repo-workflows-surgery-draw-row-bff8613c"),
+                    Click::Hunk(f, i),
+                ))
             } else if changed {
-                Some(("this line", Click::Line(f, i)))
+                Some((
+                    crate::i18n::text("repo-workflows-surgery-draw-row-cdd88a94"),
+                    Click::Line(f, i),
+                ))
             } else {
                 None
             };
@@ -644,15 +738,39 @@ fn draw_row(ui: &mut Ui, t: &Tokens, editor: &SplitEditor, row: Row) -> Option<C
 /// What a click on `name` (units `units` of file `f`) does.
 fn tip(editor: &SplitEditor, f: usize, units: &[usize], name: &str) -> String {
     let Mode::Move(m) = &editor.mode else {
-        return format!("Put {name} in commit {}", editor.active + 1);
+        return crate::i18n::message(
+            "repo-workflows-surgery-tip-9e1cf75b",
+            &[
+                ("name", (name).into()),
+                ("editor-active-1-1", (editor.active + 1).into()),
+            ],
+        );
     };
     if !units.is_empty() && units.iter().all(|&u| editor.group_of(f, u) == 1) {
-        return format!("Keep {name} in {}", short(&editor.hash));
+        return crate::i18n::message(
+            "repo-workflows-surgery-tip-182c90c3",
+            &[
+                ("name", (name).into()),
+                ("short-editor-hash-1", (short(&editor.hash)).into()),
+            ],
+        );
     }
     match (&m.dest, m.target()) {
-        (_, Some(t)) => format!("Move {name} to {}", short(&t.hash)),
-        (Some(Dest::Work), None) => format!("Move {name} to the working changes"),
-        _ => format!("Move {name} (pick where on the left)"),
+        (_, Some(t)) => crate::i18n::message(
+            "repo-workflows-surgery-tip-abb8d5a0",
+            &[
+                ("name", (name).into()),
+                ("short-t-hash-1", (short(&t.hash)).into()),
+            ],
+        ),
+        (Some(Dest::Work), None) => crate::i18n::message(
+            "repo-workflows-surgery-tip-9b5f8a9f",
+            &[("name", (name).into())],
+        ),
+        _ => crate::i18n::message(
+            "repo-workflows-surgery-tip-4e078e93",
+            &[("name", (name).into())],
+        ),
     }
 }
 
@@ -694,18 +812,32 @@ fn preview_line(ui: &mut Ui, t: &Tokens, editor: &SplitEditor, look: Look, text:
                 .unwrap_or_default();
             ui.label(RichText::new(subject).font(theme::medium(13.0)));
             if files == 0 {
-                RichText::new(format!("· nothing: {} is dropped", short(&editor.hash)))
-                    .color(t.text_dim)
+                RichText::new(crate::i18n::message(
+                    "repo-workflows-surgery-preview-line-4a4c8a43",
+                    &[("short-editor-hash-1", (short(&editor.hash)).into())],
+                ))
+                .color(t.text_dim)
             } else {
-                RichText::new(format!(
-                    "· {files} file{}: {text}",
-                    if files == 1 { "" } else { "s" }
+                RichText::new(crate::i18n::message(
+                    "repo-workflows-surgery-preview-files",
+                    &[("count", (files).into()), ("text", (text).into())],
                 ))
                 .color(t.text_dim)
             }
         }
         Look::Header => mono(t.accent),
-        Look::Meta => mono(t.text_faint),
+        Look::Meta => {
+            if text == "(binary contents)" {
+                RichText::new(crate::i18n::message(
+                    "repo-workflows-surgery-binary-preview",
+                    &[],
+                ))
+                .font(theme::mono(11.5))
+                .color(t.text_faint)
+            } else {
+                mono(t.text_faint)
+            }
+        }
         Look::Context => mono(t.text_dim),
         Look::Add | Look::Del => {
             let fill = if look == Look::Add {

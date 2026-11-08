@@ -70,7 +70,7 @@ impl RepoTab {
                 }));
                 match read {
                     Ok(result) => result.map(|health| (health, cache)),
-                    Err(_) => Err("the read stopped unexpectedly".to_owned()),
+                    Err(_) => Err(crate::i18n::text("repo-core-0240").to_owned()),
                 }
             },
             |tab, result, ctx| tab.health_arrived(result, ctx),
@@ -100,14 +100,18 @@ impl RepoTab {
             return;
         };
         let path = self.path.clone();
+        let context = crate::connections::current();
         let asked = self.prs_loaded;
         self.forge_then(
             ctx,
             move || {
                 let merged = hosting.forge.provider().merged(&path, &hosting);
-                (hosting, merged)
+                (hosting, merged, context)
             },
-            move |tab, (hosting, merged), ctx| {
+            move |tab, (hosting, merged, context), ctx| {
+                if crate::connections::current() != context {
+                    return;
+                }
                 let same = super::load::same_repository(Some(&hosting), tab.hosting.as_ref());
                 if let (true, Ok(prs)) = (same && tab.prs_loaded == asked, merged)
                     && prs != tab.branch_health.merged_prs

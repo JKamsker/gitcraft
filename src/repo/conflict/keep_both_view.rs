@@ -104,7 +104,7 @@ impl RepoTab {
                     },
                     ctx,
                 ),
-                Err(e) => tab.status = Some((e, true)),
+                Err(e) => tab.status = Some(crate::repo::Notice::plain((e, true))),
             },
         );
     }
@@ -121,7 +121,10 @@ impl RepoTab {
             .corner_radius(t.radius_lg)
             .inner_margin(egui::Margin::same(18))
             .shadow(ctx.global_style().visuals.window_shadow);
-        let title = format!("Keep both versions of {}", state.path());
+        let title = crate::i18n::message(
+            "repo-core-0590",
+            &[("path", state.path().to_string().into())],
+        );
         let body = |ui: &mut Ui| {
             ui.set_width(440.0_f32.min(ctx.content_rect().width() - 64.0).max(200.0));
             ui.label(RichText::new(&title).font(theme::semibold(15.0)));
@@ -173,15 +176,19 @@ fn contents(ui: &mut Ui, t: &Tokens, state: &KeepBoth) -> Option<Step> {
         KeepBoth::Reading(_) => {
             ui.horizontal(|ui| {
                 ui.add(crate::spinner::Spinner::new());
-                ui.label("Reading both versions…");
+                ui.label(crate::i18n::text("repo-core-0593"));
             });
-            buttons(ui, None, "Cancel")
+            buttons(ui, None, crate::i18n::text("repo-core-0443"))
         }
         KeepBoth::Failed { error, .. } => {
-            ui.label(RichText::new("Both versions could not be kept").font(theme::medium(13.0)));
+            ui.label(RichText::new(crate::i18n::text("repo-core-0594")).font(theme::medium(13.0)));
             ui.add_space(4.0);
             ui.add(egui::Label::new(RichText::new(error).color(t.danger)).wrap());
-            buttons(ui, Some(("Try again", Step::Retry)), "Close")
+            buttons(
+                ui,
+                Some((crate::i18n::text("repo-core-0437"), Step::Retry)),
+                crate::i18n::text("repo-core-0595"),
+            )
         }
         KeepBoth::Preview(plan) | KeepBoth::Writing(plan) => {
             let writing = matches!(state, KeepBoth::Writing(_));
@@ -189,34 +196,43 @@ fn contents(ui: &mut Ui, t: &Tokens, state: &KeepBoth) -> Option<Step> {
             if writing {
                 ui.horizontal(|ui| {
                     ui.add(crate::spinner::Spinner::new());
-                    ui.label("Writing both files…");
+                    ui.label(crate::i18n::text("repo-core-0596"));
                 });
                 return None;
             }
-            buttons(ui, Some(("Write both files", Step::Write)), "Cancel")
+            buttons(
+                ui,
+                Some((crate::i18n::text("repo-core-0597"), Step::Write)),
+                crate::i18n::text("repo-core-0443"),
+            )
         }
         KeepBoth::Written(plan) => {
             ui.add(
-                egui::Label::new(format!(
-                    "Wrote {} and {}.{} Nothing is staged yet.",
-                    plan.ours.target,
-                    plan.theirs.target,
-                    if plan.ours.ignored || plan.theirs.ignored {
-                        " A .gitignore hides them from the changes list: check them in the \
-                         folder."
-                    } else {
-                        " They are in the changes list as new files: click them there to check \
-                         them."
-                    }
+                egui::Label::new(crate::i18n::message(
+                    "repo-core-0598",
+                    &[
+                        ("target", plan.ours.target.to_string().into()),
+                        ("target2", plan.theirs.target.to_string().into()),
+                        (
+                            "them",
+                            (if plan.ours.ignored || plan.theirs.ignored {
+                                crate::i18n::text("repo-core-0599")
+                            } else {
+                                crate::i18n::text("repo-core-0600")
+                            })
+                            .to_string()
+                            .into(),
+                        ),
+                    ],
                 ))
                 .wrap(),
             );
             ui.add_space(6.0);
             ui.add(
                 egui::Label::new(
-                    RichText::new(format!(
-                        "Staging them also removes {} and marks its conflict resolved.",
-                        plan.path
+                    RichText::new(crate::i18n::message(
+                        "repo-core-0601",
+                        &[("path", plan.path.to_string().into())],
                     ))
                     .color(t.text_dim),
                 )
@@ -225,16 +241,19 @@ fn contents(ui: &mut Ui, t: &Tokens, state: &KeepBoth) -> Option<Step> {
             ui.add_space(6.0);
             ui.add(
                 egui::Label::new(
-                    RichText::new(format!(
-                        "Not now leaves them as they are: to finish later, stage both files and \
-                         delete {}.",
-                        plan.path
+                    RichText::new(crate::i18n::message(
+                        "repo-core-0602",
+                        &[("path", plan.path.to_string().into())],
                     ))
                     .color(t.text_dim),
                 )
                 .wrap(),
             );
-            buttons(ui, Some(("Stage both", Step::Stage)), "Not now")
+            buttons(
+                ui,
+                Some((crate::i18n::text("repo-core-0603"), Step::Stage)),
+                crate::i18n::text("repo-core-0604"),
+            )
         }
     }
 }
@@ -242,10 +261,9 @@ fn contents(ui: &mut Ui, t: &Tokens, state: &KeepBoth) -> Option<Step> {
 /// The two files to be written, and the warning about references to the old name.
 fn preview(ui: &mut Ui, t: &Tokens, plan: &Plan) {
     ui.add(
-        egui::Label::new(format!(
-            "Neither version is thrown away: each is written as a file of its own, beside {}. \
-             Nothing is staged before you have checked them.",
-            plan.path
+        egui::Label::new(crate::i18n::message(
+            "repo-core-0605",
+            &[("path", plan.path.to_string().into())],
         ))
         .wrap(),
     );
@@ -263,9 +281,9 @@ fn preview(ui: &mut Ui, t: &Tokens, plan: &Plan) {
             ui.set_width(ui.available_width());
             ui.add(
                 egui::Label::new(
-                    RichText::new(format!(
-                        "Anything that refers to {name} (code, stylesheets, scenes, docs) may \
-                         need updating to one of the new names."
+                    RichText::new(crate::i18n::message(
+                        "repo-core-0606",
+                        &[("name", name.to_string().into())],
                     ))
                     .color(t.text),
                 )
@@ -297,12 +315,9 @@ fn version_row(ui: &mut Ui, t: &Tokens, version: &Version) {
             if version.ignored {
                 ui.add(
                     egui::Label::new(
-                        RichText::new(
-                            "A .gitignore names this file: it won't show in the changes \
-                             list, and Stage both adds it anyway",
-                        )
-                        .color(t.text_dim)
-                        .small(),
+                        RichText::new(crate::i18n::text("repo-core-0607"))
+                            .color(t.text_dim)
+                            .small(),
                     )
                     .wrap(),
                 );
@@ -310,9 +325,9 @@ fn version_row(ui: &mut Ui, t: &Tokens, version: &Version) {
             if !version.taken.is_empty() {
                 ui.add(
                     egui::Label::new(
-                        RichText::new(format!(
-                            "{} already there, so not that name",
-                            version.taken.join(", ")
+                        RichText::new(crate::i18n::message(
+                            "repo-core-0608",
+                            &[("version", version.taken.join(", ").to_string().into())],
                         ))
                         .color(t.text_faint)
                         .small(),

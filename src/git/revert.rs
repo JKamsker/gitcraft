@@ -27,14 +27,15 @@ pub fn commit_file_patch(repo: &Path, hash: &str, path: &str) -> Result<String, 
 /// Why `patch` (of `path`) can't be reverse-applied, if it can't.
 pub fn check_revertable(patch: &str, path: &str) -> Result<(), String> {
     if patch.trim().is_empty() {
-        return Err(format!(
-            "The commit doesn't change {path}: nothing to revert"
+        return Err(crate::i18n::message(
+            "backend-the-commit-doesn-t-change-path-nothing-to-revert-a2ecb5",
+            &[("path", (path).to_string().into())],
         ));
     }
     if is_binary_patch(patch) {
-        return Err(format!(
-            "Can't revert {path}: it is a binary file. Use View file on the commit before it to \
-             get the old version."
+        return Err(crate::i18n::message(
+            "backend-can-t-revert-path-it-is-a-binary-file-use-view-file-on-the-commit-bf2587",
+            &[("path", (path).to_string().into())],
         ));
     }
     if patch_header(patch).any(|l| l.starts_with("Subproject commit") || l == "new mode 160000")
@@ -42,9 +43,9 @@ pub fn check_revertable(patch: &str, path: &str) -> Result<(), String> {
             .lines()
             .any(|l| l.starts_with("-Subproject commit ") || l.starts_with("+Subproject commit "))
     {
-        return Err(format!(
-            "Can't revert {path}: it is a submodule. Check out the commit it was at in the \
-             submodule instead."
+        return Err(crate::i18n::message(
+            "backend-can-t-revert-path-it-is-a-submodule-check-out-the-commit-it-was-a-1ca1b1",
+            &[("path", (path).to_string().into())],
         ));
     }
     Ok(())
@@ -82,7 +83,12 @@ pub fn reverse_apply(repo: &Path, patch_file: &str) -> Result<Reverted, String> 
             Some(repo),
             &["apply", "--reverse", "--whitespace=nowarn", patch_file],
         )
-        .map_err(|e| format!("The changes could not be reverted: {e}"))?;
+        .map_err(|e| {
+            crate::i18n::message(
+                "backend-the-changes-could-not-be-reverted-e-48d48f",
+                &[("detail", (e).to_string().into())],
+            )
+        })?;
         return Ok(Reverted::Clean);
     }
     match run(
@@ -116,28 +122,26 @@ fn three_way_outcome(err: &str) -> Result<Reverted, String> {
             .map(str::to_owned)
     };
     if let Some(file) = named(": does not match index") {
-        return Err(format!(
-            "{file} has changed since that commit, and has unstaged changes (an earlier revert \
-             counts). Stage or stash them, then revert again: the 3-way merge starts from the \
-             file as staged."
+        return Err(crate::i18n::message(
+            "backend-file-has-changed-since-that-commit-and-has-unstaged-changes-an-ea-948530",
+            &[("file", (file).to_string().into())],
         ));
     }
     if let Some(file) = named(": does not exist in index") {
-        return Err(format!(
-            "{file} isn't tracked any more, so the commit's changes to it can't be merged \
-             back out. Restore the file first."
+        return Err(crate::i18n::message(
+            "backend-file-isn-t-tracked-any-more-so-the-commit-s-changes-to-it-can-t-b-d27ce9",
+            &[("file", (file).to_string().into())],
         ));
     }
     if err.contains("lacks the necessary blob") {
-        return Err(
-            "The file has changed since that commit, and the version needed to merge the revert \
-             in isn't in this repository."
-                .to_owned(),
-        );
+        return Err(crate::i18n::text(
+            "backend-the-file-has-changed-since-that-commit-and-the-version-needed-to-62f8a1",
+        )
+        .to_owned());
     }
-    Err(format!(
-        "The changes don't apply to the file as it is now: {}",
-        err.trim()
+    Err(crate::i18n::message(
+        "backend-the-changes-don-t-apply-to-the-file-as-it-is-now-43cf8c",
+        &[("detail", (err.trim()).to_string().into())],
     ))
 }
 

@@ -6,7 +6,12 @@ mod picker;
 mod view;
 
 use std::collections::BTreeMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
+static COMPARISONS: AtomicU64 = AtomicU64::new(1);
+fn next_request() -> u64 {
+    COMPARISONS.fetch_add(1, Ordering::Relaxed)
+}
 use std::time::{Duration, Instant};
 
 use crate::agent::Launch;
@@ -40,6 +45,7 @@ pub(crate) struct Bakeoff {
     polled: Option<Instant>,
     assembling: bool,
     note: Option<(String, bool)>,
+    note_presentation: Option<(String, BakeNote)>,
     /// Numbers the comparisons asked for: an older answer doesn't replace a newer one.
     request: u64,
     /// The attempts' trees the picks were made for.
@@ -48,6 +54,7 @@ pub(crate) struct Bakeoff {
     rows: Vec<(String, Vec<bool>)>,
     /// Where each build leaves its status, once one was started.
     statuses: Vec<Option<PathBuf>>,
+    launches: Vec<Option<std::sync::Arc<std::sync::atomic::AtomicBool>>>,
     /// The commit _Assemble_ made last, to show in the graph.
     made: Option<String>,
     /// Close was asked for once with picks made: a second time drops them.
@@ -95,6 +102,7 @@ pub(crate) enum BakeAct {
     BuildAll,
     /// Shows the commit _Assemble_ made in the graph.
     ShowMade,
+    Output(usize),
 }
 
 impl Bakeoff {
@@ -117,10 +125,12 @@ impl Bakeoff {
             polled: None,
             assembling: false,
             note: None,
-            request: 0,
+            note_presentation: None,
+            request: next_request(),
             picked_trees: Vec::new(),
             rows: Vec::new(),
             statuses: vec![None; n],
+            launches: vec![None; n],
             made: None,
             confirm_close: false,
         }
@@ -130,6 +140,24 @@ impl Bakeoff {
 impl RepoTab {
     pub(crate) fn bake_act(&mut self, act: BakeAct, ctx: &egui::Context) {
         match act {
+            BakeAct::Output(n) => {
+                if let Some(path) = self
+                    .bakeoff
+                    .view
+                    .as_ref()
+                    .and_then(|v| v.statuses.get(n))
+                    .and_then(|s| s.as_ref())
+                {
+                    let log = crate::remote::resolve(
+                        path.parent().unwrap_or(&self.path),
+                        &format!(
+                            "{}.log",
+                            path.file_name().unwrap_or_default().to_string_lossy()
+                        ),
+                    );
+                    self.apply(super::Action::OpenInEditor(log), ctx);
+                }
+            }
             BakeAct::OpenPicker => self.bakeoff.picker = Some(Picker::new(self)),
             BakeAct::ClosePicker => self.bakeoff.picker = None,
             BakeAct::Compare(attempts) => {
@@ -154,13 +182,7 @@ impl RepoTab {
                 {
                     view.confirm_close = true;
                     let n = view.picks.len();
-                    view.note = Some((
-                        format!(
-                            "{n} file{} picked and not assembled: close again to drop them",
-                            if n == 1 { "" } else { "s" }
-                        ),
-                        true,
-                    ));
+                    view.remember_note(BakeNote::Unassembled { count: n }, true);
                 } else {
                     self.bakeoff.view = None;
                 }
@@ -199,7 +221,12 @@ impl RepoTab {
             BakeAct::BuildAll => {
                 let idle: Vec<usize> = self.bakeoff.view.as_ref().map_or_else(Vec::new, |v| {
                     (0..v.attempts.len())
-                        .filter(|i| v.builds.get(*i) != Some(&Some(Built::Running)))
+                        .filter(|i| {
+                            !matches!(
+                                v.builds.get(*i),
+                                Some(Some(Built::Preparing | Built::Running))
+                            )
+                        })
                         .collect()
                 });
                 for i in idle {
@@ -225,8 +252,11 @@ impl RepoTab {
             return;
         };
         view.comparison = None;
+        view.builds.fill(None);
+        view.statuses.fill(None);
+        view.launches.fill(None);
         view.file = None;
-        view.request += 1;
+        view.request = next_request();
         let request = view.request;
         let attempts = view.attempts.clone();
         let repo = self.path.clone();
@@ -252,11 +282,7 @@ impl RepoTab {
                     let trees: Vec<String> = new.attempts.iter().map(|a| a.tree.clone()).collect();
                     if trees != view.picked_trees {
                         if !view.picks.is_empty() {
-                            view.note = Some((
-                                "Picks cleared: the attempts changed since they were made"
-                                    .to_owned(),
-                                true,
-                            ));
+                            view.remember_note(BakeNote::Changed, true);
                         }
                         view.picks.clear();
                         view.picked_trees = trees;
@@ -280,6 +306,7 @@ impl RepoTab {
         view.file = Some((path.clone(), None));
         let repo = self.path.clone();
         let wanted = path.clone();
+        let request = view.request;
         self.then(
             ctx,
             move || {
@@ -295,6 +322,7 @@ impl RepoTab {
             },
             move |tab, sides, _| {
                 if let Some(view) = &mut tab.bakeoff.view
+                    && view.request == request
                     && let Some((shown, slot)) = &mut view.file
                     && *shown == wanted
                 {
@@ -322,24 +350,31 @@ impl RepoTab {
                 .collect(),
             branch: view.branch.trim().to_owned(),
         };
+        let request = view.request;
         view.assembling = true;
         view.note = None;
         let repo = self.path.clone();
         self.then(
             ctx,
             move || assemble::assemble(&repo, &plan).map(|commit| (plan.branch, commit)),
-            |tab, result, ctx| {
-                if let Some(view) = &mut tab.bakeoff.view {
+            move |tab, result, ctx| {
+                if let Some(view) = &mut tab.bakeoff.view
+                    && view.request == request
+                {
                     view.assembling = false;
+                    view.note_presentation = None;
                     view.note = Some(match &result {
                         Ok((branch, commit)) => {
                             view.made = Some(commit.clone());
                             // Another go at it needs a name of its own.
                             view.branch = next_name(branch);
-                            (
-                                format!("Made {branch} at {}", crate::repo::short(commit)),
-                                false,
-                            )
+                            let note = BakeNote::Made {
+                                branch: branch.clone(),
+                                commit: crate::repo::short(commit).into(),
+                            };
+                            let raw = note.raw();
+                            view.note_presentation = Some((raw.clone(), note));
+                            (raw, false)
                         }
                         Err(e) => (e.clone(), true),
                     });
@@ -357,14 +392,20 @@ impl RepoTab {
             return;
         };
         let command = view.build_command.trim().to_owned();
-        let Some(worktree) = view.attempts.get(n).and_then(|a| a.worktree.clone()) else {
+        let Some(Ok(comparison)) = &view.comparison else {
             return;
         };
+        let Some(compared) = comparison.attempts.get(n) else {
+            return;
+        };
+        if view.builds.get(n) == Some(&Some(Built::Preparing)) {
+            return;
+        }
+        let tree = compared.tree.clone();
+        let base = comparison.base.clone();
+        let request = view.request;
         if command.is_empty() {
-            view.note = Some((
-                "Type the command that builds the project first".to_owned(),
-                true,
-            ));
+            view.remember_note(BakeNote::CommandMissing, true);
             return;
         }
         let name = view
@@ -373,33 +414,51 @@ impl RepoTab {
             .map(|a| a.name.clone())
             .unwrap_or_default();
         if let Some(slot) = view.builds.get_mut(n) {
-            *slot = Some(Built::Running);
+            *slot = Some(Built::Preparing);
+        }
+        if let Some(status) = view.statuses.get_mut(n) {
+            *status = None;
+        }
+        if let Some(launch) = view.launches.get_mut(n) {
+            *launch = None;
         }
         let repo = self.path.clone();
         let remembered = command.clone();
-        let wt = worktree.clone();
         self.then(
             ctx,
-            move || -> Result<PathBuf, String> {
+            move || -> Result<(PathBuf, PathBuf), String> {
                 let _ = crate::agent::write_json(&repo, build::COMMAND_FILE, &remembered);
-                let status = build::status_file(&repo, &wt)?;
+                let worktree = build::workspace(&repo, &tree, &base)?;
+                let status = build::status_file(&repo, &worktree)?;
                 // An earlier build's status isn't this one's.
                 if let Some(dir) = status.parent() {
                     let _ = crate::remote::create_dir_all(dir);
                 }
-                crate::remote::write(&status, b"")
-                    .map_err(|e| format!("could not prepare the build's status file: {e}"))?;
-                Ok(status)
+                crate::remote::write(&status, b"").map_err(|e| {
+                    crate::i18n::message(
+                        "repo-workflows-bakeoff-build-06d160c3",
+                        &[("e", (e).to_string().into())],
+                    )
+                })?;
+                Ok((worktree, status))
             },
             move |tab, status, ctx| match status {
-                Ok(status) => {
+                Ok((worktree, status)) => {
+                    if tab
+                        .bakeoff
+                        .view
+                        .as_ref()
+                        .is_none_or(|v| v.request != request)
+                    {
+                        return;
+                    }
                     let there = build::for_sh(&status);
                     if let Some(view) = &mut tab.bakeoff.view
                         && let Some(slot) = view.statuses.get_mut(n)
                     {
-                        *slot = Some(status);
+                        *slot = Some(status.clone());
                     }
-                    tab.start_launch(
+                    let launched = tab.start_launch_tracked(
                         Launch {
                             label: format!("build · {name}"),
                             worktree,
@@ -408,12 +467,18 @@ impl RepoTab {
                         },
                         ctx,
                     );
+                    if let Some(view) = &mut tab.bakeoff.view {
+                        view.accept_launch(request, n, &status, launched);
+                    }
                 }
                 Err(e) => {
-                    if let Some(view) = &mut tab.bakeoff.view {
+                    if let Some(view) = &mut tab.bakeoff.view
+                        && view.request == request
+                    {
+                        view.note_presentation = None;
                         view.note = Some((e, true));
                         if let Some(slot) = view.builds.get_mut(n) {
-                            *slot = None;
+                            *slot = Some(Built::Unavailable);
                         }
                     }
                 }
@@ -423,16 +488,36 @@ impl RepoTab {
 
     /// Every frame the bake-off is shown: the builds still running are looked at now and then.
     fn poll_builds(&mut self, ctx: &egui::Context) {
+        // Atomic observation only: no try_wait, process search or signals on UI.
+        let terminals = self
+            .terminals
+            .iter()
+            .map(|terminal| terminal.output_lifetime())
+            .collect::<Vec<_>>();
         let Some(view) = &mut self.bakeoff.view else {
             return;
         };
-        let running: Vec<(usize, PathBuf)> = view
+        let running: Vec<(usize, PathBuf, bool)> = view
             .builds
             .iter()
             .zip(&view.statuses)
             .enumerate()
             .filter(|(_, (b, _))| **b == Some(Built::Running))
-            .filter_map(|(i, (_, file))| file.clone().map(|f| (i, f)))
+            .filter_map(|(i, (_, file))| {
+                file.clone().map(|f| {
+                    let open = view
+                        .launches
+                        .get(i)
+                        .and_then(|launch| launch.as_ref())
+                        .is_some_and(|witness| {
+                            !witness.load(std::sync::atomic::Ordering::Relaxed)
+                                && terminals
+                                    .iter()
+                                    .any(|terminal| std::sync::Arc::ptr_eq(terminal, witness))
+                        });
+                    (i, f, open)
+                })
+            })
             .collect();
         if running.is_empty() || view.polled.is_some_and(|t| t.elapsed() < BUILD_POLL) {
             if !running.is_empty() {
@@ -441,26 +526,21 @@ impl RepoTab {
             return;
         }
         view.polled = Some(Instant::now());
+        let request = view.request;
         self.then(
             ctx,
             move || {
                 running
                     .into_iter()
-                    .map(|(i, file)| {
+                    .map(|(i, file, open)| {
                         let text = crate::remote::read_to_string(&file).ok();
-                        (i, build::read_status(text.as_deref()))
+                        (i, file, build::observed_status(text.as_deref(), open))
                     })
                     .collect::<Vec<_>>()
             },
-            |tab, found, _| {
+            move |tab, found, _| {
                 if let Some(view) = &mut tab.bakeoff.view {
-                    for (i, built) in found {
-                        if let Some(slot) = view.builds.get_mut(i)
-                            && *slot == Some(Built::Running)
-                        {
-                            *slot = Some(built);
-                        }
-                    }
+                    view.accept_builds(request, found);
                 }
             },
         );
@@ -479,3 +559,267 @@ fn next_name(branch: &str) -> String {
 
 #[cfg(test)]
 mod tests;
+
+impl Bakeoff {
+    fn accept_launch(
+        &mut self,
+        request: u64,
+        n: usize,
+        status: &Path,
+        launched: Result<std::sync::Arc<std::sync::atomic::AtomicBool>, String>,
+    ) {
+        if self.request != request
+            || self.statuses.get(n) != Some(&Some(status.to_path_buf()))
+            || self.builds.get(n) != Some(&Some(Built::Preparing))
+        {
+            return;
+        }
+        match launched {
+            Ok(witness) => {
+                self.launches[n] = Some(witness);
+                self.builds[n] = Some(Built::Running);
+            }
+            Err(error) => {
+                self.builds[n] = Some(Built::Unavailable);
+                self.note_presentation = None;
+                self.note = Some((error, true));
+            }
+        }
+    }
+    fn accept_builds(&mut self, request: u64, found: Vec<(usize, PathBuf, Built)>) {
+        if self.request != request {
+            return;
+        }
+        for (i, path, built) in found {
+            if self.statuses.get(i) == Some(&Some(path))
+                && let Some(slot) = self.builds.get_mut(i)
+                && *slot == Some(Built::Running)
+            {
+                *slot = Some(built);
+            }
+        }
+    }
+}
+#[cfg(test)]
+mod generation_tests {
+    use super::*;
+    #[test]
+    fn pure_bakeoff_recorded_launch_failure_is_retryable_and_stale_launch_receipts_are_rejected()
+    -> Result<(), String> {
+        let mut view = Bakeoff::new(
+            vec![Attempt {
+                name: "a".into(),
+                rev: "a".into(),
+                worktree: None,
+            }],
+            String::new(),
+        );
+        let status = PathBuf::from("owned-unique-receipt");
+        view.statuses[0] = Some(status.clone());
+        view.builds[0] = Some(Built::Preparing);
+        view.accept_launch(view.request + 1, 0, &status, Err("old launch".into()));
+        assert_eq!(view.builds[0], Some(Built::Preparing));
+        view.accept_launch(
+            view.request,
+            0,
+            &PathBuf::from("previous-launch"),
+            Err("stale path".into()),
+        );
+        assert_eq!(view.builds[0], Some(Built::Preparing));
+        view.accept_launch(
+            view.request,
+            0,
+            &status,
+            Err("recorded PTY spawn failure".into()),
+        );
+        assert_eq!(view.builds[0], Some(Built::Unavailable));
+        assert!(
+            view.note
+                .as_ref()
+                .ok_or("expected Some")?
+                .0
+                .contains("spawn failure")
+        );
+        // Retry owns a different status path; no receipt from the old run wins.
+        view.statuses[0] = Some(PathBuf::from("fresh-owned-receipt"));
+        view.builds[0] = Some(Built::Preparing);
+        view.accept_builds(view.request, vec![(0, status, Built::Passed)]);
+        assert_eq!(view.builds[0], Some(Built::Preparing));
+        Ok(())
+    }
+    #[test]
+    fn pure_bakeoff_closed_or_reloaded_comparisons_reject_old_build_statuses() {
+        let attempts = vec![
+            Attempt {
+                name: "a".into(),
+                rev: "a".into(),
+                worktree: None,
+            },
+            Attempt {
+                name: "b".into(),
+                rev: "b".into(),
+                worktree: None,
+            },
+        ];
+        let old = Bakeoff::new(attempts.clone(), String::new());
+        let mut current = Bakeoff::new(attempts, String::new());
+        assert_ne!(old.request, current.request);
+        let path = PathBuf::from("new-owned-status");
+        current.builds[0] = Some(Built::Running);
+        current.statuses[0] = Some(path.clone());
+        current.accept_builds(old.request, vec![(0, path.clone(), Built::Passed)]);
+        assert_eq!(current.builds[0], Some(Built::Running));
+        current.accept_builds(
+            current.request,
+            vec![(0, PathBuf::from("old-owned-status"), Built::Passed)],
+        );
+        assert_eq!(current.builds[0], Some(Built::Running));
+        current.accept_builds(current.request, vec![(0, path, Built::Passed)]);
+        assert_eq!(current.builds[0], Some(Built::Passed));
+    }
+}
+
+impl Side {
+    fn display_kind(&self) -> &'static str {
+        let id = match self.kind() {
+            "unchanged" => "repo-workflows-bakeoff-kind-unchanged",
+            "deleted" => "repo-workflows-bakeoff-kind-deleted",
+            "added" => "repo-workflows-bakeoff-kind-added",
+            "changed" => "repo-workflows-bakeoff-kind-changed",
+            other => return other,
+        };
+        crate::i18n::text(id)
+    }
+}
+#[cfg(test)]
+mod fluent_kind_tests {
+    use super::*;
+    #[test]
+    fn fluent_partition_bakeoff_actual_kind_label_keeps_raw_classification() {
+        for language in ["en-US", "de"] {
+            crate::i18n::set_language(language);
+            for (patch, raw, german) in [
+                ("", "unchanged", "unverändert"),
+                (
+                    "diff --git a/x b/x\ndeleted file mode 100644",
+                    "deleted",
+                    "gelöscht",
+                ),
+                (
+                    "diff --git a/x b/x\nnew file mode 100644",
+                    "added",
+                    "hinzugefügt",
+                ),
+                ("@@ -1 +1 @@\n-before\n+after", "changed", "geändert"),
+            ] {
+                let side = Side {
+                    patch: patch.into(),
+                    hunks: Vec::new(),
+                };
+                assert_eq!(side.kind(), raw);
+                assert_eq!(
+                    side.display_kind(),
+                    if language == "de" { german } else { raw }
+                );
+                assert_eq!(side.kind() != "unchanged", !patch.is_empty());
+                assert_eq!(side.patch, patch);
+            }
+        }
+        crate::i18n::set_language("en-US");
+    }
+}
+
+#[derive(Clone)]
+enum BakeNote {
+    Unassembled { count: usize },
+    Changed,
+    CommandMissing,
+    Made { branch: String, commit: String },
+}
+impl BakeNote {
+    fn raw(&self) -> String {
+        match self {
+            Self::Unassembled { count } => format!(
+                "{count} file{} picked and not assembled: close again to drop them",
+                if *count == 1 { "" } else { "s" }
+            ),
+            Self::Changed => "Picks cleared: the attempts changed since they were made".into(),
+            Self::CommandMissing => "Type the command that builds the project first".into(),
+            Self::Made { branch, commit } => format!("Made {branch} at {commit}"),
+        }
+    }
+    fn display(&self) -> String {
+        match self {
+            Self::Unassembled { count } => crate::i18n::message(
+                "repo-workflows-bakeoff-unassembled",
+                &[("count", (*count).into())],
+            ),
+            Self::Changed => {
+                crate::i18n::text("repo-workflows-bakeoff-load-bakeoff-c6f043db").into()
+            }
+            Self::CommandMissing => {
+                crate::i18n::text("repo-workflows-bakeoff-build-c18d3706").into()
+            }
+            Self::Made { branch, commit } => crate::i18n::message(
+                "repo-workflows-bakeoff-assemble-c7f55e42",
+                &[
+                    ("branch", branch.as_str().into()),
+                    ("crate-repo-short-commit-1", commit.as_str().into()),
+                ],
+            ),
+        }
+    }
+}
+impl Bakeoff {
+    fn remember_note(&mut self, note: BakeNote, error: bool) {
+        let raw = note.raw();
+        self.note = Some((raw.clone(), error));
+        self.note_presentation = Some((raw, note));
+    }
+    fn display_note(&self, raw: &str) -> String {
+        match &self.note_presentation {
+            Some((old, note)) if old == raw => note.display(),
+            _ => raw.into(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod fluent_r1_note_tests {
+    use super::*;
+    #[test]
+    fn fluent_partition_r1_bakeoff_same_note_keeps_picks_request_and_opaque_branch()
+    -> Result<(), String> {
+        for note in [
+            BakeNote::Unassembled { count: 1234 },
+            BakeNote::Changed,
+            BakeNote::CommandMissing,
+            BakeNote::Made {
+                branch: "raw/{$x}:日本語".into(),
+                commit: "1234abcd".into(),
+            },
+        ] {
+            crate::i18n::set_language("de");
+            let mut view = Bakeoff::new(vec![], "printf raw".into());
+            view.remember_note(note, true);
+            let raw = view.note.clone().ok_or("missing test value")?.0;
+            let request = view.request;
+            for lang in ["de", "en-US", "de"] {
+                crate::i18n::set_language(lang);
+                if lang == "de" {
+                    assert_ne!(view.display_note(&raw), raw);
+                }
+                assert_eq!(view.note.as_ref().ok_or("missing test value")?.0, raw);
+                assert_eq!(view.request, request);
+                assert_eq!(view.build_command, "printf raw");
+                assert!(view.picks.is_empty());
+                assert!(!view.assembling);
+            }
+            view.note_presentation = None;
+            assert_eq!(view.display_note(&raw), raw);
+        }
+        crate::i18n::set_language("en-US");
+
+        Ok(())
+    }
+}

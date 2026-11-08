@@ -230,8 +230,26 @@ pub(super) fn files<'a, T>(
     path: impl Fn(&'a T) -> &'a str,
     selected: &impl Fn(&&'a T) -> bool,
     row: &mut impl FnMut(&mut Ui, Option<f32>, &'a T),
-) {
+) -> Option<Rect> {
+    let mut reveal_rect = None;
+    let reveal_id = id.with("keyboard-reveal");
+    let reveal = ui.data_mut(|d| {
+        let path = d.get_temp::<String>(reveal_id);
+        d.remove::<String>(reveal_id);
+        path
+    });
     if !Settings::get(ui.ctx()).files_as_tree {
+        if let Some(target) = &reveal
+            && let Some(i) = files.iter().position(|file| path(file) == target)
+        {
+            let pitch = widgets::ROW_H + ui.spacing().item_spacing.y;
+            let rect = Rect::from_min_size(
+                ui.cursor().min + vec2(0.0, i as f32 * pitch),
+                vec2(ui.available_width(), widgets::ROW_H),
+            );
+            ui.scroll_to_rect(rect, Some(egui::Align::Center));
+            reveal_rect = Some(rect);
+        }
         // A commit can change tens of thousands of files: only the rows in sight are drawn.
         // While a menu is open (perhaps one of a row out of sight, which must go on being
         // shown), row by row.
@@ -243,7 +261,7 @@ pub(super) fn files<'a, T>(
                     row(ui, None, f);
                 }
             }
-            return;
+            return reveal_rect;
         }
         let pitch = widgets::ROW_H + ui.spacing().item_spacing.y;
         let top = ui.cursor().top();
@@ -264,7 +282,7 @@ pub(super) fn files<'a, T>(
             // What follows the list (another list) keeps its ids too.
             ui.skip_ahead_auto_ids(files.len() - end);
         }
-        return;
+        return reveal_rect;
     }
     let mut tree = build(files.iter().map(|f| (path(f), f)));
     compact(&mut tree);
@@ -276,10 +294,43 @@ pub(super) fn files<'a, T>(
         left: 18.0,
         leaf_h: Some(widgets::ROW_H),
     };
+    if let Some(target) = &reveal {
+        let mut y = ui.cursor().top();
+        let mut levels = vec![tree.iter()];
+        while let Some(level) = levels.last_mut() {
+            match level.next() {
+                Some(Node::Leaf { item, .. }) => {
+                    if path(item) == target {
+                        let rect = Rect::from_min_size(
+                            pos2(ui.cursor().left(), y),
+                            vec2(ui.available_width(), widgets::ROW_H),
+                        );
+                        ui.scroll_to_rect(rect, Some(egui::Align::Center));
+                        reveal_rect = Some(rect);
+                        break;
+                    }
+                    y += widgets::ROW_H + ui.spacing().item_spacing.y;
+                }
+                Some(Node::Folder(folder)) => {
+                    y += ROW_H + ui.spacing().item_spacing.y;
+                    let saved = ui
+                        .data_mut(|d| d.get_persisted::<bool>(id.with(folder.path)))
+                        .unwrap_or(false);
+                    if saved != start_open {
+                        levels.push(folder.children.iter());
+                    }
+                }
+                None => {
+                    levels.pop();
+                }
+            }
+        }
+    }
     let key = |f: &&'a T| file_key(path(f));
     show(ui, &tree, &view, selected, &key, &mut |ui, leaf, f| {
         row(ui, Some(leaf.indent), f);
     });
+    reveal_rect
 }
 
 /// What [`widgets::file_row`] knows the row of the file at `path` by.
@@ -292,7 +343,14 @@ fn file_key(path: &str) -> (&'static str, &str) {
 pub(super) fn files_toggle(ui: &mut Ui) {
     let mut settings = Settings::get(ui.ctx());
     let on = usize::from(settings.files_as_tree);
-    if let Some(picked) = widgets::switch(ui, &["Path", "Tree"], on) {
+    if let Some(picked) = widgets::switch(
+        ui,
+        &[
+            crate::i18n::text("repo-core-0250"),
+            crate::i18n::text("repo-core-0251"),
+        ],
+        on,
+    ) {
         settings.files_as_tree = picked == 1;
         settings.set(ui.ctx());
     }
@@ -386,7 +444,14 @@ fn folder_row<T>(
     let (rect, resp) = ui.allocate_exact_size(vec2(ui.available_width(), ROW_H), Sense::click());
     crate::a11y::a11y(&resp, egui::WidgetType::CollapsingHeader, || {
         let count = labels::count(folder.leaves(), "item", "items");
-        labels::section(&format!("folder {}", folder.name), &count, open)
+        labels::section(
+            &crate::i18n::message(
+                "repo-core-0255",
+                &[("name", folder.name.to_string().into())],
+            ),
+            &count,
+            open,
+        )
     });
     let painter = ui.painter_at(rect);
     if resp.hovered() {

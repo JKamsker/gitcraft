@@ -106,7 +106,7 @@ pub(crate) fn robot(ui: &Ui, left: f32, mid: f32, a: &Attribution, id: egui::Id)
     };
     crate::icons::paint(ui, rect, "bot", 13.0, color);
     ui.interact(rect, id, egui::Sense::hover())
-        .on_hover_text(a.describe());
+        .on_hover_text(a.display_description());
     18.0
 }
 
@@ -153,7 +153,7 @@ impl RepoTab {
                         }
                     }
                     Ok(None) => {}
-                    Err(e) => tab.status = Some((e, true)),
+                    Err(e) => tab.status = Some(crate::repo::Notice::plain((e, true))),
                 }
                 if std::mem::take(&mut tab.authorship.again) {
                     tab.load_authorship(ctx);
@@ -180,8 +180,13 @@ impl RepoTab {
         self.search.edited = None;
         self.search.running = false;
         self.search.searched = AGENT_FILTER.to_owned();
-        self.search.matches = found.iter().cloned().collect();
+        self.search.matches = found
+            .iter()
+            .cloned()
+            .collect::<std::collections::HashSet<_>>()
+            .into();
         self.search.results = found;
+        self.cancel_minimap();
         if jump {
             self.search.current = 0;
             if let Some(first) = self.search.results.first().cloned() {
@@ -202,7 +207,8 @@ impl RepoTab {
         } else if self.search.searched == AGENT_FILTER {
             self.search.searched.clear();
             self.search.results.clear();
-            self.search.matches.clear();
+            self.search.matches = Default::default();
+            self.cancel_minimap();
         }
     }
 
@@ -221,20 +227,23 @@ impl RepoTab {
         let known = self.authorship.map.clone();
         let repo = self.path.clone();
         let name = branch.to_owned();
-        self.status = Some((format!("Working out who wrote {branch}…"), false));
+        self.status = Some(crate::repo::Notice::plain((
+            crate::i18n::message("repo-core-0197", &[("branch", branch.to_string().into())]),
+            false,
+        )));
         self.then(
             ctx,
             move || {
-                let base = default_branch(&repo, &full)
-                    .or(main)
-                    .ok_or_else(|| format!("There is no main branch to set {name} against"))?;
+                let base = default_branch(&repo, &full).or(main).ok_or_else(|| {
+                    crate::i18n::message("repo-core-0198", &[("name", name.to_string().into())])
+                })?;
                 authorship::branch::figures(&repo, &full, &base, &known, complete)
-                    .map(|f| f.headline(&name))
+                    .map(|f| (name, f))
             },
             |tab, said, _| {
                 tab.status = Some(match said {
-                    Ok(line) => (line, false),
-                    Err(e) => (e, true),
+                    Ok((branch, figures)) => super::Notice::authorship(branch, figures),
+                    Err(e) => super::Notice::plain((e, true)),
                 });
             },
         );
@@ -260,11 +269,8 @@ pub(crate) const AGENT_FILTER: &str = "agent-written commits";
 /// The filter's toggle in the search bar.
 pub(crate) fn filter_toggle(ui: &mut Ui, on: bool, acts: &mut Vec<Action>) {
     if ui
-        .selectable_label(on, "Agent-written")
-        .on_hover_text(
-            "Step through the commits an agent wrote or co-wrote, as they record it (git-ai \
-             notes, Agent Trace, an agent's account or Co-authored-by trailer)",
-        )
+        .selectable_label(on, crate::i18n::text("repo-core-0205"))
+        .on_hover_text(crate::i18n::text("repo-core-0206"))
         .clicked()
     {
         acts.push(Action::AgentFilter(!on));
@@ -335,7 +341,9 @@ mod tests {
         assert_eq!(tab.authorship.map.len(), 2);
 
         // The filter: the agent-written commits as the search's results.
+        tab.history_minimap.dirty = false;
         tab.apply(Action::AgentFilter(true), &ctx);
+        assert!(tab.history_minimap.dirty);
         let mut found = tab.search.results.clone();
         found.sort();
         let mut want = vec![agent.clone(), trailer.clone()];
@@ -344,13 +352,17 @@ mod tests {
         // A reload keeps the one shown; closing the search turns the filter off.
         tab.search.current = 1;
         let shown = tab.search.results[1].clone();
+        tab.history_minimap.dirty = false;
         tab.filter_agent_commits(false, &ctx);
+        assert!(tab.history_minimap.dirty);
         assert_eq!(tab.search.results[tab.search.current], shown);
         tab.search.open = true;
         tab.toggle_search();
         assert!(!tab.authorship.filter && tab.search.results.is_empty());
         tab.apply(Action::AgentFilter(true), &ctx);
+        tab.history_minimap.dirty = false;
         tab.apply(Action::AgentFilter(false), &ctx);
+        assert!(tab.history_minimap.dirty);
         assert!(tab.search.results.is_empty());
 
         // The diff's stripe: the two lines added are the agent's (line 1 was there).
@@ -378,15 +390,54 @@ mod tests {
         // The branch's figures, said in the status line.
         tab.apply(Action::BranchAuthorship("agent/x".into()), &ctx);
         until(&mut tab, &ctx, |t| {
-            t.status.as_ref().is_some_and(|(s, _)| !s.ends_with('…'))
+            t.status.as_deref().is_some_and(|(s, _)| !s.ends_with('…'))
         })?;
         let said = tab
             .status
-            .as_ref()
+            .as_deref()
             .map(|(s, _)| s.clone())
             .unwrap_or_default();
         assert!(said.starts_with("agent/x: "), "{said}");
         let _ = std::fs::remove_dir_all(&dir);
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod core_guard_paint_tests {
+    use super::*;
+    use crate::repo::push_preflight::core_guard_paint_tests::{frame, text};
+
+    #[test]
+    fn core_guard_paint_robot_hover_uses_supplied_attribution_in_current_language() {
+        let attribution = Attribution {
+            who: Who::Agent,
+            agents: vec!["Agent 12345".into()],
+            source: authorship::Source::Author,
+            lines: Default::default(),
+        };
+        let before = attribution.clone();
+        let raw = attribution.describe();
+        let ctx = egui::Context::default();
+        let id = egui::Id::new("opaque-authorship-12345");
+        let mut draw = |ui: &mut Ui| {
+            ui.allocate_space(vec2(100., 60.));
+            assert_eq!(robot(ui, 20., 30., &attribution, id), 18.);
+        };
+        for (locale, expected) in [
+            ("en-US", "Agent-written"),
+            ("de", "Von einem Agenten geschrieben"),
+        ] {
+            crate::i18n::set_language(locale);
+            let pointer = vec![egui::Event::PointerMoved(pos2(28., 30.))];
+            let _ = frame(&ctx, pointer.clone(), &mut draw);
+            let _ = frame(&ctx, pointer.clone(), &mut draw);
+            let shown = text(&frame(&ctx, pointer, &mut draw));
+            assert!(shown.contains(expected), "{shown}");
+            assert!(shown.contains("Agent 12345"), "{shown}");
+            assert_eq!(attribution, before);
+            assert_eq!(attribution.describe(), raw);
+        }
+        crate::i18n::set_language("en-US");
     }
 }

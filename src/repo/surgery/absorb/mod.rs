@@ -266,19 +266,13 @@ impl AbsorbEditor {
 
     pub fn problem(&self) -> Option<String> {
         if self.hunks.is_empty() {
-            return Some(
-                "Nothing staged changes lines an earlier commit has: new files and whole-file changes stay staged"
-                    .to_owned(),
-            );
+            return Some(crate::i18n::text("repo-workflows-surgery-problem-2d960e1c").to_owned());
         }
         if self.targets.is_empty() {
-            return Some(
-                "The branch has no commits of its own to put fixes in (every one is on another branch or a remote)"
-                    .to_owned(),
-            );
+            return Some(crate::i18n::text("repo-workflows-surgery-problem-e836ee78").to_owned());
         }
         if self.choice.iter().all(Option::is_none) {
-            return Some("Pick a commit for at least one change".to_owned());
+            return Some(crate::i18n::text("repo-workflows-surgery-problem-ed9bc2e2").to_owned());
         }
         None
     }
@@ -341,9 +335,7 @@ pub(crate) fn prepare(
     )
     .is_err()
     {
-        return Err(
-            "what is staged changed since this was opened: close it and open it again".to_owned(),
-        );
+        return Err(crate::i18n::text("repo-workflows-surgery-prepare-9e68dba0").to_owned());
     }
     let rest_patch = git::patch_between(repo, &absorbed, &staged_tree)?;
     let rest = !rest_patch.is_empty();
@@ -362,7 +354,7 @@ pub(crate) fn prepare(
         .map(|(t, _)| *t)
         .max()
         .and_then(|t| targets.get(t))
-        .ok_or("no commit gets fixes")?;
+        .ok_or(crate::i18n::text("repo-workflows-surgery-prepare-6f254528"))?;
     let new_head = history::absorbed(repo, head, oldest, &fixes, &absorbed)?;
     Ok(Checked {
         fixups,
@@ -377,47 +369,47 @@ impl RepoTab {
     /// Reads what is staged and the branch's commits, and opens the absorb editor.
     pub(in crate::repo) fn open_absorb(&mut self, ctx: &egui::Context) {
         let Some(branch) = self.refs.current.clone() else {
-            self.status = Some((
+            self.status = Some(crate::repo::Notice::plain((
                 "Distribute staged fixes: HEAD is detached, check out a branch first".to_owned(),
                 true,
-            ));
+            )));
             return;
         };
         if let Some(state) = self.work.in_progress {
-            self.status = Some((
-                format!(
-                    "Distribute staged fixes: a {} is in progress",
-                    state.label().to_lowercase()
-                ),
+            self.status = Some(crate::repo::Notice::plain((
+                in_progress_status(state),
                 true,
-            ));
+            )));
             return;
         }
         if self.work.staged.is_empty() {
-            self.status = Some((
+            self.status = Some(crate::repo::Notice::plain((
                 "Distribute staged fixes: nothing is staged, stage the fixes first".to_owned(),
                 true,
-            ));
+            )));
             return;
         }
         if self.split.is_some() || self.rebase.is_some() {
-            self.status = Some((
+            self.status = Some(crate::repo::Notice::plain((
                 "Distribute staged fixes: close the editor that is open first".to_owned(),
                 true,
-            ));
+            )));
             return;
         }
-        self.status = Some(("Distribute staged fixes: reading…".to_owned(), false));
+        self.status = Some(crate::repo::Notice::plain((
+            "Distribute staged fixes: reading…".to_owned(),
+            false,
+        )));
         let path = self.path.clone();
         self.then(
             ctx,
             move || read(&path, &branch),
             |tab, result, _| match result {
                 Ok(_) if tab.rebase.is_some() || tab.conflict.is_some() || tab.split.is_some() => {
-                    tab.status = Some((
+                    tab.status = Some(crate::repo::Notice::plain((
                         "Distribute staged fixes: another editor opened meanwhile".to_owned(),
                         true,
-                    ));
+                    )));
                 }
                 Ok(read) => {
                     tab.status = None;
@@ -425,7 +417,12 @@ impl RepoTab {
                     tab.file_view = None;
                     tab.absorb = Some(Box::new(AbsorbEditor::new(read)));
                 }
-                Err(e) => tab.status = Some((format!("Distribute staged fixes: {e}"), true)),
+                Err(e) => {
+                    tab.status = Some(crate::repo::Notice::plain((
+                        format!("Distribute staged fixes: {e}"),
+                        true,
+                    )))
+                }
             },
         );
     }
@@ -572,5 +569,41 @@ mod tests {
         let decided: Vec<Vec<u32>> = runs.iter().map(|(_, old)| old.clone()).collect();
         assert_eq!(decided, [vec![2], vec![3, 4], vec![5]]);
         assert_eq!(runs[0].0.len(), 2);
+    }
+}
+
+/// Stored status identity; presentation labels never supply this raw operation state.
+fn in_progress_status(state: git::InProgress) -> String {
+    let identity = match state {
+        git::InProgress::Merge => "merge",
+        git::InProgress::CherryPick => "cherry-pick",
+        git::InProgress::Revert => "revert",
+        git::InProgress::Rebase => "rebase",
+        git::InProgress::Am => "patch",
+    };
+    format!("Distribute staged fixes: a {identity} is in progress")
+}
+
+#[cfg(test)]
+mod fluent_raw_operation_tests {
+    use super::*;
+    #[test]
+    fn fluent_partition_absorb_raw_in_progress_identity_and_command_are_locale_independent() {
+        for language in ["en-US", "de", "en-US"] {
+            crate::i18n::set_language(language);
+            for (state, raw, command) in [
+                (git::InProgress::Merge, "merge", "merge"),
+                (git::InProgress::CherryPick, "cherry-pick", "cherry-pick"),
+                (git::InProgress::Revert, "revert", "revert"),
+                (git::InProgress::Rebase, "rebase", "rebase"),
+                (git::InProgress::Am, "patch", "am"),
+            ] {
+                assert_eq!(
+                    in_progress_status(state),
+                    format!("Distribute staged fixes: a {raw} is in progress")
+                );
+                assert_eq!(state.command(), command);
+            }
+        }
     }
 }

@@ -6,7 +6,7 @@ use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 use base64::Engine;
 
 use crate::remote;
@@ -53,10 +53,7 @@ fn removed_env() -> Vec<String> {
 
 pub(super) fn compare(repo: &Path, path: &str, old: &str, new: &str) -> Result<Vec<u8>, String> {
     if remote::is_remote(repo) {
-        return Err(
-            "Syntax comparison is currently available for local repositories. Showing the patch."
-                .to_owned(),
-        );
+        return Err(crate::i18n::text("repo-core-2337").to_owned());
     }
     let (temp, before, after) = prepare(old, new)?;
     let mut command = Command::new("difft");
@@ -97,32 +94,31 @@ pub(super) fn prepare(old: &str, new: &str) -> Result<(Temp, PathBuf, PathBuf), 
         temp.0.join("after").join("source"),
     );
     for (file, text) in [(&before, old), (&after, new)] {
-        std::fs::write(file, text)
-            .map_err(|e| format!("Couldn't prepare syntax comparison: {e}"))?;
+        std::fs::write(file, text).map_err(|e| {
+            crate::i18n::message("repo-core-4069", &[("e", format!("{}", e).into())])
+        })?;
     }
     Ok((temp, before, after))
 }
 
 fn output(code: i32, stdout: Vec<u8>, stderr: Vec<u8>) -> Result<Vec<u8>, String> {
     if code == 127 {
-        return Err(
-            "Install Difftastic (difft) on the repository's machine to compare syntax.".to_owned(),
-        );
+        return Err(crate::i18n::text("repo-core-4070").to_owned());
     }
     if stdout.len() > MAX_OUTPUT || stderr.len() > MAX_ERROR {
-        return Err("Difftastic's output was too large to show.".to_owned());
+        return Err(crate::i18n::text("repo-core-4071").to_owned());
     }
     if code != 0 {
         let error = String::from_utf8_lossy(&stderr);
-        return Err(format!(
-            "Difftastic couldn't compare these files: {}",
-            error.trim()
+        return Err(crate::i18n::message(
+            "repo-core-4072",
+            &[("trim", error.trim().to_string().into())],
         ));
     }
     Ok(stdout)
 }
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 pub(super) fn request(
     target: &remote::Target,
     path: &str,
@@ -181,12 +177,14 @@ impl Temp {
                 std::process::id(),
                 SEQ.fetch_add(1, Ordering::Relaxed)
             ));
-            let mut builder = std::fs::DirBuilder::new();
+            let builder = std::fs::DirBuilder::new();
             #[cfg(unix)]
-            {
+            let builder = {
                 use std::os::unix::fs::DirBuilderExt;
+                let mut builder = builder;
                 builder.mode(0o700);
-            }
+                builder
+            };
             match builder.create(&path) {
                 Ok(()) => {
                     let temp = Self(path);
@@ -196,10 +194,15 @@ impl Temp {
                     return Ok(temp);
                 }
                 Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
-                Err(e) => return Err(format!("Couldn't prepare syntax comparison: {e}")),
+                Err(e) => {
+                    return Err(crate::i18n::message(
+                        "repo-core-4069",
+                        &[("e", format!("{}", e).into())],
+                    ));
+                }
             }
         }
-        Err("Couldn't create a private folder for syntax comparison.".to_owned())
+        Err(crate::i18n::text("repo-core-4074").to_owned())
     }
 }
 impl Drop for Temp {
@@ -220,9 +223,7 @@ pub(super) fn run(command: Command, timeout: Duration) -> Result<remote::Output,
             ..Default::default()
         },
     )
-    .map_err(|e| {
-        format!("Couldn't start Difftastic. Install Difftastic (difft) to compare syntax: {e}")
-    })?
+    .map_err(|e| crate::i18n::message("repo-core-4075", &[("e", e.to_string().into())]))?
     .complete()?;
     Ok(remote::Output {
         code: out.status.code().unwrap_or(-1),

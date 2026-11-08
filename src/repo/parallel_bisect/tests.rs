@@ -133,7 +133,7 @@ fn a_parallel_bisect_from_a_commit_finds_the_culprit_and_shows_it() -> Result<()
         assert_eq!(selected, Some(culprit));
         assert!(
             tab.status
-                .as_ref()
+                .as_deref()
                 .is_some_and(|(s, failed)| s.contains("first bad commit") && !failed)
         );
         assert_eq!(git::head(&dir), head_before);
@@ -240,7 +240,7 @@ fn a_good_end_that_fails_says_so() -> Result<(), String> {
         );
         until(&mut tab, &ctx, ended)?;
         assert!(matches!(outcome(&tab), Some(Outcome::GoodEndFails { .. })));
-        let (said, failed) = tab.status.clone().ok_or("nothing said")?;
+        let (said, failed) = tab.status.as_deref().cloned().ok_or("nothing said")?;
         assert!(
             failed && said.contains("the good end already fails"),
             "{said}"

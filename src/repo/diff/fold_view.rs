@@ -34,7 +34,7 @@ pub(super) fn controls(
     if !gap.trailing {
         items.push((
             format!("↑ {step}"),
-            "Show the unchanged lines right above this hunk",
+            crate::i18n::text("repo-core-1795"),
             Unfold::Up(step),
             4,
         ));
@@ -42,31 +42,31 @@ pub(super) fn controls(
     if gap.opens_down(g) {
         items.push((
             format!("↓ {step}"),
-            "Show the unchanged lines right below the hunk above",
+            crate::i18n::text("repo-core-1797"),
             Unfold::Down(step),
             4,
         ));
     }
     if hidden > STEP {
         items.push((
-            format!("Show all {hidden}"),
-            "Show every unchanged line folded here",
+            crate::i18n::message("repo-core-1798", &[("hidden", (hidden).into())]),
+            crate::i18n::text("repo-core-1799"),
             Unfold::All,
             2,
         ));
     }
     if is_hunk && ctx.function_opens(g) {
         items.push((
-            "Function".to_owned(),
-            "Show the enclosing function: its unchanged lines above and below this hunk",
+            crate::i18n::text("repo-core-1800").to_owned(),
+            crate::i18n::text("repo-core-1801"),
             Unfold::Function,
             1,
         ));
     }
     let what = if hidden == 1 {
-        "1 unchanged line".to_owned()
+        crate::i18n::text("repo-core-1802").to_owned()
     } else {
-        format!("{hidden} unchanged lines")
+        crate::i18n::message("repo-core-1803", &[("hidden", (hidden).into())])
     };
     let count = ui
         .painter()

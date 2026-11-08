@@ -57,10 +57,10 @@ impl RepoTab {
             HotfixAct::Start { tag, target } => {
                 let prefix = self.hotfix_prefix();
                 let Some(name) = plan::start_name(&tag, &prefix) else {
-                    self.status = Some((
+                    self.status = Some(crate::repo::Notice::plain((
                         format!("{tag} isn't a version to start a hotfix from"),
                         true,
-                    ));
+                    )));
                     return;
                 };
                 let mut dialog = Dialog::create_branch(&target, &tag);
@@ -225,8 +225,10 @@ impl RepoTab {
                     ctx,
                 );
 
-                if let Some((text, true)) = &mut tab.status {
-                    text.push_str(" — Ctrl+Z puts back what it did");
+                if let Some((text, true)) = tab.status.as_mut().map(crate::repo::Notice::edit_raw) {
+                    text.push_str(crate::i18n::text(
+                        "repo-workflows-hotfix-hotfix-op-done-5b11af18",
+                    ));
                 }
             },
         );

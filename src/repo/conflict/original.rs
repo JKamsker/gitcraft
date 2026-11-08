@@ -190,14 +190,15 @@ pub(super) fn summary(lines: &Lines) -> String {
         count(Change::Removed),
         count(Change::Same),
     );
-    let n = |k: usize| format!("{k} line{}", if k == 1 { "" } else { "s" });
     match (added, removed) {
-        (0, 0) => "unchanged".to_owned(),
-        (0, r) if same == 0 => format!("deleted all {}", n(r)),
-        (0, r) => format!("deleted {}", n(r)),
-        (a, 0) => format!("inserted {}", n(a)),
-        (a, r) if same == 0 => format!("replaced all {} with {}", n(r), n(a)),
-        (a, r) => format!("inserted {}, deleted {}", n(a), n(r)),
+        (0, 0) => crate::i18n::text("repo-core-0610").to_owned(),
+        (0, r) if same == 0 => crate::i18n::message("repo-core-0611", &[("r", (r).into())]),
+        (0, r) => crate::i18n::message("repo-core-0612", &[("r", (r).into())]),
+        (a, 0) => crate::i18n::message("repo-core-0613", &[("a", (a).into())]),
+        (a, r) if same == 0 => {
+            crate::i18n::message("repo-core-0614", &[("r", (r).into()), ("a", (a).into())])
+        }
+        (a, r) => crate::i18n::message("repo-core-0615", &[("a", (a).into()), ("r", (r).into())]),
     }
 }
 
@@ -286,11 +287,7 @@ impl State {
             IndexBases::NotNeeded | IndexBases::Loading => Original::Loading,
             IndexBases::Added => Original::Added,
             IndexBases::Failed(why) => Original::Unknown(why),
-            IndexBases::Found(_) => Original::Unknown(
-                "this conflict doesn't match the one rebuilt from the index (the file may have \
-                 been edited since, or merged with options or a merge driver that can't be \
-                 repeated here)",
-            ),
+            IndexBases::Found(_) => Original::Unknown(crate::i18n::text("repo-core-0616")),
         }
     }
 
@@ -328,13 +325,18 @@ impl State {
 pub(super) fn load(repo: &std::path::Path, path: &str) -> IndexBases {
     let stages = match crate::git::conflict_stages(repo, path) {
         Ok(stages) => stages,
-        Err(e) => return IndexBases::Failed(format!("could not read the index: {e}")),
+        Err(e) => {
+            return IndexBases::Failed(crate::i18n::message(
+                "repo-core-0617",
+                &[("e", e.to_string().into())],
+            ));
+        }
     };
     if stages.base.is_none() {
         return if stages.ours.is_some() && stages.theirs.is_some() {
             IndexBases::Added
         } else {
-            IndexBases::Failed("the index no longer has this file in conflict".to_owned())
+            IndexBases::Failed(crate::i18n::text("repo-core-0618").to_owned())
         };
     }
     match crate::git::conflict_with_base(repo, path) {

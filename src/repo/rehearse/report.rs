@@ -7,26 +7,41 @@ use crate::repo::short;
 /// The operation, as a heading: `Rebase feature onto main`, `Merge main into feature`.
 pub(crate) fn heading(kind: RehearseKind, branch: &str, other: &str) -> String {
     match kind {
-        RehearseKind::Rebase => format!("Rebase {branch} onto {other}"),
-        RehearseKind::Merge => format!("Merge {other} into {branch}"),
+        RehearseKind::Rebase => crate::i18n::message(
+            "repo-workflows-rehearse-heading-52968e32",
+            &[("branch", (branch).into()), ("other", (other).into())],
+        ),
+        RehearseKind::Merge => crate::i18n::message(
+            "repo-workflows-rehearse-heading-e812253e",
+            &[("other", (other).into()), ("branch", (branch).into())],
+        ),
     }
 }
 
 /// How the `kind` went: `Stops at commit 3 of 5 (1a2b3c4d Parse headers): 2 conflicts`.
 pub(crate) fn played_line(kind: RehearseKind, played: &Played) -> String {
     match played {
-        Played::UpToDate => "Nothing to do: the branch has it all already".to_owned(),
-        Played::FastForward { tip, .. } => {
-            format!("Goes through: a fast-forward to {}", short(tip))
+        Played::UpToDate => {
+            crate::i18n::text("repo-workflows-rehearse-played-line-357eba9b").to_owned()
         }
+        Played::FastForward { tip, .. } => crate::i18n::message(
+            "repo-workflows-rehearse-played-line-78e91cc7",
+            &[("short-tip-1", (short(tip)).into())],
+        ),
         Played::Clean { commits, .. } if kind == RehearseKind::Merge => match commits {
-            1 => "Goes through cleanly: a merge commit, bringing in 1 commit".to_owned(),
-            n => format!("Goes through cleanly: a merge commit, bringing in {n} commits"),
+            1 => crate::i18n::text("repo-workflows-rehearse-played-line-6b8c28e6").to_owned(),
+            n => crate::i18n::message(
+                "repo-workflows-rehearse-played-line-cc3a8109",
+                &[("n", (*(n)).into())],
+            ),
         },
         Played::Clean { commits, .. } => match commits {
-            0 => "Goes through: the branch moves onto it, no commit to replay".to_owned(),
-            1 => "Goes through cleanly: 1 commit".to_owned(),
-            n => format!("Goes through cleanly: {n} commits"),
+            0 => crate::i18n::text("repo-workflows-rehearse-played-line-a969dd77").to_owned(),
+            1 => crate::i18n::text("repo-workflows-rehearse-played-line-31877584").to_owned(),
+            n => crate::i18n::message(
+                "repo-workflows-rehearse-played-line-e270e3ca",
+                &[("n", (*(n)).into())],
+            ),
         },
         Played::Stopped {
             step,
@@ -36,8 +51,11 @@ pub(crate) fn played_line(kind: RehearseKind, played: &Played) -> String {
             conflicts,
         } => {
             let files = match conflicts.len() {
-                1 => "1 conflict".to_owned(),
-                n => format!("{n} conflicts"),
+                1 => crate::i18n::text("repo-workflows-rehearse-played-line-2704eda1").to_owned(),
+                n => crate::i18n::message(
+                    "repo-workflows-rehearse-played-line-3fb21e29",
+                    &[("n", (n).into())],
+                ),
             };
             match commit {
                 Some(commit) => {
@@ -46,12 +64,26 @@ pub(crate) fn played_line(kind: RehearseKind, played: &Played) -> String {
                     } else {
                         format!("{} {summary}", short(commit))
                     };
-                    format!("Stops at commit {step} of {of} ({what}): {files}")
+                    crate::i18n::message(
+                        "repo-workflows-rehearse-played-line-9a2020a6",
+                        &[
+                            ("step", (*(step)).into()),
+                            ("of", (*(of)).into()),
+                            ("what", (what).clone().into()),
+                            ("files", (files).clone().into()),
+                        ],
+                    )
                 }
-                None => format!("Stops with {files}"),
+                None => crate::i18n::message(
+                    "repo-workflows-rehearse-played-line-6fc15496",
+                    &[("files", (files).clone().into())],
+                ),
             }
         }
-        Played::Failed(e) => format!("Fails: {e}"),
+        Played::Failed(e) => crate::i18n::message(
+            "repo-workflows-rehearse-played-line-da976bc1",
+            &[("e", (e).clone().into())],
+        ),
     }
 }
 
@@ -61,20 +93,38 @@ pub(crate) fn tested_line(tested: &Tested, command: &str) -> String {
         Tested::Ran {
             verdict: Verdict::Good,
             ..
-        } => format!("`{command}` passes"),
+        } => crate::i18n::message(
+            "repo-workflows-rehearse-tested-line-4deabe28",
+            &[("command", (command).into())],
+        ),
         Tested::Ran {
             verdict: Verdict::Bad,
             code: Some(code),
             ..
-        } => format!("`{command}` fails (exit code {code})"),
+        } => crate::i18n::message(
+            "repo-workflows-rehearse-tested-line-437947b9",
+            &[("command", (command).into()), ("code", (*(code)).into())],
+        ),
         Tested::Ran {
             verdict: Verdict::Bad,
             code: None,
             ..
-        } => format!("`{command}` fails (ended by a signal)"),
-        Tested::Known(Verdict::Good) => format!("`{command}` passes (a stored result)"),
-        Tested::Known(Verdict::Bad) => format!("`{command}` fails (a stored result)"),
-        Tested::NotRun(why) => format!("`{command}` not run: {why}"),
+        } => crate::i18n::message(
+            "repo-workflows-rehearse-tested-line-ebe78b3a",
+            &[("command", (command).into())],
+        ),
+        Tested::Known(Verdict::Good) => crate::i18n::message(
+            "repo-workflows-rehearse-tested-line-ff964b6a",
+            &[("command", (command).into())],
+        ),
+        Tested::Known(Verdict::Bad) => crate::i18n::message(
+            "repo-workflows-rehearse-tested-line-26bf178a",
+            &[("command", (command).into())],
+        ),
+        Tested::NotRun(why) => crate::i18n::message(
+            "repo-workflows-rehearse-tested-line-246783da",
+            &[("command", (command).into()), ("why", (why).clone().into())],
+        ),
     }
 }
 
@@ -82,9 +132,9 @@ pub(crate) fn tested_line(tested: &Tested, command: &str) -> String {
 pub(crate) fn compare_line(a: &Rehearsal, b: &Rehearsal) -> Option<String> {
     let (ta, tb) = (a.played.tree()?, b.played.tree()?);
     Some(if ta == tb {
-        "Both give the same files.".to_owned()
+        crate::i18n::text("repo-workflows-rehearse-compare-line-16ca6f02").to_owned()
     } else {
-        "They give different files.".to_owned()
+        crate::i18n::text("repo-workflows-rehearse-compare-line-cd991a2e").to_owned()
     })
 }
 

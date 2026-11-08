@@ -73,10 +73,12 @@ pub fn checked_out_blob(repo: &Path, oid: &str, path: &str) -> Result<Vec<u8>, S
 /// to, read from the pointer (nothing is downloaded); any other blob's is its own.
 pub fn checked_out_size(repo: &Path, oid: &str) -> Result<u64, String> {
     let out = run(Some(repo), &["cat-file", "-s", oid])?;
-    let size: u64 = out
-        .trim()
-        .parse()
-        .map_err(|_| format!("could not read the size of object {oid}"))?;
+    let size: u64 = out.trim().parse().map_err(|_| {
+        crate::i18n::message(
+            "backend-could-not-read-the-size-of-object-oid-765caf",
+            &[("oid", (oid).to_string().into())],
+        )
+    })?;
     // Pointers are small: only those are read.
     if size <= 1024 {
         let text = String::from_utf8(blob(repo, oid)?).unwrap_or_default();
@@ -128,8 +130,10 @@ fn merge_stages(repo: &Path, path: &str, extra: Option<&str>) -> Result<String, 
     let ok: Vec<i32> = (0..=127).collect();
     run_ok_codes(Some(repo), &args, &ok).map_err(|e| {
         if e.contains("unknown option `object-id'") {
-            "showing the original needs git 2.43 or newer (or merge.conflictStyle set to diff3)"
-                .to_owned()
+            crate::i18n::text(
+                "backend-showing-the-original-needs-git-2-43-or-newer-or-merge-conflictsty-8ad858",
+            )
+            .to_owned()
         } else {
             e
         }

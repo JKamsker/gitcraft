@@ -31,11 +31,11 @@ pub(super) type ProfileStates = BTreeMap<u64, ProfileState>;
 /// How the tab strip calls a tab's unfinished work (see `worktree_tab::Unfinished`).
 fn unfinished_phrase(label: &str) -> &str {
     match label {
-        "running" => "an operation running",
-        "terminal" => "a terminal open",
-        "commit message" => "a commit message written",
-        "editor" => "an editor open",
-        "review draft" => "a review draft",
+        "running" => crate::i18n::text("interaction-tabs-running"),
+        "terminal" => crate::i18n::text("interaction-tabs-terminal"),
+        "commit message" => crate::i18n::text("interaction-tabs-message"),
+        "editor" => crate::i18n::text("interaction-tabs-editor"),
+        "review draft" => crate::i18n::text("interaction-tabs-review"),
         other => other,
     }
 }
@@ -46,6 +46,7 @@ impl App {
         let open = self
             .tabs
             .iter()
+            .chain(self.windows.parked.values().flat_map(|w| &w.tabs))
             .filter_map(|t| match t {
                 Tab::Repo(r) => Some(r.path.clone()),
                 Tab::Home | Tab::Settings => None,
@@ -78,6 +79,11 @@ impl App {
         let settings_open = self.tabs.iter().any(|t| matches!(t, Tab::Settings));
         let settings_active = matches!(self.tabs.get(self.active), Some(Tab::Settings));
         self.save_all_tabs();
+        // The root view is temporarily parked during a deferred callback; retain its slot
+        // for the callback to restore, then let it install the new profile in the root.
+        self.windows
+            .parked
+            .retain(|id, _| *id == egui::ViewportId::ROOT);
         self.tabs.clear();
         self.tab_drag = None;
         self.closed.clear();
@@ -110,24 +116,33 @@ impl App {
     /// lose, nor while a repository is being cloned or connected to (it would open in the other
     /// profile): a toast says why.
     fn can_switch_profile(&mut self) -> bool {
-        if self.cloning.is_some() || !self.connecting.is_empty() {
+        if self.setup.busy()
+            || self.practicing.is_some()
+            || self.cloning.is_some()
+            || !self.connecting.is_empty()
+        {
             self.toasts.push(Toast::new(
-                "A repository is still being cloned or connected to: wait for it before switching \
-                 profiles"
-                    .to_owned(),
+                crate::i18n::text("interaction-tabs-wait").to_owned(),
                 true,
             ));
             return false;
         }
-        for tab in &mut self.tabs {
+        for tab in self
+            .tabs
+            .iter_mut()
+            .chain(self.windows.parked.values_mut().flat_map(|w| &mut w.tabs))
+        {
             if let Tab::Repo(r) = tab
                 && let Some(work) = r.unfinished_anywhere()
             {
                 let name = r.label(true).repo;
                 self.toasts.push(Toast::new(
-                    format!(
-                        "{name} has {}: finish it, or close the tab, before switching profiles",
-                        unfinished_phrase(work)
+                    crate::i18n::message(
+                        "interaction-tabs-unfinished",
+                        &[
+                            ("name", name.into()),
+                            ("work", unfinished_phrase(work).into()),
+                        ],
                     ),
                     true,
                 ));
@@ -149,6 +164,13 @@ impl App {
         else {
             return false;
         };
+        if next.pending_setup() {
+            self.toasts.push(Toast::new(
+                crate::i18n::text("interaction-tabs-setup").into(),
+                true,
+            ));
+            return false;
+        }
         if id == self.settings.active_profile {
             return true;
         }
@@ -176,7 +198,10 @@ impl App {
         // gone. What was seen of each stays, being the forge account's, not the profile's.
         self.inbox = Default::default();
         self.toasts.push(Toast::new(
-            format!("Switched to the profile “{}”", next.title()),
+            crate::i18n::message(
+                "interaction-tabs-switched",
+                &[("profile", next.display_title().into())],
+            ),
             false,
         ));
         true
@@ -218,6 +243,7 @@ impl App {
                 return;
             }
         }
+        self.setup.forget_profile(id);
         self.settings.user_profiles.retain(|p| p.id != id);
         self.profile_states.remove(&id);
         settings::profiles::forget(id);
@@ -250,12 +276,15 @@ impl App {
         }
         if self.profile_git_seen != now {
             self.profile_git_seen = now;
-            for tab in &mut self.tabs {
+            self.inbox = Default::default();
+            for tab in self
+                .tabs
+                .iter_mut()
+                .chain(self.windows.parked.values_mut().flat_map(|w| &mut w.tabs))
+            {
                 // One not read yet, or suspended, reads it when shown.
-                if let Tab::Repo(r) = tab
-                    && !r.sleeping()
-                {
-                    r.reload_identity(ctx);
+                if let Tab::Repo(r) = tab {
+                    r.notice_connections(ctx);
                 }
             }
         }
@@ -267,13 +296,16 @@ impl App {
     pub(super) fn profile_button(&mut self, ui: &mut Ui, t: &Tokens, extras: &[AppButton]) {
         let profile = self.settings.profile();
         let font = theme::medium(12.0);
-        let name = ui
-            .painter()
-            .layout_no_wrap(profile.title().to_owned(), font, t.text_dim);
+        let name =
+            ui.painter()
+                .layout_no_wrap(profile.display_title().to_owned(), font, t.text_dim);
         let width = (name.size().x + 34.0).min(180.0);
         let (rect, resp) = ui.allocate_exact_size(vec2(width, 28.0), Sense::click());
         crate::repo::widgets::a11y(&resp, egui::WidgetType::ComboBox, || {
-            format!("profile {}", profile.title())
+            crate::i18n::message(
+                "interaction-tabs-profile-a11y",
+                &[("profile", profile.display_title().into())],
+            )
         });
         if resp.hovered() {
             ui.painter().rect_filled(rect, t.radius, t.pressed);
@@ -289,17 +321,19 @@ impl App {
             name,
             t.text_dim,
         );
-        let resp = resp.on_hover_text(format!(
-            "Profile: {}{}",
-            profile.title(),
-            author_line(&profile)
+        let resp = resp.on_hover_text(crate::i18n::message(
+            "interaction-tabs-profile-tip",
+            &[
+                ("profile", profile.display_title().into()),
+                ("author", author_line(&profile).into()),
+            ],
         ));
         let mut request = None;
         egui::Popup::menu(&resp)
             .style(theme::menu_style)
             .show(|ui| {
                 ui.label(
-                    RichText::new("PROFILES")
+                    RichText::new(crate::i18n::text("interaction-tabs-profiles"))
                         .font(theme::semibold(10.5))
                         .color(t.text_faint),
                 );
@@ -317,10 +351,16 @@ impl App {
                     }
                 }
                 ui.separator();
-                if ui.button("New profile").clicked() {
+                if ui
+                    .button(crate::i18n::text("interaction-tabs-new"))
+                    .clicked()
+                {
                     request = Some(ProfileRequest::New);
                 }
-                if ui.button("Manage profiles…").clicked() {
+                if ui
+                    .button(crate::i18n::text("interaction-tabs-manage"))
+                    .clicked()
+                {
                     settings::show_page(ui.ctx(), settings::Page::Profile);
                     self.open_settings();
                 }
@@ -340,7 +380,16 @@ impl App {
 fn profile_row(ui: &mut Ui, p: &settings::UserProfile, active: bool, t: &Tokens) -> egui::Response {
     let width = ui.available_width().clamp(180.0, 260.0);
     let (rect, resp) = ui.allocate_exact_size(vec2(width, 26.0), Sense::click());
-    crate::repo::widgets::a11y_selected(&resp, || format!("profile {}", p.title()), active);
+    crate::repo::widgets::a11y_selected(
+        &resp,
+        || {
+            crate::i18n::message(
+                "interaction-tabs-profile-a11y",
+                &[("profile", p.display_title().into())],
+            )
+        },
+        active,
+    );
     if resp.hovered() {
         ui.painter().rect_filled(rect, t.radius_sm, t.pressed);
     }
@@ -353,7 +402,7 @@ fn profile_row(ui: &mut Ui, p: &settings::UserProfile, active: bool, t: &Tokens)
     };
     let name = ui
         .painter()
-        .layout_no_wrap(p.title().to_owned(), font, color);
+        .layout_no_wrap(p.display_title().to_owned(), font, color);
     let text_rect = egui::Rect::from_min_max(
         egui::pos2(rect.left() + 28.0, rect.top()),
         egui::pos2(rect.right() - 26.0, rect.bottom()),
@@ -381,5 +430,80 @@ fn author_line(p: &settings::UserProfile) -> String {
         (false, true) => format!(" · {name}"),
         (true, false) => format!(" · <{email}>"),
         (false, false) => format!(" · {name} <{email}>"),
+    }
+}
+
+#[cfg(test)]
+mod localization_tests {
+    use super::*;
+    use egui_kittest::{Harness, kittest::Queryable};
+
+    #[test]
+    fn actual_profile_row_keeps_identity_selection_and_opaque_author_across_languages()
+    -> Result<(), String> {
+        crate::i18n::set_language("de");
+        let profile = settings::UserProfile {
+            name: "Arbeitsprofil 日本語".into(),
+            author_name: "Jonas 日本語".into(),
+            author_email: "jonas@example.invalid".into(),
+            ..Default::default()
+        };
+        let before = serde_json::to_string(&profile).map_err(|error| format!("{error:?}"))?;
+        let fonts = std::cell::Cell::new(false);
+        let mut h = Harness::new_ui_state(
+            move |ui, state: &mut (settings::UserProfile, bool, Option<egui::Id>)| {
+                if !fonts.replace(true) {
+                    theme::install_fonts(ui.ctx());
+                    return;
+                }
+                let response = profile_row(ui, &state.0, true, &Tokens::get(ui.ctx()));
+                if let Some(id) = state.2 {
+                    assert_eq!(response.id, id);
+                }
+                state.2 = Some(response.id);
+                state.1 |= response.clicked();
+            },
+            (profile, false, None),
+        );
+        h.run();
+        h.get_by_label("Profil Arbeitsprofil 日本語").click();
+        h.run();
+        assert!(h.state().1);
+        assert_eq!(
+            author_line(&h.state().0),
+            " · Jonas 日本語 <jonas@example.invalid>"
+        );
+        assert_eq!(
+            serde_json::to_string(&h.state().0).map_err(|error| format!("{error:?}"))?,
+            before
+        );
+        crate::i18n::set_language("en-US");
+        h.run();
+        h.get_by_label("profile Arbeitsprofil 日本語");
+        assert_eq!(
+            serde_json::to_string(&h.state().0).map_err(|error| format!("{error:?}"))?,
+            before
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn unfinished_work_translates_only_known_display_phrases() {
+        crate::i18n::set_language("de");
+        assert_eq!(unfinished_phrase("running"), "einen laufenden Vorgang");
+        assert_eq!(unfinished_phrase("terminal"), "ein geöffnetes Terminal");
+        assert_eq!(
+            unfinished_phrase("commit message"),
+            "eine geschriebene Commit-Nachricht"
+        );
+        assert_eq!(unfinished_phrase("editor"), "einen geöffneten Editor");
+        assert_eq!(unfinished_phrase("review draft"), "einen Review-Entwurf");
+        assert_eq!(
+            unfinished_phrase("external operation 日本語"),
+            "external operation 日本語"
+        );
+        crate::i18n::set_language("en-US");
+        assert_eq!(unfinished_phrase("running"), "an operation running");
     }
 }

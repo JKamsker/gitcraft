@@ -12,12 +12,23 @@ readme = "README.md"
 [features]
 # Oniguruma is substantially faster for the syntax grammars used while opening diffs.
 # `--no-default-features` retains the pure-Rust regex backend for builds without a C compiler.
-default = ["native-highlighting", "native-git"]
+default = ["native-highlighting", "native-git", "symbol-history"]
 # Local read operations use gitoxide; all unsupported operations retain the installed Git.
 native-git = ["dep:gix"]
 native-highlighting = ["syntect/default-onig", "two-face/syntect-default-onig"]
 
+# Structural biography parsing uses bundled grammars; optional so minimal builds need no C compiler.
+symbol-history = ["dep:tree-sitter", "dep:tree-sitter-rust", "dep:tree-sitter-python", "dep:tree-sitter-javascript", "dep:tree-sitter-typescript", "dep:tree-sitter-go", "dep:tree-sitter-c", "dep:tree-sitter-cpp"]
+
 [dependencies]
+tree-sitter = { version = "0.25", optional = true }
+tree-sitter-rust = { version = "0.24.2", optional = true }
+tree-sitter-python = { version = "0.25", optional = true }
+tree-sitter-javascript = { version = "0.25", optional = true }
+tree-sitter-typescript = { version = "0.23.2", optional = true }
+tree-sitter-go = { version = "0.25", optional = true }
+tree-sitter-c = { version = "0.24", optional = true }
+tree-sitter-cpp = { version = "0.23.4", optional = true }
 gix = { version = "0.90", optional = true, default-features = false, features = ["revision", "sha1", "sha256"] }
 eframe = { version = "0.36", default-features = false, features = ["default_fonts", "wgpu", "accesskit", "wayland", "x11", "persistence", "links"] }
 egui = { version = "0.36", features = ["bytemuck"] }
@@ -26,6 +37,9 @@ egui_commonmark = { version = "0.25", default-features = false, features = ["pul
 egui_extras = { version = "0.36", default-features = false, features = ["svg", "image"] }
 # Sign-ins kept with "Remember connection": Credential Manager, Keychain, Secret Service.
 keyring = "4.2"
+# Bounded SVG rendering with explicitly disabled external resolvers; already transitive.
+resvg = { version = "=0.45.1", default-features = false, features = ["raster-images"] }
+roxmltree = "=0.20.0"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "bmp", "webp"] }
 md5 = "0.7"
 # Inflating the members of .docx / .odt / .zip files and PDF streams, for their text in diffs.
@@ -37,18 +51,30 @@ portable-pty = "0.9"
 pulldown-cmark = { version = "0.13", default-features = false }
 # Issue references, find-in-view expressions, and CODEOWNERS patterns.
 regex = "1"
+# Rust review freshness: parse syntax and compare exact function token streams without executing code.
+syn = { version = "2", features = ["full", "visit"] }
+quote = "1"
 # Reads one setting from eframe's saved state before the window is made (app::title_bar).
 ron = "0.12"
 # The window's handle, to hide Windows' border when the tabs are in the title bar (app::title_bar).
 raw-window-handle = "0.6"
 rfd = "0.17"
+# Quiet synthesized native earcons; no codec or media-file support. Device opens only on opt-in.
+rodio = { version = "0.21", default-features = false, features = ["playback"] }
+same-file = "=1.0.6"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+# Fluent catalogs use the concurrent bundle for deferred native view callbacks.
+fluent-bundle = "=0.16.0"
+unic-langid = "0.9"
+sys-locale = "=0.3.2"
+num-format = "=0.4.4"
 syntect = { version = "5", default-features = false, features = ["default-fancy"] }
 # bat's syntax set: TypeScript, Vue, TOML, Dockerfile, PowerShell… beyond syntect's own.
 two-face = { version = "0.5.2", default-features = false, features = ["syntect-default-fancy"] }
 # The system's certificates, as git uses them: a self-hosted forge may have its own CA. (The proxy
 # is picked in src/forge/http.rs: ureq's own reading of the environment ignores NO_PROXY.)
+url = "2"
 ureq = { version = "2", features = ["native-certs"] }
 base64 = "0.22"
 # What a repository's trusted command file read as (Settings → Custom commands).
@@ -63,17 +89,28 @@ gitcraft-os = { path = "crates/gitcraft-os" }
 # Config files read by key in diffs (with where each key is): TOML and YAML.
 toml_edit = { version = "0.25.17", default-features = false, features = ["parse"] }
 yaml-rust2 = "0.13.0"
+mailparse = "0.18"
+# Private, atomically created staging repositories for verified independent object packs.
+tempfile = "3"
+
+[target.'cfg(any(windows, target_os = "macos"))'.dependencies]
+# Created only after opt-in, in the running native event loop.
+tray-icon = { version = "=0.26.1", default-features = false }
 
 # Reading a repository's file without following a link swapped in on the way (safe_read.rs).
 [target.'cfg(unix)'.dependencies]
-rustix = { version = "1", features = ["fs"] }
+rustix = { version = "1", features = ["fs", "process"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
+# Read native ACLs for publication and serialize durable shelf/undo policy.
+exacl = { version = "=0.13.0", default-features = false, features = ["serde"] }
 # Keep native rounded corners while drawing the tabs over a transparent title bar.
 objc2 = "0.6"
 objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSButton", "NSView", "NSWindow"] }
 
 [target.'cfg(windows)'.dependencies]
+# Compare retained Windows file identities when detaching an alternate; already used transitively.
+winapi-util = "0.1"
 windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Dwm", "Win32_Storage_FileSystem"] }
 # Whether the connection is metered (WinRT's NetworkInformation: safe calls, no unsafe code).
 windows = { version = "0.62", features = ["Networking_Connectivity"] }
@@ -81,6 +118,8 @@ windows = { version = "0.62", features = ["Networking_Connectivity"] }
 raw-window-handle = "0.6"
 
 [target.'cfg(target_os = "linux")'.dependencies]
+# Direct availability callbacks support desktops without a StatusNotifierWatcher; no GTK.
+ksni = { version = "=0.3.7", default-features = false, features = ["blocking", "async-io"] }
 # The launcher's progress: a signal on the session bus (the version notify-rust uses).
 zbus = { version = "5", default-features = false, features = ["blocking-api", "async-io"] }
 
@@ -90,8 +129,7 @@ members = [".", "crates/gitcraft-os"]
 default-members = [".", "crates/gitcraft-os"]
 
 [lints.rust]
-# Denied everywhere; the exceptions, asking Windows where an open file really is (safe_read.rs)
-# and setting the window's border colour (app/title_bar.rs), allow it on that function alone.
+# Denied everywhere; narrowly documented Windows API adapters allow it on that function alone.
 unsafe_code = "deny"
 
 [lints.clippy]
@@ -151,6 +189,7 @@ rustix = { version = "1", features = ["time"] }
 
 # winit 0.30.13 with two Windows fixes for moving the window between monitors of different
 # scales: the fix of rust-windowing/winit#4341 (released only in 0.31) and a minimum size that
-# follows the scale. Branch `gitcraft/v0.30.13` of the fork; drop this once on winit 0.31.
+# follows the scale. The fork also adds a macOS Dock-menu hook and restores the release
+# position before a drag's final MouseInput. Branch `gitcraft/dock-menu-drag-release` of the fork.
 [patch.crates-io]
-winit = { git = "https://github.com/JKamsker/winit", rev = "12fdcb03ef036f0fcb7fa26d19dd7395b1feb141" }
+winit = { git = "https://github.com/JKamsker/winit", rev = "b641090c1688c6425c4589b999209cc680954f98" }

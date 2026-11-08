@@ -81,7 +81,10 @@ impl RepoTab {
             ui.add_space(8.0);
             ui.horizontal(|ui| {
                 ui.add_space(10.0);
-                ui.colored_label(t.danger, err);
+                ui.colored_label(
+                    t.danger,
+                    crate::git::display_error(&crate::forge::inbox::display_error(err)),
+                );
             });
             if self.terminals.is_empty() {
                 return;
@@ -94,8 +97,10 @@ impl RepoTab {
         if term.has_exited() {
             ui.add_space(12.0);
             ui.vertical_centered(|ui| {
-                ui.label(egui::RichText::new("The shell has exited.").color(t.text_dim));
-                if ui.button("Close").clicked() {
+                ui.label(
+                    egui::RichText::new(crate::i18n::text("repo-core-3644")).color(t.text_dim),
+                );
+                if ui.button(crate::i18n::text("repo-core-0595")).clicked() {
                     acts.push(Action::CloseTerminal(i));
                 }
             });

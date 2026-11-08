@@ -7,7 +7,7 @@ use super::ParallelAct;
 use crate::repo::{Action, RepoTab};
 
 /// Why a parallel bisect can't start while one runs.
-pub(super) const RUNNING: &str = "A parallel bisect is running: wait for it, or cancel it";
+pub(super) const RUNNING: &str = "repo-workflows-parallel_bisect--1df5e96c";
 
 impl RepoTab {
     /// A commit's entry: bisect in parallel from it (the marks of the bisect going on, if any).
@@ -18,13 +18,16 @@ impl RepoTab {
         acts: &mut Vec<Action>,
     ) {
         let running = self.parallel.running();
-        let resp = ui
-            .add_enabled(!running, egui::Button::new("Bisect in parallel from here…"))
-            .on_hover_text(
-                "Tests several commits at once, each in a worktree of its own (here, in WSL or \
-                 over SSH), to find the first bad commit; the checkout isn't touched",
-            )
-            .on_disabled_hover_text(RUNNING);
+        let resp = crate::menu_item::MenuItem::new(crate::i18n::text(
+            "repo-workflows-parallel_bisect-parallel-menu-items-be3adae3",
+        ))
+        .icon("command")
+        .refused(running.then_some(crate::i18n::text(RUNNING)))
+        .show(ui)
+        .on_hover_text(crate::i18n::text(
+            "repo-workflows-parallel_bisect-parallel-menu-items-7109f605",
+        ))
+        .on_disabled_hover_text(crate::i18n::text(RUNNING));
         if resp.clicked() {
             acts.push(self.parallel_dialog_for(hash));
         }
@@ -41,7 +44,8 @@ impl RepoTab {
     pub(in crate::repo) fn parallel_palette_items(&self) -> Vec<(String, String, Action)> {
         if self.parallel.running() {
             return vec![(
-                "Parallel bisect: cancel".to_owned(),
+                crate::i18n::text("repo-workflows-parallel_bisect-parallel-palette-items-060e9182")
+                    .to_owned(),
                 "bisect".to_owned(),
                 Action::ParallelBisect(ParallelAct::Cancel),
             )];
@@ -51,7 +55,8 @@ impl RepoTab {
         }
         let head = self.refs.head.clone();
         vec![(
-            "Bisect in parallel…".to_owned(),
+            crate::i18n::text("repo-workflows-parallel_bisect-parallel-palette-items-a69bdd78")
+                .to_owned(),
             "bisect".to_owned(),
             self.parallel_dialog_for(&head),
         )]
@@ -62,15 +67,19 @@ impl RepoTab {
         let ready = self.bisect.state().is_some_and(|b| b.progress.is_some());
         let running = self.parallel.running();
         let resp = ui
-            .add_enabled(ready && !running, egui::Button::new("Run in parallel…"))
-            .on_hover_text(
-                "Tests several commits at once between these marks, each in a worktree of its \
-                 own, here, in WSL or over SSH",
+            .add_enabled(
+                ready && !running,
+                egui::Button::new(crate::i18n::text(
+                    "repo-workflows-parallel_bisect-parallel-banner-button-2fe0d401",
+                )),
             )
+            .on_hover_text(crate::i18n::text(
+                "repo-workflows-parallel_bisect-parallel-banner-button-0afdf9b5",
+            ))
             .on_disabled_hover_text(if running {
-                RUNNING
+                crate::i18n::text(RUNNING)
             } else {
-                "Mark a good and a bad commit first"
+                crate::i18n::text("repo-workflows-parallel_bisect-parallel-banner-button-c3efc1be")
             });
         if resp.clicked()
             && let Some(action) = self.parallel_from_bisect()

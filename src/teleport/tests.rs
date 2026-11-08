@@ -273,6 +273,7 @@ fn no_bundle_left() {
 }
 
 /// `len` bytes that don't compress.
+#[cfg(unix)]
 fn noise(len: usize) -> Vec<u8> {
     let mut state: u64 = 0x9e37_79b9_7f4a_7c15;
     (0..len)

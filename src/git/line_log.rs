@@ -24,7 +24,8 @@ pub type LineRange = (u32, u32);
 const LINE_LOG_FORMAT: &str = "--format=\x1e%H\x1f%an\x1f%ae\x1f%at\x1f%s";
 
 /// What makes git print a plain patch, whatever the user's config says.
-const PLAIN_PATCH: [&str; 4] = [
+const PLAIN_PATCH: [&str; 5] = [
+    "--no-textconv",
     "--no-color",
     "--no-ext-diff",
     "--src-prefix=a/",
@@ -56,6 +57,7 @@ pub fn line_history(
         PLAIN_PATCH[1],
         PLAIN_PATCH[2],
         PLAIN_PATCH[3],
+        PLAIN_PATCH[4],
         LINE_LOG_FORMAT,
         &spec,
         super::END_OPTS,
@@ -74,7 +76,10 @@ pub fn line_diff(
     ranges: &[LineRange],
 ) -> Result<String, String> {
     if ranges.is_empty() {
-        return Err(format!("No lines of {path} picked"));
+        return Err(crate::i18n::message(
+            "backend-no-lines-of-path-picked-1b9f1e",
+            &[("path", (path).to_string().into())],
+        ));
     }
     let specs: Vec<String> = ranges.iter().map(|&r| line_spec(r, path)).collect();
     let mut args = vec![
@@ -88,6 +93,7 @@ pub fn line_diff(
         PLAIN_PATCH[1],
         PLAIN_PATCH[2],
         PLAIN_PATCH[3],
+        PLAIN_PATCH[4],
     ];
     args.extend(specs.iter().map(String::as_str));
     args.extend([super::END_OPTS, hash]);
@@ -108,13 +114,28 @@ fn ordered((a, b): LineRange) -> LineRange {
 /// git's error for a range it can't follow, in words that say what to do.
 fn line_log_error(err: &str, path: &str) -> String {
     if err.contains("has only") && err.contains("lines") {
-        format!("Those lines aren't in {path} at that commit: {err}")
+        crate::i18n::message(
+            "backend-those-lines-aren-t-in-path-at-that-commit-err-dca525",
+            &[
+                ("path", (path).to_string().into()),
+                ("detail", (err).to_string().into()),
+            ],
+        )
     } else if err.contains("no path") || err.contains("There is no path") {
-        format!("{path} isn't in that commit, so its lines have no history there")
+        crate::i18n::message(
+            "backend-path-isn-t-in-that-commit-so-its-lines-have-no-history-there-e1e1f3",
+            &[("path", (path).to_string().into())],
+        )
     } else if err.contains("unknown revision") || err.contains("bad revision") {
-        "The repository has no commits yet, so these lines have no history".to_owned()
+        crate::i18n::text(
+            "backend-the-repository-has-no-commits-yet-so-these-lines-have-no-history-87624b",
+        )
+        .to_owned()
     } else {
-        format!("Could not read the history of these lines: {err}")
+        crate::i18n::message(
+            "backend-could-not-read-the-history-of-these-lines-err-e0dc46",
+            &[("detail", (err).to_string().into())],
+        )
     }
 }
 
@@ -158,6 +179,7 @@ fn committed_range(
         PLAIN_PATCH[1],
         PLAIN_PATCH[2],
         PLAIN_PATCH[3],
+        PLAIN_PATCH[4],
     ];
     if *at == LinesAt::Index {
         args.push("--cached");
@@ -171,14 +193,16 @@ fn committed_range(
         .take_while(|l| !l.starts_with("@@"))
         .any(|l| l.starts_with("new file mode") || l == "--- /dev/null")
     {
-        return Err(format!(
-            "{path} isn't committed yet, so its lines have no history"
+        return Err(crate::i18n::message(
+            "backend-path-isn-t-committed-yet-so-its-lines-have-no-history-1cb9ba",
+            &[("path", (path).to_string().into())],
         ));
     }
     let range = map_to_old(&diff, ordered(range)).ok_or_else(|| {
-        "These lines aren't committed yet, so they have no history. Commit them, or pick lines \
-         that are already committed."
-            .to_owned()
+        crate::i18n::text(
+            "backend-these-lines-aren-t-committed-yet-so-they-have-no-history-commit-t-f54ae1",
+        )
+        .to_owned()
     })?;
     Ok((old.unwrap_or_else(|| path.to_owned()), range))
 }

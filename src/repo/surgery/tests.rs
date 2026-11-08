@@ -57,7 +57,7 @@ pub(super) fn finished(tab: &mut RepoTab, ctx: &egui::Context) -> Option<(String
     pump(tab, ctx, |t| t.busy_op.is_some());
     pump(tab, ctx, |t| t.busy_op.is_none());
     pump(tab, ctx, RepoTab::settled);
-    tab.status.clone()
+    tab.status.as_deref().cloned()
 }
 
 pub(super) fn git_out(dir: &Path, args: &[&str]) -> String {
@@ -256,7 +256,7 @@ fn a_commit_with_merges_after_it_is_refused() {
     let _ = std::fs::remove_dir_all(&dir);
     assert!(refused.is_some_and(|r| r.contains("Merges")));
     assert!(tab.split.is_none());
-    assert!(tab.status.as_ref().is_some_and(|s| s.1));
+    assert!(tab.status.as_deref().is_some_and(|s| s.1));
 }
 
 #[test]

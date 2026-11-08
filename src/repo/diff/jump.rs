@@ -26,6 +26,7 @@ pub(super) fn changes(runs: &ChangeRuns) -> Vec<Range<usize>> {
 }
 
 /// The scroll offset that shows a change starting at row `start`, a few rows below the top.
+#[cfg(test)]
 pub(super) fn offset_of(start: usize) -> f32 {
     start.saturating_sub(ABOVE) as f32 * LINE_H
 }
@@ -67,7 +68,20 @@ impl DiffView {
     pub(in crate::repo) fn step_change(&mut self, split: bool, delta: i32) {
         let Some(Ok(data)) = &self.data else { return };
         let (_, changes) = data.runs(data.shows_split(split));
-        if let Some(i) = step(changes, self.scroll, self.at_change, delta) {
+        let logical = self.wrap_offsets.as_ref().map_or(self.scroll, |o| {
+            o.partition_point(|y| *y <= self.scroll).saturating_sub(1) as f32 * LINE_H
+        });
+        let last = self.at_change.map(|(i, at)| {
+            (
+                i,
+                if (at - self.scroll).abs() < 1.0 {
+                    logical
+                } else {
+                    at
+                },
+            )
+        });
+        if let Some(i) = step(changes, logical, last, delta) {
             self.jump = Some(i);
         }
     }

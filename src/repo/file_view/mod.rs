@@ -77,6 +77,7 @@ impl RepoTab {
             return;
         }
 
+        self.intent_badge(ui, &view.path);
         egui::Frame::new()
             .fill(t.chrome)
             .inner_margin(egui::Margin::symmetric(10, 6))
@@ -88,15 +89,18 @@ impl RepoTab {
                     if let Some(rev) = &view.rev {
                         widgets::chip(
                             ui,
-                            &format!("at {}", rev.get(..8).unwrap_or(rev)),
+                            &crate::i18n::message(
+                                "repo-core-2494",
+                                &[("rev", rev.get(..8).unwrap_or(rev).to_string().into())],
+                            ),
                             t.text_dim,
                         );
                     }
                     ui.add_space(12.0);
                     let tabs = [
-                        (FileTab::History, "History"),
-                        (FileTab::Blame, "Blame"),
-                        (FileTab::File, "File"),
+                        (FileTab::History, crate::i18n::text("repo-core-2497")),
+                        (FileTab::Blame, crate::i18n::text("repo-core-2498")),
+                        (FileTab::File, crate::i18n::text("repo-core-2368")),
                     ];
                     for (tab, label) in tabs {
                         let on = view.tab == tab;
@@ -120,7 +124,9 @@ impl RepoTab {
                         }
                     }
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if icons::small_button(ui, "x", "Close (Esc)").clicked() {
+                        if icons::small_button(ui, "x", crate::i18n::text("repo-core-0711"))
+                            .clicked()
+                        {
                             acts.push(Action::CloseFileView);
                         }
                     });
@@ -142,6 +148,30 @@ impl RepoTab {
                 let rev = view.rev.clone();
                 let menu = self.link_menu(None);
                 let mut link = |ui: &mut Ui, lines: Lines| {
+                    if let Some(rev) = &rev
+                        && crate::git::investigations::oid(rev)
+                        && ui.button(crate::i18n::text("repo-core-2325")).clicked()
+                    {
+                        acts.push(Action::OpenLineDossier(Some(
+                            crate::git::investigations::dossier::Seed {
+                                commit: rev.clone(),
+                                path: view.path.clone(),
+                                line: lines.first as usize,
+                            },
+                        )));
+                    }
+                    if let Some(rev) = &rev
+                        && crate::git::investigations::oid(rev)
+                        && ui.button(crate::i18n::text("repo-core-2326")).clicked()
+                    {
+                        acts.push(Action::OpenSymbolBiography(Some(
+                            crate::git::investigations::dossier::Seed {
+                                commit: rev.clone(),
+                                path: view.path.clone(),
+                                line: lines.first as usize,
+                            },
+                        )));
+                    }
                     if let (Some(rev), Some(menu)) = (&rev, menu.clone()) {
                         let target = Target::File {
                             rev: rev.clone(),
@@ -152,7 +182,9 @@ impl RepoTab {
                     }
                 };
                 // Lines are picked only when there's something to link them to.
-                let links = (view.rev.is_some() && self.link_menu(None).is_some())
+                let links = view
+                    .rev
+                    .is_some()
                     .then_some(&mut link as file_text::LineMenu<'_>);
                 let picked = file_text::show(
                     ui,
@@ -165,6 +197,7 @@ impl RepoTab {
                     },
                     Ok(()),
                     links,
+                    Some((&view.goto_line, view.marked_line)),
                 );
                 if let Some(range) = picked {
                     let at = view
@@ -187,6 +220,9 @@ fn error(ui: &mut Ui, e: &str) {
     ui.add_space(12.0);
     ui.horizontal(|ui| {
         ui.add_space(12.0);
-        ui.colored_label(t.danger, e);
+        ui.colored_label(
+            t.danger,
+            crate::git::display_error(&crate::forge::inbox::display_error(e)),
+        );
     });
 }

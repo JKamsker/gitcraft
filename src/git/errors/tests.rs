@@ -483,24 +483,26 @@ fn git_processes_of_tasklist() {
     );
 }
 
-/// The real list of this machine: this test's own git isn't in it.
+/// A supplied local-process snapshot excludes our descendants, not unrelated Git
+/// commands whose arguments happen to mention this repository or application.
 #[cfg(unix)]
 #[test]
-fn git_processes_here() -> Result<(), String> {
-    let dir = repo("processes")?;
-    let running = lock::git_processes(&dir)?;
-    assert!(
-        running.iter().all(|line| {
-            // Another checkout can be running Git against a path or URL containing
-            // "gitcraft". Only the executable identifies the application itself.
-            let program = line.split_whitespace().next().unwrap_or_default();
-            let name = program.rsplit(['/', '\\']).next().unwrap_or_default();
-            !matches!(name, "gitcraft" | "gitcraft.exe")
-        }),
-        "{running:?}"
+fn git_processes_here() {
+    let snapshot = "100 1 gitcraft\n\
+                    101 100 /bin/sh -c git status\n\
+                    102 101 /usr/bin/git status\n\
+                    103 102 /usr/libexec/git-core/git-remote-https origin https://owned.invalid\n\
+                    200 1 /usr/bin/git ls-remote https://github.com/JKamsker/gitcraft\n\
+                    201 1 /usr/bin/git -C /work/gitcraft commit -m retained\n";
+    assert_eq!(
+        lock::git_lines(snapshot, Some(100)),
+        [
+            "/usr/bin/git ls-remote https://github.com/JKamsker/gitcraft",
+            "/usr/bin/git -C /work/gitcraft commit -m retained",
+        ]
     );
-    let _ = std::fs::remove_dir_all(&dir);
-    Ok(())
+    // With no local ownership information, the same parser retains all Git rows.
+    assert_eq!(lock::git_lines(snapshot, None).len(), 4);
 }
 
 /// Review findings: each one's case, as git really prints it.

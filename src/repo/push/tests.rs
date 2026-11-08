@@ -519,7 +519,8 @@ fn a_failed_sync_pull_pushes_nothing() {
     assert!(tab.push_flow.banner.is_none());
     let status = tab
         .status
-        .clone()
+        .as_deref()
+        .cloned()
         .map(|(s, err)| (s.contains("nothing was pushed"), err));
     assert_eq!(status, Some((true, true)));
 }
