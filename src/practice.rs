@@ -67,6 +67,58 @@ impl Scenario {
             }
         }
     }
+
+    /// Resolve presentation at paint time; raw scenario text and serialized identities stay stable.
+    pub fn display_title(self) -> &'static str {
+        crate::i18n::text(match self {
+            Self::Conflict => "interaction-practice-conflict-title",
+            Self::Diverged => "interaction-practice-diverged-title",
+            Self::Detached => "interaction-practice-detached-title",
+            Self::Published => "interaction-practice-published-title",
+        })
+    }
+
+    pub fn display_goal(self) -> &'static str {
+        crate::i18n::text(match self {
+            Self::Conflict => "interaction-practice-conflict-goal",
+            Self::Diverged => "interaction-practice-diverged-goal",
+            Self::Detached => "interaction-practice-detached-goal",
+            Self::Published => "interaction-practice-published-goal",
+        })
+    }
+
+    pub fn display_hint(self) -> &'static str {
+        crate::i18n::text(match self {
+            Self::Conflict => "interaction-practice-conflict-hint",
+            Self::Diverged => "interaction-practice-diverged-hint",
+            Self::Detached => "interaction-practice-detached-hint",
+            Self::Published => "interaction-practice-published-hint",
+        })
+    }
+}
+
+/// Paint only known application diagnostics. OS/Git/provider payloads stay opaque, and
+/// creation/checking still return the original raw strings for control and deferred results.
+pub(crate) fn display_error(raw: &str) -> String {
+    let id = match raw {
+        "This practice repository no longer matches its scenario. Start a fresh one from Practice." => {
+            "interaction-practice-scenario-mismatch"
+        }
+        "Practice folder is missing" => "interaction-practice-folder-missing",
+        "Making the practice repository stopped unexpectedly. Try again." => {
+            "interaction-practice-stopped"
+        }
+        _ => {
+            if let Some(detail) = raw.strip_prefix("Could not make a practice folder: ") {
+                return crate::i18n::message(
+                    "interaction-practice-folder-failed",
+                    &[("detail", detail.into())],
+                );
+            }
+            return raw.to_owned();
+        }
+    };
+    crate::i18n::text(id).to_owned()
 }
 
 /// The fixture's original commits, kept outside its working tree so solving it stays clean.

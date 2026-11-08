@@ -10,36 +10,11 @@ impl App {
         if !self.practice_open {
             return;
         }
-        let mut close = false;
-        let mut start = None;
-        let modal = egui::Modal::new(egui::Id::new("practice-picker"))
-            .show(ctx, |ui| {
-                ui.set_width(520.0_f32.min((ctx.content_rect().width() - 48.0).max(180.0)));
-                ui.heading("Practice git");
-                egui::ScrollArea::vertical().max_height((ctx.content_rect().height() * 0.7).max(120.0)).show(ui, |ui| {
-                    ui.label("Try real git in a new local temporary folder. Your repositories are untouched. The practice folder may be removed by your system; copy it elsewhere if you want to keep it.");
-                    ui.add_space(10.0);
-                    for scenario in Scenario::ALL {
-                        ui.group(|ui| {
-                            if ui.add_enabled(self.practicing.is_none(), egui::Button::new(scenario.title())).clicked() {
-                                start = Some(scenario);
-                            }
-                            ui.label(scenario.goal());
-                        });
-                    }
-                });
-                if self.practicing.is_some() {
-                    ui.horizontal(|ui| {
-                        ui.add(crate::spinner::Spinner::new());
-                        ui.label("Making a practice repository…");
-                    });
-                }
-                close = ui.button("Close").clicked();
-            });
-        if close || modal.should_close() {
+        let action = practice_picker(ctx, self.practicing.is_some());
+        if action.close {
             self.practice_open = false;
         }
-        if let Some(scenario) = start {
+        if let Some(scenario) = action.start {
             self.start_practice(scenario, ctx);
         }
     }
@@ -63,7 +38,7 @@ impl App {
             .map_err(str::to_owned)
         });
         if let Err(error) = queued {
-            self.report(error);
+            self.report(crate::practice::display_error(&error));
             return;
         }
         self.practicing = Some(rx);
@@ -89,10 +64,54 @@ impl App {
             }
             Err(error) => {
                 self.practice_open = false;
-                self.report(error);
+                self.report(crate::practice::display_error(&error));
             }
         }
     }
+}
+
+/// Inert drawing adapter shared by the application and headless tests. Clicking a scenario
+/// returns a selection; only the App handoff above is allowed to enqueue repository work.
+#[derive(Default)]
+struct PickerAction {
+    close: bool,
+    start: Option<Scenario>,
+}
+
+fn practice_picker(ctx: &egui::Context, making: bool) -> PickerAction {
+    let mut action = PickerAction::default();
+    let modal = egui::Modal::new(egui::Id::new("practice-picker")).show(ctx, |ui| {
+        ui.set_width(520.0_f32.min((ctx.content_rect().width() - 48.0).max(180.0)));
+        ui.heading(crate::i18n::text("interaction-practice-picker-title"));
+        egui::ScrollArea::vertical()
+            .max_height((ctx.content_rect().height() * 0.7).max(120.0))
+            .show(ui, |ui| {
+                ui.label(crate::i18n::text("interaction-practice-picker-description"));
+                ui.add_space(10.0);
+                for scenario in Scenario::ALL {
+                    ui.group(|ui| {
+                        if ui
+                            .add_enabled(!making, egui::Button::new(scenario.display_title()))
+                            .clicked()
+                        {
+                            action.start = Some(scenario);
+                        }
+                        ui.label(scenario.display_goal());
+                    });
+                }
+            });
+        if making {
+            ui.horizontal(|ui| {
+                ui.add(crate::spinner::Spinner::new());
+                ui.label(crate::i18n::text("interaction-practice-making"));
+            });
+        }
+        action.close = ui
+            .button(crate::i18n::text("interaction-practice-close"))
+            .clicked();
+    });
+    action.close |= modal.should_close();
+    action
 }
 
 #[cfg(test)]
@@ -100,6 +119,52 @@ mod tests {
     use super::*;
     use egui_kittest::kittest::Queryable as _;
     use std::time::{Duration, Instant};
+
+    #[test]
+    fn fluent_picker_draws_and_selects_without_app_jobs_or_repositories() {
+        crate::i18n::set_language("en-US");
+        let mut h = egui_kittest::Harness::builder()
+            .with_size([900.0, 1500.0])
+            .build_ui_state(
+                |ui, state: &mut (bool, Option<Scenario>, bool)| {
+                    let action = practice_picker(ui.ctx(), state.0);
+                    if action.start.is_some() {
+                        state.1 = action.start;
+                    }
+                    state.2 |= action.close;
+                },
+                (false, None, false),
+            );
+        h.run_steps(3);
+        h.get_by_label("Practice git");
+        for scenario in Scenario::ALL {
+            h.get_by_label(scenario.display_title());
+            h.get_by_label(scenario.display_goal());
+        }
+        h.get_by_label("Rescue a detached HEAD").click();
+        h.run_steps(3);
+        assert_eq!(h.state().1, Some(Scenario::Detached));
+        crate::i18n::set_language("de");
+        h.run_steps(3);
+        h.get_by_label("Git üben");
+        h.get_by_label("Einen losgelösten HEAD retten");
+        h.get_by_label(Scenario::Published.display_goal());
+        h.get_by_label("Schließen").click();
+        h.run_steps(3);
+        assert!(h.state().2);
+        h.state_mut().0 = true;
+        h.state_mut().1 = None;
+        h.run_steps(3);
+        h.get_by_label("Übungsrepository wird erstellt…");
+        // A disabled scenario can be queried but cannot enqueue or select any work.
+        h.get_by_label("Einen Merge-Konflikt lösen").click();
+        h.run_steps(3);
+        assert_eq!(h.state().1, None);
+        crate::i18n::set_language("en-US");
+        h.run_steps(3);
+        h.get_by_label("Making a practice repository…");
+        h.get_by_label("Close");
+    }
 
     #[test]
     fn the_start_page_picker_creates_and_opens_the_selected_scenario() -> Result<(), String> {
@@ -115,9 +180,11 @@ mod tests {
         harness.run_steps(3);
         assert!(harness.state().practice_open);
         for scenario in Scenario::ALL {
-            let _ = harness.get_by_label(scenario.title());
+            let _ = harness.get_by_label(scenario.display_title());
         }
-        harness.get_by_label(Scenario::Detached.title()).click();
+        harness
+            .get_by_label(Scenario::Detached.display_title())
+            .click();
         harness.run_steps(3);
         let until = Instant::now() + Duration::from_secs(15);
         while harness.state().practicing.is_some() {
