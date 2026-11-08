@@ -57,3 +57,40 @@ interaction-operation-track-lfs = Track { $value } in LFS
 interaction-operation-undo = Undo { $operation }
 interaction-operation-unstage = Unstage
 interaction-operation-unstage-all = Unstage all
+
+interaction-release-bump = Commits { $files } on { $branch }: “chore(release): { $tag }”
+
+interaction-release-changelog = { $file } (the notes on top)
+
+interaction-release-forge = the forge
+
+interaction-release-publish = { $pre ->
+        [yes] Makes the pre-release { $tag } on { $forge } with the notes
+       *[no] Makes the release { $tag } on { $forge } with the notes
+    }
+
+interaction-release-push-bump = Pushes the version commit to { $remote }'s { $branch } and the tag to { $remote }, both or neither (git push --atomic)
+
+interaction-release-push-tag = Pushes the tag to { $remote }
+
+interaction-release-step-bump = Move the version
+
+interaction-release-step-publish = Make the release on the forge
+
+interaction-release-step-push = Push
+
+interaction-release-step-tag = Tag
+
+interaction-release-step-upload = Attach the files
+
+interaction-release-tag-object = { $kind ->
+        [signed] Makes the signed tag { $tag } at { $commit }, its message the notes (git tag -s { $tag })
+       *[annotated] Makes the annotated tag { $tag } at { $commit }, its message the notes (git tag -a { $tag })
+    }
+
+interaction-release-tag-version = { $kind ->
+        [signed] Makes the signed tag { $tag } at that commit, its message the notes (git tag -s { $tag })
+       *[annotated] Makes the annotated tag { $tag } at that commit, its message the notes (git tag -a { $tag })
+    }
+
+interaction-release-upload = Attaches { $files } to it

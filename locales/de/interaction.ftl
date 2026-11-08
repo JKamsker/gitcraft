@@ -57,3 +57,40 @@ interaction-operation-track-lfs = { $value } in LFS verwalten
 interaction-operation-undo = Rückgängig: { $operation }
 interaction-operation-unstage = Vormerkung aufheben
 interaction-operation-unstage-all = Alle Vormerkungen aufheben
+
+interaction-release-bump = Committet { $files } auf { $branch }: „chore(release): { $tag }“
+
+interaction-release-changelog = { $file } (Release Notes am Anfang)
+
+interaction-release-forge = der Forge
+
+interaction-release-publish = { $pre ->
+        [yes] Erstellt das Vorab-Release { $tag } auf { $forge } mit den Release Notes
+       *[no] Erstellt das Release { $tag } auf { $forge } mit den Release Notes
+    }
+
+interaction-release-push-bump = Pusht den Versions-Commit nach { $branch } auf { $remote } und den Tag nach { $remote }, beide oder keinen (git push --atomic)
+
+interaction-release-push-tag = Pusht den Tag nach { $remote }
+
+interaction-release-step-bump = Version aktualisieren
+
+interaction-release-step-publish = Release auf der Forge erstellen
+
+interaction-release-step-push = Pushen
+
+interaction-release-step-tag = Tag
+
+interaction-release-step-upload = Dateien anhängen
+
+interaction-release-tag-object = { $kind ->
+        [signed] Erstellt den signierten Tag { $tag } an { $commit } mit den Release Notes als Nachricht (git tag -s { $tag })
+       *[annotated] Erstellt den annotierten Tag { $tag } an { $commit } mit den Release Notes als Nachricht (git tag -a { $tag })
+    }
+
+interaction-release-tag-version = { $kind ->
+        [signed] Erstellt den signierten Tag { $tag } an diesem Commit mit den Release Notes als Nachricht (git tag -s { $tag })
+       *[annotated] Erstellt den annotierten Tag { $tag } an diesem Commit mit den Release Notes als Nachricht (git tag -a { $tag })
+    }
+
+interaction-release-upload = Hängt { $files } daran an
