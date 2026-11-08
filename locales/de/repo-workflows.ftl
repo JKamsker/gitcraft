@@ -164,3 +164,159 @@ repo-workflows-dco-whole-preview = Schreibt { $count ->
     Strg+Z stellt die lokalen Commits wieder her. Bereits veröffentlichter Remote-Verlauf kann nur durch einen eigenen geprüften Push wiederhergestellt werden.
        *[no] { "\u000ADer Branch hat keinen Remote-Branch: Es wird nichts gepusht. Ein späterer Push ersetzt dort die alten Commits (Force-Push).\u000A\u000AStrg+Z stellt die vorherigen Commits wieder her." }
     }
+
+repo-workflows-ghost-approval-preview-1426bc08 = { $files-len-1 } Arbeitsdateien ändern sich
+
+repo-workflows-ghost-approval-preview-675d236b = Verwirft uncommittete Arbeitsänderungen
+
+repo-workflows-ghost-approval-preview-70be46e5 = Liste zurückbleibender Commits bei 200 gekürzt
+
+repo-workflows-ghost-approval-preview-e74a52f6 = Hält bei Schritt { $conflict-step-1 } an: { $conflict-files-join-2 }
+
+repo-workflows-ghost-current-7776bacf = HEAD ist losgelöst. Checken Sie zuerst einen Branch aus.
+
+repo-workflows-ghost-delete-branch-26d05fbc = { $name } ist nicht in { $what } gemergt. Löschen wird ohne „Erzwingen (-D)“ abgelehnt. Mit Erzwingen bleiben seine eigenen Commits ohne Branch zurück.
+
+repo-workflows-ghost-delete-branch-dde58e5a = seinen Upstream
+
+repo-workflows-ghost-delete-branch-fadd1b38 = den ausgecheckten Branch
+
+repo-workflows-ghost-diverged-pull = { $branch } und { $tracking } sind auseinandergegangen. Ein Pull, der nur Fast-Forward zulässt, wird daher abgelehnt{ $fetched ->
+        [yes] { " (nur " }{ $tracking } wird mit dem abgerufenen Stand verschoben)
+       *[no] { "" }
+    }
+
+repo-workflows-ghost-drop-commit-181a54e0 = Nach dem Commit kamen Merges, die dieser Vorgang einebnen würde
+
+repo-workflows-ghost-drop-commit-da2d4ead = Der erste Commit hat keinen Elterncommit für einen Rebase
+
+repo-workflows-ghost-dropped-note = { $count ->
+        [one] Ein Commit ausgelassen: Seine Änderung ist bereits vorhanden.
+       *[other] { $count } Commits ausgelassen: Ihre Änderungen sind bereits vorhanden.
+    }
+
+repo-workflows-ghost-fetched-count = { $count ->
+        [one] Ein Commit abgerufen
+       *[other] { $count } Commits abgerufen
+    }
+
+repo-workflows-ghost-force-push-2d4460fd = Stand des letzten Abrufs von { $up-remote-1 }. Mit Lease wird der Push abgelehnt, wenn seitdem jemand gepusht hat.
+
+repo-workflows-ghost-force-push-a9c01edc = Hier gibt es keinen Branch { $name }
+
+repo-workflows-ghost-force-push-c637c04f = { $up-tracking-name-1 } verliert nichts. Ein normaler Push würde ausreichen.
+
+repo-workflows-ghost-force-push-f06fee94 = { $name } verfolgt keinen Remote-Branch
+
+repo-workflows-ghost-ghost-strip-a81f72de = Es wurde nichts ausgeführt
+
+repo-workflows-ghost-ghost-strip-c4a8b8f8 = Vorschau: { $title }
+
+repo-workflows-ghost-ghost-strip-d0c20bfd = Auswirkungen werden ermittelt …
+
+repo-workflows-ghost-ghost-strip-f637d899 = Vorschau nicht möglich. { $sentence-one-line-why-1 }
+
+repo-workflows-ghost-listed-683768ab = und { $items-len-listed-1 } weitere
+
+repo-workflows-ghost-lost-count = { $more ->
+        [yes] mehr als { $count } Commits
+       *[no] { $count ->
+            [one] ein Commit
+           *[other] { $count } Commits
+        }
+    }
+
+repo-workflows-ghost-lost-line-02717c8c = Verlässt den Remote-Branch ({ $count }): { $names }
+
+repo-workflows-ghost-lost-line-811bd7ca = Ohne Branch zurückgelassen ({ $count }): { $names }
+
+repo-workflows-ghost-lost-line-8ccbdaa0 = Ohne Branch zurückgelassen ({ $count }, davon { $o-replaced-1 } durch neue Kopien ersetzt): { $names }
+
+repo-workflows-ghost-new-above = { $count ->
+        [one] ↑ Ein neuer Commit liegt oberhalb der sichtbaren Zeilen.
+       *[other] ↑ { $count } neue Commits liegen oberhalb der sichtbaren Zeilen.
+    }
+
+repo-workflows-ghost-new-copies = { $count ->
+        [one] Ein neuer Commit
+       *[other] { $count } neue Commits
+    }
+
+repo-workflows-ghost-outcome-lines-02e3b1f7 = Keine Arbeitsdatei ändert sich.
+
+repo-workflows-ghost-outcome-lines-193731dd = Der Merge hält an
+
+repo-workflows-ghost-outcome-lines-4b54308f = Geänderte Arbeitsdateien ({ $files-len-1 }): { $listed-files-f-format-f-status-f-2 }
+
+repo-workflows-ghost-outcome-lines-7728bdcc = Hält bei Schritt { $c-step-1 } von { $c-of-2 } an ({ $describe-commit-3 })
+
+repo-workflows-ghost-outcome-lines-81deb64d = { $name } wird bei { $shown-to-1 } erstellt
+
+repo-workflows-ghost-outcome-lines-820df962 = Ermittelt mit { $engine-describe-1 }
+
+repo-workflows-ghost-outcome-lines-91af17db = { $name } wird gelöscht
+
+repo-workflows-ghost-outcome-lines-b8d8f166 = Verwirft { $describe-dropped-1 } — { $dropped-author-2 }
+
+repo-workflows-ghost-outcome-lines-ce73844c = { $name } wird verschoben: { $short-from-1 } → { $shown-to-2 }
+
+repo-workflows-ghost-outcome-lines-f0e05d95 = Der Commit wird leer
+
+repo-workflows-ghost-outcome-lines-f93fde8f = Konflikte in { $listed-c-files-f-f-clone-1 }
+
+repo-workflows-ghost-pull-3a19c0c2 = Uncommittete Änderungen werden zuerst gestasht und danach wiederhergestellt.
+
+repo-workflows-ghost-pull-9045dbaa = Stand des letzten Abrufs von { $up-remote-1 }. Spätere Pushes werden nicht angezeigt.
+
+repo-workflows-ghost-pull-c7917d08 = Fast-Forward: Der Branch wird auf den Remote-Commit verschoben.
+
+repo-workflows-ghost-pull-dd489c0a = Bereits aktuell. Der Branch enthält alles vom Remote.
+
+repo-workflows-ghost-pull-f53705f4 = { $branch-name-1 } verfolgt keinen Remote-Branch. Nichts zu pullen.
+
+repo-workflows-ghost-rebase-1f963916 = Bereits aktuell. Nichts erneut anzuwenden, keine Änderungen.
+
+repo-workflows-ghost-rebase-b1f8a147 = Der Rebase startet nicht mit uncommitteten Änderungen. Committen oder stashen Sie diese zuerst.
+
+repo-workflows-ghost-rebase-e550da8a = Uncommittete Änderungen werden zuerst gestasht und danach wiederhergestellt (rebase.autoStash).
+
+repo-workflows-ghost-replaced-originals = Durch neue Kopien ersetzt ({ $count }; { $number ->
+        [one] das Original liegt auf keinem Branch mehr
+       *[other] die Originale liegen auf keinem Branch mehr
+    }): { $names }
+
+repo-workflows-ghost-reset-hard-3126bbde = Uncommittete Änderungen dieser Dateien gehen unwiderruflich verloren.
+
+repo-workflows-ghost-rewrite-3477e4cb = Der Rebase hält dort an und fragt, ob der leer gewordene Commit erhalten bleiben soll. Der Branch bewegt sich noch nicht.
+
+repo-workflows-ghost-rewrite-3d8b966c = rebase.rebaseMerges ist gesetzt und die Commits enthalten Merges. Git behält diese, die Vorschau kann sie noch nicht erneut anwenden.
+
+repo-workflows-ghost-rewrite-af60968a = Geänderte Dateien werden nicht aufgelistet. Git { $self-version-1 } wendet die Commits in einem Scratch-Klon erneut an.
+
+repo-workflows-ghost-rewrite-c84070ef = { $w-picks-len-1 } Commits erneut anzuwenden. Zu viele für die Vorschau (höchstens { $PICKS-LIMIT }).
+
+repo-workflows-ghost-rewrite-e69265a2 = Der Rebase hält dort bis zur Konfliktlösung an. Der Branch bewegt sich noch nicht.
+
+repo-workflows-ghost-rewrite-fb29af2f = HEAD ist währenddessen mitten im Rebase bei { $waits } losgelöst.
+
+repo-workflows-ghost-shown-4ef6715c = ein Merge-Commit
+
+repo-workflows-ghost-timeline-18df3f5f = Dateiänderungsvorschau unvollständig: Erforderliche Blobs fehlen lokal oder das begrenzte Lesen wurde beendet. Keine Objekte wurden heruntergeladen.
+
+repo-workflows-ghost-timeline-48223518 = Ungültige Timeline-Commit-ID
+
+repo-workflows-ghost-timeline-5a1baa67 = Timeline-Vorschau unvollständig: Erforderlicher lokaler Verlauf fehlt oder das begrenzte Lesen wurde beendet. Darüberfahren lädt nie Objekte herunter.
+
+repo-workflows-ghost-timeline-6f3d9015 = Uncommittete Änderungen bleiben mit --keep erhalten. Ein kollidierender Checkout verweigert den Sprung.
+
+repo-workflows-ghost-timeline-c25867a7 = Gespeicherte Referenzen halten frühere Zustände wiederherstellbar. Diese Vorschau bewegt weder Referenzen noch Dateien.
+
+repo-workflows-local_ci-submit-84f8f92f = Vor dem Start abgebrochen
+
+repo-workflows-postcards-bounded-graph-8e2ed023 = Postkartenrendering abgebrochen
+
+repo-workflows-saved_views-poll-33647b3e = Verlaufsprozess abgestürzt
+
+repo-workflows-saved_views-poll-da12ac51 = Verlaufsprozess angehalten
+
+repo-workflows-saved_views-poll-dc101692 = Lesen des Verlaufs abgebrochen

@@ -164,3 +164,159 @@ repo-workflows-dco-whole-preview = Rewrites { $count ->
     Ctrl+Z restores the local commits. Restoring published remote history requires its own reviewed push.
        *[no] { "\u000AThe branch has no remote branch: nothing is pushed. Pushing it later replaces the old commits there (a force push).\u000A\u000ACtrl+Z puts the commits as they were back." }
     }
+
+repo-workflows-ghost-approval-preview-1426bc08 = { $files-len-1 } working files change
+
+repo-workflows-ghost-approval-preview-675d236b = Discards uncommitted working changes
+
+repo-workflows-ghost-approval-preview-70be46e5 = Leaving-commit list is truncated at 200
+
+repo-workflows-ghost-approval-preview-e74a52f6 = Stops at step { $conflict-step-1 }: { $conflict-files-join-2 }
+
+repo-workflows-ghost-current-7776bacf = HEAD is detached: check out a branch first
+
+repo-workflows-ghost-delete-branch-26d05fbc = { $name } isn't merged into { $what }: Delete refuses unless Force (-D) is ticked, which leaves its own commits on no branch.
+
+repo-workflows-ghost-delete-branch-dde58e5a = its upstream
+
+repo-workflows-ghost-delete-branch-fadd1b38 = the checked-out branch
+
+repo-workflows-ghost-diverged-pull = { $branch } and { $tracking } have diverged, so a fast-forward-only pull refuses{ $fetched ->
+        [yes] { " (only " }{ $tracking } moves, with what it fetches)
+       *[no] { "" }
+    }
+
+repo-workflows-ghost-drop-commit-181a54e0 = merges came after the commit, which this would flatten
+
+repo-workflows-ghost-drop-commit-da2d4ead = the first commit has no parent to rebase from
+
+repo-workflows-ghost-dropped-note = { $count ->
+        [one] One commit dropped: its change is already there.
+       *[other] { $count } commits dropped: their changes are already there.
+    }
+
+repo-workflows-ghost-fetched-count = { $count ->
+        [one] One commit fetched
+       *[other] { $count } commits fetched
+    }
+
+repo-workflows-ghost-force-push-2d4460fd = As of the last fetch of { $up-remote-1 }: with the lease, the push is refused if someone pushed since.
+
+repo-workflows-ghost-force-push-a9c01edc = there is no branch { $name } here
+
+repo-workflows-ghost-force-push-c637c04f = { $up-tracking-name-1 } loses nothing: a plain push would do.
+
+repo-workflows-ghost-force-push-f06fee94 = { $name } tracks no branch on a remote
+
+repo-workflows-ghost-ghost-strip-a81f72de = nothing has been done
+
+repo-workflows-ghost-ghost-strip-c4a8b8f8 = Preview: { $title }
+
+repo-workflows-ghost-ghost-strip-d0c20bfd = Working out what it would do…
+
+repo-workflows-ghost-ghost-strip-f637d899 = Can't preview it. { $sentence-one-line-why-1 }
+
+repo-workflows-ghost-listed-683768ab = and { $items-len-listed-1 } more
+
+repo-workflows-ghost-lost-count = { $more ->
+        [yes] more than { $count } commits
+       *[no] { $count ->
+            [one] one commit
+           *[other] { $count } commits
+        }
+    }
+
+repo-workflows-ghost-lost-line-02717c8c = Leaving the remote's branch ({ $count }): { $names }
+
+repo-workflows-ghost-lost-line-811bd7ca = Left on no branch ({ $count }): { $names }
+
+repo-workflows-ghost-lost-line-8ccbdaa0 = Left on no branch ({ $count }, { $o-replaced-1 } of them replaced by new copies): { $names }
+
+repo-workflows-ghost-new-above = { $count ->
+        [one] ↑ One new commit is above the rows in view.
+       *[other] ↑ { $count } new commits are above the rows in view.
+    }
+
+repo-workflows-ghost-new-copies = { $count ->
+        [one] One new commit
+       *[other] { $count } new commits
+    }
+
+repo-workflows-ghost-outcome-lines-02e3b1f7 = No file of the working tree changes.
+
+repo-workflows-ghost-outcome-lines-193731dd = The merge stops
+
+repo-workflows-ghost-outcome-lines-4b54308f = Files of the working tree that change ({ $files-len-1 }): { $listed-files-f-format-f-status-f-2 }
+
+repo-workflows-ghost-outcome-lines-7728bdcc = Stops at step { $c-step-1 } of { $c-of-2 } ({ $describe-commit-3 })
+
+repo-workflows-ghost-outcome-lines-81deb64d = { $name } is made at { $shown-to-1 }
+
+repo-workflows-ghost-outcome-lines-820df962 = Worked out with { $engine-describe-1 }
+
+repo-workflows-ghost-outcome-lines-91af17db = { $name } is deleted
+
+repo-workflows-ghost-outcome-lines-b8d8f166 = Drops { $describe-dropped-1 } — { $dropped-author-2 }
+
+repo-workflows-ghost-outcome-lines-ce73844c = { $name } moves { $short-from-1 } → { $shown-to-2 }
+
+repo-workflows-ghost-outcome-lines-f0e05d95 = the commit becomes empty
+
+repo-workflows-ghost-outcome-lines-f93fde8f = conflicts in { $listed-c-files-f-f-clone-1 }
+
+repo-workflows-ghost-pull-3a19c0c2 = Uncommitted changes are stashed first and put back after.
+
+repo-workflows-ghost-pull-9045dbaa = As of the last fetch of { $up-remote-1 }: what was pushed there since isn't shown.
+
+repo-workflows-ghost-pull-c7917d08 = Fast-forward: the branch moves to its remote's commit.
+
+repo-workflows-ghost-pull-dd489c0a = Already up to date: the branch has everything its remote has.
+
+repo-workflows-ghost-pull-f53705f4 = { $branch-name-1 } tracks no branch on a remote: nothing to pull
+
+repo-workflows-ghost-rebase-1f963916 = Already up to date: nothing to replay, nothing changes.
+
+repo-workflows-ghost-rebase-b1f8a147 = the rebase refuses to start with uncommitted changes: commit or stash them first
+
+repo-workflows-ghost-rebase-e550da8a = Uncommitted changes are stashed first and put back after (rebase.autoStash).
+
+repo-workflows-ghost-replaced-originals = Replaced by new copies ({ $count }; { $number ->
+        [one] the original is left on no branch
+       *[other] the originals are left on no branch
+    }): { $names }
+
+repo-workflows-ghost-reset-hard-3126bbde = Uncommitted changes to these files are thrown away, and can't be brought back.
+
+repo-workflows-ghost-rewrite-3477e4cb = The rebase stops there, asking whether to keep the commit that became empty; the branch doesn't move yet.
+
+repo-workflows-ghost-rewrite-3d8b966c = rebase.rebaseMerges is set and merges are among the commits: git keeps them, which the preview can't replay yet
+
+repo-workflows-ghost-rewrite-af60968a = The files that change aren't listed: git { $self-version-1 } replays in a scratch clone.
+
+repo-workflows-ghost-rewrite-c84070ef = { $w-picks-len-1 } commits to replay, too many to preview (at most { $PICKS-LIMIT })
+
+repo-workflows-ghost-rewrite-e69265a2 = The rebase stops there until the conflicts are resolved; the branch doesn't move yet.
+
+repo-workflows-ghost-rewrite-fb29af2f = Meanwhile HEAD is detached at { $waits }, mid-rebase.
+
+repo-workflows-ghost-shown-4ef6715c = a merge commit
+
+repo-workflows-ghost-timeline-18df3f5f = File-change preview is incomplete: required blobs are unavailable locally or the bounded read stopped. No objects were downloaded.
+
+repo-workflows-ghost-timeline-48223518 = Invalid timeline commit ID
+
+repo-workflows-ghost-timeline-5a1baa67 = Timeline preview is incomplete: required local history is missing or the bounded read stopped. Hover never downloads objects.
+
+repo-workflows-ghost-timeline-6f3d9015 = Uncommitted changes are preserved with --keep; a conflicting checkout will refuse the jump.
+
+repo-workflows-ghost-timeline-c25867a7 = Saved refs keep earlier states recoverable. This preview moves no refs or files.
+
+repo-workflows-local_ci-submit-84f8f92f = Cancelled before starting
+
+repo-workflows-postcards-bounded-graph-8e2ed023 = Postcard rendering cancelled
+
+repo-workflows-saved_views-poll-33647b3e = History worker panicked
+
+repo-workflows-saved_views-poll-da12ac51 = History worker stopped
+
+repo-workflows-saved_views-poll-dc101692 = History read cancelled

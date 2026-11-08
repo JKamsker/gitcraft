@@ -77,7 +77,7 @@ struct Shown {
     key: Key,
     /// The history the view was laid out from (see `RepoTab::history_gen`).
     history: u64,
-    result: Arc<Result<Outcome, String>>,
+    result: Arc<Result<Outcome, PreviewFailure>>,
     view: Option<GhostView>,
     /// The view is in the tab's place while the graph draws (see [`Ghost::swap_in`]).
     swapped: bool,
@@ -220,14 +220,14 @@ impl Ghost {
         }
     }
 
-    fn cached(&self, key: &Key) -> Option<Arc<Result<Outcome, String>>> {
+    fn cached(&self, key: &Key) -> Option<Arc<Result<Outcome, PreviewFailure>>> {
         self.cache
             .iter()
             .find(|(k, _, _)| k == key)
             .map(|(_, _, r)| Arc::clone(r))
     }
 
-    fn remember(&mut self, key: Key, result: &Arc<Result<Outcome, String>>) {
+    fn remember(&mut self, key: Key, result: &Arc<Result<Outcome, PreviewFailure>>) {
         self.cache.retain(|(k, _, _)| *k != key);
         self.cache
             .push_front((key, Instant::now(), Arc::clone(result)));
@@ -236,14 +236,59 @@ impl Ghost {
 }
 
 /// An outcome worked out, or why it couldn't be.
-type Found = Arc<Result<Outcome, String>>;
+type Found = Arc<Result<Outcome, PreviewFailure>>;
+
+/// A retained failure's source; no String is ever inferred to be a backend-owned variant.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum PreviewFailure {
+    Backend(crate::git::dry_run::Failure),
+    RawPlan(String),
+}
+
+impl From<String> for PreviewFailure {
+    fn from(raw: String) -> Self {
+        Self::RawPlan(raw)
+    }
+}
+impl From<crate::git::dry_run::Failure> for PreviewFailure {
+    fn from(failure: crate::git::dry_run::Failure) -> Self {
+        Self::Backend(failure)
+    }
+}
+impl PreviewFailure {
+    pub(crate) fn raw(&self) -> String {
+        match self {
+            Self::Backend(failure) => failure.raw(),
+            Self::RawPlan(raw) => raw.clone(),
+        }
+    }
+    pub(crate) fn display(&self) -> String {
+        match self {
+            Self::Backend(failure) => failure.display(),
+            Self::RawPlan(raw) => plan::display_preview_text(raw),
+        }
+    }
+    fn is_cancelled(&self) -> bool {
+        match self {
+            Self::Backend(failure) => failure.is_cancelled(),
+            Self::RawPlan(raw) => raw == CANCELLED,
+        }
+    }
+    /// Existing String callers retain the backend's display-at-call compatibility boundary.
+    fn legacy(&self) -> String {
+        match self {
+            Self::Backend(failure) => failure.display(),
+            Self::RawPlan(raw) => raw.clone(),
+        }
+    }
+}
 
 /// What the strip shows.
 pub(crate) enum Strip<'a> {
     /// Worked out in the background.
     Working(String),
     Ready(String, &'a Outcome),
-    Failed(String, &'a str),
+    Failed(String, &'a PreviewFailure),
 }
 
 impl RepoTab {
@@ -371,7 +416,14 @@ impl RepoTab {
             ctx,
             move |error| {
                 super::Msg::Then(Box::new(move |tab, ctx| {
-                    tab.ghost_arrived(id, failure_key, history, Arc::new(Err(error)), None, ctx);
+                    tab.ghost_arrived(
+                        id,
+                        failure_key,
+                        history,
+                        Arc::new(Err(error.into())),
+                        None,
+                        ctx,
+                    );
                 }))
             },
             move || {
@@ -383,7 +435,7 @@ impl RepoTab {
                         } else {
                             git_version(&repo, &version)
                         })
-                        .and_then(|v| plan::plan(&repo, &op, &facts, v, &stop))
+                        .and_then(|v| plan::plan_with_witness(&repo, &op, &facts, v, &stop))
                         .map(|mut outcome| {
                             if matches!(op, GhostOp::Timeline { .. }) {
                                 let loaded: std::collections::HashSet<_> =
@@ -422,11 +474,11 @@ impl RepoTab {
         id: u64,
         key: Key,
         history: u64,
-        result: Arc<Result<Outcome, String>>,
+        result: Arc<Result<Outcome, PreviewFailure>>,
         view: Option<GhostView>,
         ctx: &egui::Context,
     ) {
-        let cancelled = matches!(&*result, Err(e) if e == CANCELLED);
+        let cancelled = matches!(&*result, Err(e) if e.is_cancelled());
         // Only what was worked out: a failure may be passing (a machine not reachable).
         if result.is_ok() {
             self.ghost.remember(key.clone(), &result);
@@ -500,11 +552,11 @@ impl Ghost {
 fn git_version(
     repo: &std::path::Path,
     cache: &Mutex<Option<GitVersion>>,
-) -> Result<GitVersion, String> {
+) -> Result<GitVersion, PreviewFailure> {
     if let Some(v) = cache.lock().ok().and_then(|c| *c) {
         return Ok(v);
     }
-    let v = GitVersion::of(repo)?;
+    let v = GitVersion::of_with_witness(repo)?;
     if let Ok(mut c) = cache.lock() {
         *c = Some(v);
     }
@@ -526,20 +578,28 @@ pub(in crate::repo) fn approval_preview(
     notes.extend(outcome.warnings);
     notes.extend(outcome.refused);
     if outcome.discards_work {
-        notes.push("Discards uncommitted working changes".into());
+        notes.push(crate::i18n::text("repo-workflows-ghost-approval-preview-675d236b").into());
     }
     if let Some(files) = outcome.files {
-        notes.push(format!("{} working files change", files.len()));
+        notes.push(crate::i18n::message(
+            "repo-workflows-ghost-approval-preview-1426bc08",
+            &[("files-len-1", (files.len()).clone().into())],
+        ));
     }
     if let Some(conflict) = outcome.conflict {
-        notes.push(format!(
-            "Stops at step {}: {}",
-            conflict.step,
-            conflict.files.join(", ")
+        notes.push(crate::i18n::message(
+            "repo-workflows-ghost-approval-preview-e74a52f6",
+            &[
+                ("conflict-step-1", (conflict.step).clone().into()),
+                (
+                    "conflict-files-join-2",
+                    (conflict.files.join(", ")).clone().into(),
+                ),
+            ],
         ));
     }
     if outcome.lost_more {
-        notes.push("Leaving-commit list is truncated at 200".into());
+        notes.push(crate::i18n::text("repo-workflows-ghost-approval-preview-70be46e5").into());
     }
     Ok(crate::repo::agent::preview::Preview {
         moves: outcome

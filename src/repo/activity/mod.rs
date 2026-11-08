@@ -256,6 +256,46 @@ pub(super) fn seconds(d: Duration) -> String {
     }
 }
 
+/// Finite workflow-owned control errors: presentation only; unknown diagnostics remain opaque.
+pub(in crate::repo) fn display_workflow_error(error: &str) -> String {
+    match error {
+        "Cancelled before starting" => {
+            crate::i18n::text("repo-workflows-local_ci-submit-84f8f92f").to_owned()
+        }
+        "Cancelled before terminal start" => {
+            crate::i18n::text("repo-workflows-devcontainer-terminal-f171832a").to_owned()
+        }
+        "File history cancelled" => {
+            crate::i18n::text("repo-workflows-atlas-new-70ba4563").to_owned()
+        }
+        "History read cancelled" => {
+            crate::i18n::text("repo-workflows-saved_views-poll-dc101692").to_owned()
+        }
+        "History summary cancelled or exceeded its output limit" => {
+            crate::i18n::text("repo-workflows-line_dossier-run-a9f1b338").to_owned()
+        }
+        "History worker panicked" => {
+            crate::i18n::text("repo-workflows-saved_views-poll-33647b3e").to_owned()
+        }
+        "History worker stopped" => {
+            crate::i18n::text("repo-workflows-saved_views-poll-da12ac51").to_owned()
+        }
+        "Moved-code analysis cancelled or exceeded 40 seconds" => {
+            crate::i18n::text("repo-workflows-file_comparison-read-431f5828").to_owned()
+        }
+        "Moved-code comparison cancelled" => {
+            crate::i18n::text("repo-workflows-file_comparison-assemble-56abde67").to_owned()
+        }
+        "Postcard rendering cancelled" => {
+            crate::i18n::text("repo-workflows-postcards-bounded-graph-8e2ed023").to_owned()
+        }
+        "Summary cancelled" => {
+            crate::i18n::text("repo-workflows-line_dossier-run-ae6f0623").to_owned()
+        }
+        other => crate::git::display_error(&crate::forge::inbox::display_error(other)),
+    }
+}
+
 #[cfg(test)]
 mod tests;
 
