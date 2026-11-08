@@ -267,6 +267,9 @@ fn owned_completion(
 ) -> Result<Ran, RunError> {
     match result {
         Err(crate::processes::Failure::CancelledBeforeStart) => Err(RunError::Cancelled),
+        Err(crate::processes::Failure::TimedOutBeforeStart) => {
+            Err(timed_out(&job.command.program(), job.timeout))
+        }
         Err(e) => Err(RunError::Failed(e.message())),
         Ok(out) => {
             if let Some(reason) = out.stopped {

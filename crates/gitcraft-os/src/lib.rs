@@ -25,6 +25,8 @@ pub struct Link {
     pub tooltip: String,
 }
 
+mod close_file;
+pub use close_file::close_file;
 mod workspace_lock;
 pub use workspace_lock::{WorkspaceClaim, WorkspaceFence, WorkspaceGrant};
 mod private_directory;

@@ -22,6 +22,7 @@ mod supervisor;
 mod transport;
 mod ui_guard;
 mod vault;
+pub(crate) mod workspace_authority;
 
 use std::path::{Path, PathBuf};
 
@@ -53,10 +54,11 @@ pub(crate) fn recover_owner(record: &Path) -> Result<Vec<u8>, String> {
         bytes.ok_or_else(|| "missing, replaced or invalid owner record; cleanup unknown".into())
     };
     let bytes = read_record()?;
+    let endpoint = workspace_authority::endpoint(&bytes)?;
     if let Some(target) = parse(record) {
-        session::stop_endpoint(&target.host, &supervisor::Endpoint::from_record(&bytes)?)?;
+        session::stop_endpoint(&target.host, &supervisor::Endpoint::from_record(&endpoint)?)?;
     } else {
-        native_owner::Endpoint::from_record(&bytes)?.stop()?;
+        native_owner::Endpoint::from_record(&endpoint)?.stop()?;
     }
     if read_record()? != bytes {
         return Err("owner record changed during recovery; workspace preserved".into());
@@ -67,10 +69,11 @@ pub(crate) fn recover_owner(record: &Path) -> Result<Vec<u8>, String> {
 /// After confirmed workspace cleanup, remove only the authenticated owner's private
 /// terminal artifacts. Failure retains temporary evidence and never sends a signal.
 pub(crate) fn retire_owner(record: &Path, bytes: &[u8]) -> Result<(), String> {
+    let endpoint = workspace_authority::endpoint(bytes)?;
     if let Some(target) = parse(record) {
-        session::retire_endpoint(&target.host, &supervisor::Endpoint::from_record(bytes)?)
+        session::retire_endpoint(&target.host, &supervisor::Endpoint::from_record(&endpoint)?)
     } else {
-        native_owner::Endpoint::from_record(bytes)?.retire()
+        native_owner::Endpoint::from_record(&endpoint)?.retire()
     }
 }
 pub use ui_guard::{mark_ui_thread, refused_on_ui_thread};

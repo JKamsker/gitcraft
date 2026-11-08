@@ -158,6 +158,10 @@ mod recording_outcomes {
             Err(Failure::CancelledBeforeStart)
         ));
         assert!(matches!(
+            checked(Err("process timed out and was stopped".into())),
+            Err(Failure::TimedOutBeforeStart)
+        ));
+        assert!(matches!(
             checked(Err("could not finish owned process".into())),
             Err(Failure::Failed(_))
         ));
@@ -184,20 +188,26 @@ mod recording_outcomes {
 #[derive(Debug)]
 pub(crate) enum Failure {
     CancelledBeforeStart,
+    TimedOutBeforeStart,
     Failed(String),
 }
 impl Failure {
     pub(crate) fn message(self) -> String {
         match self {
             Self::CancelledBeforeStart => "cancelled before execution".into(),
+            Self::TimedOutBeforeStart => "timed out before execution".into(),
             Self::Failed(message) => message,
         }
     }
 }
 pub(crate) fn checked(result: ResultOutput) -> Result<Output, Failure> {
+    // These exact Err values originate only before Service dispatch. Dispatched stop or
+    // timeout returns Output with typed stop_kind; arbitrary cleanup errors stay failures.
     result.map_err(|message| {
         if message == "cancelled" {
             Failure::CancelledBeforeStart
+        } else if message == "process timed out and was stopped" {
+            Failure::TimedOutBeforeStart
         } else {
             Failure::Failed(message)
         }

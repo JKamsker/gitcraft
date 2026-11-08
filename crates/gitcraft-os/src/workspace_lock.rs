@@ -21,6 +21,7 @@ pub struct WorkspaceClaim {
 }
 pub struct WorkspaceFence {
     coordination: Coordination,
+    generation: String,
 }
 struct Coordination {
     path: PathBuf,
@@ -299,7 +300,26 @@ impl WorkspaceFence {
                 "workspace primary owner is no longer live",
             ));
         }
-        Ok(Self { coordination })
+        Ok(Self {
+            coordination,
+            generation: grant.generation.clone(),
+        })
+    }
+    pub fn publish_record(&self, name: &str, bytes: &[u8]) -> io::Result<()> {
+        if bytes.len() > 2048
+            || !name.starts_with(&format!("{}-", self.generation))
+            || !name.ends_with(".owner")
+        {
+            return Err(io::Error::other("invalid bounded generation owner record"));
+        }
+        self.coordination.verify_names()?;
+        let mut file = self
+            .coordination
+            .directory
+            .open_file(name, PrivateFileMode::CreateNew)?;
+        file.write_all(bytes)?;
+        file.sync_all()?;
+        crate::close_file(file)
     }
     pub fn verify(&self, grant: &WorkspaceGrant) -> io::Result<()> {
         self.coordination.verify_names()?;

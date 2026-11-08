@@ -60,6 +60,8 @@ struct Request {
     cwd: Option<Word>,
     record: PathBuf,
     milliseconds: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    workspace: Option<super::workspace_authority::WorkspaceAuthority>,
 }
 
 #[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -153,6 +155,15 @@ impl Endpoint {
         if self.terminal().is_ok() {
             return Ok(());
         }
+        match self.stop_exchange() {
+            Ok(()) => Ok(()),
+            Err(error) => self
+                .terminal()
+                .map(|_| ())
+                .map_err(|proof| format!("{error}; atomic cleanup proof unavailable: {proof}")),
+        }
+    }
+    fn stop_exchange(&self) -> Result<(), String> {
         let deadline = Instant::now() + Duration::from_secs(5);
         let address = SocketAddrV4::new(Ipv4Addr::LOCALHOST, self.port);
         let mut socket = TcpStream::connect_timeout(&address.into(), Duration::from_secs(2))
@@ -195,6 +206,14 @@ pub(crate) fn command(
     record: &Path,
     limit: Duration,
 ) -> Result<NativeCommand, String> {
+    command_with_authority(command, record, limit, None)
+}
+pub(crate) fn command_with_authority(
+    command: Command,
+    record: &Path,
+    limit: Duration,
+    workspace: Option<super::workspace_authority::WorkspaceAuthority>,
+) -> Result<NativeCommand, String> {
     let nonce = random_hex(32)?;
     let request = Request {
         nonce: nonce.clone(),
@@ -209,6 +228,7 @@ pub(crate) fn command(
             .map(|p| Word::capture(p.as_os_str())),
         record: record.into(),
         milliseconds: u64::try_from(limit.as_millis()).map_err(|e| e.to_string())?,
+        workspace,
     };
     let mut input = serde_json::to_vec(&request).map_err(|e| e.to_string())?;
     input.push(b'\n');
@@ -306,9 +326,51 @@ fn private_file(path: &Path, bytes: &[u8]) -> Result<(), String> {
     let mut file = options.open(path).map_err(|e| e.to_string())?;
     file.write_all(bytes)
         .and_then(|()| file.sync_all())
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    gitcraft_os::close_file(file).map_err(|e| e.to_string())
 }
-fn helper() -> Result<i32, String> {
+type TerminalParts = (i32, bool, Vec<u8>, Vec<u8>);
+fn terminal_parts(
+    result: Result<crate::processes::Output, String>,
+) -> Result<TerminalParts, String> {
+    use crate::processes::{Failure, StopKind};
+    match crate::processes::checked(result) {
+        Err(Failure::CancelledBeforeStart | Failure::TimedOutBeforeStart) => {
+            Ok((125, false, Vec::new(), Vec::new()))
+        }
+        Err(error) => Err(error.message()),
+        Ok(result) => {
+            if result.stop_kind == Some(StopKind::Uncertain) {
+                return Err("native cleanup unconfirmed".into());
+            }
+            Ok((
+                result.status.code().unwrap_or(125),
+                result.stopped.is_none(),
+                result.stdout,
+                result.stderr,
+            ))
+        }
+    }
+}
+fn terminal_receipt(
+    path: &Path,
+    endpoint: &Endpoint,
+    code: i32,
+    complete: bool,
+) -> Result<Vec<u8>, String> {
+    let receipt = Receipt {
+        endpoint: endpoint.clone(),
+        state: "stopped".into(),
+        code: i64::from(code),
+        complete,
+    };
+    let mut bytes = serde_json::to_vec(&receipt).map_err(|e| e.to_string())?;
+    bytes.push(b'\n');
+    private_file(&path.join("terminal.new"), &bytes)?;
+    std::fs::rename(path.join("terminal.new"), path.join("terminal")).map_err(|e| e.to_string())?;
+    Ok(bytes)
+}
+fn helper(fence: &mut Option<gitcraft_os::WorkspaceFence>) -> Result<i32, String> {
     gitcraft_os::detach_controller().map_err(|e| e.to_string())?;
     let mut controller = BufReader::new(std::io::stdin());
     let mut line = Vec::new();
@@ -327,29 +389,6 @@ fn helper() -> Result<i32, String> {
     {
         return Err("invalid native request identity/deadline".into());
     }
-    let path = std::env::temp_dir().join(format!("{PREFIX}{}", random_hex(16)?));
-    gitcraft_os::create_private_directory(&path).map_err(|e| e.to_string())?;
-    let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).map_err(|e| e.to_string())?;
-    listener.set_nonblocking(true).map_err(|e| e.to_string())?;
-    let endpoint = Endpoint {
-        v: 2,
-        nonce: request.nonce,
-        path: path.clone(),
-        port: listener.local_addr().map_err(|e| e.to_string())?.port(),
-        token: random_hex(32)?,
-    };
-    let bytes = serde_json::to_vec(&endpoint).map_err(|e| e.to_string())?;
-    // Exclusive record creation precedes target submission. Workspace created its private
-    // directory, with owner-only inherited ACLs on Windows and mode 0700 on Unix.
-    private_file(&request.record, &bytes)?;
-    println!("\n{READY}");
-    std::io::stdout().flush().map_err(|e| e.to_string())?;
-    std::io::stderr()
-        .write_all(MARKER)
-        .and_then(|()| std::io::stderr().write_all(&bytes))
-        .and_then(|()| std::io::stderr().write_all(b"\n"))
-        .and_then(|()| std::io::stderr().flush())
-        .map_err(|e| e.to_string())?;
     let cancel = crate::tasks::Cancellation::default();
     let eof = cancel.clone();
     std::thread::spawn(move || {
@@ -364,14 +403,27 @@ fn helper() -> Result<i32, String> {
             }
         }
     });
+    let started = Instant::now();
+    *fence = request
+        .workspace
+        .as_ref()
+        .map(|authority| {
+            authority.record_name(&request.record)?;
+            gitcraft_os::WorkspaceFence::acquire(&authority.native_grant(), || {
+                !cancel.is_cancelled()
+                    && started.elapsed() < Duration::from_millis(request.milliseconds)
+            })
+            .map_err(|e| e.to_string())
+        })
+        .transpose()?;
     let mut command = Command::new(request.program.restore()?);
-    for word in request.args {
+    for word in &request.args {
         command.arg(word.restore()?);
     }
-    if let Some(cwd) = request.cwd {
+    if let Some(cwd) = &request.cwd {
         command.current_dir(cwd.restore()?);
     }
-    for (key, value) in request.env {
+    for (key, value) in &request.env {
         let key = key.restore()?;
         if let Some(value) = value {
             command.env(key, value.restore()?);
@@ -380,20 +432,77 @@ fn helper() -> Result<i32, String> {
         }
     }
     command.env_remove("GITCRAFT_NATIVE_HELPER");
-    let ticket = crate::processes::service()?.submit(
-        command,
-        crate::processes::Options {
-            cancel: cancel.clone(),
-            timeout: Some(Duration::from_millis(request.milliseconds)),
-            ..Default::default()
-        },
-    )?;
+    let path = std::env::temp_dir().join(format!("{PREFIX}{}", random_hex(16)?));
+    gitcraft_os::create_private_directory(&path).map_err(|e| e.to_string())?;
+    let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).map_err(|e| e.to_string())?;
+    listener.set_nonblocking(true).map_err(|e| e.to_string())?;
+    let endpoint = Endpoint {
+        v: 2,
+        nonce: request.nonce.clone(),
+        path: path.clone(),
+        port: listener.local_addr().map_err(|e| e.to_string())?.port(),
+        token: random_hex(32)?,
+    };
+    let bytes = serde_json::to_vec(&endpoint).map_err(|e| e.to_string())?;
+    // Exclusive record creation precedes target submission. Workspace created its private
+    // directory, with owner-only inherited ACLs on Windows and mode 0700 on Unix.
+    if let Some(authority) = &request.workspace {
+        let name = authority.record_name(&request.record)?;
+        let bound = super::workspace_authority::record(&bytes, authority)?;
+        fence
+            .as_ref()
+            .ok_or("missing actual workspace fence")?
+            .publish_record(name, &bound)
+            .map_err(|e| e.to_string())?;
+    } else {
+        private_file(&request.record, &bytes)?;
+    }
+    let submitted = (|| {
+        println!("\n{READY}");
+        std::io::stdout().flush().map_err(|e| e.to_string())?;
+        std::io::stderr()
+            .write_all(MARKER)
+            .and_then(|()| std::io::stderr().write_all(&bytes))
+            .and_then(|()| std::io::stderr().write_all(b"\n"))
+            .and_then(|()| std::io::stderr().flush())
+            .map_err(|e| e.to_string())?;
+        crate::processes::service()?.submit(
+            command,
+            crate::processes::Options {
+                cancel: cancel.clone(),
+                timeout: Some(Duration::from_millis(request.milliseconds)),
+                ..Default::default()
+            },
+        )
+    })();
+    let ticket = match submitted {
+        Ok(ticket) => ticket,
+        Err(error) => {
+            // No successful submit: there is no target or future queued dispatch. Preserve
+            // an authenticated NotDispatched terminal proof when the record was published.
+            if let Err(proof) = terminal_receipt(&path, &endpoint, 125, false) {
+                return Err(format!(
+                    "{error}; NotDispatched proof publication failed: {proof}"
+                ));
+            }
+            return Err(error);
+        }
+    };
+    if request
+        .workspace
+        .as_ref()
+        .is_some_and(|a| a.mode == super::workspace_authority::FenceMode::Dispatch)
+    {
+        // The actual helper and cancellation token are live, the durable record is complete,
+        // and the only pending ticket is now sticky-cancelable before releasing this fence.
+        drop(fence.take());
+    }
     let mut clients = Vec::new();
     let mut pending_clients: Vec<(TcpStream, Vec<u8>, Instant)> = Vec::new();
     let start = Instant::now();
     let result = loop {
         if let Some(result) = ticket.try_result() {
-            break result?;
+            break terminal_parts(result)?;
         }
         if start.elapsed() > Duration::from_millis(request.milliseconds) + Duration::from_secs(10) {
             cancel.cancel();
@@ -448,22 +557,11 @@ fn helper() -> Result<i32, String> {
         }
         std::thread::sleep(Duration::from_millis(20));
     };
-    // A Service error is not acknowledged. A completed cancellation confirms the actual
-    // anchored group/Job was stopped/reaped before a durable receipt is published.
-    if result.stop_kind == Some(crate::processes::StopKind::Uncertain) {
-        return Err("native cleanup unconfirmed".into());
-    }
-    let code = result.status.code().unwrap_or(125);
-    let receipt = Receipt {
-        endpoint,
-        state: "stopped".into(),
-        code: i64::from(code),
-        complete: result.stopped.is_none(),
-    };
-    let mut bytes = serde_json::to_vec(&receipt).map_err(|e| e.to_string())?;
-    bytes.push(b'\n');
-    private_file(&path.join("terminal.new"), &bytes)?;
-    std::fs::rename(path.join("terminal.new"), path.join("terminal")).map_err(|e| e.to_string())?;
+    let (code, complete, stdout, stderr) = result;
+    let bytes = terminal_receipt(&path, &endpoint, code, complete)?;
+    // Mutation authority remains in this actual owner until target cleanup and durable
+    // terminal proof; no parent-side lock lifetime is substituted for it.
+    drop(fence.take());
     for mut client in clients {
         let deadline = Instant::now() + Duration::from_millis(100);
         let _ = super::deadline_io::write_frame(
@@ -474,14 +572,18 @@ fn helper() -> Result<i32, String> {
         );
     }
     std::io::stdout()
-        .write_all(&result.stdout)
-        .and_then(|()| std::io::stderr().write_all(&result.stderr))
+        .write_all(&stdout)
+        .and_then(|()| std::io::stderr().write_all(&stderr))
         .map_err(|e| e.to_string())?;
     Ok(code)
 }
 /// Called before normal app initialization; no window or persisted app state is touched.
 pub(crate) fn entrypoint() -> i32 {
-    let code = match helper() {
+    // Error paths retain actual mutation authority through joined Service cleanup.
+    // The external record remains if cleanup cannot be confirmed; a new claimant must
+    // recover that exact owner before destructive work, even after this helper exits.
+    let mut fence = None;
+    let code = match helper(&mut fence) {
         Ok(code) => code,
         Err(error) => {
             eprintln!("gitcraft owned endpoint: {error}");
@@ -490,6 +592,7 @@ pub(crate) fn entrypoint() -> i32 {
     };
     crate::processes::shutdown();
     crate::processes::shutdown_cleanup();
+    drop(fence);
     gitcraft_os::retire_process_helpers();
     code
 }
@@ -497,6 +600,30 @@ pub(crate) fn entrypoint() -> i32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn recording_cancelled_pending_result_proves_no_dispatch_but_unknown_never_does() {
+        for result in [
+            Err("cancelled".into()),
+            Err("process timed out and was stopped".into()),
+        ] {
+            let (code, complete, out, err) = terminal_parts(result).unwrap();
+            assert_eq!(code, 125);
+            assert!(!complete);
+            assert!(out.is_empty() && err.is_empty());
+        }
+        for message in [
+            "could not finish owned process",
+            "Process service stopped before returning a result",
+        ] {
+            assert!(terminal_parts(Err(message.into())).is_err());
+        }
+        assert!(
+            terminal_parts(Ok(crate::processes::recording_output(Some(
+                crate::processes::StopKind::Uncertain
+            ))))
+            .is_err()
+        );
+    }
     #[test]
     fn recording_native_exit_codes_preserve_windows_status_range() {
         for code in [0, 7, 255] {
