@@ -153,23 +153,27 @@ impl Endpoint {
         if self.terminal().is_ok() {
             return Ok(());
         }
+        let deadline = Instant::now() + Duration::from_secs(5);
         let address = SocketAddrV4::new(Ipv4Addr::LOCALHOST, self.port);
         let mut socket = TcpStream::connect_timeout(&address.into(), Duration::from_secs(2))
             .map_err(|_| "native owner unavailable; cleanup unknown")?;
-        socket
-            .set_read_timeout(Some(Duration::from_secs(5)))
-            .map_err(|e| e.to_string())?;
-        socket
-            .set_write_timeout(Some(Duration::from_secs(1)))
-            .map_err(|e| e.to_string())?;
+        socket.set_nonblocking(true).map_err(|e| e.to_string())?;
         let mut request = serde_json::to_vec(self).map_err(|e| e.to_string())?;
         request.push(b'\n');
-        socket.write_all(&request).map_err(|e| e.to_string())?;
-        let mut answer = Vec::new();
-        BufReader::new(socket)
-            .take(4097)
-            .read_until(b'\n', &mut answer)
-            .map_err(|e| e.to_string())?;
+        super::deadline_io::write_frame(
+            &mut socket,
+            &request,
+            || Instant::now() >= deadline,
+            || std::thread::sleep(Duration::from_millis(2)),
+        )
+        .map_err(|e| e.to_string())?;
+        let answer = super::deadline_io::read_frame(
+            &mut socket,
+            4096,
+            || Instant::now() >= deadline,
+            || std::thread::sleep(Duration::from_millis(2)),
+        )
+        .map_err(|e| e.to_string())?;
         if !self.confirms(&answer) {
             return Err("native stop was not acknowledged".into());
         }
@@ -386,6 +390,7 @@ fn helper() -> Result<i32, String> {
         },
     )?;
     let mut clients = Vec::new();
+    let mut pending_clients: Vec<(TcpStream, Vec<u8>, Instant)> = Vec::new();
     let start = Instant::now();
     let result = loop {
         if let Some(result) = ticket.try_result() {
@@ -395,18 +400,42 @@ fn helper() -> Result<i32, String> {
             cancel.cancel();
         }
         match listener.accept() {
-            Ok((mut socket, _)) => {
-                socket
-                    .set_read_timeout(Some(Duration::from_millis(100)))
-                    .map_err(|e| e.to_string())?;
-                socket
-                    .set_write_timeout(Some(Duration::from_millis(100)))
-                    .map_err(|e| e.to_string())?;
-                let mut bytes = Vec::new();
-                let read = BufReader::new(&mut socket)
-                    .take(2049)
-                    .read_until(b'\n', &mut bytes);
-                if read.is_ok()
+            Ok((socket, _)) => {
+                if pending_clients.len() < 4 && clients.len() < 4 {
+                    socket.set_nonblocking(true).map_err(|e| e.to_string())?;
+                    pending_clients.push((
+                        socket,
+                        Vec::new(),
+                        Instant::now() + Duration::from_millis(100),
+                    ));
+                }
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {}
+            Err(e) => return Err(e.to_string()),
+        }
+        let mut index = 0;
+        while index < pending_clients.len() {
+            let (socket, bytes, deadline) = &mut pending_clients[index];
+            let mut done = Instant::now() >= *deadline;
+            let mut buffer = [0u8; 256];
+            if !done {
+                match socket.read(&mut buffer) {
+                    Ok(0) => done = true,
+                    Ok(n) => {
+                        bytes.extend_from_slice(&buffer[..n]);
+                        done = bytes.len() > 2048 || bytes.contains(&b'\n');
+                    }
+                    Err(e)
+                        if matches!(
+                            e.kind(),
+                            std::io::ErrorKind::WouldBlock | std::io::ErrorKind::Interrupted
+                        ) => {}
+                    Err(_) => done = true,
+                }
+            }
+            if done {
+                let (socket, bytes, deadline) = pending_clients.swap_remove(index);
+                if Instant::now() < deadline
                     && Endpoint::from_record(&bytes).is_ok_and(|other| other == endpoint)
                 {
                     cancel.cancel();
@@ -414,9 +443,9 @@ fn helper() -> Result<i32, String> {
                         clients.push(socket);
                     }
                 }
+            } else {
+                index += 1;
             }
-            Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {}
-            Err(e) => return Err(e.to_string()),
         }
         std::thread::sleep(Duration::from_millis(20));
     };
@@ -437,7 +466,13 @@ fn helper() -> Result<i32, String> {
     private_file(&path.join("terminal.new"), &bytes)?;
     std::fs::rename(path.join("terminal.new"), path.join("terminal")).map_err(|e| e.to_string())?;
     for mut client in clients {
-        let _ = client.write_all(&bytes);
+        let deadline = Instant::now() + Duration::from_millis(100);
+        let _ = super::deadline_io::write_frame(
+            &mut client,
+            &bytes,
+            || Instant::now() >= deadline,
+            || std::thread::sleep(Duration::from_millis(2)),
+        );
     }
     std::io::stdout()
         .write_all(&result.stdout)

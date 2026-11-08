@@ -10,6 +10,7 @@
 
 pub mod askpass;
 pub(crate) use pool::shutdown;
+mod deadline_io;
 mod discover;
 mod fs;
 pub(crate) mod native_owner;

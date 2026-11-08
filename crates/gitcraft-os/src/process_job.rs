@@ -2,7 +2,7 @@
 //! The safe owner returned to the event loop also covers children surviving their parent.
 
 use std::os::windows::io::{AsRawHandle, FromRawHandle, OwnedHandle};
-use windows::Win32::Foundation::HANDLE;
+use windows::Win32::Foundation::{HANDLE, WAIT_TIMEOUT};
 use windows::Win32::System::Diagnostics::ToolHelp::{
     CreateToolhelp32Snapshot, TH32CS_SNAPTHREAD, THREADENTRY32, Thread32First, Thread32Next,
 };
@@ -13,8 +13,8 @@ use windows::Win32::System::JobObjects::{
     QueryInformationJobObject, SetInformationJobObject, TerminateJobObject,
 };
 use windows::Win32::System::Threading::{
-    GetExitCodeProcess, GetProcessIdOfThread, OpenThread, ResumeThread,
-    THREAD_QUERY_LIMITED_INFORMATION, THREAD_SUSPEND_RESUME,
+    GetProcessIdOfThread, OpenThread, ResumeThread, THREAD_QUERY_LIMITED_INFORMATION,
+    THREAD_SUSPEND_RESUME, WaitForSingleObject,
 };
 
 fn owned(handle: HANDLE) -> OwnedHandle {
@@ -112,12 +112,12 @@ pub(super) fn resume(child: &std::process::Child) -> Result<(), String> {
                 }
                 .map_err(|e| e.to_string())?,
             );
-            let mut exit_code = 0;
-            // SAFETY: both retained handles remain open across validation and resume.
-            unsafe { GetExitCodeProcess(HANDLE(child.as_raw_handle()), &mut exit_code) }
-                .map_err(|e| e.to_string())?;
+            // SAFETY: both retained handles remain open. A signaled process HANDLE proves
+            // the old lifetime ended even when its numeric exit code happens to be 259.
             let actual = unsafe { GetProcessIdOfThread(raw(&thread)) };
-            super::suspended::validate_thread_owner(pid, actual, exit_code == 259)
+            let active =
+                unsafe { WaitForSingleObject(HANDLE(child.as_raw_handle()), 0) } == WAIT_TIMEOUT;
+            super::suspended::validate_thread_owner(pid, actual, active)
                 .map_err(|e| e.to_string())?;
             // SAFETY: the handle remains valid for this call; failure leaves the job owner
             // responsible for terminating the child rather than returning it suspended.
