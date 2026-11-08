@@ -352,16 +352,16 @@ pub fn identity(repo: &Path) -> Identity {
 /// "3 minutes ago", "2 days ago"… for `time` seen from `now` (both Unix seconds).
 pub fn relative_time(time: i64, now: i64) -> String {
     let secs = now.saturating_sub(time).max(0);
-    let (n, unit) = match secs {
-        0..60 => return "just now".to_owned(),
-        60..3_600 => (secs / 60, "minute"),
-        3_600..86_400 => (secs / 3_600, "hour"),
-        86_400..604_800 => (secs / 86_400, "day"),
-        604_800..2_629_800 => (secs / 604_800, "week"),
-        2_629_800..31_557_600 => (secs / 2_629_800, "month"),
-        _ => (secs / 31_557_600, "year"),
+    let (count, id) = match secs {
+        0..60 => return crate::i18n::text("backend-just-now-7ddb44").to_owned(),
+        60..3_600 => (secs / 60, "backend-relative-minutes"),
+        3_600..86_400 => (secs / 3_600, "backend-relative-hours"),
+        86_400..604_800 => (secs / 86_400, "backend-relative-days"),
+        604_800..2_629_800 => (secs / 604_800, "backend-relative-weeks"),
+        2_629_800..31_557_600 => (secs / 2_629_800, "backend-relative-months"),
+        _ => (secs / 31_557_600, "backend-relative-years"),
     };
-    format!("{n} {unit}{} ago", if n == 1 { "" } else { "s" })
+    crate::i18n::message(id, &[("count", count.into())])
 }
 
 pub fn now() -> i64 {

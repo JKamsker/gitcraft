@@ -19,8 +19,10 @@ const MAX_YEARS: u32 = 50;
 const LAST_YEAR: u32 = 2099;
 
 /// How dates are written, for the hints and the help.
-pub const DATE_FORMATS: &str = "2024-05-01, 2024-05, 2024, today, yesterday, or a time ago: \
-    12h, 3d, 2w, 6m (months), 1y";
+pub const DATE_FORMATS: &str = "backend-search-date-formats";
+pub fn date_formats() -> &'static str {
+    crate::i18n::text(DATE_FORMATS)
+}
 
 /// What `value` means as a date, or why it isn't one.
 pub fn git_date(value: &str) -> Result<GitDate, String> {
@@ -34,9 +36,14 @@ pub fn git_date(value: &str) -> Result<GitDate, String> {
         return Ok(GitDate { arg, day: None });
     }
     let (y, m, d) = day(&lower).ok_or_else(|| {
-        format!(
-            "“{value}” is not a date: write {DATE_FORMATS} (at most {MAX_YEARS} years back, \
-             days up to {LAST_YEAR})"
+        crate::i18n::message(
+            "backend-value-is-not-a-date-write-date-formats-at-most-max-years-years-ba-cd7a9d",
+            &[
+                ("value", (value).to_string().into()),
+                ("date_formats", date_formats().into()),
+                ("max_years", MAX_YEARS.into()),
+                ("last_year", (LAST_YEAR).to_string().into()),
+            ],
         )
     })?;
     Ok(GitDate {
