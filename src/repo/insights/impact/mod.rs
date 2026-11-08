@@ -186,6 +186,11 @@ impl RepoTab {
                     return;
                 };
                 if view.impact.data.accept(request, result) {
+                    // The layout and what is picked were of the data before: their places
+                    // aren't this data's.
+                    view.impact.layout = Slot::default();
+                    view.impact.selected = None;
+                    view.impact.filter.symbol = None;
                     tab.impact_layout(ctx);
                 }
             },

@@ -137,6 +137,10 @@ impl RepoTab {
                     return;
                 };
                 if view.coverage.data.accept(request, result) {
+                    // The layout and what is picked were of the data before: their places
+                    // aren't this data's.
+                    view.coverage.layout = Slot::default();
+                    view.coverage.selected = None;
                     tab.coverage_layout(ctx);
                 }
             },

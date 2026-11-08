@@ -346,7 +346,8 @@ pub fn scan(text: &str) -> Vec<Item> {
             let close = pair[open].unwrap_or(toks.len() - 1);
             if open == i + 1 {
                 pending.start.get_or_insert(line);
-                pending.test |= test_attribute(&toks[open + 1..close]);
+                // Unclosed at the end of the file, it has nothing inside.
+                pending.test |= test_attribute(toks.get(open + 1..close).unwrap_or(&[]));
             }
             i = close + 1;
             at_start = true;

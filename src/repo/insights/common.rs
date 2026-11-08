@@ -45,6 +45,13 @@ impl<T> Slot<T> {
         self.request
     }
 
+    /// A read of something else starts: what was read before is dropped, not shown meanwhile
+    /// as if it were the answer.
+    pub(crate) fn restart(&mut self) -> u64 {
+        self.value = None;
+        self.start()
+    }
+
     /// The answer to read `request`, taken when it is the latest. Whether it was.
     pub(crate) fn accept(&mut self, request: u64, value: Result<T, String>) -> bool {
         if request != self.request {

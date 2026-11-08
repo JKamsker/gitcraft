@@ -134,7 +134,8 @@ impl RepoTab {
                     return;
                 }
                 state.hunks_for = Some(k);
-                let request = state.hunks.start();
+                // Another pair's regions: those of the pair shown before are not these.
+                let request = state.hunks.restart();
                 let repo = self.path.clone();
                 self.insight_then(
                     ctx,

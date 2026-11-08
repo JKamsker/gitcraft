@@ -27,6 +27,16 @@ fn comments_strings_and_characters_are_blanked_with_their_lines_kept() {
     assert!(masked.contains("fn f<'a>(x: &'a str) {}"));
 }
 
+/// A file cut off in an attribute (a truncated file, a parser's fixture) is scanned, not a
+/// panic.
+#[test]
+fn a_file_ending_in_an_open_attribute_is_scanned() {
+    for text in ["#[", "fn a() {}\n#[", "#![", "fn a() {}\n#[cfg(test"] {
+        let items = scan::scan(text);
+        assert!(items.len() <= 1, "{text:?}: {items:?}");
+    }
+}
+
 #[test]
 fn the_items_of_a_file_are_found_with_where_they_start_and_end() -> Result<(), String> {
     let text = r#"//! A crate.
