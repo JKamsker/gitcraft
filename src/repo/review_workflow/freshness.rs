@@ -286,8 +286,8 @@ pub(in crate::repo) fn show(
                 if !row.dependencies_checked && row.rust.is_none(){ui.weak(crate::i18n::text("repo-workflows-review-label-dependencies-unchecked-144460"));}
                 if let Some(rust)=&row.rust {
                     ui.weak(crate::i18n::message("repo-workflows-review-message-count-one-one-unchanged-rust-symbol-inspected-da406d", &[("count", (rust.checked).into())]));
-                    for witness in &rust.witnesses {ui.label(crate::i18n::message("repo-workflows-review-message-dependency-freshness-witness-25c9d7", &[("witness", (crate::repo::messages::display_status(witness)).into())]));}
-                    for limitation in &rust.limitations {ui.weak(crate::i18n::message("repo-workflows-review-message-unchecked-detail-5176bf", &[("detail", (crate::repo::messages::display_status(limitation)).into())]));}
+                    for witness in &rust.witnesses {ui.label(crate::i18n::message("repo-workflows-review-message-dependency-freshness-witness-25c9d7", &[("witness", (crate::repo::messages::display_review_dependency(witness)).into())]));}
+                    for limitation in &rust.limitations {ui.weak(crate::i18n::message("repo-workflows-review-message-unchecked-detail-5176bf", &[("detail", (crate::repo::messages::display_review_dependency(limitation)).into())]));}
                 }
                 if let Some((base,head))=&row.reviewed{ui.weak(crate::i18n::message("repo-workflows-review-message-receipt-base-head-433a2f", &[("base", (crate::repo::short(base)).into()), ("head", (crate::repo::short(head)).into())]));}
                 if ui.button(crate::i18n::text("repo-workflows-review-label-mark-file-reviewed-7e0e78")).clicked(){acts.push(Action::Freshness(FreshnessAct::Mark{path:row.path.clone(),base:files.from.clone(),head:files.to.clone(),dependencies:state.dependencies.lines().map(str::trim).filter(|s|!s.is_empty()).map(str::to_owned).collect()}));}
