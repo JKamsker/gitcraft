@@ -713,6 +713,9 @@ fn operation_display(label: &str, depth: usize) -> String {
                 if rendered != inner {
                     return crate::i18n::message(id, &[("operation", rendered.into())]);
                 }
+                // A custom inner command must stay opaque as an entire wrapper. Do not
+                // let a more general label/path template reinterpret its first word.
+                return label.to_owned();
             }
         }
     }
