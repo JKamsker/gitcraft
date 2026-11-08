@@ -19,10 +19,9 @@ pub(crate) fn badges(tab: &RepoTab, number: u64, sha: &str) -> Vec<(&'static str
     if waiting > 0 {
         out.push((
             crate::i18n::text("repo-workflows-forks-badges-84e3eb92"),
-            format!(
-                "{waiting} workflow run{} of its latest commit wait for a maintainer to approve \
-                 them: Approve and run in its menu",
-                if waiting == 1 { "" } else { "s" }
+            crate::i18n::message(
+                "repo-workflows-fork-waiting-runs",
+                &[("count", (waiting).into())],
             ),
             true,
         ));

@@ -34,7 +34,13 @@ impl RepoTab {
                 ui.set_width(560.0);
                 close = header(ui, &t, acts);
                 if let Some(busy) = &self.busy_op {
-                    ui.label(RichText::new(format!("{busy}…")).color(t.text_dim));
+                    ui.label(
+                        RichText::new(format!(
+                            "{}…",
+                            crate::repo::messages::display_operation(busy)
+                        ))
+                        .color(t.text_dim),
+                    );
                 }
                 let max = (ctx.content_rect().height() - 160.0).max(240.0);
                 egui::ScrollArea::vertical().max_height(max).show(ui, |ui| {

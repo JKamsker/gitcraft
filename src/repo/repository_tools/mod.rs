@@ -1051,9 +1051,7 @@ impl RepoTab {
         };
         let id = state.id;
         let control = self.follow_op(&super::ops(&[&["push"]]), false, ctx);
-        self.busy_op = Some(
-            crate::i18n::text("repo-workflows-repository_tools-publish-group-3cc9a2c6").into(),
-        );
+        self.busy_op = Some("Publish group".into());
         self.op_started = Some(std::time::Instant::now());
         self.last_op = None;
         self.timeline_op_started(false, super::Refresh::All);

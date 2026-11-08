@@ -219,7 +219,10 @@ fn grid(ui: &mut Ui, view: &Bakeoff, cmp: &Comparison, t: &Tokens, act: &mut Opt
             );
             for c in &cmp.attempts {
                 if c.new_deps.is_empty() {
-                    ui.label(RichText::new("none").color(t.text_faint));
+                    ui.label(
+                        RichText::new(crate::i18n::text("repo-workflows-bakeoff-grid-140bedbf"))
+                            .color(t.text_faint),
+                    );
                 } else {
                     ui.vertical(|ui| {
                         for dep in &c.new_deps {
@@ -291,10 +294,15 @@ fn build_cell(
             }
             Some(Built::Running) => {
                 ui.add(crate::spinner::Spinner::new().size(12.0));
-                ui.label(RichText::new("building…").color(t.text_dim))
-                    .on_hover_text(crate::i18n::text(
-                        "repo-workflows-bakeoff-build-cell-ef24cfb5",
-                    ));
+                ui.label(
+                    RichText::new(crate::i18n::text(
+                        "repo-workflows-bakeoff-build-cell-899686f3",
+                    ))
+                    .color(t.text_dim),
+                )
+                .on_hover_text(crate::i18n::text(
+                    "repo-workflows-bakeoff-build-cell-ef24cfb5",
+                ));
             }
             Some(Built::Passed) => {
                 ui.colored_label(

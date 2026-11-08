@@ -442,10 +442,7 @@ impl RepoTab {
         match submitted {
             Ok(()) => {
                 if mutation {
-                    self.busy_op = Some(
-                        crate::i18n::text("repo-workflows-devcontainer-devcontainer-act-519a489a")
-                            .into(),
-                    );
+                    self.busy_op = Some("Dev container operation".into());
                 }
                 state.pending = Some(Pending {
                     rx,

@@ -618,6 +618,8 @@ repo-workflows-bakeoff-build-cell-6fe4abd4 = Retry in fresh workspace
 
 repo-workflows-bakeoff-build-cell-84b604d3 = The previous outcome is unknown and its processes may still run. Starts another retained workspace; no automatic stop or cleanup
 
+repo-workflows-bakeoff-build-cell-899686f3 = building…
+
 repo-workflows-bakeoff-build-cell-98cd8a0b = preparing snapshot…
 
 repo-workflows-bakeoff-build-cell-adccacb7 = Runs the command in another fresh retained snapshot
@@ -648,6 +650,8 @@ repo-workflows-bakeoff-files-83d88f06 = { $a-name-1 } changed it
 
 repo-workflows-bakeoff-files-fe616a60 = { $path }
     Open it side by side across the attempts
+
+repo-workflows-bakeoff-grid-140bedbf = none
 
 repo-workflows-bakeoff-grid-1af85190 = Size
 
@@ -809,6 +813,8 @@ repo-workflows-bisect-reset-bisect-b63b6486 = back on the commit it began at
 
 repo-workflows-bisect-reset-bisect-fd58b76b = back on { $branch }
 
+repo-workflows-bisect-run-log-14aae160 = running…
+
 repo-workflows-bisect-run-log-534a3a34 = ended with exit code { $c }
 
 repo-workflows-bisect-run-log-5fd804ed = failed: { $e }
@@ -816,6 +822,8 @@ repo-workflows-bisect-run-log-5fd804ed = failed: { $e }
 repo-workflows-bisect-run-log-64876c47 = Hide output
 
 repo-workflows-bisect-run-log-7d9eb7ac = Close
+
+repo-workflows-bisect-run-log-8322e87d = stopped
 
 repo-workflows-bisect-run-log-8d23f4ee = Stops the command and what it started; the bisect stays where it got to
 
@@ -1610,6 +1618,8 @@ repo-workflows-doctor-set-row-30a28bf1 = Choose a value first
 repo-workflows-doctor-set-row-3da50e6f = Git's system file, for every user of this machine; usually needs administrator rights.
 
 repo-workflows-doctor-set-row-46f01635 = Type a value first
+
+repo-workflows-doctor-set-row-663ea1bf = to
 
 repo-workflows-doctor-set-row-6ec46474 = Needs extensions.worktreeConfig = true in this repository: without it git refuses when there are other worktrees, and with only one writes .git/config
 
@@ -3127,11 +3137,15 @@ repo-workflows-lfs_storage-usage-aca1a392 = Measuring the LFS objects…
 
 repo-workflows-lfs_storage-usage-bc295532 = Could not measure the LFS objects: { $e }
 
+repo-workflows-line_dossier-append-dossier-ignore-716419f1 = Appending reviewed ignore revision
+
 repo-workflows-line_dossier-dossier-ignore-finished-366a809a = Revision already present; ignore file and index unchanged
 
 repo-workflows-line_dossier-dossier-ignore-finished-4c50387c = Ignore revision: { $error }
 
 repo-workflows-line_dossier-dossier-ignore-finished-6e1731ff = Revision appended to .git-blame-ignore-revs; staged contents preserved. Ordinary Git blame can use blame.ignoreRevsFile=.git-blame-ignore-revs.
+
+repo-workflows-line_dossier-dossier-ignore-finished-716419f1 = Appending reviewed ignore revision
 
 repo-workflows-line_dossier-dossier-ignore-view-66c640dc = Full commit patch
 
@@ -3638,6 +3652,10 @@ repo-workflows-partial_stash-files-problem-9175a257 = “{ $path }” has no cha
 
 repo-workflows-partial_stash-files-problem-bdb546dd = pick the files to stash first ({ $crate-manual-command-1 }+click them in the changes)
 
+repo-workflows-partial_stash-label-057347af = Stash staged
+
+repo-workflows-partial_stash-label-598787f5 = Stash files
+
 repo-workflows-partial_stash-push-args-0a7314b3 = a snapshot isn't made with git stash push
 
 repo-workflows-partial_stash-push-args-e90b2782 = nothing is staged
@@ -4114,6 +4132,8 @@ repo-workflows-push-sync-5ca83b4b = Sync: { $current } published (it had nothing
 repo-workflows-reflog--1af58b4f = An operation is running
 
 repo-workflows-reflog--41e8eb8b = Apply its changes on top of what is checked out, as a new commit
+
+repo-workflows-reflog-apply-stash-93a6ce40 = Apply stash { $short-pick-hash-1 }
 
 repo-workflows-reflog-lost-list-625e19f0 = Nothing lost: every commit is on a branch, a tag or a stash.
 
@@ -5395,6 +5415,8 @@ repo-workflows-stack-publish-done-c4ffa0c1 = Publish { $noun }s
 
 repo-workflows-stack-read-stacks-4272623a = Couldn't read the stacks: { $e }
 
+repo-workflows-stack-remove-parent-4272623a = Couldn't read the stacks: { $e }
+
 repo-workflows-stack-remove-parent-e6733ec1 = Remove { $branch } from its stack
 
 repo-workflows-stack-restack-banner-13c0353b = 1 dependent branch needs updating
@@ -5549,6 +5571,8 @@ repo-workflows-surgery-absorbed-4b7f1a77 = { $short-commit-1 } no longer fits on
 repo-workflows-surgery-absorbed-d6840076 = the branch would end up with other files than HEAD and the fixes: absorb by hand
 
 repo-workflows-surgery-card-204fd472 = line { $at }
+
+repo-workflows-surgery-card-6b847a0e = into
 
 repo-workflows-surgery-card-f5133568 = … { $hunk-lines-len-shown-1 } more lines
 
@@ -6596,6 +6620,8 @@ repo-workflows-versions-mark-aa470a25 = Only in the old version
 
 repo-workflows-versions-mark-c4cdd5dd = The patch or the message changed, and it is in another place
 
+repo-workflows-versions-mark-pr-seen-93fe69bf = Mark as seen: #{ $number } isn't in the list of this repository's pull requests
+
 repo-workflows-versions-named-30c21f29 = { " " }(changes nothing)
 
 repo-workflows-versions-open-branch-versions-70c06512 = Compare versions: { $e }
@@ -6637,6 +6663,8 @@ repo-workflows-versions-pr-since-items-528089c6 = Its commits as you last saw th
 
 repo-workflows-versions-pr-since-items-aeced7e0 = The next push is compared with the version it has now
 
+repo-workflows-versions-seen-marked-f9ed1e57 = Couldn't remember the version of #{ $number } seen: { $e }
+
 repo-workflows-versions-show-pr-since-0abee578 = Now ({ $short-since-new-tip-1 })
 
 repo-workflows-versions-show-pr-since-62205b1f = Last looked at ({ $short-since-old-tip-1 })
@@ -6664,6 +6692,8 @@ repo-workflows-versions-versions-palette-item-67f7dd27 = Compare { $rewrite-bran
 repo-workflows-versions-versions-ui-557f9543 = Neither version has commits of its own.
 
 repo-workflows-versions-versions-ui-81dc7cd5 = Couldn't compare the versions: { $e }
+
+repo-workflows-working_drafts-change-working-draft-278865c0 = Working draft
 
 repo-workflows-working_drafts-history-0e916101 = Refresh
 
@@ -6712,6 +6742,8 @@ repo-workflows-working_drafts-recovery-87ca587d = staged version
 repo-workflows-working_drafts-recovery-eb7ee658 = Current: { $preview-before-len-1 } bytes · saved { $if-preview-index-layer-staged-ve-2 }: { $preview-saved-len-3 } bytes
 
 repo-workflows-working_drafts-recovery-ec7046f0 = Back up current, then recover selected
+
+repo-workflows-working_drafts-save-working-draft-3e48426a = Saved manually
 
 repo-workflows-activity-count = { $count ->
         [one] One operation{ $running }, newest first
@@ -7150,4 +7182,53 @@ repo-workflows-draft-history-title = { $when } · { $reason } · { $count ->
 repo-workflows-draft-reason-pause = Pause
 
 repo-workflows-draft-reason-manual = Saved manually
+
+repo-workflows-atlas-touching-summary = { $touching } touching commits among { $scanned } scanned unique commits · { $tips } reference tips{ $partial ->
+        [yes] { " · partial history" }
+       *[no] { " · all reachable history scanned" }
+    }{ $shallow ->
+        [yes] { " · shallow boundary" }
+       *[no] { "" }
+    }
+
+repo-workflows-atlas-period-summary = { $selected } of { $scanned } scanned unique commits in period · { $tips } reference tips · tree { $tree }{ $partial ->
+        [yes] { " · partial history" }
+       *[no] { " · all reachable history" }
+    }{ $shallow ->
+        [yes] { " · shallow boundary" }
+       *[no] { "" }
+    }
+
+repo-workflows-fork-waiting-runs = { $count ->
+        [one] One workflow run of its latest commit waits for a maintainer to approve it: Approve and run in its menu
+       *[other] { $count } workflow runs of its latest commit wait for a maintainer to approve them: Approve and run in its menu
+    }
+
+repo-workflows-ghost-new-above = { $count ->
+        [one] ↑ One new commit is above the rows in view.
+       *[other] ↑ { $count } new commits are above the rows in view.
+    }
+
+repo-workflows-ghost-new-copies = { $count ->
+        [one] One new commit
+       *[other] { $count } new commits
+    }
+
+repo-workflows-ghost-fetched-count = { $count ->
+        [one] One commit fetched
+       *[other] { $count } commits fetched
+    }
+
+repo-workflows-ghost-lost-count = { $more ->
+        [yes] more than { $count } commits
+       *[no] { $count ->
+            [one] one commit
+           *[other] { $count } commits
+        }
+    }
+
+repo-workflows-ghost-replaced-originals = Replaced by new copies ({ $count }; { $number ->
+        [one] the original is left on no branch
+       *[other] the originals are left on no branch
+    }): { $names }
 

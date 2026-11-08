@@ -91,7 +91,13 @@ fn header(ui: &mut Ui, t: &Tokens, state: &LockState, acts: &mut Vec<Action>) ->
         ui.add(egui::Label::new(RichText::new(e).color(t.danger)).wrap());
     }
     if let Some(busy) = &state.busy {
-        ui.label(RichText::new(format!("{busy}…")).color(t.text_dim));
+        ui.label(
+            RichText::new(format!(
+                "{}…",
+                crate::repo::messages::display_operation(busy)
+            ))
+            .color(t.text_dim),
+        );
     }
     close
 }

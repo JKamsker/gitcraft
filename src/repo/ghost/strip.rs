@@ -47,7 +47,10 @@ impl RepoTab {
                     ui.label(
                         RichText::new(crate::i18n::message(
                             "repo-workflows-ghost-ghost-strip-c4a8b8f8",
-                            &[("title", (title).clone().into())],
+                            &[(
+                                "title",
+                                crate::repo::messages::display_operation(title).into(),
+                            )],
                         ))
                         .font(theme::semibold(12.5))
                         .color(t.text),
@@ -92,13 +95,8 @@ impl RepoTab {
                         ui,
                         &t,
                         &crate::i18n::message(
-                            "repo-workflows-ghost-ghost-strip-b69b3d5d",
-                            &[(
-                                "plural-above-new-commit-is-new-c-1",
-                                (plural(above, "new commit is", "new commits are"))
-                                    .clone()
-                                    .into(),
-                            )],
+                            "repo-workflows-ghost-new-above",
+                            &[("count", (above).into())],
                         ),
                     );
                 }
@@ -155,15 +153,15 @@ fn outcome_lines(ui: &mut Ui, t: &Tokens, o: &Outcome) {
     let fetched = o.created.len() - o.copies;
     let mut made = Vec::new();
     if o.copies > 0 {
-        made.push(plural(o.copies, "new commit", "new commits"));
+        made.push(crate::i18n::message(
+            "repo-workflows-ghost-new-copies",
+            &[("count", (o.copies).into())],
+        ));
     }
     if fetched > 0 {
         made.push(crate::i18n::message(
-            "repo-workflows-ghost-outcome-lines-dfa9e9b6",
-            &[(
-                "plural-fetched-commit-commits-1",
-                (plural(fetched, "commit", "commits")).clone().into(),
-            )],
+            "repo-workflows-ghost-fetched-count",
+            &[("count", (fetched).into())],
         ));
     }
     for m in &o.moves {
@@ -239,14 +237,7 @@ fn outcome_lines(ui: &mut Ui, t: &Tokens, o: &Outcome) {
 /// The commits the operation leaves on no ref (or takes off the remote's branch), with who
 /// made them.
 fn lost_line(ui: &mut Ui, t: &Tokens, o: &Outcome) {
-    let count = if o.lost_more {
-        crate::i18n::message(
-            "repo-workflows-ghost-lost-line-50788b96",
-            &[("o-lost-len-1", (o.lost.len()).clone().into())],
-        )
-    } else {
-        plural(o.lost.len(), "commit", "commits")
-    };
+    let count = ghost_count(o.lost.len(), o.lost_more);
     let names = listed(&o.lost, |c| format!("{} — {}", describe(c), c.author));
     let (color, text) = if o.from_remote {
         (
@@ -260,19 +251,14 @@ fn lost_line(ui: &mut Ui, t: &Tokens, o: &Outcome) {
             ),
         )
     } else if o.replaced == o.lost.len() && !o.lost_more {
-        let originals = if o.replaced == 1 {
-            "the original is"
-        } else {
-            "the originals are"
-        };
         (
             t.text_dim,
             crate::i18n::message(
-                "repo-workflows-ghost-lost-line-2cd6d050",
+                "repo-workflows-ghost-replaced-originals",
                 &[
-                    ("count", (count).clone().into()),
-                    ("originals", (originals).clone().into()),
-                    ("names", (names).clone().into()),
+                    ("count", (count.as_str()).into()),
+                    ("number", (o.replaced).into()),
+                    ("names", (names.as_str()).into()),
                 ],
             ),
         )
@@ -342,10 +328,6 @@ fn one_line(text: &str) -> &str {
     text.lines().next().unwrap_or(text)
 }
 
-fn plural(n: usize, one: &str, many: &str) -> String {
-    format!("{n} {}", if n == 1 { one } else { many })
-}
-
 /// The first [`LISTED`] of `items`, then how many more.
 fn listed<T>(items: &[T], name: impl Fn(&T) -> String) -> String {
     let mut names: Vec<String> = items.iter().take(LISTED).map(name).collect();
@@ -367,8 +349,21 @@ mod tests {
         let items: Vec<String> = (1..=7).map(|n| n.to_string()).collect();
         assert_eq!(listed(&items, String::clone), "1, 2, 3, 4, 5, and 2 more");
         assert_eq!(listed(&items[..2], String::clone), "1, 2");
-        assert_eq!(plural(1, "file", "files"), "1 file");
-        assert_eq!(plural(3, "file", "files"), "3 files");
+        crate::i18n::set_language("en-US");
+        assert_eq!(ghost_count(1, false), "one commit");
+        assert_eq!(ghost_count(3, false), "3 commits");
+        crate::i18n::set_language("de");
+        assert_eq!(ghost_count(1234, true), "mehr als 1.234 Commits");
         assert_eq!(sentence("x isn't merged"), "X isn't merged");
     }
+}
+
+fn ghost_count(count: usize, more: bool) -> String {
+    crate::i18n::message(
+        "repo-workflows-ghost-lost-count",
+        &[
+            ("more", (if more { "yes" } else { "no" }).into()),
+            ("count", (count).into()),
+        ],
+    )
 }

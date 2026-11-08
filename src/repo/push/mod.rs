@@ -497,10 +497,7 @@ impl RepoTab {
             || crate::i18n::text("repo-workflows-push-check-remote-d6f3f0c2").to_owned(),
             Target::label,
         );
-        self.busy_op = Some(crate::i18n::message(
-            "repo-workflows-push-check-remote-9a7c53eb",
-            &[("what", (what).clone().into())],
-        ));
+        self.busy_op = Some(format!("Checking {what}"));
         let path = self.path.clone();
         let creds = self.credentials.clone();
         // Let go of all the same if it panics.

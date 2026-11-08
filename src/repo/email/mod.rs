@@ -436,8 +436,7 @@ impl RepoTab {
         });
         match submitted {
             Ok(()) => {
-                self.busy_op =
-                    Some(crate::i18n::text("repo-workflows-email-email-act-c19c9f05").into());
+                self.busy_op = Some("Email patches · b4".into());
                 state.pending = Some(Pending {
                     rx,
                     scope,

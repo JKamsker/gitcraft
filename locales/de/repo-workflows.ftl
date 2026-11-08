@@ -618,6 +618,8 @@ repo-workflows-bakeoff-build-cell-6fe4abd4 = In neuem Arbeitsbereich wiederholen
 
 repo-workflows-bakeoff-build-cell-84b604d3 = Das vorherige Ergebnis ist unbekannt; Prozesse laufen möglicherweise noch. Startet einen weiteren gespeicherten Arbeitsbereich ohne automatisches Beenden oder Bereinigen.
 
+repo-workflows-bakeoff-build-cell-899686f3 = wird gebaut…
+
 repo-workflows-bakeoff-build-cell-98cd8a0b = Stand wird vorbereitet …
 
 repo-workflows-bakeoff-build-cell-adccacb7 = Führt den Befehl in einem weiteren neuen gespeicherten Stand aus
@@ -648,6 +650,8 @@ repo-workflows-bakeoff-files-83d88f06 = { $a-name-1 } hat diese Datei geändert
 
 repo-workflows-bakeoff-files-fe616a60 = { $path }
     Im direkten Vergleich über alle Versuche öffnen
+
+repo-workflows-bakeoff-grid-140bedbf = keine
 
 repo-workflows-bakeoff-grid-1af85190 = Größe
 
@@ -809,6 +813,8 @@ repo-workflows-bisect-reset-bisect-b63b6486 = wieder am Ausgangscommit
 
 repo-workflows-bisect-reset-bisect-fd58b76b = wieder auf { $branch }
 
+repo-workflows-bisect-run-log-14aae160 = läuft…
+
 repo-workflows-bisect-run-log-534a3a34 = mit Exitcode { $c } beendet
 
 repo-workflows-bisect-run-log-5fd804ed = fehlgeschlagen: { $e }
@@ -816,6 +822,8 @@ repo-workflows-bisect-run-log-5fd804ed = fehlgeschlagen: { $e }
 repo-workflows-bisect-run-log-64876c47 = Ausgabe ausblenden
 
 repo-workflows-bisect-run-log-7d9eb7ac = Schließen
+
+repo-workflows-bisect-run-log-8322e87d = angehalten
 
 repo-workflows-bisect-run-log-8d23f4ee = Stoppt den Befehl und seine Kindprozesse. Der Bisect bleibt am erreichten Stand.
 
@@ -1610,6 +1618,8 @@ repo-workflows-doctor-set-row-30a28bf1 = Wählen Sie zuerst einen Wert aus
 repo-workflows-doctor-set-row-3da50e6f = Gits Systemdatei für alle Benutzer dieses Rechners. Benötigt meist Administratorrechte.
 
 repo-workflows-doctor-set-row-46f01635 = Geben Sie zuerst einen Wert ein
+
+repo-workflows-doctor-set-row-663ea1bf = auf
 
 repo-workflows-doctor-set-row-6ec46474 = Benötigt extensions.worktreeConfig = true in diesem Repository. Ohne diese Einstellung verweigert Git den Vorgang bei mehreren Worktrees; bei nur einem schreibt es in .git/config.
 
@@ -3127,11 +3137,15 @@ repo-workflows-lfs_storage-usage-aca1a392 = LFS-Objekte werden vermessen …
 
 repo-workflows-lfs_storage-usage-bc295532 = Die LFS-Objekte konnten nicht vermessen werden: { $e }
 
+repo-workflows-line_dossier-append-dossier-ignore-716419f1 = Geprüfte Ignorierrevision anhängen
+
 repo-workflows-line_dossier-dossier-ignore-finished-366a809a = Revision bereits vorhanden. Ignore-Datei und Index blieben unverändert.
 
 repo-workflows-line_dossier-dossier-ignore-finished-4c50387c = Revision ignorieren: { $error }
 
 repo-workflows-line_dossier-dossier-ignore-finished-6e1731ff = Revision an .git-blame-ignore-revs angehängt. Der vorgemerkte Inhalt blieb erhalten. Git blame kann blame.ignoreRevsFile=.git-blame-ignore-revs verwenden.
+
+repo-workflows-line_dossier-dossier-ignore-finished-716419f1 = Geprüfte Ignorierrevision anhängen
 
 repo-workflows-line_dossier-dossier-ignore-view-66c640dc = Gesamter Commit-Patch
 
@@ -3638,6 +3652,10 @@ repo-workflows-partial_stash-files-problem-9175a257 = „{ $path }“ hat keine 
 
 repo-workflows-partial_stash-files-problem-bdb546dd = Zuerst die zu stashenden Dateien auswählen ({ $crate-manual-command-1 }+Klick auf die Änderungen)
 
+repo-workflows-partial_stash-label-057347af = Vorgemerktes stashen
+
+repo-workflows-partial_stash-label-598787f5 = Dateien stashen
+
 repo-workflows-partial_stash-push-args-0a7314b3 = Eine Momentaufnahme wird nicht mit git stash push erstellt
 
 repo-workflows-partial_stash-push-args-e90b2782 = Nichts ist vorgemerkt
@@ -4114,6 +4132,8 @@ repo-workflows-push-sync-5ca83b4b = Sync: { $current } veröffentlicht (es gab n
 repo-workflows-reflog--1af58b4f = Ein Vorgang läuft
 
 repo-workflows-reflog--41e8eb8b = Seine Änderungen als neuen Commit auf den ausgecheckten Stand anwenden
+
+repo-workflows-reflog-apply-stash-93a6ce40 = Stash { $short-pick-hash-1 } anwenden
 
 repo-workflows-reflog-lost-list-625e19f0 = Nichts verloren. Jeder Commit ist über einen Branch, ein Tag oder einen Stash erreichbar.
 
@@ -5395,6 +5415,8 @@ repo-workflows-stack-publish-done-c4ffa0c1 = { $noun }s veröffentlichen
 
 repo-workflows-stack-read-stacks-4272623a = Stapel konnten nicht gelesen werden: { $e }
 
+repo-workflows-stack-remove-parent-4272623a = Stapel konnten nicht gelesen werden: { $e }
+
 repo-workflows-stack-remove-parent-e6733ec1 = { $branch } aus seinem Stapel entfernen
 
 repo-workflows-stack-restack-banner-13c0353b = Ein abhängiger Branch muss aktualisiert werden
@@ -5549,6 +5571,8 @@ repo-workflows-surgery-absorbed-4b7f1a77 = { $short-commit-1 } passt nach den vo
 repo-workflows-surgery-absorbed-d6840076 = Der Branch hätte anschließend andere Dateien als HEAD mit den Korrekturen: manuell einarbeiten
 
 repo-workflows-surgery-card-204fd472 = Zeile { $at }
+
+repo-workflows-surgery-card-6b847a0e = in
 
 repo-workflows-surgery-card-f5133568 = … { $hunk-lines-len-shown-1 } weitere Zeilen
 
@@ -6596,6 +6620,8 @@ repo-workflows-versions-mark-aa470a25 = Nur in der alten Version
 
 repo-workflows-versions-mark-c4cdd5dd = Patch oder Nachricht geändert und an anderer Position
 
+repo-workflows-versions-mark-pr-seen-93fe69bf = Als angesehen markieren: #{ $number } ist nicht in der Liste der Pull-Anfragen dieses Repositorys
+
 repo-workflows-versions-named-30c21f29 = { " " }(ändert nichts)
 
 repo-workflows-versions-open-branch-versions-70c06512 = Versionen vergleichen: { $e }
@@ -6637,6 +6663,8 @@ repo-workflows-versions-pr-since-items-528089c6 = Die Commits beim letzten Besuc
 
 repo-workflows-versions-pr-since-items-aeced7e0 = Der nächste Push wird mit der aktuellen Version verglichen
 
+repo-workflows-versions-seen-marked-f9ed1e57 = Die als angesehen markierte Version von #{ $number } konnte nicht gespeichert werden: { $e }
+
 repo-workflows-versions-show-pr-since-0abee578 = Jetzt ({ $short-since-new-tip-1 })
 
 repo-workflows-versions-show-pr-since-62205b1f = Zuletzt angesehen ({ $short-since-old-tip-1 })
@@ -6664,6 +6692,8 @@ repo-workflows-versions-versions-palette-item-67f7dd27 = { $rewrite-branch-1 } v
 repo-workflows-versions-versions-ui-557f9543 = Keine Version enthält eigene Commits.
 
 repo-workflows-versions-versions-ui-81dc7cd5 = Versionen konnten nicht verglichen werden: { $e }
+
+repo-workflows-working_drafts-change-working-draft-278865c0 = Arbeitsentwurf
 
 repo-workflows-working_drafts-history-0e916101 = Aktualisieren
 
@@ -6712,6 +6742,8 @@ repo-workflows-working_drafts-recovery-87ca587d = vorgemerkte Version
 repo-workflows-working_drafts-recovery-eb7ee658 = Aktuell: { $preview-before-len-1 } Bytes · gespeichert { $if-preview-index-layer-staged-ve-2 }: { $preview-saved-len-3 } Bytes
 
 repo-workflows-working_drafts-recovery-ec7046f0 = Aktuellen Stand sichern, dann Auswahl wiederherstellen
+
+repo-workflows-working_drafts-save-working-draft-3e48426a = Manuell gespeichert
 
 repo-workflows-activity-count = { $count ->
         [one] Ein Vorgang{ $running }, neueste zuerst
@@ -7148,4 +7180,53 @@ repo-workflows-draft-history-title = { $when } · { $reason } · { $count ->
 repo-workflows-draft-reason-pause = Pause
 
 repo-workflows-draft-reason-manual = Manuell gespeichert
+
+repo-workflows-atlas-touching-summary = { $touching } betroffene Commits unter { $scanned } untersuchten eindeutigen Commits · { $tips } Ref-Spitzen{ $partial ->
+        [yes] { " · teilweiser Verlauf" }
+       *[no] { " · gesamter erreichbarer Verlauf untersucht" }
+    }{ $shallow ->
+        [yes] { " · Grenze des flachen Klons" }
+       *[no] { "" }
+    }
+
+repo-workflows-atlas-period-summary = { $selected } von { $scanned } untersuchten eindeutigen Commits im Zeitraum · { $tips } Ref-Spitzen · Baum { $tree }{ $partial ->
+        [yes] { " · teilweiser Verlauf" }
+       *[no] { " · gesamter erreichbarer Verlauf" }
+    }{ $shallow ->
+        [yes] { " · Grenze des flachen Klons" }
+       *[no] { "" }
+    }
+
+repo-workflows-fork-waiting-runs = { $count ->
+        [one] Ein Workflow-Lauf des neuesten Commits wartet auf die Genehmigung eines Maintainers: „Genehmigen und ausführen“ in seinem Menü
+       *[other] { $count } Workflow-Läufe des neuesten Commits warten auf die Genehmigung eines Maintainers: „Genehmigen und ausführen“ in ihrem Menü
+    }
+
+repo-workflows-ghost-new-above = { $count ->
+        [one] ↑ Ein neuer Commit liegt oberhalb der sichtbaren Zeilen.
+       *[other] ↑ { $count } neue Commits liegen oberhalb der sichtbaren Zeilen.
+    }
+
+repo-workflows-ghost-new-copies = { $count ->
+        [one] Ein neuer Commit
+       *[other] { $count } neue Commits
+    }
+
+repo-workflows-ghost-fetched-count = { $count ->
+        [one] Ein Commit abgerufen
+       *[other] { $count } Commits abgerufen
+    }
+
+repo-workflows-ghost-lost-count = { $more ->
+        [yes] mehr als { $count } Commits
+       *[no] { $count ->
+            [one] ein Commit
+           *[other] { $count } Commits
+        }
+    }
+
+repo-workflows-ghost-replaced-originals = Durch neue Kopien ersetzt ({ $count }; { $number ->
+        [one] das Original liegt auf keinem Branch mehr
+       *[other] die Originale liegen auf keinem Branch mehr
+    }): { $names }
 

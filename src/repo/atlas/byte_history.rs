@@ -71,21 +71,21 @@ impl ByteHistory {
                     )],
                 ))
                 .on_hover_text(&self.label);
-                ui.label(format!(
-                    "{} touching commits among {} scanned unique commits · {} reference tips{}{}",
-                    self.rows.len(),
-                    self.history.commits.len(),
-                    self.history.tips,
-                    if self.history.more {
-                        " · partial history"
-                    } else {
-                        " · all reachable history scanned"
-                    },
-                    if self.history.shallow {
-                        " · shallow boundary"
-                    } else {
-                        ""
-                    }
+                ui.label(crate::i18n::message(
+                    "repo-workflows-atlas-touching-summary",
+                    &[
+                        ("touching", (self.rows.len()).into()),
+                        ("scanned", (self.history.commits.len()).into()),
+                        ("tips", (self.history.tips).into()),
+                        (
+                            "partial",
+                            (if self.history.more { "yes" } else { "no" }).into(),
+                        ),
+                        (
+                            "shallow",
+                            (if self.history.shallow { "yes" } else { "no" }).into(),
+                        ),
+                    ],
                 ));
                 ui.small(crate::i18n::text("repo-workflows-atlas-show-076017ad"));
                 if self.reader.busy() {

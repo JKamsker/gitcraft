@@ -343,10 +343,16 @@ fn run_log(ui: &mut Ui, run: &RunLog, acts: &mut Vec<Action>) {
         match &run.ended {
             None => {
                 ui.add(crate::spinner::Spinner::new());
-                ui.label(RichText::new("running…").color(t.text_dim));
+                ui.label(
+                    RichText::new(crate::i18n::text("repo-workflows-bisect-run-log-14aae160"))
+                        .color(t.text_dim),
+                );
             }
             Some(Ok(e)) if e.stopped => {
-                ui.label(RichText::new("stopped").color(t.text_dim));
+                ui.label(
+                    RichText::new(crate::i18n::text("repo-workflows-bisect-run-log-8322e87d"))
+                        .color(t.text_dim),
+                );
             }
             Some(Ok(e)) => {
                 let (text, color) = match e.code {

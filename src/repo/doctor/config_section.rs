@@ -360,7 +360,7 @@ fn set_row(
                     });
                 }
             });
-        ui.label("to");
+        ui.label(crate::i18n::text("repo-workflows-doctor-set-row-663ea1bf"));
         if setting.choices.is_empty() {
             ui.add(egui::TextEdit::singleline(&mut state.value).desired_width(220.0));
         } else {

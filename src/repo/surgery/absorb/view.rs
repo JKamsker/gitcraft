@@ -381,7 +381,12 @@ fn card(
                 ui.horizontal(|ui| {
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         picker(ui, editor, h, chosen);
-                        ui.label(RichText::new("into").color(t.text_dim));
+                        ui.label(
+                            RichText::new(crate::i18n::text(
+                                "repo-workflows-surgery-card-6b847a0e",
+                            ))
+                            .color(t.text_dim),
+                        );
                         ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
                             let first = hunk.lines.first().and_then(|&i| file.lines.get(i));
                             let at = first.and_then(|l| l.old.or(l.new)).unwrap_or(0);
