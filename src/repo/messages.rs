@@ -909,13 +909,13 @@ fn operation_display(label: &str, depth: usize) -> String {
             ("(?s)^Add$", "repo-core-0976", &[][..]),
             ("(?s)^to$", "repo-core-1102", &[][..]),
             ("(?s)^Go\\ to\\ line\\ (.*?)\\ of\\ the\\ file\\ before\\ the\\ change$", "repo-core-2040", &[("o", false)][..]),
-            ("(?s)^Remove\\ unused\\ fork\\ remotes\\ \\(([0-9]+))$", "repo-core-0121", &[("unused", true)][..]),
+            ("(?s)^Remove\\ unused\\ fork\\ remotes\\ \\(([0-9]+)\\)$", "repo-core-0121", &[("unused", true)][..]),
             ("(?s)^Interactive\\ rebase\\ (.*?)\\ onto\\ (.*?)…$", "repo-core-2988", &[("target", false), ("at", false)][..]),
             ("(?s)^Interactive\\ rebase\\ onto\\ (.*?)$", "repo-core-3342", &[("onto-label", false)][..]),
             ("(?s)^Revert\\ a\\ hunk\\ of\\ (.*?)\\ from\\ (.*?)$", "repo-core-3311", &[("path", false), ("hash", false)][..]),
             ("(?s)^Keep\\ both\\ versions\\ of\\ (.*?)$", "repo-core-0590", &[("path", false)][..]),
             ("(?s)^Revert\\ (.*?)\\ as\\ changed\\ in\\ (.*?)$", "repo-core-3309", &[("path", false), ("hash", false)][..]),
-            ("(?s)^Revert\\ ([0-9]+) line(.*?)\\ of\\ (.*?)\\ from\\ (.*?)$", "repo-core-3312", &[("n", true), ("", false), ("path", false), ("hash", false)][..]),
+            ("(?s)^Revert\\ ([0-9]+)\\ line(.*?)\\ of\\ (.*?)\\ from\\ (.*?)$", "repo-core-3312", &[("n", true), ("", false), ("path", false), ("hash", false)][..]),
             ("(?s)^(.*?)\\ \\(its\\ fixup!\\ commit\\)$", "repo-core-2538", &[("label", false)][..]),
             ("(?s)^Rebase\\ commit\\ (.*?),\\ (.*?),\\ (.*?),\\ (.*?)$", "repo-core-3249", &[("hash", false), ("summary", false), ("author", false), ("label", false)][..]),
             ("(?s)^Edit\\ the\\ message\\ of\\ (.*?)$", "repo-core-3321", &[("hash", false)][..]),
@@ -927,11 +927,11 @@ fn operation_display(label: &str, depth: usize) -> String {
             ("(?s)^Reset\\ (.*?)\\ to\\ here…$", "repo-core-2986", &[("target", false)][..]),
             ("(?s)^Create\\ tag\\ at\\ (.*?)…$", "repo-core-2992", &[("at", false)][..]),
             ("(?s)^Open\\ (.*?)\\ in\\ editor$", "repo-core-3001", &[("path", false)][..]),
-            ("(?s)^([0-9]+) picked\\ file(.*?)$", "repo-core-1498", &[("n", true), ("", false)][..]),
+            ("(?s)^([0-9]+)\\ picked\\ file(.*?)$", "repo-core-1498", &[("n", true), ("", false)][..]),
             ("(?s)^(.*?)\\ notes\\ “(.*?)”\\ (.*?)\\ (.*?)$", "repo-core-1100", &[("Push", false), ("namespace", false), ("", false), ("remote", false)][..]),
             ("(?s)^Rename\\ (.*?)\\ to\\ (.*?)$", "repo-core-1233", &[("old", false), ("new", false)][..]),
             ("(?s)^Go\\ to\\ line\\ ([0-9]+)$", "repo-core-2039", &[("n", true)][..]),
-            ("(?s)^(Stage|Unstage|Discard|Revert)\\ ([0-9]+) line(.*?)\\ of\\ (.*?)$", "repo-core-0164", &[("verb", false), ("n", true), ("", false), ("path", false)][..]),
+            ("(?s)^(Stage|Unstage|Discard|Revert)\\ ([0-9]+)\\ line(.*?)\\ of\\ (.*?)$", "repo-core-0164", &[("verb", false), ("n", true), ("", false), ("path", false)][..]),
             ("(?s)^Fold\\ into\\ (.*?)$", "repo-core-2530", &[("hash", false)][..]),
             ("(?s)^(.*?)\\ worktree\\ (.*?)$", "repo-core-3595", &[("label", false), ("name", false)][..]),
             ("(?s)^Push\\ tag\\ (.*?)$", "repo-core-3541", &[("name", false)][..]),
@@ -1055,7 +1055,21 @@ mod fluent_presentation_tests {
         let raw = format!("Stage 1234 lines of {path}");
         for language in ["en-US", "de"] {
             crate::i18n::set_language(language);
+            // Unknown external text forces all finite regexes to initialize, even when
+            // a known German label could return early through the shared adapter.
+            assert_eq!(
+                display_operation("external-custom --flag=literal"),
+                "external-custom --flag=literal"
+            );
             let german = language == "de";
+            assert_eq!(
+                display_operation("Remove unused fork remotes (1234)"),
+                if german {
+                    "Ungenutzte Fork-Remotes entfernen (1.234)"
+                } else {
+                    "Remove unused fork remotes (1,234)"
+                }
+            );
             assert_eq!(
                 display_operation("Abort rebase"),
                 if german {
