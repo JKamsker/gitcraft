@@ -810,6 +810,10 @@ impl eframe::App for App {
                 }
             }
         }
+        if crate::settings::network_page::take_inspection_request(&ctx) {
+            crate::settings::show_page(&ctx, crate::settings::Page::HttpsSignins);
+            self.open_settings();
+        }
         self.toast_finished(focused);
         self.toasts_ui(&ctx);
         self.dropped_files(&ctx);

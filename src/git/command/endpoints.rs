@@ -4,6 +4,7 @@ use super::*;
 pub(crate) struct RemoteEndpoint {
     pub remote: String,
     pub push: bool,
+    pub lfs: bool,
     pub index: usize,
     pub url: String,
 }
@@ -12,7 +13,13 @@ impl RemoteEndpoint {
         format!(
             "{} · {} {}",
             self.remote,
-            if self.push { "push" } else { "fetch" },
+            if self.lfs {
+                "LFS"
+            } else if self.push {
+                "push"
+            } else {
+                "fetch"
+            },
             self.index + 1
         )
     }
@@ -32,6 +39,7 @@ pub(crate) fn remote_endpoints(repo: &Path) -> Result<Vec<RemoteEndpoint>, Strin
                     endpoints.push(RemoteEndpoint {
                         remote: name.into(),
                         push,
+                        lfs: false,
                         index,
                         url: url.into(),
                     });
@@ -48,6 +56,7 @@ pub(crate) struct AuthFailure {
     pub endpoints: Vec<String>,
     pub confirmed: bool,
     pub binding: Option<RouteBinding>,
+    pub lfs: bool,
 }
 fn safe_http_url(value: &str) -> Option<String> {
     let (scheme, rest) = value.split_once("://")?;
@@ -63,6 +72,27 @@ fn safe_http_url(value: &str) -> Option<String> {
     Some(clean)
 }
 impl AuthFailure {
+    pub fn needs_separate_account(&self) -> bool {
+        if self.lfs {
+            return true;
+        }
+        let Some(binding) = &self.binding else {
+            return false;
+        };
+        if super::after_options(&binding.args.iter().map(String::as_str).collect::<Vec<_>>())
+            .first()
+            == Some(&"lfs")
+        {
+            return true;
+        }
+        self.confirmed
+            && self.endpoints.iter().any(|url| {
+                !binding.routes.iter().any(|route| {
+                    crate::git::CredentialScope::for_url(url, "endpoint-check")
+                        .is_ok_and(|scope| scope.matches_url(route))
+                })
+            })
+    }
     /// An explicit URL reported by Git/LFS takes precedence over configured candidates.
     /// Otherwise the UI requires a destination choice; it never guesses a fetch URL.
     pub fn from_error(error: &str, attempted: &[String]) -> Self {
@@ -107,6 +137,11 @@ impl AuthFailure {
             endpoints,
             confirmed,
             binding: None,
+            lfs: error.lines().any(|line| {
+                line.trim_start().starts_with("LFS:")
+                    || line.contains("git-lfs")
+                    || line.contains("Git LFS")
+            }),
         }
     }
 }

@@ -52,6 +52,43 @@ pub(crate) fn rejected(ctx: &egui::Context, repo: PathBuf, url: String) {
     });
 }
 
+/// A secondary consumer has no operation-bound transient retry policy. Its actual
+/// endpoint remains inspectable through an explicit standalone Settings action.
+pub(crate) fn inspect_secondary(ctx: &egui::Context, repo: PathBuf, urls: Vec<String>) {
+    let context = crate::connections::current();
+    let remotes = urls
+        .into_iter()
+        .enumerate()
+        .filter(|(_, url)| valid_https(url))
+        .map(|(index, url)| crate::git::RemoteEndpoint {
+            remote: "Reported secondary endpoint".into(),
+            push: false,
+            lfs: true,
+            index,
+            url,
+        })
+        .collect::<Vec<_>>();
+    let selected = remotes.first().map(|e| e.key()).unwrap_or_default();
+    let inventory=doctor::Inventory{remotes,lines:vec!["This LFS/secondary sign-in is separate from the failed Git operation. Inspect or forget only the endpoint you explicitly select here, select its account in Profile connections or your credential manager, then run the operation again. No automatic retry was authorized.".into()]};
+    let lines = inventory.lines.clone();
+    let state = Arc::new(Mutex::new(State {
+        context,
+        repo,
+        remote: selected,
+        inventory,
+        lines,
+        ..Default::default()
+    }));
+    ctx.data_mut(|data| {
+        data.insert_temp(state_id(), state);
+        data.insert_temp(Id::new("https-inspection-request"), true);
+    });
+}
+pub(crate) fn take_inspection_request(ctx: &egui::Context) -> bool {
+    ctx.data_mut(|data| data.remove_temp::<bool>(Id::new("https-inspection-request")))
+        .unwrap_or(false)
+}
+
 impl State {
     fn launch(
         &mut self,
@@ -148,9 +185,9 @@ impl Settings {
                 if s.repo.as_os_str().is_empty(){layout::note(ui,"Open a repository or choose one from this profile's recent repositories.");}
                 if ui.add_enabled(!busy&&!s.repo.as_os_str().is_empty(),egui::Button::new("Inspect routes and remotes")).clicked(){let p=s.repo.clone();let name=s.remote.clone();s.launch(ui.ctx(),move||doctor::inventory(&p,Some(&name)).map(Answer::Inventory));}
                 let remotes=s.inventory.remotes.clone();let before=s.remote.clone();
-                ui.add_enabled_ui(!busy,|ui|{egui::ComboBox::from_id_salt("network-remote").selected_text(if s.remote.is_empty(){"Choose remote"}else{&s.remote}).show_ui(ui,|ui|{for e in &remotes{if (https && e.url.starts_with("https://")) || (!https && !e.push){ui.selectable_value(&mut s.remote,e.key(),format!("{} · {}",e.key(),doctor::endpoint(&e.url)));}}});});
+                ui.add_enabled_ui(!busy,|ui|{egui::ComboBox::from_id_salt("network-remote").selected_text(if s.remote.is_empty(){"Choose remote"}else{&s.remote}).show_ui(ui,|ui|{for e in &remotes{if (https && e.url.starts_with("https://")) || (!https && !e.push && !e.lfs){ui.selectable_value(&mut s.remote,e.key(),format!("{} · {}",e.key(),doctor::endpoint(&e.url)));}}});});
                 if before!=s.remote{s.lines.clear();s.account=None;s.confirm_reject=false;}
-                let selected=remotes.iter().find(|e|e.key()==s.remote).cloned();
+                let selected=remotes.iter().find(|e|e.key()==s.remote && (https || (!e.push&&!e.lfs))).cloned();
                 if https {
                     let selected=selected.filter(|e|valid_https(&e.url));
                     if ui.add_enabled(!busy&&selected.is_some(),egui::Button::new("Inspect helper and account")).clicked() && let Some(endpoint)=selected.as_ref(){let p=s.repo.clone();let url=endpoint.url.clone();s.launch(ui.ctx(),move||{let helpers=crate::git::connection_read(&p,&["config","--get-urlmatch","credential.helper",&url])?;let mut lines=helper_lines(&helpers);let account=crate::git::https_account(&p,&url)?;

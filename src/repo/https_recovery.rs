@@ -42,11 +42,26 @@ impl RepoTab {
         self.https_challenge = Some(self.https_ticket(url.clone()));
         self.dialog = Some(Dialog::credentials(&url, refused));
     }
-    pub(super) fn offer_failed_https_signin(&mut self, failure: git::AuthFailure, refused: bool) {
+    pub(super) fn offer_failed_https_signin(
+        &mut self,
+        failure: git::AuthFailure,
+        refused: bool,
+        ctx: &egui::Context,
+    ) {
         if failure.context != self.connection_context
             || failure.context != crate::connections::current()
         {
             self.status = Some(("The operation used a previous connection. Run it again with the current profile before signing in.".into(), true));
+            return;
+        }
+        if failure.needs_separate_account() {
+            self.invalidate_https_challenge();
+            self.status=Some(("LFS or a secondary endpoint needs its own explicitly selected account. The HTTPS sign-ins page shows the reported endpoint; no account rejection or automatic retry has been authorized.".into(),true));
+            crate::settings::network_page::inspect_secondary(
+                ctx,
+                self.path.clone(),
+                failure.endpoints,
+            );
             return;
         }
         if failure.binding.is_none() {
@@ -102,6 +117,51 @@ impl RepoTab {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn missing_route_proof_cannot_schedule_signin_rejection_or_retry() -> Result<(), String> {
+        let ctx = egui::Context::default();
+        crate::connections::Context::default().run(|| -> Result<(), String> {
+            let mut tab = RepoTab::new_deferred("/nonexistent/missing-route".into(), &ctx);
+            let failure = git::AuthFailure::from_error(
+                "fatal: Authentication failed for 'https://push.invalid/repo'",
+                &[],
+            );
+            tab.offer_failed_https_signin(failure, false, &ctx);
+            assert!(tab.dialog.is_none() && tab.https_challenge.is_none());
+            tab.switch_https("https://push.invalid/repo".into(), &ctx);
+            tab.sign_in(
+                git::Credentials::for_url(
+                    "https://push.invalid/repo",
+                    "alice".into(),
+                    "DUMMY".into(),
+                )?,
+                &ctx,
+            );
+            assert!(!tab.https_checking && tab.busy_op.is_none() && tab.running.is_none());
+            assert!(tab.credentials.is_none());
+            assert!(crate::settings::network_page::take_rejections(&ctx).is_empty());
+            assert!(!crate::settings::network_page::take_inspection_request(
+                &ctx
+            ));
+            Ok(())
+        })
+    }
+    #[test]
+    fn lfs_recovery_stages_only_standalone_endpoint_inspection() {
+        let ctx = egui::Context::default();
+        crate::connections::Context::default().run(|| {
+            let mut tab = RepoTab::new_deferred("/nonexistent/lfs-route".into(), &ctx);
+            let failure = git::AuthFailure::from_error(
+                "LFS: https://lfs.invalid/repo/info/lfs authentication required",
+                &[],
+            );
+            tab.offer_failed_https_signin(failure, false, &ctx);
+            assert!(tab.dialog.is_none() && tab.https_challenge.is_none());
+            assert!(!tab.https_checking && tab.busy_op.is_none() && tab.running.is_none());
+            assert!(crate::settings::network_page::take_rejections(&ctx).is_empty());
+            assert!(crate::settings::network_page::take_inspection_request(&ctx));
+        });
+    }
     #[test]
     fn connection_or_operation_changes_discard_old_rejection_completion_and_retry() {
         let ctx = egui::Context::default();

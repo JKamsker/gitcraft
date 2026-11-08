@@ -146,6 +146,70 @@ const TRANSPORT_ALIAS: &str = concat!(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(unix)]
+    #[test]
+    fn private_alias_configuration_is_preserved_by_the_production_builder_without_metadata_execution()
+    -> Result<(), String> {
+        let credentials = Credentials::for_url(
+            "https://push.invalid/team/repo",
+            "alice".into(),
+            "DUMMY".into(),
+        )?;
+        let original = ["push", "reviewed-private-alias", "HEAD:refs/heads/main"];
+        let policy = credential_command_policy(
+            Some(Path::new("/nonexistent/recording")),
+            &credentials,
+            &original,
+        )?;
+        let mut extra = Extra {
+            normalize_repository: true,
+            owned_pre: policy.arguments,
+            env: policy.environment,
+            ..Default::default()
+        };
+        extra.env.extend([
+            ("GIT_CONFIG_COUNT", "1".into()),
+            (
+                "GIT_CONFIG_KEY_0",
+                "remote.reviewed-private-alias.url".into(),
+            ),
+            (
+                "GIT_CONFIG_VALUE_0",
+                "https://push.invalid/team/repo".into(),
+            ),
+        ]);
+        let command = local_command(Some(Path::new("/nonexistent/recording")), &extra, &original);
+        let args = command
+            .get_args()
+            .map(|a| a.to_string_lossy().into_owned())
+            .collect::<Vec<_>>();
+        assert!(args.ends_with(&original.map(String::from)));
+        assert!(!args.join(" ").contains("DUMMY"));
+        let env = command
+            .get_envs()
+            .map(|(k, v)| {
+                (
+                    k.to_string_lossy().into_owned(),
+                    v.map(|v| v.to_string_lossy().into_owned()),
+                )
+            })
+            .collect::<std::collections::HashMap<_, _>>();
+        assert_eq!(env.get("GIT_CONFIG_COUNT"), Some(&Some("1".into())));
+        assert_eq!(
+            env.get("GIT_CONFIG_KEY_0"),
+            Some(&Some("remote.reviewed-private-alias.url".into()))
+        );
+        assert_eq!(
+            env.get("GIT_CONFIG_VALUE_0"),
+            Some(&Some("https://push.invalid/team/repo".into()))
+        );
+        assert_eq!(env.get("GIT_DIR"), Some(&None));
+        assert_eq!(
+            env.get("GITCRAFT_GIT_ORIGINAL"),
+            Some(&Some(command.get_program().to_string_lossy().into_owned()))
+        );
+        Ok(())
+    }
     #[test]
     fn transport_artifacts_and_consumer_chain_are_explicit_without_process_searches() {
         assert!(TRANSPORT_ALIAS.contains("unset GITCRAFT_CREDENTIAL_OWNER"));

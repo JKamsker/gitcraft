@@ -393,7 +393,7 @@ impl RepoTab {
                 // Only a URL reported by the failed step, or its captured destinations.
                 // An absent endpoint must never be replaced with the default fetch URL.
                 let failure = auth_failure.unwrap_or_else(|| git::AuthFailure::from_error(e, &[]));
-                self.offer_failed_https_signin(failure, refused);
+                self.offer_failed_https_signin(failure, refused, ctx);
             }
             Err(e) => {
                 self.note_reused(Some(e));
