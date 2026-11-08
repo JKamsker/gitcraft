@@ -21,7 +21,13 @@ pub(super) fn run_with_input(
     input: Option<&str>,
 ) -> Result<String, String> {
     if input.is_some_and(|text| text.len() > INPUT_LIMIT) {
-        return Err(format!("{tool} input exceeds {INPUT_LIMIT} bytes"));
+        return Err(crate::i18n::message(
+            "backend-tool-input-exceeds-input-limit-bytes-202e7a",
+            &[
+                ("tool", (tool).to_string().into()),
+                ("input_limit", INPUT_LIMIT.into()),
+            ],
+        ));
     }
     let (cmd, start_error) = prepared(tool, noun, repo, args)?;
     let options = bounded_options(TOOL_TIMEOUT, input);
@@ -96,9 +102,13 @@ fn finish_run(
     let timed_out = output.stop_kind == Some(crate::processes::StopKind::TimedOut);
     let out = output.complete().map_err(|error| {
         if timed_out {
-            format!(
-                "{tool} didn't finish within {} seconds: {error}",
-                within.as_secs()
+            crate::i18n::message(
+                "backend-tool-didn-t-finish-within-seconds-error-f169ac",
+                &[
+                    ("tool", (tool).to_string().into()),
+                    ("seconds", (within.as_secs()).to_string().into()),
+                    ("detail", (error).to_string().into()),
+                ],
             )
         } else {
             error
@@ -148,9 +158,13 @@ fn prepared(
             .into_iter()
             .find(|named| !same_host(named, &host))
         {
-            return Err(format!(
-                "{tool} was to go to {other}, but the repository's remote is now on {host}: \
-                 refresh the tab"
+            return Err(crate::i18n::message(
+                "backend-tool-was-to-go-to-other-but-the-repository-s-remote-is-now-on-hos-7e3c60",
+                &[
+                    ("tool", (tool).to_string().into()),
+                    ("other", (other).to_string().into()),
+                    ("host", (host).to_string().into()),
+                ],
             ));
         }
         cmd.current_dir(std::env::temp_dir()).args(args);
@@ -176,11 +190,25 @@ fn prepared(
     // installation hint for a failed launch, without guessing an OS errno or rebuilding PATH.
     let start_error = move |error: String| {
         let hint = if here && error.starts_with("could not run process:") {
-            format!("; check that {tool} is installed: gitcraft uses it for {noun}s")
+            crate::i18n::message(
+                "backend-check-that-tool-is-installed-gitcraft-uses-it-for-noun-s-cffe52",
+                &[
+                    ("tool", (tool).to_string().into()),
+                    ("noun", (noun).to_string().into()),
+                ],
+            )
         } else {
             String::new()
         };
-        format!("couldn't run {tool} in {shown}: {error}{hint}")
+        crate::i18n::message(
+            "backend-couldn-t-run-tool-in-shown-error-hint-a76b18",
+            &[
+                ("tool", (tool).to_string().into()),
+                ("shown", (shown).to_string().into()),
+                ("detail", (error).to_string().into()),
+                ("hint", (hint).to_string().into()),
+            ],
+        )
     };
     Ok((cmd, start_error))
 }
@@ -190,8 +218,9 @@ fn forge_of(tool: &str) -> Result<Forge, String> {
     match tool {
         "gh" => Ok(Forge::GitHub),
         "glab" => Ok(Forge::GitLab),
-        _ => Err(format!(
-            "{tool} can't be run for a repository on another machine"
+        _ => Err(crate::i18n::message(
+            "backend-tool-can-t-be-run-for-a-repository-on-another-machine-966b8b",
+            &[("tool", (tool).to_string().into())],
         )),
     }
 }
@@ -219,13 +248,22 @@ fn remote_location(repo: &Path, forge: Forge) -> Result<(String, String), String
     };
     let (host, path) = tool_location(forge, url)
         .filter(|(_, path)| plain_path(path))
-        .ok_or_else(|| format!("{tool} needs a remote with an owner/repo URL"))?;
+        .ok_or_else(|| {
+            crate::i18n::message(
+                "backend-tool-needs-a-remote-with-an-owner-repo-url-3e1de1",
+                &[("tool", (tool).to_string().into())],
+            )
+        })?;
     // Named to the tool, a host is used whether or not the user signed in to it (in a folder,
     // the tool skips remotes on hosts it doesn't know): only the forge's own or one signed in
     // to, so a repository can't send the tool, and a token, to a host of its choosing.
     if !trusted_host(forge, tool, &host)? {
-        return Err(format!(
-            "{tool} isn't signed in to {host}: `{tool} auth login --hostname {host}` to use it",
+        return Err(crate::i18n::message(
+            "backend-tool-isn-t-signed-in-to-host-tool-auth-login-hostname-host-to-use-5c4b1b",
+            &[
+                ("tool", (tool).to_string().into()),
+                ("host", (host).to_string().into()),
+            ],
         ));
     }
     Ok((host, path))
@@ -354,8 +392,15 @@ fn signed_in_to(tool: &str, host: &str) -> Result<bool, String> {
         .current_dir(std::env::temp_dir());
     let options = auth_options(AUTH_CHECK_FOR, false)?;
     // No auth output reaches an error message, including partial output on failure.
-    finish_auth(crate::processes::run_checked(cmd, options))
-        .map_err(|error| format!("couldn't check {tool} login: {error}"))
+    finish_auth(crate::processes::run_checked(cmd, options)).map_err(|error| {
+        crate::i18n::message(
+            "backend-couldn-t-check-tool-login-error-2f36d0",
+            &[
+                ("tool", (tool).to_string().into()),
+                ("detail", (error).to_string().into()),
+            ],
+        )
+    })
 }
 
 fn finish_auth(
@@ -391,10 +436,12 @@ fn auth_options_with(
     if !keep {
         // Service overrides Command.stdout: redirect through its file option, so `gh auth
         // token` goes directly to the OS null device and is never captured in memory.
-        options.stdout_file = Some(
-            open_sink(NULL_SINK)
-                .map_err(|error| format!("couldn't open the null output sink: {error}"))?,
-        );
+        options.stdout_file = Some(open_sink(NULL_SINK).map_err(|error| {
+            crate::i18n::message(
+                "backend-couldn-t-open-the-null-output-sink-error-65c977",
+                &[("detail", (error).to_string().into())],
+            )
+        })?);
     }
     Ok(options)
 }
@@ -512,29 +559,32 @@ pub(super) fn history_api(
     let (tool, forge) = match hosting.forge {
         Forge::GitHub => ("gh", Forge::GitHub),
         Forge::GitLab => ("glab", Forge::GitLab),
-        _ => return Err("This forge uses its HTTP API".into()),
+        _ => return Err(crate::i18n::text("backend-this-forge-uses-its-http-api-60dbf1").into()),
     };
     let authority = hosting
         .web
         .split_once("://")
         .map(|(_, rest)| rest.trim_end_matches('/'))
-        .ok_or("Invalid forge address")?;
+        .ok_or(crate::i18n::text("backend-invalid-forge-address-0f6311"))?;
     if authority.contains(['/', '@', '\n', '\r'])
         || authority.starts_with('-')
         || endpoint.starts_with(['/', '-'])
         || endpoint.contains("://")
         || endpoint.chars().any(char::is_control)
     {
-        return Err("Invalid history API address".into());
+        return Err(crate::i18n::text("backend-invalid-history-api-address-f52ebe").into());
     }
     let actual = super::location(&format!("{}/_history_guard_", hosting.web))
         .map(|(host, _)| host)
-        .ok_or("Invalid forge authority")?;
+        .ok_or(crate::i18n::text("backend-invalid-forge-authority-9d9b21"))?;
     if !actual.eq_ignore_ascii_case(&hosting.host) {
-        return Err("Forge account and API authority do not match".into());
+        return Err(crate::i18n::text(
+            "backend-forge-account-and-api-authority-do-not-match-1393cc",
+        )
+        .into());
     }
     if !active() {
-        return Err("History lookup cancelled".into());
+        return Err(crate::i18n::text("backend-history-lookup-cancelled-9533a8").into());
     }
     let mut command = tool_command(tool);
     command
@@ -564,17 +614,21 @@ pub(super) fn history_api(
         },
     )
     .and_then(|o| o.complete())
-    .map_err(|_| "Bounded forge history lookup failed or was cancelled")?;
+    .map_err(|_| {
+        crate::i18n::text("backend-bounded-forge-history-lookup-failed-or-was-cancelled-41e4a7")
+    })?;
     if !active() {
-        return Err("History lookup cancelled".into());
+        return Err(crate::i18n::text("backend-history-lookup-cancelled-9533a8").into());
     }
     if !output.status.success() {
-        return Err(
-            "Forge history lookup failed; check the selected account and server API support".into(),
-        );
+        return Err(crate::i18n::text(
+            "backend-forge-history-lookup-failed-check-the-selected-account-and-server-ff8b19",
+        )
+        .into());
     }
-    serde_json::from_slice(&output.stdout)
-        .map_err(|_| "Forge history lookup returned malformed JSON".into())
+    serde_json::from_slice(&output.stdout).map_err(|_| {
+        crate::i18n::text("backend-forge-history-lookup-returned-malformed-json-faed17").into()
+    })
 }
 
 #[cfg(test)]

@@ -64,7 +64,10 @@ impl GiteaTarget {
     /// into any review sent, so sending without knowing of one would publish it.
     fn known(&self) -> Result<(), String> {
         if self.pr_id.is_empty() {
-            Err("Couldn't read all of this pull request. Load it again.".to_owned())
+            Err(crate::i18n::text(
+                "backend-couldn-t-read-all-of-this-pull-request-load-it-again-250862",
+            )
+            .to_owned())
         } else {
             Ok(())
         }
@@ -89,7 +92,7 @@ impl GiteaTarget {
             let state = self.api.get(&self.pulls(&format!("/reviews/{review}")))?;
             if at(&state, "/state") != "PENDING" {
                 return Err(
-                    "Your pending review was sent or discarded meanwhile. Load it again."
+                    crate::i18n::text("backend-your-pending-review-was-sent-or-discarded-meanwhile-load-it-again-9836ae")
                         .to_owned(),
                 );
             }
@@ -136,10 +139,9 @@ impl Target for GiteaTarget {
                     Ok(_) => Ok(()),
                     // Forgejo counts only the words, not the comments on lines.
                     Err(failure) if body.trim().is_empty() && needs_words(&failure.message) => {
-                        Err(format!(
-                            "{} sends a review of comments only with a few words: write \
-                             something, or approve",
-                            self.name
+                        Err(crate::i18n::message(
+                            "backend-sends-a-review-of-comments-only-with-a-few-words-write-something-dcd801",
+                            &[("name", (self.name).to_string().into())],
                         ))
                     }
                     Err(failure) => Err(failure.message),
@@ -168,27 +170,27 @@ impl Target for GiteaTarget {
         if last {
             return self.discard_pending();
         }
-        let review = self
-            .pending_review
-            .as_ref()
-            .ok_or("There is no pending review")?;
+        let review = self.pending_review.as_ref().ok_or(crate::i18n::text(
+            "backend-there-is-no-pending-review-1a6148",
+        ))?;
         let endpoint = self.pulls(&format!("/reviews/{review}/comments/{comment}"));
         match self.api.send("DELETE", &endpoint, None) {
             Ok(_) => Ok(()),
-            Err(failure) if matches!(failure.status, Some(404 | 405)) => Err(format!(
-                "This {} can't take one comment out of a pending review: discard the review, or \
-                 send it ({})",
-                self.name, failure.message
+            Err(failure) if matches!(failure.status, Some(404 | 405)) => Err(crate::i18n::message(
+                "backend-this-can-t-take-one-comment-out-of-a-pending-review-discard-the-r-fe31dd",
+                &[
+                    ("name", (self.name).to_string().into()),
+                    ("message", (failure.message).to_string().into()),
+                ],
             )),
             Err(failure) => Err(failure.message),
         }
     }
 
     fn discard_pending(&self) -> Result<(), String> {
-        let review = self
-            .pending_review
-            .as_ref()
-            .ok_or("There is no pending review")?;
+        let review = self.pending_review.as_ref().ok_or(crate::i18n::text(
+            "backend-there-is-no-pending-review-1a6148",
+        ))?;
         self.api
             .send("DELETE", &self.pulls(&format!("/reviews/{review}")), None)?;
         Ok(())
@@ -197,8 +199,9 @@ impl Target for GiteaTarget {
     /// A comment on the same line of the same file is a reply: that's what makes a conversation
     /// here. With a review pending, it goes into it, as it would on the web page.
     fn reply(&self, thread: &str, body: &str) -> Result<(), String> {
-        let (side, line, path) =
-            parse_thread_id(thread).ok_or("This thread can't be answered from here")?;
+        let (side, line, path) = parse_thread_id(thread).ok_or(crate::i18n::text(
+            "backend-this-thread-can-t-be-answered-from-here-c6d211",
+        ))?;
         let comment = LineComment {
             path: path.to_owned(),
             line,
@@ -212,9 +215,9 @@ impl Target for GiteaTarget {
     }
 
     fn set_resolved(&self, _: &str, _: bool) -> Result<(), String> {
-        Err(format!(
-            "{}'s API can't resolve conversations: do it on the pull request's web page",
-            self.name
+        Err(crate::i18n::message(
+            "backend-s-api-can-t-resolve-conversations-do-it-on-the-pull-request-s-web-d6a191",
+            &[("name", (self.name).to_string().into())],
         ))
     }
 
@@ -262,9 +265,9 @@ impl Target for GiteaTarget {
                 Ok(_) => {}
                 Err(failure) if failure.status == Some(404) => {}
                 Err(failure) => {
-                    return Err(format!(
-                        "It's merged, but the branch wasn't deleted: {}",
-                        failure.message
+                    return Err(crate::i18n::message(
+                        "backend-it-s-merged-but-the-branch-wasn-t-deleted-7758b4",
+                        &[("message", (failure.message).to_string().into())],
                     ));
                 }
             }
@@ -274,10 +277,9 @@ impl Target for GiteaTarget {
 
     fn apply_suggestion(&self, suggestion: &Suggestion) -> Result<(), String> {
         check_path(&suggestion.path)?;
-        let head = self
-            .head_repo
-            .as_ref()
-            .ok_or("The repository of this branch is gone")?;
+        let head = self.head_repo.as_ref().ok_or(crate::i18n::text(
+            "backend-the-repository-of-this-branch-is-gone-ce162e",
+        ))?;
         let endpoint = format!("repos/{head}/contents/{}", encode_path(&suggestion.path));
         let file = self.api.get(&format!("{endpoint}?ref={}", self.head_oid))?;
         let content = decode_file(&file, self.name)?;

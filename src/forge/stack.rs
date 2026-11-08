@@ -199,13 +199,24 @@ fn publish_one(
     let noun = to.provider.noun();
     let step = plan.step();
     if let Step::Merged(n) = step {
-        return Ok((format!("#{n} merged, left alone"), None));
+        return Ok((
+            crate::i18n::message("backend-n-merged-left-alone-28e650", &[("count", n.into())]),
+            None,
+        ));
     }
     if let Some(from) = &plan.reparent_from {
         // Its parent's pull request was merged: based on what that one went into now.
         let set = set_op(&config_key(&plan.branch, PARENT_KEY), &plan.base);
         let args: Vec<&str> = set.iter().map(String::as_str).collect();
-        git::run(Some(repo), &args).map_err(|e| format!("couldn't move it off {from}: {e}"))?;
+        git::run(Some(repo), &args).map_err(|e| {
+            crate::i18n::message(
+                "backend-couldn-t-move-it-off-from-e-9e58d5",
+                &[
+                    ("from", (from).to_string().into()),
+                    ("detail", (e).to_string().into()),
+                ],
+            )
+        })?;
     }
     push(repo, &plan.branch, to)?;
     match step {
@@ -228,26 +239,67 @@ fn publish_one(
                 record(repo, &plan.branch, n)?;
             }
             let what = match number {
-                Some(n) => format!("opened #{n} into {}", plan.base),
-                None => format!("opened into {} ({said})", plan.base),
+                Some(n) => crate::i18n::message(
+                    "backend-opened-n-into-50a67c",
+                    &[
+                        ("count", n.into()),
+                        ("base", (plan.base).to_string().into()),
+                    ],
+                ),
+                None => crate::i18n::message(
+                    "backend-opened-into-said-e75205",
+                    &[
+                        ("base", (plan.base).to_string().into()),
+                        ("said", (said).to_string().into()),
+                    ],
+                ),
             };
             Ok((what, number))
         }
         Step::Retarget { number, from } => {
             to.provider
                 .retarget(repo, to.hosting, number, &plan.base)
-                .map_err(|e| format!("pointing {noun} #{number} at {} failed: {e}", plan.base))?;
+                .map_err(|e| {
+                    crate::i18n::message(
+                        "backend-pointing-noun-number-at-failed-e-5b522b",
+                        &[
+                            ("noun", (noun).to_string().into()),
+                            ("number", (number).to_string().into()),
+                            ("base", (plan.base).to_string().into()),
+                            ("detail", (e).to_string().into()),
+                        ],
+                    )
+                })?;
             record(repo, &plan.branch, number)?;
             Ok((
-                format!("#{number} now into {} (was {from})", plan.base),
+                crate::i18n::message(
+                    "backend-number-now-into-was-from-5423c7",
+                    &[
+                        ("number", (number).to_string().into()),
+                        ("base", (plan.base).to_string().into()),
+                        ("from", (from).to_string().into()),
+                    ],
+                ),
                 Some(number),
             ))
         }
         Step::Push(number) => {
             record(repo, &plan.branch, number)?;
-            Ok((format!("#{number} has the new commits"), Some(number)))
+            Ok((
+                crate::i18n::message(
+                    "backend-number-has-the-new-commits-ca1768",
+                    &[("number", (number).to_string().into())],
+                ),
+                Some(number),
+            ))
         }
-        Step::Empty => Ok((format!("pushed, no {noun}: nothing of its own"), None)),
+        Step::Empty => Ok((
+            crate::i18n::message(
+                "backend-pushed-no-noun-nothing-of-its-own-244003",
+                &[("noun", (noun).to_string().into())],
+            ),
+            None,
+        )),
         Step::Merged(_) => Ok((String::new(), None)),
     }
 }
@@ -281,7 +333,15 @@ fn push(repo: &Path, branch: &str, to: &Target) -> Result<(), String> {
         to.creds,
     )
     .map(drop)
-    .map_err(|e| format!("pushing {branch} failed: {e}"))
+    .map_err(|e| {
+        crate::i18n::message(
+            "backend-pushing-branch-failed-e-6bb910",
+            &[
+                ("branch", (branch).to_string().into()),
+                ("detail", (e).to_string().into()),
+            ],
+        )
+    })
 }
 
 /// The number of the pull request a forge said it opened: the last run of digits of its URL

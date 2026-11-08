@@ -123,7 +123,12 @@ impl GitHubTarget {
             args.extend(["--hostname", &self.host]);
         }
         let out = gh_with_input(&self.repo, &args, Some(&payload.to_string()))?;
-        serde_json::from_str(&out).map_err(|e| format!("unexpected output of gh: {e}"))
+        serde_json::from_str(&out).map_err(|e| {
+            crate::i18n::message(
+                "backend-unexpected-output-of-gh-e-24588e",
+                &[("detail", (e).to_string().into())],
+            )
+        })
     }
 
     fn post_review(&self, payload: &Value) -> Result<(), String> {
@@ -171,7 +176,10 @@ impl Target for GitHubTarget {
     /// Adds a comment on a line to the pending review, starting one if there is none.
     fn add_pending(&self, comment: &LineComment) -> Result<(), String> {
         if self.pr_id.is_empty() {
-            return Err("Couldn't read all of this pull request. Load it again.".to_owned());
+            return Err(crate::i18n::text(
+                "backend-couldn-t-read-all-of-this-pull-request-load-it-again-250862",
+            )
+            .to_owned());
         }
         let review = match &self.pending_review {
             Some(review) => review.clone(),
@@ -186,7 +194,9 @@ impl Target for GitHubTarget {
                 answer
                     .pointer("/data/addPullRequestReview/pullRequestReview/id")
                     .and_then(Value::as_str)
-                    .ok_or("GitHub didn't start a review")?
+                    .ok_or(crate::i18n::text(
+                        "backend-github-didn-t-start-a-review-43919b",
+                    ))?
                     .to_owned()
             }
         };
@@ -226,10 +236,9 @@ impl Target for GitHubTarget {
 
     /// Throws the pending review away.
     fn discard_pending(&self) -> Result<(), String> {
-        let review = self
-            .pending_review
-            .as_ref()
-            .ok_or("There is no pending review")?;
+        let review = self.pending_review.as_ref().ok_or(crate::i18n::text(
+            "backend-there-is-no-pending-review-1a6148",
+        ))?;
         self.mutate(
             "deletePullRequestReview",
             json!({ "pullRequestReviewId": review }),
@@ -293,7 +302,10 @@ impl Target for GitHubTarget {
             if let Err(e) = self.api("DELETE", &endpoint, None)
                 && !branch_was_gone(&e)
             {
-                return Err(format!("It's merged, but the branch wasn't deleted: {e}"));
+                return Err(crate::i18n::message(
+                    "backend-it-s-merged-but-the-branch-wasn-t-deleted-e-98aa9e",
+                    &[("detail", (e).to_string().into())],
+                ));
             }
         }
         Ok(())
@@ -304,14 +316,17 @@ impl Target for GitHubTarget {
     /// landing on the wrong lines.
     fn apply_suggestion(&self, suggestion: &Suggestion) -> Result<(), String> {
         check_path(&suggestion.path)?;
-        let head = self
-            .head_repo
-            .as_ref()
-            .ok_or("The repository of this branch is gone")?;
+        let head = self.head_repo.as_ref().ok_or(crate::i18n::text(
+            "backend-the-repository-of-this-branch-is-gone-ce162e",
+        ))?;
         let endpoint = format!("repos/{head}/contents/{}", encode_path(&suggestion.path));
         let file = self.api("GET", &format!("{endpoint}?ref={}", self.head_oid), None)?;
-        let file: Value =
-            serde_json::from_str(&file).map_err(|e| format!("unexpected output of gh: {e}"))?;
+        let file: Value = serde_json::from_str(&file).map_err(|e| {
+            crate::i18n::message(
+                "backend-unexpected-output-of-gh-e-24588e",
+                &[("detail", (e).to_string().into())],
+            )
+        })?;
         let content = decode_file(&file, "GitHub")?;
         let changed = apply_lines(&content, suggestion.start, suggestion.end, &suggestion.text)?;
         let payload = json!({

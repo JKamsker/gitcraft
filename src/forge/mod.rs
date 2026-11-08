@@ -76,11 +76,19 @@ impl Forge {
         self.provider().noun()
     }
 
+    /// Localized presentation; `noun()` retains its existing protocol identity.
+    pub fn noun_label(self) -> &'static str {
+        crate::i18n::text(match self {
+            Forge::GitLab => "backend-noun-merge-request",
+            _ => "backend-noun-pull-request",
+        })
+    }
+
     /// The heading of the sidebar's list.
     pub fn list_title(self) -> &'static str {
         match self.noun() {
-            "merge request" => "MERGE REQUESTS",
-            _ => "PULL REQUESTS",
+            "merge request" => crate::i18n::text("backend-merge-requests-6e2149"),
+            _ => crate::i18n::text("backend-pull-requests-334b28"),
         }
     }
 
@@ -323,14 +331,20 @@ pub trait Provider: Sync {
 
     /// The open issues of the repository assigned to the person signed in.
     fn assigned_issues(&self, _repo: &Path, _hosting: &Hosting) -> Result<Vec<Issue>, String> {
-        Err(format!("gitcraft can't list {}'s issues", self.name()))
+        Err(crate::i18n::message(
+            "backend-gitcraft-can-t-list-s-issues-0a6c81",
+            &[("name", (self.name()).to_string().into())],
+        ))
     }
 
     /// Issue `number` of the repository as it is now, to read its description again.
     fn issue(&self, _repo: &Path, _hosting: &Hosting, number: u64) -> Result<Issue, String> {
-        Err(format!(
-            "gitcraft can't read {}'s issue #{number}",
-            self.name()
+        Err(crate::i18n::message(
+            "backend-gitcraft-can-t-read-s-issue-number-6d6c88",
+            &[
+                ("name", (self.name()).to_string().into()),
+                ("number", (number).to_string().into()),
+            ],
         ))
     }
 
@@ -339,10 +353,12 @@ pub trait Provider: Sync {
     /// unasked, so it never asks for a password or a keyring: only logins already at hand.
     fn inbox(&self, repo: &Path, hosting: &Hosting) -> Result<inbox::Answer, String> {
         let _ = (repo, hosting);
-        Err(format!(
-            "gitcraft can't list the {}s waiting for you on {}",
-            self.noun(),
-            self.name()
+        Err(crate::i18n::message(
+            "backend-gitcraft-can-t-list-the-s-waiting-for-you-on-c02926",
+            &[
+                ("noun", (self.noun()).to_string().into()),
+                ("name", (self.name()).to_string().into()),
+            ],
         ))
     }
 
@@ -360,10 +376,12 @@ pub trait Provider: Sync {
     /// Where each open pull request's branch is (a fork or the repository itself), and what its
     /// author allows.
     fn forks(&self, _repo: &Path, _hosting: &Hosting) -> Result<Vec<ForkInfo>, String> {
-        Err(format!(
-            "{} can't say where its {}s come from",
-            self.name(),
-            self.noun()
+        Err(crate::i18n::message(
+            "backend-can-t-say-where-its-s-come-from-013949",
+            &[
+                ("name", (self.name()).to_string().into()),
+                ("noun", (self.noun()).to_string().into()),
+            ],
         ))
     }
 
@@ -374,9 +392,9 @@ pub trait Provider: Sync {
 
     /// Approves the workflow run `run`, which then runs.
     fn approve_run(&self, _repo: &Path, _hosting: &Hosting, _run: u64) -> Result<(), String> {
-        Err(format!(
-            "{} has no runs to approve from gitcraft",
-            self.name()
+        Err(crate::i18n::message(
+            "backend-has-no-runs-to-approve-from-gitcraft-635889",
+            &[("name", (self.name()).to_string().into())],
         ))
     }
 
@@ -387,7 +405,10 @@ pub trait Provider: Sync {
         _hosting: &Hosting,
         _new: &NewRelease,
     ) -> Result<String, String> {
-        Err(format!("gitcraft can't make releases on {}", self.name()))
+        Err(crate::i18n::message(
+            "backend-gitcraft-can-t-make-releases-on-16af5d",
+            &[("name", (self.name()).to_string().into())],
+        ))
     }
 
     /// Attaches `files` (of this machine) to the release of `tag`.
@@ -398,9 +419,9 @@ pub trait Provider: Sync {
         _tag: &str,
         _files: &[std::path::PathBuf],
     ) -> Result<(), String> {
-        Err(format!(
-            "gitcraft can't attach files to releases on {}",
-            self.name()
+        Err(crate::i18n::message(
+            "backend-gitcraft-can-t-attach-files-to-releases-on-c02ad8",
+            &[("name", (self.name()).to_string().into())],
         ))
     }
 }
@@ -603,7 +624,10 @@ pub(crate) fn tool(forge: Forge, repo: &Path, args: &[&str]) -> Result<String, S
         Forge::GitHub => "gh",
         Forge::GitLab => "glab",
         Forge::Forgejo | Forge::Gitea | Forge::Azure | Forge::Bitbucket => {
-            return Err(format!("gitcraft has no tool for {}", forge.name()));
+            return Err(crate::i18n::message(
+                "backend-gitcraft-has-no-tool-for-c05ef1",
+                &[("name", (forge.name()).to_string().into())],
+            ));
         }
     };
     cli::run(tool, forge.noun(), repo, args)
@@ -623,18 +647,36 @@ pub(crate) fn ask_reviewers(
         .collect();
     match refused.as_slice() {
         [] => Ok(url),
-        [(who, why)] => Err(format!(
-            "Opened {url}, but couldn't ask {who} for a review: {}",
-            why.lines().next().unwrap_or_default()
+        [(who, why)] => Err(crate::i18n::message(
+            "backend-opened-url-but-couldn-t-ask-who-for-a-review-eded91",
+            &[
+                ("url", (url).to_string().into()),
+                ("who", (who).to_string().into()),
+                (
+                    "why",
+                    (why.lines().next().unwrap_or_default()).to_string().into(),
+                ),
+            ],
         )),
-        [(_, why), ..] => Err(format!(
-            "Opened {url}, but couldn't ask {} for a review: {}",
-            refused
-                .iter()
-                .map(|(w, _)| w.as_str())
-                .collect::<Vec<_>>()
-                .join(", "),
-            why.lines().next().unwrap_or_default()
+        [(_, why), ..] => Err(crate::i18n::message(
+            "backend-opened-url-but-couldn-t-ask-for-a-review-3afd5b",
+            &[
+                ("url", (url).to_string().into()),
+                (
+                    "refused",
+                    (refused
+                        .iter()
+                        .map(|(w, _)| w.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", "))
+                    .to_string()
+                    .into(),
+                ),
+                (
+                    "why",
+                    (why.lines().next().unwrap_or_default()).to_string().into(),
+                ),
+            ],
         )),
     }
 }

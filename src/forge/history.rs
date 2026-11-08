@@ -146,7 +146,10 @@ impl Client<'_> {
     fn get(&mut self, path: &str) -> Result<Value, String> {
         if self.requests >= 48 || self.began.elapsed() > Duration::from_secs(90) || !(self.active)()
         {
-            return Err("History evidence request budget reached or cancelled".into());
+            return Err(crate::i18n::text(
+                "backend-history-evidence-request-budget-reached-or-cancelled-8d8d5d",
+            )
+            .into());
         }
         self.requests += 1;
         match &self.api {
@@ -168,7 +171,7 @@ pub(crate) fn lookup(
         || query.at.line > 20000
         || query.at.path.len() > 4096
     {
-        return Err("Invalid pinned history card".into());
+        return Err(crate::i18n::text("backend-invalid-pinned-history-card-1b9013").into());
     }
     if !safe_url(&hosting.web)
         || hosting
@@ -176,13 +179,15 @@ pub(crate) fn lookup(
             .split('/')
             .any(|s| s.is_empty() || matches!(s, "." | ".."))
     {
-        return Err("Invalid captured forge repository".into());
+        return Err(crate::i18n::text("backend-invalid-captured-forge-repository-098e0a").into());
     }
     let authority = super::location(&format!("{}/_history_guard_", hosting.web))
         .map(|(host, _)| host)
-        .ok_or("Invalid forge authority")?;
+        .ok_or(crate::i18n::text("backend-invalid-forge-authority-9d9b21"))?;
     if !authority.eq_ignore_ascii_case(&hosting.host) {
-        return Err("Captured forge account and API host differ".into());
+        return Err(
+            crate::i18n::text("backend-captured-forge-account-and-api-host-differ-39ae5b").into(),
+        );
     }
     let reader = Reader::new(repo, active);
     let config = reader.run(
@@ -190,7 +195,8 @@ pub(crate) fn lookup(
         vec![],
         &[0, 1],
     )?;
-    let config = std::str::from_utf8(&config).map_err(|_| "Repository remote is not UTF-8")?;
+    let config = std::str::from_utf8(&config)
+        .map_err(|_| crate::i18n::text("backend-repository-remote-is-not-utf-8-db2d43"))?;
     let same = config
         .lines()
         .filter_map(|line| line.split_once(' '))
@@ -200,7 +206,10 @@ pub(crate) fn lookup(
             })
         });
     if !same {
-        return Err("Repository forge remote changed; refresh before requesting evidence".into());
+        return Err(crate::i18n::text(
+            "backend-repository-forge-remote-changed-refresh-before-requesting-evidenc-cd608a",
+        )
+        .into());
     }
     let api = matches!(hosting.forge, Forge::Gitea | Forge::Forgejo)
         .then(|| super::gitea::history_api(hosting));
@@ -266,22 +275,26 @@ pub(crate) fn lookup(
     let mut result = lookup_with(hosting, query, &mut |path| client.get(path), &mut prove)?;
     if proof_limited {
         result.limited = true;
-        result.notes.push("64 reviewed-revision proofs reached; remaining comments were not labelled line-specific".into());
+        result.notes.push(
+            crate::i18n::text(
+                "backend-64-reviewed-revision-proofs-reached-remaining-comments-were-not-l-e73501",
+            )
+            .into(),
+        );
     }
     Ok(result)
 }
 fn list(value: Value) -> Result<Vec<Value>, String> {
-    value
-        .as_array()
-        .cloned()
-        .ok_or_else(|| "Forge history API did not return a list".into())
+    value.as_array().cloned().ok_or_else(|| {
+        crate::i18n::text("backend-forge-history-api-did-not-return-a-list-4383b5").into()
+    })
 }
 fn check_provider(forge: Forge) -> Result<(), String> {
     match forge {
         Forge::GitHub | Forge::GitLab | Forge::Gitea | Forge::Forgejo => Ok(()),
-        Forge::Azure | Forge::Bitbucket => Err(format!(
-            "Commit-to-PR history evidence is not supported for {}; open its pull request page for native review",
-            forge.name()
+        Forge::Azure | Forge::Bitbucket => Err(crate::i18n::message(
+            "backend-commit-to-pr-history-evidence-is-not-supported-for-open-its-pull-1f6d28",
+            &[("name", (forge.name()).to_string().into())],
         )),
     }
 }
@@ -319,9 +332,9 @@ fn lookup_with(
             },
         );
         if n == 0 {
-            result
-                .notes
-                .push("An associated PR had no valid number".into());
+            result.notes.push(
+                crate::i18n::text("backend-an-associated-pr-had-no-valid-number-113e31").into(),
+            );
             continue;
         }
         let pr_path = if h.forge == Forge::GitLab {
@@ -352,9 +365,12 @@ fn lookup_with(
             ),
             state: text(&details, "/state"),
             association: if merge == q.at.commit || squash == q.at.commit {
-                "Exact merge/squash commit".into()
+                crate::i18n::text("backend-exact-merge-squash-commit-e17e96").into()
             } else {
-                "Forge commit association; multiple PRs may contain this version".into()
+                crate::i18n::text(
+                    "backend-forge-commit-association-multiple-prs-may-contain-this-version-dbc81f",
+                )
+                .into()
             },
             issues: issue_links(h, &text(&details, "/body")),
             comments: vec![],
@@ -384,7 +400,7 @@ fn lookup_with(
                     };
                     if left.is_none() {
                         pull.limited = true;
-                        pull.notes.push("GitHub's reviewed merge base could not be established; old-side comments remain unmapped.".into());
+                        pull.notes.push(crate::i18n::text("backend-github-s-reviewed-merge-base-could-not-be-established-old-side-co-f06816").into());
                     }
                     pages(&format!("{pr_path}/comments?per_page=100"), get, &mut |v| {
                         github_comment(v, &details, left.as_deref(), q, prove, &mut pull)
@@ -438,7 +454,10 @@ fn lookup_with(
                     }
                 }
                 Forge::Azure | Forge::Bitbucket => {
-                    return Err("This forge does not support commit-to-PR history evidence".into());
+                    return Err(crate::i18n::text(
+                        "backend-this-forge-does-not-support-commit-to-pr-history-evidence-6f1ca1",
+                    )
+                    .into());
                 }
             };
             match fetched {
@@ -453,7 +472,12 @@ fn lookup_with(
         result.pulls.push(pull);
     }
     if result.limited {
-        result.notes.push("Coverage is bounded: up to4associated PRs,5comment pages per endpoint,48requests/90seconds and64local revision proofs. Missing objects are never downloaded.".into());
+        result.notes.push(
+            crate::i18n::text(
+                "backend-coverage-is-bounded-up-to4associated-prs-5comment-pages-per-endpo-9d92d5",
+            )
+            .into(),
+        );
     }
     Ok(result)
 }
@@ -513,9 +537,9 @@ fn add(
                 && prove(&revision, &path))
             .then(|| {
                 if revision == q.at.commit {
-                    "Exact reviewed revision and line range".into()
+                    crate::i18n::text("backend-exact-reviewed-revision-and-line-range-522601").into()
                 } else {
-                    "Identical pinned file blob at the reviewed revision; line numbers preserved"
+                    crate::i18n::text("backend-identical-pinned-file-blob-at-the-reviewed-revision-line-numbers-fd3258")
                         .into()
                 }
             })

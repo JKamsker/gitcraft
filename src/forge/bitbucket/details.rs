@@ -25,11 +25,17 @@ pub(super) fn snapshot(api: &Api, n: u64) -> Result<Snapshot, String> {
     if pr.get("id").and_then(Value::as_u64) != Some(n)
         || pr.pointer("/destination/repository/uuid") != repo.get("uuid")
     {
-        return Err("Bitbucket returned a different PR/repository".into());
+        return Err(crate::i18n::text(
+            "backend-bitbucket-returned-a-different-pr-repository-e2606a",
+        )
+        .into());
     }
     for p in ["/source/commit/hash", "/destination/commit/hash"] {
         if !crate::pull_request::is_oid(required(&pr, p)?) {
-            return Err("Bitbucket returned an invalid commit ID".into());
+            return Err(crate::i18n::text(
+                "backend-bitbucket-returned-an-invalid-commit-id-7a2d6b",
+            )
+            .into());
         }
     }
     required(&pr, "/source/repository/uuid")?;
@@ -48,7 +54,10 @@ pub(super) fn read(api: &Api, n: u64) -> Result<PrDetails, String> {
         ))?;
         let base = required(&common, "/hash")?.to_owned();
         if !crate::pull_request::is_oid(&base) {
-            return Err("Bitbucket returned an invalid common ancestor".into());
+            return Err(crate::i18n::text(
+                "backend-bitbucket-returned-an-invalid-common-ancestor-4d3940",
+            )
+            .into());
         }
         let comments = pages(api, &format!("{end}/comments?pagelen=100"));
         let commits = pages(api, &format!("{end}/commits?pagelen=100"));
@@ -61,7 +70,7 @@ pub(super) fn read(api: &Api, n: u64) -> Result<PrDetails, String> {
         }
         let open = text(&s.pr, "/state") == "OPEN";
         let own = text(&s.pr, "/author/uuid").eq_ignore_ascii_case(&api.viewer);
-        let mut extras=PrExtras{pr_id:n.to_string(),native_policy:true,native_account:Some(api.viewer.clone()),viewer:Some(if own{p.author.clone()}else{api.viewer.clone()}),head_oid:p.sha.clone(),head_repo:Some(text(&s.pr,"/source/repository/full_name")),connection_binding:Some(crate::pr_threads::connection_binding()),review_revision:Some(s.revision()),review_features:ReviewFeatures{pending:false,request_changes:open&&!own,approve:open&&!own,apply_suggestions:false},merge_handoff:true,merge_blocker:Some("Bitbucket Cloud's documented merge API has no expected-head condition; complete this PR on Bitbucket.".into()),..Default::default()};
+        let mut extras=PrExtras{pr_id:n.to_string(),native_policy:true,native_account:Some(api.viewer.clone()),viewer:Some(if own{p.author.clone()}else{api.viewer.clone()}),head_oid:p.sha.clone(),head_repo:Some(text(&s.pr,"/source/repository/full_name")),connection_binding:Some(crate::pr_threads::connection_binding()),review_revision:Some(s.revision()),review_features:ReviewFeatures{pending:false,request_changes:open&&!own,approve:open&&!own,apply_suggestions:false},merge_handoff:true,merge_blocker:Some(crate::i18n::text("backend-bitbucket-cloud-s-documented-merge-api-has-no-expected-head-condi-3cd48b").into()),..Default::default()};
         let mut timeline = vec![];
         for v in items(&s.pr, "/participants") {
             let status = text(v, "/state");
@@ -70,7 +79,7 @@ pub(super) fn read(api: &Api, n: u64) -> Result<PrDetails, String> {
             {
                 timeline.push(Entry {
                     kind: EntryKind::Review(if status == "changes_requested" {
-                        "requested changes"
+                        crate::i18n::text("backend-requested-changes-7adfe7")
                     } else {
                         "approved"
                     }),
@@ -186,7 +195,10 @@ pub(super) fn read(api: &Api, n: u64) -> Result<PrDetails, String> {
             ..Default::default()
         });
     }
-    Err("Bitbucket source or target changed while reading; reload".into())
+    Err(
+        crate::i18n::text("backend-bitbucket-source-or-target-changed-while-reading-reload-d92e43")
+            .into(),
+    )
 }
 fn threads(rows: &[Value], open: bool) -> Vec<Thread> {
     let mut roots = std::collections::BTreeMap::<u64, Vec<&Value>>::new();

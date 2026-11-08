@@ -275,9 +275,9 @@ fn create(api: &Api, hosting: &Hosting, new: &NewPullRequest) -> Result<String, 
     };
     let url = match at(&answer, "/html_url") {
         "" => {
-            return Err(format!(
-                "{} didn't say which pull request it opened",
-                api.name()
+            return Err(crate::i18n::message(
+                "backend-didn-t-say-which-pull-request-it-opened-56835e",
+                &[("name", (api.name()).to_string().into())],
             ));
         }
         url => url.to_owned(),
@@ -287,9 +287,12 @@ fn create(api: &Api, hosting: &Hosting, new: &NewPullRequest) -> Result<String, 
         return Ok(url);
     }
     if number == 0 {
-        return Err(format!(
-            "Opened {url}, but {} didn't say its number: ask for the reviews on its page",
-            api.name()
+        return Err(crate::i18n::message(
+            "backend-opened-url-but-didn-t-say-its-number-ask-for-the-reviews-on-its-p-449045",
+            &[
+                ("url", (url).to_string().into()),
+                ("name", (api.name()).to_string().into()),
+            ],
         ));
     }
     let endpoint = format!("repos/{}/pulls/{number}/requested_reviewers", hosting.path);
@@ -326,9 +329,13 @@ fn create_release(api: &Api, hosting: &Hosting, new: &super::NewRelease) -> Resu
     // The tag must be on the server: without it, the forge would make one of the default branch.
     api.get(&format!("repos/{}/tags/{tag}", hosting.path))
         .map_err(|e| {
-            format!(
-                "{} isn't on {} yet: push it first ({})",
-                new.tag, hosting.host, e.message
+            crate::i18n::message(
+                "backend-isn-t-on-yet-push-it-first-1584cd",
+                &[
+                    ("tag", (new.tag).to_string().into()),
+                    ("host", (hosting.host).to_string().into()),
+                    ("message", (e.message).to_string().into()),
+                ],
             )
         })?;
     let answer = api.send(
@@ -357,10 +364,15 @@ fn upload_assets(api: &Api, hosting: &Hosting, tag: &str, files: &[PathBuf]) -> 
         .and_then(Value::as_array)
         .map(|a| a.iter().map(|x| at(x, "/name").to_owned()).collect())
         .unwrap_or_default();
-    let id = release
-        .get("id")
-        .and_then(Value::as_u64)
-        .ok_or_else(|| format!("{} didn't say which release {tag} is", api.name()))?;
+    let id = release.get("id").and_then(Value::as_u64).ok_or_else(|| {
+        crate::i18n::message(
+            "backend-didn-t-say-which-release-tag-is-1ede89",
+            &[
+                ("name", (api.name()).to_string().into()),
+                ("tag", (tag).to_string().into()),
+            ],
+        )
+    })?;
     for file in files {
         let name = file
             .file_name()
@@ -370,8 +382,15 @@ fn upload_assets(api: &Api, hosting: &Hosting, tag: &str, files: &[PathBuf]) -> 
         if attached.contains(&name) {
             continue;
         }
-        let bytes =
-            std::fs::read(file).map_err(|e| format!("Couldn't read {}: {e}", file.display()))?;
+        let bytes = std::fs::read(file).map_err(|e| {
+            crate::i18n::message(
+                "backend-couldn-t-read-e-decf41",
+                &[
+                    ("path", (file.display()).to_string().into()),
+                    ("detail", (e).to_string().into()),
+                ],
+            )
+        })?;
         let query = encode(&name);
         api.upload(
             &format!("repos/{}/releases/{id}/assets?name={query}", hosting.path),
@@ -379,7 +398,15 @@ fn upload_assets(api: &Api, hosting: &Hosting, tag: &str, files: &[PathBuf]) -> 
             &name,
             &bytes,
         )
-        .map_err(|e| format!("Couldn't attach {name}: {}", e.message))?;
+        .map_err(|e| {
+            crate::i18n::message(
+                "backend-couldn-t-attach-name-30c34d",
+                &[
+                    ("name", (name).to_string().into()),
+                    ("message", (e.message).to_string().into()),
+                ],
+            )
+        })?;
     }
     Ok(())
 }
@@ -557,10 +584,14 @@ pub(crate) fn selected_tea_metadata(alias: &str) -> Option<(String, String)> {
 
 pub(crate) fn selected_tea_secret(alias: &str, host: &str) -> Result<(String, String), String> {
     let logins = tea_logins();
-    let login = selected_tea_login(&logins, &format!("https://{host}"), alias)
-        .ok_or("The selected tea login is unavailable for this server")?;
+    let login = selected_tea_login(&logins, &format!("https://{host}"), alias).ok_or(
+        crate::i18n::text("backend-the-selected-tea-login-is-unavailable-for-this-server-7ec179"),
+    )?;
     if login.user.is_empty() {
-        return Err("The tea login must include its account username".to_owned());
+        return Err(crate::i18n::text(
+            "backend-the-tea-login-must-include-its-account-username-70a13b",
+        )
+        .to_owned());
     }
     Ok((login.user.clone(), login.token.clone()))
 }

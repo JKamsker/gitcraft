@@ -24,10 +24,12 @@ pub fn resolve(
     remote: &str,
     target: &Target,
 ) -> Result<Link, String> {
-    let chosen = remotes
-        .iter()
-        .find(|r| r.name == remote)
-        .ok_or_else(|| format!("the remote {remote} is gone"))?;
+    let chosen = remotes.iter().find(|r| r.name == remote).ok_or_else(|| {
+        crate::i18n::message(
+            "backend-the-remote-remote-is-gone-275dba",
+            &[("remote", (remote).to_string().into())],
+        )
+    })?;
     let mut config = forge::gitcraft_config(repo);
     // `gitcraft.forge` says what `origin` (the remote detection reads) is on, not every remote:
     // another remote goes by `gitcraft.<host>.forge` and its host's name.
@@ -53,7 +55,13 @@ pub fn resolve(
         Target::File { rev, path, lines } => {
             let sha = commit_sha(repo, rev)?;
             if git::run(Some(repo), &["cat-file", "-e", &format!("{sha}:{path}")]).is_err() {
-                return Err(format!("{path} isn't in commit {}", short(&sha)));
+                return Err(crate::i18n::message(
+                    "backend-path-isn-t-in-commit-920013",
+                    &[
+                        ("path", (path).to_string().into()),
+                        ("sha", (short(&sha)).to_string().into()),
+                    ],
+                ));
             }
             let warning = unpushed(repo, remotes, remote, &sha)?;
             let link = url(
@@ -76,10 +84,12 @@ pub fn resolve(
 /// Why `remote` has no link: its host isn't one gitcraft knows a forge by.
 fn unknown_forge(remote: &Remote) -> String {
     let host = forge::location(&remote.url).map_or_else(|| remote.url.clone(), |(host, _)| host);
-    format!(
-        "gitcraft doesn't know which forge {host} (remote {}) is; if it's GitHub, GitLab, \
-         Forgejo or Gitea, say which with: git config gitcraft.{host}.forge forgejo",
-        remote.name
+    crate::i18n::message(
+        "backend-gitcraft-doesn-t-know-which-forge-host-remote-is-if-it-s-github-g-1df5a2",
+        &[
+            ("host", (host).to_string().into()),
+            ("name", (remote.name).to_string().into()),
+        ],
     )
 }
 
@@ -94,8 +104,14 @@ fn commit_sha(repo: &Path, rev: &str) -> Result<String, String> {
     let sha = out.trim();
     if sha.is_empty() {
         return Err(match rev.strip_suffix('^') {
-            Some(child) => format!("{} has no parent commit", short(child)),
-            None => format!("{} isn't a commit in this repository", short(rev)),
+            Some(child) => crate::i18n::message(
+                "backend-has-no-parent-commit-99ef4b",
+                &[("child", (short(child)).to_string().into())],
+            ),
+            None => crate::i18n::message(
+                "backend-isn-t-a-commit-in-this-repository-733379",
+                &[("rev", (short(rev)).to_string().into())],
+            ),
         });
     }
     Ok(sha.to_owned())
@@ -130,12 +146,18 @@ fn unpushed(
     }
     let commit = short(sha);
     Ok(Some(if holders.is_empty() {
-        format!("{commit} isn't pushed to any remote yet, so the link won't work until it is")
+        crate::i18n::message(
+            "backend-commit-isn-t-pushed-to-any-remote-yet-so-the-link-won-t-work-unti-d88428",
+            &[("commit", (commit).to_string().into())],
+        )
     } else {
-        format!(
-            "{commit} isn't on {remote} yet (only on {}), so the link won't work until it's \
-             pushed there",
-            holders.join(", ")
+        crate::i18n::message(
+            "backend-commit-isn-t-on-remote-yet-only-on-so-the-link-won-t-work-until-i-0be5b9",
+            &[
+                ("commit", (commit).to_string().into()),
+                ("remote", (remote).to_string().into()),
+                ("holders", (holders.join(", ")).to_string().into()),
+            ],
         )
     }))
 }
@@ -153,7 +175,13 @@ fn branch_missing(repo: &Path, remote: &str, name: &str) -> Result<Option<String
         &[0, 1],
     )?;
     Ok(out.trim().is_empty().then(|| {
-        format!("{name} isn't on {remote} yet, so the link won't work until it's pushed there")
+        crate::i18n::message(
+            "backend-name-isn-t-on-remote-yet-so-the-link-won-t-work-until-it-s-pushed-8a4f97",
+            &[
+                ("name", (name).to_string().into()),
+                ("remote", (remote).to_string().into()),
+            ],
+        )
     }))
 }
 

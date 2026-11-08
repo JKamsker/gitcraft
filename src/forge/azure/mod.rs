@@ -28,9 +28,10 @@ impl Location {
             || p[2] != "_git"
             || p.iter().any(|p| p.is_empty())
         {
-            return Err(
-                "Use a canonical hosted Azure organization/project/_git/repository remote".into(),
-            );
+            return Err(crate::i18n::text(
+                "backend-use-a-canonical-hosted-azure-organization-project-git-repository-a1513e",
+            )
+            .into());
         }
         Ok(Self {
             org: p[0].into(),
@@ -126,12 +127,18 @@ fn repository(api: &Api) -> Result<Repository, String> {
     if !required(&v, "/name")?.eq_ignore_ascii_case(&loc.repo)
         || !required(&v, "/project/name")?.eq_ignore_ascii_case(&loc.project)
     {
-        return Err("Azure returned a different repository/project".into());
+        return Err(crate::i18n::text(
+            "backend-azure-returned-a-different-repository-project-ca75b6",
+        )
+        .into());
     }
     let id = required(&v, "/id")?.to_owned();
     let project = required(&v, "/project/id")?.to_owned();
     if !super::cloud::plain(&id) || !super::cloud::plain(&project) {
-        return Err("Azure returned invalid stable repository identities".into());
+        return Err(crate::i18n::text(
+            "backend-azure-returned-invalid-stable-repository-identities-5fab09",
+        )
+        .into());
     }
     Ok(Repository {
         endpoint: format!(
@@ -154,17 +161,23 @@ fn parse(v: &Value, h: &Hosting) -> Result<PullRequest, String> {
         .get("pullRequestId")
         .and_then(Value::as_u64)
         .filter(|n| *n > 0)
-        .ok_or("Azure PR has no native number")?;
+        .ok_or(crate::i18n::text(
+            "backend-azure-pr-has-no-native-number-d96652",
+        ))?;
     Ok(PullRequest {
         number,
         title: required(v, "/title")?.into(),
         branch: required(v, "/sourceRefName")?
             .strip_prefix("refs/heads/")
-            .ok_or("Azure source is not a branch")?
+            .ok_or(crate::i18n::text(
+                "backend-azure-source-is-not-a-branch-cd06b8",
+            ))?
             .into(),
         base: required(v, "/targetRefName")?
             .strip_prefix("refs/heads/")
-            .ok_or("Azure target is not a branch")?
+            .ok_or(crate::i18n::text(
+                "backend-azure-target-is-not-a-branch-d6829b",
+            ))?
             .into(),
         from_fork: v.get("forkSource").is_some_and(|f| !f.is_null()),
         sha: required(v, "/lastMergeSourceCommit/commitId")?.into(),
@@ -186,14 +199,20 @@ fn list(api: &Api, repo: &Repository, criteria: &str) -> Result<Vec<Value>, Stri
             return Ok(out);
         }
     }
-    Err("Azure returned more than 1,000 pull requests; use the forge page".into())
+    Err(crate::i18n::text(
+        "backend-azure-returned-more-than-1-000-pull-requests-use-the-forge-page-7b17a6",
+    )
+    .into())
 }
 fn create(api: &Api, n: &NewPullRequest) -> Result<String, String> {
     if !crate::pull_request::is_branch_name(n.branch)
         || !crate::pull_request::is_branch_name(n.base)
         || n.title.trim().is_empty()
     {
-        return Err("Choose valid source/target branches and a title".into());
+        return Err(crate::i18n::text(
+            "backend-choose-valid-source-target-branches-and-a-title-0803b8",
+        )
+        .into());
     }
     let repo = repository(api)?;
     api.guard_context()?;
@@ -204,13 +223,18 @@ fn create(api: &Api, n: &NewPullRequest) -> Result<String, String> {
             if super::cloud::plain(id) {
                 Ok(json!({"id":id}))
             } else {
-                Err("Azure reviewers must be native user IDs")
+                Err(crate::i18n::text(
+                    "backend-azure-reviewers-must-be-native-user-ids-dc5078",
+                ))
             }
         })
         .collect::<Result<Vec<_>, _>>()?;
     let v=api.send("POST",&format!("{}/pullrequests",repo.endpoint),Some(&json!({"sourceRefName":format!("refs/heads/{}",n.branch),"targetRefName":format!("refs/heads/{}",n.base),"title":n.title,"description":n.body,"isDraft":n.draft,"reviewers":reviewers})))?;
     parse(&v, &api.hosting).map(|p| p.url).map_err(|e| {
-        format!("Azure create response could not be read; refresh the list before retrying: {e}")
+        crate::i18n::message(
+            "backend-azure-create-response-could-not-be-read-refresh-the-list-before-r-647cf7",
+            &[("detail", (e).to_string().into())],
+        )
     })
 }
 impl Provider for Azure {
@@ -235,7 +259,7 @@ impl Provider for Azure {
     }
     fn retarget(&self, _: &Path, h: &Hosting, number: u64, base: &str) -> Result<(), String> {
         if !crate::pull_request::is_branch_name(base) {
-            return Err("Invalid target branch".into());
+            return Err(crate::i18n::text("backend-invalid-target-branch-d8264c").into());
         }
         let api = Api::new(Service::Azure, h)?;
         let s = details::snapshot(&api, number)?;

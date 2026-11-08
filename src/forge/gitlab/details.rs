@@ -10,7 +10,7 @@ use serde_json::Value;
 
 pub(super) fn read(api: &Api, number: u64) -> Result<PrDetails, String> {
     if number == 0 {
-        return Err("Invalid merge request number".into());
+        return Err(crate::i18n::text("backend-invalid-merge-request-number-f1cfff").into());
     }
     for _ in 0..2 {
         let mr = api.get(&api.mr(number))?;
@@ -33,14 +33,17 @@ pub(super) fn read(api: &Api, number: u64) -> Result<PrDetails, String> {
                 number,
             )?;
             if !super::api::source_matches(&api.hosting, &result.url) {
-                return Err("GitLab returned a merge request for a different repository".into());
+                return Err(crate::i18n::text(
+                    "backend-gitlab-returned-a-merge-request-for-a-different-repository-7ae447",
+                )
+                .into());
             }
             result.changed_files = diffs.len() as u64;
             for diff in &diffs {
                 if diff.get("too_large").and_then(Value::as_bool) == Some(true)
                     || diff.get("collapsed").and_then(Value::as_bool) == Some(true)
                 {
-                    result.inline_error=Some("GitLab omitted a large or collapsed diff; line comments on omitted lines are unavailable.".into());
+                    result.inline_error=Some(crate::i18n::text("backend-gitlab-omitted-a-large-or-collapsed-diff-line-comments-on-omitted-67ae9d").into());
                 }
                 let mut in_hunk = false;
                 for line in at(diff, "/diff").lines() {
@@ -62,7 +65,10 @@ pub(super) fn read(api: &Api, number: u64) -> Result<PrDetails, String> {
             return Ok(result);
         }
     }
-    Err("The merge request changed while it was read. Reload it before reviewing.".into())
+    Err(crate::i18n::text(
+        "backend-the-merge-request-changed-while-it-was-read-reload-it-before-revi-592b0c",
+    )
+    .into())
 }
 pub(super) fn same_revision(a: &Value, b: &Value) -> bool {
     revision(a) == revision(b) && a.get("state") == b.get("state")
@@ -92,13 +98,20 @@ pub(super) fn blocker(
     approvals: &Result<Value, String>,
 ) -> Option<String> {
     if at(mr, "/state") != "opened" {
-        return Some("This merge request is no longer open.".into());
+        return Some(
+            crate::i18n::text("backend-this-merge-request-is-no-longer-open-5a106c").into(),
+        );
     }
     if !flag(mr, "/user/can_merge") {
-        return Some("GitLab has not granted this account permission to merge.".into());
+        return Some(
+            crate::i18n::text(
+                "backend-gitlab-has-not-granted-this-account-permission-to-merge-991e9f",
+            )
+            .into(),
+        );
     }
     if flag(mr, "/draft") || flag(mr, "/work_in_progress") {
-        return Some("It is still a draft.".into());
+        return Some(crate::i18n::text("backend-it-is-still-a-draft-ce75ce").into());
     }
     if !matches!(
         at(project, "/merge_method"),
@@ -107,34 +120,53 @@ pub(super) fn blocker(
         at(project, "/squash_option"),
         "always" | "never" | "default_on" | "default_off"
     ) {
-        return Some("GitLab's merge policy could not be read. Reload before merging.".into());
+        return Some(
+            crate::i18n::text(
+                "backend-gitlab-s-merge-policy-could-not-be-read-reload-before-merging-100f05",
+            )
+            .into(),
+        );
     }
     match approvals.as_ref().ok().and_then(approval_state) {
         None => {
             return Some(
-                "GitLab approval requirements could not be read. Reload before merging.".into(),
+                crate::i18n::text("backend-gitlab-approval-requirements-could-not-be-read-reload-before-merg-74d3ea").into(),
             );
         }
-        Some(false) => return Some("Required GitLab approvals are missing.".into()),
+        Some(false) => {
+            return Some(
+                crate::i18n::text("backend-required-gitlab-approvals-are-missing-6c2652").into(),
+            );
+        }
         Some(true) => {}
     }
     let status = at(mr, "/detailed_merge_status");
     let message = match status {
         "mergeable" => return None,
-        "conflict" => "Resolve the merge conflicts first.",
-        "not_approved" => "Required GitLab approvals are missing.",
-        "discussions_not_resolved" => "Resolve the required discussions first.",
-        "ci_must_pass" | "ci_still_running" => "GitLab requires the pipeline to pass first.",
-        "need_rebase" => "GitLab requires the source branch to be rebased first.",
-        "checking" | "unchecked" | "approvals_syncing" => {
-            "GitLab is still checking merge requirements. Reload in a moment."
+        "conflict" => crate::i18n::text("backend-resolve-the-merge-conflicts-first-849762"),
+        "not_approved" => crate::i18n::text("backend-required-gitlab-approvals-are-missing-6c2652"),
+        "discussions_not_resolved" => {
+            crate::i18n::text("backend-resolve-the-required-discussions-first-5acaeb")
         }
-        "requested_changes" => "GitLab reports requested changes which must be addressed first.",
-        "" => "GitLab did not report whether its merge requirements are met.",
+        "ci_must_pass" | "ci_still_running" => {
+            crate::i18n::text("backend-gitlab-requires-the-pipeline-to-pass-first-21e000")
+        }
+        "need_rebase" => crate::i18n::text(
+            "backend-gitlab-requires-the-source-branch-to-be-rebased-first-cd6394",
+        ),
+        "checking" | "unchecked" | "approvals_syncing" => crate::i18n::text(
+            "backend-gitlab-is-still-checking-merge-requirements-reload-in-a-moment-b5d0ce",
+        ),
+        "requested_changes" => crate::i18n::text(
+            "backend-gitlab-reports-requested-changes-which-must-be-addressed-first-6dace1",
+        ),
+        "" => crate::i18n::text(
+            "backend-gitlab-did-not-report-whether-its-merge-requirements-are-met-9a2c0c",
+        ),
         _ => {
-            return Some(format!(
-                "GitLab merge blocker: {}",
-                status.replace('_', " ")
+            return Some(crate::i18n::message(
+                "backend-gitlab-merge-blocker-fd282e",
+                &[("status", (status.replace('_', " ")).to_string().into())],
             ));
         }
     };
@@ -151,7 +183,9 @@ pub(super) fn assemble(
 ) -> Result<PrDetails, String> {
     let head = at(mr, "/sha");
     if id(project, "/id") == 0 || id(mr, "/target_project_id") != id(project, "/id") {
-        return Err("GitLab returned a different target project".into());
+        return Err(
+            crate::i18n::text("backend-gitlab-returned-a-different-target-project-3be59d").into(),
+        );
     }
     if mr.get("iid").and_then(Value::as_u64) != Some(number)
         || id(mr, "/id") == 0
@@ -160,11 +194,17 @@ pub(super) fn assemble(
         || head != at(mr, "/diff_refs/head_sha")
         || !oid(at(mr, "/diff_refs/start_sha"))
     {
-        return Err("GitLab did not return a complete merge request revision. Reload it.".into());
+        return Err(crate::i18n::text(
+            "backend-gitlab-did-not-return-a-complete-merge-request-revision-reload-it-4f6731",
+        )
+        .into());
     }
     let who = at(viewer, "/username");
     if who.is_empty() || id(viewer, "/id") == 0 {
-        return Err("GitLab did not identify the signed-in account".into());
+        return Err(crate::i18n::text(
+            "backend-gitlab-did-not-identify-the-signed-in-account-2b2179",
+        )
+        .into());
     }
     let permission = if flag(mr, "/user/can_merge") {
         "WRITE"
@@ -263,7 +303,10 @@ pub(super) fn assemble(
     let checks = pipeline
         .map(|p| {
             vec![Check {
-                name: format!("GitLab pipeline #{}", id(p, "/id")),
+                name: crate::i18n::message(
+                    "backend-gitlab-pipeline-26d62e",
+                    &[("id", (id(p, "/id")).to_string().into())],
+                ),
                 state: match at(p, "/status") {
                     "success" => CheckState::Passed,
                     "failed" => CheckState::Failed,

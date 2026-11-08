@@ -11,17 +11,21 @@ use crate::pull_request::{at, items};
 /// API only knows whose they are from the login, so without one it isn't asked.
 pub(super) fn assigned(api: &Api, hosting: &Hosting) -> Result<Vec<Issue>, String> {
     if !api.logged_in() {
-        return Err(format!(
-            "{} needs a login to tell which issues are yours: add one with `tea login add`, or \
-             keep a token for {} in git's credential helper",
-            api.name(),
-            hosting.web
+        return Err(crate::i18n::message(
+            "backend-needs-a-login-to-tell-which-issues-are-yours-add-one-with-tea-log-2494d5",
+            &[
+                ("name", (api.name()).to_string().into()),
+                ("web", (hosting.web).to_string().into()),
+            ],
         ));
     }
     let me = api.get("user")?;
     let login = at(&me, "/login");
     if login.is_empty() {
-        return Err(format!("{} didn't say who the login is", api.name()));
+        return Err(crate::i18n::message(
+            "backend-didn-t-say-who-the-login-is-ecaade",
+            &[("name", (api.name()).to_string().into())],
+        ));
     }
     let endpoint = format!(
         "repos/{}/issues?state=open&type=issues&assigned_by={}",
@@ -39,7 +43,12 @@ pub(super) fn assigned(api: &Api, hosting: &Hosting) -> Result<Vec<Issue>, Strin
 /// Issue `number` as it is now.
 pub(super) fn one(api: &Api, hosting: &Hosting, number: u64) -> Result<Issue, String> {
     let item = api.get(&format!("repos/{}/issues/{number}", hosting.path))?;
-    parse_issue(&item).ok_or_else(|| format!("#{number} is a pull request, not an issue"))
+    parse_issue(&item).ok_or_else(|| {
+        crate::i18n::message(
+            "backend-number-is-a-pull-request-not-an-issue-26f440",
+            &[("number", (number).to_string().into())],
+        )
+    })
 }
 
 /// Older servers ignore `type=issues`: a pull request still says it is one.

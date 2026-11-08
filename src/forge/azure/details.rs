@@ -32,13 +32,18 @@ pub(super) fn snapshot(api: &Api, n: u64) -> Result<Snapshot, String> {
         || required(&pr, "/repository/id")? != repo.id
         || required(&pr, "/repository/project/id")? != repo.project
     {
-        return Err("Azure returned a different pull request/repository/project".into());
+        return Err(crate::i18n::text(
+            "backend-azure-returned-a-different-pull-request-repository-project-ab2cf5",
+        )
+        .into());
     }
     let iteration = api
         .array(&format!("{endpoint}/iterations"))?
         .into_iter()
         .max_by_key(|v| v.get("id").and_then(Value::as_u64))
-        .ok_or("Azure has not returned a reviewable iteration")?;
+        .ok_or(crate::i18n::text(
+            "backend-azure-has-not-returned-a-reviewable-iteration-7b2358",
+        ))?;
     let s = Snapshot {
         repo,
         pr,
@@ -50,7 +55,9 @@ pub(super) fn snapshot(api: &Api, n: u64) -> Result<Snapshot, String> {
         "/commonRefCommit/commitId",
     ] {
         if !crate::pull_request::is_oid(required(&s.iteration, p)?) {
-            return Err("Azure iteration has an invalid commit".into());
+            return Err(
+                crate::i18n::text("backend-azure-iteration-has-an-invalid-commit-98f492").into(),
+            );
         }
     }
     if s.iteration_id() == 0
@@ -58,7 +65,10 @@ pub(super) fn snapshot(api: &Api, n: u64) -> Result<Snapshot, String> {
             != text(&s.pr, "/lastMergeSourceCommit/commitId")
         || !crate::pull_request::is_oid(required(&s.pr, "/lastMergeTargetCommit/commitId")?)
     {
-        return Err("Azure is still updating the PR iteration; reload before reviewing".into());
+        return Err(crate::i18n::text(
+            "backend-azure-is-still-updating-the-pr-iteration-reload-before-reviewing-b44079",
+        )
+        .into());
     }
     Ok(s)
 }
@@ -107,7 +117,7 @@ pub(super) fn read(api: &Api, n: u64) -> Result<PrDetails, String> {
             connection_binding: Some(crate::pr_threads::connection_binding()),
             review_revision: Some(s.revision()),
             merge_blocker: Some(
-                "Complete this pull request on Azure DevOps; in-app completion is unavailable."
+                crate::i18n::text("backend-complete-this-pull-request-on-azure-devops-in-app-completion-is-u-83cb2a")
                     .into(),
             ),
             merge_handoff: true,
@@ -121,11 +131,14 @@ pub(super) fn read(api: &Api, n: u64) -> Result<PrDetails, String> {
                     kind: EntryKind::Review(if vote > 0 {
                         "approved"
                     } else {
-                        "requested changes"
+                        crate::i18n::text("backend-requested-changes-7adfe7")
                     }),
                     author: text(reviewer, "/displayName"),
                     at: 0,
-                    body: format!("Azure review vote: {vote}"),
+                    body: crate::i18n::message(
+                        "backend-azure-review-vote-vote-71682e",
+                        &[("vote", (vote).to_string().into())],
+                    ),
                     url: parsed.url.clone(),
                     review_id: None,
                 });
@@ -181,9 +194,9 @@ pub(super) fn read(api: &Api, n: u64) -> Result<PrDetails, String> {
                         .and_then(Value::as_bool)
                         == Some(true)
                     {
-                        "Required Azure policy".into()
+                        crate::i18n::text("backend-required-azure-policy-de08a2").into()
                     } else {
-                        "Azure policy".into()
+                        crate::i18n::text("backend-azure-policy-501d23").into()
                     },
                     url: parsed.url.clone(),
                 });
@@ -242,7 +255,10 @@ pub(super) fn read(api: &Api, n: u64) -> Result<PrDetails, String> {
             ..Default::default()
         });
     }
-    Err("Azure pull request changed while loading; reload it".into())
+    Err(
+        crate::i18n::text("backend-azure-pull-request-changed-while-loading-reload-it-1bfd35")
+            .into(),
+    )
 }
 fn state(s: &str) -> CheckState {
     match s.to_ascii_lowercase().as_str() {

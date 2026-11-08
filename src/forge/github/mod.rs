@@ -286,8 +286,16 @@ impl Provider for GitHub {
         let mine_fields = format!("{FIELDS},statusCheckRollup,comments,reviews");
         let mine = inbox::parse_github(&list(&["--author", "@me"], &mine_fields)?, false)?;
         let cut = [
-            inbox::cut_note(asked.len(), MAX, "asking your review"),
-            inbox::cut_note(mine.len(), MAX, "of yours"),
+            inbox::cut_note(
+                asked.len(),
+                MAX,
+                crate::i18n::text("backend-asking-your-review-3c3907"),
+            ),
+            inbox::cut_note(
+                mine.len(),
+                MAX,
+                crate::i18n::text("backend-of-yours-2a649f"),
+            ),
         ];
         Ok(inbox::Answer {
             prs: inbox::merged(vec![asked, mine]),
