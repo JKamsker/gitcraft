@@ -185,9 +185,13 @@ fn section_title(ui: &mut Ui, title: &str, count: usize) {
         })
         .show(ui, |ui| {
             ui.label(
-                RichText::new(format!("{} · {count}", title.to_uppercase()))
-                    .font(theme::semibold(10.5))
-                    .color(t.text_faint),
+                RichText::new(format!(
+                    "{} · {}",
+                    title.to_uppercase(),
+                    crate::i18n::number(count)
+                ))
+                .font(theme::semibold(10.5))
+                .color(t.text_faint),
             );
         });
 }

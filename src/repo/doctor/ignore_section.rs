@@ -530,7 +530,7 @@ fn preview(ui: &mut Ui, p: &Preview) {
         }
         ui.add_space(4.0);
         ui.label(
-            RichText::new(format!("{title} ({})", paths.len()))
+            RichText::new(format!("{title} ({})", crate::i18n::number(paths.len())))
                 .font(crate::theme::semibold(12.5))
                 .color(color),
         );

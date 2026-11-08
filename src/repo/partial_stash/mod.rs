@@ -206,7 +206,9 @@ pub(crate) fn push_args(request: &StashRequest, work: &WorkStatus) -> Result<Vec
     let mut args = vec!["stash".to_owned(), "push".to_owned()];
     let paths = match &request.mode {
         StashMode::Snapshot => {
-            return Err(crate::i18n::text("repo-workflows-partial_stash-push-args-0a7314b3").into());
+            return Err(
+                crate::i18n::text("repo-workflows-partial_stash-push-args-0a7314b3").into(),
+            );
         }
         StashMode::Everything => {
             if let Some(problem) = everything_problem(work, request.untracked) {

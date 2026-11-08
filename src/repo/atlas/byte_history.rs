@@ -108,7 +108,11 @@ impl ByteHistory {
                     {
                         self.page -= 1;
                     }
-                    ui.label(format!("{} / {pages}", self.page + 1));
+                    ui.label(format!(
+                        "{} / {}",
+                        crate::i18n::number(self.page + 1),
+                        crate::i18n::number(pages)
+                    ));
                     if ui
                         .add_enabled(
                             self.page + 1 < pages,
