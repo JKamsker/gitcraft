@@ -84,6 +84,7 @@ gitcraft-os = { path = "crates/gitcraft-os" }
 # Config files read by key in diffs (with where each key is): TOML and YAML.
 toml_edit = { version = "0.25.17", default-features = false, features = ["parse"] }
 yaml-rust2 = "0.13.0"
+mailparse = "0.18"
 
 # Reading a repository's file without following a link swapped in on the way (safe_read.rs).
 [target.'cfg(unix)'.dependencies]

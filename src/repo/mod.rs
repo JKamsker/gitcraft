@@ -44,6 +44,7 @@ mod drafts;
 mod drafts_tests;
 mod drag_drop;
 mod drift_view;
+mod email;
 mod error_help;
 mod external_tools;
 pub(crate) mod fence_view;
@@ -317,6 +318,7 @@ pub struct RepoTab {
     /// The builds of a commit the big area shows.
     ci_view: Option<ci_view::CiView>,
     local_ci: local_ci::State,
+    email: email::State,
     /// The reflog (or the lost commits) shown above the graph.
     reflog: Option<reflog::ReflogView>,
     /// Two versions of a series of commits compared, the rewrites kept and the pull requests'
@@ -662,6 +664,7 @@ impl RepoTab {
             review_tools: Default::default(),
             ci_view: None,
             local_ci: Default::default(),
+            email: Default::default(),
             reflog: None,
             versions: Default::default(),
             doctor: None,
