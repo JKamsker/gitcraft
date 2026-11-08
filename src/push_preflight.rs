@@ -233,25 +233,6 @@ fn saved_branch_spec(current: &str, saved: &str, implicit: bool) -> Option<Strin
         .then(|| format!("refs/heads/{current}:refs/heads/{saved}"))
 }
 
-#[cfg(test)]
-mod internals_route_recording {
-    use super::*;
-    #[test]
-    fn saved_branch_enters_the_reviewed_plan_without_overriding_explicit_refs() {
-        assert_eq!(
-            saved_branch_spec("main", "dev", true),
-            Some("refs/heads/main:refs/heads/dev".into())
-        );
-        for (branch, saved, implicit) in [
-            ("main", "dev", false),
-            ("", "dev", true),
-            ("main", "", true),
-        ] {
-            assert_eq!(saved_branch_spec(branch, saved, implicit), None);
-        }
-    }
-}
-
 pub(crate) fn scan(
     repo: &Path,
     original: Vec<Vec<String>>,
@@ -1439,3 +1420,23 @@ pub(super) fn recording_input(
     )?
     .complete()
 }
+
+#[cfg(test)]
+mod internals_route_recording {
+    use super::*;
+    #[test]
+    fn saved_branch_enters_the_reviewed_plan_without_overriding_explicit_refs() {
+        assert_eq!(
+            saved_branch_spec("main", "dev", true),
+            Some("refs/heads/main:refs/heads/dev".into())
+        );
+        for (branch, saved, implicit) in [
+            ("main", "dev", false),
+            ("", "dev", true),
+            ("main", "", true),
+        ] {
+            assert_eq!(saved_branch_spec(branch, saved, implicit), None);
+        }
+    }
+}
+
