@@ -42,7 +42,7 @@ pub(super) struct State {
     trust: bool,
     pending: Option<Pending>,
     result: Option<Result<String, String>>,
-    result_presentation: Option<(String, run::CatalogFailure)>,
+    result_presentation: Option<(String, ResultFailure)>,
     log: Arc<Mutex<run::Log>>,
     provenance: Option<String>,
 }
@@ -509,17 +509,13 @@ impl RepoTab {
                 {
                     Ok(context) => context,
                     Err(error) => {
+                        self.local_ci.result_presentation = None;
                         self.local_ci.result = Some(Err(error));
                         return;
                     }
                 };
                 let state = &mut self.local_ci;
-                if state.displayed_context.as_ref() != Some(&context) {
-                    state.trust = false;
-                    state.result = Some(Err(crate::i18n::text(
-                        "repo-workflows-local_ci-local-ci-act-933801f0",
-                    )
-                    .into()));
+                if !state.run_context_matches(&context) {
                     return;
                 }
                 if !state.trust {
@@ -534,16 +530,16 @@ impl RepoTab {
                 let Some(job) = workflow.jobs.get(state.job).cloned() else {
                     return;
                 };
-                let matrix = match workflow.matrices(&job).and_then(|e| {
-                    e.get(state.matrix).cloned().ok_or(
-                        crate::i18n::text("repo-workflows-local_ci-local-ci-act-3feaaea5").into(),
-                    )
-                }) {
-                    Ok(m) => m,
+                let entries = match workflow.matrices(&job) {
+                    Ok(entries) => entries,
                     Err(e) => {
+                        state.result_presentation = None;
                         state.result = Some(Err(e));
                         return;
                     }
+                };
+                let Some(matrix) = state.run_matrix(&entries) else {
+                    return;
                 };
                 state.provenance = Some(crate::i18n::message(
                     "repo-workflows-local_ci-local-ci-act-476da961",
@@ -588,16 +584,219 @@ impl RepoTab {
     }
 }
 
+enum ResultFailure {
+    Catalog(run::CatalogFailure),
+    ContextChanged,
+    MissingMatrix,
+}
+impl ResultFailure {
+    fn raw(&self) -> String {
+        match self {
+            Self::Catalog(failure) => failure.raw(),
+            Self::ContextChanged => {
+                "Repository context changed since display; review it before running".into()
+            }
+            Self::MissingMatrix => "No selected matrix entry".into(),
+        }
+    }
+    fn display(&self) -> String {
+        match self {
+            Self::Catalog(failure) => failure.display(),
+            Self::ContextChanged => {
+                crate::i18n::text("repo-workflows-local_ci-local-ci-act-933801f0").into()
+            }
+            Self::MissingMatrix => {
+                crate::i18n::text("repo-workflows-local_ci-local-ci-act-3feaaea5").into()
+            }
+        }
+    }
+}
+
 impl State {
     fn remember_catalog_failure(&mut self, failure: run::CatalogFailure) {
+        self.remember_failure(ResultFailure::Catalog(failure));
+    }
+    fn remember_failure(&mut self, failure: ResultFailure) {
         let raw = failure.raw();
         self.result = Some(Err(raw.clone()));
         self.result_presentation = Some((raw, failure));
+    }
+    fn run_context_matches(&mut self, context: &context::Context) -> bool {
+        if self.displayed_context.as_ref() == Some(context) {
+            return true;
+        }
+        self.trust = false;
+        self.remember_failure(ResultFailure::ContextChanged);
+        false
+    }
+    fn run_matrix(&mut self, entries: &[yaml_rust2::Yaml]) -> Option<yaml_rust2::Yaml> {
+        let entry = entries.get(self.matrix).cloned();
+        if entry.is_none() {
+            self.remember_failure(ResultFailure::MissingMatrix);
+        }
+        entry
     }
     fn display_result_error(&self, raw: &str) -> String {
         match &self.result_presentation {
             Some((old, failure)) if old == raw => failure.display(),
             _ => crate::repo::activity::display_workflow_error(raw),
         }
+    }
+}
+
+#[cfg(test)]
+mod fluent_r2_guard_tests {
+    #![allow(clippy::unwrap_used)]
+    use super::*;
+    use egui_kittest::{Harness, kittest::Queryable};
+
+    fn remotes() -> Vec<crate::git::Remote> {
+        vec![crate::git::Remote {
+            name: "fork".into(),
+            url: "https://github.com/supplied/opaque-repo.git".into(),
+        }]
+    }
+    fn supplied_state() -> State {
+        let mut state = State::default();
+        state.workflows = vec![model::parse("opaque.yml".into(), "on: [push]\njobs:\n  opaque-job:\n    runs-on: ubuntu-latest\n    steps: [{run: 'opaque command --unchanged'}]\n".into()).unwrap()];
+        state.remote = "fork".into();
+        state.remote_override = true;
+        state.displayed_context = Some(context::Context::capture("fork", &remotes()).unwrap());
+        state.payload = "{\"opaque\":\"Working…\"}".into();
+        state.platforms = "ubuntu-latest=supplied/image".into();
+        state.architecture = "linux/arm64".into();
+        state.minutes = 17;
+        state.trust = true;
+        state.provenance = Some("opaque prior provenance\nKein Matrixeintrag ausgewählt".into());
+        state
+    }
+    fn snapshot(state: &State) -> String {
+        let log = state.log.lock().unwrap();
+        format!(
+            "{:?}",
+            (
+                (
+                    &state.workflows[0].file,
+                    &state.workflows[0].source,
+                    &state.workflows[0].events,
+                    &state.workflows[0].jobs
+                ),
+                (state.workflow, state.event, state.job, state.matrix),
+                (
+                    &state.remote,
+                    state.remote_override,
+                    &state.displayed_context
+                ),
+                (
+                    &state.payload,
+                    &state.platforms,
+                    &state.architecture,
+                    state.minutes
+                ),
+                (state.trust, state.busy(), &state.provenance),
+                (Arc::as_ptr(&state.log), &log.text, &log.rows, log.truncated),
+            )
+        )
+    }
+    fn repaint_same_state(state: State, raw: &str, german: &str) {
+        let before = snapshot(&state);
+        let mut h = Harness::new_ui_state(
+            |ui, state: &mut State| {
+                let mut actions = Vec::new();
+                state.controls(ui, &mut actions, &remotes());
+                assert!(actions.is_empty());
+            },
+            state,
+        );
+        for (lang, expected) in [("en-US", raw), ("de", german), ("en-US", raw)] {
+            crate::i18n::set_language(lang);
+            h.run();
+            h.get_by_label(expected);
+            assert_eq!(h.state().display_result_error(raw), expected);
+            assert_eq!(h.state().result.as_ref(), Some(&Err(raw.to_owned())));
+            assert_eq!(snapshot(h.state()), before);
+            assert!(h.state().pending.is_none());
+        }
+    }
+
+    #[test]
+    fn actual_context_guard_retains_raw_error_and_repaints_without_restoring_consent() {
+        for created_in in ["en-US", "de"] {
+            crate::i18n::set_language(created_in);
+            let mut state = supplied_state();
+            let old = snapshot(&state);
+            let displayed = state.displayed_context.clone().unwrap();
+            assert!(state.run_context_matches(&displayed));
+            assert_eq!(snapshot(&state), old);
+            assert!(state.result.is_none());
+            let changed = context::Context::capture(
+                "fork",
+                &[crate::git::Remote {
+                    name: "fork".into(),
+                    url: "https://github.com/replacement/repo.git".into(),
+                }],
+            )
+            .unwrap();
+            assert!(!state.run_context_matches(&changed));
+            assert!(!state.trust);
+            assert_eq!(state.displayed_context.as_ref(), Some(&displayed));
+            repaint_same_state(
+                state,
+                "Repository context changed since display; review it before running",
+                "Der Repository-Kontext hat sich seit der Anzeige geändert. Vor dem Start erneut prüfen.",
+            );
+        }
+        crate::i18n::set_language("en-US");
+    }
+
+    #[test]
+    fn actual_matrix_guard_retains_raw_error_and_selection_eligibility_without_submitting() {
+        for created_in in ["en-US", "de"] {
+            crate::i18n::set_language(created_in);
+            let mut state = supplied_state();
+            let entries = state.workflows[0].matrices("opaque-job").unwrap();
+            let before = snapshot(&state);
+            assert_eq!(state.run_matrix(&entries), Some(entries[0].clone()));
+            assert_eq!(snapshot(&state), before);
+            assert!(state.result.is_none());
+            state.matrix = entries.len();
+            assert!(state.run_matrix(&entries).is_none());
+            assert!(state.trust);
+            assert!(entries.get(state.matrix).is_none());
+            repaint_same_state(
+                state,
+                "No selected matrix entry",
+                "Kein Matrixeintrag ausgewählt",
+            );
+        }
+        crate::i18n::set_language("en-US");
+    }
+
+    #[test]
+    fn local_guard_receipt_rejects_mismatch_and_leaves_unmarked_provider_details_opaque() {
+        let mut state = supplied_state();
+        state.remember_failure(ResultFailure::MissingMatrix);
+        state.result = Some(Err(
+            "provider diagnostic\nNo selected matrix entry\nKein Matrixeintrag ausgewählt".into(),
+        ));
+        for lang in ["en-US", "de", "en-US"] {
+            crate::i18n::set_language(lang);
+            let raw = state.result.as_ref().unwrap().as_ref().unwrap_err();
+            assert_eq!(state.display_result_error(raw), *raw);
+        }
+        state.result_presentation = None;
+        for raw in [
+            "No selected matrix entry",
+            "Repository context changed since display; review it before running",
+            "Kein Matrixeintrag ausgewählt",
+        ] {
+            state.result = Some(Err(raw.into()));
+            for lang in ["en-US", "de", "en-US"] {
+                crate::i18n::set_language(lang);
+                assert_eq!(state.display_result_error(raw), raw);
+                assert_eq!(state.result.as_ref(), Some(&Err(raw.to_owned())));
+            }
+        }
+        crate::i18n::set_language("en-US");
     }
 }
