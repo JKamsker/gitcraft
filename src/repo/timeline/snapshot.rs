@@ -242,7 +242,13 @@ pub(crate) fn restore_steps(
 
 /// What [`restore_steps`] would change, as a line each ("main: 1a2b3c4d → 5e6f7a8b").
 pub(crate) fn describe(now: &RefState, target: &RefState) -> Vec<String> {
-    let short = |c: Option<&String>| c.map_or("gone", |c| crate::repo::short(c)).to_owned();
+    let short = |c: Option<&String>| {
+        c.map_or(
+            crate::i18n::text("repo-workflows-timeline-describe-283bb9de"),
+            |c| crate::repo::short(c),
+        )
+        .to_owned()
+    };
     let mut lines: Vec<String> = names(now, target)
         .into_iter()
         .filter(|n| now.branches.get(*n) != target.branches.get(*n))

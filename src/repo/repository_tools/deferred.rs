@@ -351,14 +351,19 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
         .show(ui, |ui| {
             for job in &view.jobs.jobs {
                 ui.separator();
-                ui.strong(format!(
-                    "{} · {} / {} replayed{}",
-                    job.title,
-                    job.cursor,
-                    job.steps.len(),
-                    if job.cancelled { " · closed" } else { "" }
+                ui.strong(crate::i18n::message(
+                    "repo-workflows-deferred-replay-progress",
+                    &[
+                        (
+                            "title",
+                            (crate::repo::messages::display_operation(&job.title)).into(),
+                        ),
+                        ("done", (job.cursor).into()),
+                        ("total", (job.steps.len()).into()),
+                        ("closed", (if job.cancelled { "yes" } else { "no" }).into()),
+                    ],
                 ));
-                ui.label(&job.notice);
+                ui.label(crate::repo::messages::display_status(&job.notice));
                 if job.busy {
                     ui.colored_label(
                         crate::theme::Tokens::get(ui.ctx()).warning,

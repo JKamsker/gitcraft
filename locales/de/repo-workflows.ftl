@@ -596,6 +596,8 @@ repo-workflows-bakeoff-bakeoff-view-9754333a = Versuche werden verglichen …
 
 repo-workflows-bakeoff-body-bfd30d1e = Klicken Sie auf eine Datei, um die Versuche zu vergleichen und daraus auszuwählen
 
+repo-workflows-bakeoff-body-faff10f7 = DATEIEN
+
 repo-workflows-bakeoff-build-06d160c3 = Die Statusdatei für den Build konnte nicht vorbereitet werden: { $e }
 
 repo-workflows-bakeoff-build-c18d3706 = Geben Sie zuerst den Build-Befehl für das Projekt ein
@@ -927,6 +929,8 @@ repo-workflows-ci_view-page-66f52811 = Keine Jobs.
 repo-workflows-ci_view-page-7261125c = Das Protokoll ist leer.
 
 repo-workflows-ci_view-page-77a860cb = An Agent senden
+
+repo-workflows-ci_view-page-a47c5497 = JOBS
 
 repo-workflows-ci_view-page-da532fb6 = Fügt das Ende dieses Protokolls in das Agent-Terminal ein, um den Fehler zu beheben
 
@@ -1507,6 +1511,8 @@ repo-workflows-doctor-hook-row-433c4667 = läuft bei { $on }
 
 repo-workflows-doctor-hook-row-96c0aa61 = Ausführbar machen
 
+repo-workflows-doctor-hook-row-b24d6d33 = bereit
+
 repo-workflows-doctor-hooks-act-63222fea = ausführbar gemacht
 
 repo-workflows-doctor-hooks-act-fdf85121 = mit LF-Zeilenenden gespeichert
@@ -1572,6 +1578,10 @@ repo-workflows-doctor-output-card-01623799 = Ausgabe der letzten Vorgänge
 repo-workflows-doctor-output-card-109b47bc = … { $lines-len-shown-len-1 } Zeilen darüber
 
 repo-workflows-doctor-output-card-50f9b973 = Noch keine Ausgabe von durch gitcraft ausgeführten Hook-Vorgängen. Terminalausgaben werden nicht gespeichert.
+
+repo-workflows-doctor-output-card-5d28a90f = fehlgeschlagen
+
+repo-workflows-doctor-output-card-a4c3ed04 = fertig
 
 repo-workflows-doctor-output-card-ae5bfc74 = Ausgaben von Git und seinen Hooks bei den letzten Vorgängen in diesem Repository (Commit, Merge, Push, Checkout …), bis zu zwölf Einträge. Nur im Speicher, mit verborgenen Passwörtern in URLs.
 
@@ -1898,6 +1908,8 @@ repo-workflows-email-email-window-9cb42639 = Für HEAD { $received-snapshot-head
 repo-workflows-email-email-window-b0fcf938 = Zusätzliche Empfänger. b4 ermittelt Empfänger auch aus Anschreiben, Konfiguration und Review-Trailern. Prüfen Sie unten jede erzeugte Nachricht.
 
 repo-workflows-email-email-window-b28037e9 = Cc
+
+repo-workflows-email-email-window-b64a0d4f = Vorgang abbrechen
 
 repo-workflows-email-email-window-b8c5cd6e = Vorbereiteten Branch gelesen
 
@@ -3885,6 +3897,8 @@ repo-workflows-pr_review-resolve-buttons-5be3c2c8 = Gelöst
 repo-workflows-pr_review-resolve-buttons-c8f193b3 = Lösen
 
 repo-workflows-pr_review-resolve-buttons-ecae00bf = Erneut öffnen
+
+repo-workflows-pr_review-review-box-182e4992 = REVIEW
 
 repo-workflows-pr_review-review-box-9b1f2050 = Dieser Pull Request stammt von Ihnen. Sie können kommentieren, aber nicht genehmigen.
 
@@ -5986,6 +6000,8 @@ repo-workflows-timeline-commits-683768ab = und { $total-list-len-1 } weitere
 
 repo-workflows-timeline-describe-0e4c8e5b = Ausgecheckt: { $at-now-1 } → { $at-target-2 }
 
+repo-workflows-timeline-describe-283bb9de = entfernt
+
 repo-workflows-timeline-describe-39787410 = { $n }: unter { $short-new-1 } erneut erstellt
 
 repo-workflows-timeline-describe-891c0723 = { $n }: gelöscht (hier unter { $short-old-1 } aufbewahrt)
@@ -7306,5 +7322,18 @@ repo-workflows-ghost-dropped-note = { $count ->
 repo-workflows-fork-unpulled-commits = { $fork }/{ $branch } enthält { $count ->
         [one] einen Commit, der Ihrem Branch { $local } fehlt. Rufen Sie ihn zuerst mit Pull ab, sonst würde der Push ihn verwerfen.
        *[other] { $count } Commits, die Ihrem Branch { $local } fehlen. Rufen Sie sie zuerst mit Pull ab, sonst würde der Push sie verwerfen.
+    }
+
+repo-workflows-bakeoff-kind-unchanged = unverändert
+
+repo-workflows-bakeoff-kind-deleted = gelöscht
+
+repo-workflows-bakeoff-kind-added = hinzugefügt
+
+repo-workflows-bakeoff-kind-changed = geändert
+
+repo-workflows-deferred-replay-progress = { $title } · { $done } / { $total } erneut angewendet{ $closed ->
+        [yes] { " · geschlossen" }
+       *[no] { "" }
     }
 

@@ -146,7 +146,10 @@ fn page(ui: &mut Ui, view: &CiView, runs: &[(Project, Run)], acts: &mut Vec<Acti
     let ok_jobs = jobs.and_then(|jobs| jobs.as_ref().ok());
     ui.add_space(10.0);
     run_actions(ui, view, run, ok_jobs.map_or(&[], Vec::as_slice), acts);
-    section(ui, "JOBS");
+    section(
+        ui,
+        crate::i18n::text("repo-workflows-ci_view-page-a47c5497"),
+    );
     match jobs {
         None => {
             ui.add(crate::spinner::Spinner::new());

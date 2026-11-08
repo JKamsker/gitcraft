@@ -195,7 +195,11 @@ fn hook_row(ui: &mut Ui, hook: &Hook, locked: Option<&str>, acts: &mut Vec<Actio
             widgets::chip(ui, i, t.text_dim);
         }
         if hook.problems.is_empty() {
-            widgets::chip(ui, "ready", t.success);
+            widgets::chip(
+                ui,
+                crate::i18n::text("repo-workflows-doctor-hook-row-b24d6d33"),
+                t.success,
+            );
         }
     });
     for problem in &hook.problems {
@@ -248,9 +252,17 @@ fn output_card(ui: &mut Ui, runs: &[Run]) {
                 ui.horizontal(|ui| {
                     ui.label(code(&format!("git {}", run.command)).color(t.text));
                     if run.ok {
-                        widgets::chip(ui, "done", t.success);
+                        widgets::chip(
+                            ui,
+                            crate::i18n::text("repo-workflows-doctor-output-card-a4c3ed04"),
+                            t.success,
+                        );
                     } else {
-                        widgets::chip(ui, "failed", t.danger);
+                        widgets::chip(
+                            ui,
+                            crate::i18n::text("repo-workflows-doctor-output-card-5d28a90f"),
+                            t.danger,
+                        );
                     }
                     ui.label(RichText::new(ago(run.when)).color(t.text_faint));
                 });

@@ -49,9 +49,11 @@ pub(in crate::repo) fn review_box(
     let t = Tokens::get(ui.ctx());
     ui.spacing_mut().item_spacing.y = 6.0;
     ui.label(
-        RichText::new("REVIEW")
-            .font(theme::semibold(10.5))
-            .color(t.text_faint),
+        RichText::new(crate::i18n::text(
+            "repo-workflows-pr_review-review-box-182e4992",
+        ))
+        .font(theme::semibold(10.5))
+        .color(t.text_faint),
     );
     super::native_discussions::show(ui, draft, extras, acts);
     if extras.review_features.pending {

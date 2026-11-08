@@ -596,6 +596,8 @@ repo-workflows-bakeoff-bakeoff-view-9754333a = Comparing the attempts…
 
 repo-workflows-bakeoff-body-bfd30d1e = click one to see it across the attempts and pick from it
 
+repo-workflows-bakeoff-body-faff10f7 = FILES
+
 repo-workflows-bakeoff-build-06d160c3 = could not prepare the build's status file: { $e }
 
 repo-workflows-bakeoff-build-c18d3706 = Type the command that builds the project first
@@ -927,6 +929,8 @@ repo-workflows-ci_view-page-66f52811 = No jobs.
 repo-workflows-ci_view-page-7261125c = The log is empty.
 
 repo-workflows-ci_view-page-77a860cb = Send to agent
+
+repo-workflows-ci_view-page-a47c5497 = JOBS
 
 repo-workflows-ci_view-page-da532fb6 = Types the end of this log into the agent's terminal, to fix the failure
 
@@ -1507,6 +1511,8 @@ repo-workflows-doctor-hook-row-433c4667 = runs on { $on }
 
 repo-workflows-doctor-hook-row-96c0aa61 = Make executable
 
+repo-workflows-doctor-hook-row-b24d6d33 = ready
+
 repo-workflows-doctor-hooks-act-63222fea = made executable
 
 repo-workflows-doctor-hooks-act-fdf85121 = saved with LF line endings
@@ -1572,6 +1578,10 @@ repo-workflows-doctor-output-card-01623799 = Output of the last operations
 repo-workflows-doctor-output-card-109b47bc = … { $lines-len-shown-len-1 } lines above
 
 repo-workflows-doctor-output-card-50f9b973 = Nothing yet: no operation gitcraft ran that runs hooks printed anything (what runs in the terminal isn't kept).
+
+repo-workflows-doctor-output-card-5d28a90f = failed
+
+repo-workflows-doctor-output-card-a4c3ed04 = done
 
 repo-workflows-doctor-output-card-ae5bfc74 = What git and its hooks printed during the last operations gitcraft ran in this repository (commit, merge, push, checkout…), the last dozen. Kept in memory only, with passwords in URLs hidden.
 
@@ -1898,6 +1908,8 @@ repo-workflows-email-email-window-9cb42639 = Fetched for HEAD { $received-snapsh
 repo-workflows-email-email-window-b0fcf938 = Additional recipients. b4 also derives recipients from its cover/configuration and review trailers; inspect every generated message below.
 
 repo-workflows-email-email-window-b28037e9 = Cc
+
+repo-workflows-email-email-window-b64a0d4f = Cancel operation
 
 repo-workflows-email-email-window-b8c5cd6e = Prepared branch read
 
@@ -3885,6 +3897,8 @@ repo-workflows-pr_review-resolve-buttons-5be3c2c8 = Resolved
 repo-workflows-pr_review-resolve-buttons-c8f193b3 = Resolve
 
 repo-workflows-pr_review-resolve-buttons-ecae00bf = Open again
+
+repo-workflows-pr_review-review-box-182e4992 = REVIEW
 
 repo-workflows-pr_review-review-box-9b1f2050 = This one is yours: you can comment, but not approve it.
 
@@ -5986,6 +6000,8 @@ repo-workflows-timeline-commits-683768ab = and { $total-list-len-1 } more
 
 repo-workflows-timeline-describe-0e4c8e5b = Checked out: { $at-now-1 } → { $at-target-2 }
 
+repo-workflows-timeline-describe-283bb9de = gone
+
 repo-workflows-timeline-describe-39787410 = { $n }: made again at { $short-new-1 }
 
 repo-workflows-timeline-describe-891c0723 = { $n }: deleted (it is kept here, at { $short-old-1 })
@@ -7308,5 +7324,18 @@ repo-workflows-ghost-dropped-note = { $count ->
 repo-workflows-fork-unpulled-commits = { $fork }/{ $branch } has { $count ->
         [one] one commit your { $local } does not have: pull it first, or the push would throw it away
        *[other] { $count } commits your { $local } does not have: pull them first, or the push would throw them away
+    }
+
+repo-workflows-bakeoff-kind-unchanged = unchanged
+
+repo-workflows-bakeoff-kind-deleted = deleted
+
+repo-workflows-bakeoff-kind-added = added
+
+repo-workflows-bakeoff-kind-changed = changed
+
+repo-workflows-deferred-replay-progress = { $title } · { $done } / { $total } replayed{ $closed ->
+        [yes] { " · closed" }
+       *[no] { "" }
     }
 

@@ -158,7 +158,7 @@ fn body(ui: &mut Ui, view: &Bakeoff, t: &Tokens, act: &mut Option<BakeAct>) {
     ui.horizontal(|ui| {
         ui.add_space(8.0);
         ui.label(
-            RichText::new("FILES")
+            RichText::new(crate::i18n::text("repo-workflows-bakeoff-body-faff10f7"))
                 .font(theme::semibold(10.5))
                 .color(t.text_faint),
         );
@@ -627,7 +627,9 @@ fn column(
     t: &Tokens,
     act: &mut Option<BakeAct>,
 ) {
-    ui.label(RichText::new(format!("{name} · {}", side.kind())).font(theme::semibold(12.0)));
+    ui.label(
+        RichText::new(format!("{name} · {}", side.display_kind())).font(theme::semibold(12.0)),
+    );
     let whole = take == Some(&Take::File(n));
     let label = match side.kind() {
         "deleted" => crate::i18n::text("repo-workflows-bakeoff-column-772841f1"),
