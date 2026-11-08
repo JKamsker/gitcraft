@@ -40,6 +40,7 @@ pub(crate) struct Versions {
 /// The comparison shown.
 pub(crate) struct VersionsView {
     pub(super) title: String,
+    heading: Option<VersionHeading>,
     pub(super) old_label: String,
     pub(super) new_label: String,
     pub(super) old: Series,
@@ -118,9 +119,9 @@ impl RepoTab {
         // Those editors hold choices written nowhere yet and take the big area until done.
         if self.conflict.is_some() || self.rebase.is_some() {
             let what = if self.conflict.is_some() {
-                "Finish or close the conflict editor first"
+                crate::i18n::text("repo-workflows-versions-open-versions-08c18016")
             } else {
-                "Finish or cancel the interactive rebase first"
+                crate::i18n::text("repo-workflows-versions-open-versions-d5204b0d")
             };
             self.status = Some((what.to_owned(), true));
             return;
@@ -133,6 +134,7 @@ impl RepoTab {
         self.ci_view = None;
         self.versions.view = Some(VersionsView {
             title,
+            heading: None,
             old_label,
             new_label,
             old: old.clone(),
@@ -177,7 +179,14 @@ impl RepoTab {
             format!("Before ({})", short(&rewrite.old.tip)),
             format!("After ({})", short(&rewrite.new.tip)),
         );
+        let heading = VersionHeading::Rewrite {
+            branch: rewrite.branch.clone(),
+            time: rewrite.time,
+        };
         self.open_versions(title, labels, rewrite.old, rewrite.new, ctx);
+        if let Some(view) = &mut self.versions.view {
+            view.heading = Some(heading);
+        }
     }
 
     /// Compares two branches by what each has that the other hasn't, once both are resolved.
@@ -205,6 +214,7 @@ impl RepoTab {
                     // Neither is older: the marks say which side a commit is only on.
                     if let Some(view) = &mut tab.versions.view {
                         view.sides = true;
+                        view.heading = Some(VersionHeading::Branches);
                     }
                 }
                 Err(e) => tab.status = Some((format!("Compare versions: {e}"), true)),
@@ -260,23 +270,125 @@ impl RepoTab {
 /// How a summary of two versions reads: "2 commits changed, 1 added, 3 identical".
 pub(crate) fn summary(counts: &git::Counts) -> String {
     let mut parts: Vec<String> = Vec::new();
-    let mut push = |n: usize, what: &str| {
+    for (n, kind) in [
+        (counts.changed, "changed"),
+        (counts.added, "added"),
+        (counts.dropped, "dropped"),
+        (counts.moved, "moved"),
+        (counts.same, "identical"),
+    ] {
         if n > 0 {
-            parts.push(format!("{n} {what}"));
+            let part = crate::i18n::message(
+                "repo-workflows-versions-summary-part",
+                &[
+                    ("count", (n).into()),
+                    ("kind", (kind).into()),
+                    ("noun", (if parts.is_empty() { "yes" } else { "no" }).into()),
+                ],
+            );
+            parts.push(part);
         }
-    };
-    push(counts.changed, "changed");
-    push(counts.added, "added");
-    push(counts.dropped, "dropped");
-    push(counts.moved, "moved");
-    push(counts.same, "identical");
-    let Some(first) = parts.first_mut() else {
-        return "no commits".to_owned();
-    };
-    // "2 commits changed": the noun goes with the first count only.
-    if let Some((n, what)) = first.split_once(' ') {
-        let noun = if n == "1" { "commit" } else { "commits" };
-        *first = format!("{n} {noun} {what}");
     }
-    parts.join(", ")
+    if parts.is_empty() {
+        crate::i18n::text("repo-workflows-versions-summary-45f8b47d").to_owned()
+    } else {
+        parts.join(", ")
+    }
+}
+
+#[derive(Clone)]
+enum VersionHeading {
+    Rewrite { branch: String, time: i64 },
+    Branches,
+    Since(u64),
+}
+impl VersionsView {
+    fn display_title(&self) -> String {
+        match &self.heading {
+            Some(VersionHeading::Rewrite { branch, time }) => crate::i18n::message(
+                "repo-workflows-versions-rewrite-heading",
+                &[
+                    ("branch", (branch.as_str()).into()),
+                    ("when", (git::relative_time(*time, git::now())).into()),
+                ],
+            ),
+            Some(VersionHeading::Branches) => crate::i18n::message(
+                "repo-workflows-versions-branches-heading",
+                &[
+                    ("old", (self.old_label.as_str()).into()),
+                    ("new", (self.new_label.as_str()).into()),
+                ],
+            ),
+            Some(VersionHeading::Since(number)) => crate::i18n::message(
+                "repo-workflows-versions-since-heading",
+                &[("number", (*number).into())],
+            ),
+            None => self.title.clone(),
+        }
+    }
+    fn display_labels(&self) -> (String, String) {
+        match self.heading {
+            Some(VersionHeading::Rewrite { .. }) => (
+                crate::i18n::message(
+                    "repo-workflows-versions-old-label",
+                    &[("tip", (short(&self.old.tip)).into())],
+                ),
+                crate::i18n::message(
+                    "repo-workflows-versions-new-label",
+                    &[("tip", (short(&self.new.tip)).into())],
+                ),
+            ),
+            Some(VersionHeading::Since(_)) => (
+                crate::i18n::message(
+                    "repo-workflows-versions-seen-label",
+                    &[("tip", (short(&self.old.tip)).into())],
+                ),
+                crate::i18n::message(
+                    "repo-workflows-versions-now-label",
+                    &[("tip", (short(&self.new.tip)).into())],
+                ),
+            ),
+            _ => (self.old_label.clone(), self.new_label.clone()),
+        }
+    }
+}
+
+#[cfg(test)]
+mod fluent_versions_tests {
+    use super::*;
+    #[test]
+    fn fluent_partition_version_heading_follows_language_and_summary_keeps_numeric_state() {
+        let view = VersionsView {
+            title: "Opaque user title".into(),
+            heading: Some(VersionHeading::Since(1234)),
+            old_label: "Old identity".into(),
+            new_label: "New identity".into(),
+            old: Series::new("a", "b"),
+            new: Series::new("a", "c"),
+            data: None,
+            selected: None,
+            interdiff: None,
+            seen_when_shown: None,
+            reveal: false,
+            sides: false,
+            request: 1,
+        };
+        let counts = git::Counts {
+            changed: 1234,
+            added: 1,
+            ..git::Counts::default()
+        };
+        for (lang, number, title) in [
+            ("en-US", "1,234", "since you last looked"),
+            ("de", "1.234", "seit Ihrem letzten Besuch"),
+        ] {
+            crate::i18n::set_language(lang);
+            assert!(view.display_title().contains(title));
+            assert!(view.display_title().contains(number));
+            assert!(summary(&counts).contains(number));
+            assert_eq!(view.title, "Opaque user title");
+            assert_eq!(view.old_label, "Old identity");
+            assert_eq!(counts.changed, 1234);
+        }
+    }
 }

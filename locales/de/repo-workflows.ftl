@@ -6536,9 +6536,182 @@ repo-workflows-unity-vcs-place-49a234f8 = In Unity: Edit → Project Settings �
 
 repo-workflows-unity-vcs-place-bc141862 = In Unity: Edit → Project Settings → Version Control → Mode: Visible Meta Files
 
+repo-workflows-versions-banner-text-1b763c24 = Neue Commits seit Ihrem letzten Besuch
+
+repo-workflows-versions-banner-text-5675af30 = Seit Ihrem letzten Besuch per Rebase verschoben; kein Commit geändert{ $moved }
+
+repo-workflows-versions-banner-text-c600fba5 = Seit Ihrem letzten Besuch umgeschrieben
+
+repo-workflows-versions-base-of-e9c2679e = Der Beginn der Commits von #{ $pr-number-1 } ist unbekannt: Öffnen Sie seine Seite oder rufen Sie seinen Basis-Branch ab
+
+repo-workflows-versions-commit-cell-e53a4b40 = (leer) { $c-summary-1 }
+
+repo-workflows-versions-fresh-rewrite-button-e6be1703 = Vorher / nachher vergleichen
+
+repo-workflows-versions-fresh-rewrite-button-fce3e9e3 = Die Commits des Branches vor und nach dem Umschreiben nebeneinander
+
+repo-workflows-versions-have-head-36c411a3 = Die Plattform hat { $short-pr-head-1 } nicht geliefert
+
+repo-workflows-versions-have-head-54ea0ca1 = Die Plattform hat einen Head genannt, der keine Commit-ID ist
+
+repo-workflows-versions-have-head-5c35312b = Die Plattform hat keine von Git abrufbare Ref genannt
+
+repo-workflows-versions-have-head-c36591b2 = Kein Remote dieses Repositorys enthält die Pull-Anfrage
+
+repo-workflows-versions-header-04845d1b = Vergleich schließen (Esc)
+
+repo-workflows-versions-interdiff-28a9a423 = Keine Änderungen anzuzeigen.
+
+repo-workflows-versions-interdiff-2f7bd5cc = Der Patch, nur in der neuen Version
+
+repo-workflows-versions-interdiff-5021964e = Der Patch, nur in der alten Version
+
+repo-workflows-versions-interdiff-5e6bb637 = Nichts geändert: dieselbe Nachricht und dieselben Änderungen.
+
+repo-workflows-versions-interdiff-99a88874 = Der Patch ist in beiden Versionen identisch
+
+repo-workflows-versions-interdiff-b160076a = Änderung des Patches
+
+repo-workflows-versions-interdiff-d4270a48 = Patch konnte nicht gelesen werden: { $e }
+
+repo-workflows-versions-mark-039487e7 = nur rechts
+
+repo-workflows-versions-mark-0635092b = Derselbe Patch und dieselbe Nachricht
+
+repo-workflows-versions-mark-1162b77f = Nur in der neuen Version
+
+repo-workflows-versions-mark-493229a6 = Derselbe Patch an anderer Position
+
+repo-workflows-versions-mark-49725c64 = nur links
+
+repo-workflows-versions-mark-6194c18b = Patch oder Nachricht geändert
+
+repo-workflows-versions-mark-731ad770 = geändert ↕
+
+repo-workflows-versions-mark-a1c7e1f3 = Nur rechts
+
+repo-workflows-versions-mark-a31c61c4 = Nur links
+
+repo-workflows-versions-mark-aa470a25 = Nur in der alten Version
+
+repo-workflows-versions-mark-c4cdd5dd = Patch oder Nachricht geändert und an anderer Position
+
+repo-workflows-versions-named-30c21f29 = { " " }(ändert nichts)
+
+repo-workflows-versions-open-branch-versions-70c06512 = Versionen vergleichen: { $e }
+
+repo-workflows-versions-open-branch-versions-8b2f0bf9 = { $old-label } und { $new-label }
+
+repo-workflows-versions-open-pr-since-1e0c2674 = Änderungen in #{ $number }: Die Anfrage befindet sich nicht in der Liste dieses Repositorys
+
+repo-workflows-versions-open-pr-since-60afdf08 = #{ $number } wird gelesen…
+
+repo-workflows-versions-open-pr-since-e9aaff48 = Änderungen in #{ $number }: { $e }
+
+repo-workflows-versions-open-pr-since-f8a6567c = #{ $number } hat sich seit Ihrem letzten Besuch nicht geändert
+
+repo-workflows-versions-open-rewrite-18f73cb2 = { $rewrite-branch-1 } vor und nach dem Umschreiben ({ $when })
+
+repo-workflows-versions-open-rewrite-d96eef7a = Nachher ({ $short-rewrite-new-tip-1 })
+
+repo-workflows-versions-open-rewrite-fd0ad136 = Vorher ({ $short-rewrite-old-tip-1 })
+
+repo-workflows-versions-open-versions-08c18016 = Beenden oder schließen Sie zunächst den Konflikteditor
+
+repo-workflows-versions-open-versions-d5204b0d = Beenden oder verwerfen Sie zunächst den interaktiven Rebase
+
+repo-workflows-versions-pair-row-19eda466 = Klicken, um den Patch auszublenden
+
+repo-workflows-versions-pair-row-4f20a058 = Klicken, um die Änderung des Patches zu sehen
+
+repo-workflows-versions-pair-row-8c3b014d = { $tip }
+    Links: { $named-pair-old-as-ref-1 }
+    Rechts: { $named-pair-new-as-ref-2 }
+    { $action }
+
+repo-workflows-versions-pr-since-items-20383a22 = Als angesehen markieren
+
+repo-workflows-versions-pr-since-items-49804fd7 = Änderungen seit Ihrem letzten Besuch
+
+repo-workflows-versions-pr-since-items-528089c6 = Die Commits beim letzten Besuch und jetzt, einander zugeordnet
+
+repo-workflows-versions-pr-since-items-aeced7e0 = Der nächste Push wird mit der aktuellen Version verglichen
+
+repo-workflows-versions-show-pr-since-0abee578 = Jetzt ({ $short-since-new-tip-1 })
+
+repo-workflows-versions-show-pr-since-62205b1f = Zuletzt angesehen ({ $short-since-old-tip-1 })
+
+repo-workflows-versions-show-pr-since-8d96ab54 = #{ $number } seit Ihrem letzten Besuch
+
+repo-workflows-versions-since-banner-7b518252 = Die beiden Versionen vergleichen
+
+repo-workflows-versions-since-banner-9e053092 = Versionen vergleichen
+
+repo-workflows-versions-since-banner-a9306697 = Ohne Vergleich als angesehen markieren
+
+repo-workflows-versions-summary-45f8b47d = Keine Commits
+
+repo-workflows-versions-versions-items-28feb7ce = Links die Commits, die nur { $b-upstream-1 } enthält; rechts die Commits, die nur { $b-name-2 } enthält; dieselbe Änderung auf beiden Seiten einander zugeordnet
+
+repo-workflows-versions-versions-items-8e286a1d = { $b-name-1 } vor dem Umschreiben { $when } und danach
+
+repo-workflows-versions-versions-items-a0142396 = Commits mit { $b-upstream-1 } vergleichen
+
+repo-workflows-versions-versions-items-a2e93753 = Vorher / nachher des letzten Umschreibens vergleichen
+
+repo-workflows-versions-versions-palette-item-67f7dd27 = { $rewrite-branch-1 } vor / nach dem letzten Umschreiben vergleichen
+
+repo-workflows-versions-versions-ui-557f9543 = Keine Version enthält eigene Commits.
+
+repo-workflows-versions-versions-ui-81dc7cd5 = Versionen konnten nicht verglichen werden: { $e }
+
+repo-workflows-working_drafts-history-0e916101 = Aktualisieren
+
+repo-workflows-working_drafts-history-171888ea = Gespeicherte vorgemerkte/Index-Inhalte anzeigen (andernfalls die Arbeitsversion)
+
+repo-workflows-working_drafts-history-210ff933 = Arbeitsentwürfe automatisch speichern (freiwillig)
+
+repo-workflows-working_drafts-history-2f1765a5 = Letzte Wiederherstellung rückgängig machen…
+
+repo-workflows-working_drafts-history-36ceae04 = { " " }(unversioniert)
+
+repo-workflows-working_drafts-history-51423780 = Keine gespeicherten Versionen. Nach dem Aktivieren werden Entwürfe ab der nächsten Pause gespeichert; bei sauberem Arbeitsverzeichnis gibt es nichts zu speichern.
+
+repo-workflows-working_drafts-history-5e6c0d68 = Entfernte Wiederherstellung behält Dateiberechtigungen mittels Python 3 auf dem anderen Rechner bei. Vorgemerkte Versionen enthalten rohe Git-Blobs (einschließlich LFS-Zeiger). Die Wiederherstellung führt keine Filter oder Zeilenendenkonvertierung aus; Arbeitsversionen enthalten die gespeicherten Bytes vom Datenträger.
+
+repo-workflows-working_drafts-history-65b35d4c = Nach 15 Sekunden Ruhe und vor Checkout/Rebase speichern. Enthält Änderungen versionierter Dateien und nicht ignorierte, unversionierte reguläre Dateien. Ignorierte Dateien und Submodulinhalte bleiben ausgeschlossen. Geänderte Links, Konflikte und Spezialdateien erfordern eine manuelle Sicherung.
+
 repo-workflows-working_drafts-history-7d9eb7ac = Schließen
 
+repo-workflows-working_drafts-history-9d0c13d9 = kein HEAD
+
+repo-workflows-working_drafts-history-a2a28532 = Version jetzt speichern
+
+repo-workflows-working_drafts-history-d0ea2534 = Frühere Versionen der Arbeitsänderungen
+
+repo-workflows-working_drafts-history-ffdc452f = Index und Arbeitsinhalte werden getrennt lokal unter geschützten Baum-Refs gespeichert. Normale Pushes überspringen sie; Mirror-Pushes oder manuelle Exporte aller Refs können Entwürfe enthalten. Bis zu 50 Versionen für 14 Tage behalten. Grenzen: 8 MiB/Datei, 32 MiB geänderte Inhalte, 2000 geänderte/20000 Index-Pfade. Git muss --no-lazy-fetch unterstützen.
+
+repo-workflows-working_drafts-poll-working-drafts-7a49e8a4 = Frühere Versionen: { $e }
+
+repo-workflows-working_drafts-recovery-092db2a8 = Keine Inhaltsänderungen wiederherzustellen. Reine Modusänderungen können hier nur gelesen werden.
+
 repo-workflows-working_drafts-recovery-19766ed6 = Abbrechen
+
+repo-workflows-working_drafts-recovery-1d540f7f = Arbeitsversion
+
+repo-workflows-working_drafts-recovery-33fc31a9 = Binärdateien werden als Ganzes wiederhergestellt.
+
+repo-workflows-working_drafts-recovery-3ef7c934 = Wählen Sie die wiederherzustellenden Hunks. Andere Arbeitsänderungen und der tatsächliche Index bleiben unverändert. Zunächst wird eine Sicherheitsversion gespeichert, auch wenn automatische Entwürfe deaktiviert sind. „Wiederherstellung rückgängig machen“ öffnet diese Version.
+
+repo-workflows-working_drafts-recovery-76900f1b = Zurück
+
+repo-workflows-working_drafts-recovery-86201db4 = { $preview-path-1 } wiederherstellen
+
+repo-workflows-working_drafts-recovery-87ca587d = vorgemerkte Version
+
+repo-workflows-working_drafts-recovery-eb7ee658 = Aktuell: { $preview-before-len-1 } Bytes · gespeichert { $if-preview-index-layer-staged-ve-2 }: { $preview-saved-len-3 } Bytes
+
+repo-workflows-working_drafts-recovery-ec7046f0 = Aktuellen Stand sichern, dann Auswahl wiederherstellen
 
 repo-workflows-activity-count = { $count ->
         [one] Ein Vorgang{ $running }, neueste zuerst
@@ -6933,4 +7106,46 @@ repo-workflows-tour-scan-summary = { $count ->
         [yes] { " · flacher Klon" }
        *[no] { "" }
     } · Dokumente unter { $head }
+
+repo-workflows-versions-rewrite-heading = { $branch } vor und nach dem Umschreiben ({ $when })
+
+repo-workflows-versions-branches-heading = { $old } und { $new }
+
+repo-workflows-versions-since-heading = #{ $number } seit Ihrem letzten Besuch
+
+repo-workflows-versions-old-label = Vorher ({ $tip })
+
+repo-workflows-versions-new-label = Nachher ({ $tip })
+
+repo-workflows-versions-seen-label = Zuletzt angesehen ({ $tip })
+
+repo-workflows-versions-now-label = Jetzt ({ $tip })
+
+repo-workflows-versions-summary-part = { $noun ->
+        [yes] { $count ->
+            [one] Ein Commit
+           *[other] { $count } Commits
+        }
+       *[no] { $count }
+    } { $kind ->
+        [changed] geändert
+        [added] hinzugefügt
+        [dropped] entfernt
+        [moved] verschoben
+       *[identical] identisch
+    }
+
+repo-workflows-versions-rebased-banner = Seit Ihrem letzten Besuch per Rebase verschoben; kein Commit geändert{ $moved ->
+        [yes] , nur die Reihenfolge
+       *[no] { "" }
+    }
+
+repo-workflows-draft-history-title = { $when } · { $reason } · { $count ->
+        [one] eine Datei
+       *[other] { $count } Dateien
+    }
+
+repo-workflows-draft-reason-pause = Pause
+
+repo-workflows-draft-reason-manual = Manuell gespeichert
 

@@ -39,8 +39,11 @@ impl RepoTab {
                 ui.vertical_centered(|ui| {
                     ui.add(
                         egui::Label::new(
-                            RichText::new(format!("Couldn't compare the versions: {e}"))
-                                .color(t.danger),
+                            RichText::new(crate::i18n::message(
+                                "repo-workflows-versions-versions-ui-81dc7cd5",
+                                &[("e", (e).clone().into())],
+                            ))
+                            .color(t.danger),
                         )
                         .wrap(),
                     )
@@ -50,7 +53,10 @@ impl RepoTab {
                 ui.add_space(20.0);
                 ui.vertical_centered(|ui| {
                     ui.label(
-                        RichText::new("Neither version has commits of its own.").color(t.text_dim),
+                        RichText::new(crate::i18n::text(
+                            "repo-workflows-versions-versions-ui-557f9543",
+                        ))
+                        .color(t.text_dim),
                     )
                 });
             }
@@ -87,8 +93,14 @@ impl RepoTab {
 
 /// The title bar: what is compared, how it came out, and the button to leave.
 fn header(ui: &mut Ui, view: &VersionsView, acts: &mut Vec<Action>) {
-    widgets::panel_header(ui, &view.title, |ui| {
-        if icons::small_button(ui, "x", "Close the comparison (Esc)").clicked() {
+    widgets::panel_header(ui, &view.display_title(), |ui| {
+        if icons::small_button(
+            ui,
+            "x",
+            crate::i18n::text("repo-workflows-versions-header-04845d1b"),
+        )
+        .clicked()
+        {
             acts.push(Action::Versions(VersionsAct::Close));
         }
     });
@@ -105,9 +117,10 @@ fn labels(ui: &mut Ui, view: &VersionsView) {
                     ui.label(RichText::new(label).font(theme::medium(12.5)).color(t.text))
                         .on_hover_text(format!("{}..{}", short(base), short(tip)));
                 };
-                side(ui, &view.old_label, &view.old.base, &view.old.tip);
+                let (old_label, new_label) = view.display_labels();
+                side(ui, &old_label, &view.old.base, &view.old.tip);
                 ui.label(RichText::new("→").color(t.text_faint));
-                side(ui, &view.new_label, &view.new.base, &view.new.tip);
+                side(ui, &new_label, &view.new.base, &view.new.tip);
                 if let Some(Ok(data)) = &view.data {
                     ui.add_space(12.0);
                     let counts = data.counts();
@@ -126,18 +139,46 @@ fn labels(ui: &mut Ui, view: &VersionsView) {
 /// one, so a commit is only on the left or the right rather than added or dropped.
 fn mark(pair: &Pair, sides: bool, t: &Tokens) -> (&'static str, Color32, &'static str) {
     match pair.kind {
-        PairKind::Same if pair.moved => ("moved", t.accent, "The same patch, in another place"),
-        PairKind::Same => ("=", t.text_faint, "The same patch and message"),
-        PairKind::Changed if pair.moved => (
-            "changed ↕",
-            t.warning,
-            "The patch or the message changed, and it is in another place",
+        PairKind::Same if pair.moved => (
+            "moved",
+            t.accent,
+            crate::i18n::text("repo-workflows-versions-mark-493229a6"),
         ),
-        PairKind::Changed => ("changed", t.warning, "The patch or the message changed"),
-        PairKind::Added if sides => ("right only", t.success, "Only on the right"),
-        PairKind::Added => ("added", t.success, "Only in the new version"),
-        PairKind::Dropped if sides => ("left only", t.danger, "Only on the left"),
-        PairKind::Dropped => ("dropped", t.danger, "Only in the old version"),
+        PairKind::Same => (
+            "=",
+            t.text_faint,
+            crate::i18n::text("repo-workflows-versions-mark-0635092b"),
+        ),
+        PairKind::Changed if pair.moved => (
+            crate::i18n::text("repo-workflows-versions-mark-731ad770"),
+            t.warning,
+            crate::i18n::text("repo-workflows-versions-mark-c4cdd5dd"),
+        ),
+        PairKind::Changed => (
+            "changed",
+            t.warning,
+            crate::i18n::text("repo-workflows-versions-mark-6194c18b"),
+        ),
+        PairKind::Added if sides => (
+            crate::i18n::text("repo-workflows-versions-mark-039487e7"),
+            t.success,
+            crate::i18n::text("repo-workflows-versions-mark-a1c7e1f3"),
+        ),
+        PairKind::Added => (
+            "added",
+            t.success,
+            crate::i18n::text("repo-workflows-versions-mark-1162b77f"),
+        ),
+        PairKind::Dropped if sides => (
+            crate::i18n::text("repo-workflows-versions-mark-49725c64"),
+            t.danger,
+            crate::i18n::text("repo-workflows-versions-mark-a31c61c4"),
+        ),
+        PairKind::Dropped => (
+            "dropped",
+            t.danger,
+            crate::i18n::text("repo-workflows-versions-mark-aa470a25"),
+        ),
     }
 }
 
@@ -146,7 +187,11 @@ fn named(c: Option<&SeriesCommit>) -> String {
     c.map_or_else(
         || "—".to_owned(),
         |c| {
-            let empty = if c.empty { " (changes nothing)" } else { "" };
+            let empty = if c.empty {
+                crate::i18n::text("repo-workflows-versions-named-30c21f29")
+            } else {
+                ""
+            };
             format!("{} {}{empty}", short(&c.hash), c.summary)
         },
     )
@@ -184,14 +229,24 @@ fn pair_row(
     );
     commit_cell(ui, right, pair.new.as_ref(), faded);
     let action = if selected {
-        "Click to hide its patch"
+        crate::i18n::text("repo-workflows-versions-pair-row-19eda466")
     } else {
-        "Click to see how its patch changed"
+        crate::i18n::text("repo-workflows-versions-pair-row-4f20a058")
     };
-    let r = r.on_hover_text(format!(
-        "{tip}\nLeft: {}\nRight: {}\n{action}",
-        named(pair.old.as_ref()),
-        named(pair.new.as_ref())
+    let r = r.on_hover_text(crate::i18n::message(
+        "repo-workflows-versions-pair-row-8c3b014d",
+        &[
+            ("tip", (tip).clone().into()),
+            (
+                "named-pair-old-as-ref-1",
+                (named(pair.old.as_ref())).clone().into(),
+            ),
+            (
+                "named-pair-new-as-ref-2",
+                (named(pair.new.as_ref())).clone().into(),
+            ),
+            ("action", (action).clone().into()),
+        ],
     ));
     if r.clicked() {
         acts.push(Action::Versions(VersionsAct::Select(i)));
@@ -234,7 +289,10 @@ fn commit_cell(ui: &Ui, rect: Rect, commit: Option<&SeriesCommit>, faded: bool) 
     );
     // Before the summary, which is what gets cut when there is no room.
     let summary = if c.empty {
-        format!("(empty) {}", c.summary)
+        crate::i18n::message(
+            "repo-workflows-versions-commit-cell-e53a4b40",
+            &[("c-summary-1", (c.summary).clone().into())],
+        )
     } else {
         c.summary.clone()
     };
@@ -251,10 +309,10 @@ fn commit_cell(ui: &Ui, rect: Rect, commit: Option<&SeriesCommit>, faded: bool) 
 fn interdiff(ui: &mut Ui, pair: &Pair, data: Option<&Result<diff::DiffData, String>>) {
     let t = Tokens::get(ui.ctx());
     let what = match pair.kind {
-        PairKind::Same => "Its patch is the same in both versions",
-        PairKind::Changed => "How its patch changed",
-        PairKind::Added => "Its patch, only in the new version",
-        PairKind::Dropped => "Its patch, only in the old version",
+        PairKind::Same => crate::i18n::text("repo-workflows-versions-interdiff-99a88874"),
+        PairKind::Changed => crate::i18n::text("repo-workflows-versions-interdiff-b160076a"),
+        PairKind::Added => crate::i18n::text("repo-workflows-versions-interdiff-2f7bd5cc"),
+        PairKind::Dropped => crate::i18n::text("repo-workflows-versions-interdiff-5021964e"),
     };
     let summary = pair
         .new
@@ -276,15 +334,21 @@ fn interdiff(ui: &mut Ui, pair: &Pair, data: Option<&Result<diff::DiffData, Stri
             ui.vertical_centered(|ui| ui.add(crate::spinner::Spinner::new()));
         }
         Some(Err(e)) => {
-            ui.colored_label(t.danger, format!("Couldn't read the patch: {e}"));
+            ui.colored_label(
+                t.danger,
+                crate::i18n::message(
+                    "repo-workflows-versions-interdiff-d4270a48",
+                    &[("e", (e).clone().into())],
+                ),
+            );
         }
         Some(Ok(data)) if data.lines.is_empty() => {
             ui.add_space(12.0);
             ui.vertical_centered(|ui| {
                 let note = if pair.kind == PairKind::Same {
-                    "Nothing changed: the same message and the same changes."
+                    crate::i18n::text("repo-workflows-versions-interdiff-5e6bb637")
                 } else {
-                    "No changes to show."
+                    crate::i18n::text("repo-workflows-versions-interdiff-28a9a423")
                 };
                 ui.label(RichText::new(note).color(t.text_faint));
             });

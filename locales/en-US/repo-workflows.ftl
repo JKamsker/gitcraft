@@ -6536,9 +6536,182 @@ repo-workflows-unity-vcs-place-49a234f8 = In Unity: Edit → Project Settings �
 
 repo-workflows-unity-vcs-place-bc141862 = In Unity: Edit → Project Settings → Version Control → Mode: Visible Meta Files
 
+repo-workflows-versions-banner-text-1b763c24 = New commits since you last looked
+
+repo-workflows-versions-banner-text-5675af30 = Rebased since you last looked; no commit changed{ $moved }
+
+repo-workflows-versions-banner-text-c600fba5 = Rewritten since you last looked
+
+repo-workflows-versions-base-of-e9c2679e = can't tell where the commits of #{ $pr-number-1 } start: open its page, or fetch its base branch
+
+repo-workflows-versions-commit-cell-e53a4b40 = (empty) { $c-summary-1 }
+
+repo-workflows-versions-fresh-rewrite-button-e6be1703 = Compare before / after
+
+repo-workflows-versions-fresh-rewrite-button-fce3e9e3 = The branch's commits before and after, side by side
+
+repo-workflows-versions-have-head-36c411a3 = the forge didn't give { $short-pr-head-1 }
+
+repo-workflows-versions-have-head-54ea0ca1 = the forge named a head that isn't a commit id
+
+repo-workflows-versions-have-head-5c35312b = the forge named no ref git can fetch
+
+repo-workflows-versions-have-head-c36591b2 = no remote of this repository has the pull request
+
+repo-workflows-versions-header-04845d1b = Close the comparison (Esc)
+
+repo-workflows-versions-interdiff-28a9a423 = No changes to show.
+
+repo-workflows-versions-interdiff-2f7bd5cc = Its patch, only in the new version
+
+repo-workflows-versions-interdiff-5021964e = Its patch, only in the old version
+
+repo-workflows-versions-interdiff-5e6bb637 = Nothing changed: the same message and the same changes.
+
+repo-workflows-versions-interdiff-99a88874 = Its patch is the same in both versions
+
+repo-workflows-versions-interdiff-b160076a = How its patch changed
+
+repo-workflows-versions-interdiff-d4270a48 = Couldn't read the patch: { $e }
+
+repo-workflows-versions-mark-039487e7 = right only
+
+repo-workflows-versions-mark-0635092b = The same patch and message
+
+repo-workflows-versions-mark-1162b77f = Only in the new version
+
+repo-workflows-versions-mark-493229a6 = The same patch, in another place
+
+repo-workflows-versions-mark-49725c64 = left only
+
+repo-workflows-versions-mark-6194c18b = The patch or the message changed
+
+repo-workflows-versions-mark-731ad770 = changed ↕
+
+repo-workflows-versions-mark-a1c7e1f3 = Only on the right
+
+repo-workflows-versions-mark-a31c61c4 = Only on the left
+
+repo-workflows-versions-mark-aa470a25 = Only in the old version
+
+repo-workflows-versions-mark-c4cdd5dd = The patch or the message changed, and it is in another place
+
+repo-workflows-versions-named-30c21f29 = { " " }(changes nothing)
+
+repo-workflows-versions-open-branch-versions-70c06512 = Compare versions: { $e }
+
+repo-workflows-versions-open-branch-versions-8b2f0bf9 = { $old-label } and { $new-label }
+
+repo-workflows-versions-open-pr-since-1e0c2674 = What changed in #{ $number }: it isn't in the list of this repository's pull requests
+
+repo-workflows-versions-open-pr-since-60afdf08 = Reading #{ $number }…
+
+repo-workflows-versions-open-pr-since-e9aaff48 = What changed in #{ $number }: { $e }
+
+repo-workflows-versions-open-pr-since-f8a6567c = #{ $number } hasn't changed since you last looked
+
+repo-workflows-versions-open-rewrite-18f73cb2 = { $rewrite-branch-1 } before and after its rewrite ({ $when })
+
+repo-workflows-versions-open-rewrite-d96eef7a = After ({ $short-rewrite-new-tip-1 })
+
+repo-workflows-versions-open-rewrite-fd0ad136 = Before ({ $short-rewrite-old-tip-1 })
+
+repo-workflows-versions-open-versions-08c18016 = Finish or close the conflict editor first
+
+repo-workflows-versions-open-versions-d5204b0d = Finish or cancel the interactive rebase first
+
+repo-workflows-versions-pair-row-19eda466 = Click to hide its patch
+
+repo-workflows-versions-pair-row-4f20a058 = Click to see how its patch changed
+
+repo-workflows-versions-pair-row-8c3b014d = { $tip }
+    Left: { $named-pair-old-as-ref-1 }
+    Right: { $named-pair-new-as-ref-2 }
+    { $action }
+
+repo-workflows-versions-pr-since-items-20383a22 = Mark as seen
+
+repo-workflows-versions-pr-since-items-49804fd7 = What changed since you last looked
+
+repo-workflows-versions-pr-since-items-528089c6 = Its commits as you last saw them and as they are now, paired up
+
+repo-workflows-versions-pr-since-items-aeced7e0 = The next push is compared with the version it has now
+
+repo-workflows-versions-show-pr-since-0abee578 = Now ({ $short-since-new-tip-1 })
+
+repo-workflows-versions-show-pr-since-62205b1f = Last looked at ({ $short-since-old-tip-1 })
+
+repo-workflows-versions-show-pr-since-8d96ab54 = #{ $number } since you last looked
+
+repo-workflows-versions-since-banner-7b518252 = Compare the two versions
+
+repo-workflows-versions-since-banner-9e053092 = Compare versions
+
+repo-workflows-versions-since-banner-a9306697 = Mark as seen without comparing
+
+repo-workflows-versions-summary-45f8b47d = no commits
+
+repo-workflows-versions-versions-items-28feb7ce = Left, the commits only { $b-upstream-1 } has; right, those only { $b-name-2 } has; the same change on both sides paired up
+
+repo-workflows-versions-versions-items-8e286a1d = { $b-name-1 } as it was before it was rewritten { $when }, and after
+
+repo-workflows-versions-versions-items-a0142396 = Compare commits with { $b-upstream-1 }
+
+repo-workflows-versions-versions-items-a2e93753 = Compare before / after the last rewrite
+
+repo-workflows-versions-versions-palette-item-67f7dd27 = Compare { $rewrite-branch-1 } before / after its last rewrite
+
+repo-workflows-versions-versions-ui-557f9543 = Neither version has commits of its own.
+
+repo-workflows-versions-versions-ui-81dc7cd5 = Couldn't compare the versions: { $e }
+
+repo-workflows-working_drafts-history-0e916101 = Refresh
+
+repo-workflows-working_drafts-history-171888ea = Preview the saved staged/index contents (otherwise the working version)
+
+repo-workflows-working_drafts-history-210ff933 = Automatically save working drafts (opt in)
+
+repo-workflows-working_drafts-history-2f1765a5 = Undo last recovery…
+
+repo-workflows-working_drafts-history-36ceae04 = { " " }(untracked)
+
+repo-workflows-working_drafts-history-51423780 = No saved versions. Enabling drafts starts saving after the next pause; a clean tree has nothing to save.
+
+repo-workflows-working_drafts-history-5e6c0d68 = Remote recovery preserves file permissions using Python 3 on that machine. Staged versions contain raw Git blobs (including LFS pointers). Recovery does not run filters or line-ending conversions; working versions contain the saved on-disk bytes.
+
+repo-workflows-working_drafts-history-65b35d4c = Save after 15 seconds of quiet and before checkout/rebase. Includes tracked changes and nonignored untracked regular files; ignored files and submodule contents stay out. Changed links/conflicts/special files require a manual backup.
+
 repo-workflows-working_drafts-history-7d9eb7ac = Close
 
+repo-workflows-working_drafts-history-9d0c13d9 = no HEAD
+
+repo-workflows-working_drafts-history-a2a28532 = Save version now
+
+repo-workflows-working_drafts-history-d0ea2534 = Earlier versions of working changes
+
+repo-workflows-working_drafts-history-ffdc452f = Index and working contents are saved separately, locally under protected tree refs. Normal pushes skip them; mirror pushes or manual all-ref exports can include drafts. Keep up to 50 versions for 14 days. Limits: 8 MiB/file, 32 MiB changed content, 2000 changed/20000 index paths. Git must support --no-lazy-fetch.
+
+repo-workflows-working_drafts-poll-working-drafts-7a49e8a4 = Earlier versions: { $e }
+
+repo-workflows-working_drafts-recovery-092db2a8 = No content changes to recover. Mode-only changes are read-only here.
+
 repo-workflows-working_drafts-recovery-19766ed6 = Cancel
+
+repo-workflows-working_drafts-recovery-1d540f7f = working version
+
+repo-workflows-working_drafts-recovery-33fc31a9 = Binary files are recovered as a whole.
+
+repo-workflows-working_drafts-recovery-3ef7c934 = Choose the hunks to put back. Other working edits and the actual index stay as they are. Recovery first saves a safety version, even when automatic drafts are off; Undo recovery opens that version.
+
+repo-workflows-working_drafts-recovery-76900f1b = Back
+
+repo-workflows-working_drafts-recovery-86201db4 = Recover { $preview-path-1 }
+
+repo-workflows-working_drafts-recovery-87ca587d = staged version
+
+repo-workflows-working_drafts-recovery-eb7ee658 = Current: { $preview-before-len-1 } bytes · saved { $if-preview-index-layer-staged-ve-2 }: { $preview-saved-len-3 } bytes
+
+repo-workflows-working_drafts-recovery-ec7046f0 = Back up current, then recover selected
 
 repo-workflows-activity-count = { $count ->
         [one] One operation{ $running }, newest first
@@ -6935,4 +7108,46 @@ repo-workflows-tour-scan-summary = { $count ->
         [yes] { " · shallow clone" }
        *[no] { "" }
     } · documents at { $head }
+
+repo-workflows-versions-rewrite-heading = { $branch } before and after its rewrite ({ $when })
+
+repo-workflows-versions-branches-heading = { $old } and { $new }
+
+repo-workflows-versions-since-heading = #{ $number } since you last looked
+
+repo-workflows-versions-old-label = Before ({ $tip })
+
+repo-workflows-versions-new-label = After ({ $tip })
+
+repo-workflows-versions-seen-label = Last looked at ({ $tip })
+
+repo-workflows-versions-now-label = Now ({ $tip })
+
+repo-workflows-versions-summary-part = { $noun ->
+        [yes] { $count ->
+            [one] 1 commit
+           *[other] { $count } commits
+        }
+       *[no] { $count }
+    } { $kind ->
+        [changed] changed
+        [added] added
+        [dropped] dropped
+        [moved] moved
+       *[identical] identical
+    }
+
+repo-workflows-versions-rebased-banner = Rebased since you last looked; no commit changed{ $moved ->
+        [yes] , only their order
+       *[no] { "" }
+    }
+
+repo-workflows-draft-history-title = { $when } · { $reason } · { $count ->
+        [one] one file
+       *[other] { $count } files
+    }
+
+repo-workflows-draft-reason-pause = Pause
+
+repo-workflows-draft-reason-manual = Saved manually
 
