@@ -568,7 +568,7 @@ fn tree_navigation_reveals_collapsed_folders_scrolls_and_preserves_path_selectio
     let point = text_center(&shapes, "045.txt");
     assert!(
         point.is_some_and(|p| p.y > 80.0 && p.y < 600.0),
-        "keyboard selection must scroll into the visible file area"
+        "keyboard selection must scroll into the visible file area: point={point:?}, cursor={selected:?}"
     );
     t.tab.reload_status(&t.ctx);
     t.wait()?;

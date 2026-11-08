@@ -109,9 +109,10 @@ impl RepoTab {
         let id = egui::Id::new(("file-folder", self.repo_key(), "all"));
         // Rows are known by their path within this commit's files.
         let paths: Vec<&str> = files.iter().map(String::as_str).collect();
+        let mut reveal = None;
         super::horizontal_files(ui, ("all-files-scroll", &detail.hash), &paths, |ui| {
             ui.push_id(("all-files", &detail.hash), |ui| {
-                branch_tree::files(
+                reveal = branch_tree::files(
                     ui,
                     (id, false),
                     files,
@@ -165,8 +166,14 @@ impl RepoTab {
                             });
                         }
                     },
-                );
+                )
+                .or(reveal);
             });
         });
+        // egui consumes both scroll targets at the inner horizontal list. Forward the
+        // same typed row rectangle to its outer vertical scroller after that list ends.
+        if let Some(rect) = reveal {
+            ui.scroll_to_rect(rect, Some(egui::Align::Center));
+        }
     }
 }

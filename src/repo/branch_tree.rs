@@ -230,7 +230,8 @@ pub(super) fn files<'a, T>(
     path: impl Fn(&'a T) -> &'a str,
     selected: &impl Fn(&&'a T) -> bool,
     row: &mut impl FnMut(&mut Ui, Option<f32>, &'a T),
-) {
+) -> Option<Rect> {
+    let mut reveal_rect = None;
     let reveal_id = id.with("keyboard-reveal");
     let reveal = ui.data_mut(|d| {
         let path = d.get_temp::<String>(reveal_id);
@@ -247,6 +248,7 @@ pub(super) fn files<'a, T>(
                 vec2(ui.available_width(), widgets::ROW_H),
             );
             ui.scroll_to_rect(rect, Some(egui::Align::Center));
+            reveal_rect = Some(rect);
         }
         // A commit can change tens of thousands of files: only the rows in sight are drawn.
         // While a menu is open (perhaps one of a row out of sight, which must go on being
@@ -259,7 +261,7 @@ pub(super) fn files<'a, T>(
                     row(ui, None, f);
                 }
             }
-            return;
+            return reveal_rect;
         }
         let pitch = widgets::ROW_H + ui.spacing().item_spacing.y;
         let top = ui.cursor().top();
@@ -280,7 +282,7 @@ pub(super) fn files<'a, T>(
             // What follows the list (another list) keeps its ids too.
             ui.skip_ahead_auto_ids(files.len() - end);
         }
-        return;
+        return reveal_rect;
     }
     let mut tree = build(files.iter().map(|f| (path(f), f)));
     compact(&mut tree);
@@ -304,6 +306,7 @@ pub(super) fn files<'a, T>(
                             vec2(ui.available_width(), widgets::ROW_H),
                         );
                         ui.scroll_to_rect(rect, Some(egui::Align::Center));
+                        reveal_rect = Some(rect);
                         break;
                     }
                     y += widgets::ROW_H + ui.spacing().item_spacing.y;
@@ -327,6 +330,7 @@ pub(super) fn files<'a, T>(
     show(ui, &tree, &view, selected, &key, &mut |ui, leaf, f| {
         row(ui, Some(leaf.indent), f);
     });
+    reveal_rect
 }
 
 /// What [`widgets::file_row`] knows the row of the file at `path` by.

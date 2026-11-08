@@ -347,29 +347,37 @@ impl RepoTab {
         };
         // Rows are known by their path within the list: a file can be both staged and unstaged.
         let paths: Vec<&str> = files.iter().map(|f| f.path.as_str()).collect();
+        let mut reveal = None;
         super::horizontal_files(ui, ("work-files-scroll", tree), &paths, |ui| {
             ui.push_id(("work-list", tree), |ui| {
-                branch_tree::files(
+                reveal = branch_tree::files(
                     ui,
                     (id, true),
                     &group.shown,
                     |f| &f.path,
                     &selected,
                     &mut |ui, indent, f| row(ui, indent, f, acts),
-                );
+                )
+                .or(reveal);
                 let holds_open = group.folded.iter().any(|f| selected(&f));
                 if group.header(ui, id.with("folded-open"), None, holds_open) {
-                    branch_tree::files(
+                    reveal = branch_tree::files(
                         ui,
                         (id.with("folded"), true),
                         &group.folded,
                         |f| &f.path,
                         &selected,
                         &mut |ui, indent, f| row(ui, indent, f, acts),
-                    );
+                    )
+                    .or(reveal);
                 }
             });
         });
+        // egui consumes both scroll targets at the inner horizontal list. Forward the
+        // same typed row rectangle to its outer vertical scroller after that list ends.
+        if let Some(rect) = reveal {
+            ui.scroll_to_rect(rect, Some(egui::Align::Center));
+        }
         if let Some(first) = files.first() {
             let area = super::super::weakened_marks::area_of(first.area);
             let scope = crate::weakened::Scope::Work(area);

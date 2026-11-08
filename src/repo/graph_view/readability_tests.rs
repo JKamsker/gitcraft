@@ -477,16 +477,32 @@ fn real_git_tooltip_retains_long_message_paragraphs_and_follows_hover_not_select
         Some(2),
         "hover must not change the selected commit"
     );
-    let events = [true, false]
-        .into_iter()
-        .map(|pressed| Event::PointerButton {
+    // Let the old tooltip close, then send an ordinary press/release across frames.
+    frame(&ctx, &mut tab, size, vec![], 3.6);
+    frame(
+        &ctx,
+        &mut tab,
+        size,
+        vec![Event::PointerButton {
             pos: first_point,
             button: egui::PointerButton::Primary,
-            pressed,
+            pressed: true,
             modifiers: egui::Modifiers::NONE,
-        })
-        .collect();
-    let (_, acts) = frame(&ctx, &mut tab, size, events, 3.3);
+        }],
+        3.61,
+    );
+    let (_, acts) = frame(
+        &ctx,
+        &mut tab,
+        size,
+        vec![Event::PointerButton {
+            pos: first_point,
+            button: egui::PointerButton::Primary,
+            pressed: false,
+            modifiers: egui::Modifiers::NONE,
+        }],
+        3.62,
+    );
     assert!(acts.iter().any(|a| matches!(a, Action::Select(0))));
     drop(tab);
     assert!(git::commit_message(&path, "--output=written").is_err());

@@ -482,6 +482,15 @@ fn exchange_harness(
     width: f32,
     short_refs: bool,
 ) -> egui_kittest::Harness<'static, RepoTab> {
+    exchange_harness_height(settings, width, short_refs, 120.0)
+}
+
+fn exchange_harness_height(
+    settings: &Settings,
+    width: f32,
+    short_refs: bool,
+    height: f32,
+) -> egui_kittest::Harness<'static, RepoTab> {
     let ctx = egui::Context::default();
     let mut tab = scene(&ctx);
     if short_refs {
@@ -495,9 +504,11 @@ fn exchange_harness(
     let mut styled = false;
     let mut h = egui_kittest::Harness::builder()
         // UiState supplies eight points of outer margin on each side.
+        // Keep this divider matrix below the minimap height threshold: full-height
+        // overview reservation is covered by the dedicated integration test.
         .with_size([
             (width + 16.0) * settings.ui_scale,
-            540.0 * settings.ui_scale,
+            height * settings.ui_scale,
         ])
         .with_step_dt(0.1)
         .build_ui_state(
@@ -959,5 +970,27 @@ fn automatic_refs_and_graph_modes_follow_production_inputs_after_an_exchange() -
     h.state_mut().graph.width = width;
     h.run_steps(3);
     assert_eq!(painted(&h)?.cols, start.cols);
+    Ok(())
+}
+
+#[test]
+fn full_height_minimap_reservation_keeps_visible_date_divider_interactive() -> Result<(), String> {
+    let settings = Settings {
+        show_hash: true,
+        show_date: true,
+        ..exchange_settings()
+    };
+    let mut h = exchange_harness_height(&settings, 1100.0, false, 540.0);
+    let start = painted(&h)?;
+    assert_eq!(
+        start.header.width(),
+        1016.0,
+        "the minimap owns its separate 84-point strip"
+    );
+    let saved = Settings::get(&h.ctx);
+    let press = press_divider(&mut h, Bar::Date, -4.0)?;
+    let end = pointer_delta(&mut h, press, Bar::Date, 10.0);
+    pointer_button(&mut h, end, false);
+    assert_exchange(&h, start, &saved, Bar::Date, 10.0)?;
     Ok(())
 }

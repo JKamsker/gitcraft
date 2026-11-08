@@ -172,9 +172,30 @@ impl RepoTab {
             map_area.right_bottom(),
         );
         let show_map = map_area.width() > 480.0 && map_area.height() > 120.0;
-        if show_map {
-            ui.set_width((map_area.width() - 84.0).max(1.0));
+        let graph_rect = egui::Rect::from_min_max(
+            map_area.min,
+            egui::pos2(
+                map_area.right() - if show_map { 84.0 } else { 0.0 },
+                map_area.bottom(),
+            ),
+        );
+        // Earlier full-width strips have already grown the parent UI's minimum width.
+        // A fresh child enforces the reservation for layout, clipping and hit testing.
+        let scroll_geometry = ui
+            .scope_builder(egui::UiBuilder::new().max_rect(graph_rect), |ui| {
+                self.graph_rows_content(ui, acts)
+            })
+            .inner;
+        // The reserved minimap strip is a sibling of the horizontally clipped graph.
+        if show_map
+            && !self.ghost.drawing()
+            && let Some((offset, viewport)) = scroll_geometry
+        {
+            self.history_minimap(ui, map_rect, offset, viewport);
         }
+    }
+
+    fn graph_rows_content(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) -> Option<(f32, f32)> {
         let t = Tokens::get(ui.ctx());
         if self.search.open {
             self.search_bar(ui, acts);
@@ -188,14 +209,14 @@ impl RepoTab {
                     crate::git::display_error(&crate::forge::inbox::display_error(err)),
                 );
             });
-            return;
+            return None;
         }
         self.tip_bar(ui);
         let first_steps = self.first_steps();
         if self.commits.is_empty() {
             if let Some(steps) = first_steps {
                 self.first_steps_view(ui, steps, acts);
-                return;
+                return None;
             }
             ui.centered_and_justified(|ui| {
                 if self.loading {
@@ -206,7 +227,7 @@ impl RepoTab {
                     );
                 }
             });
-            return;
+            return None;
         }
 
         // Keyboard navigation (only when no text field has focus, nor a window of the app's
@@ -478,10 +499,7 @@ impl RepoTab {
                 (out.state.offset.y, out.inner_rect.height())
             })
             .inner;
-        // The reserved minimap strip is a sibling of the horizontally clipped graph.
-        if show_map && !ghost {
-            self.history_minimap(ui, map_rect, scroll_geometry.0, scroll_geometry.1);
-        }
+        Some(scroll_geometry)
     }
 
     /// A row of the ghost graph, faded as what it is: a commit the operation would make, one

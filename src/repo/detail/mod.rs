@@ -117,16 +117,18 @@ impl RepoTab {
         };
         // Rows are known by their path within the list of this commit (or range): a menu left
         // open while another one is shown is not that one's file of the same path.
+        let mut reveal = None;
         horizontal_files(ui, ("changed-files-scroll", tree, rev), &paths, |ui| {
             ui.push_id(("file-list", tree, rev), |ui| {
-                branch_tree::files(
+                reveal = branch_tree::files(
                     ui,
                     (id, true),
                     &group.shown,
                     |f| &f.path,
                     &selected,
                     &mut |ui, indent, f| row(ui, indent, f, acts),
-                );
+                )
+                .or(reveal);
                 let stats = group.folded.iter().fold((0u32, 0u32), |(a, d), f| {
                     (
                         a.saturating_add(f.added.unwrap_or(0)),
@@ -136,17 +138,23 @@ impl RepoTab {
                 let holds_open = group.folded.iter().any(|f| selected(&f));
                 let open_id = id.with(("folded-open", rev));
                 if group.header(ui, open_id, Some(stats), holds_open) {
-                    branch_tree::files(
+                    reveal = branch_tree::files(
                         ui,
                         (id.with("folded"), true),
                         &group.folded,
                         |f| &f.path,
                         &selected,
                         &mut |ui, indent, f| row(ui, indent, f, acts),
-                    );
+                    )
+                    .or(reveal);
                 }
             });
         });
+        // egui consumes both scroll targets at the inner horizontal list. Forward the
+        // same typed row rectangle to its outer vertical scroller after that list ends.
+        if let Some(rect) = reveal {
+            ui.scroll_to_rect(rect, Some(egui::Align::Center));
+        }
         super::weakened_marks::error_note(ui, found.as_ref());
     }
 }

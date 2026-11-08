@@ -728,7 +728,8 @@ fn the_keys_step_through_the_drawn_tab() {
     frames(&mut harness);
     let (head, base) = head_and_base(&dir);
     assert_eq!(harness.state().selected_hash(), Some(head.clone()));
-    harness.key_press_modifiers(Modifiers::ALT, Key::ArrowDown);
+    // The graph uses its registered default; Alt+Down belongs to diff stepping.
+    harness.key_press(Key::ArrowDown);
     frames(&mut harness);
     assert_eq!(harness.state().selected_hash(), Some(base));
     harness.key_press(Key::ArrowUp);

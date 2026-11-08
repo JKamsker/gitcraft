@@ -280,9 +280,24 @@ mod tests {
         let mut tab = loaded(&dir, &ctx);
         for b in crate::keymap::BINDINGS {
             let resolved = tab.key_action(b.command);
-            // Reload has a window shortcut and a direct repository/palette action.
-            let tabs =
-                b.command.scope() != crate::keymap::Scope::Window || b.command == Command::Reload;
+            // Graph/rebase/search/selection/settings widgets own their registry commands.
+            // Reload also has a direct repository action behind its window shortcut.
+            let tabs = matches!(
+                b.command.scope(),
+                crate::keymap::Scope::Repository
+                    | crate::keymap::Scope::Changes
+                    | crate::keymap::Scope::Diff
+            ) || matches!(
+                b.command,
+                Command::Reload
+                    | Command::GraphCopyHash
+                    | Command::GraphCopyMessage
+                    | Command::GraphCopyBranch
+                    | Command::FileNext
+                    | Command::FilePrevious
+                    | Command::FileToggleStage
+                    | Command::FileOpen
+            );
             match resolved {
                 Ok(Some(_)) => assert!(tabs, "{:?}", b.command),
                 Ok(None) => assert!(!tabs, "{:?}", b.command),
