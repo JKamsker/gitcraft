@@ -144,7 +144,11 @@ const TRANSPORT_ALIAS: &str = concat!(
     "test -x \"$GITCRAFT_HTTP_ORIGINAL\" && test -x \"$GITCRAFT_HTTPS_ORIGINAL\" || return 126; ",
     "export GITCRAFT_HTTP_ORIGINAL GITCRAFT_HTTPS_ORIGINAL; ",
     "launch_dir=$PWD; umask 077; owned=$(mktemp -d \"${TMPDIR:-/tmp}/gitcraft-credential-XXXXXXXX\") || return 126; cd \"$owned\" || return 126; owned=$PWD; ",
-    "cleanup() { rm -f -- ./git-remote-http ./git-remote-https; if test \"$owned\" -ef .; then rmdir -- \"$owned\"; fi; }; ",
+    // CWD retains the exclusive directory identity even if its name is replaced.
+    // Retire only the fixed private files relative to that identity. Deliberately
+    // retain the empty 0700 directory: POSIX shell cannot atomically prove the
+    // identity of a pathname passed to rmdir after a separate identity check.
+    "cleanup() { rm -f -- ./git-remote-http ./git-remote-https; }; ",
     "trap cleanup EXIT; ",
     "(set -C; printf '%s' \"$GITCRAFT_HTTP_WRAPPER\" > ./git-remote-http && printf '%s' \"$GITCRAFT_HTTP_WRAPPER\" > ./git-remote-https) || return 126; ",
     "chmod 700 ./git-remote-http ./git-remote-https || return 126; ",
@@ -249,6 +253,23 @@ mod tests {
         assert!(CREDENTIAL_HELPER.contains("test -z \"$GITCRAFT_CREDENTIAL_OWNER\""));
         assert!(CREDENTIAL_HELPER.contains("test \"$PPID\" != \"$GITCRAFT_CREDENTIAL_OWNER\""));
         assert!(CREDENTIAL_HELPER.contains("quit=true"));
+    }
+    #[test]
+    fn retirement_uses_the_retained_directory_and_leaves_its_empty_entry() {
+        let entry = TRANSPORT_ALIAS.find("cd \"$owned\" || return 126");
+        let cleanup =
+            TRANSPORT_ALIAS.find("cleanup() { rm -f -- ./git-remote-http ./git-remote-https; };");
+        assert!(
+            entry
+                .zip(cleanup)
+                .is_some_and(|(entry, cleanup)| entry < cleanup)
+        );
+        assert!(TRANSPORT_ALIAS.contains("trap cleanup EXIT"));
+        assert!(!TRANSPORT_ALIAS.contains("rmdir"));
+        assert!(!TRANSPORT_ALIAS.contains("-ef"));
+        assert!(!TRANSPORT_ALIAS.contains("rm -f -- \"$owned"));
+        // Inert source/recording contract: no execution of cleanup, renames, or children.
+        // The empty private directory is intentionally retained, including after failure.
     }
     #[test]
     fn policy_resets_wrong_helpers_and_overrides_specific_redirects_and_accounts()
