@@ -379,7 +379,12 @@ fn display_list_error(raw: &str, dir: &str, host: &Host) -> String {
             ],
         );
     }
-    crate::git::display_error(raw)
+    let remote = crate::remote::display::diagnostic(raw);
+    if remote == raw {
+        crate::git::display_error(raw)
+    } else {
+        remote
+    }
 }
 
 /// The script listing `dir`'s folders: the folder (as `cd` found it), whether it holds a
@@ -700,10 +705,15 @@ mod localization_tests {
             "Auf SSH · recorded-host gibt es keinen Ordner {dir}."
         ));
         assert_eq!(h.state().0.error, Some((dir.clone(), raw.clone())));
+        let native_raw = "it is a symbolic link".to_owned();
+        h.state_mut().0.error = Some((dir.clone(), native_raw.clone()));
+        h.run();
+        h.get_by_label("Dies ist ein symbolischer Link.");
+        assert_eq!(h.state().0.error, Some((dir.clone(), native_raw.clone())));
         crate::i18n::set_language("en-US");
         h.run();
-        h.get_by_label(&raw);
-        assert_eq!(h.state().0.error, Some((dir, raw)));
+        h.get_by_label(&native_raw);
+        assert_eq!(h.state().0.error, Some((dir, native_raw)));
         Ok(())
     }
 

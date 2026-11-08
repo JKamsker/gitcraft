@@ -1,0 +1,13 @@
+{
+  "base": "0b7db112afa9ac511b5dc3132c88be74cbcf0ef0",
+  "dependency_source": "e585e595798468b8d6b222e563fdb2f8d68abd52",
+  "protected_files": {
+    "src/remote/display.rs": "d21ae0a421ef0b1ca1db0915133212f184d48dc2b5d2e3723e764793b48b5b7f",
+    "src/remote/display/composition.rs": "3c422fe69bf2db26948dac01be82d44efbfa7cf6bd8c490c9c5bcd230a02f1f8",
+    "src/remote/mod.rs": "fc1a5564559625ad54810619c5bf5a9ffad804a157d8240a9c74bbfe04aef110",
+    "src/remote/askpass.rs": "f66621ee6849f07cc2704d28b51588e7c9f579858047a24d06cc545221f75d5d",
+    "locales/en-US/interaction-remote.ftl": "8c9f41746e57448d92e6be84215c954ee851ec6fe506b92aa264bfe61742ff74",
+    "locales/de/interaction-remote.ftl": "060d38589008461d06d1eb67938355bf2383a3c538dc8cc4d214f81f4990e3cf"
+  },
+  "browser_script_list_parser_paths_existing_tests_sha256": "fb0c9ae75a4f5f3e85afe87954c002f347a964f0af0efba7d23e0b572e934748"
+}
