@@ -200,6 +200,8 @@ pub(crate) const ISSUES_MAX: usize = 100;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Issue {
     pub tracker: Option<crate::trackers::Identity>,
+    /// An explicitly selected tracker field takes precedence over description heuristics.
+    pub acceptance: Option<String>,
     /// Its number on the forge (GitLab's `iid`, the one `#N` means).
     pub number: u64,
     pub title: String,

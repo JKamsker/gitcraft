@@ -21,6 +21,7 @@ pub(crate) fn account(ui: &mut Ui, profile: u64, kind: Kind, account: &mut Accou
         ui.text_edit_singleline(&mut account.user);
     });
     if kind == Kind::Jira {
+        ui.small("A configured criteria field takes precedence over criteria in the description, including when the field is empty.");
         ui.horizontal(|ui| {
             ui.label("Criteria field (optional)");
             ui.text_edit_singleline(&mut account.acceptance_field);

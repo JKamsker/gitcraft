@@ -44,7 +44,10 @@ impl IssueLink {
     }
     /// The link to `issue`, read today.
     pub(crate) fn of(issue: &Issue) -> IssueLink {
-        let (kept, criteria) = super::criteria::extract(&issue.body);
+        let (kept, criteria) = issue.acceptance.as_ref().map_or_else(
+            || super::criteria::extract(&issue.body),
+            |field| (Kept::Criteria, super::criteria::cap(field.trim())),
+        );
         IssueLink {
             tracker: issue.tracker.clone(),
             number: issue.number,

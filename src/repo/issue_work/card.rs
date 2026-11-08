@@ -117,9 +117,13 @@ fn card(
     let lines = criteria::lines(&link.criteria);
     if lines.is_empty() {
         ui.label(
-            RichText::new("The issue says nothing more than its title.")
-                .size(11.5)
-                .color(t.text_faint),
+            RichText::new(if link.kept == criteria::Kept::Criteria {
+                "No acceptance criteria are recorded for this issue."
+            } else {
+                "The issue says nothing more than its title."
+            })
+            .size(11.5)
+            .color(t.text_faint),
         );
         return;
     }

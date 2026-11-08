@@ -66,6 +66,7 @@ fn parse_issue(item: &Value) -> Option<Issue> {
     }
     Some(Issue {
         tracker: None,
+        acceptance: None,
         number: item.get("number").and_then(Value::as_u64)?,
         title: at(item, "/title").to_owned(),
         body: at(item, "/body").to_owned(),
@@ -95,6 +96,7 @@ mod tests {
             parse_issue(&item),
             Some(Issue {
                 tracker: None,
+                acceptance: None,
                 number: 9,
                 title: "Füße".into(),
                 body: "* [x] done".into(),

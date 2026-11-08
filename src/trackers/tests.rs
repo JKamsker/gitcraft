@@ -34,11 +34,7 @@ fn jira_cursor_account_adf_and_custom_criteria_are_preserved() {
     let issue = &list[0];
     assert_eq!(issue.key(), "APP-42");
     assert_eq!(issue.branch_name(), "app-42-fix-login");
-    assert!(
-        issue
-            .body
-            .contains("## Acceptance criteria\n- [ ] no crash")
-    );
+    assert_eq!(issue.acceptance.as_deref(), Some("- [ ] no crash"));
     assert_eq!(issue.url, "https://company.atlassian.net/browse/APP-42");
     let link = crate::repo::issue_work::link::IssueLink::of(issue);
     assert_eq!(
@@ -215,4 +211,49 @@ fn jira_repeated_and_missing_continuations_are_errors() {
         };
         assert!(c.listed().is_err());
     }
+}
+
+#[test]
+fn configured_jira_criteria_take_precedence_through_link_and_card_data() {
+    let row = json!({"id":"908","key":"APP-42","fields":{"summary":"Fix","description":{"type":"doc","content":[{"type":"heading","attrs":{"level":2},"content":[{"type":"text","text":"Acceptance criteria"}]},{"type":"paragraph","content":[{"type":"text","text":"old description requirement"}]}]},"customfield_10001":{"type":"doc","content":[{"type":"heading","attrs":{"level":2},"content":[{"type":"text","text":"New requirements"}]},{"type":"taskList","content":[{"type":"taskItem","attrs":{"state":"TODO"},"content":[{"type":"text","text":"selected custom-field requirement"}]}]}]}}});
+    let mut client = Client {
+        kind: Kind::Jira,
+        account: Account {
+            origin: "https://site.atlassian.net".into(),
+            user: "me@example.org".into(),
+            acceptance_field: "customfield_10001".into(),
+            ..Default::default()
+        },
+        send: |_: &str, _: &str, _: Option<&Value>| -> Result<Value, String> {
+            panic!("parse must not perform I/O")
+        },
+    };
+    let parsed = client.parse(&row, "viewer").unwrap();
+    assert!(parsed.body.contains("old description requirement"));
+    let link = crate::repo::issue_work::link::IssueLink::of(&parsed);
+    assert_eq!(link.kept, crate::repo::issue_work::criteria::Kept::Criteria);
+    assert_eq!(
+        link.criteria,
+        "## New requirements\n\n- [ ] selected custom-field requirement"
+    );
+    let rendered = crate::repo::issue_work::criteria::lines(&link.criteria);
+    assert!(rendered.iter().any(|l|matches!(l,crate::repo::issue_work::criteria::Line::Task{text,..} if text=="selected custom-field requirement")));
+    assert!(!link.criteria.contains("old description requirement"));
+    client.account.acceptance_field.clear();
+    let fallback =
+        crate::repo::issue_work::link::IssueLink::of(&client.parse(&row, "viewer").unwrap());
+    assert_eq!(fallback.criteria, "old description requirement");
+    client.account.acceptance_field = "customfield_10001".into();
+    let mut empty = row.clone();
+    empty["fields"]["customfield_10001"] = Value::Null;
+    assert!(
+        crate::repo::issue_work::link::IssueLink::of(&client.parse(&empty, "viewer").unwrap())
+            .criteria
+            .is_empty()
+    );
+    empty["fields"]
+        .as_object_mut()
+        .unwrap()
+        .remove("customfield_10001");
+    assert!(client.parse(&empty, "viewer").is_err());
 }

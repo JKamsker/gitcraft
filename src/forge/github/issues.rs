@@ -60,6 +60,7 @@ fn parse(json: &str) -> Result<Vec<Issue>, String> {
 fn parse_issue(item: &Value) -> Option<Issue> {
     Some(Issue {
         tracker: None,
+        acceptance: None,
         number: item.get("number").and_then(Value::as_u64)?,
         title: at(item, "/title").to_owned(),
         body: at(item, "/body").to_owned(),
@@ -90,6 +91,7 @@ mod tests {
             issues[0],
             Issue {
                 tracker: None,
+                acceptance: None,
                 number: 42,
                 title: "Fix login crash".into(),
                 body: "- [ ] no crash".into(),

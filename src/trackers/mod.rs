@@ -311,20 +311,17 @@ impl<F: FnMut(&str, &str, Option<&Value>) -> Result<Value, String>> Client<F> {
     }
     fn parse(&self, v: &Value, viewer: &str) -> Result<Issue, String> {
         let id = required(v, "/id")?.to_owned();
+        let mut acceptance = None;
         let (key, title, body, url, labels) = match self.kind {
             Kind::Jira => {
                 let key = required(v, "/key")?.to_owned();
                 if !key.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-') {
                     return Err("Jira returned an invalid issue key".into());
                 }
-                let mut body = adf(v.pointer("/fields/description").unwrap_or(&Value::Null))?;
-                if !self.account.acceptance_field.is_empty()
-                    && let Some(c) =
-                        v.pointer(&format!("/fields/{}", self.account.acceptance_field))
-                    && !c.is_null()
-                {
-                    body.push_str("\n\n## Acceptance criteria\n");
-                    body.push_str(&adf(c)?);
+                let body = adf(v.pointer("/fields/description").unwrap_or(&Value::Null))?;
+                if !self.account.acceptance_field.is_empty() {
+                    let value=v.pointer(&format!("/fields/{}",self.account.acceptance_field)).ok_or("Jira did not return the configured criteria field; verify the field and account permissions")?;
+                    acceptance = Some(adf(value)?);
                 }
                 (
                     key.clone(),
@@ -374,6 +371,7 @@ impl<F: FnMut(&str, &str, Option<&Value>) -> Result<Value, String>> Client<F> {
         };
         Ok(Issue {
             number: 0,
+            acceptance,
             title,
             body,
             url,

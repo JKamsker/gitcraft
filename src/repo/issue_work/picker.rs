@@ -437,6 +437,7 @@ mod tests {
     fn issue(number: u64, title: &str, labels: &[&str]) -> Issue {
         Issue {
             tracker: None,
+            acceptance: None,
             number,
             title: title.into(),
             body: String::new(),
