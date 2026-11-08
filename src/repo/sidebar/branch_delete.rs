@@ -42,7 +42,7 @@ impl RepoTab {
                     .flat_map(|(_, bs)| bs)
                     .find(|r| r.name == b.upstream),
             );
-        let delete = MenuItem::new("Delete…")
+        let delete = MenuItem::new(crate::i18n::text("repo-core-1117"))
             .icon("minus")
             .enabled(idle)
             .refused(refused)
@@ -58,7 +58,7 @@ impl RepoTab {
                 Dialog::confirm(
                     "Delete branch",
                     format!("Delete the local branch “{}”?", b.name),
-                    "Delete",
+                    crate::i18n::text("repo-core-1115"),
                     guarded(ops(&[&["branch", "-d", "--", &b.name]])),
                     Some((
                         "Force, even if it isn't merged (-D)".to_owned(),

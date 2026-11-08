@@ -217,8 +217,7 @@ impl ConflictEditor {
             return Ok(Vec::new());
         }
         let texts = self.resolutions().ok_or_else(|| {
-            "The notes were not kept: the text around the conflicts was edited by hand, so \
-             which part resolves which conflict can't be told"
+            crate::i18n::text("repo-core-0476")
                 .to_owned()
         })?;
         let spots = record::spots(&self.segments);

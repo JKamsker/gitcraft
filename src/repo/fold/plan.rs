@@ -39,7 +39,7 @@ pub(crate) fn blocked(
         ));
     }
     if branch.is_none() {
-        return Some("HEAD is detached: check out a branch first".to_owned());
+        return Some(crate::i18n::text("repo-core-0842").to_owned());
     }
     (staged == 0).then(|| "Nothing is staged: stage the changes to fold in first".to_owned())
 }

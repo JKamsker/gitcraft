@@ -19,9 +19,9 @@ enum Model {
 impl Model {
     fn label(self) -> &'static str {
         match self {
-            Self::Compact => "Compact lanes",
-            Self::Trunk => "Trunk · release · feature",
-            Self::GitFlow => "Git flow",
+            Self::Compact => crate::i18n::text("repo-core-0207"),
+            Self::Trunk => crate::i18n::text("repo-core-0208"),
+            Self::GitFlow => crate::i18n::text("repo-core-0209"),
         }
     }
 }
@@ -160,12 +160,12 @@ impl RepoTab {
         let first_parent = self.log_order.first_parent;
         self.band_reader.queue(move |active| {
             if !active() {
-                return Err("Band layout cancelled".into());
+                return Err(crate::i18n::text("repo-core-0220").into());
             }
             let hints = prefs.hints(&commits, &refs);
             let graph = crate::graph::layout_banded(&commits, first_parent, &hints);
             if !active() {
-                return Err("Band layout cancelled".into());
+                return Err(crate::i18n::text("repo-core-0220").into());
             }
             Ok(graph)
         });
@@ -184,37 +184,37 @@ impl RepoTab {
     }
     pub(super) fn branch_bands_header(&mut self, ui: &mut egui::Ui) {
         let mut changed = false;
-        ui.menu_button("Graph tools…", |ui| {
+        ui.menu_button(crate::i18n::text("repo-core-0221"), |ui| {
             let mut settings = crate::settings::Settings::get(ui.ctx());
             if ui
-                .checkbox(&mut settings.graph_lane_walk, "Walk graph topology")
+                .checkbox(&mut settings.graph_lane_walk, crate::i18n::text("repo-core-0222"))
                 .changed()
             {
                 settings.set(ui.ctx());
             }
 
-            if ui.button("Sparse checkout and downloads…").clicked() {
+            if ui.button(crate::i18n::text("repo-core-0223")).clicked() {
                 self.open_sparse();
                 ui.close();
             }
-            if ui.button("Clean history in a fresh clone…").clicked() {
+            if ui.button(crate::i18n::text("repo-core-0224")).clicked() {
                 self.open_cleanup();
                 ui.close();
             }
             self.postcard_button(ui);
-            if ui.button("Watch the repository grow…").clicked() {
+            if ui.button(crate::i18n::text("repo-core-0225")).clicked() {
                 self.open_growth();
                 ui.close();
             }
-            if ui.button("Churn and contributor atlas…").clicked() {
+            if ui.button(crate::i18n::text("repo-core-0226")).clicked() {
                 self.open_atlas();
                 ui.close();
             }
-            if ui.button("Activity calendar…").clicked() {
+            if ui.button(crate::i18n::text("repo-core-0227")).clicked() {
                 self.open_activity(super::history_activity::Page::Calendar, ui.ctx());
                 ui.close();
             }
-            if ui.button("Contributor statistics…").clicked() {
+            if ui.button(crate::i18n::text("repo-core-0228")).clicked() {
                 self.open_activity(super::history_activity::Page::Contributors, ui.ctx());
                 ui.close();
             }
@@ -227,7 +227,7 @@ impl RepoTab {
                             .changed();
                     }
                 });
-            ui.menu_button("Pin branch to band…", |ui| {
+            ui.menu_button(crate::i18n::text("repo-core-0230"), |ui| {
                 egui::ScrollArea::vertical()
                     .max_height(320.0)
                     .show(ui, |ui| {
@@ -247,7 +247,7 @@ impl RepoTab {
                                     if ui
                                         .selectable_label(
                                             self.branch_bands.pins.get(&full) == Some(&band),
-                                            format!("Band {}", band + 1),
+                                            crate::i18n::message("repo-core-0231", &[("band", format!("{}", band + 1).into())]),
                                         )
                                         .clicked()
                                     {
@@ -256,7 +256,7 @@ impl RepoTab {
                                         ui.close();
                                     }
                                 }
-                                if ui.button("Use preset").clicked() {
+                                if ui.button(crate::i18n::text("repo-core-0232")).clicked() {
                                     self.branch_bands.pins.remove(&full);
                                     changed = true;
                                     ui.close();
@@ -264,7 +264,7 @@ impl RepoTab {
                             });
                         }
                     });
-                if ui.button("Clear all pins").clicked() {
+                if ui.button(crate::i18n::text("repo-core-0233")).clicked() {
                     self.branch_bands.pins.clear();
                     changed = true;
                     ui.close();
@@ -272,14 +272,14 @@ impl RepoTab {
             });
             if self.branch_bands.model != Model::Compact || !self.branch_bands.pins.is_empty() {
                 ui.small(
-                    "Bands ordered left to right · branch colours remain stable across reloads",
+                    crate::i18n::text("repo-core-0234"),
                 );
             }
         });
         if self.band_reader.busy() {
             ui.add(crate::spinner::Spinner::new().size(14.0));
-            ui.small("Updating branch-model layout…").on_hover_text(
-                "The visible layout is a preview until the selected branch model finishes rebuilding.",
+            ui.small(crate::i18n::text("repo-core-0235")).on_hover_text(
+                crate::i18n::text("repo-core-0236"),
             );
         }
         if changed {

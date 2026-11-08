@@ -173,7 +173,7 @@ impl RepoTab {
                         format!("Stage {path}"),
                         "file",
                         stage_action(
-                            "Stage",
+                            crate::i18n::text("repo-core-0836"),
                             vec![vec!["--literal-pathspecs", "add", "--", path]],
                         ),
                     )
@@ -187,7 +187,7 @@ impl RepoTab {
                     format!("Unstage {path}"),
                     "file",
                     Action::Ops {
-                        label: "Unstage".to_owned(),
+                        label: crate::i18n::text("repo-core-0844").to_owned(),
                         ops: vec![unstage_args(&self.refs.head, path)],
                         refresh: Refresh::Status,
                     },

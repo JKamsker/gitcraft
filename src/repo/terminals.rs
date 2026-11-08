@@ -95,7 +95,7 @@ impl RepoTab {
             ui.add_space(12.0);
             ui.vertical_centered(|ui| {
                 ui.label(egui::RichText::new("The shell has exited.").color(t.text_dim));
-                if ui.button("Close").clicked() {
+                if ui.button(crate::i18n::text("repo-core-0595")).clicked() {
                     acts.push(Action::CloseTerminal(i));
                 }
             });

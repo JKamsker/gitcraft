@@ -416,7 +416,7 @@ pub(super) fn dialog(ui: &mut egui::Ui, plan: &mut Plan, acknowledge: &mut bool)
         if ui.button("Recheck").clicked() {
             out = Outcome::Done(Box::new(Action::ReloadPreflight(Box::new(plan.clone()))));
         }
-        if ui.button("Cancel").clicked() {
+        if ui.button(crate::i18n::text("repo-core-0443")).clicked() {
             out = Outcome::Cancel;
         }
     });

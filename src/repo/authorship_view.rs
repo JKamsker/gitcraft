@@ -218,13 +218,13 @@ impl RepoTab {
         let known = self.authorship.map.clone();
         let repo = self.path.clone();
         let name = branch.to_owned();
-        self.status = Some((format!("Working out who wrote {branch}…"), false));
+        self.status = Some((crate::i18n::message("repo-core-0197", &[("branch", format!("{}", branch).into())]), false));
         self.then(
             ctx,
             move || {
                 let base = default_branch(&repo, &full)
                     .or(main)
-                    .ok_or_else(|| format!("There is no main branch to set {name} against"))?;
+                    .ok_or_else(|| crate::i18n::message("repo-core-0198", &[("name", format!("{}", name).into())]))?;
                 authorship::branch::figures(&repo, &full, &base, &known, complete)
                     .map(|f| f.headline(&name))
             },
@@ -257,10 +257,9 @@ pub(crate) const AGENT_FILTER: &str = "agent-written commits";
 /// The filter's toggle in the search bar.
 pub(crate) fn filter_toggle(ui: &mut Ui, on: bool, acts: &mut Vec<Action>) {
     if ui
-        .selectable_label(on, "Agent-written")
+        .selectable_label(on, crate::i18n::text("repo-core-0205"))
         .on_hover_text(
-            "Step through the commits an agent wrote or co-wrote, as they record it (git-ai \
-             notes, Agent Trace, an agent's account or Co-authored-by trailer)",
+            crate::i18n::text("repo-core-0206"),
         )
         .clicked()
     {

@@ -38,7 +38,7 @@ impl RepoTab {
                             .small(),
                     );
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if icons::small_button(ui, "x", "Close (Esc)").clicked() {
+                        if icons::small_button(ui, "x", crate::i18n::text("repo-core-0711")).clicked() {
                             acts.push(Action::ToggleSearch);
                         }
                         if icons::small_button(ui, "chevron-down", "Next (Enter)").clicked() {

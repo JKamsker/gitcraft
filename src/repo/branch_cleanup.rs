@@ -66,7 +66,7 @@ impl RepoTab {
                 }));
                 match read {
                     Ok(result) => result.map(|health| (health, cache)),
-                    Err(_) => Err("the read stopped unexpectedly".to_owned()),
+                    Err(_) => Err(crate::i18n::text("repo-core-0240").to_owned()),
                 }
             },
             |tab, result, ctx| tab.health_arrived(result, ctx),

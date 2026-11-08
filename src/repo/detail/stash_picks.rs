@@ -29,7 +29,7 @@ impl RepoTab {
                             .font(theme::medium(12.0)),
                     );
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if ui.button("Clear").clicked() {
+                        if ui.button(crate::i18n::text("repo-core-1149")).clicked() {
                             acts.push(Action::ClearStashPicks);
                         }
                         let stash = ui

@@ -257,14 +257,14 @@ fn spoken(status: &Status) -> String {
     } else {
         tally
     };
-    crate::a11y::labels::join([format!("builds: {tally}").as_str(), "opens the builds"])
+    crate::a11y::labels::join([crate::i18n::message("repo-core-0283", &[("tally", (tally).into())]).as_str(), crate::i18n::text("repo-core-0284")])
 }
 
 /// What a dot's tooltip says: the tally, then the checks that need attention.
 pub(super) fn tooltip(status: &Status) -> String {
     let mut text = match ci::tally_label(&status.checks) {
-        tally if tally.is_empty() => format!("CI: {}", state_word(status.state)),
-        tally => format!("CI: {tally}"),
+        tally if tally.is_empty() => crate::i18n::message("repo-core-0285", &[("state", format!("{}", state_word(status.state)).into())]),
+        tally => crate::i18n::message("repo-core-0286", &[("tally", (tally).into())]),
     };
     let mut worst: Vec<_> = status
         .checks
@@ -276,18 +276,18 @@ pub(super) fn tooltip(status: &Status) -> String {
         text.push_str(&format!("\n{}  {}", state_word(check.state), check.name));
     }
     if worst.len() > 8 {
-        text.push_str(&format!("\n… and {} more", worst.len() - 8));
+        text.push_str(&crate::i18n::message("repo-core-0287", &[("len", format!("{}", worst.len() - 8).into())]));
     }
-    text.push_str("\nClick for details");
+    text.push_str(crate::i18n::text("repo-core-0288"));
     text
 }
 
 pub(crate) fn state_word(state: CheckState) -> &'static str {
     match state {
-        CheckState::Passed => "passed",
-        CheckState::Failed => "failed",
-        CheckState::Running => "running",
-        CheckState::Skipped => "skipped",
+        CheckState::Passed => crate::i18n::text("repo-core-0289"),
+        CheckState::Failed => crate::i18n::text("repo-core-0290"),
+        CheckState::Running => crate::i18n::text("repo-core-0291"),
+        CheckState::Skipped => crate::i18n::text("repo-core-0292"),
     }
 }
 

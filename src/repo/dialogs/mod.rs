@@ -518,10 +518,10 @@ impl RepoTab {
             ui.set_width(380.0);
             let enter = ui.input(|i| i.key_pressed(Key::Enter));
             match dialog {
-                Dialog::PushLoading{..}=>{ui.heading("Checking outgoing history…");ui.add(crate::spinner::Spinner::new());ui.label("Local/fetched objects only; nothing is pushed until you review.");if ui.button("Cancel").clicked(){Outcome::Cancel}else{Outcome::Open}},
+                Dialog::PushLoading{..}=>{ui.heading("Checking outgoing history…");ui.add(crate::spinner::Spinner::new());ui.label("Local/fetched objects only; nothing is pushed until you review.");if ui.button(crate::i18n::text("repo-core-0443")).clicked(){Outcome::Cancel}else{Outcome::Open}},
                 Dialog::PushPreflight{plan,acknowledge}=>super::push_preflight::dialog(ui,plan,acknowledge),
-                Dialog::PushError(error)=>{ui.heading("Push preflight could not finish");ui.label(error.as_str());if ui.button("Close").clicked(){Outcome::Cancel}else{Outcome::Open}},
-                Dialog::WorkingDraftLoading => { ui.heading("Reading earlier versions…");ui.add(crate::spinner::Spinner::new());if ui.button("Cancel").clicked(){Outcome::Cancel}else{Outcome::Open} },
+                Dialog::PushError(error)=>{ui.heading("Push preflight could not finish");ui.label(error.as_str());if ui.button(crate::i18n::text("repo-core-0595")).clicked(){Outcome::Cancel}else{Outcome::Open}},
+                Dialog::WorkingDraftLoading => { ui.heading("Reading earlier versions…");ui.add(crate::spinner::Spinner::new());if ui.button(crate::i18n::text("repo-core-0443")).clicked(){Outcome::Cancel}else{Outcome::Open} },
                 Dialog::WorkingDraftHistory { on,versions,error,index } => super::working_drafts::view::history(ui,on,versions,error.as_deref(),index,idle,working_draft_undo),
                 Dialog::WorkingDraftRecovery { preview,selected } => super::working_drafts::view::recovery(ui,preview,selected,idle),
                 Dialog::ContentRecovery => self.content_recovery.show(ui, idle),
@@ -536,7 +536,7 @@ impl RepoTab {
                 } => gerrit::review(ui, remote, head, targets, target, topic, *skip_hooks, web_warning.as_deref()),
                 Dialog::RepositoryTools(state) => {
                     super::repository_tools::show(ui, state, acts);
-                    if ui.button("Close").clicked() { Outcome::Cancel } else { Outcome::Open }
+                    if ui.button(crate::i18n::text("repo-core-0595")).clicked() { Outcome::Cancel } else { Outcome::Open }
                 }
                 Dialog::Behaviour(form) => form.show(ui),
                 Dialog::LinkedMachines(form) => form.show(ui),
@@ -544,7 +544,7 @@ impl RepoTab {
                     ui.heading("Reading bundle information…");
                     ui.label("Git runs on the repository's machine. Local bundle files are temporarily copied there for SSH / WSL verification. No refs change while inspecting.");
                     ui.add(crate::spinner::Spinner::new());
-                    if ui.button("Cancel").clicked() { Outcome::Cancel } else { Outcome::Open }
+                    if ui.button(crate::i18n::text("repo-core-0443")).clicked() { Outcome::Cancel } else { Outcome::Open }
                 }
                 Dialog::BundleExport { refs, selected, base } => bundles::export(ui, refs, selected, base, idle),
                 Dialog::BundleIncoming(form) => form.show(ui),
@@ -812,7 +812,7 @@ fn buttons(
 
 /// Whether Cancel was clicked.
 fn cancel_button(ui: &mut egui::Ui) -> bool {
-    ui.add(egui::Button::new("Cancel").min_size(egui::vec2(80.0, 30.0)))
+    ui.add(egui::Button::new(crate::i18n::text("repo-core-0443")).min_size(egui::vec2(80.0, 30.0)))
         .clicked()
 }
 

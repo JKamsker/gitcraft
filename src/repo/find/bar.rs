@@ -54,7 +54,7 @@ impl Find {
 
     /// Close, next and previous, laid out right to left.
     fn buttons(&mut self, ui: &mut Ui) {
-        if icons::small_button(ui, "x", "Close (Esc)").clicked() {
+        if icons::small_button(ui, "x", crate::i18n::text("repo-core-0711")).clicked() {
             self.close();
         }
         let next = crate::keymap::tip(

@@ -73,9 +73,7 @@ impl RepoTab {
             match result {
                 Ok(version) => state.version = Some(version),
                 Err(e) => {
-                    state.error = Some(format!(
-                        "Install git-filter-repo on this machine and reopen this wizard. {e}"
-                    ))
+                    state.error = Some(crate::i18n::message("repo-core-0293", &[("e", format!("{}", e).into())]))
                 }
             }
         }
@@ -83,42 +81,42 @@ impl RepoTab {
         let mut start = false;
         let mut cancel = false;
         let idle = state.running.is_none() && self.busy_op.is_none() && !state.capability.busy();
-        egui::Window::new("Clean history in a fresh clone").id(egui::Id::new(("cleanup", &self.path))).open(&mut open).default_width(620.0).show(ctx, |ui| {
+        egui::Window::new(crate::i18n::text("repo-core-0294")).id(egui::Id::new(("cleanup", &self.path))).open(&mut open).default_width(620.0).show(ctx, |ui| {
             egui::ScrollArea::vertical().max_height(650.0).show(ui, |ui| {
-                ui.label(format!("Source (never rewritten): {}", self.path.display()));
-                ui.label("Local repositories only. Creates a fresh full mirror with no shared objects, then runs installed git-filter-repo without --force. The new clone and maps remain on disk even on failure/cancel. Closing this tab cancels owned work.");
-                if let Some(version) = &state.version { ui.label(format!("Installed git-filter-repo: {version}")); }
+                ui.label(crate::i18n::message("repo-core-0296", &[("self", format!("{}", self.path.display()).into())]));
+                ui.label(crate::i18n::text("repo-core-0297"));
+                if let Some(version) = &state.version { ui.label(crate::i18n::message("repo-core-0298", &[("version", format!("{}", version).into())])); }
                 if let Some(report) = &state.report {
                     result_ui(ui, report, &mut state.publishing);
                 } else {
                     ui.add_enabled_ui(idle, |ui| {
-                        ui.label("Output parent folder (a new owned subfolder will be created)");
+                        ui.label(crate::i18n::text("repo-core-0299"));
                         ui.horizontal(|ui| {
                             ui.text_edit_singleline(&mut state.parent);
-                            if ui.button("Browse…").clicked() && let Some(folder) = rfd::FileDialog::new().pick_folder() { state.parent = folder.display().to_string(); }
+                            if ui.button(crate::i18n::text("repo-core-0300")).clicked() && let Some(folder) = rfd::FileDialog::new().pick_folder() { state.parent = folder.display().to_string(); }
                         });
-                        ui.label("Remove literal repository-relative paths, one per line (maximum 32). Include historical names: renames are not followed. Folder paths may end with /.");
+                        ui.label(crate::i18n::text("repo-core-0301"));
                         ui.add(egui::TextEdit::multiline(&mut state.paths).desired_rows(3).char_limit(64 << 10));
-                        ui.label("Literal text replacements (maximum 32); text blobs only. Messages, binary blobs, LFS storage and other clones/forks/caches need separate review.");
+                        ui.label(crate::i18n::text("repo-core-0302"));
                         let mut remove = None;
                         for (index, rule) in state.replacements.iter_mut().enumerate() {
                             ui.horizontal(|ui| {
                                 ui.label(format!("{}", index + 1));
-                                ui.add(egui::TextEdit::singleline(&mut rule.find).hint_text("Exact text to find").password(true).char_limit(4096).desired_width(200.0));
+                                ui.add(egui::TextEdit::singleline(&mut rule.find).hint_text(crate::i18n::text("repo-core-0303")).password(true).char_limit(4096).desired_width(200.0));
                                 ui.label("→");
-                                ui.add(egui::TextEdit::singleline(&mut rule.replace).hint_text("Replacement (empty deletes)").char_limit(4096).desired_width(200.0));
-                                if ui.small_button("Remove").clicked() { remove = Some(index); }
+                                ui.add(egui::TextEdit::singleline(&mut rule.replace).hint_text(crate::i18n::text("repo-core-0304")).char_limit(4096).desired_width(200.0));
+                                if ui.small_button(crate::i18n::text("repo-core-0305")).clicked() { remove = Some(index); }
                             });
                         }
                         if let Some(index) = remove { state.replacements.remove(index); }
-                        if ui.add_enabled(state.replacements.len() < 32, egui::Button::new("Add literal replacement")).clicked() { state.replacements.push(Replacement::default()); }
-                        ui.label("Revoke/rotate leaked secrets now. Rewriting history does not revoke them. Replacement rules briefly exist in a new file in the owned folder, then are removed; choose a private output folder, especially on Windows (inherited ACLs apply).");
-                        ui.checkbox(&mut state.acknowledged, "I will inspect the new clone and changed refs before any separate publication");
-                        if ui.add_enabled(state.version.is_some() && state.acknowledged && !state.parent.trim().is_empty(), egui::Button::new("Create fresh clone and rewrite")).clicked() { start = true; }
+                        if ui.add_enabled(state.replacements.len() < 32, egui::Button::new(crate::i18n::text("repo-core-0306"))).clicked() { state.replacements.push(Replacement::default()); }
+                        ui.label(crate::i18n::text("repo-core-0307"));
+                        ui.checkbox(&mut state.acknowledged, crate::i18n::text("repo-core-0308"));
+                        if ui.add_enabled(state.version.is_some() && state.acknowledged && !state.parent.trim().is_empty(), egui::Button::new(crate::i18n::text("repo-core-0309"))).clicked() { start = true; }
                     });
                 }
-                if state.capability.busy() { ui.label("Checking installed capability…"); }
-                if state.running.is_some() { ui.label("Cloning, rewriting and checking the owned mirror…"); if ui.button("Cancel cleanup").clicked() { cancel = true; } }
+                if state.capability.busy() { ui.label(crate::i18n::text("repo-core-0310")); }
+                if state.running.is_some() { ui.label(crate::i18n::text("repo-core-0311")); if ui.button(crate::i18n::text("repo-core-0312")).clicked() { cancel = true; } }
                 if let Some(error) = &state.error { ui.colored_label(crate::theme::Tokens::get(ctx).danger, error); }
             });
         });
@@ -146,7 +144,7 @@ impl RepoTab {
             sender.cancel = self.tx.cancel.child();
             state.running = Some(sender.cancel.clone());
             state.error = None;
-            self.busy_op = Some("Clean history in a fresh clone".into());
+            self.busy_op = Some(crate::i18n::text("repo-core-0294").into());
             spawn_mutation(
                 &sender,
                 ctx,
@@ -173,14 +171,11 @@ fn completion(result: Result<Report, String>) -> Msg {
     }))
 }
 fn report_ui(ui: &mut egui::Ui, report: &Report) {
-    ui.label(format!("Owned rewritten mirror: {}", report.repo.display()));
-    if ui.button("Copy rewritten repository path").clicked() {
+    ui.label(crate::i18n::message("repo-core-0313", &[("report", format!("{}", report.repo.display()).into())]));
+    if ui.button(crate::i18n::text("repo-core-0314")).clicked() {
         ui.ctx().copy_text(report.repo.display().to_string());
     }
-    ui.label(format!(
-        "{} changed refs (old → new; ∅ means absent)",
-        report.changes.len()
-    ));
+    ui.label(crate::i18n::message("repo-core-0315", &[("count", (report.changes.len()).into())]));
     for change in &report.changes {
         ui.label(format!(
             "{}: {} → {}",
@@ -197,30 +192,30 @@ fn report_ui(ui: &mut egui::Ui, report: &Report) {
             check.detail
         ));
     }
-    ui.collapsing("Managed filter-repo result", |ui| {
+    ui.collapsing(crate::i18n::text("repo-core-0316"), |ui| {
         ui.monospace(&report.output);
     });
-    ui.label("Inspect filter-repo's commit-map/ref-map inside the mirror. Integrity and literal blob checks are bounded checks, not proof that every secret is gone. Residual scans cap at 20000 reachable objects, 4 MiB per blob and 16 MiB total; skipped binary blobs or exceeded limits are unverified. Inspect the intended history and all failed checks yourself.");
+    ui.label(crate::i18n::text("repo-core-0317"));
 }
 fn publishing_ui(ui: &mut egui::Ui, report: &Report) {
     ui.separator();
-    ui.label("Separate publishing step — no remote write is performed by this wizard.");
+    ui.label(crate::i18n::text("repo-core-0318"));
     if report.checks.iter().any(|check| !check.passed) {
         ui.colored_label(
             crate::theme::Tokens::get(ui.ctx()).danger,
-            "Resolve the failed result checks before publishing.",
+            crate::i18n::text("repo-core-0319"),
         );
     }
-    ui.label("1. Revoke or rotate exposed secrets at their issuer; audit access. Rewriting cannot revoke a credential.");
-    ui.label("2. Inspect the new mirror and coordinate the rewrite with collaborators. Retain an offline backup of the original; treat it as sensitive.");
-    ui.label("3. Deliberately add a publishing remote to the NEW mirror. Compare each destination ref against its current remote value and use explicit per-ref force-with-lease publication through your existing guarded publisher or terminal. Do not use an unreviewed mirror/force push.");
-    ui.label("4. Ask collaborators to re-clone. Review forge PR refs, forks, caches, release assets and LFS storage separately. The wizard's origin has been removed to prevent accidental publication back to the source.");
+    ui.label(crate::i18n::text("repo-core-0320"));
+    ui.label(crate::i18n::text("repo-core-0321"));
+    ui.label(crate::i18n::text("repo-core-0322"));
+    ui.label(crate::i18n::text("repo-core-0323"));
 }
 
 fn result_ui(ui: &mut egui::Ui, report: &Report, publishing: &mut bool) {
     report_ui(ui, report);
     if ui
-        .button("Review separate publishing and revocation steps")
+        .button(crate::i18n::text("repo-core-0324"))
         .clicked()
     {
         *publishing = true;

@@ -50,7 +50,7 @@ impl RepoTab {
             widgets::toolbar_separator(ui);
             if icons::tool_button(ui, "refresh-cw", "", !self.loading)
                 .named("Reload (F5)")
-                .on_hover_text(keymap::tip(ui.ctx(), "Reload", Command::Reload))
+                .on_hover_text(keymap::tip(ui.ctx(), crate::i18n::text("repo-core-0070"), Command::Reload))
                 .clicked()
             {
                 acts.push(Action::Reload);
@@ -59,19 +59,19 @@ impl RepoTab {
             ui.menu_button("File views", |ui| {
                 for (label, page) in [
                     (
-                        "Code moved across files",
+                        crate::i18n::text("repo-core-0022"),
                         super::file_comparison::Page::CodeMoves,
                     ),
                     (
-                        "File migration map",
+                        crate::i18n::text("repo-core-0024"),
                         super::file_comparison::Page::Migration,
                     ),
                     (
-                        "Three-state staging lens",
+                        crate::i18n::text("repo-core-0026"),
                         super::file_comparison::Page::Lens,
                     ),
                     (
-                        "File versions across branches",
+                        crate::i18n::text("repo-core-0028"),
                         super::file_comparison::Page::Matrix,
                     ),
                 ] {
@@ -99,7 +99,7 @@ impl RepoTab {
     fn history_buttons(&self, ui: &mut Ui, idle: bool, acts: &mut Vec<Action>) {
         let undo = self.timeline.current_entry();
         let undo_tip = match undo {
-            Some(e) => step_tip("Undo", e, &keymap::label(ui.ctx(), keymap::Command::Undo)),
+            Some(e) => step_tip(crate::i18n::text("repo-core-0051"), e, &keymap::label(ui.ctx(), keymap::Command::Undo)),
             None => "Nothing to undo".to_owned(),
         };
         let waits = self.waits_text();
@@ -134,7 +134,7 @@ impl RepoTab {
         }
         let redo = self.timeline.redo_target();
         let redo_tip = match redo {
-            Some(e) => step_tip("Redo", e, &keymap::label(ui.ctx(), keymap::Command::Redo)),
+            Some(e) => step_tip(crate::i18n::text("repo-core-0052"), e, &keymap::label(ui.ctx(), keymap::Command::Redo)),
             None => "Nothing to redo".to_owned(),
         };
         if icons::tool_button(ui, "redo-2", "", idle && redo.is_some())
@@ -185,7 +185,7 @@ impl RepoTab {
             ),
             short_duration(self.last_fetch.elapsed())
         );
-        if icons::tool_button(ui, "cloud-download", "Fetch", has_remote)
+        if icons::tool_button(ui, "cloud-download", crate::i18n::text("repo-core-0029"), has_remote)
             .on_hover_text(fetched)
             .on_disabled_hover_ui(|ui| self.why_not(ui, Command::Fetch))
             .on_disabled_hover_text(no_remote)
@@ -202,8 +202,8 @@ impl RepoTab {
             .map(|b| b.ahead_behind())
             .unwrap_or((0, 0));
         let mode = Settings::get(ui.ctx()).pull_mode;
-        let pull = icons::tool_button_count(ui, "arrow-down-to-line", "Pull", behind, has_remote)
-            .named(|| behind_ahead("Pull", behind, "behind"))
+        let pull = icons::tool_button_count(ui, "arrow-down-to-line", crate::i18n::text("repo-core-0030"), behind, has_remote)
+            .named(|| behind_ahead(crate::i18n::text("repo-core-0030"), behind, "behind"))
             .on_hover_text(format!("{}{waits}", mode.tip(ui.ctx())))
             .on_disabled_hover_text(&off_why);
         crate::repo::ghost::offer(&pull, || crate::repo::ghost::GhostOp::Pull(mode));
@@ -223,7 +223,7 @@ impl RepoTab {
             let push = icons::tool_button(
                 ui,
                 "arrow-up-from-line",
-                "Push for review",
+                crate::i18n::text("repo-core-0031"),
                 has_remote && !self.refs.head.is_empty(),
             )
             .on_hover_text(
@@ -237,8 +237,8 @@ impl RepoTab {
             super::hooks::push_menu(&push, acts);
             return;
         }
-        let push = icons::tool_button_count(ui, "arrow-up-from-line", "Push", ahead, has_remote)
-            .named(|| behind_ahead("Push", ahead, "ahead"))
+        let push = icons::tool_button_count(ui, "arrow-up-from-line", crate::i18n::text("repo-core-0032"), ahead, has_remote)
+            .named(|| behind_ahead(crate::i18n::text("repo-core-0032"), ahead, "ahead"))
             .on_hover_text(keymap::tip(
                 ui.ctx(),
                 "Push the current branch (publishes it if it has no upstream yet)",
@@ -291,7 +291,7 @@ impl RepoTab {
         {
             acts.push(Action::Dialog(Dialog::create_branch(&head, "HEAD")));
         }
-        if icons::tool_button(ui, "archive", "Stash", idle && !self.work.is_clean())
+        if icons::tool_button(ui, "archive", crate::i18n::text("repo-core-0862"), idle && !self.work.is_clean())
             .on_hover_text(keymap::tip(
                 ui.ctx(),
                 "Stash everything, staged changes, a snapshot, or picked files",
@@ -328,7 +328,7 @@ impl RepoTab {
             acts.push(Action::ToggleActivity);
         }
         let search = icons::tool_button(ui, "search", "", true)
-            .named("Search commits")
+            .named(crate::i18n::text("repo-core-0057"))
             .on_hover_text(format!(
                 "Search commits ({})",
                 keymap::label(ui.ctx(), keymap::Command::Search)
@@ -377,7 +377,7 @@ impl RepoTab {
                     acts.push(Action::ReviewTools(super::review_workflow::ToolsAct::Open));
                     ui.close();
                 }
-                let browser = MenuItem::new("Open in browser")
+                let browser = MenuItem::new(crate::i18n::text("repo-core-0115"))
                     .icon("external-link")
                     .refused(page.is_none().then_some("No remote with a web page"))
                     .show(ui);
@@ -399,7 +399,7 @@ impl RepoTab {
                 {
                     acts.push(Action::OpenPath(PathBuf::new()));
                 }
-                if MenuItem::new("Open in editor")
+                if MenuItem::new(crate::i18n::text("repo-core-0113"))
                     .icon("code")
                     .refused(why)
                     .show(ui)
@@ -464,7 +464,7 @@ impl RepoTab {
 
         if let Some(state) = self.work.in_progress {
             ui.add_space(10.0);
-            widgets::chip(ui, &format!("{} in progress", state.label()), t.warning);
+            widgets::chip(ui, &crate::i18n::message("repo-core-0818", &[("label", format!("{}", state.label()).into())]), t.warning);
             if ui
                 .add_enabled(
                     idle,
@@ -518,7 +518,7 @@ impl RepoTab {
         };
         if self.can_cancel()
             && ui
-                .button("Cancel")
+                .button(crate::i18n::text("repo-core-0443"))
                 .on_hover_text(if self.waiting.is_empty() {
                     format!("Stop {op}, and what it started")
                 } else {

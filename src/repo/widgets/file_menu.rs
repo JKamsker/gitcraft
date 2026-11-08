@@ -66,7 +66,7 @@ pub fn file_menu_with(
             {
                 acts.push(Action::OpenPath(rel.clone()));
             }
-            if crate::menu_item::MenuItem::new("Open in editor")
+            if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-0113"))
                 .icon("code")
                 .show(ui)
                 .clicked()
@@ -250,7 +250,7 @@ fn tool_items(ui: &mut egui::Ui, key: &DiffKey, acts: &mut Vec<Action>) {
             }
         }
         ToolItem::ResolveInMergeTool => {
-            if crate::menu_item::MenuItem::new("Resolve in merge tool")
+            if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-0730"))
                 .icon("git-merge")
                 .show(ui)
                 .on_hover_text(

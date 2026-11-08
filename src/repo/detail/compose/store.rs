@@ -36,8 +36,8 @@ impl PrefixStyle {
 
     pub fn label(self) -> &'static str {
         match self {
-            Self::Off => "Off",
-            Self::Conventional => "Conventional Commits",
+            Self::Off => crate::i18n::text("repo-core-1041"),
+            Self::Conventional => crate::i18n::text("repo-core-1042"),
             Self::Gitmoji => "Gitmoji",
         }
     }
@@ -136,15 +136,13 @@ impl Store {
     ) -> Result<(), String> {
         let name = name.trim();
         if name.is_empty() {
-            return Err("Give the template a name".to_owned());
+            return Err(crate::i18n::text("repo-core-1044").to_owned());
         }
         if text.trim().is_empty() {
-            return Err("Write the message to save as a template first".to_owned());
+            return Err(crate::i18n::text("repo-core-1045").to_owned());
         }
         if text.chars().count() > MAX_TEMPLATE_LEN {
-            return Err(format!(
-                "A template can be at most {MAX_TEMPLATE_LEN} characters"
-            ));
+            return Err(crate::i18n::message("repo-core-1046", &[("MAX-TEMPLATE-LEN", format!("{}", MAX_TEMPLATE_LEN).into())]));
         }
         let list = self.templates_mut(scope, repo);
         let template = Template {
@@ -156,9 +154,7 @@ impl Store {
             return Ok(());
         }
         if list.len() >= MAX_TEMPLATES {
-            return Err(format!(
-                "There are already {MAX_TEMPLATES} templates here; delete one first"
-            ));
+            return Err(crate::i18n::message("repo-core-1047", &[("MAX-TEMPLATES", format!("{}", MAX_TEMPLATES).into())]));
         }
         list.push(template);
         list.sort_by_key(|t| t.name.to_lowercase());

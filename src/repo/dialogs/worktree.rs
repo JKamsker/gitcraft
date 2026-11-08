@@ -151,7 +151,7 @@ pub(super) fn add_worktree(
         usable(branch)
     };
     let valid = name_ok && usable(path) && folder.is_ok() && resolved_root.is_ok();
-    buttons(ui, "Add", valid, enter, || {
+    buttons(ui, crate::i18n::text("repo-core-0976"), valid, enter, || {
         let path = folder.clone().unwrap_or_default();
         let args: Vec<String> = if *new_branch {
             vec![
@@ -258,7 +258,7 @@ fn folder_field(
         if ui
             .add_enabled(
                 can_pick,
-                egui::Button::new("Browse…").min_size(egui::vec2(80.0, 28.0)),
+                egui::Button::new(crate::i18n::text("repo-core-0300")).min_size(egui::vec2(80.0, 28.0)),
             )
             .on_disabled_hover_text("Type a path on that machine")
             .clicked()

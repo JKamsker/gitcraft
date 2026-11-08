@@ -61,7 +61,7 @@ pub(super) fn export(
                 base: base.clone(),
             }));
         }
-        if ui.button("Cancel").clicked() {
+        if ui.button(crate::i18n::text("repo-core-0443")).clicked() {
             outcome = Outcome::Cancel;
         }
     });
@@ -233,7 +233,7 @@ impl Form {
                     });
                 });
             }
-            if ui.button(if self.imported.is_empty() { "Close" } else { "Close and refresh repository" }).clicked() {
+            if ui.button(if self.imported.is_empty() { crate::i18n::text("repo-core-0595") } else { "Close and refresh repository" }).clicked() {
                 outcome = if self.imported.is_empty() { Outcome::Cancel } else { Outcome::Done(Box::new(Action::Reload)) };
             }
         });

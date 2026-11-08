@@ -156,13 +156,13 @@ impl RepoTab {
             }
         });
         ui.horizontal_wrapped(|ui| {
-            ui.label("Commit");
+            ui.label(crate::i18n::text("repo-core-0056"));
             ui.add(
                 egui::TextEdit::singleline(&mut self.symbols.revision)
                     .desired_width(150.)
                     .char_limit(256),
             );
-            ui.label("Path");
+            ui.label(crate::i18n::text("repo-core-0250"));
             if ui
                 .add(
                     egui::TextEdit::singleline(&mut self.symbols.path)

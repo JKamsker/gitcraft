@@ -23,7 +23,7 @@ pub(super) fn show(ui: &mut Ui, diff: &DvcDiff, acts: &mut Vec<Action>) {
                             .color(t.text),
                     );
                     if ui
-                        .button("DVC: Pull")
+                        .button(crate::i18n::text("repo-core-0020"))
                         .on_hover_text(
                             "Download data for the current checkout from its configured DVC remote",
                         )
@@ -52,7 +52,7 @@ fn pair(
         (None, _) => "now tracked",
         (_, None) => "no longer tracked",
         (Some(o), Some(n)) if o.hash == n.hash && o.size == n.size && o.repo == n.repo => {
-            "unchanged"
+            crate::i18n::text("repo-core-0610")
         }
         _ => "changed",
     };

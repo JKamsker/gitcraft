@@ -359,7 +359,7 @@ impl RepoTab {
             ),
             (false, Some(mark)) => {
                 let word = match mark {
-                    git::Mark::Skip => "skipped",
+                    git::Mark::Skip => crate::i18n::text("repo-core-0292"),
                     _ => bisect.word(mark),
                 };
                 (

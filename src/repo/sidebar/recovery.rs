@@ -18,14 +18,14 @@ impl RepoTab {
         let rows = [
             (
                 "history",
-                "Reflog",
+                crate::i18n::text("repo-core-0058"),
                 "Where HEAD and each branch have been",
                 Source::head(),
                 ReflogAct::Show(Source::head()),
             ),
             (
                 "search",
-                "Find lost commits",
+                crate::i18n::text("repo-core-0060"),
                 "Commits no branch, tag or stash has any more",
                 Source::Lost,
                 ReflogAct::FindLost,

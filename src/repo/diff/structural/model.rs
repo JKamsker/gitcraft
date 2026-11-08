@@ -73,7 +73,7 @@ pub(super) fn parse(json: &[u8], old: &str, new: &str) -> Result<Structural, Str
     let (before, after): (Vec<_>, Vec<_>) = (old.split('\n').collect(), new.split('\n').collect());
     let mut rows = Vec::new();
     match report.status.as_str() {
-        "unchanged" if report.chunks.is_empty() => {}
+        crate::i18n::text("repo-core-0610") if report.chunks.is_empty() => {}
         "created" if old.is_empty() && !new.is_empty() => {
             full_side(&mut rows, &after, false)?;
         }
@@ -134,7 +134,7 @@ pub(super) fn parse(json: &[u8], old: &str, new: &str) -> Result<Structural, Str
     Ok(Structural {
         language: report.language,
         rows,
-        unchanged: report.status == "unchanged",
+        unchanged: report.status == crate::i18n::text("repo-core-0610"),
         longest,
     })
 }

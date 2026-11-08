@@ -30,8 +30,8 @@ impl RepoTab {
     }
     pub(super) fn open_bundle_inspect(&mut self, ctx: &egui::Context) {
         let Some(file) = rfd::FileDialog::new()
-            .set_title("Inspect local Git bundle (temporary copy to repository machine)")
-            .add_filter("Git bundle", &["bundle"])
+            .set_title(crate::i18n::text("repo-core-0260"))
+            .add_filter(crate::i18n::text("repo-core-0261"), &["bundle"])
             .pick_file()
         else {
             return;
@@ -66,7 +66,7 @@ impl RepoTab {
             }
             Err(e) => {
                 self.dialog = None;
-                self.status = Some((format!("Read bundle refs: {e}"), true));
+                self.status = Some((crate::i18n::message("repo-core-0263", &[("e", format!("{}", e).into())]), true));
             }
         }
     }
@@ -90,7 +90,7 @@ impl RepoTab {
             }
             Err(e) => {
                 self.dialog = None;
-                self.status = Some((format!("Inspect bundle: {e}"), true));
+                self.status = Some((crate::i18n::message("repo-core-0264", &[("e", format!("{}", e).into())]), true));
             }
         }
     }
@@ -104,15 +104,15 @@ impl RepoTab {
             return;
         }
         let Some(file) = rfd::FileDialog::new()
-            .set_title("Save bundle on this machine (choose a new file)")
+            .set_title(crate::i18n::text("repo-core-0265"))
             .set_file_name("repository.bundle")
-            .add_filter("Git bundle", &["bundle"])
+            .add_filter(crate::i18n::text("repo-core-0261"), &["bundle"])
             .save_file()
         else {
             return;
         };
         let repo = self.path.clone();
-        let label = format!("Export bundle to {}", file.display());
+        let label = crate::i18n::message("repo-core-0267", &[("file", format!("{}", file.display()).into())]);
         self.bundle_job(label, Refresh::Status, ctx, move || {
             let bytes = git::export_bundle(&repo, &refs, Some(&base))?;
             git::save_bundle_file(&file, &bytes)
@@ -157,8 +157,8 @@ impl RepoTab {
         // Untrusted prerequisite descriptions are never interpreted as an authentication
         // request or used to retry a previous operation.
         self.status = Some(match result {
-            Ok(()) => (format!("{label}: done"), false),
-            Err(e) => (format!("{label} failed: {e}"), true),
+            Ok(()) => (crate::i18n::message("repo-core-0269", &[("label", format!("{}", label).into())]), false),
+            Err(e) => (crate::i18n::message("repo-core-0270", &[("label", format!("{}", label).into()), ("e", format!("{}", e).into())]), true),
         });
         match refresh {
             Refresh::All => self.reload(ctx),

@@ -163,7 +163,7 @@ impl RepoTab {
                     true,
                 )
             }
-            Err(e) => (format!("{label} failed: {e}"), true),
+            Err(e) => (crate::i18n::message("repo-core-0270", &[("label", format!("{}", label).into()), ("e", format!("{}", e).into())]), true),
         });
         self.reload_status(ctx);
     }

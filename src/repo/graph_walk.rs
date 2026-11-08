@@ -356,7 +356,7 @@ impl RepoTab {
         }
         ui.horizontal_wrapped(|ui| {
             if ui
-                .checkbox(&mut settings.graph_lane_walk, "Walk graph topology")
+                .checkbox(&mut settings.graph_lane_walk, crate::i18n::text("repo-core-0222"))
                 .changed()
             {
                 settings.set(ui.ctx());
@@ -376,7 +376,7 @@ impl RepoTab {
                         .get(row)
                         .into_iter()
                         .flatten()
-                        .map(|r| ("Parent", *r))
+                        .map(|r| (crate::i18n::text("repo-core-0882"), *r))
                         .chain(
                             self.topology
                                 .children

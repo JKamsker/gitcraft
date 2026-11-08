@@ -169,7 +169,7 @@ impl RepoTab {
             Ok(()) if dropped => self.dropped_patch = DroppedPatch::Running(label),
             Ok(()) => {}
             Err(e) => {
-                self.status = Some((format!("{label} failed: {e}"), true));
+                self.status = Some((crate::i18n::message("repo-core-0270", &[("label", format!("{}", label).into()), ("e", format!("{}", e).into())]), true));
                 if dropped {
                     self.dropped_patch = DroppedPatch::Done(Err(e));
                 }

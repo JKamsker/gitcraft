@@ -18,7 +18,7 @@ pub(super) fn review(
     let t = Tokens::get(ui.ctx());
     title(
         ui,
-        "Push for review",
+        crate::i18n::text("repo-core-0031"),
         &format!(
             "Submit {} to Gerrit on {remote}.",
             &head[..head.len().min(8)]
@@ -72,8 +72,8 @@ pub(super) fn review(
     }
     ui.add_space(10.0);
     // A deliberate click is needed; Enter in the topic field must not send a review.
-    buttons(ui, "Push for review", plan.is_ok(), false, || Action::Ops {
-        label: "Push for review".to_owned(),
+    buttons(ui, crate::i18n::text("repo-core-0031"), plan.is_ok(), false, || Action::Ops {
+        label: crate::i18n::text("repo-core-0031").to_owned(),
         ops: plan.unwrap_or_default(),
         refresh: Refresh::All,
     })

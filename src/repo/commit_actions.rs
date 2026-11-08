@@ -17,7 +17,7 @@ pub(crate) struct Rewrite<'a> {
 
 pub(crate) fn cherry_pick_action(hash: &str, short: &str) -> Action {
     Action::UndoableOps {
-        label: format!("Cherry-pick {short}"),
+        label: crate::i18n::message("repo-core-0370", &[("short", format!("{}", short).into())]),
         ops: ops(&[&["cherry-pick", hash]]),
         refresh: Refresh::All,
         undo: Undo::HeadMove { mode: "--keep" },
@@ -26,7 +26,7 @@ pub(crate) fn cherry_pick_action(hash: &str, short: &str) -> Action {
 
 pub(crate) fn revert_action(hash: &str, short: &str) -> Action {
     Action::UndoableOps {
-        label: format!("Revert {short}"),
+        label: crate::i18n::message("repo-core-0371", &[("short", format!("{}", short).into())]),
         ops: ops(&[&["revert", "--no-edit", hash]]),
         refresh: Refresh::All,
         undo: Undo::HeadMove { mode: "--keep" },
@@ -45,32 +45,30 @@ pub(crate) struct ResetMode {
 
 pub(crate) const RESET_MODES: [ResetMode; 4] = [
     ResetMode {
-        label: "Soft",
-        short: "Keeps every change, staged",
-        explain: "Keeps every change, staged.",
+        label: "repo-core-0373",
+        short: "repo-core-0374",
+        explain: "repo-core-0375",
         mode: "--soft",
         undo_mode: "--soft",
     },
     ResetMode {
-        label: "Mixed",
-        short: "Keeps every change, unstaged",
-        explain: "Keeps every change, unstaged.",
+        label: "repo-core-0376",
+        short: "repo-core-0377",
+        explain: "repo-core-0378",
         mode: "--mixed",
         undo_mode: "--mixed",
     },
     ResetMode {
-        label: "Keep",
-        short: "Keeps local changes; stops if changed files would be touched",
-        explain: "Moves the branch while preserving uncommitted changes. Stops without moving \
-                  the branch if a file changed locally must also change for this reset.",
+        label: "repo-core-0380",
+        short: "repo-core-0381",
+        explain: "repo-core-0382",
         mode: "--keep",
         undo_mode: "--keep",
     },
     ResetMode {
-        label: "Hard",
-        short: "Throws away uncommitted changes and the commits after this one",
-        explain: "Throws away uncommitted changes and the commits after this one. Uncommitted \
-                  work can't be recovered.",
+        label: "repo-core-0383",
+        short: "repo-core-0384",
+        explain: "repo-core-0385",
         mode: "--hard",
         undo_mode: "--keep",
     },
@@ -87,9 +85,9 @@ pub(crate) fn reset_action(r: &Rewrite<'_>, mode: &ResetMode) -> Action {
     } = *r;
     Action::Dialog(
         Dialog::confirm(
-            &format!("{} reset", mode.label),
-            format!("Move {target} to {short} ({summary})? {}", mode.explain),
-            &format!("Reset {}", mode.label.to_lowercase()),
+            &crate::i18n::message("repo-core-0387", &[("label", format!("{}", crate::i18n::text(mode.label)).into())]),
+            crate::i18n::message("repo-core-0388", &[("target", format!("{}", target).into()), ("short", format!("{}", short).into()), ("summary", format!("{}", summary).into()), ("explain", format!("{}", crate::i18n::text(mode.explain)).into())]),
+            &crate::i18n::message("repo-core-0389", &[("to-lowercase", format!("{}", crate::i18n::text(mode.label).to_lowercase()).into())]),
             reset_steps(mode.mode, hash, target, head),
             None,
         )
@@ -127,7 +125,7 @@ mod tests {
         assert_eq!(RESET_MODES.len(), 4);
         let keep = RESET_MODES
             .iter()
-            .find(|m| m.label == "Keep")
+            .find(|m| m.label == "repo-core-0380")
             .ok_or("Missing Keep reset")?;
         assert_eq!(keep.mode, "--keep");
         assert_eq!(keep.undo_mode, "--keep");

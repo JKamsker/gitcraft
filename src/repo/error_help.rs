@@ -8,7 +8,7 @@ use crate::error_card::{CardEvent, ErrorCard};
 use crate::theme::Tokens;
 
 /// What a failed read of the repository is called on the card.
-pub(super) const RELOAD: &str = "Reload";
+pub(super) const RELOAD: &str = crate::i18n::text("repo-core-0070");
 
 impl RepoTab {
     /// Shows the card for `error` (what git said when `label` failed), if it is a failure

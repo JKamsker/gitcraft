@@ -214,7 +214,7 @@ pub(super) fn stash(
     let button = if d.choice == Choice::Snapshot {
         "Save snapshot"
     } else {
-        "Stash"
+        crate::i18n::text("repo-core-0862")
     };
     let request = d.request();
     buttons(ui, button, problem.is_none(), enter, || {

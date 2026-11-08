@@ -93,7 +93,7 @@ pub(super) fn test_commits(
         ui.add_space(4.0);
     }
     let valid = why_not.is_none();
-    buttons(ui, "Test", valid, enter, || {
+    buttons(ui, crate::i18n::text("repo-core-0554"), valid, enter, || {
         let mut start = start.clone();
         start.range = start.range.trim().to_owned();
         start.command = start.command.trim().to_owned();

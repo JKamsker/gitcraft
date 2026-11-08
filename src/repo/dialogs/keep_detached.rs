@@ -33,7 +33,7 @@ pub(super) fn keep_detached(
         let rest = if d.more() {
             "and more".to_owned()
         } else {
-            format!("and {} more", n - SHOWN)
+            crate::i18n::message("repo-core-1099", &[("SHOWN", format!("{}", n - SHOWN).into())])
         };
         ui.label(RichText::new(rest).color(t.text_faint).small());
     }

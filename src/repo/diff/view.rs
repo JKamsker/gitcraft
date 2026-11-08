@@ -517,7 +517,7 @@ impl RepoTab {
                         widgets::chip(ui, "before the change", t.warning);
                     }
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if icons::small_button(ui, "x", "Close (Esc)").clicked() {
+                        if icons::small_button(ui, "x", crate::i18n::text("repo-core-0711")).clicked() {
                             acts.push(Action::CloseDiff);
                         }
                         popout::button(ui, Panel::Diff, !self.docked(Panel::Diff), acts);
@@ -630,7 +630,7 @@ impl RepoTab {
                 "Unstage file",
                 vec![unstage_args(&self.refs.head, &file.path)],
             ),
-            Area::Conflicted => ("Mark resolved", add()),
+            Area::Conflicted => (crate::i18n::text("repo-core-0179"), add()),
             _ => ("Stage file", add()),
         };
         if ui.add_enabled(idle, egui::Button::new(label)).clicked() {
@@ -677,7 +677,7 @@ impl RepoTab {
                 });
             }
         }
-        ui.button("Clear")
+        ui.button(crate::i18n::text("repo-core-1149"))
             .on_hover_text("Unselect the lines")
             .clicked()
     }
@@ -712,7 +712,7 @@ impl RepoTab {
                 });
             }
             return ui
-                .button("Clear")
+                .button(crate::i18n::text("repo-core-1149"))
                 .on_hover_text("Unselect the lines")
                 .clicked();
         }

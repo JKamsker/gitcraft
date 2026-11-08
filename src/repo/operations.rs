@@ -428,7 +428,7 @@ impl RepoTab {
         match &result {
             Ok(_) => {
                 self.note_reused(None);
-                if label == "Commit" || label == "Amend" || label.starts_with("Continue ") {
+                if label == crate::i18n::text("repo-core-0056") || label == crate::i18n::text("repo-core-0358") || label.starts_with("Continue ") {
                     self.commit_summary.clear();
                     self.commit_body.clear();
                     self.amend = false;
@@ -442,7 +442,7 @@ impl RepoTab {
                 {
                     self.status = Some((format!("{label}: done, but {note}"), true));
                 } else if refresh == Refresh::All && !quiet {
-                    self.status = Some((format!("{label}: done"), false));
+                    self.status = Some((crate::i18n::message("repo-core-0269", &[("label", format!("{}", label).into())]), false));
                 }
                 if label.contains("etch") {
                     self.note_fetched();
@@ -484,7 +484,7 @@ impl RepoTab {
                 self.open_when_done.take_if(|(l, _)| *l == label);
                 self.focus_wip = e.contains("CONFLICT") || e.contains("could not apply");
                 // A failed undo stays undoable: the timeline stays where it was.
-                self.status = Some((format!("{label} failed: {e}"), true));
+                self.status = Some((crate::i18n::message("repo-core-0270", &[("label", format!("{}", label).into()), ("e", format!("{}", e).into())]), true));
                 if !quiet {
                     self.explain_failure(e, &label, ctx);
                 }

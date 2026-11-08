@@ -429,10 +429,7 @@ impl RepoTab {
         };
         match args {
             Ok(args) => acts.push(Action::Ops {
-                label: format!(
-                    "{} notes “{namespace}” {} {remote}",
-                    if fetch { "Fetch" } else { "Push" },
-                    if fetch { "from" } else { "to" },
+                label: crate::i18n::message("repo-core-1100", &[("Push", format!("{}", if fetch { "Fetch" } else { "Push" }).into()), ("namespace", format!("{}", namespace).into()), ("to", format!("{}", if fetch { "from" } else { "to" }).into()), ("remote", format!("{}", remote).into())])     if fetch { crate::i18n::text("repo-core-1101") } else { crate::i18n::text("repo-core-1102") },
                 ),
                 ops: vec![args],
                 refresh: Refresh::All,

@@ -189,7 +189,7 @@ fn lines_menu(
         .style(crate::theme::menu_style)
         .show(|ui| {
             let selected_text = selected_text();
-            if crate::menu_item::MenuItem::new("Copy")
+            if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-1133"))
                 .icon("copy")
                 .keys(crate::keymap::Command::SelectionCopy)
                 .refused(

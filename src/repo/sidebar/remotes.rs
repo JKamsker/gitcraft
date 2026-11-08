@@ -218,7 +218,7 @@ impl RepoTab {
                     format!(
                         "Delete “{short}” from {remote}? This changes the remote for everyone.",
                     ),
-                    "Delete",
+                    crate::i18n::text("repo-core-1115"),
                     // Only while it is where it was last fetched: commits pushed since are others'.
                     ops(&[&[
                         "push",
@@ -362,7 +362,7 @@ fn remote_menu_items(ui: &mut Ui, acts: &mut Vec<Action>, remote: &Remote, idle:
                 "Remove the remote “{}” ({})? Its branches disappear from this repository; nothing changes on the server.",
                 remote.name, remote.url
             ),
-            "Remove",
+            crate::i18n::text("repo-core-0305"),
             ops(&[&["remote", "remove", &remote.name]]),
             None,
         )));

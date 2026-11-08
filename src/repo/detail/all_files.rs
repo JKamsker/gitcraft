@@ -54,8 +54,8 @@ impl RepoTab {
             .show(ui, |ui| {
                 let mut on = self.all_files.on;
                 let resp = ui
-                    .checkbox(&mut on, "View all files")
-                    .on_hover_text("List every file of the commit, not only those it changed");
+                    .checkbox(&mut on, crate::i18n::text("repo-core-0806"))
+                    .on_hover_text(crate::i18n::text("repo-core-0807"));
                 if resp.changed() {
                     acts.push(Action::ViewAllFiles(on));
                 }

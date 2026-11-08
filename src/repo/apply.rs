@@ -103,7 +103,7 @@ impl RepoTab {
             Action::ReloadPreflight(plan) => self.reload_preflight(*plan, ctx),
             Action::RepositoryTools(act) => self.repository_tools_act(act, ctx),
             Action::DvcPull => {
-                self.dialog=Some(super::Dialog::confirm("DVC: Pull", "Download the data referenced by this checkout from its configured DVC remote and materialize it in the working tree? DVC must be installed on the repository machine. Review local data edits first; this operation has no automatic undo.".into(), "Pull data",git::dvc::pull_steps(),None));
+                self.dialog=Some(super::Dialog::confirm(crate::i18n::text("repo-core-0020"), crate::i18n::text("repo-core-0143").into(), crate::i18n::text("repo-core-0144"),git::dvc::pull_steps(),None));
             }
 
             Action::OpenFileComparison(page) => self.open_file_comparison(page, ctx),
@@ -278,7 +278,7 @@ impl RepoTab {
             Action::Fetch => {
                 self.last_fetch = Instant::now();
                 self.run_ops(
-                    "Fetch",
+                    crate::i18n::text("repo-core-0029"),
                     ops(&[&["fetch", "--all", "--prune"]]),
                     Refresh::All,
                     plain,
@@ -380,7 +380,7 @@ impl RepoTab {
             Action::OpenInDiffTool(key) => self.open_in_diff_tool(key, ctx),
             Action::ResolveInMergeTool(path) => self.resolve_in_merge_tool(path, ctx),
             Action::SetIdentity(name, email) => self.run_ops(
-                "Set identity",
+                crate::i18n::text("repo-core-0148"),
                 ops(&[
                     &["config", "--local", "user.name", &name],
                     &["config", "--local", "user.email", &email],
@@ -399,7 +399,7 @@ impl RepoTab {
                 }
                 if !list.is_empty() {
                     self.run_ops(
-                        "Use the profile's author",
+                        crate::i18n::text("repo-core-0154"),
                         ops(&list),
                         Refresh::All,
                         plain,
@@ -668,8 +668,8 @@ impl RepoTab {
             Ok(added) => {
                 if tracked {
                     self.run_prepared(
-                        &format!("Ignore {pattern}"),
-                        &format!("{pattern} is in .gitignore, but {path} is still tracked"),
+                        &crate::i18n::message("repo-core-0155", &[("pattern", format!("{}", pattern).into())]),
+                        &crate::i18n::message("repo-core-0156", &[("pattern", format!("{}", pattern).into()), ("path", format!("{}", path).into())]),
                         ops(&[&[
                             "--literal-pathspecs",
                             "rm",
@@ -685,9 +685,9 @@ impl RepoTab {
                     );
                 } else {
                     let msg = if added {
-                        format!("Added {pattern} to .gitignore")
+                        crate::i18n::message("repo-core-0162", &[("pattern", format!("{}", pattern).into())])
                     } else {
-                        format!("{pattern} was already in .gitignore")
+                        crate::i18n::message("repo-core-0163", &[("pattern", format!("{}", pattern).into())])
                     };
                     self.status = Some((msg, false));
                     self.reload_status(ctx);
@@ -749,7 +749,7 @@ impl RepoTab {
             key: view.key.clone(),
             request: view.request,
             pick,
-            preparing: format!("Preparing {label}"),
+            preparing: crate::i18n::message("repo-core-0166", &[("label", format!("{}", label).into())]),
             label,
             started: Instant::now(),
         };
@@ -787,7 +787,7 @@ impl RepoTab {
             || !current
         {
             self.status = Some((
-                "Changes reloaded; pick the hunk again before applying it.".to_owned(),
+                crate::i18n::text("repo-core-0167").to_owned(),
                 true,
             ));
             return;
@@ -824,7 +824,7 @@ impl RepoTab {
         };
         self.run_prepared(
             label,
-            &format!("{label}: not done"),
+            &crate::i18n::message("repo-core-0169", &[("label", format!("{}", label).into())]),
             ops(&[&args]),
             Refresh::Status,
             kind,
@@ -846,23 +846,19 @@ impl RepoTab {
                     Ok(Some(command)) => {
                         let tool = if command == "nbstripout" { "nbstripout" } else { "Python" };
                         (
-                            format!(
-                                "Notebooks are staged without their outputs from now on (by \
-                                 {tool}, in this clone): git status may show them changed until \
-                                 they are committed once so"
-                            ),
+                            crate::i18n::message("repo-core-0172", &[("tool", format!("{}", tool).into())]),
                             false,
                         )
                     }
                     Ok(_) => match state {
                         git::StripState::Other(name) => (
-                            format!("gitcraft no longer strips outputs, but the repository's {name} filter still does"),
+                            crate::i18n::message("repo-core-0173", &[("name", format!("{}", name).into())]),
                             false,
                         ),
-                        _ => ("Notebooks are staged with their outputs again".to_owned(), false),
+                        _ => (crate::i18n::text("repo-core-0174").to_owned(), false),
                     },
                     Err(e) => (
-                        format!("Could not change how notebooks are staged: {e}"),
+                        crate::i18n::message("repo-core-0175", &[("e", format!("{}", e).into())]),
                         true,
                     ),
                 });
@@ -897,14 +893,9 @@ impl RepoTab {
                 let left = ed.take_solved(text);
                 let solved = before.saturating_sub(left);
                 let message = match (solved, left) {
-                    (0, _) => format!("Mergiraf could not solve the conflicts in {path}"),
-                    (_, 0) => format!(
-                        "Mergiraf solved every conflict in {path}: check the result, then save"
-                    ),
-                    _ => format!(
-                        "Mergiraf solved {solved} of {before} conflicts in {path}; {left} left \
-                         to choose"
-                    ),
+                    (0, _) => crate::i18n::message("repo-core-0176", &[("path", format!("{}", path).into())]),
+                    (_, 0) => crate::i18n::message("repo-core-0177", &[("path", format!("{}", path).into())]),
+                    _ => crate::i18n::message("repo-core-0178", &[("solved", (solved).into()), ("before", (before).into()), ("path", format!("{}", path).into()), ("left", (left).into())]),
                 };
                 (message, false)
             }
@@ -959,8 +950,8 @@ impl RepoTab {
         match saved {
             Ok(()) => {
                 self.run_prepared(
-                    "Mark resolved",
-                    &format!("Saved {file}, but not marked resolved"),
+                    crate::i18n::text("repo-core-0179"),
+                    &crate::i18n::message("repo-core-0180", &[("file", format!("{}", file).into())]),
                     ops(&[&["--literal-pathspecs", "add", "--", &file]]),
                     Refresh::Status,
                     OpKind::plain(),
@@ -991,7 +982,7 @@ impl RepoTab {
     ) {
         if let Some(busy) = &self.busy_op {
             self.status = Some((
-                format!("{left}: {busy} was still running. Try again once it's done."),
+                crate::i18n::message("repo-core-0182", &[("left", (left).into()), ("busy", format!("{}", busy).into())]),
                 true,
             ));
             return;
@@ -1049,7 +1040,7 @@ pub(crate) fn open_in_editor(editor: &str, path: &Path) -> Result<(), String> {
     };
     let mut child = cmd
         .spawn()
-        .map_err(|e| format!("Could not run {editor}: {e}"))?;
+        .map_err(|e| crate::i18n::message("repo-core-0191", &[("editor", format!("{}", editor).into()), ("e", format!("{}", e).into())]))?;
     // Reaped once it ends (most editor commands hand the file over and exit at once), or each
     // file opened would leave a zombie process for as long as the app runs.
     std::thread::spawn(move || {

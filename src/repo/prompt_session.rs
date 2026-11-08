@@ -136,7 +136,7 @@ fn matches(state: &State) -> Vec<(usize, usize)> {
     matched
 }
 fn panel(ui: &mut egui::Ui, state: &mut State, hash: &str, acts: &mut Vec<Action>) {
-    ui.heading("Prompt & session");
+    ui.heading(crate::i18n::text("repo-core-0864"));
     ui.label("Local evidence only. Nothing is uploaded, executed or exported through MCP. Entire checkpoints already in Git and the recorded commit message are read; local Claude/Codex discovery is opt in. Multiple time/path matches remain separate candidates.");
     ui.checkbox(
         &mut state.local,

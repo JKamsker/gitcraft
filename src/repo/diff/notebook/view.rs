@@ -157,7 +157,7 @@ fn folded(ui: &mut Ui, t: &Tokens, unchanged: &mut Vec<&CellChange>) {
     ui.horizontal(|ui| {
         ui.add_space(10.0);
         egui::CollapsingHeader::new(RichText::new(text).color(t.text_faint).small())
-            .id_salt(("unchanged", first))
+            .id_salt((crate::i18n::text("repo-core-0610"), first))
             .show(ui, |ui| {
                 for c in cells {
                     let Some(cell) = c.new.as_ref() else { continue };

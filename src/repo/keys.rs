@@ -85,14 +85,14 @@ impl RepoTab {
             Command::NewBranch => Action::Dialog(Dialog::create_branch(&self.refs.head, "HEAD")),
             Command::Terminal => Action::ToggleTerminal,
             Command::StageAll if self.work.unstaged.is_empty() => {
-                return Err("Nothing to stage".into());
+                return Err(crate::i18n::text("repo-core-0838").into());
             }
             // `add -A` would mark them resolved, conflict markers and all.
             Command::StageAll if !self.work.conflicted.is_empty() => {
-                return Err("Resolve the conflicted files first".into());
+                return Err(crate::i18n::text("repo-core-0351").into());
             }
             Command::StageAll => Action::Ops {
-                label: "Stage all".into(),
+                label: crate::i18n::text("repo-core-0832").into(),
                 ops: ops(&[&["add", "-A"]]),
                 refresh: Refresh::Status,
             },
@@ -116,7 +116,7 @@ impl RepoTab {
     /// the message.
     fn commit_key(&self) -> Result<Action, String> {
         if !self.work.conflicted.is_empty() {
-            return Err("Resolve the conflicted files first".into());
+            return Err(crate::i18n::text("repo-core-0351").into());
         }
         // A rebase or patch stopped on conflicts: the commit continues it, with git's message.
         if self.work.in_progress.is_some_and(|s| s.continues()) {
@@ -133,7 +133,7 @@ impl RepoTab {
             return if self.index.contains_key(WIP_HASH) {
                 Ok(Action::FocusCommit)
             } else {
-                Err("Write a commit summary first".into())
+                Err(crate::i18n::text("repo-core-0355").into())
             };
         }
         Ok(Action::Commit)

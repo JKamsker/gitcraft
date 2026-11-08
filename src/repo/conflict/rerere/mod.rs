@@ -150,7 +150,7 @@ impl RepoTab {
                     // Not asked again on every reload: the switch says it.
                     Err(e) => {
                         tab.rerere.setup = Some(Setup::default());
-                        tab.status = Some((format!("Remembered resolutions: {e}"), true));
+                        tab.status = Some((crate::i18n::message("repo-core-0671", &[("e", format!("{}", e).into())]), true));
                     }
                 }
             },
@@ -220,9 +220,9 @@ impl RepoTab {
         self.rerere.busy = true;
         let repo = self.path.clone();
         let failed = match act {
-            RerereAct::SetEnabled(true) => "Could not turn on remembered resolutions",
-            RerereAct::SetEnabled(false) => "Could not turn off remembered resolutions",
-            RerereAct::LeaveUnstaged => "Could not leave reused resolutions unstaged",
+            RerereAct::SetEnabled(true) => crate::i18n::text("repo-core-0673"),
+            RerereAct::SetEnabled(false) => crate::i18n::text("repo-core-0674"),
+            RerereAct::LeaveUnstaged => crate::i18n::text("repo-core-0675"),
         };
         self.then(
             ctx,
@@ -251,13 +251,12 @@ impl RepoTab {
 fn switched_message(now: Setup) -> &'static str {
     match (now.on, now.stages) {
         (true, false) => {
-            "Conflict resolutions are remembered here: how you resolve a conflict is recorded \
-             when you commit or continue, and reused when it comes back"
+            crate::i18n::text("repo-core-0677")
         }
         (true, true) => {
-            "Conflict resolutions are remembered here, but git stages what it reuses by itself"
+            crate::i18n::text("repo-core-0678")
         }
-        (false, _) => "Conflict resolutions are no longer remembered here",
+        (false, _) => crate::i18n::text("repo-core-0679"),
     }
 }
 

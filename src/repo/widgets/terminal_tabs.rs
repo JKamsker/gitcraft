@@ -31,7 +31,7 @@ pub fn terminal_tabs(
         terminal_tab(ui, &t, i, term, i == active, acts);
     }
     ui.add_space(4.0);
-    let plus = icons::small_button(ui, "plus", "New terminal");
+    let plus = icons::small_button(ui, "plus", crate::i18n::text("repo-core-0068"));
     if plus.clicked() {
         acts.push(Action::NewTerminal {
             shell: None,

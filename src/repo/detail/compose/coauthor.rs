@@ -31,7 +31,7 @@ pub fn filtered<'a>(authors: &'a [Author], filter: &str, me: &str) -> Vec<&'a Au
 
 impl RepoTab {
     pub(super) fn coauthor_button(&mut self, ui: &mut Ui) {
-        let b = icons::small_button(ui, "circle-user-round", "Add co-author");
+        let b = icons::small_button(ui, "circle-user-round", crate::i18n::text("repo-core-0942"));
         if b.clicked() && !self.compose.authors_asked {
             self.load_authors(ui.ctx());
         }
@@ -47,7 +47,7 @@ impl RepoTab {
             .show(|ui| {
                 let field = ui.add(
                     egui::TextEdit::singleline(filter)
-                        .hint_text("Name or email; Enter adds the first")
+                        .hint_text(crate::i18n::text("repo-core-0943"))
                         .desired_width(f32::INFINITY),
                 );
                 if b.clicked() {
@@ -63,7 +63,7 @@ impl RepoTab {
                     Some(Ok(all)) => {
                         let shown = filtered(all, filter, &me);
                         if shown.is_empty() {
-                            ui.label(RichText::new("No other author matches").color(t.text_faint));
+                            ui.label(RichText::new(crate::i18n::text("repo-core-0944")).color(t.text_faint));
                         }
                         egui::ScrollArea::vertical()
                             .max_height(260.0)
@@ -73,7 +73,7 @@ impl RepoTab {
                                     let r =
                                         ui.add_enabled(!busy, egui::Button::new(text).truncate());
                                     let plural = if a.commits == 1 { "" } else { "s" };
-                                    if r.on_hover_text(format!("{} commit{plural}", a.commits))
+                                    if r.on_hover_text(crate::i18n::message("repo-core-0945", &[("commits", format!("{}", a.commits).into()), ("plural", format!("{}", plural).into())]))
                                         .clicked()
                                     {
                                         picked = Some(a.clone());
@@ -127,8 +127,7 @@ impl RepoTab {
                             tab.set_message(&message);
                         } else {
                             tab.compose.notice = Some(
-                                "The message changed while the co-author was added: add them \
-                                 again"
+                                crate::i18n::text("repo-core-0946")
                                     .to_owned(),
                             );
                         }

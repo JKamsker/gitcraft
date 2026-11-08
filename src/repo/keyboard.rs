@@ -658,11 +658,11 @@ impl RepoTab {
                 } else if let DiffKey::Work(file) = key {
                     let (label, steps) = match file.area {
                         Area::Staged => (
-                            "Unstage",
+                            crate::i18n::text("repo-core-0844"),
                             vec![diff::unstage_args(&self.refs.head, &file.path)],
                         ),
                         Area::Unstaged | Area::Untracked => (
-                            "Stage",
+                            crate::i18n::text("repo-core-0836"),
                             ops(&[&["--literal-pathspecs", "add", "--", &file.path]]),
                         ),
                         Area::Conflicted => return,

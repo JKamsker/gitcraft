@@ -18,7 +18,7 @@ pub(super) fn section(
     let t = Tokens::get(ui.ctx());
     let summary = match backlinks {
         None => Summary::Loading,
-        Some(Err(_)) => Summary::Text("Could not be searched".to_owned(), t.danger),
+        Some(Err(_)) => Summary::Text(crate::i18n::text("repo-core-1066").to_owned(), t.danger),
         Some(Ok((links, more))) => {
             let color = if links.is_empty() {
                 t.text_faint
@@ -31,12 +31,12 @@ pub(super) fn section(
     let mut again = false;
     section::section(
         ui,
-        "Backlinks",
+        crate::i18n::text("repo-core-1067"),
         summary,
         false,
-        Some(("Search again", &mut again)),
+        Some((crate::i18n::text("repo-core-1068"), &mut again)),
         |ui| match backlinks {
-            None => section::faint(ui, "Searching later commits for its hash…"),
+            None => section::faint(ui, crate::i18n::text("repo-core-1069")),
             Some(Err(e)) => section::error(ui, e),
             Some(Ok((links, more))) => body(ui, links, *more, cmds),
         },
@@ -49,26 +49,20 @@ pub(super) fn section(
 /// "1 link · 2 mentions".
 pub(super) fn headline(links: &[Backlink], more: bool) -> String {
     if links.is_empty() {
-        return "no later commit mentions it".to_owned();
+        return crate::i18n::text("repo-core-1070").to_owned();
     }
     let explicit = links.iter().filter(|l| l.kind.explicit()).count();
     let bare = links.len() - explicit;
     let mut parts = Vec::new();
     if explicit > 0 {
-        parts.push(format!(
-            "{explicit} link{}",
-            if explicit == 1 { "" } else { "s" }
-        ));
+        parts.push(crate::i18n::message("repo-core-1071", &[("explicit", format!("{}", explicit).into()), ("s", format!("{}", if explicit == 1 { "" } else { "s" }).into())]));
     }
     if bare > 0 {
-        parts.push(format!(
-            "{bare} mention{}",
-            if bare == 1 { "" } else { "s" }
-        ));
+        parts.push(crate::i18n::message("repo-core-1072", &[("bare", format!("{}", bare).into()), ("s", format!("{}", if bare == 1 { "" } else { "s" }).into())]));
     }
     let text = parts.join(" · ");
     if more {
-        format!("{text} · only the {BACKLINK_CAP} most recent")
+        crate::i18n::message("repo-core-1073", &[("text", format!("{}", text).into()), ("BACKLINK-CAP", format!("{}", BACKLINK_CAP).into())])
     } else {
         text
     }
@@ -78,18 +72,18 @@ fn body(ui: &mut Ui, links: &[Backlink], more: bool, cmds: &mut Vec<ExtrasCmd>) 
     if links.is_empty() {
         section::faint(
             ui,
-            "No later commit mentions its hash: no revert, cherry-pick, Fixes: trailer or plain mention.",
+            crate::i18n::text("repo-core-1074"),
         );
         return;
     }
     let (explicit, bare): (Vec<&Backlink>, Vec<&Backlink>) =
         links.iter().partition(|l| l.kind.explicit());
-    group(ui, "Links", &explicit, cmds);
-    group(ui, "Mentions", &bare, cmds);
+    group(ui, crate::i18n::text("repo-core-1075"), &explicit, cmds);
+    group(ui, crate::i18n::text("repo-core-1076"), &bare, cmds);
     if more {
         section::faint(
             ui,
-            format!("Only the {BACKLINK_CAP} most recent are listed."),
+            crate::i18n::message("repo-core-1077", &[("BACKLINK-CAP", format!("{}", BACKLINK_CAP).into())]),
         );
     }
 }
@@ -146,14 +140,8 @@ fn row(ui: &mut Ui, link: &Backlink) -> bool {
             ui.id().with(("backlink", &link.hash)),
             Sense::click(),
         )
-        .named(|| format!("Open changes in {}: {}", short(&link.hash), link.subject))
-        .on_hover_text(format!(
-            "{} · {} · {}\n\n{}\n\nClick to open this commit’s changes and diff",
-            short(&link.hash),
-            link.author,
-            link.date,
-            link.text
-        ));
+        .named(|| crate::i18n::message("repo-core-1079", &[("hash", format!("{}", short(&link.hash)).into()), ("subject", format!("{}", link.subject).into())]))
+        .on_hover_text(crate::i18n::message("repo-core-1080", &[("hash", format!("{}", short(&link.hash)).into()), ("author", format!("{}", link.author).into()), ("date", format!("{}", link.date).into()), ("text", format!("{}", link.text).into())]));
     // The root's action label and the interaction metadata describe this same button.
     // Keep one name; a second widget_info call would overwrite its existing action label.
     ui.ctx().accesskit_node_builder(resp.id, |node| {

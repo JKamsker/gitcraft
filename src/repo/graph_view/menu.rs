@@ -306,7 +306,7 @@ impl RepoTab {
                 self.default_remote(),
             )));
         }
-        if crate::menu_item::MenuItem::new("Cut release…")
+        if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-0139"))
             .icon("package")
             .enabled(idle)
             .show(ui)
@@ -331,7 +331,7 @@ impl RepoTab {
         if crate::menu_item::MenuItem::new("Check out this commit (detached)")
             .icon("log-in")
             .enabled(idle)
-            .refused(is_head.then_some("This commit is already checked out"))
+            .refused(is_head.then_some(crate::i18n::text("repo-core-0796")))
             .show(ui)
             .clicked()
         {
@@ -358,7 +358,7 @@ impl RepoTab {
                 .and_then(|s| self.commits.get(s))
                 .map(|c| {
                     if c.hash == WIP_HASH {
-                        "the working tree".to_owned()
+                        crate::i18n::text("repo-core-0926").to_owned()
                     } else {
                         crate::repo::short(&c.hash).to_owned()
                     }
@@ -418,7 +418,7 @@ fn rewrite_items(ui: &mut Ui, r: &Rewrite<'_>, idle: bool, is_head: bool, acts: 
     if crate::menu_item::MenuItem::new(format!("Interactive rebase {target} onto this commit…"))
         .icon("git-merge")
         .enabled(idle)
-        .refused(is_head.then_some("This commit is already checked out"))
+        .refused(is_head.then_some(crate::i18n::text("repo-core-0796")))
         .show(ui)
         .on_hover_text("Reorder, reword, squash or drop the commits after this one")
         .clicked()
@@ -433,7 +433,7 @@ fn rewrite_items(ui: &mut Ui, r: &Rewrite<'_>, idle: bool, is_head: bool, acts: 
         crate::menu_item::MenuItem::new(cherry_pick)
             .icon("command")
             .enabled(idle)
-            .refused(is_head.then_some("This commit is already checked out"))
+            .refused(is_head.then_some(crate::i18n::text("repo-core-0796")))
             .show(ui)
     } else {
         r.tab
@@ -454,7 +454,7 @@ fn rewrite_items(ui: &mut Ui, r: &Rewrite<'_>, idle: bool, is_head: bool, acts: 
         crate::menu_item::MenuItem::new(format!("Reset {target} to here"))
             .icon("undo-2")
             .enabled(idle)
-            .refused(is_head.then_some("This commit is already checked out"))
+            .refused(is_head.then_some(crate::i18n::text("repo-core-0796")))
             .submenu(ui, |ui| {
                 reset_items(ui, r, acts);
             });
@@ -473,26 +473,25 @@ pub(in crate::repo) fn reset_items(ui: &mut Ui, r: &Rewrite<'_>, acts: &mut Vec<
         ..
     } = *r;
     for (mode, undo_mode, label, explain) in [
-        ("--soft", "--soft", "Soft", "Keeps every change, staged."),
+        ("--soft", "--soft", crate::i18n::text("repo-core-0373"), crate::i18n::text("repo-core-0375")),
         (
             "--mixed",
             "--mixed",
-            "Mixed",
-            "Keeps every change, unstaged.",
+            crate::i18n::text("repo-core-0376"),
+            crate::i18n::text("repo-core-0378"),
         ),
         (
             "--keep",
             "--keep",
-            "Keep",
+            crate::i18n::text("repo-core-0380"),
             "Drops the commits after this one, keeps uncommitted changes. It stops, changing \
              nothing, if a file with changes is one those commits touched.",
         ),
         (
             "--hard",
             "--keep",
-            "Hard",
-            "Throws away uncommitted changes and the commits after this one. Uncommitted \
-             work can't be recovered.",
+            crate::i18n::text("repo-core-0383"),
+            crate::i18n::text("repo-core-0385"),
         ),
     ] {
         let first = explain.split('.').next().unwrap_or(explain);
@@ -509,7 +508,7 @@ pub(in crate::repo) fn reset_items(ui: &mut Ui, r: &Rewrite<'_>, acts: &mut Vec<
                 Dialog::confirm(
                     &format!("{label} reset"),
                     format!("Move {target} to {short} ({summary})? {explain}"),
-                    &format!("Reset {}", label.to_lowercase()),
+                    &crate::i18n::message("repo-core-0389", &[("to-lowercase", format!("{}", label.to_lowercase()).into())]),
                     reset_steps(mode, hash, target, head),
                     None,
                 )

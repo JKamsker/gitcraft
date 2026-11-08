@@ -153,7 +153,7 @@ pub(super) fn merge_box(ui: &mut Ui, draft: &mut PrDraft, d: &PrDetails, acts: &
             {
                 acts.push(Action::Pr(PrAct::Merge));
             }
-            if ui.button("Cancel").clicked() {
+            if ui.button(crate::i18n::text("repo-core-0443")).clicked() {
                 acts.push(Action::Pr(PrAct::CancelMerge));
             }
             if draft.posting {

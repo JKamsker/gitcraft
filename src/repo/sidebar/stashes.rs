@@ -28,7 +28,7 @@ impl RepoTab {
                 default_open: true,
                 button: Some(Button {
                     icon: "plus",
-                    tooltip: "Stash changes…",
+                    tooltip: crate::i18n::text("repo-core-0054"),
                     action: can_stash.then(|| Action::Dialog(Dialog::stash())),
                 }),
             },
@@ -135,7 +135,7 @@ fn menu(
     idle: bool,
     steps: impl Fn(StashOp) -> Vec<Vec<String>>,
 ) {
-    if crate::menu_item::MenuItem::new("Apply")
+    if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-0872"))
         .icon("check")
         .enabled(idle)
         .show(ui)
@@ -148,7 +148,7 @@ fn menu(
             refresh: Refresh::All,
         });
     }
-    if crate::menu_item::MenuItem::new("Pop")
+    if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-0871"))
         .icon("check")
         .enabled(idle)
         .show(ui)

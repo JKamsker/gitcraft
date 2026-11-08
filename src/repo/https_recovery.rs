@@ -114,7 +114,7 @@ impl RepoTab {
     }
     pub(super) fn https_rejection_done(&mut self, ticket: Ticket, result: Result<(), String>) {
         if !self.https_ticket_current(&ticket) || !ticket.authorizes_endpoint(&ticket.url) {
-            self.finished.push((format!("Sign-in rejection for the previous connection {}. Current sign-in was not changed.", if result.is_ok() { "finished" } else { "failed" }), result.is_err()));
+            self.finished.push((format!("Sign-in rejection for the previous connection {}. Current sign-in was not changed.", if result.is_ok() { "finished" } else { crate::i18n::text("repo-core-0290") }), result.is_err()));
             return;
         }
         match result {

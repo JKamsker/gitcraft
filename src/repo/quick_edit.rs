@@ -146,7 +146,7 @@ impl RepoTab {
     ) {
         let line = first_parents(&self.commits, &self.index, &self.refs.head);
         let blocked = if self.refs.current.is_none() {
-            Some("HEAD is detached: check out a branch first".to_owned())
+            Some(crate::i18n::text("repo-core-0842").to_owned())
         } else {
             self.work
                 .in_progress

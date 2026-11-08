@@ -103,7 +103,7 @@ impl RepoTab {
                 acts.push(Action::Dialog(Dialog::confirm(
                     "Delete remote tag",
                     format!("Delete the tag “{}” from {remote}?", tag.name),
-                    "Delete",
+                    crate::i18n::text("repo-core-1115"),
                     ops(&[&[
                         "push",
                         &remote,
@@ -143,7 +143,7 @@ impl RepoTab {
                     Dialog::confirm(
                         "Delete tag",
                         format!("Delete the local tag “{name}”?"),
-                        "Delete",
+                        crate::i18n::text("repo-core-1115"),
                         delete_tag(&name, object.as_deref()),
                         None,
                     )

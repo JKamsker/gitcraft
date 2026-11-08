@@ -316,7 +316,7 @@ fn worktree_menu_items(
             acts.push(Action::Dialog(Dialog::confirm(
                 "Remove worktree",
                 format!("Remove the worktree at {path}? Its folder is deleted; the branch stays."),
-                "Remove",
+                crate::i18n::text("repo-core-0305"),
                 ops(&[&["worktree", "remove", &path]]),
                 Some((
                     "Force, even with uncommitted changes or locked".to_owned(),

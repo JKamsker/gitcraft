@@ -48,7 +48,7 @@ impl Step {
             Step::Squash => "Squash",
             Step::Fixup => "Fixup",
             Step::Drop => "Drop",
-            Step::Edit => "Edit",
+            Step::Edit => crate::i18n::text("repo-core-1116"),
         }
     }
 
@@ -565,7 +565,7 @@ impl RepoTab {
                     {
                         acts.push(Action::RunRebase);
                     }
-                    if ui.button("Cancel").clicked() {
+                    if ui.button(crate::i18n::text("repo-core-0443")).clicked() {
                         acts.push(Action::CloseRebase);
                     }
                     if editor.starting {

@@ -180,7 +180,7 @@ impl RepoTab {
         self.checkout_items(ui, acts, b, idle);
         if b.is_head
             && b.name.starts_with(&self.hotfix_prefix())
-            && crate::menu_item::MenuItem::new("Finish hotfix…")
+            && crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-0137"))
                 .icon("package")
                 .enabled(idle)
                 .show(ui)
@@ -370,7 +370,7 @@ impl RepoTab {
         if crate::menu_item::MenuItem::new("Check out")
             .icon("log-in")
             .enabled(idle)
-            .refused(b.is_head.then_some("This commit is already checked out"))
+            .refused(b.is_head.then_some(crate::i18n::text("repo-core-0796")))
             .show(ui)
             .clicked()
         {
@@ -379,7 +379,7 @@ impl RepoTab {
         if crate::menu_item::MenuItem::new("Check out in a new worktree…")
             .icon("folder-git-2")
             .enabled(idle)
-            .refused(b.is_head.then_some("This commit is already checked out"))
+            .refused(b.is_head.then_some(crate::i18n::text("repo-core-0796")))
             .show(ui)
             .clicked()
         {
@@ -402,7 +402,7 @@ impl RepoTab {
         {
             acts.push(push);
         }
-        if ui.button("Pull and push routes…").clicked() {
+        if ui.button(crate::i18n::text("repo-core-0088")).clicked() {
             acts.push(Action::RepositoryTools(
                 crate::repo::repository_tools::Act::Routes(b.name.clone()),
             ));
@@ -429,7 +429,7 @@ impl RepoTab {
             )));
         }
         if !b.upstream.is_empty()
-            && crate::menu_item::MenuItem::new(format!("Stop tracking {}", b.upstream))
+            && crate::menu_item::MenuItem::new(crate::i18n::message("repo-core-0348", &[("upstream", format!("{}", b.upstream).into())]))
                 .icon("git-branch")
                 .enabled(idle)
                 .show(ui)
@@ -566,7 +566,7 @@ impl RepoTab {
         current: &str,
         idle: bool,
     ) {
-        if crate::menu_item::MenuItem::new(format!("Fast-forward {current} to {}", b.name))
+        if crate::menu_item::MenuItem::new(crate::i18n::message("repo-core-0011", &[("current", format!("{}", current).into()), ("name", format!("{}", b.name).into())]))
             .icon("arrow-right")
             .enabled(idle)
             .show(ui)
@@ -574,14 +574,14 @@ impl RepoTab {
         {
             acts.push(fast_forward_action(BranchRef::local(&b.name), current));
         }
-        let merge = format!("Merge {} into {current}", b.name);
+        let merge = crate::i18n::message("repo-core-0006", &[("name", format!("{}", b.name).into()), ("current", format!("{}", current).into())]);
         if self
             .conflict_button(ui, merge, idle, Op::Merge, &b.target)
             .clicked()
         {
             acts.push(merge_action(BranchRef::local(&b.name), current));
         }
-        let rebase = format!("Rebase {current} onto {}", b.name);
+        let rebase = crate::i18n::message("repo-core-0013", &[("current", format!("{}", current).into()), ("name", format!("{}", b.name).into())]);
         let rebase = self.conflict_button(ui, rebase, idle, Op::Rebase, &b.target);
         offer(&rebase, || GhostOp::Rebase {
             onto: BranchRef::local(&b.name).full(),

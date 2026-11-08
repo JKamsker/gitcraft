@@ -217,7 +217,7 @@ impl ConflictChecks {
     /// `ctx` repainted when it is done.
     pub fn get(&self, ctx: &egui::Context, repo: &Path, key: Key) -> Check {
         let Ok(mut inner) = self.inner.lock() else {
-            return Check::Failed("the conflict check stopped".to_owned());
+            return Check::Failed(crate::i18n::text("repo-core-0747").to_owned());
         };
         // Mergiraf's set-up changed (Settings → Git): every answer may have.
         let mergiraf_changes = crate::mergiraf::changes();
@@ -278,7 +278,7 @@ fn work(shared: &Mutex<Inner>, ctx: &egui::Context, repo: &Path) {
             };
             run_check(ctx, repo, info, &key)
         }))
-        .unwrap_or_else(|_| Check::Failed("internal error".to_owned()));
+        .unwrap_or_else(|_| Check::Failed(crate::i18n::text("repo-core-0748").to_owned()));
         if let Ok(mut inner) = shared.lock()
             && inner.generation == generation
             && let Some(entry) = inner.entries.get_mut(&key)
@@ -306,7 +306,7 @@ fn run_check(ctx: &egui::Context, repo: &Path, info: Result<RepoInfo, String>, k
     };
     if partial {
         return Check::Unavailable(
-            "Not checked in a partial clone: git would download the files it lacks".to_owned(),
+            crate::i18n::text("repo-core-0749").to_owned(),
         );
     }
     let unavailable = match key.op {
@@ -384,19 +384,19 @@ fn plain_kinds(kinds: &[String]) -> String {
         .iter()
         .filter(|k| kinds.len() == 1 || *k != "contents")
         .map(|k| match k.as_str() {
-            "contents" => "both sides changed it",
-            "binary" => "binary file",
-            "modify/delete" => "changed on one side, deleted on the other",
-            "rename/delete" => "renamed on one side, deleted on the other",
-            "rename/rename" => "renamed differently on each side",
-            "file/directory" | "directory/file" => "a file on one side, a folder on the other",
-            "add/add" => "added on both sides",
+            "contents" => crate::i18n::text("repo-core-0751"),
+            "binary" => crate::i18n::text("repo-core-0752"),
+            "modify/delete" => crate::i18n::text("repo-core-0754"),
+            "rename/delete" => crate::i18n::text("repo-core-0756"),
+            "rename/rename" => crate::i18n::text("repo-core-0758"),
+            "file/directory" | "directory/file" => crate::i18n::text("repo-core-0761"),
+            "add/add" => crate::i18n::text("repo-core-0763"),
             "submodule" => "submodule",
             other => other,
         })
         .collect();
     if words.is_empty() {
-        "not a text conflict".to_owned()
+        crate::i18n::text("repo-core-0764").to_owned()
     } else {
         words.join("; ")
     }
@@ -413,22 +413,22 @@ pub(super) enum Tone {
 /// The few words beside the menu entry of `op`, if any.
 pub(super) fn label(op: Op, check: &Check) -> Option<(String, Tone)> {
     match check {
-        Check::Checking => Some(("checking…".to_owned(), Tone::Faint)),
+        Check::Checking => Some((crate::i18n::text("repo-core-0765").to_owned(), Tone::Faint)),
         Check::Unavailable(_) => None,
-        Check::Failed(_) => Some(("check failed".to_owned(), Tone::Faint)),
+        Check::Failed(_) => Some((crate::i18n::text("repo-core-0766").to_owned(), Tone::Faint)),
         Check::Done(verdict) => Some(match &verdict.prediction.outcome {
             Outcome::Clean { changes: false } if op == Op::CherryPick => {
-                ("already applied".to_owned(), Tone::Faint)
+                (crate::i18n::text("repo-core-0767").to_owned(), Tone::Faint)
             }
             Outcome::Clean { changes: false } if op == Op::Merge => {
-                ("already merged".to_owned(), Tone::Faint)
+                (crate::i18n::text("repo-core-0768").to_owned(), Tone::Faint)
             }
-            Outcome::Clean { .. } => ("applies cleanly".to_owned(), Tone::Good),
+            Outcome::Clean { .. } => (crate::i18n::text("repo-core-0769").to_owned(), Tone::Good),
             Outcome::Conflicts { files, .. } => (
-                format!("conflicts in {}", files_count(files.len())),
+                crate::i18n::message("repo-core-0770", &[("len", format!("{}", files_count(files.len())).into())]),
                 Tone::Warn,
             ),
-            Outcome::Unsure(_) => ("may conflict".to_owned(), Tone::Warn),
+            Outcome::Unsure(_) => (crate::i18n::text("repo-core-0771").to_owned(), Tone::Warn),
         }),
     }
 }
@@ -436,9 +436,9 @@ pub(super) fn label(op: Op, check: &Check) -> Option<(String, Tone)> {
 /// `1 file`, `3 files`.
 fn files_count(n: usize) -> String {
     if n == 1 {
-        "1 file".to_owned()
+        crate::i18n::text("repo-core-0772").to_owned()
     } else {
-        format!("{n} files")
+        crate::i18n::message("repo-core-0773", &[("n", (n).into())])
     }
 }
 
@@ -450,16 +450,15 @@ const LISTED: usize = 15;
 pub(super) fn tooltip(op: Op, check: &Check, dirty: bool) -> String {
     let mut text = match check {
         Check::Checking => {
-            "Checking for conflicts; nothing in the repository is changed".to_owned()
+            crate::i18n::text("repo-core-0774").to_owned()
         }
         Check::Unavailable(why) => return why.clone(),
-        Check::Failed(e) => format!("Couldn't check for conflicts: {e}"),
+        Check::Failed(e) => crate::i18n::message("repo-core-0775", &[("e", format!("{}", e).into())]),
         Check::Done(verdict) => verdict_text(op, verdict),
     };
     if dirty && !matches!(check, Check::Unavailable(_)) {
         text.push_str(
-            "\n\nUncommitted changes aren't part of the check; git may refuse to start if they \
-             touch these files",
+            crate::i18n::text("repo-core-0776"),
         );
     }
     text
@@ -469,40 +468,33 @@ fn verdict_text(op: Op, verdict: &Verdict) -> String {
     let commits = verdict.prediction.commits;
     match &verdict.prediction.outcome {
         Outcome::Clean { changes: false } if op == Op::CherryPick => {
-            "Its changes are already on the current branch: git would stop with an empty \
-             cherry-pick"
+            crate::i18n::text("repo-core-0777")
                 .to_owned()
         }
         Outcome::Clean { changes: false } if op == Op::Merge => {
-            "Already merged: there is nothing to bring in".to_owned()
+            crate::i18n::text("repo-core-0778").to_owned()
         }
         Outcome::Clean { .. } if op == Op::Rebase && commits > 0 => {
             let all = if commits == 1 {
-                "The commit applies".to_owned()
+                crate::i18n::text("repo-core-0779").to_owned()
             } else {
-                format!("All {commits} commits apply")
+                crate::i18n::message("repo-core-0780", &[("commits", format!("{}", commits).into())])
             };
-            format!("{all} without conflicts")
+            crate::i18n::message("repo-core-0781", &[("all", format!("{}", all).into())])
         }
-        Outcome::Clean { .. } => "No conflicts".to_owned(),
-        Outcome::Unsure(why) => format!("No conflicts found, but this may conflict: {why}"),
+        Outcome::Clean { .. } => crate::i18n::text("repo-core-0782").to_owned(),
+        Outcome::Unsure(why) => crate::i18n::message("repo-core-0783", &[("why", format!("{}", why).into())]),
         Outcome::Conflicts { files, stop } => {
             let mut text = match stop {
-                Some(stop) if op == Op::Rebase || commits > 1 => format!(
-                    "Commit {} of {commits}, {} “{}”, conflicts in {}:",
-                    stop.index,
-                    super::short(&stop.commit.hash),
-                    stop.commit.summary,
-                    files_count(files.len())
-                ),
-                _ => format!("Conflicts in {}:", files_count(files.len())),
+                Some(stop) if op == Op::Rebase || commits > 1 => crate::i18n::message("repo-core-0784", &[("index", format!("{}", stop.index).into()), ("commits", format!("{}", commits).into()), ("hash", format!("{}", super::short(&stop.commit.hash)).into()), ("summary", format!("{}", stop.commit.summary).into()), ("len", format!("{}", files_count(files.len())).into())]),
+                _ => crate::i18n::message("repo-core-0785", &[("len", format!("{}", files_count(files.len())).into())]),
             };
             text.push_str(&file_lines(files, &verdict.mergiraf));
             if let Some(stop) = stop
                 && stop.index < commits
             {
                 text.push_str(
-                    "\n\nThe commits after it aren't checked: they depend on how this is solved.",
+                    crate::i18n::text("repo-core-0786"),
                 );
             }
             let unchecked = verdict.mergiraf.iter().find_map(|m| match m {
@@ -510,14 +502,11 @@ fn verdict_text(op: Op, verdict: &Verdict) -> String {
                 _ => None,
             });
             if let Some(e) = unchecked {
-                text.push_str(&format!(
-                    "\n\nMergiraf is installed but couldn't list the file types it knows: {e}"
-                ));
+                text.push_str(&crate::i18n::message("repo-core-0787", &[("e", format!("{}", e).into())]));
             }
             if verdict.mergiraf.contains(&Mergiraf::NotInstalled) {
                 text.push_str(
-                    "\n\nMergiraf can solve many text conflicts: Settings → Git → Mergiraf \
-                     installs it.",
+                    crate::i18n::text("repo-core-0788"),
                 );
             }
             text
@@ -530,17 +519,17 @@ fn file_lines(files: &[ConflictFile], mergiraf: &[Mergiraf]) -> String {
     let mut text = String::new();
     for (n, file) in files.iter().enumerate().take(LISTED) {
         let hint = match mergiraf.get(n) {
-            Some(Mergiraf::Likely) => "Mergiraf can likely solve it".to_owned(),
-            Some(Mergiraf::UnknownLanguage) => "a file type Mergiraf doesn't know".to_owned(),
-            Some(Mergiraf::NotText(kinds)) => format!("{kinds}: solve by hand"),
+            Some(Mergiraf::Likely) => crate::i18n::text("repo-core-0789").to_owned(),
+            Some(Mergiraf::UnknownLanguage) => crate::i18n::text("repo-core-0790").to_owned(),
+            Some(Mergiraf::NotText(kinds)) => crate::i18n::message("repo-core-0791", &[("kinds", format!("{}", kinds).into())]),
             Some(Mergiraf::NotInstalled | Mergiraf::Unchecked(_)) | None => {
-                "text conflict".to_owned()
+                crate::i18n::text("repo-core-0792").to_owned()
             }
         };
         text.push_str(&format!("\n• {} — {hint}", file.path));
     }
     if files.len() > LISTED {
-        text.push_str(&format!("\n…and {} more", files.len() - LISTED));
+        text.push_str(&crate::i18n::message("repo-core-0794", &[("LISTED", format!("{}", files.len() - LISTED).into())]));
     }
     text
 }
@@ -582,9 +571,9 @@ impl RepoTab {
             Op::CherryPick => "git-branch",
         };
         let refused = (!enabled).then_some(if other == self.refs.head {
-            "This commit is already checked out"
+            crate::i18n::text("repo-core-0796")
         } else {
-            "Another operation is running"
+            crate::i18n::text("repo-core-0797")
         });
         if !enabled || self.refs.head.is_empty() || other == self.refs.head {
             return crate::menu_item::MenuItem::new(text)
@@ -680,8 +669,8 @@ impl RepoTab {
             return;
         };
         let what = match &verdict.prediction.outcome {
-            Outcome::Conflicts { .. } => "Conflicts with",
-            Outcome::Unsure(_) => "May conflict with",
+            Outcome::Conflicts { .. } => crate::i18n::text("repo-core-0798"),
+            Outcome::Unsure(_) => crate::i18n::text("repo-core-0799"),
             Outcome::Clean { .. } => return,
         };
         let t = Tokens::get(ui.ctx());
@@ -689,13 +678,13 @@ impl RepoTab {
         let current = self.refs.current.clone().unwrap_or_default();
         ui.add_space(6.0);
         let why = if self.target_watch.upstream {
-            "its upstream"
+            crate::i18n::text("repo-core-0800")
         } else {
-            "the default branch; it has no upstream"
+            crate::i18n::text("repo-core-0801")
         };
         let doing = match op {
-            Op::Rebase => format!("Rebasing {current} onto {target} ({why}), as Pull does"),
-            _ => format!("Merging {target} ({why}) into {current}"),
+            Op::Rebase => crate::i18n::message("repo-core-0802", &[("current", format!("{}", current).into()), ("target", format!("{}", target).into()), ("why", format!("{}", why).into())]),
+            _ => crate::i18n::message("repo-core-0803", &[("target", format!("{}", target).into()), ("why", format!("{}", why).into()), ("current", format!("{}", current).into())]),
         };
         super::widgets::chip(ui, &format!("{what} {target}"), t.warning).on_hover_text(format!(
             "{doing}:\n{}",

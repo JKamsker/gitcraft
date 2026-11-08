@@ -158,7 +158,7 @@ impl RepoTab {
             .iter()
             .map(|mode| {
                 PaletteItem::action(
-                    format!("{} — {}", mode.label, mode.short),
+                    format!("{} — {}", crate::i18n::text(mode.label), crate::i18n::text(mode.short)),
                     "reset",
                     reset_action(&rewrite, mode),
                 )

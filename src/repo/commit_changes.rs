@@ -30,7 +30,7 @@ impl RepoTab {
     pub(super) fn open_commit_changes(&mut self, hash: String, ctx: &egui::Context) {
         if self.conflict.is_some() || self.rebase.is_some() || self.reword.is_some() {
             self.status = Some((
-                "Finish or close the current editor before following a backlink".into(),
+                crate::i18n::text("repo-core-0392").into(),
                 true,
             ));
             return;
@@ -67,7 +67,7 @@ impl RepoTab {
                 }
             }
             Some(Destination::NoChanges) => {
-                self.status = Some(("This commit has no file changes to show".into(), false))
+                self.status = Some((crate::i18n::text("repo-core-0393").into(), false))
             }
             Some(Destination::Failed) | None => (), // The existing detail pane displays the error.
         }

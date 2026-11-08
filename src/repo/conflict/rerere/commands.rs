@@ -26,7 +26,7 @@ fn bool_config(repo: &Path, name: &str) -> Result<Option<bool>, String> {
         &["config", "--type=bool", "--get", name],
         &[0, 1],
     )
-    .map_err(|e| format!("{name} can't be read: {e}"))?;
+    .map_err(|e| crate::i18n::message("repo-core-0635", &[("name", format!("{}", name).into()), ("e", format!("{}", e).into())]))?;
     Ok(match set.trim() {
         "true" => Some(true),
         "false" => Some(false),
@@ -263,9 +263,9 @@ pub fn preimage(
         Ok(out) => Ok(Some(line_ends_like(out, current))),
         Err(e) if e.to_lowercase().contains("binary") => Ok(None),
         Err(e) if e.contains("object-id") || e.contains("usage:") => {
-            Err("Showing what git rerere reused needs git 2.43 or newer".to_owned())
+            Err(crate::i18n::text("repo-core-0669").to_owned())
         }
-        Err(e) => Err(format!("Could not rebuild the conflicts of {path}: {e}")),
+        Err(e) => Err(crate::i18n::message("repo-core-0670", &[("path", format!("{}", path).into()), ("e", format!("{}", e).into())])),
     }
 }
 

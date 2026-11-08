@@ -77,7 +77,7 @@ pub(super) fn set_upstream(
         ui.label(RichText::new(note).color(t.text_dim));
     }
     ui.add_space(10.0);
-    let button = if exists { "Set upstream" } else { "Push" };
+    let button = if exists { "Set upstream" } else { crate::i18n::text("repo-core-0032") };
     buttons(ui, button, valid, enter, || {
         let upstream = format!("{remote}/{target}");
         if exists {

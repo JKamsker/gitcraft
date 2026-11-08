@@ -21,7 +21,7 @@ pub(super) fn create_branch(
     focus: &mut bool,
 ) -> Outcome {
     let t = Tokens::get(ui.ctx());
-    title(ui, "Create branch", &format!("Starting at {at_label}"), &t);
+    title(ui, crate::i18n::text("repo-core-0140"), &format!("Starting at {at_label}"), &t);
     field(ui, name, "feature/my-branch", focus);
     dash_spaces(name);
     ui.add_space(6.0);
@@ -94,7 +94,7 @@ pub(super) fn tag(
     focus: &mut bool,
 ) -> Outcome {
     let t = Tokens::get(ui.ctx());
-    title(ui, "Create tag", &format!("At {at_label}"), &t);
+    title(ui, crate::i18n::text("repo-core-0141"), &format!("At {at_label}"), &t);
     field(ui, name, "v1.2.0", focus);
     dash_spaces(name);
     ui.add_space(4.0);

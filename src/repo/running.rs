@@ -48,9 +48,9 @@ impl Waiter {
 
     pub(super) fn label(self) -> &'static str {
         match self {
-            Self::Fetch => "Fetch",
+            Self::Fetch => crate::i18n::text("repo-core-0029"),
             Self::Pull(mode) => mode.label(),
-            Self::Push => "Push",
+            Self::Push => crate::i18n::text("repo-core-0032"),
         }
     }
 

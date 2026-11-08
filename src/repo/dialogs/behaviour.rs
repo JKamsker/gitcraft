@@ -401,7 +401,7 @@ impl Form {
             }
         }
         ui.label("Cache lives with this tab and is bounded to 64 keys / 32 MiB, keyed by repository/machine path, tree, exact command and mode. Checkout identity, timestamps or machine configuration can affect a command even with the same tree: use Forget cache when those inputs change. Closing cancels work; recovery evidence is retained if cleanup is unconfirmed.");
-        if ui.button("Close").clicked() {
+        if ui.button(crate::i18n::text("repo-core-0595")).clicked() {
             Outcome::Cancel
         } else {
             Outcome::Open

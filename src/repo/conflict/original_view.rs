@@ -53,9 +53,9 @@ pub(super) fn section(
     names: (&str, &str),
 ) -> bool {
     let tip = if open {
-        "Hide the original"
+        crate::i18n::text("repo-core-0619")
     } else {
-        "Show the text both sides started from, and what each changed"
+        crate::i18n::text("repo-core-0620")
     };
     let mut clicked = false;
     ui.horizontal_wrapped(|ui| {
@@ -66,16 +66,16 @@ pub(super) fn section(
         };
         icons::inline(ui, icon, 12.0, t.text_dim);
         let button = egui::Button::new(
-            RichText::new("Original")
+            RichText::new(crate::i18n::text("repo-core-0621"))
                 .font(theme::medium(11.5))
                 .color(t.text_dim),
         )
         .frame(false);
         clicked = ui.add(button).on_hover_text(tip).clicked();
         let note = match (original, diffs) {
-            (Original::Loading, _) => "reading the base…".to_owned(),
-            (Original::Added, _) => "none: both sides added this file".to_owned(),
-            (Original::Unknown(_), _) => "not available".to_owned(),
+            (Original::Loading, _) => crate::i18n::text("repo-core-0622").to_owned(),
+            (Original::Added, _) => crate::i18n::text("repo-core-0623").to_owned(),
+            (Original::Unknown(_), _) => crate::i18n::text("repo-core-0624").to_owned(),
             (Original::Text(_), Some((ours, theirs))) => format!(
                 "{}: {} · {}: {}",
                 names.0,
@@ -83,7 +83,7 @@ pub(super) fn section(
                 names.1,
                 super::original::summary(theirs)
             ),
-            (Original::Text(_), None) => "what each side changed".to_owned(),
+            (Original::Text(_), None) => crate::i18n::text("repo-core-0625").to_owned(),
         };
         ui.label(RichText::new(note).color(t.text_faint).small());
     });
@@ -111,17 +111,16 @@ fn body(
             note(
                 ui,
                 t,
-                "There is no original: both sides added this file, so neither changed \
-                 an earlier version.",
+                crate::i18n::text("repo-core-0626"),
             );
         }
-        (Original::Unknown(why), _) => note(ui, t, &format!("The original is not known: {why}.")),
+        (Original::Unknown(why), _) => note(ui, t, &crate::i18n::message("repo-core-0627", &[("why", format!("{}", why).into())])),
         (Original::Text(base), Some((ours, theirs))) => {
             if base.is_empty() {
                 note(
                     ui,
                     t,
-                    "The original was empty here: both sides inserted text.",
+                    crate::i18n::text("repo-core-0628"),
                 );
             }
             ui.columns(2, |cols| {
@@ -151,10 +150,7 @@ fn side_changes(ui: &mut Ui, t: &Tokens, (k, ours): (usize, bool), name: &str, l
         .show(ui, |ui| {
             ui.set_width(ui.available_width());
             ui.label(
-                RichText::new(format!(
-                    "{name} against the original: {}",
-                    super::original::summary(lines)
-                ))
+                RichText::new(crate::i18n::message("repo-core-0629", &[("name", format!("{}", name).into()), ("lines", format!("{}", super::original::summary(lines)).into())]))
                 .color(t.text_faint)
                 .small(),
             );
@@ -167,7 +163,7 @@ fn side_changes(ui: &mut Ui, t: &Tokens, (k, ours): (usize, bool), name: &str, l
                     }
                     if lines.len() > MAX_SHOWN {
                         ui.label(
-                            RichText::new(format!("… {} more lines", lines.len() - MAX_SHOWN))
+                            RichText::new(crate::i18n::message("repo-core-0631", &[("MAX-SHOWN", format!("{}", lines.len() - MAX_SHOWN).into())]))
                                 .color(t.text_faint)
                                 .small(),
                         );

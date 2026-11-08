@@ -36,7 +36,7 @@ const REMOTE_INDENT: f32 = 18.0;
 impl RepoTab {
     pub(super) fn sidebar(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
         let t = Tokens::get(ui.ctx());
-        widgets::panel_header(ui, "Branches", |ui| self.branch_header_buttons(ui, acts));
+        widgets::panel_header(ui, crate::i18n::text("repo-core-1094"), |ui| self.branch_header_buttons(ui, acts));
         // Sized like the commit search bar (Ctrl+F).
         ui.add_space(8.0);
         ui.horizontal(|ui| {
@@ -112,7 +112,7 @@ impl RepoTab {
     fn branch_header_buttons(&self, ui: &mut Ui, acts: &mut Vec<Action>) {
         let idle = self.busy_op.is_none();
         let clean = ui.add_enabled_ui(idle, |ui| {
-            icons::small_button(ui, "brush", "Select stale or merged branches…")
+            icons::small_button(ui, "brush", crate::i18n::text("repo-core-0071"))
         });
         let clean = clean.inner.on_disabled_hover_text(
             "Select stale or merged branches… once the running operation is done",
@@ -122,7 +122,7 @@ impl RepoTab {
         }
         let mut order = BranchOrder::load(ui.ctx(), self.repo_key());
         let on = usize::from(order.by_date);
-        let sort = ui.scope(|ui| widgets::switch(ui, &["Name", "Recent"], on));
+        let sort = ui.scope(|ui| widgets::switch(ui, &[crate::i18n::text("repo-core-1061"), "Recent"], on));
         sort.response.on_hover_text(
             "Sort the local branches by name, or by their last commit (newest first)",
         );
@@ -171,7 +171,7 @@ impl RepoTab {
             "merge request" => "Merge requests",
             _ => "Pull requests",
         });
-        let tags = (!self.refs.tags.is_empty()).then_some("Tags");
+        let tags = (!self.refs.tags.is_empty()).then_some(crate::i18n::text("repo-core-1096"));
         let submodules = (!self.submodules.is_empty()).then_some("Submodules");
         let top = [
             ("local", "laptop", Some("Local branches")),

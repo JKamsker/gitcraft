@@ -208,7 +208,7 @@ impl Form {
         ui.label("Matches compare clean tracked Git blob identities. Untracked files are excluded. Symlink targets, submodule worktrees and byte-for-byte checkout equivalence are not certified. Limits: 20,000 paths, 4 MiB per facts response, 120 seconds per facts command.");
         if let Some(path) = open {
             Outcome::Done(Box::new(crate::repo::Action::OpenTab(path)))
-        } else if ui.button("Close").clicked() {
+        } else if ui.button(crate::i18n::text("repo-core-0595")).clicked() {
             Outcome::Cancel
         } else {
             Outcome::Open
