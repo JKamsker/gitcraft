@@ -178,10 +178,10 @@ fn render_with_parser(
         }
         if matches!(
             n.tag_name().name(),
-            // Marker definitions expand recursively at path vertices, including when
-            // references come from inline styles or escaped stylesheet properties.
+            // Markers and clip paths expand recursively during parsing or painting,
+            // including references from inline styles or escaped CSS properties.
             // Refuse definitions irrespective of reference syntax before CSS/usvg.
-            "use" | "marker" | "filter" | "mask" | "pattern" | "foreignObject"
+            "use" | "marker" | "clipPath" | "filter" | "mask" | "pattern" | "foreignObject"
         ) {
             return Err(
                 "SVG expansion/effect graphs are unsupported in previews; use source view".into(),
@@ -266,6 +266,52 @@ fn render_with_parser(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn nested_clip_paths_are_refused_before_parser_for_attributes_and_css() -> Result<(), String> {
+        for depth in [1, 4, 8] {
+            for route in ["attribute", "inline", "css", "escaped-css"] {
+                let mut definitions = String::new();
+                let mut styles = String::new();
+                for i in 0..depth {
+                    let child = if i + 1 < depth {
+                        let target = i + 1;
+                        let reference = match route {
+                            "attribute" => format!("clip-path='url(#c{target})'"),
+                            "inline" => format!("style='clip-path:url(#c{target})'"),
+                            _ => {
+                                let property = if route == "css" {
+                                    "clip-path"
+                                } else {
+                                    r"cl\69 p-path"
+                                };
+                                styles.push_str(&format!(".p{i} {{{property}:url(#c{target})}}"));
+                                format!("class='p{i}'")
+                            }
+                        };
+                        // Each level visits the next clip twice, despite linear XML size.
+                        format!("<rect width='8' height='8' {reference}/>").repeat(2)
+                    } else {
+                        "<rect width='8' height='8'/>".into()
+                    };
+                    definitions.push_str(&format!("<clipPath id='c{i}'>{child}</clipPath>"));
+                }
+                let svg = format!(
+                    "<svg xmlns='http://www.w3.org/2000/svg' width='8' height='8'><style>{styles}</style><defs>{definitions}</defs><rect width='8' height='8' clip-path='url(#c0)'/></svg>"
+                );
+                assert!(svg.len() < 4096);
+                let mut parser_entered = false;
+                let error = render_with_parser(svg.as_bytes(), SizeHint::default(), |_, _| {
+                    parser_entered = true;
+                    Err("Parser must not receive recursive clipping".into())
+                })
+                .err()
+                .ok_or("Clip graph unexpectedly accepted")?;
+                assert!(error.contains("expansion/effect") && error.contains("source view"));
+                assert!(!parser_entered, "depth={depth}, route={route}");
+            }
+        }
+        Ok(())
+    }
     #[test]
     fn nested_distinct_markers_are_refused_before_parser_for_attributes_and_css()
     -> Result<(), String> {
