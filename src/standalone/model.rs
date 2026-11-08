@@ -40,7 +40,9 @@ pub(super) fn load(invocation: &Invocation, active: &dyn Fn() -> bool) -> Result
             let initial = output.initial_bytes().map(Vec::from);
             let computed = compute(&inputs, active);
             if !active() {
-                return Err("File merge cancelled".into());
+                return Err(
+                    crate::i18n::text("interaction-standalone-error-merge-cancelled").into(),
+                );
             }
             let mut notice = None;
             let computed = match computed {
@@ -79,7 +81,7 @@ pub(super) fn load(invocation: &Invocation, active: &dyn Fn() -> bool) -> Result
                 original_binary,
             })))
         }
-        _ => Err("Expected a standalone file invocation".into()),
+        _ => Err(crate::i18n::text("interaction-standalone-error-expected-invocation").into()),
     }
 }
 fn text(bytes: &[u8]) -> Option<&str> {
@@ -100,10 +102,9 @@ impl Merge {
         }
     }
     pub fn use_computed(&mut self) -> Result<(), String> {
-        let text = self
-            .computed
-            .clone()
-            .ok_or("No computed text merge is available")?;
+        let text = self.computed.clone().ok_or(crate::i18n::text(
+            "interaction-standalone-error-no-computed-merge",
+        ))?;
         self.editor = Some(ConflictEditor::standalone(text)?);
         self.whole = None;
         Ok(())
@@ -134,22 +135,22 @@ impl Merge {
         }
         self.editor
             .as_ref()
-            .ok_or("Choose a whole input or prepare a text result")?
+            .ok_or(crate::i18n::text(
+                "interaction-standalone-error-choose-input",
+            ))?
             .solved()
             .map(String::into_bytes)
     }
 }
 fn compute(inputs: &[Snapshot], active: &dyn Fn() -> bool) -> Result<String, String> {
     if inputs.iter().any(|s| text(&s.bytes).is_none()) {
-        return Err(
-            "Binary or non-UTF8 inputs: choose a whole side to preserve exact bytes".into(),
-        );
+        return Err(crate::i18n::text("interaction-standalone-error-binary-inputs").into());
     }
     if inputs
         .iter()
         .any(|s| text(&s.bytes).is_some_and(|s| s.split_inclusive('\n').count() > 20_000))
     {
-        return Err("More than 20,000 lines in an input; choose a whole side".into());
+        return Err(crate::i18n::text("interaction-standalone-error-line-limit").into());
     }
     let temp = crate::git::file_comparison::Scratch::new()?;
     for (name, input) in ["base", "local", "remote"].into_iter().zip(inputs) {
@@ -198,15 +199,13 @@ fn compute(inputs: &[Snapshot], active: &dyn Fn() -> bool) -> Result<String, Str
     )?
     .complete()?;
     if !out.status.code().is_some_and(|c| (0..=127).contains(&c)) {
-        return Err(
-            "Git could not prepare a three-way merge; choose a whole input or edit existing MERGED"
-                .into(),
-        );
+        return Err(crate::i18n::text("interaction-standalone-error-prepare-merge").into());
     }
     if out.stdout.len() > super::files::FILE_LIMIT as usize {
-        return Err("Computed result exceeds 2 MiB; choose a whole input".into());
+        return Err(crate::i18n::text("interaction-standalone-error-computed-limit").into());
     }
-    String::from_utf8(out.stdout).map_err(|_| "The computed merge is not UTF-8".into())
+    String::from_utf8(out.stdout)
+        .map_err(|_| crate::i18n::text("interaction-standalone-error-computed-encoding").into())
 }
 
 #[cfg(test)]
@@ -322,5 +321,60 @@ mod tests {
             ));
             Ok(())
         })()
+    }
+}
+
+#[cfg(test)]
+mod localization_tests {
+    use super::*;
+
+    #[test]
+    fn actual_model_guards_localize_before_any_reader_or_merge_runtime() -> Result<(), String> {
+        let binary = Snapshot {
+            path: "opaque ' $() & ü\npath".into(),
+            bytes: vec![0, 0xff],
+            stamp: None,
+            handle: None,
+            access: None,
+        };
+        let long = Snapshot {
+            path: "not-opened".into(),
+            bytes: "line\n".repeat(20_001).into_bytes(),
+            stamp: None,
+            handle: None,
+            access: None,
+        };
+        for (locale, invocation, binary_error, line_error) in [
+            (
+                "en-US",
+                "Expected a standalone file invocation",
+                "Binary or non-UTF8 inputs: choose a whole side to preserve exact bytes",
+                "More than 20,000 lines in an input; choose a whole side",
+            ),
+            (
+                "de",
+                "Ein Aufruf eines eigenständigen Dateiwerkzeugs wird erwartet",
+                "Binäre oder nicht UTF-8-kodierte Eingaben: Wähle eine vollständige Seite, um die Bytes exakt zu erhalten",
+                "Eine Eingabedatei hat mehr als 20.000 Zeilen; wähle eine vollständige Seite",
+            ),
+        ] {
+            crate::i18n::set_language(locale);
+            assert_eq!(
+                load(&Invocation::Help, &|| true)
+                    .err()
+                    .ok_or("missing guard")?,
+                invocation
+            );
+            assert_eq!(
+                compute(std::slice::from_ref(&binary), &|| true),
+                Err(binary_error.into())
+            );
+            assert_eq!(
+                compute(std::slice::from_ref(&long), &|| true),
+                Err(line_error.into())
+            );
+        }
+        crate::i18n::set_language("en-US");
+        Ok(())
     }
 }
