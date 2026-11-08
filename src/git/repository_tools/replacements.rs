@@ -12,6 +12,7 @@ pub(crate) struct Histories {
     pub snapshot: Snapshot,
     pub replacements: Vec<Replacement>,
     pub legacy: String,
+    legacy_bytes: Option<Vec<u8>>,
     pub original: String,
     pub effective: String,
 }
@@ -53,12 +54,10 @@ pub(crate) fn read(repo: &Path) -> Result<Histories, String> {
             parents,
         });
     }
-    let grafts = text(repo, &["rev-parse", "--git-path", "info/grafts"])?;
-    let legacy = match crate::remote::read_to_string(&crate::remote::resolve(repo, grafts.trim())) {
-        Ok(s) => s,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
-        Err(e) => return Err(e.to_string()),
-    };
+    let cancel = crate::tasks::cancellation();
+    let legacy_bytes = graft_bytes(repo, &|| !cancel.is_cancelled())?;
+    let legacy = String::from_utf8(legacy_bytes.clone().unwrap_or_default())
+        .map_err(|_| "Legacy graft metadata is not UTF-8; inspect info/grafts with Git")?;
     let args = [
         "--no-pager",
         "log",
@@ -86,9 +85,28 @@ pub(crate) fn read(repo: &Path) -> Result<Histories, String> {
         snapshot,
         replacements,
         legacy,
+        legacy_bytes,
         original,
         effective,
     })
+}
+fn graft_bytes(repo: &Path, active: &dyn Fn() -> bool) -> Result<Option<Vec<u8>>, String> {
+    let path = text(repo, &["rev-parse", "--git-path", "info/grafts"])?;
+    super::object::files::read(
+        &crate::remote::resolve(repo, path.trim()),
+        64 * 1024,
+        active,
+    )
+    .map_err(|e| format!("Cannot inspect legacy info/grafts (64 KiB regular-file limit): {e}"))
+}
+impl Histories {
+    fn check(&self, runner: &Runner<'_>) -> Result<(), String> {
+        self.snapshot.check(runner.repo)?;
+        if graft_bytes(runner.repo, &|| !runner.control.is_cancelled())? != self.legacy_bytes {
+            return Err("Legacy graft file changed; read a fresh history preview".into());
+        }
+        Ok(())
+    }
 }
 pub(crate) fn graft(
     runner: &Runner<'_>,
@@ -96,7 +114,7 @@ pub(crate) fn graft(
     original: &str,
     parent: &str,
 ) -> Result<String, String> {
-    history.snapshot.check(runner.repo)?;
+    history.check(runner)?;
     let resolve = |s: &str| -> Result<String, String> {
         if !super::object::valid_oid(s) {
             return Err("Use full immutable commit IDs from the preview".into());
@@ -129,6 +147,7 @@ pub(crate) fn graft(
         Some(1) => (),
         _ => return Err(ancestry.stderr),
     }
+    history.check(runner)?;
     runner.run(&["replace", "--graft", &original, &parent])?;
     Ok(format!(
         "Temporary graft {original} → parent {parent}. Remove its replace ref to restore original history."
@@ -140,7 +159,7 @@ pub(crate) fn remove(
     original: &str,
     effective: &str,
 ) -> Result<String, String> {
-    history.snapshot.check(runner.repo)?;
+    history.check(runner)?;
     if !history
         .replacements
         .iter()
@@ -156,10 +175,7 @@ pub(crate) fn remove(
     ])
 }
 pub(crate) fn convert(runner: &Runner<'_>, history: &Histories) -> Result<String, String> {
-    history.snapshot.check(runner.repo)?;
-    if read(runner.repo)?.legacy != history.legacy {
-        return Err("Legacy graft file changed; read again".into());
-    }
+    history.check(runner)?;
     runner.run(&["replace", "--convert-graft-file"])
 }
 #[cfg(test)]
