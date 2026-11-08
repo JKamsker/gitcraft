@@ -8,6 +8,7 @@ mod custom_commands;
 mod diffs;
 mod external_tools;
 mod file_menus;
+mod language;
 mod layout;
 pub(crate) mod network_page;
 mod page;
@@ -44,6 +45,8 @@ pub struct SavedIdentity {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Settings {
+    /// Empty follows OS language preferences; unknown stored tags fall back to English.
+    pub language: String,
     /// Interface zoom (1.0 = 100 %).
     pub ui_scale: f32,
     /// Stable action IDs mapped to zero (unbound) or up to four key strokes.
@@ -187,6 +190,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             ui_scale: 1.0,
+            language: String::new(),
             key_bindings: Default::default(),
             terminal_font: 12.5,
             shell: String::new(),
@@ -313,6 +317,9 @@ impl Settings {
     }
 
     pub fn set(&self, ctx: &egui::Context) {
+        if crate::i18n::set_language(&self.language) {
+            ctx.request_repaint();
+        }
         ctx.data_mut(|d| d.insert_temp(id(), self.clone()));
         ctx.set_zoom_factor(self.ui_scale.clamp(0.7, 2.0));
         crate::vscode_theme::set_enabled(self.vscode_colors);
@@ -478,6 +485,21 @@ impl Settings {
             Page::Network => self.network_ui(ui, f, false),
             Page::HttpsSignins => self.network_ui(ui, f, true),
             Page::General => {
+                section(
+                    ui,
+                    f,
+                    crate::i18n::text("settings-language-section"),
+                    None,
+                    |card| {
+                        card.row(
+                            crate::i18n::text("settings-language-label"),
+                            "language locale translation Sprache",
+                            |ui| {
+                                self.language_ui(ui);
+                            },
+                        );
+                    },
+                );
                 section(ui, f, "Quiet celebrations", None, |card| {
                     card.row("After success", "first commit release tag merge sound motion", |ui| { ui.checkbox(&mut self.celebration_motion,"Short visual flourish"); ui.checkbox(&mut self.celebration_sound,"Soft celebration sound"); ui.small("Opt-in acknowledgements for a first repository commit, a tag marked as a release, or a completed merge. Motion follows the system preference."); if crate::audio::unavailable() { ui.label("Audio unavailable"); if ui.button("Retry audio").clicked() { crate::audio::retry(); } } });
                 });

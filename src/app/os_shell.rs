@@ -7,8 +7,9 @@ use crate::os_shell::{self, TaskbarState};
 
 impl App {
     pub(super) fn os_shell(&mut self, ctx: &egui::Context, frame: Option<&eframe::Frame>) {
-        if self.menu_for.as_ref() != Some(&self.recent) {
-            self.menu_for = Some(self.recent.clone());
+        let menu_owner = (crate::i18n::generation(), self.recent.clone());
+        if self.menu_for.as_ref() != Some(&menu_owner) {
+            self.menu_for = Some(menu_owner);
             os_shell::set_menu(os_shell::menu_items(&self.recent));
         }
 

@@ -26,6 +26,7 @@ mod gerrit;
 mod git;
 mod glossary;
 mod graph;
+mod i18n;
 mod icons;
 mod image_cache;
 mod image_fit;

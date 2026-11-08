@@ -64,6 +64,11 @@ rodio = { version = "0.21", default-features = false, features = ["playback"] }
 same-file = "=1.0.6"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+# Fluent catalogs use the concurrent bundle for deferred native view callbacks.
+fluent-bundle = "=0.16.0"
+unic-langid = "0.9"
+sys-locale = "=0.3.2"
+num-format = "=0.4.4"
 syntect = { version = "5", default-features = false, features = ["default-fancy"] }
 # bat's syntax set: TypeScript, Vue, TOML, Dockerfile, PowerShell… beyond syntect's own.
 two-face = { version = "0.5.2", default-features = false, features = ["syntect-default-fancy"] }

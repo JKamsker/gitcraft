@@ -142,7 +142,7 @@ pub struct App {
     /// What the taskbar button shows.
     taskbar: crate::os_shell::Taskbar,
     /// The recent repositories the taskbar button's menu was made for.
-    menu_for: Option<Vec<PathBuf>>,
+    menu_for: Option<(u64, Vec<PathBuf>)>,
     /// The dialog that opens a repository in WSL or over SSH.
     remote_form: Option<RemoteForm>,
     /// Repositories on other machines being reached, each tab to open once it answers.
