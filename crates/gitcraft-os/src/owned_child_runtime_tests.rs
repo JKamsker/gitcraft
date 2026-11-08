@@ -162,7 +162,7 @@ fn darwin_live_anchor_and_canary() -> io::Result<()> {
             target
                 .process
                 .as_ref()
-                .is_some_and(|process| process.status.is_some())
+                .is_some_and(|process| process.anchor.is_some())
         );
         if explicit_finish {
             let first = target.finish()?; // EPERM is a failure, never excused on Darwin.
