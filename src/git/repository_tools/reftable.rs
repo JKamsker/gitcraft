@@ -146,7 +146,12 @@ mod tests {
             credentials: None,
         };
         let refs = refs?;
-        migrate(&runner, &before, "reftable")?;
+        migrate(&runner, &before, "reftable").map_err(|error| {
+            format!(
+                "{error}\nRef witness before migration: {refs:#?}\nRef witness after migration: {:#?}",
+                ref_witness(r.path())
+            )
+        })?;
         assert_eq!(ref_witness(r.path())?, refs);
         assert_eq!(inspect(r.path())?.format, "reftable");
         assert!(migrate(&runner, &before, "reftable").is_err());
