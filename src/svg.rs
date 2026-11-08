@@ -141,6 +141,17 @@ impl ImageLoader for Loader {
     }
 }
 fn render(bytes: &[u8], hint: SizeHint) -> Result<egui::ColorImage, String> {
+    render_with_parser(bytes, hint, |bytes, options| {
+        usvg::Tree::from_data(bytes, options).map_err(|_| "SVG parsing failed".into())
+    })
+}
+// The parser boundary is injectable so refusals can be proved without ever expanding
+// hostile paint graphs. Active parsing/rasterization is bounded work, not preemptible.
+fn render_with_parser(
+    bytes: &[u8],
+    hint: SizeHint,
+    parse: impl FnOnce(&[u8], &usvg::Options<'_>) -> Result<usvg::Tree, String>,
+) -> Result<egui::ColorImage, String> {
     if bytes.len() > SOURCE_LIMIT {
         return Err("SVG exceeds 256 KiB; use source view".into());
     }
@@ -167,7 +178,10 @@ fn render(bytes: &[u8], hint: SizeHint) -> Result<egui::ColorImage, String> {
         }
         if matches!(
             n.tag_name().name(),
-            "use" | "filter" | "mask" | "pattern" | "foreignObject"
+            // Marker definitions expand recursively at path vertices, including when
+            // references come from inline styles or escaped stylesheet properties.
+            // Refuse definitions irrespective of reference syntax before CSS/usvg.
+            "use" | "marker" | "filter" | "mask" | "pattern" | "foreignObject"
         ) {
             return Err(
                 "SVG expansion/effect graphs are unsupported in previews; use source view".into(),
@@ -221,7 +235,7 @@ fn render(bytes: &[u8], hint: SizeHint) -> Result<egui::ColorImage, String> {
             .ok()?;
         Some(usvg::ImageKind::PNG(Arc::new(png)))
     });
-    let tree = usvg::Tree::from_data(bytes, &options).map_err(|_| "SVG parsing failed")?;
+    let tree = parse(bytes, &options)?;
     let size = tree.size();
     let requested = match hint {
         SizeHint::Size { width, height, .. } => width.max(height) as f32,
@@ -252,6 +266,74 @@ fn render(bytes: &[u8], hint: SizeHint) -> Result<egui::ColorImage, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn nested_distinct_markers_are_refused_before_parser_for_attributes_and_css()
+    -> Result<(), String> {
+        for depth in [1, 4, 8] {
+            for route in ["attribute", "inline", "css", "escaped-css"] {
+                let mut definitions = String::new();
+                let mut styles = String::new();
+                for i in 0..depth {
+                    let target = if i + 1 < depth { i + 1 } else { i };
+                    let reference = match route {
+                        "attribute" => format!("marker-mid='url(#m{target})'"),
+                        "inline" => format!("style='marker-mid:url(#m{target})'"),
+                        _ => {
+                            let property = if route == "css" {
+                                "marker-mid"
+                            } else {
+                                r"m\61 rker-mid"
+                            };
+                            styles.push_str(&format!(".p{i} {{{property}:url(#m{target})}}"));
+                            format!("class='p{i}'")
+                        }
+                    };
+                    let child = if i + 1 < depth {
+                        format!("<path d='M0 0 L1 1 L2 0 L3 1' {reference}/>")
+                    } else {
+                        "<circle r='1'/>".into()
+                    };
+                    definitions.push_str(&format!(
+                        "<marker id='m{i}' markerWidth='4' markerHeight='4'>{child}</marker>"
+                    ));
+                }
+                let svg = format!(
+                    "<svg xmlns='http://www.w3.org/2000/svg' width='8' height='8'><style>{styles}</style><defs>{definitions}</defs><path d='M0 0L1 1L2 0L3 1' marker-mid='url(#m0)'/></svg>"
+                );
+                assert!(svg.len() < 4096);
+                let mut parser_entered = false;
+                let result = render_with_parser(svg.as_bytes(), SizeHint::default(), |_, _| {
+                    parser_entered = true;
+                    Err("Parser must never receive expansion input".into())
+                });
+                let error = result.err().ok_or("Marker preview unexpectedly accepted")?;
+                assert!(error.contains("expansion/effect") && error.contains("source view"));
+                assert!(!parser_entered, "depth={depth}, route={route}");
+            }
+        }
+        Ok(())
+    }
+    #[test]
+    fn preflight_refusal_precedes_parser_allocation_and_ordinary_style_still_renders()
+    -> Result<(), String> {
+        let over_budget = format!(
+            "<svg xmlns='http://www.w3.org/2000/svg'>{}</svg>",
+            "<g/>".repeat(4096)
+        );
+        let mut parser_entered = false;
+        let error = render_with_parser(over_budget.as_bytes(), SizeHint::default(), |_, _| {
+            parser_entered = true;
+            Err("Unexpected parser allocation".into())
+        })
+        .err()
+        .ok_or("Injected source budget should refuse")?;
+        assert!(!parser_entered);
+        assert!(error.contains("complexity") && error.contains("source view"));
+        let ordinary = br#"<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8"><style>.paint {fill:magenta}</style><rect class="paint" width="8" height="8" style="opacity:1"/></svg>"#;
+        let image = render(ordinary, SizeHint::default())?;
+        assert!(image.pixels.iter().any(|p| p.a() > 0));
+        Ok(())
+    }
     #[test]
     fn external_absolute_relative_and_file_resources_are_never_resolved() -> Result<(), String> {
         let temp = crate::git::file_comparison::Scratch::new()?;
