@@ -1,6 +1,5 @@
 //! Versioned authenticated endpoints. A PID is never termination authority.
 //! Backends own a live group anchor and publish an atomic receipt only after stop/reap.
-use std::io::{self, Write};
 use std::sync::{Arc, Mutex};
 
 use serde::{Deserialize, Serialize};
@@ -226,13 +225,6 @@ pub(super) fn streaming(
     ))
 }
 
-/// The actual writer treats every write/flush error as potentially delivered. A zero-byte
-/// error from a reused buffered transport is still not evidence that a request is safe to
-/// replay. No automatic retry after entering this operation.
-pub(super) fn write_request(writer: &mut impl Write, script: &[u8]) -> io::Result<()> {
-    writer.write_all(script).and_then(|()| writer.flush())
-}
-
 #[cfg(test)]
 mod recording_tests {
     use super::*;
@@ -308,42 +300,5 @@ mod recording_tests {
         );
         assert!(lease.endpoint().is_none());
         Ok(())
-    }
-
-    #[test]
-    fn actual_writer_never_reports_partial_or_flush_failure_as_success() {
-        struct Recording {
-            left: usize,
-            flush_fails: bool,
-            sent: Vec<u8>,
-        }
-        impl Write for Recording {
-            fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
-                let n = self.left.min(bytes.len());
-                if n == 0 {
-                    return Err(io::ErrorKind::BrokenPipe.into());
-                }
-                self.sent.extend_from_slice(&bytes[..n]);
-                self.left -= n;
-                Ok(n)
-            }
-            fn flush(&mut self) -> io::Result<()> {
-                if self.flush_fails {
-                    Err(io::ErrorKind::BrokenPipe.into())
-                } else {
-                    Ok(())
-                }
-            }
-        }
-        let frame = b"{\nrequest\n}\n";
-        for (left, flush_fails) in [(0, false), (frame.len() - 1, false), (frame.len(), true)] {
-            let mut writer = Recording {
-                left,
-                flush_fails,
-                sent: Vec::new(),
-            };
-            assert!(write_request(&mut writer, frame).is_err());
-            assert_eq!(writer.sent.len(), left.min(frame.len()));
-        }
     }
 }

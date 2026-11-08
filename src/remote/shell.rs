@@ -2,8 +2,8 @@
 //! the few reads that must not wait for good (the connection being made, the check of a shell
 //! left idle) can have a deadline.
 
-use std::io::{Read, Write};
-use std::process::{ChildStdin, Command, Stdio};
+use std::io::Read;
+use std::process::{Command, Stdio};
 use std::sync::mpsc::{Receiver, RecvTimeoutError};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -55,7 +55,7 @@ enum ReadError {
 
 pub(super) struct Shell {
     child: gitcraft_os::OwnedChild,
-    stdin: Option<ChildStdin>,
+    stdin: Option<gitcraft_os::BoundedInput>,
     /// What the shell printed, as the reader thread got it.
     chunks: Receiver<Vec<u8>>,
     /// Read and not taken yet.
@@ -90,6 +90,8 @@ impl Shell {
             let _ = child.finish();
             return Err(format!("could not reach {label}"));
         };
+        let stdin = gitcraft_os::BoundedInput::new(stdin)
+            .map_err(|e| format!("could not prepare {label} input: {e}"))?;
         let said = Arc::new(Mutex::new(String::new()));
         let drain = drain_errors(stderr, Arc::clone(&said));
         let mut shell = Self {
@@ -130,18 +132,26 @@ impl Shell {
     fn handshake(&mut self) -> Result<(), String> {
         let label = self.label.clone();
         let lost = |e: &dyn std::fmt::Display| format!("could not reach {label}: {e}");
+        let mut deadline = Instant::now() + CONNECT_FOR;
+        let cancel = crate::tasks::cancellation();
         self.stdin
             .as_mut()
             .ok_or("remote controller closed")?
-            .write_all(setup_script().as_bytes())
-            .and_then(|()| {
-                self.stdin
-                    .as_mut()
-                    .ok_or_else(|| std::io::Error::other("remote controller closed"))?
-                    .flush()
+            .write_until(setup_script().into_bytes(), || {
+                if cancel.is_cancelled() {
+                    return false;
+                }
+                if Instant::now() < deadline {
+                    return true;
+                }
+                if super::askpass::asked_lately(CONNECT_FOR) {
+                    deadline = Instant::now() + CONNECT_FOR;
+                    true
+                } else {
+                    false
+                }
             })
             .map_err(|e| lost(&e))?;
-        let mut deadline = Instant::now() + CONNECT_FOR;
         loop {
             match self.read_line(Some(deadline)) {
                 Ok(line) => {
@@ -173,16 +183,19 @@ impl Shell {
         }
         let nonce = nonce();
         let check = format!("P {nonce}\n");
+        let deadline = Instant::now() + CHECK_FOR;
+        let cancel = crate::tasks::cancellation();
         if self.stdin.as_mut().is_none_or(|stdin| {
             stdin
-                .write_all(check.as_bytes())
-                .and_then(|()| stdin.flush())
+                .write_until(check.into_bytes(), || {
+                    Instant::now() < deadline && !cancel.is_cancelled()
+                })
                 .is_err()
         }) {
             return false;
         }
         let answered = self
-            .read_line(Some(Instant::now() + CHECK_FOR))
+            .read_line(Some(deadline))
             .is_ok_and(|line| line.trim_ascii_end() == format!("P {nonce}").as_bytes());
         if answered {
             self.used = Instant::now();
@@ -206,12 +219,17 @@ impl Shell {
             .as_mut()
             .ok_or_else(|| Failure::NotSent("remote controller closed".into()))?;
         // Every write failure is unknown, including partial delivery or flush failure.
-        super::supervisor::write_request(stdin, script.as_bytes()).map_err(|e| {
-            Failure::Lost(format!(
-                "{}; command delivery/cleanup unknown",
-                self.lost(&e.to_string())
-            ))
-        })?;
+        let cancel = crate::tasks::cancellation();
+        stdin
+            .write_until(script.as_bytes().to_vec(), || {
+                Instant::now() < deadline && !cancel.is_cancelled()
+            })
+            .map_err(|e| {
+                Failure::Lost(format!(
+                    "{}; command delivery/cleanup unknown",
+                    self.lost(&e.to_string())
+                ))
+            })?;
         let mut deadline = deadline;
         let mut expired = false;
         let start = self.protocol_line(&mut deadline, &mut expired)?;
@@ -258,10 +276,12 @@ impl Shell {
         // Only the complete receipt and frozen binary output permit retiring evidence.
         // This uses the same connection, including passive reads; no reconnect is needed.
         let ack = format!("A {nonce}\n");
+        let ack_deadline = deadline.min(Instant::now() + CHECK_FOR);
         if self.stdin.as_mut().is_none_or(|stdin| {
             stdin
-                .write_all(ack.as_bytes())
-                .and_then(|()| stdin.flush())
+                .write_until(ack.into_bytes(), || {
+                    Instant::now() < ack_deadline && !cancel.is_cancelled()
+                })
                 .is_err()
         }) {
             self.stdin.take();
