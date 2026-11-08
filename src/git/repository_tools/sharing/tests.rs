@@ -124,16 +124,30 @@ fn missing_donor_and_stale_alternate_are_diagnosed_without_detaching() -> Result
     let old = std::fs::read(&alt).map_err(|e| e.to_string())?;
     let mut changed = old.clone();
     changed.extend_from_slice(b"\n");
-    std::fs::write(&alt, &changed).map_err(|e| e.to_string())?;
-    let control = git::OpControl::new(|| {});
-    assert!(
-        independent(
-            &runner(&clone, &control),
-            model.plan.as_ref().ok_or("no plan")?
-        )
-        .is_err()
-    );
-    assert_eq!(std::fs::read(&alt).map_err(|e| e.to_string())?, changed);
+    #[cfg(windows)]
+    {
+        // The prepared plan owns the alternate without write/delete sharing.
+        // A stale writer must be refused by the kernel before changing any bytes.
+        let error = std::fs::write(&alt, &changed)
+            .err()
+            .ok_or("Prepared alternate must be locked")?;
+        assert_eq!(error.raw_os_error(), Some(32));
+        assert_eq!(std::fs::read(&alt).map_err(|e| e.to_string())?, old);
+        drop(model);
+    }
+    #[cfg(unix)]
+    {
+        std::fs::write(&alt, &changed).map_err(|e| e.to_string())?;
+        let control = git::OpControl::new(|| {});
+        assert!(
+            independent(
+                &runner(&clone, &control),
+                model.plan.as_ref().ok_or("no plan")?
+            )
+            .is_err()
+        );
+        assert_eq!(std::fs::read(&alt).map_err(|e| e.to_string())?, changed);
+    }
     std::fs::write(&alt, old).map_err(|e| e.to_string())?;
     std::fs::rename(donor.path(), root.path().join("missing")).map_err(|e| e.to_string())?;
     let broken = inspect(&clone)?;

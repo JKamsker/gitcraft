@@ -72,10 +72,17 @@ fn malformed_or_oversized_mail_is_refused() {
 }
 #[test]
 fn interpreter_and_final_send_gate_do_not_send_stale_mail() -> Result<(), String> {
-    assert_eq!(
-        model::interpreter(b"#!/venv/bin/python3\nimport b4")?,
+    let python = if cfg!(windows) {
+        "C:/venv/bin/python3"
+    } else {
         "/venv/bin/python3"
+    };
+    assert_eq!(
+        model::interpreter(format!("#!{python}\nimport b4").as_bytes())?,
+        python
     );
+    #[cfg(windows)]
+    assert!(model::interpreter(b"#!/venv/bin/python3\n").is_err());
     assert_eq!(model::interpreter(b"#!/usr/bin/env python3\n")?, "python3");
     assert!(model::interpreter(b"#!/bin/sh\n").is_err());
     let shown = vec![model::parse(

@@ -341,53 +341,69 @@ mod tests {
         };
         assert!(resolve(&runner, &conflict, &ours).is_err());
         assert!(conflict.candidates.iter().all(|c| c.oid != tag));
-        // HELD actual-repository regression: a different writer resolves the
-        // public index after preparation and after the broad repository guard.
-        // The exact production publisher must refuse to overwrite that stage 0.
-        let index_path = r.path().join(".git/index");
-        let mut newer = None;
-        let stale = super::super::submodule_index::record_with_hook(
-            &runner,
-            &conflict,
-            &merged,
-            &mut |phase| {
-                if phase == super::super::submodule_index::Phase::BeforePublication {
-                    r.git(&[
-                        "update-index",
-                        "--add",
-                        "--cacheinfo",
-                        &format!("160000,{theirs},lib"),
-                    ])?;
-                    newer = Some(std::fs::read(&index_path).map_err(|e| e.to_string())?);
-                }
-                Ok(())
-            },
-        );
-        assert!(stale.is_err());
-        assert_eq!(
-            std::fs::read(&index_path).map_err(|e| e.to_string())?,
-            newer.ok_or("Competing stage-zero writer did not run")?
-        );
-        assert!(r.git(&["ls-files", "--stage", "lib"])?.contains(&theirs));
-        crate::git::run_input(
-            Some(r.path()),
-            &["update-index", "--index-info"],
-            &format!(
-                "0 {}\tlib\n160000 {base} 1\tlib\n160000 {ours} 2\tlib\n160000 {theirs} 3\tlib\n",
-                "0".repeat(40)
-            ),
-        )?;
-        let conflict = read(r.path(), "lib")?;
-        resolve(&runner, &conflict, &tag)?;
-        assert!(r.git(&["ls-files", "--unmerged"])?.is_empty());
-        let indexed = r.git(&["ls-files", "--stage", "lib"])?;
-        assert!(indexed.contains(&merged));
-        let indexed_oid = indexed.split_whitespace().nth(1).ok_or("No indexed OID")?;
-        assert_eq!(
-            crate::git::run(Some(&conflict.child), &["cat-file", "-t", indexed_oid])?.trim(),
-            "commit"
-        );
-        assert!(resolve(&runner, &conflict, &merged).is_err());
+        #[cfg(windows)]
+        {
+            let before = std::fs::read(r.path().join(".git/index")).map_err(|e| e.to_string())?;
+            let error = resolve(&runner, &conflict, &tag)
+                .err()
+                .ok_or("Windows publisher is unsupported")?;
+            assert_eq!(Some(error.as_str()), conflict.recording_blocker.as_deref());
+            assert!(error.contains("requires the shared macOS/Linux native publisher"));
+            assert_eq!(
+                std::fs::read(r.path().join(".git/index")).map_err(|e| e.to_string())?,
+                before
+            );
+        }
+        #[cfg(any(target_os = "macos", target_os = "linux"))]
+        {
+            // HELD actual-repository regression: a different writer resolves the
+            // public index after preparation and after the broad repository guard.
+            // The exact production publisher must refuse to overwrite that stage 0.
+            let index_path = r.path().join(".git/index");
+            let mut newer = None;
+            let stale = super::super::submodule_index::record_with_hook(
+                &runner,
+                &conflict,
+                &merged,
+                &mut |phase| {
+                    if phase == super::super::submodule_index::Phase::BeforePublication {
+                        r.git(&[
+                            "update-index",
+                            "--add",
+                            "--cacheinfo",
+                            &format!("160000,{theirs},lib"),
+                        ])?;
+                        newer = Some(std::fs::read(&index_path).map_err(|e| e.to_string())?);
+                    }
+                    Ok(())
+                },
+            );
+            assert!(stale.is_err());
+            assert_eq!(
+                std::fs::read(&index_path).map_err(|e| e.to_string())?,
+                newer.ok_or("Competing stage-zero writer did not run")?
+            );
+            assert!(r.git(&["ls-files", "--stage", "lib"])?.contains(&theirs));
+            crate::git::run_input(
+                Some(r.path()),
+                &["update-index", "--index-info"],
+                &format!(
+                    "0 {}\tlib\n160000 {base} 1\tlib\n160000 {ours} 2\tlib\n160000 {theirs} 3\tlib\n",
+                    "0".repeat(40)
+                ),
+            )?;
+            let conflict = read(r.path(), "lib")?;
+            resolve(&runner, &conflict, &tag)?;
+            assert!(r.git(&["ls-files", "--unmerged"])?.is_empty());
+            let indexed = r.git(&["ls-files", "--stage", "lib"])?;
+            assert!(indexed.contains(&merged));
+            let indexed_oid = indexed.split_whitespace().nth(1).ok_or("No indexed OID")?;
+            assert_eq!(
+                crate::git::run(Some(&conflict.child), &["cat-file", "-t", indexed_oid])?.trim(),
+                "commit"
+            );
+            assert!(resolve(&runner, &conflict, &merged).is_err());
+        }
         Ok(())
     }
 }

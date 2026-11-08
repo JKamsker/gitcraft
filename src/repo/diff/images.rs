@@ -173,7 +173,11 @@ mod svg_tests {
     #[test]
     fn renamed_svg_with_git_quoted_paths_keeps_both_rendered_versions() -> Result<(), String> {
         let r = crate::git::file_comparison::tests::Repo::new()?;
-        let old = "old\tü.svg";
+        let old = if cfg!(windows) {
+            "old ü.svg"
+        } else {
+            "old\tü.svg"
+        };
         let new = "new ü.svg";
         let bytes=br#"<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="5" height="5"/></svg>"#;
         r.write(old, bytes)?;

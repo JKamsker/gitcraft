@@ -2,7 +2,12 @@ use super::model::{self, Binding, Config, Engine};
 use serde_json::json;
 fn config() -> Config {
     Config {
-        path: "/owned/worktree one".into(),
+        path: if cfg!(windows) {
+            "C:/owned/worktree one"
+        } else {
+            "/owned/worktree one"
+        }
+        .into(),
         source: "{\n// jsonc\n\"image\":\"debian\"\n}".into(),
         context: Default::default(),
         linked: None,
@@ -29,7 +34,7 @@ fn per_worktree_up_has_no_global_cleanup_and_positional_arguments() {
     let args = model::arguments(&config, "up");
     assert!(
         args.windows(2)
-            .any(|w| w == ["--workspace-folder", "/owned/worktree one"])
+            .any(|w| w == ["--workspace-folder", config.path.to_string_lossy().as_ref()])
     );
     assert!(args.contains(&config.label()));
     assert!(args.contains(&"--mount-workspace-git-root=true".into()));
@@ -217,7 +222,18 @@ fn linked_readiness_requires_actual_relative_common_metadata_mount() -> Result<(
     let mut data = inspection(&bound);
     model::inspect(&bound, &bound.config, &bound.engine, &data)?;
     assert!(model::metadata_ready(&bound, &data).is_err());
-    data[0]["Mounts"].as_array_mut().ok_or("Missing fixture mounts")?.push(json!({"Type":"bind","Source":"/owned/main/.git","Destination":"/workspaces/main/.git","RW":true}));
+    let common = &bound
+        .config
+        .linked
+        .as_ref()
+        .ok_or("Missing linked fixture")?
+        .common;
+    data[0]["Mounts"]
+        .as_array_mut()
+        .ok_or("Missing fixture mounts")?
+        .push(
+            json!({"Type":"bind","Source":common,"Destination":"/workspaces/main/.git","RW":true}),
+        );
     model::metadata_ready(&bound, &data)?;
     for (key, value) in [
         ("Source", json!("/foreign/.git")),
@@ -235,7 +251,8 @@ fn linked_readiness_requires_actual_relative_common_metadata_mount() -> Result<(
 }
 #[test]
 fn unsupported_linked_metadata_is_refused_without_rewriting() -> Result<(), String> {
-    let worktree = std::path::Path::new("/owned/worktree one");
+    let config = config();
+    let worktree = config.path.as_path();
     assert!(
         model::linked(
             worktree,
@@ -287,6 +304,9 @@ fn unsupported_linked_metadata_is_refused_without_rewriting() -> Result<(), Stri
         "../..",
         "../../../../worktree one/.git",
     )?;
-    assert_eq!(linked.common, std::path::PathBuf::from("/owned/main/.git"));
+    assert_eq!(
+        linked.common,
+        worktree.parent().ok_or("Missing parent")?.join("main/.git")
+    );
     Ok(())
 }

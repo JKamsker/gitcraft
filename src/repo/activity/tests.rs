@@ -215,13 +215,22 @@ fn a_recorded_call_hides_its_secrets() -> Result<(), String> {
         password: "s3cr3t-pass".to_owned(),
     };
     let url = "https://ghp_TOKEN123@example.invalid/o/r.git";
-    let (_, added) = git::run_recorded(
+    let (added_result, added) = git::run_recorded(
         Some(&dir),
         &["remote", "add", "o", url],
         Some(&creds),
         false,
     );
-    let (_, listed) = git::run_recorded(Some(&dir), &["remote", "-v"], None, false);
+    if cfg!(windows) {
+        assert!(added_result.is_err_and(|e| e.contains("unavailable for local Windows Git")));
+        // Explicit transient sign-in is refused locally on Windows. Still read a
+        // real token-bearing remote to exercise output redaction on that platform.
+        git::run(Some(&dir), &["remote", "add", "o", url])?;
+    } else {
+        added_result?;
+    }
+    let (listed_result, listed) = git::run_recorded(Some(&dir), &["remote", "-v"], None, false);
+    listed_result?;
     let (_, echoed) = git::run_recorded(
         Some(&dir),
         &["config", "x.y", "s3cr3t-pass"],

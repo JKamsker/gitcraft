@@ -69,7 +69,13 @@ impl Drop for Repo {
 #[test]
 fn aliases_refs_dates_renames_binary_and_empty_commits_share_one_snapshot() -> Result<(), String> {
     let r = Repo::new()?;
-    std::fs::write(r.0.join("file\twith\nlines"), b"base\n").map_err(|e| e.to_string())?;
+    // Control characters are not legal Windows filenames; Unicode still exercises raw paths.
+    let original = if cfg!(windows) {
+        "file ü"
+    } else {
+        "file\twith\nlines"
+    };
+    std::fs::write(r.0.join(original), b"base\n").map_err(|e| e.to_string())?;
     let first = r.commit(
         "2026-01-01T23:30:00-1000",
         "2026-01-02T09:30:00+0000",
@@ -77,7 +83,7 @@ fn aliases_refs_dates_renames_binary_and_empty_commits_share_one_snapshot() -> R
     )?;
     r.git(&["branch", "duplicate"])?;
     r.git(&["tag", "also-first"])?;
-    r.git(&["mv", "file\twith\nlines", "renamed"])?;
+    r.git(&["mv", original, "renamed"])?;
     std::fs::write(r.0.join("binary"), b"\0binary\xff").map_err(|e| e.to_string())?;
     let second = r.commit(
         "2025-12-01T00:30:00+1400",
@@ -133,7 +139,7 @@ fn aliases_refs_dates_renames_binary_and_empty_commits_share_one_snapshot() -> R
         .find(|c| c.hash == second)
         .ok_or("second")?;
     assert_eq!(c.paths.len(), 3);
-    assert!(c.paths.contains(b"file\twith\nlines".as_slice()));
+    assert!(c.paths.contains(original.as_bytes()));
     assert!(c.paths.contains(b"binary".as_slice()));
     Ok(())
 }
