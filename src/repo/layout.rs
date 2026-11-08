@@ -69,7 +69,7 @@ impl RepoTab {
                 )
                 .show(ui, |ui| self.activity_panel(ui, &mut acts));
         }
-        if self.terminal_open && self.docked(Panel::Terminal) {
+        if self.terminals.is_open() && self.docked(Panel::Terminal) {
             egui::Panel::bottom("repo_terminal")
                 .resizable(true)
                 .default_size(260.0)

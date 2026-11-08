@@ -1,6 +1,7 @@
 //! What the views ask the tab to do, and the actions several views build.
 
 use super::toolbar::reveal_label;
+use crate::repo::terminals::TerminalAct;
 use std::path::PathBuf;
 
 use super::dialogs::StashChoice;
@@ -11,7 +12,6 @@ use super::{
 };
 use crate::git::{self, InProgress};
 use crate::keymap::{Command, label, written};
-use crate::terminal::ShellSpec;
 
 /// Everything the views ask for; applied after drawing so views only borrow the state.
 pub(crate) enum Action {
@@ -116,7 +116,7 @@ pub(crate) enum Action {
     OpenTab(PathBuf),
     /// Open a worktree the way the settings say: in this tab, or in its own.
     OpenWorktree(PathBuf),
-    ToggleTerminal,
+    Terminal(TerminalAct),
     /// Pop a view out into its own window, or bring it back.
     Popout(super::popout::Request),
     /// Collapse or bring back the branches panel.
@@ -130,12 +130,6 @@ pub(crate) enum Action {
     GraphOrder(git::LogOrder),
     /// Collapse or bring back the detail panel.
     ToggleDetail,
-    NewTerminal {
-        shell: Option<ShellSpec>,
-        cwd: Option<PathBuf>,
-    },
-    CloseTerminal(usize),
-    SelectTerminal(usize),
     ToggleSearch,
     /// Open the checklist of stale or merged branches to delete.
     SelectStaleBranches,
@@ -628,11 +622,7 @@ impl RepoTab {
                 "recovery".into(),
                 Action::Reflog(reflog::ReflogAct::FindLost),
             ),
-            (
-                "Toggle terminal".into(),
-                label(Command::Terminal),
-                Action::ToggleTerminal,
-            ),
+            super::terminals::toggle_palette_item(),
             if crate::network::refused().is_some() {
                 (
                     "Go online".into(),
@@ -651,14 +641,7 @@ impl RepoTab {
                 "log".into(),
                 Action::ToggleActivity,
             ),
-            (
-                "New terminal".into(),
-                "terminal".into(),
-                Action::NewTerminal {
-                    shell: None,
-                    cwd: None,
-                },
-            ),
+            super::terminals::new_palette_item(),
             ("Reload".into(), label(Command::Reload), Action::Reload),
             (
                 "Select stale or merged branches…".into(),

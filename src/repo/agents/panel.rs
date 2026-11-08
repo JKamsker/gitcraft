@@ -1,6 +1,7 @@
 //! The AGENTS section of the left pane: the repository's agent tasks, each with its worktree's
 //! uncommitted changes, to open and review with the normal diff.
 
+use crate::repo::terminals::TerminalAct;
 use egui::{Align2, Rect, Ui, pos2, vec2};
 
 use super::AgentAct;
@@ -207,10 +208,10 @@ fn menu(ui: &mut Ui, row: &Row, acts: &mut Vec<Action>) {
         .add_enabled(there, egui::Button::new("Open a terminal there"))
         .clicked()
     {
-        acts.push(Action::NewTerminal {
+        acts.push(Action::Terminal(TerminalAct::New {
             shell: None,
             cwd: Some(path),
-        });
+        }));
     }
     ui.separator();
     if ui

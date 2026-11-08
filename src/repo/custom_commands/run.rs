@@ -76,15 +76,10 @@ impl RepoTab {
                 (shell_spec(name, program, args), self.path.clone())
             }
         };
-        match Terminal::spawn(&cwd, &spec, ctx) {
-            Ok(term) => {
-                self.terminals.push(term);
-                self.active_terminal = self.terminals.len() - 1;
-                self.terminal_error = None;
-            }
-            Err(e) => self.terminal_error = Some(format!("{name} couldn't be started: {e}")),
-        }
-        self.terminal_open = true;
+        self.terminals.opened(
+            Terminal::spawn(&cwd, &spec, ctx)
+                .map_err(|e| format!("{name} couldn't be started: {e}")),
+        );
     }
 }
 
