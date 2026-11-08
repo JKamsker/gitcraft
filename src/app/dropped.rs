@@ -70,9 +70,15 @@ pub(super) fn folder_error(folder: &Path, err: &str) -> String {
     let name = name_of(folder);
     let lower = err.to_lowercase();
     if lower.contains("not a git repository") || lower.contains("not inside a git repository") {
-        format!("{name} isn't in a git repository: drop a repository's folder to open it")
+        crate::i18n::message("interaction-drop-folder-not-repo", &[("name", name.into())])
     } else {
-        format!("Could not open {name}: {err}")
+        crate::i18n::message(
+            "interaction-drop-folder-error",
+            &[
+                ("name", name.into()),
+                ("error", crate::git::display_error(err).into()),
+            ],
+        )
     }
 }
 
@@ -169,7 +175,13 @@ impl PatchQueue {
             }
             match targets.apply(&repo, &file) {
                 Ok(()) => self.current = Some((file, repo)),
-                Err(e) => said.push(format!("{} wasn't applied: {e}", name_of(&file))),
+                Err(e) => said.push(crate::i18n::message(
+                    "interaction-drop-not-applied",
+                    &[
+                        ("name", name_of(&file).into()),
+                        ("error", crate::git::display_error(&e).into()),
+                    ],
+                )),
             }
         }
     }
@@ -179,24 +191,24 @@ impl PatchQueue {
         let before = self.waiting.len();
         self.waiting.retain(|(_, r)| r != repo);
         let left = before - self.waiting.len();
-        let mut said = format!("{} failed: {err}", name_of(file));
-        if left > 0 {
-            said.push_str(&format!(
-                " (so the {left} {} dropped after it {} not applied)",
-                if left == 1 { "patch" } else { "patches" },
-                if left == 1 { "was" } else { "were" }
-            ));
-        }
-        said
+        crate::i18n::message(
+            if left > 0 {
+                "interaction-drop-failed-following"
+            } else {
+                "interaction-drop-failed"
+            },
+            &[
+                ("name", name_of(file).into()),
+                ("error", crate::git::display_error(err).into()),
+                ("count", left.into()),
+            ],
+        )
     }
 }
 
 /// What is said of a patch whose repository's tab was closed before it was applied.
 fn closed(file: &Path) -> String {
-    format!(
-        "{} wasn't applied: its repository's tab was closed",
-        name_of(file)
-    )
+    crate::i18n::message("interaction-drop-closed", &[("name", name_of(file).into())])
 }
 
 #[cfg(test)]
@@ -293,10 +305,9 @@ impl App {
                         self.report(msg);
                     }
                 },
-                DropKind::Other => self.report(format!(
-                    "Can't open {}: drop a folder to open it, or a .patch, .diff, .eml or .mbox \
-                     file to apply it",
-                    name_of(&path)
+                DropKind::Other => self.report(crate::i18n::message(
+                    "interaction-drop-unsupported",
+                    &[("name", name_of(&path).into())],
                 )),
             }
         }
@@ -326,14 +337,10 @@ impl App {
 
     /// Why a patch dropped where no repository is shown wasn't applied.
     fn no_repo_for(&self, patch: &Path) -> String {
-        let name = name_of(patch);
-        if self.tabs.iter().any(|t| matches!(t, Tab::Repo(_))) {
-            format!("To apply {name}, show its repository's tab, then drop the patch there")
-        } else {
-            format!(
-                "Applying {name} needs a repository open first: open one, then drop the patch on it"
-            )
-        }
+        patch_target_message(
+            self.tabs.iter().any(|t| matches!(t, Tab::Repo(_))),
+            &name_of(patch),
+        )
     }
 
     /// Opens the dropped folder's repository, or says why it can't.
@@ -350,6 +357,17 @@ impl App {
     }
 }
 
+fn patch_target_message(has_repo: bool, name: &str) -> String {
+    crate::i18n::message(
+        if has_repo {
+            "interaction-drop-show-repo"
+        } else {
+            "interaction-drop-open-repo"
+        },
+        &[("name", name.into())],
+    )
+}
+
 /// A veil over the window while files are dragged over it, saying what a drop does there.
 fn drop_hint(ctx: &egui::Context, on_repo: bool) {
     let t = Tokens::get(ctx);
@@ -357,9 +375,9 @@ fn drop_hint(ctx: &egui::Context, on_repo: bool) {
     let painter = ctx.layer_painter(LayerId::new(Order::Foreground, Id::new("drop-hint")));
     painter.rect_filled(rect, 0.0, Color32::from_black_alpha(110));
     let text = if on_repo {
-        "Drop a folder to open it, or a patch to apply it here"
+        crate::i18n::text("interaction-drop-hint-repo")
     } else {
-        "Drop a folder to open its repository"
+        crate::i18n::text("interaction-drop-hint-folder")
     };
     let galley = painter.layout_no_wrap(text.to_owned(), theme::semibold(16.0), t.text);
     let pill = Align2::CENTER_CENTER
@@ -540,6 +558,134 @@ mod tests {
         assert_eq!(
             closed_said,
             vec!["good.patch wasn't applied: its repository's tab was closed".to_owned()]
+        );
+    }
+}
+
+#[cfg(test)]
+mod localization_tests {
+    use super::*;
+
+    struct Recorded {
+        repo: PathBuf,
+        raw_error: String,
+        applied: Vec<PathBuf>,
+    }
+
+    impl PatchTargets for Recorded {
+        fn busy(&mut self, repo: &Path) -> Option<bool> {
+            (repo == self.repo).then_some(false)
+        }
+        fn outcome(&mut self, _: &Path) -> Option<Result<(), String>> {
+            Some(Err(self.raw_error.clone()))
+        }
+        fn apply(&mut self, _: &Path, file: &Path) -> Result<(), String> {
+            self.applied.push(file.to_owned());
+            Err(self.raw_error.clone())
+        }
+    }
+
+    #[test]
+    fn actual_recorded_queue_keeps_raw_outcomes_and_paths_while_translating_only_captions() {
+        crate::i18n::set_language("de");
+        let repo = PathBuf::from("/opaque/repo");
+        let file = PathBuf::from("/opaque/日本語 failed: literal.patch");
+        let raw = "external diagnostic 日本語\n: untouched".to_owned();
+        let mut targets = Recorded {
+            repo: repo.clone(),
+            raw_error: raw.clone(),
+            applied: vec![],
+        };
+        let mut queue = PatchQueue {
+            current: Some((file.clone(), repo.clone())),
+            waiting: VecDeque::new(),
+        };
+        queue.push("one.patch".into(), repo.clone());
+        queue.push("two.patch".into(), repo.clone());
+        let gone = PathBuf::from("/opaque/closed");
+        queue.push("closed.patch".into(), gone);
+        let said = queue.advance_with(&mut targets);
+        assert_eq!(said.len(), 2);
+        assert_eq!(
+            said[0],
+            format!(
+                "日本語 failed: literal.patch ist fehlgeschlagen: {raw} (deshalb wurden die 2 danach abgelegten Patches nicht angewendet)"
+            )
+        );
+        assert_eq!(
+            said[1],
+            "closed.patch wurde nicht angewendet: Der Tab des zugehörigen Repositorys wurde geschlossen"
+        );
+        assert!(queue.is_empty());
+        assert!(targets.applied.is_empty());
+        assert_eq!(targets.raw_error, raw);
+        // A direct apply rejection keeps the original file request and external diagnostic.
+        queue.push(file.clone(), repo.clone());
+        assert_eq!(
+            queue.advance_with(&mut targets),
+            [format!(
+                "日本語 failed: literal.patch wurde nicht angewendet: {raw}"
+            )]
+        );
+        assert_eq!(targets.applied, [file.clone()]);
+        assert!(queue.is_empty());
+        // Singular and zero variants use the same original retain decision.
+        queue.push("later.patch".into(), repo.clone());
+        assert!(
+            queue
+                .failed(&file, &repo, &raw)
+                .ends_with("(deshalb wurde der danach abgelegte Patch nicht angewendet)")
+        );
+        assert_eq!(
+            queue.failed(&file, &repo, &raw),
+            format!("日本語 failed: literal.patch ist fehlgeschlagen: {raw}")
+        );
+        crate::i18n::set_language("en-US");
+        queue.push("later.patch".into(), repo.clone());
+        assert_eq!(
+            queue.failed(&file, &repo, &raw),
+            format!(
+                "日本語 failed: literal.patch failed: {raw} (so the 1 patch dropped after it was not applied)"
+            )
+        );
+        assert_eq!(
+            closed(&file),
+            "日本語 failed: literal.patch wasn't applied: its repository's tab was closed"
+        );
+    }
+
+    #[test]
+    fn actual_folder_classifier_and_target_guidance_preserve_opaque_names_and_unknown_errors() {
+        crate::i18n::set_language("de");
+        let path = Path::new("/opaque/日本語 isn't in a git repository");
+        let raw = "FATAL: NOT A GIT REPOSITORY";
+        assert_eq!(
+            folder_error(path, raw),
+            "日本語 isn't in a git repository liegt nicht in einem Git-Repository: Ziehe einen Repository-Ordner hierher, um ihn zu öffnen"
+        );
+        assert_eq!(raw, "FATAL: NOT A GIT REPOSITORY");
+        let unknown = "external 日本語\n: diagnostic";
+        assert_eq!(
+            folder_error(path, unknown),
+            format!("日本語 isn't in a git repository konnte nicht geöffnet werden: {unknown}")
+        );
+        assert_eq!(
+            patch_target_message(true, "literal.patch"),
+            "Zeige den Tab des zugehörigen Repositorys und lege literal.patch dort ab, um den Patch anzuwenden"
+        );
+        assert!(
+            patch_target_message(false, "日本語.patch").starts_with(
+                "Um 日本語.patch anzuwenden, muss zuerst ein Repository geöffnet sein"
+            )
+        );
+        crate::i18n::set_language("en-US");
+        assert_eq!(
+            patch_target_message(true, "literal.patch"),
+            "To apply literal.patch, show its repository's tab, then drop the patch there"
+        );
+        assert_eq!(
+            folder_error(Path::new("/x/y"), unknown),
+            format!("Could not open y: {unknown}")
         );
     }
 }

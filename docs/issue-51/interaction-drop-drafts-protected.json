@@ -1,0 +1,24 @@
+{
+  "base": "29cd668105c68740467b83bc6406d3c4399bb42b",
+  "scope": "Presentation-only drop caption expressions; raw incoming classifier/outcome values, original queue retain/ordering, draft writer/session storage stay unchanged",
+  "protected_files": {
+    "src/drafts/keeper.rs": "a4f1e4b3b865e9443cc8a4c5654fe0fd3dba6f53a7293b3c97b9414d2419cbe6",
+    "src/drafts/limits.rs": "1b6aa7ca3a170e4ce2abbab540848f563c061aa2562e0d5ef3521a8d6d486f51",
+    "src/drafts/mod.rs": "d00d53e632d5511af900f3c8abddbe736e80eee0ddc5eff2bf05ce9c88337d64",
+    "src/drafts/session.rs": "853c401d2270d95f371fad4a3513ff93038f3105a4cbcfba59e97dbc75010be3",
+    "src/drafts/store.rs": "86b70661cd215cf1d6013502f29cfa430d7684993c4ea98a49894b429a3b57e4",
+    "src/drafts/tests.rs": "0d0829378bb3303eb2cfedc9311fda705fe14cb59c3f31a41b9306b98aa4e6ff",
+    "src/drafts/writer.rs": "febb8b520f01b9c79cc4957882d9ea976faed2039e55b29c7147e9a95cc26240"
+  },
+  "protected_blocks": {
+    "draft_saving_original": "50bce89693df5f90e95daaea30324deb85c9a7e794e38d54b0349295d820a91d",
+    "classification_paths": "f469251ccf2bd63407315379a87f8e2460909611ddd909040d7e304a27eef9c1",
+    "target_protocol": "a55e78392330cb842ddeb0df5a33ff3ee49ed4e6e5961a988d0c4b46c9cf90f2",
+    "queue_advance_decisions": "469087c06f6887ac6760882c31492ab20c6c1bc8a25b91041aac6760b699bfa4",
+    "failure_retain": "205a67289225b97b49d9d9c590bd0e47792d04f91bc16b1169c05b7ee91e47cd",
+    "recording_test": "466bae42abe61e8c556d76b206fb92fcbb88c194d55cc1624c084b4d2fbdfae5",
+    "hidden_continuation": "c17d5f219f29581333e2e4ba7c3d5525baaaf714732912f8eaaee92352cd5ecd",
+    "open_dispatch": "5fed50b4fcbd7d235f57b09f87a4a46cef1f5098c5a85576f6de1d4a6dc8c7a0",
+    "existing_tests": "9e801cef2e41cae4fd2e9843edaedebc0886567ea020c33935edb37d3c466788"
+  }
+}

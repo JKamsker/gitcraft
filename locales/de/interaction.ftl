@@ -1679,3 +1679,20 @@ interaction-scan-added-both = { $added ->
 interaction-scan-permission = gitcraft darf { $path } nicht durchsuchen.
 interaction-scan-gone = { $path } ist nicht mehr vorhanden.
 interaction-scan-read-error = Durchsuchen fehlgeschlagen: { $detail }
+interaction-drop-folder-not-repo = { $name } liegt nicht in einem Git-Repository: Ziehe einen Repository-Ordner hierher, um ihn zu öffnen
+interaction-drop-folder-error = { $name } konnte nicht geöffnet werden: { $error }
+interaction-drop-not-applied = { $name } wurde nicht angewendet: { $error }
+interaction-drop-closed = { $name } wurde nicht angewendet: Der Tab des zugehörigen Repositorys wurde geschlossen
+interaction-drop-unsupported = { $name } kann nicht geöffnet werden: Ziehe einen Ordner hierher, um ihn zu öffnen, oder eine .patch-, .diff-, .eml- oder .mbox-Datei, um sie anzuwenden
+interaction-drop-failed = { $name } ist fehlgeschlagen: { $error }
+interaction-drop-failed-following = { $name } ist fehlgeschlagen: { $error } ({ $count ->
+        [one] deshalb wurde der danach abgelegte Patch nicht angewendet
+       *[other] deshalb wurden die { $count } danach abgelegten Patches nicht angewendet
+    })
+interaction-drop-show-repo = Zeige den Tab des zugehörigen Repositorys und lege { $name } dort ab, um den Patch anzuwenden
+interaction-drop-open-repo = Um { $name } anzuwenden, muss zuerst ein Repository geöffnet sein: Öffne eines und lege den Patch dort ab
+interaction-drop-hint-repo = Ziehe einen Ordner hierher, um ihn zu öffnen, oder einen Patch, um ihn hier anzuwenden
+interaction-drop-hint-folder = Ziehe einen Ordner hierher, um sein Repository zu öffnen
+interaction-draft-restored = gitcraft wurde unerwartet beendet: Deine Entwürfe und Tabs wurden wiederhergestellt
+interaction-draft-cut = Ein Teil deiner Eingaben in { $name } ist zu lang für die Wiederherstellung nach einem Absturz: Nicht alles könnte danach wiederhergestellt werden
+interaction-draft-failed = Deine Eingaben konnten nicht gespeichert werden: { $detail }

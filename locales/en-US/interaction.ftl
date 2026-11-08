@@ -1685,3 +1685,20 @@ interaction-scan-added-both = Added { $added ->
 interaction-scan-permission = gitcraft isn't allowed to look in { $path }.
 interaction-scan-gone = { $path } isn't there any more.
 interaction-scan-read-error = Could not look in { $detail }
+interaction-drop-folder-not-repo = { $name } isn't in a git repository: drop a repository's folder to open it
+interaction-drop-folder-error = Could not open { $name }: { $error }
+interaction-drop-not-applied = { $name } wasn't applied: { $error }
+interaction-drop-closed = { $name } wasn't applied: its repository's tab was closed
+interaction-drop-unsupported = Can't open { $name }: drop a folder to open it, or a .patch, .diff, .eml or .mbox file to apply it
+interaction-drop-failed = { $name } failed: { $error }
+interaction-drop-failed-following = { $name } failed: { $error } (so the { $count } { $count ->
+        [one] patch dropped after it was
+       *[other] patches dropped after it were
+    } not applied)
+interaction-drop-show-repo = To apply { $name }, show its repository's tab, then drop the patch there
+interaction-drop-open-repo = Applying { $name } needs a repository open first: open one, then drop the patch on it
+interaction-drop-hint-repo = Drop a folder to open it, or a patch to apply it here
+interaction-drop-hint-folder = Drop a folder to open its repository
+interaction-draft-restored = gitcraft closed unexpectedly: your drafts and tabs were restored
+interaction-draft-cut = Some of what you typed in { $name } is too long to keep in case gitcraft closes: not all of it would come back after a crash
+interaction-draft-failed = Couldn't save what you typed in { $detail }
