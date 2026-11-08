@@ -70,6 +70,9 @@ impl Account {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(default)]
 pub(crate) struct Choices {
+    /// Selected tracker accounts and secure-store references only; no exported tokens.
+    pub jira: crate::trackers::Account,
+    pub linear: crate::trackers::Account,
     pub ssh_key: String,
     pub github: Account,
     pub gitlab: Account,
@@ -81,6 +84,8 @@ pub(crate) struct Choices {
 impl Default for Choices {
     fn default() -> Self {
         Self {
+            jira: Default::default(),
+            linear: Default::default(),
             ssh_key: String::new(),
             github: Account::on("github.com"),
             gitlab: Account::on("gitlab.com"),
@@ -92,6 +97,8 @@ impl Default for Choices {
 
 impl Choices {
     pub fn validate(&self) -> Result<(), String> {
+        self.jira.validate(crate::trackers::Kind::Jira)?;
+        self.linear.validate(crate::trackers::Kind::Linear)?;
         self.github.validate()?;
         self.gitlab.validate()?;
         if !self.tea_login.is_empty() {

@@ -67,7 +67,7 @@ fn card(
             folded = !folded;
         }
         ui.label(
-            RichText::new(format!("#{}", link.number))
+            RichText::new(link.key())
                 .font(theme::mono(12.0))
                 .color(t.accent),
         );

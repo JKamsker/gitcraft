@@ -6,6 +6,8 @@ mod card;
 pub(crate) mod criteria;
 pub(crate) mod link;
 pub(crate) mod naming;
+pub(crate) use naming::branch_name as issue_branch;
+pub(crate) use naming::tracker_branch;
 mod picker;
 #[cfg(test)]
 mod tests;
@@ -85,6 +87,7 @@ fn remote_heads(repo: &Path) -> HashMap<String, String> {
 pub(crate) enum IssueAct {
     /// List the issues assigned to you, to pick one.
     OpenPicker,
+    OpenSource(Option<crate::trackers::Kind>),
     /// Start work on `issue` on the branch `branch`, in a worktree of its own or here.
     Start {
         issue: Box<Issue>,
@@ -123,7 +126,8 @@ pub(super) struct Plan {
 impl RepoTab {
     pub(super) fn issue_act(&mut self, act: IssueAct, ctx: &egui::Context) {
         match act {
-            IssueAct::OpenPicker => self.open_issue_picker(ctx),
+            IssueAct::OpenPicker => self.open_issue_picker(None, ctx),
+            IssueAct::OpenSource(source) => self.open_issue_picker(source, ctx),
             IssueAct::Start {
                 issue,
                 branch,
@@ -156,57 +160,66 @@ impl RepoTab {
         }
     }
 
-    fn open_issue_picker(&mut self, ctx: &egui::Context) {
-        let Some(hosting) = self.hosting.clone() else {
-            self.status = Some((
-                "Issues come from the forge the repository is on, and its remote is on none \
-                 gitcraft knows"
-                    .to_owned(),
-                true,
-            ));
-            return;
-        };
+    fn open_issue_picker(&mut self, source: Option<crate::trackers::Kind>, ctx: &egui::Context) {
+        let hosting = self.hosting.clone();
+        let label = source.map_or_else(
+            || {
+                hosting
+                    .as_ref()
+                    .map_or("Repository forge", |h| h.forge.name())
+            },
+            |k| k.name(),
+        );
         self.issue_work.requests += 1;
         let request = self.issue_work.requests;
-        // Asked again (Try again): what was typed in the filter stays.
         let filter = self
             .issue_work
             .picker
             .take()
             .map(|p| p.filter)
             .unwrap_or_default();
-        self.issue_work.picker = Some(picker::Picker::new(hosting.forge.name(), filter));
+        let mut picker = picker::Picker::new(label, filter);
+        picker.source = source;
+        self.issue_work.picker = Some(picker);
         let path = self.path.clone();
-        self.then(
-            ctx,
-            move || hosting.forge.provider().assigned_issues(&path, &hosting),
-            move |tab, result, _| {
-                if tab.issue_work.requests == request
-                    && let Some(picker) = &mut tab.issue_work.picker
-                {
-                    picker.listed(result);
-                }
-            },
-        );
+        let connection = crate::connections::current();
+        self.then(ctx,move || match source {
+            Some(kind)=>crate::trackers::assigned(kind),
+            None=>hosting.ok_or_else(||"No repository forge detected. Select Jira or Linear above, or configure the repository remote".to_owned()).and_then(|h|h.forge.provider().assigned_issues(&path,&h)),
+        },move |tab,result,_| {
+            if tab.issue_work.requests==request && connection==crate::connections::current() && let Some(picker)=&mut tab.issue_work.picker{picker.listed(result);}
+        });
     }
 
     fn start_issue(&mut self, issue: &Issue, branch: &str, worktree: bool, ctx: &egui::Context) {
-        if let Some(busy) = &self.busy_op {
+        if issue
+            .tracker
+            .as_ref()
+            .is_some_and(|i| !i.selected(&crate::connections::current()))
+        {
             self.status = Some((
-                format!("Start work on #{}: wait for {busy}", issue.number),
+                "Tracker account changed; reload the issue source".into(),
                 true,
             ));
             return;
         }
-        let plan = self.issue_plan(issue.number, branch, worktree);
+
+        if let Some(busy) = &self.busy_op {
+            self.status = Some((
+                format!("Start work on {}: wait for {busy}", issue.key()),
+                true,
+            ));
+            return;
+        }
+        let plan = self.issue_plan(issue.key(), branch, worktree);
         let start = match plan.start {
             Ok(start) => start,
             Err(why) => {
-                self.status = Some((format!("Start work on #{}: {why}", issue.number), true));
+                self.status = Some((format!("Start work on {}: {why}", issue.key()), true));
                 return;
             }
         };
-        let label = format!("Start work on #{}", issue.number);
+        let label = format!("Start work on {}", issue.key());
         let ops = link::start_ops(&start, &IssueLink::of(issue));
         if let Some(path) = plan.open {
             self.open_when_done = Some((label.clone(), path));
@@ -217,7 +230,13 @@ impl RepoTab {
     /// What starting work on issue `number` on `branch` does, here or in a new worktree (when
     /// `worktree`), or why it can't. Reads only what the tab holds: the picker asks it every
     /// frame.
-    pub(super) fn issue_plan(&self, number: u64, branch: &str, worktree: bool) -> Plan {
+    pub(super) fn issue_plan(&self, number: impl ToString, branch: &str, worktree: bool) -> Plan {
+        let number = number.to_string();
+        let key = if number.bytes().all(|b| b.is_ascii_digit()) {
+            format!("#{number}")
+        } else {
+            number
+        };
         let refuse = |why: String| Plan {
             start: Err(why),
             open: None,
@@ -240,11 +259,11 @@ impl RepoTab {
         }
         let mut warnings = Vec::new();
         if let Some(other) = self.issue_work.links.get(branch)
-            && other.number != number
+            && other.key() != key
         {
             warnings.push(format!(
-                "{branch} is for #{} already: starting makes it the branch of #{number} instead",
-                other.number
+                "{branch} is for {} already: starting makes it the branch of {key} instead",
+                other.key()
             ));
         }
         let exists = self.refs.local.iter().any(|b| b.name == branch);
@@ -279,10 +298,10 @@ impl RepoTab {
         let (source, fetch, note) = if exists {
             let note = match &place {
                 Place::Here if !checkout_here => {
-                    format!("{branch} is checked out here already: it's linked to #{number}.")
+                    format!("{branch} is checked out here already: it's linked to {key}.")
                 }
                 Place::Worktree => format!(
-                    "{branch} is checked out in {} already: it's linked to #{number}, and that \
+                    "{branch} is checked out in {} already: it's linked to {key}, and that \
                      worktree opens.",
                     folder(&open)
                 ),
@@ -410,18 +429,12 @@ impl RepoTab {
     /// Reads the issue of `branch` again, in the background, and writes what is kept of it
     /// over what was.
     fn refresh_issue(&mut self, branch: String, ctx: &egui::Context) {
-        let Some(hosting) = self.hosting.clone() else {
-            self.status = Some((
-                "The issue comes from the forge the repository is on, and its remote is on none \
-                 gitcraft knows"
-                    .to_owned(),
-                true,
-            ));
+        let hosting = self.hosting.clone();
+        let Some(link) = self.issue_work.links.get(&branch).cloned() else {
             return;
         };
-        let Some(number) = self.issue_work.links.get(&branch).map(|l| l.number) else {
-            return;
-        };
+        let previous = link.clone();
+        let connection = crate::connections::current();
         if self.issue_work.refreshing.is_some() {
             return;
         }
@@ -429,10 +442,20 @@ impl RepoTab {
         let path = self.path.clone();
         self.then(
             ctx,
-            move || hosting.forge.provider().issue(&path, &hosting, number),
+            move || match &link.tracker {
+                Some(identity) => crate::trackers::one(identity),
+                None => hosting
+                    .ok_or_else(|| "The repository forge is unavailable".into())
+                    .and_then(|h| h.forge.provider().issue(&path, &h, link.number)),
+            },
             move |tab, result, ctx| {
                 tab.issue_work.refreshing = None;
-                let label = format!("Read #{number} again");
+                if connection != crate::connections::current()
+                    || tab.issue_work.links.get(&branch) != Some(&previous)
+                {
+                    return;
+                }
+                let label = format!("Read {} again", previous.key());
                 match result {
                     Ok(issue) => match &tab.busy_op {
                         Some(busy) => {

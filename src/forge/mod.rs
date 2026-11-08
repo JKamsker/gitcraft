@@ -198,6 +198,7 @@ pub(crate) const ISSUES_MAX: usize = 100;
 /// An open issue assigned to the person signed in, to start work from.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Issue {
+    pub tracker: Option<crate::trackers::Identity>,
     /// Its number on the forge (GitLab's `iid`, the one `#N` means).
     pub number: u64,
     pub title: String,
@@ -205,6 +206,20 @@ pub struct Issue {
     pub body: String,
     pub url: String,
     pub labels: Vec<String>,
+}
+
+impl Issue {
+    pub fn key(&self) -> String {
+        self.tracker
+            .as_ref()
+            .map_or_else(|| format!("#{}", self.number), |i| i.key.clone())
+    }
+    pub fn branch_name(&self) -> String {
+        self.tracker.as_ref().map_or_else(
+            || crate::repo::issue_work::issue_branch(self.number, &self.title),
+            |i| crate::repo::issue_work::tracker_branch(&i.key, &self.title),
+        )
+    }
 }
 
 /// Where a pull request stands.

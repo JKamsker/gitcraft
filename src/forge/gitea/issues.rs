@@ -65,6 +65,7 @@ fn parse_issue(item: &Value) -> Option<Issue> {
         return None;
     }
     Some(Issue {
+        tracker: None,
         number: item.get("number").and_then(Value::as_u64)?,
         title: at(item, "/title").to_owned(),
         body: at(item, "/body").to_owned(),
@@ -93,6 +94,7 @@ mod tests {
         assert_eq!(
             parse_issue(&item),
             Some(Issue {
+                tracker: None,
                 number: 9,
                 title: "Füße".into(),
                 body: "* [x] done".into(),

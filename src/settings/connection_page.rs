@@ -51,6 +51,19 @@ impl Settings {
                         },
                     );
                 }
+                for (kind, account) in [
+                    (crate::trackers::Kind::Jira, &mut profile.connections.jira),
+                    (
+                        crate::trackers::Kind::Linear,
+                        &mut profile.connections.linear,
+                    ),
+                ] {
+                    card.row(
+                        kind.name(),
+                        "jira linear tracker issue token account",
+                        |ui| crate::trackers::ui::account(ui, id, kind, account),
+                    );
+                }
                 card.row("Forgejo / Gitea login", "tea forge account login alias", |ui| {
                     ui.horizontal_wrapped(|ui| {
                         ui.add(layout::field(&mut profile.connections.tea_login)

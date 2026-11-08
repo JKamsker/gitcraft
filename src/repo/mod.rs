@@ -66,7 +66,7 @@ mod history_reader;
 mod hooks;
 mod hotfix;
 mod interaction;
-mod issue_work;
+pub(crate) mod issue_work;
 mod keep_submodules;
 mod keys;
 mod layout;
