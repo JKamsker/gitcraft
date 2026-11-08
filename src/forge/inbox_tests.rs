@@ -263,7 +263,7 @@ fn backend_fluent_inbox_presentation_preserves_numeric_counts_and_login_identity
             "external provider detail: HTTP 409 /refs/main"
         );
         let json = r#"[{"iid":7,"title":"User title","source_branch":"de/untranslated","target_branch":"main","web_url":"https://git.example/mr/7","author":{"username":"user"}}]"#;
-        let prs = gitlab_list(json, false).unwrap();
+        let prs = parse_gitlab(json, false).unwrap();
         assert_eq!(prs[0].title, "User title");
         assert_eq!(prs[0].url, "https://git.example/mr/7");
     }

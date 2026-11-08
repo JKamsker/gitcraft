@@ -790,7 +790,12 @@ pub(crate) fn transfer_pack(
 pub fn run_to_file(dir: &Path, args: &[&str], file: &Path) -> Result<(), String> {
     if remote::is_remote(dir) {
         return run_bytes(Some(dir), args).and_then(|bytes| {
-            std::fs::write(file, bytes).map_err(|e| format!("could not save it: {e}"))
+            std::fs::write(file, bytes).map_err(|e| {
+                crate::i18n::message(
+                    "backend-could-not-save-it-e-24f824",
+                    &[("detail", (e).to_string().into())],
+                )
+            })
         });
     }
     let out = execute(
@@ -983,13 +988,20 @@ pub(crate) fn run_workspace_command(
         ..Default::default()
     };
     let command = if let Some(target) = remote::parse(dir) {
-        let record =
-            remote::parse(record).ok_or("remote owner record is on a different machine")?;
+        let record = remote::parse(record).ok_or(crate::i18n::text(
+            "backend-remote-owner-record-is-on-a-different-machine-5eab4e",
+        ))?;
         if record.host != target.host {
-            return Err("remote owner record is on a different machine".into());
+            return Err(crate::i18n::text(
+                "backend-remote-owner-record-is-on-a-different-machine-5eab4e",
+            )
+            .into());
         }
         if owned.directory.is_some() {
-            return Err("remote private directories use their fenced shell operation".into());
+            return Err(crate::i18n::text(
+                "backend-remote-private-directories-use-their-fenced-shell-operation-9bbfda",
+            )
+            .into());
         }
         let request = remote_request(&target, &extra, args);
         remote::streaming_command_authority(
@@ -1002,7 +1014,10 @@ pub(crate) fn run_workspace_command(
         .configure(&mut options)
     } else {
         if remote::parse(record).is_some() {
-            return Err("native owner record is on a different machine".into());
+            return Err(crate::i18n::text(
+                "backend-native-owner-record-is-on-a-different-machine-56f2b5",
+            )
+            .into());
         }
         remote::native_owner::command_with_authority(
             local_command(Some(dir), &extra, args),
@@ -1402,10 +1417,10 @@ pub(crate) fn syntax_read(
     timeout: std::time::Duration,
 ) -> Result<Vec<u8>, String> {
     if crate::remote::is_remote(repo) {
-        return Err(
-            "Syntax comparison is currently available for local repositories. Showing the patch."
-                .to_owned(),
-        );
+        return Err(crate::i18n::text(
+            "backend-syntax-comparison-is-currently-available-for-local-repositories-s-c279dd",
+        )
+        .to_owned());
     }
     let args: Vec<_> = std::iter::once("--no-lazy-fetch")
         .chain(args.iter().copied())
@@ -1418,7 +1433,10 @@ fn syntax_read_error(error: String) -> String {
         .lines()
         .any(|line| line.trim() == "unknown option: --no-lazy-fetch")
     {
-        format!("Syntax preparation requires Git with --no-lazy-fetch support: {error}")
+        crate::i18n::message(
+            "backend-syntax-preparation-requires-git-with-no-lazy-fetch-support-error-0c471c",
+            &[("detail", (error).to_string().into())],
+        )
     } else {
         error
     }
@@ -1432,7 +1450,7 @@ pub(super) fn comparison_output(
     active: &dyn Fn() -> bool,
 ) -> Result<remote::Output, String> {
     if !active() {
-        return Err("Comparison cancelled".into());
+        return Err(crate::i18n::text("backend-comparison-cancelled-fe0a3c").into());
     }
     let guarded: Vec<_> = std::iter::once("--no-lazy-fetch")
         .chain(args.iter().copied())
@@ -1467,10 +1485,13 @@ pub(super) fn comparison_output(
         }
     };
     if out.stdout.len() > 8 * 1024 * 1024 || out.stderr.len() > 64 * 1024 {
-        return Err("Comparison output exceeds the size limit; choose fewer files".into());
+        return Err(crate::i18n::text(
+            "backend-comparison-output-exceeds-the-size-limit-choose-fewer-files-727a73",
+        )
+        .into());
     }
     if !active() {
-        return Err("Comparison cancelled".into());
+        return Err(crate::i18n::text("backend-comparison-cancelled-fe0a3c").into());
     }
     Ok(out)
 }
@@ -1480,13 +1501,13 @@ pub(super) fn comparison_remote(
     active: &dyn Fn() -> bool,
 ) -> Result<remote::Output, String> {
     if !active() {
-        return Err("Comparison cancelled".into());
+        return Err(crate::i18n::text("backend-comparison-cancelled-fe0a3c").into());
     }
     request.timeout = Some(std::time::Duration::from_secs(20));
     request.long = true;
     let out = remote::exec(host, &request)?;
     if !active() {
-        return Err("Comparison cancelled".into());
+        return Err(crate::i18n::text("backend-comparison-cancelled-fe0a3c").into());
     }
     Ok(out)
 }

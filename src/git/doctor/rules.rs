@@ -37,7 +37,12 @@ pub fn files(repo: &Path) -> Result<Vec<RulesFile>, String> {
             ":(glob)**/.gitignore",
         ],
     )
-    .map_err(|e| format!("Could not list the .gitignore files: {e}"))?;
+    .map_err(|e| {
+        crate::i18n::message(
+            "backend-could-not-list-the-gitignore-files-e-5e71e6",
+            &[("detail", (e).to_string().into())],
+        )
+    })?;
     let mut out = vec![in_repo(repo, ".gitignore")];
     let mut nested: Vec<&str> = listed
         .split('\0')
@@ -52,7 +57,7 @@ pub fn files(repo: &Path) -> Result<Vec<RulesFile>, String> {
             label: printed.to_owned(),
             location: crate::remote::resolve(repo, printed),
             base: String::new(),
-            kind: "This clone only, never committed",
+            kind: crate::i18n::text("backend-this-clone-only-never-committed-136363"),
             outside: false,
         });
     }
@@ -80,9 +85,13 @@ fn excludes_file(repo: &Path) -> Option<RulesFile> {
         _ => (None, default_excludes(repo)?),
     };
     let kind = match scope.as_deref() {
-        None => "Your own (git's default place), every repository",
-        Some("global" | "system") => "Your own (core.excludesFile), every repository",
-        Some(_) => "Named by this repository's config (core.excludesFile)",
+        None => crate::i18n::text("backend-your-own-git-s-default-place-every-repository-45a1e4"),
+        Some("global" | "system") => {
+            crate::i18n::text("backend-your-own-core-excludesfile-every-repository-332eb5")
+        }
+        Some(_) => {
+            crate::i18n::text("backend-named-by-this-repository-s-config-core-excludesfile-c2ecb5")
+        }
     };
     Some(RulesFile {
         label: printed.clone(),
@@ -137,9 +146,9 @@ fn in_repo(repo: &Path, rel: &str) -> RulesFile {
         label: rel.to_owned(),
         location: crate::remote::join(repo, rel),
         kind: if base.is_empty() {
-            "The repository's, shared once committed"
+            crate::i18n::text("backend-the-repository-s-shared-once-committed-052f02")
         } else {
-            "This folder and below, shared once committed"
+            crate::i18n::text("backend-this-folder-and-below-shared-once-committed-8be1fd")
         },
         base,
         outside: false,
@@ -151,7 +160,13 @@ pub fn read(file: &RulesFile) -> Result<String, String> {
     match crate::remote::read_to_string(&file.location) {
         Ok(text) => Ok(text),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(String::new()),
-        Err(e) => Err(format!("Could not read {}: {e}", file.label)),
+        Err(e) => Err(crate::i18n::message(
+            "backend-could-not-read-e-6dfcf3",
+            &[
+                ("label", (file.label).to_string().into()),
+                ("detail", (e).to_string().into()),
+            ],
+        )),
     }
 }
 
@@ -160,29 +175,58 @@ pub fn read(file: &RulesFile) -> Result<String, String> {
 pub fn save(file: &RulesFile, expected: &str, text: &str) -> Result<(), String> {
     match crate::remote::try_is_link(&file.location) {
         Ok(false) => {}
-        Ok(true) => return Err(format!("{} is a symbolic link: not changed", file.label)),
+        Ok(true) => {
+            return Err(crate::i18n::message(
+                "backend-is-a-symbolic-link-not-changed-a7a07a",
+                &[("label", (file.label).to_string().into())],
+            ));
+        }
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
-        Err(e) => return Err(format!("Could not check {}: {e}", file.label)),
+        Err(e) => {
+            return Err(crate::i18n::message(
+                "backend-could-not-check-e-668235",
+                &[
+                    ("label", (file.label).to_string().into()),
+                    ("detail", (e).to_string().into()),
+                ],
+            ));
+        }
     }
     if read(file)? != expected {
-        return Err(format!(
-            "{} changed on disk since you opened it. Read it again (your changes stay in the \
-             editor) before saving.",
-            file.label
+        return Err(crate::i18n::message(
+            "backend-changed-on-disk-since-you-opened-it-read-it-again-your-changes-st-6493c6",
+            &[("label", (file.label).to_string().into())],
         ));
     }
     if let Some(parent) = file.location.parent() {
-        crate::remote::create_dir_all(parent)
-            .map_err(|e| format!("Could not make the folder of {}: {e}", file.label))?;
+        crate::remote::create_dir_all(parent).map_err(|e| {
+            crate::i18n::message(
+                "backend-could-not-make-the-folder-of-e-b35db5",
+                &[
+                    ("label", (file.label).to_string().into()),
+                    ("detail", (e).to_string().into()),
+                ],
+            )
+        })?;
     }
     // Checked again right before writing: here `write` follows a link (elsewhere it checks
     // and writes in one script).
     if crate::remote::try_is_link(&file.location).unwrap_or(false) {
-        return Err(format!("{} is a symbolic link: not changed", file.label));
+        return Err(crate::i18n::message(
+            "backend-is-a-symbolic-link-not-changed-a7a07a",
+            &[("label", (file.label).to_string().into())],
+        ));
     }
     let text = same_line_endings(expected, text);
-    crate::remote::write(&file.location, text.as_bytes())
-        .map_err(|e| format!("Could not write {}: {e}", file.label))
+    crate::remote::write(&file.location, text.as_bytes()).map_err(|e| {
+        crate::i18n::message(
+            "backend-could-not-write-e-6c22d7",
+            &[
+                ("label", (file.label).to_string().into()),
+                ("detail", (e).to_string().into()),
+            ],
+        )
+    })
 }
 
 /// `text` with the line endings `original` has: a CRLF file stays CRLF (the editor's new lines
@@ -303,10 +347,12 @@ impl<'a> RulesTemp<'a> {
         let file = if empty {
             None
         } else {
-            Some(
-                crate::git::save_patch_for(repo, rules)
-                    .map_err(|e| format!("Could not prepare the preview: {e}"))?,
-            )
+            Some(crate::git::save_patch_for(repo, rules).map_err(|e| {
+                crate::i18n::message(
+                    "backend-could-not-prepare-the-preview-e-664f50",
+                    &[("detail", (e).to_string().into())],
+                )
+            })?)
         };
         Ok(Self { repo, file })
     }
@@ -349,7 +395,12 @@ fn matched(
     if which == "-o" {
         args.push("--directory");
     }
-    let out = run(Some(repo), &args).map_err(|e| format!("Could not preview the rules: {e}"))?;
+    let out = run(Some(repo), &args).map_err(|e| {
+        crate::i18n::message(
+            "backend-could-not-preview-the-rules-e-76cfb4",
+            &[("detail", (e).to_string().into())],
+        )
+    })?;
     Ok(
         super::ignore::collapse(out.split('\0').filter(|p| !p.is_empty()))
             .into_iter()

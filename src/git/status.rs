@@ -37,11 +37,11 @@ pub enum InProgress {
 impl InProgress {
     pub fn label(self) -> &'static str {
         match self {
-            InProgress::Merge => "Merge",
-            InProgress::CherryPick => "Cherry-pick",
-            InProgress::Revert => "Revert",
-            InProgress::Rebase => "Rebase",
-            InProgress::Am => "Patch",
+            InProgress::Merge => crate::i18n::text("backend-in-progress-merge"),
+            InProgress::CherryPick => crate::i18n::text("backend-in-progress-cherry-pick"),
+            InProgress::Revert => crate::i18n::text("backend-in-progress-revert"),
+            InProgress::Rebase => crate::i18n::text("backend-in-progress-rebase"),
+            InProgress::Am => crate::i18n::text("backend-in-progress-patch"),
         }
     }
 
