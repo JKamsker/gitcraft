@@ -28,6 +28,8 @@ impl Hit {
 pub(crate) enum Layout<'a> {
     /// A line per row.
     Lines,
+    /// Visual segments of complete logical rows.
+    Rendered(&'a [super::rendered::Segment]),
     /// Side by side: each row's (left line, right line). A line on both sides (a diff's
     /// unchanged one) counts once, on the left.
     Split(&'a [(Option<usize>, Option<usize>)]),
@@ -53,6 +55,17 @@ pub(crate) fn ordered(found: &[(usize, Vec<Range<usize>>)], layout: Layout<'_>) 
         Layout::Lines => found
             .iter()
             .flat_map(|(line, ranges)| ranges.iter().map(|r| hit(*line, 0, *line, r)))
+            .collect(),
+        Layout::Rendered(rows) => found
+            .iter()
+            .flat_map(|(line, ranges)| {
+                ranges.iter().map(|r| {
+                    let row = rows.partition_point(|s| {
+                        s.line < *line || s.line == *line && s.chars.end <= r.start
+                    });
+                    hit(row.min(rows.len().saturating_sub(1)), 0, *line, r)
+                })
+            })
             .collect(),
         Layout::Split(rows) => {
             let places = places_of(rows, found.last().map_or(0, |(l, _)| l + 1));

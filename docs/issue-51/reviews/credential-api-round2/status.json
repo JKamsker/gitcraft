@@ -1,0 +1,5 @@
+{
+  "candidate": "5716ad6ec158d433ce83499b384779ac397cbb38",
+  "verdict": "FAIL four findings",
+  "runtime": "No actual Git/HTTP/process fixtures; hold retained"
+}

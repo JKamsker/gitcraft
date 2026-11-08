@@ -1,0 +1,10 @@
+{
+  "candidate": "ed92fde22fc1b11c48196f81d40c47b39f529879",
+  "fork_dev": "0830614f89de60936b7e6358060f99ce18f4f3c0",
+  "merge": "automatic; no conflicts",
+  "command": "CARGO_BUILD_JOBS=2 cargo +1.95.0 check --locked --all-targets",
+  "exit": 0,
+  "log_sha256": "05c96df515adebe9ee45eb36943e3885300e873fa9869833f8c1429b0bebf55d",
+  "scope": "Compilation check only; no tests executed. Existing macOS dead_code warnings remain. Other implementation branches not yet integrated.",
+  "final_base": "Use verified fork origin/dev, not stale divergent local dev35a26"
+}

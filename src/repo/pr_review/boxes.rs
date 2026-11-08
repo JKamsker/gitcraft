@@ -46,7 +46,10 @@ pub(in crate::repo) fn review_box(
             .font(theme::semibold(10.5))
             .color(t.text_faint),
     );
-    pending_list(ui, extras, draft.posting, acts);
+    super::native_discussions::show(ui, draft, extras, acts);
+    if extras.review_features.pending {
+        pending_list(ui, extras, draft.posting, acts);
+    }
     ui.add_enabled(
         !draft.posting,
         egui::TextEdit::multiline(&mut draft.review)
@@ -80,6 +83,11 @@ fn verdict_buttons(
         (Verdict::Approve, "Approve"),
         (Verdict::RequestChanges, "Request changes"),
     ] {
+        if (verdict == Verdict::Approve && !extras.review_features.approve)
+            || (verdict == Verdict::RequestChanges && !extras.review_features.request_changes)
+        {
+            continue;
+        }
         // Whatever is pending can still go out, but a verdict comes too late.
         if !open && verdict != Verdict::Comment {
             continue;
@@ -168,4 +176,47 @@ fn pending_list(ui: &mut Ui, extras: &PrExtras, posting: bool, acts: &mut Vec<Ac
 
 fn first_line(text: &str) -> &str {
     text.lines().next().unwrap_or("")
+}
+
+#[cfg(test)]
+mod native_tests {
+    use super::*;
+    #[test]
+    fn native_review_only_shows_supported_verdicts() {
+        let ctx = egui::Context::default();
+        crate::theme::install_fonts(&ctx);
+        let extras = PrExtras {
+            review_features: crate::pr_threads::ReviewFeatures {
+                pending: false,
+                request_changes: false,
+                approve: true,
+                apply_suggestions: false,
+            },
+            ..Default::default()
+        };
+        let mut draft = PrDraft {
+            review: "Reviewed".into(),
+            ..Default::default()
+        };
+        let out = ctx.run_ui(egui::RawInput::default(), |ui| {
+            review_box(ui, &mut draft, &extras, false, true, &mut Vec::new())
+        });
+        let text = out
+            .shapes
+            .iter()
+            .filter_map(|s| {
+                if let egui::Shape::Text(t) = &s.shape {
+                    Some(t.galley.text())
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(text.contains("Approve"));
+        assert!(text.contains("Comment"));
+        assert!(!text.contains("Request changes"));
+        assert!(!text.contains("Discard"));
+        out.drop_without_applying_deltas();
+    }
 }

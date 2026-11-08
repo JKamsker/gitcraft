@@ -1,0 +1,266 @@
+{
+  "verdict": "SCOPED PASS",
+  "candidate": "be013726aa51c270bde95cecff727191a603c785",
+  "application": "10727c7e88725b4510350ec3416bd1e4ebfcfeda",
+  "base": "a850de26b0a0778ea96fe34cd1498e6e78928492",
+  "prior_report_parent_snapshot": "4143becdd51f8c09002f10154ffce962b3ca193e",
+  "prior_ui_matches_tmp_original": true,
+  "documentation_only_delta": [
+    "docs/validation/issue51-diff-batch-2026-11-07.md",
+    "docs/validation/issue51-fileviews-corrections-2026-11-08-tests.log.gz",
+    "docs/validation/issue51-fileviews-corrections-2026-11-08.json",
+    "docs/validation/issue51-fileviews-corrections-2026-11-08.md"
+  ],
+  "source_sha256": {
+    "src/repo/file_comparison/mod.rs": "fb1d0317dc5afe4f44c712e5b3fba1d4e1617b89031706bea53441e5e2a418cf",
+    "src/repo/file_comparison/code_moves.rs": "b37b021ebf36009b72e0425be50060c28e874ebf36fb88a8d0908bebefdc334c",
+    "src/repo/file_comparison/tests.rs": "dc5d66ad9eb31a3b5b20e847e86a39332661a4f8bd3b77ab0c8f2ad8b2936f14",
+    "src/repo/file_comparison/view.rs": "2b119386fb1ae5f7bb6d2b2e4a0aa35c333f9a28fce4e0568786ab1abf44e2cb",
+    "src/repo/diff/view.rs": "ec629d2a2a8c66a1d454ef41f227e892f8e73d2445e8e610c518af178889dadd",
+    "src/repo/diff/moved_view.rs": "bd4a8af98f35c23d6e7fc1549b0f369ba3c711283ca41ec4e6f2c75623855a56",
+    "src/repo/diff/moved.rs": "4fbddf6d14ee0a305b9cba2af05b0d40626502c3b03c7d3fc91006447345baa7",
+    "src/repo/apply.rs": "14f2a83eb995d2d73aba3f73c38d61b33f99cbef300d2fb2e8a6e6d5ac28dcf2",
+    "docs/validation/issue51-fileviews-corrections-2026-11-08.md": "71186109e982b157b1e21c110489dc24fa051eb170de35fb1b49af207e984b6c",
+    "docs/validation/issue51-fileviews-corrections-2026-11-08.json": "c1883c999519215d5720a5771a46e63013e617dff38d351e2514d6efb9a5dc5e",
+    "prior-ui.md": "03eaf0c7c030aa93ccd95fd5de22f2606f3624ecb7081d05942d440795fc0b9b"
+  },
+  "test_binary_sha256": "21ea31281ac07bd05a85eebbcd437b8be9172a55274e8639f19d18cd3d6c3af2",
+  "artifact_provenance": "Copied existing writer artifact; matches candidate archived manifest hash. No fresh compilation or independent source-to-binary attestation.",
+  "environment": {
+    "TMPDIR": "/private/tmp",
+    "SHELL": "/tmp/gitcraft-integration-tools/validation-shell",
+    "PATH_prefix": "/tmp/gitcraft-integration-tools",
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "test_threads": 1,
+    "writer_toolchain": "cargo/rust +1.95.0",
+    "cargo_compilation_executed_by_reviewer": false
+  },
+  "executed_tests": [
+    {
+      "filter": "repo::file_comparison::tests::actual_matrix_cells_open_a_read_only_content_diff_from_pinned_branches",
+      "code": 0,
+      "seconds": 0.247,
+      "log": "/tmp/gitcraft-fileviews-ui-r2-evidence/test-00.log",
+      "counts": {
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0
+      },
+      "log_sha256": "40e89a5397b2baf664d643cbc87bfd9aab663f16929b8de0f17e4cfe6b77d2cb"
+    },
+    {
+      "filter": "repo::file_comparison::code_moves::tests::",
+      "code": 0,
+      "seconds": 0.682,
+      "log": "/tmp/gitcraft-fileviews-ui-r2-evidence/test-01.log",
+      "counts": {
+        "passed": 5,
+        "failed": 0,
+        "ignored": 0
+      },
+      "log_sha256": "6d13e7a7f94740c590a25cd31bcfe39849c56984cb80289ff6e4110cb929d81e"
+    },
+    {
+      "filter": "repo::file_comparison::tests::line_history_header_wrap_toggles_without_reloading_or_losing_logical_selection",
+      "code": 0,
+      "seconds": 0.188,
+      "log": "/tmp/gitcraft-fileviews-ui-r2-evidence/test-02.log",
+      "counts": {
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0
+      },
+      "log_sha256": "b4701618372e33b3f7ffb0f7fb847101001443cb3c42916e97b7c6588917594e"
+    },
+    {
+      "filter": "repo::file_comparison::tests::actual_cross_file_move_opens_both_places_and_navigates_after_the_patch_arrives",
+      "code": 0,
+      "seconds": 0.187,
+      "log": "/tmp/gitcraft-fileviews-ui-r2-evidence/test-03.log",
+      "counts": {
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0
+      },
+      "log_sha256": "9566edf7147cb1d30ecf93d380ccd64d2d27b7af9d329de1cb74a251f8397a43"
+    },
+    {
+      "filter": "repo::file_comparison::tests::actual_migration_ribbon_opens_content_edits_apart_from_the_rename",
+      "code": 0,
+      "seconds": 0.171,
+      "log": "/tmp/gitcraft-fileviews-ui-r2-evidence/test-04.log",
+      "counts": {
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0
+      },
+      "log_sha256": "90c009450afafef7372ba8cfac8d5ee036a82c7509912e4755755cf10319359c"
+    },
+    {
+      "filter": "repo::file_comparison::tests::closed_refreshed_or_reopened_views_cannot_apply_old_line_actions",
+      "code": 0,
+      "seconds": 0.372,
+      "log": "/tmp/gitcraft-fileviews-ui-r2-evidence/test-05.log",
+      "counts": {
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0
+      },
+      "log_sha256": "7c1b696e28e8b19f723ff067b563cefe5c735203515f8d2cc043b437bdb24499"
+    },
+    {
+      "filter": "repo::file_comparison::tests::opening_snapshot_views_drops_diff_reading_modes_and_selections",
+      "code": 0,
+      "seconds": 0.1,
+      "log": "/tmp/gitcraft-fileviews-ui-r2-evidence/test-06.log",
+      "counts": {
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0
+      },
+      "log_sha256": "f9c1d70f7e137d1f97e96f4187563d1c9ae29fd335402d4aaf386ca92cf25e0d"
+    },
+    {
+      "filter": "repo::file_comparison::text::tests::",
+      "code": 0,
+      "seconds": 0.01,
+      "log": "/tmp/gitcraft-fileviews-ui-r2-evidence/test-07.log",
+      "counts": {
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0
+      },
+      "log_sha256": "9a3741753227c10146f65f25a550789e0658374d2722e1e7651e191c65f51ecb"
+    },
+    {
+      "filter": "repo::diff::wrap::tests::",
+      "code": 0,
+      "seconds": 0.008,
+      "log": "/tmp/gitcraft-fileviews-ui-r2-evidence/test-08.log",
+      "counts": {
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0
+      },
+      "log_sha256": "2c1b57284e0f1c00abdefe757501348eb3e0cfbdf82bd4339c95ae9857f78919"
+    },
+    {
+      "filter": "git::line_log::tests::",
+      "code": 0,
+      "seconds": 0.007,
+      "log": "/tmp/gitcraft-fileviews-ui-r2-evidence/test-09.log",
+      "counts": {
+        "passed": 10,
+        "failed": 0,
+        "ignored": 0
+      },
+      "log_sha256": "05e050311b686391ec91b20fb29bf1e0bf20280373bff74ed68c8d6fc05dab49"
+    },
+    {
+      "filter": "git::dvc::tests::pull_is_fixed_argv_and_uses_network_operation_guards",
+      "code": 0,
+      "seconds": 0.008,
+      "log": "/tmp/gitcraft-fileviews-ui-r2-evidence/test-10.log",
+      "counts": {
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0
+      },
+      "log_sha256": "e26f5dfda5a471cf5acb8fedd7b48782e98e58c668de02473084c1c3038f8f70"
+    }
+  ],
+  "counts": {
+    "passed": 24,
+    "failed": 0,
+    "ignored": 0
+  },
+  "writer_logs_verified": [
+    {
+      "section": "sops.log",
+      "sha256_valid": true
+    },
+    {
+      "section": "standalone.log",
+      "sha256_valid": true
+    },
+    {
+      "section": "wrap.log",
+      "sha256_valid": true
+    },
+    {
+      "section": "comparison.log",
+      "sha256_valid": true
+    },
+    {
+      "section": "svg.log",
+      "sha256_valid": true
+    },
+    {
+      "section": "dvc.log",
+      "sha256_valid": true
+    },
+    {
+      "section": "binary.log",
+      "sha256_valid": true
+    },
+    {
+      "section": "reset.log",
+      "sha256_valid": true
+    },
+    {
+      "section": "reset-mode.log",
+      "sha256_valid": true
+    },
+    {
+      "section": "moved.log",
+      "sha256_valid": true
+    },
+    {
+      "section": "patch.log",
+      "sha256_valid": true
+    },
+    {
+      "section": "algorithm.log",
+      "sha256_valid": true
+    },
+    {
+      "section": "context.log",
+      "sha256_valid": true
+    },
+    {
+      "section": "standalone-cli.log",
+      "sha256_valid": true
+    },
+    {
+      "section": "line-history.log",
+      "sha256_valid": true
+    },
+    {
+      "section": "check.log",
+      "sha256_valid": true
+    },
+    {
+      "section": "build.log",
+      "sha256_valid": true
+    },
+    {
+      "section": "clippy.log",
+      "sha256_valid": true
+    },
+    {
+      "section": "qualified-lint.log",
+      "sha256_valid": true
+    }
+  ],
+  "held": [
+    "full suite",
+    "process runtime/cancellation/signals",
+    "CI",
+    "PR",
+    "live SSH/WSL/DVC",
+    "native GUI/platform runtime"
+  ],
+  "report": "/tmp/gitcraft-51-fileviews-ui-r2.md",
+  "report_sha256": "d45b4c451fa68bc91d7046b55a374f96a40017cee7c17ccb311ede0c499ebab7"
+}

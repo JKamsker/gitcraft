@@ -78,7 +78,17 @@ pub(in crate::git) fn request(
     input: Vec<u8>,
     limit: usize,
 ) -> remote::Request {
-    let mut req = super::remote_request(target, &super::Extra::default(), args);
+    request_with_extra(target, args, input, limit, &super::Extra::default())
+}
+
+fn request_with_extra(
+    target: &remote::Target,
+    args: &[&str],
+    input: Vec<u8>,
+    limit: usize,
+    extra: &super::Extra,
+) -> remote::Request {
+    let mut req = super::remote_request(target, extra, args);
     let git = req.script;
     // Git stdout is binary. Bound disk use before passing it through the remote protocol.
     // The inner subshell keeps `exec git` from replacing the cleanup shell.
@@ -107,7 +117,7 @@ pub(in crate::git) fn request_captured(
     input: Vec<u8>,
     limit: usize,
 ) -> remote::Request {
-    let mut req = request(target, args, input, limit);
+    let mut req = request_with_extra(target, args, input, limit, &super::Extra::repository());
     req.script = req
         .script
         .replace("[ \"$code\" = 0 ] || exit \"$code\"\n", "");
@@ -144,8 +154,8 @@ mod captured_recording {
             .env("GIT_CONFIG_KEY_0", "remote.origin.mirror");
         let command = super::super::apply_command_extras(
             inherited,
-            Some(std::path::Path::new("/selected")),
-            &super::super::Extra::default(),
+            None,
+            &super::super::Extra::repository(),
             &args,
         );
         let env: std::collections::BTreeMap<_, _> = command.get_envs().collect();

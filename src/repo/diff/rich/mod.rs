@@ -11,6 +11,7 @@ pub(super) mod config;
 #[cfg(test)]
 mod config_tests;
 mod config_view;
+mod dependency_metadata;
 pub(super) mod deps;
 #[cfg(test)]
 mod deps_tests;
@@ -20,6 +21,7 @@ mod dvc_view;
 mod json;
 pub(super) mod prose;
 pub(super) mod prose_view;
+mod search;
 mod tab;
 pub(super) mod table;
 #[cfg(test)]
@@ -279,6 +281,7 @@ pub fn load(
 /// What a rich view keeps between frames.
 #[derive(Default)]
 pub struct RichState {
+    metadata: dependency_metadata::State,
     /// Runs of unchanged parts opened (by their place in the view).
     pub opened: std::collections::HashSet<usize>,
     /// The height of each thing shown, measured at `width`.
@@ -292,7 +295,7 @@ pub fn show(ui: &mut Ui, diff: &RichDiff, state: &mut RichState, acts: &mut Vec<
         RichDiff::Prose(prose) => prose_view::show(ui, prose, state, acts),
         RichDiff::Config(config) => config_view::show(ui, config, acts),
         RichDiff::Api(api) => api_view::show(ui, api, acts),
-        RichDiff::Deps(deps) => deps_view::show(ui, deps, acts),
+        RichDiff::Deps(deps) => deps_view::show(ui, deps, &mut state.metadata, acts),
         RichDiff::Table(table) => table_view::show(ui, table, state, acts),
         RichDiff::Dvc(dvc) => dvc_view::show(ui, dvc, acts),
     }
@@ -317,4 +320,12 @@ pub fn fallback_note(ui: &mut Ui, kind: RichKind, note: &str) {
                 );
             });
         });
+}
+
+pub(in crate::repo) use search::with_state as search_document;
+impl RichState {
+    pub(in crate::repo) fn search_generation(&mut self, ctx: &egui::Context) -> u64 {
+        self.metadata.poll(ctx);
+        self.metadata.generation()
+    }
 }

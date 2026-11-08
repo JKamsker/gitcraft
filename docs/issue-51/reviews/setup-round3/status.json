@@ -1,0 +1,6 @@
+{
+  "candidate": "753040fe942c9ef96cc496b61eb0174486fda366",
+  "verdict": "FAIL F4 absent proof and omitted LFS routing",
+  "F6": "scoped STATIC PASS",
+  "runtime": "No programs under test; hold retained"
+}

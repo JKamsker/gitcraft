@@ -70,6 +70,7 @@ struct Job {
     id: u64,
     key: Key,
     cancel: Arc<AtomicBool>,
+    _scope: crate::tasks::Scope,
 }
 
 struct Shown {
@@ -289,6 +290,13 @@ impl RepoTab {
         self.start_ghost(key, ctx);
     }
 
+    pub(in crate::repo) fn timeline_ghost_active(&self) -> bool {
+        self.ghost
+            .hover
+            .as_ref()
+            .is_some_and(|(op, _)| matches!(op, GhostOp::Timeline { .. }))
+    }
+
     /// The key `op`'s outcome is cached by.
     fn ghost_key(&mut self, op: GhostOp) -> Key {
         let mut h = DefaultHasher::new();
@@ -337,10 +345,14 @@ impl RepoTab {
         self.ghost.jobs += 1;
         let id = self.ghost.jobs;
         let cancel = Arc::new(AtomicBool::new(false));
+        let scope = self.tx.cancel.child();
+        let mut sender = self.tx.clone();
+        sender.cancel = scope.clone();
         self.ghost.job = Some(Job {
             id,
             key: key.clone(),
             cancel: Arc::clone(&cancel),
+            _scope: crate::tasks::Scope(scope),
         });
         let cached = self.ghost.cached(&key);
         let facts = Facts {
@@ -353,28 +365,55 @@ impl RepoTab {
         let version = Arc::clone(&self.ghost.version);
         let history = self.history_gen;
         let op = key.op.clone();
-        self.then(
+        let failure_key = key.clone();
+        super::messages::spawn_or(
+            &sender,
             ctx,
+            move |error| {
+                super::Msg::Then(Box::new(move |tab, ctx| {
+                    tab.ghost_arrived(id, failure_key, history, Arc::new(Err(error)), None, ctx);
+                }))
+            },
             move || {
                 let stop = || cancel.load(Ordering::Relaxed);
                 let result = cached.unwrap_or_else(|| {
                     Arc::new(
-                        git_version(&repo, &version)
-                            .and_then(|v| plan::plan(&repo, &op, &facts, v, &stop)),
+                        (if matches!(op, GhostOp::Timeline { .. }) {
+                            Ok(GitVersion(0, 0, 0))
+                        } else {
+                            git_version(&repo, &version)
+                        })
+                        .and_then(|v| plan::plan(&repo, &op, &facts, v, &stop))
+                        .map(|mut outcome| {
+                            if matches!(op, GhostOp::Timeline { .. }) {
+                                let loaded: std::collections::HashSet<_> =
+                                    rows.iter().map(|c| c.hash.as_str()).collect();
+                                outcome
+                                    .created
+                                    .retain(|c| !loaded.contains(c.hash.as_str()));
+                            }
+                            outcome
+                        }),
                     )
                 });
-                let head_ref = facts
-                    .refs
-                    .current
-                    .as_deref()
-                    .map(|c| format!("refs/heads/{c}"));
+                let head_ref = match &op {
+                    GhostOp::Timeline { state, .. } => {
+                        (!state.branch.is_empty()).then(|| format!("refs/heads/{}", state.branch))
+                    }
+                    _ => facts
+                        .refs
+                        .current
+                        .as_deref()
+                        .map(|c| format!("refs/heads/{c}")),
+                };
                 let view = match (&*result, stop()) {
                     (Ok(outcome), false) => Some(view::build(&rows, outcome, head_ref.as_deref())),
                     _ => None,
                 };
-                (result, view)
+                super::Msg::Then(Box::new(move |tab, ctx| {
+                    tab.ghost_arrived(id, key, history, result, view, ctx)
+                }))
             },
-            move |tab, (result, view), ctx| tab.ghost_arrived(id, key, history, result, view, ctx),
         );
     }
 

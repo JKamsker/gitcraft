@@ -8,6 +8,7 @@ mod algorithm;
 mod algorithm_tests;
 mod binary;
 pub(super) mod context;
+pub(in crate::repo) mod encrypted;
 mod fold_view;
 mod image_compare;
 mod images;
@@ -37,6 +38,7 @@ pub(in crate::repo) mod structural;
 mod tests;
 mod view;
 mod weakened;
+mod wrap;
 
 #[cfg(test)]
 pub(super) use binary::{make_docx, make_pdf, make_zip};
@@ -121,6 +123,7 @@ pub struct DiffData {
     pub header: String,
     /// Hunks and lines can be staged, unstaged or discarded on their own.
     pub partial: bool,
+    pub sops: bool,
     /// Hunks and lines of a commit's diff can be reverted on their own.
     pub revertable: bool,
     /// Blocks removed in one place and added in another.
@@ -219,7 +222,11 @@ pub fn load_lines(
         (Some(ranges), DiffKey::Commit { hash, path }) => {
             let text = git::line_diff(repo, hash, path, ranges)?;
             // Not the commit's patch: nothing of it is picked to revert.
-            Ok(prepare(repo, key, path, &text, false, true, dark))
+            // Line history always uses raw source lines, including its initial log query.
+            // Decryption remains an explicit whole-file comparison in the private owner.
+            let mut data = prepare(repo, key, path, &text, false, true, dark);
+            data.sops = encrypted::probe_checked(repo, key) == Some(true);
+            Ok(data)
         }
         _ => load(repo, key, opts, dark),
     }
@@ -227,6 +234,12 @@ pub fn load_lines(
 
 /// Reads and prepares the diff for `key`.
 pub fn load(repo: &Path, key: &DiffKey, opts: DiffOptions, dark: bool) -> Result<DiffData, String> {
+    let recognized = encrypted::probe_checked(repo, key);
+    let sops = recognized == Some(true);
+    let opts = DiffOptions {
+        no_textconv: opts.no_textconv || recognized != Some(false),
+        ..opts
+    };
     let patch = |opts: DiffOptions| -> Result<(String, String), String> {
         Ok(match key {
             DiffKey::Commit { hash, path } => {
@@ -260,15 +273,9 @@ pub fn load(repo: &Path, key: &DiffKey, opts: DiffOptions, dark: bool) -> Result
         done => done?,
     };
     let pickable = !opts.ignore_ws;
-    Ok(prepare(
-        repo,
-        key,
-        &path,
-        &text,
-        pickable,
-        opts.whole_file,
-        dark,
-    ))
+    let mut data = prepare(repo, key, &path, &text, pickable, opts.whole_file, dark);
+    data.sops = sops;
+    Ok(data)
 }
 
 /// The diff `text` of `path` read into lines, coloured and paired. `pickable`: hunks and lines
@@ -310,7 +317,7 @@ fn prepare(
     let lfs = lfs_pair(&lines);
     // An image in LFS: git has only its pointer.
     let image = if is_image(&path) && lfs.is_none() {
-        Some(load_images(repo, key, &path, images::renamed_from(text)))
+        Some(load_images(repo, key, &path, old_name(text).as_deref()))
     } else {
         None
     };
@@ -350,6 +357,7 @@ fn prepare(
     let weakened = weakened::by_hunk_line(text, &lines);
     DiffData {
         line_counts,
+        sops: false,
         lines,
         spans,
         changed,
@@ -514,3 +522,10 @@ pub(super) fn unstage_args(head: &str, path: &str) -> Vec<String> {
 pub(in crate::repo) fn literal_path(path: &str) -> String {
     format!(":(literal){path}")
 }
+
+/// Pair raw patch lines for the snapshot-only file comparison panes.
+pub(in crate::repo) fn comparison_pairs(lines: &[DiffLine]) -> Vec<(Option<usize>, Option<usize>)> {
+    pair_lines(lines).1
+}
+
+pub(in crate::repo) use wrap::logical_offset as logical_wrap_offset;

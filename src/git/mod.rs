@@ -2,6 +2,8 @@
 //! Git as the compatibility backend (config, credentials, hooks and remote machines).
 
 mod absorb;
+pub(crate) mod activity;
+pub(crate) mod atlas;
 mod attributes;
 pub mod backend;
 mod backlinks;
@@ -10,9 +12,9 @@ mod branch_health;
 mod bundles;
 #[cfg(test)]
 mod clone_tests;
-mod credential_scope;
-pub use credential_scope::*;
 mod command;
+mod credential_scope;
+pub use credential_scope::{CREDENTIAL_HELPER, CredentialScope};
 mod commit_msg;
 mod commits;
 mod conflict;
@@ -21,14 +23,17 @@ mod detached;
 mod diff;
 mod diff_algorithm;
 pub mod doctor;
-pub(crate) mod drafts;
 pub mod dry_run;
+pub(crate) mod dvc;
 pub mod errors;
 pub mod external_tool;
+pub(crate) mod file_comparison;
 mod files;
 mod fold;
+pub(crate) mod growth;
 mod hooks;
 mod interaction;
+pub(crate) mod investigations;
 mod lfs;
 #[cfg(test)]
 pub(crate) mod lfs_fixtures;
@@ -42,9 +47,11 @@ mod log_order;
 mod notebook_filter;
 mod notes;
 mod overview;
+pub(crate) mod postcards;
 mod preview;
 pub mod progress;
 mod range_diff;
+pub(crate) mod recovery;
 mod redact;
 mod reflog;
 mod refs;
@@ -66,9 +73,12 @@ mod timed;
 mod trees;
 mod unity;
 #[cfg(test)]
+mod visualization_tests;
+#[cfg(test)]
 pub(crate) use self::unity::tests as unity_tests;
 mod testlane;
 mod worktree;
+mod worktree_location;
 
 pub use self::absorb::*;
 pub use self::attributes::*;
@@ -119,6 +129,7 @@ pub use self::timed::*;
 pub use self::trees::*;
 pub use self::unity::*;
 pub use self::worktree::*;
+pub use self::worktree_location::*;
 
 // Explicit names for types and helpers independently added by feature stacks.
 pub use self::commit_msg::Author;
@@ -379,3 +390,9 @@ pub fn clone_with(
     args.extend(["--", url, &there]);
     run_with(from.as_deref(), &args, creds).map(|_| ())
 }
+
+pub(crate) mod drafts;
+
+mod push_hooks;
+pub(crate) use bundles::bundle_git_path;
+pub(crate) use command::{PushTarget, local_repair_input, push_preflight_with, repair_host};

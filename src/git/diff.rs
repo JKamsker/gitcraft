@@ -196,6 +196,25 @@ pub fn diff_files(repo: &Path, from: &str, to: Option<&str>) -> Result<Vec<Chang
     Ok(files)
 }
 
+pub(crate) fn investigation_diff_files(
+    reader: &super::investigations::Reader<'_>,
+    from: &str,
+    to: &str,
+) -> Result<Vec<ChangedFile>, String> {
+    if !super::investigations::oid(from) || !super::investigations::oid(to) {
+        return Err("Invalid pinned diff request".into());
+    }
+    let read = |kind| -> Result<String, String> {
+        let mut args = range_args(kind, from, Some(to));
+        args.splice(1..1, ["--no-ext-diff", "--no-textconv"]);
+        String::from_utf8(reader.run(&args, vec![], &[0])?)
+            .map_err(|_| "Local diff returned non-UTF-8 paths".into())
+    };
+    let mut files = parse_name_status(&read("--name-status")?);
+    add_line_counts(&mut files, &read("--numstat")?);
+    Ok(files)
+}
+
 /// `diff` arguments that list the files that differ from `from` to `to` (`kind` is
 /// `--name-status` or `--numstat`).
 fn range_args<'a>(kind: &'a str, from: &'a str, to: Option<&'a str>) -> Vec<&'a str> {
@@ -245,7 +264,7 @@ pub fn work_diff(repo: &Path, file: &StatusFile, opts: DiffOptions) -> Result<St
     if file.area == Area::Untracked {
         // An untracked file has no history: show it as all added.
         let mut args = vec!["diff"];
-        args.extend(PATCH_ARGS);
+        opts.push_args(&mut args);
         args.extend(["--no-index", "--", "/dev/null", path]);
         return run_ok_codes(Some(repo), &args, &[0, 1]);
     }

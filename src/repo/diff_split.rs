@@ -94,6 +94,8 @@ impl RepoTab {
     /// Leaves a pull request's or a commit's builds page for the graph: a diff shown over it
     /// was one of its files, and goes with it rather than staying below the graph.
     pub(super) fn leave_pages(&mut self) {
+        self.file_comparison = None;
+        self.tour = None;
         self.versions.view = None;
         if (self.pr_view.is_some() || self.ci_view.is_some()) && self.conflict.is_none() {
             self.diff = None;

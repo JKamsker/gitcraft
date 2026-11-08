@@ -65,7 +65,7 @@ where
         let work = Arc::clone(&work);
         let wake = Arc::clone(&wake);
         let tx = tx.clone();
-        std::thread::spawn(move || worker(&queue, per_group, &work, &*wake, &tx, timeout));
+        crate::connections::spawn(move || worker(&queue, per_group, &work, &*wake, &tx, timeout));
     }
     rx
 }
@@ -139,7 +139,7 @@ where
     W: Fn(T) -> Result<R, String> + Send + Sync + 'static,
 {
     let (tx, rx) = channel();
-    std::thread::spawn(move || {
+    crate::connections::spawn(move || {
         let _ = tx.send(work(item));
     });
     match rx.recv_timeout(timeout) {

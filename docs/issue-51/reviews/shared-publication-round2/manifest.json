@@ -1,0 +1,134 @@
+{
+  "candidate": "825d1f89b3f68360fea309b77246470165d4867f",
+  "tree": "f88037ff172e2171e4e467e6540607b82f64f720",
+  "verdict": "FAIL",
+  "scope": "state C1 C2 C4 and agent C-AGENT-1 only",
+  "dispositions": {
+    "C1": "CORRECTED_STATIC",
+    "C2": "PARTIAL: C2-R2-1 equal-content saved-policy restore/refusal bypass",
+    "C4": "CORRECTED_STATIC",
+    "C-AGENT-1": "CORRECTED_STATIC"
+  },
+  "finding": {
+    "id": "C2-R2-1",
+    "priority": "P2",
+    "source": "src/git/drafts/working_transaction.rs:26-31 before52-62",
+    "proof": "Exact native_apply body with inert recovery/FS doubles calls commit and returns success for equal content while saved policy differs/is missing"
+  },
+  "source_method": "immutable Git object exports; every bound copied file byte-compared to object",
+  "snapshot": "/tmp/gitcraft-shared-r2-825d-source",
+  "source_sha256_and_blob": {
+    "src/git/drafts/index_transaction.rs": {
+      "sha256": "bcd47633249a31e60df4f7c25394da9973c9719e2918dda33c933127141951e0",
+      "blob": "a89bfc543ae6f0da8f0a3021a3c4ed8f2077fd92"
+    },
+    "src/git/drafts/lists/index.rs": {
+      "sha256": "4ed9dea6bbf0fdd8f281c6c86f5c9c0ffe75a674d230792a0b079f19d431b968",
+      "blob": "776577fad87aaae836352c66d867bb227b6c3dcb"
+    },
+    "src/git/drafts/lists/mod.rs": {
+      "sha256": "a36c39ab2a4f7792d25b9e4ca93fadc1046c51e55448070341a3e2b60e3895fe",
+      "blob": "a90f6d302bc437a0767976e3678db8a85be8be89"
+    },
+    "src/git/drafts/mod.rs": {
+      "sha256": "cfa65ea8325ba82038ee9a41e0325dcf11ebf55dc252895542a7cda91a94ddac",
+      "blob": "d1b6f38cdee446c554840d1480e60b4aa8a8d6eb"
+    },
+    "src/git/drafts/native_files/access.rs": {
+      "sha256": "588f72e48a5c6cf3129cc095077478886519cb8e90133e9b1653177e8ca80d58",
+      "blob": "f59b0eab6552810b77b917cb23a2f98c0fd93d92"
+    },
+    "src/git/drafts/native_files/directory.rs": {
+      "sha256": "2388acb0f86ea6ae77b88531cb7be95264a2a6c307511edf91adc9b3bee25275",
+      "blob": "b52c6fd904dd0112ea3e207ef1303b54002e709e"
+    },
+    "src/git/drafts/native_files/mod.rs": {
+      "sha256": "f3f78bc9df437df6de0aa01ada3c18923a19b54ac767e586969f17ea9e24fd25",
+      "blob": "8c60432a6766fabb8cf72288c10be696eeb920eb"
+    },
+    "src/git/drafts/publication.rs": {
+      "sha256": "ab7bc0a29d0025834f17ebff0cc8059c2ffd04dc985cd8f40bf62787d243bcd4",
+      "blob": "940c61136f4e71f9977f6ef7099baa25079e5a46"
+    },
+    "src/git/drafts/turn.rs": {
+      "sha256": "50cc99157e2b7ffb08c6584c6b7d5b5b770da74e08ce00d25e837acd8e0badf8",
+      "blob": "8b0f72f03ded9c805d1d08805dddb625b59180dd"
+    },
+    "src/git/drafts/virtuals.rs": {
+      "sha256": "3e725b67e1e5ad8d3660873d6c3ef1cc1524f0084fcc0c5e2146779e199d0e4c",
+      "blob": "181269b6f2b604322fadb8871994e2de6fccadbf"
+    },
+    "src/git/drafts/working_transaction.rs": {
+      "sha256": "ba78f3b28102ebd753a01815aa6faf2b5db780599d84d6b60b3c2c6ed464655a",
+      "blob": "4ee724614c62f69fdb19600c1e2e7b840a6f05ac"
+    },
+    "src/repo/actions.rs": {
+      "sha256": "fc007ea973b4e33aa741f91fad89d013781628355d7a57908d57d7cd8178b613",
+      "blob": "0a09a8b2ce7883a46346baa4a899959508f4f9fc"
+    },
+    "src/repo/repository_tools/lists.rs": {
+      "sha256": "ba5a3bdee9b11baa30a94a4923ab9e276110fc0f07aea151108a72afca6ba7bf",
+      "blob": "af4da66d9db742196941e4a2e681e4c34adc3410"
+    },
+    "src/repo/repository_tools/mod.rs": {
+      "sha256": "8d4d6fe58172519d915ac82678a52f4f5200af2b3045c09ee1815dad1f7041f4",
+      "blob": "2f2cad35520631a9588f37c8a79eeddb34356838"
+    },
+    "src/repo/repository_tools/receipts.rs": {
+      "sha256": "e2bf762bc12b9a16c0c65d06f8147443564bbafa3701c177b4e92f059a944f57",
+      "blob": "0cc839d5586b30a1d55a63cd96e05e2b515f0a85"
+    },
+    "src/repo/repository_tools/turns.rs": {
+      "sha256": "c5ae509f0bfa5f4f6fcaafba8811cc9a43860b058734978b8a5974bbc50c1e74",
+      "blob": "ab9584fe28ba7d3dccb314e35bb0b4bf5313569d"
+    },
+    "src/repo/repository_tools/virtuals.rs": {
+      "sha256": "a1de516a7afe6bc1a23c991cf5a665aa564d5e903c939424ba88da45e000b662",
+      "blob": "24d1b5b69cacb184824a1a5219e4338d6f74dbd1"
+    },
+    "src/git/drafts/context.rs": {
+      "sha256": "666770a5278197820f2e6cf212c17df8d4839e8a07c8158c6a58bfde2625cc81",
+      "blob": "b2d8a67029240aae8893f0776b9da800244a56e0"
+    }
+  },
+  "inputs_sha256": {
+    "/tmp/gitcraft-51-batch-c-state-review-r1.md": "9c8ddcfeb63b6576f45ea688d29c780a501117140708a071165a41ac391fcccb",
+    "/tmp/gitcraft-51-batch-c-state-review-r1-manifest.json": "578a836b2cd4bfb589c50466899029e87d863375ea38be01c28381173b95ccaf",
+    "/tmp/gitcraft-51-batch-c-agent-review-r1.md": "867074da27e9dbc1e0f2d21b607a049103875a939be4cccbea5b548fe32242c7",
+    "/tmp/gitcraft-51-batch-c-agent-review-r1-manifest.json": "0857b4732b9ede4ddf9e53f38f22e21f7cff8f9f594a6257cf542d6b905cf3b1"
+  },
+  "report": {
+    "path": "/tmp/gitcraft-51-shared-publication-review-r2.md",
+    "sha256": "5f5c478b1961d5220e23aca88a255f6a9a407879395b008fcb3fdb55b4d4d19c"
+  },
+  "evidence_sha256": {
+    "/tmp/gitcraft-shared-r2-825d-evidence/make-policy-adapter.py": "51845c245b46012e10990a84d19401d930748dc2a6674d66dd848ad6cf4626e0",
+    "/tmp/gitcraft-shared-r2-825d-evidence/adapter-seams.json": "14370aa52870f2dbebb57efe6f6429177bd4637045b8f97e07f1064093452a0f",
+    "/tmp/gitcraft-shared-r2-825d-evidence/policy-noop": "c34c208665ec27c1ede047903134f41cb6900686b531bafc7e995290c273d3bc",
+    "/tmp/gitcraft-shared-r2-825d-evidence/policy-noop.rs": "a704f6a5166265ff37d09acfb47bacf502885d2c803e24e8ef7015f6b3b97331",
+    "/tmp/gitcraft-shared-r2-825d-evidence/policy-noop.log": "eb0bec885dcd5d97df20dd261b4c5b952d9e4fc276a971c8980369c4e2fd62a5"
+  },
+  "exact_adapter_seams": {
+    "exact_native_apply_sha256": "7326c07ccc822e8724d9aaaaa1937674ab8609d0fde56d14600eb34ad9000ad2",
+    "inert_doubles": "All filesystem/recovery dependencies stubbed; no native method or filesystem I/O can execute; exact native_apply body and supplied equal content maps only."
+  },
+  "reviewer_execution": {
+    "rustc_1_95_calls": 1,
+    "compiler_exit": 0,
+    "compiler_warning": "unused import in inert double",
+    "inert_runs": 1,
+    "exit": 0,
+    "no_native_or_Git_execution": true
+  },
+  "writer_logs_inspected_not_rerun": {
+    "/tmp/gitcraft-c-a171ea39-native-foundation-pure.log": "e3b137aa5478de7861576f328539de56226f253e60f7bd3a3d906144215edd59",
+    "/tmp/gitcraft-c-adef03b8-shared-caller-pure.log": "02a785db7a7f9e37eb65970863753b41d1b28c914d9975e1a9b38584362d3e4f",
+    "/tmp/gitcraft-c-825d1f89-index-pure.log": "b2897d07f982de5158f4b0a653a0288c50cac346cb65bf890e6f9eebdb8a45cd",
+    "/tmp/gitcraft-c-shared-receipts-pure2.log": "7e9e1db5d87d334f502d9c770f646fd0691e99a9f2cf2f7b4b954ac3771ee27f",
+    "/tmp/gitcraft-c-shared-caller-check.log": "8b103ef1558842b8d605afdc2297ff64908b654711b7961a7f663dbb5e300966"
+  },
+  "writer_log_limits": "Overlapping pure matrices/serialization supplied-state headless tests; no native interleavings. Owner exact executable manifest not yet supplied at report creation. Historical shared-caller-check FAILED and not treated as passing.",
+  "runtime_hold": "UNCHANGED: actual Git/helper/process/native/ACL/filesystem-race fixtures, constructors, fullsuite/CI/PR/subagents not run or authorized",
+  "tracked_edits": false,
+  "provenance_not_acceptance": "fileviews1535 extraction independently inspected; no inherited approval"
+}

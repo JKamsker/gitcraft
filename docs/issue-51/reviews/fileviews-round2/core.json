@@ -1,0 +1,236 @@
+{
+  "review": "fileviews-core-r2",
+  "candidate": "be013726aa51c270bde95cecff727191a603c785",
+  "application": "10727c7e88725b4510350ec3416bd1e4ebfcfeda",
+  "prior_candidate": "c82112a5ab8ba461c487c3266462a81896c85d33",
+  "snapshot": "/private/tmp/gitcraft-fileviews-core-r2-be013726",
+  "application_to_candidate_docs_only_files": [
+    "docs/validation/issue51-diff-batch-2026-11-07.md",
+    "docs/validation/issue51-fileviews-corrections-2026-11-08-tests.log.gz",
+    "docs/validation/issue51-fileviews-corrections-2026-11-08.json",
+    "docs/validation/issue51-fileviews-corrections-2026-11-08.md"
+  ],
+  "source_sha256": {
+    "Cargo.lock": "567afe06ce341115af69b90f7268f6aa6cb7876fb5eba75017daed3fd0113caa",
+    "Cargo.toml": "420b48a30fc8ec9317fc68c5a90caa611437bfd25fb10c882932c5ca0080ede9",
+    "src/app/mod.rs": "421d4414b59cadda871295d6aad33acdd94f828578e806602455f3931afb5a66",
+    "src/git/command.rs": "f97c5f4e573ef1618b0bcc9abbe7c193b1e19b8dacc2b901b006a6c314c187ff",
+    "src/git/diff.rs": "51fb9c47041298c6018c6ae26c6bd6c9efbfb573ce984c504e70ee80ee9ce6b5",
+    "src/git/file_comparison/index_transaction.rs": "83f4cea4b032cf44b4f1b164658c5c5d78f25fcaca0527d156e1664e4ee3dd75",
+    "src/git/file_comparison/lens.rs": "cc1b737b7ccd2b1961246b1963a7a2baeb53c8797a9a2f8c7147811d69e94a4f",
+    "src/git/file_comparison/mod.rs": "e334d31615976d9e7895b5174080772b13556b5353efee9a172dae9d68549751",
+    "src/git/file_comparison/remote_index.py": "5955f17aa7fecbd6eed3fe0984793c902fcd6711d69297345e421d1bda2fcc2c",
+    "src/git/file_comparison/transaction.rs": "15b7941e04a285ee20852018159cc9d8cf699cfb46cd5a03113b5a4e5cb3d880",
+    "src/git/line_log.rs": "b517424f40d7feb4a0225dafcdddfbbc89f07ac31aa648c290127694d4d29a71",
+    "src/lib.rs": "82935567ad855e5e11a2c2526b6f281086e3c895bfe3c793126356bc16263da5",
+    "src/repo/commit_actions.rs": "36043791bf9e65f3dcd0d97d21a92c1fec701279ab6a5773b5a92d4c7d5ea1f8",
+    "src/repo/diff/encrypted/reader.rs": "e5edeac796332d22456884e7d6d5337dc1045776d142fa7c6bf2c14c3d1a72b0",
+    "src/repo/diff/encrypted/tests.rs": "942937d498807ef62a3b3ba307b3dfa7fa209db9db53992f3f42ed97b21ebd27",
+    "src/repo/diff/images.rs": "cf8f70c4323125f9e640d9f60db6747d9f0cf442ae585b12fd3aa14ed0dac40a",
+    "src/repo/diff/mod.rs": "ecdcc0a50ab185b69b3f16fe97461c024a5ad47f81483b95c58864c83a40932a",
+    "src/repo/diff/moved_view.rs": "bd4a8af98f35c23d6e7fc1549b0f369ba3c711283ca41ec4e6f2c75623855a56",
+    "src/repo/diff/view.rs": "ec629d2a2a8c66a1d454ef41f227e892f8e73d2445e8e610c518af178889dadd",
+    "src/repo/file_comparison/code_moves.rs": "b37b021ebf36009b72e0425be50060c28e874ebf36fb88a8d0908bebefdc334c",
+    "src/repo/file_comparison/mod.rs": "fb1d0317dc5afe4f44c712e5b3fba1d4e1617b89031706bea53441e5e2a418cf",
+    "src/repo/file_comparison/tests.rs": "dc5d66ad9eb31a3b5b20e847e86a39332661a4f8bd3b77ab0c8f2ad8b2936f14",
+    "src/standalone/access.rs": "f4bbeb35506d1df0f3dbd3dbdf3b6736e5a11415958719e907ac3c8184b32858",
+    "src/standalone/directory.rs": "faca87722f01bb05aee1ab53086df12ef22a0d14b7b036007f0ca11fd871ae45",
+    "src/standalone/files.rs": "10a290bf4ad1747fd0c7c7d762dfb034de954bb89d2f8c2f7da1a6a19274ce75",
+    "src/standalone/mod.rs": "cc244d577da33c3f7b14511252988641100cb0dd65ff74e6d93c66386d3ebaf9",
+    "src/standalone/permissions.rs": "8210173670fc5cc78245162da1013189896fd7786aa6dfd6a61d833a47f99eea",
+    "src/standalone/save.rs": "401236726b1e94c1277684e92f330742ee10fb8760b7c9d854c6591cca20811c",
+    "src/standalone/windows_metadata.rs": "31b43fa447786eb8fc9eab23b9c2d4c5545952cd07d8db43242871764b1b933d",
+    "src/svg.rs": "de4104e59ef85e5011cc2e96e2f402f25a6d0929ea10d572628902082386bf12"
+  },
+  "prior_report_sha256": "bb438b58485dbb5503231e952d78e426687811a81338642c0c400b2f47be6959",
+  "writer_archive_sha256_matches": true,
+  "writer_raw_logs": [
+    {
+      "name": "sops",
+      "raw_log_sha256_matches": true,
+      "raw_log_present_in_archive": true
+    },
+    {
+      "name": "standalone",
+      "raw_log_sha256_matches": true,
+      "raw_log_present_in_archive": true
+    },
+    {
+      "name": "wrap",
+      "raw_log_sha256_matches": true,
+      "raw_log_present_in_archive": true
+    },
+    {
+      "name": "comparison",
+      "raw_log_sha256_matches": true,
+      "raw_log_present_in_archive": true
+    },
+    {
+      "name": "svg",
+      "raw_log_sha256_matches": true,
+      "raw_log_present_in_archive": true
+    },
+    {
+      "name": "dvc",
+      "raw_log_sha256_matches": true,
+      "raw_log_present_in_archive": true
+    },
+    {
+      "name": "binary",
+      "raw_log_sha256_matches": true,
+      "raw_log_present_in_archive": true
+    },
+    {
+      "name": "reset",
+      "raw_log_sha256_matches": true,
+      "raw_log_present_in_archive": true
+    },
+    {
+      "name": "reset-mode",
+      "raw_log_sha256_matches": true,
+      "raw_log_present_in_archive": true
+    },
+    {
+      "name": "moved",
+      "raw_log_sha256_matches": true,
+      "raw_log_present_in_archive": true
+    },
+    {
+      "name": "patch",
+      "raw_log_sha256_matches": true,
+      "raw_log_present_in_archive": true
+    },
+    {
+      "name": "algorithm",
+      "raw_log_sha256_matches": true,
+      "raw_log_present_in_archive": true
+    },
+    {
+      "name": "context",
+      "raw_log_sha256_matches": true,
+      "raw_log_present_in_archive": true
+    },
+    {
+      "name": "standalone-cli",
+      "raw_log_sha256_matches": true,
+      "raw_log_present_in_archive": true
+    },
+    {
+      "name": "line-history",
+      "raw_log_sha256_matches": true,
+      "raw_log_present_in_archive": true
+    },
+    {
+      "name": "check",
+      "raw_log_sha256_matches": true,
+      "raw_log_present_in_archive": true
+    },
+    {
+      "name": "build",
+      "raw_log_sha256_matches": true,
+      "raw_log_present_in_archive": true
+    },
+    {
+      "name": "clippy",
+      "raw_log_sha256_matches": true,
+      "raw_log_present_in_archive": true
+    },
+    {
+      "name": "qualified-lint",
+      "raw_log_sha256_matches": true,
+      "raw_log_present_in_archive": true
+    }
+  ],
+  "independent_safe_execution": {
+    "docs_commit": "be013726aa51c270bde95cecff727191a603c785",
+    "application_commit": "10727c7e88725b4510350ec3416bd1e4ebfcfeda",
+    "artifact_sha256": "21ea31281ac07bd05a85eebbcd437b8be9172a55274e8639f19d18cd3d6c3af2",
+    "process_control_tests_executed": false,
+    "executed": [
+      {
+        "name": "git::file_comparison::index_transaction::tests::configured_private_and_group_modes_match_native_git_and_policy_drift_is_refused",
+        "returncode": 0,
+        "seconds": 1.6598,
+        "log": "/private/tmp/gitcraft-fileviews-core-r2-be013726/independent-safe-00.log",
+        "log_sha256": "0b7b1d198412a7b8d898e8d6da6b94b4062ef6f19a1589c9760f5b41b0b345f8"
+      },
+      {
+        "name": "git::file_comparison::index_transaction::tests::foreign_lock_regular_symlink_and_last_moment_replacements_are_preserved",
+        "returncode": 0,
+        "seconds": 0.9448,
+        "log": "/private/tmp/gitcraft-fileviews-core-r2-be013726/independent-safe-01.log",
+        "log_sha256": "f5349aa0a996839217cd2af2a45c254ace89c3495584a9af10ed267286484b1b"
+      },
+      {
+        "name": "git::file_comparison::index_transaction::tests::index_owner_comparison_and_real_group_drift_refuse_stale_publication",
+        "returncode": 0,
+        "seconds": 0.2312,
+        "log": "/private/tmp/gitcraft-fileviews-core-r2-be013726/independent-safe-02.log",
+        "log_sha256": "581e1d5a93850db241ff5c8e1b6825f5c5f4244b8b4afeadc21d0f1801a55361"
+      },
+      {
+        "name": "git::file_comparison::index_transaction::tests::native_index_acl_is_preserved_and_acl_only_drift_cannot_succeed",
+        "returncode": 0,
+        "seconds": 0.4896,
+        "log": "/private/tmp/gitcraft-fileviews-core-r2-be013726/independent-safe-03.log",
+        "log_sha256": "7e9c06493b140b2cdc97cc29e6da4284bafcf80278ec32d101eda61270706698"
+      },
+      {
+        "name": "git::file_comparison::index_transaction::tests::split_index_keeps_unrelated_entries_and_reverses_through_the_new_publisher",
+        "returncode": 0,
+        "seconds": 0.5427,
+        "log": "/private/tmp/gitcraft-fileviews-core-r2-be013726/independent-safe-04.log",
+        "log_sha256": "261706ab526c84dca97b6488370553386eb04245780a655868f42fb6d4d5b426"
+      },
+      {
+        "name": "git::file_comparison::index_transaction::tests::swapped_index_parent_and_last_moment_index_creator_are_recoverable",
+        "returncode": 0,
+        "seconds": 0.4936,
+        "log": "/private/tmp/gitcraft-fileviews-core-r2-be013726/independent-safe-05.log",
+        "log_sha256": "503bb1649a9142e899bb482ad705ff288f6a4a0bff60d63ab85fd70468b8aab5"
+      },
+      {
+        "name": "standalone::windows_metadata::fixture_recording_tests::owned_acl_fixture_records_literal_single_file_arguments_without_recursion",
+        "returncode": 0,
+        "seconds": 0.0071,
+        "log": "/private/tmp/gitcraft-fileviews-core-r2-be013726/independent-safe-06.log",
+        "log_sha256": "f888dfc3adf8b427d6dd9a123845b078f61190cf94e9f282906f3eda36444565"
+      },
+      {
+        "name": "standalone::windows_metadata::full_policy_fixture_recording_tests::label_and_audit_fixtures_record_only_owned_literal_paths",
+        "returncode": 0,
+        "seconds": 0.007,
+        "log": "/private/tmp/gitcraft-fileviews-core-r2-be013726/independent-safe-07.log",
+        "log_sha256": "7b2da86bd4e4d045aa629e0867c0293143dd8d36c3974560655a4c13a0629a40"
+      },
+      {
+        "name": "standalone::windows_metadata::tests::metadata_protocol_records_only_constant_script_and_literal_native_path_data",
+        "returncode": 0,
+        "seconds": 0.0076,
+        "log": "/private/tmp/gitcraft-fileviews-core-r2-be013726/independent-safe-08.log",
+        "log_sha256": "809f2d0ee56f92c6a0f417f0acac059fc9d7bd5544147208803e240337ca22ae"
+      },
+      {
+        "name": "git::file_comparison::transaction::owned_remote_correction_tests::stock_darwin_md5_is_accepted_without_gnu_md5sum",
+        "returncode": 0,
+        "seconds": 0.1328,
+        "log": "/private/tmp/gitcraft-fileviews-core-r2-be013726/independent-safe-09.log",
+        "log_sha256": "6654f5254d4aade5cde7f0638c73586725a79cea96132156bce6fada42751431"
+      }
+    ]
+  },
+  "synthetic_remote_xattr_recording": {
+    "candidate": "be013726aa51c270bde95cecff727191a603c785",
+    "application": "10727c7e88725b4510350ec3416bd1e4ebfcfeda",
+    "fixture": "AST-extracted exact functions; recording fake os, no process/filesystem access",
+    "names": 1025,
+    "value_bytes": 65536,
+    "value_reads_before_rejection": 1025,
+    "requested_value_bytes_before_rejection": 67174400,
+    "error": "Index access metadata exceeds 1 MiB"
+  },
+  "limits": [
+    "No full suite, CI, live SSH/WSL, process signals/cancellation/cleanup, legacy remote fixture, remote transaction runtime, native Windows/Linux, native GUI runtime, fresh build.",
+    "10 safe exact tests passed, including owned local Git/index and Darwin hashing; Windows checks recording only."
+  ]
+}

@@ -1,0 +1,84 @@
+{
+  "report_sha256": "da93c85f55f2875b8350d1ad1f6efb662a8bf9628145b8ac90ce39bf35665c0b",
+  "manifest_sha256": "cb2b3e146a9f99daca5f399c8678e8cd199f50a14ce220c5b9842448a8218720",
+  "artifacts": [
+    {
+      "original_path": "/tmp/gitcraft-51-batch-b-validation.json",
+      "sha256": "a76784f1cfe92d9caf295713b5db9fd043c3700d7a8b0bfa71a0706b7b3d4b3d",
+      "bytes": 13952,
+      "archive": "evidence-000-gitcraft-51-batch-b-validation.json.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-51-gitlab-delta-r2-evidence/correction.diff",
+      "sha256": "a406e40aa45c27156ab0aabc07a627d89ab2a31a02f72cd2541f8beaf32e13c5",
+      "bytes": 12399,
+      "archive": "evidence-001-correction.diff.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-51-gitlab-delta-r2-evidence/reachability-tests",
+      "sha256": "9cce396f7382d08d7061506663e55d75ae0841dbb053a5441e066125cf777ac1",
+      "bytes": 1054544,
+      "archive": "not copied: binary or >2MB; hash retained"
+    },
+    {
+      "original_path": "/tmp/gitcraft-51-gitlab-delta-r2-evidence/reachability.log",
+      "sha256": "868dcf7ba6289f4d2f06ce4cf8aa4ca1242a5176fb5226834289c6d7e01c3e5f",
+      "bytes": 293,
+      "archive": "evidence-003-reachability.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-51-gitlab-delta-r2-evidence/reachability.rs",
+      "sha256": "01dcf9e4efdd9fa2a817e821ea213f36749e18925552e9b1553fe97b42b65562",
+      "bytes": 6039,
+      "archive": "evidence-004-reachability.rs.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-51-gitlab-delta-r2-evidence/source-binding.json",
+      "sha256": "520c6a2bb701f93aae636a0164ba263e316e70fdc1aa8fedcc83fee4c2bddd56",
+      "bytes": 2486,
+      "archive": "evidence-005-source-binding.json.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-51-gitlab-delta-review-r2.md",
+      "sha256": "da93c85f55f2875b8350d1ad1f6efb662a8bf9628145b8ac90ce39bf35665c0b",
+      "bytes": 3581,
+      "archive": "evidence-006-gitcraft-51-gitlab-delta-review-r2.md.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-51-gitlab-r1-fix-7ef8cac8-0.log",
+      "sha256": "33d08d68a1de4a2130c29acd1a1bd0f949986bade16fbd3658c9d344f7a11392",
+      "bytes": 4214,
+      "archive": "evidence-007-gitcraft-51-gitlab-r1-fix-7ef8cac8-0.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-51-gitlab-r1-fix-7ef8cac8-1.log",
+      "sha256": "e6aa31660dde092ecdc16d82e1073a81bc6bb12ef63f3fce007a43beba36de99",
+      "bytes": 5508,
+      "archive": "evidence-008-gitcraft-51-gitlab-r1-fix-7ef8cac8-1.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-51-gitlab-r1-fix-7ef8cac8-2.log",
+      "sha256": "21146060aaddc960f3b97b59ac98f68786247bfc39ba16c2fac0fb5121c148bc",
+      "bytes": 7873,
+      "archive": "evidence-009-gitcraft-51-gitlab-r1-fix-7ef8cac8-2.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-51-gitlab-r1-fix-7ef8cac8-3.log",
+      "sha256": "f4403412cb20dc7d8a0a94c08c9c8853e4bac9b3e8489158834f30512311ed97",
+      "bytes": 72,
+      "archive": "evidence-010-gitcraft-51-gitlab-r1-fix-7ef8cac8-3.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-51-gitlab-review-r1-manifest.json",
+      "sha256": "16e46cafe730548ad811c77b11bb04af5a73be0a1a5967099953a43e3849fced",
+      "bytes": 9062,
+      "archive": "evidence-011-gitcraft-51-gitlab-review-r1-manifest.json.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-51-gitlab-review-r1.md",
+      "sha256": "67750ec21e6de281b7e02bbf5eff127acf88ad309a9a7c7f936f264baba25df2",
+      "bytes": 11011,
+      "archive": "evidence-012-gitcraft-51-gitlab-review-r1.md.gz"
+    }
+  ]
+}

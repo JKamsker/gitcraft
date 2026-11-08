@@ -14,6 +14,7 @@ mod scratch;
 mod version;
 
 pub use picks::{Replay, Replayed, Stop, rebase_picks, replay};
+pub(crate) use reach::unreachable_bounded;
 pub use reach::{Merge, is_ancestor, leaving, merge, unreachable};
 pub use version::GitVersion;
 

@@ -1,0 +1,251 @@
+{
+  "review": "Independent residual TEAR-R1-1 contention delta closure",
+  "verdict": "SCOPED PASS",
+  "commit": "e12121f9dbb52a71976b0a12dc5473041f31fa76",
+  "tree": "d98ad3dedd6f8c70bc789c69d2bbc1b8fc609f1d",
+  "parent": "cd6562b008462a371439fbd6c042c7c434d4c63f",
+  "compared_from": "f48a28ad41f7e2d29119311fa0c77affdbdef124",
+  "source_root": "/private/tmp/gitcraft-tearoff-contention-e12121f9",
+  "changed_files": [
+    "src/app/windows.rs"
+  ],
+  "scope": "ONLY residual TEAR-R1-1 previously reproduced Desktop logic/ROOT UI contention paths, deferred replay and explicit Quit/last-window preservation",
+  "report": {
+    "path": "/tmp/gitcraft-51-tearoff-contention-delta-review.md",
+    "sha256": "ec06f886ff9618f9c83e88785758881bcd7957e0757705d383dd973c89343393"
+  },
+  "sources": [
+    {
+      "path": "AGENTS.md",
+      "sha256": "a6b99ef334f51715e97ee6fd0d24fd4bd6920999d277657edc87ef6d570ffb1d",
+      "git_object_bytes_verified": true,
+      "byte_unchanged_from_f48": true
+    },
+    {
+      "path": "src/app/windows.rs",
+      "sha256": "8c7fc727eed13163fcfba6fa3c3cbd65bb8a74b435b21d60db05e935fb560ce8",
+      "git_object_bytes_verified": true,
+      "byte_unchanged_from_f48": false
+    },
+    {
+      "path": "src/app/askpass_dialog.rs",
+      "sha256": "31fc7ecd51089156b4b15376605fb2797c12c6f385764415c285083b14fd15d9",
+      "git_object_bytes_verified": true,
+      "byte_unchanged_from_f48": true
+    },
+    {
+      "path": "src/app/clone.rs",
+      "sha256": "39e58a5dc4bf2ad4f85648a8940e6f9a666be3ad370a2f5faabacee2974a13cf",
+      "git_object_bytes_verified": true,
+      "byte_unchanged_from_f48": true
+    },
+    {
+      "path": "src/app/dropped.rs",
+      "sha256": "0b6fff5f81349ed44ab464696604523fdee85bd321588ec9501a52171a856381",
+      "git_object_bytes_verified": true,
+      "byte_unchanged_from_f48": true
+    },
+    {
+      "path": "src/app/launch.rs",
+      "sha256": "f56da6ab5c818be4b364e438ffc62d4515e28544eecc65345568f8b7bc3130a0",
+      "git_object_bytes_verified": true,
+      "byte_unchanged_from_f48": true
+    },
+    {
+      "path": "src/app/mod.rs",
+      "sha256": "f6b68716976543ce1dd190a5cc836b555d45ef70edbdd3401c8c2278e6dfb120",
+      "git_object_bytes_verified": true,
+      "byte_unchanged_from_f48": true
+    },
+    {
+      "path": "src/app/my_work.rs",
+      "sha256": "80e49e82f06c0439fde381261560c7052f117db1869baad7424ef013759f02c0",
+      "git_object_bytes_verified": true,
+      "byte_unchanged_from_f48": true
+    },
+    {
+      "path": "src/app/remote_open.rs",
+      "sha256": "66f1a647366182635546ea7c5557b8ed778acfcb126ddec85728d5b30b98d34b",
+      "git_object_bytes_verified": true,
+      "byte_unchanged_from_f48": true
+    },
+    {
+      "path": "src/app/repo_scan.rs",
+      "sha256": "d49c435e42977d42449c015ad4024cd3dbb50dbee1584a77ce94ae20c9f17b6c",
+      "git_object_bytes_verified": true,
+      "byte_unchanged_from_f48": true
+    },
+    {
+      "path": "src/app/teleport/mod.rs",
+      "sha256": "c0d4e191b89c19f74da6d6f0aefaae5e0d3a9ce8404c87e4fb42c56b996319b4",
+      "git_object_bytes_verified": true,
+      "byte_unchanged_from_f48": true
+    },
+    {
+      "path": "src/repo/mod.rs",
+      "sha256": "e7353896f867f75c5f9624e83b2237455275d25067bf132f27a1dc1db0947bb4",
+      "git_object_bytes_verified": true,
+      "byte_unchanged_from_f48": true
+    },
+    {
+      "path": "src/repo/popout/views.rs",
+      "sha256": "e5bee63e737cdbbd9c2d200d7d1e28ac2254b64093861f26ae8cf2d6136b876f",
+      "git_object_bytes_verified": true,
+      "byte_unchanged_from_f48": true
+    },
+    {
+      "path": "src/repo/popout/window.rs",
+      "sha256": "ddbe29a95505182e13e6a3a0a4777b2418ea5b28a0561ecca04cebc2b24cbef2",
+      "git_object_bytes_verified": true,
+      "byte_unchanged_from_f48": true
+    },
+    {
+      "path": "src/keymap/editor.rs",
+      "sha256": "f98a1149c5fcaed87fa019244e8d456323f7347f4ce963d8d70b3379f7e28675",
+      "git_object_bytes_verified": true,
+      "byte_unchanged_from_f48": true
+    },
+    {
+      "path": "src/a11y/mod.rs",
+      "sha256": "3b0796ed0dc544c55632bc6366fb1b1b19f74eaf6c8ffb45ecbadf0971f6771a",
+      "git_object_bytes_verified": true,
+      "byte_unchanged_from_f48": true
+    },
+    {
+      "path": "src/a11y/focus.rs",
+      "sha256": "d8f48fff41dfb5d47770f7c9f145841b4ec760745530f22a2d9ec47dfa518e1f",
+      "git_object_bytes_verified": true,
+      "byte_unchanged_from_f48": true
+    }
+  ],
+  "production_method_extractions": [
+    {
+      "path": "/private/tmp/gitcraft-tearoff-contention-evidence/logic_tick.rs",
+      "sha256": "b4e6ab1f88109edd00b837ec8e4c7cf0166d0a120483a973876a677b965c48c7",
+      "production_source": "src/app/windows.rs",
+      "byte_identical_extraction": true
+    },
+    {
+      "path": "/private/tmp/gitcraft-tearoff-contention-evidence/defer_close.rs",
+      "sha256": "b48e51d4c4e30e2acf252a30e0d4bb8b8e66bffcc085b495bb2ab63852e3661b",
+      "production_source": "src/app/windows.rs",
+      "byte_identical_extraction": true
+    },
+    {
+      "path": "/private/tmp/gitcraft-tearoff-contention-evidence/ui_tick.rs",
+      "sha256": "437d8a2385d6582ea7bf28cb34c75c2aa59df752f05c20171cbdb5019d534788",
+      "production_source": "src/app/windows.rs",
+      "byte_identical_extraction": true
+    },
+    {
+      "path": "/private/tmp/gitcraft-tearoff-contention-evidence/logic_wrapper.rs",
+      "sha256": "445438a467876fe86d805ad346327d52c9d7c1d44883f21d59da3242849d2acd",
+      "production_source": "src/app/windows.rs",
+      "byte_identical_extraction": true
+    },
+    {
+      "path": "/private/tmp/gitcraft-tearoff-contention-evidence/ui_wrapper.rs",
+      "sha256": "795e99a1f0d54c23f3d2e459568903decf9db3a0bda2efe831fb7e879cbfbf9a",
+      "production_source": "src/app/windows.rs",
+      "byte_identical_extraction": true
+    },
+    {
+      "path": "/private/tmp/gitcraft-tearoff-contention-evidence/close_root.rs",
+      "sha256": "3ff913c13b7aeecb781d6e3bd4d99a96eae6fed9176ebe931b57996ed0ecf341",
+      "production_source": "src/app/windows.rs",
+      "byte_identical_extraction": true
+    },
+    {
+      "path": "/private/tmp/gitcraft-tearoff-contention-evidence/root_close_request.rs",
+      "sha256": "13e8c831c493fd252de17a1344dc243c02ce331ff2466eab215f5438c6113699",
+      "production_source": "src/app/windows.rs",
+      "byte_identical_extraction": true
+    }
+  ],
+  "independent_artifacts": [
+    {
+      "path": "/private/tmp/gitcraft-tearoff-contention-evidence/extractions.json",
+      "sha256": "627e409b58918d7e296a7f4205c7a7f946b638a27386b54f95c51070d80d6acc"
+    },
+    {
+      "path": "/private/tmp/gitcraft-tearoff-contention-evidence/probe.rs",
+      "sha256": "b48dc3498b22b5a93505ed9e2eac86d30011f7a50289dc976ca164316de2c549"
+    },
+    {
+      "path": "/private/tmp/gitcraft-tearoff-contention-evidence/probe",
+      "sha256": "3848565e6c1b895e7e1965f1c180f429ba6fda86524d2e84770acdced0a50126"
+    },
+    {
+      "path": "/private/tmp/gitcraft-tearoff-contention-evidence/probe.log",
+      "sha256": "063a6772fcbabb47583e3952264aad0ec92167bf11fd631d6a611104a52eba3b"
+    }
+  ],
+  "dependency_rlib": {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-b9411fc1/target/debug/deps/libegui-0e410d2928238130.rlib",
+    "sha256": "00991d51820997eadb725e41ef7721aa7c818dd7c1a201afb2ac0c71ae3d7703"
+  },
+  "primary_dependency_source": {
+    "path": "/Users/jonas/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/eframe-0.36.2/src/native/epi_integration.rs",
+    "sha256": "54770c41c9036bd5139e14a045d75303b428c73c066ee3def9bd14b57f7b9e96"
+  },
+  "inputs_inspected": [
+    {
+      "path": "/tmp/gitcraft-51-tearoff-review-r2.md",
+      "sha256": "9fde67108f6c05f9d118db96146f5fcc353c22255ec3078ea6a7cdfef87fbf6a"
+    },
+    {
+      "path": "/tmp/gitcraft-51-tearoff-review-r2-manifest.json",
+      "sha256": "8b7e9448cd1a9806202596024216446289e11e784f4f2dd1659501edd6e2c241"
+    },
+    {
+      "path": "/tmp/gitcraft-interaction-both-contention-validation.json",
+      "sha256": "e25e0ded9080f7cdf0dca0dcaaa36c8b891e34e039b6a6e806327ffaebf09c20"
+    }
+  ],
+  "historical_logs_inspected": [
+    {
+      "path": "/tmp/gitcraft-interaction-e12121f9-close-0.log",
+      "sha256": "651dc8aa7b143fe2c90a28ec9b0068041f69feec2cfda0880febeac6e649570c",
+      "evidence": "historical writer; not rerun"
+    },
+    {
+      "path": "/tmp/gitcraft-interaction-e12121f9-close-1.log",
+      "sha256": "f2066ca264b9a8598ecd436c70919e1efe1acea4098ad2a13b5d82d67bc049ec",
+      "evidence": "historical writer; not rerun"
+    }
+  ],
+  "independent_execution": {
+    "compiler_invocations": 1,
+    "compiler_exit_code": 0,
+    "pure_headless_adapter_runs": 1,
+    "run_exit_code": 0,
+    "cases": 6,
+    "entry_paths": [
+      "logic eframe wrapper -> logic_tick",
+      "ui eframe wrapper -> ui_tick"
+    ],
+    "replay_cases_per_entry": [
+      "ordinary live children: CancelClose/Visible(false), child retained",
+      "explicit Quit: Close without CancelClose",
+      "ordinary last-window: Close without CancelClose"
+    ],
+    "common_assertions": [
+      "held owner emits CancelClose and pending=true",
+      "released owner consumes pending",
+      "next empty tick does not duplicate Close"
+    ],
+    "actual_App_RepoTab_native_git_process_runtime_fixtures": 0,
+    "full_suite_ci_pr_runs": 0,
+    "tracked_source_edits": 0
+  },
+  "observed_stdout": [
+    "PASS exact logic entry: held-owner Close cancelled/remembered; replay keeps children, permits explicit Quit and last-window close; no duplicate replay.",
+    "PASS exact ROOT UI entry: held-owner Close cancelled/remembered; replay keeps children, permits explicit Quit and last-window close; no duplicate replay."
+  ],
+  "preservation": "Other five TEAR findings and editor/panel closures carried forward; source unchanged except narrow windows deferred-close delta; no reopening.",
+  "limits": [
+    "Minimal recorded App state/Frame, tick_model/normal UI/children stand-ins; exact locked branches and root close reducer exercised without actual App constructor.",
+    "Native source-window-exit PointerGone/capture remains original OPEN requirement.",
+    "No native or global runtime/final combined/full-suite acceptance."
+  ]
+}

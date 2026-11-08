@@ -37,6 +37,7 @@ pub struct OpControl {
     progress: Mutex<Option<Progress>>,
     /// What each git call of the operation did so far, for the activity log.
     steps: Mutex<Vec<Recorded>>,
+    auth_failure: Mutex<Option<super::AuthFailure>>,
     /// Called whenever there is news (a repaint of the window).
     notify: Box<dyn Fn() + Send + Sync>,
 }
@@ -55,6 +56,7 @@ impl OpControl {
             cancel,
             progress: Mutex::new(None),
             steps: Mutex::new(Vec::new()),
+            auth_failure: Mutex::new(None),
             notify: Box::new(notify),
         })
     }
@@ -85,6 +87,15 @@ impl OpControl {
             steps.push(step);
         }
         (self.notify)();
+    }
+
+    pub(crate) fn authentication_failed(&self, failure: super::AuthFailure) {
+        if let Ok(mut stored) = self.auth_failure.lock() {
+            *stored = Some(failure);
+        }
+    }
+    pub(crate) fn auth_failure(&self) -> Option<super::AuthFailure> {
+        self.auth_failure.lock().ok().and_then(|s| s.clone())
     }
 
     /// What the operation's git calls did, taken out (once it has ended).
@@ -212,6 +223,10 @@ pub(in crate::git) fn run_watched_extra_recorded(
         let rec = Recorded::new(&words, None, &e, creds, started);
         (Err(e), rec)
     };
+    let _source = match super::source::bind(&mut extra, dir, args) {
+        Ok(source) => source,
+        Err(e) => return failed(e),
+    };
     extra.trace_hooks = !quiet && crate::git::hooks::wants_trace(args);
     let trace = (dir.and_then(remote::parse).is_none() && extra.trace_hooks)
         .then(crate::git::hooks::TraceFile::new)
@@ -246,6 +261,9 @@ pub(in crate::git) fn run_watched_extra_recorded(
         return (Err(reason), recorded);
     }
     if ended.code == Some(0) {
+        if let Err(e) = super::source::finish(_source.as_ref(), args, true) {
+            return (Err(e), recorded);
+        }
         return (Ok(ended.stdout), recorded);
     }
     if let Some(t) = &target
@@ -267,6 +285,44 @@ pub(in crate::git) fn run_watched_extra_recorded(
     );
     let e = failed_hook.map_or_else(|| e.clone(), |hook| hook.explain(&e, args));
     (Err(e), recorded)
+}
+
+/// Reviewed target/options use the same progress, cancellation and owned transport as normal pushes.
+pub(super) fn reviewed(
+    dir: &Path,
+    extra: &Extra,
+    args: &[&str],
+    control: &Arc<OpControl>,
+) -> Result<super::Ran, String> {
+    let started = Instant::now();
+    if control.is_cancelled() {
+        return Err(CANCELLED.into());
+    }
+    let words = with_progress(args);
+    let words = words.iter().map(String::as_str).collect::<Vec<_>>();
+    let target = remote::parse(dir);
+    let ended = follow_command(Some(dir), extra, &words, target.as_ref(), control)?;
+    control.record(Recorded::new(
+        &words,
+        ended.code,
+        if ended.code == Some(0) {
+            "Reviewed push completed"
+        } else {
+            "Reviewed push failed; server diagnostics withheld"
+        },
+        None,
+        started,
+    ));
+    if let Some(reason) = ended.stopped {
+        return Err(reason);
+    }
+    Ok(super::Ran {
+        code: ended.code,
+        status: ended.status,
+        stdout: ended.stdout.into_bytes(),
+        stderr: ended.stderr.into_bytes(),
+        failed_hook: None,
+    })
 }
 
 /// Drains both pipes and writes input on the process service's single event loop. Only

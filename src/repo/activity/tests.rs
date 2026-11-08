@@ -204,10 +204,13 @@ fn a_background_fetch_is_kept_only_when_it_fails() {
 /// What is recorded of a call has its secrets hidden: a token URL in its arguments and output,
 /// and the password typed into the tab.
 #[test]
-fn a_recorded_call_hides_its_secrets() {
+fn a_recorded_call_hides_its_secrets() -> Result<(), String> {
     let dir = repo("secrets");
     let creds = git::Credentials {
-        scope: None,
+        scope: Some(git::CredentialScope::for_url(
+            "https://example.invalid/o/r.git",
+            "ana",
+        )?),
         username: "ana".to_owned(),
         password: "s3cr3t-pass".to_owned(),
     };
@@ -238,6 +241,7 @@ fn a_recorded_call_hides_its_secrets() {
         "{}",
         listed.output
     );
+    Ok(())
 }
 
 /// A background fetch failing the same way again and again is one entry, counted.

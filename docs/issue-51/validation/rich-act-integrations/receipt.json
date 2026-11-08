@@ -1,0 +1,23 @@
+{
+  "checks": [
+    {
+      "integration": "e7d20f67f1cac6a53f8f8a9eabfba00399b2fd5b",
+      "reviewed_owner": "53832430c296f039d287b4219385d1401c69afa8",
+      "command": "env CARGO_BUILD_JOBS=2 cargo +1.95.0 check --locked --all-targets",
+      "exit_code": 0,
+      "log": "rich-merge-e7d20f67-check.log.gz",
+      "log_sha256": "18fc5d2533eeb4c4acc407783526d427184c5c3e08db3b2c505072826e1d4e6d"
+    },
+    {
+      "integration": "1a3c6f56435b32a7146ebc31975606ad69994613",
+      "reviewed_owner": "12e7641c917d92482788f5f8a3449ffca425f83f",
+      "command": "env CARGO_BUILD_JOBS=2 cargo +1.95.0 check --locked --all-targets",
+      "exit_code": 0,
+      "log": "act-merge-1a3c6f56-check.log.gz",
+      "log_sha256": "f0ef2e216ea1bc42f997c85041f0320c58364e98072c82473baf3e80f31e9c50"
+    }
+  ],
+  "runtime": "No actual act/Docker/Git/HTTP/native/process fixtures run; global hold unchanged",
+  "changes": "Rich integration retains SOPS exclusive rendering/discard, wrap/SVG/comparison controls;21of23featurefiles identicalowner. Act5localmodules identicalowner; narrow stdout port only, no supervisor acceptance.",
+  "documentation_only": "This archival commit changes no application files; binds prior checks, no new test execution."
+}

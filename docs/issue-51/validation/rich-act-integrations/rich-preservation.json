@@ -1,0 +1,120 @@
+{
+  "reviewed": "53832430c296f039d287b4219385d1401c69afa8",
+  "files": [
+    {
+      "path": "src/repo/diff/binary/mod.rs",
+      "matches_reviewed": true,
+      "sha256": "179dd2956955691317732c4222b5aa6b670a125c6c6f2e75a8a7a4d1f48b7588"
+    },
+    {
+      "path": "src/repo/diff/binary/search.rs",
+      "matches_reviewed": true,
+      "sha256": "5f883754ac75a136642a19600a64b2972568c7f2377df897cfd3a915dd53f2d0"
+    },
+    {
+      "path": "src/repo/diff/notebook/mod.rs",
+      "matches_reviewed": true,
+      "sha256": "a82b4f574606295921d664bd1ecfc044ece9bd44571d5adf68ab41a81aff1771"
+    },
+    {
+      "path": "src/repo/diff/notebook/search.rs",
+      "matches_reviewed": true,
+      "sha256": "d034583ae63caae811138da1604ae33b427a2c1991ae045c0dd2da6b01a8083e"
+    },
+    {
+      "path": "src/repo/diff/rich/dependency_metadata/archive.rs",
+      "matches_reviewed": true,
+      "sha256": "404415fb07fbcbf24f0a5281217beb8040e7a2c024ba69dbebd7b8f5e9d804fb"
+    },
+    {
+      "path": "src/repo/diff/rich/dependency_metadata/mod.rs",
+      "matches_reviewed": true,
+      "sha256": "1f6569defcb1ca5986c47ca943e325e7d996d3491657f7d78eddb0e67129a009"
+    },
+    {
+      "path": "src/repo/diff/rich/dependency_metadata/tests.rs",
+      "matches_reviewed": true,
+      "sha256": "028c87137bd1f9a67938b55948fba82b334a51e5ac4432d5ee6525b108fc9574"
+    },
+    {
+      "path": "src/repo/diff/rich/deps.rs",
+      "matches_reviewed": true,
+      "sha256": "d9c9a245b2d47e6d12afcf9ec2572530044c09decaa799b16889e972f5f56900"
+    },
+    {
+      "path": "src/repo/diff/rich/deps_tests.rs",
+      "matches_reviewed": true,
+      "sha256": "36a618a35ad07b70596d63e9a57cda01465109f975c0efbcc3568d7e9239304d"
+    },
+    {
+      "path": "src/repo/diff/rich/deps_view.rs",
+      "matches_reviewed": true,
+      "sha256": "72d808007f2136c52d5d1d544b58bbb993c35b95dc368f1974d6ea1adf544e1c"
+    },
+    {
+      "path": "src/repo/diff/rich/mod.rs",
+      "matches_reviewed": true,
+      "sha256": "050f391d2d1de39c9fd4d910fa5b79341e119a3e1ec49b5981b314bbec82f4b1"
+    },
+    {
+      "path": "src/repo/diff/rich/prose_view.rs",
+      "matches_reviewed": true,
+      "sha256": "65bf78ba7c19536ada5540f329a440fdd8ed4d30b2d963a957777d24ac93639e"
+    },
+    {
+      "path": "src/repo/diff/rich/search.rs",
+      "matches_reviewed": true,
+      "sha256": "e9b79a9f5e2adf1df632cbb2ba7774cdd9e6537ea4b44766cb7a9e77771a8069"
+    },
+    {
+      "path": "src/repo/diff/structural/mod.rs",
+      "matches_reviewed": false,
+      "sha256": "925721fc0c4f94180ea6a70099c2690b123709f8ff5a950b84c4c138633655ef"
+    },
+    {
+      "path": "src/repo/diff/structural/tests.rs",
+      "matches_reviewed": true,
+      "sha256": "457c82792005850c901bee9703389579fb464bb2f4a2b94c1af40a9634d0189f"
+    },
+    {
+      "path": "src/repo/diff/view.rs",
+      "matches_reviewed": false,
+      "sha256": "7a366246f5408bf614e0bd9f1777b5c4e0f9b31253d1ea34275740340b1a3871"
+    },
+    {
+      "path": "src/repo/find/keys.rs",
+      "matches_reviewed": true,
+      "sha256": "199d92a4d2562f654a358e2647270609634322a9882565f8ba9e13c3981f3e6c"
+    },
+    {
+      "path": "src/repo/find/matcher.rs",
+      "matches_reviewed": true,
+      "sha256": "59709f19eeeba743fcc4142a0679c8acc643ae43fb6b38a411d743d0690da2d0"
+    },
+    {
+      "path": "src/repo/find/mod.rs",
+      "matches_reviewed": true,
+      "sha256": "6d0985ae4d96c1f200b651d31b009bcbd62b4fd8035505d733231b3088265857"
+    },
+    {
+      "path": "src/repo/find/order.rs",
+      "matches_reviewed": true,
+      "sha256": "ef46b5752e4e79dbb22bb78d82854b9507888c0720b97a9595569d270bd2b971"
+    },
+    {
+      "path": "src/repo/find/rendered.rs",
+      "matches_reviewed": true,
+      "sha256": "109f4650a1f0230a2123bb83dfc65c42a72b68daa5a0f29049a51fb3bff42dea"
+    },
+    {
+      "path": "src/repo/find/scan.rs",
+      "matches_reviewed": true,
+      "sha256": "d9228d5478a378d908a9e703e8f138c81825df1d17113e1ca173e433f59d8a30"
+    },
+    {
+      "path": "src/repo/find/tests.rs",
+      "matches_reviewed": true,
+      "sha256": "516b0a22efe574100a26596e6d485134586f80e830947e973dcc17f52c7b1bdd"
+    }
+  ]
+}

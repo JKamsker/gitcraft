@@ -122,10 +122,10 @@ pub fn run(test: &Test<'_>, stop: &(dyn Fn() -> bool + Sync)) -> Result<Ran, Str
     );
     let (tx, rx) = channel();
     std::thread::scope(|scope| {
-        scope.spawn(|| {
+        scope.spawn(crate::connections::inherit(|| {
             let words: Vec<&str> = words.iter().map(String::as_str).collect();
             let _ = tx.send(git::run_for_test(test.dir, &words, test.limit + GRACE));
-        });
+        }));
         let deadline = Instant::now() + test.limit;
         let mut why: Option<Ended> = None;
         let mut told: Option<Instant> = None;

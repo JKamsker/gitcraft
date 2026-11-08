@@ -8,6 +8,7 @@ mod header;
 mod lanes;
 mod menu;
 pub(super) mod message_tooltip;
+pub(super) mod minimap;
 mod order;
 mod pills;
 mod readability;
@@ -92,6 +93,9 @@ impl RepoTab {
     /// The graph, or during a ghost run the graph as the operation would leave it (see
     /// [`super::ghost`]), with the strip that says what it would do above it.
     pub(super) fn graph_view(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
+        if self.timeline_view.is_none() {
+            self.saved_graph_header(ui);
+        }
         let area = ui.available_rect_before_wrap();
         let ghost = self
             .ghost
@@ -122,6 +126,19 @@ impl RepoTab {
     }
 
     fn graph_rows_view(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
+        self.graph_motion.expire();
+        self.graph_motion.schedule_expiry(ui.ctx());
+        self.celebration_ui(ui);
+        self.graph_walk_header(ui);
+        let map_area = ui.available_rect_before_wrap();
+        let map_rect = egui::Rect::from_min_max(
+            egui::pos2(map_area.right() - 78.0, map_area.top()),
+            map_area.right_bottom(),
+        );
+        let show_map = map_area.width() > 480.0 && map_area.height() > 120.0;
+        if show_map {
+            ui.set_width((map_area.width() - 84.0).max(1.0));
+        }
         let t = Tokens::get(ui.ctx());
         if self.search.open {
             self.search_bar(ui, acts);
@@ -198,20 +215,43 @@ impl RepoTab {
             }
             _ => {}
         }
-        if let Some(row) = self.scroll_to.take_if(|_| !ghost) {
+        if let Some(row) = self.take_graph_scroll_row() {
+            let follow_head = self.graph_motion.take_head_scroll();
             let view_h = ui.available_height();
             let top = row as f32 * ROW_PITCH;
             // Only scroll if the row is outside the visible part.
             let offset = ui.data(|d| d.get_temp::<f32>(offset_id)).unwrap_or(0.0);
             if top < offset || top + ROW_PITCH > offset + view_h {
-                scroll = scroll.vertical_scroll_offset((top - view_h / 2.0).max(0.0));
+                let target = (top - view_h / 2.0).max(0.0);
+                let offset = if follow_head {
+                    self.graph_motion.start_scroll(offset, target, ui.ctx())
+                } else {
+                    self.graph_motion.cancel_scroll();
+                    target
+                };
+                scroll = scroll.vertical_scroll_offset(offset);
             }
         }
 
+        if ui.input(|i| i.smooth_scroll_delta.y != 0.0 || i.pointer.any_pressed()) {
+            self.graph_motion.cancel_scroll();
+        }
+        if let Some(offset) = self.graph_motion.scroll_offset(ui.ctx()) {
+            scroll = scroll.vertical_scroll_offset(offset);
+        }
+        if let Some(offset) = self.history_minimap.offset.take() {
+            self.graph_motion.cancel_scroll();
+            scroll = scroll.vertical_scroll_offset(offset);
+        }
         // `show_rows` sizes rows as ROW_PITCH + item spacing, so the spacing must be zero here.
         ui.spacing_mut().item_spacing.y = 0.0;
         let idle = self.busy_op.is_none();
-        let total = self.commits.len() + usize::from(self.has_more);
+        let filtered = self.graph_projection_displayed();
+        let total = if filtered {
+            self.saved_views.len()
+        } else {
+            self.commits.len() + usize::from(self.has_more)
+        };
         // The merges shown, for their badges: only those are read.
         let mut shown_merges = Vec::new();
         // A new repository's first steps go under its few rows.
@@ -234,28 +274,77 @@ impl RepoTab {
             });
             let first = visible.clone().next().unwrap_or(range.start);
             let end = visible.next_back().map_or(first, |i| i + 1);
-            let readable = self.readable_viewport(ui, first..end, lanes.shown);
+            let readable = if filtered {
+                self.readable_rows(
+                    ui,
+                    (first..end).filter_map(|i| match self.saved_views.row(i) {
+                        Some(super::saved_views::Row::Commit(raw)) => Some(*raw),
+                        _ => None,
+                    }),
+                    lanes.shown,
+                )
+            } else {
+                self.readable_viewport(ui, first..end, lanes.shown)
+            };
             if settings.fit_visible_refs() {
                 prefs.refs = readable.refs_width;
             }
             cols = prefs.squeezed(ui.available_width(), settings.last_resized);
             // Near the end: fetch the next page of history.
             // Not from the ghost graph, whose rows don't grow as pages come in.
-            if range.end + 40 >= self.commits.len() && self.has_more && !self.loading_more && !ghost
+            if !filtered
+                && range.end + 40 >= self.commits.len()
+                && self.has_more
+                && !self.loading_more
+                && !ghost
             {
                 acts.push(Action::LoadMore);
             }
             self.drag_auto_scroll(ui);
             // Tab reaches the selected row, else the first in view.
+            let visible_raw = |projected| {
+                if filtered {
+                    match self.saved_views.row(projected) {
+                        Some(super::saved_views::Row::Commit(raw)) => Some(*raw),
+                        _ => None,
+                    }
+                } else {
+                    Some(projected)
+                }
+            };
             let stop = self
                 .selected
-                .filter(|s| range.contains(s))
-                .unwrap_or(range.start);
+                .filter(|s| {
+                    let projected = if filtered {
+                        self.saved_views.position(*s)
+                    } else {
+                        Some(*s)
+                    };
+                    projected.is_some_and(|p| range.contains(&p))
+                })
+                .or_else(|| range.clone().find_map(visible_raw))
+                .unwrap_or(0);
             // Where ↑ / ↓ start from while nothing is selected: the row Tab rings.
             ui.data_mut(|d| d.insert_temp(rows_id, stop));
             let menu_row = ui.data(|d| d.get_temp::<String>(menu_row_id()));
             let mut menu_drawn = false;
-            for i in range {
+            for projected in range {
+                let i = if filtered {
+                    match self.saved_views.row(projected) {
+                        Some(super::saved_views::Row::Commit(raw)) => *raw,
+                        Some(super::saved_views::Row::Gap { range, top, bottom }) => {
+                            if connector_row(ui, &t, cols, lanes, range.len(), top, bottom)
+                                .clicked()
+                            {
+                                self.expand_graph_span(range.clone());
+                            }
+                            continue;
+                        }
+                        None => continue,
+                    }
+                } else {
+                    projected
+                };
                 if i >= self.commits.len() {
                     loading_row(ui, &t);
                     continue;
@@ -300,6 +389,9 @@ impl RepoTab {
             }
         });
         ui.data_mut(|d| d.insert_temp(offset_id, out.state.offset.y));
+        if show_map && !ghost {
+            self.history_minimap(ui, map_rect, out.state.offset.y, out.inner_rect.height());
+        }
         if let Some(steps) = first_steps {
             self.first_steps_view(ui, steps, acts);
         }
@@ -365,9 +457,48 @@ impl RepoTab {
         self.row_menu(&resp, i, idle, acts);
     }
 
+    /// Every index conversion follows the projection actually being drawn.
+    pub(super) fn graph_projection_displayed(&self) -> bool {
+        self.saved_views.active() && !self.ghost.drawing() && self.timeline_view.is_none()
+    }
+    pub(super) fn take_graph_scroll_row(&mut self) -> Option<usize> {
+        let raw = self.scroll_to.take_if(|_| !self.ghost.drawing())?;
+        Some(if self.graph_projection_displayed() {
+            self.saved_views.position(raw).unwrap_or(raw)
+        } else {
+            raw
+        })
+    }
+
     /// Up and down select the row above or below the selected one.
     /// `ringed`: the row Tab reaches, where they start while nothing is selected.
     fn arrow_keys(&mut self, ui: &Ui, ringed: Option<usize>, acts: &mut Vec<Action>) {
+        if Settings::get(ui.ctx()).graph_lane_walk {
+            let direction = ui.input(|i| {
+                if !i.modifiers.is_none() {
+                    return None;
+                }
+                use crate::repo::graph_walk::Direction;
+                if i.key_pressed(Key::ArrowDown) {
+                    Some(Direction::Parent)
+                } else if i.key_pressed(Key::ArrowUp) {
+                    Some(Direction::Child)
+                } else if i.key_pressed(Key::ArrowRight) {
+                    Some(Direction::Merge)
+                } else if i.key_pressed(Key::ArrowLeft) {
+                    Some(Direction::Tip)
+                } else {
+                    None
+                }
+            });
+            if let Some(direction) = direction
+                && let Some(next) = self.graph_walk(direction, ringed, ui.ctx())
+            {
+                acts.push(Action::Select(next));
+                self.scroll_to = Some(next);
+            }
+            return;
+        }
         // Alt+↑ / Alt+↓ go from change to change of the diff shown below the graph.
         let below = self.diff_beside_graph(ui.ctx());
         let (up, down) = ui.input(|i| {
@@ -378,7 +509,9 @@ impl RepoTab {
             )
         });
         let current = self.selected.or(ringed).unwrap_or(0);
-        let next = if up {
+        let next = if self.graph_projection_displayed() && (up || down) {
+            self.saved_views.next(current, down)
+        } else if up {
             Some(current.saturating_sub(1))
         } else if down {
             Some((current + 1).min(self.commits.len().saturating_sub(1)))
@@ -774,4 +907,72 @@ mod tests {
         assert!(opened, "the right-click opened no menu");
         assert!(!egui::Popup::is_any_open(&ctx));
     }
+}
+
+/// A collapsed run preserves only continuous lanes at its boundaries. Ended/reused lanes
+/// have separate caps; hidden internal merges are deliberately not invented as edges.
+fn connector_row(
+    ui: &mut Ui,
+    t: &Tokens,
+    cols: Cols,
+    lanes: Lanes,
+    count: usize,
+    top: &[Option<usize>; 24],
+    bottom: &[Option<usize>; 24],
+) -> Response {
+    let (rect, response) =
+        ui.allocate_exact_size(vec2(ui.available_width(), ROW_PITCH), Sense::click());
+    let painter = ui.painter_at(rect);
+    let mid = rect.center().y;
+    for col in 0..lanes.shown.min(24) {
+        let x = rect.left() + cols.refs + 6.0 + col as f32 * lanes.width + lanes.width / 2.0;
+        let stroke = egui::Stroke::new(1.3, t.lane(col).gamma_multiply(0.65));
+        let continuous = top[col].is_some() && top[col] == bottom[col];
+        for step in 0..6 {
+            let y = rect.top() + step as f32 * 5.0;
+            let upper = y < mid - 3.0;
+            let lower = y > mid + 1.0;
+            if continuous || (upper && top[col].is_some()) || (lower && bottom[col].is_some()) {
+                painter.line_segment(
+                    [
+                        egui::pos2(x, y),
+                        egui::pos2(x, (y + 3.0).min(rect.bottom())),
+                    ],
+                    stroke,
+                );
+            }
+        }
+        if !continuous {
+            if top[col].is_some() {
+                painter.line_segment(
+                    [
+                        egui::pos2(x - 2.0, mid - 3.0),
+                        egui::pos2(x + 2.0, mid - 3.0),
+                    ],
+                    stroke,
+                );
+            }
+            if bottom[col].is_some() {
+                painter.line_segment(
+                    [
+                        egui::pos2(x - 2.0, mid + 3.0),
+                        egui::pos2(x + 2.0, mid + 3.0),
+                    ],
+                    stroke,
+                );
+            }
+        }
+    }
+    painter.text(
+        egui::pos2(rect.left() + cols.refs + cols.graph + 6.0, mid),
+        Align2::LEFT_CENTER,
+        format!("⋯ {count} intervening commits · expand"),
+        FontId::proportional(12.0),
+        if response.hovered() {
+            t.text
+        } else {
+            t.text_dim
+        },
+    );
+    response.on_hover_text("Expand this omitted history. Dashed lanes show continuous boundary runs; internal merges remain hidden until expanded.")
 }

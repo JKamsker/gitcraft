@@ -1,0 +1,11 @@
+{
+  "reference": "074ca29a2bd17996cee6a0c652c52b6e58ed75f1",
+  "sha256": "04853ecc1fc3e8bdf14e3552c894d7e48dfe0850280cb93d5bd55f1c26f5921b",
+  "disposition": "Conditional design adequacy only; no implementation approval",
+  "later_source_not_reviewed": [
+    "38507e7df44141be7967b69bc82d920def220d97",
+    "fbe1b5ee20dc9f122fbeceb0eb60941ba4f7fea4"
+  ],
+  "note": "The note records unchecked CLEAR at074; later38507 checked-error correction is a separate unreviewed checkpoint, not durable ledger approval",
+  "runtime": "HELD"
+}

@@ -82,6 +82,7 @@ impl RepoTab {
         if self.pr_view.is_some() {
             self.close_pr();
         }
+        self.tour = None;
         self.timeline_view = Some(TimelineView {
             selected: None,
             confirm: None,
@@ -200,6 +201,18 @@ impl RepoTab {
                     .auto_shrink([false, false])
                     .show(ui, |ui| self.tree_rows(ui, selected, acts));
             });
+        if self.timeline_ghost_active() {
+            egui::Panel::bottom("timeline_ghost_graph")
+                .resizable(true)
+                .default_size(280.0)
+                .show(ui, |ui| {
+                    ui.label(
+                        RichText::new("Hovered state · release the pointer to end preview")
+                            .color(t.text_dim),
+                    );
+                    ui.add_enabled_ui(false, |ui| self.graph_view(ui, &mut Vec::new()));
+                });
+        }
         egui::CentralPanel::default()
             .frame(
                 egui::Frame::new()
@@ -350,6 +363,10 @@ impl RepoTab {
                 ),
                 None => "The branches as they were before the oldest entry still in the timeline"
                     .to_owned(),
+            });
+            super::super::ghost::offer(&resp, || super::super::ghost::GhostOp::Timeline {
+                state: self.timeline.state_at(&self.ref_state(), row.id),
+                label: entry.map_or_else(|| "Before the oldest entry".into(), |e| e.label.clone()),
             });
             if resp.clicked() {
                 acts.push(Action::Timeline(TimelineAct::Select(row.id)));

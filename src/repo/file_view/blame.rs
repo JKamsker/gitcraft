@@ -212,6 +212,39 @@ impl RepoTab {
                     t.text_faint,
                 );
                 let x = gutter.right() + NUM_W + 8.0;
+                let text_response = ui.interact(
+                    Rect::from_min_max(pos2(x, rect.top()), rect.right_bottom()),
+                    ui.id().with(("blame-dossier", i)),
+                    Sense::click(),
+                );
+                egui::Popup::context_menu(&text_response)
+                    .style(crate::theme::menu_style)
+                    .show(|ui| {
+                        if !line.uncommitted()
+                            && let Ok(path) = git::investigations::dossier::quoted_path(&line.file)
+                            && ui.button("Explain history").clicked()
+                        {
+                            acts.push(Action::OpenLineDossier(Some(
+                                git::investigations::dossier::Seed {
+                                    commit: line.hash.clone(),
+                                    path,
+                                    line: line.orig as usize,
+                                },
+                            )));
+                        }
+                        if !line.uncommitted()
+                            && let Ok(path) = git::investigations::dossier::quoted_path(&line.file)
+                            && ui.button("Symbol biography").clicked()
+                        {
+                            acts.push(Action::OpenSymbolBiography(Some(
+                                git::investigations::dossier::Seed {
+                                    commit: line.hash.clone(),
+                                    path,
+                                    line: line.orig as usize,
+                                },
+                            )));
+                        }
+                    });
                 let spans = data.spans.as_ref().and_then(|s| s.get(i));
                 let galley = file_text::line_galley(ui, spans, &line.text, &font, t.text);
                 find::paint_line(&p, (x, mid, LINE_H), galley, found.marks(i), &t);

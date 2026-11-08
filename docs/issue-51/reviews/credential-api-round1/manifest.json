@@ -1,0 +1,61 @@
+{
+  "verdict": "FAIL",
+  "credential_commit": "8796fc1db893693f43afdec9c0aaa2f255b184fe",
+  "credential_implementation": "a1b03673156d3f65d0a990c0deab0e7510088944",
+  "connection_commit": "2c04e3bd52259e6fd70ae580fc2fe6824c37ae2e",
+  "source_sha256": {
+    "credentials/src/git/credential_scope.rs": "9ec9732c4effc5c8a91237bba4cc2e5bbf78a669c7b68dee8abd8fcc50e6c27c",
+    "credentials/src/git/command.rs": "18a9cdf4ab7f4886a04e799142d1fe2d5e21cfa5493821f9c6d832f38b9d28a1",
+    "credentials/src/git/command/watched.rs": "f33d8717f950c4d2e00e936a47cab7a81395e53e49b3aa993f7b0226af488d59",
+    "connection/src/git/command.rs": "f6de082db970b06cd0cce0905ef3509b4250cb436e5056858b5bd510c0348f65",
+    "connection/src/git/command/connection.rs": "31b4fd40db007419b1588450a953913008c8a1f2306ae7aeecb490e70a886f31",
+    "connection/src/remote/session.rs": "a7af787d7ba28f347bac9cf908e1d8430e9049d89c438efb4f98d90c856fa4ff"
+  },
+  "credential_source_identical_at_connection_tip": true,
+  "fixtures_before_gate_update": {
+    "actual_git_credential_fill_calls": 7,
+    "actual_git_config_reads_through_builder_harness": 3,
+    "ordinary_owned_fixture_git_init_config_setup_calls": 5,
+    "network_authentication": false,
+    "real_secrets": false,
+    "process_signal_timeout_cancellation_tests": false
+  },
+  "after_gate_update": "Static review and pure Rust scope checks only; no additional Git-fill or Git process fixtures.",
+  "pure_programs": [
+    "credential-plan (imports exact credential_scope module)",
+    "connection-captured (exact API body with recording execute adapter)",
+    "scope-pure (imports exact credential_scope module)"
+  ],
+  "normalization_program": "Exact local-command builder/normalization/profile functions with a stub selected-profile context, ordinary owned local Git execution before updated hold.",
+  "evidence_sha256": {
+    "connection-captured": "cbda05592b86395fb91e3f1b2f2ac7d337ed8e6f762d14eb4abb95573e8239b0",
+    "connection-captured.rs": "5f540b48fc28fb685a957e021e1e2b17604e6ac26cbd167d89caae3ddd39f396",
+    "connection-normalization": "63e5853def7c83de5098ec772100ae2d52838cf149287dbbe0ea8dd664d2d9fe",
+    "connection-normalization.json": "e2ac5b2144411a165f7fa3bbd56fdc2173345e3ec63e238d5b5163dd69bbcbca",
+    "connection-normalization.rs": "f0096abec618bcb5ea08601d2016c4e471c0019bc31855d8142f69513afa1ff3",
+    "credential-fill-probes.json": "591933a596e169d150cd15e2b02c0c9058d6765db0ad7161cde8b6ae17662dc2",
+    "credential-plan": "21f275713320be073098c0d92c78d3c6e4ce1d23b9098d186f0281eb0ece5210",
+    "credential-plan.rs": "723f71f599db3298bb52183145fe40c3687e23960a9818e28875305a9a6b13c1",
+    "pure-results.txt": "2d70018db24d1c03738136e8a9314967e0f7549fc8a3e927cfeef4f203cf58b1",
+    "scope-pure": "e8fe1ae2387e9b801849aafa5374105871755490c94d57d13db096316d6909ad",
+    "scope-pure.rs": "f05eeffc1c2bafb8fb71a64940071d02e9ab994537319e80a58c906570f65f22",
+    "writer-final-check.log": "d4168eec77ff4c7a0b470318132d1a407750769afe113abdcb0f571c93b0cdd8",
+    "writer-recording.log": "1c7f519d3825af478a3a875f1edccf9c7ef928f37c92efa3632979f149d87606",
+    "writer-synthetic.log": "5ce15294a57724f6fb9cec5e51849d8ef61ca3a4e18cc8742a136c74e05e0bfd"
+  },
+  "official_sources": [
+    "https://raw.githubusercontent.com/git/git/master/credential.c",
+    "https://git-scm.com/docs/git-config#Documentation/git-config.txt-httpfollowRedirects",
+    "https://curl.se/libcurl/c/CURLOPT_FOLLOWLOCATION.html",
+    "https://raw.githubusercontent.com/git-lfs/git-lfs/main/lfsapi/auth.go"
+  ],
+  "held": [
+    "Full suite",
+    "CI",
+    "process cancellation/timeout/signal runtime",
+    "additional actual Git-fill/process fixtures",
+    "live SSH/WSL/LFS/authentication"
+  ],
+  "report": "/tmp/gitcraft-51-credential-api-review-r1.md",
+  "report_sha256": "b4991b816143079e65693052c1024b1001592830fca12215172dbbef53643763"
+}

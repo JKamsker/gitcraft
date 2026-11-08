@@ -1,0 +1,294 @@
+{
+  "review": "interaction checkpoint independent R1",
+  "verdict": "FAIL",
+  "commit": "5914916f1246986ae1e34de0ef6d8c03edaecd5b",
+  "tree": "3866f0f229b5e8bb847431aac28e7bf968d041bb",
+  "parent": "1c920c0937434bdc9fc13809e2b67e3b5daf70d6",
+  "source_root": "/tmp/gitcraft-interaction-r1-5914916f",
+  "source_read_mode": "immutable Git archive; listed source bytes rechecked against git show",
+  "report": {
+    "path": "/tmp/gitcraft-51-interaction-checkpoint-review-r1.md",
+    "sha256": "bcfda86a92acf0f7103cebb0b84967ddd82f62a47837d998438de6df23f8ae72"
+  },
+  "source_files": [
+    {
+      "path": "src/keymap.rs",
+      "sha256": "b1e7e5836d62efca8cb637b9a3eaaca8f977b2085a18bf5ce6c2b389d521f361",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/keymap/config.rs",
+      "sha256": "7360cb2ea531670e50823a691491aa1f55e8d3c32bcfc1c558b99fa1bce7fcc6",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/keymap/editor.rs",
+      "sha256": "15c1ed1e251f0ef6756e25dcae7510a8f27e8623dac7ea02af5e622b33770f26",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/keymap/resolver.rs",
+      "sha256": "8ecaa7790f238832c21b20b8e162d17b737d46c2a088808d6653450cfaeb82b4",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/a11y/mod.rs",
+      "sha256": "3b0796ed0dc544c55632bc6366fb1b1b19f74eaf6c8ffb45ecbadf0971f6771a",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/a11y/focus.rs",
+      "sha256": "d8f48fff41dfb5d47770f7c9f145841b4ec760745530f22a2d9ec47dfa518e1f",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/a11y/tests/repo_view.rs",
+      "sha256": "d1d05f33aeec833d530ff0b93170c45f0e7dcb1c46880351646ac20dead1ecc9",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/repo/popout/window.rs",
+      "sha256": "c26c44a08e458541f55ff9dd7cfdd46b5dedb84203fcc1835750ac840b7d39e8",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/repo/popout/views.rs",
+      "sha256": "d1c92721a73f6c256ef0cf6de8a993688a84376a2e03993cde03063fce57dad9",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/repo/popout/hint.rs",
+      "sha256": "944e3a121d9c92423292ebedc2bbb2523b5ddc4fcca6287a3640dd0e27943b52",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/app/mod.rs",
+      "sha256": "da7ad44244a635870a80ecbcdeb72b48bc9534a5194d565a3ac63318ab249cfc",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/repo/keyboard.rs",
+      "sha256": "a8fbdf6e0fc85040a46b696b29d3b8b3321e4e9a1bfce1b66f8375343bf48925",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/repo/keyboard/tests.rs",
+      "sha256": "34c87ef87cbb37ce6fa2976e75ccc05b2ebd298f158201766480c6f3456344d3",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/repo/layout.rs",
+      "sha256": "95556e1434f47882c8e2b9bf224f6191cab9df6f3a01dfdcf8b25f1b8f9a6b3f",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/repo/apply.rs",
+      "sha256": "e7a8135cb9d236a7909b41d8b7c00611bf82a9a603c339a9cefb60a38279dfbc",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/repo/load.rs",
+      "sha256": "bb47c7fb45ed748b775a9663e2fcf3e53e1e7a1947dcf50013dc4a9c3138e7cb",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/repo/keys.rs",
+      "sha256": "16f755ba1a1eeab503cffbf56b45bc077d532e81874bfe875f673287b6cdfe1c",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/repo/palette/mod.rs",
+      "sha256": "cf8a2973dd0f72e07a46c05e7caa7a8acafebc8079375df68f73bda7787f65ca",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/repo/diff/select.rs",
+      "sha256": "fdcfc447c67730f40982f44fbd134dd40029539804e86dff1fcb48ba9d0630e5",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/repo/diff/rich/deps_view.rs",
+      "sha256": "9f1760376f06a1731ff8570be9c1fbfef63fb097ccfaf974b779caf89cb84948",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/repo/diff/rich/dvc_view.rs",
+      "sha256": "fbbdda1f6838f851cfe7925c44bc20c85d33e8eaf7a60adbcf97bd1ee9cf9360",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/repo/diff/rich/table_view.rs",
+      "sha256": "abcb71e2faa1082d957a50d01c31468ddbbda787e4858027c448182bdd6015f1",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/repo/graph_view/minimap.rs",
+      "sha256": "76c72095c057ad95db22ba88d44ac20af001b88f5b582b15c32e640a3d11d1b4",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/repo/diff/rows.rs",
+      "sha256": "6c9a750045ae3b3ff4591431248d2f539838eb4752fc03a91bcbdaad61217e8f",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/repo/diff/image_compare/view.rs",
+      "sha256": "604ed9be00b193b6628f754889896d42b8bfd7b2821f1b90877703342c90f3a3",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/menu_item.rs",
+      "sha256": "6e9023d660640f27b6376fc1d9874477d308f13c2bf2e0098acd6ccf3c2dd51d",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/manual.rs",
+      "sha256": "8ace86d0cd7ba470624a4af1a1490bedb0fb2a8b503a684fb81cb7f24cc967e7",
+      "git_object_bytes_verified": true
+    }
+  ],
+  "harness_production_copies": [
+    {
+      "path": "/tmp/gitcraft-interaction-r1-evidence/keymap/mod.rs",
+      "sha256": "b1e7e5836d62efca8cb637b9a3eaaca8f977b2085a18bf5ce6c2b389d521f361",
+      "production_source": "src/keymap.rs",
+      "byte_identical": true
+    },
+    {
+      "path": "/tmp/gitcraft-interaction-r1-evidence/keymap/config.rs",
+      "sha256": "7360cb2ea531670e50823a691491aa1f55e8d3c32bcfc1c558b99fa1bce7fcc6",
+      "production_source": "src/keymap/config.rs",
+      "byte_identical": true
+    },
+    {
+      "path": "/tmp/gitcraft-interaction-r1-evidence/keymap/editor.rs",
+      "sha256": "15c1ed1e251f0ef6756e25dcae7510a8f27e8623dac7ea02af5e622b33770f26",
+      "production_source": "src/keymap/editor.rs",
+      "byte_identical": true
+    },
+    {
+      "path": "/tmp/gitcraft-interaction-r1-evidence/keymap/resolver.rs",
+      "sha256": "8ecaa7790f238832c21b20b8e162d17b737d46c2a088808d6653450cfaeb82b4",
+      "production_source": "src/keymap/resolver.rs",
+      "byte_identical": true
+    }
+  ],
+  "inputs_inspected": [
+    {
+      "path": "/tmp/gitcraft-51-interaction-plan.md",
+      "sha256": "3b039e4a7b4e3a1942ab6906d3f089b901e0bc9e40740e761dba838a2d2fbe77"
+    },
+    {
+      "path": "/tmp/gitcraft-issue51-issues.json",
+      "sha256": "411e76639a880c52a8f92ef5ec543e4e76befaa1f95b2be271629df23a88edfc"
+    },
+    {
+      "path": "/tmp/gitcraft-interaction-r1-5914916f/docs/issue-51/baseline-core.md",
+      "sha256": "ace6e8941b5340ac078b71142fb9345eec3d3aa48a6ece54fabeff4ce5f51006"
+    },
+    {
+      "path": "/tmp/gitcraft-interaction-r1-5914916f/docs/issue-51/baseline-content.md",
+      "sha256": "db38a3646f12d247e3a6ac6140008d237a76a0cd142bcff17903c330b34f6cd4"
+    },
+    {
+      "path": "/tmp/gitcraft-interaction-r1-5914916f/docs/issue-51/baseline-platform.md",
+      "sha256": "12ec9cfe568604a2798996e57c838c4036ae3d6a406bf49c41264e680ebbe0ee"
+    },
+    {
+      "path": "/tmp/gitcraft-interaction-context-validation.json",
+      "sha256": "7d6c6a395d488b38c69d6493876fef64e3cca69a83e8ebe6b67558d2d594db04"
+    },
+    {
+      "path": "/tmp/gitcraft-interaction-keyboard-validation.json",
+      "sha256": "ee223403d5288f414b32cb61b5f72584a68a618208e79b6cb59a2bfef23a05ff"
+    },
+    {
+      "path": "/tmp/gitcraft-interaction-a11y-validation-final.json",
+      "sha256": "aa71057884d7ddd97ea35ca752d2fbfd19d5535cd647a731821e15bde25b4722"
+    },
+    {
+      "path": "/tmp/gitcraft-interaction-modal-chord-validation.json",
+      "sha256": "7f5030ff9f1249a580e7ad9a366a5e9eaa49f9670c0e3b448131d4bbe988bf2f"
+    }
+  ],
+  "checkpoint_historical_logs_inspected": [
+    {
+      "path": "/tmp/gitcraft-interaction-5914916f-a11y-.log",
+      "sha256": "41c4fa83d220b7d42c20ce97ccf090899b060cffbdf534547152aba420c131c8",
+      "execution": "writer historical evidence; not rerun"
+    },
+    {
+      "path": "/tmp/gitcraft-interaction-5914916f-keymap-.log",
+      "sha256": "17e967416713b396baed172d15e83db885f1b0e62466e4836587f7aed6ffa564",
+      "execution": "writer historical evidence; not rerun"
+    },
+    {
+      "path": "/tmp/gitcraft-interaction-5914916f-menu_item-.log",
+      "sha256": "8b2b2e439338ec65e2f49b6f77b5aa2b3d968402789e8d1a42ce15e0d44d8a17",
+      "execution": "writer historical evidence; not rerun"
+    },
+    {
+      "path": "/tmp/gitcraft-interaction-5914916f-repo-keyboard-.log",
+      "sha256": "1af7b8aa041facd825daa414ba4a360e4665c255116c1306d8b18f1e4df1b42e",
+      "execution": "writer historical evidence; not rerun"
+    },
+    {
+      "path": "/tmp/gitcraft-interaction-5914916f-repo-keys-.log",
+      "sha256": "8d488a319eaca9043f385713a9eea745506d4ece8e42b4045ffd9b6a9ecfa388",
+      "execution": "writer historical evidence; not rerun"
+    },
+    {
+      "path": "/tmp/gitcraft-interaction-5914916f-repo-palette-.log",
+      "sha256": "82495869f1170cb15ef5ef2e668f08cf1f3d1e9beb84678e9c172ab4ddddc193",
+      "execution": "writer historical evidence; not rerun"
+    }
+  ],
+  "executed_artifacts": [
+    {
+      "path": "/tmp/gitcraft-interaction-r1-evidence/keymap-probe.rs",
+      "sha256": "8d939cf6201f63bc3d8e86724523e55ba34b45525ed036dae925aaa83e27f9eb"
+    },
+    {
+      "path": "/tmp/gitcraft-interaction-r1-evidence/keymap-probe",
+      "sha256": "9fb2c1352d7d3938420dd3198d5ebbe4ffbc0d1e15e18e5d7a4cbd634b273986"
+    }
+  ],
+  "dependency_rlibs": [
+    {
+      "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-b9411fc1/target/debug/deps/libegui-0e410d2928238130.rlib",
+      "sha256": "00991d51820997eadb725e41ef7721aa7c818dd7c1a201afb2ac0c71ae3d7703"
+    },
+    {
+      "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-b9411fc1/target/debug/deps/libserde-36dbb8e9db568175.rlib",
+      "sha256": "b0c964fa2d904432910514fe147d7d7325f89462301121aceba63ae46915c4a4"
+    }
+  ],
+  "execution_inventory": {
+    "compiler_invocations": 3,
+    "compiler_failures": 1,
+    "headless_runs": 2,
+    "initial_probe": "failed expected capture assertion; exposed editor state mismatch",
+    "final_probe": "passed assertions reproducing missing capture/unchanged overrides",
+    "program_under_test_process_git_pty_network_native_runs": 0,
+    "full_suite_ci_pr_runs": 0,
+    "tracked_source_edits": 0
+  },
+  "final_observed_stdout": [
+    "HEADLESS: clicking first Change sets capturing=true.",
+    "HEADLESS: next F8 frame has no Save binding/capture panel; capturing=false and overrides remain empty."
+  ],
+  "limitations": [
+    "Pure/headless harness substitutes Settings/theme/manual only; does not assert application persistence or full app dispatch.",
+    "Historical 65-test writer gates include at least18 owned-Git cases and one shell/PTY case; inspected only, not rerun.",
+    "No native accessibility/window/terminal/repository-mutation acceptance; runtime hold retained."
+  ],
+  "findings": [
+    "INT-R1-1 binding editor state storage type mismatch",
+    "INT-R1-2 missing native child viewport focus flush"
+  ],
+  "coverage_gaps": [
+    "COV-R1-1 action registry incomplete",
+    "COV-R1-2 actual shortcut labels incomplete",
+    "COV-R1-3 source-wide focus/role/state inventory incomplete"
+  ]
+}

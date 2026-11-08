@@ -17,6 +17,9 @@ pub(super) use text::{blocks, only_web_links};
 
 pub(crate) struct PrView {
     pub number: u64,
+    pub(super) storyboard: super::review_workflow::Storyboard,
+    pub(super) freshness: super::review_workflow::Freshness,
+    pub(super) relocated: super::review_workflow::Relocations,
     request: u64,
     loading: bool,
     pub(super) details: Option<Result<PrDetails, String>>,
@@ -30,10 +33,30 @@ pub(crate) struct PrView {
     /// The suggested change of each comment that has one the reader can see.
     pub(super) suggestions: HashMap<String, String>,
     pub(super) files: Option<Result<PrFiles, String>>,
+    pub(super) files_request: u64,
     pub(super) markdown: CommonMarkCache,
 }
 
 impl PrView {
+    pub(super) fn account_changed(&mut self, request: u64) {
+        self.request = request;
+        self.loading = false;
+        self.details = None;
+        self.files = None;
+        self.relocated = Default::default();
+        self.storyboard.invalidate();
+    }
+
+    pub(super) fn relocations(
+        &self,
+    ) -> Option<&std::collections::HashMap<String, super::pr_review::LineTarget>> {
+        let files = self.files.as_ref()?.as_ref().ok()?;
+        let details = self.details.as_ref()?.as_ref().ok()?;
+        if self.loading || files.to != details.head_oid {
+            return None;
+        }
+        self.relocated.current(&files.from, &files.to)
+    }
     /// The pull request's latest commit as last read.
     pub(super) fn head(&self) -> Option<&str> {
         self.seen_head.as_deref()
@@ -78,6 +101,7 @@ impl RepoTab {
             self.status = Some((why.to_owned(), true));
             return;
         }
+        self.tour = None;
         self.leave_pr();
         self.diff = None;
         self.file_view = None;
@@ -85,6 +109,9 @@ impl RepoTab {
         self.versions.view = None;
         self.pr_view = Some(PrView {
             number,
+            storyboard: Default::default(),
+            freshness: Default::default(),
+            relocated: Default::default(),
             request: 0,
             loading: true,
             details: None,
@@ -94,6 +121,7 @@ impl RepoTab {
             thread_bodies: HashMap::new(),
             suggestions: HashMap::new(),
             files: None,
+            files_request: 0,
             markdown: CommonMarkCache::default(),
         });
         self.load_pr(ctx);
@@ -101,12 +129,15 @@ impl RepoTab {
 
     /// Reads the pull request shown (again). What is shown stays until the answer comes.
     pub(super) fn load_pr(&mut self, ctx: &egui::Context) {
+        self.invalidate_pr_document();
         self.pr_requests += 1;
         let request = self.pr_requests;
         let Some(view) = &mut self.pr_view else {
             return;
         };
         view.request = request;
+        view.relocated = Default::default();
+        view.storyboard.invalidate();
         view.loading = true;
         let (path, number, hosting) = (self.path.clone(), view.number, self.hosting.clone());
         spawn(&self.tx, ctx, move || {
@@ -187,6 +218,7 @@ impl RepoTab {
         {
             draft.posting = false;
         }
+        view.relocated = Default::default();
         let before = view.files.take().and_then(Result::ok);
         // Its commits are here now: whether it changed since it was last looked at.
         let details = match (&result, &view.details) {
@@ -194,9 +226,42 @@ impl RepoTab {
             _ => None,
         };
         view.files = Some(result);
+        view.files_request = request;
+        if let Some(details) = details.clone() {
+            let path = self.path.clone();
+            let base = view
+                .files
+                .as_ref()
+                .and_then(|r| r.as_ref().ok())
+                .map(|f| f.from.clone());
+            if let Some(base) = base {
+                self.then_or(
+                    ctx,
+                    true,
+                    Err,
+                    move || super::review_workflow::relocate_threads(&path, &details, &base),
+                    move |tab, result, _| {
+                        if let Some(view) = tab.pr_view.as_mut().filter(|v| v.request == request) {
+                            match result {
+                                Ok(anchors) => view.relocated = anchors,
+                                Err(e) => {
+                                    view.relocated = Default::default();
+                                    view.relocated.error = Some(e.clone());
+                                    tab.status = Some((format!("Comment relocation: {e}"), true))
+                                }
+                            }
+                        }
+                    },
+                );
+            }
+        }
+
         if let Some(details) = details {
             self.check_pr_since(&details, ctx);
         }
+        self.load_review_freshness(ctx);
+        self.refresh_storyboard(ctx);
+        self.refresh_pr_document(ctx);
         let Some(view) = self.pr_view.as_mut() else {
             return;
         };

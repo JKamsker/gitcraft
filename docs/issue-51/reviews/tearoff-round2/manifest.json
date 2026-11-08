@@ -1,0 +1,261 @@
+{
+  "review": "Independent bounded tearoff correction R2",
+  "verdict": "FAIL",
+  "commit": "f48a28ad41f7e2d29119311fa0c77affdbdef124",
+  "tree": "533a15bbda0a11872b9fcff8a206f6292d21b942",
+  "parent": "586d0894fe72e3a621672bbe9e0371beaaa9d8a0",
+  "source_root": "/private/tmp/gitcraft-tearoff-r2-f48a28ad",
+  "source_mode": "immutable archive with byte verification against exact Git objects",
+  "report": {
+    "path": "/tmp/gitcraft-51-tearoff-review-r2.md",
+    "sha256": "9fde67108f6c05f9d118db96146f5fcc353c22255ec3078ea6a7cdfef87fbf6a"
+  },
+  "sources": [
+    {
+      "path": "AGENTS.md",
+      "sha256": "a6b99ef334f51715e97ee6fd0d24fd4bd6920999d277657edc87ef6d570ffb1d",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/app/windows.rs",
+      "sha256": "674694418d7df8fda2215bf95ebee50fe27e6088d15c85a43cb11ded9e049f3a",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/app/askpass_dialog.rs",
+      "sha256": "31fc7ecd51089156b4b15376605fb2797c12c6f385764415c285083b14fd15d9",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/app/clone.rs",
+      "sha256": "39e58a5dc4bf2ad4f85648a8940e6f9a666be3ad370a2f5faabacee2974a13cf",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/app/dropped.rs",
+      "sha256": "0b6fff5f81349ed44ab464696604523fdee85bd321588ec9501a52171a856381",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/app/launch.rs",
+      "sha256": "f56da6ab5c818be4b364e438ffc62d4515e28544eecc65345568f8b7bc3130a0",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/app/mod.rs",
+      "sha256": "f6b68716976543ce1dd190a5cc836b555d45ef70edbdd3401c8c2278e6dfb120",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/app/my_work.rs",
+      "sha256": "80e49e82f06c0439fde381261560c7052f117db1869baad7424ef013759f02c0",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/app/remote_open.rs",
+      "sha256": "66f1a647366182635546ea7c5557b8ed778acfcb126ddec85728d5b30b98d34b",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/app/repo_scan.rs",
+      "sha256": "d49c435e42977d42449c015ad4024cd3dbb50dbee1584a77ce94ae20c9f17b6c",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/app/teleport/mod.rs",
+      "sha256": "c0d4e191b89c19f74da6d6f0aefaae5e0d3a9ce8404c87e4fb42c56b996319b4",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/repo/mod.rs",
+      "sha256": "e7353896f867f75c5f9624e83b2237455275d25067bf132f27a1dc1db0947bb4",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/repo/popout/views.rs",
+      "sha256": "e5bee63e737cdbbd9c2d200d7d1e28ac2254b64093861f26ae8cf2d6136b876f",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/repo/popout/window.rs",
+      "sha256": "ddbe29a95505182e13e6a3a0a4777b2418ea5b28a0561ecca04cebc2b24cbef2",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/keymap/editor.rs",
+      "sha256": "f98a1149c5fcaed87fa019244e8d456323f7347f4ce963d8d70b3379f7e28675",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/a11y/mod.rs",
+      "sha256": "3b0796ed0dc544c55632bc6366fb1b1b19f74eaf6c8ffb45ecbadf0971f6771a",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/a11y/focus.rs",
+      "sha256": "d8f48fff41dfb5d47770f7c9f145841b4ec760745530f22a2d9ec47dfa518e1f",
+      "git_object_bytes_verified": true
+    }
+  ],
+  "finding_dispositions": {
+    "TEAR-R1-1": "PARTIAL / FAIL: ordinary model path fixed; Desktop lock-contention Close still has no CancelClose",
+    "TEAR-R1-2": "PASS source/historical headless; SSH explicit ROOT-presented application-modal policy accepted",
+    "TEAR-R1-3": "PASS source/historical recording; captured initiation owner, ROOT fallback, credentials across memberships",
+    "TEAR-R1-4": "PASS source/pure arithmetic/historical placement; native mixed-DPI unvalidated",
+    "TEAR-R1-5": "PASS source/historical immediate callback retention; no native picker execution",
+    "TEAR-R1-6": "PASS source/independent exact queue recording; no actual patch application"
+  },
+  "prior_interaction_closures": {
+    "INT-R1-1": "retained; editor byte-identical to586",
+    "INT-R1-2": "retained; a11y unchanged, window only builder visibility changed"
+  },
+  "remaining_original_coverage": [
+    "source-window-exit PointerGone/native capture/release remains OPEN",
+    "native platform acceptance/final combined/full-suite gates not executed"
+  ],
+  "production_extractions": [
+    {
+      "path": "/private/tmp/gitcraft-tearoff-r2-evidence/desktop_logic.rs",
+      "sha256": "a1a83710023af4b0108bb355b9afa73e7d7410b21dbf1d3121837f7b81666ddd",
+      "production_source": "src/app/windows.rs",
+      "byte_identical_extraction": true
+    },
+    {
+      "path": "/private/tmp/gitcraft-tearoff-r2-evidence/close_policy.rs",
+      "sha256": "98f61b9869d15ed88161569b63376251b2c17d4dc3f63973af4e5d27b545e74d",
+      "production_source": "src/app/windows.rs",
+      "byte_identical_extraction": true
+    },
+    {
+      "path": "/private/tmp/gitcraft-tearoff-r2-evidence/bounded_size.rs",
+      "sha256": "2c0f6bb0e5051b7c783948567723a365c44c89d885ae46ef97fceed0c5c19a78",
+      "production_source": "src/app/windows.rs",
+      "byte_identical_extraction": true
+    },
+    {
+      "path": "/private/tmp/gitcraft-tearoff-r2-evidence/drop_target.rs",
+      "sha256": "0c98eba4be1a1d186154aa0daef6e8677eeca50e1ee3a9362a52cbd5b0be2068",
+      "production_source": "src/app/windows.rs",
+      "byte_identical_extraction": true
+    }
+  ],
+  "patch_extraction": {
+    "path": "/private/tmp/gitcraft-tearoff-r2-evidence/patch-extractions.json",
+    "sha256": "80808eaae002bfe9b96c5c29984894ba59364800263481a52889963f3e0bee32",
+    "production_source": "src/app/dropped.rs",
+    "all_eight_fragments_byte_identical": true
+  },
+  "independent_artifacts": [
+    {
+      "path": "/private/tmp/gitcraft-tearoff-r2-evidence/probe.rs",
+      "sha256": "b1140e738bb326dc0ca5f19dbfb5ca30efb14cf7c5398568f95cdc7a6ebfb160"
+    },
+    {
+      "path": "/private/tmp/gitcraft-tearoff-r2-evidence/probe-initial.rs",
+      "sha256": "2c5f71b82d69e307729d7956d0d5c6465b9ec788fcd8ffd33c2c405e52481530"
+    },
+    {
+      "path": "/private/tmp/gitcraft-tearoff-r2-evidence/probe",
+      "sha256": "0735581ff454a74d8b217c96c42625469cf85ee83d4af7005992fe144421fa9b"
+    },
+    {
+      "path": "/private/tmp/gitcraft-tearoff-r2-evidence/probe.log",
+      "sha256": "98fe8312fcea9d08e4911d1dbee018548ef9936ded7440eb564495d50b84bbb5"
+    },
+    {
+      "path": "/private/tmp/gitcraft-tearoff-r2-evidence/patch-probe.rs",
+      "sha256": "0f9237f9f4c882ead189771e3b4b241c44da34f72129348dad811bd2f412196c"
+    },
+    {
+      "path": "/private/tmp/gitcraft-tearoff-r2-evidence/patch-probe",
+      "sha256": "e4944757c2043fbfca6211f34de7864729bac10ecda768ee465d4d16e4fe7a7d"
+    },
+    {
+      "path": "/private/tmp/gitcraft-tearoff-r2-evidence/patch-probe.log",
+      "sha256": "ee00999849c03395772a8b8cec804c256b65a43ad01acdc3bd5dcc3cfa6a3227"
+    }
+  ],
+  "independent_primary_dependency_sources": [
+    {
+      "path": "/Users/jonas/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/eframe-0.36.2/src/native/epi_integration.rs",
+      "sha256": "54770c41c9036bd5139e14a045d75303b428c73c066ee3def9bd14b57f7b9e96"
+    }
+  ],
+  "dependency_rlib": {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-b9411fc1/target/debug/deps/libegui-0e410d2928238130.rlib",
+    "sha256": "00991d51820997eadb725e41ef7721aa7c818dd7c1a201afb2ac0c71ae3d7703"
+  },
+  "inputs_inspected": [
+    {
+      "path": "/tmp/gitcraft-51-tearoff-review-r1.md",
+      "sha256": "110aef94ab765393631695658eb69e33f16a548afdd9bb4f988650864160c355"
+    },
+    {
+      "path": "/tmp/gitcraft-51-tearoff-review-r1-manifest.json",
+      "sha256": "18a961f0ec3c1706ee65527d9242e9c0e208fd4f41e4982d225c4b4b32c2a904"
+    },
+    {
+      "path": "/tmp/gitcraft-interaction-tearoff-corrections-validation.json",
+      "sha256": "6c35d0ce2a75f316cc63f1eafe8393c163479197bb68730bd1624f0c0b11f021"
+    },
+    {
+      "path": "/tmp/gitcraft-51-interaction-corrections-review-r2.md",
+      "sha256": "d520554730f96838d7bed765a7b78a7ac5206249321cf4ec8e174d153c131134"
+    },
+    {
+      "path": "/tmp/gitcraft-51-interaction-corrections-review-r2-manifest.json",
+      "sha256": "697fc2960847d4c7847874bdaef92b14d2a7b778432d8c96a19ac6eb0ee2a5b7"
+    }
+  ],
+  "historical_writer_logs": [
+    {
+      "path": "/tmp/gitcraft-interaction-f48a28ad-tearoff-fixes-0.log",
+      "sha256": "7415f55c2704a17b7a10dc30c5644337067b71a1eb13784a55386b00c0cd154f",
+      "evidence": "writer historical; inspected, not rerun"
+    },
+    {
+      "path": "/tmp/gitcraft-interaction-f48a28ad-tearoff-fixes-1.log",
+      "sha256": "932cf6b0c7e2028995f1360b9a962c5c529b5d90354d3b9ee3d3db16d662ebb5",
+      "evidence": "writer historical; inspected, not rerun"
+    },
+    {
+      "path": "/tmp/gitcraft-interaction-f48a28ad-tearoff-fixes-2.log",
+      "sha256": "f2066ca264b9a8598ecd436c70919e1efe1acea4098ad2a13b5d82d67bc049ec",
+      "evidence": "writer historical; inspected, not rerun"
+    }
+  ],
+  "execution_inventory": {
+    "compiler_invocations": 3,
+    "compiler_failures": 1,
+    "compiler_failure": "review harness include macro in impl position; embedded exact extracted method text then compiled",
+    "pure_headless_executable_runs": 2,
+    "final_exit_codes": [
+      0,
+      0
+    ],
+    "assertion_groups": 6,
+    "negative_groups_confirming_remaining_finding": 1,
+    "actual_app_or_repotab_constructor_runs": 0,
+    "actual_application_git_helper_pty_network_native_process_control_fixtures": 0,
+    "full_suite_ci_pr_runs": 0,
+    "tracked_source_edits": 0
+  },
+  "observed_stdout": {
+    "close_geometry": [
+      "PASS exact Desktop logic + close reducer cancels hidden-root Close when coordinator is available.",
+      "CONFIRMED TEAR-R1-1 remains: exact Desktop logic emits no CancelClose while coordinator is held; eframe accepts this Close.",
+      "PASS explicit Quit is not cancelled on available-owner path.",
+      "PASS exact drop_target and bounded_size functions: common physical-coordinate hit, source exclusion, finite/NaN bounds."
+    ],
+    "patch_queue": [
+      "PASS exact PatchQueue recording adapter: busy wait, two completions consumed once, next patch follows moved session.",
+      "PASS exact PatchQueue error path leaves out failed-session successors while preserving other-session queued work."
+    ]
+  },
+  "adapter_limits": [
+    "Desktop logic and close reducer extracted unchanged; minimal Frame/state adapters, tick_model shim calls only exact close reducer. Locked failure branch bypasses shim.",
+    "PatchQueue uses exact production fragments with recording target trait implementation; no live repo adapter executed.",
+    "No actual App construction, native close/picker/window/drag or process fixture; eframe Close acceptance follows exact dependency source."
+  ],
+  "hold": "Global runtime, final combined/full-suite/CI acceptance remain held; no authorization inferred."
+}

@@ -33,7 +33,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libxkbcommon-dev libwayland-dev libx11-dev libxcursor-dev \
-            libxrandr-dev libxi-dev libgtk-3-dev libdbus-1-dev pkg-config
+            libxrandr-dev libxi-dev libgtk-3-dev libdbus-1-dev libasound2-dev pkg-config
       - name: Formatting
         run: cargo fmt --check
       - name: Clippy
@@ -54,7 +54,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libxkbcommon-dev libwayland-dev libx11-dev libxcursor-dev \
-            libxrandr-dev libxi-dev libgtk-3-dev libdbus-1-dev pkg-config openssh-server
+            libxrandr-dev libxi-dev libgtk-3-dev libdbus-1-dev libasound2-dev pkg-config openssh-server
       - name: Build tests
         run: cargo test --locked --no-run
       - name: Test
@@ -125,7 +125,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libxkbcommon-dev libwayland-dev libx11-dev libxcursor-dev \
-            libxrandr-dev libxi-dev libgtk-3-dev libdbus-1-dev pkg-config
+            libxrandr-dev libxi-dev libgtk-3-dev libdbus-1-dev libasound2-dev pkg-config
       - name: Build the tests
         run: cargo test --locked --lib --no-run
       - name: Start Forgejo and Gitea

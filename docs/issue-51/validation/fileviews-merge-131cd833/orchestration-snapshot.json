@@ -1,0 +1,389 @@
+{
+  "base": "a850de26b0a0778ea96fe34cd1498e6e78928492",
+  "parent_branch": "t3/implement-issue-51-ideas",
+  "provider": "codex",
+  "model": "gpt-6.1-sol",
+  "reasoning": "high",
+  "tasks": {
+    "visualization": {
+      "task_id": "node:delegated-task:command%3Amcp%3Aac208ef8-c783-429a-97d3-715d9e6e96f3%3Adelegate-task%3Aissue51-visualization-v1",
+      "status": "corrected_candidate_under_independent_review",
+      "tip": "39d8c4cecd63fbb225d6a32f8dac1186aab538ea",
+      "tested_application": "0b5718ce575d3ba6332ca0ae6ea96f90d6493073",
+      "worktree": "/Users/jonas/.t3/worktrees/gitcraft/t3-680bf798"
+    },
+    "history": {
+      "task_id": "node:delegated-task:command%3Amcp%3Aac208ef8-c783-429a-97d3-715d9e6e96f3%3Adelegate-task%3Aissue51-history-v1",
+      "status": "preserved; independent acceptance pending",
+      "tip": "68ca8a66ed722a19de5864bd3270846ef99a38c5",
+      "worktree": "/Users/jonas/.t3/worktrees/gitcraft/t3-4a6c0b9e",
+      "tests_distinct": 156
+    },
+    "setup": {
+      "task_id": "node:delegated-task:command%3Amcp%3Aac208ef8-c783-429a-97d3-715d9e6e96f3%3Adelegate-task%3Aissue51-setup-v1",
+      "status": "preserved; independent acceptance pending",
+      "tip": "154c34b09123be9c97e3fd0945f3ab6dbc02c1f7",
+      "worktree": "/Users/jonas/.t3/worktrees/gitcraft/t3-5b9a0fe3",
+      "tests": 110
+    },
+    "fileviews": {
+      "task_id": "node:delegated-task:command%3Amcp%3Aac208ef8-c783-429a-97d3-715d9e6e96f3%3Adelegate-task%3Aissue51-fileviews-v1",
+      "status": "review_failed_corrections_running",
+      "tip": "c82112a5ab8ba461c487c3266462a81896c85d33",
+      "tested_application": "5df74dbb3792a34ee0b1d13c301c9aa552aa6c69",
+      "worktree": "/Users/jonas/.t3/worktrees/gitcraft/t3-e06bdc42",
+      "real_sops_gate": "PASS: verified official tools, one test not skipped; docs/issue-51/validation/fileviews-c82112a5"
+    },
+    "internals": {
+      "task_id": "node:delegated-task:command%3Amcp%3Aac208ef8-c783-429a-97d3-715d9e6e96f3%3Adelegate-task%3Aissue51-internals-v1",
+      "status": "review_failed_corrections_queued",
+      "tip": "3e5b685a17d9351ae59dd89cd4c148358c9644bd",
+      "tests": 53,
+      "worktree": "/Users/jonas/.t3/worktrees/gitcraft/t3-3a66e6f0"
+    },
+    "review": {
+      "task_id": "node:delegated-task:command%3Amcp%3Aac208ef8-c783-429a-97d3-715d9e6e96f3%3Adelegate-task%3Aissue51-review-v1",
+      "status": "corrections running",
+      "tip": "bf6089b684597d878d3c2f256b7c69d64c6785a0",
+      "worktree": "/Users/jonas/.t3/worktrees/gitcraft/t3-940761ce",
+      "limitations": [
+        "real Docker gate unavailable"
+      ]
+    },
+    "machines-imports": {
+      "task_id": "node:delegated-task:command%3Amcp%3Aac208ef8-c783-429a-97d3-715d9e6e96f3%3Adelegate-task%3Aissue51-machines-imports-v1",
+      "status": "running",
+      "progress": {
+        "preserved_wip": [
+          "7f4cdccc",
+          "4b9a1414",
+          "82ddf160"
+        ],
+        "status": "owned-process prerequisite only; seven feature ideas not started",
+        "pending_gates": [
+          "Darwin live native anchor for zombie-only EPERM",
+          "Windows durable bisect owner/receipt",
+          "legacy bisect selector migration"
+        ],
+        "api": "Options.stdout Option<Box<dyn FnMut(&[u8])+Send>> defaultNone; complete_remote defaulted; Output.stop_kind Option<StopKind>",
+        "preserved_candidate": "1688bbfef0e855dba768ca26cc4414a606f196f3",
+        "remote_sha_verified": true,
+        "production_callers": "all listed incl bisect migrated; STOP_SCRIPT/raw PID stop APIs removed",
+        "recording_gates": "writerreports8app4OS/Python5/Perl8+alltargetcheck; no runtime",
+        "runtime": "HELD; writer17app9OS recording+check; checkedCLEAR38507 is not durableledger acceptance",
+        "pending_static_fixes": [
+          "endpoint artifact retirement",
+          "scalable proof handoff",
+          "Windows ordering recording gates"
+        ],
+        "features_started": 0,
+        "static_followups": [
+          "b9ec1294bd0e9059f8abca19c746d65a4a37614d",
+          "103a6b4b4c2897269d04617a7e3720615b9edf22",
+          "bc2521c6a8422571e67ae2da00e381bde48f6de5"
+        ],
+        "latest_reported_fixes": [
+          "41386256d3be760ec3b25f6547f9fa3ac105d51f",
+          "286897a7fa47f02d7abc2287c6bc72f11ac9ded4"
+        ],
+        "remaining_reported": "Claim/fence primitives UNWIRED; actual workspace/backend/ledger integration and twelve schedules pending; no runtime"
+      }
+    },
+    "visual-corrections": {
+      "task_id": "node:delegated-task:command%3Amcp%3Aac208ef8-c783-429a-97d3-715d9e6e96f3%3Adelegate-task%3Aissue51-visual-corrections-v1",
+      "status": "completed_under_review",
+      "base": "883c14d8ebe8f38cd2c404cc87de05e21c07e66c",
+      "application": "bc201e42d3480c4cc9525c948a69fb06afd3ac73",
+      "tip": "cfc96d8ff949e35d0de5ea643e76b1551b874769",
+      "worktree": "/Users/jonas/.t3/worktrees/gitcraft/t3-54b1a48a"
+    },
+    "fileviews-corrections": {
+      "task_id": "node:delegated-task:command%3Amcp%3Aac208ef8-c783-429a-97d3-715d9e6e96f3%3Athread-send%3Aissue51-fileviews-corrections-v1",
+      "status": "R2 FAIL three corrections queued",
+      "base": "c82112a5ab8ba461c487c3266462a81896c85d33",
+      "tip": "be013726aa51c270bde95cecff727191a603c785",
+      "application": "10727c7e88725b4510350ec3416bd1e4ebfcfeda"
+    },
+    "interaction": {
+      "task_id": "node:delegated-task:command%3Amcp%3Aac208ef8-c783-429a-97d3-715d9e6e96f3%3Adelegate-task%3Aissue51-interaction-v1",
+      "status": "tearoff six findings correcting; editor08 and panel586 locally headless validated; registry/a11y + four desktop/localization requirements pending",
+      "base": "a6f5c000d83b6a242290b87e2c9cfed2d1bf1319",
+      "tip": "586d0894fe72e3a621672bbe9e0371beaaa9d8a0"
+    },
+    "integrations": {
+      "task_id": "node:delegated-task:command%3Amcp%3Aac208ef8-c783-429a-97d3-715d9e6e96f3%3Adelegate-task%3Aissue51-integrations-v1",
+      "status": "correction units preserved; Act R2 running; five features await resume",
+      "base": "a6f5c000d83b6a242290b87e2c9cfed2d1bf1319",
+      "completed_units": {
+        "dependency_metadata": "dde8f35544c5896d66c26ae4412bd611e5edd7d7",
+        "rich_find": "270a8a3b33402847f6d04cd8b8e70d625f33f4cb",
+        "local_act": "052721ed3c36853ad97c34485dbef65950f7ea38"
+      },
+      "rich_corrections": "8P2 dispatched in same activewriter, nextcoherentunit",
+      "rich_corrected_candidate": "53832430c296f039d287b4219385d1401c69afa8",
+      "act_gates": "writer12pure/UI/manual callback passed,1ignored precommit; qualified lint blocked imported clone collapsible_if; owner notified",
+      "tip": "12e7641c917d92482788f5f8a3449ffca425f83f",
+      "rich_r2": "SCOPED PASS53832430;27harness checks",
+      "act_r2": "scoped PASS12e7641c; five unstarted features queued"
+    },
+    "setup-review-r1": {
+      "task_id": "node:delegated-task:command%3Amcp%3Aac208ef8-c783-429a-97d3-715d9e6e96f3%3Adelegate-task%3Aissue51-setup-review-r1",
+      "status": "completed FAIL six findings",
+      "candidate": "b0698e9b1925f61810cc3a8823bdc6292525147c",
+      "role": "review"
+    },
+    "working-agents": {
+      "task_id": "node:delegated-task:command%3Amcp%3Aac208ef8-c783-429a-97d3-715d9e6e96f3%3Adelegate-task%3Aissue51-working-agents-v1",
+      "status": "8 features WIP; prompt/session ongoing; batch state and agent reviews FAIL",
+      "base": "58a27bc584a79bbd0c5609c0baa5e54baa6a6301",
+      "tip": "6cf01fd36acfbd33ceea832faa55a4882199bb76"
+    },
+    "history-core-review-r1": {
+      "task_id": "node:delegated-task:command%3Amcp%3Aac208ef8-c783-429a-97d3-715d9e6e96f3%3Adelegate-task%3Aissue51-history-core-review-r1",
+      "status": "completed FAIL sevenfindings",
+      "candidate": "0de454f05f8fbdf932fc841b5d696bfc7d9b0cca",
+      "role": "review"
+    },
+    "rich-review-r1": {
+      "task_id": "node:delegated-task:command%3Amcp%3Aac208ef8-c783-429a-97d3-715d9e6e96f3%3Adelegate-task%3Aissue51-rich-review-r1",
+      "status": "completed FAIL8P2, routed writer",
+      "candidate": "270a8a3b33402847f6d04cd8b8e70d625f33f4cb",
+      "role": "review"
+    },
+    "setup-corrections": {
+      "task_id": "node:delegated-task:command%3Amcp%3Aac208ef8-c783-429a-97d3-715d9e6e96f3%3Athread-send%3Aissue51-setup-corrections-v1",
+      "status": "preserved; independent acceptance pending",
+      "base": "b0698e9b1925f61810cc3a8823bdc6292525147c",
+      "shared_api": "owns optional endpoint-scoped Credentials+publichelper for history/internals; preserved commit forthcoming",
+      "preserved_candidate": "adca6abfcf961b31f8b799ed4d32e907910d8ffb",
+      "review_r2": "FAIL F4/F6 fullreport routed; F1/F2/F3/F5 staticPASS",
+      "route_proof_candidate": "753040fe942c9ef96cc496b61eb0174486fda366",
+      "review_r3": "core static F4/F6 at7530 running",
+      "tip": "154c34b09123be9c97e3fd0945f3ab6dbc02c1f7",
+      "remaining": "API R3-1 mixed foreign endpoint proof; R3-2 netrc precedence; rmdir removed154 awaiting delta review"
+    },
+    "act-review-r1": {
+      "task_id": "node:delegated-task:command%3Amcp%3Aac208ef8-c783-429a-97d3-715d9e6e96f3%3Adelegate-task%3Aissue51-act-review-r1",
+      "role": "review",
+      "status": "completed FAIL4P2 routed writer",
+      "candidate": "052721ed3c36853ad97c34485dbef65950f7ea38"
+    },
+    "history-corrections": {
+      "task_id": "node:delegated-task:command%3Amcp%3Aac208ef8-c783-429a-97d3-715d9e6e96f3%3Athread-send%3Aissue51-history-corrections-v1",
+      "status": "preserved; independent acceptance pending",
+      "base": "0de454f05f8fbdf932fc841b5d696bfc7d9b0cca",
+      "preserved_units": [
+        "7c67b27a",
+        "c6851817",
+        "7e234415",
+        "7c109947",
+        "2b0d2a97",
+        "804239da"
+      ],
+      "remaining": "Core R2 review active; shared API R3 blockers; exact68ca gate classification corrected25 strict +1 discovery-capable test",
+      "tip": "68ca8a66ed722a19de5864bd3270846ef99a38c5"
+    },
+    "visual-followups-r3": {
+      "task_id": "node:delegated-task:command%3Amcp%3Aac208ef8-c783-429a-97d3-715d9e6e96f3%3Adelegate-task%3Aissue51-visual-final-corrections-r3",
+      "status": "completed scoped PASS 34candidate+3probes",
+      "candidate": "4a9a22c806126a813d9d5633a699dd7cafa135da",
+      "role": "review"
+    },
+    "act-review-r2": {
+      "task_id": "node:delegated-task:command%3Amcp%3Aac208ef8-c783-429a-97d3-715d9e6e96f3%3Adelegate-task%3Aissue51-act-review-r2",
+      "role": "review",
+      "candidate": "12e7641c917d92482788f5f8a3449ffca425f83f",
+      "status": "completed scoped PASS all4; no runtime clearance"
+    },
+    "fileviews-corrections-r2": {
+      "task_id": "node:delegated-task:command%3Amcp%3Aac208ef8-c783-429a-97d3-715d9e6e96f3%3Athread-send%3Aissue51-fileviews-corrections-r2",
+      "status": "completed under independent R3",
+      "base": "be013726aa51c270bde95cecff727191a603c785",
+      "tip": "9fd9b235051d2f5a3e244aa1cb641630c24ba896",
+      "application": "1535d831578ee600bf6ef2f385c019e1eb569da8"
+    },
+    "workflows-corrections-r1": {
+      "task_id": "node:delegated-task:command%3Amcp%3Aac208ef8-c783-429a-97d3-715d9e6e96f3%3Athread-send%3Aissue51-workflows-corrections-r1",
+      "status": "running",
+      "base": "bf6089b684597d878d3c2f256b7c69d64c6785a0"
+    },
+    "internals-corrections-r1": {
+      "task_id": "node:delegated-task:command%3Amcp%3Aac208ef8-c783-429a-97d3-715d9e6e96f3%3Athread-send%3Aissue51-internals-corrections-r1",
+      "status": "requested read-only inventory to release coding slot for API owner; awaiting acknowledgement",
+      "base": "3e5b685a17d9351ae59dd89cd4c148358c9644bd"
+    },
+    "integrations-resume-v2": {
+      "task_id": "node:delegated-task:command%3Amcp%3Aac208ef8-c783-429a-97d3-715d9e6e96f3%3Athread-send%3Aissue51-integrations-resume-remaining-v2",
+      "status": "running five remaining integration ideas plus shared API migration",
+      "base": "12e7641c917d92482788f5f8a3449ffca425f83f"
+    },
+    "credential-setup-review-r3": {
+      "task_id": "node:delegated-task:command%3Amcp%3Aac208ef8-c783-429a-97d3-715d9e6e96f3%3Adelegate-task%3Aissue51-credential-setup-review-r3",
+      "status": "completed FAIL twoP2 + residualP3",
+      "candidate": "0319dfa27e0fff740a954ac0abb2dd398890bd20",
+      "role": "review"
+    }
+  },
+  "native_auditors": [
+    "audit_core_ideas",
+    "audit_content_ideas",
+    "audit_platform_ideas"
+  ],
+  "ci": "not started; implementation branches outside triggers",
+  "baseline_build_log": "/tmp/gitcraft-51-baseline-build.log",
+  "safety_blocker": "Retained workspace claim/fence primitives1688 UNWIRED; full containment source acceptance and narrow runtime prerequisites outstanding. All runtime fixtures held.",
+  "integration_head": "131cd833ea9504daec87400ec8efcacd583cfe7a",
+  "concurrency_limits": {
+    "coding": 6,
+    "total": 10,
+    "lifetime_limit": null
+  },
+  "visualization_corrections": {
+    "UI-R1-1": "scoped review PASS at33a74a5e",
+    "suspension-B2": "scoped review PASS at72a6a6a3",
+    "others": "open; no whole-batch pass"
+  },
+  "next_priority": "Correct shared API two R3 blockers after coding slot release; preserve reports; finish batch C/interaction/workflow corrections and remaining integrations/internals/process prerequisites. Runtime/fullsuite/CI/PR held.",
+  "review_workflow_r1": {
+    "reviewers": [
+      "audit_core_ideas",
+      "audit_content_ideas",
+      "audit_platform_ideas"
+    ],
+    "reports": [
+      "/tmp/gitcraft-51-review-workflows-core-r1.md",
+      "/tmp/gitcraft-51-review-workflows-content-r1.md",
+      "/tmp/gitcraft-51-review-workflows-ui-r1.md"
+    ],
+    "provisional_findings": [
+      "multi-line relocation loses start range",
+      "old-head relocation map persists through refresh/error",
+      "echo assumes fetch tracking ref represents differing push destination",
+      "continuous Reload retains original key list/head, omits new changes",
+      "continuous metadata-only changes rendered empty"
+    ],
+    "status": "complete FAIL content4/UI5/core6 correction groups",
+    "core_reviewer": "stream failure retried via followup",
+    "content_report": "complete FAIL fourP2, exact-source repros"
+  },
+  "final_base_note": {
+    "fork_dev": "0830614f89de60936b7e6358060f99ce18f4f3c0",
+    "local_dev": "35a26a547820bdf1b1e4f6fcbb3ec5e5346f2e22",
+    "rule": "Use freshly verified fork origin/dev for final PR branch, not stale/divergent local dev",
+    "integrated": "ed92fde22fc1b11c48196f81d40c47b39f529879",
+    "remote_sha_verified": true
+  },
+  "parent_check": {
+    "application": "131cd833ea9504daec87400ec8efcacd583cfe7a",
+    "check": "cargo +1.95.0 check --locked --all-targets",
+    "result": "PASS",
+    "tests": "7 SVG pure/headless passed",
+    "runtime": "HELD"
+  },
+  "native_review_assignments": {
+    "audit_core_ideas": "batch C state R1 exact6cf",
+    "audit_content_ideas": "history core R2 exact68ca",
+    "audit_platform_ideas": "credential netrc source design and154 cleanup delta"
+  },
+  "queued_corrections": {
+    "setup": {
+      "source": "b0698e9b1925f61810cc3a8823bdc6292525147c",
+      "report": "/tmp/gitcraft-51-setup-review-r1.md",
+      "count": 6,
+      "reuse_writer": "issue51-setup-v1",
+      "status": "not dispatched; six coders busy"
+    },
+    "workflows": {
+      "source": "bf6089b684597d878d3c2f256b7c69d64c6785a0",
+      "reports": [
+        "/tmp/gitcraft-51-review-workflows-core-r1.md",
+        "/tmp/gitcraft-51-review-workflows-content-r1.md",
+        "/tmp/gitcraft-51-review-workflows-ui-r1.md"
+      ],
+      "groups": 15,
+      "reuse_writer": "issue51-review-v1",
+      "status": "not dispatched; six coders busy"
+    },
+    "internals": {
+      "source": "3e5b685a17d9351ae59dd89cd4c148358c9644bd",
+      "status": "core3+content3+UI4 finalized",
+      "core_report": "/tmp/gitcraft-51-internals-core-r1.md"
+    },
+    "history": {
+      "source": "0de454f05f8fbdf932fc841b5d696bfc7d9b0cca",
+      "status": "core7+content5 finalized",
+      "reports": [
+        "/tmp/gitcraft-51-history-core-r1.md",
+        "/tmp/gitcraft-51-history-content-r1.md"
+      ]
+    },
+    "fileviews-r2": {
+      "candidate": "be013726aa51c270bde95cecff727191a603c785",
+      "reports": [
+        "/tmp/gitcraft-51-fileviews-core-r2.md",
+        "/tmp/gitcraft-51-fileviews-content-r2.md",
+        "/tmp/gitcraft-51-fileviews-ui-r2.md"
+      ],
+      "findings": [
+        "standalone capture-inspect lock release",
+        "Linux metadata allocation before limits",
+        "SVG marker expansion before parsing"
+      ],
+      "reuse_writer": "issue51-fileviews-v1",
+      "status": "dispatched originalwriter"
+    }
+  },
+  "process_safety_review_r1": {
+    "candidate": "6a289fd8fe90b50750d639958f70f1c48337b8c4",
+    "reviewer": "audit_core_ideas",
+    "status": "complete STATICFAIL sixgroups; no execution",
+    "mode": "STATIC ONLY; no owned-child fixtures/runtime",
+    "report": "/tmp/gitcraft-51-process-safety-review-r1.md"
+  },
+  "process_safety_review_r2": {
+    "candidate": "bc2521c6a8422571e67ae2da00e381bde48f6de5",
+    "mode": "STATIC ONLY",
+    "scopes": {
+      "audit_core_ideas": "remote supervisors/Shell",
+      "audit_platform_ideas": "native anchors/Jobs/endpoints",
+      "audit_content_ideas": "bisect/callers/shutdown"
+    },
+    "provisional_open": [
+      "Shell blocking writes beforedeadline",
+      "pooled ACK coalesced with nextrequest rejected",
+      "successful truncation if streamqueues pending after300ms drain",
+      "bisect process-local claim loserDropclearswinner",
+      "Windows Jobempty wait and threadhandleowner",
+      "native Windows exitcode receipt range",
+      "fsck/AI cancellation masks cleanupfailure",
+      "parent stopUnknown kills nativehelper owner while Unix target survives"
+    ],
+    "provisional_resolved": [
+      "native postsubmit earlyreturn nowentrypoint shuts Service down; boundedness still reviewed",
+      "103 streamforwarding responsiveness structurally changed, terminaldelivery defects remain"
+    ],
+    "status": "all3complete STATICFAIL; reports ready"
+  },
+  "parent_visual_fixes": {
+    "status": "three R2 followups independently PASS at4a9a22c8",
+    "minimap": "4143becd focused test PASS",
+    "celebration": "26061b7a 8 tests PASS",
+    "postcards": "4a9a22c8 12 tests and alltarget check PASS",
+    "ghost": "reviewer withdrew after !ghost sole-call guard confirmed"
+  },
+  "shared_credential_api": {
+    "commits": [
+      "a1b03673156d3f65d0a990c0deab0e7510088944",
+      "8796fc1db893693f43afdec9c0aaa2f255b184fe"
+    ],
+    "owner": "setup-corrections",
+    "status": "WIP source corrections; not accepted",
+    "api": "credential_command_policy(Some(repo),creds,original_args) -> arguments prefix including alias + environment; append original args; helper_environment alone refuses",
+    "connection_metadata_commit": "2c04e3bd52259e6fd70ae580fc2fe6824c37ae2e",
+    "review": "R3 FAIL0319 mixed foreign route authorization + netrc precedence;154 removes final rmdir awaiting independent review",
+    "gate_classification": "R8 setup19 strict; history68ca 25strict+1discovery-capable despite writer26strict claim",
+    "direct_corrections": "8855beca4b8cbd1d9ac913bfe373c0a1c521bc3a under static R2 subset",
+    "policy": "Unix trusted HTTP-consumer exactendpoint target; rootPID refuted; wrapper design notaccepted, LFS/Windows/lifetime open",
+    "candidate": "154c34b09123be9c97e3fd0945f3ab6dbc02c1f7"
+  }
+}

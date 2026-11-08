@@ -109,6 +109,7 @@ pub fn badge(ui: &mut Ui, size: f32, profile: &UserProfile) {
 impl Settings {
     /// The profile in use and its own settings, or what a search matches of them.
     pub(super) fn profile_ui(&mut self, ui: &mut Ui, f: &Filter, view: &mut SettingsView) {
+        self.profile_connections_ui(ui, f);
         let t = Tokens::get(ui.ctx());
         let current = self.profile();
         let mut request = None;
@@ -226,6 +227,70 @@ impl Settings {
                             .desired_width(layout::fit(ui, FIELD_WIDTH)),
                     );
                 });
+            },
+        );
+
+        section(
+            ui,
+            f,
+            "Outgoing author per host",
+            Some(
+                "Push preflight compares outgoing authors with these expectations. Use a host (github.com), or host/namespace (github.com/company). The longest matching namespace wins. These rules do not change repository Git configuration.",
+            ),
+            |card| {
+                let profile = self.profile_mut();
+                let mut remove = None;
+                for (i, rule) in profile.author_hosts.iter_mut().enumerate() {
+                    card.row(
+                        "Host / namespace",
+                        "push preflight identity author host email",
+                        |ui| {
+                            ui.push_id(i, |ui| {
+                                ui.horizontal_wrapped(|ui| {
+                                    ui.add(
+                                        egui::TextEdit::singleline(&mut rule.host)
+                                            .hint_text("github.com/team")
+                                            .desired_width(180.)
+                                            .char_limit(512),
+                                    );
+                                    ui.add(
+                                        egui::TextEdit::singleline(&mut rule.name)
+                                            .hint_text("Author name")
+                                            .desired_width(140.)
+                                            .char_limit(256),
+                                    );
+                                    ui.add(
+                                        egui::TextEdit::singleline(&mut rule.email)
+                                            .hint_text("author@example.com")
+                                            .desired_width(200.)
+                                            .char_limit(256),
+                                    );
+                                    if ui.small_button("Remove").clicked() {
+                                        remove = Some(i);
+                                    }
+                                });
+                            });
+                        },
+                    );
+                }
+                if let Some(i) = remove {
+                    profile.author_hosts.remove(i);
+                }
+                card.row(
+                    "New expectation",
+                    "push preflight identity author host email",
+                    |ui| {
+                        if ui
+                            .add_enabled(
+                                profile.author_hosts.len() < 64,
+                                egui::Button::new("Add host author rule"),
+                            )
+                            .clicked()
+                        {
+                            profile.author_hosts.push(Default::default());
+                        }
+                    },
+                );
             },
         );
 

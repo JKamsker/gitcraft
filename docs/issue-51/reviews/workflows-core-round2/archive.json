@@ -1,0 +1,138 @@
+{
+  "report_sha256": "ca552268c241a574933618c31ce12ea0b6923345dc05c83aa20d64af043d4df0",
+  "manifest_sha256": "d760c30849ad1b9d9885a0b806bc5117329833a2ee437981807f3ddd0e6346d4",
+  "artifacts": [
+    {
+      "original_path": "/private/tmp/gitcraft-workflows-core-r2-evidence/intent-boundary-probe",
+      "sha256": "ecabe6b5b89cabf7a051e13de07f5cd18e61772ed5bf255e1ef9aa4b89f18a5e",
+      "bytes": 906312,
+      "archive": "not copied: binary or >2MB; hash retained"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-workflows-core-r2-evidence/intent-boundary-probe.log",
+      "sha256": "5e0da002880619594db121b8815f191ca79723aa57cbf2ac1d69cb201eee4bca",
+      "bytes": 86,
+      "archive": "evidence-001-intent-boundary-probe.log.gz"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-workflows-core-r2-evidence/intent-boundary-probe.rs",
+      "sha256": "48b2cc5916d23e49aa6458a575bc01bd91948a7c6162f860173db258450a04e9",
+      "bytes": 6401,
+      "archive": "evidence-002-intent-boundary-probe.rs.gz"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-workflows-core-r2-evidence/intent-extractions.json",
+      "sha256": "35a08306859722fd0a941dbac43d994da940a212a8f7da0396fd6d4b1ff12d90",
+      "bytes": 5274,
+      "archive": "evidence-003-intent-extractions.json.gz"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-workflows-core-r2-evidence/review-tests",
+      "sha256": "fba747936ba8c153dbd59a7c25f1a654c88c76d4e76ac72c9fe792f759059343",
+      "bytes": 143727768,
+      "archive": "not copied: binary or >2MB; hash retained"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-workflows-core-r2-evidence/selected-pure-rechecks.log",
+      "sha256": "e5ea7c74588310c7ae9719869cafa0d16de312872977477b7d0f68bfe7428eca",
+      "bytes": 6270,
+      "archive": "evidence-005-selected-pure-rechecks.log.gz"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-workflows-core-r2-evidence/selected-pure-results.json",
+      "sha256": "82b9e7c3b277f941fa681b6e5b279d45f2f3faa30eb6696133ffd46447890522",
+      "bytes": 3359,
+      "archive": "evidence-006-selected-pure-results.json.gz"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-workflows-core-r2-evidence/selected-tests.json",
+      "sha256": "e45b6e3e60dd5a18e199a9e4194b0a58af8fd3cf4954f7488e1634c7f16fca92",
+      "bytes": 2354,
+      "archive": "evidence-007-selected-tests.json.gz"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-workflows-core-r2-evidence/sharing-capture-extraction.json",
+      "sha256": "678bb65204d6ef515e67f51f2c421d39a71714407bea56abb4ee38e9161feeb5",
+      "bytes": 334,
+      "archive": "evidence-008-sharing-capture-extraction.json.gz"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-workflows-core-r2-evidence/sharing-capture-race-probe",
+      "sha256": "e13329bb3ef934e3d351f0d7681c19dc3f2ed493484c4cbd4ab0e58ee2950b0f",
+      "bytes": 547720,
+      "archive": "not copied: binary or >2MB; hash retained"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-workflows-core-r2-evidence/sharing-capture-race-probe.log",
+      "sha256": "3b30827232602a43eea0d3179d62b1888b6f022d65a92a0897e7fc2063ea8582",
+      "bytes": 97,
+      "archive": "evidence-010-sharing-capture-race-probe.log.gz"
+    },
+    {
+      "original_path": "/private/tmp/gitcraft-workflows-core-r2-evidence/sharing-capture-race-probe.rs",
+      "sha256": "0778b81f7f0837013092de5e6a3ce70bb6c80e6a987854f1ff08ee638b98b990",
+      "bytes": 3154,
+      "archive": "evidence-011-sharing-capture-race-probe.rs.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-51-orchestration/review-workflows-r2-status.json",
+      "sha256": "edddce9eaf735672d2cb03977fddececda0b5d308512ee87898e16041297cc25",
+      "bytes": 4803,
+      "archive": "evidence-012-review-workflows-r2-status.json.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-51-r2-final-check.log",
+      "sha256": "4bdb242147b5c9aa90e4979d5b30a0968bfa41fafb025487efc1a7f500a8857e",
+      "bytes": 1512,
+      "archive": "evidence-013-gitcraft-51-r2-final-check.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-51-r2-final-committed-clippy.log",
+      "sha256": "8d86a29fa97ac33f7e0b914bb72d0c7c9427cbf66023946ba33d9ff3e345838f",
+      "bytes": 228,
+      "archive": "evidence-014-gitcraft-51-r2-final-committed-clippy.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-51-r2-final-committed-pure.log",
+      "sha256": "06a04d7a251b7961aec6a19279760c5eb52d9b1d3c5795dfd5f174328c2c6944",
+      "bytes": 5050,
+      "archive": "evidence-015-gitcraft-51-r2-final-committed-pure.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-51-r2-final-fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "archive": "evidence-016-gitcraft-51-r2-final-fmt.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-51-review-workflows-core-r1.md",
+      "sha256": "8a427cfdfd47f20ea92303bef5e7e4e36ae3810f1d1f090376eb6b5c7fdf42cc",
+      "bytes": 17292,
+      "archive": "evidence-017-gitcraft-51-review-workflows-core-r1.md.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-51-review-workflows-r2-handoff.md",
+      "sha256": "3ea6473eebd996117e41909eb0ece7b52b1acbe794970ac66e851f00bf6c5552",
+      "bytes": 21276,
+      "archive": "evidence-018-gitcraft-51-review-workflows-r2-handoff.md.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-51-workflows-core-review-r2.md",
+      "sha256": "ca552268c241a574933618c31ce12ea0b6923345dc05c83aa20d64af043d4df0",
+      "bytes": 12868,
+      "archive": "evidence-019-gitcraft-51-workflows-core-review-r2.md.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-issue51-issues.json",
+      "sha256": "411e76639a880c52a8f92ef5ec543e4e76befaa1f95b2be271629df23a88edfc",
+      "bytes": 177452,
+      "archive": "evidence-020-gitcraft-issue51-issues.json.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-workflows-r2-fe88.tar",
+      "sha256": "1ffef367218b199afc6d436d18e827d5683362d11b5675240de99bbc5a06bc18",
+      "bytes": 16056320,
+      "archive": "not copied: binary or >2MB; hash retained"
+    }
+  ]
+}

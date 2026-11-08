@@ -79,6 +79,30 @@ pub fn write(path: &Path, bytes: &[u8]) -> io::Result<()> {
     }
 }
 
+/// Appends bytes to the current file, preserving edits made since the caller read it.
+pub fn append(path: &Path, bytes: &[u8]) -> io::Result<()> {
+    let Some(t) = parse(path) else {
+        use std::io::Write;
+        return std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(path)?
+            .write_all(bytes);
+    };
+    let f = sh_path(&t.path);
+    let out = run(
+        &t,
+        format!(
+            "if [ -L {f} ]; then echo 'it is a symbolic link' >&2; exit 1; fi\nexec cat >> {f}"
+        ),
+        Some(bytes.to_vec()),
+    )?;
+    match out.code {
+        0 => Ok(()),
+        _ => Err(failed(&out)),
+    }
+}
+
 pub fn create_dir_all(path: &Path) -> io::Result<()> {
     let Some(t) = parse(path) else {
         return std::fs::create_dir_all(path);
@@ -198,7 +222,7 @@ pub fn read_within(repo: &Path, rel: &str, max: u64) -> Option<io::Result<Option
 
 /// The script [`read_within`] runs in `repo` (a path there): the file on its output, exit code
 /// 0, when `rel` is such a file. `None` for an empty path.
-fn read_within_script(repo: &str, rel: &str, max: u64) -> Option<String> {
+pub(crate) fn read_within_script(repo: &str, rel: &str, max: u64) -> Option<String> {
     let names: Vec<&str> = rel.split('/').filter(|n| !n.is_empty()).collect();
     if names.is_empty() || names.iter().any(|n| matches!(*n, "." | "..")) {
         return None;

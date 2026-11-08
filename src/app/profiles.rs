@@ -110,7 +110,11 @@ impl App {
     /// lose, nor while a repository is being cloned or connected to (it would open in the other
     /// profile): a toast says why.
     fn can_switch_profile(&mut self) -> bool {
-        if self.cloning.is_some() || !self.connecting.is_empty() {
+        if self.setup.busy()
+            || self.practicing.is_some()
+            || self.cloning.is_some()
+            || !self.connecting.is_empty()
+        {
             self.toasts.push(Toast::new(
                 "A repository is still being cloned or connected to: wait for it before switching \
                  profiles"
@@ -149,6 +153,10 @@ impl App {
         else {
             return false;
         };
+        if next.pending_setup() {
+            self.toasts.push(Toast::new("This imported profile needs local keys and verified accounts. Open Import setup → Finish profile setup before activating it.".into(),true));
+            return false;
+        }
         if id == self.settings.active_profile {
             return true;
         }
@@ -218,6 +226,7 @@ impl App {
                 return;
             }
         }
+        self.setup.forget_profile(id);
         self.settings.user_profiles.retain(|p| p.id != id);
         self.profile_states.remove(&id);
         settings::profiles::forget(id);
@@ -250,12 +259,11 @@ impl App {
         }
         if self.profile_git_seen != now {
             self.profile_git_seen = now;
+            self.inbox = Default::default();
             for tab in &mut self.tabs {
                 // One not read yet, or suspended, reads it when shown.
-                if let Tab::Repo(r) = tab
-                    && !r.sleeping()
-                {
-                    r.reload_identity(ctx);
+                if let Tab::Repo(r) = tab {
+                    r.notice_connections(ctx);
                 }
             }
         }

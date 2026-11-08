@@ -38,6 +38,27 @@ use crate::theme::{self, Tokens};
 
 pub enum Dialog {
     RepositoryTools(Box<super::repository_tools::State>),
+    PushLoading {
+        id: u64,
+        token: std::sync::Arc<()>,
+    },
+    PushPreflight {
+        plan: Box<crate::push_preflight::Plan>,
+        acknowledge: bool,
+    },
+    PushError(String),
+    WorkingDraftLoading,
+    WorkingDraftHistory {
+        on: bool,
+        versions: Vec<crate::git::drafts::Draft>,
+        error: Option<String>,
+        index: bool,
+    },
+    WorkingDraftRecovery {
+        preview: Box<crate::git::drafts::RestorePreview>,
+        selected: std::collections::BTreeSet<usize>,
+    },
+    ContentRecovery,
     GerritReview {
         remote: String,
         head: String,
@@ -67,8 +88,9 @@ pub enum Dialog {
         focus: bool,
     },
     AddWorktree {
-        /// The repository, to suggest a folder next to it.
+        /// The main checkout, so relative roots stay the same from every worktree.
         repo: PathBuf,
+        root: String,
         path: String,
         /// The user typed a path; stop suggesting one.
         path_edited: bool,
@@ -107,6 +129,7 @@ pub enum Dialog {
         /// Remote to push the tag to, if any.
         remote: Option<String>,
         push: bool,
+        release: bool,
         focus: bool,
     },
     RenameBranch {
@@ -132,6 +155,7 @@ pub enum Dialog {
     /// Username and password / token for an HTTPS remote that asked for them.
     Credentials {
         url: String,
+        endpoints: Vec<String>,
         /// The last ones typed were refused.
         refused: bool,
         username: String,
@@ -287,6 +311,7 @@ impl Dialog {
     pub fn credentials(url: &str, refused: bool) -> Self {
         Dialog::Credentials {
             url: url.to_owned(),
+            endpoints: vec![url.to_owned()],
             refused,
             username: String::new(),
             password: String::new(),
@@ -317,6 +342,7 @@ impl Dialog {
             message: String::new(),
             remote,
             push: false,
+            release: false,
             focus: true,
         }
     }
@@ -366,6 +392,7 @@ impl Dialog {
     pub fn add_worktree(repo: &Path, branch: Option<&str>, base: &str) -> Self {
         let mut dialog = Dialog::AddWorktree {
             repo: repo.to_path_buf(),
+            root: crate::remote::git_path(&crate::git::default_worktree_root(repo)),
             path: String::new(),
             path_edited: false,
             new_branch: branch.is_none(),
@@ -421,16 +448,18 @@ pub(crate) struct Instead {
     pub(super) described: Vec<String>,
 }
 
-enum Outcome {
+pub(super) enum Outcome {
     Open,
-    /// Still open; the branch changed, so suggest a folder again.
-    Suggest,
     Cancel,
     Done(Box<Action>),
 }
 
 impl RepoTab {
     pub(super) fn dialogs(&mut self, ctx: &egui::Context, acts: &mut Vec<Action>) {
+        self.history_activity_window(ctx, acts);
+        self.atlas_window(ctx);
+        self.growth_window(ctx);
+        self.postcard_window(ctx);
         if let Some(Dialog::Stash(d)) = &mut self.dialog {
             d.seed(self.stash_picks.picked.iter().cloned());
             d.keep_changed(&self.work);
@@ -449,6 +478,7 @@ impl RepoTab {
         };
         let is_remote = crate::remote::is_remote(&self.path);
         let current_branch = self.refs.current.clone();
+        let working_draft_undo = self.working_draft_undo_available();
         let Some(dialog) = &mut self.dialog else {
             return;
         };
@@ -482,6 +512,13 @@ impl RepoTab {
             ui.set_width(380.0);
             let enter = ui.input(|i| i.key_pressed(Key::Enter));
             match dialog {
+                Dialog::PushLoading{..}=>{ui.heading("Checking outgoing history…");ui.add(crate::spinner::Spinner::new());ui.label("Local/fetched objects only; nothing is pushed until you review.");if ui.button("Cancel").clicked(){Outcome::Cancel}else{Outcome::Open}},
+                Dialog::PushPreflight{plan,acknowledge}=>super::push_preflight::dialog(ui,plan,acknowledge),
+                Dialog::PushError(error)=>{ui.heading("Push preflight could not finish");ui.label(error.as_str());if ui.button("Close").clicked(){Outcome::Cancel}else{Outcome::Open}},
+                Dialog::WorkingDraftLoading => { ui.heading("Reading earlier versions…");ui.add(crate::spinner::Spinner::new());if ui.button("Cancel").clicked(){Outcome::Cancel}else{Outcome::Open} },
+                Dialog::WorkingDraftHistory { on,versions,error,index } => super::working_drafts::view::history(ui,on,versions,error.as_deref(),index,idle,working_draft_undo),
+                Dialog::WorkingDraftRecovery { preview,selected } => super::working_drafts::view::recovery(ui,preview,selected,idle),
+                Dialog::ContentRecovery => self.content_recovery.show(ui, idle),
                 Dialog::GerritReview {
                     remote,
                     head,
@@ -514,6 +551,7 @@ impl RepoTab {
                 }
                 Dialog::AddWorktree {
                     repo,
+                    root,
                     path,
                     path_edited,
                     new_branch,
@@ -528,6 +566,7 @@ impl RepoTab {
                     worktree::add_worktree(
                         ui,
                         repo,
+                        root,
                         enter,
                         &free,
                         path,
@@ -547,8 +586,9 @@ impl RepoTab {
                     message,
                     remote,
                     push,
+                    release,
                     focus,
-                } => branch::tag(ui, enter, at, at_label, name, message, remote, push, focus),
+                } => branch::tag(ui, enter, at, at_label, name, message, remote, push, release, focus),
                 Dialog::RenameBranch { old, new, focus } => {
                     let children = crate::git::stack::children(stack_parents, old);
                     branch::rename_branch(ui, enter, old, new, focus, &children)
@@ -578,11 +618,12 @@ impl RepoTab {
                 ),
                 Dialog::Credentials {
                     url,
+                    endpoints,
                     refused,
                     username,
                     password,
                     focus,
-                } => remote::credentials(ui, enter, url, *refused, username, password, focus),
+                } => remote::credentials(ui, enter, url, endpoints, *refused, username, password, focus),
                 Dialog::CreatePr {
                     noun,
                     branch,
@@ -689,7 +730,6 @@ impl RepoTab {
             Outcome::Cancel => self.dialog = None,
             Outcome::Open if response.should_close() => self.dialog = None,
             Outcome::Open => {}
-            Outcome::Suggest => dialog.suggest_path(),
         }
     }
 }

@@ -1,0 +1,229 @@
+{
+  "verdict": "PASS",
+  "scope": "Narrow GL-R1-1 correction closeout only",
+  "candidate": "7ef8cac882eb7b9433dc12203036ccb3749f6e31",
+  "tree": "3da40659c040ce7a91f9bf7bb1ad9c7465c6b5b2",
+  "parent": "9d8f54cf9c58ad70182a88e961dc40ec2356c02e",
+  "prior_candidate": "652e63345057aee614480c656edf3b959e8bb56b",
+  "prior_report": {
+    "path": "/tmp/gitcraft-51-gitlab-review-r1.md",
+    "sha256": "67750ec21e6de281b7e02bbf5eff127acf88ad309a9a7c7f936f264baba25df2"
+  },
+  "prior_manifest": {
+    "path": "/tmp/gitcraft-51-gitlab-review-r1-manifest.json",
+    "sha256": "16e46cafe730548ad811c77b11bb04af5a73be0a1a5967099953a43e3849fced"
+  },
+  "source_method": "git show exact commit:path and immutable git diff; no moving worktree source reads",
+  "source_files": [
+    {
+      "path": "src/repo/pr_review/native_discussions.rs",
+      "git_blob": "285ffd6d977206d548903854ef36ce1d831d7e6f",
+      "sha256": "69a14f753d81c062fad9a37817dad3d64ee483cd4a56d2f188c5f12a654f85c0",
+      "unchanged_since_r1": false
+    },
+    {
+      "path": "src/forge/gitlab/native_tests.rs",
+      "git_blob": "f4d2ddabc48967c9d0469952f4ec1c6905e893ff",
+      "sha256": "aaef4a32aae0559d4f3cbfa357cdff51bdb636e7d40c9284fa412e6c00241652",
+      "unchanged_since_r1": false
+    },
+    {
+      "path": "src/forge/gitlab/api.rs",
+      "git_blob": "21760108a6b03011530009d5b0e0978e0e16ca49",
+      "sha256": "254eed3f5135d5946b132ed41275290ab5b36787854d39f67c4e6bfae2d3a1ef",
+      "unchanged_since_r1": true
+    },
+    {
+      "path": "src/forge/gitlab/details.rs",
+      "git_blob": "175b18fbf1044fa5a0a0a0a36e1ff02779ad2fab",
+      "sha256": "936a5294fed37e699bbf0bb7f0982242856d30601ac8c35def789821e183eafb",
+      "unchanged_since_r1": true
+    },
+    {
+      "path": "src/forge/gitlab/post.rs",
+      "git_blob": "07263bd819c36d9b6682fd7292df4c039ffb514d",
+      "sha256": "ab32cf9f9c849d087e2ac04b98e299d4c4f38b59c58f560fa5816550bf43227b",
+      "unchanged_since_r1": true
+    },
+    {
+      "path": "src/repo/pr_review/boxes.rs",
+      "git_blob": "5183a64699006768776352f40c69caa9873398a5",
+      "sha256": "acfaa6a78544b3cc138176afee852a8c0328a64ef6e2ba3d7ba6fd896516084e",
+      "unchanged_since_r1": true
+    },
+    {
+      "path": "src/repo/pr_review/send.rs",
+      "git_blob": "f54507fb5695b74d4040de369187deb7e178bcac",
+      "sha256": "19a0de717bf0d218d877eba93969429857c5febf4e2fbe42308960da9f815b41",
+      "unchanged_since_r1": true
+    },
+    {
+      "path": "src/repo/pr_review/line_panel.rs",
+      "git_blob": "11d71d818d68f73f8c84e872689bf6a5e4f40f41",
+      "sha256": "ad47de5a28f83af1866756bef5eae1a2cc9b7c2c00e0beabfaf1643e4ed46089",
+      "unchanged_since_r1": true
+    },
+    {
+      "path": "src/repo/pr_review/lines.rs",
+      "git_blob": "146ff239f97631341b83131fa2e7dcb1ff86443d",
+      "sha256": "a519ee29da02af82b24410412df435e301d7a186f19bfbbe28cbde6b174bc71a",
+      "unchanged_since_r1": true
+    },
+    {
+      "path": "src/repo/pr_view/timeline.rs",
+      "git_blob": "34e9ad6976ddc90910e19879de6083704ada7002",
+      "sha256": "5813a70ae61861caf170ced0e36325762e58ca75df606ca6e7945ff8f4349422",
+      "unchanged_since_r1": true
+    },
+    {
+      "path": "src/pr_threads.rs",
+      "git_blob": "3dae0ad8b6be337e5dbe620e008c54b98a48ad1c",
+      "sha256": "13a19849f20a8c0820c9db5b2fbc320fcc6789e9ee2e42cad42abfba2457c3ae",
+      "unchanged_since_r1": true
+    }
+  ],
+  "independent_execution": {
+    "class": "Tiny extracted-function Rust test with inert recording Ui; visibility widened/local fake egui facade; no actual egui/app/provider/runtime execution",
+    "passed": 1,
+    "log": {
+      "path": "/tmp/gitcraft-51-gitlab-delta-r2-evidence/reachability.log",
+      "sha256": "868dcf7ba6289f4d2f06ce4cf8aa4ca1242a5176fb5226834289c6d7e01c3e5f"
+    },
+    "commands": [
+      [
+        "/Users/jonas/.rustup/toolchains/1.95.0-aarch64-apple-darwin/bin/rustc",
+        "--edition=2024",
+        "--test",
+        "/tmp/gitcraft-51-gitlab-delta-r2-evidence/reachability.rs",
+        "-o",
+        "/tmp/gitcraft-51-gitlab-delta-r2-evidence/reachability-tests"
+      ],
+      [
+        "/tmp/gitcraft-51-gitlab-delta-r2-evidence/reachability-tests",
+        "--nocapture",
+        "--test-threads=1"
+      ]
+    ]
+  },
+  "writer_gates_inspected_not_rerun": [
+    {
+      "commit": "7ef8cac882eb7b9433dc12203036ccb3749f6e31",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--offline",
+        "--lib",
+        "repo::pr_review::native_discussions::tests::",
+        "--",
+        "--test-threads=1"
+      ],
+      "log": "/tmp/gitcraft-51-gitlab-r1-fix-7ef8cac8-0.log",
+      "exit": 0,
+      "kind": "pure/recording/headless or compilation; no runtime fixtures"
+    },
+    {
+      "commit": "7ef8cac882eb7b9433dc12203036ccb3749f6e31",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--offline",
+        "--lib",
+        "forge::gitlab::",
+        "--",
+        "--test-threads=2"
+      ],
+      "log": "/tmp/gitcraft-51-gitlab-r1-fix-7ef8cac8-1.log",
+      "exit": 0,
+      "kind": "pure/recording/headless or compilation; no runtime fixtures"
+    },
+    {
+      "commit": "7ef8cac882eb7b9433dc12203036ccb3749f6e31",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "check",
+        "--offline",
+        "--all-targets"
+      ],
+      "log": "/tmp/gitcraft-51-gitlab-r1-fix-7ef8cac8-2.log",
+      "exit": 0,
+      "kind": "pure/recording/headless or compilation; no runtime fixtures"
+    },
+    {
+      "commit": "7ef8cac882eb7b9433dc12203036ccb3749f6e31",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "clippy",
+        "--offline",
+        "--lib",
+        "--",
+        "-D",
+        "warnings",
+        "-A",
+        "dead_code"
+      ],
+      "log": "/tmp/gitcraft-51-gitlab-r1-fix-7ef8cac8-3.log",
+      "exit": 0,
+      "kind": "pure/recording/headless or compilation; no runtime fixtures"
+    }
+  ],
+  "validation_json": {
+    "path": "/tmp/gitcraft-51-batch-b-validation.json",
+    "sha256": "a76784f1cfe92d9caf295713b5db9fd043c3700d7a8b0bfa71a0706b7b3d4b3d"
+  },
+  "artifacts": [
+    {
+      "path": "/tmp/gitcraft-51-gitlab-delta-r2-evidence/correction.diff",
+      "sha256": "a406e40aa45c27156ab0aabc07a627d89ab2a31a02f72cd2541f8beaf32e13c5"
+    },
+    {
+      "path": "/tmp/gitcraft-51-gitlab-delta-r2-evidence/reachability-tests",
+      "sha256": "9cce396f7382d08d7061506663e55d75ae0841dbb053a5441e066125cf777ac1"
+    },
+    {
+      "path": "/tmp/gitcraft-51-gitlab-delta-r2-evidence/reachability.log",
+      "sha256": "868dcf7ba6289f4d2f06ce4cf8aa4ca1242a5176fb5226834289c6d7e01c3e5f"
+    },
+    {
+      "path": "/tmp/gitcraft-51-gitlab-delta-r2-evidence/reachability.rs",
+      "sha256": "01dcf9e4efdd9fa2a817e821ea213f36749e18925552e9b1553fe97b42b65562"
+    },
+    {
+      "path": "/tmp/gitcraft-51-gitlab-delta-r2-evidence/source-binding.json",
+      "sha256": "520c6a2bb701f93aae636a0164ba263e316e70fdc1aa8fedcc83fee4c2bddd56"
+    }
+  ],
+  "writer_logs": [
+    {
+      "path": "/tmp/gitcraft-51-gitlab-r1-fix-7ef8cac8-0.log",
+      "sha256": "33d08d68a1de4a2130c29acd1a1bd0f949986bade16fbd3658c9d344f7a11392"
+    },
+    {
+      "path": "/tmp/gitcraft-51-gitlab-r1-fix-7ef8cac8-1.log",
+      "sha256": "e6aa31660dde092ecdc16d82e1073a81bc6bb12ef63f3fce007a43beba36de99"
+    },
+    {
+      "path": "/tmp/gitcraft-51-gitlab-r1-fix-7ef8cac8-2.log",
+      "sha256": "21146060aaddc960f3b97b59ac98f68786247bfc39ba16c2fac0fb5121c148bc"
+    },
+    {
+      "path": "/tmp/gitcraft-51-gitlab-r1-fix-7ef8cac8-3.log",
+      "sha256": "f4403412cb20dc7d8a0a94c08c9c8853e4bac9b3e8489158834f30512311ed97"
+    }
+  ],
+  "report": {
+    "path": "/tmp/gitcraft-51-gitlab-delta-review-r2.md",
+    "sha256": "da93c85f55f2875b8350d1ad1f6efb662a8bf9628145b8ac90ce39bf35665c0b"
+  },
+  "dispositions": {
+    "GL-R1-1": "RESOLVED"
+  },
+  "held": [
+    "actual Git/CLI/helper/HTTP/network/keyring/auth/native/process/runtime fixtures",
+    "full suite/CI/PR/external writes",
+    "intervening Jira, shared credential/process and whole-branch certification"
+  ]
+}

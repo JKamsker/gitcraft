@@ -13,9 +13,21 @@ use crate::settings::Settings;
 
 impl RepoTab {
     pub(crate) fn apply(&mut self, action: Action, ctx: &egui::Context) {
+        self.notice_connections(ctx);
         let Some(action) = self.popout_intercept(action, ctx) else {
             return;
         };
+        if matches!(
+            &action,
+            Action::OpenDiff(_)
+                | Action::FileView { .. }
+                | Action::ShowActivity(_)
+                | Action::OpenPr(_)
+                | Action::OpenCi { .. }
+        ) {
+            self.dossier.close();
+            self.symbols.close();
+        }
         let plain = OpKind::plain();
         // Fetch, Pull and Push asked for while something runs start once it is done.
         if self.busy_op.is_some()
@@ -27,14 +39,65 @@ impl RepoTab {
         let Some(action) = self.fence_gate(action, ctx) else {
             return;
         };
+        if matches!(
+            &action,
+            Action::OpenDiff(_)
+                | Action::OpenPr(_)
+                | Action::OpenCi { .. }
+                | Action::FileView { .. }
+        ) {
+            self.file_comparison = None;
+        }
+        if matches!(
+            &action,
+            Action::OpenDiff(_)
+                | Action::FileView { .. }
+                | Action::OpenPr(_)
+                | Action::Select(_)
+                | Action::SelectHash(_)
+                | Action::SelectPr(_)
+                | Action::SelectStash(_)
+                | Action::Compare { .. }
+        ) {
+            self.review_document.open = false;
+        }
         match action {
             Action::RepositoryTools(act) => self.repository_tools_act(act, ctx),
+            Action::SubmitPreflight(plan) => self.submit_preflight(*plan, ctx),
+            Action::FixPreflight(plan, kind) => self.fix_preflight(*plan, &kind, ctx),
+            Action::PreflightMessages(plan) => self.preflight_messages(*plan, ctx),
+            Action::ReloadPreflight(plan) => self.reload_preflight(*plan, ctx),
+            Action::DvcPull => {
+                self.dialog=Some(super::Dialog::confirm("DVC: Pull", "Download the data referenced by this checkout from its configured DVC remote and materialize it in the working tree? DVC must be installed on the repository machine. Review local data edits first; this operation has no automatic undo.".into(), "Pull data",git::dvc::pull_steps(),None));
+            }
+
+            Action::OpenFileComparison(page) => self.open_file_comparison(page, ctx),
+            Action::RefreshFileComparison => self.load_file_comparison(ctx),
+            Action::CloseFileComparison => self.file_comparison = None,
+            Action::ComparisonMove { request, index } => self.comparison_move(request, index, ctx),
+            Action::ComparisonCell {
+                request,
+                path,
+                column,
+            } => self.comparison_cell(request, path, column, ctx),
+            Action::ComparisonPick {
+                request,
+                boundary,
+                lines,
+                whole,
+            } => self.comparison_pick(request, boundary, lines, whole, ctx),
+            Action::ComparisonNormalPatch => self.comparison_normal_patch(ctx),
+            Action::ReviewTools(act) => self.review_tools_act(act, ctx),
+            Action::Story(act) => self.story_act(act, ctx),
+            Action::Freshness(act) => self.freshness_act(act, ctx),
+            Action::Review(act) => self.review_act(act, ctx),
             Action::Select(row) => {
                 self.leave_pages();
                 self.doctor = None;
                 self.select(row, ctx);
                 self.hint_after_select(row, ctx);
             }
+            Action::ActivityCommit(hash) => self.activity_commit(hash, ctx),
             Action::SelectHash(hash) => {
                 self.leave_pages();
                 // Following a link is a step of its own, back and forward.
@@ -87,9 +150,52 @@ impl RepoTab {
             }
             Action::CloseCi => self.ci_view = None,
             Action::Ci(act) => self.ci_act(act, ctx),
+            Action::OpenLineDossier(seed) => {
+                self.symbols.close();
+                self.open_line_dossier(seed, ctx)
+            }
+            Action::OpenSymbolBiography(seed) => self.open_symbol_biography(seed, ctx),
+            Action::CloseSymbolBiography => self.symbols.close(),
+            Action::CloseLineDossier => self.dossier.close(),
+            Action::OpenPinnedFileLine(seed) => {
+                if !git::investigations::oid(&seed.commit) || seed.line == 0 {
+                    return;
+                }
+                super::file_text::focus(
+                    ctx,
+                    ("file_view", &seed.path, Some(&seed.commit)),
+                    seed.line,
+                );
+                self.apply(
+                    Action::FileView {
+                        path: seed.path,
+                        rev: Some(seed.commit),
+                        tab: super::file_view::FileTab::File,
+                    },
+                    ctx,
+                );
+            }
+            Action::EarlierVersions => self.earlier_versions(ctx),
+            Action::DraftEnable(on) => self.enable_working_drafts(on, ctx),
+            Action::DraftSnapshot => self.save_working_draft(false, ctx),
+            Action::DraftUndo => self.undo_working_draft(ctx),
+            Action::DraftPreview { id, path, index } => {
+                self.preview_working_draft(id, path, index, ctx)
+            }
+            Action::DraftRecover { preview, hunks } => {
+                self.recover_working_draft(*preview, hunks, ctx)
+            }
+            Action::OpenContentRecovery => self.dialog = Some(super::Dialog::ContentRecovery),
+            Action::ContentSearch(query) => self.content_search(query, ctx),
+            Action::ContentInspect(hit, source) => self.content_inspect(hit, source, ctx),
+            Action::ContentPrepare(target) => self.content_prepare(target, ctx),
+            Action::ContentPerform(prepared) => self.content_perform(prepared, ctx),
+            Action::LocalCi(act) => self.local_ci_act(act, ctx),
             Action::Reflog(act) => self.reflog_act(act, ctx),
             Action::CloseReflog => self.close_reflog(ctx),
             Action::Issue(act) => self.issue_act(act, ctx),
+            Action::OpenSshSetup => self.open_ssh_setup(ctx),
+            Action::OpenTour => self.open_tour(true, ctx),
             Action::OpenDoctor(section) => self.open_doctor(section, ctx),
             Action::CloseDoctor => self.doctor = None,
             Action::Doctor(act) => self.doctor_act(act, ctx),
@@ -273,6 +379,32 @@ impl RepoTab {
             Action::DiffRendered(on) => self.show_diff_rendered(on, ctx),
             Action::DiffRich(kind) => self.show_diff_rich(kind, ctx),
             Action::DiffGoToLine { old, new } => self.diff_go_to_line(old, new),
+            Action::DiffWrap(on) => {
+                let mut settings = Settings::get(ctx);
+                settings.diff_wrap = on;
+                settings.set(ctx);
+                if let Some(view) = &mut self.diff {
+                    view.text_sel = None;
+                    let logical = super::diff::logical_wrap_offset(
+                        view.wrap_offsets.as_deref().map(Vec::as_slice),
+                        view.scroll,
+                    );
+                    view.scroll_to = Some(logical);
+                    view.wrap_offsets = None;
+                }
+            }
+            Action::DiffSvgSource(on) => {
+                if let Some(view) = &mut self.diff {
+                    view.svg_source = on;
+                }
+            }
+            Action::DiffDecrypted(on) => self.show_diff_decrypted(on, ctx),
+            Action::DiffDecryptedEncoding(encoding) => {
+                if let Some(view) = &mut self.diff {
+                    view.encrypted.close();
+                    view.encrypted.json_encoding = encoding;
+                }
+            }
             Action::DiffStructural(on) => self.show_diff_structural(on, ctx),
             Action::DiffStep(delta) => {
                 // Shown in place of the lines (not fallen back to them).
@@ -349,7 +481,11 @@ impl RepoTab {
             Action::QuickEdit { edit, hash } => self.quick_edit(edit, hash, ctx),
             Action::DropMenu(menu) => self.drop_menu = Some(menu),
             Action::CommitDrop(drop) => self.commit_drop(drop, ctx),
-            Action::RunRebase => self.run_rebase(ctx),
+            Action::RunRebase => self.ask_run_rebase(ctx),
+            Action::ConfirmedRebase(id) => {
+                self.confirmed_rebase(id, ctx);
+            }
+            Action::AskRebase { onto, label } => self.ask_plain_rebase(onto, label, ctx),
             Action::FoldInto(hash) => self.fold_into(hash, ctx),
             Action::RunFold(plan) => self.run_fold(*plan, ctx),
             Action::AbortFold => self.abort_fold(ctx),
@@ -366,6 +502,7 @@ impl RepoTab {
             Action::CloseAbsorb => self.absorb = None,
             Action::Stack(act) => self.stack_act(act, ctx),
             Action::SignIn(creds) => self.sign_in(creds, ctx),
+            Action::SwitchHttps(url) => self.switch_https(url, ctx),
             Action::Ignore { pattern, path } => self.ignore(&pattern, &path, ctx),
             Action::PickLines {
                 pick: diff::Pick::Revert,
@@ -520,6 +657,14 @@ impl RepoTab {
         lines: &std::collections::BTreeSet<usize>,
         ctx: &egui::Context,
     ) {
+        if self
+            .diff
+            .as_ref()
+            .is_none_or(|v| v.encrypted.enabled || v.request != v.data_request)
+        {
+            return;
+        }
+        let request = self.diff.as_ref().map(|v| v.request);
         let Some(DiffView {
             key: DiffKey::Work(file),
             data: Some(Ok(data)),
@@ -543,12 +688,20 @@ impl RepoTab {
         self.here_or_later(
             ctx,
             move || git::save_patch_for(&repo, &patch),
-            move |tab, saved, ctx| tab.apply_picked(pick, &label, saved, ctx),
+            move |tab, saved, ctx| {
+                if tab.diff.as_ref().is_some_and(|v| {
+                    Some(v.request) == request
+                        && v.data_request == v.request
+                        && !v.encrypted.enabled
+                }) {
+                    tab.apply_picked(pick, &label, saved, ctx);
+                }
+            },
         );
     }
 
     /// Applies the patch of lines picked, saved at `saved` (see [`Self::pick_lines`]).
-    fn apply_picked(
+    pub(super) fn apply_picked(
         &mut self,
         pick: diff::Pick,
         label: &str,

@@ -1,0 +1,47 @@
+{
+  "application_candidate": "6a1cf232ff5eb68e9fef917cd5cbb79626ea824f",
+  "reviews": {
+    "keyboard_entry": {
+      "candidate": "33a74a5ed917a4ef27d9944f67ee5799dbc8de30",
+      "result": "scoped PASS"
+    },
+    "suspension": {
+      "candidate": "72a6a6a30fde9cce2b4a586f1597d42ff1e098f7",
+      "result": "scoped PASS"
+    }
+  },
+  "full_batch_status": "FAIL: other original findings remain unresolved",
+  "validation": {
+    "build": "CARGO_BUILD_JOBS=2 cargo +1.95.0 test --locked --lib --no-run",
+    "test": "target/debug/deps/gitcraft-31c2c4e1786728f8 repo::lifecycle:: repo::history_activity:: repo::postcards:: repo::graph_walk:: repo::graph_view:: --test-threads=1",
+    "passed": 79,
+    "failed": 0,
+    "ignored": 0,
+    "filtered": 3131,
+    "environment": {
+      "TMPDIR": "/private/tmp",
+      "PATH_prefix": "/tmp/gitcraft-integration-tools",
+      "SHELL": "/tmp/gitcraft-integration-tools/validation-shell"
+    }
+  },
+  "logs": [
+    {
+      "file": "parent-lifecycle.log.gz",
+      "sha256": "60f0bd1cc2e3117d9d84358353fcb4fe4f8918ea627061475b9ff5eb0673e41c"
+    },
+    {
+      "file": "parent-lifecycle-regressions.log.gz",
+      "sha256": "8eb2b931fae9273cb95f645b2f5fa661815f52d7187c208ae4421f445a1c7be0"
+    },
+    {
+      "file": "parent-lifecycle-build.log.gz",
+      "sha256": "17f7fe45c949cf645904aaf8230d18ee2fa502bbd96b81d550081d6d25f29351"
+    },
+    {
+      "file": "parent-lifecycle-regressions-final.log.gz",
+      "sha256": "bdc5888d7e88761f26cf669a61e9a81bedae3a3010780ddb5069576dc577cd41"
+    }
+  ],
+  "rejected_attempt": "Previous subset:78 passed1 failed. Loaded activity UI fixture remained Deferred; fix models Live phase. Assertions unchanged.",
+  "test_binary_sha256": "ec16cd572d724f3abd50db971cbeac9cdabea1e8e25ca2834440a20970c95b7f"
+}

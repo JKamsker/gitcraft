@@ -7,23 +7,28 @@ pub(crate) mod agent;
 mod agents;
 mod ai;
 mod apply;
+mod atlas;
 mod authorship_view;
 mod bakeoff;
 mod bisect;
+mod branch_bands;
 mod branch_cleanup;
 mod branch_health;
 mod branch_order;
 mod branch_tree;
 mod branch_visibility;
 mod bundles;
+mod celebration;
 mod ci_status;
 mod ci_view;
+mod cochanges;
 mod collision_view;
 pub(crate) mod columns;
 mod commands;
 mod commit_actions;
-mod conflict;
+pub(crate) mod conflict;
 mod conflict_check;
+mod content_recovery;
 #[cfg(test)]
 mod cpu_benchmarks;
 pub(crate) mod custom_commands;
@@ -42,6 +47,7 @@ mod drift_view;
 mod error_help;
 mod external_tools;
 pub(crate) mod fence_view;
+pub(crate) mod file_comparison;
 mod file_text;
 pub(crate) mod file_view;
 mod find;
@@ -51,29 +57,37 @@ mod forge_link;
 pub(crate) mod forks;
 mod gerrit;
 mod ghost;
+mod graph_motion;
 mod graph_order;
 pub(crate) mod graph_view;
+mod graph_walk;
+mod growth;
 mod guide;
 pub(crate) mod highlight;
+mod history_activity;
+mod history_reader;
 mod hooks;
 mod hotfix;
+mod https_recovery;
 mod interaction;
-mod issue_work;
+pub(crate) mod issue_work;
 mod keep_submodules;
 mod keys;
 mod layout;
 mod lfs_locks;
 mod lfs_storage;
 mod lifecycle;
+mod line_dossier;
 #[cfg(test)]
 mod line_history_tests;
 mod load;
+mod local_ci;
 mod messages;
 mod nav_history;
 mod navigate;
 mod navigation;
 mod offline;
-mod operations;
+pub(crate) mod operations;
 mod owners;
 mod package;
 mod palette;
@@ -82,13 +96,16 @@ mod partial_stash;
 mod patches;
 mod pinned_sections;
 pub(crate) mod popout;
+mod postcards;
 mod pr_merge;
 mod pr_review;
 mod pr_view;
+mod practice;
 #[cfg(test)]
 mod process_benchmarks;
 pub(crate) mod pull;
 mod push;
+mod push_preflight;
 mod quick_edit;
 mod rebase;
 mod reflog;
@@ -99,27 +116,35 @@ mod repository_tools;
 mod revert_piece;
 #[cfg(test)]
 mod revert_tests;
+mod review_workflow;
 mod rewrite;
 mod running;
 #[cfg(test)]
 mod samples;
+mod saved_views;
 mod sidebar;
+mod ssh_setup;
 mod stack;
 mod state;
 mod surgery;
+mod symbol_biography;
 mod terminals;
 mod test_lane;
 #[cfg(test)]
 mod tests;
 mod timeline;
 mod toolbar;
+mod tour;
 mod unity;
 mod versions;
 mod watch;
 mod watch_remote;
 mod weakened_marks;
 pub(crate) mod widgets;
+mod working_drafts;
 pub(crate) mod worktree_tab;
+#[cfg(test)]
+mod worktree_tests;
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -192,6 +217,12 @@ pub struct RepoTab {
     refs: Refs,
     graph_badge_index: graph_view::BadgeIndex,
     /// Commits as git listed them.
+    content_recovery: content_recovery::State,
+    working_drafts: working_drafts::State,
+    dossier: line_dossier::State,
+    symbols: symbol_biography::State,
+    cochanges: cochanges::State,
+    saved_views: saved_views::State,
     history: Vec<Arc<Commit>>,
     /// A selected pull request's tip, including one with no local or tracking ref.
     pr_graph_head: Option<Arc<Commit>>,
@@ -218,6 +249,8 @@ pub struct RepoTab {
     graph_messages: graph_view::message_tooltip::MessageTooltips,
     index: HashMap<String, usize>,
     worktrees: Vec<Worktree>,
+    /// Default root shared by every worktree of this repository (empty: sibling `.wt`).
+    worktree_root: String,
     stashes: Vec<Stash>,
     /// The files picked to stash, and whether git here can stash only what is staged.
     stash_picks: partial_stash::StashPicks,
@@ -225,6 +258,9 @@ pub struct RepoTab {
     submodules: Vec<Submodule>,
     /// It keeps files in Git LFS, and git-lfs is installed.
     lfs: bool,
+    practice: Option<crate::practice::Session>,
+    practice_checking: bool,
+    practice_result: Option<Result<bool, String>>,
     /// Its LFS file locks, when it keeps files in LFS.
     lfs_locks: lfs_locks::LockState,
     /// What it keeps in LFS on disk, and what is only pointers.
@@ -273,11 +309,15 @@ pub struct RepoTab {
     /// One active syntax comparison and at most one latest replacement across diff views.
     structural_running: Option<(u64, u64)>,
     structural_pending: bool,
+    file_comparison: Option<file_comparison::State>,
     compare: Option<Compare>,
     /// The pull request the big area shows.
     pr_view: Option<pr_view::PrView>,
+    review_document: review_workflow::ReviewState,
+    review_tools: review_workflow::Tools,
     /// The builds of a commit the big area shows.
     ci_view: Option<ci_view::CiView>,
+    local_ci: local_ci::State,
     /// The reflog (or the lost commits) shown above the graph.
     reflog: Option<reflog::ReflogView>,
     /// Two versions of a series of commits compared, the rewrites kept and the pull requests'
@@ -285,6 +325,8 @@ pub struct RepoTab {
     versions: versions::Versions,
     /// The repository doctor, when the big area shows it.
     doctor: Option<Box<doctor::DoctorView>>,
+    tour: Option<tour::TourView>,
+    ssh_setup: Option<ssh_setup::State>,
     pr_requests: u64,
     /// What was written on each pull request and not sent, by its number.
     pr_drafts: HashMap<u64, pr_review::PrDraft>,
@@ -316,10 +358,18 @@ pub struct RepoTab {
     /// Push and Sync: the push running, Sync's push waiting for its pull, the banner after a
     /// refused push.
     push_flow: push::PushFlow,
+    plain_rebase_request: u64,
+    preflight_pending: Option<PendingOp>,
+    preflight_after: Option<(String, PendingOp)>,
+    preflight_timeline: Option<Option<u64>>,
     /// HTTPS credentials typed in this session, used for every later git command of the tab.
     credentials: Option<git::Credentials>,
+    connection_context: crate::connections::Context,
     /// The last operation started, to run again after signing in.
     last_op: Option<PendingOp>,
+    https_generation: u64,
+    https_checking: bool,
+    https_challenge: Option<https_recovery::Ticket>,
     /// A known git failure explained, with its fix (see [`crate::error_card`]).
     error_card: Option<crate::error_card::ErrorCard>,
     /// The forge has been asked for avatars.
@@ -404,6 +454,18 @@ pub struct RepoTab {
     waiting: running::Waiting,
     /// The operations run, with their commands and output (the Activity panel).
     activity: activity::ActivityLog,
+    graph_motion: graph_motion::State,
+    celebration: celebration::State,
+    topology: std::sync::Arc<graph_walk::Topology>,
+    topology_reader: history_reader::Reader<std::sync::Arc<graph_walk::Topology>>,
+    graph_narration: graph_walk::Narration,
+    postcards: postcards::State,
+    growth: Option<growth::State>,
+    atlas: Option<atlas::State>,
+    history_activity: Option<history_activity::Activity>,
+    history_minimap: graph_view::minimap::State,
+    branch_bands: branch_bands::Preferences,
+    band_reader: history_reader::Reader<crate::graph::Graph>,
     /// A network operation failed (taken by `App`, for the taskbar button).
     network_failed: bool,
     /// The running operation moves the checkout: update the submodules after it, if asked to.
@@ -509,6 +571,7 @@ impl RepoTab {
             cancel: jobs.0.clone(),
             repo: messages::mutation_key(&path),
         };
+        let branch_bands = branch_bands::Preferences::load(_ctx, &path);
         Self {
             path,
             name,
@@ -529,6 +592,12 @@ impl RepoTab {
             load_error: None,
             refs: Refs::default(),
             graph_badge_index: graph_view::BadgeIndex::default(),
+            content_recovery: Default::default(),
+            working_drafts: Default::default(),
+            dossier: Default::default(),
+            symbols: Default::default(),
+            cochanges: Default::default(),
+            saved_views: Default::default(),
             history: Vec::new(),
             pr_graph_head: None,
             has_more: false,
@@ -542,18 +611,22 @@ impl RepoTab {
             work: WorkStatus::default(),
             commits: Vec::new(),
             graph: Graph {
-                rows: Vec::new(),
+                rows: Vec::new().into(),
                 width: 0,
             },
             graph_labels: HashMap::new(),
             graph_messages: Default::default(),
             index: HashMap::new(),
             worktrees: Vec::new(),
+            worktree_root: String::new(),
             stashes: Vec::new(),
             stash_picks: Default::default(),
             remotes: Vec::new(),
             submodules: Vec::new(),
             lfs: false,
+            practice: None,
+            practice_checking: false,
+            practice_result: None,
             lfs_locks: Default::default(),
             lfs_storage: Default::default(),
             unity: Default::default(),
@@ -583,12 +656,18 @@ impl RepoTab {
             diff: None,
             structural_running: None,
             structural_pending: false,
+            file_comparison: None,
             compare: None,
             pr_view: None,
+            review_document: Default::default(),
+            review_tools: Default::default(),
             ci_view: None,
+            local_ci: Default::default(),
             reflog: None,
             versions: Default::default(),
             doctor: None,
+            tour: None,
+            ssh_setup: None,
             pr_requests: 0,
             pr_drafts: HashMap::new(),
             compare_requests: 0,
@@ -606,8 +685,16 @@ impl RepoTab {
             package: None,
             reword: None,
             push_flow: Default::default(),
+            plain_rebase_request: 0,
+            preflight_pending: None,
+            preflight_after: None,
+            preflight_timeline: None,
             credentials: None,
+            connection_context: crate::connections::current(),
             last_op: None,
+            https_generation: 0,
+            https_checking: false,
+            https_challenge: None,
             error_card: None,
             avatars_hinted: false,
             diff_ignore_ws: false,
@@ -653,6 +740,18 @@ impl RepoTab {
             running: None,
             waiting: Default::default(),
             activity: Default::default(),
+            graph_motion: Default::default(),
+            celebration: Default::default(),
+            topology: Default::default(),
+            topology_reader: Default::default(),
+            graph_narration: Default::default(),
+            postcards: Default::default(),
+            growth: None,
+            atlas: None,
+            history_activity: None,
+            history_minimap: Default::default(),
+            branch_bands,
+            band_reader: Default::default(),
             network_failed: false,
             update_submodules: false,
             status: None,

@@ -1,0 +1,6 @@
+{
+  "candidate": "052721ed3c36853ad97c34485dbef65950f7ea38",
+  "verdict": "FAIL: four P2 findings routed to writer",
+  "execution": "independent pure/recording only; no act or Docker",
+  "runtime_process_gate": "HELD"
+}

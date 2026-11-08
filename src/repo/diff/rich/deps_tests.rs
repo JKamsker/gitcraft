@@ -173,6 +173,7 @@ fn many_versions_of_one_package_are_added_and_removed() {
         license: None,
         line: 1,
         registry: None,
+        public_registry: false,
     };
     let c = deps::compare(
         &[p("1.0.0"), p("2.0.0")],

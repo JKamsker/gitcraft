@@ -88,7 +88,19 @@ impl RepoTab {
         // Known by its commit, not its place: rows shift when a reload adds commits or the
         // changes row above them, and a menu opened on one must stay that commit's.
         let resp = ui.interact(rect, row_id(ui, &commit.hash), sense);
-        let label = || self.row_label(commit, viewport.now);
+        // WidgetInfo invokes its label closure while holding egui's context lock.
+        let walk_topology = crate::settings::Settings::get(ui.ctx()).graph_lane_walk;
+        let label = || {
+            let mut label = self.row_label(commit, viewport.now);
+            if walk_topology {
+                label.push_str(". ");
+                label.push_str(&self.graph_description(i));
+            }
+            if self.graph_motion.new_commit(&commit.hash) {
+                label.push_str(". Newly received commit");
+            }
+            label
+        };
         widgets::a11y_selected(&resp, label, self.selected == Some(i));
         let painter = ui.painter_at(rect);
         let mut hovered_message = None;
@@ -102,6 +114,16 @@ impl RepoTab {
             is_match,
             self.is_compared(commit, is_wip),
         );
+        if self.graph_motion.new_commit(&commit.hash) && !self.ghost.drawing() {
+            painter.rect_filled(
+                rect,
+                0.0,
+                t.accent
+                    .gamma_multiply(self.graph_motion.highlight(ui.ctx())),
+            );
+            let marker = egui::Rect::from_min_size(rect.left_top(), vec2(3.0, rect.height()));
+            painter.rect_filled(marker, 0.0, t.accent);
+        }
         let resp = match self.bisect_mark(&painter, &t, rect, &commit.hash) {
             Some(said) => resp.on_hover_text(said),
             None => resp,
@@ -121,7 +143,9 @@ impl RepoTab {
             gx,
             lane_w: lanes.width,
             node_x: graph_row.map(|r| lane_x(gx, r.col, lanes.width)),
-            color: graph_row.map(|r| t.lane(r.col)).unwrap_or(t.text_faint),
+            color: graph_row
+                .map(|r| t.lane(r.colours.get(&r.col).copied().unwrap_or(r.col)))
+                .unwrap_or(t.text_faint),
         };
 
         let (resp, pill) = self.refs_cell(ui, &painter, &row, resp, acts);
@@ -155,7 +179,18 @@ impl RepoTab {
                 .remerge_badge(commit)
                 .and_then(|b| b.fit(&painter, room).map(|(label, w)| (b, label, w)));
             let badge_w = resolved.map_or(0.0, |(_, _, w)| w + 6.0);
-            let end = description(ui, &painter, &t, &row, is_match, dot_w + badge_w, robot);
+            let end = description(
+                ui,
+                &painter,
+                &t,
+                &row,
+                (
+                    is_match,
+                    self.graph_motion.new_commit(&commit.hash) && !self.ghost.drawing(),
+                ),
+                dot_w + badge_w,
+                robot,
+            );
             if self.ghost.kind(i) == crate::repo::ghost::Kind::Going {
                 // Left on no ref by the operation a ghost run shows: struck through.
                 let x = row.gx + row.cols.graph + 6.0;
@@ -385,13 +420,31 @@ fn description(
     painter: &Painter,
     t: &Tokens,
     row: &Row,
-    is_match: bool,
+    (is_match, new_commit): (bool, bool),
     reserved: f32,
     robot: f32,
 ) -> f32 {
     let (rect, mid) = (row.rect, row.mid());
-    let x = row.gx + row.cols.graph + 6.0 + robot;
+    let mut x = row.gx + row.cols.graph + 6.0 + robot;
     let text_right = rect.right() - row.cols.trailing() - 10.0 - reserved;
+    if new_commit && text_right - x > 70.0 {
+        let marker = Rect::from_center_size(pos2(x + 13.0, mid), vec2(27.0, 17.0));
+        painter.rect_filled(marker, 3.0, t.card);
+        painter.rect_stroke(
+            marker,
+            3.0,
+            Stroke::new(1.0, t.accent),
+            egui::StrokeKind::Inside,
+        );
+        painter.text(
+            marker.center(),
+            Align2::CENTER_CENTER,
+            "new",
+            FontId::proportional(10.0),
+            t.text,
+        );
+        x += 34.0;
+    }
     let font = if is_match {
         theme::medium(12.5)
     } else {
@@ -597,7 +650,7 @@ mod tests {
                                 state == 3,
                                 false,
                             );
-                            description(ui, painter, &t, &row, state == 3, 0.0, 0.0);
+                            description(ui, painter, &t, &row, (state == 3, false), 0.0, 0.0);
                             row.rect = row.rect.translate(vec2(0.0, ROW_PITCH));
                             let background = row_background(
                                 painter,

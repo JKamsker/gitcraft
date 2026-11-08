@@ -71,7 +71,7 @@ impl GiteaFamily {
             &hosting.host,
             find_login(&hosting.web),
         )
-        .on_refused(forget_login)
+        .on_refused_key(forget_login, &login_key(&hosting.web))
     }
 }
 
@@ -136,7 +136,8 @@ impl Provider for GiteaFamily {
     /// unlocked, which the inbox, asking unasked, mustn't bring up.
     fn inbox(&self, _: &Path, hosting: &Hosting) -> Result<Answer, String> {
         let login = known_login(&hosting.web);
-        let api = Api::new(self.name, &hosting.web, &hosting.host, login).on_refused(forget_login);
+        let api = Api::new(self.name, &hosting.web, &hosting.host, login)
+            .on_refused_key(forget_login, &login_key(&hosting.web));
         inbox::inbox(&api, hosting)
     }
 
@@ -460,11 +461,15 @@ fn forget_login(web: &str) {
 /// The login to send to the forge at `web` (`https://host[:port]`), if the user has one. What's
 /// found is kept: a login until the server refuses it, the lack of one for a while. One lookup
 /// runs at a time, so that a credential helper asks once.
+fn login_key(web: &str) -> String {
+    let c = crate::connections::current();
+    format!("{web}\0{:?}\0{}", c.git_config, c.choices.tea_login)
+}
 fn find_login(web: &str) -> Option<Login> {
     let Ok(mut found) = found_logins().lock() else {
         return None;
     };
-    let entry = found.entry(web.to_owned()).or_default();
+    let entry = found.entry(login_key(web)).or_default();
     let fresh = match (&entry.login, entry.at) {
         (Some(_), _) => true,
         (None, Some(at)) => at.elapsed() < NO_LOGIN_FOR,
@@ -477,6 +482,9 @@ fn find_login(web: &str) -> Option<Login> {
             .filter(usable)
             .or_else(|| tea_login(web).filter(usable))
             .or_else(|| {
+                if !crate::connections::current().choices.tea_login.is_empty() {
+                    return None;
+                }
                 crate::git::stored_credentials(web)
                     .map(|c| Login::Basic {
                         user: c.username,
@@ -495,7 +503,7 @@ fn find_login(web: &str) -> Option<Login> {
 /// keyring asks to be unlocked; nothing is kept, so a tab still looks for itself.
 fn known_login(web: &str) -> Option<Login> {
     let found = found_logins().lock().ok()?;
-    let entry = found.get(web);
+    let entry = found.get(&login_key(web));
     if let Some(login) = entry.and_then(|e| e.login.clone()) {
         return Some(login);
     }
@@ -507,16 +515,54 @@ fn known_login(web: &str) -> Option<Login> {
 
 /// `tea`'s variables, for the server they name only.
 fn env_login(web: &str) -> Option<Login> {
+    if !crate::connections::current().choices.tea_login.is_empty() {
+        return None;
+    }
     let url = std::env::var("GITEA_SERVER_URL").ok()?;
     let token = std::env::var("GITEA_SERVER_TOKEN").ok()?;
     (same_server(&url, web) && !token.is_empty()).then_some(Login::Token(token))
 }
 
 fn tea_login(web: &str) -> Option<Login> {
+    let choices = crate::connections::current().choices;
+    if !choices.tea_login.is_empty() {
+        if !same_server(web, &format!("https://{}", choices.tea_host)) {
+            return None;
+        }
+        return selected_tea_login(&tea_logins(), web, &choices.tea_login)
+            .map(|l| Login::Token(l.token.clone()));
+    }
     tea_logins()
         .into_iter()
         .find(|login| same_server(&login.url, web) && !login.token.is_empty())
         .map(|login| Login::Token(login.token))
+}
+
+fn selected_tea_login<'a>(logins: &'a [TeaLogin], web: &str, alias: &str) -> Option<&'a TeaLogin> {
+    logins.iter().find(|login| {
+        login.name == alias && same_server(&login.url, web) && !login.token.is_empty()
+    })
+}
+
+pub(crate) fn selected_tea_metadata(alias: &str) -> Option<(String, String)> {
+    let logins = tea_logins();
+    let login = logins.iter().find(|login| login.name == alias)?;
+    let web = login.url.trim().trim_end_matches('/');
+    let authority = web.strip_prefix("https://")?;
+    if authority.is_empty() || authority.contains(['/', '@', '\n', '\r']) {
+        return None;
+    }
+    Some((authority.to_owned(), login.user.clone()))
+}
+
+pub(crate) fn selected_tea_secret(alias: &str, host: &str) -> Result<(String, String), String> {
+    let logins = tea_logins();
+    let login = selected_tea_login(&logins, &format!("https://{host}"), alias)
+        .ok_or("The selected tea login is unavailable for this server")?;
+    if login.user.is_empty() {
+        return Err("The tea login must include its account username".to_owned());
+    }
+    Ok((login.user.clone(), login.token.clone()))
 }
 
 /// Whether two base URLs are the same server: scheme, host and port, whatever the case or a slash
@@ -542,6 +588,8 @@ pub(super) fn tea_servers() -> Vec<(String, String)> {
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 struct TeaLogin {
+    name: String,
+    user: String,
     url: String,
     token: String,
 }
@@ -613,6 +661,8 @@ fn parse_tea_config(text: &str) -> Vec<TeaLogin> {
             .or_else(|| value.strip_prefix('\'').and_then(|v| v.strip_suffix('\'')))
             .unwrap_or(value);
         match key.trim() {
+            "name" => login.name = value.to_owned(),
+            "user" => login.user = value.to_owned(),
             "url" => login.url = value.to_owned(),
             "token" => login.token = value.to_owned(),
             _ => {}
@@ -620,6 +670,15 @@ fn parse_tea_config(text: &str) -> Vec<TeaLogin> {
     }
     logins.extend(current);
     logins
+}
+
+pub(super) fn ssh_key_api(hosting: &Hosting) -> Api {
+    Api::new(
+        hosting.forge.provider().name(),
+        &hosting.web,
+        &hosting.host,
+        tea_login(&hosting.web),
+    )
 }
 
 #[cfg(test)]
@@ -696,10 +755,14 @@ mod tests {
             logins,
             [
                 TeaLogin {
+                    name: String::new(),
+                    user: String::new(),
                     url: "https://codeberg.org".into(),
                     token: "abc123".into()
                 },
                 TeaLogin {
+                    name: String::new(),
+                    user: String::new(),
                     url: "https://git.home.example:3000/".into(),
                     token: "def".into()
                 },
@@ -724,4 +787,14 @@ mod tests {
         assert!(!same_server("http://codeberg.org", "https://codeberg.org"));
         assert!(!same_server("https://evil.example", "https://codeberg.org"));
     }
+}
+
+pub(super) fn history_api(hosting: &Hosting) -> Api {
+    Api::new(
+        "Gitea / Forgejo",
+        &hosting.web,
+        &hosting.host,
+        find_login(&hosting.web),
+    )
+    .on_refused_key(forget_login, &login_key(&hosting.web))
 }

@@ -1,0 +1,20 @@
+{
+  "release_assets": {
+    "sops-v3.13.3.darwin.arm64": "b97c0d434aab577dc40310e8d22ff9e45eef4c80638ab978daae9b4681c59286",
+    "sops-v3.13.3.checksums.txt": "91710ede6a3218e5b62286412543768a92d0c3449434951bd148d21043aad538",
+    "age-v1.3.2-darwin-arm64.tar.gz": "e2020b073c44f692685a24d6abc378817eb81ffaaf49fd0531ef8565f767f2f5"
+  },
+  "test_binary_sha256": "e3316b2d2b86f2667a519340fd7cbc563837a2abb9dc65f967239cf85769cff2",
+  "source_tip": "c82112a5ab8ba461c487c3266462a81896c85d33",
+  "application_commit": "5df74dbb3792a34ee0b1d13c301c9aa552aa6c69",
+  "result": "passed",
+  "tests_passed": 1,
+  "tests_skipped": 0,
+  "log_sha256": "f5424aa2419012c2fb750922b362b6caf92382dc3136938f8ab04594ea01bba4",
+  "scope": "Real SOPS/age generated-key offline fixture only; does not validate ordinary diff privacy paths or the whole fileviews batch",
+  "command": "env TMPDIR=/private/tmp PATH=/tmp/gitcraft-integration-tools:/usr/bin:/bin SHELL=/tmp/gitcraft-integration-tools/validation-shell GITCRAFT_TEST_SOPS=/tmp/gitcraft-51-orchestration/real-tools/sops-v3.13.3.darwin.arm64 GITCRAFT_TEST_AGE_KEYGEN=/tmp/gitcraft-51-orchestration/real-tools/age-keygen /tmp/gitcraft-51-orchestration/real-tools/gitcraft-fileviews-tests --exact repo::diff::encrypted::tests::fixture::real_sops_and_generated_age_compare_formats_and_key_rotation_offline --nocapture --test-threads=1",
+  "release_sources": [
+    "https://github.com/getsops/sops/releases/tag/v3.13.3",
+    "https://github.com/FiloSottile/age/releases/tag/v1.3.2"
+  ]
+}

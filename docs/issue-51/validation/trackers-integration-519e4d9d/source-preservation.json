@@ -1,0 +1,136 @@
+{
+  "reviewed": "f9f4da0c179ef65f9bd6743c321535301d37db32",
+  "source_commits": [
+    "9d8f54cf9c58ad70182a88e961dc40ec2356c02e",
+    "b5b7387205447a5fcfd98d50e49a49a524665c22",
+    "f9f4da0c179ef65f9bd6743c321535301d37db32"
+  ],
+  "files": [
+    {
+      "path": "Cargo.lock",
+      "matches_reviewed": false,
+      "reviewed_sha256": "28e92b6606c5ac17432dfa0dbe534cd05795399fbc35be6b987699f6dcd4ac64",
+      "integrated_sha256": "c18ec766b7fe01b7039769d0ad2e76d84251ec0afd426d297b6e9ff621c9ba4d"
+    },
+    {
+      "path": "Cargo.toml",
+      "matches_reviewed": false,
+      "reviewed_sha256": "dce8296b575420c765a6a8ee1c027dc0fecf2abfe8aa151a43eea0d756bc9d6b",
+      "integrated_sha256": "fe367eee76434c1ce49e162424238fe5920b709e924e027897b68d9ed2d66455"
+    },
+    {
+      "path": "src/connections.rs",
+      "matches_reviewed": false,
+      "reviewed_sha256": "4b391563e690e34528462cbab90f56df8ce1dc37aee410870f56b52880142d28",
+      "integrated_sha256": "d23a66c2b63c011c03e30007c12caea74262b8c6d7d2e27ce5e1940702b909a4"
+    },
+    {
+      "path": "src/forge/gitea/issues.rs",
+      "matches_reviewed": true,
+      "reviewed_sha256": "8ae2d5a5a9746ae1589b7c90936bba90e36d20a771b9efb8ac937039f90ff970",
+      "integrated_sha256": "8ae2d5a5a9746ae1589b7c90936bba90e36d20a771b9efb8ac937039f90ff970"
+    },
+    {
+      "path": "src/forge/github/issues.rs",
+      "matches_reviewed": true,
+      "reviewed_sha256": "af024e1901814124e6b258a14857d77ec44d6d350777d8a80029d5a99f083ce2",
+      "integrated_sha256": "af024e1901814124e6b258a14857d77ec44d6d350777d8a80029d5a99f083ce2"
+    },
+    {
+      "path": "src/forge/gitlab/mod.rs",
+      "matches_reviewed": true,
+      "reviewed_sha256": "b0de172e16246d928801209940ba5dca2d83d740c4724c35d3584763093c01b7",
+      "integrated_sha256": "b0de172e16246d928801209940ba5dca2d83d740c4724c35d3584763093c01b7"
+    },
+    {
+      "path": "src/forge/mod.rs",
+      "matches_reviewed": false,
+      "reviewed_sha256": "ba4ece15d3b1c99f58a463938c8a443827aa1dfbb48b5ce218da22bf499f37c3",
+      "integrated_sha256": "5dba689a24ab1ab84b71c3c7055667f8df96f63033e066d6564e44ba61a4899a"
+    },
+    {
+      "path": "src/lib.rs",
+      "matches_reviewed": false,
+      "reviewed_sha256": "4039c59f28c671b149d013fb82542034262ef2bbc753f41556637cecb2e47c6a",
+      "integrated_sha256": "6d3655e259b4c92cce99c0762b6ef73b608d652c5e5dc66ee9f345811a545766"
+    },
+    {
+      "path": "src/repo/actions.rs",
+      "matches_reviewed": false,
+      "reviewed_sha256": "4fc6cc330d4a2132cdb39cbcb27096c59639e282b32998da823080567dc8a8ae",
+      "integrated_sha256": "978a4b82c38967602e5e0a64c0ade626224d51876a6c61989ca9d20d2a3120f6"
+    },
+    {
+      "path": "src/repo/issue_work/card.rs",
+      "matches_reviewed": true,
+      "reviewed_sha256": "a168ca2603c579e35245a71d80ff27548852b4cbdde57ce200ecc87b7912d6db",
+      "integrated_sha256": "a168ca2603c579e35245a71d80ff27548852b4cbdde57ce200ecc87b7912d6db"
+    },
+    {
+      "path": "src/repo/issue_work/criteria.rs",
+      "matches_reviewed": true,
+      "reviewed_sha256": "00ddead78e6bdf6d4871df14cb52e556519316466360fc27542bf5d65287591c",
+      "integrated_sha256": "00ddead78e6bdf6d4871df14cb52e556519316466360fc27542bf5d65287591c"
+    },
+    {
+      "path": "src/repo/issue_work/link.rs",
+      "matches_reviewed": true,
+      "reviewed_sha256": "57895ff0c1f46fbe74f1624ffebec0ea568cc4cfc8bc06ac79272d3040fca81f",
+      "integrated_sha256": "57895ff0c1f46fbe74f1624ffebec0ea568cc4cfc8bc06ac79272d3040fca81f"
+    },
+    {
+      "path": "src/repo/issue_work/mod.rs",
+      "matches_reviewed": true,
+      "reviewed_sha256": "55f1391e6808875de899504cdd2c9b70cf98109ed58acfe50db2803c7d105016",
+      "integrated_sha256": "55f1391e6808875de899504cdd2c9b70cf98109ed58acfe50db2803c7d105016"
+    },
+    {
+      "path": "src/repo/issue_work/naming.rs",
+      "matches_reviewed": true,
+      "reviewed_sha256": "3fb5a54104cd50192534d7f8f3378460a6e6d2deb41f59048ca9149ef8138201",
+      "integrated_sha256": "3fb5a54104cd50192534d7f8f3378460a6e6d2deb41f59048ca9149ef8138201"
+    },
+    {
+      "path": "src/repo/issue_work/picker.rs",
+      "matches_reviewed": true,
+      "reviewed_sha256": "71ce9d353fe3c62d77d21fe41c5abaad55afc2dfe5af1d54056ecea0d0d35dca",
+      "integrated_sha256": "71ce9d353fe3c62d77d21fe41c5abaad55afc2dfe5af1d54056ecea0d0d35dca"
+    },
+    {
+      "path": "src/repo/issue_work/tests.rs",
+      "matches_reviewed": true,
+      "reviewed_sha256": "7b67ff81fb4e163f06866686f6efaac2b95eaa89209bd6438e416ddbf6620b14",
+      "integrated_sha256": "7b67ff81fb4e163f06866686f6efaac2b95eaa89209bd6438e416ddbf6620b14"
+    },
+    {
+      "path": "src/repo/mod.rs",
+      "matches_reviewed": false,
+      "reviewed_sha256": "878e75013e737ae3626fa8aa767a1b42907d058fc35311db8ca45605ebac7497",
+      "integrated_sha256": "6fddb66c0deebeaa38cd4ee53fd59bffc558e12258f06aa5f52c97a2e0acabf7"
+    },
+    {
+      "path": "src/settings/connection_page.rs",
+      "matches_reviewed": false,
+      "reviewed_sha256": "7f8046a921770af6b882f0f5c769af2aab6e33d807f0692b2dd812fa87282f43",
+      "integrated_sha256": "6dee6edd54083c61bcc28ba2b3646d31bce90c2f63cf2b13faa29e39ecd3b033"
+    },
+    {
+      "path": "src/trackers/mod.rs",
+      "matches_reviewed": true,
+      "reviewed_sha256": "a052d2d46a53251ce89d2a7693047c3a94920398ff8cfaa974d124420bf763a7",
+      "integrated_sha256": "a052d2d46a53251ce89d2a7693047c3a94920398ff8cfaa974d124420bf763a7"
+    },
+    {
+      "path": "src/trackers/tests.rs",
+      "matches_reviewed": true,
+      "reviewed_sha256": "7d25b1064b3456a1357d67b46a5abc3e02060d31f2d881e568ff5076f43bd711",
+      "integrated_sha256": "7d25b1064b3456a1357d67b46a5abc3e02060d31f2d881e568ff5076f43bd711"
+    },
+    {
+      "path": "src/trackers/ui.rs",
+      "matches_reviewed": true,
+      "reviewed_sha256": "e30e9a0781fddf400d0479665b4e35db94f592c6a1234f8d11dcde24712dd44e",
+      "integrated_sha256": "e30e9a0781fddf400d0479665b4e35db94f592c6a1234f8d11dcde24712dd44e"
+    }
+  ]
+}

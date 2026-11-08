@@ -1,0 +1,233 @@
+{
+  "verdict": "FAIL",
+  "scope": "Original issue43 native GitLab MR workflow only",
+  "candidate": "652e63345057aee614480c656edf3b959e8bb56b",
+  "tree": "5660b43324ac9cff2ebc7199a8841763f4371728",
+  "parent": "2d93de3b9c521af48b6dda0264ac9bfea75505d5",
+  "source_method": "Immutable git archive; each listed archive file verified against candidate Git blob; moving worktree source not used",
+  "archive": "/tmp/gitcraft-gitlab-r1-652e6334",
+  "source_files": [
+    {
+      "path": "AGENTS.md",
+      "git_blob": "66af36bac88105ef58ab8b6f6f551b6a354ed708",
+      "sha256": "a6b99ef334f51715e97ee6fd0d24fd4bd6920999d277657edc87ef6d570ffb1d"
+    },
+    {
+      "path": "src/forge/gitlab/api.rs",
+      "git_blob": "21760108a6b03011530009d5b0e0978e0e16ca49",
+      "sha256": "254eed3f5135d5946b132ed41275290ab5b36787854d39f67c4e6bfae2d3a1ef"
+    },
+    {
+      "path": "src/forge/gitlab/details.rs",
+      "git_blob": "175b18fbf1044fa5a0a0a0a36e1ff02779ad2fab",
+      "sha256": "936a5294fed37e699bbf0bb7f0982242856d30601ac8c35def789821e183eafb"
+    },
+    {
+      "path": "src/forge/gitlab/mod.rs",
+      "git_blob": "da13788be14a1b598bf912b64d729299aed87f37",
+      "sha256": "3b7c1fd206a9c589941ee9fddbf45443cf51fb67ee7ac0ac4bfb0314a04eaedf"
+    },
+    {
+      "path": "src/forge/gitlab/post.rs",
+      "git_blob": "07263bd819c36d9b6682fd7292df4c039ffb514d",
+      "sha256": "ab32cf9f9c849d087e2ac04b98e299d4c4f38b59c58f560fa5816550bf43227b"
+    },
+    {
+      "path": "src/forge/gitlab/native_tests.rs",
+      "git_blob": "e489998eab2afeb9146f4e73eb2587f2c6e289ae",
+      "sha256": "e8281473848659ae275298f65c69b73c48892b2d18611975d8cebe8cefea8a48"
+    },
+    {
+      "path": "src/forge/mod.rs",
+      "git_blob": "863bfef518b215b072444a104c0542288066f0d0",
+      "sha256": "03a079ecc0cd63401bea3e5d987aec9f81e2079b5f11ddcf1fb811fa9875ca7b"
+    },
+    {
+      "path": "src/pr_threads.rs",
+      "git_blob": "3dae0ad8b6be337e5dbe620e008c54b98a48ad1c",
+      "sha256": "13a19849f20a8c0820c9db5b2fbc320fcc6789e9ee2e42cad42abfba2457c3ae"
+    },
+    {
+      "path": "src/pr_post/mod.rs",
+      "git_blob": "fba0e71e4860fdb2aaa040c5f46523b1970957e8",
+      "sha256": "e43cfeaecc5b9fef9214ac4c5c172547b0436b5975e917c2c0f4df676650eebe"
+    },
+    {
+      "path": "src/pull_request/mod.rs",
+      "git_blob": "bf533a770e37d7a6637204c3beea1f97d7bf6043",
+      "sha256": "eacb016565d2182011e0265b75fc9c02d5171b4b2a0af64dd8dad166c1a76787"
+    },
+    {
+      "path": "src/repo/pr_view/mod.rs",
+      "git_blob": "d48c62d8db04a49d8c3bbeb366b3ab6b128437da",
+      "sha256": "f4f108517ee0279773a33953ce59b22d5381cf52a4ea30a422ba5845e382d58a"
+    },
+    {
+      "path": "src/repo/pr_view/select.rs",
+      "git_blob": "f777c1e0f6f8d5ebb5066410755cec6ccf072bb2",
+      "sha256": "5ab95e331fd75ae83edbfc9e09e93efbc65551e12cbdcde973a1e8f6c4266cda"
+    },
+    {
+      "path": "src/repo/pr_view/timeline.rs",
+      "git_blob": "34e9ad6976ddc90910e19879de6083704ada7002",
+      "sha256": "5813a70ae61861caf170ced0e36325762e58ca75df606ca6e7945ff8f4349422"
+    },
+    {
+      "path": "src/repo/pr_view/page.rs",
+      "git_blob": "62cb8fed4d15d672f349265ef242ef4fd41a9276",
+      "sha256": "94dfc8be1dc870c9ad17f37db377a5240777516ef54e529c8f0d986dc584ca97"
+    },
+    {
+      "path": "src/repo/pr_review/boxes.rs",
+      "git_blob": "5183a64699006768776352f40c69caa9873398a5",
+      "sha256": "acfaa6a78544b3cc138176afee852a8c0328a64ef6e2ba3d7ba6fd896516084e"
+    },
+    {
+      "path": "src/repo/pr_review/native_discussions.rs",
+      "git_blob": "8d0d62de4df608acc26aabd112f842a845187270",
+      "sha256": "cca53113f89a1a949b1a771da5567b488821b18860d5a53ca61c4cc75ef6917e"
+    },
+    {
+      "path": "src/repo/pr_review/line_panel.rs",
+      "git_blob": "11d71d818d68f73f8c84e872689bf6a5e4f40f41",
+      "sha256": "ad47de5a28f83af1866756bef5eae1a2cc9b7c2c00e0beabfaf1643e4ed46089"
+    },
+    {
+      "path": "src/repo/pr_review/lines.rs",
+      "git_blob": "146ff239f97631341b83131fa2e7dcb1ff86443d",
+      "sha256": "a519ee29da02af82b24410412df435e301d7a186f19bfbbe28cbde6b174bc71a"
+    },
+    {
+      "path": "src/repo/pr_review/send.rs",
+      "git_blob": "f54507fb5695b74d4040de369187deb7e178bcac",
+      "sha256": "19a0de717bf0d218d877eba93969429857c5febf4e2fbe42308960da9f815b41"
+    },
+    {
+      "path": "src/repo/pr_review/mod.rs",
+      "git_blob": "88c192ff11df3066b2eda055c2bd7d5b0536370c",
+      "sha256": "d4cf14c73fa4f0c2b32ed7a33dc03af652a2f3e173e8b0a6cebdb0791a3ac764"
+    },
+    {
+      "path": "src/repo/pr_merge.rs",
+      "git_blob": "16ade61a1b2cb954596b648061e3d896500a1b3e",
+      "sha256": "25e1fb17baa1d03ca7e26541d1be98be84d84489daa16d07ab9804bea4d50d23"
+    },
+    {
+      "path": "src/repo/sidebar/pull_requests.rs",
+      "git_blob": "19b20518fa95726b1566e29baddf4d14f2212001",
+      "sha256": "34a2674b4b939b7e27c2af032e6622ef8766e6f4ee9671363d37d3f15a9545c9"
+    },
+    {
+      "path": "src/repo/apply.rs",
+      "git_blob": "260cbf1d2aa7701ac6df3a5c232a1164bdf0eafc",
+      "sha256": "ccfea3f0b54a59ab1407a39ae2b067597b26cf005dee21d62545b7e200c19b56"
+    },
+    {
+      "path": "src/connections.rs",
+      "git_blob": "9ea4e6f1292b0e2861ed95540c57d4223a412b91",
+      "sha256": "e62ddc831c82f848a081d326e8970339ca49e5098804de1ada3e558f98affc4a"
+    }
+  ],
+  "independent_execution": [
+    {
+      "class": "Inert extracted-function Rust harness, fake recording Ui, minimal Thread fixture; no actual app/egui execution",
+      "compile": [
+        "/Users/jonas/.rustup/toolchains/1.95.0-aarch64-apple-darwin/bin/rustc",
+        "--edition=2024",
+        "--test",
+        "/tmp/gitcraft-51-gitlab-r1-evidence/reachability.rs",
+        "-o",
+        "/tmp/gitcraft-51-gitlab-r1-evidence/reachability-tests"
+      ],
+      "run": [
+        "/tmp/gitcraft-51-gitlab-r1-evidence/reachability-tests",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "tests_passed": 2,
+      "log": "/tmp/gitcraft-51-gitlab-r1-evidence/reachability.log"
+    }
+  ],
+  "writer_gates_attested_not_rerun": [
+    {
+      "commit": "652e63345057aee614480c656edf3b959e8bb56b",
+      "log": "/tmp/gitcraft-51-gitlab-652e6334-0.log",
+      "class": "12 pure/recording provider tests"
+    },
+    {
+      "commit": "652e63345057aee614480c656edf3b959e8bb56b",
+      "log": "/tmp/gitcraft-51-gitlab-652e6334-1.log",
+      "class": "1 headless review UI test"
+    },
+    {
+      "commit": "652e63345057aee614480c656edf3b959e8bb56b",
+      "log": "/tmp/gitcraft-51-gitlab-652e6334-2.log",
+      "class": "cargo check --all-targets"
+    },
+    {
+      "commit": "652e63345057aee614480c656edf3b959e8bb56b",
+      "log": "/tmp/gitcraft-51-gitlab-652e6334-3.log",
+      "class": "qualified cargo clippy --lib, -D warnings -A dead_code"
+    }
+  ],
+  "official_docs": [
+    "https://docs.gitlab.com/api/merge_requests/",
+    "https://docs.gitlab.com/api/discussions/",
+    "https://docs.gitlab.com/api/merge_request_approvals/"
+  ],
+  "held_gates": [
+    "actual Git/CLI/helper/process/HTTP/SSH/network/auth/native/PTY/cancel/timeout fixtures",
+    "full suite/CI/PR/external writes",
+    "real GitLab account, server and platform compatibility"
+  ],
+  "findings": [
+    "GL-R1-1 P2 outdated line discussions have no reachable reply or resolution controls"
+  ],
+  "artifact_hashes": [
+    {
+      "path": "/tmp/gitcraft-51-gitlab-r1-evidence/extraction.json",
+      "sha256": "966481080104eb15713983c27c94fc9ef49d61f0d81b4459db4f786aab9aa61e"
+    },
+    {
+      "path": "/tmp/gitcraft-51-gitlab-r1-evidence/list-create-find-preservation.diff",
+      "sha256": "fe01accfb3b258329ae12826dbfb60c9eb3f3c105fe38e6720e30872e15b7be1"
+    },
+    {
+      "path": "/tmp/gitcraft-51-gitlab-r1-evidence/reachability-tests",
+      "sha256": "faebe9a7d9e9b13d816506ce3adb2ed03e7426c80824ceca5eb4c97fa72a6871"
+    },
+    {
+      "path": "/tmp/gitcraft-51-gitlab-r1-evidence/reachability.log",
+      "sha256": "030ccaf5d80198e52615a8736d11005d38251bf08d9e4a031e2b1116ca103688"
+    },
+    {
+      "path": "/tmp/gitcraft-51-gitlab-r1-evidence/reachability.rs",
+      "sha256": "0230d07429b5e957de4ee39aa78c2d09a0050d6e24458acc3a1b48954168e54f"
+    },
+    {
+      "path": "/tmp/gitcraft-51-gitlab-652e6334-0.log",
+      "sha256": "e4a2a5971bf8b59b4398c6c24658de2f34b7e1542809ed6b5e7c1dd82641804c"
+    },
+    {
+      "path": "/tmp/gitcraft-51-gitlab-652e6334-1.log",
+      "sha256": "e81a09999695fc269f465b4cf1c77fc3ad5dd9e43ba2bd5bdaed7ea0084d6754"
+    },
+    {
+      "path": "/tmp/gitcraft-51-gitlab-652e6334-2.log",
+      "sha256": "02df02f4eac190d619ec2d1b4e581cf9c705cf4dbd877bf9aa8672d4ebbc0202"
+    },
+    {
+      "path": "/tmp/gitcraft-51-gitlab-652e6334-3.log",
+      "sha256": "f591e097f22f91dd5c31fbbf7e587d80c0a4e0ed594f9c9012a544f38c52d926"
+    }
+  ],
+  "original_issue_json": {
+    "path": "/tmp/gitcraft-issue51-issues.json",
+    "sha256": "411e76639a880c52a8f92ef5ec543e4e76befaa1f95b2be271629df23a88edfc"
+  },
+  "report": {
+    "path": "/tmp/gitcraft-51-gitlab-review-r1.md",
+    "sha256": "67750ec21e6de281b7e02bbf5eff127acf88ad309a9a7c7f936f264baba25df2"
+  }
+}

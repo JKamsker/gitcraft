@@ -1,0 +1,269 @@
+{
+  "review": "full repository tearoff independent R1",
+  "verdict": "FAIL",
+  "commit": "1b04721f524d9e8fdbcc5337366789295d675487",
+  "tree": "f16faca9ab1c70ab8c1f76c6b0fc2b7e93651603",
+  "parent": "5914916f1246986ae1e34de0ef6d8c03edaecd5b",
+  "source_root": "/tmp/gitcraft-tearoff-r1-1b04721f",
+  "source_mode": "immutable Git archive; listed source bytes verified against Git objects",
+  "report": {
+    "path": "/tmp/gitcraft-51-tearoff-review-r1.md",
+    "sha256": "110aef94ab765393631695658eb69e33f16a548afdd9bb4f988650864160c355"
+  },
+  "sources": [
+    {
+      "path": "src/app/windows.rs",
+      "sha256": "bedbdcf3cb11687b25ce54ff0f3d6e31af23d62c91c25c1b8d8ad6c33d7c65ad",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/app/mod.rs",
+      "sha256": "e8ee8dca6fec48423dbbb6b46a5b46de97ce60ae447c495cea977498e5455c8d",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/app/tab_strip/mod.rs",
+      "sha256": "10742374f1c2707211e63276cca5ef3b44580aef2626d904976a54c11e67e596",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/app/tab_strip/tab.rs",
+      "sha256": "55c4bfebdcf0f17302ce74cd257f0b101415b28eabc7bb6c1a2144cc39e8ddba",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/app/clone.rs",
+      "sha256": "28a9d31db1bdf180fd492ee490cdbf1facdcf04647a7e1086d412f6018c4635d",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/app/remote_open.rs",
+      "sha256": "124ddd35b9f209d9b6e9ead22fa6e9754606beaa212a4be442abb94d2eb34bae",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/app/dropped.rs",
+      "sha256": "38ddb6e2012f143fb40944d8f1498412bc27b26795265c182858274c4080bd14",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/app/draft_saving.rs",
+      "sha256": "50bce89693df5f90e95daaea30324deb85c9a7e794e38d54b0349295d820a91d",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/app/agent_card.rs",
+      "sha256": "d5e104250a70b9f2c25b401f41046205d0f1328e50f91ffde5b5add06b621d2a",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/app/launch.rs",
+      "sha256": "18455706ea9eeba35cde41d8c1724f0706697343fcfa41bf01d0bcf6cc52d180",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/app/handoff.rs",
+      "sha256": "1f59f2e2a4d17d86a9799880a6c5af6202cc46b7036f43df1ba71310e422ced7",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/app/inbox.rs",
+      "sha256": "1e832f3895e53aeeaf191ec2f8f27afb9a872066e3ef332ec3d47b78921aa729",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/app/profiles.rs",
+      "sha256": "8017d03b6fc90940a6585bd051c9e0fc2b81358ca5e1d31bb35c40ce1f08529e",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/app/os_shell.rs",
+      "sha256": "0ac07bc89ee94ca12b58d83880183618e076ab4e99281e173e9b3761ef580d8d",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/app/panels.rs",
+      "sha256": "563b65d37de6175ca22e858007d0a00df198a9c3802ad8a225d0d26f7e93388a",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/app/worktrees.rs",
+      "sha256": "86342abc4f9f655e2ec24965bee760ee39342c9fc709c07938c15397105bcf86",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/app/home.rs",
+      "sha256": "fd1c3018bccb9a0029aa3a38edb646276117cfe2aaac5857f3ef9ce8486764f0",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/app/tabs.rs",
+      "sha256": "8073b517ab42db2a0d2218013e1a1daf165370dbef60dd81f18697c2dd2caa67",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/app/tests.rs",
+      "sha256": "ba2e1b8e324f3836a2a275d67231d68a8b83df379559b8e86c83108af3878f3d",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/main.rs",
+      "sha256": "9fb347263e6fa804563b3f36a72f2fa9895b8c646e10504625bad59c0b1220bc",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/repo/keyboard.rs",
+      "sha256": "dc7d155345de60467eaae1a337961fc2956d417e5b050166b0865cf7dc3313bb",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/repo/mod.rs",
+      "sha256": "84bba46a25547fd770dfb8916aa346126eb662f6a5511213d419ac0894be983f",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/repo/layout.rs",
+      "sha256": "95556e1434f47882c8e2b9bf224f6191cab9df6f3a01dfdcf8b25f1b8f9a6b3f",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/repo/messages.rs",
+      "sha256": "c4e0dcd1d09d8d12ecf616b90c100af4ceafcd1211e2ba4691438155be77490c",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/repo/lifecycle.rs",
+      "sha256": "5dcce17e44f99a3e20ab7c616d60975a1cd69e6c7978d3d009274ebdaa4661b9",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/keymap/editor.rs",
+      "sha256": "15c1ed1e251f0ef6756e25dcae7510a8f27e8623dac7ea02af5e622b33770f26",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/repo/popout/window.rs",
+      "sha256": "c26c44a08e458541f55ff9dd7cfdd46b5dedb84203fcc1835750ac840b7d39e8",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "src/a11y/focus.rs",
+      "sha256": "d8f48fff41dfb5d47770f7c9f145841b4ec760745530f22a2d9ec47dfa518e1f",
+      "git_object_bytes_verified": true
+    },
+    {
+      "path": "Cargo.lock",
+      "sha256": "248b664c07e11b90818de4a49c050323e0723ac8659161942744b3965d451161",
+      "git_object_bytes_verified": true
+    }
+  ],
+  "primary_dependency_sources": [
+    {
+      "path": "/Users/jonas/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/egui-0.36.2/src/context.rs",
+      "sha256": "c1152788996a49f6ebfb45d817d4e9541d731334c12817ee075d448c0e55eea3"
+    },
+    {
+      "path": "/Users/jonas/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/egui-0.36.2/src/input_state/mod.rs",
+      "sha256": "86e244febe8b99ba2f462439aef2a3f7334a119e1e48c5bb1a8c2f4f82ef76d0"
+    },
+    {
+      "path": "/Users/jonas/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/egui-winit-0.36.2/src/lib.rs",
+      "sha256": "c7adae2eca7b6e874db0af8776c8c87bc3a5b62e128eddc95a94802cb3eee9e4"
+    },
+    {
+      "path": "/Users/jonas/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/eframe-0.36.2/src/native/epi_integration.rs",
+      "sha256": "54770c41c9036bd5139e14a045d75303b428c73c066ee3def9bd14b57f7b9e96"
+    },
+    {
+      "path": "/Users/jonas/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/eframe-0.36.2/src/native/wgpu_integration.rs",
+      "sha256": "b776ccf1b1642229abce524a22fc2ec53b362be5bb97bbe326c56d0ca2a54934"
+    },
+    {
+      "path": "/Users/jonas/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/eframe-0.36.2/src/native/glow_integration.rs",
+      "sha256": "65a3542c285c387ab83e7983add4cb9969aba1416278e511cdcf99e2ec5fc76a"
+    }
+  ],
+  "inputs_inspected": [
+    {
+      "path": "/tmp/gitcraft-51-interaction-plan.md",
+      "sha256": "3b039e4a7b4e3a1942ab6906d3f089b901e0bc9e40740e761dba838a2d2fbe77"
+    },
+    {
+      "path": "/tmp/gitcraft-issue51-issues.json",
+      "sha256": "411e76639a880c52a8f92ef5ec543e4e76befaa1f95b2be271629df23a88edfc"
+    },
+    {
+      "path": "/tmp/gitcraft-interaction-windows-validation.json",
+      "sha256": "555237782f68f8f7ad6b05be4c5f3bf7b6ad8daf5ccb48c8ea111a5a66a0e380"
+    },
+    {
+      "path": "/tmp/gitcraft-interaction-1b04721f-windows-0.log",
+      "sha256": "39564bce438e1a4cb4b1fbef5e83246c2fc1fe8f44e64552f18b9bafbf8573c5"
+    },
+    {
+      "path": "/tmp/gitcraft-interaction-1b04721f-windows-1.log",
+      "sha256": "f4403412cb20dc7d8a0a94c08c9c8853e4bac9b3e8489158834f30512311ed97"
+    }
+  ],
+  "independent_pure_headless_artifacts": [
+    {
+      "path": "/tmp/gitcraft-tearoff-r1-evidence/probe.rs",
+      "sha256": "32f3dffae729be73450ebeb376562e79b958e59c6ef37a6f52a8c70915f5fc85"
+    },
+    {
+      "path": "/tmp/gitcraft-tearoff-r1-evidence/drop_target.rs",
+      "sha256": "0c98eba4be1a1d186154aa0daef6e8677eeca50e1ee3a9362a52cbd5b0be2068"
+    },
+    {
+      "path": "/tmp/gitcraft-tearoff-r1-evidence/probe",
+      "sha256": "6c35e98cb6046ed6caf199a6fda286f47000837ec068c670debfc57140dac76f"
+    }
+  ],
+  "production_function_extraction": {
+    "source": "src/app/windows.rs::drop_target",
+    "copy": "/tmp/gitcraft-tearoff-r1-evidence/drop_target.rs",
+    "byte_identical": true
+  },
+  "dependency_rlib": {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-b9411fc1/target/debug/deps/libegui-0e410d2928238130.rlib",
+    "sha256": "00991d51820997eadb725e41ef7721aa7c818dd7c1a201afb2ac0c71ae3d7703"
+  },
+  "executions": {
+    "compiler_invocations": 1,
+    "compile_exit_code": 0,
+    "compile_note": "unused_mut warning in review harness",
+    "pure_headless_executable_runs": 1,
+    "run_exit_code": 0,
+    "application_App_RepoTab_constructor_runs": 0,
+    "actual_git_shell_pty_process_control_network_native_fixture_runs": 0,
+    "full_suite_ci_pr_runs": 0,
+    "tracked_source_edits": 0
+  },
+  "observed_stdout": [
+    "PURE production drop_target: equivalent physical hit misses when target rect uses its 2x point scale.",
+    "HEADLESS egui lifecycle: redeclaring cached full shell alone prunes omitted panel child ID.",
+    "HEADLESS input limitation: after PointerGone plus a pass, primary remains down while source has no interact position."
+  ],
+  "historical_writer_gates": {
+    "windows_headless_cases_declared": 9,
+    "rerun_by_reviewer": false,
+    "clippy": "all-targets -D warnings -A dead_code",
+    "constructor_process_freedom": "not independently executed/attested",
+    "stale_patch_actual_git_test": "authored, NOT RUN"
+  },
+  "findings": [
+    "TEAR-R1-1 logic-only root close bypass",
+    "TEAR-R1-2 shared modal ownership",
+    "TEAR-R1-3 repaint-dependent async result routing",
+    "TEAR-R1-4 mixed DPI drop coordinates",
+    "TEAR-R1-5 reentrant fallback omits existing panel viewports",
+    "TEAR-R1-6 hidden PatchQueue continuation gap"
+  ],
+  "open_coverage": [
+    "monitor-safe restoration",
+    "native source-exit drag capture/release",
+    "all platform native/window/screen-reader integration"
+  ],
+  "prior_checkpoint_findings": "remain separate unresolved; editor/popout-window/focus bytes unchanged",
+  "hold": "runtime/process/native/full-suite/CI hold retained; no acceptance authorization"
+}

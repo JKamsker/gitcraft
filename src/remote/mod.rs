@@ -21,9 +21,11 @@ mod vault;
 
 use std::path::{Path, PathBuf};
 
+pub(crate) use fs::read_within_script;
+
 pub use discover::{ssh_config_hosts, wsl_distros};
 pub use fs::{
-    copy_keeping_time, create_dir_all, host_scratch_dir, host_temp_file, is_file, is_link,
+    append, copy_keeping_time, create_dir_all, host_scratch_dir, host_temp_file, is_file, is_link,
     is_same_dir_as, read, read_to_string, read_within, remove_file, remove_host_scratch_dir,
     same_dir, try_is_dir, try_is_file, try_is_link, worktree_file, write,
 };

@@ -1,0 +1,24 @@
+{
+  "reviewed_tip": "39d8c4cecd63fbb225d6a32f8dac1186aab538ea",
+  "application_candidate": "0b5718ce575d3ba6332ca0ae6ea96f90d6493073",
+  "overall": "FAIL",
+  "corrections": [
+    {
+      "finding": "UI-R1-1",
+      "commits": [
+        "903de82d539c1cc7c0ed08c48bc59f31b8522922",
+        "33a74a5ed917a4ef27d9944f67ee5799dbc8de30"
+      ],
+      "status": "scoped independent PASS at33a74a5e"
+    },
+    {
+      "finding": "Lifecycle B2: suspension",
+      "commits": [
+        "72a6a6a30fde9cce2b4a586f1597d42ff1e098f7",
+        "6a1cf232ff5eb68e9fef917cd5cbb79626ea824f"
+      ],
+      "status": "scoped independent PASS on72a6a6a3 application correction; followup fixes test fixture lifecycle;79 focused regression tests pass at6a1cf232"
+    }
+  ],
+  "unresolved": "UI-R1-2 through5; atlas navigation, file/directory overlap, dense postcard graphs, expanded allocation budgets; UI-thread copying/export work; cancellation test contract. Overall FAIL, no full-suite/CI claim."
+}

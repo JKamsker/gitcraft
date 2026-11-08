@@ -1,0 +1,792 @@
+{
+  "report_sha256": "489adea2f82ceecdaeb7481919f4e7bff37b7d9b331fe98a478d74e9c44b54c3",
+  "manifest_sha256": "0ce6116d3a9fc2f6f595e750a346487ebadf5b953879141921a62fdb11362506",
+  "artifacts": [
+    {
+      "original_path": "/tmp/gitcraft-51-credential-setup-review-r3.md",
+      "sha256": "489adea2f82ceecdaeb7481919f4e7bff37b7d9b331fe98a478d74e9c44b54c3",
+      "bytes": 17862,
+      "archive": "evidence-000-gitcraft-51-credential-setup-review-r3.md.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/carry-checks.json",
+      "sha256": "2fab625461848b03e72dbac765262b354575258c95f749090f09899122dbb608",
+      "bytes": 1554,
+      "archive": "evidence-001-carry-checks.json.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/cleanup-recording.json",
+      "sha256": "a339b4cb25871c636d4f158d2ed82ac30bf4bc8ae8eb0a1f1c9e392fdc731215",
+      "bytes": 532,
+      "archive": "evidence-002-cleanup-recording.json.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/connection_doctor.rs.since-setup-r3.diff",
+      "sha256": "f6a856720c7b8e1aca46054548027afc7a6fbec9096160fba8cb50bc8355c29c",
+      "bytes": 673,
+      "archive": "evidence-003-connection_doctor.rs.since-setup-r3.diff.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/curl-netrc.html",
+      "sha256": "42a54818d2eb2be26d2c0e27c5aa34725d2240563376fdf7695ad1c97965549b",
+      "bytes": 12827,
+      "archive": "evidence-004-curl-netrc.html.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/external-sources.json",
+      "sha256": "5fdc9c7bd61ffac3f16332ad922519c02cefbbae8c7710501646c758c01e181e",
+      "bytes": 568,
+      "archive": "evidence-005-external-sources.json.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/git-credential.c",
+      "sha256": "7d9ddaf3978af10176f600429119dcab518d2e488fbb5ced091422a0436b213b",
+      "bytes": 19217,
+      "archive": "evidence-006-git-credential.c.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/git-http-master.c",
+      "sha256": "d915edd40a8cbed34b3a1c1c01f42e8ed0690712b10be43818d4d56b6236d63c",
+      "bytes": 84651,
+      "archive": "evidence-007-git-http-master.c.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/git-http-v2.47.c",
+      "sha256": "ff609bbe9b3fb7ee521ea495d972a0ab9d80d5fb777be096986e625e31e96870",
+      "bytes": 77136,
+      "archive": "evidence-008-git-http-v2.47.c.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/git-main.c",
+      "sha256": "0e1bbafb1fa791d07a91e9e714adb1274e1247ce5d7b9bde46562f0d55494432",
+      "bytes": 30923,
+      "archive": "evidence-009-git-main.c.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/git-remote-curl.c",
+      "sha256": "6fbb100e3ae0617b203880bd1359414c4b21d2769b3e8523dbd0b484923a8624",
+      "bytes": 44803,
+      "archive": "evidence-010-git-remote-curl.c.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/git-urlmatch.c",
+      "sha256": "a2e11d4e8ee2db43409cbb65a90b3f11ceb63aa5e2d186efed1ead0dd8cd5d97",
+      "bytes": 22521,
+      "archive": "evidence-011-git-urlmatch.c.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/later-r7.diff",
+      "sha256": "a146c2af2b484ab0e50ce243f59275b3dc219a5ba9b5c1a4939f54ab118c5357",
+      "bytes": 4681,
+      "archive": "evidence-012-later-r7.diff.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/mod.rs.since-setup-r3.diff",
+      "sha256": "36c2191e75b0748550f69feabae46d9907ff0763c8d65d136fc0f8c6e276bb52",
+      "bytes": 522,
+      "archive": "evidence-013-mod.rs.since-setup-r3.diff.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/parser",
+      "sha256": "c7fe8f09d427fa722087d308aab0a018d6690a8bf947f0b373725eece44bfda9",
+      "bytes": 637640,
+      "archive": "not copied: binary or >2MB; hash retained"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/parser.rs",
+      "sha256": "5cfa0991e081acc5309781521ba196d09f5037419d8deeeebeb0150c14bd48c7",
+      "bytes": 6169,
+      "archive": "evidence-015-parser.rs.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/parser.stdout.log",
+      "sha256": "845db82e89550baed474598bebcf9354f2d2568bb19a362c6b859456e25583d1",
+      "bytes": 255,
+      "archive": "evidence-016-parser.stdout.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior-inputs.json",
+      "sha256": "3ce02e0f71bceae6261e8e198b3fccbb255216f0993e8f550ef0beb321f56fa5",
+      "bytes": 26231,
+      "archive": "evidence-017-prior-inputs.json.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/credential-api-round1--01-connection-captured.rs",
+      "sha256": "5f540b48fc28fb685a957e021e1e2b17604e6ac26cbd167d89caae3ddd39f396",
+      "bytes": 1747,
+      "archive": "evidence-018-credential-api-round1--01-connection-captured.rs.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/credential-api-round1--03-connection-normalization.json",
+      "sha256": "e2ac5b2144411a165f7fa3bbd56fdc2173345e3ec63e238d5b5163dd69bbcbca",
+      "bytes": 402,
+      "archive": "evidence-019-credential-api-round1--03-connection-normalization.json.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/credential-api-round1--04-connection-normalization.rs",
+      "sha256": "f0096abec618bcb5ea08601d2016c4e471c0019bc31855d8142f69513afa1ff3",
+      "bytes": 4038,
+      "archive": "evidence-020-credential-api-round1--04-connection-normalization.rs.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/credential-api-round1--05-credential-fill-probes.json",
+      "sha256": "591933a596e169d150cd15e2b02c0c9058d6765db0ad7161cde8b6ae17662dc2",
+      "bytes": 1560,
+      "archive": "evidence-021-credential-api-round1--05-credential-fill-probes.json.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/credential-api-round1--07-credential-plan.rs",
+      "sha256": "723f71f599db3298bb52183145fe40c3687e23960a9818e28875305a9a6b13c1",
+      "bytes": 763,
+      "archive": "evidence-022-credential-api-round1--07-credential-plan.rs.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/credential-api-round1--08-pure-results.txt",
+      "sha256": "2d70018db24d1c03738136e8a9314967e0f7549fc8a3e927cfeef4f203cf58b1",
+      "bytes": 348,
+      "archive": "evidence-023-credential-api-round1--08-pure-results.txt.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/credential-api-round1--10-scope-pure.rs",
+      "sha256": "f05eeffc1c2bafb8fb71a64940071d02e9ab994537319e80a58c906570f65f22",
+      "bytes": 1239,
+      "archive": "evidence-024-credential-api-round1--10-scope-pure.rs.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/credential-api-round1--11-writer-final-check.log",
+      "sha256": "d4168eec77ff4c7a0b470318132d1a407750769afe113abdcb0f571c93b0cdd8",
+      "bytes": 2427,
+      "archive": "evidence-025-credential-api-round1--11-writer-final-check.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/credential-api-round1--12-writer-recording.log",
+      "sha256": "1c7f519d3825af478a3a875f1edccf9c7ef928f37c92efa3632979f149d87606",
+      "bytes": 1587,
+      "archive": "evidence-026-credential-api-round1--12-writer-recording.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/credential-api-round1--13-writer-synthetic.log",
+      "sha256": "5ce15294a57724f6fb9cec5e51849d8ef61ca3a4e18cc8742a136c74e05e0bfd",
+      "bytes": 1634,
+      "archive": "evidence-027-credential-api-round1--13-writer-synthetic.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/credential-api-round1--archive.json",
+      "sha256": "0e39f89ee8f8c61634599c39cb4c504a7f47ca6fc270d5d2fcd683aee2a4a4f5",
+      "bytes": 3476,
+      "archive": "evidence-028-credential-api-round1--archive.json.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/credential-api-round1--manifest.json",
+      "sha256": "c7c4f35c4958ba1892cdea3ba10e45a9b66abb5b02bcdf1f1708e4954b063b3d",
+      "bytes": 3858,
+      "archive": "evidence-029-credential-api-round1--manifest.json.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/credential-api-round1--policy-static-note.md",
+      "sha256": "ada4fe03eca6ce986980ef8edadc8f2e361f7ee018a8cb1276d46fa2603b99cc",
+      "bytes": 8208,
+      "archive": "evidence-030-credential-api-round1--policy-static-note.md.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/credential-api-round1--review.md",
+      "sha256": "b4991b816143079e65693052c1024b1001592830fca12215172dbbef53643763",
+      "bytes": 14028,
+      "archive": "evidence-031-credential-api-round1--review.md.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/credential-api-round1--status.json",
+      "sha256": "98865fd5adbd6c53f2ee6a7bc9a3beeedaaa9e84c137dce8c49cd4a9c6e4b191",
+      "bytes": 390,
+      "archive": "evidence-032-credential-api-round1--status.json.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/credential-api-round2--00-gitcraft-51-credential-api-review-r1-manifest.json",
+      "sha256": "c7c4f35c4958ba1892cdea3ba10e45a9b66abb5b02bcdf1f1708e4954b063b3d",
+      "bytes": 3858,
+      "archive": "evidence-033-credential-api-round2--00-gitcraft-51-credential-api-review-r1-manifest.json.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/credential-api-round2--06-pure-policy-5716.rs",
+      "sha256": "d614128be54d73d9fcfcde0ee05bb1650c73bd2243188ef57999ad980d1fa806",
+      "bytes": 3387,
+      "archive": "evidence-034-credential-api-round2--06-pure-policy-5716.rs.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/credential-api-round2--07-pure-policy-5716.stdout.log",
+      "sha256": "b376a2912fdfb29ca2fa5d3ddd480c74ffa676d6a12eaee7b3181f12593bef45",
+      "bytes": 343,
+      "archive": "evidence-035-credential-api-round2--07-pure-policy-5716.stdout.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/credential-api-round2--08-pure-policy-8855.stdout.log",
+      "sha256": "d28de380abbe0eb8ac5a07e52ddf45d94b24119ab76b31093032fd54e18bf216",
+      "bytes": 334,
+      "archive": "evidence-036-credential-api-round2--08-pure-policy-8855.stdout.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/credential-api-round2--09-pure-policy.rs",
+      "sha256": "9d0c98d7892f858d27b9e815596fa895e0d91d3e47ed8634ffb1e8b74da6b136",
+      "bytes": 3029,
+      "archive": "evidence-037-credential-api-round2--09-pure-policy.rs.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/credential-api-round2--archive.json",
+      "sha256": "346a962dfbbd22cadd2b193147e22f12415a1fb6b185b96b8d4ca1fb92709270",
+      "bytes": 1969,
+      "archive": "evidence-038-credential-api-round2--archive.json.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/credential-api-round2--manifest.json",
+      "sha256": "171fc664efff9bf93531a47c6f5320d141b85ba456ee21d408e140bf6a1bfbd0",
+      "bytes": 6897,
+      "archive": "evidence-039-credential-api-round2--manifest.json.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/credential-api-round2--review.md",
+      "sha256": "c769fa58798e308640a4bb99eac6eefd3d01cfad7c6c9c54690727f1778b64f0",
+      "bytes": 14092,
+      "archive": "evidence-040-credential-api-round2--review.md.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/credential-api-round2--status.json",
+      "sha256": "5183f4510dbc4f9175d0455dfc5bc2ac3da6c8000117b0b5501fc766dacbb77c",
+      "bytes": 164,
+      "archive": "evidence-041-credential-api-round2--status.json.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/gitcraft-51-setup-r6-pure-validation.json",
+      "sha256": "7299d226c6149cb5665723f84b5c0ebc79513f669c46cb1c6a155242b65fc658",
+      "bytes": 12046,
+      "archive": "evidence-042-gitcraft-51-setup-r6-pure-validation.json.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/gitcraft-51-setup-r7-pure-validation.json",
+      "sha256": "709fb9a31cba222c2d0119c9e30da9be18f0735bf822bbe8c837e94aadd9f78b",
+      "bytes": 12046,
+      "archive": "evidence-043-gitcraft-51-setup-r7-pure-validation.json.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/setup-round1--00-config-source.rs",
+      "sha256": "7eae92105a76cbaf0d04f7e1294f914576571a8bd3e050e479e94c6de41a839a",
+      "bytes": 16239,
+      "archive": "evidence-044-setup-round1--00-config-source.rs.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/setup-round1--01-push-endpoint-build.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "archive": "evidence-045-setup-round1--01-push-endpoint-build.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/setup-round1--02-mux-repro.json",
+      "sha256": "2abd01056f347e5d005f103c0941c1641574cdd55e57dc51dc1050a62ffb72b4",
+      "bytes": 756,
+      "archive": "evidence-046-setup-round1--02-mux-repro.json.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/setup-round1--03-source-repros-build.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "archive": "evidence-047-setup-round1--03-source-repros-build.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/setup-round1--04-stale-switch.log",
+      "sha256": "0a8de83ef240833695d770ed35c6ede3825418d7048cd3960237d47bed5b66ee",
+      "bytes": 75,
+      "archive": "evidence-048-setup-round1--04-stale-switch.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/setup-round1--05-SHA256SUMS.json",
+      "sha256": "5cb20baf01ead32be3ca3f3052d73601391f73a7a686a5f0c2d180ae0deb72e2",
+      "bytes": 4963,
+      "archive": "evidence-049-setup-round1--05-SHA256SUMS.json.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/setup-round1--06-mux_repro.py",
+      "sha256": "b0a66ffd73753ee1ddfeb777a3482fb207607f4970f9569885be6e802a8741be",
+      "bytes": 2767,
+      "archive": "evidence-050-setup-round1--06-mux_repro.py.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/setup-round1--07-stale-switch-build.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "archive": "evidence-051-setup-round1--07-stale-switch-build.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/setup-round1--08-source-repros.log",
+      "sha256": "51dd70b09d7c1b517a964047d876bdceb7cb1b1ea7db1707ecec1585e1c6df4d",
+      "bytes": 729,
+      "archive": "evidence-052-setup-round1--08-source-repros.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/setup-round1--09-source-function-hashes.json",
+      "sha256": "ea073843545e4a38ef639c9e34e396e6fcfb8e56f50bcf543855550b4fe3d092",
+      "bytes": 615,
+      "archive": "evidence-053-setup-round1--09-source-function-hashes.json.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/setup-round1--10-stale_switch_repro.py",
+      "sha256": "e2ffc1fdad1d22176e9737f379af7a14475f5279af4e2c62d74e6fc0d664bd0b",
+      "bytes": 3096,
+      "archive": "evidence-054-setup-round1--10-stale_switch_repro.py.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/setup-round1--11-source_repros.py",
+      "sha256": "f61f8b380f9e27530e02052477976fedc937d233691853b3ba747311ead254a1",
+      "bytes": 3971,
+      "archive": "evidence-055-setup-round1--11-source_repros.py.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/setup-round1--12-gitcraft-51-t3-5b9a0fe3-validation.json",
+      "sha256": "1fd6b4b9c2ab6fba6c89818b51fe18483bbe8dac687975746eadfba9a544b1fe",
+      "bytes": 11346,
+      "archive": "evidence-056-setup-round1--12-gitcraft-51-t3-5b9a0fe3-validation.json.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/setup-round1--13-verification.json",
+      "sha256": "9d3a8af0993077767425e1c02dfdc408af50cc594dd28f21bc369970e608ee6b",
+      "bytes": 1987,
+      "archive": "evidence-057-setup-round1--13-verification.json.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/setup-round1--14-gitcraft-issue51-issues.json",
+      "sha256": "411e76639a880c52a8f92ef5ec543e4e76befaa1f95b2be271629df23a88edfc",
+      "bytes": 177452,
+      "archive": "evidence-058-setup-round1--14-gitcraft-issue51-issues.json.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/setup-round1--15-stale-switch-repro.rs",
+      "sha256": "08d3837bfa42803c9ce4795f1ce17f892adf94d83a84d2f2319e7ec7616cd186",
+      "bytes": 2720,
+      "archive": "evidence-059-setup-round1--15-stale-switch-repro.rs.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/setup-round1--16-push-endpoint.log",
+      "sha256": "59d849142c82b0874aa01fbf812af3e2d39e93c91d61261495f527d8c82018de",
+      "bytes": 92,
+      "archive": "evidence-060-setup-round1--16-push-endpoint.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/setup-round1--17-push-endpoint-repro.rs",
+      "sha256": "d615c16d38091d9836f5c2c335e13f697e054446a1c1a41f6aa6a0cc4691f8dd",
+      "bytes": 821,
+      "archive": "evidence-061-setup-round1--17-push-endpoint-repro.rs.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/setup-round1--18-source-repros.rs",
+      "sha256": "f6d6240f63667a8ca7244254ba4e168dea81b45a93f03797ba95a9842e9f8eb5",
+      "bytes": 10384,
+      "archive": "evidence-062-setup-round1--18-source-repros.rs.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/setup-round1--review.md",
+      "sha256": "0a0243da9bc26ad185731c6685d7467d755ea82f5712b7ea6368c201229058e3",
+      "bytes": 21796,
+      "archive": "evidence-063-setup-round1--review.md.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/setup-round1--status.json",
+      "sha256": "5196f3c6fa3ca827415effff0e56f3de7a98889ea87b42250d76f5c9953b2257",
+      "bytes": 4517,
+      "archive": "evidence-064-setup-round1--status.json.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/setup-round2--00-gitcraft-51-setup-r2-check-f6.log",
+      "sha256": "29389350005e2bfe1b18c2a842c1ab19a522627fc04ecf4add42b000f63db694",
+      "bytes": 1983,
+      "archive": "evidence-065-setup-round2--00-gitcraft-51-setup-r2-check-f6.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/setup-round2--01-gitcraft-51-setup-r2-f1-connections.log",
+      "sha256": "168695d7815b7e67fcca98347db3392e0205e41b04c9c774a24f53874a375299",
+      "bytes": 4180,
+      "archive": "evidence-066-setup-round2--01-gitcraft-51-setup-r2-f1-connections.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/setup-round2--02-gitcraft-51-setup-r2-f1-synthetic.log",
+      "sha256": "dcbc9b85af1fdc1f0a3fa93e0105100cd0d0b53f8efbc6ea55313f5d86cd1a9a",
+      "bytes": 1636,
+      "archive": "evidence-067-setup-round2--02-gitcraft-51-setup-r2-f1-synthetic.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/setup-round2--03-gitcraft-51-setup-r2-final-collecting_diagnostics_cannot_open_a_browser_before_local_review.log",
+      "sha256": "20dedb2a9380f335ce9885d6b17c81016f1957d18c3f02c2f103ff1ca003c8f8",
+      "bytes": 2099,
+      "archive": "evidence-068-setup-round2--03-gitcraft-51-setup-r2-final-collecting_diagnostics_cannot_open_a_browser_before_local_review.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/setup-round2--04-gitcraft-51-setup-r2-final-connection_or_operation_changes_discard_old_rejection_completion_and_retry.log",
+      "sha256": "62d8813b31f6c2637436625fcbb8212c9073250db53c44db98e6fb39c1dd8a60",
+      "bytes": 1575,
+      "archive": "evidence-069-setup-round2--04-gitcraft-51-setup-r2-final-connection_or_operation_changes_discard_old_rejection_completion_and_retry.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/setup-round2--05-gitcraft-51-setup-r2-final-normalized_connection_commands_remove_repository_redirects_and_keep_the_selected_profile.log",
+      "sha256": "036c5305c10fc0c0f4159c151e31482707dd677ba275a0659196d55104d3e32f",
+      "bytes": 1593,
+      "archive": "evidence-070-setup-round2--05-gitcraft-51-setup-r2-final-normalized_connection_commands_remove_repository_redirects_and_keep_the_selected_profile.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/setup-round2--06-gitcraft-51-setup-r2-final-reported_push_and_lfs_endpoint_override_fetch_guesses_without_userinfo.log",
+      "sha256": "e5d2072a7b7010b476c9e4e4234419863f3bad695dfce19e54b2a751ccfb40fe",
+      "bytes": 1654,
+      "archive": "evidence-071-setup-round2--06-gitcraft-51-setup-r2-final-reported_push_and_lfs_endpoint_override_fetch_guesses_without_userinfo.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/setup-round2--07-gitcraft-51-setup-r2-validation.json",
+      "sha256": "0f75e5d15dae9b9442b833c11481bd13d44ae1a039882c70ad55badefccd5a02",
+      "bytes": 3468,
+      "archive": "evidence-072-setup-round2--07-gitcraft-51-setup-r2-validation.json.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/setup-round2--archive.json",
+      "sha256": "71e3b3ad57fe41dcb08602008671821b07c5307b07bca0314d3f700022d237ff",
+      "bytes": 3802,
+      "archive": "evidence-073-setup-round2--archive.json.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/setup-round2--manifest.json",
+      "sha256": "845b1ac13c8c39a074b7bcdd4e72b5f11937b0dd80390007ff146b2f6cef7ee9",
+      "bytes": 10746,
+      "archive": "evidence-074-setup-round2--manifest.json.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/setup-round2--review.md",
+      "sha256": "9f1482767ebe97cb646349ce98c2e6497de94be9ba1fbbc49b6c8fc27b9b592c",
+      "bytes": 15098,
+      "archive": "evidence-075-setup-round2--review.md.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/setup-round2--status.json",
+      "sha256": "a90b3183fd94f69db50fc61c33c7f96accc625e04f44bb2a684a341df2dc24d5",
+      "bytes": 374,
+      "archive": "evidence-076-setup-round2--status.json.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/setup-round3--00-gitcraft-51-setup-r3-pure-clippy.log",
+      "sha256": "a57bbd47d935b21d32fcdc70049cc237641a478b722b155af76333f5152a4a51",
+      "bytes": 3621,
+      "archive": "evidence-077-setup-round3--00-gitcraft-51-setup-r3-pure-clippy.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/setup-round3--01-gitcraft-51-setup-r3-pure-collecting_diagnostics_cannot_open_a_browser_before_local_review.log",
+      "sha256": "20317f2846f6c72e34e3df0d67eee17dc3bce0e2e212313eb46e0371ee3ba7aa",
+      "bytes": 1561,
+      "archive": "evidence-078-setup-round3--01-gitcraft-51-setup-r3-pure-collecting_diagnostics_cannot_open_a_browser_before_local_review.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/setup-round3--02-gitcraft-51-setup-r3-pure-command_values_and_invalid_enum_values_cannot_enter_an_issue_query.log",
+      "sha256": "445b9515fc0f7a521f49a9f4c4ead82c9681929e6e7cdcf743364d53464feba9",
+      "bytes": 1577,
+      "archive": "evidence-079-setup-round3--02-gitcraft-51-setup-r3-pure-command_values_and_invalid_enum_values_cannot_enter_an_issue_query.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/setup-round3--03-gitcraft-51-setup-r3-pure-connection_or_operation_changes_discard_old_rejection_completion_and_retry.log",
+      "sha256": "7404f65daf167d1f7412a6fc262b8979466f8fa2798c5a55666ebc2faa6bff08",
+      "bytes": 1575,
+      "archive": "evidence-080-setup-round3--03-gitcraft-51-setup-r3-pure-connection_or_operation_changes_discard_old_rejection_completion_and_retry.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/setup-round3--04-gitcraft-51-setup-r3-pure-git-command-credential_policy-tests.log",
+      "sha256": "2b6b6bcd461abee0bbe3b4e405cead41acb65f4f56ea867ee9c48f5ac4613edb",
+      "bytes": 1795,
+      "archive": "evidence-081-setup-round3--04-gitcraft-51-setup-r3-pure-git-command-credential_policy-tests.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/setup-round3--05-gitcraft-51-setup-r3-pure-git-credential_scope-tests.log",
+      "sha256": "a5592c607b7903546f0a129a77e4fd98ad264d9121670d62f11690975d7fedac",
+      "bytes": 1554,
+      "archive": "evidence-082-setup-round3--05-gitcraft-51-setup-r3-pure-git-credential_scope-tests.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/setup-round3--06-gitcraft-51-setup-r3-pure-later_connection_failure_preserves_earlier_tls_evidence.log",
+      "sha256": "e6773a57dbf92e41a852e889d2d2c8517b6afc988b2f9b59a639165d89b9f97d",
+      "bytes": 1565,
+      "archive": "evidence-083-setup-round3--06-gitcraft-51-setup-r3-pure-later_connection_failure_preserves_earlier_tls_evidence.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/setup-round3--07-gitcraft-51-setup-r3-pure-normalized_connection_commands_remove_repository_redirects_and_keep_the_selected_profile.log",
+      "sha256": "7ac7b26df67698cc7fd1a6e2db93ba20be6c1c8c52d5f7b13fb29f17f7766dd5",
+      "bytes": 1593,
+      "archive": "evidence-084-setup-round3--07-gitcraft-51-setup-r3-pure-normalized_connection_commands_remove_repository_redirects_and_keep_the_selected_profile.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/setup-round3--08-gitcraft-51-setup-r3-pure-push_only_and_override_configuration_changes_invalidate_route_snapshots.log",
+      "sha256": "64de1df4b3b0450b912eca56f3b2a16963e3c06c3668aab10072c38ec8631d1b",
+      "bytes": 1575,
+      "archive": "evidence-085-setup-round3--08-gitcraft-51-setup-r3-pure-push_only_and_override_configuration_changes_invalidate_route_snapshots.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/setup-round3--09-gitcraft-51-setup-r3-pure-reported_push_and_lfs_endpoint_override_fetch_guesses_without_userinfo.log",
+      "sha256": "382627c8474afcb76fcfd64494c8675fe26584c4ccfa6724190dfe7bf83f4761",
+      "bytes": 1574,
+      "archive": "evidence-086-setup-round3--09-gitcraft-51-setup-r3-pure-reported_push_and_lfs_endpoint_override_fetch_guesses_without_userinfo.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/setup-round3--10-gitcraft-51-setup-r3-pure-signout_clears_nested_parked_credentials_before_a_view_is_reopened.log",
+      "sha256": "e07cee05ad97428e76bb40eaebd3cceff1fbfdc2a8450223582ac0fad0995676",
+      "bytes": 1571,
+      "archive": "evidence-087-setup-round3--10-gitcraft-51-setup-r3-pure-signout_clears_nested_parked_credentials_before_a_view_is_reopened.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/setup-round3--11-gitcraft-51-setup-r3-pure-successful_tls_followed_by_auth_failure_is_not_a_certificate_failure.log",
+      "sha256": "b5ca6450247c2ea240869e4071e746583ea93378a31fa0041440d9e17ec2e81c",
+      "bytes": 1578,
+      "archive": "evidence-088-setup-round3--11-gitcraft-51-setup-r3-pure-successful_tls_followed_by_auth_failure_is_not_a_certificate_failure.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/setup-round3--12-gitcraft-51-setup-r3-pure-validation.json",
+      "sha256": "aa769ab5e86d1ad43087d76e9d6069a5dd853967a986b299a6ba51b8e9c35281",
+      "bytes": 9291,
+      "archive": "evidence-089-setup-round3--12-gitcraft-51-setup-r3-pure-validation.json.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/setup-round3--archive.json",
+      "sha256": "17e73b697a5018a3e9fc7f16110d03774ed4e15d224d496116e303bac22a97fa",
+      "bytes": 6297,
+      "archive": "evidence-090-setup-round3--archive.json.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/setup-round3--manifest.json",
+      "sha256": "9100e7c624427e7776efcd6667b395624fe4297ea9a74b8faf4485fb13218362",
+      "bytes": 18127,
+      "archive": "evidence-091-setup-round3--manifest.json.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/setup-round3--review.md",
+      "sha256": "e178914d450ffe86f9b33929d4d60b1c8950ed95e330c3a2ab70f8e48d786d2f",
+      "bytes": 11260,
+      "archive": "evidence-092-setup-round3--review.md.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/setup-round3--status.json",
+      "sha256": "d7df02dee32da9e41aede38518ab2ce653bc3b3221afbd5cfc02be72fd357bec",
+      "bytes": 207,
+      "archive": "evidence-093-setup-round3--status.json.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/writer-r6--gitcraft-51-setup-r6-pure-clippy.log",
+      "sha256": "5c4f84b36403d8f00df3e649dfa2b65812d536a2cda80a193da15f96a6a2f6d8",
+      "bytes": 152,
+      "archive": "evidence-094-writer-r6--gitcraft-51-setup-r6-pure-clippy.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/writer-r6--gitcraft-51-setup-r6-pure-collecting_diagnostics_cannot_open_a_browser_before_local_review.log",
+      "sha256": "7844bf2421f1833960ef1ddff5125780f003a165b175cb1832651a113975c35b",
+      "bytes": 2027,
+      "archive": "evidence-095-writer-r6--gitcraft-51-setup-r6-pure-collecting_diagnostics_cannot_open_a_browser_before_local_review.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/writer-r6--gitcraft-51-setup-r6-pure-command_values_and_invalid_enum_values_cannot_enter_an_issue_query.log",
+      "sha256": "8262cc74ae288bb7795ffa362b0804063b26ff8e2bd918340824fd26fded3b83",
+      "bytes": 2043,
+      "archive": "evidence-096-writer-r6--gitcraft-51-setup-r6-pure-command_values_and_invalid_enum_values_cannot_enter_an_issue_query.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/writer-r6--gitcraft-51-setup-r6-pure-credentials_preserve_typed_fields_without_authorizing_helper_only_use.log",
+      "sha256": "15bb7eb27483621913f4640c18491adccc9c500300807555a1699d10069a5ff0",
+      "bytes": 2028,
+      "archive": "evidence-097-writer-r6--gitcraft-51-setup-r6-pure-credentials_preserve_typed_fields_without_authorizing_helper_only_use.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/writer-r6--gitcraft-51-setup-r6-pure-diff-check.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "archive": "evidence-098-writer-r6--gitcraft-51-setup-r6-pure-diff-check.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/writer-r6--gitcraft-51-setup-r6-pure-format.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "archive": "evidence-099-writer-r6--gitcraft-51-setup-r6-pure-format.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/writer-r6--gitcraft-51-setup-r6-pure-git-command-credential_policy-tests.log",
+      "sha256": "d2b30b6cb79f38a65ad4ead6014858f9bf3a02e40f9715ab299dc87e81e44a35",
+      "bytes": 2407,
+      "archive": "evidence-100-writer-r6--gitcraft-51-setup-r6-pure-git-command-credential_policy-tests.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/writer-r6--gitcraft-51-setup-r6-pure-git-credential_scope-helper_tests.log",
+      "sha256": "c60c3cd66b5fda798114d655e88c32d50eb819235a0dd920276cd1db62c06a24",
+      "bytes": 2029,
+      "archive": "evidence-101-writer-r6--gitcraft-51-setup-r6-pure-git-credential_scope-helper_tests.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/writer-r6--gitcraft-51-setup-r6-pure-git-credential_scope-tests.log",
+      "sha256": "b39eac3e69d2bf8966d2dd50032b6e928e33305006c0b25591be23a36fa0752c",
+      "bytes": 2020,
+      "archive": "evidence-102-writer-r6--gitcraft-51-setup-r6-pure-git-credential_scope-tests.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/writer-r6--gitcraft-51-setup-r6-pure-later_connection_failure_preserves_earlier_tls_evidence.log",
+      "sha256": "073bbf58be171fc3fafdf8c5cb6f80bd4bc26c3a61e925563c4dcedda775b162",
+      "bytes": 2031,
+      "archive": "evidence-103-writer-r6--gitcraft-51-setup-r6-pure-later_connection_failure_preserves_earlier_tls_evidence.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/writer-r6--gitcraft-51-setup-r6-pure-normalized_connection_commands_remove_repository_redirects_and_keep_the_selected_profile.log",
+      "sha256": "e545aa428b3c14e7900c0607a247e4c570905937e54303850b3273363cbcae1b",
+      "bytes": 2059,
+      "archive": "evidence-104-writer-r6--gitcraft-51-setup-r6-pure-normalized_connection_commands_remove_repository_redirects_and_keep_the_selected_profile.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/writer-r6--gitcraft-51-setup-r6-pure-push_only_and_override_configuration_changes_invalidate_route_snapshots.log",
+      "sha256": "8c06ddd11673bf2d07b91e178f0c5abcb88da5e3fc9b988321702034e7c0be1f",
+      "bytes": 2041,
+      "archive": "evidence-105-writer-r6--gitcraft-51-setup-r6-pure-push_only_and_override_configuration_changes_invalidate_route_snapshots.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/writer-r6--gitcraft-51-setup-r6-pure-quiet_transient_credentials_use_the_shared_transport_policy.log",
+      "sha256": "c37356028ed507b2e32edd3c95deb790fc5e9b23d42b16b87cfcd40a47dddc67",
+      "bytes": 2018,
+      "archive": "evidence-106-writer-r6--gitcraft-51-setup-r6-pure-quiet_transient_credentials_use_the_shared_transport_policy.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/writer-r6--gitcraft-51-setup-r6-pure-repo-https_recovery-tests.log",
+      "sha256": "0e548cf9d25d7efc441ededb573f3eac27e1bb6b1148e409bec35fcc77e06cf8",
+      "bytes": 2242,
+      "archive": "evidence-107-writer-r6--gitcraft-51-setup-r6-pure-repo-https_recovery-tests.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/writer-r6--gitcraft-51-setup-r6-pure-reported_push_and_lfs_endpoint_override_fetch_guesses_without_userinfo.log",
+      "sha256": "cd64eb7e06bb59588a083878d802896b1e4883f00d8d68a6377b8c1abc18d03e",
+      "bytes": 2040,
+      "archive": "evidence-108-writer-r6--gitcraft-51-setup-r6-pure-reported_push_and_lfs_endpoint_override_fetch_guesses_without_userinfo.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/writer-r6--gitcraft-51-setup-r6-pure-signout_clears_nested_parked_credentials_before_a_view_is_reopened.log",
+      "sha256": "00e11a5f630f16e399b05339d13dc3b60d3ea0d6ce168f4f82d26501ef6b63b6",
+      "bytes": 2037,
+      "archive": "evidence-109-writer-r6--gitcraft-51-setup-r6-pure-signout_clears_nested_parked_credentials_before_a_view_is_reopened.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/writer-r6--gitcraft-51-setup-r6-pure-successful_tls_followed_by_auth_failure_is_not_a_certificate_failure.log",
+      "sha256": "7011dc2df6909ea6076949c56510f52f227b2085f8a97908bc346da33a844e3b",
+      "bytes": 2044,
+      "archive": "evidence-110-writer-r6--gitcraft-51-setup-r6-pure-successful_tls_followed_by_auth_failure_is_not_a_certificate_failure.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/writer-r7--gitcraft-51-setup-r7-pure-clippy.log",
+      "sha256": "e18266d97d45855fa2bfd3d98cbd93249f186073e23ce771e2c022a610c24c41",
+      "bytes": 152,
+      "archive": "evidence-111-writer-r7--gitcraft-51-setup-r7-pure-clippy.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/writer-r7--gitcraft-51-setup-r7-pure-collecting_diagnostics_cannot_open_a_browser_before_local_review.log",
+      "sha256": "7844bf2421f1833960ef1ddff5125780f003a165b175cb1832651a113975c35b",
+      "bytes": 2027,
+      "archive": "evidence-112-writer-r7--gitcraft-51-setup-r7-pure-collecting_diagnostics_cannot_open_a_browser_before_local_review.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/writer-r7--gitcraft-51-setup-r7-pure-command_values_and_invalid_enum_values_cannot_enter_an_issue_query.log",
+      "sha256": "e52b503eac6f8feb5e53403c5dd7d551aefe5c14cacd1e504e39aac665ea6015",
+      "bytes": 2043,
+      "archive": "evidence-113-writer-r7--gitcraft-51-setup-r7-pure-command_values_and_invalid_enum_values_cannot_enter_an_issue_query.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/writer-r7--gitcraft-51-setup-r7-pure-credentials_preserve_typed_fields_without_authorizing_helper_only_use.log",
+      "sha256": "c4aa53e11c0ddeb6caabd9c9ee32f26ebd475968251cf72319ea2807a1306e09",
+      "bytes": 2028,
+      "archive": "evidence-114-writer-r7--gitcraft-51-setup-r7-pure-credentials_preserve_typed_fields_without_authorizing_helper_only_use.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/writer-r7--gitcraft-51-setup-r7-pure-diff-check.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "archive": "evidence-115-writer-r7--gitcraft-51-setup-r7-pure-diff-check.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/writer-r7--gitcraft-51-setup-r7-pure-format.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "archive": "evidence-116-writer-r7--gitcraft-51-setup-r7-pure-format.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/writer-r7--gitcraft-51-setup-r7-pure-git-command-credential_policy-tests.log",
+      "sha256": "ed43604800e3151eb06508452ccfa97bcff1a5090622f495a658ac72190a6262",
+      "bytes": 2407,
+      "archive": "evidence-117-writer-r7--gitcraft-51-setup-r7-pure-git-command-credential_policy-tests.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/writer-r7--gitcraft-51-setup-r7-pure-git-credential_scope-helper_tests.log",
+      "sha256": "c60c3cd66b5fda798114d655e88c32d50eb819235a0dd920276cd1db62c06a24",
+      "bytes": 2029,
+      "archive": "evidence-118-writer-r7--gitcraft-51-setup-r7-pure-git-credential_scope-helper_tests.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/writer-r7--gitcraft-51-setup-r7-pure-git-credential_scope-tests.log",
+      "sha256": "b39eac3e69d2bf8966d2dd50032b6e928e33305006c0b25591be23a36fa0752c",
+      "bytes": 2020,
+      "archive": "evidence-119-writer-r7--gitcraft-51-setup-r7-pure-git-credential_scope-tests.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/writer-r7--gitcraft-51-setup-r7-pure-later_connection_failure_preserves_earlier_tls_evidence.log",
+      "sha256": "073bbf58be171fc3fafdf8c5cb6f80bd4bc26c3a61e925563c4dcedda775b162",
+      "bytes": 2031,
+      "archive": "evidence-120-writer-r7--gitcraft-51-setup-r7-pure-later_connection_failure_preserves_earlier_tls_evidence.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/writer-r7--gitcraft-51-setup-r7-pure-normalized_connection_commands_remove_repository_redirects_and_keep_the_selected_profile.log",
+      "sha256": "a386cb53e56a8b47e17ad564eeb9e6fd73ed526a654023b9f98ad2a6265091b4",
+      "bytes": 2059,
+      "archive": "evidence-121-writer-r7--gitcraft-51-setup-r7-pure-normalized_connection_commands_remove_repository_redirects_and_keep_the_selected_profile.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/writer-r7--gitcraft-51-setup-r7-pure-push_only_and_override_configuration_changes_invalidate_route_snapshots.log",
+      "sha256": "fe1001ab2d18321c1419541f212e45a2f66bf84f1bd900c05e2fcffc94458b6b",
+      "bytes": 2041,
+      "archive": "evidence-122-writer-r7--gitcraft-51-setup-r7-pure-push_only_and_override_configuration_changes_invalidate_route_snapshots.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/writer-r7--gitcraft-51-setup-r7-pure-quiet_transient_credentials_use_the_shared_transport_policy.log",
+      "sha256": "c94c9d5d60a91c4aa124492cd3e4f6a1cd2979e76d4463393a26900b4ee1e920",
+      "bytes": 2018,
+      "archive": "evidence-123-writer-r7--gitcraft-51-setup-r7-pure-quiet_transient_credentials_use_the_shared_transport_policy.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/writer-r7--gitcraft-51-setup-r7-pure-repo-https_recovery-tests.log",
+      "sha256": "0e548cf9d25d7efc441ededb573f3eac27e1bb6b1148e409bec35fcc77e06cf8",
+      "bytes": 2242,
+      "archive": "evidence-124-writer-r7--gitcraft-51-setup-r7-pure-repo-https_recovery-tests.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/writer-r7--gitcraft-51-setup-r7-pure-reported_push_and_lfs_endpoint_override_fetch_guesses_without_userinfo.log",
+      "sha256": "cd64eb7e06bb59588a083878d802896b1e4883f00d8d68a6377b8c1abc18d03e",
+      "bytes": 2040,
+      "archive": "evidence-125-writer-r7--gitcraft-51-setup-r7-pure-reported_push_and_lfs_endpoint_override_fetch_guesses_without_userinfo.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/writer-r7--gitcraft-51-setup-r7-pure-signout_clears_nested_parked_credentials_before_a_view_is_reopened.log",
+      "sha256": "cc57c1508a03674e4535741897514c54816fee895c52b2cea6336b8e98b87c8e",
+      "bytes": 2037,
+      "archive": "evidence-126-writer-r7--gitcraft-51-setup-r7-pure-signout_clears_nested_parked_credentials_before_a_view_is_reopened.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/prior/writer-r7--gitcraft-51-setup-r7-pure-successful_tls_followed_by_auth_failure_is_not_a_certificate_failure.log",
+      "sha256": "7011dc2df6909ea6076949c56510f52f227b2085f8a97908bc346da33a844e3b",
+      "bytes": 2044,
+      "archive": "evidence-127-writer-r7--gitcraft-51-setup-r7-pure-successful_tls_followed_by_auth_failure_is_not_a_certificate_failure.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/pure",
+      "sha256": "8e51b7e28c56d757b963ad69eac4bb4499790d444993d261593a085716c8b5c6",
+      "bytes": 779240,
+      "archive": "not copied: binary or >2MB; hash retained"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/pure.rs",
+      "sha256": "3a7f4cfd0b8582a2e4fa02e11891dc42578f395f1f8e017d3be1b0c099fe9ed4",
+      "bytes": 7274,
+      "archive": "evidence-129-pure.rs.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-credential-setup-r3-0319-evidence/pure.stdout.log",
+      "sha256": "cdecf3afc0317d2581aa1e396141108a4e2fba1b616df35592f719b5a16907a4",
+      "bytes": 286,
+      "archive": "evidence-130-pure.stdout.log.gz"
+    }
+  ]
+}

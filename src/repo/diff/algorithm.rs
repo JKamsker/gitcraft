@@ -105,7 +105,11 @@ impl RepoTab {
             settings.set(ctx);
         }
         if let Some(Ok(data)) = &view.data {
-            view.keep_place = place_at(data, data.shows_split(settings.diff_split), view.scroll);
+            let logical = super::wrap::logical_offset(
+                view.wrap_offsets.as_deref().map(Vec::as_slice),
+                view.scroll,
+            );
+            view.keep_place = place_at(data, data.shows_split(settings.diff_split), logical);
         }
         view.repairing = true;
         self.refresh_diff(ctx);

@@ -75,8 +75,14 @@ impl Runner<'_> {
         if self.control.is_cancelled() {
             return Err(git::CANCELLED.into());
         }
-        let (result, record) =
-            git::run_watched_recorded(Some(repo), args, None, false, self.control);
+        let (result, record) = git::command::run_watched_extra_recorded(
+            Some(repo),
+            args,
+            None,
+            false,
+            self.control,
+            git::command::Extra::repository(),
+        );
         self.control.record(record);
         result
     }

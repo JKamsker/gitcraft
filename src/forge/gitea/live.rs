@@ -761,7 +761,7 @@ fn pull_request_from_a_fork(
     );
     // Checked out as gitcraft does, then pushed to with the author's login.
     let creds = git::Credentials {
-        scope: None,
+        scope: Some(git::CredentialScope::for_url(&info.clone_https, "author")?),
         username: "author".to_owned(),
         password: server.author_token.clone(),
     };

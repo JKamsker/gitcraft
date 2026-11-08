@@ -1,0 +1,90 @@
+# Process remote review R3 — STATIC FAIL
+
+Candidate: `c74d6f49f349bfe76c12ed1a8fa83368c211ae07`, tree `d8d3ca70b97a6a0c55eae58a33c3f2198c1b9caa`, parent `e0cf3559aa5ae63f74615e2a7d81689cc243be6f`. Author observed: Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>. Review uses immutable archive `/private/tmp/gitcraft-process-remote-r3-c74`; no moving writer source. The companion JSON binds inspected source, inputs and independent recording logs by SHA-256.
+
+**Disposition:** one concrete blocking regression remains in the original R2-B5 boundary, reached through the new external recovery ledger. Ordinary endpoint retirement is repaired; cached-proof retirement bypasses its current-directory authentication in both Python and Perl. The other six named remote objections have scoped source/recording closure, with native writer/Service implementation accepted only by its separate reviewer. The twelve schedules have deterministic boundary coverage, not live scheduling proof. This does not clear the global runtime/full-suite hold or approve the whole prerequisite.
+
+## R3-B1 — cached recovery proof does not authenticate the directory being erased (P1)
+
+Exact production evidence:
+
+- `src/remote/supervisor/owner.py:269`: `retire_proven` validates `checked_receipt(owner,data)`, opens `PinnedDirectory(owner['path'])`, and unlinks `input`, `control`, `terminal`. It never calls the pinned directory’s `receipt()`.
+- `src/remote/supervisor/owner.pl:252`: `ledger_retire_proven` calls `retire`, but replaces its receipt callback with `checked_terminal($owner,$proof)`. That callback validates cached bytes, ignoring the currently pinned directory. The pin authenticates only a private same-UID directory, not its owner endpoint.
+- The path is reachable after successful checked cleanup: Python `RecoveryLedger.complete` at 341–346 and Perl `ledger_complete` at 289–293 publish a completed manifest then invoke these helpers for recovered entries. Cached proofs are deliberately reusable after a partial prior cleanup.
+- In contrast, ordinary Python `retire` at 232–237 reads `directory.receipt()` before any unlink; Perl `retire` at 92–103 reads `terminal` relative to the pinned directory.
+
+Concrete source interleaving: retain a valid cached terminal receipt for endpoint E; move E’s original directory away; a different private same-UID 0700 directory occupies E.path and contains files named `input`, `control`, `terminal` with a missing or different terminal receipt. Recovery pins this replacement directory, accepts the *old* cached receipt, deletes its three entries and can continue pruning the ledger. No capability forgery, symlink following, PID selection or unknown signal is needed. This is the previously demonstrated endpoint-path replacement defect reintroduced by the ledger integration, rather than an additional threat model.
+
+Independent production-function recording evidence, with zero actual directory/process/lock/signal operations:
+
+- `independent_cached_retirement.py` imports guarded production definitions, injects a foreign `PinnedDirectory`, and records its methods. Ordinary retirement reads the foreign receipt, refuses and records zero deletes. `retire_proven` records `foreign-replacement/input`, `/control`, `/terminal` deletions without a current-receipt read.
+- `independent_cached_retirement.pl` intercepts built-in `unlink` before compiling the production backend and injects pin/current-terminal operations. The same ordinary-refusal versus cached-three-deletions result occurs through actual `ledger_retire_proven`.
+- Both probes exit 0 because their expected unsafe-behavior assertions reproduce the defect. Full text and outputs are external in the immutable snapshot and hashed in the manifest; this is recording evidence, not a filesystem race execution.
+
+Minimal correction: authenticate the *currently pinned* terminal against the exact endpoint (and cached proof as appropriate) before deleting any present artifact. A missing endpoint directory may be acknowledged without mutation. A missing terminal must not authorize deleting remaining `input`/`control` entries solely because a cache exists: either demonstrate that all fixed artifacts are already absent without erasing anything, or return uncertainty and retain ledger/manifest evidence. Keep relative operations on the same retained directory and do not reintroduce pathname `rmdir`. Add these two production-helper recordings to schedule 8/12 before rerunning owned fixtures. The native reviewer reports its proven-retirement path already uses current pinned `remove_checked(terminal, exact cached bytes)` and does not share this remote defect.
+
+## Prior finding dispositions
+
+| Original finding | Scoped R3 disposition and evidence |
+| --- | --- |
+| R2-B1, Shell protocol input blocking | **SOURCE PASS, native implementation dependency.** `shell.rs:132,177,208` route setup, ping, request and ACK through retained `BoundedInput::write_until` with the same relevant deadline/cancellation predicate; partial request write failure is `Lost`, not replayable `NotSent`. Timeout cleanup closes input once and uses a separate finite receipt-read budget (`297`). Writer retirement/Windows cancellation guarantees belong to the native reviewer. No real blocked pipe/transport was run here. |
+| R2-B2, coalesced pooled frames | **PASS, source + independent recordings.** Python `Frames` at 646 and Perl `frame_read` at 527 consume one bounded line and retain all remainder, including coalesced ACK/JSON/ping. Partial frames have a finite absolute budget. Each protocol recording suite checks every split of those adjacent frames. Rust Shell reads one line while retaining remainder (`shell.rs:370`). |
+| R2-B3, false success after partial delivery | **PASS, source + bounded recording evidence.** Both supervisors track output/capture overflow, final EOF and queued forwarding completeness, retain a strict receipt `complete` boolean and map incomplete delivery to transport failure 125 even if target exit is zero. Python `run_inner` finalization and Perl `owner.pl:493–526` implement the production branch; recording suites test the decision and bounded forwarder, not a live saturated stream. Rust `Endpoint::complete` (`supervisor.rs:113`) and Shell receipt parsing reject incomplete delivery; `session.rs:404` independently authenticates standalone completion. Stop/reap proof intentionally remains distinct from complete output. |
+| R2-B4, blocking initial/READY/reply emission | **PASS for Python/Perl source + recordings.** Both backends set protocol output nonblocking before READY/ownership emission. `Handshake` / `handshake_step` release the command gate only after complete ownership-frame delivery, with EOF/stop/deadline remaining effective. `emit` uses one absolute finite budget across partial READY/ping/start/completion/binary-reply writes; request framing is bounded. Python control has a shared finite connect/send/read deadline; Perl control retains its finite alarm. No endpoint/helper is launched here. Native helper ACK ordering/backpressure remains the native reviewer’s disclosed runtime limitation. |
+| R2-B5, receipt-to-path retirement substitution | **PARTIAL / FAIL.** Ordinary retirement pins the directory, reads its current terminal and removes fixed names relative to that same identity, retaining the empty directory. New cached-ledger retirement bypasses the current terminal check: R3-B1 above. Existing positive ordinary-retire tests therefore cannot close this finding across all production callers. |
+| R2-B6, private marker leakage after banners/large prefix | **PASS, exact Rust pure tests + source.** `private_marker.rs` searches for the marker after arbitrary banner bytes, retains split-prefix tails, bounds pre-handshake buffering and discards invalid/oversized/EOF private frames. The first accepted owner wins. Independently compiled unchanged module tests cover every split, banner without newline, EOF mid-marker and oversized/invalid frames. Accepted post-gate command output remains ordinary user output. |
+| R2-C1, Perl double signal refusal skips reap | **PASS, source + independent recording.** `owner.pl:304–321` captures primary/fallback failures and attempts exact-child reap independently before returning errors. The protocol recording explicitly makes both injected signals fail and still observes reap. Python `finish_owned` at 361 also places reap in `finally`. These records never invoke a signal; live ownership/native behavior remains held. |
+
+## Actual-machine claim/fence/ledger/transfer integration
+
+The remote source now uses kernel-held primary/fence coordination, stable recorded directory/file identities and a random 64-hex generation. Python `WorkspaceLocks` at 80–183 and Perl workspace functions at 106–208 refuse missing/replaced coordination components instead of recreating a second namespace. A contender must own primary and acquire the operation fence before replacing generation. A mutation/dispatch helper acquires the fence, verifies namespace, exact anchor/generation and a live primary claimant on the actual machine before entering `run_inner`. Closure only closes inherited descriptors; it does not explicitly unlock a shared inherited lock description.
+
+The durable command owner is created gated. Generation/kind-bound exclusive owner publication finishes write/flush/sync/close before dispatch releases its fence and before ownership-frame delivery can release the gate. Mutation mode keeps the actual helper fence through owned termination and ledger finalization. A new claimant can acquire primary after disconnect but cannot publish its generation across a retained mutation fence. The cancellation/EOF-before-gate decisions and terminal receipt publication preserve the no-late-start invariant in source; actual kernel/transport interleavings remain unvalidated.
+
+Remote ledger parsing validates the complete bounded inventory, record/name/anchor/generation bindings, exact cached receipts and prior completed manifests before issuing control. It caches proofs outside CLEAR’s removable base and publishes a completed manifest before retirement/pruning; partial prune keeps that manifest. Bounds are explicit: 4096 owners, 64 MiB aggregate evidence, 40 MiB manifest and individual-file limits. Failure returns uncertainty rather than inventing cleanup success. R3-B1 prevents accepting this boundary as a whole.
+
+Transfer-specific direct seams checked in `parallel_bisect/workspace.rs`: source packs are read-only and bundle refs include destination generation plus a random transfer nonce; destination chunks, verify, fetch, expected-absent ref transaction and removal use mutation-owned execution. Size/digest/offset checks precede fetch/publication. Whole-history fallback is limited to confirmed Git failure with successful attempted-transfer cleanup; cancellation, transport/ref-publication/cleanup uncertainty remains non-replayable. This is static interface tracing only. The caller reviewer owns complete grant/CLEAR/dispatch routing and retained actual cwd guarantees; no live Git transfer, SHA-256/shallow roundtrip or platform command compatibility is certified here.
+
+`workspace-generation-wiring.md` and `remote-recovery-ledger.md` retain explicitly labelled earlier incomplete checkpoints. The later `claim-schedules.md` and `workspace-transfers.md` document the current integration. Historical checkpoint prose was not mistaken for current missing code or current acceptance.
+
+## Twelve schedule coverage — boundary recordings only
+
+Both exact Python and Perl workspace scripts were audited before execution. They replace locks/descriptors with memory/scalar handles and injected operations; their imported backend does not enter serve/claim/stream mode. Both independently pass all twelve named schedules.
+
+| Schedule | Established scope / remaining limitation |
+| --- | --- |
+| 1. Competing claims / loser Drop | Production claim decision refuses second synthetic primary owner; loser records close-only effects and preserves winner generation. |
+| 2. Equal PID/clock | PID/heartbeat values do not bypass the held synthetic primary. No real process identity used. |
+| 3. Queued old generation | Production actual-machine `run` wrapper rejects old G before injected inner operation/record/start. |
+| 4. Parent disconnect during mutation | Synthetic primary closure cannot allow next claim across retained operation fence; new generation succeeds after mutation closes. No actual disconnect or kernel lock test. |
+| 5. Record/ACK/start boundaries | Publication failure branches refuse handoff; stopped pending gate never releases. Python injects write/flush/sync/close separately; Perl replaces atomic publication for each failure. These are separate boundaries, not one live EOF race. |
+| 6. Pending stop | Production pending-gate state stays stopped across repeated later opportunities to release. |
+| 7. Partial publication / inventory | Retained synthetic fence excludes takeover before/partial/complete record boundaries. No actual partial-write concurrency run. |
+| 8. Invalid/replaced evidence | Binding/proof/receipt refusal covered, but current endpoint-directory substitution through cached retirement is **missing and fails** in the new independent probes. |
+| 9. Namespace unlink/replacement | Production identity predicates refuse replacement/missing components; stale close does not rewrite G. Synthetic identity checks, not host contention. |
+| 10. Checked CLEAR failure | These remote tests check the success/delivery predicate prevents ledger completion. Author’s separate three CLEAR command-function recording tests are supplied evidence only and were not rerun here. Actual repository removal/command compatibility held. |
+| 11. Partial prune | Injected proof-prune failure preserves a complete manifest containing exact original record/receipt recovery evidence. Ref expected-OID behavior is caller-owned. |
+| 12. Retirement refusal / shutdown | Injected refusal/lease loss prevents subsequent prune. Because successful retirement is mocked, these cases do not catch R3-B1; no claim of live shutdown completion. |
+
+## Evidence and limits
+
+Independent gates executed only after source audit:
+
+- Python protocol recording: **11 PASS**; Python workspace schedules: **12 PASS**.
+- Perl protocol recording: **15 PASS**; Perl workspace schedules: **12 PASS** (loader also reruns the same 15 protocol gates; not counted twice).
+- Exact unchanged Rust `private_marker` and `deadline_io` modules compiled inside a minimal module wrapper: **4 pure tests PASS**. The first direct-file compile attempt failed solely because `pub(super)` needs a containing module; no tests ran in that attempt. That failed attempt and the successful wrapper are recorded separately.
+- Two backend-specific cached-retirement recording counterexamples: **both reproduced R3-B1**, each with a normal-retirement negative control. No production filesystem operations, locks, signals, shell scripts, endpoints, children, Git, network, application constructor or native helper were exercised.
+
+Total independent existing named pure/recording gates: **54 PASS**, plus the two regression probes. Logs are in the immutable snapshot; the manifest hashes their exact text. Generated executables/archive remain external under `/tmp`, are not committed, and are not supplied as repository evidence artifacts.
+
+Supplied writer evidence: `claim-schedules.md` and inspected `/tmp/gitcraft51-schedules-recording.log` show **25 app +13 OS recording tests**; the log names indicate boundary/predicate tests, not owned-child runtime. Supplied Windows crosscheck is a **compile** gate, not Windows runtime. All-target check/full build and warnings are compile evidence, not CI lint/native acceptance. Python11+12/Perl15+12/CLEAR3 and format/diff results are author reports; only the remote recording groups listed above were independently repeated. Historical logs do not themselves contain a self-authenticating candidate SHA; the candidate docs bind the author’s claim, while independent snapshot hashes bind this review’s execution.
+
+Excluded: actual Git/helper/shell/supervisor/SSH/WSL/Docker/HTTP execution, process cancellation or timeout fixtures, native process/pipe/Job tests, lock/filesystem contention, arbitrary commands under test, full suites, CI and PR actions. No host-wide PID selectors/signals or source edits occurred. This report makes no normal Reader cancellation/leak claim.
+
+## Finite next gates
+
+1. Repair only cached remote retirement; preserve the exact candidate, push and verify the remote SHA. Re-run direct production-helper recording counterexamples plus the existing protocol/schedule recordings, including absent-directory, missing-terminal-with-present-artifact, changed-terminal, authenticated-match, partial-retirement retry and retained-manifest failure branches. Keep both Python/Perl coverage and require zero foreign deletes.
+2. Obtain scoped native and Workspace caller dispositions on that exact combined source. Refresh the finite owned-runtime fixture inventory against the accepted merged commit before enabling it; do not inherit a moving branch’s “recording” filter as proof of containment.
+3. Only after those source/recording gates pass and parent clears the appropriate containment gate: run preserved owned-child fixtures for bounded Shell setup/request/ping/ACK backpressure and EOF, coalesced pooled requests, output completion/overflow, authenticated stop→reap→receipt→retire, primary/fence takeover and pending-publication cancellation, partial ledger retry, and bounded transfer/fallback. Fixtures must create and retain their own child/group/Job identities and use fixed exact test names; no host-wide selectors or watchdogs. Separate Linux/Windows/SSH/WSL/native availability and no cross-platform runtime claim from macOS compilation.
+
+The list is a prerequisite sequence, not authorization to run it now. R3-B1 keeps remote static acceptance FAIL and global runtime/full-suite gates held.

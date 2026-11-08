@@ -127,7 +127,7 @@ pub(super) fn capture_with_timeout(
             stderr: out.stderr,
         });
     }
-    let mut cmd = command::local_command(Some(repo), &command::Extra::default(), args);
+    let mut cmd = command::local_command(Some(repo), &command::Extra::repository(), args);
     for (key, value) in env {
         cmd.env(key, value);
     }

@@ -443,8 +443,8 @@ fn syntax_view_draws_read_only_and_patch_fallback_cannot_stage_lines() -> Result
         };
     }
     assert!(
-        tab.find_in().is_none(),
-        "successful Syntax has no patch Find"
+        tab.find_in().is_some(),
+        "successful Syntax searches its rendered text"
     );
     tab.apply(Action::DiffStep(-1), &ctx);
     assert!(tab.diff.as_ref().is_some_and(|v| v.jump.is_none()));
