@@ -15,6 +15,7 @@ pub mod coupling;
 pub mod deploy;
 pub mod evolution;
 pub mod history;
+pub mod impact;
 pub mod review_heat;
 pub mod ribbons;
 pub mod transform;
