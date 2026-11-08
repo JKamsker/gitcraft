@@ -7488,9 +7488,9 @@ repo-workflows-fork-rebase-preview = Baut { $local } ({ $branch } von { $owner }
         [one] einen Commit, der dem Branch fehlt
        *[other] { $behind } Commits, die dem Branch fehlen
     }. Danach wird der Branch mit Force-Push und Lease an { $fork } (den Fork) gesendet. Der Push wird abgelehnt, wenn { $owner } dort seit dem gerade erfolgten Abruf gepusht hat.
-    
+
     Bei Konflikten hält der Rebase an. Lösen Sie diese und setzen Sie den Rebase fort; gitcraft bietet anschließend den Push an. Beim Abbrechen wird nichts gepusht.
-    
+
     Strg+Z stellt den vorherigen Branchstand im Fork und hier wieder her.
 
 repo-workflows-fence-violation-line = { "  " }{ $path } ({ $how ->
@@ -7519,7 +7519,7 @@ repo-workflows-dco-whole-preview = Schreibt { $count ->
             [yes] Der Push wird abgelehnt, wenn dort seit dem letzten Abruf jemand gepusht hat
            *[no] Der Push wird abgelehnt, wenn dieser Branch dort bereits existiert
         }. Prüfen und genehmigen Sie diesen Push gesondert.
-    
+
     Strg+Z stellt die lokalen Commits wieder her. Bereits veröffentlichter Remote-Verlauf kann nur durch einen eigenen geprüften Push wiederhergestellt werden.
        *[no] { "\u000ADer Branch hat keinen Remote-Branch: Es wird nichts gepusht. Ein späterer Push ersetzt dort die alten Commits (Force-Push).\u000A\u000AStrg+Z stellt die vorherigen Commits wieder her." }
     }
@@ -7632,4 +7632,3 @@ repo-workflows-calendar-month-heading = { $month ->
         [11] November
        *[12] Dezember
     } { $year }
-

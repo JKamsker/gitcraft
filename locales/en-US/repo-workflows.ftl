@@ -7490,9 +7490,9 @@ repo-workflows-fork-rebase-preview = Rebases { $local } ({ $owner }’s branch {
         [one] one commit it does not have
        *[other] { $behind } commits it does not have
     }, then force-pushes it to { $fork } (their fork) with a lease: refused if { $owner } pushed there since it was fetched a moment ago.
-    
+
     If the rebase stops on conflicts, resolve them and continue it: gitcraft then offers to push it. Abort it, and nothing is pushed.
-    
+
     Ctrl+Z puts the branch back as it was, on the fork and here.
 
 repo-workflows-fence-violation-line = { "  " }{ $path } ({ $how ->
@@ -7521,7 +7521,7 @@ repo-workflows-dco-whole-preview = Rewrites { $count ->
             [yes] refused if someone pushed there since it was last fetched
            *[no] refused if that branch exists there already
         }. Review and approve that push separately.
-    
+
     Ctrl+Z restores the local commits. Restoring published remote history requires its own reviewed push.
        *[no] { "\u000AThe branch has no remote branch: nothing is pushed. Pushing it later replaces the old commits there (a force push).\u000A\u000ACtrl+Z puts the commits as they were back." }
     }
@@ -7634,4 +7634,3 @@ repo-workflows-calendar-month-heading = { $month ->
         [11] November
        *[12] December
     } { $year }
-
