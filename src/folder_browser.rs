@@ -46,7 +46,8 @@ pub struct FolderBrowser {
     listing: Option<Listing>,
     /// The folder asked for, while it is listed; what came of it.
     loading: Option<(String, Receiver<Result<Listing, String>>)>,
-    error: Option<String>,
+    /// Original requested directory and raw failure; neither is translated.
+    error: Option<(String, String)>,
     /// The folder of the listing clicked, by its index.
     selected: Option<usize>,
     hidden: bool,
@@ -89,15 +90,18 @@ impl FolderBrowser {
 
     /// The listing asked for, once it came.
     fn take_listing(&mut self) {
-        let Some((_, rx)) = &self.loading else { return };
+        let Some((asked, rx)) = &self.loading else {
+            return;
+        };
         let Ok(result) = rx.try_recv() else { return };
+        let asked = asked.clone();
         self.loading = None;
         match result {
             Ok(listing) => {
                 self.listing = Some(listing);
                 self.selected = None;
             }
-            Err(e) => self.error = Some(e),
+            Err(e) => self.error = Some((asked, e)),
         }
     }
 
@@ -118,8 +122,8 @@ impl FolderBrowser {
         let mut outcome = None;
         self.bar(ui, &t, &mut go_to);
         ui.add_space(6.0);
-        if let Some(e) = &self.error {
-            ui.colored_label(t.danger, e);
+        if let Some((dir, e)) = &self.error {
+            ui.colored_label(t.danger, display_list_error(e, dir, &self.host));
             ui.add_space(4.0);
         }
         let frame = egui::Frame::new()
@@ -136,8 +140,8 @@ impl FolderBrowser {
         ui.horizontal(|ui| {
             let choice = self.choice();
             let label = match (&choice, self.selected) {
-                (Some(_), Some(_)) => "Select folder",
-                _ => "Select this folder",
+                (Some(_), Some(_)) => crate::i18n::text("interaction-browser-select"),
+                _ => crate::i18n::text("interaction-browser-select-current"),
             };
             if crate::repo::primary_button(ui, label, choice.is_some(), 140.0).clicked()
                 && let Some(choice) = choice
@@ -145,12 +149,18 @@ impl FolderBrowser {
                 outcome = Some(Outcome::Picked(choice));
             }
             if ui
-                .add(egui::Button::new("Back").min_size(vec2(80.0, 30.0)))
+                .add(
+                    egui::Button::new(crate::i18n::text("interaction-browser-back"))
+                        .min_size(vec2(80.0, 30.0)),
+                )
                 .clicked()
             {
                 outcome = Some(Outcome::Cancelled);
             }
-            ui.checkbox(&mut self.hidden, "Hidden folders");
+            ui.checkbox(
+                &mut self.hidden,
+                crate::i18n::text("interaction-browser-hidden"),
+            );
         });
         if let Some(dir) = go_to {
             self.go(dir, ui.ctx());
@@ -166,7 +176,7 @@ impl FolderBrowser {
             let up = dir.as_deref().filter(|d| *d != "/");
             if ui
                 .add_enabled_ui(up.is_some(), |ui| {
-                    icons::small_button(ui, "arrow-up", "The folder above")
+                    icons::small_button(ui, "arrow-up", crate::i18n::text("interaction-browser-up"))
                 })
                 .inner
                 .clicked()
@@ -174,10 +184,21 @@ impl FolderBrowser {
             {
                 *go_to = Some(remote::parent_there(d).to_owned());
             }
-            if icons::small_button(ui, "user-round", "Home folder").clicked() {
+            if icons::small_button(
+                ui,
+                "user-round",
+                crate::i18n::text("interaction-browser-home"),
+            )
+            .clicked()
+            {
                 *go_to = Some("~".to_owned());
             }
-            if icons::small_button(ui, "refresh-cw", "List again").clicked()
+            if icons::small_button(
+                ui,
+                "refresh-cw",
+                crate::i18n::text("interaction-browser-reload"),
+            )
+            .clicked()
                 && let Some(d) = &dir
             {
                 *go_to = Some(d.clone());
@@ -223,8 +244,11 @@ impl FolderBrowser {
         let Some(listing) = &self.listing else {
             if self.loading.is_some() {
                 ui.label(
-                    RichText::new(format!("Connecting to {}…", self.host.label()))
-                        .color(t.text_faint),
+                    RichText::new(crate::i18n::message(
+                        "interaction-browser-connecting",
+                        &[("host", self.host.label().into())],
+                    ))
+                    .color(t.text_faint),
                 );
             }
             return;
@@ -233,7 +257,7 @@ impl FolderBrowser {
             ui.horizontal(|ui| {
                 icons::inline(ui, "folder-git-2", 14.0, t.accent_fg);
                 ui.label(
-                    RichText::new("This folder is a git repository.")
+                    RichText::new(crate::i18n::text("interaction-browser-is-repo"))
                         .color(t.accent_fg)
                         .small(),
                 );
@@ -247,7 +271,7 @@ impl FolderBrowser {
             .collect();
         if shown.is_empty() {
             ui.label(
-                RichText::new("No folders here.")
+                RichText::new(crate::i18n::text("interaction-browser-empty"))
                     .color(t.text_faint)
                     .small(),
             );
@@ -264,8 +288,14 @@ impl FolderBrowser {
                     crate::repo::widgets::a11y_selected(
                         &resp,
                         || {
-                            let kind = if folder.repo { "repository" } else { "folder" };
-                            crate::a11y::labels::join([folder.name.as_str(), kind])
+                            crate::i18n::message(
+                                if folder.repo {
+                                    "interaction-browser-repo-label"
+                                } else {
+                                    "interaction-browser-folder-label"
+                                },
+                                &[("name", folder.name.as_str().into())],
+                            )
                         },
                         selected,
                     );
@@ -294,7 +324,7 @@ impl FolderBrowser {
                         ui.painter().text(
                             rect.right_center() - vec2(8.0, 0.0),
                             egui::Align2::RIGHT_CENTER,
-                            "repository",
+                            crate::i18n::text("interaction-browser-repository"),
                             egui::FontId::proportional(11.0),
                             t.accent_fg,
                         );
@@ -308,9 +338,12 @@ impl FolderBrowser {
             });
         if listing.cut {
             ui.label(
-                RichText::new(format!("Only the first {MOST} folders are listed."))
-                    .color(t.text_faint)
-                    .small(),
+                RichText::new(crate::i18n::message(
+                    "interaction-browser-limit",
+                    &[("max", MOST.into())],
+                ))
+                .color(t.text_faint)
+                .small(),
             );
         }
         // A repository double-clicked is picked, rather than opened as a folder.
@@ -324,6 +357,29 @@ impl FolderBrowser {
             *go_to = None;
         }
     }
+}
+
+/// Presentation from the original request values, never by splitting opaque paths or host names.
+fn display_list_error(raw: &str, dir: &str, host: &Host) -> String {
+    let host = host.label();
+    let args = [("dir", dir.into()), ("host", host.as_str().into())];
+    if raw == format!("There is no folder {dir} on {host}.") {
+        return crate::i18n::message("interaction-browser-missing", &args);
+    }
+    if raw == format!("Could not list {dir} on {host}.") {
+        return crate::i18n::message("interaction-browser-list-invalid", &args);
+    }
+    if let Some(detail) = raw.strip_prefix(&format!("Could not list {dir} on {host}: ")) {
+        return crate::i18n::message(
+            "interaction-browser-list-failed",
+            &[
+                ("dir", dir.into()),
+                ("host", host.as_str().into()),
+                ("detail", detail.into()),
+            ],
+        );
+    }
+    crate::git::display_error(raw)
 }
 
 /// The script listing `dir`'s folders: the folder (as `cd` found it), whether it holds a
@@ -562,5 +618,122 @@ mod tests {
     fn the_script_names_the_folder_safely() {
         assert!(script("/x/it's $(id)").starts_with(r"cd -- '/x/it'\''s $(id)' || exit 3"));
         assert!(script("~/repos").starts_with("cd -- \"$HOME\"'/repos' || exit 3"));
+    }
+}
+
+#[cfg(test)]
+mod localization_tests {
+    use super::*;
+    use egui_kittest::{Harness, kittest::Queryable};
+
+    #[test]
+    fn actual_inert_browser_picks_original_path_and_keeps_raw_recorded_listing_failures()
+    -> Result<(), String> {
+        crate::i18n::set_language("de");
+        let browser = FolderBrowser {
+            host: Host::Ssh("recorded-host".into()),
+            listing: Some(Listing {
+                dir: "/opaque/root".into(),
+                repo: true,
+                cut: true,
+                folders: vec![
+                    Folder {
+                        name: "日本語".into(),
+                        repo: true,
+                    },
+                    Folder {
+                        name: ".hidden".into(),
+                        repo: false,
+                    },
+                ],
+            }),
+            loading: None,
+            error: None,
+            selected: None,
+            hidden: false,
+        };
+        let fonts = std::cell::Cell::new(false);
+        let mut h = Harness::new_ui_state(
+            move |ui, state: &mut (FolderBrowser, Option<String>)| {
+                if !fonts.replace(true) {
+                    crate::theme::install_fonts(ui.ctx());
+                    return;
+                }
+                if let Some(Outcome::Picked(path)) = state.0.ui(ui) {
+                    state.1 = Some(path);
+                }
+            },
+            (browser, None),
+        );
+        h.run();
+        h.get_by_label("Dieser Ordner ist ein Git-Repository.");
+        h.get_by_label("Nur die ersten 5.000 Ordner werden aufgelistet.");
+        h.get_by_label("日本語, Repository").click();
+        h.run();
+        assert_eq!(h.state().0.selected, Some(0));
+        h.get_by_label("Ordner auswählen").click();
+        h.run();
+        assert_eq!(h.state().1.as_deref(), Some("/opaque/root/日本語"));
+        assert!(h.state().0.loading.is_none());
+        assert_eq!(h.state().0.host, Host::Ssh("recorded-host".into()));
+        h.get_by_label("Versteckte Ordner").click();
+        h.run();
+        assert!(h.state().0.hidden);
+        h.get_by_label(".hidden, Ordner");
+        crate::i18n::set_language("en-US");
+        h.run();
+        h.get_by_label("Select folder");
+        h.get_by_label(".hidden, folder");
+        assert_eq!(h.state().0.selected, Some(0));
+        // Empty supplied receiver drives actual pending paint and completion routing without a worker.
+        crate::i18n::set_language("de");
+        let (tx, rx) = channel();
+        let dir = "/opaque/name on SSH · recorded-host: literal".to_owned();
+        h.state_mut().0.listing = None;
+        h.state_mut().0.loading = Some((dir.clone(), rx));
+        h.run_steps(3);
+        h.get_by_label("Verbindung zu SSH · recorded-host wird hergestellt…");
+        let raw = format!("There is no folder {dir} on SSH · recorded-host.");
+        tx.send(Err(raw.clone())).map_err(|e| e.to_string())?;
+        h.run();
+        h.get_by_label(&format!(
+            "Auf SSH · recorded-host gibt es keinen Ordner {dir}."
+        ));
+        assert_eq!(h.state().0.error, Some((dir.clone(), raw.clone())));
+        crate::i18n::set_language("en-US");
+        h.run();
+        h.get_by_label(&raw);
+        assert_eq!(h.state().0.error, Some((dir, raw)));
+        Ok(())
+    }
+
+    #[test]
+    fn known_listing_envelopes_use_original_typed_directory_and_host_and_keep_unknown_details_opaque()
+     {
+        crate::i18n::set_language("de");
+        let host = Host::Ssh("recorded-host".into());
+        let dir = "/日本語 on SSH · recorded-host: literal";
+        let detail = "external 日本語: Could not list anything\nunchanged";
+        let raw = format!("Could not list {dir} on {}: {detail}", host.label());
+        assert_eq!(
+            display_list_error(&raw, dir, &host),
+            format!(
+                "Der Ordner {dir} auf SSH · recorded-host konnte nicht aufgelistet werden: {detail}"
+            )
+        );
+        let malformed = format!("Could not list {dir} on {}.", host.label());
+        assert_eq!(
+            display_list_error(&malformed, dir, &host),
+            format!("Der Ordner {dir} auf SSH · recorded-host konnte nicht aufgelistet werden.")
+        );
+        let unknown = "Could not list another opaque external diagnostic";
+        assert_eq!(display_list_error(unknown, dir, &host), unknown);
+        assert_eq!(
+            display_list_error(&raw, "different original request", &host),
+            raw
+        );
+        crate::i18n::set_language("en-US");
+        assert_eq!(display_list_error(&raw, dir, &host), raw);
+        assert_eq!(display_list_error(&malformed, dir, &host), malformed);
     }
 }

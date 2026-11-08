@@ -1,0 +1,7 @@
+{
+  "base": "8fa9fd3de08b044a76931048413c4e7b04f729c9",
+  "source": "src/folder_browser.rs",
+  "protected_script_list_parser_paths_existing_tests_sha256": "bd01da475dae16077f3870ababacb3c850f73e1ea2915221c114211214b26477",
+  "byte_equal_after_outer_whitespace": true,
+  "presentation_context": "Failed listing now retains the original requested directory with its unchanged raw error; no path/host splitting or backend protocol changes"
+}
