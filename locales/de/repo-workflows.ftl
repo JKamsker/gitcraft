@@ -1697,9 +1697,15 @@ repo-workflows-doctor-suggestion-5a1f096a = Einschalten
 
 repo-workflows-doctor-suggestion-5a853d12 = Objekte packen
 
+repo-workflows-doctor-suggestion-8ad70375 = empfohlen
+
 repo-workflows-doctor-suggestion-a96e0fc8 = Gits eigener Monitor existiert nur unter Windows und macOS (auf Netzlaufwerken nur mit fsmonitor.allowRemote). Unter Linux kann ein durch core.fsmonitor benannter Watchman-Hook einspringen.
 
+repo-workflows-doctor-suggestion-b4dc66dd = aus
+
 repo-workflows-doctor-suggestion-b5c82673 = Warten Sie auf den laufenden Vorgang
+
+repo-workflows-doctor-suggestion-b8d31e85 = an
 
 repo-workflows-doctor-suggestion-bd63228b = Dateisystemmonitor
 
@@ -3061,6 +3067,8 @@ repo-workflows-lfs_storage-fetch-only-3f558a4c = LFS ruft jetzt nur { $names-joi
 
 repo-workflows-lfs_storage-fetch-only-e3be5d1f = Die LFS-Abrufauswahl konnte nicht gesetzt werden: { $e }
 
+repo-workflows-lfs_storage-filters-140bedbf = keine
+
 repo-workflows-lfs_storage-filters-49e74a0b = Abweichend von der .lfsconfig des Repositorys: { $names-join-1 }
 
 repo-workflows-lfs_storage-filters-72d4ac36 = Die LFS-Abrufauswahl konnte nicht gelesen werden: { $e }
@@ -3811,6 +3819,8 @@ repo-workflows-pr_review-apply-suggestion-d1083ab3 = Diese Änderung auf dem Bra
 repo-workflows-pr_review-comment-box-44f5e3fb = Kommentieren
 
 repo-workflows-pr_review-comment-box-e5841068 = Kommentar hinterlassen (Markdown möglich)
+
+repo-workflows-pr_review-comment-header-62a2fed3 = ausstehend
 
 repo-workflows-pr_review-done-0096e38c = Thread gelöst
 
@@ -7229,4 +7239,33 @@ repo-workflows-ghost-replaced-originals = Durch neue Kopien ersetzt ({ $count };
         [one] das Original liegt auf keinem Branch mehr
        *[other] die Originale liegen auf keinem Branch mehr
     }): { $names }
+
+repo-workflows-atlas-applied-period = Angewendeter Zeitraum: { $from-set ->
+        [yes] { $from }
+       *[no] frühestes untersuchtes Datum
+    } – { $through-set ->
+        [yes] { $through }
+       *[no] spätestes untersuchtes Datum
+    } ({ $clock ->
+        [committer] Committer-Datum
+       *[author] Autorendatum
+    }). Änderungsaktivität zählt geänderte Pfade pro Commit einschließlich Löschungen; Ordnersummen zählen betroffene Dateien. Leere oder gelöschte Einträge erhalten eine sichtbare Mindestfläche. Dateigrößen stammen aus dem festgehaltenen HEAD-Baum.
+
+repo-workflows-drift-folder-count = { $name } ({ $count ->
+        [one] eine Datei
+       *[other] { $count } Dateien
+    })
+
+repo-workflows-outbox-entry-summary = { $status ->
+        [sending] Wird gesendet
+        [sent] Gesendet
+        [paused] Pausiert: { $detail }
+       *[ready] Bereit
+    } · { $endpoints ->
+        [one] ein festgelegter Endpunkt
+       *[other] { $endpoints } festgelegte Endpunkte
+    } · automatisches Senden { $automatic ->
+        [yes] an
+       *[no] aus
+    }
 

@@ -281,7 +281,13 @@ fn comment_header(ui: &mut Ui, comment: &ThreadComment) {
                 .small(),
         );
         if comment.pending {
-            ui.label(RichText::new("pending").color(t.accent_fg).small());
+            ui.label(
+                RichText::new(crate::i18n::text(
+                    "repo-workflows-pr_review-comment-header-62a2fed3",
+                ))
+                .color(t.accent_fg)
+                .small(),
+            );
         }
     });
 }

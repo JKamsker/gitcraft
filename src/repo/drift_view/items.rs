@@ -111,16 +111,12 @@ fn sections(ui: &mut Ui, view: &DriftView, report: &Report, acts: &mut Vec<Actio
             }
         },
     );
-    let title = format!(
-        "Formatting only: {}% of {} changed lines ({} file{} only that)",
-        report.formatting_percent(),
-        report.changed_lines,
-        report.formatting_files.len(),
-        if report.formatting_files.len() == 1 {
-            ""
-        } else {
-            "s"
-        }
+    let title = crate::i18n::message(
+        "repo-workflows-drift-folder-count",
+        &[
+            ("name", (name).into()),
+            ("count", (folder.files.len()).into()),
+        ],
     );
     section(ui, &title, |ui| {
         for file in report.formatting_files.iter().take(LISTED) {

@@ -325,7 +325,12 @@ fn filters(ui: &mut Ui, t: &Tokens, panel: &mut Panel, acts: &mut Vec<Action>) {
         ui.label(RichText::new(title).font(theme::medium(12.5)));
         ui.horizontal_wrapped(|ui| {
             if list.is_empty() {
-                ui.label(RichText::new("none").color(t.text_faint));
+                ui.label(
+                    RichText::new(crate::i18n::text(
+                        "repo-workflows-lfs_storage-filters-140bedbf",
+                    ))
+                    .color(t.text_faint),
+                );
             }
             for (i, pattern) in list.iter().enumerate() {
                 let name = pattern_label(pattern);

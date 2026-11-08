@@ -285,11 +285,10 @@ pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>)
                                 },
                             ),
                         );
-                        ui.label(format!(
-                            "{:?} · {} pinned endpoint(s) · autosend {}",
-                            e.status,
+                        ui.label(outbox_entry_summary(
+                            &e.status,
                             e.endpoints.len(),
-                            e.autosend
+                            e.autosend,
                         ));
                         if !e.receipt.is_empty() {
                             egui::CollapsingHeader::new(crate::i18n::text(
@@ -479,5 +478,79 @@ mod consent_tests {
             &a,
             4
         ));
+    }
+}
+
+fn outbox_entry_summary(status: &logic::Status, endpoints: usize, automatic: bool) -> String {
+    crate::i18n::message(
+        "repo-workflows-outbox-entry-summary",
+        &[
+            (
+                "status",
+                (match status {
+                    logic::Status::Ready => "ready",
+                    logic::Status::Sending => "sending",
+                    logic::Status::Sent => "sent",
+                    logic::Status::Paused(_) => "paused",
+                })
+                .into(),
+            ),
+            (
+                "detail",
+                (match status {
+                    logic::Status::Paused(detail) => {
+                        crate::repo::activity::display_workflow_error(detail)
+                    }
+                    _ => String::new(),
+                })
+                .into(),
+            ),
+            ("endpoints", (endpoints).into()),
+            ("automatic", (if automatic { "yes" } else { "no" }).into()),
+        ],
+    )
+}
+#[cfg(test)]
+mod fluent_outbox_tests {
+    use super::*;
+
+    #[test]
+    fn fluent_partition_outbox_actual_summary_keeps_supplied_state_opaque() {
+        let paused = logic::Status::Paused("Provider detail / refs/heads/ß".into());
+        for (language, ready, count, paused_label) in [
+            ("en-US", "Ready", "1,234 pinned endpoints", "Paused:"),
+            ("de", "Bereit", "1.234 festgelegte Endpunkte", "Pausiert:"),
+        ] {
+            crate::i18n::set_language(language);
+            let summary = outbox_entry_summary(&logic::Status::Ready, 1234, true);
+            assert!(summary.starts_with(ready));
+            assert!(summary.contains(count));
+            let summary = outbox_entry_summary(&paused, 1, false);
+            assert!(summary.starts_with(paused_label));
+            assert!(summary.contains("Provider detail / refs/heads/ß"));
+            assert!(summary.contains(if language == "de" {
+                "ein festgelegter Endpunkt"
+            } else {
+                "one pinned endpoint"
+            }));
+            assert_eq!(
+                paused,
+                logic::Status::Paused("Provider detail / refs/heads/ß".into())
+            );
+            assert!(
+                outbox_entry_summary(&logic::Status::Sending, 0, false).starts_with(
+                    if language == "de" {
+                        "Wird gesendet"
+                    } else {
+                        "Sending"
+                    }
+                )
+            );
+            assert!(
+                outbox_entry_summary(&logic::Status::Sent, 0, false)
+                    .starts_with(if language == "de" { "Gesendet" } else { "Sent" })
+            );
+        }
+        crate::i18n::set_language("en-US");
     }
 }

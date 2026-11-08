@@ -1697,9 +1697,15 @@ repo-workflows-doctor-suggestion-5a1f096a = Turn on
 
 repo-workflows-doctor-suggestion-5a853d12 = Pack the objects
 
+repo-workflows-doctor-suggestion-8ad70375 = suggested
+
 repo-workflows-doctor-suggestion-a96e0fc8 = git's own monitor exists on Windows and macOS only (and not on network drives unless fsmonitor.allowRemote is set); on Linux a Watchman hook can stand in (core.fsmonitor naming it).
 
+repo-workflows-doctor-suggestion-b4dc66dd = off
+
 repo-workflows-doctor-suggestion-b5c82673 = Wait for the running operation
+
+repo-workflows-doctor-suggestion-b8d31e85 = on
 
 repo-workflows-doctor-suggestion-bd63228b = File system monitor
 
@@ -3061,6 +3067,8 @@ repo-workflows-lfs_storage-fetch-only-3f558a4c = LFS now fetches only { $names-j
 
 repo-workflows-lfs_storage-fetch-only-e3be5d1f = Could not set what LFS fetches: { $e }
 
+repo-workflows-lfs_storage-filters-140bedbf = none
+
 repo-workflows-lfs_storage-filters-49e74a0b = Instead of what the repository's .lfsconfig sets: { $names-join-1 }
 
 repo-workflows-lfs_storage-filters-72d4ac36 = Could not read what LFS fetches: { $e }
@@ -3811,6 +3819,8 @@ repo-workflows-pr_review-apply-suggestion-d1083ab3 = Commit this change to the p
 repo-workflows-pr_review-comment-box-44f5e3fb = Comment
 
 repo-workflows-pr_review-comment-box-e5841068 = Leave a comment (Markdown works)
+
+repo-workflows-pr_review-comment-header-62a2fed3 = pending
 
 repo-workflows-pr_review-done-0096e38c = Thread resolved
 
@@ -7231,4 +7241,33 @@ repo-workflows-ghost-replaced-originals = Replaced by new copies ({ $count }; { 
         [one] the original is left on no branch
        *[other] the originals are left on no branch
     }): { $names }
+
+repo-workflows-atlas-applied-period = Applied period: { $from-set ->
+        [yes] { $from }
+       *[no] earliest scanned
+    } – { $through-set ->
+        [yes] { $through }
+       *[no] latest scanned
+    } ({ $clock ->
+        [committer] committer date
+       *[author] author date
+    }). Churn counts changed paths per commit, including deletions; folder totals count file touches. Zero-byte/deleted entries get a minimum visible area. File bytes are from the pinned HEAD tree.
+
+repo-workflows-drift-folder-count = { $name } ({ $count ->
+        [one] one file
+       *[other] { $count } files
+    })
+
+repo-workflows-outbox-entry-summary = { $status ->
+        [sending] Sending
+        [sent] Sent
+        [paused] Paused: { $detail }
+       *[ready] Ready
+    } · { $endpoints ->
+        [one] one pinned endpoint
+       *[other] { $endpoints } pinned endpoints
+    } · automatic sending { $automatic ->
+        [yes] on
+       *[no] off
+    }
 

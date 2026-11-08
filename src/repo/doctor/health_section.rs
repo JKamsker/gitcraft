@@ -182,12 +182,22 @@ fn suggestion(ui: &mut Ui, s: &Suggestion, locked: bool, acts: &mut Vec<Action>)
                 .color(t.text),
         );
         match s.state {
-            State::On => widgets::chip(ui, "on", t.success),
+            State::On => widgets::chip(
+                ui,
+                crate::i18n::text("repo-workflows-doctor-suggestion-b8d31e85"),
+                t.success,
+            ),
             // A one-off action rather than something left on.
-            State::Off if s.title == "Pack the objects" => {
-                widgets::chip(ui, "suggested", t.warning)
-            }
-            State::Off => widgets::chip(ui, "off", t.text_faint),
+            State::Off if s.title == "Pack the objects" => widgets::chip(
+                ui,
+                crate::i18n::text("repo-workflows-doctor-suggestion-8ad70375"),
+                t.warning,
+            ),
+            State::Off => widgets::chip(
+                ui,
+                crate::i18n::text("repo-workflows-doctor-suggestion-b4dc66dd"),
+                t.text_faint,
+            ),
             State::Unsupported => widgets::chip(
                 ui,
                 crate::i18n::text("repo-workflows-doctor-suggestion-2b7f0cfe"),
