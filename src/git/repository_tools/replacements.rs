@@ -119,7 +119,7 @@ pub(crate) fn graft(
         return Err("A commit cannot be its own parent".into());
     }
     // Refuse cycles through the effective graph, including existing replacement joins.
-    let ancestry = crate::git::run_captured(
+    let ancestry = super::captured(
         runner.repo,
         &["merge-base", "--is-ancestor", &original, &parent],
         None,

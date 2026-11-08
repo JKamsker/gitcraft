@@ -17,20 +17,16 @@ pub(crate) fn inspect(repo: &Path) -> Result<Storage, String> {
     let format = if matches!(reported.as_str(), "files" | "reftable") {
         reported
     } else {
-        crate::git::run_ok_codes(
-            Some(repo),
-            &["config", "--get", "extensions.refStorage"],
-            &[0, 1],
-        )?
-        .trim()
-        .to_owned()
+        super::text_codes(repo, &["config", "--get", "extensions.refStorage"], &[0, 1])?
+            .trim()
+            .to_owned()
     };
     let format = if format.is_empty() {
         "files".into()
     } else {
         format
     };
-    let help = crate::git::run_captured(repo, &["refs", "migrate", "-h"], None)?;
+    let help = super::captured(repo, &["refs", "migrate", "-h"], None)?;
     let help = format!("{}{}", help.stdout, help.stderr);
     let migrates = help.contains("--ref-format") && help.contains("--reflog");
     let snapshot = Snapshot::capture(repo)?;

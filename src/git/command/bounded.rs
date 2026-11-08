@@ -98,3 +98,59 @@ pub(in crate::git) fn request(
     req.long = true;
     req
 }
+
+/// Preserve expected nonzero plumbing statuses and their bounded stdout. The
+/// ordinary success-only stream API retains its existing behavior.
+pub(in crate::git) fn request_captured(
+    target: &remote::Target,
+    args: &[&str],
+    input: Vec<u8>,
+    limit: usize,
+) -> remote::Request {
+    let mut req = request(target, args, input, limit);
+    req.script = req
+        .script
+        .replace("[ \"$code\" = 0 ] || exit \"$code\"\n", "");
+    req.script.push_str("\nexit \"$code\"");
+    req
+}
+
+#[cfg(test)]
+mod captured_recording {
+    use super::*;
+    #[test]
+    fn expected_nonzero_reads_keep_output_and_selected_repository_environment() {
+        let target = remote::Target {
+            host: remote::Host::Ssh("uncontacted.invalid".into()),
+            path: "/selected".into(),
+        };
+        let req = request_captured(
+            &target,
+            &["config", "--bool", "--get", "remote.origin.mirror"],
+            Vec::new(),
+            65536,
+        );
+        assert!(!req.script.contains("[ \"$code\" = 0 ] || exit"));
+        assert!(req.script.ends_with("exit \"$code\""));
+        assert!(req.script.contains("head -c 65536"));
+        for key in super::super::REPOSITORY_ENV_REMOVED {
+            assert!(req.unset.iter().any(|k| k == key), "{key}");
+        }
+        let args = ["rev-parse", "--verify", "HEAD"];
+        let mut inherited = std::process::Command::new("/recorded/git");
+        inherited
+            .env("GIT_DIR", "/decoy")
+            .env("GIT_CONFIG_COUNT", "1")
+            .env("GIT_CONFIG_KEY_0", "remote.origin.mirror");
+        let command = super::super::apply_command_extras(
+            inherited,
+            Some(std::path::Path::new("/selected")),
+            &super::super::Extra::default(),
+            &args,
+        );
+        let env: std::collections::BTreeMap<_, _> = command.get_envs().collect();
+        for key in ["GIT_DIR", "GIT_CONFIG_COUNT"] {
+            assert_eq!(env.get(std::ffi::OsStr::new(key)), Some(&None));
+        }
+    }
+}

@@ -1,4 +1,4 @@
-use crate::git;
+use super::guard::text;
 use std::path::Path;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -31,16 +31,19 @@ pub(crate) fn read(repo: &Path, namespace: &str) -> Result<Browser, String> {
         );
     }
     let format = "--format=%(refname)%00%(objectname)%00%(objecttype)%00%(symref)";
-    let (code, out) = git::run_code(
-        Some(repo),
+    let output = super::capture_with(
+        repo,
         &["for-each-ref", "--include-root-refs", format],
-        &[0, 129],
+        Vec::new(),
+        32 << 20,
+        &[],
+        None,
     )?;
-    let root_fallback = code != 0;
+    let root_fallback = output.code == Some(129);
     let out = if root_fallback {
-        git::run(Some(repo), &["for-each-ref", format])?
+        text(repo, &["for-each-ref", format])?
     } else {
-        String::from_utf8(out).map_err(|e| e.to_string())?
+        String::from_utf8(output.checked(&[0])?).map_err(|_| "Ref metadata is not UTF-8")?
     };
     let mut refs: Vec<Reference> = out
         .lines()
@@ -57,8 +60,8 @@ pub(crate) fn read(repo: &Path, namespace: &str) -> Result<Browser, String> {
     // %(symref) resolves a whole chain. Keep the immediate target so Follow can visit
     // intermediate symbolic/root refs instead of silently jumping over them.
     for reference in refs.iter_mut().filter(|r| !r.symbolic.is_empty()) {
-        reference.symbolic = git::run(
-            Some(repo),
+        reference.symbolic = text(
+            repo,
             &["symbolic-ref", "--no-recurse", "-q", &reference.name],
         )?
         .trim()
@@ -80,23 +83,24 @@ pub(crate) fn read(repo: &Path, namespace: &str) -> Result<Browser, String> {
         if refs.iter().any(|r| r.name == name) {
             continue;
         }
-        let Ok(oid) = git::run(
-            Some(repo),
-            &["rev-parse", "--verify", "--end-of-options", name],
-        ) else {
+        let output = super::capture_with(
+            repo,
+            &["rev-parse", "--verify", "-q", "--end-of-options", name],
+            Vec::new(),
+            65536,
+            &[],
+            None,
+        )?;
+        if output.code == Some(1) {
             continue;
-        };
+        }
+        let oid = String::from_utf8(output.checked(&[0])?).map_err(|_| "Invalid root ref")?;
         let oid = oid.trim().to_owned();
-        let kind = git::run(Some(repo), &["cat-file", "-t", &oid])?
-            .trim()
-            .to_owned();
-        let symbolic = git::run_ok_codes(
-            Some(repo),
-            &["symbolic-ref", "--no-recurse", "-q", name],
-            &[0, 1],
-        )?
-        .trim()
-        .to_owned();
+        let kind = text(repo, &["cat-file", "-t", &oid])?.trim().to_owned();
+        let symbolic =
+            super::text_codes(repo, &["symbolic-ref", "--no-recurse", "-q", name], &[0, 1])?
+                .trim()
+                .to_owned();
         refs.push(Reference {
             name: name.into(),
             oid,
@@ -119,8 +123,8 @@ pub(crate) fn read(repo: &Path, namespace: &str) -> Result<Browser, String> {
         if r.kind == "commit" {
             tips.push(r.oid.clone());
         } else if r.kind == "tag"
-            && let Ok(commit) = git::run(
-                Some(repo),
+            && let Ok(commit) = text(
+                repo,
                 &["rev-parse", "--verify", &format!("{}^{{commit}}", r.oid)],
             )
         {
@@ -132,8 +136,8 @@ pub(crate) fn read(repo: &Path, namespace: &str) -> Result<Browser, String> {
     let history = if tips.is_empty() {
         String::new()
     } else {
-        git::run_input(
-            Some(repo),
+        String::from_utf8(super::read(
+            repo,
             &[
                 "--no-pager",
                 "log",
@@ -145,8 +149,10 @@ pub(crate) fn read(repo: &Path, namespace: &str) -> Result<Browser, String> {
                 "200",
                 "--stdin",
             ],
-            &(tips.join("\n") + "\n"),
-        )?
+            (tips.join("\n") + "\n").into_bytes(),
+            1 << 20,
+        )?)
+        .map_err(|_| "Ref history is not UTF-8")?
     };
     Ok(Browser {
         refs,

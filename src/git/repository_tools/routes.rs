@@ -57,8 +57,7 @@ fn route(repo: &Path, oid: &str, remote: String, branch: String) -> Result<Route
     let counts = if remote.is_empty() || branch.is_empty() {
         None
     } else if let Some(refname) = tracking(repo, &remote, &branch)? {
-        let resolved =
-            crate::git::run_captured(repo, &["rev-parse", "--verify", "-q", &refname], None)?;
+        let resolved = super::captured(repo, &["rev-parse", "--verify", "-q", &refname], None)?;
         if resolved.code == Some(0) {
             let range = format!("{oid}...{}", resolved.stdout.trim());
             let out = text(repo, &["rev-list", "--left-right", "--count", &range])?;
