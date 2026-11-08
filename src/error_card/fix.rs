@@ -46,12 +46,12 @@ impl Fix {
     /// Its button.
     pub fn button(&self) -> &'static str {
         match self {
-            Fix::RemoveLock(_) => "Remove stale lock",
+            Fix::RemoveLock(_) => crate::i18n::text("interaction-error-remove-lock"),
             Fix::Config { edit, .. } => match edit.key {
-                "safe.directory" => "Trust this folder",
-                "core.longpaths" => "Enable long paths",
-                "http.sslBackend" => "Use Windows' certificates",
-                _ => "Fix it",
+                "safe.directory" => crate::i18n::text("interaction-error-trust-folder"),
+                "core.longpaths" => crate::i18n::text("interaction-error-long-paths"),
+                "http.sslBackend" => crate::i18n::text("interaction-error-use-certificates"),
+                _ => crate::i18n::text("interaction-error-fix"),
             },
         }
     }
@@ -59,25 +59,38 @@ impl Fix {
     /// What it will do, exactly, asked before it does.
     pub fn confirm(&self) -> String {
         match self {
-            Fix::Config { edit, file } if edit.add => {
-                format!(
-                    "Adds {} to {file}. Undo, on this card, takes it out again.",
-                    edit.line()
-                )
-            }
-            Fix::Config { edit, file } => format!(
-                "Sets {} in {file} ({}). Undo, on this card, puts it back.",
-                edit.line(),
-                edit.previous.as_ref().map_or_else(
-                    || "it isn't set now".to_owned(),
-                    |v| format!("it is {v} now")
-                )
+            Fix::Config { edit, file } if edit.add => crate::i18n::message(
+                "interaction-error-confirm-add",
+                &[("line", edit.line().into()), ("file", file.as_str().into())],
             ),
-            Fix::RemoveLock(seen) => format!(
-                "Removes {}, last written {} ago. A lock holds nothing to keep, so there is no \
-                 undo; a git still using it would fail.",
-                seen.shown,
-                text::age(seen.age)
+            Fix::Config { edit, file } => crate::i18n::message(
+                "interaction-error-confirm-set",
+                &[
+                    ("line", edit.line().into()),
+                    ("file", file.as_str().into()),
+                    (
+                        "previous",
+                        edit.previous
+                            .as_ref()
+                            .map_or_else(
+                                || crate::i18n::text("interaction-error-not-set").to_owned(),
+                                |v| {
+                                    crate::i18n::message(
+                                        "interaction-error-current-value",
+                                        &[("value", v.as_str().into())],
+                                    )
+                                },
+                            )
+                            .into(),
+                    ),
+                ],
+            ),
+            Fix::RemoveLock(seen) => crate::i18n::message(
+                "interaction-error-confirm-remove",
+                &[
+                    ("lock", seen.shown.as_str().into()),
+                    ("age", text::age(seen.age).into()),
+                ],
             ),
         }
     }
@@ -87,16 +100,27 @@ impl Fix {
         match self {
             Fix::Config { edit, file } => {
                 config::apply(place, edit)?;
-                let verb = if edit.add { "Added" } else { "Set" };
-                let into = if edit.add { "to" } else { "in" };
                 Ok((
-                    format!("{verb} {} {into} {file}.", edit.line()),
+                    crate::i18n::message(
+                        if edit.add {
+                            "interaction-error-added"
+                        } else {
+                            "interaction-error-set"
+                        },
+                        &[("line", edit.line().into()), ("file", file.as_str().into())],
+                    ),
                     Some(self.clone()),
                 ))
             }
             Fix::RemoveLock(seen) => {
                 lock::remove(place, seen)?;
-                Ok((format!("Removed {}.", seen.shown), None))
+                Ok((
+                    crate::i18n::message(
+                        "interaction-error-removed",
+                        &[("lock", seen.shown.as_str().into())],
+                    ),
+                    None,
+                ))
             }
         }
     }
@@ -107,12 +131,27 @@ impl Fix {
             Fix::Config { edit, file } => {
                 config::revert(place, edit)?;
                 Ok(match (&edit.previous, edit.add) {
-                    (_, true) => format!("Took {} out of {file} again.", edit.line()),
-                    (Some(v), false) => format!("Set {} back to {v} in {file}.", edit.key),
-                    (None, false) => format!("Unset {} in {file} again.", edit.key),
+                    (_, true) => crate::i18n::message(
+                        "interaction-error-undo-add",
+                        &[("line", edit.line().into()), ("file", file.as_str().into())],
+                    ),
+                    (Some(v), false) => crate::i18n::message(
+                        "interaction-error-undo-value",
+                        &[
+                            ("key", edit.key.into()),
+                            ("value", v.as_str().into()),
+                            ("file", file.as_str().into()),
+                        ],
+                    ),
+                    (None, false) => crate::i18n::message(
+                        "interaction-error-undo-unset",
+                        &[("key", edit.key.into()), ("file", file.as_str().into())],
+                    ),
                 })
             }
-            Fix::RemoveLock(_) => Err("Removing a lock can't be undone".to_owned()),
+            Fix::RemoveLock(_) => {
+                Err(crate::i18n::text("interaction-error-cannot-undo").to_owned())
+            }
         }
     }
 }
@@ -160,10 +199,9 @@ fn trust(dir: &Path, path: &str) -> Result<Found, String> {
     let listed = config::get_all(dir, &Scope::Global, "safe.directory")?;
     if listed.iter().any(|p| p == path) {
         return Ok(Found {
-            notes: vec![Note::warning(format!(
-                "{file} lists this folder in safe.directory already, so git still refusing \
-                 means the path git checks is spelled another way (a trailing slash, letter \
-                 case, a network share's %(prefix)/ form): compare it with What git said."
+            notes: vec![Note::warning(crate::i18n::message(
+                "interaction-error-already-trusted",
+                &[("file", file.as_str().into())],
             ))],
             fix: None,
         });
@@ -184,17 +222,19 @@ const SETTLE: Duration = Duration::from_millis(400);
 fn stale_lock(dir: &Path, lock_path: &str) -> Result<Found, String> {
     let Some(seen) = lock::inspect(dir, lock_path)? else {
         return Ok(Found {
-            notes: vec![Note::plain(format!(
-                "{lock_path} is gone now: the git that held it is done, and nothing is left \
-                 to remove."
+            notes: vec![Note::plain(crate::i18n::message(
+                "interaction-error-lock-gone",
+                &[("lock", lock_path.into())],
             ))],
             fix: None,
         });
     };
-    let mut notes = vec![Note::plain(format!(
-        "{} was last written {} ago.",
-        text::file_name(&seen.shown),
-        text::age(seen.age)
+    let mut notes = vec![Note::plain(crate::i18n::message(
+        "interaction-error-lock-age",
+        &[
+            ("lock", text::file_name(&seen.shown).into()),
+            ("age", text::age(seen.age).into()),
+        ],
     ))];
     // On another machine, the tab's own reads take a round trip or more.
     let remote = crate::remote::is_remote(dir);
@@ -203,19 +243,20 @@ fn stale_lock(dir: &Path, lock_path: &str) -> Result<Found, String> {
     let ours_hidden = cfg!(unix) && !remote;
     notes.push(match lock::git_processes(dir) {
         Ok(running) if running.is_empty() => {
-            Note::plain("No other git is running on this machine.".to_owned())
+            Note::plain(crate::i18n::text("interaction-error-no-git").to_owned())
         }
-        Ok(running) => Note::warning(format!(
-            "git is running on this machine: {}.{} If one is working in this repository, let \
-             it finish (or close the editor it opened) instead.",
-            running.join("; "),
+        Ok(running) => Note::warning(crate::i18n::message(
             if ours_hidden {
-                ""
+                "interaction-error-running"
             } else {
-                " Some may be gitcraft's own, reading the repository."
-            }
+                "interaction-error-running-with-ours"
+            },
+            &[("processes", running.join("; ").into())],
         )),
-        Err(e) => Note::warning(format!("Whether git is running couldn't be checked: {e}.")),
+        Err(e) => Note::warning(crate::i18n::message(
+            "interaction-error-process-check-failed",
+            &[("error", e.as_str().into())],
+        )),
     });
     Ok(Found {
         notes,
@@ -234,18 +275,29 @@ fn set_once(dir: &Path, scope: Scope, key: &'static str, value: &str) -> Result<
         && local != value
     {
         let there = config::file_of(dir, &Scope::Repo)
-            .unwrap_or_else(|_| "the repository's config".to_owned());
+            .unwrap_or_else(|_| crate::i18n::text("interaction-error-repo-config").to_owned());
         return Ok(Found {
-            notes: vec![Note::warning(format!(
-                "{key} is {local} in {there}, which wins over {file}: change it there."
+            notes: vec![Note::warning(crate::i18n::message(
+                "interaction-error-local-wins",
+                &[
+                    ("key", key.into()),
+                    ("value", local.as_str().into()),
+                    ("there", there.as_str().into()),
+                    ("file", file.as_str().into()),
+                ],
             ))],
             fix: None,
         });
     }
     if edit.previous.as_deref() == Some(value) {
         return Ok(Found {
-            notes: vec![Note::warning(format!(
-                "{key} is {value} in {file} already, so that isn't it."
+            notes: vec![Note::warning(crate::i18n::message(
+                "interaction-error-already-set",
+                &[
+                    ("key", key.into()),
+                    ("value", value.into()),
+                    ("file", file.as_str().into()),
+                ],
             ))],
             fix: None,
         });
@@ -277,11 +329,15 @@ fn autocrlf_note(dir: &Path) -> String {
         &[0, 1],
     );
     match out.as_deref().map(origin_and_value) {
-        Ok(Some((origin, value))) => format!("core.autocrlf is {value} here (set in {origin})."),
-        Ok(None) => "core.autocrlf isn't set here, which is false: git leaves line endings as \
-                     they are unless .gitattributes says otherwise."
-            .to_owned(),
-        Err(e) => format!("core.autocrlf couldn't be read: {e}."),
+        Ok(Some((origin, value))) => crate::i18n::message(
+            "interaction-error-autocrlf-value",
+            &[
+                ("value", value.as_str().into()),
+                ("origin", origin.as_str().into()),
+            ],
+        ),
+        Ok(None) => crate::i18n::text("interaction-error-autocrlf-unset").to_owned(),
+        Err(e) => crate::i18n::message("interaction-error-autocrlf-error", &[("error", e.into())]),
     }
 }
 
@@ -297,9 +353,17 @@ pub fn origin_and_value(out: &str) -> Option<(String, String)> {
 fn attributes_note(dir: &Path, file: &str) -> String {
     let out = crate::git::run(Some(dir), &["check-attr", "-z", "text", "eol", "--", file]);
     match out.map(|out| attribute_values(&out)) {
-        Ok(set) if set.is_empty() => format!("No .gitattributes rule covers {file}."),
-        Ok(set) => format!(".gitattributes gives {file}: {}.", set.join(", ")),
-        Err(e) => format!("The .gitattributes rules for {file} couldn't be read: {e}."),
+        Ok(set) if set.is_empty() => {
+            crate::i18n::message("interaction-error-no-attributes", &[("file", file.into())])
+        }
+        Ok(set) => crate::i18n::message(
+            "interaction-error-attributes-value",
+            &[("file", file.into()), ("attributes", set.join(", ").into())],
+        ),
+        Err(e) => crate::i18n::message(
+            "interaction-error-attributes-error",
+            &[("file", file.into()), ("error", e.as_str().into())],
+        ),
     }
 }
 

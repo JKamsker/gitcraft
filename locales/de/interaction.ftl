@@ -224,3 +224,110 @@ interaction-manual-group-window = Fenster
 interaction-manual-group-repository = Repository
 interaction-manual-group-contextual-actions = Kontextaktionen
 interaction-manual-shortcut-heading = Tastenkürzel für { $group }
+interaction-error-title-trust = Git vertraut diesem Ordner nicht
+interaction-error-title-lock = Hier scheint bereits ein Git-Prozess zu arbeiten
+interaction-error-title-to-crlf = Git wandelt hier Zeilenenden um (LF in CRLF)
+interaction-error-title-to-lf = Git wandelt hier Zeilenenden um (CRLF in LF)
+interaction-error-title-path = Ein Pfad ist zu lang
+interaction-error-title-certificate = Das Serverzertifikat konnte nicht geprüft werden
+interaction-error-title-too-large = Der Server hat eine so große Anfrage abgelehnt (HTTP 413)
+interaction-error-title-transfer = Die Verbindung wurde während der Übertragung unterbrochen
+interaction-error-title-histories = Diese Historien haben keinen gemeinsamen Ursprung
+interaction-error-title-shallow = Ein flacher Klon kann hier nicht pushen
+interaction-error-title-ssh = Der SSH-Server hat deinen Schlüssel nicht akzeptiert
+interaction-error-trust-advice = Diesem Ordner vertrauen fügt nur diesen Ordner zu safe.directory in deiner globalen Git-Konfiguration hinzu. Tue dies nur, wenn du die Herkunft des Repositorys kennst.
+interaction-error-lock-advice = Entferne sie nur, wenn kein Git-Prozess in diesem Repository arbeitet.
+interaction-error-long-windows = Windows begrenzt Pfade auf 260 Zeichen, sofern ein Programm keine längeren anfordert. Mit core.longpaths fordert Git längere Pfade an: Lange Pfade aktivieren setzt diese Einstellung für dieses Repository.
+interaction-error-long-other = Ein Name ist länger, als das Dateisystem dieses Computers erlaubt (meist 255 Byte pro Name). Git kann das nicht ändern: Benenne die Datei auf einem Computer um, der sie auschecken kann, oder lasse ihren Ordner mit einem Sparse-Checkout aus.
+interaction-error-large-advice = Der Server oder ein vorgeschalteter Proxy begrenzt die Größe einer Anfrage. Pushe weniger Commits auf einmal (zuerst einen älteren Commit: git push origin <commit>:refs/heads/<branch> im Terminal), verwalte große Dateien mit Git LFS oder bitte die Serveradministration, die Grenze zu erhöhen (client_max_body_size bei nginx).
+interaction-error-transfer-advice = Der Server oder das Netzwerk hat die Übertragung vorzeitig beendet (RPC failed, early EOF). Häufig liegt dies an Proxy- oder Servergrenzen für lange HTTPS-Anfragen oder an einem unzuverlässigen Netzwerk. Versuche es erneut. Bei wiederholten Fehlern umgeht die SSH-Adresse des Repositorys den HTTP-Proxy und dessen Grenzen; beim Klonen überträgt git clone --depth 1 weniger auf einmal.
+interaction-error-histories-why = Der einzuführende Branch hat keinen gemeinsamen Commit mit deinem Branch. Meist wurde das Repository zweimal angelegt (git init hier und ein neues Repository mit README auf der Forge), oder das falsche Remote wurde gewählt.
+interaction-error-histories-advice = Wenn diese Historien zusammengeführt werden sollen, führe git pull --allow-unrelated-histories (oder git merge --allow-unrelated-histories) im Terminal aus. Prüfe andernfalls die URL des Remotes.
+interaction-error-shallow-advice = Dieser Klon enthält nur einen Teil der Historie (er wurde mit --depth geklont). Das Remote nimmt Pushes nur von vollständigen Klonen an. Lade den Rest mit git fetch --unshallow im Terminal und pushe anschließend erneut.
+interaction-error-autocrlf-advice = core.autocrlf gilt unabhängig vom Einstellungsort (siehe unten) für alle davon erfassten Repositorys: true wandelt beim Auschecken LF in CRLF und beim Committen zurück in LF um (unter Windows üblich). input wandelt beim Committen CRLF in LF um und ändert beim Auschecken nichts. false lässt Zeilenenden unverändert.
+interaction-error-attributes-advice = .gitattributes wird mit dem Repository eingecheckt und gilt für alle, die es klonen: * text=auto speichert Textdateien mit LF (Git erkennt, welche Dateien Text enthalten). eol=lf oder eol=crlf für ein Muster gibt diesen Dateien beim Auschecken überall das entsprechende Zeilenende; -text lässt sie unverändert. eol= und -text haben Vorrang vor core.autocrlf. Bei text=auto allein bestimmt weiterhin core.autocrlf die Zeilenenden beim Auschecken.
+interaction-error-safecrlf-advice = core.safecrlf ist gesetzt, daher hat Git den Vorgang abgelehnt, statt nur zu warnen: Ändere core.autocrlf oder die .gitattributes-Regel der Datei, oder entferne core.safecrlf.
+interaction-error-windows-certificates = Git for Windows prüft Zertifikate standardmäßig anhand einer eigenen Liste. Mit http.sslBackend = schannel verwendet es stattdessen den Windows-Zertifikatspeicher, in dem deine IT-Abteilung ihr Zertifikat hinterlegt (ein selbstsigniertes Serverzertifikat muss dort zuerst importiert werden; http.sslCAInfo gilt dann nicht mehr). Windows-Zertifikate verwenden setzt dies in deiner globalen Git-Konfiguration.
+interaction-error-other-certificates = Füge die Zertifizierungsstelle zu den vertrauenswürdigen Stellen dieses Computers hinzu oder verweise mit http.sslCAInfo darauf. Das Abschalten von http.sslVerify würde jeden Server akzeptieren, auch einen gefälschten.
+interaction-error-remote-keys = Das Repository liegt auf einem anderen Computer. Daher zählen dessen Schlüssel und SSH-Agent.
+interaction-error-server = Der Server
+interaction-error-trust-why = { $path } gehört einem anderen Benutzerkonto (von einem anderen Computer kopiert, auf einem anderswo formatierten Laufwerk oder einer Netzwerkfreigabe). Git arbeitet nicht in solchen Ordnern, da deren Konfiguration Programme unter deinem Konto ausführen könnte.
+interaction-error-lock-why = Git behält { $lock } während Änderungen am Repository und entfernt sie anschließend. Sie ist noch vorhanden: Entweder arbeitet ein anderer Git-Prozess in diesem Repository (ein von git commit geöffneter Editor, eine IDE, ein Terminal), oder ein Prozess ist abgestürzt und hat sie hinterlassen.
+interaction-error-tls-why = TLS meldete: { $detail }. Meist liegt dies an einem Firmennetzwerk oder Proxy, der HTTPS mit seiner eigenen Zertifizierungsstelle signiert, oder an einem Server mit selbstsigniertem Zertifikat.
+interaction-error-ssh-why = { $who } hat keinen der von SSH angebotenen Schlüssel akzeptiert. Prüfe die Ausgabe von { $test } im Terminal. Lade deinen Schlüssel in den Agenten (ssh-add) oder hinterlege seinen öffentlichen Schlüssel (~/.ssh/id_ed25519.pub) in deinem Konto auf der Forge.
+interaction-error-files = { $more ->
+        [0] Dateien: { $files }.
+       *[other] Dateien: { $files } und { $more } weitere.
+    }
+interaction-error-age-short = weniger als einer Minute
+interaction-error-age-minute = { $count ->
+        [one] { $count } Minute
+       *[other] { $count } Minuten
+    }
+interaction-error-age-hour = { $count ->
+        [one] { $count } Stunde
+       *[other] { $count } Stunden
+    }
+interaction-error-age-day = { $count ->
+        [one] { $count } Tag
+       *[other] { $count } Tagen
+    }
+interaction-error-age-week = { $count ->
+        [one] { $count } Woche
+       *[other] { $count } Wochen
+    }
+interaction-error-age-month = { $count ->
+        [one] { $count } Monat
+       *[other] { $count } Monaten
+    }
+interaction-error-age-year = { $count ->
+        [one] { $count } Jahr
+       *[other] { $count } Jahren
+    }
+interaction-error-remove-lock = Verwaiste Sperrdatei entfernen
+interaction-error-trust-folder = Diesem Ordner vertrauen
+interaction-error-long-paths = Lange Pfade aktivieren
+interaction-error-use-certificates = Windows-Zertifikate verwenden
+interaction-error-fix = Beheben
+interaction-error-not-set = derzeit nicht gesetzt
+interaction-error-cannot-undo = Das Entfernen einer Sperrdatei kann nicht rückgängig gemacht werden
+interaction-error-no-git = Auf diesem Computer läuft kein anderer Git-Prozess.
+interaction-error-repo-config = der Konfiguration des Repositorys
+interaction-error-autocrlf-unset = core.autocrlf ist hier nicht gesetzt, das entspricht false: Git lässt Zeilenenden unverändert, sofern .gitattributes nichts anderes festlegt.
+interaction-error-confirm-add = Fügt { $line } zu { $file } hinzu. Rückgängig auf dieser Karte entfernt den Eintrag wieder.
+interaction-error-confirm-set = Setzt { $line } in { $file } ({ $previous }). Rückgängig auf dieser Karte stellt den vorherigen Wert wieder her.
+interaction-error-confirm-remove = Entfernt { $lock }, zuletzt vor { $age } geschrieben. Eine Sperrdatei enthält keine aufzubewahrenden Daten, daher gibt es kein Rückgängig. Ein Git-Prozess, der sie noch verwendet, würde fehlschlagen.
+interaction-error-removed = { $lock } wurde entfernt.
+interaction-error-undo-add = { $line } wurde wieder aus { $file } entfernt.
+interaction-error-undo-value = { $key } wurde in { $file } wieder auf { $value } gesetzt.
+interaction-error-undo-unset = { $key } wurde in { $file } wieder entfernt.
+interaction-error-already-trusted = { $file } führt diesen Ordner bereits unter safe.directory auf. Wenn Git ihn weiterhin ablehnt, ist der geprüfte Pfad anders geschrieben (abschließender Schrägstrich, Groß-/Kleinschreibung, %(prefix)/-Form einer Netzwerkfreigabe). Vergleiche ihn mit Was Git gemeldet hat.
+interaction-error-lock-gone = { $lock } ist inzwischen verschwunden: Der zugehörige Git-Prozess ist fertig, es gibt nichts mehr zu entfernen.
+interaction-error-lock-age = { $lock } wurde zuletzt vor { $age } geschrieben.
+interaction-error-process-check-failed = Es konnte nicht geprüft werden, ob Git läuft: { $error }.
+interaction-error-local-wins = { $key } ist in { $there } auf { $value } gesetzt. Dies hat Vorrang vor { $file }: Ändere die Einstellung dort.
+interaction-error-already-set = { $key } ist in { $file } bereits auf { $value } gesetzt, daran liegt es also nicht.
+interaction-error-autocrlf-value = core.autocrlf ist hier auf { $value } gesetzt (in { $origin }).
+interaction-error-autocrlf-error = core.autocrlf konnte nicht gelesen werden: { $error }.
+interaction-error-no-attributes = Keine .gitattributes-Regel gilt für { $file }.
+interaction-error-attributes-value = .gitattributes legt für { $file } fest: { $attributes }.
+interaction-error-attributes-error = Die .gitattributes-Regeln für { $file } konnten nicht gelesen werden: { $error }.
+interaction-error-current-value = derzeit { $value }
+interaction-error-added = { $line } wurde zu { $file } hinzugefügt.
+interaction-error-set = { $line } wurde in { $file } gesetzt.
+interaction-error-running = Auf diesem Computer läuft Git: { $processes }. Falls ein Prozess in diesem Repository arbeitet, lasse ihn fertig werden (oder schließe den von ihm geöffneten Editor).
+interaction-error-running-with-ours = Auf diesem Computer läuft Git: { $processes }. Einige Prozesse können zu gitcraft gehören und das Repository lesen. Falls ein Prozess in diesem Repository arbeitet, lasse ihn fertig werden (oder schließe den von ihm geöffneten Editor).
+interaction-error-close = Schließen
+interaction-error-looking = Wird genauer geprüft…
+interaction-error-git-said = Was Git gemeldet hat
+interaction-error-retry = Erneut versuchen
+interaction-error-cancel = Abbrechen
+interaction-error-working = Wird ausgeführt…
+interaction-error-undo = Rückgängig
+interaction-error-back = Zurück
+interaction-error-undo-earlier = Dies rückgängig machen
+interaction-error-look-error = Genauere Prüfung fehlgeschlagen: { $error }
+interaction-error-earlier = Zuvor: { $what }
+interaction-error-undo-stopped = Interner Fehler: Das Rückgängigmachen wurde vorzeitig beendet
+interaction-error-check-stopped = Interner Fehler: Die Prüfung wurde vorzeitig beendet
+interaction-error-undo-failed = Rückgängigmachen fehlgeschlagen: { $error }

@@ -224,3 +224,110 @@ interaction-manual-group-window = Window
 interaction-manual-group-repository = Repository
 interaction-manual-group-contextual-actions = Contextual actions
 interaction-manual-shortcut-heading = { $group } shortcuts
+interaction-error-title-trust = git doesn't trust this folder
+interaction-error-title-lock = Another git seems to be at work here
+interaction-error-title-to-crlf = git changes line endings here (LF to CRLF)
+interaction-error-title-to-lf = git changes line endings here (CRLF to LF)
+interaction-error-title-path = A path is too long
+interaction-error-title-certificate = The server's certificate couldn't be checked
+interaction-error-title-too-large = The server refused a request this large (HTTP 413)
+interaction-error-title-transfer = The connection broke during the transfer
+interaction-error-title-histories = These histories have nothing in common
+interaction-error-title-shallow = A shallow clone can't push here
+interaction-error-title-ssh = The SSH server didn't accept your key
+interaction-error-trust-advice = Trust this folder adds this folder, and only this one, to safe.directory in your global git config. Only do that if you know where the repository came from.
+interaction-error-lock-advice = Remove it only when no git is working in this repository.
+interaction-error-long-windows = Windows limits paths to 260 characters unless a program asks for longer ones. core.longpaths makes git ask: Enable long paths sets it for this repository.
+interaction-error-long-other = A name in it is longer than this machine's file system takes (255 bytes per name on most). git can't change that: rename the file from a machine that can check it out, or leave its folder out with a sparse checkout.
+interaction-error-large-advice = The server, or a proxy in front of it, limits how large a request may be. Push fewer commits at a time (an older commit first: git push origin <commit>:refs/heads/<branch> in the terminal), keep large files in Git LFS, or ask the server's administrator to raise the limit (client_max_body_size on nginx).
+interaction-error-transfer-advice = The server or the network stopped before the transfer was done (RPC failed, early EOF): often a proxy or server limit on long HTTPS requests, or an unreliable network. Try again. If it keeps failing, the repository's SSH address avoids the HTTP proxy and its limits; for a clone, git clone --depth 1 transfers less at once.
+interaction-error-histories-why = The branch being merged shares no commit with yours: usually a repository made twice (git init here, and a new repository with a README on the forge), or the wrong remote.
+interaction-error-histories-advice = If they are meant to be joined, run git pull --allow-unrelated-histories (or git merge --allow-unrelated-histories) in the terminal; otherwise check the remote's URL.
+interaction-error-shallow-advice = This clone has only part of the history (it was cloned with --depth), and the remote takes pushes only from clones that have all of it. Fetch the rest with git fetch --unshallow in the terminal, then push again.
+interaction-error-autocrlf-advice = core.autocrlf, wherever it is set (see below), applies to every repository it covers: true turns LF into CRLF when files are checked out and back into LF when they are committed (the usual choice on Windows); input turns CRLF into LF when committing and changes nothing on checkout; false leaves line endings alone.
+interaction-error-attributes-advice = .gitattributes, committed with the repository, is the same for everyone who clones it: * text=auto has text files stored with LF (which files are text, git decides); eol=lf or eol=crlf on a pattern gives those files that ending on checkout everywhere, and -text leaves them alone. eol= and -text win over core.autocrlf; text=auto alone still leaves the checkout ending to core.autocrlf.
+interaction-error-safecrlf-advice = core.safecrlf is set, so git refused rather than warned: change core.autocrlf or the file's .gitattributes rule, or unset core.safecrlf.
+interaction-error-windows-certificates = Git for Windows checks certificates against its own list by default. With http.sslBackend = schannel it uses Windows' certificate store instead, where your IT department adds its certificate (a self-signed server certificate has to be imported there first; http.sslCAInfo no longer applies then): Use Windows' certificates sets that in your global git config.
+interaction-error-other-certificates = Add the certificate authority to this machine's trusted ones, or point git at it with http.sslCAInfo. Turning http.sslVerify off would accept any server, an impostor too.
+interaction-error-remote-keys = The repository is on another machine, so it is that machine's keys and agent that count.
+interaction-error-server = The server
+interaction-error-trust-why = { $path } belongs to another user account (copied from another machine, on a drive formatted elsewhere, or on a network share). git refuses to work in such a folder, since its config could run programs as you.
+interaction-error-lock-why = git keeps { $lock } while it changes the repository and removes it when it is done. It is still there: either another git is working in this repository (an editor opened by git commit, an IDE, a terminal), or one crashed and left it behind.
+interaction-error-tls-why = TLS said: { $detail }. Usually a company network or proxy that signs HTTPS with its own certificate authority, or a server with a self-signed certificate.
+interaction-error-ssh-why = { $who } took none of the keys ssh offered. See what it says to { $test } in the terminal; load your key into the agent (ssh-add), or add its public key (~/.ssh/id_ed25519.pub) to your account on the forge.
+interaction-error-files = { $more ->
+        [0] Files: { $files }.
+       *[other] Files: { $files } and { $more } more.
+    }
+interaction-error-age-short = less than a minute
+interaction-error-age-minute = { $count ->
+        [one] { $count } minute
+       *[other] { $count } minutes
+    }
+interaction-error-age-hour = { $count ->
+        [one] { $count } hour
+       *[other] { $count } hours
+    }
+interaction-error-age-day = { $count ->
+        [one] { $count } day
+       *[other] { $count } days
+    }
+interaction-error-age-week = { $count ->
+        [one] { $count } week
+       *[other] { $count } weeks
+    }
+interaction-error-age-month = { $count ->
+        [one] { $count } month
+       *[other] { $count } months
+    }
+interaction-error-age-year = { $count ->
+        [one] { $count } year
+       *[other] { $count } years
+    }
+interaction-error-remove-lock = Remove stale lock
+interaction-error-trust-folder = Trust this folder
+interaction-error-long-paths = Enable long paths
+interaction-error-use-certificates = Use Windows' certificates
+interaction-error-fix = Fix it
+interaction-error-not-set = it isn't set now
+interaction-error-cannot-undo = Removing a lock can't be undone
+interaction-error-no-git = No other git is running on this machine.
+interaction-error-repo-config = the repository's config
+interaction-error-autocrlf-unset = core.autocrlf isn't set here, which is false: git leaves line endings as they are unless .gitattributes says otherwise.
+interaction-error-confirm-add = Adds { $line } to { $file }. Undo, on this card, takes it out again.
+interaction-error-confirm-set = Sets { $line } in { $file } ({ $previous }). Undo, on this card, puts it back.
+interaction-error-confirm-remove = Removes { $lock }, last written { $age } ago. A lock holds nothing to keep, so there is no undo; a git still using it would fail.
+interaction-error-removed = Removed { $lock }.
+interaction-error-undo-add = Took { $line } out of { $file } again.
+interaction-error-undo-value = Set { $key } back to { $value } in { $file }.
+interaction-error-undo-unset = Unset { $key } in { $file } again.
+interaction-error-already-trusted = { $file } lists this folder in safe.directory already, so git still refusing means the path git checks is spelled another way (a trailing slash, letter case, a network share's %(prefix)/ form): compare it with What git said.
+interaction-error-lock-gone = { $lock } is gone now: the git that held it is done, and nothing is left to remove.
+interaction-error-lock-age = { $lock } was last written { $age } ago.
+interaction-error-process-check-failed = Whether git is running couldn't be checked: { $error }.
+interaction-error-local-wins = { $key } is { $value } in { $there }, which wins over { $file }: change it there.
+interaction-error-already-set = { $key } is { $value } in { $file } already, so that isn't it.
+interaction-error-autocrlf-value = core.autocrlf is { $value } here (set in { $origin }).
+interaction-error-autocrlf-error = core.autocrlf couldn't be read: { $error }.
+interaction-error-no-attributes = No .gitattributes rule covers { $file }.
+interaction-error-attributes-value = .gitattributes gives { $file }: { $attributes }.
+interaction-error-attributes-error = The .gitattributes rules for { $file } couldn't be read: { $error }.
+interaction-error-current-value = it is { $value } now
+interaction-error-added = Added { $line } to { $file }.
+interaction-error-set = Set { $line } in { $file }.
+interaction-error-running = git is running on this machine: { $processes }. If one is working in this repository, let it finish (or close the editor it opened) instead.
+interaction-error-running-with-ours = git is running on this machine: { $processes }. Some may be gitcraft's own, reading the repository. If one is working in this repository, let it finish (or close the editor it opened) instead.
+interaction-error-close = Close
+interaction-error-looking = Looking closer…
+interaction-error-git-said = What git said
+interaction-error-retry = Try again
+interaction-error-cancel = Cancel
+interaction-error-working = Working…
+interaction-error-undo = Undo
+interaction-error-back = Back
+interaction-error-undo-earlier = Undo that
+interaction-error-look-error = Couldn't look closer: { $error }
+interaction-error-earlier = Earlier: { $what }
+interaction-error-undo-stopped = Internal error: the undo stopped before it was done
+interaction-error-check-stopped = Internal error: the check stopped before it was done
+interaction-error-undo-failed = Undo failed: { $error }
