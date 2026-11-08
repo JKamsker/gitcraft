@@ -422,3 +422,49 @@ fn secondary_fetch_is_pinned_to_previewed_url_and_an_owned_git_directory() -> Re
     }
     Ok(())
 }
+
+#[cfg(windows)]
+#[test]
+fn local_setup_clone_uses_git_paths_without_enabling_network_auth() -> Result<(), String> {
+    let workspace = Workspace::new()?;
+    let destination = workspace.0.join("target with spaces");
+    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    // Recording only: none of these source paths are opened or executed.
+    for (source, expected) in [
+        (
+            r"\\?\C:\source with spaces\repo",
+            "C:/source with spaces/repo",
+        ),
+        (r"C:\source with spaces\repo", "C:/source with spaces/repo"),
+        (r"\\?\UNC\server\share\repo", "//server/share/repo"),
+        (r"\\server\share\repo", "//server/share/repo"),
+    ] {
+        let pending = connections::Context {
+            error: Some("Local clone must not consult profile authentication".into()),
+            ..Default::default()
+        };
+        let prepared = pending
+            .run(|| clone_command(&workspace.0, source, &destination, "origin", true, &exe))?;
+        let args: Vec<_> = prepared.command.get_args().collect();
+        assert_eq!(args[args.len() - 2], std::ffi::OsStr::new(expected));
+        let recorded_destination = Path::new(args.last().ok_or("Missing clone destination")?);
+        assert!(recorded_destination.is_absolute());
+        assert_eq!(
+            recorded_destination
+                .parent()
+                .ok_or("Missing parent")?
+                .canonicalize()
+                .map_err(|e| e.to_string())?,
+            workspace.0
+        );
+        assert_eq!(recorded_destination.file_name(), destination.file_name());
+        assert!(!recorded_destination.to_string_lossy().contains(['?', '\\']));
+        let env: std::collections::BTreeMap<_, _> = prepared.command.get_envs().collect();
+        assert_eq!(
+            env.get(std::ffi::OsStr::new("GIT_ALLOW_PROTOCOL")),
+            Some(&Some(std::ffi::OsStr::new("file")))
+        );
+        assert!(!env.contains_key(std::ffi::OsStr::new("GITCRAFT_GIT_PASSWORD")));
+    }
+    Ok(())
+}
