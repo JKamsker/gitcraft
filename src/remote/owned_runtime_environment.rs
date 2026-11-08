@@ -37,6 +37,9 @@ struct Receipt {
     non_utf8: Option<Vec<u8>>,
     path: Option<Vec<u8>>,
     empty_environment: bool,
+    /// Only the empty-clear case records all key names; never capture their values.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    unexpected_environment_keys: Option<Vec<Vec<u8>>>,
 }
 
 pub(super) fn is_snapshot() -> bool {
@@ -50,6 +53,14 @@ pub(super) fn is_driver() -> bool {
 }
 
 pub(super) fn snapshot() -> io::Result<()> {
+    let unexpected_environment_keys =
+        if std::env::current_dir()?.file_name() == Some(OsStr::new("empty-clear")) {
+            let mut keys: Vec<_> = std::env::vars_os().map(|(key, _)| key.into_vec()).collect();
+            keys.sort();
+            Some(keys)
+        } else {
+            None
+        };
     let value = |key: &OsStr| std::env::var_os(key).map(OsString::into_vec);
     let receipt = Receipt {
         arg0: std::env::args_os()
@@ -63,6 +74,7 @@ pub(super) fn snapshot() -> io::Result<()> {
         non_utf8: value(OsStr::from_bytes(NON_UTF8)),
         path: value(OsStr::new("PATH")),
         empty_environment: std::env::vars_os().next().is_none(),
+        unexpected_environment_keys,
     };
     let mut bytes = serde_json::to_vec(&receipt)?;
     bytes.push(b'\n');
@@ -87,6 +99,7 @@ fn expected(case: &str, directory: &Path) -> Receipt {
         non_utf8: (!cleared).then(|| b"baseline-\xfe".to_vec()),
         path: (!cleared).then(|| directory.as_os_str().as_bytes().to_vec()),
         empty_environment: case == "empty-clear",
+        unexpected_environment_keys: (case == "empty-clear").then(Vec::new),
     };
     match case {
         "set" => {
@@ -168,17 +181,33 @@ pub(super) fn driver(directory: &Path) -> io::Result<()> {
             .map_err(io::Error::other)?;
         let output = wait(&ticket).map_err(io::Error::other)?;
         assert!(output.stopped.is_none(), "{case}: {:?}", output.stopped);
-        assert_eq!(output.status.code(), Some(0), "{case}");
+        assert_eq!(
+            output.status.code(),
+            Some(0),
+            "{case}: snapshot stdout={:?}; stderr={:?}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr),
+        );
         assert!(output.stderr.is_empty(), "{case}: {:?}", output.stderr);
         let receipt = expected(case, directory);
+        let actual_bytes = std::fs::read(case_directory.join("environment-receipt.json"))?;
+        let actual: Receipt = serde_json::from_slice(&actual_bytes)?;
+        // Report only escaped key names from empty-clear. The strict receipt equality
+        // still requires empty_environment=true and no unexpected keys; no exemptions.
+        let unexpected_names: Vec<_> = actual
+            .unexpected_environment_keys
+            .iter()
+            .flatten()
+            .map(|key| OsStr::from_bytes(key))
+            .collect();
+        assert_eq!(
+            actual, receipt,
+            "{case}: unexpected environment key names (no values)={unexpected_names:?}"
+        );
         let mut bytes = serde_json::to_vec(&receipt)?;
         bytes.push(b'\n');
         assert_eq!(output.stdout, stdout(&bytes), "{case}");
-        assert_eq!(
-            std::fs::read(case_directory.join("environment-receipt.json"))?,
-            bytes,
-            "{case}"
-        );
+        assert_eq!(actual_bytes, bytes, "{case}");
     }
     drop(service);
     io::stdout().write_all(DONE)?;
@@ -218,8 +247,20 @@ fn owned_runtime_opaque_command_environment() -> Result<(), Box<dyn std::error::
         }
         std::thread::sleep(std::time::Duration::from_millis(5));
     };
-    assert!(output.stopped.is_none(), "{:?}", output.stopped);
-    assert_eq!(output.status.code(), Some(0));
+    assert!(
+        output.stopped.is_none(),
+        "{:?}; driver stdout={:?}; stderr={:?}",
+        output.stopped,
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "driver stdout={:?}; stderr={:?}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
     assert_eq!(output.stdout, stdout(DONE));
     assert!(output.stderr.is_empty(), "{:?}", output.stderr);
     for case in CASES {
