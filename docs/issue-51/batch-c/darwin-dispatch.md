@@ -1,0 +1,9 @@
+# Bounded Darwin candidate dispatch
+
+Darwin Git rejected retained directory descriptor paths in the preserved dc8746e deferred fixtures. The correction uses the already captured, validated absolute metadata/common paths on Darwin, with explicit `--git-dir`, `GIT_COMMON_DIR` and retained cwd `--work-tree=.`. It never selects dispatch paths from another `.git` read. Other Unix dispatch remains descriptor based.
+
+The same two binding observations, native no-follow root/link/metadata/common snapshots, exact registration/backlink/commondir checks, fixed argv, held descriptor checks and completion post-check remain. Immediately before Git, physical metadata/common identities must equal the opened handles. Candidate creation remains detached and locked; close retains candidates. Original branches move only through guarded acceptance. Drift after dispatch reports uncertainty and requires candidate inspection/reconciliation.
+
+Supported concurrency includes ordinary source checkout work, stale source tips, paused candidate resolutions and lock-respecting worktree management. Forcibly unlocking, moving, removing, repairing or replacing an active proposal's administration after the final check is unsupported: pause/cancel first. Physical paths and post-checks cannot prove zero foreign writes under that same-user replacement schedule. No capability or sandbox claim is made. Windows remains unsupported; Linux execution is not established by Darwin evidence.
+
+Design source: `/tmp/gitcraft-51-deferred-darwin-dispatch-design.md` (root-authorized finite disposition). Prior failures and receipts remain in `/tmp/gitcraft-c-runtime-corrections/`; this document does not supersede those results. Runtime results for this source will be recorded externally against its immutable commit after preservation and verified push.

@@ -334,6 +334,9 @@ fn configured_filters_hooks_fsmonitor_and_signing_never_run_for_drafts_or_recove
     }
     git::run(Some(&f.0), &["config", "filter.trap.required", "true"])?;
     git::run(Some(&f.0), &["config", "commit.gpgSign", "true"])?;
+    // The authorized isolated test environment deliberately has an empty Git
+    // template directory. Install this fixture's hook explicitly.
+    std::fs::create_dir_all(f.0.join(".git/hooks")).map_err(|e| e.to_string())?;
     std::fs::copy(&script, f.0.join(".git/hooks/reference-transaction"))
         .map_err(|e| e.to_string())?;
     f.write("file", b"saved\r\n")?;
@@ -940,6 +943,16 @@ fn partial_shallow_drafts_and_missing_index_preview_never_call_network_helpers()
             dest.to_str().ok_or("utf8")?,
         ],
     )?;
+    // Checkout is a passive operation under the shared no-lazy-fetch policy.
+    // Seed only the known fixture blob needed for the sparse working folder;
+    // the omitted promisor blob remains unavailable for the regression below.
+    let keep = git::run(Some(&f.0), &["rev-parse", "HEAD:keep/file"])?;
+    let seeded = git::run_input(
+        Some(&dest),
+        &["hash-object", "-w", "--stdin"],
+        "keep base\n",
+    )?;
+    assert_eq!(seeded.trim(), keep.trim());
     git::run(Some(&dest), &["sparse-checkout", "set", "--cone", "keep"])?;
     git::run(Some(&dest), &["checkout", "-q"])?;
     assert_eq!(
@@ -1013,8 +1026,27 @@ fn partial_shallow_drafts_and_missing_index_preview_never_call_network_helpers()
     assert_eq!(packs(&after), packs(&objects));
     assert!(git::run(Some(&dest), &["cat-file", "-e", missing.trim()]).is_err());
     assert!(
+        !marker.exists(),
+        "Ordinary object reads must also refuse lazy fetch"
+    );
+    // An explicit fetch to this owned local source exercises the installed trap.
+    // It is separate from draft inspection and never contacts an external server.
+    assert!(
+        git::run(
+            Some(&dest),
+            &[
+                "fetch",
+                "--no-tags",
+                "--no-write-fetch-head",
+                "origin",
+                missing.trim()
+            ]
+        )
+        .is_err()
+    );
+    assert!(
         marker.exists(),
-        "Positive control must attempt the configured helper"
+        "Explicit local fetch positive control must attempt the configured helper"
     );
     Ok(())
 }
