@@ -520,6 +520,7 @@ impl Drop for Service {
 
 static SERVICE: OnceLock<Result<Service, String>> = OnceLock::new();
 static CLEANUP: OnceLock<Result<Service, String>> = OnceLock::new();
+static LEASES: OnceLock<Result<Service, String>> = OnceLock::new();
 pub(crate) fn service() -> Result<&'static Service, String> {
     SERVICE
         .get_or_init(|| {
@@ -544,6 +545,20 @@ pub(crate) fn run_cleanup(command: Command, mut options: Options) -> ResultOutpu
         .map_err(Clone::clone)?
         .submit(command, options)?
         .wait()
+}
+
+/// Claim-only helpers have independent bounded capacity; they never run repository code.
+pub(crate) fn submit_lease(command: Command, options: Options) -> Result<Ticket, String> {
+    LEASES
+        .get_or_init(|| Service::new(16, 64).map_err(|e| e.to_string()))
+        .as_ref()
+        .map_err(Clone::clone)?
+        .submit(command, options)
+}
+pub(crate) fn shutdown_leases() {
+    if let Some(Ok(service)) = LEASES.get() {
+        service.shutdown();
+    }
 }
 
 pub(crate) fn counts() -> Option<Counts> {
@@ -783,28 +798,47 @@ async fn execute(
         if let Some(trace) = trace {
             trace.stage(trace::Stage::Reaping);
         }
-        match child.finish() {
-            Ok(s) => {
-                if status.is_none() {
-                    status = Some(s);
+        if !options.native_controller {
+            match child.finish() {
+                Ok(s) => {
+                    if status.is_none() {
+                        status = Some(s);
+                    }
                 }
-            }
-            Err(e) => {
-                return Err(format!(
-                    "{}; could not finish owned process: {e}",
-                    stopped.as_deref().unwrap_or("cleanup failed")
-                ));
+                Err(e) => {
+                    return Err(format!(
+                        "{}; could not finish owned process: {e}",
+                        stopped.as_deref().unwrap_or("cleanup failed")
+                    ));
+                }
             }
         }
         // Killing/reaping does not consume bytes already buffered in the pipes. Retain
         // those diagnostics without waiting indefinitely for an inherited pipe to close.
-        let until = tokio::time::Instant::now() + options.drain_for;
+        // A native helper may still be delivering its terminal output. Keep consuming
+        // while it exits on EOF; never mark the sole owner expendable or kill it.
+        let until = tokio::time::Instant::now()
+            + if options.native_controller {
+                Duration::from_secs(5)
+            } else {
+                options.drain_for
+            };
         #[cfg(test)]
         if let Some(trace) = trace {
             trace.stage(trace::Stage::Draining);
         }
         let mut overflow = None;
-        while out.is_some() || err.is_some() {
+        while out.is_some() || err.is_some() || (options.native_controller && status.is_none()) {
+            if options.native_controller && status.is_none() {
+                match child.observe() {
+                    Ok(Some(s)) => status = Some(s),
+                    Ok(None) => {}
+                    Err(_) => break,
+                }
+            }
+            if out.is_none() && err.is_none() && status.is_some() {
+                break;
+            }
             tokio::select! {
                 result = async { match &mut out { Some(p) => p.read(&mut obuf).await, None => std::future::pending().await } } => {
                     match result {
@@ -829,14 +863,18 @@ async fn execute(
                     }
                 }
                 _ = tokio::time::sleep_until(until) => break,
+                _ = tokio::time::sleep(POLL), if options.native_controller && status.is_none() => {},
             }
         }
     }
     // Also retire successful owners: descendants with closed output remain in the group.
     // This is idempotent when cancellation already finished it above.
-    child
-        .finish()
-        .map_err(|e| format!("could not finish owned process: {e}"))?;
+    child.finish().map_err(|e| {
+        format!(
+            "{}; could not finish owned process: {e}",
+            stopped.as_deref().unwrap_or("process completion failed")
+        )
+    })?;
     if stopped.is_none()
         && let Some(confirm) = options.complete_remote.take()
     {

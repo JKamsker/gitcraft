@@ -953,6 +953,7 @@ fn on_path(name: &str) -> bool {
 pub fn after_exit() {
     crate::tasks::shutdown();
     crate::parallel_bisect::shutdown();
+    crate::processes::shutdown_leases();
     crate::processes::shutdown();
     crate::remote::shutdown();
     crate::processes::shutdown_cleanup();

@@ -23,6 +23,7 @@ mod transport;
 mod ui_guard;
 mod vault;
 pub(crate) mod workspace_authority;
+pub(crate) mod workspace_claim;
 
 use std::path::{Path, PathBuf};
 
