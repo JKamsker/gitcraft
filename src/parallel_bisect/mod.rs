@@ -10,6 +10,7 @@
 mod cache;
 mod dag;
 mod machine;
+pub(crate) mod observe;
 mod runner;
 mod search;
 mod session;

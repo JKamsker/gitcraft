@@ -1,5 +1,6 @@
 //! Modal dialogs: create a branch, confirm a destructive operation.
 
+mod behaviour;
 mod bisect;
 pub(super) mod branch;
 mod bundles;
@@ -69,6 +70,7 @@ pub enum Dialog {
         skip_hooks: bool,
         web_warning: Option<String>,
     },
+    Behaviour(Box<behaviour::Form>),
     LinkedMachines(Box<linked_machines::Form>),
     BundleLoading(u64),
     BundleExport {
@@ -536,6 +538,7 @@ impl RepoTab {
                     super::repository_tools::show(ui, state, acts);
                     if ui.button("Close").clicked() { Outcome::Cancel } else { Outcome::Open }
                 }
+                Dialog::Behaviour(form) => form.show(ui),
                 Dialog::LinkedMachines(form) => form.show(ui),
                 Dialog::BundleLoading(_) => {
                     ui.heading("Reading bundle information…");

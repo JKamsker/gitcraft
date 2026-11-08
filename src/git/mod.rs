@@ -7,6 +7,8 @@ pub(crate) mod atlas;
 mod attributes;
 pub mod backend;
 mod backlinks;
+mod behaviour;
+pub(crate) use behaviour::{BehaviourCommit, behaviour_commits};
 mod bisect;
 mod branch_health;
 mod bundles;

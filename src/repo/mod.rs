@@ -194,6 +194,7 @@ pub struct RepoTab {
     pub name: String,
     tx: messages::JobSender,
     _jobs: crate::tasks::Scope,
+    behaviour_cache: crate::parallel_bisect::observe::Cache,
     rx: Receiver<Msg>,
 
     /// When the tab was made: its opening screen shows only if the first read takes a while.
@@ -593,6 +594,7 @@ impl RepoTab {
             name,
             tx,
             _jobs: jobs,
+            behaviour_cache: Default::default(),
             rx,
             opened: Instant::now(),
             life: lifecycle::Lifecycle::new(Instant::now()),
