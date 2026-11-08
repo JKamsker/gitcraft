@@ -161,6 +161,7 @@ fn threads(
     shown.pending_exists = extras.pending_review.is_some();
     shown.open = details.state == "OPEN";
     let open = shown.open;
+    let relocated = view.relocations().cloned().unwrap_or_default();
     let markdown = &mut view.markdown;
     let bodies = &view.thread_bodies;
     let suggestions = &view.suggestions;
@@ -169,11 +170,15 @@ fn threads(
         .max_height(THREAD_MAX_H)
         .auto_shrink([false, true])
         .show(ui, |ui| {
-            for thread in extras
-                .threads
-                .iter()
-                .filter(|th| thread_is_on(th, &target.path, target.side, target.line))
-            {
+            for thread in extras.threads.iter().filter(|th| {
+                thread_is_on(th, &target.path, target.side, target.line)
+                    || relocated.get(&th.id) == Some(target)
+            }) {
+                if relocated.contains_key(&thread.id) {
+                    ui.label(
+                        "Earlier comment · relocated across unchanged lines (local navigation)",
+                    );
+                }
                 if thread.can_reply && shown.reply_to.is_none() {
                     shown.reply_to = Some(thread.id.clone());
                 }

@@ -51,6 +51,9 @@ portable-pty = "0.9"
 pulldown-cmark = { version = "0.13", default-features = false }
 # Issue references, find-in-view expressions, and CODEOWNERS patterns.
 regex = "1"
+# Rust review freshness: parse syntax and compare exact function token streams without executing code.
+syn = { version = "2", features = ["full", "visit"] }
+quote = "1"
 # Reads one setting from eframe's saved state before the window is made (app::title_bar).
 ron = "0.12"
 # The window's handle, to hide Windows' border when the tabs are in the title bar (app::title_bar).

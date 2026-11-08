@@ -48,6 +48,19 @@ impl RepoTab {
         ) {
             self.file_comparison = None;
         }
+        if matches!(
+            &action,
+            Action::OpenDiff(_)
+                | Action::FileView { .. }
+                | Action::OpenPr(_)
+                | Action::Select(_)
+                | Action::SelectHash(_)
+                | Action::SelectPr(_)
+                | Action::SelectStash(_)
+                | Action::Compare { .. }
+        ) {
+            self.review_document.open = false;
+        }
         match action {
             Action::SubmitPreflight(plan) => self.submit_preflight(*plan, ctx),
             Action::FixPreflight(plan, kind) => self.fix_preflight(*plan, &kind, ctx),
@@ -73,6 +86,10 @@ impl RepoTab {
                 whole,
             } => self.comparison_pick(request, boundary, lines, whole, ctx),
             Action::ComparisonNormalPatch => self.comparison_normal_patch(ctx),
+            Action::ReviewTools(act) => self.review_tools_act(act, ctx),
+            Action::Story(act) => self.story_act(act, ctx),
+            Action::Freshness(act) => self.freshness_act(act, ctx),
+            Action::Review(act) => self.review_act(act, ctx),
             Action::Select(row) => {
                 self.leave_pages();
                 self.doctor = None;
@@ -683,7 +700,7 @@ impl RepoTab {
     }
 
     /// Applies the patch of lines picked, saved at `saved` (see [`Self::pick_lines`]).
-    fn apply_picked(
+    pub(super) fn apply_picked(
         &mut self,
         pick: diff::Pick,
         label: &str,

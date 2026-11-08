@@ -1257,6 +1257,15 @@ pub(crate) fn execute_controlled(
     creds: Option<&git::Credentials>,
     control: Option<&Arc<git::OpControl>>,
 ) -> Result<String, String> {
+    execute_controlled_with_guard(repo, plan, creds, control, || Ok(()))
+}
+pub(crate) fn execute_controlled_with_guard(
+    repo: &Path,
+    plan: &Plan,
+    creds: Option<&git::Credentials>,
+    control: Option<&Arc<git::OpControl>>,
+    before_publish: impl Fn() -> Result<(), String>,
+) -> Result<String, String> {
     if let Some(why) = crate::network::refused() {
         return Err(why.why().into());
     }
@@ -1275,6 +1284,7 @@ pub(crate) fn execute_controlled(
         let remote_at = args.len() - 2;
         args[remote_at] = opaque.clone();
         let objects: Vec<_> = plan.lfs_objects.iter().cloned().collect();
+        before_publish()?;
         git::push_preflight_with(
             repo,
             &args,

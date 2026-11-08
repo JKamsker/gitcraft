@@ -115,6 +115,7 @@ mod remerge;
 mod revert_piece;
 #[cfg(test)]
 mod revert_tests;
+mod review_workflow;
 mod rewrite;
 mod running;
 #[cfg(test)]
@@ -311,6 +312,8 @@ pub struct RepoTab {
     compare: Option<Compare>,
     /// The pull request the big area shows.
     pr_view: Option<pr_view::PrView>,
+    review_document: review_workflow::ReviewState,
+    review_tools: review_workflow::Tools,
     /// The builds of a commit the big area shows.
     ci_view: Option<ci_view::CiView>,
     local_ci: local_ci::State,
@@ -655,6 +658,8 @@ impl RepoTab {
             file_comparison: None,
             compare: None,
             pr_view: None,
+            review_document: Default::default(),
+            review_tools: Default::default(),
             ci_view: None,
             local_ci: Default::default(),
             reflog: None,

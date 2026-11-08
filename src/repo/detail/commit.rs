@@ -53,6 +53,11 @@ impl RepoTab {
             return;
         };
 
+        self.review_all_button(
+            ui,
+            crate::repo::review_workflow::ReviewSource::Commit(detail.hash.clone()),
+            acts,
+        );
         // On a forge, the commit's builds: how they went, if that's known.
         let builds = (self.ci_project().is_some() && self.stash_view.is_none())
             .then(|| self.ci.by_sha.get(&detail.hash));

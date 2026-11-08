@@ -148,6 +148,8 @@ pub(crate) fn focus(ctx: &egui::Context, id: impl std::hash::Hash + std::fmt::De
     ctx.data_mut(|d| d.insert_temp(egui::Id::new(("file-text-focus", id)), line));
 }
 
+// The optional logical location accompanies the existing search/history/menu inputs.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn show(
     ui: &mut Ui,
     id: impl std::hash::Hash + std::fmt::Debug,
@@ -156,6 +158,7 @@ pub(crate) fn show(
     source: impl FnOnce() -> Source,
     history: Result<(), &str>,
     mut links: Option<LineMenu<'_>>,
+    location: Option<(&std::cell::Cell<Option<usize>>, Option<usize>)>,
 ) -> Option<(u32, u32)> {
     let t = Tokens::get(ui.ctx());
     let data = match text {
@@ -234,6 +237,17 @@ pub(crate) fn show(
             char_w,
         );
     }
+    if let Some((goto, _)) = location
+        && let Some(line) = goto.take()
+    {
+        if (1..=lines.len()).contains(&line) {
+            scroll = scroll.vertical_scroll_offset(
+                (line.saturating_sub(1) as f32 * LINE_H - 2.0 * LINE_H).max(0.0),
+            );
+        } else {
+            ui.weak("Pinned line is outside this file revision");
+        }
+    }
     let found = &*find;
     let out = scroll.show_rows(ui, LINE_H, data.lines.len(), |ui, range| {
         for i in range {
@@ -264,7 +278,9 @@ pub(crate) fn show(
                 p.cursor = i;
             }
             let p = ui.painter().with_clip_rect(rect.intersect(ui.clip_rect()));
-            if pick.is_some_and(|p| p.contains(i)) {
+            if location.is_some_and(|(_, line)| line == Some(i + 1))
+                || pick.is_some_and(|p| p.contains(i))
+            {
                 p.rect_filled(rect, 0.0, t.row_selected);
             }
             if let Some(picked) = pick {
@@ -468,5 +484,58 @@ mod tests {
             (vec!["two".to_owned()], true)
         );
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod r2_navigation_tests {
+    use super::*;
+    #[test]
+    fn r2_pure_pinned_file_reveal_waits_for_text_and_scrolls_to_logical_line() {
+        let ctx = egui::Context::default();
+        let goto = std::cell::Cell::new(Some(90));
+        let mut find = Find::default();
+        let mut frame = |text: Option<&Result<FileText, String>>| {
+            let mut output = ctx.run_ui(
+                egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(900.0, 300.0),
+                    )),
+                    ..Default::default()
+                },
+                |ui| {
+                    show(
+                        ui,
+                        "pinned",
+                        text,
+                        &mut find,
+                        || Source::File {
+                            path: "unchanged.rs".into(),
+                            rev: Some("pinned".into()),
+                        },
+                        Ok(()),
+                        None,
+                        Some((&goto, Some(90))),
+                    );
+                },
+            );
+            output.textures_delta.clear();
+            output
+        };
+        let _ = frame(None);
+        assert_eq!(goto.get(), Some(90));
+        let text = Ok(FileText::new(
+            (1..=100)
+                .map(|n| format!("row{n}\n"))
+                .collect::<String>()
+                .as_bytes(),
+            "unchanged.rs",
+            false,
+        ));
+        let _ = frame(Some(&text));
+        let output = frame(Some(&text));
+        assert_eq!(goto.get(), None);
+        assert!(output.shapes.iter().any(|shape|matches!(&shape.shape,egui::epaint::Shape::Text(text) if text.galley.text().contains("row90"))));
     }
 }

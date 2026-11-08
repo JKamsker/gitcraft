@@ -207,6 +207,10 @@ pub fn run_watched_recorded(
         Ok(extra) => extra,
         Err(e) => return failed(e),
     };
+    let _source = match super::source::bind(&mut extra, dir, args) {
+        Ok(source) => source,
+        Err(e) => return failed(e),
+    };
     extra.trace_hooks = !quiet && crate::git::hooks::wants_trace(args);
     let trace = (dir.and_then(remote::parse).is_none() && extra.trace_hooks)
         .then(crate::git::hooks::TraceFile::new)
@@ -241,6 +245,9 @@ pub fn run_watched_recorded(
         return (Err(reason), recorded);
     }
     if ended.code == Some(0) {
+        if let Err(e) = super::source::finish(_source.as_ref(), args, true) {
+            return (Err(e), recorded);
+        }
         return (Ok(ended.stdout), recorded);
     }
     if let Some(t) = &target

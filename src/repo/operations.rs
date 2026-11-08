@@ -95,6 +95,18 @@ impl RepoTab {
             self.begin_push_preflight(ops, ctx);
             return;
         }
+        if self.echo_before_operation(
+            PendingOp {
+                label: label.to_owned(),
+                ops: ops.clone(),
+                refresh,
+                kind: kind.clone(),
+                quiet,
+            },
+            ctx,
+        ) {
+            return;
+        }
         self.graph_motion_begin(&ops);
         self.celebration_begin(label, &ops, ctx);
         let observe_celebration_head = self.celebration_needs_head();
@@ -186,14 +198,7 @@ impl RepoTab {
     /// would never run.
     pub(super) fn keep_unfinished(&mut self, stopped: usize) {
         if let Some(op) = &mut self.last_op {
-            // The checks stay: what they guard must still hold when it runs after signing in.
-            let mut i = 0;
-            op.ops.retain(|step| {
-                i += 1;
-                i > stopped
-                    || is_expectation(step)
-                    || step.first().is_some_and(|m| m == EXPECT_HTTPS_ROUTE)
-            });
+            retain_unfinished(&mut op.ops, stopped);
         }
     }
 
@@ -637,6 +642,60 @@ fn run_step(
 
 /// Reviewed dispatch bypasses run_step's normal argv, but retains its original-remote
 /// route proof. The runtime private alias must never become the retry authorization.
+fn reviewed_operands(op: &[String]) -> Result<(&str, Option<&[String]>), String> {
+    match op {
+        [marker, id] if marker == crate::push_preflight::APPROVED => Ok((id, None)),
+        [marker, id, option, binding]
+            if marker == crate::push_preflight::APPROVED
+                && option == "-c"
+                && binding.starts_with("gitcraft.commandSource=") =>
+        {
+            Ok((id, Some(&op[2..])))
+        }
+        _ => Err("Invalid reviewed push execution evidence".into()),
+    }
+}
+
+fn retain_unfinished(ops: &mut Vec<Vec<String>>, stopped: usize) {
+    // The checks and opaque source owner stay with the original operation on sign-in retry.
+    let mut i = 0;
+    ops.retain(|step| {
+        i += 1;
+        i > stopped || is_expectation(step) || step.first().is_some_and(|m| m == EXPECT_HTTPS_ROUTE)
+    });
+}
+
+#[cfg(test)]
+#[test]
+fn merge_pure_reviewed_echo_operands_are_strict_and_survive_retry() -> Result<(), String> {
+    let plain = vec![crate::push_preflight::APPROVED.to_owned(), "plan".into()];
+    assert_eq!(reviewed_operands(&plain)?, ("plan", None));
+    let bound = [
+        plain.clone(),
+        vec!["-c".into(), "gitcraft.commandSource=owned".into()],
+    ]
+    .concat();
+    let (id, source) = reviewed_operands(&bound)?;
+    assert_eq!(id, "plan");
+    assert_eq!(source, Some(&bound[2..]));
+    for malformed in [
+        [plain.clone(), vec!["-c".into()]].concat(),
+        [
+            plain.clone(),
+            vec!["-c".into(), "http.proxy=foreign".into()],
+        ]
+        .concat(),
+        [bound.clone(), vec!["extra".into()]].concat(),
+    ] {
+        assert!(reviewed_operands(&malformed).is_err());
+    }
+    // Credential recovery retains internal steps, including their opaque source owner.
+    let mut retained = vec![bound.clone()];
+    retain_unfinished(&mut retained, 0);
+    assert_eq!(retained, vec![bound]);
+    Ok(())
+}
+
 fn run_reviewed_push(
     original: &[String],
     capture: impl FnOnce(&[&str]) -> Result<git::RouteBinding, String>,
@@ -910,15 +969,31 @@ pub(super) fn run_steps_counted(
                 let args: Vec<&str> = prepared.iter().map(String::as_str).collect();
                 return run_step(path, &args, creds, quiet, control);
             }
-            if let [mark, id] = op.as_slice()
-                && mark == crate::push_preflight::APPROVED
+            if op
+                .first()
+                .is_some_and(|mark| mark == crate::push_preflight::APPROVED)
             {
+                let (id, evidence) = reviewed_operands(op)?;
                 let plan = crate::push_preflight::registered(id)?;
                 let original = crate::push_preflight::push_args(&plan)?;
+                let source = evidence
+                    .map(|args| git::CommandSource::reviewed_binding(path, args))
+                    .transpose()?;
                 return run_reviewed_push(
                     &original,
                     |args| git::RouteBinding::capture(path, args),
-                    || crate::push_preflight::execute_controlled(path, &plan, creds, control),
+                    || match source {
+                        Some(source) => crate::push_preflight::execute_controlled_with_guard(
+                            path,
+                            &plan,
+                            creds,
+                            control,
+                            || source.check_execution(),
+                        ),
+                        None => {
+                            crate::push_preflight::execute_controlled(path, &plan, creds, control)
+                        }
+                    },
                     control,
                 );
             }

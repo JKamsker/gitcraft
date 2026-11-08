@@ -38,6 +38,12 @@ pub(crate) struct Payload {
     line: Line,
 }
 
+impl Payload {
+    pub(in crate::repo) fn repository(&self) -> &std::path::Path {
+        &self.repo
+    }
+}
+
 /// The pointer is over a drop target this frame: whether it takes what is dragged, and the
 /// first thing it offers.
 #[derive(Clone, Default)]

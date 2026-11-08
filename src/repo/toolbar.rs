@@ -354,6 +354,13 @@ impl RepoTab {
                     acts.push(Action::OpenSshSetup);
                     ui.close();
                 }
+                if MenuItem::new("Review evidence and release coordination…")
+                    .show(ui)
+                    .clicked()
+                {
+                    acts.push(Action::ReviewTools(super::review_workflow::ToolsAct::Open));
+                    ui.close();
+                }
                 let browser = MenuItem::new("Open in browser")
                     .refused(page.is_none().then_some("No remote with a web page"))
                     .show(ui);

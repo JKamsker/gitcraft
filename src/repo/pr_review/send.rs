@@ -39,8 +39,20 @@ impl RepoTab {
         if *from != files.from || *to != files.to || files.to != details.head_oid {
             return None;
         }
+        let mut marks = line_marks(&details.extras.threads, path);
+        for (id, target) in view.relocations().into_iter().flatten() {
+            if target.path == *path {
+                let count = details
+                    .extras
+                    .threads
+                    .iter()
+                    .find(|t| &t.id == id)
+                    .map_or(0, |t| t.comments.len());
+                *marks.entry((target.side, target.line)).or_insert(0) += count;
+            }
+        }
         Some(DiffReview {
-            marks: line_marks(&details.extras.threads, path),
+            marks,
             target: self
                 .pr_drafts
                 .get(&view.number)

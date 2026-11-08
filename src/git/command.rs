@@ -3,6 +3,8 @@
 //! environment.
 
 pub(super) mod bounded;
+mod source;
+pub use source::CommandSource;
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -182,9 +184,13 @@ const TOOL_FOR: std::time::Duration = std::time::Duration::from_secs(12 * 3600);
 /// Runs git with `args` in `dir` (on whichever machine it is), `extra` before them.
 fn execute(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Result<Ran, String> {
     let _timer = super::backend::CliTimer::new(args);
+    let mut extra = extra.clone();
+    let _source = source::bind(&mut extra, dir, args)?;
+    let extra = &extra;
     if let Some(target) = dir.and_then(remote::parse) {
         let result = execute_there(&target, extra, args);
         if let Ok(out) = &result {
+            source::finish(_source.as_ref(), args, out.code == Some(0))?;
             super::doctor::hook_log::record(dir, args, out.code == Some(0), &out.stderr);
         }
         return result;
@@ -218,6 +224,7 @@ fn execute(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Result<Ran, Stri
         },
     )?
     .complete()?;
+    source::finish(_source.as_ref(), args, out.status.success())?;
     super::doctor::hook_log::record(dir, args, out.status.success(), &out.stderr);
     let failed = !out.status.success();
     Ok(Ran {
@@ -607,6 +614,79 @@ pub fn run_bytes(dir: Option<&Path>, args: &[&str]) -> Result<Vec<u8>, String> {
         Ok(out.stdout)
     } else {
         Err(String::from_utf8_lossy(&out.stderr).trim().to_owned())
+    }
+}
+
+/// Bounded raw-object plumbing for source preparation before containment. This never
+/// checks out files, invokes filters/hooks, or permits lazy object fetches/transports.
+pub fn run_inert_objects(
+    dir: &Path,
+    args: &[&str],
+    input: Option<&[u8]>,
+    output_limit: usize,
+    ok: &[i32],
+) -> Result<Vec<u8>, String> {
+    let extra = inert_object_options(args, input, output_limit)?;
+    let out = execute(Some(dir), &extra, args)?;
+    if out.code.is_some_and(|code| ok.contains(&code)) {
+        Ok(out.stdout)
+    } else {
+        Err(String::from_utf8_lossy(&out.stderr).trim().to_owned())
+    }
+}
+fn inert_object_options(
+    args: &[&str],
+    input: Option<&[u8]>,
+    output_limit: usize,
+) -> Result<Extra, String> {
+    if !matches!(
+        args.first().copied(),
+        Some("ls-tree" | "cat-file" | "rev-parse" | "hash-object" | "update-ref")
+    ) {
+        return Err("Sandbox source preparation permits only raw object plumbing".into());
+    }
+    Ok(Extra {
+        pre: vec![
+            "--no-pager",
+            "--no-replace-objects",
+            "-c",
+            "core.hooksPath=/dev/null",
+            "-c",
+            "core.fsmonitor=false",
+            "-c",
+            "protocol.allow=never",
+        ],
+        env: vec![("GIT_NO_LAZY_FETCH", "1".into())],
+        timeout: Some(std::time::Duration::from_secs(15)),
+        stdin: input.map(<[u8]>::to_vec),
+        output_limit: Some(output_limit),
+        ..Default::default()
+    })
+}
+#[cfg(test)]
+mod r2_inert_tests {
+    use super::*;
+    #[test]
+    fn r2_pure_source_plumbing_disables_hooks_transports_filters_and_has_a_deadline()
+    -> Result<(), String> {
+        let extra = inert_object_options(&["cat-file", "blob", "oid"], None, 8192)?;
+        assert!(extra.pre.contains(&"core.hooksPath=/dev/null"));
+        assert!(extra.pre.contains(&"protocol.allow=never"));
+        assert!(extra.env.contains(&("GIT_NO_LAZY_FETCH", "1".into())));
+        assert!(extra.timeout.is_some());
+        assert_eq!(extra.output_limit, Some(8192));
+        for command in [
+            "checkout",
+            "archive",
+            "clone",
+            "submodule",
+            "clean",
+            "fetch",
+            "config",
+        ] {
+            assert!(inert_object_options(&[command], None, 1).is_err());
+        }
+        Ok(())
     }
 }
 
