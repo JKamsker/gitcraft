@@ -53,7 +53,7 @@ fn contents(ui: &mut Ui, view: &PackageView, room: f32, acts: &mut Vec<Action>) 
                 t.danger,
                 crate::i18n::message(
                     "repo-workflows-package-contents-e237505e",
-                    &[("e", (e).clone().into())],
+                    &[("e", e.display().into())],
                 ),
             );
             buttons(ui, acts, true);
@@ -138,7 +138,7 @@ fn contents(ui: &mut Ui, view: &PackageView, room: f32, acts: &mut Vec<Action>) 
                 t.danger,
                 crate::i18n::message(
                     "repo-workflows-package-contents-89bee303",
-                    &[("e", (e).clone().into())],
+                    &[("e", e.display().into())],
                 ),
             );
         }
@@ -162,21 +162,23 @@ fn contents(ui: &mut Ui, view: &PackageView, room: f32, acts: &mut Vec<Action>) 
 fn report_ui(
     ui: &mut Ui,
     report: &Report,
-    published: Option<&Result<Option<Published>, String>>,
+    published: Option<&Result<Option<Published>, crate::package::Failure>>,
     registry: &str,
 ) {
     let t = Tokens::get(ui.ctx());
-    if let Some(hint) = &report.hint {
+    if let Some(hint) = report.display_hint() {
         ui.add(egui::Label::new(RichText::new(hint).color(t.warning).small()).wrap());
     }
     notes(
         ui,
+        report,
         crate::i18n::text("repo-workflows-package-report-ui-fefc6039"),
         &report.accidental,
         t.warning,
     );
     notes(
         ui,
+        report,
         crate::i18n::text("repo-workflows-package-report-ui-fa5b38db"),
         &report.missing,
         t.warning,
@@ -215,7 +217,7 @@ fn report_ui(
             ui,
             &crate::i18n::message(
                 "repo-workflows-package-report-ui-74f3a93b",
-                &[("e", (e).clone().into())],
+                &[("e", e.display().into())],
             ),
         ),
         Some(Ok(Some(p))) => {
@@ -266,8 +268,11 @@ fn report_ui(
     more(ui, report.files.len());
 }
 
-fn notes(ui: &mut Ui, title: &str, notes: &[Note], color: egui::Color32) {
-    heading(ui, &format!("{title} ({})", notes.len()));
+fn notes(ui: &mut Ui, report: &Report, title: &str, notes: &[Note], color: egui::Color32) {
+    heading(
+        ui,
+        &format!("{title} ({})", crate::i18n::number(notes.len())),
+    );
     if notes.is_empty() {
         faint(
             ui,
@@ -275,7 +280,12 @@ fn notes(ui: &mut Ui, title: &str, notes: &[Note], color: egui::Color32) {
         );
     }
     for n in notes.iter().take(SHOWN) {
-        line(ui, &format!("{} — {}", n.path, n.why), color, "");
+        line(
+            ui,
+            &format!("{} — {}", n.path, report.display_why(n)),
+            color,
+            "",
+        );
     }
     more(ui, notes.len());
 }
@@ -342,4 +352,125 @@ fn buttons(ui: &mut Ui, acts: &mut Vec<Action>, refresh: bool) {
             acts.push(Action::Package(PackageAct::Close));
         }
     });
+}
+
+#[cfg(test)]
+mod fluent_package_witness_tests {
+    use super::*;
+    use crate::package::{Ecosystem, Failure, Package};
+    use egui_kittest::{Harness, kittest::Queryable};
+
+    fn package() -> Package {
+        Package {
+            ecosystem: Ecosystem::Npm,
+            name: "raw; {$name}".into(),
+            version: "1234.5".into(),
+            dir: "opaque/path\nmain".into(),
+            registry: None,
+        }
+    }
+
+    #[test]
+    fn fluent_partition_actual_package_three_cached_failure_slots_repaint_without_request_or_action_changes()
+     {
+        let detail = "provider: No Cargo.toml or package.json at the top of the repository; ;\n{$raw} 日本語";
+        let failures = [
+            Failure::NoManifest {
+                raw: "No Cargo.toml or package.json at the top of the repository".into(),
+            },
+            Failure::NpmPackAnswer {
+                raw: format!("npm pack answered: {detail}"),
+                detail: detail.into(),
+            },
+            Failure::AskRegistry {
+                raw: format!("registry lookup: {detail}"),
+                url: "https://example/1234;raw".into(),
+                detail: detail.into(),
+            },
+        ];
+        let report = Report { files: vec![("raw.env".into(), Some(1536 * 1024))], accidental: vec![Note { path: "raw.env".into(), why: "big for a package (1.5 MB)".into() }], missing: vec![], hint: Some("package.json has a prepack script, which npm publish runs first and this listing doesn't: files it builds may show as left out or gone until it has run".into()) };
+        let original = report.clone();
+        for (slot, failure) in failures.into_iter().enumerate() {
+            let mut installed = false;
+            let view = PackageView {
+                packages: Some(if slot == 0 {
+                    Err(failure.clone())
+                } else {
+                    Ok(vec![package()])
+                }),
+                report: Some(if slot == 1 {
+                    Err(failure.clone())
+                } else {
+                    Ok(report.clone())
+                }),
+                published: Some(Err(failure.clone())),
+                selected: 0,
+                request: 1234,
+            };
+            let mut h = Harness::new_ui_state(
+                |ui, state: &mut (PackageView, Vec<Action>)| {
+                    if !installed {
+                        crate::theme::install_fonts(ui.ctx());
+                        installed = true;
+                        ui.ctx().request_discard("supplied fonts");
+                        return;
+                    }
+                    contents(ui, &state.0, 1400.0, &mut state.1);
+                },
+                (view, Vec::new()),
+            );
+            for locale in ["en-US", "de", "en-US"] {
+                crate::i18n::set_language(locale);
+                h.run();
+                let id = [
+                    "repo-workflows-package-contents-e237505e",
+                    "repo-workflows-package-contents-89bee303",
+                    "repo-workflows-package-report-ui-74f3a93b",
+                ][slot];
+                let expected = crate::i18n::message(id, &[("e", failure.display().into())]);
+                h.get_by_label(&expected);
+                if locale == "de" {
+                    assert_ne!(failure.display(), failure.raw());
+                }
+                assert_eq!(h.state().0.request, 1234);
+                assert_eq!(h.state().0.selected, 0);
+                assert!(h.state().1.is_empty());
+                let retained = match slot {
+                    0 => h.state().0.packages.as_ref().unwrap().as_ref().unwrap_err(),
+                    1 => h.state().0.report.as_ref().unwrap().as_ref().unwrap_err(),
+                    _ => h
+                        .state()
+                        .0
+                        .published
+                        .as_ref()
+                        .unwrap()
+                        .as_ref()
+                        .unwrap_err(),
+                };
+                assert_eq!(retained, &failure);
+                assert_eq!(retained.clone().into_raw(), failure.raw());
+                if slot == 2 {
+                    let r = h.state().0.report.as_ref().unwrap().as_ref().unwrap();
+                    h.get_by_label(&format!("raw.env — {}", r.display_why(&r.accidental[0])));
+                    h.get_by_label(&r.display_hint().unwrap());
+                    assert_eq!(r, &original);
+                }
+            }
+            h.get_by_label(crate::i18n::text("repo-workflows-package-buttons-0e916101"))
+                .click();
+            h.run();
+            assert!(matches!(
+                h.state().1.as_slice(),
+                [Action::Package(PackageAct::Refresh)]
+            ));
+            assert_eq!(h.state().0.request, 1234);
+        }
+        let opaque =
+            Failure::Opaque("No Cargo.toml or package.json at the top of the repository".into());
+        for locale in ["en-US", "de", "en-US"] {
+            crate::i18n::set_language(locale);
+            assert_eq!(opaque.display(), opaque.raw());
+        }
+        crate::i18n::set_language("en-US");
+    }
 }
