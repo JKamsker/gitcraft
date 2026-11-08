@@ -4,18 +4,19 @@
 //! worktree goes back to its branch, free for the user to check out anything meanwhile. Brought
 //! back, all of it is as it was, conflicts and what was staged included.
 //!
-//! What is kept: the files as a commit (parents: the commit checked out, and the one being
-//! brought in) under `refs/gitcraft/parked/<id>`, which keeps it from git's garbage collection;
-//! the index, the operation's files and the conflicted files' own bytes (as no filter changed
-//! them) under `.git/gitcraft/parked/<id>/`, with what is known of it (`parked.json`).
+//! What is kept: the files as a commit (parents: the commit checked out, the one being brought
+//! in, and, when it differs, a commit of what was staged) under `refs/gitcraft/parked/<id>`,
+//! which keeps it and what was staged from git's garbage collection; the index, the
+//! operation's files and the changed files' own bytes (as no filter changed them) under
+//! `.git/gitcraft/parked/<id>/`, with what is known of it (`parked.json`).
 //!
 //! Nothing of the user's is lost on the way, whatever fails: nothing in the worktree changes
 //! before all of it is written and checked against the worktree once more; what git can't keep
 //! exactly (files marked assume-unchanged or left out of a sparse checkout, submodules changed)
-//! isn't put aside at all; bringing it back never writes over a file git doesn't track (it
-//! stops, and says which), and when anything fails half way the worktree goes back to its
-//! branch, clean, and the merge stays put aside to try again. Files git doesn't track stay
-//! where they are throughout.
+//! isn't put aside at all; neither putting it aside nor bringing it back writes over a file git
+//! doesn't track (it stops, and says which), and when anything fails half way the worktree
+//! goes back to its branch, clean, and the merge stays put aside to try again. Files git
+//! doesn't track stay where they are throughout.
 
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
@@ -63,7 +64,7 @@ pub struct Parked {
     pub files: Vec<String>,
     /// How many unmerged entries the index had: it has as many once back.
     pub unmerged: usize,
-    /// The conflicted files kept byte for byte (under `raw/`).
+    /// The changed files kept byte for byte (under `raw/`).
     pub raw: Vec<String>,
     /// git's files of the operation that were kept (of [`STATE_FILES`]).
     pub state_files: Vec<String>,
@@ -152,10 +153,20 @@ fn operation(repo: &Path, gd: &Path) -> Result<(&'static str, String), String> {
     Err("There is no merge, cherry-pick or revert in progress to put aside".to_owned())
 }
 
+/// Whether sparse checkout is on: it would leave the merge's files out on the way back.
+fn sparse(repo: &Path) -> bool {
+    run(repo, &["config", "--bool", "core.sparseCheckout"]).is_ok_and(|v| v.trim() == "true")
+}
+
 /// Why the worktree's state can't be kept exactly, if it can't: files git is told not to look
 /// at (assume-unchanged, or left out of a sparse checkout), whose changes would be lost, and
-/// submodules changed, whose own worktrees aren't kept.
+/// submodules changed (or with changes of their own), whose own worktrees aren't kept.
 fn unkeepable(repo: &Path) -> Option<String> {
+    if sparse(repo) {
+        return Some(
+            "A merge in a sparse checkout can't be put aside safely: resolve it here".to_owned(),
+        );
+    }
     let listed = run(repo, &["ls-files", "-v"]).ok()?;
     let hidden: Vec<&str> = listed
         .lines()
@@ -170,29 +181,85 @@ fn unkeepable(repo: &Path) -> Option<String> {
             hidden.join(", ")
         ));
     }
-    let submodule =
-        |out: Result<String, String>| out.is_ok_and(|o| o.lines().any(|l| l.contains("160000")));
+    // A gitlink's mode among the fields before the path (not in a file's name or an id).
+    let submodule = |out: Result<String, String>| {
+        out.is_ok_and(|o| {
+            o.lines().any(|l| {
+                l.split('\t').next().is_some_and(|fields| {
+                    fields
+                        .split_whitespace()
+                        .any(|f| f.trim_start_matches(':') == "160000")
+                })
+            })
+        })
+    };
+    let all = "--ignore-submodules=none";
     if submodule(run(repo, &["ls-files", "-u"]))
-        || submodule(run(repo, &["diff-index", "--cached", "HEAD"]))
+        || submodule(run(repo, &["diff-index", "--cached", all, "HEAD"]))
+        || submodule(run(repo, &["diff-files", all]))
     {
-        return Some("A merge that changes submodules can't be put aside: resolve it here".into());
+        return Some(
+            "A merge with submodules changed (or changes in one) can't be put aside: resolve it \
+             here"
+                .into(),
+        );
     }
     None
 }
 
-/// The tree of the worktree's tracked files as they are now (conflicted ones as the files are,
-/// markers and all), written through a copy of the index at `index`: it is left alone.
-fn files_tree(repo: &Path, index: &Path) -> Result<String, String> {
+/// The trees of the worktree's tracked files, written through a copy of the index at `index`
+/// (it is left alone): what is staged (conflicted files as they are on disk), then the files
+/// as they are now (conflicted ones markers and all).
+fn trees(repo: &Path, index: &Path) -> Result<(String, String), String> {
     let temporary = snapshot::temporary_index(repo, "park")?;
     let path = repo.join(&temporary);
+    let with_index = |args: &[&str]| git::run_with_index(repo, &temporary, args);
     let result = std::fs::copy(index, &path)
         .map_err(|e| format!("couldn't copy the index: {e}"))
         .and_then(|_| {
-            git::run_with_index(repo, &temporary, &["add", "-u", "--", ":/"])?;
-            git::run_with_index(repo, &temporary, &["write-tree"]).map(trimmed)
+            let unmerged = with_index(&["ls-files", "-u", "-z"])?;
+            let mut paths: Vec<&str> = unmerged
+                .split('\0')
+                .filter_map(|e| e.split_once('\t').map(|(_, p)| p))
+                .collect();
+            paths.dedup();
+            let input: String = paths.iter().map(|p| format!("{p}\0")).collect();
+            let call = git::Call {
+                env: vec![("GIT_INDEX_FILE", temporary.clone())],
+                stdin: Some(input.into_bytes()),
+                ..git::Call::default()
+            };
+            let args = ["update-index", "--remove", "-z", "--stdin"];
+            git::run_call(Some(repo), &args, call)?;
+            let staged = with_index(&["write-tree"]).map(trimmed)?;
+            with_index(&["add", "-u", "--", ":/"])?;
+            Ok((staged, with_index(&["write-tree"]).map(trimmed)?))
         });
     snapshot::remove(repo, &temporary);
     result
+}
+
+/// Whether the worktree is still as it was kept in `dir`, as `snapshot`: its index and files.
+fn unchanged(repo: &Path, gd: &Path, dir: &Path, snapshot: &str) -> bool {
+    let files = trees(repo, &gd.join("index")).ok().map(|(_, files)| files);
+    let kept = run(repo, &["rev-parse", &format!("{snapshot}^{{tree}}")])
+        .ok()
+        .map(trimmed);
+    std::fs::read(gd.join("index")).ok() == std::fs::read(dir.join("index")).ok()
+        && files.is_some()
+        && files == kept
+}
+
+/// Takes `dir` for a merge put aside: none is there yet, or it isn't written over.
+fn reserve(dir: &Path) -> Result<(), String> {
+    if let Some(parent) = dir.parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|e| format!("couldn't make {}: {e}", parent.display()))?;
+    }
+    std::fs::create_dir(dir).map_err(|e| match e.kind() {
+        std::io::ErrorKind::AlreadyExists => format!("{} is put aside already", dir.display()),
+        _ => format!("couldn't make {}: {e}", dir.display()),
+    })
 }
 
 fn unmerged(repo: &Path) -> Result<usize, String> {
@@ -220,6 +287,8 @@ pub fn park(repo: &Path, id: &str, files: &[String]) -> Result<Parked, String> {
         run(repo, &["update-index", "--no-split-index"])?;
     }
     let dir = folder(repo, id)?;
+    // Its folder first, new: what is cleaned up on failure is this one's only.
+    reserve(&dir)?;
     let kept = keep(repo, &gd, &dir, id, operation, &theirs, files);
     let parked = match kept {
         Ok(parked) => parked,
@@ -229,32 +298,46 @@ pub fn park(repo: &Path, id: &str, files: &[String]) -> Result<Parked, String> {
         }
     };
     // Last look: the user (an editor saving) changed nothing since it was kept.
-    let same = std::fs::read(gd.join("index")).ok() == std::fs::read(dir.join("index")).ok()
-        && files_tree(repo, &gd.join("index")).ok().as_deref()
-            == run(
-                repo,
-                &["rev-parse", &format!("{}^{{tree}}", parked.snapshot)],
-            )
-            .ok()
-            .map(trimmed)
-            .as_deref();
-    if !same {
+    if !unchanged(repo, &gd, &dir, &parked.snapshot) {
         forget(repo, id);
         return Err("Files changed while the merge was put aside: try again".to_owned());
     }
-    // All of it is kept: now the worktree is cleared. If git can't, nothing changed.
+    // The reset writes the branch's files back over whatever is in their way: one the merge
+    // deleted that is on disk again, untracked or ignored, stops it.
+    match in_the_way(repo, &parked.snapshot, &parked.head) {
+        Ok(None) => {}
+        Ok(Some(path)) => {
+            forget(repo, id);
+            return Err(format!(
+                "{path} isn't tracked, but its branch has it: move it, or resolve the merge here"
+            ));
+        }
+        Err(e) => {
+            forget(repo, id);
+            return Err(e);
+        }
+    }
+    // All of it is kept: now the worktree is cleared.
     if let Err(e) = run(repo, &["reset", "--hard", "-q", "HEAD"]) {
-        forget(repo, id);
+        // Nothing changed: nothing need be kept. Anything did: it stays put aside, whole.
+        if unchanged(repo, &gd, &dir, &parked.snapshot) {
+            forget(repo, id);
+            return Err(format!(
+                "The worktree couldn't be cleared ({e}): resolve it here"
+            ));
+        }
         return Err(format!(
-            "The worktree couldn't be cleared ({e}): resolve it here"
+            "The worktree was cleared only in part ({e}); the merge is put aside, whole: bring \
+             it back, or drop it to keep its files on a branch"
         ));
     }
     Ok(parked)
 }
 
-/// Writes all that is kept of the operation in progress: its index (first, the files' tree is
-/// made from that copy), the files' commit and its ref, the conflicted files' bytes, the
-/// operation's files, and last what is known of it (a parked merge is listed once it is whole).
+/// Writes all that is kept of the operation in progress into `dir` (made for it): its index
+/// (first, the files' trees are made from that copy), the files' commit and its ref, the
+/// changed files' bytes, the operation's files, and last what is known of it (a parked merge
+/// is listed once it is whole).
 fn keep(
     repo: &Path,
     gd: &Path,
@@ -264,10 +347,9 @@ fn keep(
     theirs: &str,
     files: &[String],
 ) -> Result<Parked, String> {
-    std::fs::create_dir_all(dir).map_err(|e| format!("couldn't make {}: {e}", dir.display()))?;
     std::fs::copy(gd.join("index"), dir.join("index"))
         .map_err(|e| format!("couldn't keep the index: {e}"))?;
-    let tree = files_tree(repo, &dir.join("index"))?;
+    let (staged, tree) = trees(repo, &dir.join("index"))?;
     let head = trimmed(run(repo, &["rev-parse", "--verify", "HEAD"])?);
     let branch = run(repo, &["symbolic-ref", "-q", "--short", "HEAD"])
         .ok()
@@ -287,21 +369,21 @@ fn keep(
         ("GIT_COMMITTER_NAME", "gitcraft"),
         ("GIT_COMMITTER_EMAIL", "gitcraft@localhost"),
     ];
-    let snapshot = git::run_env(
-        Some(repo),
-        &[
-            "commit-tree",
-            &tree,
-            "-p",
-            &head,
-            "-p",
-            theirs,
-            "-m",
-            &message,
-        ],
-        &env,
-    )
-    .map(trimmed)?;
+    let commit = |args: &[&str]| git::run_env(Some(repo), args, &env).map(trimmed);
+    // What was staged, when the files differ from it: a parent of the files' commit, kept
+    // from garbage collection meanwhile and on the branch the merge is dropped to.
+    let staged = if staged == tree {
+        None
+    } else {
+        let what = format!("Staged when the {operation} was parked");
+        Some(commit(&["commit-tree", &staged, "-p", &head, "-m", &what])?)
+    };
+    let mut args = vec!["commit-tree", &tree, "-p", &head, "-p", theirs];
+    if let Some(staged) = &staged {
+        args.extend(["-p", staged]);
+    }
+    args.extend(["-m", &message]);
+    let snapshot = commit(&args)?;
     let mut parked = Parked {
         id: id.to_owned(),
         worktree: trimmed(run(repo, &["rev-parse", "--show-toplevel"])?),
@@ -321,19 +403,18 @@ fn keep(
         repo,
         &["update-ref", &parked.ref_name(), &parked.snapshot, ""],
     )?;
-    // The conflicted files as they are on disk: a filter (line endings, LFS) going through
-    // git both ways may not give them back byte for byte.
-    for path in files {
-        let path = crate::mcp::args::repo_path(path)?;
-        let file = repo.join(path);
+    // The changed files as they are on disk: a filter (line endings, LFS, one cleaning
+    // notebooks) going through git both ways may not give them back byte for byte.
+    for path in raw_paths(repo, &parked, files)? {
+        let file = repo.join(&path);
         let plain = std::fs::symlink_metadata(&file).is_ok_and(|m| m.file_type().is_file());
         if plain {
-            let to = dir.join("raw").join(path);
+            let to = dir.join("raw").join(&path);
             if let Some(parent) = to.parent() {
                 std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
             }
             std::fs::copy(&file, &to).map_err(|e| format!("couldn't keep {path}: {e}"))?;
-            parked.raw.push(path.to_owned());
+            parked.raw.push(path);
         }
     }
     for name in STATE_FILES {
@@ -348,6 +429,35 @@ fn keep(
     std::fs::write(dir.join("parked.json"), text)
         .map_err(|e| format!("couldn't write what was kept: {e}"))?;
     Ok(parked)
+}
+
+/// The files whose bytes are kept: the conflicted ones (`files`) and those the merge's files
+/// change, but for names a path to a file can't take as it is (`-x`: git's round trip then).
+fn raw_paths(repo: &Path, parked: &Parked, files: &[String]) -> Result<Vec<String>, String> {
+    let args = [
+        "diff-tree",
+        "-r",
+        "-z",
+        "--name-only",
+        "--no-renames",
+        "--diff-filter=d",
+        &parked.head,
+        &parked.snapshot,
+    ];
+    let changed = run(repo, &args)?;
+    let mut paths = files
+        .iter()
+        .map(|p| crate::mcp::args::repo_path(p).map(str::to_owned))
+        .collect::<Result<Vec<_>, _>>()?;
+    paths.extend(
+        changed
+            .split('\0')
+            .filter(|p| !p.is_empty() && crate::mcp::args::repo_path(p).is_ok())
+            .map(str::to_owned),
+    );
+    paths.sort_unstable();
+    paths.dedup();
+    Ok(paths)
 }
 
 /// Removes what is kept of `id`: its ref and its folder.
@@ -380,6 +490,13 @@ pub fn blocker(repo: &Path, parked: &Parked) -> Option<String> {
     let gd = git_dir(repo).ok()?;
     if let Some(what) = busy_with(&gd) {
         return Some(format!("Finish or abort {what} in progress first"));
+    }
+    if sparse(repo) {
+        return Some(
+            "Turn sparse checkout off first (git sparse-checkout disable): it would leave the \
+             merge's files out"
+                .to_owned(),
+        );
     }
     let dirty = run(repo, &["status", "--porcelain", "--untracked-files=no"])
         .map(|s| !s.trim().is_empty())
@@ -432,18 +549,21 @@ pub fn bring_back(repo: &Path, parked: &Parked) -> Result<(), String> {
     let current = run(repo, &["symbolic-ref", "-q", "--short", "HEAD"])
         .ok()
         .map(trimmed);
+    // Ignored files where the branch's go stop it too: git would write over those.
+    let checkout = ["checkout", "-q", "--no-overwrite-ignore"];
     match &parked.branch {
         Some(b) if current.as_deref() != Some(b.as_str()) => {
-            run(repo, &["checkout", "-q", b])?;
+            run(repo, &[&checkout[..], &[b.as_str()]].concat())?;
         }
-        None if trimmed(run(repo, &["rev-parse", "HEAD"])?) != parked.head => {
-            run(repo, &["checkout", "-q", "--detach", &parked.head])?;
+        // Detached it was, detached it is again, even where a branch is at its commit.
+        None if current.is_some() || trimmed(run(repo, &["rev-parse", "HEAD"])?) != parked.head => {
+            run(repo, &[&checkout[..], &["--detach", &parked.head]].concat())?;
         }
         _ => {}
     }
     // Anything on disk where a file of the merge goes that the branch doesn't have, ignored
     // files included (git would write over those): it stops here, nothing written.
-    if let Some(path) = in_the_way(repo, parked)? {
+    if let Some(path) = in_the_way(repo, &parked.head, &parked.snapshot)? {
         return Err(format!(
             "Files git doesn't track are where the merge's files go ({path}): move them, then \
              bring it back"
@@ -453,14 +573,21 @@ pub fn bring_back(repo: &Path, parked: &Parked) -> Result<(), String> {
     // when a file it doesn't track is in the way.
     let tree = format!("{}^{{tree}}", parked.snapshot);
     if let Err(e) = run(repo, &["read-tree", "-m", "-u", &parked.head, &tree]) {
-        return Err(format!(
-            "Files git doesn't track are where the merge's files go: move them, then bring it \
-             back ({})",
-            e.lines()
-                .find(|l| l.contains("would be"))
-                .unwrap_or(&e)
-                .trim()
-        ));
+        // Whatever git wrote before it stopped goes: the worktree was clean, and files git
+        // doesn't track stay as they are.
+        let cleaned = match run(repo, &["reset", "--hard", "-q", "HEAD"]) {
+            Ok(_) => String::new(),
+            Err(r) => format!("; the worktree couldn't be cleaned either ({})", r.trim()),
+        };
+        let why = match e.lines().find(|l| l.contains("would be")) {
+            Some(l) => format!(
+                "Files git doesn't track are where the merge's files go: move them, then bring \
+                 it back ({})",
+                l.trim()
+            ),
+            None => format!("It couldn't be brought back ({})", e.trim()),
+        };
+        return Err(format!("{why}{cleaned}; it is still put aside"));
     }
     let gd = git_dir(repo)?;
     match restore(repo, &gd, &dir, parked) {
@@ -481,10 +608,11 @@ pub fn bring_back(repo: &Path, parked: &Parked) -> Result<(), String> {
     }
 }
 
-/// The first file or folder on disk where a file the merge adds goes (or a file where one of
-/// its folders goes), if one is: the branch checked out has none of them, so whatever is there
-/// is the user's, untracked or ignored.
-fn in_the_way(repo: &Path, parked: &Parked) -> Result<Option<String>, String> {
+/// The first file or folder on disk where a file of `to` that `from` hasn't goes (or a file
+/// where one of its folders goes), if one is. The worktree being `from`'s, whatever is there
+/// is the user's, untracked or ignored, but for a file of `from`'s itself (where `to` has a
+/// folder): git replaces that.
+fn in_the_way(repo: &Path, from: &str, to: &str) -> Result<Option<String>, String> {
     let added = run(
         repo,
         &[
@@ -494,8 +622,8 @@ fn in_the_way(repo: &Path, parked: &Parked) -> Result<Option<String>, String> {
             "--name-only",
             "--no-renames",
             "--diff-filter=A",
-            &parked.head,
-            &parked.snapshot,
+            from,
+            to,
         ],
     )?;
     for path in added.split('\0').filter(|p| !p.is_empty()) {
@@ -506,16 +634,29 @@ fn in_the_way(repo: &Path, parked: &Parked) -> Result<Option<String>, String> {
             let Ok(meta) = std::fs::symlink_metadata(&at) else {
                 break;
             };
+            let there = parts[..=i].join("/");
             // The file itself there (anything), or a non-folder where a folder of it goes.
-            if i + 1 == parts.len() || !meta.is_dir() {
-                return Ok(Some(parts[..=i].join("/")));
+            if i + 1 == parts.len() {
+                // A folder of tracked files only (where `to` has a file): git replaces it.
+                let others = ["ls-files", "-o", "-z", "--", &format!(":(literal){there}")];
+                if meta.is_dir() && run(repo, &others).is_ok_and(|o| o.is_empty()) {
+                    break;
+                }
+                return Ok(Some(there));
+            }
+            if !meta.is_dir() {
+                let tracked = run(repo, &["cat-file", "-e", &format!("{from}:{there}")]).is_ok();
+                if tracked {
+                    break;
+                }
+                return Ok(Some(there));
             }
         }
     }
     Ok(None)
 }
 
-/// Puts the kept index, the operation's files and the conflicted files' bytes back, and
+/// Puts the kept index, the operation's files and the changed files' bytes back, and
 /// checks that the conflicts are all there.
 fn restore(repo: &Path, gd: &Path, dir: &Path, parked: &Parked) -> Result<(), String> {
     // The index through its lock, as git writes it: no git running meanwhile reads half of it.

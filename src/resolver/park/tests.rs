@@ -91,10 +91,11 @@ fn a_merge_put_aside_comes_back_exactly_as_it_was() -> Result<(), String> {
         Some("mine\n"),
         "left alone"
     );
-    // It is listed, and its files are a commit on the two sides, kept by a ref.
+    // It is listed, and its files are a commit on the two sides and what was staged (the
+    // user's change to `notes.txt` isn't), kept by a ref.
     assert_eq!(list(repo.path())?, vec![parked.clone()]);
     let parents = repo.git(&["rev-list", "--parents", "-n1", &parked.ref_name()])?;
-    assert_eq!(parents.split_whitespace().count(), 3);
+    assert_eq!(parents.split_whitespace().count(), 4);
 
     // Meanwhile the user works elsewhere, and comes back.
     repo.git(&["checkout", "-q", "other"])?;
@@ -285,7 +286,14 @@ fn a_locked_index_stops_it_and_it_stays_put_aside() -> Result<(), String> {
     let parked = park(repo.path(), "l1", &["a.txt".to_owned()])?;
     let lock = repo.path().join(".git/index.lock");
     std::fs::write(&lock, "").map_err(|e| e.to_string())?;
-    assert!(bring_back(repo.path(), &parked).is_err());
+    let refused = bring_back(repo.path(), &parked);
+    // What stopped it is said, not files in the way that aren't.
+    assert!(
+        refused
+            .as_ref()
+            .is_err_and(|e| e.contains("index.lock") && !e.contains("doesn't track")),
+        "{refused:?}"
+    );
     std::fs::remove_file(&lock).map_err(|e| e.to_string())?;
     assert_eq!(list(repo.path())?.len(), 1);
     assert_eq!(
@@ -308,5 +316,251 @@ fn a_merge_dropped_keeps_its_files_on_a_branch() -> Result<(), String> {
     assert!(a.contains("<<<<<<<"), "the conflicted file as it was: {a}");
     let notes = repo.git(&["show", &format!("{branch}:notes.txt")])?;
     assert_eq!(notes, "notes, changed meanwhile\n", "the user's change too");
+    Ok(())
+}
+
+/// `side` merged into `main` in `repo`, `a.txt` conflicting; the base having `base` too, and
+/// `side` changing `side` too.
+fn conflict(
+    repo: &Repo,
+    base: &[(&str, Option<&str>)],
+    side: &[(&str, Option<&str>)],
+) -> Result<(), String> {
+    repo.commit("base", &[&[("a.txt", Some("a base\n"))], base].concat())?;
+    repo.git(&["checkout", "-q", "-b", "side"])?;
+    repo.commit("side", &[&[("a.txt", Some("a side\n"))], side].concat())?;
+    repo.git(&["checkout", "-q", "main"])?;
+    repo.commit("main", &[("a.txt", Some("a main\n"))])?;
+    assert!(repo.git(&["merge", "-q", "side"]).is_err(), "it conflicts");
+    Ok(())
+}
+
+#[test]
+fn a_file_named_like_a_submodule_mode_is_no_submodule() -> Result<(), String> {
+    let repo = mid_merge("park-160000")?;
+    write(repo.path(), "160000.txt", "a number\n")?;
+    repo.git(&["add", "160000.txt"])?;
+    let before = state(&repo)?;
+    let parked = park(repo.path(), "m1", &["a.txt".to_owned()])?;
+    bring_back(repo.path(), &parked)?;
+    assert_eq!(state(&repo)?, before);
+    Ok(())
+}
+
+#[test]
+fn a_submodule_with_changes_of_its_own_keeps_the_merge_from_being_put_aside() -> Result<(), String>
+{
+    let repo = Repo::new("park-sub")?;
+    let sub = repo.path().join("sub");
+    std::fs::create_dir_all(&sub).map_err(|e| e.to_string())?;
+    let in_sub = |args: &[&str]| git::run(Some(&sub), args);
+    in_sub(&["init", "-q"])?;
+    write(&sub, "s.txt", "s\n")?;
+    in_sub(&["add", "s.txt"])?;
+    in_sub(&[
+        "-c",
+        "user.name=t",
+        "-c",
+        "user.email=t@t",
+        "commit",
+        "-q",
+        "-m",
+        "s",
+    ])?;
+    conflict(&repo, &[], &[])?;
+    assert!(repo.git(&["ls-files", "-s", "sub"])?.starts_with("160000"));
+    write(&sub, "s.txt", "the submodule's own change\n")?;
+    let refused = park(repo.path(), "s1", &["a.txt".to_owned()]);
+    assert!(
+        refused.as_ref().is_err_and(|e| e.contains("submodule")),
+        "{refused:?}"
+    );
+    assert!(merging_now(&repo), "nothing changed");
+    assert_eq!(
+        read(&sub, "s.txt").as_deref(),
+        Some("the submodule's own change\n")
+    );
+    Ok(())
+}
+
+#[test]
+fn an_ignored_file_where_its_branch_has_one_stops_the_checkout() -> Result<(), String> {
+    let repo = mid_merge("park-ignored-checkout")?;
+    let before = state(&repo)?;
+    let parked = park(repo.path(), "i1", &["a.txt".to_owned()])?;
+    repo.git(&["checkout", "-q", "-b", "elsewhere"])?;
+    repo.git(&["rm", "-q", "notes.txt"])?;
+    repo.git(&["commit", "-q", "-m", "no notes"])?;
+    let exclude = repo.path().join(".git/info/exclude");
+    std::fs::write(&exclude, "notes.txt\n").map_err(|e| e.to_string())?;
+    write(repo.path(), "notes.txt", "IGNORED BUT MINE\n")?;
+    assert!(bring_back(repo.path(), &parked).is_err());
+    assert_eq!(
+        read(repo.path(), "notes.txt").as_deref(),
+        Some("IGNORED BUT MINE\n")
+    );
+    assert_eq!(list(repo.path())?.len(), 1, "still put aside");
+    std::fs::remove_file(repo.path().join("notes.txt")).map_err(|e| e.to_string())?;
+    bring_back(repo.path(), &parked)?;
+    assert_eq!(state(&repo)?, before);
+    Ok(())
+}
+
+#[test]
+fn what_was_staged_is_kept_from_gc_and_on_the_branch_it_is_dropped_to() -> Result<(), String> {
+    let repo = mid_merge("park-staged")?;
+    write(repo.path(), "notes.txt", "staged notes\n")?;
+    repo.git(&["add", "notes.txt"])?;
+    write(repo.path(), "notes.txt", "notes on disk\n")?;
+    let staged = repo.rev(":notes.txt")?;
+    let before = state(&repo)?;
+    let parked = park(repo.path(), "g1", &["a.txt".to_owned()])?;
+    let objects = repo.git(&["rev-list", "--objects", &parked.ref_name()])?;
+    assert!(objects.contains(&staged), "reachable from its ref");
+    bring_back(repo.path(), &parked)?;
+    assert_eq!(state(&repo)?, before);
+
+    let parked = park(repo.path(), "g2", &["a.txt".to_owned()])?;
+    let branch = drop_to_branch(repo.path(), &parked)?;
+    let kept = repo.git(&["show", &format!("{branch}^3:notes.txt")])?;
+    assert_eq!(kept, "staged notes\n");
+    let files = repo.git(&["show", &format!("{branch}:notes.txt")])?;
+    assert_eq!(files, "notes on disk\n");
+    Ok(())
+}
+
+#[test]
+fn a_sparse_checkout_keeps_it_from_coming_back_until_it_is_off() -> Result<(), String> {
+    let repo = mid_merge("park-sparse")?;
+    let before = state(&repo)?;
+    let parked = park(repo.path(), "c1", &["a.txt".to_owned()])?;
+    repo.git(&["sparse-checkout", "set", "--no-cone", "/a.txt", "/b.txt"])?;
+    let refused = bring_back(repo.path(), &parked);
+    assert!(
+        refused.as_ref().is_err_and(|e| e.contains("sparse")),
+        "{refused:?}"
+    );
+    assert_eq!(list(repo.path())?.len(), 1, "still put aside");
+    assert!(!merging_now(&repo));
+    repo.git(&["sparse-checkout", "disable"])?;
+    bring_back(repo.path(), &parked)?;
+    assert_eq!(state(&repo)?, before);
+    Ok(())
+}
+
+#[test]
+fn a_merge_on_a_detached_head_comes_back_detached() -> Result<(), String> {
+    let repo = Repo::new("park-detached")?;
+    repo.commit("base", &[("a.txt", Some("base\n"))])?;
+    repo.git(&["checkout", "-q", "-b", "side"])?;
+    repo.commit("side", &[("a.txt", Some("side\n"))])?;
+    repo.git(&["checkout", "-q", "main"])?;
+    repo.commit("main", &[("a.txt", Some("main\n"))])?;
+    repo.git(&["checkout", "-q", "--detach"])?;
+    assert!(repo.git(&["merge", "-q", "side"]).is_err());
+    let before = repo.git(&["ls-files", "-s"])?;
+    let parked = park(repo.path(), "h1", &["a.txt".to_owned()])?;
+    assert_eq!(parked.branch, None);
+    // A branch at the very commit checked out meanwhile.
+    repo.git(&["checkout", "-q", "main"])?;
+    bring_back(repo.path(), &parked)?;
+    assert!(
+        repo.git(&["symbolic-ref", "-q", "HEAD"]).is_err(),
+        "detached again"
+    );
+    assert!(merging_now(&repo));
+    assert_eq!(repo.git(&["ls-files", "-s"])?, before);
+    Ok(())
+}
+
+#[test]
+fn a_tracked_file_the_merge_makes_a_folder_comes_back() -> Result<(), String> {
+    let repo = Repo::new("park-file-folder")?;
+    let side = [("config", None), ("config/x", Some("x\n"))];
+    conflict(&repo, &[("config", Some("cfg\n"))], &side)?;
+    let before = repo.git(&["ls-files", "-s"])?;
+    // Something of the user's in that folder: the reset would remove it with the folder.
+    write(repo.path(), "config/mine.txt", "MINE\n")?;
+    let refused = park(repo.path(), "f1", &["a.txt".to_owned()]);
+    assert!(
+        refused.as_ref().is_err_and(|e| e.contains("config")),
+        "{refused:?}"
+    );
+    assert_eq!(
+        read(repo.path(), "config/mine.txt").as_deref(),
+        Some("MINE\n")
+    );
+    std::fs::remove_file(repo.path().join("config/mine.txt")).map_err(|e| e.to_string())?;
+
+    let parked = park(repo.path(), "f2", &["a.txt".to_owned()])?;
+    assert_eq!(read(repo.path(), "config").as_deref(), Some("cfg\n"));
+    bring_back(repo.path(), &parked)?;
+    assert_eq!(repo.git(&["ls-files", "-s"])?, before);
+    assert_eq!(read(repo.path(), "config/x").as_deref(), Some("x\n"));
+    Ok(())
+}
+
+#[test]
+fn a_changed_file_comes_back_byte_for_byte_whatever_the_filters() -> Result<(), String> {
+    let repo = mid_merge("park-bytes")?;
+    let attributes = repo.path().join(".git/info/attributes");
+    std::fs::write(&attributes, "notes.txt text eol=crlf\n").map_err(|e| e.to_string())?;
+    let parked = park(repo.path(), "b1", &["a.txt".to_owned()])?;
+    bring_back(repo.path(), &parked)?;
+    let notes = std::fs::read(repo.path().join("notes.txt")).map_err(|e| e.to_string())?;
+    assert_eq!(notes, b"notes, changed meanwhile\n", "not with CRLF");
+    Ok(())
+}
+
+#[test]
+fn a_file_the_merge_deleted_on_disk_again_keeps_it_from_being_put_aside() -> Result<(), String> {
+    let repo = mid_merge("park-recreated")?;
+    // Out of the merge's index, the file on disk the user's own: the reset would write the
+    // branch's over it.
+    repo.git(&["rm", "-q", "--cached", "notes.txt"])?;
+    let before = state(&repo)?;
+    let refused = park(repo.path(), "r1", &["a.txt".to_owned()]);
+    assert!(
+        refused.as_ref().is_err_and(|e| e.contains("notes.txt")),
+        "{refused:?}"
+    );
+    assert_eq!(state(&repo)?, before, "nothing changed");
+    assert!(list(repo.path())?.is_empty(), "nothing kept");
+    Ok(())
+}
+
+#[test]
+fn a_merge_put_aside_already_isnt_written_over() -> Result<(), String> {
+    let repo = mid_merge("park-taken")?;
+    let taken = crate::agent::repo_file(repo.path(), "parked/t1")?;
+    std::fs::create_dir_all(&taken).map_err(|e| e.to_string())?;
+    std::fs::write(taken.join("index"), "kept before").map_err(|e| e.to_string())?;
+    let before = state(&repo)?;
+    assert!(park(repo.path(), "t1", &["a.txt".to_owned()]).is_err());
+    assert_eq!(read(&taken, "index").as_deref(), Some("kept before"));
+    assert_eq!(state(&repo)?, before, "nothing changed");
+    Ok(())
+}
+
+#[test]
+fn a_failure_once_it_is_coming_back_leaves_it_clean_and_put_aside() -> Result<(), String> {
+    let repo = mid_merge("park-half")?;
+    let before = state(&repo)?;
+    let parked = park(repo.path(), "k1", &["a.txt".to_owned()])?;
+    let dir = folder(repo.path(), "k1")?;
+    let (raw, away) = (dir.join("raw/a.txt"), dir.join("a.txt.away"));
+    std::fs::rename(&raw, &away).map_err(|e| e.to_string())?;
+    // The index goes back, then a file kept can't be.
+    assert!(bring_back(repo.path(), &parked).is_err());
+    assert!(!merging_now(&repo));
+    assert_eq!(
+        repo.git(&["status", "--porcelain", "--untracked-files=no"])?,
+        ""
+    );
+    assert_eq!(read(repo.path(), "new.txt"), None);
+    assert_eq!(list(repo.path())?.len(), 1, "still put aside");
+    std::fs::rename(&away, &raw).map_err(|e| e.to_string())?;
+    bring_back(repo.path(), &parked)?;
+    assert_eq!(state(&repo)?, before);
     Ok(())
 }
