@@ -53,6 +53,7 @@ impl RepoTab {
         let mut fetch = false;
         let idle = self.busy_op.is_none() && !state.writing && !state.reader.busy();
         egui::Window::new("Sparse checkout and downloads").id(egui::Id::new(("sparse", &self.path))).open(&mut open).show(ctx, |ui| {
+            ui.label("Sparse patterns are limited to a regular UTF-8 file of 1 MiB. Remote metadata reads require python3 with nonblocking/no-follow support.");
             ui.label("Cone mode keeps root files and the selected folders. Back up ignored files first; changes are refused while the worktree is dirty.");
             ui.label("History reads never download missing objects automatically. A missing-object error means you need to consent here and retry the file/diff. Passive reads require Git with --no-lazy-fetch support (older Git fails closed).");
             ui.add_enabled_ui(idle, |ui| {
@@ -96,6 +97,7 @@ impl RepoTab {
             let folders = (!state.all).then(|| state.selected.iter().cloned().collect::<Vec<_>>());
             let consent = std::mem::take(&mut state.consent);
             let repo = self.path.clone();
+            let credentials = self.credentials.clone();
             state.writing = true;
             state.error = None;
             self.busy_op = Some("Change sparse checkout".into());
@@ -103,7 +105,15 @@ impl RepoTab {
                 ctx,
                 true,
                 Err,
-                move || git::set_sparse(&repo, &before, folders.as_deref(), consent),
+                move || {
+                    git::set_sparse(
+                        &repo,
+                        &before,
+                        folders.as_deref(),
+                        consent,
+                        credentials.as_ref(),
+                    )
+                },
                 |tab, result, ctx| {
                     tab.busy_op = None;
                     match result {

@@ -5,6 +5,8 @@ use std::path::Path;
 
 use super::{Credentials, END_OPTS, clone_from, run, run_watched};
 
+mod patterns;
+
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct CloneOptions {
     pub depth: Option<u32>,
@@ -222,17 +224,7 @@ pub fn sparse_state(repo: &Path) -> Result<SparseState, String> {
     )?;
     let path = sparse_file.trim_end_matches(['\n', '\r']);
     let sparse_file = crate::remote::resolve(repo, path);
-    if crate::remote::try_is_link(&sparse_file).map_err(|e| e.to_string())? {
-        return Err(
-            "The sparse-checkout file is a symbolic link; use the terminal to inspect it"
-                .to_owned(),
-        );
-    }
-    let patterns = match crate::remote::read_to_string(&sparse_file) {
-        Ok(s) => s,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
-        Err(e) => return Err(format!("Could not read sparse-checkout: {e}")),
-    };
+    let patterns = patterns::read(&sparse_file)?;
     let selected = if enabled && cone {
         run(
             Some(repo),
@@ -287,16 +279,13 @@ pub fn set_sparse(
     before: &SparseState,
     folders: Option<&[String]>,
     allow_download: bool,
+    credentials: Option<&Credentials>,
 ) -> Result<(), String> {
     if let Some(folders) = folders {
         validate_folders(folders)?;
     }
     let now = sparse_state(repo)?;
-    if now.head != before.head
-        || now.patterns != before.patterns
-        || now.enabled != before.enabled
-        || now.cone != before.cone
-    {
+    if !same_sparse_definition(before, &now) {
         return Err(
             "HEAD or sparse-checkout changed since this dialog opened; reopen it".to_owned(),
         );
@@ -305,12 +294,31 @@ pub fn set_sparse(
     if super::status(repo)?.in_progress.is_some() {
         return Err("Finish the operation in progress before changing sparse folders".to_owned());
     }
+    sparse_mutation(repo, folders, allow_download, credentials, super::run_with)
+}
+
+fn same_sparse_definition(before: &SparseState, now: &SparseState) -> bool {
+    before.head == now.head
+        && before.patterns == now.patterns
+        && before.enabled == now.enabled
+        && before.cone == now.cone
+}
+
+/// Only the consented mutation receives the initiating tab's account. The surrounding
+/// metadata/cleanliness reads stay credential-free and cannot download missing objects.
+pub(super) fn sparse_mutation(
+    repo: &Path,
+    folders: Option<&[String]>,
+    allow_download: bool,
+    credentials: Option<&Credentials>,
+    execute: impl FnOnce(Option<&Path>, &[&str], Option<&Credentials>) -> Result<String, String>,
+) -> Result<(), String> {
     let args = sparse_args(folders)?;
     let args: Vec<&str> = args.iter().map(String::as_str).collect();
     if allow_download {
-        download_scope(|| run(Some(repo), &args)).map(|_| ())
+        download_scope(|| execute(Some(repo), &args, credentials)).map(|_| ())
     } else {
-        run(Some(repo), &args).map(|_| ())
+        execute(Some(repo), &args, None).map(|_| ())
     }
 }
 
@@ -347,6 +355,29 @@ fn ensure_sparse_clean(repo: &Path) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn stale_sparse_definition_refuses_each_changed_input() {
+        let before = SparseState {
+            head: "old-head".into(),
+            enabled: true,
+            cone: true,
+            patterns: "/*\n!/*/\n/src/\n".into(),
+            selected: BTreeSet::new(),
+            folders: Vec::new(),
+            partial: true,
+        };
+        assert!(same_sparse_definition(&before, &before));
+        for field in 0..4 {
+            let mut changed = before.clone();
+            match field {
+                0 => changed.head = "new-head".into(),
+                1 => changed.patterns.push_str("/other/\n"),
+                2 => changed.enabled = false,
+                _ => changed.cone = false,
+            }
+            assert!(!same_sparse_definition(&before, &changed));
+        }
+    }
     #[test]
     fn clone_plan_keeps_paths_separate_and_honors_all_options() -> Result<(), String> {
         let options = CloneOptions {
@@ -481,9 +512,9 @@ mod runtime_held_tests {
             "passive history selection hydrated an object"
         );
         let state = sparse_state(&dest)?;
-        assert!(set_sparse(&dest, &state, Some(&["folder".into()]), false).is_err());
+        assert!(set_sparse(&dest, &state, Some(&["folder".into()]), false, None).is_err());
         let state = sparse_state(&dest)?;
-        set_sparse(&dest, &state, Some(&["folder".into()]), true)?;
+        set_sparse(&dest, &state, Some(&["folder".into()]), true, None)?;
         assert_eq!(
             std::fs::read_to_string(dest.join("folder/file")).map_err(|e| e.to_string())?,
             "new contents"

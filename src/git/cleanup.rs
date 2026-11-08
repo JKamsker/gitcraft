@@ -299,26 +299,9 @@ fn execute_owned(source: &Path, root: &Path, config: &Config) -> Result<Report, 
         );
         checks.push(check_result(format!("Removed path: {path}"), answer));
     }
-    for (index, rule) in config.replacements.iter().enumerate() {
-        let pickaxe = format!("-S{}", rule.find);
-        let answer = git(
-            &repo,
-            &[
-                "log",
-                "--all",
-                "--format=%H",
-                "--no-ext-diff",
-                "--no-textconv",
-                &pickaxe,
-                "--",
-            ],
-            120,
-        );
-        checks.push(check_result(
-            format!("Replacement {} residual search", index + 1),
-            answer.map_err(|e| config.redact(&e)),
-        ));
-    }
+    checks.extend(residual_checks(config, |args, input, limit| {
+        bounded::local(&repo, args, input, limit, Duration::from_secs(120))
+    }));
     // filter-repo normally removes origin; enforce the separate publication boundary.
     let remotes = git(&repo, &["remote"], 30)?;
     if remotes.lines().any(|r| r == "origin") {
@@ -352,9 +335,318 @@ fn check_result(label: String, result: Result<String, String>) -> Check {
     }
 }
 
+// Fixed harmless argv; literal rules never leave memory during residual inspection.
+// Enumerate metadata first so a large blob cannot force an unbounded batch allocation.
+const SCAN_OBJECTS: usize = 20_000;
+const SCAN_BLOB: usize = 4 << 20;
+const SCAN_TOTAL: usize = 16 << 20;
+fn residual_checks(
+    config: &Config,
+    mut run: impl FnMut(&[&str], Vec<u8>, usize) -> Result<Vec<u8>, String>,
+) -> Vec<Check> {
+    if config.replacements.is_empty() {
+        return Vec::new();
+    }
+    let result = scan_residuals(config, &mut run);
+    config.replacements.iter().enumerate().map(|(i, _)| {
+        let (passed, detail) = match &result {
+            Ok((hits, _)) if hits[i] => (false, "Literal find text remains in reachable text blobs; inspect before publishing".into()),
+            Ok((_, true)) => (false, "Unverified: binary blobs were skipped (NUL in first 8192 bytes)".into()),
+            Ok(_) => (true, "No literal find text in reachable text blobs (at most 20000 objects, 4 MiB per blob, 16 MiB total). Messages, LFS and external copies are unverified".into()),
+            Err(error) => (false, format!("Unverified: {}", config.redact(error))),
+        };
+        Check { label: format!("Replacement {} residual search", i + 1), passed, detail }
+    }).collect()
+}
+fn scan_residuals(
+    config: &Config,
+    run: &mut impl FnMut(&[&str], Vec<u8>, usize) -> Result<Vec<u8>, String>,
+) -> Result<(Vec<bool>, bool), String> {
+    let objects = run(
+        &["rev-list", "--objects", "--all", "--no-object-names"],
+        Vec::new(),
+        LIMIT,
+    )?;
+    let text = std::str::from_utf8(&objects).map_err(|_| "Invalid reachable object list")?;
+    let mut ids = std::collections::BTreeSet::new();
+    for id in text.lines() {
+        if !valid_object_id(id) {
+            return Err("Invalid reachable object ID".into());
+        }
+        ids.insert(id);
+        if ids.len() > SCAN_OBJECTS {
+            return Err("Reachable object scan exceeds 20000 objects".into());
+        }
+    }
+    if ids.is_empty() {
+        return Ok((vec![false; config.replacements.len()], false));
+    }
+    let input: Vec<u8> = ids
+        .iter()
+        .flat_map(|id| id.bytes().chain([b'\n']))
+        .collect();
+    let metadata = run(&["cat-file", "--batch-check"], input, LIMIT)?;
+    let metadata = std::str::from_utf8(&metadata).map_err(|_| "Invalid object metadata")?;
+    let mut lines = metadata.lines();
+    let mut blobs = Vec::new();
+    let mut total = 0usize;
+    for id in ids {
+        let line = lines.next().ok_or("Incomplete object metadata")?;
+        let fields: Vec<_> = line.split(' ').collect();
+        if fields.len() != 3 || fields[0] != id {
+            return Err("Missing or mismatched reachable object".into());
+        }
+        let size = fields[2]
+            .parse::<usize>()
+            .map_err(|_| "Invalid object size")?;
+        match fields[1] {
+            "blob" => {
+                if size > SCAN_BLOB {
+                    return Err(
+                        "Text scan exceeds 4 MiB per blob; inspect larger blobs separately".into(),
+                    );
+                }
+                total = total
+                    .checked_add(size)
+                    .ok_or("Object sizes overflow the scan budget")?;
+                if total > SCAN_TOTAL {
+                    return Err(
+                        "Text scan exceeds 16 MiB total; inspect the remaining history separately"
+                            .into(),
+                    );
+                }
+                blobs.push((id.to_owned(), size));
+            }
+            "tree" | "commit" | "tag" => (),
+            _ => return Err("Unknown reachable object type".into()),
+        }
+    }
+    if lines.next().is_some() {
+        return Err("Unexpected object metadata".into());
+    }
+    let input = blobs
+        .iter()
+        .flat_map(|(id, _)| id.bytes().chain([b'\n']))
+        .collect();
+    if blobs.is_empty() {
+        return Ok((vec![false; config.replacements.len()], false));
+    }
+    let bytes = run(&["cat-file", "--batch"], input, total + blobs.len() * 96)?;
+    let matchers: Vec<_> = config
+        .replacements
+        .iter()
+        .map(|rule| Literal::new(rule.find.as_bytes()))
+        .collect();
+    let mut hits = vec![false; matchers.len()];
+    let mut skipped_binary = false;
+    let mut rest = bytes.as_slice();
+    for (id, size) in blobs {
+        let end = rest
+            .iter()
+            .position(|b| *b == b'\n')
+            .ok_or("Missing blob header")?;
+        let header = format!("{id} blob {size}");
+        if rest[..end] != *header.as_bytes() {
+            return Err("Mismatched blob header".into());
+        }
+        rest = &rest[end + 1..];
+        if rest.len() <= size || rest[size] != b'\n' {
+            return Err("Truncated blob stream".into());
+        }
+        let blob = &rest[..size];
+        if blob[..blob.len().min(8192)].contains(&0) {
+            skipped_binary = true;
+        } else {
+            for (found, matcher) in hits.iter_mut().zip(&matchers) {
+                *found |= matcher.contains(blob);
+            }
+        }
+        rest = &rest[size + 1..];
+    }
+    if !rest.is_empty() {
+        return Err("Unexpected blob stream suffix".into());
+    }
+    Ok((hits, skipped_binary))
+}
+fn valid_object_id(id: &str) -> bool {
+    matches!(id.len(), 40 | 64) && id.bytes().all(|b| b.is_ascii_hexdigit())
+}
+// Linear literal matching over bytes, including non-UTF-8 text; no regex interpretation.
+struct Literal<'a> {
+    bytes: &'a [u8],
+    prefix: Vec<usize>,
+}
+impl<'a> Literal<'a> {
+    fn new(bytes: &'a [u8]) -> Self {
+        let mut prefix = vec![0; bytes.len()];
+        let mut matched = 0;
+        for i in 1..bytes.len() {
+            while matched > 0 && bytes[i] != bytes[matched] {
+                matched = prefix[matched - 1];
+            }
+            if bytes[i] == bytes[matched] {
+                matched += 1;
+            }
+            prefix[i] = matched;
+        }
+        Self { bytes, prefix }
+    }
+    fn contains(&self, haystack: &[u8]) -> bool {
+        if self.bytes.is_empty() {
+            return false;
+        } // Config rejects empty find text.
+        let mut matched = 0;
+        for byte in haystack {
+            while matched > 0 && *byte != self.bytes[matched] {
+                matched = self.prefix[matched - 1];
+            }
+            if *byte == self.bytes[matched] {
+                matched += 1;
+            }
+            if matched == self.bytes.len() {
+                return true;
+            }
+        }
+        false
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn recorded_scan(
+        config: &Config,
+        blob: &[u8],
+        size_override: Option<usize>,
+        truncate: bool,
+    ) -> Vec<Check> {
+        let id = "a".repeat(40);
+        let size = size_override.unwrap_or(blob.len());
+        let mut stage = 0;
+        let result = residual_checks(config, |args, input, limit| {
+            // Both fields are synthetic canaries. Neither may occur in any argv.
+            for rule in &config.replacements {
+                assert!(!args.join(" ").contains(&rule.find));
+                if !rule.replace.is_empty() {
+                    assert!(!args.join(" ").contains(&rule.replace));
+                }
+            }
+            stage += 1;
+            let output = match stage {
+                1 => {
+                    assert_eq!(
+                        args,
+                        ["rev-list", "--objects", "--all", "--no-object-names"]
+                    );
+                    assert!(input.is_empty());
+                    format!("{id}\n").into_bytes()
+                }
+                2 => {
+                    assert_eq!(args, ["cat-file", "--batch-check"]);
+                    assert_eq!(input, format!("{id}\n").as_bytes());
+                    format!("{id} blob {size}\n").into_bytes()
+                }
+                3 => {
+                    assert_eq!(args, ["cat-file", "--batch"]);
+                    assert_eq!(input, format!("{id}\n").as_bytes());
+                    let mut out = format!("{id} blob {size}\n").into_bytes();
+                    out.extend_from_slice(blob);
+                    if !truncate {
+                        out.push(b'\n');
+                    }
+                    out
+                }
+                _ => return Err("Unexpected command".into()),
+            };
+            assert!(output.len() <= limit);
+            Ok(output)
+        });
+        assert_eq!(stage, if size > SCAN_BLOB { 2 } else { 3 });
+        result
+    }
+    #[test]
+    fn residual_recording_keeps_both_sensitive_fields_out_of_argv() {
+        let config = Config {
+            paths: Vec::new(),
+            replacements: vec![Replacement {
+                find: "GC_REVIEW_CANARY_DO_NOT_USE".into(),
+                replace: "GC_REPLACEMENT_CANARY".into(),
+            }],
+        };
+        let hit = recorded_scan(
+            &config,
+            b"prefix GC_REVIEW_CANARY_DO_NOT_USE suffix",
+            None,
+            false,
+        );
+        assert!(!hit[0].passed);
+        assert!(hit[0].detail.contains("remains"));
+        let clean = recorded_scan(&config, b"prefix GC_REPLACEMENT_CANARY suffix", None, false);
+        assert!(clean[0].passed);
+        let binary = recorded_scan(&config, b"\0binary", None, false);
+        assert!(!binary[0].passed);
+        assert!(binary[0].detail.contains("Unverified"));
+        let big = recorded_scan(&config, b"", Some(SCAN_BLOB + 1), false);
+        assert!(!big[0].passed);
+        assert!(big[0].detail.contains("4 MiB"));
+        let truncated = recorded_scan(&config, b"text", None, true);
+        assert!(!truncated[0].passed);
+        assert!(truncated[0].detail.contains("Unverified"));
+    }
+    #[test]
+    fn residual_budgets_refuse_before_blob_download_and_errors_are_redacted() {
+        let config = Config {
+            paths: Vec::new(),
+            replacements: vec![Replacement {
+                find: "SENSITIVE_FIND_CANARY".into(),
+                replace: "SENSITIVE_REPLACE_CANARY".into(),
+            }],
+        };
+        for count in [5, SCAN_OBJECTS + 1] {
+            let ids: Vec<_> = (0..count).map(|i| format!("{i:040x}")).collect();
+            let mut calls = 0;
+            let result = residual_checks(&config, |args, _, limit| {
+                calls += 1;
+                let data = match args {
+                    ["rev-list", ..] => format!("{}\n", ids.join("\n")),
+                    ["cat-file", "--batch-check"] => ids
+                        .iter()
+                        .map(|id| format!("{id} blob {SCAN_BLOB}\n"))
+                        .collect(),
+                    _ => {
+                        return Err("Blob content must not be requested after budget refusal".into());
+                    }
+                };
+                assert!(data.len() <= limit);
+                Ok(data.into_bytes())
+            });
+            assert!(!result[0].passed);
+            assert!(
+                result[0]
+                    .detail
+                    .contains(if count == 5 { "16 MiB" } else { "20000" })
+            );
+            assert_eq!(calls, if count == 5 { 2 } else { 1 });
+        }
+        let checks = residual_checks(&config, |_, _, _| {
+            Err("SENSITIVE_FIND_CANARY SENSITIVE_REPLACE_CANARY".into())
+        });
+        assert!(!checks[0].passed);
+        assert!(!checks[0].detail.contains("SENSITIVE_FIND_CANARY"));
+        assert!(!checks[0].detail.contains("SENSITIVE_REPLACE_CANARY"));
+    }
+    #[test]
+    fn literal_scan_handles_overlaps_and_non_utf8_without_regex() {
+        for (pattern, text, found) in [
+            (&b"ababac"[..], &b"ababababac"[..], true),
+            (b"a.*", b"abc", false),
+            (b"token", b"\xfftoken\xfe", true),
+            (b"token", b"toke", false),
+        ] {
+            assert_eq!(Literal::new(pattern).contains(text), found);
+        }
+    }
+
     #[test]
     fn config_is_bounded_and_literal_without_force_or_publication() -> Result<(), String> {
         let config = Config {

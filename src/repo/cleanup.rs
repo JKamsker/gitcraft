@@ -200,7 +200,7 @@ fn report_ui(ui: &mut egui::Ui, report: &Report) {
     ui.collapsing("Managed filter-repo result", |ui| {
         ui.monospace(&report.output);
     });
-    ui.label("Inspect filter-repo's commit-map/ref-map inside the mirror. Integrity and residual pickaxe checks are bounded checks, not proof that every secret is gone. Inspect the intended history and all failed checks yourself.");
+    ui.label("Inspect filter-repo's commit-map/ref-map inside the mirror. Integrity and literal blob checks are bounded checks, not proof that every secret is gone. Residual scans cap at 20000 reachable objects, 4 MiB per blob and 16 MiB total; skipped binary blobs or exceeded limits are unverified. Inspect the intended history and all failed checks yourself.");
 }
 fn publishing_ui(ui: &mut egui::Ui, report: &Report) {
     ui.separator();
