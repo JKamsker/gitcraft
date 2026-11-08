@@ -192,3 +192,92 @@ fn pure_prompt_checkpoint_push_warning_follows_exact_oid_aliases_and_named_route
         &refs
     ));
 }
+
+#[test]
+fn pure_prompt_r1_compact_typeless_text_ts_patch_and_missing_origin_are_visible() {
+    let bytes=br#"{"v":1,"agent":"claude-code","type":"user","ts":"2026-11-08T00:00:00Z","content":[{"id":"u1","text":"repair file"}]}
+{"v":1,"agent":"codex","type":"assistant","ts":"2026-11-08T00:00:01Z","content":[{"type":"tool_use","name":"apply_patch","input":{"patch":"*** Begin Patch\n*** Update File: /original/worktree/file\n@@\n-old\n+new\n*** End Patch"}}]}
+{"v":1,"agent":"claude-code","type":"assistant","ts":"2026-11-08T00:00:02Z","content":[{"type":"tool_use","name":"Edit","input":{"file_path":"/original/worktree/other","old_string":"before","new_string":"after"}}]}
+"#;
+    let (steps, _) = parse::checkpoint_transcript(bytes, Path::new("/different/clone"), 0);
+    assert_eq!(steps.len(), 3);
+    assert_eq!(steps[0].text, "repair file");
+    assert_eq!(steps[0].at, parse::stamp("2026-11-08T00:00:00Z"));
+    assert_eq!(steps[1].at, parse::stamp("2026-11-08T00:00:01Z"));
+    assert_eq!(steps[1].before, "old\n");
+    assert_eq!(steps[1].after, "new\n");
+    for step in &steps[1..] {
+        assert!(step.path.is_none());
+        assert!(step.text.contains("origin worktree is absent"));
+    }
+    assert_eq!(steps[2].after, "after");
+}
+
+#[test]
+fn pure_prompt_r1_delete_call_retains_validated_path_without_invented_ranges() {
+    let bytes=br#"{"type":"session_meta","timestamp":"2026-11-08T00:00:00Z","payload":{"cwd":"/synthetic/root"}}
+{"type":"response_item","payload":{"type":"custom_tool_call","name":"apply_patch","input":"*** Begin Patch\n*** Delete File: file\n*** End Patch"}}
+"#;
+    let (steps, _) = parse::checkpoint_transcript(bytes, Path::new("/different/clone"), 0);
+    assert_eq!(steps.len(), 1);
+    assert_eq!(steps[0].path.as_deref(), Some("file"));
+    assert!(steps[0].text.contains("deletion"));
+    assert!(steps[0].text.contains("unmapped"));
+    assert!(!steps[0].exact);
+    assert!(steps[0].ranges.is_empty());
+}
+
+#[test]
+fn pure_prompt_r1_separate_changed_runs_exclude_another_steps_interior_hunk() {
+    let old = (1..=40).map(|n| format!("line {n}\n")).collect::<String>();
+    let endpoints = old
+        .replace("line 1\n", "changed first\n")
+        .replace("line 40\n", "changed last\n");
+    let runs = changed_matches(&old, &old, &endpoints, true);
+    assert_eq!(
+        runs,
+        [
+            Span {
+                start: 1,
+                end: 1,
+                old: true
+            },
+            Span {
+                start: 40,
+                end: 40,
+                old: true
+            }
+        ]
+    );
+    let mut step = Step::new("Tool", "endpoint-only edit".into(), None);
+    step.path = Some("file".into());
+    step.ranges = runs;
+    let e = Evidence {
+        commit: "a".repeat(40),
+        sessions: vec![Session {
+            source: "recording".into(),
+            relation: "unverified".into(),
+            steps: vec![step],
+        }],
+        notices: vec![],
+    };
+    assert!(hunk_steps(&e, "file", (17, 23), true).is_empty());
+    assert_eq!(hunk_steps(&e, "file", (1, 4), true), [(0, 0)]);
+}
+
+#[test]
+fn pure_prompt_r1_ordinary_code_push_warns_conditionally_when_entire_integration_can_publish() {
+    assert!(!checkpoint_publication(
+        "refs/heads/main",
+        "refs/heads/main",
+        "ordinary-code",
+        "ordinary-code",
+        ""
+    ));
+    let warning = entire_automatic_notice(true, false).unwrap();
+    assert!(warning.contains("pre-push hook"));
+    assert!(warning.contains("separate checkpoint remote"));
+    assert!(warning.contains("If automatic"));
+    assert!(entire_automatic_notice(true, true).is_none());
+    assert!(entire_automatic_notice(false, false).is_none());
+}

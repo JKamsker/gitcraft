@@ -79,14 +79,17 @@ pub(super) fn stamp(s: &str) -> Option<i64> {
 fn string<'a>(v: &'a Value, name: &str) -> &'a str {
     v.get(name).and_then(Value::as_str).unwrap_or("")
 }
-fn text(v: &Value) -> String {
+fn text(v: &Value, compact: bool) -> String {
     if let Some(s) = v.as_str() {
         return s.to_owned();
     }
     v.as_array()
         .into_iter()
         .flatten()
-        .filter(|b| matches!(string(b, "type"), "text" | "input_text" | "output_text"))
+        .filter(|b| {
+            matches!(string(b, "type"), "text" | "input_text" | "output_text")
+                || compact && string(b, "type").is_empty()
+        })
         .filter_map(|b| b.get("text").and_then(Value::as_str))
         .collect::<Vec<_>>()
         .join("\n")
@@ -118,6 +121,22 @@ fn tool(
     at: Option<i64>,
     line: usize,
 ) {
+    if name == "apply_patch" {
+        let body = input.as_str().unwrap_or_else(|| {
+            let body = string(input, "patch");
+            if body.is_empty() {
+                string(input, "input")
+            } else {
+                body
+            }
+        });
+        if !body.is_empty() {
+            patch(out, root, cwd, body, at, line);
+        } else {
+            out.push(Step::new("Tool", format!("apply_patch · transcript line {line} · unmapped: unsupported recorded patch input"),at));
+        }
+        return;
+    }
     let path = string(input, "file_path");
     let path = if path.is_empty() {
         string(input, "path")
@@ -144,6 +163,9 @@ fn tool(
         let mut step = Step::new("Tool", format!("{name} · transcript line {line}"), at);
         if allowed {
             step.path = relative(root, cwd, path);
+            if step.path.is_none() {
+                step.text.push_str(if cwd.is_empty() && Path::new(path).is_absolute() { " · unmapped: recorded origin worktree is absent; absolute edit path cannot be assigned to this clone" } else { " · unmapped: recorded path is outside the known worktree or unsupported" });
+            }
             step.before = redact(old);
             step.after = redact(new);
             step.exact = step.before == old && step.after == new;
@@ -161,6 +183,14 @@ fn patch(out: &mut Vec<Step>, root: &Path, cwd: &str, patch: &str, at: Option<i6
         }
         let mut s = Step::new("Tool", format!("apply_patch · transcript line {line}"), at);
         s.path = relative(root, cwd, path);
+        if s.path.is_none() {
+            s.text
+                .push_str(if cwd.is_empty() && Path::new(path).is_absolute() {
+                    " · unmapped: recorded origin worktree is absent"
+                } else {
+                    " · unmapped: recorded path is outside the known worktree or unsupported"
+                });
+        }
         s.before = redact(before);
         s.after = redact(after);
         s.exact = s.before == *before && s.after == *after;
@@ -169,10 +199,26 @@ fn patch(out: &mut Vec<Step>, root: &Path, cwd: &str, patch: &str, at: Option<i6
         after.clear();
     };
     for l in patch.lines().take(10000) {
+        if let Some(deleted) = l.strip_prefix("*** Delete File: ") {
+            flush(out, &path, &mut before, &mut after);
+            path.clear();
+            let mut step = Step::new(
+                "Tool",
+                format!(
+                    "apply_patch deletion · transcript line {line} · unmapped: removed bytes were not recorded"
+                ),
+                at,
+            );
+            step.path = relative(root, cwd, deleted);
+            if step.path.is_none() {
+                step.text.push_str("; origin/path mapping unavailable");
+            }
+            out.push(step);
+            continue;
+        }
         if let Some(p) = l
             .strip_prefix("*** Update File: ")
             .or_else(|| l.strip_prefix("*** Add File: "))
-            .or_else(|| l.strip_prefix("*** Delete File: "))
         {
             flush(out, &path, &mut before, &mut after);
             path = p.into();
@@ -265,9 +311,16 @@ fn records_from(
         if !next_cwd.is_empty() {
             cwd = next_cwd.into();
         }
+        let compact =
+            v.get("v").and_then(Value::as_u64) == Some(1) && !string(&v, "agent").is_empty();
         let date = string(&v, "timestamp");
         let date = if date.is_empty() {
-            string(p, "timestamp")
+            let date = string(p, "timestamp");
+            if date.is_empty() && compact {
+                string(&v, "ts")
+            } else {
+                date
+            }
         } else {
             date
         };
@@ -299,7 +352,7 @@ fn records_from(
             role
         };
         if matches!(role, "user" | "assistant") {
-            let t = text(message.get("content").unwrap_or(&Value::Null));
+            let t = text(message.get("content").unwrap_or(&Value::Null), compact);
             if !t.is_empty() {
                 steps.push(Step::new(
                     if role == "user" {

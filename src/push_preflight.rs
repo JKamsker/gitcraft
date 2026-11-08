@@ -676,6 +676,16 @@ pub(crate) fn scan(
                 "Checkpoint reference list exceeds 1 MiB; narrow publication before pushing".into(),
             );
         }
+        if let Some(detail) = crate::git::prompt_session::entire_automatic_publication(
+            repo, &names, skip_hooks, active,
+        )? {
+            findings.push(Finding {
+                kind: Kind::Transcript,
+                commit: push_oid.clone(),
+                path: String::new(),
+                detail: detail.into(),
+            });
+        }
         if crate::git::prompt_session::checkpoint_publication(
             &source,
             &destination,

@@ -222,8 +222,6 @@ fn panel(ui: &mut egui::Ui, state: &mut State, hash: &str, acts: &mut Vec<Action
                     ui.label(&step.text);
                     if let Some(path)=&step.path {
                         ui.monospace(logic::redact(path));
-                        if !step.before.is_empty(){ui.label("Recorded before:");ui.monospace(&step.before);}
-                        if !step.after.is_empty(){ui.label("Recorded after:");ui.monospace(&step.after);}
                         if step.ranges.is_empty(){ui.weak("No unique exact old/new content match in this commit; no line attribution asserted.");}
                         for span in &step.ranges {
                             if ui.button(if span.old {format!("Open commit diff · parent lines {}–{}",span.start,span.end)}else{format!("Open commit lines {}–{}",span.start,span.end)}).clicked(){
@@ -232,6 +230,8 @@ fn panel(ui: &mut egui::Ui, state: &mut State, hash: &str, acts: &mut Vec<Action
                             }
                         }
                     }
+                    if !step.before.is_empty(){ui.label("Recorded before:");ui.monospace(&step.before);}
+                    if !step.after.is_empty(){ui.label("Recorded after:");ui.monospace(&step.after);}
                 }).response;
                 if state.jump==Some((i,j)){response.scroll_to_me(Some(egui::Align::Center));state.jump=None;}
             }
