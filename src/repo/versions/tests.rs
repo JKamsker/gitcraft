@@ -96,10 +96,17 @@ fn a_rebase_keeps_both_versions_and_offers_to_compare_them() -> Result<(), Strin
     assert!(wait(&mut tab, &ctx, |t| t.versions.fresh.is_some()));
     let after = git(dir, &["rev-parse", "HEAD"])?;
     let main = git(dir, &["rev-parse", "main"])?;
+    assert!(wait(&mut tab, &ctx, |t| t.status.as_ref().is_some_and(
+        |(s, failed)| { !failed && s.ends_with("(receipt in the timeline, Ctrl+Shift+Z)") }
+    )));
     let status = tab.status.clone();
     assert_eq!(
         status,
-        Some(("Rebase topic onto main: done".to_owned(), false))
+        Some((
+            "Rebase topic onto main: done. Final files differ, authors kept, messages kept (receipt in the timeline, Ctrl+Shift+Z)"
+                .to_owned(),
+            false
+        ))
     );
     let kept = git::rewrites(dir)?;
     assert_eq!(kept.len(), 1);
