@@ -118,3 +118,16 @@ interaction-release-files-changed = { $files } wurden seit der Release-Planung g
 interaction-release-version-missing = Die Version konnte in { $file } nicht gefunden werden
 
 interaction-release-write-failed = { $file } konnte nicht geschrieben werden: { $reason }
+
+interaction-recipe-path-empty = leerer Pfad
+interaction-recipe-path-space = beginnt oder endet mit einem Leerzeichen
+interaction-recipe-path-line = ein Pfad muss in einer Zeile stehen
+interaction-recipe-path-relative = einen Pfad innerhalb des Worktrees angeben, relativ zu dessen oberstem Ordner
+interaction-recipe-path-outside = ein Pfad darf den Worktree nicht verlassen (..)
+interaction-recipe-path-whole = das ist der gesamte Worktree
+interaction-recipe-path = { $path }: { $reason }
+interaction-recipe-variable-reserved = Variable „{ $name }“: gitcraft setzt sie selbst; einen anderen Namen wählen
+interaction-recipe-variable-name = Variable „{ $name }“: Namen bestehen aus Buchstaben, Ziffern und _ und dürfen nicht mit einer Ziffer beginnen
+interaction-recipe-variable-duplicate = Variable „{ $name }“ wird zweimal gesetzt
+interaction-recipe-variable-line = Variable „{ $name }“: ein Wert muss in einer Zeile stehen
+interaction-recipe-not-saved = Das Rezept wurde nicht gespeichert: { $problem }

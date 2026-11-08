@@ -118,3 +118,16 @@ interaction-release-files-changed = { $files } changed since the release was pla
 interaction-release-version-missing = Couldn't find the version in { $file }
 
 interaction-release-write-failed = Couldn't write { $file }: { $reason }
+
+interaction-recipe-path-empty = empty path
+interaction-recipe-path-space = starts or ends with a space
+interaction-recipe-path-line = a path is one line
+interaction-recipe-path-relative = give a path inside the worktree, relative to its top folder
+interaction-recipe-path-outside = a path can't go out of the worktree (..)
+interaction-recipe-path-whole = that is the whole worktree
+interaction-recipe-path = { $path }: { $reason }
+interaction-recipe-variable-reserved = Variable "{ $name }": gitcraft sets that one itself, pick another name
+interaction-recipe-variable-name = Variable "{ $name }": names are letters, digits and _, not starting with a digit
+interaction-recipe-variable-duplicate = Variable "{ $name }" is set twice
+interaction-recipe-variable-line = Variable "{ $name }": a value is one line
+interaction-recipe-not-saved = The recipe isn't saved: { $problem }
