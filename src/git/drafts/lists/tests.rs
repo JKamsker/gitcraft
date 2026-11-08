@@ -206,3 +206,40 @@ fn pure_state_snapshot_budget_stops_before_fifth_eight_mib_read_without_allocati
     assert!(b.allowance().is_err());
     assert!(SnapshotBudget::from_sizes([TOTAL_LIMIT + 1]).is_err());
 }
+
+#[test]
+fn pure_state_unshelve_refuses_another_active_owner_before_restoring_contents() {
+    let shelf = Shelf {
+        permissions: BTreeMap::new(),
+        base: BTreeMap::new(),
+        index: BTreeMap::new(),
+        work: BTreeMap::new(),
+    };
+    let a = List {
+        id: "a".into(),
+        name: "A".into(),
+        message: "draft A".into(),
+        paths: ["f".into()].into(),
+        shelf: Some(shelf.clone()),
+    };
+    let b = List {
+        id: "b".into(),
+        name: "B".into(),
+        message: "draft B".into(),
+        paths: ["f".into()].into(),
+        shelf: None,
+    };
+    let mut lists = Lists {
+        lists: vec![a.clone(), b],
+    };
+    let error = require_restore_ownership(&lists, &a).unwrap_err();
+    assert!(error.contains("active changelist B"));
+    assert!(lists.lists[0].shelf.is_some());
+    assert!(lists.lists[1].paths.contains("f"));
+    assert_eq!(lists.lists[0].message, "draft A");
+    lists.lists[1].paths.clear();
+    assert!(require_restore_ownership(&lists, &a).is_ok());
+    lists.lists[1].paths.insert("f".into());
+    lists.lists[1].shelf = Some(shelf);
+    assert!(require_restore_ownership(&lists, &a).is_ok());
+}

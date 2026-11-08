@@ -623,6 +623,27 @@ pub fn commit(
     }
 }
 
+fn require_restore_ownership(lists: &Lists, restoring: &List) -> Result<(), String> {
+    if let Some((other, path)) = lists
+        .lists
+        .iter()
+        .filter(|other| other.id != restoring.id && other.shelf.is_none())
+        .find_map(|other| {
+            other
+                .paths
+                .intersection(&restoring.paths)
+                .next()
+                .map(|path| (other, path))
+        })
+    {
+        return Err(format!(
+            "Cannot unshelve {}: {path} belongs to active changelist {}. Release that ownership first; nothing was changed",
+            restoring.name, other.name
+        ));
+    }
+    Ok(())
+}
+
 pub fn shelve(
     repo: &Path,
     view: &View,
@@ -645,6 +666,9 @@ pub fn shelve(
         .ok_or("List disappeared")?;
     if list.paths.is_empty() {
         return Err("Choose a nonempty changelist".into());
+    }
+    if restore {
+        require_restore_ownership(&view.lists, list)?;
     }
     let current = list
         .paths
