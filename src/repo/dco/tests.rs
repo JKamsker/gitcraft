@@ -471,6 +471,11 @@ fn a_refused_push_leaves_the_rewrite_undoable_here() -> Result<(), String> {
     });
     let signed = git::head(&dir);
     assert_ne!(signed, head);
+    if let Some(Dialog::PushError(error)) = &tab.dialog {
+        return Err(format!(
+            "DCO fresh checklist refused after local rewrite: {error}"
+        ));
+    }
     assert!(matches!(
         &tab.dialog,
         Some(Dialog::PushPreflight {
