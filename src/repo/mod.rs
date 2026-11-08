@@ -27,6 +27,7 @@ mod collision_view;
 pub(crate) mod columns;
 mod commands;
 mod commit_actions;
+mod commit_changes;
 pub(crate) mod conflict;
 mod conflict_check;
 mod content_recovery;
@@ -301,6 +302,7 @@ pub struct RepoTab {
     scroll_to: Option<usize>,
     /// The commit the detail pane is about (a graph row or a stash).
     detail_hash: Option<String>,
+    pending_commit_diff: Option<String>,
     detail: Option<CommitDetail>,
     detail_error: Option<String>,
     /// The selected commit's signature, containment, notes and backlinks.
@@ -650,6 +652,7 @@ impl RepoTab {
             stash_view: None,
             scroll_to: None,
             detail_hash: None,
+            pending_commit_diff: None,
             detail: None,
             detail_error: None,
             extras: Default::default(),

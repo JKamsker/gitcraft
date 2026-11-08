@@ -63,16 +63,23 @@ impl RepoTab {
     }
 
     pub(super) fn load_detail(&mut self, hash: String, ctx: &egui::Context) {
+        self.pending_commit_diff = None;
         self.detail = None;
         self.reword = None;
         self.detail_error = None;
         self.detail_hash = Some(hash.clone());
         self.load_extras(&hash, ctx);
         let path = self.path.clone();
-        spawn(&self.tx, ctx, move || {
-            let detail = git::commit_detail(&path, &hash);
-            Msg::Detail(hash, detail)
-        });
+        let failed_hash = hash.clone();
+        super::messages::spawn_or(
+            &self.tx,
+            ctx,
+            move |error| Msg::Detail(failed_hash, Err(error)),
+            move || {
+                let detail = git::commit_detail(&path, &hash);
+                Msg::Detail(hash, detail)
+            },
+        );
     }
 
     pub(super) fn select_stash(&mut self, i: usize, ctx: &egui::Context) {

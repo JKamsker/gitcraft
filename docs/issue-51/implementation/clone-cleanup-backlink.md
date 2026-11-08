@@ -83,3 +83,33 @@ check warnings. Their source invokes no App/RepoTab discovery or process/filesys
 fixture. A real owned filter-repo fixture checks source preservation, rewritten
 content, path removal, ref changes and replacement-file cleanup; it is compile-only
 under the hold and requires installed git-filter-repo when explicitly executed.
+
+## #50.4 direct backlink diff navigation
+
+An actual backlink row now emits `OpenCommitChanges` via `ExtrasCmd::Open`.
+The dispatcher opens the target's details and first changed-file diff through the
+existing asynchronous detail/diff readers, without expanding a filtered/bounded
+history. Deleted files retain their normal commit diff; generated-file folding
+is opened. Empty commits report that they have no file changes. Existing Links /
+Mentions groups, matching text, caps, settle timing and background lookup remain.
+Rows expose an explicit accessible Open changes label.
+
+The pending opening belongs to one target and is consumed once. Stale results do
+not consume another target's request; later actions or detail loads discard a
+pending automatic opening. Existing editors must be closed first. The shared
+detail read now has an explicit error continuation on rejection/cancel/panic,
+so this navigation does not wait indefinitely for a detail result.
+
+Two pure tests cover completion, deleted/empty/error results and superseded
+navigation. A headless test clicks the actual accessible backlink row and checks
+its target command plus both evidence groups. No App/RepoTab constructor or Git
+is invoked by these tests. An owned real detail/diff fixture for an out-of-graph
+target is authored and compile-only under the runtime hold.
+
+## Evidence boundaries
+
+Only concise text and source/hash JSON records belong in the repository. Logs,
+adapters and compressed/generated receipts remain outside it. No generated binary
+evidence is introduced by these commits. The parent owns independent review and
+combined runtime/CI gates after containment clearance; this writer does not claim
+those gates from source inspection or compile/pure/headless results.

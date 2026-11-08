@@ -72,6 +72,8 @@ pub(crate) enum Action {
     },
     ComparisonNormalPatch,
     SelectHash(String),
+    /// Follow a backlink directly to changed files and the first file diff.
+    OpenCommitChanges(String),
     ActivityCommit(String),
     /// Focus a pull request's branch and compare all of its proposed changes.
     SelectPr(u64),

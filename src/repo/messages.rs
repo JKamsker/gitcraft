@@ -545,6 +545,7 @@ impl RepoTab {
                         }
                         Err(e) => self.detail_error = Some(e),
                     }
+                    self.finish_commit_changes(&hash, ctx);
                 }
             }
             Msg::RebaseCommits {
