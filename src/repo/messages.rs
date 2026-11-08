@@ -1054,6 +1054,13 @@ fn operation_template(label: &str, depth: usize, family: PaintFamily) -> Option<
                 continue;
             };
             if matches!(family, PaintFamily::Workflow | PaintFamily::WorkflowFixed) {
+                // Config keys/values/files are opaque. Repeated unescaped separators
+                // do not identify one removal-label partition, so paint no envelope.
+                if template.id == "repo-workflows-doctor-remove-confirm-b0b26eef"
+                    && (label.matches(" (").count() != 1 || label.matches(") from ").count() != 1)
+                {
+                    return Some(Painted::Opaque);
+                }
                 let mut args = Vec::new();
                 for (i, (name, numeric)) in template.args.iter().enumerate() {
                     if name.is_empty() {

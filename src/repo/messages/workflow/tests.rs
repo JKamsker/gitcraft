@@ -2664,6 +2664,12 @@ fn workflow_selector_defaults_nested_guards_and_numeric_identity_are_paint_only(
             );
             assert_eq!(display_status(raw), expected);
         }
+        // Source-derived workflow60: both splits are legal opaque value/file data.
+        let raw = "Remove core.editor (old) from new) from .git/config";
+        let stored = raw.to_owned();
+        assert_eq!(display_operation(&stored), raw);
+        assert_eq!(display_status(&stored), raw);
+        assert_eq!(stored, raw);
         let pr = "Rebase #00001234 onto refs/heads/00001234 and push";
         let shown = display_operation(pr);
         assert!(shown.contains("00001234"));

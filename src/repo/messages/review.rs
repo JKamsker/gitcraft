@@ -762,8 +762,9 @@ pub(super) const TEMPLATES: &[super::TemplateSpec] = &[
         "repo-workflows-review-raw-invalid-preserved-reproducer-evidence-e-4bd6de",
         &[("detail", false)],
     ),
+    // reproducer_source validates a colon-free path and a full 40/64-digit hex OID.
     (
-        "(?s)^Submodule (.*?) at (.*?): (.*?)\\. Its pinned objects must already be present locally; gitcraft never clones or checks it out\\.$",
+        "(?s)^Submodule ([^:]+?) at ([0-9A-Fa-f]{40}|[0-9A-Fa-f]{64}): (.*?)\\. Its pinned objects must already be present locally; gitcraft never clones or checks it out\\.$",
         "repo-workflows-review-raw-submodule-path-at-oid-e-its-pinned-objects-mus-6a547c",
         &[("path", false), ("oid", false), ("detail", false)],
     ),
@@ -811,6 +812,11 @@ pub(super) fn dependency(raw: &str) -> String {
         .strip_suffix(')')
         .and_then(|s| s.split_once(": Rust syntax not parsed ("))
     {
+        // The same separator is legal inside a Rust path or parse diagnostic.
+        // A second occurrence leaves the source fields ambiguous; keep the whole raw value.
+        if detail.contains(": Rust syntax not parsed (") {
+            return raw.to_owned();
+        }
         return crate::i18n::message(
             "repo-workflows-review-raw-path-rust-syntax-not-parsed-e-110a0e",
             &[("path", path.into()), ("detail", detail.into())],

@@ -902,9 +902,9 @@ fn review_finite_map_all_entries_render_in_both_locales_without_mutating_raw() {
             "Ungültiger gesicherter Reproduktionsnachweis: OPAQUE-detail-Stage1/日本語/00001234",
         ),
         (
-            "Submodule OPAQUE-path-Stage1/日本語/00001234 at OPAQUE-oid-Stage1/日本語/00001234: OPAQUE-detail-Stage1/日本語/00001234. Its pinned objects must already be present locally; gitcraft never clones or checks it out.",
-            "Submodule OPAQUE-path-Stage1/日本語/00001234 at OPAQUE-oid-Stage1/日本語/00001234: OPAQUE-detail-Stage1/日本語/00001234. Its pinned objects must already be present locally; gitcraft never clones or checks it out.",
-            "Submodul OPAQUE-path-Stage1/日本語/00001234 bei OPAQUE-oid-Stage1/日本語/00001234: OPAQUE-detail-Stage1/日本語/00001234. Seine fixierten Objekte müssen bereits lokal vorhanden sein; gitcraft klont es niemals und führt keinen Checkout aus.",
+            "Submodule OPAQUE-path-Stage1/日本語/00001234 at 0123456789abcdef0123456789abcdef01234567: OPAQUE-detail-Stage1/日本語/00001234. Its pinned objects must already be present locally; gitcraft never clones or checks it out.",
+            "Submodule OPAQUE-path-Stage1/日本語/00001234 at 0123456789abcdef0123456789abcdef01234567: OPAQUE-detail-Stage1/日本語/00001234. Its pinned objects must already be present locally; gitcraft never clones or checks it out.",
+            "Submodul OPAQUE-path-Stage1/日本語/00001234 bei 0123456789abcdef0123456789abcdef01234567: OPAQUE-detail-Stage1/日本語/00001234. Seine fixierten Objekte müssen bereits lokal vorhanden sein; gitcraft klont es niemals und führt keinen Checkout aus.",
         ),
         (
             "Unsafe or unsupported sandbox source path: OPAQUE-path-Stage1/日本語/00001234",
@@ -971,6 +971,10 @@ fn review_source_owned_diagnostics_keep_refs_commands_and_unknown_lookalikes_opa
             "path/00001234.rs: Rust-Syntax nicht geparst (provider: Stage 1)",
         ),
         (
+            "src/a: Rust syntax not parsed (b.rs: Rust syntax not parsed (cannot parse string into token stream)",
+            "src/a: Rust syntax not parsed (b.rs: Rust syntax not parsed (cannot parse string into token stream)",
+        ),
+        (
             "a → b: static call targets changed",
             "a → b: Ziele statischer Aufrufe geändert",
         ),
@@ -985,6 +989,38 @@ fn review_source_owned_diagnostics_keep_refs_commands_and_unknown_lookalikes_opa
             let stored = raw.to_owned();
             assert_eq!(dependency(&stored), if language == "de" { de } else { raw });
             assert_eq!(stored, raw);
+        }
+        // Source-derived review191: the path itself contains the old OID separator.
+        for oid in [
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789",
+        ] {
+            let path = "vendor/lib at stable";
+            let detail = "Missing object";
+            let raw = format!(
+                "Submodule {path} at {oid}: {detail}. Its pinned objects must already be present locally; gitcraft never clones or checks it out."
+            );
+            let stored = raw.clone();
+            let expected = if language == "de" {
+                format!(
+                    "Submodul {path} bei {oid}: {detail}. Seine fixierten Objekte müssen bereits lokal vorhanden sein; gitcraft klont es niemals und führt keinen Checkout aus."
+                )
+            } else {
+                raw.clone()
+            };
+            assert_eq!(display_operation(&stored), expected);
+            assert_eq!(display_status(&stored), expected);
+            for field in [path, oid, detail] {
+                assert!(expected.contains(field));
+            }
+            assert_eq!(stored, raw);
+        }
+        for oid in ["aaaaaaaa", "not-a-pinned-object"] {
+            let raw = format!(
+                "Submodule vendor/lib at stable at {oid}: Missing object. Its pinned objects must already be present locally; gitcraft never clones or checks it out."
+            );
+            assert_eq!(display_operation(&raw), raw);
+            assert_eq!(display_status(&raw), raw);
         }
         let raw = "refs/gitcraft/intents/日本語/00001234: Invalid intent JSON: provider: Stage";
         assert_eq!(
