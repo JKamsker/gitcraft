@@ -405,7 +405,7 @@ pub(crate) fn load(
         .map_err(|_| crate::i18n::text("backend-invalid-commit-time-ee5277"))?;
     let root = read(repo, &["rev-parse", "--show-toplevel"], active)?;
     let root = std::str::from_utf8(&root)
-        .map_err(|_| "Worktree path must be UTF-8")?
+        .map_err(|_| crate::i18n::text("backend-worktree-path-must-be-utf-8-20c4a0"))?
         .trim_end_matches(['\r', '\n']);
     let root = std::fs::canonicalize(root)
         .map_err(|_| crate::i18n::text("backend-native-worktree-is-unavailable-b6ba9e"))?;
