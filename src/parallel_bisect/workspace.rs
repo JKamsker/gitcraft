@@ -1,15 +1,13 @@
-//! Where a parallel bisect works on the machine its tests run on: a repository there (the
-//! tab's own when it is on that machine, else a copy the commits are sent to), and a folder of
-//! its own for that repository, `~/.cache/gitcraft/bisect/run-<hash of its git folder>`, which
-//! holds the worktrees, the test logs and what says who is using it. Outside the repository, so
-//! that what the tests build there isn't seen by the tab's watcher. Everything the bisect makes
-//! is in there (and under `refs/gitcraft-bisect/`), so taking it away is all the cleaning up
-//! there is: when the bisect ends however it ends, and when an authenticated recovery after a crash
-//! (or the tab opens).
+//! Machine-side bisect workspace. A stable external ledger and retained claim live under
+//! the canonical Git common directory; the removable work folder is its separate sibling.
+//! Git metadata paths keep build output outside the tab's watched working tree. Every
+//! mutation/test carries an immutable generation to its actual durable owner.
 
+use crate::remote::workspace_authority::{FenceMode, WorkspaceAuthority};
+use crate::remote::workspace_claim::Lease;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Mutex, PoisonError};
 
 use super::machine::Machine;
 use super::runner;
@@ -19,28 +17,12 @@ use crate::remote;
 /// The refs the bisect makes, under `refs/`.
 const FOLDER: &str = "gitcraft-bisect";
 
-/// Where the folders are, under the home folder; each is `run-<hash>`.
-const RUNS: &str = ".cache/gitcraft/bisect";
-
-/// What says the folder is in use: `gitcraft <process> <unix seconds>`, rewritten every
-/// [`HEARTBEAT`] while the bisect runs.
-const OWNER: &str = "owner";
-
-/// How often the owner is rewritten.
-const HEARTBEAT: std::time::Duration = std::time::Duration::from_secs(20);
-
-/// A folder whose owner wasn't rewritten for this long is a crashed bisect's.
-const STALE_AFTER: i64 = 90;
-
 /// The most history sent to another machine in one go (through its shell).
 const MAX_SEND: usize = 256 << 20;
 
 /// Numbers the bundles made in this process, so that two bisects sending at once never share a
 /// ref.
 static SENDS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
-
-/// The folders of the bisects running in this process.
-static ACTIVE: Mutex<Vec<PathBuf>> = Mutex::new(Vec::new());
 
 pub struct Workspace {
     pub machine: Machine,
@@ -52,8 +34,9 @@ pub struct Workspace {
     pub base_there: String,
     /// Held while a worktree is added.
     adding: Mutex<()>,
-    /// The thread saying the folder is in use runs while this holds.
-    beating: Arc<AtomicBool>,
+    lease: Mutex<Lease>,
+    uncertain: AtomicBool,
+    close_error: Option<String>,
     closed: bool,
 }
 
@@ -68,50 +51,134 @@ impl Workspace {
         repo_there: Option<&str>,
     ) -> Result<Self, String> {
         let repo = repository_for(source, machine, repo_there)?;
-        let (base, base_there) = base_for(&repo, machine)?;
-        claim(&base)?;
-        if let Err(e) = refuse_if_in_use(&base, machine) {
-            release(&base);
-            return Err(e);
-        }
-        // From here on, dropping it releases the claim (and clears what is there).
-        let ws = Workspace {
+        let common = canonical_common(&repo)?;
+        let root = format!("{common}/gitcraft-bisect-owners");
+        let lease = match machine {
+            Machine::Here => Lease::native(Path::new(&root))?,
+            Machine::There(host) => Lease::remote(host, &root)?,
+        };
+        let base_there = format!("{common}/gitcraft-bisect-work");
+        // Cleanup-enabled ownership is constructed only after actual-machine claim success.
+        // Initialization errors leave Drop with only its own lease to release.
+        let mut ws = Workspace {
             machine: machine.clone(),
             repo,
-            base,
+            base: machine.path(&base_there),
             base_there,
             adding: Mutex::new(()),
-            beating: Arc::default(),
-            closed: false,
+            lease: Mutex::new(lease),
+            uncertain: AtomicBool::new(false),
+            closed: true,
+            close_error: None,
         };
         ws.clear()?;
-        ws.make_private().map_err(|e| {
-            format!(
-                "could not make {} on {}: {e}",
-                ws.base_there,
-                ws.machine.label()
-            )
-        })?;
-        ws.keep_beating();
+        ws.make_private()?;
+        ws.closed = false;
         Ok(ws)
     }
-
-    /// Says the folder is in use now and every [`HEARTBEAT`] until it is closed, from a thread
-    /// of its own: through every step (sending the commits, reading the range, the rounds).
-    fn keep_beating(&self) {
-        self.beating.store(true, Ordering::Relaxed);
-        let (beating, owner) = (Arc::clone(&self.beating), remote::join(&self.base, OWNER));
-        std::thread::spawn(move || {
-            let mut last: Option<std::time::Instant> = None;
-            while beating.load(Ordering::Relaxed) {
-                if last.is_none_or(|at| at.elapsed() >= HEARTBEAT) {
-                    last = Some(std::time::Instant::now());
-                    let line = format!("gitcraft {} {}\n", std::process::id(), git::now());
-                    let _ = remote::write(&owner, line.as_bytes());
+    pub(crate) fn authority(&self, mode: FenceMode) -> Result<WorkspaceAuthority, String> {
+        if self.uncertain.load(Ordering::Acquire) {
+            return Err(
+                "workspace ownership uncertain; external recovery evidence retained".into(),
+            );
+        }
+        self.lease
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .authority(mode)
+    }
+    pub(crate) fn owner_record(&self, authority: &WorkspaceAuthority) -> Result<PathBuf, String> {
+        let mut random = [0; 16];
+        gitcraft_os::random_bytes(&mut random).map_err(|e| e.to_string())?;
+        let nonce: String = random.iter().map(|b| format!("{b:02x}")).collect();
+        let mode = match authority.mode {
+            FenceMode::Dispatch => "dispatch",
+            FenceMode::Mutation => "mutation",
+        };
+        let root = authority.root.to_string_lossy().replace('\\', "/");
+        Ok(self.machine.path(&format!(
+            "{root}/{}-{mode}-{nonce}.owner",
+            authority.generation
+        )))
+    }
+    fn execute(
+        &self,
+        dir: &Path,
+        args: &[&str],
+        record: &Path,
+        limit: std::time::Duration,
+        owned: git::WorkspaceCommand<'_>,
+    ) -> Result<git::Exit, String> {
+        let result = crate::processes::checked(git::run_workspace_command(
+            dir,
+            args,
+            record,
+            limit,
+            crate::tasks::cancellation(),
+            owned,
+        ));
+        let out = match result {
+            Ok(out) => out,
+            Err(error) => {
+                if matches!(error, crate::processes::Failure::Failed(_)) {
+                    self.uncertain.store(true, Ordering::Release);
                 }
-                std::thread::sleep(std::time::Duration::from_millis(500));
+                return Err(error.message());
             }
-        });
+        };
+        if let Some(reason) = out.stopped {
+            if out.stop_kind == Some(crate::processes::StopKind::Uncertain) {
+                self.uncertain.store(true, Ordering::Release);
+            }
+            return Err(format!(
+                "{reason}; {}",
+                String::from_utf8_lossy(&out.stderr).trim()
+            ));
+        }
+        Ok(git::Exit {
+            code: out.status.code(),
+            stdout: out.stdout,
+            stderr: out.stderr,
+        })
+    }
+    pub(crate) fn invalidate(&self) {
+        self.uncertain.store(true, Ordering::Release);
+    }
+    pub(crate) fn run_git(
+        &self,
+        dir: &Path,
+        args: &[&str],
+        limit: std::time::Duration,
+    ) -> Result<git::Exit, String> {
+        let authority = self.authority(FenceMode::Mutation)?;
+        let record = self.owner_record(&authority)?;
+        self.execute(
+            dir,
+            args,
+            &record,
+            limit,
+            git::WorkspaceCommand::new(&authority),
+        )
+    }
+    fn shell(&self, script: &str, args: &[&str], input: Option<Vec<u8>>) -> Result<(), String> {
+        let authority = self.authority(FenceMode::Mutation)?;
+        let record = self.owner_record(&authority)?;
+        let words = runner::sh_alias("gitcraft-bisect-mutation", script, args);
+        let words: Vec<_> = words.iter().map(String::as_str).collect();
+        let mut owned = git::WorkspaceCommand::new(&authority);
+        owned.input = input;
+        let out = self.execute(
+            &self.repo,
+            &words,
+            &record,
+            std::time::Duration::from_secs(1800),
+            owned,
+        )?;
+        if out.code == Some(0) {
+            Ok(())
+        } else {
+            Err(String::from_utf8_lossy(&out.stderr).into_owned())
+        }
     }
 
     /// Worktree `n`'s folder: as the app names it, and as a path there.
@@ -186,206 +253,213 @@ impl Workspace {
         })
     }
 
-    /// Takes away everything a bisect made there: stops its tests that still run, removes its
-    /// worktrees and its folder, and its refs.
     fn clear(&self) -> Result<(), String> {
-        // Every record is authenticated before CLEAR may mutate worktrees or refs. Keep
-        // the exact bytes as a final barrier against replaced/new records during recovery.
-        let listing = runner::shell(&self.repo, RECORDS, &[&self.base_there])?;
-        let mut retired = Vec::new();
-        let proof = clear_proof(&listing, |name| {
-            let path = remote::join(&self.base, name);
-            let bytes = remote::recover_owner(&path).map_err(|e| {
-                format!(
-                    "unresolved test owner {name}; {} preserved: {e}",
-                    self.base_there
-                )
-            })?;
-            retired.push((path, bytes.clone()));
-            Ok(bytes)
-        })?;
-        let pid = std::process::id().to_string();
-        let input = format!("{}\n", proof.join("\n")).into_bytes();
-        if input.len() > 64 << 20 {
-            return Err("recovery proof exceeds 64 MiB; workspace preserved".into());
+        let authority = self.authority(FenceMode::Mutation)?;
+        let record = self.owner_record(&authority)?;
+        let ledger = authority.root.to_string_lossy().replace('\\', "/");
+        let own = record
+            .file_name()
+            .and_then(|v| v.to_str())
+            .ok_or("invalid cleanup owner name")?;
+        let words = runner::sh_alias(
+            "gitcraft-bisect-clear",
+            CLEAR,
+            &[&self.base_there, &ledger, own, &authority.generation],
+        );
+        let words: Vec<_> = words.iter().map(String::as_str).collect();
+        let mut owned = git::WorkspaceCommand::new(&authority);
+        owned.cleanup = true;
+        let out = self.execute(
+            &self.repo,
+            &words,
+            &record,
+            std::time::Duration::from_secs(1800),
+            owned,
+        )?;
+        if out.code != Some(0) {
+            return Err(format!(
+                "workspace cleanup partial; external ledger retained: {}",
+                String::from_utf8_lossy(&out.stderr).trim()
+            ));
         }
-        let result = runner::shell_input(&self.repo, CLEAR, &[&self.base_there, &pid], Some(input))
-            .map(|_| ())
-            .map_err(|e| {
-                format!(
-                    "could not clear {} on {}: {e}",
-                    self.base_there,
-                    self.machine.label()
-                )
-            });
-        if result.is_ok() {
-            for (path, bytes) in retired {
-                let _ = remote::retire_owner(&path, &bytes);
+        if !cleaned_receipt(&out.stdout, &authority) {
+            self.uncertain.store(true, Ordering::Release);
+            return Err("missing or mismatched cleaned receipt; external ledger retained".into());
+        }
+        Ok(())
+    }
+    fn make_private(&self) -> Result<(), String> {
+        if matches!(self.machine, Machine::Here) {
+            let authority = self.authority(FenceMode::Mutation)?;
+            let record = self.owner_record(&authority)?;
+            let mut owned = git::WorkspaceCommand::new(&authority);
+            owned.directory = Some(&self.base);
+            let out = self.execute(
+                &self.repo,
+                &["--version"],
+                &record,
+                std::time::Duration::from_secs(30),
+                owned,
+            )?;
+            if out.code == Some(0) {
+                Ok(())
+            } else {
+                Err(String::from_utf8_lossy(&out.stderr).into_owned())
             }
+        } else {
+            self.shell("umask 077; mkdir -- \"$1\"", &[&self.base_there], None)
         }
+    }
+    pub fn close(&mut self) -> Result<(), String> {
+        if self.closed {
+            return self.close_error.clone().map_or(Ok(()), Err);
+        }
+        self.closed = true;
+        let cleared = if self.uncertain.load(Ordering::Acquire) {
+            Err("workspace ownership uncertain; external recovery evidence retained".into())
+        } else {
+            self.clear()
+        };
+        let released = self
+            .lease
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .close();
+        let result = match (cleared, released) {
+            (Ok(()), Ok(())) => Ok(()),
+            (Err(e), Ok(())) | (Ok(()), Err(e)) => Err(e),
+            (Err(primary), Err(release)) => Err(format!("{primary}; lease release: {release}")),
+        };
+        self.close_error = result.as_ref().err().cloned();
         result
     }
-
-    fn make_private(&self) -> Result<(), String> {
-        let parent = self.base.parent().ok_or("bisect folder has no parent")?;
-        remote::create_dir_all(parent).map_err(|e| e.to_string())?;
-        if remote::parse(&self.base).is_some() {
-            runner::shell(
-                &self.repo,
-                "umask 077; mkdir -- \"$1\"",
-                &[&self.base_there],
-            )
-            .map(|_| ())
-        } else {
-            gitcraft_os::create_private_directory(&self.base).map_err(|e| e.to_string())
-        }
-    }
-
-    /// Clears what the bisect made (once; dropping it does the same).
-    pub fn close(&mut self) -> Result<(), String> {
-        if std::mem::replace(&mut self.closed, true) {
-            return Ok(());
-        }
-        self.beating.store(false, Ordering::Relaxed);
-        let cleared = self.clear();
-        release(&self.base);
-        cleared
-    }
 }
-
 impl Drop for Workspace {
     fn drop(&mut self) {
-        let _ = self.close();
+        if !self.closed {
+            let _ = self.close();
+        }
     }
 }
-
-/// Refuses the folder `base` when another gitcraft is using it (its owner rewritten lately).
-fn refuse_if_in_use(base: &Path, machine: &Machine) -> Result<(), String> {
-    let Ok(owner) = remote::read_to_string(&remote::join(base, OWNER)) else {
-        return Ok(());
-    };
-    let ours = owner.split_whitespace().nth(1) == Some(std::process::id().to_string().as_str());
-    let at: i64 = owner
-        .split_whitespace()
-        .nth(2)
-        .and_then(|w| w.parse().ok())
-        .unwrap_or(0);
-    // This process's own (claimed by none of its bisects, or `claim` would have refused):
-    // left by one whose clean-up failed.
-    if !ours && git::now() - at < STALE_AFTER {
-        return Err(format!(
-            "another gitcraft window is running a parallel bisect in this repository on {}; \
-             cancel it there first",
-            machine.label()
-        ));
+fn cleaned_receipt(bytes: &[u8], authority: &WorkspaceAuthority) -> bool {
+    #[derive(serde::Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct Receipt {
+        v: u8,
+        state: String,
+        anchor: String,
+        generation: String,
+        records: usize,
+        records_sha256: String,
     }
-    Ok(())
+    bytes.len() <= 4096
+        && serde_json::from_slice::<Receipt>(bytes).is_ok_and(|r| {
+            r.v == 1
+                && r.state == "cleaned"
+                && r.anchor == authority.anchor
+                && r.generation == authority.generation
+                && r.records <= 4096
+                && r.records_sha256.len() == 64
+                && r.records_sha256
+                    .bytes()
+                    .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+        })
 }
-
-/// Clears what a crashed bisect left in `repo`'s git folder, if anything; one running (here
-/// or in another window) is left alone.
 pub fn clear_leftovers(repo: &Path) {
     let machine = Machine::of(repo);
-    let Ok((base, base_there)) = base_for(repo, &machine) else {
+    let Ok(common) = canonical_common(repo) else {
         return;
     };
-    if !remote::try_is_dir(&base).unwrap_or(false) || claim(&base).is_err() {
+    let root = format!("{common}/gitcraft-bisect-owners");
+    // A read avoids initializing an empty coordination namespace for every tab open.
+    if !remote::try_is_dir(&machine.path(&root)).unwrap_or(false) {
         return;
     }
-    if refuse_if_in_use(&base, &machine).is_err() {
-        release(&base);
+    let lease = match &machine {
+        Machine::Here => Lease::native(Path::new(&root)),
+        Machine::There(host) => Lease::remote(host, &root),
+    };
+    let Ok(lease) = lease else {
         return;
-    }
-    let mut ws = Workspace {
-        machine,
-        repo: repo.to_path_buf(),
-        base,
+    };
+    let base_there = format!("{common}/gitcraft-bisect-work");
+    let ws = Workspace {
+        base: machine.path(&base_there),
         base_there,
+        machine,
+        repo: repo.into(),
         adding: Mutex::new(()),
-        beating: Arc::default(),
-        closed: false,
+        lease: Mutex::new(lease),
+        uncertain: AtomicBool::new(false),
+        closed: true,
+        close_error: None,
     };
-    let _ = ws.close();
+    let _ = ws.clear();
+    let _ = ws
+        .lease
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .close();
 }
 
 /// The folder for bisecting in `repo` (on `machine`): as the app names it, and as a path there.
 pub fn base_for(repo: &Path, machine: &Machine) -> Result<(PathBuf, String), String> {
-    let common = git_common_dir(repo)?;
-    let home = machine.home()?.replace('\\', "/");
-    let digest = format!("{:x}", md5::compute(common.as_bytes()));
-    let there = format!(
-        "{}/{RUNS}/run-{}",
-        home.trim_end_matches('/'),
-        &digest[..12]
-    );
+    let there = format!("{}/gitcraft-bisect-work", canonical_common(repo)?);
     Ok((machine.path(&there), there))
 }
-
-/// List names only. Legacy PID files are recovery uncertainty, never kill authority.
-const RECORDS: &str = r#"for f in "$1"/*.owner "$1"/*.pid; do
+const CLEAR: &str = r#"LC_ALL=C; export LC_ALL
+b=$1
+ledger=$2
+own=$3
+generation=$4
+shift 4
+fail() { printf 'gitcraft: %s; external recovery ledger retained\n' "$1" >&2; exit 1; }
+[ "$b" = "${ledger%/*}/gitcraft-bisect-work" ] || fail 'cleanup base is outside claimed repository'
+[ ! -L "$b" ] && [ ! -L "$ledger" ] || fail 'workspace or ledger became a symbolic link'
+for f in "$b"/*.pid "$b"/*.owner "$b"/owner; do
+  [ ! -e "$f" ] && [ ! -L "$f" ] || fail 'unresolved legacy evidence in workspace base'
+done
+IFS=' ' read -r kind count || fail 'missing generation proof'
+[ "$kind" = G ] || fail 'invalid generation proof'
+case $count in ''|*[!0-9]*) fail 'invalid generation count';; esac
+[ "$count" -gt 0 ] && [ "$count" -le 4097 ] || fail 'generation proof bound'
+generations=''
+i=0
+while [ "$i" -lt "$count" ]; do
+  IFS= read -r g || fail 'truncated generation proof'
+  [ "${#g}" -eq 64 ] || fail 'invalid generation length'
+  case $g in *[!0-9a-f]*) fail 'invalid generation';; esac
+  generations="$generations $g"
+  i=$((i+1))
+done
+case " $generations " in *" $generation "*) ;; *) fail 'current generation missing';; esac
+IFS=' ' read -r kind count || fail 'missing record proof'
+[ "$kind" = R ] || fail 'invalid record proof'
+case $count in ''|*[!0-9]*) fail 'invalid record count';; esac
+[ "$count" -le 4096 ] || fail 'record proof bound'
+i=0
+for f in "$ledger"/*.owner; do
   [ -e "$f" ] || [ -L "$f" ] || continue
-  printf '%s\000' "${f##*/}"
+  [ "${f##*/}" != "$own" ] || continue
+  IFS= read -r expected && IFS= read -r proof || fail 'owner records changed'
+  [ "${f##*/}" = "$expected" ] && [ ! -L "$f" ] || fail 'owner record changed'
+  # The actual fenced owner validated private regular files before this bounded reread.
+  actual=$(od -An -v -tx1 -N 2049 "$f") || fail 'cannot inspect owner record'
+  actual=$(printf '%s' "$actual" | tr -d ' \n') || fail 'cannot encode owner record'
+  [ "${#actual}" -le 4096 ] && [ "$actual" = "$proof" ] || fail 'owner record replaced'
+  i=$((i+1))
 done
-true"#;
-
-fn record_names(listing: &str) -> Result<Vec<String>, String> {
-    let mut names = Vec::new();
-    for name in listing.split('\0').filter(|n| !n.is_empty()) {
-        let valid = name
-            .strip_suffix(".owner")
-            .and_then(|n| n.split_once('-'))
-            .is_some_and(|(slot, nonce)| {
-                !slot.is_empty()
-                    && slot.bytes().all(|b| b.is_ascii_digit())
-                    && nonce.len() == 32
-                    && nonce
-                        .bytes()
-                        .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
-            });
-        if !valid {
-            return Err(format!(
-                "unresolved legacy or invalid owner record {name}; workspace preserved; no signals sent"
-            ));
-        }
-        names.push(name.to_owned());
-    }
-    Ok(names)
-}
-
-fn clear_proof(
-    listing: &str,
-    mut recover: impl FnMut(&str) -> Result<Vec<u8>, String>,
-) -> Result<Vec<String>, String> {
-    // Validate the entire set first: a legacy/unknown record grants no signal authority.
-    let names = record_names(listing)?;
-    let mut proof = Vec::new();
-    for name in names {
-        let bytes = recover(&name)?;
-        proof.push(name);
-        proof.push(bytes.iter().map(|b| format!("{b:02x}")).collect());
-    }
-    Ok(proof)
-}
-
-/// Verify exact acknowledged records again before any mutation. Never prune unrelated
-/// worktrees. Coordination heartbeat PID is used only to retain this app's send refs.
-const CLEAR: &str = r#"b=$1
-ours=$2
-shift 2
-case $b in */.cache/gitcraft/bisect/run-*) ;; *) echo "gitcraft: $b is no bisect folder" >&2; exit 1;; esac
-for f in "$b"/*.pid; do
-  if [ -e "$f" ] || [ -L "$f" ]; then echo 'gitcraft: unresolved legacy owner; workspace preserved' >&2; exit 1; fi
-done
-for f in "$b"/*.owner; do
-  [ -e "$f" ] || [ -L "$f" ] || continue
-  IFS= read -r expected && IFS= read -r receipt || { echo 'gitcraft: owner records changed; workspace preserved' >&2; exit 1; }
-  if [ "${f##*/}" != "$expected" ] || [ -L "$f" ]; then echo 'gitcraft: owner records changed; workspace preserved' >&2; exit 1; fi
-  value=$(head -c 2049 "$f" | od -An -v -tx1) || exit 1
-  value=$(printf '%s' "$value" | tr -d ' \n')
-  if [ "$value" != "$receipt" ]; then echo 'gitcraft: owner record replaced; workspace preserved' >&2; exit 1; fi
-done
-if IFS= read -r extra && [ -n "$extra" ]; then echo 'gitcraft: owner record missing; workspace preserved' >&2; exit 1; fi
-fail() { printf 'gitcraft: %s; endpoint artifacts retained\n' "$1" >&2; exit 1; }
+[ "$i" -eq "$count" ] || fail 'owner record set changed'
+if IFS= read -r extra; then fail 'unexpected trailing recovery proof'; fi
+refs=$(git for-each-ref --format='%(refname) %(objectname)' refs/gitcraft-bisect/) || fail 'cannot list bisect refs'
+while IFS=' ' read -r r expected; do
+  [ -n "$r" ] || continue
+  suffix=${r#refs/gitcraft-bisect/}
+  g=${suffix%%/*}
+  case " $generations " in *" $g "*) ;; *) fail "ref has no recovered generation: $r";; esac
+done <<GITCRAFT_REFS
+$refs
+GITCRAFT_REFS
 worktrees=$(git -c core.quotePath=false worktree list --porcelain) || fail 'cannot list worktrees'
 while IFS= read -r line; do
   case $line in 'worktree "'*) fail 'quoted worktree path requires manual recovery';; esac
@@ -413,43 +487,18 @@ for g in "$c"/worktrees/*/gitdir; do
     [ ! -e "${g%/gitdir}" ] && [ ! -L "${g%/gitdir}" ] || fail 'worktree metadata remains';;
   esac
 done
-refs=$(git for-each-ref --format='%(refname) %(objectname)' refs/gitcraft-bisect/) || fail 'cannot list bisect refs'
 while IFS=' ' read -r r expected; do
   [ -n "$r" ] || continue
-  case $r in refs/gitcraft-bisect/send-"$ours"-*) ;; *)
-    git update-ref -d "$r" "$expected" || fail "cannot remove unchanged ref $r";; esac
+  git update-ref -d "$r" "$expected" || fail "cannot remove unchanged ref $r"
 done <<GITCRAFT_REFS
 $refs
 GITCRAFT_REFS
 remaining=$(git for-each-ref --format='%(refname)' refs/gitcraft-bisect/) || fail 'cannot verify remaining refs'
-while IFS= read -r r; do
-  [ -n "$r" ] || continue
-  case $r in refs/gitcraft-bisect/send-"$ours"-*) ;; *) fail "bisect ref remains: $r";; esac
-done <<GITCRAFT_REFS
-$remaining
-GITCRAFT_REFS
+[ -z "$remaining" ] || fail 'bisect refs remain'
 [ ! -L "$b" ] || fail 'workspace became a symbolic link'
 rm -rf -- "$b" || fail "cannot remove workspace $b"
 [ ! -e "$b" ] && [ ! -L "$b" ] || fail 'workspace remains after removal'
-
-true"#;
-
-/// Claims `base` for this process's bisect, refusing one already claimed (another tab).
-fn claim(base: &Path) -> Result<(), String> {
-    let mut active = ACTIVE.lock().unwrap_or_else(PoisonError::into_inner);
-    if active.iter().any(|b| b == base) {
-        return Err(
-            "a parallel bisect is already running in this repository; cancel it first".to_owned(),
-        );
-    }
-    active.push(base.to_path_buf());
-    Ok(())
-}
-
-fn release(base: &Path) {
-    let mut active = ACTIVE.lock().unwrap_or_else(PoisonError::into_inner);
-    active.retain(|b| b != base);
-}
+"#;
 
 /// The repository the bisect works in on `machine` (see [`Workspace::open`]).
 fn repository_for(
@@ -527,6 +576,25 @@ fn git_common_dir(repo: &Path) -> Result<String, String> {
     })
 }
 
+fn canonical_common(repo: &Path) -> Result<String, String> {
+    let common = git_common_dir(repo)?;
+    let canonical = if remote::parse(repo).is_some() {
+        runner::shell(repo, "cd \"$1\" && pwd -P", &[&common])?
+            .trim()
+            .to_owned()
+    } else {
+        crate::app::strip_verbatim(std::fs::canonicalize(&common).map_err(|e| e.to_string())?)
+            .to_string_lossy()
+            .replace('\\', "/")
+    };
+    if canonical.contains(['\n', '\r', '\0'])
+        || !(canonical.starts_with('/') || canonical.get(1..2) == Some(":"))
+    {
+        return Err("unsupported canonical repository path".into());
+    }
+    Ok(canonical)
+}
+
 fn has_commit(repo: &Path, hash: &str) -> bool {
     git::run(
         Some(repo),
@@ -571,51 +639,24 @@ fn bundle(source: &Path, with: &[String], without: &[String]) -> Result<Vec<u8>,
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
-    fn recording_recovery_requires_every_receipt_and_rejects_legacy_before_control() {
-        let name = format!("0-{}.owner", "a".repeat(32));
-        let mut controlled = Vec::new();
-        let invalid = format!("{name}\0old.pid\0");
-        assert!(
-            clear_proof(&invalid, |n| {
-                controlled.push(n.to_owned());
-                Ok(b"not used".to_vec())
-            })
-            .is_err()
-        );
-        assert!(
-            controlled.is_empty(),
-            "legacy files must not grant control authority"
-        );
-        let valid = format!("{name}\0");
-        assert!(clear_proof(&valid, |_| Err("missing receipt".into())).is_err());
-        assert_eq!(
-            clear_proof(&valid, |_| Ok(b"verified endpoint\n".to_vec())).unwrap_or_default(),
-            [
-                name.clone(),
-                "766572696669656420656e64706f696e740a".to_owned()
-            ]
-        );
-        for invalid in [
-            "../../escape.owner\0",
-            "0-abcd.owner\0",
-            "owner\0",
-            "0-a.pid\0",
-        ] {
-            assert!(record_names(invalid).is_err());
-        }
-    }
-
-    /// Two bisects never share a folder in one process; the second one is told why.
-    #[test]
-    fn a_folder_is_claimed_once() {
-        let base = std::env::temp_dir().join(format!("gitcraft-claim-{}", std::process::id()));
-        assert!(claim(&base).is_ok());
-        let again = claim(&base);
-        assert!(again.is_err_and(|e| e.contains("already running")));
-        release(&base);
-        assert!(claim(&base).is_ok());
-        release(&base);
+    fn recording_cleanup_requires_exact_generation_and_structured_complete_receipt() {
+        let authority = WorkspaceAuthority {
+            root: "/synthetic".into(),
+            anchor: "original".into(),
+            generation: "a".repeat(64),
+            mode: FenceMode::Mutation,
+        };
+        let mut receipt = serde_json::json!({"v":1,"state":"cleaned","anchor":"original","generation":authority.generation,"records":2,"records_sha256":"b".repeat(64)});
+        assert!(cleaned_receipt(
+            &serde_json::to_vec(&receipt).unwrap(),
+            &authority
+        ));
+        receipt["generation"] = "old".into();
+        assert!(!cleaned_receipt(
+            &serde_json::to_vec(&receipt).unwrap(),
+            &authority
+        ));
+        assert!(!cleaned_receipt(b"true", &authority));
     }
 }

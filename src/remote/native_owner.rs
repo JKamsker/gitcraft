@@ -67,6 +67,8 @@ struct Request {
     input: Option<String>,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     cleanup: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    directory: Option<PathBuf>,
 }
 
 #[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -251,6 +253,7 @@ pub(crate) fn command_with_authority(
         workspace,
         input: None,
         cleanup: false,
+        directory: None,
     };
     let mut input = serde_json::to_vec(&request).map_err(|e| e.to_string())?;
     input.push(b'\n');
@@ -299,6 +302,14 @@ impl NativeCommand {
         if self.input.len() > MAX_REQUEST {
             return Err("native request exceeds 96 MiB".into());
         }
+        Ok(self)
+    }
+    pub(crate) fn with_directory(mut self, directory: Option<&Path>) -> Result<Self, String> {
+        let mut request: Request =
+            serde_json::from_slice(&self.input).map_err(|e| e.to_string())?;
+        request.directory = directory.map(Path::to_path_buf);
+        self.input = serde_json::to_vec(&request).map_err(|e| e.to_string())?;
+        self.input.push(b'\n');
         Ok(self)
     }
     pub(crate) fn configure(self, options: &mut crate::processes::Options) -> Command {
@@ -370,6 +381,17 @@ fn private_file(path: &Path, bytes: &[u8]) -> Result<(), String> {
         .and_then(|()| file.sync_all())
         .map_err(|e| e.to_string())?;
     gitcraft_os::close_file(file).map_err(|e| e.to_string())
+}
+fn emit_hello(bytes: &[u8]) -> Result<(), String> {
+    println!("\n{READY}");
+    std::io::stdout().flush().map_err(|e| e.to_string())?;
+    std::io::stderr()
+        .write_all(MARKER)
+        .and_then(|()| std::io::stderr().write_all(bytes))
+        .and_then(|()| std::io::stderr().write_all(b"\n"))
+        .and_then(|()| std::io::stderr().flush())
+        .map_err(|e| e.to_string())?;
+    Ok(())
 }
 type TerminalParts = (i32, bool, Vec<u8>, Vec<u8>);
 fn terminal_parts(
@@ -507,16 +529,46 @@ fn helper(fence: &mut Option<gitcraft_os::WorkspaceFence>) -> Result<i32, String
     } else {
         private_file(&request.record, &bytes)?;
     }
+    if let Some(directory) = &request.directory {
+        let authority = request
+            .workspace
+            .as_ref()
+            .ok_or("private directory creation requires workspace authority")?;
+        if authority.mode != super::workspace_authority::FenceMode::Mutation
+            || authority
+                .root
+                .parent()
+                .map(|p| p.join("gitcraft-bisect-work"))
+                .as_ref()
+                != Some(directory)
+        {
+            return Err("private directory is outside claimed workspace".into());
+        }
+        let result = (|| {
+            emit_hello(&bytes)?;
+            if cancel.is_cancelled()
+                || started.elapsed() >= Duration::from_millis(request.milliseconds)
+            {
+                return Err("private directory creation cancelled before mutation".to_owned());
+            }
+            fence
+                .as_ref()
+                .ok_or("missing directory fence")?
+                .verify(&authority.native_grant())
+                .map_err(|e| e.to_string())?;
+            gitcraft_os::create_private_directory(directory).map_err(|e| e.to_string())
+        })();
+        terminal_receipt(
+            &path,
+            &endpoint,
+            if result.is_ok() { 0 } else { 125 },
+            result.is_ok(),
+        )?;
+        return result.map(|()| 0);
+    }
     let mut cleanup_plan = None;
     let submitted = (|| {
-        println!("\n{READY}");
-        std::io::stdout().flush().map_err(|e| e.to_string())?;
-        std::io::stderr()
-            .write_all(MARKER)
-            .and_then(|()| std::io::stderr().write_all(&bytes))
-            .and_then(|()| std::io::stderr().write_all(b"\n"))
-            .and_then(|()| std::io::stderr().flush())
-            .map_err(|e| e.to_string())?;
+        emit_hello(&bytes)?;
         let input = if request.cleanup {
             let authority = request
                 .workspace

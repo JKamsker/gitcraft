@@ -81,6 +81,7 @@ pub struct Test<'a> {
     /// A folder of the same machine to stop it from (the worktree may be in use).
     pub control: &'a Path,
     pub owner_record: &'a Path,
+    pub authority: &'a crate::remote::workspace_authority::WorkspaceAuthority,
     pub log: &'a str,
     pub command: &'a str,
     pub limit: Duration,
@@ -102,6 +103,7 @@ pub fn run(test: &Test<'_>, stop: &(dyn Fn() -> bool + Sync)) -> Result<Ran, Str
                 &record,
                 test.limit + GRACE,
                 cancel.clone(),
+                test.authority,
             ));
         });
         let deadline = Instant::now() + test.limit;

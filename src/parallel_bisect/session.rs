@@ -366,7 +366,7 @@ impl Slot {
                 &self.there,
                 hash,
             ];
-            let exit = ws.adding(|| git::run_for_test(&ws.repo, &add, limit))?;
+            let exit = ws.adding(|| ws.run_git(&ws.repo, &add, limit))?;
             if exit.code != Some(0) {
                 return Err(failed(exit));
             }
@@ -376,7 +376,7 @@ impl Slot {
             &["checkout", "-q", "--detach", "--force", hash][..],
             &["clean", "-q", "-ffd"],
         ] {
-            let exit = git::run_for_test(&self.path, args, limit)?;
+            let exit = ws.run_git(&self.path, args, limit)?;
             if exit.code != Some(0) {
                 return Err(failed(exit));
             }
@@ -399,22 +399,22 @@ impl Slot {
                 output: String::new(),
             });
         }
-        let mut random = [0u8; 16];
-        gitcraft_os::random_bytes(&mut random).map_err(|e| e.to_string())?;
-        let unique: String = random.iter().map(|b| format!("{b:02x}")).collect();
-        let owner_record = crate::remote::join(&ws.base, &format!("{}-{unique}.owner", self.n));
+        let authority = ws.authority(crate::remote::workspace_authority::FenceMode::Dispatch)?;
+        let owner_record = ws.owner_record(&authority)?;
         let log = format!("{}/{}.log", ws.base_there, self.n);
         runner::run(
             &runner::Test {
                 dir: &self.path,
                 control: &ws.repo,
                 owner_record: &owner_record,
+                authority: &authority,
                 log: &log,
                 command: &setup.command,
                 limit: setup.timeout,
             },
             stop,
         )
+        .inspect_err(|_| ws.invalidate())
     }
 }
 

@@ -639,16 +639,51 @@ pub(crate) fn run_for_test_input(
     })
 }
 
-/// A bisect test with durable, authenticated crash recovery on its actual machine.
+/// Immutable actual-machine authority for one durable workspace operation.
+pub(crate) struct WorkspaceCommand<'a> {
+    pub authority: &'a remote::workspace_authority::WorkspaceAuthority,
+    pub input: Option<Vec<u8>>,
+    pub cleanup: bool,
+    pub directory: Option<&'a Path>,
+}
+impl<'a> WorkspaceCommand<'a> {
+    pub fn new(authority: &'a remote::workspace_authority::WorkspaceAuthority) -> Self {
+        Self {
+            authority,
+            input: None,
+            cleanup: false,
+            directory: None,
+        }
+    }
+}
 pub(crate) fn run_owned_test(
     dir: &Path,
     args: &[&str],
     record: &Path,
     limit: std::time::Duration,
     cancel: crate::tasks::Cancellation,
+    authority: &remote::workspace_authority::WorkspaceAuthority,
+) -> Result<crate::processes::Output, String> {
+    run_workspace_command(
+        dir,
+        args,
+        record,
+        limit,
+        cancel,
+        WorkspaceCommand::new(authority),
+    )
+}
+pub(crate) fn run_workspace_command(
+    dir: &Path,
+    args: &[&str],
+    record: &Path,
+    limit: std::time::Duration,
+    cancel: crate::tasks::Cancellation,
+    owned: WorkspaceCommand<'_>,
 ) -> Result<crate::processes::Output, String> {
     let extra = Extra {
         test: Some(limit),
+        stdin: owned.input.clone(),
         ..Default::default()
     };
     let mut options = crate::processes::Options {
@@ -663,15 +698,31 @@ pub(crate) fn run_owned_test(
         if record.host != target.host {
             return Err("remote owner record is on a different machine".into());
         }
+        if owned.directory.is_some() {
+            return Err("remote private directories use their fenced shell operation".into());
+        }
         let request = remote_request(&target, &extra, args);
-        remote::streaming_command_record(&target.host, &request, Some(&record.path))?
-            .configure(&mut options)
+        remote::streaming_command_authority(
+            &target.host,
+            &request,
+            Some(&record.path),
+            Some(owned.authority),
+            owned.cleanup,
+        )?
+        .configure(&mut options)
     } else {
         if remote::parse(record).is_some() {
             return Err("native owner record is on a different machine".into());
         }
-        remote::native_owner::command(local_command(Some(dir), &extra, args), record, limit)?
-            .configure(&mut options)
+        remote::native_owner::command_with_authority(
+            local_command(Some(dir), &extra, args),
+            record,
+            limit,
+            Some(owned.authority.clone()),
+        )?
+        .with_input(owned.input.as_deref(), owned.cleanup)?
+        .with_directory(owned.directory)?
+        .configure(&mut options)
     };
     crate::processes::run(command, options)
 }
