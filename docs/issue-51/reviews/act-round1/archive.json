@@ -1,0 +1,67 @@
+[
+  {
+    "source": "/tmp/gitcraft-51-act-review-r1.md",
+    "archive": "review.md",
+    "sha256": "f34db12c5eb05669854579bf2ddedbc1cf02f473dafd1760dd57fa92f5821dcb"
+  },
+  {
+    "source": "/tmp/gitcraft-51-act-review-r1-evidence.json",
+    "archive": "00-gitcraft-51-act-review-r1-evidence.json.gz",
+    "sha256": "8612ffce4afca0f4897c8434daefa765db47ab2301c86671f432eab1a0e95487",
+    "compressed_sha256": "7f5ec722fca5eec4f70da628da6c14dcfcb8542055e955daf1fa0cb4f4c8ba14"
+  },
+  {
+    "source": "/tmp/gitcraft-act-r1-model-harness/Cargo.lock",
+    "archive": "01-Cargo.lock.gz",
+    "sha256": "bfe8acf6158b38649dae47f6502cc4ad04e2715e974e716a1817c7c46d8c800e",
+    "compressed_sha256": "bd31eb9bba0f07fd9a94ddd02fdb3b7d4a6b4ea2c077bc9c132bef0c09f57d8c"
+  },
+  {
+    "source": "/tmp/gitcraft-act-r1-model-harness/Cargo.toml",
+    "archive": "02-Cargo.toml.gz",
+    "sha256": "81acacb8ca4b66da36cf058f31ab46dfbe629a0a66cfc2e91b1858644e750512",
+    "compressed_sha256": "1566fc8427ed47eb95177b9a386692bc38e24a6695473c908d7844f96b82a7da"
+  },
+  {
+    "source": "/tmp/gitcraft-act-r1-model-harness/src/main.rs",
+    "archive": "03-main.rs.gz",
+    "sha256": "cd5e3be459af7769a029795911f5d6e85cf5b07d41276bfda15b3469b308002d",
+    "compressed_sha256": "4e14ca3bee7fc639c1e62d7d2df477c914c2fe6085f373e609d78deec430effb"
+  },
+  {
+    "source": "/tmp/gitcraft-act-r1-model-harness.log",
+    "archive": "04-gitcraft-act-r1-model-harness.log.gz",
+    "sha256": "9080d4e657af462a344957e08143b4d28351cc87371f6a88602577a4457f3e16",
+    "compressed_sha256": "9d264dcf6950a0515d25bafb3ab749d8f6322fd616431fe32e72ae89b766c371"
+  },
+  {
+    "source": "/tmp/gitcraft-act-r1-recording-harness/Cargo.lock",
+    "archive": "05-Cargo.lock.gz",
+    "sha256": "009d36eace1f2de7c019c2e3675586723bee70be18027f2e117026dd30639fb7",
+    "compressed_sha256": "732b14da09ab47b4ba78cd631b9579eb49037ce3df6195635a9a4472c2be7139"
+  },
+  {
+    "source": "/tmp/gitcraft-act-r1-recording-harness/Cargo.toml",
+    "archive": "06-Cargo.toml.gz",
+    "sha256": "35ab54b8ece52a30df8905462cc4d4a13adab55f10fedf71ff8545a2a8b06c88",
+    "compressed_sha256": "fdd80435edbaa80a074d947bf2cc0bc873829fd40b895eaa9b3f60e0c13a55ec"
+  },
+  {
+    "source": "/tmp/gitcraft-act-r1-recording-harness/src/main.rs",
+    "archive": "07-main.rs.gz",
+    "sha256": "82362ec83ec0844436548349adc2951e1941331051953c1356a2ffd7361bf0d6",
+    "compressed_sha256": "ca0f412f4f3ac1bab5b9717bd4969585a1e909a3184103bc1347b36204b34ccd"
+  },
+  {
+    "source": "/tmp/gitcraft-act-r1-recording-harness.log",
+    "archive": "08-gitcraft-act-r1-recording-harness.log.gz",
+    "sha256": "f695eaf67c5758248bc0f2eedcfb98d32ced1e9934390b9481c74f5ba98f55ae",
+    "compressed_sha256": "b6eaf99a0c4a03e0aedb6b34ed2c56e4d1833aa6bb83d1281f4a6d3ad885ce00"
+  },
+  {
+    "source": "/tmp/gitcraft-act-r1-upstream/provenance.json",
+    "archive": "09-provenance.json.gz",
+    "sha256": "10e36165cbcbc4c9fd40ddfee0af2ba270523ee38ce0dbd78db43c45e8b2060b",
+    "compressed_sha256": "780311cb796f0aaacb60f8d138c4381dd4ba4bd106086a99029f3d365fc2a489"
+  }
+]

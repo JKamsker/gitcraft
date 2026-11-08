@@ -1,0 +1,56 @@
+{
+  "application": "4a9a22c806126a813d9d5633a699dd7cafa135da",
+  "checks": [
+    {
+      "application": "4143becdd51f8c09002f10154ffce962b3ca193e",
+      "command": "cargo +1.95.0 test --locked --lib repo::authorship_view::tests::the_lens_through_the_tab -- --exact --test-threads=1",
+      "exit_code": 0,
+      "tests_passed": 1,
+      "log": "minimap-4143becd-test.log.gz",
+      "sha256": "d5ec55d815aaae286e1a2827706d6beb31bedb98be61e21e84002a4ca968c55f",
+      "compressed_sha256": "8a8b9a408431d1d82a736cb2565549274758502f3c21d0deb20098989e0d130b"
+    },
+    {
+      "application": "26061b7a30d564c9cdab1a2907cd6e97e6c53da1",
+      "command": "cargo +1.95.0 test --locked --lib repo::celebration::tests:: -- --test-threads=1",
+      "exit_code": 0,
+      "tests_passed": 8,
+      "log": "celebration-26061b7a-test.log.gz",
+      "sha256": "b9eb7286f604a00d8e2e82469a34c907d77880ff34be40427deb286ef392f856",
+      "compressed_sha256": "bc14c64ff872ecf5fb2b4d603bcbb7c5d266f6b4976cba0f01f5489d860b4703"
+    },
+    {
+      "application": "4a9a22c806126a813d9d5633a699dd7cafa135da",
+      "command": "cargo +1.95.0 test --locked --lib repo::postcards:: -- --test-threads=1",
+      "exit_code": 0,
+      "tests_passed": 12,
+      "log": "postcards-4a9a22c8-test.log.gz",
+      "sha256": "02cf12a00823e479b8f68c03dba47db384eea59aa4dcb5f13d2cf667e135eafe",
+      "compressed_sha256": "c7e65400a12cffb9ac2817d3b83ff64db5d1f6ac2e5e2444019bd27faeef887e"
+    },
+    {
+      "application": "4a9a22c806126a813d9d5633a699dd7cafa135da",
+      "command": "cargo +1.95.0 check --locked --all-targets",
+      "exit_code": 0,
+      "tests_passed": null,
+      "log": "visual-followups-4a9a22c8-check.log.gz",
+      "sha256": "af2ef72d9f07f13599373668e40d963786c046b1ba283a87528031cef927b0f4",
+      "compressed_sha256": "bc51c49fa46947a9a16eb1f903b8459833ee14444e66af988b2aaf9939b49e6b"
+    }
+  ],
+  "source_sha256": {
+    "src/repo/authorship_view.rs": "e1f361547fa8096475392178eb9128f4c214c342757dad52c9e69a4692840bb7",
+    "src/repo/celebration.rs": "31d8b531147949102a3c8d3ef2922f55e952e92a47722c5f183f28ec81e0baca",
+    "src/repo/operations.rs": "ce42d5ff59f8a97a8a86ecfd3161651af19e258b0c99be755ac4c29af5815c3c",
+    "src/repo/postcards/render.rs": "33e9fa4fd34bf61dbc20166f60ee8e38c37a06a4592d57ccaae8ad825082da15",
+    "src/graph.rs": "546b581bb2978baeac6598ba7e53ddd51c47451ed19c190203554828feeb808b"
+  },
+  "test_environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "TMPDIR": "/private/tmp",
+    "PATH_prefix": "/tmp/gitcraft-integration-tools",
+    "SHELL": "/tmp/gitcraft-integration-tools/validation-shell"
+  },
+  "review": "independent R3 pending",
+  "process_runtime": "HELD; no process-control runtime/full suite/CI performed"
+}
