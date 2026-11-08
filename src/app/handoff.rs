@@ -57,7 +57,7 @@ impl App {
             Request::Launch { cwd, args } => {
                 let parsed = crate::launch::parse(args.iter().map(std::ffi::OsString::from));
                 if let crate::launch::Parsed::Run(Some(cmd)) = parsed
-                    && self.git_version.is_ok()
+                    && (matches!(&cmd, crate::launch::Command::Quit) || self.git_version.is_ok())
                 {
                     self.manual_open = false;
                     self.palette = None;

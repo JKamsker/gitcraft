@@ -22,7 +22,6 @@ mod profiles;
 mod recent_status;
 mod remote_open;
 mod resident;
-#[cfg(not(test))]
 pub(crate) use resident::notification_body as resident_notification_body;
 mod repo_scan;
 mod setup;

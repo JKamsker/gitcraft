@@ -438,6 +438,14 @@ pub(crate) struct Watcher {
     running: Option<Running>,
     pub status: String,
     notified: BTreeMap<String, Instant>,
+    // The watcher retains each delivery lifetime separately from the observation job.
+    // Removing one path retires only its pending notifications; profile/opt-in/preference
+    // changes retire every old owner. Queued tasks hold tokens, never these Scope guards.
+    deliveries: BTreeMap<PathBuf, tasks::Scope>,
+    #[cfg(test)]
+    queued_notifications: Vec<Box<dyn FnOnce() + Send>>,
+    #[cfg(test)]
+    recorded_notifications: std::sync::Arc<Mutex<Vec<String>>>,
 }
 impl Drop for Watcher {
     fn drop(&mut self) {
@@ -483,6 +491,16 @@ impl Watcher {
         if changed {
             self.notified.clear();
             self.status.clear();
+        }
+        if changed || !active || !notifications_enabled {
+            self.deliveries.clear(); // Scope::drop cancels both queued and already-starting tasks
+        }
+        self.deliveries
+            .retain(|path, _| self.model.subscriptions.contains_key(path));
+        if active && notifications_enabled {
+            for path in self.model.subscriptions.keys() {
+                self.deliveries.entry(path.clone()).or_default();
+            }
         }
         if let Some(job) = &self.running
             && !job.stale
@@ -544,7 +562,7 @@ impl Watcher {
                                     self.notified.clear();
                                 }
                                 self.notified.insert(key, now);
-                                notify(&job.path, &notice.text);
+                                self.queue_notification(&job.path, &notice.text);
                             }
                         }
                     }
@@ -584,6 +602,41 @@ impl Watcher {
             && let Some(path) = self.model.next(now, busy, allowed)
         {
             self.start(path, ctx);
+        }
+    }
+    fn queue_notification(&mut self, path: &Path, text: &str) {
+        let Some(owner) = self.deliveries.get(path) else {
+            return;
+        };
+        let cancel = owner.0.clone();
+        let body = crate::app::resident_notification_body(&format!(
+            "{}: {text}",
+            path.file_name()
+                .unwrap_or(path.as_os_str())
+                .to_string_lossy()
+        ));
+        #[cfg(not(test))]
+        {
+            let job = notification_job(cancel.clone(), body, |body| {
+                let _ = notify_rust::Notification::new()
+                    .appname("gitcraft")
+                    .summary("gitcraft repository update")
+                    .body(body)
+                    .show();
+            });
+            if let Ok(pool) = tasks::pool() {
+                let _ = pool.submit(cancel, tasks::Priority::Background, None, job);
+            }
+        }
+        #[cfg(test)]
+        {
+            let sink = std::sync::Arc::clone(&self.recorded_notifications);
+            self.queued_notifications
+                .push(notification_job(cancel, body, move |body| {
+                    sink.lock()
+                        .unwrap_or_else(std::sync::PoisonError::into_inner)
+                        .push(body.to_owned());
+                }));
         }
     }
     #[cfg(not(test))]
@@ -642,31 +695,19 @@ impl Watcher {
     #[cfg(test)]
     fn start(&mut self, _: PathBuf, _: &egui::Context) {} // pure tests never submit live jobs
 }
-#[cfg(not(test))]
-fn notify(path: &Path, text: &str) {
-    let body = crate::app::resident_notification_body(&format!(
-        "{}: {text}",
-        path.file_name()
-            .unwrap_or(path.as_os_str())
-            .to_string_lossy()
-    ));
-    if let Ok(pool) = tasks::pool() {
-        let _ = pool.submit(
-            Default::default(),
-            tasks::Priority::Background,
-            None,
-            Box::new(move || {
-                let _ = notify_rust::Notification::new()
-                    .appname("gitcraft")
-                    .summary("gitcraft repository update")
-                    .body(&body)
-                    .show();
-            }),
-        );
-    }
+/// The exact final delivery boundary used by the OS notifier and recording notifier. The
+/// owner token is also the task's cancellation token; check again immediately before show.
+fn notification_job(
+    cancel: tasks::Cancellation,
+    body: String,
+    show: impl FnOnce(&str) + Send + 'static,
+) -> Box<dyn FnOnce() + Send> {
+    Box::new(move || {
+        if !cancel.is_cancelled() {
+            show(&body);
+        }
+    })
 }
-#[cfg(test)]
-fn notify(_: &Path, _: &str) {}
 
 #[cfg(test)]
 #[path = "watch_tests.rs"]

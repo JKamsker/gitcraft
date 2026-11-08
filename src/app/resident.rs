@@ -69,7 +69,6 @@ impl App {
     }
 }
 
-#[cfg(not(test))]
 pub(crate) fn notification_body(text: &str) -> String {
     super::panels::notification_body(text)
 }

@@ -440,3 +440,70 @@ fn checked_out_branch_ci_uses_existing_push_destination_routes_and_keeps_transit
     assert!(watcher.notified.is_empty()); // tray status works with desktop notifications off
     Ok(())
 }
+
+#[test]
+fn actual_queued_delivery_rechecks_profile_context_path_opt_in_preference_and_drop_owner()
+-> Result<(), String> {
+    let _network = crate::network::test_pause::set(None);
+    let ctx = egui::Context::default();
+    let path = PathBuf::from("/recorded/private-repository");
+    for invalidation in [
+        "unchanged",
+        "profile",
+        "context",
+        "path",
+        "opt-out",
+        "notifications-off",
+        "drop",
+    ] {
+        let mut watcher = Watcher::default();
+        let tick =
+            |watcher: &mut Watcher, enabled, profile, open: &[PathBuf], notifications_enabled| {
+                watcher.tick(
+                    Inputs {
+                        enabled,
+                        profile,
+                        open,
+                        busy: &HashSet::new(),
+                        recent: &[],
+                        minutes: 10,
+                        notifications_enabled,
+                    },
+                    &ctx,
+                );
+            };
+        tick(&mut watcher, true, 1, std::slice::from_ref(&path), true);
+        watcher.queue_notification(&path, "Review requested: private title");
+        assert_eq!(watcher.queued_notifications.len(), 1);
+        let jobs = std::mem::take(&mut watcher.queued_notifications);
+        let delivered = std::sync::Arc::clone(&watcher.recorded_notifications);
+        match invalidation {
+            "profile" => tick(&mut watcher, true, 2, std::slice::from_ref(&path), true),
+            "context" => connections::Context {
+                error: Some("new immutable configuration".into()),
+                ..Default::default()
+            }
+            .run(|| tick(&mut watcher, true, 1, std::slice::from_ref(&path), true)),
+            "path" => tick(&mut watcher, true, 1, &[], true),
+            "opt-out" => tick(&mut watcher, false, 1, std::slice::from_ref(&path), true),
+            "notifications-off" => tick(&mut watcher, true, 1, std::slice::from_ref(&path), false),
+            "unchanged" => tick(&mut watcher, true, 1, std::slice::from_ref(&path), true),
+            "drop" => drop(watcher),
+            _ => return Err("unknown recording case".into()),
+        }
+        for job in jobs {
+            job();
+        }
+        let messages = delivered.lock().map_err(|e| e.to_string())?;
+        if invalidation == "unchanged" {
+            assert_eq!(
+                *messages,
+                vec!["private-repository: Review requested: private title"],
+                "{invalidation}"
+            );
+        } else {
+            assert!(messages.is_empty(), "stale delivery escaped {invalidation}");
+        }
+    }
+    Ok(())
+}
