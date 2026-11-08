@@ -166,6 +166,7 @@ impl RepoTab {
                     },
                     Ok(()),
                     links,
+                    Some((&view.goto_line, view.marked_line)),
                 );
                 if let Some(range) = picked {
                     let at = view

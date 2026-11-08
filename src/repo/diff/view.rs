@@ -143,6 +143,7 @@ impl RepoTab {
                 || find::Source::DiffFile(path.clone()),
                 history,
                 links,
+                None,
             )
             .and_then(pick)
             {

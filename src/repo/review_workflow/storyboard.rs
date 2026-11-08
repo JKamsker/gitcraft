@@ -3,7 +3,7 @@ use super::{sharing, store};
 use crate::{
     git,
     pull_request::{PrDetails, PrFiles},
-    repo::{Action, DiffKey, RepoTab, file_view::FileTab},
+    repo::{Action, RepoTab, file_view::FileTab},
 };
 use serde::{Deserialize, Serialize};
 use std::path::Path;
@@ -56,6 +56,22 @@ pub(crate) struct Storyboard {
     form: CardForm,
     remote: String,
     imported: bool,
+    cached: Option<Vec<Card>>,
+}
+impl Storyboard {
+    pub(in crate::repo) fn invalidate(&mut self) {
+        self.request += 1;
+        self.rows = None;
+    }
+    fn accept(&mut self, request: u64, result: Result<Vec<Shown>, String>) {
+        if request != self.request {
+            return;
+        }
+        if let Ok(rows) = &result {
+            self.cached = Some(rows.iter().map(|r| r.card.clone()).collect());
+        }
+        self.rows = Some(result);
+    }
 }
 #[derive(Clone)]
 pub(crate) enum StoryAct {
@@ -447,35 +463,58 @@ fn fetch_board(
     imported(repo, &oid(repo, &cached)?)
 }
 impl RepoTab {
+    pub(in crate::repo) fn refresh_storyboard(&mut self, ctx: &egui::Context) {
+        let Some(view) = &mut self.pr_view else {
+            return;
+        };
+        let (Some(Ok(details)), Some(Ok(files))) = (&view.details, &view.files) else {
+            return;
+        };
+        if details.head_oid != files.to {
+            return;
+        }
+        let Some(cards) = view.storyboard.cached.clone() else {
+            return;
+        };
+        view.storyboard.invalidate();
+        let request = view.storyboard.request;
+        let pr_request = self.pr_requests;
+        let (repo, files) = (self.path.clone(), files.clone());
+        self.then_or(
+            ctx,
+            false,
+            Err,
+            move || {
+                cards
+                    .into_iter()
+                    .map(|c| show_card(&repo, c, &files))
+                    .collect()
+            },
+            move |tab, result, _| {
+                if tab.pr_requests != pr_request {
+                    return;
+                }
+                if let Some(view) = tab
+                    .pr_view
+                    .as_mut()
+                    .filter(|v| v.storyboard.request == request)
+                {
+                    view.storyboard.accept(request, result);
+                }
+            },
+        );
+    }
     pub(in crate::repo) fn story_act(&mut self, act: StoryAct, ctx: &egui::Context) {
         if let StoryAct::OpenCode { commit, path, line } = act {
-            let key = DiffKey::Commit { hash: commit, path };
             self.review_document.open = false;
-            self.open_diff(key.clone(), ctx);
-            let repo = self.path.clone();
-            self.then_or(
-                ctx,
-                false,
-                Err,
-                move || {
-                    let data =
-                        crate::repo::diff::load(&repo, &key, git::DiffOptions::default(), false)?;
-                    Ok((
-                        key,
-                        data.lines
-                            .iter()
-                            .position(|l| l.new == u32::try_from(line).ok())
-                            .unwrap_or(0),
-                    ))
-                },
-                |tab, result, _| {
-                    if let Ok((key, index)) = result
-                        && let Some(v) = tab.diff.as_mut().filter(|v| v.key == key)
-                    {
-                        v.jump_line = Some(index);
-                    }
-                },
-            );
+            // A line card describes the full pinned file, including unchanged/out-of-hunk
+            // lines. Its logical line stays on this view until accepted file data is painted.
+            self.open_file_view(path, Some(commit), FileTab::File, ctx);
+            if let Some(view) = &mut self.file_view {
+                view.goto_line
+                    .set(usize::try_from(line).ok().filter(|n| *n > 0));
+                view.marked_line = usize::try_from(line).ok().filter(|n| *n > 0);
+            }
             return;
         }
         if let StoryAct::Fetch { remote, head } | StoryAct::Publish { remote, head } = &act {
@@ -551,7 +590,7 @@ impl RepoTab {
                         match result {
                             Ok((rows, imported)) => {
                                 v.storyboard.imported = imported;
-                                v.storyboard.rows = Some(Ok(rows));
+                                v.storyboard.accept(request, Ok(rows));
                             }
                             Err(e) => v.storyboard.rows = Some(Err(e)),
                         }
@@ -564,6 +603,13 @@ impl RepoTab {
         let (Some(Ok(d)), Some(Ok(f))) = (&v.details, &v.files) else {
             return;
         };
+        if d.head_oid != f.to {
+            self.status = Some((
+                "Pull request files are refreshing; wait before arranging its storyboard".into(),
+                true,
+            ));
+            return;
+        }
         let (d, f, path, request) = (
             d.clone(),
             f.clone(),
@@ -638,7 +684,7 @@ impl RepoTab {
                     .as_mut()
                     .filter(|v| v.storyboard.request == request)
                 {
-                    v.storyboard.rows = Some(result);
+                    v.storyboard.accept(request, result);
                 }
             },
         );
@@ -909,5 +955,55 @@ mod tests {
         assert_eq!(server.tip("HEAD")?, server_head);
         assert_eq!(reviewer.tip("HEAD")?, reviewer_head);
         Ok(())
+    }
+    #[test]
+    fn r2_pure_storyboard_refresh_invalidates_rows_preserves_provenance_and_rejects_late_results() {
+        let card = Card {
+            phase: "Result".into(),
+            text: "tested".into(),
+            base: "A".into(),
+            head: "B".into(),
+            anchor: Anchor::Test {
+                commit: "B".into(),
+                tree: "treeB".into(),
+                command: "test".into(),
+                verdict: "good".into(),
+            },
+        };
+        let mut state = Storyboard {
+            imported: true,
+            ..Default::default()
+        };
+        let shown = || {
+            vec![Shown {
+                card: card.clone(),
+                target: None,
+                stale: None,
+            }]
+        };
+        state.accept(0, Ok(shown()));
+        state.invalidate();
+        assert!(state.rows.is_none());
+        assert!(state.cached.is_some());
+        assert!(state.imported);
+        state.accept(0, Ok(shown()));
+        assert!(state.rows.is_none());
+        let request = state.request;
+        state.accept(
+            request,
+            Ok(vec![Shown {
+                card,
+                target: None,
+                stale: Some("Current tree differs".into()),
+            }]),
+        );
+        assert!(
+            state
+                .rows
+                .as_ref()
+                .and_then(|r| r.as_ref().ok())
+                .is_some_and(|rows| rows[0].stale.is_some())
+        );
+        assert!(state.imported);
     }
 }

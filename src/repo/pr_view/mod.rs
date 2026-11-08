@@ -124,6 +124,7 @@ impl RepoTab {
         };
         view.request = request;
         view.relocated = Default::default();
+        view.storyboard.invalidate();
         view.loading = true;
         let (path, number, hosting) = (self.path.clone(), view.number, self.hosting.clone());
         spawn(&self.tx, ctx, move || {
@@ -245,6 +246,7 @@ impl RepoTab {
             self.check_pr_since(&details, ctx);
         }
         self.load_review_freshness(ctx);
+        self.refresh_storyboard(ctx);
         let Some(view) = self.pr_view.as_mut() else {
             return;
         };
