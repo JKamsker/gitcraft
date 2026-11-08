@@ -325,6 +325,7 @@ impl RepoTab {
                     .id_salt(file)
                     .default_open(true)
                     .show(ui, |ui| {
+                        ui.spacing_mut().item_spacing.y = 0.0;
                         file_intro(ui, key, data, acts);
                         let review = self.diff_review(key);
                         // Clip fixed-height rows before building widgets. Offscreen hunks do no layout work.
@@ -343,7 +344,10 @@ impl RepoTab {
                             let row_top = ui.cursor().top();
                             if line.kind == diff::Kind::Hunk {
                                 ui.horizontal(|ui| {
-                                    ui.monospace(&line.text);
+                                    ui.add(
+                                        egui::Label::new(RichText::new(&line.text).monospace())
+                                            .wrap_mode(egui::TextWrapMode::Extend),
+                                    );
                                     for &pick in picks(key, data.partial, data.revertable) {
                                         if ui
                                             .add_enabled(idle, egui::Button::new(pick.verb()))

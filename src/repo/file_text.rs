@@ -144,6 +144,8 @@ impl LinePick {
 /// and the lines picked in it (click, Shift+click or drag over them). `history`: why the lines
 /// picked can have no history, if they can't. Returns the lines (from 1) whose history was
 /// asked for from their right-click menu.
+// The optional logical location accompanies the existing search/history/menu inputs.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn show(
     ui: &mut Ui,
     id: impl std::hash::Hash + std::fmt::Debug,

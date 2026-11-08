@@ -463,6 +463,9 @@ fn fetch_board(
         .ok_or("Shared storyboard was not fetched")?;
     imported(repo, &commit)
 }
+fn current_files(request: u64, files_request: u64, head: &str, files_head: &str) -> bool {
+    request == files_request && head == files_head
+}
 impl RepoTab {
     pub(in crate::repo) fn refresh_storyboard(&mut self, ctx: &egui::Context) {
         let Some(view) = &mut self.pr_view else {
@@ -471,7 +474,12 @@ impl RepoTab {
         let (Some(Ok(details)), Some(Ok(files))) = (&view.details, &view.files) else {
             return;
         };
-        if details.head_oid != files.to {
+        if !current_files(
+            self.pr_requests,
+            view.files_request,
+            &details.head_oid,
+            &files.to,
+        ) {
             return;
         }
         let Some(cards) = view.storyboard.cached.clone() else {
@@ -530,7 +538,9 @@ impl RepoTab {
             let (Some(Ok(d)), Some(Ok(f))) = (&v.details, &v.files) else {
                 return;
             };
-            if &d.head_oid != head || &f.to != head {
+            if !current_files(self.pr_requests, v.files_request, &d.head_oid, &f.to)
+                || &d.head_oid != head
+            {
                 self.status = Some(("Pull request changed; refresh the storyboard".into(), true));
                 return;
             }
@@ -604,7 +614,7 @@ impl RepoTab {
         let (Some(Ok(d)), Some(Ok(f))) = (&v.details, &v.files) else {
             return;
         };
-        if d.head_oid != f.to {
+        if !current_files(self.pr_requests, v.files_request, &d.head_oid, &f.to) {
             self.status = Some((
                 "Pull request files are refreshing; wait before arranging its storyboard".into(),
                 true,
@@ -844,6 +854,12 @@ fn open(acts: &mut Vec<Action>, commit: &str, path: &str, line: u64) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn r2_pure_storyboard_requires_current_files_even_when_refreshed_head_is_unchanged() {
+        assert!(current_files(2, 2, "head", "head"));
+        assert!(!current_files(2, 1, "head", "head"));
+        assert!(!current_files(2, 2, "new", "old"));
+    }
     #[test]
     fn cards_follow_range_diff_pairs_and_flag_changed_content() -> Result<(), String> {
         let r = git::stack::test_repo::TestRepo::new("storyboard")?;
