@@ -1,0 +1,176 @@
+{
+  "review": "Bounded interaction COV-R1-3 correction check",
+  "candidate": "435648afec0431e19641282207508ae883cb44f6",
+  "tree": "2235e4e042760ac0dd0cafbe06dcfa8228371afa",
+  "verdict": "FAIL_COV3_MINIMAP_ACCESSIBLE_NAME",
+  "scope": "Prior named painted action/focus/role/state omissions only; closed editor/panel/tearoff excluded; registry/menu inventory separate",
+  "report": {
+    "path": "/tmp/gitcraft-51-interaction-a11y-delta-review.md",
+    "sha256": "7953c42716a5be655e9365a93ffddababbe716ff8d7f5197f3fdfa1f10b7b15c"
+  },
+  "snapshot": "/tmp/gitcraft-interaction-a11y-r1-4356-source",
+  "source_read_mode": "immutable archive; each bound source matches git-show object",
+  "source_sha256_and_blob": {
+    "src/a11y/mod.rs": {
+      "sha256": "11e16d9f81b59f92ca2af5b3344b3e525d3203f1e615b44b353f3f48f6bd52a3",
+      "blob": "995d7a08b22eceb97e19f6552cb092132960c19b",
+      "snapshot_matches_git_object": true
+    },
+    "src/a11y/value.rs": {
+      "sha256": "7ae490f84bcef03ca99ea921eb0ef6159a9c1c834e1819ab2514c41230a9392d",
+      "blob": "76b1e460d6161e7461b0e3e97b65b84a08bbd9e2",
+      "snapshot_matches_git_object": true
+    },
+    "src/repo/diff/image_compare/lazy.rs": {
+      "sha256": "43c4102067eef5fe91819c17d84c3059682baf609be703342b6ea5795464e4b4",
+      "blob": "9b1566ec2839efc7506e9da9803be858fd1d3c90",
+      "snapshot_matches_git_object": true
+    },
+    "src/repo/diff/image_compare/view.rs": {
+      "sha256": "a6102bb2c671bca8df2bdfc64113aac12314fbae779e964f1d984f94534928b6",
+      "blob": "aa1edbfd2d51db658bcaa0f61bc23ce49398c397",
+      "snapshot_matches_git_object": true
+    },
+    "src/repo/diff/rich/deps_view.rs": {
+      "sha256": "bbb18d80dbaf64457842c46b518f52f33dd2c54daf3586bb6f9559f72cc3c62b",
+      "blob": "867216f13001dc5c3d641f4b9e058a28738ca756",
+      "snapshot_matches_git_object": true
+    },
+    "src/repo/diff/rich/dvc_view.rs": {
+      "sha256": "ede66f0981f906caa29bf9f70670b71ca38ab8eb5a934d42ee1b82a2ad1816be",
+      "blob": "6ee46c21c35070ebd42cfba3f61229eccd4b4f5c",
+      "snapshot_matches_git_object": true
+    },
+    "src/repo/diff/rich/table_view.rs": {
+      "sha256": "7741cb3c529fe0ff947979c946efc799ede07ba2a961c208538e39318ac55559",
+      "blob": "7a09e83ffc16b6e4b735f064c84058cf85705aed",
+      "snapshot_matches_git_object": true
+    },
+    "src/repo/diff/rows.rs": {
+      "sha256": "795da1767aaec91aeb1b079dcbfac275d90d2e1a960b7ac56eb55e36cad456ca",
+      "blob": "b2e92d335a53233bc6198a2d2ac2960806a3cf74",
+      "snapshot_matches_git_object": true
+    },
+    "src/repo/graph_view/minimap.rs": {
+      "sha256": "f7020110f7774c2a82a5276e1cb0661a50f7b387e8e3a0697bf314887609cb0e",
+      "blob": "83b2bab09f25960f4cfb0759d14fe5c280c54bcc",
+      "snapshot_matches_git_object": true
+    },
+    "src/repo/popout/hint.rs": {
+      "sha256": "ddf5a152e99853cfb3c15de6b76221b571a8b9aca6c10717cd2dfc08ab363383",
+      "blob": "ad92c97f93918ca248649058d2441bf359d4c138",
+      "snapshot_matches_git_object": true
+    },
+    "src/a11y/focus.rs": {
+      "sha256": "d8f48fff41dfb5d47770f7c9f145841b4ec760745530f22a2d9ec47dfa518e1f",
+      "blob": "18f4de7e911cce6087d7f26ce9b1b488f6004236",
+      "snapshot_matches_git_object": true
+    },
+    "src/a11y/labels.rs": {
+      "sha256": "634a52ee712dd5eeb43c0ba83fb761c0e747aea3825cc8031f3eccf97a3da07b",
+      "blob": "d8bf2a79fb402de7b805c3caae4cdcdf5ebeccda",
+      "snapshot_matches_git_object": true
+    },
+    "src/repo/graph_view/mod.rs": {
+      "sha256": "6be864dffea894824a5fdae0d6982a2f53a90aec4568234d68a2e2576ba54bf6",
+      "blob": "9494431fa6b3d4ff58cc6327dfe6a353febbb58a",
+      "snapshot_matches_git_object": true
+    },
+    "src/repo/diff/image_compare/view_state.rs": {
+      "sha256": "15b24ef1d5297e6609de9419fe8290588f257449ac3d13f6f238f24f033bf246",
+      "blob": "4712196e64aa35fb0cb2ac2a39ff8955a22edbeb",
+      "snapshot_matches_git_object": true
+    },
+    "src/repo/diff/image_compare/mod.rs": {
+      "sha256": "69ccd66efcb3b7e78082953dca8282c3922bf6ce6c8401dbc7b0eeabbdfd9102",
+      "blob": "31d1464ae02a353f500282845c46129ec50f4b4d",
+      "snapshot_matches_git_object": true
+    }
+  },
+  "input_sha256": {
+    "/tmp/gitcraft-51-interaction-checkpoint-review-r1.md": "bcfda86a92acf0f7103cebb0b84967ddd82f62a47837d998438de6df23f8ae72",
+    "/tmp/gitcraft-51-interaction-checkpoint-review-r1-manifest.json": "94528f3cf8269056a9c0ea250cd29722e8b8e3fe91a3162c611f9a68cb6f6eb1",
+    "/tmp/gitcraft-interaction-a11y-coverage-validation.json": "1c363c2de9df13965b2b17616b3d1da48709da38b16142d86bf05bceb551b48f"
+  },
+  "writer_logs_sha256": {
+    "/tmp/gitcraft-interaction-435648af-a11y-0.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "/tmp/gitcraft-interaction-435648af-a11y-1.log": "06781b868bcbc9899332ab59eeb123ff46e1581c16019c793b44e6f595f029c2",
+    "/tmp/gitcraft-interaction-435648af-a11y-2.log": "242e456ae8f6d23b407b89f4f656f09d21dabc1355f994c400a2e572ac9b273e",
+    "/tmp/gitcraft-interaction-435648af-a11y-3.log": "5e32a9e6b4e34f88ec0fc92d8db8b3972d3730be4ec127fe3e1438d9c83d0d8a",
+    "/tmp/gitcraft-interaction-435648af-a11y-4.log": "1e79a65e0a94237df57887bbee39bd5e80c2cf67d1e2805ff4fc73e210c68d23",
+    "/tmp/gitcraft-interaction-435648af-a11y-5.log": "4beabdbbcbe7ae0e58ca4568f6b7c31285aa15e0afff12f88b67f14037619a79",
+    "/tmp/gitcraft-interaction-435648af-a11y-6.log": "732186322402325172940531d8d6d7cfac85dc902585b2bef6715ad6839dacfd"
+  },
+  "writer_gates": {
+    "reported_selected_passes": 7,
+    "test_filters": 5,
+    "fmt": "PASS_INSPECTED_NOT_RERUN",
+    "qualified_alltarget_clippy": "PASS_INSPECTED_NOT_RERUN -D warnings -A dead_code",
+    "separate_cargo_check_claim": false,
+    "actual_callsite_test_reachability": [
+      "deps row Button Tab/Enter/ring",
+      "DVC pair Button Tab/Enter/ring",
+      "raise chip Button Tab/Enter/ring recording Action only",
+      "table header Tab skip",
+      "actual Rows.show AccessKit SetValue persistent ScrollArea+Tab avoids text shield",
+      "actual compare_view SetValue stored zoom; precompleted lazies"
+    ],
+    "minimap_writer_limit": "compiled+shared scalar contract only; no actual production RepoTab/history integration execution"
+  },
+  "reviewer_execution": {
+    "compiler": "rustc +1.95.0 --edition=2024 minimap-label.rs --extern cached egui -L cached dependencies",
+    "compiler_calls": 1,
+    "compiler_exit": 0,
+    "adapter_runs": 1,
+    "adapter_exit": 0,
+    "stdout": [
+      "has_more=false: slider label=Some(\"History ends\"), value=Some(40.0), min=Some(0.0), max=Some(1900.0)",
+      "has_more=true: slider label=Some(\"Older unloaded \u2193\"), value=Some(40.0), min=Some(0.0), max=Some(1900.0)"
+    ],
+    "exact_method_sha256": "1dcc462ca9cdd60f07692f87d839df88debc58d82ef059bd99c245a71480877c",
+    "seams": "Exact history_minimap/offset_at and imported actual value.rs; inert prepared bins/rows/graph-width struct, no-op prepare_minimap; inert theme and naming helper. No production RepoTab constructor/history_reader; numeric/label callback only.",
+    "excluded": [
+      "App/RepoTab/discovery constructor",
+      "actual Git/helper/CLI/keyring/HTTP/network/process fixture",
+      "native screenreader/window/PTY",
+      "signal/cancel/timeout",
+      "fullsuite/CI/PR/source edits/subagents"
+    ]
+  },
+  "evidence_sha256": {
+    "/tmp/gitcraft-interaction-a11y-r1-4356-evidence/minimap-label.rs": "4fb83f5637e0ba48223b9c17db1d476a46da3e25c73bb788ee972aa772585a3f",
+    "/tmp/gitcraft-interaction-a11y-r1-4356-evidence/writer-receipt.json": "1c363c2de9df13965b2b17616b3d1da48709da38b16142d86bf05bceb551b48f",
+    "/tmp/gitcraft-interaction-a11y-r1-4356-evidence/minimap-label": "4a42f6f155d9f46af8b8c380522a6eb8798d1b6d76223bd4d855394689735a0e",
+    "/tmp/gitcraft-interaction-a11y-r1-4356-evidence/reviewed.diff": "b08964f02aaa238c163deac20c579ea2755d0328e31c9670412cf9f75fcd54c7",
+    "/tmp/gitcraft-interaction-a11y-r1-4356-evidence/execution.json": "6717720396ed94a15d912da98941874e6db6e79dc1bfa81a7f8fe93b69d5fac2"
+  },
+  "cached_dependency": {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-b9411fc1/target/debug/deps/libegui-0e410d2928238130.rlib",
+    "sha256": "00991d51820997eadb725e41ef7721aa7c818dd7c1a201afb2ac0c71ae3d7703",
+    "class": "headless dependency only; no App binary"
+  },
+  "findings": [
+    {
+      "id": "COV3-D1",
+      "severity": "P2",
+      "source": "graph_view/minimap.rs:116,175-179,236-243",
+      "proof": "exact inert callback emits populated Slider footer label, both has_more states",
+      "correction": "separate footer and accessible label; populated-map AccessKit label gate"
+    }
+  ],
+  "prior_inventory_dispositions": {
+    "dependency_jump_button": "CORRECTED_SCOPED_STATIC_HEADLESS",
+    "DVC_jump_button": "CORRECTED_SCOPED_STATIC_HEADLESS",
+    "raise_child_label": "CORRECTED_SCOPED_STATIC_HEADLESS_ACTION_ONLY",
+    "table_header_deadstop": "CORRECTED_SCOPED_STATIC_HEADLESS",
+    "diff_text_shield_deadstop": "CORRECTED_SCOPED_STATIC_HEADLESS",
+    "diff_map_numeric_actions_store": "CORRECTED_SCOPED_STATIC_HEADLESS",
+    "image_zoom_numeric_actions_store": "CORRECTED_SCOPED_STATIC_HEADLESS_POSITIVE_PATH",
+    "minimap_numeric_actions": "IMPLEMENTED_SCOPED_STATIC_INERT; production history integration compiled only",
+    "minimap_accessible_name": "FAIL_COV3-D1",
+    "overall_COV3_sourcewide_exit": "STILL_PENDING_TARGETED_INVENTORY_NOT_EXHAUSTIVE_NATIVE_UNVALIDATED"
+  },
+  "previous_closed_findings": "No new disposition/reopening of editor/panel/e121 tearoff closures",
+  "other_open_ownership": "COV1/2 registry/menu separate; OS/localization/native source exit pending",
+  "hold": "UNCHANGED; no actual runtime/native/process/fullsuite fixture authorization. No whole-a11y or fullbatch acceptance."
+}

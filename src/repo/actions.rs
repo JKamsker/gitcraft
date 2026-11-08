@@ -80,6 +80,10 @@ pub(crate) enum Action {
     SelectPr(u64),
     SelectStash(usize),
     OpenDiff(DiffKey),
+    Review(super::review_workflow::ReviewAct),
+    Freshness(super::review_workflow::FreshnessAct),
+    Story(super::review_workflow::StoryAct),
+    ReviewTools(super::review_workflow::ToolsAct),
     /// Show a pull request in the big area.
     OpenPr(u64),
     /// Open the worktree of a pull request (proposing `branch`, at `sha`), making it first
@@ -101,6 +105,7 @@ pub(crate) enum Action {
     CloseCi,
     /// Something done in the pipeline view.
     Ci(ci_view::CiAct),
+    LocalCi(super::local_ci::Act),
     /// Something done in the reflog view (opening it on a reflog, or on the lost commits).
     Reflog(reflog::ReflogAct),
     CloseReflog,
@@ -951,7 +956,7 @@ impl RepoTab {
                 Action::LfsStorage(super::lfs_storage::StorageAct::OpenPanel),
             ));
         }
-        if self.hosting.is_some() {
+        {
             items.push((
                 "Start work from an issue…".into(),
                 "issue".into(),

@@ -1,0 +1,36 @@
+{
+  "base_review_candidate": "c74d6f49f349bfe76c12ed1a8fa83368c211ae07",
+  "pre_fix_parent": "0c7fdf0b76b4ee8246d2682d1e4a62fb08426d63",
+  "scope": [
+    "C-R3-1",
+    "R3-B1"
+  ],
+  "runtime_hold": true,
+  "files": [
+    {
+      "path": "src/parallel_bisect/session.rs",
+      "sha256": "9764edbe624de27406ff9acc2c8fe828c9fffb58810607c9674d8a121738117e",
+      "git_blob": "1e93f38731cfcbade900c62cb0dfcff4201259b6"
+    },
+    {
+      "path": "src/remote/supervisor/owner.py",
+      "sha256": "5841982e999e8445f6c87d548ab8e1be010b83b8e71320baeae096df2cf7e86c",
+      "git_blob": "92549371632aaa73ab23a1f04ae8cadc6c6c1d5d"
+    },
+    {
+      "path": "src/remote/supervisor/owner.pl",
+      "sha256": "23b634d14ff27670f23d9d0e522d3c2c933bf293df87516384c03e8e8dd83240",
+      "git_blob": "1f5453a49716f784a76181d68cf9ba91de0f2ca2"
+    },
+    {
+      "path": "src/remote/supervisor/cached_retirement_recording_tests.py",
+      "sha256": "8e5b741d9c959f5f32aadc4778ac53adfaad5332c051882885de2f86a2f9cd81",
+      "git_blob": "817d09223a0fcc41996cad11309979adf6c89a1d"
+    },
+    {
+      "path": "src/remote/supervisor/cached_retirement_recording_tests.pl",
+      "sha256": "1606a5cd7d2a05b4fcaf0416784af52643bd02033b5159aa6924a548c266f31d",
+      "git_blob": "333c1c10200e9c505a163657166266dda752c2ed"
+    }
+  ]
+}

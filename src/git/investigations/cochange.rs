@@ -120,6 +120,56 @@ fn parse(bytes: &[u8]) -> Result<History, String> {
     }
     Ok(out)
 }
+// Eligibility comes from the same immutable HEAD used by the history cache.
+// Deleted paths, old rename names, links and gitlinks cannot be actionable hints.
+fn eligible_paths(tree: &[u8]) -> Result<BTreeSet<String>, String> {
+    if !tree.is_empty() && tree.last() != Some(&0) {
+        return Err("Truncated pinned coupling tree".into());
+    }
+    let mut paths = BTreeSet::new();
+    for entry in tree.split(|b| *b == 0).filter(|e| !e.is_empty()) {
+        let tab = entry
+            .iter()
+            .position(|b| *b == b'\t')
+            .ok_or("Malformed pinned coupling tree")?;
+        let header = std::str::from_utf8(&entry[..tab]).map_err(|_| "Invalid pinned tree entry")?;
+        let fields = header.split(' ').collect::<Vec<_>>();
+        if fields.len() != 3 || !oid(fields[2]) {
+            return Err("Invalid pinned tree object".into());
+        }
+        if !matches!(fields[0], "100644" | "100755") || fields[1] != "blob" {
+            continue;
+        }
+        let Ok(path) = std::str::from_utf8(&entry[tab + 1..]) else {
+            continue;
+        };
+        if path.chars().any(char::is_control)
+            || path
+                .split('/')
+                .any(|part| matches!(part, "" | "." | ".." | ".git"))
+            || generated(path)
+        {
+            continue;
+        }
+        paths.insert(path.to_owned());
+    }
+    Ok(paths)
+}
+fn retain_current_paths(history: &mut History, current: &BTreeSet<String>) {
+    let mut omitted = BTreeSet::new();
+    for record in &mut history.records {
+        record.files.retain(|path| {
+            let keep = current.contains(path);
+            if !keep {
+                omitted.insert(path.clone());
+            }
+            keep
+        });
+    }
+    if !omitted.is_empty() {
+        history.notes.push(format!("{} historical paths are absent or ineligible at the pinned HEAD and omitted from actionable hints. Rename identities are not guessed.", omitted.len()));
+    }
+}
 pub(crate) fn load(repo: &Path, head: &str, active: &dyn Fn() -> bool) -> Result<History, String> {
     if !oid(head) {
         return Err("Coupling needs a pinned committed HEAD".into());
@@ -182,13 +232,19 @@ pub(crate) fn load(repo: &Path, head: &str, active: &dyn Fn() -> bool) -> Result
         },
         Err(_)=>history.notes.push("Generated attributes could not be read at this commit; known generated paths and commit subjects were excluded. Git 2.43+ supports pinned attribute queries.".into())
     }
+    let tree = reader.run(
+        &["ls-tree", "-r", "-z", "--full-tree", head, "--"],
+        vec![],
+        &[0],
+    )?;
+    retain_current_paths(&mut history, &eligible_paths(&tree)?);
     if reader.run(&["rev-parse", "--is-shallow-repository"], vec![], &[0])? == b"true\n" {
         history.limited = true;
         history
             .notes
             .push("Shallow repository: older cochanges are unavailable locally.".into());
     }
-    history.notes.push("Sample: latest 600 nonmerge commits. Bulk changes (>20 files), generated commit subjects, generated paths and generated attributes are excluded. At least three shared changes and 60% source confidence are required; this is historical association, not proof of a missing change.".into());
+    history.notes.push("Sample: latest 600 nonmerge commits. Bulk changes (>20 files), generated commit subjects, generated paths and generated attributes are excluded. Only regular, nongenerated files present at the pinned HEAD are actionable. At least three shared changes and 60% source confidence are required; this is historical association, not proof of a missing change.".into());
     Ok(history)
 }
 pub(crate) fn rank(
@@ -299,6 +355,78 @@ mod tests {
             index
         );
         assert!(load(&r.0, &head, &|| false).is_err());
+        Ok(())
+    }
+    #[test]
+    fn pure_cochange_current_tree_omits_deleted_renamed_and_nonregular_companions() {
+        let id = "a".repeat(40);
+        let tree = format!(
+            "100644 blob {id}\tserializer.rs\0100644 blob {id}\tcurrent.fixture\0100644 blob {id}\trenamed.fixture\0120000 blob {id}\tlink.fixture\0160000 commit {id}\tsubmodule\0100644 blob {id}\tgenerated/out.rs\0"
+        );
+        let eligible = eligible_paths(tree.as_bytes()).unwrap();
+        let files = BTreeSet::from(
+            [
+                "serializer.rs",
+                "current.fixture",
+                "deleted.fixture",
+                "old-name.fixture",
+                "link.fixture",
+                "submodule",
+                "generated/out.rs",
+            ]
+            .map(str::to_owned),
+        );
+        let mut history = History {
+            records: (0..3)
+                .map(|n| Record {
+                    id: format!("{n:040x}"),
+                    subject: format!("change {n}"),
+                    files: files.clone(),
+                })
+                .collect(),
+            ..Default::default()
+        };
+        retain_current_paths(&mut history, &eligible);
+        let staged = BTreeSet::from(["serializer.rs".into()]);
+        let hints = rank(&history, &staged, &staged);
+        assert_eq!(hints.len(), 1);
+        assert_eq!(hints[0].companion, "current.fixture");
+        assert_eq!(hints[0].source_changes, 3);
+        assert_eq!(
+            hints[0].evidence,
+            (0..3)
+                .map(|n| (format!("{n:040x}"), format!("change {n}")))
+                .collect::<Vec<_>>()
+        );
+        assert!(!history.notes.is_empty());
+        assert!(eligible_paths(b"truncated").is_err());
+    }
+    #[test]
+    fn deleted_and_renamed_historical_companions_are_not_current_missing_work() -> Result<(), String>
+    {
+        let r = Repo::new()?;
+        for n in 0..3 {
+            for p in [
+                "serializer.rs",
+                "deleted.fixture",
+                "old-name.fixture",
+                "current.fixture",
+            ] {
+                std::fs::write(r.0.join(p), format!("{n}")).map_err(|e| e.to_string())?;
+            }
+            r.git(&["add", "-A"])?;
+            r.commit("test@invalid", 1_700_000_000 + n)?;
+        }
+        r.git(&["rm", "deleted.fixture"])?;
+        r.git(&["mv", "old-name.fixture", "new-name.fixture"])?;
+        r.commit("test@invalid", 1_700_000_010)?;
+        let history = load(&r.0, &r.git(&["rev-parse", "HEAD"])?, &|| true)?;
+        let staged = BTreeSet::from(["serializer.rs".into()]);
+        let hints = rank(&history, &staged, &staged);
+        assert_eq!(hints.len(), 1);
+        assert_eq!(hints[0].companion, "current.fixture");
+        assert_eq!(hints[0].evidence.len(), 3);
+        assert_eq!(hints[0].source_changes, 3);
         Ok(())
     }
     #[test]

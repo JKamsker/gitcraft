@@ -458,7 +458,13 @@ fn pause(repo: &Path, id: &str, why: &str) -> Result<(), String> {
     e.status = Status::Paused(git::redact(why, None));
     save(repo, &view, None)
 }
-pub(crate) fn send(runner: &Runner<'_>, p: &Prepared, automatic: bool) -> Result<String, String> {
+pub(crate) fn send(
+    runner: &Runner<'_>,
+    p: &Prepared,
+    automatic: bool,
+    reviewed: &preflight::ReviewedSend,
+) -> Result<String, String> {
+    reviewed.check_plan(&p.plan)?;
     if crate::network::refused().is_some() {
         return Err("Outbox remains queued while offline".into());
     }
@@ -536,9 +542,10 @@ pub(crate) fn send(runner: &Runner<'_>, p: &Prepared, automatic: bool) -> Result
         .lock()
         .map_err(|_| "Sending intent saved; live consent unavailable, inspect before retry")?
         .insert((e.identity.clone(), e.id.clone()), p.context.clone());
-    let result = preflight::execute_controlled(
+    let result = preflight::execute_bound_controlled(
         runner.repo,
         &p.plan,
+        reviewed,
         runner.credentials,
         Some(runner.control),
     );
@@ -614,10 +621,23 @@ mod tests {
             control: &control,
             credentials: None,
         };
-        send(&runner, &p, false)?;
+        send(
+            &runner,
+            &p,
+            false,
+            &preflight::ReviewedSend::from_echo(preflight::push_args(&p.plan)?, None),
+        )?;
         let remote = git::run(Some(&bare), &["rev-parse", &p.plan.destination])?;
         assert_eq!(remote.trim(), queued);
-        assert!(send(&runner, &p, false).is_err());
+        assert!(
+            send(
+                &runner,
+                &p,
+                false,
+                &preflight::ReviewedSend::from_echo(preflight::push_args(&p.plan)?, None)
+            )
+            .is_err()
+        );
         assert_eq!(read(r.path())?.queue.entries[0].status, Status::Sent);
         Ok(())
     }
@@ -683,7 +703,12 @@ mod tests {
             control: &control,
             credentials: None,
         };
-        send(&runner, &p, true)?;
+        send(
+            &runner,
+            &p,
+            true,
+            &preflight::ReviewedSend::from_echo(preflight::push_args(&p.plan)?, None),
+        )?;
         assert_eq!(read(r.path())?.queue.entries[0].status, Status::Sent);
         r.commit("second", &[])?;
         let queued2 = r.rev("HEAD")?;
@@ -696,8 +721,21 @@ mod tests {
         let p = review_prepare(r.path(), &id, UserProfile::default(), None)?;
         assert_eq!(p.view.queue.entries[1].commit, queued2);
         assert!(!p.view.queue.entries[1].autosend);
-        assert!(send(&runner, &p, true).is_err());
-        send(&runner, &p, false)?;
+        assert!(
+            send(
+                &runner,
+                &p,
+                true,
+                &preflight::ReviewedSend::from_echo(preflight::push_args(&p.plan)?, None)
+            )
+            .is_err()
+        );
+        send(
+            &runner,
+            &p,
+            false,
+            &preflight::ReviewedSend::from_echo(preflight::push_args(&p.plan)?, None),
+        )?;
         assert_eq!(
             git::run(Some(&bare), &["rev-parse", &p.plan.destination])?.trim(),
             queued2
@@ -724,7 +762,15 @@ mod tests {
             control: &control,
             credentials: None,
         };
-        assert!(send(&runner, &p, true).is_err());
+        assert!(
+            send(
+                &runner,
+                &p,
+                true,
+                &preflight::ReviewedSend::from_echo(preflight::push_args(&p.plan)?, None)
+            )
+            .is_err()
+        );
         assert!(matches!(
             read(r.path())?.queue.entries[0].status,
             Status::Paused(_)
@@ -752,7 +798,15 @@ mod tests {
             Some(&bare),
             &["update-ref", &p.plan.destination, remote.trim()],
         )?;
-        assert!(send(&runner, &p, false).is_err());
+        assert!(
+            send(
+                &runner,
+                &p,
+                false,
+                &preflight::ReviewedSend::from_echo(preflight::push_args(&p.plan)?, None)
+            )
+            .is_err()
+        );
         let e = read(r.path())?.queue.entries.remove(0);
         assert!(matches!(e.status, Status::Paused(_)));
         assert!(!e.receipt.is_empty());
@@ -768,6 +822,40 @@ mod tests {
 #[cfg(test)]
 mod consent_tests {
     use super::*;
+    #[test]
+    fn merge_pure_outbox_consent_retains_all_added_provider_choices() {
+        let profile = UserProfile::default();
+        let context = crate::connections::Context {
+            choices: profile.connections.clone(),
+            ..Default::default()
+        };
+        let saved = Consent::capture(&profile, &context, None).unwrap();
+        let encoded = serde_json::to_value(&saved).unwrap();
+        for key in ["azure", "bitbucket", "jira", "linear", "github", "gitlab"] {
+            assert!(encoded["choices"].get(key).is_some(), "missing {key}");
+            let mut changed = profile.clone();
+            match key {
+                "azure" => changed.connections.azure.user = "other-account".into(),
+                "bitbucket" => changed.connections.bitbucket.user = "other-account".into(),
+                "jira" => changed.connections.jira.user = "other-account".into(),
+                "linear" => changed.connections.linear.user = "other-account".into(),
+                "github" => changed.connections.github.user = "other-account".into(),
+                "gitlab" => changed.connections.gitlab.user = "other-account".into(),
+                _ => unreachable!(),
+            }
+            let selected = crate::connections::Context {
+                choices: changed.connections.clone(),
+                ..Default::default()
+            };
+            let fresh = Consent::capture(&changed, &selected, None).unwrap();
+            assert!(
+                Consent::require(Some(&saved), &fresh).is_err(),
+                "changed {key} remained authorized"
+            );
+        }
+        assert_eq!(serde_json::from_value::<Consent>(encoded).unwrap(), saved);
+    }
+
     #[test]
     fn pure_outbox_consent_distinguishes_profiles_selected_accounts_scopes_and_legacy_without_secrets()
      {

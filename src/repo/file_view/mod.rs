@@ -77,6 +77,7 @@ impl RepoTab {
             return;
         }
 
+        self.intent_badge(ui, &view.path);
         egui::Frame::new()
             .fill(t.chrome)
             .inner_margin(egui::Margin::symmetric(10, 6))
@@ -191,6 +192,7 @@ impl RepoTab {
                     },
                     Ok(()),
                     links,
+                    Some((&view.goto_line, view.marked_line)),
                 );
                 if let Some(range) = picked {
                     let at = view

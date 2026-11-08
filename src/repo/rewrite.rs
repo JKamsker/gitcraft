@@ -189,7 +189,9 @@ impl RepoTab {
                 self.diff = None;
                 self.conflict = None;
                 self.file_view = None;
-                self.rebase = Some(rebase::RebaseEditor::new(onto, label, commits));
+                let mut editor = rebase::RebaseEditor::new(onto, label, commits);
+                editor.branch_guard = Some(self.same_branch());
+                self.rebase = Some(editor);
             }
             Err(e) => self.status = Some((format!("Interactive rebase: {e}"), true)),
         }
@@ -223,7 +225,8 @@ impl RepoTab {
     }
 
     pub(super) fn ask_run_rebase(&mut self, ctx: &egui::Context) {
-        let Some(editor) = self.rebase.as_ref() else {
+        let guard = self.same_branch();
+        let Some(editor) = self.rebase.as_mut() else {
             return;
         };
         if editor.problem().is_some() || editor.starting || self.busy_op.is_some() {
@@ -233,6 +236,14 @@ impl RepoTab {
             self.status = Some((reason, true));
             return;
         }
+        if let Err(reason) = editor.approve(&guard) {
+            self.status = Some((reason, true));
+            return;
+        }
+        let id = editor.id;
+        let Some(editor) = self.rebase.as_ref() else {
+            return;
+        };
         let branch = self.refs.current.as_deref().unwrap_or("HEAD");
         let ask = git::PreviewAsk::rebase(
             branch,
@@ -263,13 +274,30 @@ impl RepoTab {
         self.open_dialog(super::Dialog::confirm("Interactive rebase",
             "Replay this todo list? Dropped commits leave the branch; kept commits may receive new IDs. Git autostashes and restores tracked uncommitted changes; restoring that stash can conflict.".into(),
             "Start rebase", Vec::new(), None)
-            .instead(super::Action::ConfirmedRebase(editor.id), described)
+            .instead(super::Action::ConfirmedRebase(id), described)
             .undo(Undo::HeadMove { mode: "--keep" })
             .preview(ask, format!("Commits rewritten or dropped on {branch}")), ctx);
     }
 
+    pub(super) fn confirmed_rebase(&mut self, id: u64, ctx: &egui::Context) {
+        let guard = self.same_branch();
+        if !self
+            .rebase
+            .as_ref()
+            .is_some_and(|editor| editor.id == id && editor.approved(&guard, &self.refs.head))
+        {
+            self.status = Some((
+                "The approved rebase branch, HEAD or todo changed. Reopen its preview.".into(),
+                true,
+            ));
+            return;
+        }
+        self.run_rebase(ctx);
+    }
+
     /// Runs the rebase the editor describes.
     pub(super) fn run_rebase(&mut self, ctx: &egui::Context) {
+        let guard = self.same_branch();
         let Some(editor) = &mut self.rebase else {
             return;
         };
@@ -281,6 +309,18 @@ impl RepoTab {
         // lag a commit just made in the terminal by as long as a reload takes).
         if let Some(why) = editor.moved(&self.refs.head) {
             self.status = Some((why, true));
+            return;
+        }
+        if editor.has_approval() {
+            if !editor.approved(&guard, &self.refs.head) {
+                self.status = Some((
+                    "The approved rebase context changed. Reopen its preview.".into(),
+                    true,
+                ));
+                return;
+            }
+        } else if let Err(reason) = editor.approve(&guard) {
+            self.status = Some((reason, true));
             return;
         }
         let label = format!("Interactive rebase onto {}", editor.onto_label);
@@ -317,10 +357,22 @@ impl RepoTab {
         command: Result<Ready, String>,
         ctx: &egui::Context,
     ) {
+        let current_guard = self.same_branch();
         let Some(editor) = self.rebase.as_mut().filter(|e| e.id == id) else {
             return;
         };
         editor.starting = false;
+        if !editor.approved(&current_guard, &self.refs.head) {
+            self.status = Some(("The approved rebase branch, HEAD or todo changed while preparing its command. Reopen its preview.".into(), true));
+            return;
+        }
+        let Some(retained_guard) = editor.branch_guard.clone() else {
+            self.status = Some((
+                "The approved rebase has no retained branch identity; reopen its preview.".into(),
+                true,
+            ));
+            return;
+        };
         match command {
             // Something else started while the files were written.
             Ok(_) if self.busy_op.is_some() => {
@@ -330,13 +382,20 @@ impl RepoTab {
                 ));
             }
             Ok((command, head, refs)) => {
-                let guards = [self.same_branch(), expect_ref_at("HEAD", &head)];
+                if head != editor.head {
+                    self.status = Some((
+                        "The prepared rebase does not match its approved HEAD.".into(),
+                        true,
+                    ));
+                    return;
+                }
+                let guards = [retained_guard.clone(), expect_ref_at("HEAD", &head)];
                 self.rebase = None;
                 let steps = [guards.to_vec(), vec![command]].concat();
                 let undo = if refs.is_empty() {
                     Undo::HeadMove { mode: "--keep" }
                 } else {
-                    moved_refs_undo(self.same_branch(), &head, &refs, &steps)
+                    moved_refs_undo(retained_guard, &head, &refs, &steps)
                 };
                 self.run_undoable(label, steps, Refresh::All, undo, ctx);
             }
@@ -379,6 +438,57 @@ mod tests {
 
     use super::super::{Msg, RepoTab, rebase};
     use crate::git;
+
+    #[test]
+    fn recording_interactive_approval_rejects_same_head_branch_and_todo_changes() {
+        let ctx = egui::Context::default();
+        let mut tab = RepoTab::new_deferred("/nonexistent/pure-rebase-approval".into(), &ctx);
+        tab.refs.current = Some("approved-A".into());
+        tab.refs.head = "a".repeat(40);
+        let commit = git::RebaseCommit {
+            hash: tab.refs.head.clone(),
+            author: "Fixture".into(),
+            email: "fixture@example.invalid".into(),
+            summary: "One".into(),
+            message: "One".into(),
+            merge: false,
+        };
+        let mut editor = rebase::RebaseEditor::new("b".repeat(40), "base".into(), vec![commit]);
+        editor.branch_guard = Some(tab.same_branch());
+        editor.approve(&tab.same_branch()).unwrap();
+        let id = editor.id;
+        let approved = editor.clone();
+        tab.rebase = Some(editor);
+        tab.refs.current = Some("unexpected-B".into());
+        tab.confirmed_rebase(id, &ctx);
+        assert!(tab.busy_op.is_none() && tab.last_op.is_none());
+        assert!(
+            tab.status
+                .as_ref()
+                .is_some_and(|(s, _)| s.contains("changed"))
+        );
+        // The same branch change during asynchronous command preparation is also
+        // rejected, rather than constructing a new guard for unexpected-B.
+        tab.rebase_ready(
+            id,
+            "Interactive rebase",
+            Ok((vec!["rebase".into()], tab.refs.head.clone(), vec![])),
+            &ctx,
+        );
+        assert!(tab.busy_op.is_none() && tab.last_op.is_none());
+        tab.refs.current = Some("approved-A".into());
+        let mut changed = approved;
+        changed.entries[0].message = "Unapproved replacement todo".into();
+        tab.rebase = Some(changed);
+        tab.confirmed_rebase(id, &ctx);
+        assert!(tab.busy_op.is_none() && tab.last_op.is_none());
+        assert!(
+            !tab.rebase
+                .as_ref()
+                .unwrap()
+                .approved(&tab.same_branch(), &tab.refs.head)
+        );
+    }
 
     fn repo(name: &str) -> PathBuf {
         let dir =

@@ -8,6 +8,9 @@ use eframe::egui_wgpu::{SurfaceConfig, WgpuConfiguration, WgpuSetup, WgpuSetupCr
 use gitcraft::app;
 
 fn main() -> eframe::Result {
+    if let Some(code) = gitcraft::owned_endpoint_helper() {
+        std::process::exit(code);
+    }
     let args: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
     let explicit = args.first().is_some_and(|a| {
         [

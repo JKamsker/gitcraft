@@ -1,0 +1,209 @@
+{
+  "review": "Jira/Linear bounded two-finding correction R2",
+  "candidate": "f9f4da0c179ef65f9bd6743c321535301d37db32",
+  "tree": "09b36055572814c3482c1bebef170fd54ae93376",
+  "verdict": "SCOPED_PASS",
+  "dispositions": {
+    "TR-R1-1": "CLOSED source + independent exact-function headless pointer proof; writer actual picker pointer/keyboard receipt inspected",
+    "TR-R1-2": "CLOSED source + independent exact parse/link/card-data assertions"
+  },
+  "source_method": "immutable git-show objects, copied byte-for-byte; no moving writer source",
+  "snapshot": "/tmp/gitcraft-trackers-r2-f9f4-source",
+  "source_sha256_and_blob": {
+    "src/trackers/mod.rs": {
+      "sha256": "a052d2d46a53251ce89d2a7693047c3a94920398ff8cfaa974d124420bf763a7",
+      "blob": "8f71b0c0b937f2c67c721c1470dba877f77abe10"
+    },
+    "src/trackers/tests.rs": {
+      "sha256": "7d25b1064b3456a1357d67b46a5abc3e02060d31f2d881e568ff5076f43bd711",
+      "blob": "28f22eb2cc21b1a7d00a5b78e82b977ddf74d561"
+    },
+    "src/forge/mod.rs": {
+      "sha256": "ba4ece15d3b1c99f58a463938c8a443827aa1dfbb48b5ce218da22bf499f37c3",
+      "blob": "c6b375035ed883d850d05b6591f141e61d655e05"
+    },
+    "src/repo/issue_work/picker.rs": {
+      "sha256": "71ce9d353fe3c62d77d21fe41c5abaad55afc2dfe5af1d54056ecea0d0d35dca",
+      "blob": "e936dbbfb16260df3c3d497194170471c5e5606a"
+    },
+    "src/repo/issue_work/link.rs": {
+      "sha256": "57895ff0c1f46fbe74f1624ffebec0ea568cc4cfc8bc06ac79272d3040fca81f",
+      "blob": "780689310989de9c923efbe77078a1f837f313c2"
+    },
+    "src/repo/issue_work/card.rs": {
+      "sha256": "a168ca2603c579e35245a71d80ff27548852b4cbdde57ce200ecc87b7912d6db",
+      "blob": "b79e72467e90a8abaed865dd8508785e9fc93539"
+    },
+    "src/repo/issue_work/criteria.rs": {
+      "sha256": "00ddead78e6bdf6d4871df14cb52e556519316466360fc27542bf5d65287591c",
+      "blob": "291e96621a7d0757ab9957a58ee9a39f908cdc7d"
+    },
+    "src/forge/github/issues.rs": {
+      "sha256": "af024e1901814124e6b258a14857d77ec44d6d350777d8a80029d5a99f083ce2",
+      "blob": "34ba058c5438628b9bfb37633d0a65fa5ae69c04"
+    },
+    "src/forge/gitlab/mod.rs": {
+      "sha256": "b0de172e16246d928801209940ba5dca2d83d740c4724c35d3584763093c01b7",
+      "blob": "6bfb2577625dcae69cb9d71534daedb68bf05b0f"
+    },
+    "src/forge/gitea/issues.rs": {
+      "sha256": "8ae2d5a5a9746ae1589b7c90936bba90e36d20a771b9efb8ac937039f90ff970",
+      "blob": "3b27da07e111d019bc826efcc44be39ecf399cda"
+    },
+    "src/trackers/ui.rs": {
+      "sha256": "e30e9a0781fddf400d0479665b4e35db94f592c6a1234f8d11dcde24712dd44e",
+      "blob": "8deecc4f6b96c0fe5345360ce0edbcd04d99a78d"
+    }
+  },
+  "extracted_function_sha256": {
+    "issue_row": "da633e2a9939fd6e3ba2ce764b8f12850adb3063f18c67619f2f1420cacfdabc",
+    "Issue::identity": "0f33b4c8ae296f65cf0440bc914b23383d096bd2c24294063b127d25c6e3048f",
+    "Client::parse": "48287310adcbc622915a2940b8e3b771b825f44f8c4d372a7f689be0df9d9643",
+    "adf": "1cb75f8f3488e5eb04cc17ee74149a757d97fbaa5b43f992aa3b1b71480ddcdb",
+    "required": "d3ad31bd1103f2731a805ea87e363996fbb41b44c0e3997eead6699f2454f452",
+    "IssueLink::of": "2477474e9c759116113209ab6075650ecf8a789087b131583cc56da3120a9f60"
+  },
+  "report": {
+    "path": "/tmp/gitcraft-51-trackers-delta-review-r2.md",
+    "sha256": "c6f711347cb6bd430db04b7072d68600a8cfff4068d48c575daceae6350075f0"
+  },
+  "inputs_sha256": {
+    "/tmp/gitcraft-51-trackers-review-r1.md": "1a88cdb9f4a2e734326a359e9dabc38fd061cd57c6ac98f498464a47c80b2871",
+    "/tmp/gitcraft-51-trackers-review-r1-manifest.json": "f77a1928ca3331c049812fba2dc4d9f70a2517ab147c4b99610d29a13c68d975",
+    "/tmp/gitcraft-51-batch-b-trackers-9d8f54cf-handoff.md": "28221971da87b836f275bd449e3255745216727d0536824163cad9c50f05d219",
+    "/tmp/gitcraft-51-batch-b-validation.json": "356f64243efd43ff95e5f1ee0048f4f3209410e34573a277eea043e776e0a258"
+  },
+  "writer_gates_inspected_not_rerun": [
+    {
+      "commit": "f9f4da0c179ef65f9bd6743c321535301d37db32",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--offline",
+        "--lib",
+        "trackers::tests::",
+        "--",
+        "--test-threads=2"
+      ],
+      "log": "/tmp/gitcraft-51-trackers-tr2-f9f4da0c-0.log",
+      "exit": 0,
+      "kind": "pure/recording/headless or compilation; no runtime fixtures"
+    },
+    {
+      "commit": "f9f4da0c179ef65f9bd6743c321535301d37db32",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--offline",
+        "--lib",
+        "repo::issue_work::picker::tests::",
+        "--",
+        "--test-threads=1"
+      ],
+      "log": "/tmp/gitcraft-51-trackers-tr2-f9f4da0c-1.log",
+      "exit": 0,
+      "kind": "pure/recording/headless or compilation; no runtime fixtures"
+    },
+    {
+      "commit": "f9f4da0c179ef65f9bd6743c321535301d37db32",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--offline",
+        "--lib",
+        "repo::issue_work::link::tests::",
+        "--",
+        "--test-threads=2"
+      ],
+      "log": "/tmp/gitcraft-51-trackers-tr2-f9f4da0c-2.log",
+      "exit": 0,
+      "kind": "pure/recording/headless or compilation; no runtime fixtures"
+    },
+    {
+      "commit": "f9f4da0c179ef65f9bd6743c321535301d37db32",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "check",
+        "--offline",
+        "--all-targets"
+      ],
+      "log": "/tmp/gitcraft-51-trackers-tr2-f9f4da0c-3.log",
+      "exit": 0,
+      "kind": "pure/recording/headless or compilation; no runtime fixtures"
+    },
+    {
+      "commit": "f9f4da0c179ef65f9bd6743c321535301d37db32",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "clippy",
+        "--offline",
+        "--lib",
+        "--",
+        "-D",
+        "warnings",
+        "-A",
+        "dead_code"
+      ],
+      "log": "/tmp/gitcraft-51-trackers-tr2-f9f4da0c-4.log",
+      "exit": 0,
+      "kind": "pure/recording/headless or compilation; no runtime fixtures"
+    }
+  ],
+  "writer_gate_classification": "18 pure/recording/headless tests (7+6+5), offline all-target compile, qualified lib lint -D warnings -A dead_code; all exit0; historical actual Git entries excluded",
+  "writer_log_sha256": {
+    "/tmp/gitcraft-51-trackers-tr2-f9f4da0c-0.log": "6c3e8b86b77e87134fc4bea67f6fa736fe0774e9787cb2e89f37bdd6e27b12f6",
+    "/tmp/gitcraft-51-trackers-tr2-f9f4da0c-1.log": "f512de543995a0b24d5f91348c854afc205f9ed59504fc391b478013ef2fc776",
+    "/tmp/gitcraft-51-trackers-tr2-f9f4da0c-2.log": "8c3d3435c5d7a63b325e1ce2ea3e5d216942b4b48debe3ae57cee33a5aad7c27",
+    "/tmp/gitcraft-51-trackers-tr2-f9f4da0c-3.log": "fa980fa3bcb0f4208221b31e7fefbc7826d90669bee4b35b177999ab85440556",
+    "/tmp/gitcraft-51-trackers-tr2-f9f4da0c-4.log": "f4403412cb20dc7d8a0a94c08c9c8853e4bac9b3e8489158834f30512311ed97"
+  },
+  "reviewer_executions": [
+    {
+      "kind": "compiler",
+      "tool": "rustc +1.95.0 edition2024",
+      "input": "/tmp/gitcraft-trackers-r2-f9f4-evidence/rows-headless.rs",
+      "exit": 0
+    },
+    {
+      "kind": "compiler",
+      "tool": "rustc +1.95.0 edition2024",
+      "input": "/tmp/gitcraft-trackers-r2-f9f4-evidence/criteria-pure.rs",
+      "exit": 0
+    },
+    {
+      "kind": "inert egui headless exact row/identity pointer adapter",
+      "log": "/tmp/gitcraft-trackers-r2-f9f4-evidence/rows-headless.log",
+      "exit": 0
+    },
+    {
+      "kind": "pure supplied JSON exact parse\u2192IssueLink\u2192card-line/cap adapter",
+      "log": "/tmp/gitcraft-trackers-r2-f9f4-evidence/criteria-pure.log",
+      "exit": 0
+    }
+  ],
+  "evidence_sha256": {
+    "/tmp/gitcraft-trackers-r2-f9f4-evidence/rows-headless.log": "c941725aa8a77cddf0fdff751b2e0a813d7fcf80f54d75b970ec803d307cd2cf",
+    "/tmp/gitcraft-trackers-r2-f9f4-evidence/selected-owner-gates.json": "0a5544513b0f65390933a9dbc08d84f0227f5c99faeb8c4ce678d673a060d34c",
+    "/tmp/gitcraft-trackers-r2-f9f4-evidence/source-seams.json": "a0c01f986463ee9320a88670009ba8e380596e8190f8022f064cbc85c955e47a",
+    "/tmp/gitcraft-trackers-r2-f9f4-evidence/make-adapters.py": "a26257255420dba595b7520e907a2d1ec23cd0752dbb8332ec159abc54d12939",
+    "/tmp/gitcraft-trackers-r2-f9f4-evidence/rows-headless": "f4d3d40814d70c54a88768c83cb319431a23603b9f127f65a0b3fdad032d523b",
+    "/tmp/gitcraft-trackers-r2-f9f4-evidence/criteria-pure.log": "b8751606172e7c04f0bea7e997eea44c4bb1b47431d2b5a097457ff7e5dd1d36",
+    "/tmp/gitcraft-trackers-r2-f9f4-evidence/criteria-pure": "7394bc0042433b78109f6988186c9cb17265b2c9199ca48b0044d3c4e2ba910a",
+    "/tmp/gitcraft-trackers-r2-f9f4-evidence/source-bindings.json": "8d745679d1a784676fef7deba84999b207b08e27f7de7d19d7a2658366dcc81e",
+    "/tmp/gitcraft-trackers-r2-f9f4-evidence/rows-headless.rs": "48351bee5ad36ff6b1490bc13e27eefd387f3f7d71aadc0156c5931cc3478d66",
+    "/tmp/gitcraft-trackers-r2-f9f4-evidence/criteria-pure.rs": "d9a09eb31c90d6c1c340badec093c73b2939ad9af918891aad436e59e5941712"
+  },
+  "cached_dependency_sha256": {
+    "/Users/jonas/.t3/worktrees/gitcraft/t3-a61f0eaa/target/debug/deps/libegui-0e410d2928238130.rlib": "00991d51820997eadb725e41ef7721aa7c818dd7c1a201afb2ac0c71ae3d7703",
+    "/Users/jonas/.t3/worktrees/gitcraft/t3-a61f0eaa/target/debug/deps/libserde_json-51b929621ccde7c6.rlib": "bef1fc6f16a461d19f209cd9d8fd82df78c4f7e7ed4b9d2d4ecf0e2f79793a64",
+    "/Users/jonas/.t3/worktrees/gitcraft/t3-a61f0eaa/target/debug/deps/liburl-27951162511dcb13.rlib": "cdf10807c8fe74f0faba5a4ed32f629699bd58b66cbdf92397414f4825fba48f"
+  },
+  "adapter_seams": "Exact extracted function hashes; inert data structs/style/chip, row identity kind is supplied String; criteria today is recorded string; unrelated plain Markdown renderer omitted. No constructors or I/O clients.",
+  "runtime_hold": "UNCHANGED. Actual provider/store/Git/native acceptance not executed or authorized. No actual Git/helper/HTTP/SSH/CLI/process/keyring/native fixtures, constructors, fullsuite/CI/PR/source edits/subagents.",
+  "scope_exclusions": "No adjacent provider/authentication exploration or reopening accepted GitLab/common credential code."
+}

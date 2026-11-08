@@ -1,6 +1,118 @@
 #![cfg(feature = "symbol-history")]
 use super::*;
 use crate::git::investigations::tests::Repo;
+
+#[test]
+fn pure_symbol_identity_survives_constant_and_complete_body_rewrites() {
+    let parse = |body| syntax::parse("a.rs", body, &"a".repeat(40), &|| true).unwrap();
+    let versions = [
+        parse("fn calc() -> i32 { 1 }"),
+        parse("fn calc() -> i32 { 2 }"),
+        parse("fn calc() -> i32 { let values = [12, 37]; values.iter().sum() }"),
+    ];
+    for pair in versions.windows(2) {
+        for (a, b) in [(&pair[0][0], &pair[1][0]), (&pair[1][0], &pair[0][0])] {
+            let mut candidates = parse("fn unrelated() -> i32 { 900 }");
+            candidates.push(b.clone());
+            assert_eq!(choose(a, &candidates).unwrap().unwrap().0.qualified, "calc");
+            assert!(choose(a, &[b.clone(), b.clone()]).is_err());
+        }
+    }
+    let unrelated = parse(
+        "fn unrelated() { let x = [\"entirely different\"]; for item in x { println!(\"{}\", item); } }",
+    );
+    assert!(choose(&versions[0][0], &unrelated).is_err());
+    assert!(choose(&versions[0][0], &[]).unwrap().is_none());
+}
+
+#[test]
+fn pure_symbol_boundary_uses_stored_parents_instead_of_shallow_walk_roots() {
+    let tree = "a".repeat(40);
+    let parent = "b".repeat(40);
+    let shallow = format!(
+        "tree {tree}\nparent {parent}\nauthor Fixture <f@invalid> 1 +0000\n\nUnrelated boundary\n"
+    );
+    assert_eq!(
+        boundary_event(shallow.as_bytes(), b"\n").unwrap(),
+        ("Earlier shallow boundary (creation unproven)", true)
+    );
+    assert_eq!(
+        boundary_event(shallow.as_bytes(), parent.as_bytes()).unwrap(),
+        ("Earlier boundary (creation unproven)", true)
+    );
+    let root = format!("tree {tree}\nauthor Fixture <f@invalid> 1 +0000\n\nRoot\n");
+    assert_eq!(
+        boundary_event(root.as_bytes(), b"").unwrap(),
+        ("Created", false)
+    );
+    assert!(boundary_event(b"tree invalid\n\n", b"").is_err());
+}
+
+// Runtime regressions are intentionally separate from the pure gate while the
+// orchestrator holds actual Git/process tests.
+#[test]
+fn symbol_body_rewrites_trace_backward_and_forward_without_false_lifetime_events() {
+    let r = Repo::new().unwrap();
+    let first = save(&r, "a.rs", "fn calc() -> i32 { 1 }\n", 1_700_100_000);
+    save(&r, "a.rs", "fn calc() -> i32 { 2 }\n", 1_700_100_001);
+    let last = save(
+        &r,
+        "a.rs",
+        "fn calc() -> i32 { let values = [12, 37]; values.iter().sum() }\n",
+        1_700_100_002,
+    );
+    for revision in [&first, &last] {
+        let h = history(investigate(&r.0, revision, "a.rs", "calc", None, 256, &|| true).unwrap());
+        assert!(!h.limited, "{h:?}");
+        assert_eq!(
+            h.steps
+                .iter()
+                .filter(|s| s.event == "Created")
+                .map(|s| &s.commit)
+                .collect::<Vec<_>>(),
+            vec![&first]
+        );
+        assert_eq!(
+            h.steps
+                .iter()
+                .filter(|s| s.event.contains("Body edited"))
+                .count(),
+            2
+        );
+        assert!(!h.steps.iter().any(|s| s.event.contains("Deleted")));
+    }
+}
+
+#[test]
+fn symbol_shallow_clone_does_not_attribute_creation_to_an_unrelated_cut_point() {
+    let r = Repo::new().unwrap();
+    let actual = save(&r, "a.rs", "fn calc() -> i32 { 1 }\n", 1_700_200_000);
+    for i in 1..5 {
+        save(&r, "other", &format!("{i}\n"), 1_700_200_000 + i);
+    }
+    let clone = r.0.join("owned-shallow");
+    r.git(&[
+        "clone",
+        "--quiet",
+        "--depth=2",
+        &format!("file://{}", r.0.display()),
+        clone.to_str().unwrap(),
+    ])
+    .unwrap();
+    let h = history(investigate(&clone, "HEAD", "a.rs", "calc", None, 256, &|| true).unwrap());
+    assert!(h.limited);
+    assert!(
+        h.steps
+            .iter()
+            .any(|s| s.event == "Earlier shallow boundary (creation unproven)")
+    );
+    assert!(
+        !h.steps
+            .iter()
+            .any(|s| s.event == "Created" || s.commit == actual)
+    );
+    assert!(h.notes.iter().any(|s| s.contains("shallow")));
+}
 #[test]
 fn parses_structural_functions_and_scopes_across_supported_grammars() {
     for (path, text, expected) in [

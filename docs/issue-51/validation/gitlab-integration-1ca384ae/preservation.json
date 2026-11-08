@@ -1,0 +1,41 @@
+{
+  "reviewed": "7ef8cac882eb7b9433dc12203036ccb3749f6e31",
+  "files": [
+    {
+      "path": "src/forge/gitlab/api.rs",
+      "sha256": "254eed3f5135d5946b132ed41275290ab5b36787854d39f67c4e6bfae2d3a1ef",
+      "matches_reviewed": true,
+      "adaptation": null
+    },
+    {
+      "path": "src/forge/gitlab/details.rs",
+      "sha256": "936a5294fed37e699bbf0bb7f0982242856d30601ac8c35def789821e183eafb",
+      "matches_reviewed": true,
+      "adaptation": null
+    },
+    {
+      "path": "src/forge/gitlab/mod.rs",
+      "sha256": "3b7c1fd206a9c589941ee9fddbf45443cf51fb67ee7ac0ac4bfb0314a04eaedf",
+      "matches_reviewed": false,
+      "adaptation": "Jira Issue.tracker field not yet integrated; otherwise identical"
+    },
+    {
+      "path": "src/forge/gitlab/native_tests.rs",
+      "sha256": "aaef4a32aae0559d4f3cbfa357cdff51bdb636e7d40c9284fa412e6c00241652",
+      "matches_reviewed": true,
+      "adaptation": null
+    },
+    {
+      "path": "src/forge/gitlab/post.rs",
+      "sha256": "ab32cf9f9c849d087e2ac04b98e299d4c4f38b59c58f560fa5816550bf43227b",
+      "matches_reviewed": true,
+      "adaptation": null
+    },
+    {
+      "path": "src/repo/pr_review/native_discussions.rs",
+      "sha256": "69a14f753d81c062fad9a37817dad3d64ee483cd4a56d2f188c5f12a654f85c0",
+      "matches_reviewed": true,
+      "adaptation": null
+    }
+  ]
+}

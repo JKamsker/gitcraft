@@ -216,10 +216,9 @@ impl RepoTab {
             }
             _ => {}
         }
-        if let Some(row) = self.scroll_to.take_if(|_| !ghost) {
+        if let Some(row) = self.take_graph_scroll_row() {
             let follow_head = self.graph_motion.take_head_scroll();
             let view_h = ui.available_height();
-            let row = self.saved_views.position(row).unwrap_or(row);
             let top = row as f32 * ROW_PITCH;
             // Only scroll if the row is outside the visible part.
             let offset = ui.data(|d| d.get_temp::<f32>(offset_id)).unwrap_or(0.0);
@@ -248,7 +247,7 @@ impl RepoTab {
         // `show_rows` sizes rows as ROW_PITCH + item spacing, so the spacing must be zero here.
         ui.spacing_mut().item_spacing.y = 0.0;
         let idle = self.busy_op.is_none();
-        let filtered = self.saved_views.active() && !ghost && self.timeline_view.is_none();
+        let filtered = self.graph_projection_displayed();
         let total = if filtered {
             self.saved_views.len()
         } else {
@@ -459,6 +458,19 @@ impl RepoTab {
         self.row_menu(&resp, i, idle, acts);
     }
 
+    /// Every index conversion follows the projection actually being drawn.
+    pub(super) fn graph_projection_displayed(&self) -> bool {
+        self.saved_views.active() && !self.ghost.drawing() && self.timeline_view.is_none()
+    }
+    pub(super) fn take_graph_scroll_row(&mut self) -> Option<usize> {
+        let raw = self.scroll_to.take_if(|_| !self.ghost.drawing())?;
+        Some(if self.graph_projection_displayed() {
+            self.saved_views.position(raw).unwrap_or(raw)
+        } else {
+            raw
+        })
+    }
+
     /// Up and down select the row above or below the selected one.
     /// `ringed`: the row Tab reaches, where they start while nothing is selected.
     fn arrow_keys(&mut self, ui: &Ui, ringed: Option<usize>, acts: &mut Vec<Action>) {
@@ -498,7 +510,7 @@ impl RepoTab {
             )
         });
         let current = self.selected.or(ringed).unwrap_or(0);
-        let next = if self.saved_views.active() && (up || down) {
+        let next = if self.graph_projection_displayed() && (up || down) {
             self.saved_views.next(current, down)
         } else if up {
             Some(current.saturating_sub(1))

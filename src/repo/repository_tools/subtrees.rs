@@ -127,8 +127,11 @@ pub(super) fn act(tab: &mut RepoTab, act: Act, ctx: &egui::Context) -> Option<Ac
                 ));
                 return None;
             }
-            tab.repository_tool_mutation("Publish exact subtree split", true, ctx, move |r| {
-                p.context.run(|| logic::send(r, &p))
+            let plan = p.plan.clone();
+            tab.reviewed_send(&plan, ctx, move |tab, reviewed, ctx| {
+                tab.repository_tool_mutation("Publish exact subtree split", true, ctx, move |r| {
+                    p.context.run(|| logic::send(r, &p, &reviewed))
+                });
             });
         }
         other => return Some(other),

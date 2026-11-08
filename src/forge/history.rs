@@ -161,6 +161,7 @@ pub(crate) fn lookup(
     query: &Query,
     active: &dyn Fn() -> bool,
 ) -> Result<Evidence, String> {
+    check_provider(hosting.forge)?;
     if !oid(&query.at.commit)
         || !oid(&query.file_oid)
         || query.at.line == 0
@@ -275,12 +276,22 @@ fn list(value: Value) -> Result<Vec<Value>, String> {
         .cloned()
         .ok_or_else(|| "Forge history API did not return a list".into())
 }
+fn check_provider(forge: Forge) -> Result<(), String> {
+    match forge {
+        Forge::GitHub | Forge::GitLab | Forge::Gitea | Forge::Forgejo => Ok(()),
+        Forge::Azure | Forge::Bitbucket => Err(format!(
+            "Commit-to-PR history evidence is not supported for {}; open its pull request page for native review",
+            forge.name()
+        )),
+    }
+}
 fn lookup_with(
     h: &Hosting,
     q: &Query,
     get: &mut dyn FnMut(&str) -> Result<Value, String>,
     prove: &mut dyn FnMut(&str, &str) -> bool,
 ) -> Result<Evidence, String> {
+    check_provider(h.forge)?;
     let base = match h.forge {
         Forge::GitLab => format!("projects/{}", component(&h.path)),
         _ => format!("repos/{}", project(h)),
@@ -358,8 +369,25 @@ fn lookup_with(
         if q.comments {
             let fetched = match h.forge {
                 Forge::GitHub => {
+                    // GitHub's LEFT coordinates belong to the three-dot merge
+                    // base, which may precede the current base branch tip.
+                    let base_sha = text(&details, "/base/sha");
+                    let head_sha = text(&details, "/head/sha");
+                    let left = if oid(&base_sha) && oid(&head_sha) {
+                        get(&format!(
+                            "{base}/compare/{base_sha}...{head_sha}?per_page=1"
+                        ))
+                        .ok()
+                        .and_then(|v| github_merge_base(&v, &base_sha))
+                    } else {
+                        None
+                    };
+                    if left.is_none() {
+                        pull.limited = true;
+                        pull.notes.push("GitHub's reviewed merge base could not be established; old-side comments remain unmapped.".into());
+                    }
                     pages(&format!("{pr_path}/comments?per_page=100"), get, &mut |v| {
-                        github_comment(v, &details, q, prove, &mut pull)
+                        github_comment(v, &details, left.as_deref(), q, prove, &mut pull)
                     })
                 }
                 Forge::GitLab => pages(
@@ -408,6 +436,9 @@ fn lookup_with(
                         }
                         Err(error) => Err(error),
                     }
+                }
+                Forge::Azure | Forge::Bitbucket => {
+                    return Err("This forge does not support commit-to-PR history evidence".into());
                 }
             };
             match fetched {
@@ -511,9 +542,18 @@ fn add(
         proof,
     });
 }
+fn github_merge_base(comparison: &Value, base: &str) -> Option<String> {
+    let merge_base = text(comparison, "/merge_base_commit/sha");
+    (text(comparison, "/base_commit/sha") == base
+        && matches!(text(comparison, "/status").as_str(), "ahead" | "diverged")
+        && number(comparison, "/ahead_by") > 0
+        && oid(&merge_base))
+    .then_some(merge_base)
+}
 fn github_comment(
     v: &Value,
     pr: &Value,
+    merge_base: Option<&str>,
     q: &Query,
     prove: &mut dyn FnMut(&str, &str) -> bool,
     pull: &mut Pull,
@@ -541,9 +581,15 @@ fn github_comment(
         }
     } else if side == "LEFT"
         && text(v, "/commit_id") == text(pr, "/head/sha")
+        && let Some(base) = merge_base.filter(|base| oid(base))
         && let Some((start, end)) = range(v, "/line", "/start_line")
     {
-        anchors.push((text(pr, "/base/sha"), path, start, end));
+        let start = if text(v, "/start_side").is_empty() || text(v, "/start_side") == side {
+            start
+        } else {
+            end
+        };
+        anchors.push((base.to_owned(), path, start, end));
     }
     add(
         v,
@@ -614,7 +660,14 @@ fn gitea_comment(
         };
         anchors.push((revision, path.clone(), new as usize, new as usize));
     } else if old > 0 && old <= 20000 {
-        anchors.push((text(v, "/commit_id"), path, old as usize, old as usize));
+        // original_position is an old-side source line, not a line at the
+        // review head. Gitea/Forgejo serialize its OldRef separately.
+        anchors.push((
+            text(v, "/original_commit_id"),
+            path,
+            old as usize,
+            old as usize,
+        ));
     }
     add(
         v,

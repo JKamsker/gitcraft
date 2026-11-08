@@ -48,6 +48,19 @@ impl RepoTab {
         ) {
             self.file_comparison = None;
         }
+        if matches!(
+            &action,
+            Action::OpenDiff(_)
+                | Action::FileView { .. }
+                | Action::OpenPr(_)
+                | Action::Select(_)
+                | Action::SelectHash(_)
+                | Action::SelectPr(_)
+                | Action::SelectStash(_)
+                | Action::Compare { .. }
+        ) {
+            self.review_document.open = false;
+        }
         match action {
             Action::SubmitPreflight(plan) => self.submit_preflight(*plan, ctx),
             Action::FixPreflight(plan, kind) => self.fix_preflight(*plan, &kind, ctx),
@@ -74,6 +87,10 @@ impl RepoTab {
                 whole,
             } => self.comparison_pick(request, boundary, lines, whole, ctx),
             Action::ComparisonNormalPatch => self.comparison_normal_patch(ctx),
+            Action::ReviewTools(act) => self.review_tools_act(act, ctx),
+            Action::Story(act) => self.story_act(act, ctx),
+            Action::Freshness(act) => self.freshness_act(act, ctx),
+            Action::Review(act) => self.review_act(act, ctx),
             Action::Select(row) => {
                 self.leave_pages();
                 self.doctor = None;
@@ -175,6 +192,7 @@ impl RepoTab {
             Action::ContentInspect(hit, source) => self.content_inspect(hit, source, ctx),
             Action::ContentPrepare(target) => self.content_prepare(target, ctx),
             Action::ContentPerform(prepared) => self.content_perform(prepared, ctx),
+            Action::LocalCi(act) => self.local_ci_act(act, ctx),
             Action::Reflog(act) => self.reflog_act(act, ctx),
             Action::CloseReflog => self.close_reflog(ctx),
             Action::Issue(act) => self.issue_act(act, ctx),
@@ -467,9 +485,7 @@ impl RepoTab {
             Action::CommitDrop(drop) => self.commit_drop(drop, ctx),
             Action::RunRebase => self.ask_run_rebase(ctx),
             Action::ConfirmedRebase(id) => {
-                if self.rebase.as_ref().is_some_and(|e| e.id == id) {
-                    self.run_rebase(ctx);
-                }
+                self.confirmed_rebase(id, ctx);
             }
             Action::AskRebase { onto, label } => self.ask_plain_rebase(onto, label, ctx),
             Action::FoldInto(hash) => self.fold_into(hash, ctx),
@@ -687,7 +703,7 @@ impl RepoTab {
     }
 
     /// Applies the patch of lines picked, saved at `saved` (see [`Self::pick_lines`]).
-    fn apply_picked(
+    pub(super) fn apply_picked(
         &mut self,
         pick: diff::Pick,
         label: &str,

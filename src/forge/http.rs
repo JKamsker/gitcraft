@@ -140,7 +140,7 @@ impl Api {
                 Ok(response) if !(300..400).contains(&response.status()) => response,
                 Err(ureq::Error::Status(401, _)) => {
                     if let Some(forget) = self.on_refused {
-                        forget(&self.web);
+                        forget(self.refused_key.as_deref().unwrap_or(&self.web));
                     }
                     return Err("Selected forge account was refused".into());
                 }

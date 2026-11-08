@@ -253,3 +253,93 @@ fn actual_view_exit_park_and_drop_cancel_owned_work_and_ignore_stale_answers() -
     }
     Ok(())
 }
+
+#[test]
+fn pure_timeline_navigation_and_scroll_use_the_visible_raw_graph_with_a_saved_view_active() {
+    let ctx = egui::Context::default();
+    crate::theme::install_fonts(&ctx);
+    let mut tab = RepoTab::new_deferred("/nonexistent/timeline-projection-pure".into(), &ctx);
+    let hashes = (1..=12).map(|n| format!("{n:040x}")).collect::<Vec<_>>();
+    tab.commits = hashes
+        .iter()
+        .enumerate()
+        .map(|(i, hash)| {
+            std::sync::Arc::new(git::Commit {
+                hash: hash.clone(),
+                parents: hashes.get(i + 1).cloned().into_iter().collect(),
+                summary: format!("row {i}"),
+                ..Default::default()
+            })
+        })
+        .collect();
+    tab.history = tab.commits.clone();
+    tab.graph = crate::graph::layout(&tab.commits);
+    tab.index = hashes
+        .iter()
+        .enumerate()
+        .map(|(i, h)| (h.clone(), i))
+        .collect();
+    tab.selected = Some(0);
+    tab.saved_views.loaded = true;
+    tab.saved_views.prefs.active = Some(Preset {
+        name: "Collapsed".into(),
+        kind: Kind::MyUnpushed,
+        days: 30,
+    });
+    tab.saved_views.selection = Some(Selection {
+        commits: BTreeSet::from([hashes[0].clone(), hashes[11].clone()]),
+        limited: false,
+        explanation: String::new(),
+    });
+    tab.prepare_graph_projection();
+    assert_eq!(tab.saved_views.len(), 3);
+    assert!(tab.graph_projection_displayed());
+    tab.scroll_to = Some(11);
+    assert_eq!(tab.take_graph_scroll_row(), Some(2));
+    tab.toggle_timeline();
+    assert!(tab.saved_views.active());
+    assert!(!tab.graph_projection_displayed());
+    let mut ui = UI {
+        ctx,
+        tab,
+        time: 0.0,
+    };
+    ui.frame(vec![]);
+    ui.frame(vec![Event::Key {
+        key: egui::Key::ArrowDown,
+        physical_key: None,
+        pressed: true,
+        repeat: false,
+        modifiers: Default::default(),
+    }]);
+    assert_eq!(
+        ui.tab.selected,
+        Some(1),
+        "Down selects the adjacent displayed raw row"
+    );
+    ui.tab.scroll_to = Some(11);
+    assert_eq!(
+        ui.tab.take_graph_scroll_row(),
+        Some(11),
+        "scroll uses the same raw rows the timeline displays"
+    );
+    ui.frame(vec![Event::Key {
+        key: egui::Key::ArrowDown,
+        physical_key: None,
+        pressed: false,
+        repeat: false,
+        modifiers: Default::default(),
+    }]);
+    ui.frame(vec![Event::Key {
+        key: egui::Key::ArrowUp,
+        physical_key: None,
+        pressed: true,
+        repeat: false,
+        modifiers: Default::default(),
+    }]);
+    assert_eq!(ui.tab.selected, Some(0));
+    ui.tab.toggle_timeline();
+    assert!(ui.tab.graph_projection_displayed());
+    ui.tab.scroll_to = Some(11);
+    assert_eq!(ui.tab.take_graph_scroll_row(), Some(2));
+}

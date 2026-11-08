@@ -1172,7 +1172,12 @@ pub(crate) fn prepare_publish(
         renewed,
     })
 }
-pub(crate) fn send(r: &Runner<'_>, p: &Prepared) -> Result<String, String> {
+pub(crate) fn send(
+    r: &Runner<'_>,
+    p: &Prepared,
+    reviewed: &preflight::ReviewedSend,
+) -> Result<String, String> {
+    reviewed.check_plan(&p.plan)?;
     let ctx = check(r.repo, &p.view, true)?;
     let _ = ctx;
     if p.context != crate::connections::current() || p.principal != principal(r.credentials)? {
@@ -1188,7 +1193,13 @@ pub(crate) fn send(r: &Runner<'_>, p: &Prepared) -> Result<String, String> {
     view.state.candidates[i].stage = Stage::Sending;
     view.state.candidates[i].notice="Network dispatch intent persisted. Missing/rejected receipt never causes automatic retry. Inspect the remote before renewed approval".into();
     save(r.repo, &mut view)?;
-    let result = preflight::execute_controlled(r.repo, &p.plan, r.credentials, Some(r.control));
+    let result = preflight::execute_bound_controlled(
+        r.repo,
+        &p.plan,
+        reviewed,
+        r.credentials,
+        Some(r.control),
+    );
     view.state.candidates[i].stage = if result.is_ok() {
         Stage::Sent
     } else {

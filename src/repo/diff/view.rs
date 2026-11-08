@@ -197,6 +197,7 @@ impl RepoTab {
                 || find::Source::DiffFile(path.clone()),
                 history,
                 links,
+                None,
             )
             .and_then(pick)
             {
@@ -443,6 +444,8 @@ impl RepoTab {
         let rendered = markdown == Some(true) || rich_ready;
         let t = Tokens::get(ui.ctx());
         let mut clear = false;
+        self.intent_badge(ui, path);
+        self.reproducer_badge(ui, &view.key);
         egui::Frame::new()
             .fill(t.chrome)
             .inner_margin(egui::Margin::symmetric(10, 6))

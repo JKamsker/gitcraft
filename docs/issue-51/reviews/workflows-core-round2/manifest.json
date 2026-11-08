@@ -1,0 +1,233 @@
+{
+  "candidate": "fe88e1dc52828c278515e2a7fa9cb6c6347ad1c4",
+  "tree": "02bc2690f089bbb670ae40e28479f77473d0634f",
+  "prior_reviewed_candidate": "bf6089b684597d878d3c2f256b7c69d64c6785a0",
+  "snapshot": "/private/tmp/gitcraft-workflows-r2-fe88",
+  "archive": {
+    "path": "/tmp/gitcraft-workflows-r2-fe88.tar",
+    "sha256": "1ffef367218b199afc6d436d18e827d5683362d11b5675240de99bbc5a06bc18"
+  },
+  "scope": "Six original CORE B1-B6 and changed integration only; source/pure/recording",
+  "overall": "FAIL",
+  "dispositions": {
+    "B1": "scoped source/pure PASS",
+    "B2": "scoped source/recording PASS; runtime held",
+    "B3": "PARTIAL / FAIL residual selected-remote capture race",
+    "B4": "PARTIAL / FAIL residual silent budget truncation/freshness",
+    "B5": "scoped source/pure PASS; GC fixture held",
+    "B6": "scoped source/pure PASS"
+  },
+  "source_files": [
+    {
+      "path": "AGENTS.md",
+      "sha256": "a6b99ef334f51715e97ee6fd0d24fd4bd6920999d277657edc87ef6d570ffb1d",
+      "bytes": 2599,
+      "matches_exact_git_object": true
+    },
+    {
+      "path": "Cargo.toml",
+      "sha256": "c0b11757f0b184cf608ebd93a360aea4d5382696287ae31f5d776482b23db7c8",
+      "bytes": 7944,
+      "matches_exact_git_object": true
+    },
+    {
+      "path": "Cargo.lock",
+      "sha256": "5612c4ebb4a8b1fda93a0b429b36560a8cc02f20740a59b0b937342c4ce29541",
+      "bytes": 169761,
+      "matches_exact_git_object": true
+    },
+    {
+      "path": "src/git/command.rs",
+      "sha256": "a77e771a5e0877b04e85e94a4dee6cd5fecb04deb6c10b6d2fe38a0044f56292",
+      "bytes": 53559,
+      "matches_exact_git_object": true
+    },
+    {
+      "path": "src/git/command/source.rs",
+      "sha256": "d8839a110f3436f98ef8951cd271f295662df9c17ee576401a7a3fa4408f079e",
+      "bytes": 22250,
+      "matches_exact_git_object": true
+    },
+    {
+      "path": "src/git/refs.rs",
+      "sha256": "b2ddc8b1a290a46b328b4996dee8f5b210dd61f6532c7eeff65e6e8a6c912dae",
+      "bytes": 11930,
+      "matches_exact_git_object": true
+    },
+    {
+      "path": "src/tasks.rs",
+      "sha256": "39a48fa06b5570b1a069febe9480db4b52ab1c9d6f94ae4cb71a75771d57ff0b",
+      "bytes": 21599,
+      "matches_exact_git_object": true
+    },
+    {
+      "path": "src/repo/review_workflow/sharing.rs",
+      "sha256": "93acfe9964e93acf3ea6fb5646c3adcd99341f4aedd02eab80f7a3eed4e75ffb",
+      "bytes": 10435,
+      "matches_exact_git_object": true
+    },
+    {
+      "path": "src/repo/review_workflow/intents.rs",
+      "sha256": "95ed81eafda5adefff244f53babc3cbe865ede86cf549061d7f1ce60b593123a",
+      "bytes": 27836,
+      "matches_exact_git_object": true
+    },
+    {
+      "path": "src/repo/review_workflow/contracts.rs",
+      "sha256": "42e030f33f5f662b9df5babed3d73a55acd1937c8ed6dd9496e7118530548cc9",
+      "bytes": 17062,
+      "matches_exact_git_object": true
+    },
+    {
+      "path": "src/repo/review_workflow/reproducer.rs",
+      "sha256": "7c7384505b1114af8c9ecb95a88da7de68ca3f77ebf3875c6deebefbac1640e6",
+      "bytes": 20006,
+      "matches_exact_git_object": true
+    },
+    {
+      "path": "src/repo/review_workflow/reproducer_docker.rs",
+      "sha256": "db367f799747ea2628cfc8cdd5123523625e9c1a5d85d7ed58069ae6c4a96348",
+      "bytes": 21788,
+      "matches_exact_git_object": true
+    },
+    {
+      "path": "src/repo/review_workflow/reproducer_source.rs",
+      "sha256": "5412cc1a5d4b8f4ba3fd51e09361d66af5e2a0b326c8029e3c65bb78559e4b56",
+      "bytes": 16957,
+      "matches_exact_git_object": true
+    },
+    {
+      "path": "src/repo/review_workflow/store.rs",
+      "sha256": "b6ab52731344902f9e472d9d7e48011eb450636452d2c191c062e0f90af24717",
+      "bytes": 1618,
+      "matches_exact_git_object": true
+    }
+  ],
+  "inputs": [
+    {
+      "path": "/tmp/gitcraft-51-review-workflows-core-r1.md",
+      "sha256": "8a427cfdfd47f20ea92303bef5e7e4e36ae3810f1d1f090376eb6b5c7fdf42cc"
+    },
+    {
+      "path": "/tmp/gitcraft-51-review-workflows-r2-handoff.md",
+      "sha256": "3ea6473eebd996117e41909eb0ece7b52b1acbe794970ac66e851f00bf6c5552"
+    },
+    {
+      "path": "/tmp/gitcraft-51-orchestration/review-workflows-r2-status.json",
+      "sha256": "edddce9eaf735672d2cb03977fddececda0b5d308512ee87898e16041297cc25"
+    },
+    {
+      "path": "/tmp/gitcraft-issue51-issues.json",
+      "sha256": "411e76639a880c52a8f92ef5ec543e4e76befaa1f95b2be271629df23a88edfc"
+    }
+  ],
+  "independent_evidence": [
+    {
+      "path": "/private/tmp/gitcraft-workflows-core-r2-evidence/intent-boundary-probe",
+      "sha256": "ecabe6b5b89cabf7a051e13de07f5cd18e61772ed5bf255e1ef9aa4b89f18a5e",
+      "bytes": 906312
+    },
+    {
+      "path": "/private/tmp/gitcraft-workflows-core-r2-evidence/intent-boundary-probe.log",
+      "sha256": "5e0da002880619594db121b8815f191ca79723aa57cbf2ac1d69cb201eee4bca",
+      "bytes": 86
+    },
+    {
+      "path": "/private/tmp/gitcraft-workflows-core-r2-evidence/intent-boundary-probe.rs",
+      "sha256": "48b2cc5916d23e49aa6458a575bc01bd91948a7c6162f860173db258450a04e9",
+      "bytes": 6401
+    },
+    {
+      "path": "/private/tmp/gitcraft-workflows-core-r2-evidence/intent-extractions.json",
+      "sha256": "35a08306859722fd0a941dbac43d994da940a212a8f7da0396fd6d4b1ff12d90",
+      "bytes": 5274
+    },
+    {
+      "path": "/private/tmp/gitcraft-workflows-core-r2-evidence/review-tests",
+      "sha256": "fba747936ba8c153dbd59a7c25f1a654c88c76d4e76ac72c9fe792f759059343",
+      "bytes": 143727768
+    },
+    {
+      "path": "/private/tmp/gitcraft-workflows-core-r2-evidence/selected-pure-rechecks.log",
+      "sha256": "e5ea7c74588310c7ae9719869cafa0d16de312872977477b7d0f68bfe7428eca",
+      "bytes": 6270
+    },
+    {
+      "path": "/private/tmp/gitcraft-workflows-core-r2-evidence/selected-pure-results.json",
+      "sha256": "82b9e7c3b277f941fa681b6e5b279d45f2f3faa30eb6696133ffd46447890522",
+      "bytes": 3359
+    },
+    {
+      "path": "/private/tmp/gitcraft-workflows-core-r2-evidence/selected-tests.json",
+      "sha256": "e45b6e3e60dd5a18e199a9e4194b0a58af8fd3cf4954f7488e1634c7f16fca92",
+      "bytes": 2354
+    },
+    {
+      "path": "/private/tmp/gitcraft-workflows-core-r2-evidence/sharing-capture-extraction.json",
+      "sha256": "678bb65204d6ef515e67f51f2c421d39a71714407bea56abb4ee38e9161feeb5",
+      "bytes": 334
+    },
+    {
+      "path": "/private/tmp/gitcraft-workflows-core-r2-evidence/sharing-capture-race-probe",
+      "sha256": "e13329bb3ef934e3d351f0d7681c19dc3f2ed493484c4cbd4ab0e58ee2950b0f",
+      "bytes": 547720
+    },
+    {
+      "path": "/private/tmp/gitcraft-workflows-core-r2-evidence/sharing-capture-race-probe.log",
+      "sha256": "3b30827232602a43eea0d3179d62b1888b6f022d65a92a0897e7fc2063ea8582",
+      "bytes": 97
+    },
+    {
+      "path": "/private/tmp/gitcraft-workflows-core-r2-evidence/sharing-capture-race-probe.rs",
+      "sha256": "0778b81f7f0837013092de5e6a3ce70bb6c80e6a987854f1ff08ee638b98b990",
+      "bytes": 3154
+    }
+  ],
+  "independent_execution": {
+    "exact_existing_pure_recording_tests_passed": 17,
+    "failed": 0,
+    "extracted_source_probes_compiled": 2,
+    "extracted_source_probe_executions": 2,
+    "probe_result": "Both exit0 while asserting residual defects",
+    "test_binary_sha256": "fba747936ba8c153dbd59a7c25f1a654c88c76d4e76ac72c9fe792f759059343",
+    "fresh_full_application_build": false,
+    "actual_git_helper_docker_network_process_control_native_fixtures": 0
+  },
+  "supplied_writer_logs": [
+    {
+      "path": "/tmp/gitcraft-51-r2-final-check.log",
+      "sha256": "4bdb242147b5c9aa90e4979d5b30a0968bfa41fafb025487efc1a7f500a8857e",
+      "matches_supplied_manifest": true,
+      "execution": "writer supplied; not rerun by this reviewer"
+    },
+    {
+      "path": "/tmp/gitcraft-51-r2-final-committed-clippy.log",
+      "sha256": "8d86a29fa97ac33f7e0b914bb72d0c7c9427cbf66023946ba33d9ff3e345838f",
+      "matches_supplied_manifest": true,
+      "execution": "writer supplied; not rerun by this reviewer"
+    },
+    {
+      "path": "/tmp/gitcraft-51-r2-final-fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "matches_supplied_manifest": true,
+      "execution": "writer supplied; not rerun by this reviewer"
+    },
+    {
+      "path": "/tmp/gitcraft-51-r2-final-committed-pure.log",
+      "sha256": "06a04d7a251b7961aec6a19279760c5eb52d9b1d3c5795dfd5f174328c2c6944",
+      "matches_supplied_manifest": true,
+      "execution": "writer supplied; not rerun by this reviewer"
+    }
+  ],
+  "limits": [
+    "No actual Git/helper/Docker/HTTP/SSH/network/process/cancellation/timeout/native/fullsuite fixtures",
+    "No application discovery constructors",
+    "No source edits, subagents, CI, PR or external publication",
+    "Shared credentials/process acceptance remains separate; global runtime hold remains",
+    "No acceptance of the other nine findings or final combined candidate"
+  ],
+  "report": {
+    "path": "/tmp/gitcraft-51-workflows-core-review-r2.md",
+    "sha256": "ca552268c241a574933618c31ce12ea0b6923345dc05c83aa20d64af043d4df0"
+  }
+}

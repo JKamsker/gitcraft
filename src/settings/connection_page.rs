@@ -51,6 +51,33 @@ impl Settings {
                         },
                     );
                 }
+                for (service, account) in [
+                    (
+                        crate::forge::cloud::Service::Azure,
+                        &mut profile.connections.azure,
+                    ),
+                    (
+                        crate::forge::cloud::Service::Bitbucket,
+                        &mut profile.connections.bitbucket,
+                    ),
+                ] {
+                    card.row(service.name(), "azure bitbucket provider account", |ui| {
+                        crate::forge::cloud::ui::show(ui, id, service, account)
+                    });
+                }
+                for (kind, account) in [
+                    (crate::trackers::Kind::Jira, &mut profile.connections.jira),
+                    (
+                        crate::trackers::Kind::Linear,
+                        &mut profile.connections.linear,
+                    ),
+                ] {
+                    card.row(
+                        kind.name(),
+                        "jira linear tracker issue token account",
+                        |ui| crate::trackers::ui::account(ui, id, kind, account),
+                    );
+                }
                 card.row("Forgejo / Gitea login", "tea forge account login alias", |ui| {
                     ui.horizontal_wrapped(|ui| {
                         ui.add(layout::field(&mut profile.connections.tea_login)

@@ -669,8 +669,45 @@ pub(crate) fn investigation_page(
     let max = format!("--max-count={limit}");
     let args = log_args(Some(tips), order, skip, Some(&max));
     let output = reader.run(&args.as_args(), Vec::new(), &[0])?;
+    parse_investigation_commits(&output)
+}
+
+pub(crate) fn investigation_commits_of(
+    reader: &super::investigations::Reader<'_>,
+    hashes: &[String],
+) -> Result<Vec<Commit>, String> {
+    if hashes.len() > super::LOG_PAGE || hashes.iter().any(|s| !super::investigations::oid(s)) {
+        return Err("Invalid pinned commit request".into());
+    }
+    if hashes.is_empty() {
+        return Ok(Vec::new());
+    }
+    let format = log_args(None, LogOrder::default(), 0, None).format;
+    let mut result = Vec::new();
+    for chunk in hashes.chunks(100) {
+        let mut args = vec![
+            "log",
+            NO_SIGNATURE,
+            UTF8,
+            "--no-walk=unsorted",
+            "--date=format-local:%Y-%m-%d %H:%M",
+            &format,
+            END_OPTS,
+        ];
+        args.extend(chunk.iter().map(String::as_str));
+        args.push("--");
+        result.extend(parse_investigation_commits(&reader.run(
+            &args,
+            vec![],
+            &[0],
+        )?)?);
+    }
+    Ok(result)
+}
+
+fn parse_investigation_commits(output: &[u8]) -> Result<Vec<Commit>, String> {
     let text =
-        std::str::from_utf8(&output).map_err(|_| "History page returned non-UTF-8 metadata")?;
+        std::str::from_utf8(output).map_err(|_| "History page returned non-UTF-8 metadata")?;
     let fields: Vec<_> = text.split('\0').collect();
     let (records, tail) = fields.as_chunks::<LOG_FIELDS>();
     if !tail.iter().all(|s| s.trim().is_empty()) {

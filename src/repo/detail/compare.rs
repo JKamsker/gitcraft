@@ -33,6 +33,14 @@ impl RepoTab {
                 });
             }
             Some(Ok(d)) => {
+                self.review_all_button(
+                    ui,
+                    crate::repo::review_workflow::ReviewSource::Comparison {
+                        from: d.from.clone(),
+                        to: d.to.clone(),
+                    },
+                    acts,
+                );
                 files_header(ui, &d.files, None);
                 if d.files.is_empty() {
                     ui.add_space(10.0);

@@ -95,6 +95,18 @@ impl RepoTab {
             self.begin_push_preflight(ops, ctx);
             return;
         }
+        if self.echo_before_operation(
+            PendingOp {
+                label: label.to_owned(),
+                ops: ops.clone(),
+                refresh,
+                kind: kind.clone(),
+                quiet,
+            },
+            ctx,
+        ) {
+            return;
+        }
         self.graph_motion_begin(&ops);
         self.celebration_begin(label, &ops, ctx);
         let observe_celebration_head = self.celebration_needs_head();
@@ -186,14 +198,7 @@ impl RepoTab {
     /// would never run.
     pub(super) fn keep_unfinished(&mut self, stopped: usize) {
         if let Some(op) = &mut self.last_op {
-            // The checks stay: what they guard must still hold when it runs after signing in.
-            let mut i = 0;
-            op.ops.retain(|step| {
-                i += 1;
-                i > stopped
-                    || is_expectation(step)
-                    || step.first().is_some_and(|m| m == EXPECT_HTTPS_ROUTE)
-            });
+            retain_unfinished(&mut op.ops, stopped);
         }
     }
 
@@ -462,8 +467,17 @@ impl RepoTab {
                 self.status = Some((format!("{label}: sign-in needed"), true));
                 // Only a URL reported by the failed step, or its captured destinations.
                 // An absent endpoint must never be replaced with the default fetch URL.
-                let failure = auth_failure.unwrap_or_else(|| git::AuthFailure::from_error(e, &[]));
-                self.offer_failed_https_signin(failure, refused, ctx);
+                if crate::push_preflight::is_reviewed_auth_error(e) && auth_failure.is_none() {
+                    self.invalidate_https_challenge();
+                    self.status = Some((
+                        "The reviewed push's sign-in proof is unavailable. Reopen push preflight before signing in.".into(),
+                        true,
+                    ));
+                } else {
+                    let failure =
+                        auth_failure.unwrap_or_else(|| git::AuthFailure::from_error(e, &[]));
+                    self.offer_failed_https_signin(failure, refused, ctx);
+                }
             }
             Err(e) => {
                 self.note_reused(Some(e));
@@ -631,6 +645,123 @@ fn run_step(
     result
 }
 
+/// Reviewed dispatch bypasses run_step's normal argv, but retains its original-remote
+/// route proof. The runtime private alias must never become the retry authorization.
+fn reviewed_operands(op: &[String]) -> Result<(&str, Option<&[String]>), String> {
+    match op {
+        [marker, id] if marker == crate::push_preflight::APPROVED => Ok((id, None)),
+        [marker, id, option, binding]
+            if marker == crate::push_preflight::APPROVED
+                && option == "-c"
+                && binding.starts_with("gitcraft.commandSource=") =>
+        {
+            Ok((id, Some(&op[2..])))
+        }
+        _ => Err("Invalid reviewed push execution evidence".into()),
+    }
+}
+
+fn retain_unfinished(ops: &mut Vec<Vec<String>>, stopped: usize) {
+    // The checks and opaque source owner stay with the original operation on sign-in retry.
+    let mut i = 0;
+    ops.retain(|step| {
+        i += 1;
+        i > stopped || is_expectation(step) || step.first().is_some_and(|m| m == EXPECT_HTTPS_ROUTE)
+    });
+}
+
+#[cfg(test)]
+#[test]
+fn merge_pure_reviewed_echo_operands_are_strict_and_survive_retry() -> Result<(), String> {
+    let plain = vec![crate::push_preflight::APPROVED.to_owned(), "plan".into()];
+    assert_eq!(reviewed_operands(&plain)?, ("plan", None));
+    let bound = [
+        plain.clone(),
+        vec!["-c".into(), "gitcraft.commandSource=owned".into()],
+    ]
+    .concat();
+    let (id, source) = reviewed_operands(&bound)?;
+    assert_eq!(id, "plan");
+    assert_eq!(source, Some(&bound[2..]));
+    for malformed in [
+        [plain.clone(), vec!["-c".into()]].concat(),
+        [
+            plain.clone(),
+            vec!["-c".into(), "http.proxy=foreign".into()],
+        ]
+        .concat(),
+        [bound.clone(), vec!["extra".into()]].concat(),
+    ] {
+        assert!(reviewed_operands(&malformed).is_err());
+    }
+    // Credential recovery retains internal steps, including their opaque source owner.
+    let mut retained = vec![bound.clone()];
+    retain_unfinished(&mut retained, 0);
+    assert_eq!(retained, vec![bound]);
+    Ok(())
+}
+
+pub(crate) fn run_reviewed_push(
+    original: &[String],
+    capture: impl FnOnce(&[&str]) -> Result<git::RouteBinding, String>,
+    execute: impl FnOnce() -> Result<String, String>,
+    control: Option<&Arc<git::OpControl>>,
+) -> Result<String, String> {
+    let context = crate::connections::current();
+    let args: Vec<_> = original.iter().map(String::as_str).collect();
+    let binding = capture(&args).map_err(|error| {
+        format!(
+            "Could not verify the reviewed push's destinations; command not started: {}",
+            crate::diagnostics::crash::scrub(&error)
+        )
+    })?;
+    let result = execute();
+    if let Err(error) = &result
+        && let Some(failure) = reviewed_auth_failure(error, binding, context)
+        && let Some(control) = control
+    {
+        control.authentication_failed(failure);
+    }
+    result
+}
+
+/// A one-shot reviewed receipt is trusted only inside the captured original route.
+/// Never parse the opaque diagnostic as a canonical Git URL or guess a fetch URL.
+fn reviewed_auth_failure(
+    error: &str,
+    binding: git::RouteBinding,
+    context: crate::connections::Context,
+) -> Option<git::AuthFailure> {
+    let endpoint = crate::push_preflight::take_auth_endpoint(error)?;
+    if !binding.authorizes_endpoint(&endpoint) {
+        return None;
+    }
+    Some(git::AuthFailure {
+        context,
+        endpoints: vec![endpoint],
+        confirmed: true,
+        binding: Some(binding),
+        lfs: false,
+    })
+}
+
+/// Route proofs participate in the same before/after-draft verifier as HEAD and refs.
+fn check_https_routes(
+    ops: &[Vec<String>],
+    mut verify: impl FnMut(&git::RouteBinding) -> Result<(), String>,
+) -> Result<(), String> {
+    for op in ops {
+        if let [marker, json] = op.as_slice()
+            && marker == EXPECT_HTTPS_ROUTE
+        {
+            let binding = serde_json::from_str::<git::RouteBinding>(json)
+                .map_err(|_| "Invalid sign-in route proof".to_owned())?;
+            verify(&binding)?;
+        }
+    }
+    Ok(())
+}
+
 /// What a cancelled operation says: that it was, with what it may have left behind: the lock
 /// files a stopped git couldn't remove (not those `before` it started: they are someone
 /// else's), and for a pull, a merge or rebase it had started.
@@ -740,18 +871,6 @@ pub(super) fn run_steps_counted(
     quiet: bool,
     control: Option<&Arc<git::OpControl>>,
 ) -> (Result<String, String>, OpKind, usize) {
-    for op in ops {
-        if let [marker, json] = op.as_slice()
-            && marker == EXPECT_HTTPS_ROUTE
-        {
-            let check = serde_json::from_str::<git::RouteBinding>(json)
-                .map_err(|_| "Invalid sign-in route proof".to_owned())
-                .and_then(|binding| binding.verify(path));
-            if let Err(error) = check {
-                return (Err(error), kind, 0);
-            }
-        }
-    }
     // Undoing a HEAD move resets the branch checked out now: after a checkout or a commit made
     // elsewhere since, that would throw away commits that aren't the operation's.
     let expected = match &kind {
@@ -783,28 +902,41 @@ pub(super) fn run_steps_counted(
         .first()
         .is_some_and(|op| op.len() >= 2 && op[0] == "stash" && op[1] == "push");
     let stash_before = pushes_stash.then(|| git::resolve(path, "refs/stash").ok());
-    // Checked before anything runs, so a refused undo changes nothing.
-    if let Err(e) = check_expected(path, ops, control) {
-        return (Err(e), kind, 0);
-    }
-    // Preserve both index and worktree layers before operations that can replace files.
-    if ops.iter().any(|op| {
+    let needs_draft = ops.iter().any(|op| {
         git::subcommand(&op.iter().map(String::as_str).collect::<Vec<_>>())
             .is_some_and(|s| matches!(s, "checkout" | "switch" | "rebase"))
-    }) {
-        let active = || {
-            !crate::tasks::cancellation().is_cancelled()
-                && !control.is_some_and(|c| c.is_cancelled())
-        };
-        let snapshot = (|| {
-            if git::drafts::enabled_while(path, &active)? {
-                git::drafts::capture(path, "Before checkout / rebase", &active)?;
+    });
+    let approved_head = expected.or(head_before.as_ref());
+    let prepared = with_rechecked_preparation(
+        || {
+            check_https_routes(ops, |binding| binding.verify(path))?;
+            check_expected(path, ops, control)?;
+            if let Some(expected) = approved_head
+                && git::head(path) != *expected
+            {
+                return Err("HEAD moved while preparing this operation; reopen its preview. No operation was run.".into());
             }
-            Ok::<_, String>(())
-        })();
-        if let Err(error) = snapshot {
-            return (Err(format!("Working draft safety check: {error}")), kind, 0);
-        }
+            Ok(())
+        },
+        || {
+            if !needs_draft {
+                return Ok(());
+            }
+            let active = || {
+                !crate::tasks::cancellation().is_cancelled()
+                    && !control.is_some_and(|c| c.is_cancelled())
+            };
+            let snapshot = (|| {
+                if git::drafts::enabled_while(path, &active)? {
+                    git::drafts::capture(path, "Before checkout / rebase", &active)?;
+                }
+                Ok::<_, String>(())
+            })();
+            snapshot.map_err(|error| format!("Working draft safety check: {error}"))
+        },
+    );
+    if let Err(error) = prepared {
+        return (Err(error), kind, 0);
     }
     let mut result = Ok(String::new());
     let mut stopped = ops.len();
@@ -842,11 +974,33 @@ pub(super) fn run_steps_counted(
                 let args: Vec<&str> = prepared.iter().map(String::as_str).collect();
                 return run_step(path, &args, creds, quiet, control);
             }
-            if let [mark, id] = op.as_slice()
-                && mark == crate::push_preflight::APPROVED
+            if op
+                .first()
+                .is_some_and(|mark| mark == crate::push_preflight::APPROVED)
             {
+                let (id, evidence) = reviewed_operands(op)?;
                 let plan = crate::push_preflight::registered(id)?;
-                return crate::push_preflight::execute_controlled(path, &plan, creds, control);
+                let original = crate::push_preflight::push_args(&plan)?;
+                let source = evidence
+                    .map(|args| git::CommandSource::reviewed_binding(path, args))
+                    .transpose()?;
+                return run_reviewed_push(
+                    &original,
+                    |args| git::RouteBinding::capture(path, args),
+                    || match source {
+                        Some(source) => crate::push_preflight::execute_controlled_with_guard(
+                            path,
+                            &plan,
+                            creds,
+                            control,
+                            || source.check_execution(),
+                        ),
+                        None => {
+                            crate::push_preflight::execute_controlled(path, &plan, creds, control)
+                        }
+                    },
+                    control,
+                );
             }
             if let [mark, id, fix] = op.as_slice()
                 && mark == crate::push_preflight::FIX
@@ -900,6 +1054,18 @@ pub(super) fn run_steps_counted(
         other => other,
     };
     (result, kind, stopped)
+}
+
+/// Preparation may take minutes and observes its own coherent snapshot. It never
+/// authorizes a changed operation context: retain the original verifier and run
+/// it again after preparation, immediately before command dispatch.
+fn with_rechecked_preparation(
+    mut verify: impl FnMut() -> Result<(), String>,
+    prepare: impl FnOnce() -> Result<(), String>,
+) -> Result<(), String> {
+    verify()?;
+    prepare()?;
+    verify()
 }
 
 /// Marks a step that runs no git (no argument can hold a NUL).
@@ -1103,6 +1269,215 @@ mod tests {
     use super::super::{OpKind, Undo, UndoEntry, ops};
     use super::{run_steps, stash_push_args};
     use crate::git;
+
+    fn recorded_route() -> git::RouteBinding {
+        serde_json::from_value(serde_json::json!({
+            "args": ["push", "--", "original", "HEAD:refs/heads/main"],
+            "routes": ["https://push.invalid/team/repo"],
+            "configuration": "captured-routing-config"
+        }))
+        .unwrap()
+    }
+
+    #[test]
+    fn recording_reviewed_route_is_captured_before_dispatch_and_proves_one_shot_receipt() {
+        use std::cell::Cell;
+        let binding = recorded_route();
+        let original = binding.args.clone();
+        let control = git::OpControl::new(|| {});
+        let captured = Cell::new(false);
+        let mut context = crate::connections::Context::default();
+        context.choices.github.user = "initiating-account".into();
+        let receipt =
+            crate::push_preflight::remember_auth_endpoint("https://push.invalid/team/repo");
+        let result = context.run(|| {
+            super::run_reviewed_push(
+                &original,
+                |args| {
+                    assert_eq!(
+                        args,
+                        original.iter().map(String::as_str).collect::<Vec<_>>()
+                    );
+                    assert!(!args.contains(&crate::push_preflight::APPROVED));
+                    assert!(!args.iter().any(|word| word.contains("private-alias")));
+                    captured.set(true);
+                    Ok(binding.clone())
+                },
+                || {
+                    assert!(captured.get());
+                    Err(receipt.clone())
+                },
+                Some(&control),
+            )
+        });
+        assert_eq!(result, Err(receipt.clone())); // human diagnostics stay opaque
+        let failure = control.auth_failure().unwrap();
+        assert_eq!(failure.context, context);
+        assert!(failure.confirmed);
+        assert_eq!(failure.endpoints, ["https://push.invalid/team/repo"]);
+        assert_eq!(failure.binding, Some(binding.clone()));
+        assert!(crate::push_preflight::take_auth_endpoint(&receipt).is_none());
+        context.run(|| {
+            let ctx = egui::Context::default();
+            let mut tab =
+                super::RepoTab::new_deferred("/nonexistent/reviewed-signin-recording".into(), &ctx);
+            tab.offer_failed_https_signin(failure.clone(), true, &ctx);
+            let ticket = tab.https_challenge.as_ref().unwrap();
+            assert!(ticket.authorizes_endpoint("https://push.invalid/team/repo"));
+            assert!(!ticket.authorizes_endpoint("https://fetch.invalid/team/repo"));
+            assert_eq!(ticket.binding, Some(binding));
+            assert!(matches!(
+                tab.dialog,
+                Some(super::Dialog::Credentials { .. })
+            ));
+        });
+        let mut changed = context.clone();
+        changed.choices.github.user = "later-account".into();
+        changed.run(|| {
+            let ctx = egui::Context::default();
+            let mut tab =
+                super::RepoTab::new_deferred("/nonexistent/stale-signin-recording".into(), &ctx);
+            tab.offer_failed_https_signin(failure, true, &ctx);
+            assert!(tab.https_challenge.is_none());
+            assert!(tab.dialog.is_none());
+        });
+    }
+
+    #[test]
+    fn recording_reviewed_auth_missing_foreign_or_unproven_routes_refuse_without_dispatch() {
+        use std::cell::Cell;
+        let binding = recorded_route();
+        let original = binding.args.clone();
+        let dispatched = Cell::new(false);
+        let control = git::OpControl::new(|| {});
+        let failed = super::run_reviewed_push(
+            &original,
+            |_| Err("route proof unavailable".into()),
+            || {
+                dispatched.set(true);
+                Ok(String::new())
+            },
+            Some(&control),
+        );
+        assert!(failed.is_err());
+        assert!(!dispatched.get());
+        assert!(control.auth_failure().is_none());
+        for endpoint in [
+            "https://fetch.invalid/team/repo",
+            "https://push.invalid/other/repo",
+            "https://push.invalid/team/repo/info/lfs",
+            "http://push.invalid/team/repo",
+        ] {
+            let receipt = crate::push_preflight::remember_auth_endpoint(endpoint);
+            let failed = super::run_reviewed_push(
+                &original,
+                |_| Ok(binding.clone()),
+                || Err(receipt.clone()),
+                Some(&control),
+            );
+            assert_eq!(failed, Err(receipt.clone()));
+            assert!(control.auth_failure().is_none(), "{endpoint}");
+            assert!(crate::push_preflight::take_auth_endpoint(&receipt).is_none());
+        }
+        let receipt =
+            crate::push_preflight::remember_auth_endpoint("https://push.invalid/team/repo");
+        assert!(crate::push_preflight::take_auth_endpoint(&receipt).is_some());
+        assert!(
+            super::reviewed_auth_failure(&receipt, binding, crate::connections::Context::default())
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn recording_https_route_proof_is_rechecked_after_draft_and_retained_for_retry() {
+        use std::cell::Cell;
+        let binding = recorded_route();
+        let ops = vec![
+            vec![
+                super::EXPECT_HTTPS_ROUTE.into(),
+                serde_json::to_string(&binding).unwrap(),
+            ],
+            vec!["checkout".into(), "topic".into()],
+        ];
+        let current = Cell::new(true);
+        let checks = Cell::new(0);
+        let result = super::with_rechecked_preparation(
+            || {
+                super::check_https_routes(&ops, |proof| {
+                    assert_eq!(proof, &binding);
+                    checks.set(checks.get() + 1);
+                    if current.get() {
+                        Ok(())
+                    } else {
+                        Err("push route changed during draft".into())
+                    }
+                })
+            },
+            || {
+                current.set(false);
+                Ok(())
+            },
+        );
+        assert!(result.is_err());
+        assert_eq!(checks.get(), 2);
+        let ctx = egui::Context::default();
+        let mut tab =
+            super::RepoTab::new_deferred("/nonexistent/route-retry-recording".into(), &ctx);
+        tab.last_op = Some(super::PendingOp {
+            label: "Retry".into(),
+            ops: ops.clone(),
+            refresh: super::Refresh::All,
+            kind: OpKind::plain(),
+            quiet: false,
+        });
+        tab.keep_unfinished(1);
+        assert_eq!(tab.last_op.as_ref().unwrap().ops, ops);
+        let malformed = vec![vec![
+            super::EXPECT_HTTPS_ROUTE.into(),
+            "invalid-json".into(),
+        ]];
+        assert!(
+            super::check_https_routes(&malformed, |_| panic!("invalid proof dispatched")).is_err()
+        );
+    }
+
+    #[test]
+    fn recording_safety_draft_cannot_authorize_an_operation_after_its_context_moves() {
+        use std::cell::{Cell, RefCell};
+        let head = Cell::new("approved-head");
+        let branch = Cell::new("approved-branch");
+        let checks = RefCell::new(Vec::new());
+        for change_branch in [false, true] {
+            head.set("approved-head");
+            branch.set("approved-branch");
+            checks.borrow_mut().clear();
+            let mut dispatched = false;
+            let result = super::with_rechecked_preparation(
+                || {
+                    checks.borrow_mut().push((head.get(), branch.get()));
+                    if head.get() == "approved-head" && branch.get() == "approved-branch" {
+                        Ok(())
+                    } else {
+                        Err("original operation context moved".into())
+                    }
+                },
+                || {
+                    if change_branch {
+                        branch.set("another-branch");
+                    } else {
+                        head.set("later-coherent-draft-head");
+                    }
+                    Ok(()) // a coherent successful snapshot of the *new* state
+                },
+            );
+            if result.is_ok() {
+                dispatched = true;
+            }
+            assert!(result.is_err());
+            assert!(!dispatched);
+            assert_eq!(checks.borrow().len(), 2);
+        }
+    }
 
     fn repo(name: &str) -> PathBuf {
         let dir = std::env::temp_dir().join(format!("gitcraft-ops-{name}-{}", std::process::id()));

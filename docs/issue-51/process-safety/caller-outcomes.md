@@ -1,0 +1,9 @@
+# R2: caller outcome preservation
+
+WIP static correction. Service output now carries a typed stop kind; an additional checked facade distinguishes explicit cancellation before dispatch from all other errors. AI consumes this outcome instead of classifying errors by the substring `unconfirmed` or by a late cancellation flag. Native helper receipt production also uses typed uncertainty. Normal confirmed cancellation remains a stopped result; native finish failures, missing results and output-delivery uncertainty remain errors regardless of cancellation timing.
+
+Git stream formatting and bounded-queue failures now inspect the terminal ownership result and preserve cleanup errors alongside the content error. Both the immediate oversized-line path and post-completion formatting/overflow paths use the same pure completion function. Lost-fsck propagates the stream execution error before normalizing confirmed cancellation. Service finalization errors retain the earlier stop/cleanup reason as well.
+
+With CARGO_BUILD_JOBS=2, `cargo +1.95.0 test --locked --lib recording -- --nocapture` passed 14 application + 6 OS gates. The additional `processes::recording_outcomes` test passed separately before preservation. `cargo +1.95.0 check --locked --all-targets` passed with baseline macOS warnings. Injected cases cover cancel plus missing proof, native finish failure, lost result, content/queue error plus uncertain cleanup, confirmed stop and pre-dispatch cancellation. These tests execute no user commands or signals.
+
+The generic string-returning Service API remains source compatible. New consumers use `run_checked`/`checked` and `Output::stop_kind`; new Options fields remain defaulted. Full candidate static review, blocked-writer/native socket/claim/retirement corrections and every process runtime gate remain pending. No seven-feature completion, inherited-suite or CI claim.

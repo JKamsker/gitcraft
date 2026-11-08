@@ -1,0 +1,84 @@
+{
+  "report_sha256": "416b2af9e4d394110e55d567ca9d33f59bbcfd8c35978bfa37ebab8006d3875a",
+  "manifest_sha256": "67cbb0a8b07a3a36344a83594ad6e0da09e74e59d084b89fa2cbdf566ac10a23",
+  "artifacts": [
+    {
+      "original_path": "/tmp/gitcraft-51-orchestration/review-workflows-r2-status.json",
+      "sha256": "edddce9eaf735672d2cb03977fddececda0b5d308512ee87898e16041297cc25",
+      "bytes": 4803,
+      "archive": "evidence-000-review-workflows-r2-status.json.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-51-r2-final-check.log",
+      "sha256": "4bdb242147b5c9aa90e4979d5b30a0968bfa41fafb025487efc1a7f500a8857e",
+      "bytes": 1512,
+      "archive": "evidence-001-gitcraft-51-r2-final-check.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-51-r2-final-committed-clippy.log",
+      "sha256": "8d86a29fa97ac33f7e0b914bb72d0c7c9427cbf66023946ba33d9ff3e345838f",
+      "bytes": 228,
+      "archive": "evidence-002-gitcraft-51-r2-final-committed-clippy.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-51-r2-final-committed-pure.log",
+      "sha256": "06a04d7a251b7961aec6a19279760c5eb52d9b1d3c5795dfd5f174328c2c6944",
+      "bytes": 5050,
+      "archive": "evidence-003-gitcraft-51-r2-final-committed-pure.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-51-r2-final-fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "archive": "evidence-004-gitcraft-51-r2-final-fmt.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-51-review-workflows-content-r1.md",
+      "sha256": "d21b0100cca107a932e2d0c93f29769f61f55d7b7809383ddb9033125e916c54",
+      "bytes": 14882,
+      "archive": "evidence-005-gitcraft-51-review-workflows-content-r1.md.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-51-review-workflows-r2-handoff.md",
+      "sha256": "3ea6473eebd996117e41909eb0ece7b52b1acbe794970ac66e851f00bf6c5552",
+      "bytes": 21276,
+      "archive": "evidence-006-gitcraft-51-review-workflows-r2-handoff.md.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-51-review-workflows-ui-r1.md",
+      "sha256": "54bbf6be4a685eaf8aba6bcefde0018f04692aed0314aa1932a74a14cf19c2a4",
+      "bytes": 15800,
+      "archive": "evidence-007-gitcraft-51-review-workflows-ui-r1.md.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-51-workflows-content-ui-r2-pure.json",
+      "sha256": "eac389c4153dca4c14dfdaecf01c875b8043f411ccbf36ed0a12ce2e561de311",
+      "bytes": 2833,
+      "archive": "evidence-008-gitcraft-51-workflows-content-ui-r2-pure.json.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-51-workflows-content-ui-r2-pure.log",
+      "sha256": "e3e80cec8737e3616d6561313ec27d5be833fc7a0493e35f7877f17eea1e7e9a",
+      "bytes": 5119,
+      "archive": "evidence-009-gitcraft-51-workflows-content-ui-r2-pure.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-51-workflows-content-ui-review-r2.md",
+      "sha256": "416b2af9e4d394110e55d567ca9d33f59bbcfd8c35978bfa37ebab8006d3875a",
+      "bytes": 14900,
+      "archive": "evidence-010-gitcraft-51-workflows-content-ui-review-r2.md.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-issue51-issues.json",
+      "sha256": "411e76639a880c52a8f92ef5ec543e4e76befaa1f95b2be271629df23a88edfc",
+      "bytes": 177452,
+      "archive": "evidence-011-gitcraft-issue51-issues.json.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-workflows-r2-fe88e1dc-tests",
+      "sha256": "fba747936ba8c153dbd59a7c25f1a654c88c76d4e76ac72c9fe792f759059343",
+      "bytes": 143727768,
+      "archive": "not copied: binary or >2MB; hash retained"
+    }
+  ]
+}

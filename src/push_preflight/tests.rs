@@ -1,6 +1,89 @@
 use super::*;
 use std::path::PathBuf;
 
+#[test]
+fn reviewed_auth_receipts_keep_the_actual_failing_endpoint_out_of_logs() {
+    let a = "https://alice:DO_NOT_LOG@a.invalid/team/repo.git?private=DUMMY";
+    let b = "https://bob@b.invalid/another/repo.git";
+    let ea = remember_auth_endpoint(a);
+    let eb = remember_auth_endpoint(b);
+    assert!(git::is_auth_error(&ea));
+    assert!(!ea.contains("DO_NOT_LOG") && !ea.contains("a.invalid"));
+    assert_eq!(take_auth_endpoint(&eb).as_deref(), Some(b));
+    assert_eq!(take_auth_endpoint(&ea).as_deref(), Some(a));
+    assert!(take_auth_endpoint(&ea).is_none());
+    assert!(is_reviewed_auth_error(&ea)); // expiration never permits a fetch-URL fallback
+}
+
+#[cfg(unix)]
+#[test]
+fn recording_push_only_placeholder_rewrite_cannot_change_the_reviewed_receiver()
+-> Result<(), String> {
+    let f = Fixture::new()?;
+    let intended = f
+        .root
+        .join("uncontacted-A.git")
+        .to_string_lossy()
+        .into_owned();
+    let other = f
+        .root
+        .join("uncontacted-B.git")
+        .to_string_lossy()
+        .into_owned();
+    f.git(&[
+        "config",
+        &format!("url.{other}.pushInsteadOf"),
+        "gitcraft-preflight-address://",
+    ])?;
+    let marker = f.root.join("receiver-argv");
+    let shim = f.root.join("record-receiver");
+    std::fs::write(
+        &shim,
+        format!(
+            "#!/bin/sh\nprintf '%s\\n' \"$1\" > {}\nexit 1\n",
+            crate::remote::sh_quote(&marker.to_string_lossy())
+        ),
+    )
+    .map_err(|e| e.to_string())?;
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(&shim, std::fs::Permissions::from_mode(0o700))
+        .map_err(|e| e.to_string())?;
+    for force in [false, true] {
+        let head = f.git(&["rev-parse", "HEAD"])?;
+        let alias = "gitcraft-fixture-recorded";
+        let mut args = vec!["push".into(), "--dry-run".into(), "--no-verify".into()];
+        if force {
+            args.push(format!("--force-with-lease=refs/heads/main:{head}"));
+        }
+        args.extend([alias.into(), format!("{head}:refs/heads/main")]);
+        let result = git::push_preflight_with(
+            &f.repo,
+            &args,
+            git::PushTarget {
+                address: &intended,
+                alias,
+                original_remote: "origin",
+                skip_hooks: true,
+                lfs_config: &[],
+                lfs_objects: &[],
+                receive_pack: shim.to_str().ok_or("shim path")?,
+            },
+            None,
+            None,
+        );
+        assert!(result.is_err());
+        assert_eq!(
+            std::fs::read_to_string(&marker)
+                .map_err(|e| format!("{e}: {result:?}"))?
+                .trim(),
+            intended
+        );
+        assert!(!std::path::Path::new(&intended).exists());
+        assert!(!std::path::Path::new(&other).exists());
+    }
+    Ok(())
+}
+
 pub(crate) struct Fixture {
     pub root: PathBuf,
     pub repo: PathBuf,
@@ -140,6 +223,49 @@ fn host_and_namespace_policies_preserve_profile_serialization_and_transport_iden
     );
     let json = serde_json::to_string(&p).unwrap_or_default();
     assert_eq!(serde_json::from_str::<UserProfile>(&json).ok(), Some(p));
+}
+
+#[test]
+fn replacement_refs_cannot_hide_physical_outgoing_content_or_repair_inputs() -> Result<(), String> {
+    let f = Fixture::new()?;
+    let bad = f.commit(
+        "token.txt",
+        "api_key = 'ghp_DUMMY_REPLACEMENT_CANARY_123456789'\n",
+        "WIP physical",
+    )?;
+    let parent = f.git(&["rev-parse", "HEAD^"])?;
+    let safe_tree = f.git(&["rev-parse", &format!("{parent}^{{tree}}")])?;
+    let safe = f.git(&[
+        "commit-tree",
+        &safe_tree,
+        "-p",
+        &parent,
+        "-m",
+        "sanitized replacement",
+    ])?;
+    f.git(&["replace", &bad, &safe])?;
+    assert_eq!(
+        f.git(&["show", "-s", "--format=%s", &bad])?,
+        "sanitized replacement"
+    );
+    let plan = f.plan(f.profile())?;
+    assert_eq!(plan.head, bad);
+    assert!(
+        plan.commits
+            .iter()
+            .any(|c| c.oid == bad && c.subject == "WIP physical")
+    );
+    assert!(
+        plan.findings
+            .iter()
+            .any(|v| v.kind == Kind::Secret && v.path == "token.txt")
+    );
+    assert!(plan.findings.iter().any(|v| v.kind == Kind::Message));
+    assert!(read(&f.repo, &["cat-file", "commit", &bad], &|| true)?.contains("WIP physical"));
+    let out = git::local_repair_input(&f.repo, &["show", "-s", "--format=%s", &bad], &[], &[])?;
+    assert!(out.status.success());
+    assert_eq!(out.stdout, b"WIP physical\n");
+    Ok(())
 }
 
 #[test]
@@ -812,5 +938,60 @@ fn routed_submodule_checks_survive_preflight_without_enabling_child_publication(
     assert!(parse(&["--recurse-submodules=on-demand".into()]).is_err());
     execute(&f.repo, &plan, None)?;
     assert_eq!(f.receiver_head()?, plan.head);
+    Ok(())
+}
+
+/// Supplied metadata only: no Fixture, Git, helper, filesystem or transport.
+#[test]
+fn merge_pure_reviewed_send_receipt_refuses_changed_exact_push() -> Result<(), String> {
+    let oid = "a".repeat(40);
+    let plan = Plan {
+        branch: "refs/heads/topic".into(),
+        remote: "team".into(),
+        destination: "refs/heads/topic".into(),
+        head: oid.clone(),
+        base: None,
+        commits: vec![],
+        findings: vec![],
+        targets: vec![],
+        expected_name: String::new(),
+        expected_email: String::new(),
+        expected_accounts: BTreeMap::new(),
+        profile: UserProfile::default(),
+        force: false,
+        deleting: false,
+        tracking: false,
+        lfs_objects: BTreeSet::new(),
+        skip_hooks: false,
+        push_oid: oid,
+        original: vec![],
+        urls: vec!["https://push.invalid/team/project".into()],
+        checkout: String::new(),
+        checkout_oid: String::new(),
+        config: String::new(),
+        config_before_push: String::new(),
+        local_refs: BTreeMap::new(),
+        extras: vec![],
+        tracking_ref: None,
+        lfs_config: vec![],
+        receive_pack: "git-receive-pack".into(),
+    };
+    let receipt = ReviewedSend::from_echo(push_args(&plan)?, None);
+    receipt.check_plan(&plan)?;
+    for field in 0..6 {
+        let mut changed = plan.clone();
+        match field {
+            0 => changed.push_oid = "b".repeat(40),
+            1 => changed.destination = "refs/heads/other".into(),
+            2 => changed.remote = "different-receiver".into(),
+            3 => changed.base = Some("c".repeat(40)),
+            4 => changed.force = true, // no inspected lease: refuse even before dispatch
+            _ => changed.extras.push("--recurse-submodules=check".into()),
+        }
+        assert!(
+            receipt.check_plan(&changed).is_err(),
+            "changed field {field}"
+        );
+    }
     Ok(())
 }

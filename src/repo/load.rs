@@ -316,6 +316,7 @@ impl RepoTab {
         self.ci_view = None;
         self.avatars_hinted = false;
         self.pr_requests += 1;
+        self.invalidate_pr_document();
         if let Some(view) = &mut self.pr_view {
             view.account_changed(self.pr_requests);
         }

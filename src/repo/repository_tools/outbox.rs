@@ -37,40 +37,26 @@ pub(super) fn act(tab: &mut RepoTab, act: Act, ctx: &egui::Context) -> Option<Ac
                 logic::remove(r.repo, &view, &id)
             })
         }
-        Act::SendOutbox(p) => {
-            let selected = crate::settings::Settings::get(ctx).profile();
-            if p.context != crate::connections::current()
-                || !p.ui_generation.is_some_and(|generation| {
-                    selection_current(
-                        &p.context,
-                        p.consent.profile,
-                        &p.consent.choices,
-                        generation,
-                        &tab.connection_context,
-                        &selected,
-                        tab.https_generation,
-                    )
-                })
-            {
-                tab.status = Some((
-                    "Prepared outbox profile/sign-in changed; prepare and approve again".into(),
-                    true,
-                ));
+        Act::SendOutbox(p) => start_send(tab, p, false, ctx),
+        Act::AutoOutbox(id) => {
+            if tab.is_busy() || tab.echo_push_pending() {
                 return None;
             }
-            tab.repository_tool_mutation("Send exact queued push", true, ctx, move |r| {
-                logic::send(r, &p, false)
-            })
-        }
-        Act::AutoOutbox(id) => {
+            let (repo, credentials) = (tab.path.clone(), tab.credentials.clone());
             let profile = crate::settings::Settings::get(ctx).profile();
-            tab.repository_tool_mutation(
-                "Autosend opted-in plain outbox push",
-                true,
+            let context = crate::connections::current();
+            let generation = tab.https_generation;
+            tab.then_or(
                 ctx,
-                move |r| {
-                    let p = logic::prepare(r.repo, &id, profile, r.credentials)?;
-                    logic::send(r, &p, true)
+                false,
+                Err,
+                move || context.run(|| logic::prepare(&repo, &id, profile, credentials.as_ref())),
+                move |tab, result, ctx| match result {
+                    Ok(mut p) => {
+                        p.ui_generation = Some(generation);
+                        start_send(tab, Box::new(p), true, ctx);
+                    }
+                    Err(error) => tab.status = Some((error, true)),
                 },
             );
         }
@@ -153,6 +139,41 @@ pub(super) fn act(tab: &mut RepoTab, act: Act, ctx: &egui::Context) -> Option<Ac
         other => return Some(other),
     }
     None
+}
+fn start_send(tab: &mut RepoTab, p: Box<logic::Prepared>, automatic: bool, ctx: &egui::Context) {
+    let selected = crate::settings::Settings::get(ctx).profile();
+    if p.context != crate::connections::current()
+        || !p.ui_generation.is_some_and(|generation| {
+            selection_current(
+                &p.context,
+                p.consent.profile,
+                &p.consent.choices,
+                generation,
+                &tab.connection_context,
+                &selected,
+                tab.https_generation,
+            )
+        })
+    {
+        tab.status = Some((
+            "Prepared outbox profile/sign-in changed; prepare and approve again".into(),
+            true,
+        ));
+        return;
+    }
+    let plan = p.plan.clone();
+    tab.reviewed_send(&plan, ctx, move |tab, reviewed, ctx| {
+        tab.repository_tool_mutation(
+            if automatic {
+                "Autosend opted-in plain outbox push"
+            } else {
+                "Send exact queued push"
+            },
+            true,
+            ctx,
+            move |r| p.context.run(|| logic::send(r, &p, automatic, &reviewed)),
+        );
+    });
 }
 impl RepoTab {
     pub(in crate::repo) fn poll_outbox(&mut self, ctx: &egui::Context) {

@@ -1,0 +1,375 @@
+{
+  "review": "Jira/Linear original-feature R1",
+  "candidate": "9d8f54cf9c58ad70182a88e961dc40ec2356c02e",
+  "tree": "8d73281ffa3233ea4f75e7f427038c3b13e2a35b",
+  "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>",
+  "source_method": "immutable git archive and each bound file verified byte-for-byte against git-show objects; no moving source",
+  "snapshot": "/tmp/gitcraft-trackers-r1-9d8f-source",
+  "scope": "Issue43 Start work from an issue: JiraCloud/Linear assigned issues, branch/worktree, criteria, PR backlink, additive profile metadata/secure references, worker selected-origin credential boundaries; no parity wishlist",
+  "verdict": "FAIL",
+  "findings": [
+    {
+      "id": "TR-R1-1",
+      "severity": "P2",
+      "source": "trackers/mod.rs:375-387; issue_work/picker.rs:422-425",
+      "summary": "All tracker rows share numeric0 interaction ID; headless click first selects none, second activates both; final loop chooses last",
+      "proof": "exact extracted issue_row headless egui pointer input, inert style/data only"
+    },
+    {
+      "id": "TR-R1-2",
+      "severity": "P2",
+      "source": "trackers/mod.rs:320-327; issue_work/criteria.rs:166-180",
+      "summary": "Configured Jira criteria customfield silently omitted when description already contains criteria heading",
+      "proof": "exact pure parse/adf/extractor chain; selected field present in parsed body but absent from kept card criteria"
+    }
+  ],
+  "report": {
+    "path": "/tmp/gitcraft-51-trackers-review-r1.md",
+    "sha256": "1a88cdb9f4a2e734326a359e9dabc38fd061cd57c6ac98f498464a47c80b2871"
+  },
+  "source_sha256_and_blob": {
+    "Cargo.lock": {
+      "sha256": "28e92b6606c5ac17432dfa0dbe534cd05795399fbc35be6b987699f6dcd4ac64",
+      "blob": "dc75e856e0eedf194d55666e94da235ac230415c",
+      "archive_matches_git_object": true
+    },
+    "Cargo.toml": {
+      "sha256": "dce8296b575420c765a6a8ee1c027dc0fecf2abfe8aa151a43eea0d756bc9d6b",
+      "blob": "979d4822dbd089505e19ead2b4732ceca723bde8",
+      "archive_matches_git_object": true
+    },
+    "src/connections.rs": {
+      "sha256": "c00ece46a380b2c6e88dd423d74d6a15dbb11f500e4221a49e2c44ad8b152362",
+      "blob": "56e782154facdf70ddd6a8f18489614422de6bd0",
+      "archive_matches_git_object": true
+    },
+    "src/forge/gitea/issues.rs": {
+      "sha256": "30e4c80dd95e5cc572c8ea8ed2aa337533116efe1f2efd5453722451411297d6",
+      "blob": "37e1b7b2c6213ff7304abf35283adef927eb8f0e",
+      "archive_matches_git_object": true
+    },
+    "src/forge/github/issues.rs": {
+      "sha256": "93a5ae7f5bde1e0e025bf575e63b1765d0d8c66fa85700c52d75d07f759c4653",
+      "blob": "4d1c38a252b719d0e9b3cf152e4a257211a0cfdd",
+      "archive_matches_git_object": true
+    },
+    "src/forge/gitlab/mod.rs": {
+      "sha256": "ba59d36b6591f95a6a73b13fc9cb8c79a4212fe3055cd212214a9e3054fc7e96",
+      "blob": "4caba37f8afa7eaa0ad07234042abf1b0e655713",
+      "archive_matches_git_object": true
+    },
+    "src/forge/mod.rs": {
+      "sha256": "d1487fb815d44673aed3d67db3a1cdbfca21e5c2161f76ab574963688a7ee521",
+      "blob": "76bd86dfdca0faa56d98cedd786e54501dacf3cc",
+      "archive_matches_git_object": true
+    },
+    "src/lib.rs": {
+      "sha256": "4039c59f28c671b149d013fb82542034262ef2bbc753f41556637cecb2e47c6a",
+      "blob": "9ef81728e1fc63f90bea5f1301d44ddfdcbe3b51",
+      "archive_matches_git_object": true
+    },
+    "src/repo/actions.rs": {
+      "sha256": "4fc6cc330d4a2132cdb39cbcb27096c59639e282b32998da823080567dc8a8ae",
+      "blob": "f5ea09de47cb68edd768b892537d769a380851b2",
+      "archive_matches_git_object": true
+    },
+    "src/repo/issue_work/card.rs": {
+      "sha256": "f08a6da5dd757896c632c0cf49dac105d57d9619f453bc12509604ec138e93b2",
+      "blob": "d7b27f7927a093e501d4cd807bb11000d3922a55",
+      "archive_matches_git_object": true
+    },
+    "src/repo/issue_work/link.rs": {
+      "sha256": "cfbe2cf38a06aa99b3113c27597adbb9698f62bd8471652d1ab647ee21313754",
+      "blob": "24eabaeaa1ebfa15ad39633784c277604c746b72",
+      "archive_matches_git_object": true
+    },
+    "src/repo/issue_work/mod.rs": {
+      "sha256": "55f1391e6808875de899504cdd2c9b70cf98109ed58acfe50db2803c7d105016",
+      "blob": "ac1a6ed4c1ebb752bbef6495c4f0efa54f03d60b",
+      "archive_matches_git_object": true
+    },
+    "src/repo/issue_work/naming.rs": {
+      "sha256": "3fb5a54104cd50192534d7f8f3378460a6e6d2deb41f59048ca9149ef8138201",
+      "blob": "d7a2dbecfa94ac0805522b05855792244700bf8b",
+      "archive_matches_git_object": true
+    },
+    "src/repo/issue_work/picker.rs": {
+      "sha256": "44184791ca338e5584e90f78ebf77eadc932294be3cf5795d38356d2bd802166",
+      "blob": "43ae0264775ce942235d8435eabd25b8f33de9c4",
+      "archive_matches_git_object": true
+    },
+    "src/repo/issue_work/tests.rs": {
+      "sha256": "2fdc70ec893ff4866cb43a71f9faf5e5d4189119fcd45c5fa71c633812cad3f9",
+      "blob": "53a96718892e3c844000bd499e27838d5f17a26a",
+      "archive_matches_git_object": true
+    },
+    "src/repo/mod.rs": {
+      "sha256": "878e75013e737ae3626fa8aa767a1b42907d058fc35311db8ca45605ebac7497",
+      "blob": "ecd946d0bcedd6b6daece9fb93d088e2c58cbb3b",
+      "archive_matches_git_object": true
+    },
+    "src/settings/connection_page.rs": {
+      "sha256": "80547727f628cb318c93280fbf3c879a3846171282b553ed358ffee95e131e95",
+      "blob": "5d3eb9b0ac24a6ba5bef1ae263f2574ddfa724de",
+      "archive_matches_git_object": true
+    },
+    "src/trackers/mod.rs": {
+      "sha256": "d48abddfcdd5ab6a97ddc439dcdb25febf45e3c4c4b2cea5d697e2a3bfb2c630",
+      "blob": "655796c85b172909c8403b16cf0fb9ae885d25b4",
+      "archive_matches_git_object": true
+    },
+    "src/trackers/tests.rs": {
+      "sha256": "3c6c892d58d7ed2b8b40095b145acb60f16c4a7aa033b44f00b72d8a68a6ce95",
+      "blob": "fc7ff1aa2dc671790ca2f8494921b403ca2ef7b8",
+      "archive_matches_git_object": true
+    },
+    "src/trackers/ui.rs": {
+      "sha256": "c484ef57a9cdc4e6db00c4e7f06e0e56fc88d26dacc44f0138f4d27d4a5a37a8",
+      "blob": "970c8ca7a2cc479f540f1f8e5c069dcfa696d13e",
+      "archive_matches_git_object": true
+    },
+    "src/repo/issue_work/criteria.rs": {
+      "sha256": "2485578817324f27e3c15d0cf6b202ba158a233d6fbba0ba6ef6945aabf7372e",
+      "blob": "da19a5a6b73b1adf883c5e45460a31544ed3a23b",
+      "archive_matches_git_object": true
+    },
+    "src/repo/sidebar/branches.rs": {
+      "sha256": "3c06ffbdf7ad4e6a08960dd6596e78951b187032bb241ab34d72376ba71fb3e1",
+      "blob": "01e6d0c57b0f1f0b45e5c86806ecae03b5bf1be6",
+      "archive_matches_git_object": true
+    },
+    "src/repo/sidebar/pull_requests.rs": {
+      "sha256": "34a2674b4b939b7e27c2af032e6622ef8766e6f4ee9671363d37d3f15a9545c9",
+      "blob": "19b20518fa95726b1566e29baddf4d14f2212001",
+      "archive_matches_git_object": true
+    },
+    "src/repo/layout.rs": {
+      "sha256": "352a7a272c726ea09e8f8e6bfde8093b5671c46533dce5543a11b3c0f4e7d1b4",
+      "blob": "8eb3f5cb79098e1865ce013e3efad4058decb1d4",
+      "archive_matches_git_object": true
+    },
+    "src/repo/messages.rs": {
+      "sha256": "908c64ee702f253e20c9a83b82f6aabb039873f37aa7c03b44b3bcb823ee5760",
+      "blob": "89e995b2a26b83e96eb181d02832e0b1348f3281",
+      "archive_matches_git_object": true
+    },
+    "src/tasks.rs": {
+      "sha256": "37123aebd12bc6f0362c939a85f84dc31eba42ca941b34a70a88a38133a919c5",
+      "blob": "68706a390f536d95aee9c93f1bb081719428293e",
+      "archive_matches_git_object": true
+    },
+    "src/forge/http.rs": {
+      "sha256": "a07d19829fed5f1c44c36cfa86ec456a9817a7aafb39e041780168e008cb3f98",
+      "blob": "607ded5d39500a7d854d5a2b7cd4be9959dad36c",
+      "archive_matches_git_object": true
+    },
+    "src/settings/profiles.rs": {
+      "sha256": "a5acec0841717d21b51ade77dd366c046c72e9d955446215f8eade017850e0ed",
+      "blob": "bea32e0f9a57b06000844a706985a149f21c1c1c",
+      "archive_matches_git_object": true
+    }
+  },
+  "inputs_sha256": {
+    "/tmp/gitcraft-51-batch-b-trackers-9d8f54cf-handoff.md": "28221971da87b836f275bd449e3255745216727d0536824163cad9c50f05d219",
+    "/tmp/gitcraft-51-batch-b-validation.json": "9023f23ad3d31581331b0d9528739d0869ca606beffd50aaeab8d1b3adbc6ad2",
+    "/tmp/gitcraft-issue51-issues.json": "411e76639a880c52a8f92ef5ec543e4e76befaa1f95b2be271629df23a88edfc"
+  },
+  "supplied_gate_log_sha256": {
+    "/tmp/gitcraft-51-trackers-9d8f54cf-0.log": "0118fdd9b13cf64287517fe45afb70da3429a1bdb79585ccefeb212b24bd613a",
+    "/tmp/gitcraft-51-trackers-9d8f54cf-1.log": "3f00fbd6339fbd11c6b34789c043accc89e85a4e555e61a7757c96b28e5d9901",
+    "/tmp/gitcraft-51-trackers-9d8f54cf-2.log": "a24efca04a790ee1f2e3c26dabbb1d06249b3a325a2a7cf3d4975f0e1f8398c0",
+    "/tmp/gitcraft-51-trackers-9d8f54cf-3.log": "0b7dc74f779ea6fb6565505b2ac5e46d390569cfbaa5c775040a6bdbea66ded0",
+    "/tmp/gitcraft-51-trackers-9d8f54cf-4.log": "5604fc8f0c276397a55db4bd7008236712075c0ad37d3b3a0f1fe362b1b85a36"
+  },
+  "owner_gates": {
+    "candidate": "9d8f54cf9c58ad70182a88e961dc40ec2356c02e",
+    "reported_selected_passes": 15,
+    "entries": [
+      {
+        "commit": "9d8f54cf9c58ad70182a88e961dc40ec2356c02e",
+        "command": [
+          "cargo",
+          "+1.95.0",
+          "test",
+          "--offline",
+          "--lib",
+          "trackers::tests::",
+          "--",
+          "--test-threads=2"
+        ],
+        "log": "/tmp/gitcraft-51-trackers-9d8f54cf-0.log",
+        "exit": 0,
+        "kind": "pure/recording or compilation; no process, HTTP or keyring fixtures"
+      },
+      {
+        "commit": "9d8f54cf9c58ad70182a88e961dc40ec2356c02e",
+        "command": [
+          "cargo",
+          "+1.95.0",
+          "test",
+          "--offline",
+          "--lib",
+          "repo::issue_work::picker::tests::",
+          "--",
+          "--test-threads=2"
+        ],
+        "log": "/tmp/gitcraft-51-trackers-9d8f54cf-1.log",
+        "exit": 0,
+        "kind": "pure/recording or compilation; no process, HTTP or keyring fixtures"
+      },
+      {
+        "commit": "9d8f54cf9c58ad70182a88e961dc40ec2356c02e",
+        "command": [
+          "cargo",
+          "+1.95.0",
+          "test",
+          "--offline",
+          "--lib",
+          "repo::issue_work::link::tests::",
+          "--",
+          "--test-threads=2"
+        ],
+        "log": "/tmp/gitcraft-51-trackers-9d8f54cf-2.log",
+        "exit": 0,
+        "kind": "pure/recording or compilation; no process, HTTP or keyring fixtures"
+      },
+      {
+        "commit": "9d8f54cf9c58ad70182a88e961dc40ec2356c02e",
+        "command": [
+          "cargo",
+          "+1.95.0",
+          "check",
+          "--offline",
+          "--all-targets"
+        ],
+        "log": "/tmp/gitcraft-51-trackers-9d8f54cf-3.log",
+        "exit": 0,
+        "kind": "pure/recording or compilation; no process, HTTP or keyring fixtures"
+      },
+      {
+        "commit": "9d8f54cf9c58ad70182a88e961dc40ec2356c02e",
+        "command": [
+          "cargo",
+          "+1.95.0",
+          "clippy",
+          "--offline",
+          "--lib",
+          "--",
+          "-D",
+          "warnings",
+          "-A",
+          "dead_code"
+        ],
+        "log": "/tmp/gitcraft-51-trackers-9d8f54cf-4.log",
+        "exit": 0,
+        "kind": "pure/recording or compilation; no process, HTTP or keyring fixtures"
+      }
+    ],
+    "reviewer_rerun": false
+  },
+  "reviewer_execution": {
+    "candidate": "9d8f54cf9c58ad70182a88e961dc40ec2356c02e",
+    "compilers": {
+      "rustc_plus_1_95_0_calls": 4,
+      "successful": 3,
+      "first_row_compile_failure": "driver used old Context::run; corrected to run_ui, source function unchanged"
+    },
+    "headless_row_runs": [
+      {
+        "exit": 101,
+        "classification": "inert egui only",
+        "failure": "driver failed to clear intentionally unused TexturesDelta; fixed driver before successful repro"
+      },
+      {
+        "exit": 0,
+        "classification": "inert exact extracted issue_row; no App/RepoTab constructor or OS window",
+        "stdout": [
+          "rects=[[[8.0 8.0] - [592.0 36.0]], [[8.0 39.0] - [592.0 67.0]]]",
+          "pointer click target=0 -> row clicks=[false, false]",
+          "pointer click target=1 -> row clicks=[true, true]"
+        ]
+      }
+    ],
+    "criteria_runs": [
+      {
+        "exit": 0,
+        "classification": "pure exact Client::parse, required, adf and criteria extraction with inert structs",
+        "stdout": [
+          "BODY=\"## Acceptance criteria\\nold description requirement\\n\\n## Acceptance criteria\\nselected custom-field requirement\"",
+          "VISIBLE_CRITERIA=\"old description requirement\""
+        ]
+      }
+    ],
+    "not_executed": [
+      "App/RepoTab/discovery constructors",
+      "keyring/store operation",
+      "actual Git/helper/CLI/process fixture",
+      "HTTP/SSH/provider API fixture",
+      "netrc",
+      "native OS/window/PTY",
+      "signal/timeout/cancel fixture",
+      "full suite/CI/PR/subagents"
+    ],
+    "read_only_tooling": "Git immutable object/archive/diff reads; Python source/JSON/hash tooling; public primary source document retrieval"
+  },
+  "adapter_seams": {
+    "exact_function_sha256": {
+      "issue_row": "bad7b1fc96317d2a077b445f59516c022968e91e213bf73c2493d2e61143477a",
+      "Client::parse": "c199fe7e0fae668c2fe2b5792ebd5c130f49b72b69cdf2a9f28475a165d6b46f",
+      "adf": "8a0e354d5f3399975e55628bd7b86946f96ca8685c0c5d5f186386cf9e84ac2b"
+    },
+    "row_adapter": "Exact issue_row with inert Issue::key, Tokens and chip styling; headless egui pointer events; no app or native integration.",
+    "criteria_adapter": "Exact Client::parse/required/adf; exact criteria extraction/helpers with unrelated plain Markdown renderer omitted; inert Account/Client/Issue/Identity types. Supplied JSON only.",
+    "assertion_scope": "Demonstrated duplicate widget behavior and visible criteria composition loss. No provider/client/store shell/Git execution."
+  },
+  "evidence_sha256": {
+    "/tmp/gitcraft-trackers-r1-9d8f-evidence/selected-owner-gates.json": "ac70c4a0bed4c17ef7bc6f3edf47dd0b4e72afed9c1f317d5f50bd05018d0b6b",
+    "/tmp/gitcraft-trackers-r1-9d8f-evidence/source-seams.json": "067ffe22da9e0254d40699e477a1a250cf887c2fede5c867c067b6cb3873484b",
+    "/tmp/gitcraft-trackers-r1-9d8f-evidence/rows-headless": "fcbd7dff1893ebe68418bc1a762cc333e6f6aac454216b33cf232d2c8971805e",
+    "/tmp/gitcraft-trackers-r1-9d8f-evidence/gitcraft-51-batch-b-trackers-9d8f54cf-handoff.md": "28221971da87b836f275bd449e3255745216727d0536824163cad9c50f05d219",
+    "/tmp/gitcraft-trackers-r1-9d8f-evidence/gitcraft-51-batch-b-validation.json": "9023f23ad3d31581331b0d9528739d0869ca606beffd50aaeab8d1b3adbc6ad2",
+    "/tmp/gitcraft-trackers-r1-9d8f-evidence/criteria-pure": "ba57d886d233ecdef1c2cc9ba987316e3121187ee32c5ab4db1b614f2410bea7",
+    "/tmp/gitcraft-trackers-r1-9d8f-evidence/rows-headless.rs": "834c1c202d304b81f523919ca9d525be4f30433760fe3dd019e06b5074f0e569",
+    "/tmp/gitcraft-trackers-r1-9d8f-evidence/criteria-pure.rs": "b206fe63217376e09fcf6acad8c55f476d40ff14d686eafcaf129651214889ed",
+    "/tmp/gitcraft-trackers-r1-9d8f-evidence/reviewed.diff": "40de7c0995a7402cdd1dd9cc06447d20adc78ab28a7d81fe34836a2a04c2ff23",
+    "/tmp/gitcraft-trackers-r1-9d8f-evidence/execution.json": "d78c1845e127642db227a3f327058d5c20fd22dbe7ad79d4e3408c4af9147fe1"
+  },
+  "cached_headless_dependency": {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-a61f0eaa/target/debug/deps/libegui-0e410d2928238130.rlib",
+    "sha256": "00991d51820997eadb725e41ef7721aa7c818dd7c1a201afb2ac0c71ae3d7703",
+    "class": "dependency rlib linked into inert headless adapter; not candidate App binary"
+  },
+  "public_primary_source_reads": [
+    {
+      "url": "https://linear.app/developers/graphql",
+      "class": "browser document retrieval only, no provider API query or auth fixture"
+    },
+    {
+      "url": "https://linear.app/developers/filtering",
+      "class": "browser document retrieval only, no provider API query or auth fixture"
+    },
+    {
+      "url": "https://linear.app/developers/pagination",
+      "class": "browser document retrieval only, no provider API query or auth fixture"
+    },
+    {
+      "url": "https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issue-search/#api-rest-api-3-search-jql-post",
+      "class": "browser document retrieval only, no provider API query or auth fixture"
+    }
+  ],
+  "per_requirement": {
+    "reachability_nonforge": "IMPLEMENTED_STATIC",
+    "assigned_provider_list": "IMPLEMENTED_SOURCE_CONTRACT_RUNTIME_HELD",
+    "stable_account_issue_cursor_data": "IMPLEMENTED_STATIC; row identity FAIL TR-R1-1",
+    "branch_worktree_naming": "IMPLEMENTED_STATIC_PURE_OPERATIONS; pointer selection FAIL",
+    "criteria_visibility": "PARTIAL_FAIL_TR-R1-2",
+    "refresh_freshness": "IMPLEMENTED_STATIC; parsing defect persists",
+    "PR_backlink": "IMPLEMENTED_STATIC_PURE",
+    "profile_metadata_and_worker_store": "IMPLEMENTED_STATIC; actual store held",
+    "selected_origin_credentials": "IMPLEMENTED_STATIC; actual provider acceptance held",
+    "existing_forge_flow": "PRESERVED_INSPECTED_DELTA; GL-R1-1 excluded"
+  },
+  "runtime_hold": "UNCHANGED. No actual keyring/HTTP/Git/helper/CLI/process/native/runtime fixtures, app/discovery constructors, fullsuite/CI/PR/subagents. Pure/headless compiled adapters only. Future provider/store/Git/platform acceptance separate.",
+  "historical_receipt_classification": "Full batch receipt includes older actual Git-fill execution; preserved as historical, not current tracker gate or pure reclassification.",
+  "tracked_edits": false
+}
