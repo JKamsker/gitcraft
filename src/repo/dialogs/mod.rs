@@ -14,6 +14,7 @@ mod keep_detached;
 mod linked_machines;
 mod parallel_bisect;
 mod preview;
+mod push_error;
 #[cfg(test)]
 mod rebase_test_support;
 mod rehearse;
@@ -536,15 +537,7 @@ impl RepoTab {
                 Dialog::PushPreflight { plan, acknowledge } => {
                     super::push_preflight::dialog(ui, plan, acknowledge)
                 }
-                Dialog::PushError(error) => {
-                    ui.heading(crate::i18n::text("repo-core-1396"));
-                    ui.label(error.as_str());
-                    if ui.button(crate::i18n::text("repo-core-0595")).clicked() {
-                        Outcome::Cancel
-                    } else {
-                        Outcome::Open
-                    }
-                }
+                Dialog::PushError(error) => push_error::show(ui, error),
                 Dialog::WorkingDraftLoading => {
                     ui.heading(crate::i18n::text("repo-core-1397"));
                     ui.add(crate::spinner::Spinner::new());
