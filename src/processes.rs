@@ -107,9 +107,50 @@ fn stop_kind(reason: Option<&str>, confirmed: bool) -> Option<StopKind> {
         }
     })
 }
+fn record_stop_confirmation(
+    stopped: &mut Option<String>,
+    confirmed: &mut bool,
+    result: Result<(), String>,
+) {
+    match result {
+        Ok(()) => *confirmed = true,
+        Err(why) => {
+            *confirmed = false;
+            *stopped = Some(format!(
+                "{}; remote cleanup unconfirmed: {why}",
+                stopped.as_deref().unwrap_or("cleanup failed")
+            ));
+        }
+    }
+}
 #[cfg(test)]
 mod recording_outcomes {
     use super::*;
+    #[test]
+    fn failed_ack_or_unavailable_cleanup_worker_always_surfaces_uncertainty() {
+        for why in ["capacity closed", "worker lost", "wrong receipt"] {
+            let mut stopped = Some("cancelled".into());
+            let mut confirmed = true;
+            record_stop_confirmation(&mut stopped, &mut confirmed, Err(why.into()));
+            assert_eq!(
+                stop_kind(stopped.as_deref(), confirmed),
+                Some(StopKind::Uncertain)
+            );
+            assert!(
+                stopped
+                    .as_deref()
+                    .unwrap_or_default()
+                    .contains("cleanup unconfirmed")
+            );
+        }
+        let mut stopped = Some("cancelled".into());
+        let mut confirmed = false;
+        record_stop_confirmation(&mut stopped, &mut confirmed, Ok(()));
+        assert_eq!(
+            stop_kind(stopped.as_deref(), confirmed),
+            Some(StopKind::Cancelled)
+        );
+    }
     #[test]
     fn cancellation_requires_no_dispatch_or_confirmed_cleanup() {
         assert!(matches!(
@@ -716,23 +757,15 @@ async fn execute(
         }
         // The stderr filter has consumed every ownership handshake chunk read so far.
         // Authenticate stop/reap off the event loop, before ending the local transport.
-        if let Some(stop) = options.stop_remote.take()
-            && let Ok(_permit) = Arc::clone(blocking).acquire_owned().await
-        {
-            match tokio::task::spawn_blocking(stop).await {
-                Ok(Ok(())) => remote_confirmed = true,
-                result => {
-                    let why = match result {
-                        Ok(Err(why)) => why,
-                        Err(e) => e.to_string(),
-                        _ => String::new(),
-                    };
-                    stopped = Some(format!(
-                        "{}; remote cleanup unconfirmed: {why}",
-                        stopped.as_deref().unwrap_or_default()
-                    ));
-                }
-            }
+        if let Some(stop) = options.stop_remote.take() {
+            let result = match Arc::clone(blocking).acquire_owned().await {
+                Ok(_permit) => match tokio::task::spawn_blocking(stop).await {
+                    Ok(result) => result,
+                    Err(error) => Err(format!("cleanup worker failed: {error}")),
+                },
+                Err(error) => Err(format!("cleanup worker capacity unavailable: {error}")),
+            };
+            record_stop_confirmation(&mut stopped, &mut remote_confirmed, result);
         }
         // finish signals while the Unix leader is unreaped, then reaps exactly once;
         // Windows holds its Job through the final signal. No delayed numeric kills.
