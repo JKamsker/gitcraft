@@ -1,0 +1,120 @@
+{
+  "candidate": "6cf01fd36acfbd33ceea832faa55a4882199bb76",
+  "immutable_snapshot": "/private/tmp/gitcraft-batch-c-review-6cf01fd3",
+  "verdict": "FAIL",
+  "scope": "five batch C state features; moving writer prompt/session WIP excluded",
+  "feature_dispositions": {
+    "graph_relationships": "scoped STATIC PASS",
+    "exact_oid_outbox": "PARTIAL/FAIL",
+    "named_changelists": "PARTIAL/FAIL",
+    "virtual_hunk_branches": "PARTIAL/FAIL",
+    "deferred_replay_acceptance": "PARTIAL/FAIL"
+  },
+  "findings": [
+    {
+      "id": "C1",
+      "priority": "P1",
+      "summary": "Mutable index exchange and cleanup ownership",
+      "evidence_kind": "immutable source/interleaving; not runtime reproduction"
+    },
+    {
+      "id": "C2",
+      "priority": "P1",
+      "summary": "Full access policy omitted",
+      "evidence_kind": "immutable source/interleaving; not runtime reproduction"
+    },
+    {
+      "id": "C3",
+      "priority": "P1",
+      "summary": "Late symbolic ref redirects virtual writes",
+      "evidence_kind": "immutable source/interleaving; not runtime reproduction"
+    },
+    {
+      "id": "C4",
+      "priority": "P1",
+      "summary": "Unknown publication treated as uncommitted rollback",
+      "evidence_kind": "immutable source/interleaving; not runtime reproduction"
+    },
+    {
+      "id": "C5",
+      "priority": "P1",
+      "summary": "Deferred unvalidated metadata reread",
+      "evidence_kind": "immutable source/interleaving; not runtime reproduction"
+    },
+    {
+      "id": "C6",
+      "priority": "P2",
+      "summary": "Outbox profile/account consent not durable",
+      "evidence_kind": "immutable source/interleaving; not runtime reproduction"
+    },
+    {
+      "id": "C7",
+      "priority": "P2",
+      "summary": "Unrelated intent-to-add flag lost",
+      "evidence_kind": "immutable source/interleaving; not runtime reproduction"
+    },
+    {
+      "id": "C8",
+      "priority": "P1",
+      "summary": "Aggregate snapshot bound checked after accumulation",
+      "evidence_kind": "immutable source/interleaving; not runtime reproduction"
+    },
+    {
+      "id": "C9",
+      "priority": "P2",
+      "summary": "Unshelve duplicate active path ownership",
+      "evidence_kind": "immutable source/interleaving; not runtime reproduction"
+    }
+  ],
+  "fresh_reviewer_application_or_test_executions": 0,
+  "supplied_exact6cf_pure_tests": {
+    "passed": 5,
+    "failed": 0,
+    "status": "writer log inspected; not independently rerun"
+  },
+  "shared_dependencies": "known rejected history/internals; content reviewer owns shared working-file rollback finding; no blanket certification",
+  "global_runtime_hold": "unchanged",
+  "files_sha256": {
+    "/private/tmp/gitcraft-batch-c-review-6cf01fd3/AGENTS.md": "a6b99ef334f51715e97ee6fd0d24fd4bd6920999d277657edc87ef6d570ffb1d",
+    "/private/tmp/gitcraft-batch-c-review-6cf01fd3/review-source-issues.json": "b480a5e68925fcbac88f70cdc19b7ac5e9baf723a8ded34270bdbe9c18dfd34f",
+    "/private/tmp/gitcraft-batch-c-review-6cf01fd3/docs/issue-51/baseline-core.md": "ace6e8941b5340ac078b71142fb9345eec3d3aa48a6ece54fabeff4ce5f51006",
+    "/private/tmp/gitcraft-batch-c-review-6cf01fd3/docs/issue-51/baseline-platform.md": "12ec9cfe568604a2798996e57c838c4036ae3d6a406bf49c41264e680ebbe0ee",
+    "/private/tmp/gitcraft-batch-c-review-6cf01fd3/src/repo/stack/graph.rs": "f316285cc5f0cf67a79a8f027cd3a6ef5cd92171a0881d736ce3c7adbe527a4a",
+    "/private/tmp/gitcraft-batch-c-review-6cf01fd3/src/repo/graph_view/mod.rs": "618310a87f85199092b5b9c3247a06b134814fd67106608626b2087e711466fd",
+    "/private/tmp/gitcraft-batch-c-review-6cf01fd3/src/repo/graph_view/row.rs": "754f3df580580bd71a8ecc18860a2416f14de45ff79327917ef7f0eec97dd3a4",
+    "/private/tmp/gitcraft-batch-c-review-6cf01fd3/src/git/repository_tools/outbox.rs": "b6fca63f4cce652713adf101d5b54132ba134c8b6a8d4f2798952a74611f3d37",
+    "/private/tmp/gitcraft-batch-c-review-6cf01fd3/src/repo/repository_tools/outbox.rs": "d6e2e52299c39a1fe5e0baa22d4b23f75e544724582a52d365d62462362a1110",
+    "/private/tmp/gitcraft-batch-c-review-6cf01fd3/src/git/drafts/mod.rs": "6baab87eeb52e0dad0440db38a9c44b81ff119632600fe947b761b03d24071f1",
+    "/private/tmp/gitcraft-batch-c-review-6cf01fd3/src/git/drafts/context.rs": "666770a5278197820f2e6cf212c17df8d4839e8a07c8158c6a58bfde2625cc81",
+    "/private/tmp/gitcraft-batch-c-review-6cf01fd3/src/git/drafts/permissions.rs": "49ec2d96b6cd7f07faa2c178ec2fb5806f6151c847f0009da953f509f892b0de",
+    "/private/tmp/gitcraft-batch-c-review-6cf01fd3/src/git/drafts/working_transaction.rs": "d7cc8a742de32c1faf72b15b4f96e2e930dc7ae536517db38337708bb98c6aa0",
+    "/private/tmp/gitcraft-batch-c-review-6cf01fd3/src/git/drafts/lists/mod.rs": "6a9b4de7b76e0034d34d82002de59464089c25ba141017cddc91d1ce54a1968d",
+    "/private/tmp/gitcraft-batch-c-review-6cf01fd3/src/git/drafts/lists/index.rs": "5b8c4aa77c02fe6d916c423398d2c36cdbc87faab06e0fc21a780e3495f90228",
+    "/private/tmp/gitcraft-batch-c-review-6cf01fd3/src/git/drafts/lists/tests.rs": "d0dddca6593510e687d396a585989abf07e0eb647c19b25e48d645dc5e89d428",
+    "/private/tmp/gitcraft-batch-c-review-6cf01fd3/src/repo/repository_tools/lists.rs": "03c388b170ba100a982a37c6df7ba890958b50ff021a7481b30b6efe24e7fb23",
+    "/private/tmp/gitcraft-batch-c-review-6cf01fd3/src/git/drafts/virtuals.rs": "5b430184ecb541baeb86fe404123ff3e7b18a6f93067c73ee444d0ac12fe6bcf",
+    "/private/tmp/gitcraft-batch-c-review-6cf01fd3/src/git/drafts/virtuals/tests.rs": "55e6a1fb95f9783599bb422acb719115b859bb4dc312014b5b11c7bd7c3f46ed",
+    "/private/tmp/gitcraft-batch-c-review-6cf01fd3/src/repo/repository_tools/virtuals.rs": "4253915731427b46b32724e0cdc49e2f08dd085bcf0974b11214956550c70cd2",
+    "/private/tmp/gitcraft-batch-c-review-6cf01fd3/src/git/drafts/deferred.rs": "da5122b6210eaeec140a99afce0c44c4784f588d0f73c356b2f0a4628f3bd904",
+    "/private/tmp/gitcraft-batch-c-review-6cf01fd3/src/git/drafts/deferred/runtime_tests.rs": "8ec3df8844fd7c292bed9951206fb221afa5658798dc33f23b9404d88349d8da",
+    "/private/tmp/gitcraft-batch-c-review-6cf01fd3/src/repo/repository_tools/deferred.rs": "bd35d93291ce48cef600a3cae8035b58a16c0eaa5f2690663a872f983110de13",
+    "/private/tmp/gitcraft-batch-c-review-6cf01fd3/src/repo/repository_tools/mod.rs": "da819308b43a2726339f3d72123273f04ce8e2247b576ed7927753f0476f976a",
+    "/private/tmp/gitcraft-batch-c-review-6cf01fd3/src/repo/stack/restack.rs": "fd9404e2513a6cbeb6d069ea3480ffe6ca5b6c0370da71500b6773f1a927a522",
+    "/private/tmp/gitcraft-batch-c-review-6cf01fd3/src/repo/actions.rs": "d53e61fbbe06ec8fe4d4e47b258bf7598b50e0c7bc93884cd737eb9fa6175b2f",
+    "/private/tmp/gitcraft-batch-c-review-6cf01fd3/src/repo/messages.rs": "a491b424a655e5734b472d01c4cf06e662e4c4d6d70c9c44166201d90fd0c0d6",
+    "/private/tmp/gitcraft-batch-c-review-6cf01fd3/src/repo/mod.rs": "c188a28ec4ab4cc29bb2dcfe119d6ad0c5c331600e4fc6555fe21773fb984a18",
+    "/private/tmp/gitcraft-batch-c-review-6cf01fd3/src/git/repository_tools/guard.rs": "135d6c8028ecce9400c9d635ecaa13240feb6f97ae9645f279a0c3cfd5888165",
+    "/private/tmp/gitcraft-batch-c-review-6cf01fd3/src/git/repository_tools/routes.rs": "21fadd60e99d18c4a18495c9243c3276b6ab7509cd16f76694779d3017ed4822",
+    "/private/tmp/gitcraft-batch-c-review-6cf01fd3/src/push_preflight.rs": "808729a99336cc37a954a82273d28dfc59f02c8d6d2850787cd7c3085cf1bb23",
+    "/private/tmp/gitcraft-batch-c-review-6cf01fd3/src/push_preflight/fix.rs": "4c982f908931fdb70058e32bce0eaf12a688410bbb086bbe7df5fa3309e5409a",
+    "/private/tmp/gitcraft-batch-c-review-6cf01fd3/src/settings/profiles.rs": "391b6727e8ed60291ed5541e441159863228eed3ee78009dae9fca375322271d",
+    "/private/tmp/gitcraft-batch-c-review-6cf01fd3/src/git/command.rs": "82e564c9f81322adce3edf349e787381492034e688568c87f00db5851ac91b59",
+    "/private/tmp/gitcraft-batch-c-review-6cf01fd3/historical-logs/gitcraft-c-6cf01fd3-deferred-pure.log": "1e1490e5d0cb2b8a6ba45c43602d63f9de4216bba7b2c033414523d490d082d9",
+    "/private/tmp/gitcraft-batch-c-review-6cf01fd3/historical-logs/gitcraft-c-deferred-check7.log": "bc1988af2949ae392ff24fa13877de9ae3adc09cb7134b65240e9fcb2d1b9409",
+    "/private/tmp/gitcraft-batch-c-review-6cf01fd3/historical-logs/gitcraft-c-b9e5d2d4-virtual-ui.log": "52ec586477aa2be36dbc422f6aed1e5b10020eadf9d3715f3642c372df0a6e06",
+    "/private/tmp/gitcraft-batch-c-review-6cf01fd3/historical-logs/gitcraft-c-561dd065-graph.log": "8a5a0e873576694c1d4fd3f05372da74e846993a48d417945c746943ac09fe5e",
+    "/private/tmp/gitcraft-batch-c-review-6cf01fd3/historical-logs/gitcraft-c-efdacd23-outbox.log": "39c8be801062a52e7145cc5ea13b1454424644d62fc1a18923f27ab8abb91902",
+    "/private/tmp/gitcraft-batch-c-review-6cf01fd3/historical-logs/gitcraft-c-16968309-lists-ui.log": "996b646511ac66d2d0bb2076083d96e7b0df8d7b9680d2fa614c05ec4690e8dd",
+    "/tmp/gitcraft-51-batch-c-state-review-r1.md": "9c8ddcfeb63b6576f45ea688d29c780a501117140708a071165a41ac391fcccb"
+  }
+}

@@ -1,0 +1,42 @@
+[
+  {
+    "source": "/tmp/gitcraft-51-credential-direct-review-r2.md",
+    "archive": "review.md",
+    "sha256": "c769fa58798e308640a4bb99eac6eefd3d01cfad7c6c9c54690727f1778b64f0"
+  },
+  {
+    "source": "/tmp/gitcraft-51-credential-direct-review-r2-manifest.json",
+    "archive": "manifest.json",
+    "sha256": "171fc664efff9bf93531a47c6f5320d141b85ba456ee21d408e140bf6a1bfbd0"
+  },
+  {
+    "source": "/tmp/gitcraft-51-credential-api-review-r1-manifest.json",
+    "archive": "00-gitcraft-51-credential-api-review-r1-manifest.json.gz",
+    "sha256": "c7c4f35c4958ba1892cdea3ba10e45a9b66abb5b02bcdf1f1708e4954b063b3d",
+    "compressed_sha256": "12617d34577b4b1abce00318dc6d3ffb23b1dcc48a5eb82c0a46961a1662cd6c"
+  },
+  {
+    "source": "/tmp/gitcraft-credential-direct-r2-evidence/pure-policy-5716.rs",
+    "archive": "06-pure-policy-5716.rs.gz",
+    "sha256": "d614128be54d73d9fcfcde0ee05bb1650c73bd2243188ef57999ad980d1fa806",
+    "compressed_sha256": "0cec8028e6c6fe72d87d49ed7495c7a06fa4de5fe61e6e3e2cd657b5b0e9c496"
+  },
+  {
+    "source": "/tmp/gitcraft-credential-direct-r2-evidence/pure-policy-5716.stdout.log",
+    "archive": "07-pure-policy-5716.stdout.log.gz",
+    "sha256": "b376a2912fdfb29ca2fa5d3ddd480c74ffa676d6a12eaee7b3181f12593bef45",
+    "compressed_sha256": "699f5ac876219b53e6f1d23129ba26c1fb8e72992290ff04ddce5985832bc487"
+  },
+  {
+    "source": "/tmp/gitcraft-credential-direct-r2-evidence/pure-policy-8855.stdout.log",
+    "archive": "08-pure-policy-8855.stdout.log.gz",
+    "sha256": "d28de380abbe0eb8ac5a07e52ddf45d94b24119ab76b31093032fd54e18bf216",
+    "compressed_sha256": "a8a101f9d8bf2916e0af1a6ba792a6124467fd8c48ff1cbf71e9391a9dcf678a"
+  },
+  {
+    "source": "/tmp/gitcraft-credential-direct-r2-evidence/pure-policy.rs",
+    "archive": "09-pure-policy.rs.gz",
+    "sha256": "9d0c98d7892f858d27b9e815596fa895e0d91d3e47ed8634ffb1e8b74da6b136",
+    "compressed_sha256": "8bf8ce0b020433d1101101f30edeaee69408831cb85669feeced37f091a3ccc5"
+  }
+]

@@ -33,6 +33,8 @@ impl RepoTab {
         self.forks_frame(&ctx);
         self.hotfix_frame(&ctx);
         self.keyboard_panes(&ctx);
+        self.echo_frame(&ctx);
+        self.intent_frame(&ctx);
         self.shortcuts(&ctx, &mut acts);
         self.drag_frame_start(&ctx);
         self.nav_shortcuts(&ctx, &mut acts);
@@ -45,6 +47,8 @@ impl RepoTab {
                     .stroke(egui::Stroke::new(1.0, t.separator)),
             )
             .show(ui, |ui| self.toolbar(ui, &mut acts));
+        self.ssh_setup_window(&ctx);
+        self.practice_banner(ui);
         self.push_banner(ui, &mut acts);
         self.detached_panel(ui, &mut acts);
         self.error_card_panel(ui);
@@ -116,10 +120,18 @@ impl RepoTab {
             .frame(egui::Frame::new().fill(t.dock))
             .show(ui, |ui| {
                 let pane_rect = ui.max_rect().intersect(ui.clip_rect());
-                if self.conflict.is_some() {
+                if self.file_comparison.is_some() {
+                    self.file_comparison_view(ui, &mut acts);
+                } else if self.conflict.is_some() {
                     self.conflict_view(ui, &mut acts);
                 } else if self.rebase.is_some() {
                     self.rebase_view(ui, &mut acts);
+                } else if self.symbols.open {
+                    self.symbol_biography_view(ui, &mut acts);
+                } else if self.dossier.open {
+                    self.line_dossier_view(ui, &mut acts);
+                } else if self.review_document.open {
+                    self.review_document_ui(ui, &mut acts);
                 } else if self.split.is_some() {
                     self.graph_diff_view(ui, &mut acts);
                 } else if self.absorb.is_some() {
@@ -131,6 +143,8 @@ impl RepoTab {
                     && self.docked(Panel::Diff)
                 {
                     self.diff_view(ui, &mut acts);
+                } else if self.tour.is_some() {
+                    self.tour_view(ui, &mut acts);
                 } else if self.file_view.is_some() {
                     self.file_view(ui, &mut acts);
                 } else if self.ci_view.is_some() && self.docked(Panel::Ci) {
@@ -158,6 +172,7 @@ impl RepoTab {
         self.dialogs(&ctx, &mut acts);
         self.keep_both_dialog(&ctx);
         self.ai_review_window(&ctx);
+        self.review_tools_ui(&ctx, &mut acts);
         self.lfs_locks_ui(&ctx, &mut acts);
         self.ghost_frame(&ctx);
         self.collision_window(&ctx, &mut acts);
@@ -251,7 +266,9 @@ impl RepoTab {
             let esc = ctx.input(|i| i.key_pressed(Key::Escape));
             let diff_keys = self.diff.is_some()
                 && (self.main_keys(ctx, Panel::Diff) || self.conflict.is_some());
-            if esc && self.close_drop_menu() {
+            if esc && self.file_comparison.is_some() {
+                acts.push(Action::CloseFileComparison);
+            } else if esc && self.close_drop_menu() {
             } else if esc && diff_keys && self.note_open(ctx) {
                 acts.push(Action::Agent(super::agents::AgentAct::Tray(
                     super::agents::TrayAct::Close,

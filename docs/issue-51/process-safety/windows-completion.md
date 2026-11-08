@@ -1,0 +1,7 @@
+# R2: Windows completion and thread identity
+
+WIP static correction. Job termination now queries the retained Job HANDLE until ActiveProcesses is zero, with a five-second bound and explicit unknown cleanup on query failure or timeout. Direct-child exit alone cannot acknowledge a stopped tree. The recording-tested wait driver exercises nonempty→empty, deadline and failed query paths without a Windows process. Before ResumeThread, production validates GetProcessIdOfThread on the opened thread HANDLE against the retained child and checks that the child's HANDLE still reports active; mismatch/failure never resumes it. The original suspended→assign→resume driver still closes/reaps on failure.
+
+Native receipts use a signed 64-bit JSON field, validating native Windows exit codes across the complete signed 32-bit ExitStatus::code range (including 256+ and NTSTATUS values); POSIX receipts retain 0..255. The endpoint remains tied to the local native platform.
+
+`CARGO_BUILD_JOBS=2 cargo +1.95.0 test --locked --lib recording -- --nocapture`: 11 application + 6 OS recording tests passed. `CARGO_BUILD_JOBS=2 cargo +1.95.0 check --locked -p gitcraft-os --target x86_64-pc-windows-gnu`: passed. No native Windows runtime, owned-child, inherited or full-suite gate was run. Independent R2 follow-up review remains required; Shell write deadlines, output delivery and workspace claims are still open.

@@ -79,6 +79,8 @@ struct StripActions {
     /// The work of this repository tab is to be teleported.
     teleport: Option<PathBuf>,
     window: Option<(usize, Option<egui::ViewportId>, Option<egui::Pos2>)>,
+
+    teleport_to: Option<(PathBuf, crate::teleport::Machine)>,
 }
 
 /// A tab's name, laid out, its colour, the tab's width, its worktree chip and how many of its
@@ -312,8 +314,20 @@ impl App {
             let max = (row.right() - width(d.from)).max(row.left());
             Some((d.from, x.clamp(row.left(), max)))
         });
+        let source = self
+            .tab_drag
+            .and_then(|d| self.tabs.get(d.from))
+            .and_then(|tab| match tab {
+                Tab::Repo(repo) => Some(repo.path.clone()),
+                _ => None,
+            });
+        let teleported = self.teleport_drop_target(&ctx, source);
+        let accepted = teleported.is_some();
+        actions.teleport_to = teleported;
         let (place, slot) = places(row.left(), n, width, dragged);
         if let (Some((from, _)), Some(slot)) = (dragged, slot)
+            && !accepted
+            && !ctx.input(|i| i.key_pressed(egui::Key::Escape))
             && !ctx.input(|i| i.pointer.primary_down())
         {
             if let Some((target, position)) = self.drop_window_target(from, strip, &ctx) {
@@ -513,6 +527,9 @@ impl App {
         }
         if let Some(source) = actions.teleport {
             self.start_teleport(source, ctx);
+        }
+        if let Some((source, machine)) = actions.teleport_to {
+            self.prepare_teleport_drop(source, machine, ctx);
         }
         // Opened and closed after the strip is drawn.
         if actions.switch_to.is_some() {

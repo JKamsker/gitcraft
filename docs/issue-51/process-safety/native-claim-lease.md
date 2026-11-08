@@ -1,0 +1,9 @@
+# Native retained claim lease — incomplete integration checkpoint
+
+The packaged claim-only helper acquires the actual-machine kernel WorkspaceClaim and retains it until controller EOF/cancellation or a finite seven-day maximum. It never dispatches repository commands, clears workspaces, sends target signals or retires owner artifacts. Its acknowledgement carries the root, stable anchor and exact random generation. The client accepts only a complete bounded frame for that generation, constructs its lease after acknowledgement, and refuses authority after observing lease loss. Failed acquisition and lease Drop only cancel/release their own resources; neither invokes workspace cleanup.
+
+Long-lived claim helpers use a separate shared Service with 16 active and 64 queued requests, preserving normal command slots and bounded controller ownership. Application shutdown cancels and joins this lane before ordinary process shutdown. Native controller cancellation now consumes terminal output and observes direct-child exit for at most five seconds before finalization. It never kills a live helper; missing exit remains Unknown with retained ownership. This corrects the already identified finish-before-output-drain path.
+
+`CARGO_BUILD_JOBS=2 cargo +1.95.0 test --locked --lib recording` passed 20 application and 12 OS tests. New pure frame tests cover every split, exact generation, duplicate acknowledgement and overflow rejection. All-target compile, formatting and diff checks passed. The native claim helper, file-lock lifecycle and output-drain path have not been runtime exercised. No children, filesystem lock fixtures, SSH/WSL/Windows runtime, full suite or CI were run.
+
+Workspace still uses its prior claim path until the remote claim/fence/ledger integration is complete. This checkpoint is WIP and does not close P1, satisfy all twelve schedules, change whole-source static FAIL, or authorize runtime. Seven assigned features remain pending.

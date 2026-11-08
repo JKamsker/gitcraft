@@ -272,6 +272,11 @@ impl RepoTab {
                 ));
             }
         }
+        items.push(PaletteItem::action(
+            "Run Actions locally…",
+            "act",
+            Action::LocalCi(super::local_ci::Act::Open),
+        ));
         if !self.refs.head.is_empty() && self.ci_project().is_some() {
             items.push(PaletteItem::action(
                 "Show CI for HEAD",

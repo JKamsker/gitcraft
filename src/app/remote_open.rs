@@ -53,7 +53,7 @@ impl RemoteForm {
         let distros_rx = cfg!(windows).then(|| {
             let (tx, rx) = channel();
             let ctx = ctx.clone();
-            std::thread::spawn(move || {
+            crate::connections::spawn(move || {
                 let _ = tx.send(remote::wsl_distros());
                 ctx.request_repaint();
             });
@@ -168,10 +168,12 @@ impl App {
             owner,
             label: "recorded".into(),
             rx,
-            creds: Some(git::Credentials {
-                username: "recorded-user".into(),
-                password: "recorded-secret".into(),
-            }),
+            creds: git::Credentials::for_url(
+                "https://example.invalid/recorded/repository.git",
+                "recorded-user".into(),
+                "recorded-secret".into(),
+            )
+            .ok(),
         });
     }
 
@@ -202,7 +204,7 @@ impl App {
     ) {
         let (tx, rx) = channel();
         let ctx2 = ctx.clone();
-        std::thread::spawn(move || {
+        crate::connections::spawn(move || {
             // Said in the window, even if finding it fails unexpectedly.
             let found = std::panic::catch_unwind(std::panic::AssertUnwindSafe(find))
                 .unwrap_or_else(|_| Err("Connecting failed unexpectedly.".to_owned()));

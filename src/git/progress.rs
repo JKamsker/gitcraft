@@ -85,6 +85,7 @@ pub struct ProgressReader {
 
 impl ProgressReader {
     /// A reader that takes lines starting with `marker` apart (see [`Self::marked`]).
+    #[cfg(test)]
     pub fn with_marker(marker: &'static str) -> Self {
         Self {
             marker: Some(marker),
@@ -161,6 +162,7 @@ impl ProgressReader {
     }
 
     /// What followed the marker on its line, once it came.
+    #[cfg(test)]
     pub fn marked(&self) -> Option<&str> {
         self.marked.as_deref()
     }

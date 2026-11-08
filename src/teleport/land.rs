@@ -251,6 +251,7 @@ impl Target {
                 self.label()
             ));
         }
+        git::prepare_worktree_folder(&self.repo, &folder)?;
         let mut args = vec!["worktree", "add", "--no-checkout"];
         match &self.branch {
             BranchPlan::New(name) => {

@@ -11,7 +11,7 @@ const MAX_MARKS: usize = 512;
 #[derive(Default)]
 pub(super) struct State {
     before: Option<Snapshot>,
-    ready: Option<u64>,
+    pending: Option<(u64, Snapshot)>,
     incoming: HashSet<String>,
     moved: HashMap<String, (String, usize)>,
     started: Option<Instant>,
@@ -39,15 +39,25 @@ impl RepoTab {
             known: self.history.iter().map(|c| c.hash.clone()).collect(),
             refs: self.motion_ref_positions(),
         });
-        self.graph_motion.ready = None;
     }
 
     pub(super) fn graph_motion_done(&mut self, success: bool) {
-        if success && self.graph_motion.before.is_some() {
-            self.graph_motion.ready = Some(self.reads + 1);
+        let Some(before) = self.graph_motion.before.take().filter(|_| success) else {
+            return;
+        };
+        if let Some((min_read, pending)) = &mut self.graph_motion.pending {
+            *min_read = (*min_read).max(self.reads + 1);
+            // Retain the earliest successful baseline until its confirming read.
+            // A failure or an unrelated next operation only retires its own capture.
+            if before.fetch && !pending.fetch {
+                pending.known = before.known;
+            }
+            pending.fetch |= before.fetch;
+            for (name, position) in before.refs {
+                pending.refs.entry(name).or_insert(position);
+            }
         } else {
-            self.graph_motion.before = None;
-            self.graph_motion.ready = None;
+            self.graph_motion.pending = Some((self.reads + 1, before));
         }
     }
 
@@ -75,11 +85,15 @@ impl RepoTab {
     }
 
     pub(super) fn graph_motion_loaded(&mut self, read: u64, ctx: &egui::Context) {
-        if self.graph_motion.ready.is_none_or(|min| read < min) {
+        if self
+            .graph_motion
+            .pending
+            .as_ref()
+            .is_none_or(|(min, _)| read < *min)
+        {
             return;
         }
-        self.graph_motion.ready = None;
-        let Some(before) = self.graph_motion.before.take() else {
+        let Some((_, before)) = self.graph_motion.pending.take() else {
             return;
         };
         self.graph_motion.incoming = if before.fetch {
@@ -201,6 +215,89 @@ pub(super) fn reduced_motion(ctx: &egui::Context) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn queued_push_and_its_failure_do_not_erase_successful_fetch_feedback() {
+        let ctx = egui::Context::default();
+        let mut tab = RepoTab::new_deferred("/nonexistent/queued-motion".into(), &ctx);
+        // Exercise real op_done -> after_op -> Push hooks with all task dispatch
+        // cancelled before submission. No subprocess or filesystem read is needed.
+        tab.life.phase = super::super::lifecycle::Phase::Live;
+        tab.loading = true; // delay the confirming reload
+        tab.tx.cancel.cancel();
+        tab.refs.current = Some("main".into());
+        tab.refs.local.push(crate::git::Branch {
+            name: "main".into(),
+            target: "old".into(),
+            is_head: true,
+            upstream: "origin/main".into(),
+            track: String::new(),
+        });
+        tab.graph_motion_begin(&[vec!["fetch".into()]]);
+        tab.busy_op = Some("Fetch".into());
+        tab.waiting.push_back(super::super::running::Waiter::Push);
+        tab.op_done(
+            "Fetch".into(),
+            Ok(String::new()),
+            super::super::Refresh::All,
+            super::super::OpKind::plain(),
+            true,
+            &ctx,
+        );
+        assert_eq!(tab.busy_op.as_deref(), Some("Push"));
+        assert!(tab.graph_motion.pending.is_some());
+        tab.op_done(
+            "Push".into(),
+            Err("recorded failure".into()),
+            super::super::Refresh::All,
+            super::super::OpKind::plain(),
+            true,
+            &ctx,
+        );
+        assert!(tab.graph_motion.pending.is_some());
+        tab.history.push(std::sync::Arc::new(crate::git::Commit {
+            hash: "incoming".into(),
+            ..Default::default()
+        }));
+        tab.graph_motion_loaded(tab.reads, &ctx);
+        assert!(!tab.graph_motion.new_commit("incoming"));
+        tab.graph_motion_loaded(tab.reads + 1, &ctx);
+        assert!(tab.graph_motion.new_commit("incoming"));
+        assert!(tab.graph_motion.pending.is_none());
+    }
+    #[test]
+    fn chained_successes_keep_earliest_refs_and_failed_fetch_adds_no_markers() {
+        let ctx = egui::Context::default();
+        let mut tab = RepoTab::new_deferred("/nonexistent/chained-motion".into(), &ctx);
+        tab.refs.local.push(crate::git::Branch {
+            name: "main".into(),
+            target: "old".into(),
+            is_head: true,
+            upstream: String::new(),
+            track: String::new(),
+        });
+        tab.index.insert("old".into(), 5);
+        tab.graph_motion_begin(&[vec!["pull".into()]]);
+        tab.graph_motion_done(true);
+        tab.reads += 1; // a read already in flight cannot confirm this next success
+        tab.graph_motion_begin(&[vec!["rebase".into()]]);
+        tab.graph_motion_done(true);
+        tab.graph_motion_begin(&[vec!["fetch".into()]]);
+        tab.graph_motion_done(false);
+        tab.refs.local[0].target = "new".into();
+        tab.index.insert("new".into(), 0);
+        tab.history.push(std::sync::Arc::new(crate::git::Commit {
+            hash: "new".into(),
+            ..Default::default()
+        }));
+        tab.graph_motion_loaded(tab.reads, &ctx);
+        assert!(tab.graph_motion.pending.is_some());
+        tab.graph_motion_loaded(tab.reads + 1, &ctx);
+        assert_eq!(
+            tab.graph_motion.moved.get("refs/heads/main"),
+            Some(&("new".into(), 5))
+        );
+        assert!(!tab.graph_motion.new_commit("new"));
+    }
     #[test]
     fn markers_are_operation_scoped_and_bounded() {
         let ctx = egui::Context::default();

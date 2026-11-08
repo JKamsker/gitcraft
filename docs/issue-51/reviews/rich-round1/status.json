@@ -1,0 +1,130 @@
+{
+  "candidate": "270a8a3b33402847f6d04cd8b8e70d625f33f4cb",
+  "verdict": "FAIL",
+  "findings": 8,
+  "reproductions": 7,
+  "note": "Harness tests assert defective behavior, not a passing application gate",
+  "artifacts": [
+    {
+      "source": "/tmp/gitcraft-51-rich-r1-harness/archive.rs",
+      "archive": "00-archive.rs.gz",
+      "sha256": "2b1d0c093dc18b4d933efbd54111263f69da0005c70dc9a411271f65d1afeefe"
+    },
+    {
+      "source": "/tmp/gitcraft-51-rich-r1-harness/artifacts-sha256.json",
+      "archive": "01-artifacts-sha256.json.gz",
+      "sha256": "16dee91d68080887656fd365c29802140b9bf61fc41fab35714c1d5f49e3d548"
+    },
+    {
+      "source": "/tmp/gitcraft-51-rich-r1-harness/build.log",
+      "archive": "02-build.log.gz",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "/tmp/gitcraft-51-rich-r1-harness/build.py",
+      "archive": "03-build.py.gz",
+      "sha256": "6f82f4acdfa4c9ab9c2d1ed734b0b579a937ca79c7bdf318420250e2770f916e"
+    },
+    {
+      "source": "/tmp/gitcraft-51-rich-r1-harness/find.rs",
+      "archive": "04-find.rs.gz",
+      "sha256": "59e04c945346098acc9535862bd16767b43d0b1273816ca56a8c347f75be8267"
+    },
+    {
+      "source": "/tmp/gitcraft-51-rich-r1-harness/gitcraft-51-audit-content.md",
+      "archive": "05-gitcraft-51-audit-content.md.gz",
+      "sha256": "db38a3646f12d247e3a6ac6140008d237a76a0cd142bcff17903c330b34f6cd4"
+    },
+    {
+      "source": "/tmp/gitcraft-51-rich-r1-harness/gitcraft-51-batch-b-ci-route-dde8f355.log",
+      "archive": "06-gitcraft-51-batch-b-ci-route-dde8f355.log.gz",
+      "sha256": "097f6eeafbf8bfff968b77aca34c3a594cf7c4c447efe42b339b032df1324895"
+    },
+    {
+      "source": "/tmp/gitcraft-51-rich-r1-harness/gitcraft-51-batch-b-dependency_metadata-dde8f355.log",
+      "archive": "07-gitcraft-51-batch-b-dependency_metadata-dde8f355.log.gz",
+      "sha256": "2765628a82c145fe1fb5c72a642b06ab75c235999e7653d19fad22e849cf4b8c"
+    },
+    {
+      "source": "/tmp/gitcraft-51-rich-r1-harness/gitcraft-51-batch-b-repo-ci_status-dde8f355.log",
+      "archive": "08-gitcraft-51-batch-b-repo-ci_status-dde8f355.log.gz",
+      "sha256": "f2cc17d67dbcdaaccd260b6b55009d2d21fc9cec1957a4496f2b5ef7cb3588a8"
+    },
+    {
+      "source": "/tmp/gitcraft-51-rich-r1-harness/gitcraft-51-batch-b-repo-diff-binary-search-tests-270a8a3b.log",
+      "archive": "09-gitcraft-51-batch-b-repo-diff-binary-search-tests-270a8a3b.log.gz",
+      "sha256": "f78edbda34d050c8eb2d6e4d7dc95b4b4c2ae0f43970bee5ae0cd30af41d8af8"
+    },
+    {
+      "source": "/tmp/gitcraft-51-rich-r1-harness/gitcraft-51-batch-b-repo-diff-notebook-search-tests-270a8a3b.log",
+      "archive": "10-gitcraft-51-batch-b-repo-diff-notebook-search-tests-270a8a3b.log.gz",
+      "sha256": "7d21417a401b32483545c8548dc9562fd6174bf6a881e8bcf9076b050db41cdd"
+    },
+    {
+      "source": "/tmp/gitcraft-51-rich-r1-harness/gitcraft-51-batch-b-repo-diff-rich-deps_tests-dde8f355.log",
+      "archive": "11-gitcraft-51-batch-b-repo-diff-rich-deps_tests-dde8f355.log.gz",
+      "sha256": "bef1c9167313c23df856a0a6d21d139bc79066c617e42a699b2c6ff075f1bad3"
+    },
+    {
+      "source": "/tmp/gitcraft-51-rich-r1-harness/gitcraft-51-batch-b-repo-diff-rich-search-tests-270a8a3b.log",
+      "archive": "12-gitcraft-51-batch-b-repo-diff-rich-search-tests-270a8a3b.log.gz",
+      "sha256": "6354e717bd20f35cf3db54612fea01444a35d1ab8561789911a6fda38a30beae"
+    },
+    {
+      "source": "/tmp/gitcraft-51-rich-r1-harness/gitcraft-51-batch-b-repo-find-270a8a3b.log",
+      "archive": "13-gitcraft-51-batch-b-repo-find-270a8a3b.log.gz",
+      "sha256": "392814d82eb894b06ce8dd069965d5b1a4d84645c4cd19b8ade9db3f0c77f316"
+    },
+    {
+      "source": "/tmp/gitcraft-51-rich-r1-harness/gitcraft-51-batch-b-syntax_view_draws_read_only_and_patch_fallback_cannot_stage_lines-270a8a3b.log",
+      "archive": "14-gitcraft-51-batch-b-syntax_view_draws_read_only_and_patch_fallback_cannot_stage_lines-270a8a3b.log.gz",
+      "sha256": "8263707bf089c410c58719bd827ecb2ef48f23894de023f0de70b714226c43d2"
+    },
+    {
+      "source": "/tmp/gitcraft-51-rich-r1-harness/gitcraft-51-batch-b-validation.json",
+      "archive": "15-gitcraft-51-batch-b-validation.json.gz",
+      "sha256": "df3ff9f0d6ed7da2b360058f1482dae056fde8b80b90124f35d24afeb9abf845"
+    },
+    {
+      "source": "/tmp/gitcraft-51-rich-r1-harness/issue40.json",
+      "archive": "16-issue40.json.gz",
+      "sha256": "624566e5329c39388b1cd6841b021bd556db9a9e7270bc69bd94167a01e93c7f"
+    },
+    {
+      "source": "/tmp/gitcraft-51-rich-r1-harness/main.rs",
+      "archive": "17-main.rs.gz",
+      "sha256": "67e61284c169cc460108533ba601fb2b52dc8cbb82015b9adaaaa0a4346563b9"
+    },
+    {
+      "source": "/tmp/gitcraft-51-rich-r1-harness/results.log",
+      "archive": "20-results.log.gz",
+      "sha256": "f874a0ab10fc26bb0362db85779a7e83d2fe2f44b68b888037a697a853c7c714"
+    },
+    {
+      "source": "/tmp/gitcraft-51-rich-r1-harness/source-hashes.json",
+      "archive": "21-source-hashes.json.gz",
+      "sha256": "809b7968c27b936abc9cbe31452f3494842e9eb234337a166c7dedee4824704f"
+    },
+    {
+      "source": "/tmp/gitcraft-51-rich-r1-harness/state-build.log",
+      "archive": "22-state-build.log.gz",
+      "sha256": "307a8591b63ba3c2c93afa06905cd2e9d2001858fd4ae7beba8646484d853369"
+    },
+    {
+      "source": "/tmp/gitcraft-51-rich-r1-harness/state-build.py",
+      "archive": "23-state-build.py.gz",
+      "sha256": "6b1b57a5d3c2d02c523ac417aaca209c7580383f17d14effccfaff254166dfb2"
+    },
+    {
+      "source": "/tmp/gitcraft-51-rich-r1-harness/state-results.log",
+      "archive": "24-state-results.log.gz",
+      "sha256": "eb7b6b91892977215b66247c44e5c6f05eb84247cb1fe155aad51aedd4840d6f"
+    },
+    {
+      "source": "/tmp/gitcraft-51-rich-r1-harness/state.rs",
+      "archive": "25-state.rs.gz",
+      "sha256": "a64edefb21ede479df53a2ea2a456ce311dd38186aba6831f7b7cddc679ee9fe"
+    }
+  ],
+  "corrections": "dispatched to same active integrations writer"
+}

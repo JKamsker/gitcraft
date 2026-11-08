@@ -1,0 +1,96 @@
+{
+  "report_sha256": "5f5c478b1961d5220e23aca88a255f6a9a407879395b008fcb3fdb55b4d4d19c",
+  "manifest_sha256": "7115b7e44c78b0c0124be139bfab8c57f5b77e0ce8cb726de15efe72182a6445",
+  "artifacts": [
+    {
+      "original_path": "/tmp/gitcraft-51-batch-c-agent-review-r1-manifest.json",
+      "sha256": "0857b4732b9ede4ddf9e53f38f22e21f7cff8f9f594a6257cf542d6b905cf3b1",
+      "bytes": 10924,
+      "archive": "evidence-000-gitcraft-51-batch-c-agent-review-r1-manifest.json.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-51-batch-c-agent-review-r1.md",
+      "sha256": "867074da27e9dbc1e0f2d21b607a049103875a939be4cccbea5b548fe32242c7",
+      "bytes": 15533,
+      "archive": "evidence-001-gitcraft-51-batch-c-agent-review-r1.md.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-51-batch-c-state-review-r1-manifest.json",
+      "sha256": "578a836b2cd4bfb589c50466899029e87d863375ea38be01c28381173b95ccaf",
+      "bytes": 8920,
+      "archive": "evidence-002-gitcraft-51-batch-c-state-review-r1-manifest.json.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-51-batch-c-state-review-r1.md",
+      "sha256": "9c8ddcfeb63b6576f45ea688d29c780a501117140708a071165a41ac391fcccb",
+      "bytes": 23005,
+      "archive": "evidence-003-gitcraft-51-batch-c-state-review-r1.md.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-51-shared-publication-review-r2.md",
+      "sha256": "5f5c478b1961d5220e23aca88a255f6a9a407879395b008fcb3fdb55b4d4d19c",
+      "bytes": 9895,
+      "archive": "evidence-004-gitcraft-51-shared-publication-review-r2.md.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-c-825d1f89-index-pure.log",
+      "sha256": "b2897d07f982de5158f4b0a653a0288c50cac346cb65bf890e6f9eebdb8a45cd",
+      "bytes": 2690,
+      "archive": "evidence-005-gitcraft-c-825d1f89-index-pure.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-c-a171ea39-native-foundation-pure.log",
+      "sha256": "e3b137aa5478de7861576f328539de56226f253e60f7bd3a3d906144215edd59",
+      "bytes": 8418,
+      "archive": "evidence-006-gitcraft-c-a171ea39-native-foundation-pure.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-c-adef03b8-shared-caller-pure.log",
+      "sha256": "02a785db7a7f9e37eb65970863753b41d1b28c914d9975e1a9b38584362d3e4f",
+      "bytes": 2372,
+      "archive": "evidence-007-gitcraft-c-adef03b8-shared-caller-pure.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-c-shared-caller-check.log",
+      "sha256": "8b103ef1558842b8d605afdc2297ff64908b654711b7961a7f663dbb5e300966",
+      "bytes": 4912,
+      "archive": "evidence-008-gitcraft-c-shared-caller-check.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-c-shared-receipts-pure2.log",
+      "sha256": "7e9e1db5d87d334f502d9c770f646fd0691e99a9f2cf2f7b4b954ac3771ee27f",
+      "bytes": 2911,
+      "archive": "evidence-009-gitcraft-c-shared-receipts-pure2.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-shared-r2-825d-evidence/adapter-seams.json",
+      "sha256": "14370aa52870f2dbebb57efe6f6429177bd4637045b8f97e07f1064093452a0f",
+      "bytes": 280,
+      "archive": "evidence-010-adapter-seams.json.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-shared-r2-825d-evidence/make-policy-adapter.py",
+      "sha256": "51845c245b46012e10990a84d19401d930748dc2a6674d66dd848ad6cf4626e0",
+      "bytes": 3162,
+      "archive": "evidence-011-make-policy-adapter.py.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-shared-r2-825d-evidence/policy-noop",
+      "sha256": "c34c208665ec27c1ede047903134f41cb6900686b531bafc7e995290c273d3bc",
+      "bytes": 700728,
+      "archive": "not copied: binary or >2MB; hash retained"
+    },
+    {
+      "original_path": "/tmp/gitcraft-shared-r2-825d-evidence/policy-noop.log",
+      "sha256": "eb0bec885dcd5d97df20dd261b4c5b952d9e4fc276a971c8980369c4e2fd62a5",
+      "bytes": 203,
+      "archive": "evidence-013-policy-noop.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-shared-r2-825d-evidence/policy-noop.rs",
+      "sha256": "a704f6a5166265ff37d09acfb47bacf502885d2c803e24e8ef7015f6b3b97331",
+      "bytes": 6536,
+      "archive": "evidence-014-policy-noop.rs.gz"
+    }
+  ]
+}

@@ -137,7 +137,8 @@ impl super::RepoTab {
 
     /// Nothing goes on that suspending would end or lose.
     fn idle(&mut self) -> bool {
-        !self.is_busy()
+        !self.local_ci.busy()
+            && !self.is_busy()
             && !self.loading_more
             && !self.counting_worktrees
             && self.queued.is_empty()
@@ -175,7 +176,7 @@ impl super::RepoTab {
         self.history = Vec::new();
         self.commits = Vec::new();
         self.graph = crate::graph::Graph {
-            rows: Vec::new(),
+            rows: Vec::new().into(),
             width: 0,
         };
         self.index = Default::default();
@@ -224,7 +225,7 @@ mod tests {
             finished_tx.send(active()).map_err(|e| e.to_string())?;
             // A late success must be discarded even if its worker ignores cancellation.
             Ok(crate::graph::Graph {
-                rows: Vec::new(),
+                rows: Vec::new().into(),
                 width: 42,
             })
         });

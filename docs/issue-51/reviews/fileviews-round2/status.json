@@ -1,0 +1,10 @@
+{
+  "candidate": "be013726aa51c270bde95cecff727191a603c785",
+  "application": "10727c7e88725b4510350ec3416bd1e4ebfcfeda",
+  "verdict": "FAIL",
+  "ui": "PASS all3 original UI findings",
+  "core": "Original4 scoped corrected; two adjacent P2 findings",
+  "content": "Original1/2/4 resolved; SVG resources closed but P1 marker expansion remains",
+  "corrections": "queued until coding capacity; no acceptance or merge",
+  "process_runtime": "HELD"
+}

@@ -4,6 +4,10 @@ use egui::{Color32, FontId, Pos2, Rect, Stroke, pos2, vec2};
 use std::collections::HashMap;
 use std::io::Cursor;
 const WIDTH: usize = 1280;
+// Row count alone does not bound lanes: even one merge can name parents
+// outside the selected range. Together with the 200-row limit this caps
+// the linear lane scans in graph::layout and the edges painted below.
+const MAX_PARENT_EDGES: usize = 1024;
 const PITCH: f32 = 27.0;
 const BG: Color32 = Color32::from_rgb(21, 27, 39);
 const TEXT: Color32 = Color32::from_rgb(239, 242, 249);
@@ -23,7 +27,11 @@ pub(super) fn render(
     if snapshot.commits.is_empty() || snapshot.commits.len() > crate::git::postcards::LIMIT {
         return Err("Invalid postcard size".into());
     }
-    let graph = crate::graph::layout(&snapshot.commits);
+    if !active() {
+        return Err("Postcard rendering cancelled".into());
+    }
+    let graph = bounded_graph(&snapshot.commits, MAX_PARENT_EDGES, active)?;
+    let (graph_width, spacing) = graph_geometry(graph.width);
     let contributors = snapshot.contributors.join(" · ");
     let footer_lines = contributors.chars().count().div_ceil(70).max(1);
     let height =
@@ -70,11 +78,11 @@ pub(super) fn render(
                 DIM,
                 1200.0,
             );
-            let graph_width = (graph.width.clamp(1, 24) as f32 * 13.0 + 20.0).min(335.0);
+
             for (i, commit) in snapshot.commits.iter().enumerate() {
                 let y = 152.0 + i as f32 * PITCH;
                 let row = &graph.rows[i];
-                let x = |col: usize| 40.0 + col as f32 * 13.0;
+                let x = |col: usize| 40.0 + col as f32 * spacing;
                 let clip = painter.with_clip_rect(Rect::from_min_size(
                     pos2(33.0, y - PITCH / 2.0),
                     vec2(graph_width, PITCH),
@@ -208,8 +216,53 @@ pub(super) fn render(
     }
     Ok((image, png.into_inner()))
 }
+
+fn bounded_graph(
+    commits: &[crate::git::Commit],
+    edge_limit: usize,
+    active: &dyn Fn() -> bool,
+) -> Result<crate::graph::Graph, String> {
+    if commits.len() > crate::git::postcards::LIMIT {
+        return Err("Invalid postcard size".into());
+    }
+    let mut remaining = edge_limit;
+    for commit in commits {
+        if !active() {
+            return Err("Postcard rendering cancelled".into());
+        }
+        remaining = remaining.checked_sub(commit.parents.len()).ok_or_else(|| {
+            format!("Postcard graph exceeds {edge_limit} parent edges; choose a range with fewer merge parents")
+        })?;
+    }
+    // At most rows + edges lanes can be opened. Layout's non-interruptible
+    // section is therefore bounded even when none of the parents is a row.
+    let graph = crate::graph::layout(commits);
+    if !active() {
+        return Err("Postcard rendering cancelled".into());
+    }
+    Ok(graph)
+}
+fn graph_geometry(lanes: usize) -> (f32, f32) {
+    let columns = lanes.saturating_sub(1).max(1) as f32;
+    let spacing = 13.0f32.min(500.0 / columns);
+    (lanes.saturating_sub(1) as f32 * spacing + 20.0, spacing)
+}
+fn line_job(value: &str, size: f32, color: Color32, width: f32) -> egui::text::LayoutJob {
+    let mut job = egui::text::LayoutJob::simple_singleline(
+        value.to_owned(),
+        FontId::proportional(size),
+        color,
+    );
+    job.wrap = egui::text::TextWrapping {
+        max_width: width,
+        max_rows: 1,
+        break_anywhere: false,
+        overflow_character: Some('…'),
+    };
+    job
+}
 fn text(p: &egui::Painter, at: Pos2, value: &str, size: f32, color: Color32, width: f32) {
-    let galley = p.layout_no_wrap(value.to_owned(), FontId::proportional(size), color);
+    let galley = p.layout_job(line_job(value, size, color, width));
     p.with_clip_rect(Rect::from_min_size(at, vec2(width, size * 1.8)))
         .galley(at, galley, color);
 }
@@ -281,5 +334,111 @@ fn raster(
             image.pixels[y * image.size[0] + x] =
                 Color32::from_rgba_premultiplied(blend(0), blend(1), blend(2), blend(3));
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn graph_budget_counts_excluded_and_repeated_parents_across_rows() {
+        let commit = |hash: &str| crate::git::Commit {
+            hash: hash.into(),
+            parents: vec!["excluded-a".into(), "excluded-b".into()],
+            ..Default::default()
+        };
+        let commits = [commit("first"), commit("second")];
+        assert!(bounded_graph(&commits, 4, &|| true).is_ok());
+        assert!(
+            bounded_graph(&commits, 3, &|| true)
+                .err()
+                .unwrap()
+                .contains("parent edges")
+        );
+        let oversized = [crate::git::Commit {
+            hash: "merge".into(),
+            parents: (0..=MAX_PARENT_EDGES)
+                .map(|i| format!("excluded-{i}"))
+                .collect(),
+            ..Default::default()
+        }];
+        assert!(bounded_graph(&oversized, MAX_PARENT_EDGES, &|| true).is_err());
+        // Cancellation is checked through preflight and after bounded layout,
+        // before any font, image, or PNG composition is allocated.
+        for cancel_at in 1..=3 {
+            let calls = std::cell::Cell::new(0);
+            let result = bounded_graph(&commits, 4, &|| {
+                calls.set(calls.get() + 1);
+                calls.get() < cancel_at
+            });
+            assert!(result.err().unwrap().contains("cancelled"));
+            assert_eq!(calls.get(), cancel_at);
+        }
+    }
+    #[test]
+    fn dense_octopus_postcards_paint_every_commit_inside_the_graph() -> Result<(), String> {
+        for parents in [32, 64] {
+            let mut commits = vec![crate::git::Commit {
+                hash: "merge".into(),
+                parents: (0..parents).map(|i| format!("p{i}")).collect(),
+                ..Default::default()
+            }];
+            for i in 0..parents {
+                commits.push(crate::git::Commit {
+                    hash: format!("p{i}"),
+                    parents: vec!["root".into()],
+                    ..Default::default()
+                });
+            }
+            commits.push(crate::git::Commit {
+                hash: "root".into(),
+                ..Default::default()
+            });
+            let graph = crate::graph::layout(&commits);
+            assert_eq!(graph.width, parents);
+            let snapshot = Snapshot {
+                name: "Dense release".into(),
+                date: "2026-11-08".into(),
+                range: "root..merge".into(),
+                messages: vec!["Subject".into(); commits.len()],
+                commits,
+                contributors: Vec::new(),
+                anonymized: false,
+            };
+            let (image, png) = render(&snapshot, &|| true)?;
+            assert!(image::load_from_memory(&png).is_ok());
+            let expected_spacing = if parents == 32 { 13.0 } else { 500.0 / 63.0 };
+            for (i, row) in graph.rows.iter().enumerate() {
+                let x = (40.0 + row.col as f32 * expected_spacing) as usize;
+                let y = 152 + i * 27;
+                assert_ne!(
+                    image.pixels[y * WIDTH + x],
+                    BG,
+                    "missing node {i}, lane {} of {parents}",
+                    row.col
+                );
+                assert!(x < 553);
+            }
+            // Independent witness for the formerly clipped rightmost dot.
+            assert_ne!(
+                image.pixels[(152 + parents * 27) * WIDTH + 540.min(40 + (parents - 1) * 13)],
+                BG
+            );
+        }
+        Ok(())
+    }
+    #[test]
+    fn wide_text_is_laid_out_with_an_ellipsis_in_one_visible_line() {
+        let ctx = egui::Context::default();
+        ctx.run_ui(Default::default(), |ui| {
+            let galley = ui
+                .painter()
+                .layout_job(line_job(&"Ｗ".repeat(96), 16.0, TEXT, 150.0));
+            assert!(galley.elided);
+            assert_eq!(galley.rows.len(), 1);
+            assert!(galley.size().x <= 151.0);
+            assert!(galley.rows[0].glyphs.iter().any(|g| g.chr == '…'));
+        })
+        .drop_without_applying_deltas();
     }
 }

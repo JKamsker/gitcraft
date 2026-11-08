@@ -1,0 +1,138 @@
+{
+  "report_sha256": "bcfda86a92acf0f7103cebb0b84967ddd82f62a47837d998438de6df23f8ae72",
+  "manifest_sha256": "94528f3cf8269056a9c0ea250cd29722e8b8e3fe91a3162c611f9a68cb6f6eb1",
+  "artifacts": [
+    {
+      "original_path": "/tmp/gitcraft-51-interaction-checkpoint-review-r1.md",
+      "sha256": "bcfda86a92acf0f7103cebb0b84967ddd82f62a47837d998438de6df23f8ae72",
+      "bytes": 13871,
+      "archive": "evidence-000-gitcraft-51-interaction-checkpoint-review-r1.md.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-51-interaction-plan.md",
+      "sha256": "3b039e4a7b4e3a1942ab6906d3f089b901e0bc9e40740e761dba838a2d2fbe77",
+      "bytes": 33013,
+      "archive": "evidence-001-gitcraft-51-interaction-plan.md.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-interaction-5914916f-a11y-.log",
+      "sha256": "41c4fa83d220b7d42c20ce97ccf090899b060cffbdf534547152aba420c131c8",
+      "bytes": 2453,
+      "archive": "evidence-002-gitcraft-interaction-5914916f-a11y-.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-interaction-5914916f-keymap-.log",
+      "sha256": "17e967416713b396baed172d15e83db885f1b0e62466e4836587f7aed6ffa564",
+      "bytes": 2483,
+      "archive": "evidence-003-gitcraft-interaction-5914916f-keymap-.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-interaction-5914916f-menu_item-.log",
+      "sha256": "8b2b2e439338ec65e2f49b6f77b5aa2b3d968402789e8d1a42ce15e0d44d8a17",
+      "bytes": 1528,
+      "archive": "evidence-004-gitcraft-interaction-5914916f-menu_item-.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-interaction-5914916f-repo-keyboard-.log",
+      "sha256": "1af7b8aa041facd825daa414ba4a360e4665c255116c1306d8b18f1e4df1b42e",
+      "bytes": 2048,
+      "archive": "evidence-005-gitcraft-interaction-5914916f-repo-keyboard-.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-interaction-5914916f-repo-keys-.log",
+      "sha256": "8d488a319eaca9043f385713a9eea745506d4ece8e42b4045ffd9b6a9ecfa388",
+      "bytes": 1712,
+      "archive": "evidence-006-gitcraft-interaction-5914916f-repo-keys-.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-interaction-5914916f-repo-palette-.log",
+      "sha256": "82495869f1170cb15ef5ef2e668f08cf1f3d1e9beb84678e9c172ab4ddddc193",
+      "bytes": 1738,
+      "archive": "evidence-007-gitcraft-interaction-5914916f-repo-palette-.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-interaction-a11y-validation-final.json",
+      "sha256": "aa71057884d7ddd97ea35ca752d2fbfd19d5535cd647a731821e15bde25b4722",
+      "bytes": 2358,
+      "archive": "evidence-008-gitcraft-interaction-a11y-validation-final.json.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-interaction-context-validation.json",
+      "sha256": "7d6c6a395d488b38c69d6493876fef64e3cca69a83e8ebe6b67558d2d594db04",
+      "bytes": 1644,
+      "archive": "evidence-009-gitcraft-interaction-context-validation.json.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-interaction-keyboard-validation.json",
+      "sha256": "ee223403d5288f414b32cb61b5f72584a68a618208e79b6cb59a2bfef23a05ff",
+      "bytes": 1185,
+      "archive": "evidence-010-gitcraft-interaction-keyboard-validation.json.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-interaction-modal-chord-validation.json",
+      "sha256": "7f5030ff9f1249a580e7ad9a366a5e9eaa49f9670c0e3b448131d4bbe988bf2f",
+      "bytes": 1165,
+      "archive": "evidence-011-gitcraft-interaction-modal-chord-validation.json.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-interaction-r1-5914916f/docs/issue-51/baseline-content.md",
+      "sha256": "db38a3646f12d247e3a6ac6140008d237a76a0cd142bcff17903c330b34f6cd4",
+      "bytes": 26576,
+      "archive": "evidence-012-baseline-content.md.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-interaction-r1-5914916f/docs/issue-51/baseline-core.md",
+      "sha256": "ace6e8941b5340ac078b71142fb9345eec3d3aa48a6ece54fabeff4ce5f51006",
+      "bytes": 34813,
+      "archive": "evidence-013-baseline-core.md.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-interaction-r1-5914916f/docs/issue-51/baseline-platform.md",
+      "sha256": "12ec9cfe568604a2798996e57c838c4036ae3d6a406bf49c41264e680ebbe0ee",
+      "bytes": 28994,
+      "archive": "evidence-014-baseline-platform.md.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-interaction-r1-evidence/keymap-probe",
+      "sha256": "9fb2c1352d7d3938420dd3198d5ebbe4ffbc0d1e15e18e5d7a4cbd634b273986",
+      "bytes": 6727600,
+      "archive": "not copied: binary or >2MB; hash retained"
+    },
+    {
+      "original_path": "/tmp/gitcraft-interaction-r1-evidence/keymap-probe.rs",
+      "sha256": "8d939cf6201f63bc3d8e86724523e55ba34b45525ed036dae925aaa83e27f9eb",
+      "bytes": 2644,
+      "archive": "evidence-016-keymap-probe.rs.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-interaction-r1-evidence/keymap/config.rs",
+      "sha256": "7360cb2ea531670e50823a691491aa1f55e8d3c32bcfc1c558b99fa1bce7fcc6",
+      "bytes": 5268,
+      "archive": "evidence-017-config.rs.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-interaction-r1-evidence/keymap/editor.rs",
+      "sha256": "15c1ed1e251f0ef6756e25dcae7510a8f27e8623dac7ea02af5e622b33770f26",
+      "bytes": 4689,
+      "archive": "evidence-018-editor.rs.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-interaction-r1-evidence/keymap/mod.rs",
+      "sha256": "b1e7e5836d62efca8cb637b9a3eaaca8f977b2085a18bf5ce6c2b389d521f361",
+      "bytes": 13476,
+      "archive": "evidence-019-mod.rs.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-interaction-r1-evidence/keymap/resolver.rs",
+      "sha256": "8ecaa7790f238832c21b20b8e162d17b737d46c2a088808d6653450cfaeb82b4",
+      "bytes": 20448,
+      "archive": "evidence-020-resolver.rs.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-issue51-issues.json",
+      "sha256": "411e76639a880c52a8f92ef5ec543e4e76befaa1f95b2be271629df23a88edfc",
+      "bytes": 177452,
+      "archive": "evidence-021-gitcraft-issue51-issues.json.gz"
+    }
+  ]
+}

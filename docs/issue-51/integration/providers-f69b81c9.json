@@ -1,0 +1,216 @@
+{
+  "application": "f69b81c939b296654df4cad8d774a7f03f2ec6c5",
+  "remote_sha_verified": true,
+  "source": {
+    "provider_sources": [
+      {
+        "path": "src/forge/azure/details.rs",
+        "sha256": "eda235ee642934d61480c3cae5da6c57e3bf053d742cb20845ffe8e3e66a6004",
+        "exact_owner": "c42bfe7106ab0e26696872457f22f2c8dab45624"
+      },
+      {
+        "path": "src/forge/azure/mod.rs",
+        "sha256": "adabffd20081da670e4559e383d45ed61d8f3ab0294d3e08c130749bccf31423",
+        "exact_owner": "c42bfe7106ab0e26696872457f22f2c8dab45624"
+      },
+      {
+        "path": "src/forge/azure/post.rs",
+        "sha256": "34de5113f18098c2da21556a60b45bd83f6ce4080e5faebc895e0ec0a179bb8f",
+        "exact_owner": "c42bfe7106ab0e26696872457f22f2c8dab45624"
+      },
+      {
+        "path": "src/forge/azure/tests.rs",
+        "sha256": "e648e14a794ee5d1863c4c6bf6306afe1e4fda1f4690c813e45e418a51ea02d6",
+        "exact_owner": "c42bfe7106ab0e26696872457f22f2c8dab45624"
+      },
+      {
+        "path": "src/forge/bitbucket/details.rs",
+        "sha256": "2014ae1901666b33a1772e00049a7956b887d95c627f84a02d3ce63abde46ca5",
+        "exact_owner": "c42bfe7106ab0e26696872457f22f2c8dab45624"
+      },
+      {
+        "path": "src/forge/bitbucket/mod.rs",
+        "sha256": "9b32820da05027b86b2b286c367dd410977518e4e1c935e85eb05fac3649c07e",
+        "exact_owner": "c42bfe7106ab0e26696872457f22f2c8dab45624"
+      },
+      {
+        "path": "src/forge/bitbucket/post.rs",
+        "sha256": "f1b9fcf0690ac5b03eb5a9c5b2c7f6eb904e40678455413ac970e00e133ad7de",
+        "exact_owner": "c42bfe7106ab0e26696872457f22f2c8dab45624"
+      },
+      {
+        "path": "src/forge/bitbucket/tests.rs",
+        "sha256": "ec8f58cd955b6fc38062fb02c9bb523e78290f1281fb9ed52ee6396a62b1eaea",
+        "exact_owner": "c42bfe7106ab0e26696872457f22f2c8dab45624"
+      },
+      {
+        "path": "src/forge/cloud/mod.rs",
+        "sha256": "0c61081dcec07944d39bd12fb43b5540ecefc9b0707b5e4e449356c4bfbb19f9",
+        "exact_owner": "c42bfe7106ab0e26696872457f22f2c8dab45624"
+      },
+      {
+        "path": "src/forge/cloud/ui.rs",
+        "sha256": "afab9257149fa72dd6dbd7044c184a1f5bccc54c2c61cab32fb022a0c75a5ed7",
+        "exact_owner": "c42bfe7106ab0e26696872457f22f2c8dab45624"
+      },
+      {
+        "path": "src/pull_request/mod.rs",
+        "sha256": "60af17b6c7179d1b7c2e40f140a215704712eb4ded23b0e8ca4d53207300f47f",
+        "exact_owner": "c42bfe7106ab0e26696872457f22f2c8dab45624"
+      }
+    ],
+    "shared_policy": "unchanged from root00b8539e",
+    "history_seam": "explicit unsupported history refusal before Git/API lookup; native PR review unchanged",
+    "source_commits": [
+      "b4630f40",
+      "6e409553",
+      "fb3ecb23",
+      "eed8eca6",
+      "ada0beb4",
+      "c42bfe71"
+    ]
+  },
+  "gates": [
+    {
+      "candidate": "f69b81c939b296654df4cad8d774a7f03f2ec6c5",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--lib",
+        "forge::azure::tests::",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "log": "/tmp/gitcraft-51-provider-merge-f69b81c9-0.log",
+      "sha256": "1f7365a6386e728b099f4613c4529859a3f2bc61ef0a0b1d75a7f35ae5573f83"
+    },
+    {
+      "candidate": "f69b81c939b296654df4cad8d774a7f03f2ec6c5",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--lib",
+        "forge::bitbucket::tests::",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "log": "/tmp/gitcraft-51-provider-merge-f69b81c9-1.log",
+      "sha256": "108683180bc36c03bf801b2ab530b16e190a1347e7abc35f7e13765fe4857819"
+    },
+    {
+      "candidate": "f69b81c939b296654df4cad8d774a7f03f2ec6c5",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--lib",
+        "forge::cloud::tests::",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "log": "/tmp/gitcraft-51-provider-merge-f69b81c9-2.log",
+      "sha256": "871dceb60834190e49992519bbea099f628b4bf19845b470b424bdcf9d8d5944"
+    },
+    {
+      "candidate": "f69b81c939b296654df4cad8d774a7f03f2ec6c5",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--lib",
+        "merge_pure_native_review_providers_",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "log": "/tmp/gitcraft-51-provider-merge-f69b81c9-3.log",
+      "sha256": "c69bf8b33f5e9bb0f13b0c9b2b5f79c0d5113c750e903e9e6069c124df1ef20a"
+    },
+    {
+      "candidate": "f69b81c939b296654df4cad8d774a7f03f2ec6c5",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit": 0,
+      "log": "/tmp/gitcraft-51-provider-merge-f69b81c9-4.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "candidate": "f69b81c939b296654df4cad8d774a7f03f2ec6c5",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "clippy",
+        "--locked",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings",
+        "-A",
+        "dead_code"
+      ],
+      "exit": 101,
+      "log": "/tmp/gitcraft-51-provider-merge-f69b81c9-5.log",
+      "sha256": "92e42da15a4f1257ce7422d2b2907b46405d77c5c085008f3a329a36316fb87a"
+    }
+  ],
+  "reports": [
+    {
+      "path": "docs/issue-51/reviews/process-safety-round3/native.md",
+      "sha256": "fbff7b7529bd881462bbb6378dccf113ea6526bcf361140ef01548f13c125723",
+      "external_report": "/tmp/gitcraft-51-process-native-review-r3.md"
+    },
+    {
+      "path": "docs/issue-51/reviews/process-safety-round3/remote.md",
+      "sha256": "82f040886f4c9c0730271e21feb9d69d4f5e309bcb44eb73ce25db057efe377e",
+      "external_report": "/tmp/gitcraft-51-process-remote-review-r3.md"
+    },
+    {
+      "path": "docs/issue-51/reviews/process-safety-round3/callers.md",
+      "sha256": "fcc0fa244f1a4f12af97ff80be9ffb8a829af0a815e0d524733e419a2f80f564",
+      "external_report": "/tmp/gitcraft-51-process-callers-review-r3.md"
+    },
+    {
+      "path": "docs/issue-51/reviews/workflows-integration-r4/report.md",
+      "sha256": "235468f179c386bb1d24082036ae8061a932f10cf7c5423631a9b5d5121fa0ab",
+      "external_report": "/tmp/gitcraft-51-workflows-integration-review-r4.md"
+    },
+    {
+      "path": "docs/issue-51/reviews/workflows-storyboard-r5/report.md",
+      "sha256": "640d23ce458fd2be30061f35b093e760b3df7c5029e6fe73c698d0d6bd31ef6e",
+      "external_report": "/tmp/gitcraft-51-storyboard-delta-review-r5.md"
+    },
+    {
+      "path": "docs/issue-51/reviews/internals-corrections-r2/report.md",
+      "sha256": "9b3277d5edd760246dfd791822dc8138719495308ff680cc295c6267c8327cb8",
+      "external_report": "/tmp/gitcraft-51-internals-corrections-review-r2.md"
+    },
+    {
+      "path": "docs/issue-51/reviews/azure-delta-r2/report.md",
+      "sha256": "4b8ebc34a656297067d0f1b2a960189f61c7b1aadc68c77456a753d9a870a14d",
+      "external_report": "/tmp/gitcraft-51-azure-delta-review-r2.md"
+    },
+    {
+      "path": "docs/issue-51/reviews/bitbucket-delta-r2/report.md",
+      "sha256": "0ef7a975449fb467c6b982b4495b3a197ad49549f17dc9ab89757564a46b6131",
+      "external_report": "/tmp/gitcraft-51-bitbucket-delta-review-r2.md"
+    }
+  ],
+  "runtime": "HELD",
+  "lint": "Qualified all-target fails 71 inherited test/style diagnostics; no strict CI pass claimed",
+  "binary_evidence": "No task-added gz relative to forkdev083; all generated artifacts external"
+}

@@ -44,7 +44,15 @@ pub(crate) fn short(hash: &str) -> &str {
 /// worktrees, its folder): when a tab opens on it. A bisect running there (in this window or
 /// another) is left alone.
 pub fn clear_leftovers(repo: std::path::PathBuf) {
-    std::thread::spawn(move || {
-        workspace::clear_leftovers(&repo);
-    });
+    let Ok(pool) = crate::tasks::pool() else {
+        return;
+    };
+    // Shared workers propagate cancellation to every nested process operation and are
+    // joined before process/remote services shut down. A full queue preserves leftovers.
+    let _ = pool.submit(
+        crate::tasks::cancellation().child(),
+        crate::tasks::Priority::Background,
+        Some(repo.clone()),
+        Box::new(move || workspace::clear_leftovers(&repo)),
+    );
 }

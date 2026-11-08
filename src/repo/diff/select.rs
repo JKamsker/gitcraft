@@ -206,6 +206,39 @@ fn lines_menu(
             more(ui, acts);
             match history() {
                 Ok(action) => {
+                    if let crate::repo::Action::LineHistory {
+                        path,
+                        at: crate::git::LinesAt::Rev(commit),
+                        range,
+                    } = &action
+                        && crate::git::investigations::oid(commit)
+                        && ui.button("Explain history").clicked()
+                    {
+                        acts.push(crate::repo::Action::OpenLineDossier(Some(
+                            crate::git::investigations::dossier::Seed {
+                                commit: commit.clone(),
+                                path: path.clone(),
+                                line: range.0 as usize,
+                            },
+                        )));
+                    }
+                    if let crate::repo::Action::LineHistory {
+                        path,
+                        at: crate::git::LinesAt::Rev(commit),
+                        range,
+                    } = &action
+                        && crate::git::investigations::oid(commit)
+                        && ui.button("Symbol biography").clicked()
+                    {
+                        acts.push(crate::repo::Action::OpenSymbolBiography(Some(
+                            crate::git::investigations::dossier::Seed {
+                                commit: commit.clone(),
+                                path: path.clone(),
+                                line: range.0 as usize,
+                            },
+                        )));
+                    }
+
                     let b = crate::menu_item::MenuItem::new("History of these lines")
                         .icon("history")
                         .keys(crate::keymap::Command::SelectionHistory)

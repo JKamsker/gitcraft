@@ -1,0 +1,61 @@
+{
+  "commit": "3c28f1b37a67527c3b338699b983ec0b299963f5",
+  "remote": "https://github.com/JKamsker/gitcraft",
+  "remote_sha": "3c28f1b37a67527c3b338699b983ec0b299963f5",
+  "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>",
+  "method_sha256": "8b7a91c24ab9aa8972964ac98d4b83bc242911a04879a2be1086f18759b42cda",
+  "artifacts": {
+    "/tmp/gitcraft-interaction-3c28f1b3-minimap-source.rs": "1a21aa38781788c503407b82066f8a632db85ee83e1b0cf15d2b3daec5f57fa5",
+    "/tmp/gitcraft-interaction-3c28f1b3-minimap-probe.rs": "b633f14174bfbd4dc34bac87295e514bcf3346d8f5b26bea7ab6520064079ad1",
+    "/tmp/gitcraft-interaction-3c28f1b3-minimap-value.rs": "7ae490f84bcef03ca99ea921eb0ef6159a9c1c834e1819ab2514c41230a9392d",
+    "/tmp/gitcraft-interaction-3c28f1b3-minimap-0.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "/tmp/gitcraft-interaction-3c28f1b3-minimap-1.log": "23771cb96e30a223a3ba142d56f7facb5d5f9666567ea0866b6c04f36c6c4bca",
+    "/tmp/gitcraft-interaction-3c28f1b3-minimap-2.log": "d7dae192715495fa89ccbe279af3efb9792c1dae1768228e369035e68a1df673"
+  },
+  "results": [
+    {
+      "command": [
+        "rustc",
+        "+1.95.0",
+        "--edition=2024",
+        "/tmp/gitcraft-interaction-3c28f1b3-minimap-probe.rs",
+        "--extern",
+        "egui=target/debug/deps/libegui-0e410d2928238130.rlib",
+        "-L",
+        "dependency=target/debug/deps",
+        "-o",
+        "/tmp/gitcraft-interaction-3c28f1b3-minimap-probe"
+      ],
+      "log": "/tmp/gitcraft-interaction-3c28f1b3-minimap-0.log",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/gitcraft-interaction-3c28f1b3-minimap-probe"
+      ],
+      "log": "/tmp/gitcraft-interaction-3c28f1b3-minimap-1.log",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "clippy",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings",
+        "-A",
+        "dead_code"
+      ],
+      "log": "/tmp/gitcraft-interaction-3c28f1b3-minimap-2.log",
+      "exit_code": 0
+    }
+  ],
+  "coverage": "Exact committed history_minimap method/offset_at plus actual scalar helper; inert already-prepared bins/rows/graph-width/theme/naming and no-op history prepare; both nonempty has_more values require one descriptive Slider.",
+  "limits": [
+    "No production RepoTab/App/history-reader constructor, Git/worker/cancel/network/native fixture.",
+    "Existing production minimap test extended with actual-tree label/range assertions for later parent suite; compiled by lint, not executed under hold.",
+    "Only COV3-D1 correction; no broader inventory/native acceptance."
+  ]
+}

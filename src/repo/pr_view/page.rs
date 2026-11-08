@@ -25,6 +25,33 @@ impl RepoTab {
             return;
         };
         page_header(ui, view, popped, acts);
+        if let Some(relocated) = view.relocations().filter(|m| !m.is_empty()) {
+            egui::CollapsingHeader::new(format!(
+                "{} earlier comment anchors relocated",
+                relocated.len()
+            ))
+            .show(ui, |ui| {
+                if let Some(Ok(files)) = &view.files {
+                    for target in relocated.values() {
+                        if ui
+                            .button(format!("{}:{} · unchanged text", target.path, target.line))
+                            .clicked()
+                        {
+                            acts.push(Action::OpenDiff(DiffKey::Range {
+                                from: files.from.clone(),
+                                to: Some(files.to.clone()),
+                                path: target.path.clone(),
+                            }));
+                            acts.push(Action::Pr(pr_review::PrAct::OpenLine(target.clone())));
+                        }
+                    }
+                }
+            });
+        }
+
+        if let Some(error) = &view.relocated.error {
+            ui.weak(format!("Earlier comment locations unavailable: {error}"));
+        }
         if let Some(Ok(_)) = &view.details {
             crate::repo::versions::since_banner(
                 ui,
@@ -60,6 +87,26 @@ impl RepoTab {
                             .show(ui, |ui| {
                                 ui.set_max_width(width);
                                 let draft = drafts.entry(view.number).or_default();
+                                if let Some(Ok(files)) = &view.files {
+                                    crate::repo::review_workflow::freshness_ui(
+                                        ui,
+                                        &mut view.freshness,
+                                        files,
+                                        acts,
+                                    );
+                                }
+                                if let (Some(Ok(details)), Some(Ok(files))) =
+                                    (&view.details, &view.files)
+                                {
+                                    crate::repo::review_workflow::storyboard_ui(
+                                        ui,
+                                        &mut view.storyboard,
+                                        details,
+                                        files,
+                                        &self.remotes,
+                                        acts,
+                                    );
+                                }
                                 page(ui, view, draft, width, &dco, acts);
                             });
                     });
@@ -147,6 +194,19 @@ impl RepoTab {
                     });
             }
             Some(Ok(files)) => {
+                self.review_all_button(
+                    ui,
+                    crate::repo::review_workflow::ReviewSource::PullRequest {
+                        number: view.number,
+                        url: view
+                            .details
+                            .as_ref()
+                            .and_then(|r| r.as_ref().ok())
+                            .map(|d| d.url.clone())
+                            .unwrap_or_default(),
+                    },
+                    acts,
+                );
                 crate::repo::detail::files_header(ui, &files.files, None);
                 egui::ScrollArea::vertical()
                     .id_salt("pr-files")

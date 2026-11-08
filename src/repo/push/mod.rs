@@ -119,6 +119,9 @@ pub(crate) struct PushFlow {
 impl RepoTab {
     /// The toolbar's Push: the checked-out branch, to where it goes.
     pub(super) fn push(&mut self, ctx: &egui::Context) {
+        if self.echo_push_pending() {
+            return;
+        }
         if let Some(dialog) = self.review_dialog() {
             self.dialog = Some(dialog);
             return;
@@ -210,6 +213,9 @@ impl RepoTab {
     }
 
     fn start_push(&mut self, attempt: Attempt, steps: Vec<Vec<String>>, ctx: &egui::Context) {
+        if self.echo_push_pending() {
+            return;
+        }
         if self.busy_op.is_some() {
             return;
         }
@@ -222,6 +228,9 @@ impl RepoTab {
     /// Sync: pulls the checked-out branch the way the settings say, then pushes it. It stops
     /// at the pull when that fails (on conflicts, which are left to resolve).
     pub(super) fn sync(&mut self, ctx: &egui::Context) {
+        if self.echo_push_pending() {
+            return;
+        }
         if let Some(dialog) = self.review_dialog() {
             self.dialog = Some(dialog);
             return;
@@ -280,6 +289,9 @@ impl RepoTab {
 
     /// What the banner asked for.
     pub(super) fn push_act(&mut self, act: PushAct, ctx: &egui::Context) {
+        if self.echo_push_pending() {
+            return;
+        }
         if self.busy_op.is_some() && !matches!(act, PushAct::Dismiss) {
             return;
         }

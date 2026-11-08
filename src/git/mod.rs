@@ -13,6 +13,9 @@ mod bundles;
 #[cfg(test)]
 mod clone_tests;
 mod command;
+mod credential_scope;
+pub(crate) use command::{WorkspaceCommand, run_workspace_command, transfer_pack};
+pub use credential_scope::{CREDENTIAL_HELPER, CredentialScope};
 mod commit_msg;
 mod commits;
 mod conflict;
@@ -22,13 +25,16 @@ mod diff;
 mod diff_algorithm;
 pub mod doctor;
 pub mod dry_run;
+pub(crate) mod dvc;
 pub mod errors;
 pub mod external_tool;
+pub(crate) mod file_comparison;
 mod files;
 mod fold;
 pub(crate) mod growth;
 mod hooks;
 mod interaction;
+pub(crate) mod investigations;
 mod lfs;
 #[cfg(test)]
 pub(crate) mod lfs_fixtures;
@@ -46,6 +52,7 @@ pub(crate) mod postcards;
 mod preview;
 pub mod progress;
 mod range_diff;
+pub(crate) mod recovery;
 mod redact;
 mod reflog;
 mod refs;
@@ -71,6 +78,7 @@ mod visualization_tests;
 pub(crate) use self::unity::tests as unity_tests;
 mod testlane;
 mod worktree;
+mod worktree_location;
 
 pub use self::absorb::*;
 pub use self::attributes::*;
@@ -121,6 +129,7 @@ pub use self::timed::*;
 pub use self::trees::*;
 pub use self::unity::*;
 pub use self::worktree::*;
+pub use self::worktree_location::*;
 
 // Explicit names for types and helpers independently added by feature stacks.
 pub use self::commit_msg::Author;
@@ -381,3 +390,9 @@ pub fn clone_with(
     args.extend(["--", url, &there]);
     run_with(from.as_deref(), &args, creds).map(|_| ())
 }
+
+pub(crate) mod drafts;
+
+mod push_hooks;
+pub(crate) use bundles::bundle_git_path;
+pub(crate) use command::{PushTarget, local_repair_input, push_preflight_with, repair_host};

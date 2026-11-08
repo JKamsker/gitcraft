@@ -344,6 +344,7 @@ impl RebaseEditor {
                             }
                         });
                     picked |= e.step != before;
+                    super::weather::badge(ui, self.weather.rows.get(i), e.step == Step::Drop, t);
                     let dim = e.step == Step::Drop;
                     let hash = ui.add(
                         egui::Label::new(

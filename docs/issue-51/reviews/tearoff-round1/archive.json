@@ -1,0 +1,60 @@
+{
+  "report_sha256": "110aef94ab765393631695658eb69e33f16a548afdd9bb4f988650864160c355",
+  "manifest_sha256": "18a961f0ec3c1706ee65527d9242e9c0e208fd4f41e4982d225c4b4b32c2a904",
+  "artifacts": [
+    {
+      "original_path": "/tmp/gitcraft-51-interaction-plan.md",
+      "sha256": "3b039e4a7b4e3a1942ab6906d3f089b901e0bc9e40740e761dba838a2d2fbe77",
+      "bytes": 33013,
+      "archive": "evidence-000-gitcraft-51-interaction-plan.md.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-51-tearoff-review-r1.md",
+      "sha256": "110aef94ab765393631695658eb69e33f16a548afdd9bb4f988650864160c355",
+      "bytes": 16498,
+      "archive": "evidence-001-gitcraft-51-tearoff-review-r1.md.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-interaction-1b04721f-windows-0.log",
+      "sha256": "39564bce438e1a4cb4b1fbef5e83246c2fc1fe8f44e64552f18b9bafbf8573c5",
+      "bytes": 2112,
+      "archive": "evidence-002-gitcraft-interaction-1b04721f-windows-0.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-interaction-1b04721f-windows-1.log",
+      "sha256": "f4403412cb20dc7d8a0a94c08c9c8853e4bac9b3e8489158834f30512311ed97",
+      "bytes": 72,
+      "archive": "evidence-003-gitcraft-interaction-1b04721f-windows-1.log.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-interaction-windows-validation.json",
+      "sha256": "555237782f68f8f7ad6b05be4c5f3bf7b6ad8daf5ccb48c8ea111a5a66a0e380",
+      "bytes": 844,
+      "archive": "evidence-004-gitcraft-interaction-windows-validation.json.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-issue51-issues.json",
+      "sha256": "411e76639a880c52a8f92ef5ec543e4e76befaa1f95b2be271629df23a88edfc",
+      "bytes": 177452,
+      "archive": "evidence-005-gitcraft-issue51-issues.json.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-tearoff-r1-evidence/drop_target.rs",
+      "sha256": "0c98eba4be1a1d186154aa0daef6e8677eeca50e1ee3a9362a52cbd5b0be2068",
+      "bytes": 248,
+      "archive": "evidence-006-drop_target.rs.gz"
+    },
+    {
+      "original_path": "/tmp/gitcraft-tearoff-r1-evidence/probe",
+      "sha256": "6c35e98cb6046ed6caf199a6fda286f47000837ec068c670debfc57140dac76f",
+      "bytes": 7074200,
+      "archive": "not copied: binary or >2MB; hash retained"
+    },
+    {
+      "original_path": "/tmp/gitcraft-tearoff-r1-evidence/probe.rs",
+      "sha256": "32f3dffae729be73450ebeb376562e79b958e59c6ef37a6f52a8c70915f5fc85",
+      "bytes": 2364,
+      "archive": "evidence-008-probe.rs.gz"
+    }
+  ]
+}

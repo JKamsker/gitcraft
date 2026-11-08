@@ -1,0 +1,734 @@
+{
+  "application_commit": "bc201e42d3480c4cc9525c948a69fb06afd3ac73",
+  "base": "883c14d8",
+  "environment": {
+    "TMPDIR": "/private/tmp",
+    "SHELL": "/tmp/gitcraft-integration-tools/validation-shell",
+    "PATH_prefix": "/tmp/gitcraft-integration-tools",
+    "CARGO_BUILD_JOBS": "2"
+  },
+  "checks": [
+    {
+      "name": "fmt",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "fmt",
+        "--check"
+      ],
+      "returncode": 0,
+      "log": "fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "seconds": 1.761
+    },
+    {
+      "name": "clippy-qualified",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "clippy",
+        "--locked",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings",
+        "-A",
+        "dead_code"
+      ],
+      "returncode": 0,
+      "log": "clippy-qualified.log",
+      "sha256": "f2066ca264b9a8598ecd436c70919e1efe1acea4098ad2a13b5d82d67bc049ec",
+      "seconds": 0.293
+    },
+    {
+      "name": "clippy-strict",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "clippy",
+        "--locked",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "returncode": 101,
+      "log": "clippy-strict.log",
+      "sha256": "d7f66fa5d1863129a3170803c9dec3382e9d4c8351e2562dcf2d51c6b6b8b015",
+      "seconds": 26.54
+    },
+    {
+      "name": "test-build",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--locked",
+        "--lib",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "returncode": 0,
+      "log": "test-build.log",
+      "sha256": "740de37b989c0061ca25cb938c326751b7bd4eafacd9adafb09ee1530ca038ae",
+      "seconds": 19.915
+    },
+    {
+      "name": "production-build",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "build",
+        "--locked"
+      ],
+      "returncode": 0,
+      "log": "production-build.log",
+      "sha256": "948d4fbe32f2d0f1dd15da68dca648d004d0c54b8144774fec8645851fdf79e0",
+      "seconds": 26.536
+    }
+  ],
+  "groups": [
+    {
+      "name": "group-00",
+      "argv": [
+        "/Users/jonas/.t3/worktrees/gitcraft/t3-54b1a48a/target/debug/deps/gitcraft-31c2c4e1786728f8",
+        "repo::branch_bands::",
+        "--nocapture"
+      ],
+      "returncode": 0,
+      "log": "group-00.log",
+      "sha256": "5d0cc823e4c25ce885f8fb9a165afed62ed0a0b36d4a201bffaac9269074909b",
+      "seconds": 0.014,
+      "counts": [
+        {
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0
+        }
+      ]
+    },
+    {
+      "name": "group-01",
+      "argv": [
+        "/Users/jonas/.t3/worktrees/gitcraft/t3-54b1a48a/target/debug/deps/gitcraft-31c2c4e1786728f8",
+        "repo::graph_view::minimap::",
+        "--nocapture"
+      ],
+      "returncode": 0,
+      "log": "group-01.log",
+      "sha256": "df8687036878c897db6d0a47a61b8b9a818d28641a382b46e98496dda47975d6",
+      "seconds": 0.02,
+      "counts": [
+        {
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0
+        }
+      ]
+    },
+    {
+      "name": "group-02",
+      "argv": [
+        "/Users/jonas/.t3/worktrees/gitcraft/t3-54b1a48a/target/debug/deps/gitcraft-31c2c4e1786728f8",
+        "git::activity::",
+        "--nocapture"
+      ],
+      "returncode": 0,
+      "log": "group-02.log",
+      "sha256": "b143f8319ca09ec1651d2204554b22052b859d8ec5bb62d9921f78d8009de31f",
+      "seconds": 2.04,
+      "counts": [
+        {
+          "passed": 18,
+          "failed": 0,
+          "ignored": 2
+        }
+      ]
+    },
+    {
+      "name": "group-03",
+      "argv": [
+        "/Users/jonas/.t3/worktrees/gitcraft/t3-54b1a48a/target/debug/deps/gitcraft-31c2c4e1786728f8",
+        "repo::history_activity::",
+        "--nocapture"
+      ],
+      "returncode": 0,
+      "log": "group-03.log",
+      "sha256": "b0c23875c629c83dfc6db8d8a606314f83847968f96c379f9874b3a7811b031c",
+      "seconds": 0.05,
+      "counts": [
+        {
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0
+        }
+      ]
+    },
+    {
+      "name": "group-04",
+      "argv": [
+        "/Users/jonas/.t3/worktrees/gitcraft/t3-54b1a48a/target/debug/deps/gitcraft-31c2c4e1786728f8",
+        "git::atlas::",
+        "--nocapture"
+      ],
+      "returncode": 0,
+      "log": "group-04.log",
+      "sha256": "6034841a43b24fd4cfa110a500cdea585b90fa495cc7fb61b59e2bf4ab423ae7",
+      "seconds": 0.008,
+      "counts": [
+        {
+          "passed": 5,
+          "failed": 0,
+          "ignored": 0
+        }
+      ]
+    },
+    {
+      "name": "group-05",
+      "argv": [
+        "/Users/jonas/.t3/worktrees/gitcraft/t3-54b1a48a/target/debug/deps/gitcraft-31c2c4e1786728f8",
+        "repo::atlas::",
+        "--nocapture"
+      ],
+      "returncode": 0,
+      "log": "group-05.log",
+      "sha256": "d94e480e408be1126bb548b3d648e779e0f224c790ccd8972fc97f1e08900a06",
+      "seconds": 0.016,
+      "counts": [
+        {
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0
+        }
+      ]
+    },
+    {
+      "name": "group-06",
+      "argv": [
+        "/Users/jonas/.t3/worktrees/gitcraft/t3-54b1a48a/target/debug/deps/gitcraft-31c2c4e1786728f8",
+        "git::growth::",
+        "--nocapture"
+      ],
+      "returncode": 0,
+      "log": "group-06.log",
+      "sha256": "94de7d8cce1c2b4ef1af03a939d4d3dd61a236afbff359f3cfef3070b42ab3cf",
+      "seconds": 0.007,
+      "counts": [
+        {
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0
+        }
+      ]
+    },
+    {
+      "name": "group-07",
+      "argv": [
+        "/Users/jonas/.t3/worktrees/gitcraft/t3-54b1a48a/target/debug/deps/gitcraft-31c2c4e1786728f8",
+        "repo::growth::",
+        "--nocapture"
+      ],
+      "returncode": 0,
+      "log": "group-07.log",
+      "sha256": "eca13e4586c017229e73bf201c39b9b7d7115f6ffbdfc9aa381553e691fced2e",
+      "seconds": 0.019,
+      "counts": [
+        {
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0
+        }
+      ]
+    },
+    {
+      "name": "group-08",
+      "argv": [
+        "/Users/jonas/.t3/worktrees/gitcraft/t3-54b1a48a/target/debug/deps/gitcraft-31c2c4e1786728f8",
+        "repo::postcards::",
+        "--nocapture"
+      ],
+      "returncode": 0,
+      "log": "group-08.log",
+      "sha256": "ac26bf495a049d418c11ed8ad62608670e4f5883d12ff765bc0cb5e036b3f8db",
+      "seconds": 2.983,
+      "counts": [
+        {
+          "passed": 11,
+          "failed": 0,
+          "ignored": 0
+        }
+      ]
+    },
+    {
+      "name": "group-09",
+      "argv": [
+        "/Users/jonas/.t3/worktrees/gitcraft/t3-54b1a48a/target/debug/deps/gitcraft-31c2c4e1786728f8",
+        "git::postcards::",
+        "--nocapture"
+      ],
+      "returncode": 0,
+      "log": "group-09.log",
+      "sha256": "f6534cac54fb070c7ee58c366d377053e8be95543452a1d12403a374bf35bcd7",
+      "seconds": 0.008,
+      "counts": [
+        {
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0
+        }
+      ]
+    },
+    {
+      "name": "group-10",
+      "argv": [
+        "/Users/jonas/.t3/worktrees/gitcraft/t3-54b1a48a/target/debug/deps/gitcraft-31c2c4e1786728f8",
+        "git::visualization_tests::",
+        "--nocapture"
+      ],
+      "returncode": 0,
+      "log": "group-10.log",
+      "sha256": "7aa0bd005b03f88c7501dfaa7653257d41649589b4b6cbba71446412e3a82e29",
+      "seconds": 0.245,
+      "counts": [
+        {
+          "passed": 2,
+          "failed": 0,
+          "ignored": 0
+        }
+      ]
+    },
+    {
+      "name": "group-11",
+      "argv": [
+        "/Users/jonas/.t3/worktrees/gitcraft/t3-54b1a48a/target/debug/deps/gitcraft-31c2c4e1786728f8",
+        "repo::graph_walk::",
+        "--nocapture"
+      ],
+      "returncode": 0,
+      "log": "group-11.log",
+      "sha256": "353db7307f17a896f6575cbdb122607477292a55c63a50ede45643659f25393a",
+      "seconds": 0.021,
+      "counts": [
+        {
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0
+        }
+      ]
+    },
+    {
+      "name": "group-12",
+      "argv": [
+        "/Users/jonas/.t3/worktrees/gitcraft/t3-54b1a48a/target/debug/deps/gitcraft-31c2c4e1786728f8",
+        "repo::celebration::",
+        "--nocapture"
+      ],
+      "returncode": 0,
+      "log": "group-12.log",
+      "sha256": "d017d641f087d7003eab7221a77ee6ecc9fbc611864df3f724369772c86fca91",
+      "seconds": 0.091,
+      "counts": [
+        {
+          "passed": 7,
+          "failed": 0,
+          "ignored": 0
+        }
+      ]
+    },
+    {
+      "name": "group-13",
+      "argv": [
+        "/Users/jonas/.t3/worktrees/gitcraft/t3-54b1a48a/target/debug/deps/gitcraft-31c2c4e1786728f8",
+        "repo::graph_motion::",
+        "--nocapture"
+      ],
+      "returncode": 0,
+      "log": "group-13.log",
+      "sha256": "64700f52160e3cf3a91854f730b97e14e7f6bd823377372086396b09f12ee66a",
+      "seconds": 0.009,
+      "counts": [
+        {
+          "passed": 5,
+          "failed": 0,
+          "ignored": 0
+        }
+      ]
+    },
+    {
+      "name": "group-14",
+      "argv": [
+        "/Users/jonas/.t3/worktrees/gitcraft/t3-54b1a48a/target/debug/deps/gitcraft-31c2c4e1786728f8",
+        "repo::history_reader::",
+        "--nocapture"
+      ],
+      "returncode": 0,
+      "log": "group-14.log",
+      "sha256": "dc1e48a2a36db0fee985e71d03c409a69cf3373aea08a1b90e48a7c9fb5c3ac4",
+      "seconds": 0.008,
+      "counts": [
+        {
+          "passed": 2,
+          "failed": 0,
+          "ignored": 0
+        }
+      ]
+    },
+    {
+      "name": "group-15",
+      "argv": [
+        "/Users/jonas/.t3/worktrees/gitcraft/t3-54b1a48a/target/debug/deps/gitcraft-31c2c4e1786728f8",
+        "audio::tests::",
+        "--nocapture"
+      ],
+      "returncode": 0,
+      "log": "group-15.log",
+      "sha256": "9b4483c440e2e5f8373ac4ee9aa5b4e9e2ee73d791aebc6f0dd64e863d7f4eef",
+      "seconds": 0.008,
+      "counts": [
+        {
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0
+        }
+      ]
+    },
+    {
+      "name": "group-16",
+      "argv": [
+        "/Users/jonas/.t3/worktrees/gitcraft/t3-54b1a48a/target/debug/deps/gitcraft-31c2c4e1786728f8",
+        "graph::tests::",
+        "--nocapture"
+      ],
+      "returncode": 0,
+      "log": "group-16.log",
+      "sha256": "ab53efeec9900739cd9849519705e8f9a99d1e106d9b662ba59e8a4d6c80a694",
+      "seconds": 0.007,
+      "counts": [
+        {
+          "passed": 8,
+          "failed": 0,
+          "ignored": 0
+        }
+      ]
+    },
+    {
+      "name": "group-17",
+      "argv": [
+        "/Users/jonas/.t3/worktrees/gitcraft/t3-54b1a48a/target/debug/deps/gitcraft-31c2c4e1786728f8",
+        "repo::graph_view::",
+        "--nocapture"
+      ],
+      "returncode": 0,
+      "log": "group-17.log",
+      "sha256": "182150ad388c92b3f4126f4a87e0d52add5d4b7ae84c7d0f266b15e26e010f32",
+      "seconds": 0.191,
+      "counts": [
+        {
+          "passed": 58,
+          "failed": 0,
+          "ignored": 0
+        }
+      ]
+    },
+    {
+      "name": "group-18",
+      "argv": [
+        "/Users/jonas/.t3/worktrees/gitcraft/t3-54b1a48a/target/debug/deps/gitcraft-31c2c4e1786728f8",
+        "repo::navigate::tests::",
+        "--nocapture"
+      ],
+      "returncode": 0,
+      "log": "group-18.log",
+      "sha256": "0efe3aa928bf5d12eaa029f4215e09f93911a4a60b5f78aa6330ffe004abd663",
+      "seconds": 0.009,
+      "counts": [
+        {
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0
+        }
+      ]
+    },
+    {
+      "name": "group-19",
+      "argv": [
+        "/Users/jonas/.t3/worktrees/gitcraft/t3-54b1a48a/target/debug/deps/gitcraft-31c2c4e1786728f8",
+        "a11y::tests::repo_view::",
+        "--nocapture"
+      ],
+      "returncode": 0,
+      "log": "group-19.log",
+      "sha256": "6e281475e5dc7d8d2536edc968443303020bf52a7c0eb1711527ae7b775a4306",
+      "seconds": 0.32,
+      "counts": [
+        {
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0
+        }
+      ]
+    },
+    {
+      "name": "group-20",
+      "argv": [
+        "/Users/jonas/.t3/worktrees/gitcraft/t3-54b1a48a/target/debug/deps/gitcraft-31c2c4e1786728f8",
+        "repo::lifecycle::tests::",
+        "--nocapture"
+      ],
+      "returncode": 0,
+      "log": "group-20.log",
+      "sha256": "9602624e85b9d07bcf6bfc5d5faf0c220b2c0a7874af579e65ec49372828356a",
+      "seconds": 0.337,
+      "counts": [
+        {
+          "passed": 10,
+          "failed": 0,
+          "ignored": 0
+        }
+      ]
+    },
+    {
+      "name": "group-21",
+      "argv": [
+        "/Users/jonas/.t3/worktrees/gitcraft/t3-54b1a48a/target/debug/deps/gitcraft-31c2c4e1786728f8",
+        "repo::graph_order::tests::",
+        "--nocapture"
+      ],
+      "returncode": 0,
+      "log": "group-21.log",
+      "sha256": "9da931213cba5defdee1cac24c3901a8c4df3830b7bbef77c0936b5389c21529",
+      "seconds": 0.277,
+      "counts": [
+        {
+          "passed": 3,
+          "failed": 0,
+          "ignored": 0
+        }
+      ]
+    },
+    {
+      "name": "group-22",
+      "argv": [
+        "/Users/jonas/.t3/worktrees/gitcraft/t3-54b1a48a/target/debug/deps/gitcraft-31c2c4e1786728f8",
+        "repo::authorship_view::",
+        "--nocapture"
+      ],
+      "returncode": 0,
+      "log": "group-22.log",
+      "sha256": "19948c2cf53954f7b03654c92c8aba48d8ada28429e8c78a19994c3b921f1242",
+      "seconds": 0.4,
+      "counts": [
+        {
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0
+        }
+      ]
+    },
+    {
+      "name": "group-23",
+      "argv": [
+        "/Users/jonas/.t3/worktrees/gitcraft/t3-54b1a48a/target/debug/deps/gitcraft-31c2c4e1786728f8",
+        "repo::push::tests::",
+        "--nocapture"
+      ],
+      "returncode": 0,
+      "log": "group-23.log",
+      "sha256": "d63f12360703100e8b26d3c8ab876af6fedc16a1cde13ffbe03658ddd6a327d9",
+      "seconds": 1.381,
+      "counts": [
+        {
+          "passed": 18,
+          "failed": 0,
+          "ignored": 0
+        }
+      ]
+    }
+  ],
+  "test_binary": {
+    "path": "/Users/jonas/.t3/worktrees/gitcraft/t3-54b1a48a/target/debug/deps/gitcraft-31c2c4e1786728f8",
+    "sha256": "03ef0bbe746ebd27a01c83190781cbcd533256b3040cc1e479c821cb3f3a60d9"
+  },
+  "selected_unique_test_names": [
+    "a11y::tests::repo_view::the_graph_is_reached_with_tab_and_read_aloud",
+    "audio::tests::earcons_are_short_soft_and_recorded_without_devices",
+    "git::activity::mailmap::tests::canonical_identity_expansion_refuses_before_cloning_every_record",
+    "git::activity::tests::a_mailmap_edit_between_real_git_pages_cannot_split_an_author",
+    "git::activity::tests::aliases_refs_dates_renames_binary_and_empty_commits_share_one_snapshot",
+    "git::activity::tests::analysis_does_not_change_dirty_worktree_index_or_refs",
+    "git::activity::tests::bare_mailmap_defaults_and_absent_optional_maps_match_git",
+    "git::activity::tests::blobless_history_analysis_does_not_download_file_contents",
+    "git::activity::tests::cancelling_a_running_analysis_stops_process_descendants",
+    "git::activity::tests::configured_missing_mailmap_file_and_successful_git_errors_are_reported",
+    "git::activity::tests::configured_submodule_display_filters_never_hide_committed_gitlink_paths",
+    "git::activity::tests::detached_head_commits_are_included_once",
+    "git::activity::tests::empty_repositories_page_limits_and_cancellation_are_explicit",
+    "git::activity::tests::mailmap_blob_and_configured_file_precedence_match_git",
+    "git::activity::tests::merges_count_once_and_files_compare_with_the_first_parent",
+    "git::activity::tests::month_math_and_recorded_timezone_boundaries_are_validated",
+    "git::activity::tests::nul_records_keep_non_utf8_paths_and_reject_incomplete_metadata",
+    "git::activity::tests::running_analysis_enforces_deadlines_and_output_limits",
+    "git::activity::tests::shallow_history_reports_its_coverage_boundary",
+    "git::activity::tests::ssh_analysis_uses_the_encoded_repository_and_background_transport",
+    "git::activity::tests::stash_and_application_refs_do_not_inflate_project_activity",
+    "git::activity::tests::unavailable_promised_mailmap_blob_is_an_error_without_downloading",
+    "git::atlas::tests::deleted_files_and_current_bytes_share_mailmapped_windowed_totals",
+    "git::atlas::tests::expanded_path_budget_refuses_before_materializing_all_prefixes",
+    "git::atlas::tests::historical_directory_and_current_file_keep_separate_totals_and_navigation",
+    "git::atlas::tests::long_identity_is_interned_once_and_labels_share_storage",
+    "git::atlas::tests::parser_preserves_tabs_and_depth_is_bounded",
+    "git::growth::tests::replay_adds_changes_deletes_and_scrubs_back_to_baseline",
+    "git::postcards::tests::metadata_parser_bounds_release_size_and_rejects_incomplete_records",
+    "git::visualization_tests::atlas_growth_and_postcard_read_a_real_pinned_release_without_mutation",
+    "git::visualization_tests::atlas_side_branch_history_and_captured_head_survive_concurrent_checkout",
+    "graph::tests::a_branch_shares_unchanged_bypass_lanes",
+    "graph::tests::first_parent_history_opens_no_lane_for_merged_parents",
+    "graph::tests::lane_names_follow_first_parent_runs_without_leaking_into_reused_columns",
+    "graph::tests::linear_history_uses_one_lane",
+    "graph::tests::merge_and_branch",
+    "repo::atlas::tests::atlas_folder_hotspot_zooms_and_file_hotspot_opens_pinned_history",
+    "repo::atlas::tests::non_utf8_hotspot_opens_exact_byte_history_and_immutable_commit",
+    "repo::atlas::tests::overlapping_file_and_historical_folder_both_remain_reachable",
+    "repo::atlas::tests::treemap_covers_area_once_and_keeps_weights",
+    "repo::authorship_view::tests::the_lens_through_the_tab",
+    "repo::branch_bands::tests::a_newer_feature_tip_joins_the_older_trunk_in_the_trunk_band",
+    "repo::branch_bands::tests::branch_bands_preserve_merge_edges_and_colour_after_unrelated_tip_arrives",
+    "repo::branch_bands::tests::linked_worktrees_reconcile_shared_preferences_and_reopen",
+    "repo::branch_bands::tests::real_tips_reserve_ancestry_colour_and_slash_remote_main_remains_trunk",
+    "repo::celebration::tests::confirmation_uses_the_operation_target_after_later_head_moves",
+    "repo::celebration::tests::failed_noop_and_unconfirmed_operations_do_not_celebrate",
+    "repo::celebration::tests::first_commit_is_opt_in_confirmed_once_and_sound_is_independent_of_motion",
+    "repo::celebration::tests::merging_pull_celebrates_confirmed_merge_but_not_fast_forward_or_failure",
+    "repo::celebration::tests::real_commit_worker_pins_its_target_before_a_later_commit_and_delayed_read",
+    "repo::celebration::tests::release_requires_explicit_designation_and_confirmed_target",
+    "repo::celebration::tests::successful_first_commit_survives_queued_push_then_failure_until_confirmed_read",
+    "repo::ci_view::graph::tests::jobs_that_waited_for_others_come_after_them",
+    "repo::ci_view::graph::tests::no_jobs_no_columns",
+    "repo::ci_view::graph::tests::stages_are_columns_in_their_order_with_failures_on_top",
+    "repo::graph_motion::tests::a_successful_fetch_marks_new_history_once_and_ignores_early_reads",
+    "repo::graph_motion::tests::chained_successes_keep_earliest_refs_and_failed_fetch_adds_no_markers",
+    "repo::graph_motion::tests::markers_are_operation_scoped_and_bounded",
+    "repo::graph_motion::tests::queued_push_and_its_failure_do_not_erase_successful_fetch_feedback",
+    "repo::graph_motion::tests::reduced_motion_finishes_scroll_without_repaints",
+    "repo::graph_order::tests::the_header_says_how_history_is_read",
+    "repo::graph_order::tests::the_order_is_kept_per_repository_and_the_default_is_not_stored",
+    "repo::graph_order::tests::the_tab_reads_history_in_the_order_kept_and_again_when_changed",
+    "repo::graph_view::badge::index_tests::one_index_resolves_thousands_of_distinct_decorated_commits",
+    "repo::graph_view::badge::tests::a_local_branch_named_under_a_remote_is_local",
+    "repo::graph_view::badge::tests::a_remote_named_like_the_start_of_another_does_not_take_its_branches",
+    "repo::graph_view::badge::tests::branch_ties_are_independent_of_git_decoration_order",
+    "repo::graph_view::badge::tests::checked_out_branch_wins_even_without_a_head_decoration",
+    "repo::graph_view::badge::tests::default_branch_names_win_over_other_branches_at_the_same_commit",
+    "repo::graph_view::badge::tests::full_ref_names_make_the_same_pills",
+    "repo::graph_view::badge::tests::kept_versions_are_no_branches",
+    "repo::graph_view::badge::tests::local_branch_with_slash_is_not_remote",
+    "repo::graph_view::badge::tests::remote_twin_folds_into_local_badge",
+    "repo::graph_view::badge::tests::thousands_of_local_and_remote_twins_keep_head_order_and_separate_tags",
+    "repo::graph_view::drag::tests::a_drag_scrolls_near_the_edges_only",
+    "repo::graph_view::drag::tests::dragging_a_commit_onto_another_opens_the_drop_menu",
+    "repo::graph_view::drag::tests::escape_cancels_a_drag",
+    "repo::graph_view::handles::tests::dragging_another_bar_keeps_the_graph_fitted_to_its_lanes",
+    "repo::graph_view::handles::tests::resizing_auto_refs_fixes_the_width_without_an_initial_jump",
+    "repo::graph_view::menu::tests::a_keep_reset_moves_the_branch_and_keeps_local_changes",
+    "repo::graph_view::menu::tests::a_keep_reset_refuses_to_touch_a_changed_file",
+    "repo::graph_view::menu::tests::a_reset_refuses_once_a_branch_at_the_same_commit_is_checked_out",
+    "repo::graph_view::menu::tests::a_reset_refuses_once_another_branch_is_checked_out",
+    "repo::graph_view::message_tooltip::tests::hover_requests_are_debounced_serialized_hash_owned_and_bounded",
+    "repo::graph_view::message_tooltip::tests::moved_repository_and_superseded_worker_cannot_populate_current_tooltip",
+    "repo::graph_view::message_tooltip::tests::rejected_message_read_releases_pending_and_can_retry",
+    "repo::graph_view::minimap::tests::actual_minimap_marks_loaded_refs_and_clicks_scroll_without_changing_selection",
+    "repo::graph_view::minimap::tests::endpoints_and_drag_anchor_respect_loaded_extent",
+    "repo::graph_view::minimap::tests::large_minimap_capture_shares_rows_edges_and_search_set",
+    "repo::graph_view::minimap::tests::minimap_uses_shared_focus_ring_and_keyboard_scroll",
+    "repo::graph_view::pills::tests::minimum_column_keeps_dev_and_the_extra_refs_count_visible",
+    "repo::graph_view::pills::tests::only_the_tracked_remote_pill_of_the_checked_out_branch_pulls",
+    "repo::graph_view::pills::tests::white_pill_labels_meet_aa_for_every_builtin_and_lane_setting",
+    "repo::graph_view::readability_tests::auto_sized_pills_keep_double_click_and_branch_context_hitboxes",
+    "repo::graph_view::readability_tests::cached_badges_refresh_when_refs_change_even_without_changing_the_graph",
+    "repo::graph_view::readability_tests::ghost_rows_do_not_offer_an_unresolvable_message_popup",
+    "repo::graph_view::readability_tests::lane_names_distinguish_refs_tags_detached_and_reused_columns",
+    "repo::graph_view::readability_tests::manual_refs_optional_columns_and_compact_graph_survive_auto_sizing",
+    "repo::graph_view::readability_tests::real_git_tooltip_retains_long_message_paragraphs_and_follows_hover_not_selection",
+    "repo::graph_view::readability_tests::scrolling_reclaims_empty_refs_without_width_jitter_or_full_history_paint",
+    "repo::graph_view::readability_tests::topology_arrows_enter_history_from_uncommitted_changes_then_follow_parents",
+    "repo::graph_view::readability_tests::topology_arrows_follow_the_focused_row_when_nothing_is_selected",
+    "repo::graph_view::row::tests::painted_graph_bodies_and_wip_chips_meet_aa_in_combined_row_states",
+    "repo::graph_view::suggest::tests::a_name_inside_another_is_put_in_by_email",
+    "repo::graph_view::suggest::tests::a_word_suggests_the_operators_it_starts",
+    "repo::graph_view::suggest::tests::accepting_replaces_the_piece_at_the_cursor",
+    "repo::graph_view::suggest::tests::authors_are_suggested_by_name_or_email",
+    "repo::graph_view::suggest::tests::dates_are_suggested",
+    "repo::graph_view::suggest::tests::folders_are_listed_once",
+    "repo::graph_view::suggest::tests::forgotten_sources_are_read_again",
+    "repo::graph_view::suggest::tests::lists_are_cached_until_the_query_cursor_or_sources_change",
+    "repo::graph_view::suggest::tests::merges_is_followed_by_a_space",
+    "repo::graph_view::suggest::tests::odd_file_names_are_put_in_as_literal_paths",
+    "repo::graph_view::suggest::tests::paths_and_their_folders_are_suggested",
+    "repo::graph_view::suggest::tests::people_without_a_name_of_their_own_are_put_in_by_email",
+    "repo::graph_view::suggest::tests::sources_are_read_when_first_needed",
+    "repo::graph_view::suggest::tests::the_only_suggestion_already_typed_is_not_offered",
+    "repo::graph_view::tests::a_commit_menu_does_not_move_to_the_commit_that_takes_its_row",
+    "repo::graph_view::tests::a_compact_graph_column_fits_its_lanes_closer_together",
+    "repo::graph_view::tests::a_menu_stays_open_while_ghost_rows_push_its_row_away",
+    "repo::graph_view::tests::a_selected_pr_branch_is_visible_ahead_of_other_branches_at_its_tip",
+    "repo::graph_walk::tests::follows_edges_instead_of_adjacent_rows",
+    "repo::graph_walk::tests::lane_walking_announces_shape_and_records_only_opted_in_merge_cues",
+    "repo::graph_walk::tests::release_narration_counts_only_first_parent_integrations",
+    "repo::graph_walk::tests::topology_toggle_requeues_cancelled_and_completed_narration",
+    "repo::growth::tests::component_order_keeps_subtrees_together_and_file_directory_replacement_is_explicit",
+    "repo::growth::tests::growth_next_frame_and_pause_open_the_displayed_commit",
+    "repo::growth::tests::real_tree_rows_keep_folders_and_deleted_contributor_hotspots",
+    "repo::growth::tests::tree_budget_refuses_small_prefix_amplification_and_observes_cancellation",
+    "repo::history_activity::tests::activity_range_validates_input_and_normalizes_backward_drag",
+    "repo::history_activity::tests::calendar_and_contributors_buttons_change_the_actual_view_and_select_commit",
+    "repo::history_activity::tests::cancelled_closed_or_superseded_activity_cannot_accept_old_answers",
+    "repo::history_activity::tests::reopening_the_same_repository_cannot_receive_a_closed_views_answer",
+    "repo::history_reader::tests::reader_owns_the_ambient_io_token_and_stage_guard",
+    "repo::history_reader::tests::replacement_keeps_one_owned_worker_until_completion_and_only_latest_answer",
+    "repo::lifecycle::tests::a_real_tab_reads_when_shown_and_reads_again_after_suspending",
+    "repo::lifecycle::tests::a_reload_wakes_a_restored_tab_once",
+    "repo::lifecycle::tests::a_restored_tab_starts_only_when_first_shown",
+    "repo::lifecycle::tests::a_tab_with_a_message_typed_stays_awake",
+    "repo::lifecycle::tests::a_tab_with_work_going_on_is_never_suspended",
+    "repo::lifecycle::tests::a_watcher_from_before_is_dropped",
+    "repo::lifecycle::tests::an_idle_tab_is_suspended_after_a_while_and_resumes_when_shown",
+    "repo::lifecycle::tests::being_shown_again_restarts_the_clock",
+    "repo::lifecycle::tests::suspension_retires_private_analysis_readers_and_their_pending_captures",
+    "repo::lifecycle::tests::whether_it_is_idle_is_asked_only_when_it_could_be_suspended",
+    "repo::navigate::tests::a_closed_search_takes_no_answer",
+    "repo::navigate::tests::a_failed_search_says_why_under_the_field",
+    "repo::navigate::tests::a_query_written_wrong_says_why_and_searches_nothing",
+    "repo::navigate::tests::clearing_the_query_ends_the_search_running",
+    "repo::postcards::export::tests::publication_never_overwrites_and_cancellation_leaves_no_output",
+    "repo::postcards::export::tests::swapped_parent_cannot_redirect_publication",
+    "repo::postcards::render::tests::dense_octopus_postcards_paint_every_commit_inside_the_graph",
+    "repo::postcards::render::tests::wide_text_is_laid_out_with_an_ellipsis_in_one_visible_line",
+    "repo::postcards::tests::anonymization_removes_names_and_subjects_from_render_input_and_preview",
+    "repo::postcards::tests::closing_discards_owned_disclosures_before_a_later_profile_reopens",
+    "repo::postcards::tests::composed_png_decodes_at_expected_size_and_contains_painted_graph_and_text",
+    "repo::postcards::tests::destination_capture_runs_only_in_the_owned_export_worker",
+    "repo::postcards::tests::postcard_controls_anonymize_then_compose_the_displayed_preview",
+    "repo::postcards::tests::profile_change_cancels_a_queued_read_and_discards_prior_disclosures",
+    "repo::postcards::tests::shortened_contributor_names_keep_distinct_disclosed_identities",
+    "repo::push::tests::a_branch_only_behind_is_told_so",
+    "repo::push::tests::a_branch_that_moved_here_refuses_the_force_push",
+    "repo::push::tests::a_branch_with_no_upstream_is_published_and_tracks_it",
+    "repo::push::tests::a_commit_by_someone_else_on_top_is_not_a_rewrite",
+    "repo::push::tests::a_conflicting_pull_pushes_nothing",
+    "repo::push::tests::a_failed_sync_pull_pushes_nothing",
+    "repo::push::tests::a_hook_refusal_is_the_remotes_and_keeps_its_message",
+    "repo::push::tests::a_lease_that_moved_refuses_the_force_push",
+    "repo::push::tests::a_refused_first_push_is_checked_where_it_went",
+    "repo::push::tests::a_refused_push_is_looked_at_where_the_line_says",
+    "repo::push::tests::a_remote_branch_deleted_is_gone",
+    "repo::push::tests::an_amend_after_pushing_is_a_rewrite",
+    "repo::push::tests::an_undone_commit_after_pushing_is_a_rewrite",
+    "repo::push::tests::both_moving_on_is_diverged_not_rewritten",
+    "repo::push::tests::pull_then_push_joins_the_two",
+    "repo::push::tests::syncs_push_waits_for_the_submodule_update_after_the_pull",
+    "repo::push::tests::the_push_remote_is_the_one_checked",
+    "repo::push::tests::the_push_url_is_the_one_checked"
+  ],
+  "all_required_local_gates_pass": true,
+  "final_application_commit": "bc201e42d3480c4cc9525c948a69fb06afd3ac73"
+}

@@ -1,0 +1,8 @@
+{
+  "credentials": "8796fc1db893693f43afdec9c0aaa2f255b184fe",
+  "connection": "2c04e3bd52259e6fd70ae580fc2fe6824c37ae2e",
+  "verdict": "FAIL: transport boundary P1, path normalization P2, helper precedence P2",
+  "owner": "setup corrections",
+  "execution": "actual owned Git fixtures before gate update explicitly inventoried; no more actual process fixtures",
+  "full_runtime": "HELD"
+}

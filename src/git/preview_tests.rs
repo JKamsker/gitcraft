@@ -438,3 +438,32 @@ fn a_branch_named_like_a_tag_is_still_a_branch() -> Result<(), String> {
     assert_eq!(kept(&found), [("kept", &Kept::On("tags/v9".to_owned()))]);
     Ok(())
 }
+
+#[test]
+fn rebase_preview_names_rewritten_commits_and_already_pushed_history() -> Result<(), String> {
+    let dir = repo("rebase-pushed")?;
+    let base = commit(&dir, "base")?;
+    let head = commit(&dir, "published work")?;
+    git(&dir, &["update-ref", "refs/remotes/origin/main", &head])?;
+    let found = preview(
+        &dir,
+        &PreviewAsk::rebase(
+            "main",
+            &head,
+            &base,
+            Some("refs/remotes/origin/main".into()),
+        ),
+    )?;
+    assert_eq!(found.leaving_total, 1);
+    assert_eq!(found.leaving[0].summary, "published work");
+    assert_eq!(found.pushed.as_ref().map(|p| p.commits), Some(1));
+    assert_eq!(found.lost_total, 0);
+    let root = preview(
+        &dir,
+        &PreviewAsk::rebase("main", &head, "", Some("refs/remotes/origin/main".into())),
+    )?;
+    assert_eq!(root.leaving_total, 2);
+    assert_eq!(root.pushed.as_ref().map(|p| p.commits), Some(2));
+    let _ = std::fs::remove_dir_all(&dir);
+    Ok(())
+}

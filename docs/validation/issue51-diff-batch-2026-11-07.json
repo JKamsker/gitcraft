@@ -1,0 +1,509 @@
+{
+  "source_commit": "5df74dbb3792a34ee0b1d13c301c9aa552aa6c69",
+  "base_commit": "a850de26b0a0778ea96fe34cd1498e6e78928492",
+  "branch": "t3/diff-staging-views",
+  "remote": "https://github.com/JKamsker/gitcraft",
+  "status": "locally validated; parent adversarial review and combined gate pending",
+  "platform": "macOS-27.2-arm64-arm-64bit-Mach-O",
+  "toolchain": {
+    "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)"
+  },
+  "environment": {
+    "TMPDIR": "/private/tmp",
+    "PATH_prefix": "/tmp/gitcraft-integration-tools",
+    "SHELL": "/tmp/gitcraft-integration-tools/validation-shell",
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "target_directory": "own APFS-cloned worktree target"
+  },
+  "logs_archive": "issue51-diff-batch-2026-11-07-tests.log.gz",
+  "logs_archive_sha256": "b4e7889a7d69b6566912429e4e87dfba9dc3a0e69dffdaaab8aac5f9d11aac6a",
+  "commands": [
+    {
+      "name": "sops",
+      "sha": "5df74dbb3792a34ee0b1d13c301c9aa552aa6c69",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--lib",
+        "encrypted::tests",
+        "--",
+        "--test-threads=2",
+        "--nocapture"
+      ],
+      "code": 0,
+      "seconds": 48.54,
+      "log": "/tmp/gitcraft-final6-sops.log",
+      "log_sha256": "21180edc2772ec3a535eec60f0f7ddd5758e392706366b78b192249f14b11be6",
+      "log_section": "sops",
+      "reported_test_results": [
+        [
+          "ok",
+          "20",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0"
+        ]
+      ]
+    },
+    {
+      "name": "standalone",
+      "sha": "5df74dbb3792a34ee0b1d13c301c9aa552aa6c69",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--lib",
+        "standalone::",
+        "--",
+        "--test-threads=2",
+        "--nocapture"
+      ],
+      "code": 0,
+      "seconds": 0.6,
+      "log": "/tmp/gitcraft-final6-standalone.log",
+      "log_sha256": "4f7af7bbfb3cf0dd035f0547d421e573d0a0c1b5e7bdd6377db0a719bbf9127c",
+      "log_section": "standalone",
+      "reported_test_results": [
+        [
+          "ok",
+          "23",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0"
+        ]
+      ]
+    },
+    {
+      "name": "wrap",
+      "sha": "5df74dbb3792a34ee0b1d13c301c9aa552aa6c69",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--lib",
+        "diff::wrap::",
+        "--",
+        "--test-threads=2",
+        "--nocapture"
+      ],
+      "code": 0,
+      "seconds": 0.26,
+      "log": "/tmp/gitcraft-final6-wrap.log",
+      "log_sha256": "9b31828dc11675938b5df90ecb711dfd83e9603402467d825746e515528c475f",
+      "log_section": "wrap",
+      "reported_test_results": [
+        [
+          "ok",
+          "1",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0"
+        ]
+      ]
+    },
+    {
+      "name": "comparison",
+      "sha": "5df74dbb3792a34ee0b1d13c301c9aa552aa6c69",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--lib",
+        "file_comparison",
+        "--",
+        "--test-threads=2",
+        "--nocapture"
+      ],
+      "code": 0,
+      "seconds": 8.12,
+      "log": "/tmp/gitcraft-final6-comparison.log",
+      "log_sha256": "dd354f1e17a46fa9d3f90a89add463ca115d86e8f125f94dcafc1b7020eb608e",
+      "log_section": "comparison",
+      "reported_test_results": [
+        [
+          "ok",
+          "32",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0"
+        ]
+      ]
+    },
+    {
+      "name": "svg",
+      "sha": "5df74dbb3792a34ee0b1d13c301c9aa552aa6c69",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--lib",
+        "svg_",
+        "--",
+        "--test-threads=2",
+        "--nocapture"
+      ],
+      "code": 0,
+      "seconds": 0.46,
+      "log": "/tmp/gitcraft-final6-svg.log",
+      "log_sha256": "e8b55d5e8f8ee8c7583f298f2b0c50ed29934ab2ace6e8cdba134b3b6dcd5123",
+      "log_section": "svg",
+      "reported_test_results": [
+        [
+          "ok",
+          "3",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0"
+        ]
+      ]
+    },
+    {
+      "name": "dvc",
+      "sha": "5df74dbb3792a34ee0b1d13c301c9aa552aa6c69",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--lib",
+        "dvc::",
+        "--",
+        "--test-threads=2",
+        "--nocapture"
+      ],
+      "code": 0,
+      "seconds": 0.51,
+      "log": "/tmp/gitcraft-final6-dvc.log",
+      "log_sha256": "d6db0ab05323d1ac7b661c0e3bcbe0e6b2a883ebe4f0bd18c75113ae783baef0",
+      "log_section": "dvc",
+      "reported_test_results": [
+        [
+          "ok",
+          "2",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0"
+        ]
+      ]
+    },
+    {
+      "name": "binary",
+      "sha": "5df74dbb3792a34ee0b1d13c301c9aa552aa6c69",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--lib",
+        "diff::binary::",
+        "--",
+        "--test-threads=2",
+        "--nocapture"
+      ],
+      "code": 0,
+      "seconds": 1.1,
+      "log": "/tmp/gitcraft-final6-binary.log",
+      "log_sha256": "6a6ff6be58db40afb8654deab81ecef09458eaf0c905c8d2430361cf6dcf00d5",
+      "log_section": "binary",
+      "reported_test_results": [
+        [
+          "ok",
+          "31",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0"
+        ]
+      ]
+    },
+    {
+      "name": "reset",
+      "sha": "5df74dbb3792a34ee0b1d13c301c9aa552aa6c69",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--lib",
+        "keep_reset",
+        "--",
+        "--test-threads=2",
+        "--nocapture"
+      ],
+      "code": 0,
+      "seconds": 0.35,
+      "log": "/tmp/gitcraft-final6-reset.log",
+      "log_sha256": "a70d149823533f8c73442d3bb23d871903b5270c097b0e298e9b11c39cfd666e",
+      "log_section": "reset",
+      "reported_test_results": [
+        [
+          "ok",
+          "2",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0"
+        ]
+      ]
+    },
+    {
+      "name": "reset-mode",
+      "sha": "5df74dbb3792a34ee0b1d13c301c9aa552aa6c69",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--lib",
+        "keep_is_a_shared_reset_mode",
+        "--",
+        "--test-threads=2",
+        "--nocapture"
+      ],
+      "code": 0,
+      "seconds": 0.26,
+      "log": "/tmp/gitcraft-final6-reset-mode.log",
+      "log_sha256": "20a7f9388f5c92e7d870a021eb6a6550a6e3f45a8b14b2cb34d4869ec588c98d",
+      "log_section": "reset-mode",
+      "reported_test_results": [
+        [
+          "ok",
+          "1",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0"
+        ]
+      ]
+    },
+    {
+      "name": "moved",
+      "sha": "5df74dbb3792a34ee0b1d13c301c9aa552aa6c69",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--lib",
+        "diff::moved_tests",
+        "--",
+        "--test-threads=2",
+        "--nocapture"
+      ],
+      "code": 0,
+      "seconds": 0.5,
+      "log": "/tmp/gitcraft-final6-moved.log",
+      "log_sha256": "d4f9124aeb875a0eeb6b1aa63743dd4feacfb0a495dbae97d9820cce4979e179",
+      "log_section": "moved",
+      "reported_test_results": [
+        [
+          "ok",
+          "14",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0"
+        ]
+      ]
+    },
+    {
+      "name": "patch",
+      "sha": "5df74dbb3792a34ee0b1d13c301c9aa552aa6c69",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--lib",
+        "diff::tests",
+        "--",
+        "--test-threads=2",
+        "--nocapture"
+      ],
+      "code": 0,
+      "seconds": 1.2,
+      "log": "/tmp/gitcraft-final6-patch.log",
+      "log_sha256": "c1ce7e0ee455ef9ab894d03f0094216252bbce63a15de5e103e4c853c51fdd33",
+      "log_section": "patch",
+      "reported_test_results": [
+        [
+          "ok",
+          "57",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0"
+        ]
+      ]
+    },
+    {
+      "name": "algorithm",
+      "sha": "5df74dbb3792a34ee0b1d13c301c9aa552aa6c69",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--lib",
+        "diff::algorithm_tests",
+        "--",
+        "--test-threads=2",
+        "--nocapture"
+      ],
+      "code": 0,
+      "seconds": 1.19,
+      "log": "/tmp/gitcraft-final6-algorithm.log",
+      "log_sha256": "69b1eff34126248b60bba08868ab38b2c99a8d747abaf6a2cb319e8ec76f2e46",
+      "log_section": "algorithm",
+      "reported_test_results": [
+        [
+          "ok",
+          "6",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0"
+        ]
+      ]
+    },
+    {
+      "name": "context",
+      "sha": "5df74dbb3792a34ee0b1d13c301c9aa552aa6c69",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--lib",
+        "diff::context::",
+        "--",
+        "--test-threads=2",
+        "--nocapture"
+      ],
+      "code": 0,
+      "seconds": 0.68,
+      "log": "/tmp/gitcraft-final6-context.log",
+      "log_sha256": "c38b9acfaa6c8c027bd224c324dca475627995c31df694a3c102c0900031e0f6",
+      "log_section": "context",
+      "reported_test_results": [
+        [
+          "ok",
+          "15",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0"
+        ]
+      ]
+    },
+    {
+      "name": "standalone-cli",
+      "sha": "5df74dbb3792a34ee0b1d13c301c9aa552aa6c69",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--test",
+        "standalone_cli",
+        "--",
+        "--test-threads=2"
+      ],
+      "code": 0,
+      "seconds": 33.74,
+      "log": "/tmp/gitcraft-final6-standalone-cli.log",
+      "log_sha256": "bdc370bc4b8c25851748f466fce70652a6d60aaba8408c478ccfe7eeb47d802e",
+      "log_section": "standalone-cli",
+      "reported_test_results": [
+        [
+          "ok",
+          "3",
+          "0"
+        ]
+      ]
+    },
+    {
+      "name": "check",
+      "sha": "5df74dbb3792a34ee0b1d13c301c9aa552aa6c69",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "check",
+        "--all-targets"
+      ],
+      "code": 0,
+      "seconds": 17.07,
+      "log": "/tmp/gitcraft-final6-check.log",
+      "log_sha256": "06df7a4a49ee6a4c6cc22ae49aca0b32af409407cbf3247904ec29a7480de235",
+      "log_section": "check",
+      "reported_test_results": []
+    },
+    {
+      "name": "build",
+      "sha": "5df74dbb3792a34ee0b1d13c301c9aa552aa6c69",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "build",
+        "--bin",
+        "gitcraft"
+      ],
+      "code": 0,
+      "seconds": 31.77,
+      "log": "/tmp/gitcraft-final6-build.log",
+      "log_sha256": "9ecd2ed46907f627ae138f62246aaaf9697c9b2935b8c93ecd4515a8bccba47e",
+      "log_section": "build",
+      "reported_test_results": []
+    },
+    {
+      "name": "clippy",
+      "sha": "5df74dbb3792a34ee0b1d13c301c9aa552aa6c69",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "clippy",
+        "--all-targets",
+        "--no-deps"
+      ],
+      "code": 0,
+      "seconds": 22.74,
+      "log": "/tmp/gitcraft-final6-clippy.log",
+      "log_sha256": "df418c19be8a241f37066896e5272a89e35cce2c8a9bcd6013b04609db2927c2",
+      "log_section": "clippy",
+      "reported_test_results": []
+    }
+  ],
+  "limitations": [
+    "Full suite and parallel_bisect real timeout/cancel tests were not run under the known STOP_SCRIPT process-safety constraint.",
+    "The opt-in real SOPS/generated-age test returned success after reporting missing explicit SOPS/age tool paths; it did not execute real SOPS. Other SOPS fixtures, recording checks, owned-child cancellation and redaction tests ran.",
+    "No live SSH/WSL server or DVC remote was contacted. Encoded remote fixtures and an owned fake DVC executable exercised transport/plans.",
+    "macOS native ACL saves were tested; native Windows/Linux runtime gates remain for parent/platform validation.",
+    "Independent adversarial review and combined validation are owned by the parent; no PR or CI was opened/invoked."
+  ]
+}

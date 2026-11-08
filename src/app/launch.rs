@@ -82,7 +82,7 @@ impl App {
         }
         let (tx, rx) = channel();
         let ctx = ctx.clone();
-        std::thread::spawn(move || {
+        crate::connections::spawn(move || {
             let _ = tx.send(crate::launch::resolve::resolve_among(&cmd, &cwd, &clones));
             ctx.request_repaint();
         });

@@ -56,6 +56,7 @@ pub(super) fn change_map(
     runs: &ChangeRuns,
     split: bool,
     view: (f32, f32, f32),
+    offsets: Option<&[f32]>,
     t: &Tokens,
 ) {
     let p = ui.painter_at(strip);
@@ -66,10 +67,16 @@ pub(super) fn change_map(
     }
     let y = |px: f32| strip.top() + px / total * strip.height();
     let rows = total / LINE_H;
+    let row_offset = |row: usize| {
+        offsets
+            .and_then(|o| o.get(row))
+            .copied()
+            .unwrap_or(row as f32 * LINE_H)
+    };
     let span = |run: &Range<usize>, left: f32, right: f32| {
-        let top = y(run.start as f32 * LINE_H);
+        let top = y(row_offset(run.start));
         // Thin runs stay visible however long the file.
-        let bottom = y(run.end as f32 * LINE_H).max(top + 2.0);
+        let bottom = y(row_offset(run.end)).max(top + 2.0);
         Rect::from_min_max(pos2(left, top), pos2(right, bottom))
     };
     let mid = if split {

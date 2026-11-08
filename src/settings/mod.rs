@@ -3,11 +3,13 @@
 mod agents;
 mod ai_page;
 mod branch_names;
+mod connection_page;
 mod custom_commands;
 mod diffs;
 mod external_tools;
 mod file_menus;
 mod layout;
+pub(crate) mod network_page;
 mod page;
 mod portable_page;
 mod preview;
@@ -95,6 +97,7 @@ pub struct Settings {
     pub files_as_tree: bool,
     /// Diffs side by side rather than unified.
     pub diff_split: bool,
+    pub diff_wrap: bool,
     /// Diffs show the whole file, not just the lines around the changes.
     pub diff_whole_file: bool,
     /// Diffs of commits and of the working tree show below the graph, not in its place.
@@ -213,6 +216,7 @@ impl Default for Settings {
             button_layout: Default::default(),
             files_as_tree: true,
             diff_split: false,
+            diff_wrap: false,
             diff_whole_file: false,
             diff_beside_graph: false,
             diff_algorithms: Default::default(),
@@ -468,6 +472,8 @@ impl Settings {
         let t = Tokens::get(ui.ctx());
         match page {
             Page::Profile => self.profile_ui(ui, f, view),
+            Page::Network => self.network_ui(ui, f, false),
+            Page::HttpsSignins => self.network_ui(ui, f, true),
             Page::General => {
                 section(ui, f, "Quiet celebrations", None, |card| {
                     card.row("After success", "first commit release tag merge sound motion", |ui| { ui.checkbox(&mut self.celebration_motion,"Short visual flourish"); ui.checkbox(&mut self.celebration_sound,"Soft celebration sound"); ui.small("Opt-in acknowledgements for a first repository commit, a tag marked as a release, or a completed merge. Motion follows the system preference."); if crate::audio::unavailable() { ui.label("Audio unavailable"); if ui.button("Retry audio").clicked() { crate::audio::retry(); } } });
@@ -934,6 +940,19 @@ impl Settings {
                 section(
                     ui,
                     f,
+                    "Git file tools",
+                    Some("Use gitcraft as Git's difftool and mergetool."),
+                    |card| {
+                        card.row(
+                            "Register gitcraft",
+                            "difftool mergetool compare files standalone global config",
+                            crate::standalone::registration::settings_ui,
+                        );
+                    },
+                );
+                section(
+                    ui,
+                    f,
                     "Remote machines",
                     Some(
                         "Repositories in WSL or over SSH run git there, with that machine's own \
@@ -1152,6 +1171,8 @@ pub(crate) enum Page {
     Graph,
     Git,
     Signing,
+    Network,
+    HttpsSignins,
     Terminal,
     Identities,
     Ai,
@@ -1161,13 +1182,15 @@ pub(crate) enum Page {
 }
 
 impl Page {
-    pub const ALL: [Page; 12] = [
+    pub const ALL: [Page; 14] = [
         Page::Profile,
         Page::General,
         Page::Appearance,
         Page::Graph,
         Page::Git,
         Page::Signing,
+        Page::Network,
+        Page::HttpsSignins,
         Page::Terminal,
         Page::Identities,
         Page::Ai,
@@ -1184,6 +1207,8 @@ impl Page {
             Page::Graph => "Commit graph",
             Page::Git => "Git",
             Page::Signing => "Commit signing",
+            Page::Network => "Network",
+            Page::HttpsSignins => "HTTPS sign-ins",
             Page::Terminal => "Terminal",
             Page::Identities => "Identities",
             Page::Ai => "AI",
@@ -1201,6 +1226,8 @@ impl Page {
             Page::Graph => "git-branch",
             Page::Git => "git-merge",
             Page::Signing => "key-round",
+            Page::Network => "network",
+            Page::HttpsSignins => "key-round",
             Page::Terminal => "square-terminal",
             Page::Identities => "user-round",
             Page::Ai => "sparkles",

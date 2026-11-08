@@ -77,6 +77,7 @@ impl RepoTab {
             return;
         }
 
+        self.intent_badge(ui, &view.path);
         egui::Frame::new()
             .fill(t.chrome)
             .inner_margin(egui::Margin::symmetric(10, 6))
@@ -142,6 +143,30 @@ impl RepoTab {
                 let rev = view.rev.clone();
                 let menu = self.link_menu(None);
                 let mut link = |ui: &mut Ui, lines: Lines| {
+                    if let Some(rev) = &rev
+                        && crate::git::investigations::oid(rev)
+                        && ui.button("Explain history").clicked()
+                    {
+                        acts.push(Action::OpenLineDossier(Some(
+                            crate::git::investigations::dossier::Seed {
+                                commit: rev.clone(),
+                                path: view.path.clone(),
+                                line: lines.first as usize,
+                            },
+                        )));
+                    }
+                    if let Some(rev) = &rev
+                        && crate::git::investigations::oid(rev)
+                        && ui.button("Symbol biography").clicked()
+                    {
+                        acts.push(Action::OpenSymbolBiography(Some(
+                            crate::git::investigations::dossier::Seed {
+                                commit: rev.clone(),
+                                path: view.path.clone(),
+                                line: lines.first as usize,
+                            },
+                        )));
+                    }
                     if let (Some(rev), Some(menu)) = (&rev, menu.clone()) {
                         let target = Target::File {
                             rev: rev.clone(),
@@ -152,7 +177,9 @@ impl RepoTab {
                     }
                 };
                 // Lines are picked only when there's something to link them to.
-                let links = (view.rev.is_some() && self.link_menu(None).is_some())
+                let links = view
+                    .rev
+                    .is_some()
                     .then_some(&mut link as file_text::LineMenu<'_>);
                 let picked = file_text::show(
                     ui,
@@ -165,6 +192,7 @@ impl RepoTab {
                     },
                     Ok(()),
                     links,
+                    Some((&view.goto_line, view.marked_line)),
                 );
                 if let Some(range) = picked {
                     let at = view

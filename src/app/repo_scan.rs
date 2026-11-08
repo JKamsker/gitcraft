@@ -246,7 +246,7 @@ impl RepoScan {
         let (tx, rx) = channel();
         let cancel = Arc::new(AtomicBool::new(false));
         let (dir, stop, ctx) = (root.clone(), cancel.clone(), ctx.clone());
-        std::thread::spawn(move || {
+        crate::connections::spawn(move || {
             let mut progress = |p| {
                 let _ = tx.send(ScanMsg::Progress(p));
                 ctx.request_repaint();

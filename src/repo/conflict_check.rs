@@ -247,7 +247,7 @@ impl ConflictChecks {
         if inner.workers < WORKERS {
             inner.workers += 1;
             let (shared, ctx, repo) = (self.inner.clone(), ctx.clone(), repo.to_path_buf());
-            std::thread::spawn(move || work(&shared, &ctx, &repo));
+            crate::connections::spawn(move || work(&shared, &ctx, &repo));
         }
         Check::Checking
     }

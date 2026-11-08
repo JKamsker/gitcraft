@@ -125,11 +125,21 @@ fn prepared(
 ) -> Result<(Command, impl Fn(std::io::Error) -> String), String> {
     let mut cmd = tool_command(tool);
     let remote = crate::remote::parse(repo).is_some();
-    if remote {
+    let context = crate::connections::current();
+    if let Some(error) = &context.error {
+        return Err(error.clone());
+    }
+    let selected = if tool == "gh" {
+        context.choices.github.selected()
+    } else {
+        context.choices.gitlab.selected()
+    };
+    if remote || selected {
         // The tool runs here, where the user signed in to it, about the repository there:
         // named rather than found from the folder, which it can't read.
         let forge = forge_of(tool)?;
         let (host, path) = remote_location(repo, forge)?;
+        crate::connections::configure_cli(&mut cmd, tool, &host)?;
         // The hosts the arguments name (`--hostname`, `-R host/owner/repo`) were read when the
         // tab loaded: only the one just checked, so a changed `origin` can't send the tool, and
         // a token, to the one before.
@@ -285,6 +295,17 @@ const NOT_SIGNED_IN_FOR: Duration = Duration::from_secs(60);
 /// said is remembered: yes while the app runs, no for [`NOT_SIGNED_IN_FOR`].
 /// An error when the tool can't be run at all (not installed).
 fn trusted_host(forge: Forge, tool: &str, host: &str) -> Result<bool, String> {
+    let context = crate::connections::current();
+    let account = if tool == "gh" {
+        &context.choices.github
+    } else {
+        &context.choices.gitlab
+    };
+    if account.selected() {
+        account.validate()?;
+        return Ok(account.host.eq_ignore_ascii_case(host));
+    }
+
     use std::sync::{Mutex, OnceLock};
     type Known = Mutex<HashMap<(Forge, String), (bool, Instant)>>;
     static KNOWN: OnceLock<Known> = OnceLock::new();
@@ -351,7 +372,7 @@ fn signed_in_to(tool: &str, host: &str) -> Result<bool, String> {
 
 /// The forge's tool, set to answer this repository in plain JSON.
 fn tool_command(tool: &str) -> Command {
-    let mut cmd = Command::new(tool);
+    let mut cmd = Command::new(crate::connections::program(tool));
     cmd.env("GH_PROMPT_DISABLED", "1").env("NO_PROMPT", "1");
     // What it prints is read as JSON: `CLICOLOR_FORCE` or `GH_FORCE_TTY` in the user's
     // environment would colour it even into a pipe, escape codes no JSON reader takes.
@@ -595,4 +616,77 @@ fn report_answer(tool: &str, args: &[&str], keep: bool) -> Option<(bool, String)
     };
     let text = reader.and_then(|r| r.join().ok()).unwrap_or_default();
     Some((status.success(), text))
+}
+
+pub(super) fn history_api(
+    hosting: &super::Hosting,
+    endpoint: &str,
+    active: &dyn Fn() -> bool,
+) -> Result<serde_json::Value, String> {
+    let (tool, forge) = match hosting.forge {
+        Forge::GitHub => ("gh", Forge::GitHub),
+        Forge::GitLab => ("glab", Forge::GitLab),
+        _ => return Err("This forge uses its HTTP API".into()),
+    };
+    let authority = hosting
+        .web
+        .split_once("://")
+        .map(|(_, rest)| rest.trim_end_matches('/'))
+        .ok_or("Invalid forge address")?;
+    if authority.contains(['/', '@', '\n', '\r'])
+        || authority.starts_with('-')
+        || endpoint.starts_with(['/', '-'])
+        || endpoint.contains("://")
+        || endpoint.chars().any(char::is_control)
+    {
+        return Err("Invalid history API address".into());
+    }
+    let actual = super::location(&format!("{}/_history_guard_", hosting.web))
+        .map(|(host, _)| host)
+        .ok_or("Invalid forge authority")?;
+    if !actual.eq_ignore_ascii_case(&hosting.host) {
+        return Err("Forge account and API authority do not match".into());
+    }
+    if !active() {
+        return Err("History lookup cancelled".into());
+    }
+    let mut command = tool_command(tool);
+    command
+        .current_dir(std::env::temp_dir())
+        .env_remove("GH_DEBUG")
+        .env_remove("GLAB_DEBUG")
+        .env_remove("GH_FORCE_TTY")
+        .env("GH_PROMPT_DISABLED", "1");
+    match forge {
+        Forge::GitHub => {
+            command.env("GH_REPO", format!("{}/{}", hosting.host, hosting.path));
+        }
+        Forge::GitLab => {
+            command.env("GITLAB_HOST", authority);
+        }
+        _ => {}
+    }
+    command.args(["api", "--hostname", authority, endpoint]);
+    let output = crate::processes::run(
+        command,
+        crate::processes::Options {
+            background: true,
+            timeout: Some(Duration::from_secs(15)),
+            output_limit: 2 * 1024 * 1024,
+            stderr_limit: Some(16 * 1024),
+            ..Default::default()
+        },
+    )
+    .and_then(|o| o.complete())
+    .map_err(|_| "Bounded forge history lookup failed or was cancelled")?;
+    if !active() {
+        return Err("History lookup cancelled".into());
+    }
+    if !output.status.success() {
+        return Err(
+            "Forge history lookup failed; check the selected account and server API support".into(),
+        );
+    }
+    serde_json::from_slice(&output.stdout)
+        .map_err(|_| "Forge history lookup returned malformed JSON".into())
 }

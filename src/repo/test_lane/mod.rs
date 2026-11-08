@@ -331,7 +331,7 @@ impl RepoTab {
             let send = send.clone();
             move |e: String| send(Box::new(move |tab, ctx| tab.tests_ended(id, Err(e), ctx)))
         };
-        std::thread::spawn(move || {
+        crate::connections::spawn(move || {
             let ran = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 run_in_background(&path, &start, &command, stored.as_deref(), &stop, &send, id)
             }));

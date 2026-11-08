@@ -53,6 +53,8 @@ fn clean(dir: &Path) {
 
 fn issue(number: u64, title: &str) -> Issue {
     Issue {
+        tracker: None,
+        acceptance: None,
         number,
         title: title.into(),
         body:

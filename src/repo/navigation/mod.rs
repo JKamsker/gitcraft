@@ -148,7 +148,7 @@ impl RepoTab {
     /// What the big area shows now, as a place to come back to. `None` while an editor (the
     /// conflict editor, the interactive rebase) takes it: those are not places of the history.
     pub(super) fn current_view(&self) -> Option<View> {
-        if self.conflict.is_some() || self.rebase.is_some() {
+        if self.tour.is_some() || self.conflict.is_some() || self.rebase.is_some() {
             return None;
         }
         if let Some(diff) = self.diff.as_ref().filter(|_| !self.history_beside_diff()) {
@@ -279,6 +279,7 @@ impl RepoTab {
 
     /// Shows `view` again through the actions that open it.
     fn restore_navigation(&mut self, view: &View, ctx: &egui::Context) {
+        self.tour = None;
         match view {
             View::Graph { selected } => {
                 self.close_pages(true, ctx);

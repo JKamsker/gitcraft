@@ -1,0 +1,429 @@
+{
+  "application_commit": "bc201e42d3480c4cc9525c948a69fb06afd3ac73",
+  "base_commit": "883c14d8ebe8f38cd2c404cc87de05e21c07e66c",
+  "recorded_utc": "2026-11-07T23:40:15.019213+00:00",
+  "worktree": "/Users/jonas/.t3/worktrees/gitcraft/t3-54b1a48a",
+  "branch": "refs/heads/t3/visualization-review-fixes",
+  "remote_push_url": "https://github.com/JKamsker/gitcraft",
+  "verified_remote_application_sha": "bc201e42d3480c4cc9525c948a69fb06afd3ac73",
+  "status": "locally validated; independent review pending",
+  "passed_test_executions": 180,
+  "unique_passing_tests": 176,
+  "ignored_tests": [
+    "git::activity::tests::cancelling_a_running_analysis_stops_process_descendants",
+    "git::activity::tests::running_analysis_enforces_deadlines_and_output_limits"
+  ],
+  "failed_test_executions": 0,
+  "strict_lint_pass": false,
+  "qualified_lint_pass": true,
+  "unchanged_baseline_files": [
+    "src/desktop_entry.rs",
+    "src/diagnostics.rs",
+    "src/repo/graph_view/readability_tests.rs"
+  ],
+  "commits": [
+    {
+      "commit": "b2dbe35e401a1da0ab85393b973155ba30572e96",
+      "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>",
+      "subject": "fix: reconcile branch bands by shared worktree repository identity",
+      "status": "locally validated; independent review pending",
+      "contained_by_verified_remote_application_sha": "bc201e42d3480c4cc9525c948a69fb06afd3ac73"
+    },
+    {
+      "commit": "97ea1cc9bbc7d38ff1a6a7b33a8edb0faf97771e",
+      "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>",
+      "subject": "fix: count release integrations on their own line and renew cancelled narration",
+      "status": "locally validated; independent review pending",
+      "contained_by_verified_remote_application_sha": "bc201e42d3480c4cc9525c948a69fb06afd3ac73"
+    },
+    {
+      "commit": "bced018d27b24e1be53d6ca0bf4a9f106dc638f5",
+      "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>",
+      "subject": "fix: retain successful graph feedback across queued operations",
+      "status": "locally validated; independent review pending",
+      "contained_by_verified_remote_application_sha": "bc201e42d3480c4cc9525c948a69fb06afd3ac73"
+    },
+    {
+      "commit": "efcdc00730c07739f718c021b4973ff46cd3344c",
+      "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>",
+      "subject": "fix: preserve confirmed celebration candidates across queued work",
+      "status": "locally validated; independent review pending",
+      "contained_by_verified_remote_application_sha": "bc201e42d3480c4cc9525c948a69fb06afd3ac73"
+    },
+    {
+      "commit": "1696540552a24e780df6f9d7b9f2af2b9fc53ef5",
+      "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>",
+      "subject": "fix: bound atlas expansion and retain distinct pinned file hotspots",
+      "status": "locally validated; independent review pending",
+      "contained_by_verified_remote_application_sha": "bc201e42d3480c4cc9525c948a69fb06afd3ac73"
+    },
+    {
+      "commit": "cb25004eba12e8e8351833ff7aafd8d7b86c4a48",
+      "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>",
+      "subject": "fix: bound replay tree expansion before allocating path prefixes",
+      "status": "locally validated; independent review pending",
+      "contained_by_verified_remote_application_sha": "bc201e42d3480c4cc9525c948a69fb06afd3ac73"
+    },
+    {
+      "commit": "ae6a6bdf24867bc2ebe117ce35f2c86397b6b901",
+      "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>",
+      "subject": "fix: share immutable minimap inputs and expose lane coverage and focus",
+      "status": "locally validated; independent review pending",
+      "contained_by_verified_remote_application_sha": "bc201e42d3480c4cc9525c948a69fb06afd3ac73"
+    },
+    {
+      "commit": "2684c6a45ca84c6b6e4b445baa37aaf4a6671fdb",
+      "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>",
+      "subject": "fix: compose complete dense postcards and capture export parents off thread",
+      "status": "locally validated; independent review pending",
+      "contained_by_verified_remote_application_sha": "bc201e42d3480c4cc9525c948a69fb06afd3ac73"
+    },
+    {
+      "commit": "58ba42ed052e4a235fc5d6a0e33157526014373d",
+      "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>",
+      "subject": "test: bind analysis cancellation to the production owned task token",
+      "status": "locally validated; independent review pending",
+      "contained_by_verified_remote_application_sha": "bc201e42d3480c4cc9525c948a69fb06afd3ac73"
+    },
+    {
+      "commit": "eb7263c04ad6048b1d2c1cda085e091c56b1909f",
+      "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>",
+      "subject": "fix: confirm celebrations against the successful operation target",
+      "status": "locally validated; independent review pending",
+      "contained_by_verified_remote_application_sha": "bc201e42d3480c4cc9525c948a69fb06afd3ac73"
+    },
+    {
+      "commit": "75db4389973992b2c0c9b0494f95d855b8262662",
+      "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>",
+      "subject": "test: propagate visualization fixture errors through checked results",
+      "status": "locally validated; independent review pending",
+      "contained_by_verified_remote_application_sha": "bc201e42d3480c4cc9525c948a69fb06afd3ac73"
+    },
+    {
+      "commit": "ec03ec87e811e6313d7acc4dcb7a9dd55cf12332",
+      "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>",
+      "subject": "fix: bound canonical mailmap identity expansion before per-commit copies",
+      "status": "locally validated; independent review pending",
+      "contained_by_verified_remote_application_sha": "bc201e42d3480c4cc9525c948a69fb06afd3ac73"
+    },
+    {
+      "commit": "7d8f49ae4558f7b11b4d01df8a1da2b545eda681",
+      "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>",
+      "subject": "fix(atlas): open exact byte-path history across analyzed refs",
+      "status": "locally validated; independent review pending",
+      "contained_by_verified_remote_application_sha": "bc201e42d3480c4cc9525c948a69fb06afd3ac73"
+    },
+    {
+      "commit": "0f0bb809f2d16b64c97f27ffa7d69ecd56144cdb",
+      "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>",
+      "subject": "fix(graph): disclose asynchronous branch model layout updates",
+      "status": "locally validated; independent review pending",
+      "contained_by_verified_remote_application_sha": "bc201e42d3480c4cc9525c948a69fb06afd3ac73"
+    },
+    {
+      "commit": "bc201e42d3480c4cc9525c948a69fb06afd3ac73",
+      "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>",
+      "subject": "fix(graph): use the bounded-rate layout loading spinner",
+      "status": "locally validated; independent review pending",
+      "contained_by_verified_remote_application_sha": "bc201e42d3480c4cc9525c948a69fb06afd3ac73"
+    }
+  ],
+  "source_files_at_application_commit": [
+    {
+      "path": "src/git/activity.rs",
+      "sha256": "c8b02904ae6c597184a53da4ad44e4fbc7db6cc8f53e88e96373ea05bac971ba"
+    },
+    {
+      "path": "src/git/activity/mailmap.rs",
+      "sha256": "7d2ea0cd8dacce8c66d1a0de05e6eee2b61d27a9d9bcbdde3aed77b7ce2b045a"
+    },
+    {
+      "path": "src/git/activity/process.rs",
+      "sha256": "baebe33a05586e250ea81ef37be485e19bf5a354035edaef10d75f0c7fa44a52"
+    },
+    {
+      "path": "src/git/activity/tests.rs",
+      "sha256": "bf261020b35444393a2778710178941b98f55692d7c309d1187162ad137364da"
+    },
+    {
+      "path": "src/git/atlas.rs",
+      "sha256": "8a060e66693ef850a2eca6171ddf27a3a71e8ede4b430193031da38345f3ec5b"
+    },
+    {
+      "path": "src/git/growth.rs",
+      "sha256": "e401806173773d8f0e509c40240e9a9510a30c78fcb91e54ed9150945e6694dc"
+    },
+    {
+      "path": "src/git/visualization_tests.rs",
+      "sha256": "f5d7a1658bc36400456407570cacd080a8a43627075460f356c31d516c165c70"
+    },
+    {
+      "path": "src/graph.rs",
+      "sha256": "546b581bb2978baeac6598ba7e53ddd51c47451ed19c190203554828feeb808b"
+    },
+    {
+      "path": "src/repo/atlas/byte_history.rs",
+      "sha256": "34ecc8b34211e8261448c16527589c5200b566d424fc143ab30029343eb2ec32"
+    },
+    {
+      "path": "src/repo/atlas/mod.rs",
+      "sha256": "77911861e072594036eaf92f94e12bdf5f12877f8a0970eb7f54cf17f5c896ac"
+    },
+    {
+      "path": "src/repo/authorship_view.rs",
+      "sha256": "3e470e1a338fbe4c1fa84767f5e3f5e699c8d56f1e38cc23a83e735761cc699a"
+    },
+    {
+      "path": "src/repo/branch_bands.rs",
+      "sha256": "a0b183522fd724c03372695a382846a02cc6aba45966ca7ebf04503b3c966ea9"
+    },
+    {
+      "path": "src/repo/celebration.rs",
+      "sha256": "9e94a3a49c985a0f90bccbaaa5a45762782562e8b9336218005db57d0616d515"
+    },
+    {
+      "path": "src/repo/graph_motion.rs",
+      "sha256": "f3cc88f99c7b2c9e8efb7e0d45baab858083f5185a9bd2cba35bac2985c6a08b"
+    },
+    {
+      "path": "src/repo/graph_view/minimap.rs",
+      "sha256": "2886f125dd92e0949924b889fa23177477b2b5fc95166f9d86904d5e8a9912a2"
+    },
+    {
+      "path": "src/repo/graph_walk.rs",
+      "sha256": "421dc0f099970e57d4dfa7d9d4d868d7de18fda9ac8f576072ff44f40909ef05"
+    },
+    {
+      "path": "src/repo/growth.rs",
+      "sha256": "c34777983f839bc97b0244f6a7a69162a833df7f23df139cf33543d4f8ed4a55"
+    },
+    {
+      "path": "src/repo/history_reader.rs",
+      "sha256": "a7f2776db733cf8b94bdd8c54ccbaf50a342fc548f185d2bf77e539356107255"
+    },
+    {
+      "path": "src/repo/lifecycle.rs",
+      "sha256": "903aee54b25236a40ccff43fb68ea5ab96dbe0d4cf7da249790c15cfc0b230a3"
+    },
+    {
+      "path": "src/repo/load.rs",
+      "sha256": "c43dd33c1de5728865ea5bd19dd153a6d3f59f5fdf75e2d7b5b022bbef2b659e"
+    },
+    {
+      "path": "src/repo/messages.rs",
+      "sha256": "f1d52c9df99f22494844875c4a793d9e4b5ec6278177027d16b8c92ab0be8800"
+    },
+    {
+      "path": "src/repo/mod.rs",
+      "sha256": "0f40beeba87684a86b5abc5c944b87a9e3ecedc754a84396ac5248a0ac9723db"
+    },
+    {
+      "path": "src/repo/navigate.rs",
+      "sha256": "62eb5525b80e0aae5310bf7546e4c8d3854af7675c4dcdebfd9a52da47a2211f"
+    },
+    {
+      "path": "src/repo/operations.rs",
+      "sha256": "be8db1235722a50f08fe7401d3ad1a1fdba880cf4d6891b83259be82c73701db"
+    },
+    {
+      "path": "src/repo/postcards/mod.rs",
+      "sha256": "4a964f2132f68172955c352ca4bdc3356f0f212a07a0867795141762c0284ee2"
+    },
+    {
+      "path": "src/repo/postcards/render.rs",
+      "sha256": "94db4411874967c3545e6f5a7963b3deece576cd370d13d72e57dfc192c46cdf"
+    },
+    {
+      "path": "src/repo/state.rs",
+      "sha256": "a6aa6c8d4e46bd7467901f07aef801fff477b8592d23d2891fd86e1f2399fc0b"
+    },
+    {
+      "path": "src/settings/preview/graph.rs",
+      "sha256": "cc9509f14282081e35b92aff5e29926589fa5b8ac3b0b66dfcb2bcad55dfc256"
+    }
+  ],
+  "logs": [
+    {
+      "log": "clippy-qualified.log",
+      "file": "clippy-qualified.log.gz",
+      "raw_sha256": "f2066ca264b9a8598ecd436c70919e1efe1acea4098ad2a13b5d82d67bc049ec",
+      "gzip_sha256": "d9151c22c3f43a538c32bcb9401f3963fac69c64b3822fe3048738f45ce67e22"
+    },
+    {
+      "log": "clippy-strict.log",
+      "file": "clippy-strict.log.gz",
+      "raw_sha256": "d7f66fa5d1863129a3170803c9dec3382e9d4c8351e2562dcf2d51c6b6b8b015",
+      "gzip_sha256": "698a1aa6ea55c3deb8b9f094ed6577d4b8af7a0d3c30d530e1678c5a7ead2d20"
+    },
+    {
+      "log": "fmt.log",
+      "file": "fmt.log.gz",
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzip_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "log": "group-00.log",
+      "file": "group-00.log.gz",
+      "raw_sha256": "5d0cc823e4c25ce885f8fb9a165afed62ed0a0b36d4a201bffaac9269074909b",
+      "gzip_sha256": "346a94311b093b7e973661cca36c287ead0dfc00e67e246322025f3c1ddcb426"
+    },
+    {
+      "log": "group-01.log",
+      "file": "group-01.log.gz",
+      "raw_sha256": "df8687036878c897db6d0a47a61b8b9a818d28641a382b46e98496dda47975d6",
+      "gzip_sha256": "0ffe4861fcb60dbe9862c37669cf3f7a43b670f374d482aa21ee958d3b80cd4a"
+    },
+    {
+      "log": "group-02.log",
+      "file": "group-02.log.gz",
+      "raw_sha256": "b143f8319ca09ec1651d2204554b22052b859d8ec5bb62d9921f78d8009de31f",
+      "gzip_sha256": "cc8662bea2816e1964ec712097bcfdd4d12fd05cf75485b520dec3216706cf80"
+    },
+    {
+      "log": "group-03.log",
+      "file": "group-03.log.gz",
+      "raw_sha256": "b0c23875c629c83dfc6db8d8a606314f83847968f96c379f9874b3a7811b031c",
+      "gzip_sha256": "7445f7c5c3daf7690d8d0a1961e1fe5f5f86926de6ff944937ef1d8d46ac7626"
+    },
+    {
+      "log": "group-04.log",
+      "file": "group-04.log.gz",
+      "raw_sha256": "6034841a43b24fd4cfa110a500cdea585b90fa495cc7fb61b59e2bf4ab423ae7",
+      "gzip_sha256": "799c3452552e3c79a2b43432aecc315bafb23a17f5d455d384d3646f791e9790"
+    },
+    {
+      "log": "group-05.log",
+      "file": "group-05.log.gz",
+      "raw_sha256": "d94e480e408be1126bb548b3d648e779e0f224c790ccd8972fc97f1e08900a06",
+      "gzip_sha256": "db433cd12f04c9fcabec0879eac3d4b95c02894f32eb14c7200d0e6eb8ab8000"
+    },
+    {
+      "log": "group-06.log",
+      "file": "group-06.log.gz",
+      "raw_sha256": "94de7d8cce1c2b4ef1af03a939d4d3dd61a236afbff359f3cfef3070b42ab3cf",
+      "gzip_sha256": "77721cbded72bf3b76fe756988cebc4f6bd3643eaa3e9d19101148d45fdaa9a4"
+    },
+    {
+      "log": "group-07.log",
+      "file": "group-07.log.gz",
+      "raw_sha256": "eca13e4586c017229e73bf201c39b9b7d7115f6ffbdfc9aa381553e691fced2e",
+      "gzip_sha256": "4c910ba6ae9605f29e715ab86989c41ea9fd1cbd7e5c1362ffe45c625c9c4934"
+    },
+    {
+      "log": "group-08.log",
+      "file": "group-08.log.gz",
+      "raw_sha256": "ac26bf495a049d418c11ed8ad62608670e4f5883d12ff765bc0cb5e036b3f8db",
+      "gzip_sha256": "2c7dc4aef1131bc7dc70321f59dac744f569feb9ef618be8d892b5dcc4141c54"
+    },
+    {
+      "log": "group-09.log",
+      "file": "group-09.log.gz",
+      "raw_sha256": "f6534cac54fb070c7ee58c366d377053e8be95543452a1d12403a374bf35bcd7",
+      "gzip_sha256": "9dbcbf9b679835b8d9df34b74aaa48137af03e8f3e3201c2427bd1e3305eed6c"
+    },
+    {
+      "log": "group-10.log",
+      "file": "group-10.log.gz",
+      "raw_sha256": "7aa0bd005b03f88c7501dfaa7653257d41649589b4b6cbba71446412e3a82e29",
+      "gzip_sha256": "d39347e53defebdcfdeaed5813fb66797d28876f28b15bfd045b6ec3bacf6da1"
+    },
+    {
+      "log": "group-11.log",
+      "file": "group-11.log.gz",
+      "raw_sha256": "353db7307f17a896f6575cbdb122607477292a55c63a50ede45643659f25393a",
+      "gzip_sha256": "b928c049a13ce28ddfb68b40874bf6abe1d3bac7e3795fac44b2fc0d9aec6cfd"
+    },
+    {
+      "log": "group-12.log",
+      "file": "group-12.log.gz",
+      "raw_sha256": "d017d641f087d7003eab7221a77ee6ecc9fbc611864df3f724369772c86fca91",
+      "gzip_sha256": "7cbe8cb8adb0bca5d8f5bfdd570ff22618284e8eb45df5fb6e430571030751c4"
+    },
+    {
+      "log": "group-13.log",
+      "file": "group-13.log.gz",
+      "raw_sha256": "64700f52160e3cf3a91854f730b97e14e7f6bd823377372086396b09f12ee66a",
+      "gzip_sha256": "7b5013ca2dbe69e986b77a7bc7808387d698634166b8c36510554abdae82237b"
+    },
+    {
+      "log": "group-14.log",
+      "file": "group-14.log.gz",
+      "raw_sha256": "dc1e48a2a36db0fee985e71d03c409a69cf3373aea08a1b90e48a7c9fb5c3ac4",
+      "gzip_sha256": "8b11fe6bb8a5eba25559deb3be87dbb762313b948c7f90a8c22bc482f91143a2"
+    },
+    {
+      "log": "group-15.log",
+      "file": "group-15.log.gz",
+      "raw_sha256": "9b4483c440e2e5f8373ac4ee9aa5b4e9e2ee73d791aebc6f0dd64e863d7f4eef",
+      "gzip_sha256": "00d743b5615240ed112663b2516efda7ee19affbe17cc8851448ccc0f5aae488"
+    },
+    {
+      "log": "group-16.log",
+      "file": "group-16.log.gz",
+      "raw_sha256": "ab53efeec9900739cd9849519705e8f9a99d1e106d9b662ba59e8a4d6c80a694",
+      "gzip_sha256": "1ad3a215ad5a6b32192f4767e6c1179cdef298a85f951f9a3f68ee036a238598"
+    },
+    {
+      "log": "group-17.log",
+      "file": "group-17.log.gz",
+      "raw_sha256": "182150ad388c92b3f4126f4a87e0d52add5d4b7ae84c7d0f266b15e26e010f32",
+      "gzip_sha256": "13b68d378f416ea1e8ae1625e897b12f368e386e7b412c5f1de0635c7552229e"
+    },
+    {
+      "log": "group-18.log",
+      "file": "group-18.log.gz",
+      "raw_sha256": "0efe3aa928bf5d12eaa029f4215e09f93911a4a60b5f78aa6330ffe004abd663",
+      "gzip_sha256": "784eeaae462341141125888d4d342919857723b693c375837ed6f6e44461bc3a"
+    },
+    {
+      "log": "group-19.log",
+      "file": "group-19.log.gz",
+      "raw_sha256": "6e281475e5dc7d8d2536edc968443303020bf52a7c0eb1711527ae7b775a4306",
+      "gzip_sha256": "60d2b16f7a2829d22c16351bf5ec5a123d452a8c087b2e8c8daeebe256161a41"
+    },
+    {
+      "log": "group-20.log",
+      "file": "group-20.log.gz",
+      "raw_sha256": "9602624e85b9d07bcf6bfc5d5faf0c220b2c0a7874af579e65ec49372828356a",
+      "gzip_sha256": "7e19fe8ab44172f3ea6492c4868f17535453df9f14df4c02a45ddbc2194ffe94"
+    },
+    {
+      "log": "group-21.log",
+      "file": "group-21.log.gz",
+      "raw_sha256": "9da931213cba5defdee1cac24c3901a8c4df3830b7bbef77c0936b5389c21529",
+      "gzip_sha256": "a277d0b26da606d3857dd010230fb5ba3b9e42fcedbb5250cf4c88833762d1b6"
+    },
+    {
+      "log": "group-22.log",
+      "file": "group-22.log.gz",
+      "raw_sha256": "19948c2cf53954f7b03654c92c8aba48d8ada28429e8c78a19994c3b921f1242",
+      "gzip_sha256": "eefb6004da9e165444c04cca35e66ef6bafcbbbd383735d6024e3a6442d81539"
+    },
+    {
+      "log": "group-23.log",
+      "file": "group-23.log.gz",
+      "raw_sha256": "d63f12360703100e8b26d3c8ab876af6fedc16a1cde13ffbe03658ddd6a327d9",
+      "gzip_sha256": "001559f7c7023393e9760d8b973de01582e10f5282c51146cb9a36b24c3a62f7"
+    },
+    {
+      "log": "production-build.log",
+      "file": "production-build.log.gz",
+      "raw_sha256": "948d4fbe32f2d0f1dd15da68dca648d004d0c54b8144774fec8645851fdf79e0",
+      "gzip_sha256": "8901ab34ff0cb1005c44e068a1f949c1dbc8d13d5f2f4f72eda4310183f0d947"
+    },
+    {
+      "log": "test-build.log",
+      "file": "test-build.log.gz",
+      "raw_sha256": "740de37b989c0061ca25cb938c326751b7bd4eafacd9adafb09ee1530ca038ae",
+      "gzip_sha256": "d4423f9b82a1ddbd3f6ca6a783c1b4a974da0d592610d77b055120b5c05abfe8"
+    },
+    {
+      "log": "test-list.log",
+      "file": "test-list.log.gz",
+      "raw_sha256": "80ffe067cb8d281f87d08b67d39a0b2ee76c4633e198c498529f22ae4a2acd14",
+      "gzip_sha256": "707c4e1ba47151c2795f3f652ed516686beb50f530ba70b41d13d20d2f80ed8d"
+    }
+  ],
+  "run_gates_sha256": "b4957d38d2db83f1205ea0bec639234591c81be1c1016a4797ce27698d584245",
+  "manifest_sha256": "08d8ffb539a329e378696c84f597dee77e8d79f06819476c2d318e4b81b66d57"
+}

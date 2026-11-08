@@ -71,10 +71,12 @@ pub(super) fn remote(
 }
 
 /// Asks for the username and password of `url`, after `refused` ones if they were.
+#[allow(clippy::too_many_arguments)]
 pub(super) fn credentials(
     ui: &mut Ui,
     enter: bool,
-    url: &str,
+    url: &mut String,
+    endpoints: &[String],
     refused: bool,
     username: &mut String,
     password: &mut String,
@@ -89,12 +91,33 @@ pub(super) fn credentials(
          token as the password.",
         &t,
     );
+    if url.is_empty() || endpoints.len() > 1 {
+        ui.label("Git did not identify the failing endpoint. Choose the destination this sign-in should authorize. Other endpoints will not receive this token.");
+        egui::ComboBox::from_id_salt("https-failed-endpoint")
+            .selected_text(if url.is_empty() {
+                "Choose destination"
+            } else {
+                url.as_str()
+            })
+            .show_ui(ui, |ui| {
+                for endpoint in endpoints {
+                    ui.selectable_value(url, endpoint.clone(), endpoint);
+                }
+            });
+    } else {
+        ui.label(format!("Endpoint: {url}"));
+    }
     if refused {
         ui.colored_label(
             t.danger,
-            "Those credentials were refused. Check them and try again.",
+            "The server refused the sign-in. A 401 or 403 immediately after signing in often means the wrong account is stored, or that this account lacks repository access.",
         );
         ui.add_space(6.0);
+        if crate::settings::network_page::valid_https(url)
+            && ui.button("Forget stored account and switch…").clicked()
+        {
+            return Outcome::Done(Box::new(Action::SwitchHttps(url.to_owned())));
+        }
     }
     field(ui, username, "Username", focus);
     ui.add_space(4.0);
@@ -108,16 +131,22 @@ pub(super) fn credentials(
     ui.add_space(4.0);
     ui.label(
         RichText::new(
-            "Used for this tab until you close it. If git has a credential helper (such as Git \
-             Credential Manager), it saves them once they work.",
+            "Used only for this HTTPS endpoint and account until you close the tab. Requires Git 2.46 or newer on the repository machine. Supplies the selected username/password before the first request and is not automatically saved to a credential manager.",
         )
         .color(t.text_faint)
         .small(),
     );
     ui.add_space(8.0);
-    let valid = !username.trim().is_empty() && !password.is_empty();
+    let scope = crate::git::CredentialScope::for_url(url, username.trim()).ok();
+    let valid = scope.as_ref().is_some_and(|scope| scope.is_https())
+        && !password.is_empty()
+        && !password.chars().any(char::is_control);
+    if !scope.as_ref().is_some_and(|scope| scope.is_https()) {
+        ui.label("An exact HTTPS endpoint is required for transient sign-in. Other transports can use the profile credential manager.");
+    }
     buttons(ui, "Sign in", valid, enter, || {
         Action::SignIn(crate::git::Credentials {
+            scope: scope.clone(),
             username: username.trim().to_owned(),
             password: password.clone(),
         })

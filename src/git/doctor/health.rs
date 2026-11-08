@@ -83,7 +83,7 @@ pub struct Health {
 pub fn health(repo: &Path, unix_there: bool) -> Result<Health, String> {
     std::thread::scope(|scope| {
         // Counting every commit is the slow one on a big history: beside the rest.
-        let commits = scope.spawn(|| {
+        let commits = scope.spawn(crate::connections::inherit(|| {
             run(
                 Some(repo),
                 &[
@@ -98,7 +98,7 @@ pub fn health(repo: &Path, unix_there: bool) -> Result<Health, String> {
             )
             .ok()
             .and_then(|n| n.trim().parse().ok())
-        });
+        }));
         let objects = run(Some(repo), &["count-objects", "-v"])
             .map(|out| parse_count_objects(&out))
             .map_err(|e| format!("Could not count the objects: {e}"))?;

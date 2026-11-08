@@ -61,13 +61,17 @@ pub(super) fn merge_box(ui: &mut Ui, draft: &mut PrDraft, d: &PrDetails, acts: &
         );
         return;
     }
-    let blocker = pr_post::merge_blocker(
-        d.draft,
-        &d.mergeable,
-        &d.merge_state,
-        extras.can_write(),
-        extras.can_bypass_rules,
-    );
+    let blocker = if extras.native_policy {
+        extras.merge_blocker.as_deref()
+    } else {
+        pr_post::merge_blocker(
+            d.draft,
+            &d.mergeable,
+            &d.merge_state,
+            extras.can_write(),
+            extras.can_bypass_rules,
+        )
+    };
     let method = method_of(draft, d);
     draft.merge_method = Some(method);
     ui.horizontal_wrapped(|ui| {
@@ -120,6 +124,18 @@ pub(super) fn merge_box(ui: &mut Ui, draft: &mut PrDraft, d: &PrDetails, acts: &
                 .color(t.warning)
                 .small(),
         );
+    }
+    if extras.merge_handoff {
+        if ui
+            .button(format!(
+                "Complete on {}",
+                d.forge.map_or("forge", |f| f.name())
+            ))
+            .clicked()
+        {
+            acts.push(Action::OpenUrl(d.url.clone()));
+        }
+        return;
     }
     let enabled = blocker.is_none() && !draft.posting;
     if draft.confirm_merge {

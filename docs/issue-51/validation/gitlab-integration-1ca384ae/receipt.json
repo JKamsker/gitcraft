@@ -1,0 +1,12 @@
+{
+  "application": "1ca384ae15968a46e1f61ac2765eaa2a5fd30b8c",
+  "source_commits": [
+    "652e63345057aee614480c656edf3b959e8bb56b",
+    "7ef8cac882eb7b9433dc12203036ccb3749f6e31"
+  ],
+  "command": "env CARGO_BUILD_JOBS=2 cargo +1.95.0 check --locked --all-targets",
+  "exit_code": 0,
+  "log_sha256": "11d5bc3c965d5a3fe0354204c2cb5c36e475690617e1f9288b8afd7955ab1088",
+  "runtime": "No live provider/Git/HTTP/native/process fixture, full suite, CI or PR; hold unchanged",
+  "archival": "Documentation-only preservation binds prior exact application check, not new execution."
+}

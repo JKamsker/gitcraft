@@ -114,7 +114,7 @@ impl RepoTab {
         if !self.fetch_time_asked {
             self.fetch_time_asked = true;
             let (path, slot) = (self.path.clone(), std::sync::Arc::clone(&self.fetched_at));
-            std::thread::spawn(move || {
+            crate::connections::spawn(move || {
                 let at = last_fetched(&path);
                 if let Ok(mut s) = slot.lock() {
                     *s = s.or(at);

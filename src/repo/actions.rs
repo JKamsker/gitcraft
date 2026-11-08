@@ -18,6 +18,29 @@ pub(crate) enum Action {
     Keyboard(super::keyboard::Request),
     KeyboardStep(i32),
     FocusPane(super::keyboard::Pane),
+    OpenLineDossier(Option<git::investigations::dossier::Seed>),
+    CloseLineDossier,
+    OpenSymbolBiography(Option<git::investigations::dossier::Seed>),
+    CloseSymbolBiography,
+    OpenPinnedFileLine(git::investigations::dossier::Seed),
+    EarlierVersions,
+    DraftEnable(bool),
+    DraftSnapshot,
+    DraftUndo,
+    DraftPreview {
+        id: crate::git::drafts::Id,
+        path: String,
+        index: bool,
+    },
+    DraftRecover {
+        preview: Box<crate::git::drafts::RestorePreview>,
+        hunks: Vec<usize>,
+    },
+    OpenContentRecovery,
+    ContentSearch(String),
+    ContentInspect(usize, Option<usize>),
+    ContentPrepare(crate::git::recovery::Target),
+    ContentPerform(std::sync::Arc<crate::git::recovery::Prepared>),
     /// What a key of the tab does (see [`crate::keymap`]), or why it can't now.
     Key(crate::keymap::Command),
     /// Show the changes and put the cursor in the commit summary.
@@ -31,12 +54,36 @@ pub(crate) enum Action {
     /// Turn offline mode on or off.
     SetOffline(bool),
     Select(usize),
+    DvcPull,
+    OpenFileComparison(super::file_comparison::Page),
+    RefreshFileComparison,
+    CloseFileComparison,
+    ComparisonMove {
+        request: u64,
+        index: usize,
+    },
+    ComparisonCell {
+        request: u64,
+        path: Vec<u8>,
+        column: usize,
+    },
+    ComparisonPick {
+        request: u64,
+        boundary: usize,
+        lines: std::collections::BTreeSet<usize>,
+        whole: bool,
+    },
+    ComparisonNormalPatch,
     SelectHash(String),
     ActivityCommit(String),
     /// Focus a pull request's branch and compare all of its proposed changes.
     SelectPr(u64),
     SelectStash(usize),
     OpenDiff(DiffKey),
+    Review(super::review_workflow::ReviewAct),
+    Freshness(super::review_workflow::FreshnessAct),
+    Story(super::review_workflow::StoryAct),
+    ReviewTools(super::review_workflow::ToolsAct),
     /// Show a pull request in the big area.
     OpenPr(u64),
     /// Open the worktree of a pull request (proposing `branch`, at `sha`), making it first
@@ -58,6 +105,7 @@ pub(crate) enum Action {
     CloseCi,
     /// Something done in the pipeline view.
     Ci(ci_view::CiAct),
+    LocalCi(super::local_ci::Act),
     /// Something done in the reflog view (opening it on a reflog, or on the lost commits).
     Reflog(reflog::ReflogAct),
     CloseReflog,
@@ -66,6 +114,8 @@ pub(crate) enum Action {
     /// Show the repository doctor in the big area, at a section.
     OpenDoctor(doctor::Section),
     CloseDoctor,
+    OpenTour,
+    OpenSshSetup,
     /// Something done in the repository doctor.
     Doctor(doctor::DoctorAct),
     /// Agent tasks and the worktree setup recipe.
@@ -97,6 +147,10 @@ pub(crate) enum Action {
     Pull,
     PullWith(PullMode),
     Push,
+    SubmitPreflight(Box<crate::push_preflight::Plan>),
+    FixPreflight(Box<crate::push_preflight::Plan>, String),
+    PreflightMessages(Box<crate::push_preflight::Plan>),
+    ReloadPreflight(Box<crate::push_preflight::Plan>),
     /// Pull, then push the checked-out branch.
     Sync,
     /// A button of the banner after a refused push.
@@ -197,6 +251,10 @@ pub(crate) enum Action {
     },
     /// Read syntax changes through Difftastic; staging stays in the patch.
     DiffStructural(bool),
+    DiffDecrypted(bool),
+    DiffSvgSource(bool),
+    DiffWrap(bool),
+    DiffDecryptedEncoding(super::diff::encrypted::JsonEncoding),
     /// Scroll the diff to the next change (`1`) or the previous one (`-1`).
     DiffStep(i32),
     /// Show the two places of a moved block of the diff together (by its index), or stop.
@@ -314,6 +372,11 @@ pub(crate) enum Action {
     /// the fold's.
     AbortFold,
     RunRebase,
+    ConfirmedRebase(u64),
+    AskRebase {
+        onto: String,
+        label: String,
+    },
     CloseRebase,
     /// Open the split editor on a commit of the checked-out branch.
     OpenSplit(String),
@@ -334,6 +397,8 @@ pub(crate) enum Action {
     Stack(super::stack::StackAct),
     /// Remember these HTTPS credentials and run the operation that needed them again.
     SignIn(git::Credentials),
+    /// Forget the effective HTTPS helper login, then reopen the tab sign-in dialog.
+    SwitchHttps(String),
     /// Ask before deleting the local tag `name` (at the commit `target`), once what it points
     /// at is known (read in the background for a repository on another machine).
     DeleteTag {
@@ -489,11 +554,9 @@ pub(crate) fn fast_forward_action(branch: BranchRef<'_>, current: &str) -> Actio
 }
 
 pub(crate) fn rebase_action(onto: BranchRef<'_>, current: &str) -> Action {
-    Action::UndoableOps {
+    Action::AskRebase {
+        onto: onto.full(),
         label: format!("Rebase {current} onto {}", onto.name),
-        ops: ops(&[&["rebase", &onto.full()]]),
-        refresh: Refresh::All,
-        undo: Undo::HeadMove { mode: "--keep" },
     }
 }
 
@@ -538,6 +601,31 @@ impl RepoTab {
         ctx: &egui::Context,
     ) -> Vec<(String, String, Action)> {
         let mut items: Vec<(String, String, Action)> = vec![
+            (
+                "DVC: Pull".into(),
+                "data download remote".into(),
+                Action::DvcPull,
+            ),
+            (
+                "Code moved across files".into(),
+                "refactor moved block".into(),
+                Action::OpenFileComparison(super::file_comparison::Page::CodeMoves),
+            ),
+            (
+                "File migration map".into(),
+                "files".into(),
+                Action::OpenFileComparison(super::file_comparison::Page::Migration),
+            ),
+            (
+                "Three-state staging lens".into(),
+                "staging".into(),
+                Action::OpenFileComparison(super::file_comparison::Page::Lens),
+            ),
+            (
+                "File versions across branches".into(),
+                "files".into(),
+                Action::OpenFileComparison(super::file_comparison::Page::Matrix),
+            ),
             ("Fetch".into(), label(ctx, Command::Fetch), Action::Fetch),
             ("Pull".into(), label(ctx, Command::Pull), Action::Pull),
             (
@@ -797,7 +885,7 @@ impl RepoTab {
                 Action::LfsStorage(super::lfs_storage::StorageAct::OpenPanel),
             ));
         }
-        if self.hosting.is_some() {
+        {
             items.push((
                 "Start work from an issue…".into(),
                 "issue".into(),

@@ -220,7 +220,7 @@ impl RecentStatuses {
         let (tx, rx) = channel();
         for path in &paths {
             let (tx, ctx, path) = (tx.clone(), ctx.clone(), path.clone());
-            std::thread::spawn(move || {
+            crate::connections::spawn(move || {
                 let status = read(&path);
                 let _ = tx.send((path, status));
                 ctx.request_repaint();

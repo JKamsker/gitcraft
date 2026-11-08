@@ -132,6 +132,18 @@ impl PreviewAsk {
         }
     }
 
+    /// Replaying the commits unique to this branch. IDs change even where patches survive.
+    pub fn rebase(branch: &str, head: &str, onto: &str, upstream: Option<String>) -> Self {
+        let range = Range::new(head, Some(onto));
+        Self {
+            leaving: Some(range.clone()),
+            rewritten: Some(range),
+            upstream,
+            moving: vec![branch_ref(branch)],
+            files: LostFiles::None,
+        }
+    }
+
     /// Discarding the changes to these files, or deleting them.
     pub fn files(paths: Vec<String>) -> Self {
         PreviewAsk {

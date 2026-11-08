@@ -3,12 +3,11 @@
 //! into its command line; what it prints is the answer. It can be stopped (with everything it
 //! started), and is stopped when it takes too long.
 
-use std::io::{Read, Write};
 use std::path::Path;
-use std::process::{Child, Command, Stdio};
+use std::process::Command;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::time::{Duration, Instant};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::Duration;
 
 use super::settings::{AiSettings, AiTool};
 use crate::remote::{self, Target};
@@ -18,9 +17,6 @@ pub const TIMEOUT: Duration = Duration::from_secs(300);
 
 /// The most of an answer kept.
 const MAX_ANSWER: usize = 1 << 20;
-
-/// How often a running tool is checked on (finished, stopped, out of time).
-const TICK: Duration = Duration::from_millis(50);
 
 /// Asks a running tool to stop. Clones share it.
 #[derive(Clone, Debug, Default)]
@@ -238,86 +234,60 @@ fn timed_out(program: &str, timeout: Duration) -> RunError {
 /// stopping it stops what it started too.
 fn run_here(job: &Job<'_>) -> Result<Ran, RunError> {
     let mut cmd = shell_here(job.command);
-    cmd.current_dir(job.repo)
-        .env("NO_COLOR", "1")
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
+    cmd.current_dir(job.repo).env("NO_COLOR", "1");
     crate::shell_path::apply(&mut cmd);
-    let mut child = cmd.spawn().map_err(|e| {
-        RunError::Failed(format!(
-            "Couldn't start {} in {}: {e}",
-            job.command.program(),
-            job.repo.display()
-        ))
-    })?;
-    let input = job.input.to_vec();
-    let writer = child.stdin.take().map(|mut stdin| {
-        // A tool that stops reading has stopped for a reason, which its exit code and error
-        // output tell better than the broken pipe would.
-        std::thread::spawn(move || {
-            let _ = stdin.write_all(&input);
-        })
-    });
-    let stdout = child.stdout.take().map(read_capped);
-    let stderr = child.stderr.take().map(read_capped);
-    let started = Instant::now();
-    let code = loop {
-        match child.try_wait() {
-            Ok(Some(status)) => break status.code(),
-            Ok(None) => {}
-            Err(e) => {
-                stop_here(&mut child);
-                return Err(RunError::Failed(format!("Lost track of the tool: {e}")));
-            }
-        }
-        if job.cancel.is_cancelled() {
-            stop_here(&mut child);
-            return Err(RunError::Cancelled);
-        }
-        if started.elapsed() >= job.timeout {
-            stop_here(&mut child);
-            return Err(timed_out(&job.command.program(), job.timeout));
-        }
-        std::thread::sleep(TICK);
-    };
-    // Something the tool left running may hold its output open: what came by then is the
-    // answer, and what is still running is stopped.
-    let mut out = [(stdout, None), (stderr, None)];
-    let until = Instant::now() + LINGER;
-    for (reader, got) in &mut out {
-        *got = collect(reader.as_ref(), until);
-    }
-    if out.iter().any(|(_, got)| got.is_none()) {
-        // Stopping it closes the pipes, and what was read comes.
-        stop_here(&mut child);
-        let until = Instant::now() + LINGER;
-        for (reader, got) in &mut out {
-            if got.is_none() {
-                *got = collect(reader.as_ref(), until);
-            }
-        }
-    }
-    drop(writer);
-    let [(_, stdout), (_, stderr)] = out;
-    Ok(Ran {
-        code,
-        stdout: stdout.unwrap_or_default(),
-        stderr: stderr.unwrap_or_default(),
-    })
+    run_owned(ToolCommand::Here(cmd), job)
 }
 
-/// How long a pipe may stay open after the tool ended.
-const LINGER: Duration = Duration::from_secs(2);
-
-/// What a reader got, once its pipe closed before `until`; `None` if it didn't.
-fn collect(reader: Option<&Reader>, until: Instant) -> Option<Vec<u8>> {
-    let Some(reader) = reader else {
-        return Some(Vec::new());
+enum ToolCommand {
+    Here(Command),
+    There(remote::Streaming),
+}
+fn run_owned(command: ToolCommand, job: &Job<'_>) -> Result<Ran, RunError> {
+    let cancel = job.cancel.clone();
+    let mut options = crate::processes::Options {
+        input: Some(job.input.to_vec()),
+        background: true,
+        timeout: Some(job.timeout),
+        cancelled: Some(Box::new(move || cancel.is_cancelled())),
+        output_limit: MAX_ANSWER,
+        stderr_limit: Some(MAX_ANSWER),
+        drain_for: Duration::from_secs(2),
+        ..Default::default()
     };
-    reader
-        .recv_timeout(until.saturating_duration_since(Instant::now()))
-        .ok()
+    let command = match command {
+        ToolCommand::Here(command) => command,
+        ToolCommand::There(streaming) => streaming.configure(&mut options),
+    };
+    owned_completion(crate::processes::run_checked(command, options), job)
+}
+fn owned_completion(
+    result: Result<crate::processes::Output, crate::processes::Failure>,
+    job: &Job<'_>,
+) -> Result<Ran, RunError> {
+    match result {
+        Err(crate::processes::Failure::CancelledBeforeStart) => Err(RunError::Cancelled),
+        Err(crate::processes::Failure::TimedOutBeforeStart) => {
+            Err(timed_out(&job.command.program(), job.timeout))
+        }
+        Err(e) => Err(RunError::Failed(e.message())),
+        Ok(out) => {
+            if let Some(reason) = out.stopped {
+                if out.stop_kind == Some(crate::processes::StopKind::Cancelled) {
+                    return Err(RunError::Cancelled);
+                }
+                if out.stop_kind == Some(crate::processes::StopKind::TimedOut) {
+                    return Err(timed_out(&job.command.program(), job.timeout));
+                }
+                return Err(RunError::Failed(reason));
+            }
+            Ok(Ran {
+                code: out.status.code(),
+                stdout: out.stdout,
+                stderr: out.stderr,
+            })
+        }
+    }
 }
 
 /// The shell that runs `command` here.
@@ -344,172 +314,62 @@ fn shell_here(command: &CommandLine) -> Command {
     }
 }
 
-/// What a pipe's reader sends once the pipe closes.
-type Reader = std::sync::mpsc::Receiver<Vec<u8>>;
-
-/// Reads all of `pipe` in a thread of its own, keeping at most [`MAX_ANSWER`] bytes, and sends
-/// it once the pipe closes.
-fn read_capped(mut pipe: impl Read + Send + 'static) -> Reader {
-    let (tx, rx) = std::sync::mpsc::channel();
-    std::thread::spawn(move || {
-        let mut kept = Vec::new();
-        let mut buf = [0u8; 8192];
-        loop {
-            match pipe.read(&mut buf) {
-                Ok(0) | Err(_) => break,
-                Ok(n) => {
-                    let room = MAX_ANSWER.saturating_sub(kept.len());
-                    kept.extend_from_slice(&buf[..n.min(room)]);
-                }
-            }
-        }
-        let _ = tx.send(kept);
-    });
-    rx
-}
-
-/// Stops a tool run here and everything it started: politely, then for good.
-fn stop_here(child: &mut Child) {
-    let pid = child.id().to_string();
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        let _ = Command::new("taskkill")
-            .args(["/T", "/F", "/PID", &pid])
-            .creation_flags(0x0800_0000)
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status();
-    }
-    #[cfg(not(windows))]
-    {
-        let group = format!("-{pid}");
-        let signal = |sig: &str| {
-            let _ = Command::new("kill")
-                .args([sig, "--", &group])
-                .stderr(Stdio::null())
-                .status();
-        };
-        signal("-TERM");
-        let until = Instant::now() + Duration::from_secs(2);
-        while Instant::now() < until && matches!(child.try_wait(), Ok(None)) {
-            std::thread::sleep(TICK);
-        }
-        signal("-KILL");
-    }
-    let _ = child.kill();
-    let _ = child.wait();
-}
-
-/// A name for one run on another machine, for its process's file there.
-fn run_id() -> String {
-    static SEQ: AtomicU64 = AtomicU64::new(0);
-    let nanos = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_nanos())
-        .unwrap_or(0);
-    format!(
-        "{}-{nanos:x}-{}",
-        std::process::id(),
-        SEQ.fetch_add(1, Ordering::Relaxed)
-    )
-}
-
-/// Where a run on another machine writes its process, for stopping it.
-fn pid_file(id: &str) -> String {
-    format!("\"${{TMPDIR:-/tmp}}/gitcraft-ai-{id}.pid\"")
-}
-
-/// The script that runs `command` on another machine: in a process of its own, written to
-/// [`pid_file`] while it runs, its input passed on.
-fn there_script(command: &CommandLine, id: &str) -> String {
-    format!(
-        concat!(
-            "p={pid}\n",
-            "trap 'rm -f \"$p\"' EXIT\n",
-            "trap 'rm -f \"$p\"; exit 143' HUP INT TERM\n",
-            "exec 3<&0\n",
-            "sh -c {cmd} <&3 3<&- &\n",
-            "c=$!\n",
-            "echo \"$c\" >\"$p\"\n",
-            "wait \"$c\"; r=$?\n",
-            "rm -f \"$p\"\n",
-            "exit \"$r\"\n",
-        ),
-        pid = pid_file(id),
-        cmd = remote::sh_quote(&command.sh()),
-    )
-}
-
-/// The tool, run on `target`'s machine in its folder; stopped there when cancelled.
+/// The tool runs apart from pooled Git requests on bounded process-service capacity.
+/// Its prompt stays on stdin; the supervisor's controller channel is separate.
 fn run_there(target: &Target, job: &Job<'_>) -> Result<Ran, RunError> {
-    let id = run_id();
     let req = remote::Request {
         cwd: Some(target.path.clone()),
-        script: there_script(job.command, &id),
-        env: vec![("NO_COLOR".to_owned(), "1".to_owned())],
+        script: job.command.sh(),
+        env: vec![("NO_COLOR".into(), "1".into())],
         stdin: Some(job.input.to_vec()),
-        // Minutes, maybe: in shells apart from git's, so neither its reads nor a fetch or push
-        // wait behind it.
         apart: true,
         timeout: Some(job.timeout),
-        ..remote::Request::default()
+        ..Default::default()
     };
-    let done = Arc::new(AtomicBool::new(false));
-    let watcher = {
-        let (done, cancel, host) = (done.clone(), job.cancel.clone(), target.host.clone());
-        std::thread::spawn(move || {
-            while !done.load(Ordering::SeqCst) {
-                if cancel.is_cancelled() {
-                    stop_there(&host, &id, &done);
-                    return;
-                }
-                std::thread::sleep(TICK * 2);
-            }
-        })
-    };
-    let started = Instant::now();
-    let out = remote::exec(&target.host, &req);
-    done.store(true, Ordering::SeqCst);
-    let _ = watcher.join();
-    match out {
-        Ok(out) => Ok(Ran {
-            code: Some(out.code),
-            stdout: out.stdout,
-            stderr: out.stderr,
-        }),
-        Err(_) if job.cancel.is_cancelled() => Err(RunError::Cancelled),
-        Err(_) if started.elapsed() >= job.timeout => {
-            Err(timed_out(&job.command.program(), job.timeout))
-        }
-        Err(e) => Err(RunError::Failed(e)),
-    }
-}
-
-/// Stops the run `id` on `host` and what it started, once it has said its process: it may be
-/// waiting for a shell or its input may still be on the way, so this asks until it has, or
-/// until the run is `done`.
-fn stop_there(host: &remote::Host, id: &str, done: &AtomicBool) {
-    let read = remote::Request {
-        script: format!("cat {} 2>/dev/null", pid_file(id)),
-        timeout: Some(Duration::from_secs(30)),
-        ..remote::Request::default()
-    };
-    while !done.load(Ordering::SeqCst) {
-        let pid = remote::exec(host, &read)
-            .ok()
-            .and_then(|out| String::from_utf8_lossy(&out.stdout).trim().parse().ok());
-        if let Some(pid) = pid {
-            remote::stop_process(host, pid);
-            return;
-        }
-        std::thread::sleep(Duration::from_millis(250));
-    }
+    let streaming = remote::streaming_command(&target.host, &req).map_err(RunError::Failed)?;
+    run_owned(ToolCommand::There(streaming), job)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn recording_cancel_keeps_native_failures_and_typed_uncertainty() {
+        use crate::processes::{Failure, StopKind, recording_output};
+        let cancel = Cancel::default();
+        cancel.cancel();
+        let command = CommandLine::Line("never executed".into());
+        let job = Job {
+            repo: Path::new("/recording-only"),
+            command: &command,
+            input: b"",
+            timeout: Duration::from_secs(1),
+            cancel: &cancel,
+        };
+        for failure in [
+            "could not finish owned process",
+            "Process service stopped before returning a result",
+        ] {
+            let error = owned_completion(Err(Failure::Failed(failure.into())), &job)
+                .err()
+                .map(|e| e.message())
+                .unwrap_or_default();
+            assert!(error.contains(failure));
+        }
+        let error = owned_completion(Ok(recording_output(Some(StopKind::Uncertain))), &job)
+            .err()
+            .map(|e| e.message())
+            .unwrap_or_default();
+        assert!(error.contains("cleanup proof missing"));
+        assert!(matches!(
+            owned_completion(Ok(recording_output(Some(StopKind::Cancelled))), &job),
+            Err(RunError::Cancelled)
+        ));
+        assert!(matches!(
+            owned_completion(Err(Failure::CancelledBeforeStart), &job),
+            Err(RunError::Cancelled)
+        ));
+    }
 
     #[test]
     fn each_tool_has_its_command() -> Result<(), String> {
@@ -605,74 +465,28 @@ mod tests {
         );
     }
 
-    /// Stopped on that machine (a timeout, a cancel), the script leaves no file behind.
-    #[cfg(unix)]
-    #[test]
-    fn the_script_for_another_machine_cleans_up_when_stopped() -> Result<(), String> {
-        let id = run_id();
-        let command = CommandLine::Line("sleep 30".to_owned());
-        let mut child = Command::new("sh")
-            .args(["-c", &there_script(&command, &id)])
-            .stdin(Stdio::null())
-            .spawn()
-            .map_err(|e| e.to_string())?;
-        let tmp = std::env::var("TMPDIR").unwrap_or_else(|_| "/tmp".to_owned());
-        let file = Path::new(&tmp).join(format!("gitcraft-ai-{id}.pid"));
-        let until = Instant::now() + Duration::from_secs(5);
-        while !file.exists() && Instant::now() < until {
-            std::thread::sleep(Duration::from_millis(20));
-        }
-        let written = file.exists();
-        let _ = Command::new("kill")
-            .args(["-TERM", &child.id().to_string()])
-            .status();
-        let _ = child.wait();
-        let left = file.exists();
-        assert!(written && !left);
-        Ok(())
-    }
-
-    /// The script for another machine, run here by `sh` the same way: the input reaches the
-    /// tool, its output and exit code come back, and its process is written down while it
-    /// runs and removed after.
+    /// Exercise prompt/output semantics through the actual owned loopback dispatcher.
     #[cfg(unix)]
     #[test]
     fn the_script_for_another_machine_passes_the_input_on() -> Result<(), String> {
-        let id = run_id();
-        let command = CommandLine::Line(
-            "cat; echo \"pid=$(cat \"${TMPDIR:-/tmp}/gitcraft-ai-ID.pid\")\" >&2; exit 3"
-                .replace("ID", &id),
-        );
-        let mut child = Command::new("sh")
-            .args(["-c", &there_script(&command, &id)])
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(|e| e.to_string())?;
-        if let Some(mut stdin) = child.stdin.take() {
-            stdin
-                .write_all("prompt ü 'quoted' $HOME\n".as_bytes())
-                .map_err(|e| e.to_string())?;
-        }
-        let out = child.wait_with_output().map_err(|e| e.to_string())?;
-        let tmp = std::env::var("TMPDIR").unwrap_or_else(|_| "/tmp".to_owned());
-        let left = Path::new(&tmp)
-            .join(format!("gitcraft-ai-{id}.pid"))
-            .exists();
-        assert_eq!(out.status.code(), Some(3));
-        assert_eq!(
-            String::from_utf8_lossy(&out.stdout),
-            "prompt ü 'quoted' $HOME\n"
-        );
-        let said = String::from_utf8_lossy(&out.stderr);
-        assert!(
-            said.trim()
-                .strip_prefix("pid=")
-                .is_some_and(|p| p.parse::<u32>().is_ok()),
-            "{said}"
-        );
-        assert!(!left);
+        let repo = std::env::temp_dir();
+        let target = Target {
+            host: remote::Host::Ssh(remote::LOOPBACK.into()),
+            path: repo.to_string_lossy().into_owned(),
+        };
+        let command = CommandLine::Line("cat; printf err >&2; exit 3".into());
+        let cancel = Cancel::default();
+        let job = Job {
+            repo: &repo,
+            command: &command,
+            input: b"prompt quoted \n",
+            cancel: &cancel,
+            timeout: Duration::from_secs(10),
+        };
+        let ran = run_there(&target, &job).map_err(|e| e.message())?;
+        assert_eq!(ran.code, Some(3));
+        assert_eq!(ran.stdout, b"prompt quoted \n");
+        assert_eq!(ran.stderr, b"err");
         Ok(())
     }
 }

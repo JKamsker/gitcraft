@@ -16,15 +16,20 @@ struct Snapshot {
     anonymized: bool,
 }
 fn clean(value: &str, max: usize) -> String {
-    value.chars().filter(|c|!c.is_control() && !matches!(c,'\u{200b}'..='\u{200f}'|'\u{202a}'..='\u{202e}'|'\u{2060}'..='\u{206f}'|'\u{feff}')).take(max).collect()
+    let mut chars = value.chars().filter(|c|!c.is_control() && !matches!(c,'\u{200b}'..='\u{200f}'|'\u{202a}'..='\u{202e}'|'\u{2060}'..='\u{206f}'|'\u{feff}'));
+    let mut text: String = chars.by_ref().take(max).collect();
+    if chars.next().is_some() {
+        text.push('…');
+    }
+    text
 }
 impl Snapshot {
     fn new(state: &State, commits: &[Commit]) -> Self {
-        let names: BTreeSet<_> = commits.iter().map(|c| clean(&c.author, 256)).collect();
+        let names: BTreeSet<_> = commits.iter().map(|c| c.author.as_str()).collect();
         let aliases: BTreeMap<_, _> = names
             .iter()
             .enumerate()
-            .map(|(i, n)| (n.clone(), format!("Contributor {}", i + 1)))
+            .map(|(i, n)| (*n, format!("Contributor {}", i + 1)))
             .collect();
         let contributors = if state.include_names {
             names
@@ -33,7 +38,15 @@ impl Snapshot {
                     if state.anonymize {
                         aliases[n].clone()
                     } else {
-                        n.clone()
+                        let label = clean(n, 256);
+                        if label.ends_with('…') {
+                            format!(
+                                "{label} [contributor {}]",
+                                aliases[n].strip_prefix("Contributor ").unwrap_or("?")
+                            )
+                        } else {
+                            label
+                        }
                     }
                 })
                 .collect()
@@ -122,6 +135,24 @@ impl Default for State {
     }
 }
 impl RepoTab {
+    fn queue_postcard_export(
+        &mut self,
+        path: std::path::PathBuf,
+        png: Arc<Vec<u8>>,
+        capture: impl FnOnce(&std::path::Path) -> Result<export::Destination, String> + Send + 'static,
+    ) {
+        let profile = crate::git::profile_config();
+        self.postcards.context = Some(profile.clone());
+        self.postcards.reader.queue(move |owned| {
+            let active = || owned() && crate::git::profile_config() == profile;
+            if !active() {
+                return Err("Postcard export cancelled".into());
+            }
+            let destination = capture(&path)?;
+            destination.publish(&png, &active)?;
+            Ok(Answer::Saved)
+        });
+    }
     pub(super) fn has_postcard_draft(&self) -> bool {
         self.postcards.open
     }
@@ -140,7 +171,7 @@ impl RepoTab {
                 self.postcards.date = self
                     .selected
                     .and_then(|i| self.commits.get(i))
-                    .map(|c| clean(&c.date, 10))
+                    .map(|c| clean(&c.date.chars().take(10).collect::<String>(), 10))
                     .unwrap_or_default();
             }
         }
@@ -187,7 +218,7 @@ impl RepoTab {
                         png: Arc::new(png),
                     });
                     self.postcards.status = Some(
-                        "Preview ready. The exported PNG contains exactly this composition.".into(),
+                        "Preview ready. The exported PNG contains exactly this composition; ellipses mark shortened or width-limited text.".into(),
                     );
                 }
                 Ok(Answer::Saved) => {
@@ -294,18 +325,7 @@ impl RepoTab {
                 .add_filter("PNG image", &["png"])
                 .save_file()
             {
-                match export::Destination::capture(&path) {
-                    Ok(destination) => {
-                        let profile = crate::git::profile_config();
-                        self.postcards.context = Some(profile.clone());
-                        self.postcards.reader.queue(move |owned| {
-                            let active = || owned() && crate::git::profile_config() == profile;
-                            destination.publish(&png, &active)?;
-                            Ok(Answer::Saved)
-                        });
-                    }
-                    Err(error) => self.postcards.status = Some(error),
-                }
+                self.queue_postcard_export(path, png, export::Destination::capture);
             }
         }
         self.poll_postcards(ctx);
@@ -314,6 +334,70 @@ impl RepoTab {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn destination_capture_runs_only_in_the_owned_export_worker() -> Result<(), String> {
+        use std::{
+            sync::mpsc,
+            time::{Duration, Instant},
+        };
+        let ctx = egui::Context::default();
+        let mut tab = RepoTab::new_deferred("/nonexistent/export-capture".into(), &ctx);
+        let ui_thread = std::thread::current().id();
+        let (captured, received) = mpsc::channel();
+        let path = std::path::PathBuf::from("/nonexistent/gitcraft-postcard-parent/output.png");
+        tab.queue_postcard_export(path, Arc::new(Vec::new()), move |path| {
+            assert_ne!(std::thread::current().id(), ui_thread);
+            captured.send(()).map_err(|e| e.to_string())?;
+            export::Destination::capture(path)
+        });
+        assert!(received.try_recv().is_err());
+        assert!(tab.postcards.reader.poll(&tab.tx, &ctx).is_none());
+        received
+            .recv_timeout(Duration::from_secs(5))
+            .map_err(|e| e.to_string())?;
+        let start = Instant::now();
+        loop {
+            if let Some(result) = tab.postcards.reader.poll(&tab.tx, &ctx) {
+                assert!(result.is_err());
+                break;
+            }
+            if start.elapsed() > Duration::from_secs(5) {
+                return Err("Export did not finish".into());
+            }
+            std::thread::yield_now();
+        }
+        Ok(())
+    }
+    #[test]
+    fn shortened_contributor_names_keep_distinct_disclosed_identities() {
+        let prefix = "A".repeat(300);
+        let commits = vec![
+            Commit {
+                author: format!("{prefix}one"),
+                ..Default::default()
+            },
+            Commit {
+                author: format!("{prefix}two"),
+                ..Default::default()
+            },
+        ];
+        let snapshot = Snapshot::new(
+            &State {
+                include_names: true,
+                ..Default::default()
+            },
+            &commits,
+        );
+        assert_eq!(snapshot.contributors.len(), 2);
+        assert_ne!(snapshot.contributors[0], snapshot.contributors[1]);
+        assert!(
+            snapshot
+                .contributors
+                .iter()
+                .all(|n| n.contains('…') && n.len() < 300)
+        );
+        assert_eq!(clean("abcd", 3), "abc…");
+    }
     #[test]
     fn closing_discards_owned_disclosures_before_a_later_profile_reopens() {
         let ctx = egui::Context::default();
