@@ -464,11 +464,7 @@ fn messages(ui: &mut egui::Ui, messages: &[model::Message], salt: &str) {
                     (message
                         .headers
                         .lines()
-                        .find(|l| {
-                            l.starts_with(crate::i18n::text(
-                                "repo-workflows-email-messages-1edf47d5",
-                            ))
-                        })
+                        .find(|l| l.starts_with("Subject:"))
                         .unwrap_or(crate::i18n::text("repo-workflows-email-messages-07ed6ccf")))
                     .clone()
                     .into(),

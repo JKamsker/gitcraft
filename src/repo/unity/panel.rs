@@ -215,9 +215,7 @@ fn checks(ui: &mut Ui, t: &Tokens, state: &UnityState, here: &Context, acts: &mu
     check_row(ui, t, setup.force_text, text, advice, |_| {});
     let mode = setup.vcs_mode.as_deref();
     let text = match (setup.visible_meta(), mode) {
-        (Some(true), Some(m))
-            if m.contains(crate::i18n::text("repo-workflows-unity-checks-26c0a145")) =>
-        {
+        (Some(true), Some(m)) if m.contains("Visible Meta Files") => {
             crate::i18n::text("repo-workflows-unity-checks-b10c6093").to_owned()
         }
         (Some(true), Some(m)) => crate::i18n::message(
@@ -227,7 +225,7 @@ fn checks(ui: &mut Ui, t: &Tokens, state: &UnityState, here: &Context, acts: &mu
         (Some(false), _) => crate::i18n::text("repo-workflows-unity-checks-36e9ce17").to_owned(),
         _ => crate::i18n::text("repo-workflows-unity-checks-905615a3").to_owned(),
     };
-    let fine = mode.map(|m| m.contains(crate::i18n::text("repo-workflows-unity-checks-26c0a145")));
+    let fine = mode.map(|m| m.contains("Visible Meta Files"));
     let advice = (fine == Some(false)).then(|| vcs_place(version));
     check_row(ui, t, fine, &text, advice, |_| {});
     let yaml = &setup.missing_yaml;
