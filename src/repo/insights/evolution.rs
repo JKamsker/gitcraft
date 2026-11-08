@@ -1,0 +1,32 @@
+//! Code evolution heatmap (#175 item 4): commits (or time) across, files or folders down, coloured by how much changed.
+
+use egui::Ui;
+
+use super::common;
+use crate::repo::{Action, RepoTab};
+
+/// What the view keeps.
+#[derive(Default)]
+pub(crate) struct State {}
+
+/// What the view asks for.
+#[derive(Clone, Debug)]
+pub(crate) enum Act {}
+
+impl RepoTab {
+    /// Reads what the view shows (again).
+    pub(super) fn evolution_load(&mut self, _ctx: &egui::Context) {}
+
+    pub(super) fn evolution_act(&mut self, act: Act, _ctx: &egui::Context) {
+        match act {}
+    }
+
+    /// Esc: takes back what is selected, if anything (`false` closes the page).
+    pub(super) fn evolution_back(&mut self) -> bool {
+        false
+    }
+
+    pub(super) fn evolution_ui(&mut self, ui: &mut Ui, _acts: &mut Vec<Action>) {
+        common::not_built(ui);
+    }
+}

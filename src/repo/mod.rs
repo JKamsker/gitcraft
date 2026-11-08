@@ -59,6 +59,7 @@ pub(crate) mod highlight;
 pub(crate) mod history_filter;
 mod hooks;
 mod hotfix;
+mod insights;
 mod interaction;
 mod issue_work;
 mod keep_submodules;
@@ -298,6 +299,8 @@ pub struct RepoTab {
     versions: versions::Versions,
     /// The repository doctor, when the big area shows it.
     doctor: Option<Box<doctor::DoctorView>>,
+    /// The insights page, when the big area shows it.
+    insights: Option<Box<insights::InsightsView>>,
     pr_requests: u64,
     /// What was written on each pull request and not sent, by its number.
     pr_drafts: HashMap<u64, pr_review::PrDraft>,
@@ -611,6 +614,7 @@ impl RepoTab {
             reflog: None,
             versions: Default::default(),
             doctor: None,
+            insights: None,
             pr_requests: 0,
             pr_drafts: HashMap::new(),
             compare_requests: 0,

@@ -297,6 +297,22 @@ impl RepoTab {
         if search.clicked() {
             acts.push(Action::ToggleSearch);
         }
+        let insights = icons::tool_button(ui, "chart-column", "", true)
+            .named("Insights")
+            .on_hover_text(
+                "Insights: change impact, CI critical path, worktrees, coupling, reviews, \
+                 deployments…",
+            );
+        if self.insights.is_some() {
+            widgets::active_underline(ui, insights.rect, t.accent);
+        }
+        if insights.clicked() {
+            acts.push(Action::Insights(if self.insights.is_some() {
+                super::insights::InsightsAct::Close
+            } else {
+                super::insights::InsightsAct::Open(super::insights::Kind::ALL[0])
+            }));
+        }
         let doctor = icons::tool_button(ui, "wrench", "", true).on_hover_text(
             "Repository doctor: ignore rules, hooks, health, configuration, hidden changes",
         );

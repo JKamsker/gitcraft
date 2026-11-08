@@ -27,6 +27,7 @@ mod graph;
 mod icons;
 mod image_cache;
 mod image_fit;
+mod insights;
 mod instance;
 mod keymap;
 pub mod launch;
