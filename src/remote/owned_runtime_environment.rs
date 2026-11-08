@@ -90,6 +90,12 @@ pub(super) fn snapshot() -> io::Result<()> {
 
 fn expected(case: &str, directory: &Path) -> Receipt {
     let cleared = matches!(case, "clear" | "empty-clear" | "path-explicit");
+    // CoreFoundation initializes this linked macOS test executable after std launch:
+    // CFRuntime.c -> __CFStringGetUserDefaultEncoding -> setenv in CFStringEncodings.c.
+    // Parent diagnostic 1043c8a7 observed exactly this singleton. Keep the raw emptiness
+    // field truthful and require every actual key to match; do not filter any keys.
+    // Source/evidence links: docs/issue-51/process-safety/finite-owned-runtime-fixtures.md.
+    let macos_startup = cfg!(target_os = "macos");
     let mut receipt = Receipt {
         arg0: ARG0.as_bytes().to_vec(),
         inherit: (!cleared).then(|| b"inherit-me".to_vec()),
@@ -98,8 +104,14 @@ fn expected(case: &str, directory: &Path) -> Receipt {
         empty: None,
         non_utf8: (!cleared).then(|| b"baseline-\xfe".to_vec()),
         path: (!cleared).then(|| directory.as_os_str().as_bytes().to_vec()),
-        empty_environment: case == "empty-clear",
-        unexpected_environment_keys: (case == "empty-clear").then(Vec::new),
+        empty_environment: case == "empty-clear" && !macos_startup,
+        unexpected_environment_keys: (case == "empty-clear").then(|| {
+            if macos_startup {
+                vec![b"__CF_USER_TEXT_ENCODING".to_vec()]
+            } else {
+                Vec::new()
+            }
+        }),
     };
     match case {
         "set" => {
@@ -192,8 +204,8 @@ pub(super) fn driver(directory: &Path) -> io::Result<()> {
         let receipt = expected(case, directory);
         let actual_bytes = std::fs::read(case_directory.join("environment-receipt.json"))?;
         let actual: Receipt = serde_json::from_slice(&actual_bytes)?;
-        // Report only escaped key names from empty-clear. The strict receipt equality
-        // still requires empty_environment=true and no unexpected keys; no exemptions.
+        // Report only escaped key names from empty-clear. Strict receipt equality
+        // requires the exact platform startup key set and truthful raw emptiness.
         let unexpected_names: Vec<_> = actual
             .unexpected_environment_keys
             .iter()

@@ -90,15 +90,16 @@ A Service-owned fixed current_exe driver receives synthetic inherited/set/remove
 raw non-UTF-8 key/value bytes and PATH through Command.env. It never calls process-global
 set_var/remove_var. Seven snapshots use the original opaque std Command, directly through
 existing Service/OwnedChild: inherit, override/empty/non-UTF-8 set, remove (including PATH),
-env_clear with new values, truly empty env_clear, inherited PATH lookup and explicit PATH
+env_clear with new values, empty env_clear at launch, inherited PATH lookup and explicit PATH
 lookup after clear. PATH resolves only a fixed-name symlink to current_exe inside the
 exclusive scratch namespace; no external executable or server is involved. Custom UTF-8
 arg0 is checked exactly; non-UTF-8 coverage is for both environment key and value.
 
 Each child returns exact serialized synthetic fields on stdout and an exclusively created,
 synced receipt in its private cwd. Assertions include the fixed libtest stdout prefix,
-exact payload bytes, empty stderr, status0, absent-vs-empty values and empty entire
-environment. The parent rechecks all seven exact receipts and the driver's exact summary.
+exact payload bytes, empty stderr, status0, absent-vs-empty values and the exact
+post-startup environment key set for empty-clear (platform contract below). The parent
+rechecks all seven exact receipts and the driver's exact summary.
 Snapshot dispatch uses arg0 so even an entirely cleared environment reaches the child
 body. Driver dispatch requires a distinct arg0, and nested commands remove driver mode:
 an arg0/env regression fails instead of recursively starting another driver.
@@ -121,9 +122,9 @@ but `empty_environment=false`. PATH cases were not reached. Evidence remains in
 `/tmp/gitcraft-51-native-runtime-3813b0f9/validation.json` and `2.log`; this is a failure,
 not an environment or suite pass.
 
-The diagnostic delta adds sorted raw environment **key names only** to the empty-clear
-receipt. Its expected key list remains empty, and `empty_environment` must still be
-true. Exact receipt/stdout checks remain. Readable escaped names appear in a strict
+The diagnostic delta at `1a328125` added sorted raw environment **key names only** to
+the empty-clear receipt. That diagnostic candidate expected an empty key list and
+`empty_environment=true`. Exact receipt/stdout checks remain. Readable escaped names appear in a strict
 receipt assertion; outer driver status/stop failures now include its already capped
 synthetic stdout/stderr, preserving inner assertion details. Unknown values are neither
 recorded nor printed. Other cases omit this optional field and preserve their receipt
@@ -141,8 +142,37 @@ calls `__CFStringGetUserDefaultEncoding` during initialization, and
 [CFStringEncodings.c](https://github.com/apple-oss-distributions/CF/blob/main/CFStringEncodings.c)
 contains its environment-writing implementation. This supports a CoreFoundation startup
 injection hypothesis, not attribution of the installed framework's behavior in this
-failed run. **No startup-key exemption is implemented.** The parent's next reviewed,
-exact invocation should identify the actual keys before any further disposition.
+failed run. This was the diagnostic hypothesis, with no key exemption at that candidate.
 
-No fixture runtime results are claimed by this document. Build/lint logs and final
-immutable source hashes are handed to the parent outside the repository.
+### Observed macOS startup contract correction (runtime still held)
+
+The parent preserved/reviewed diagnostic candidate
+`1043c8a76c426cf5f80403c94d51015beea9a34b`, with fixture sources equal to `1a328125`,
+then ran the exact held environment fixture. It failed101 as expected under the prior
+empty-key contract. Its actual empty-clear receipt has **exactly one key**,
+`__CF_USER_TEXT_ENCODING`; all tracked synthetic variables and PATH are absent and
+raw `empty_environment=false`. Evidence is preserved unchanged at
+`/tmp/gitcraft-51-env-diagnostic-1043c8a7/receipt.json` and `runtime.log`.
+
+The corrected test expectation uses `cfg!(target_os = "macos")`: this linked macOS
+executable must report exactly that singleton key and raw emptiness=false after framework
+initialization. Other Unix targets must report an empty key list and raw emptiness=true.
+macOS does not accept an empty-or-singleton alternative. The observed key and the primary
+CoreFoundation source above justify this explicit platform startup contract; no production
+Command/environment defect is established by the two failed fixture expectations.
+
+Snapshot collection remains unchanged. Full sorted actual key-list and entire receipt
+equality reject every name outside that exact set, including any original inherited key
+other than the single CF startup name. Every tracked synthetic value, removal, clear, non-UTF-8 value,
+arg0 and both PATH cases retains its previous expectation. Unknown environment values,
+including the CF value, are never recorded; there is no wildcard key/value filter,
+parent environment mutation, production sanitizer or new runner. This fixture now
+distinguishes an empty environment passed to std launch from the platform startup state
+observed inside the linked application executable.
+
+No new runtime run is performed by the implementation agent. The corrected candidate
+requires parent delta review and one exact environment run; endpoint/claim passes and
+both environment failures remain bound to their original immutable evidence.
+
+Build/lint logs and final immutable source hashes are handed to the parent outside the
+repository. Parent runtime outcomes above do not imply a corrected-fixture or suite pass.
