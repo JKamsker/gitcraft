@@ -193,6 +193,10 @@ pub fn run_watched_recorded(
         (Err(e), rec)
     };
     let mut extra = extra_for(dir, creds, quiet);
+    let _source = match super::source::bind(&mut extra, dir, args) {
+        Ok(source) => source,
+        Err(e) => return failed(e),
+    };
     extra.trace_hooks = !quiet && crate::git::hooks::wants_trace(args);
     let trace = (dir.and_then(remote::parse).is_none() && extra.trace_hooks)
         .then(crate::git::hooks::TraceFile::new)

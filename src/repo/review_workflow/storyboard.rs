@@ -396,23 +396,20 @@ fn publish_board(
     let shared = shared_ref(key);
     let cached = cached_ref(key, target);
     // A remote can have different fetch/push URLs. The lease must describe the push server.
-    let remote_tip = git::run_unattended(
-        Some(repo),
+    let remote_tip = target.run(
+        repo,
         &["ls-remote", "--refs", target.push_url(), &shared],
         creds,
     )?;
     let previous = remote_tip.split_whitespace().next().map(str::to_owned);
     if previous.is_some() {
         target.guard(repo)?;
-        git::run_unattended(
-            Some(repo),
-            &[
-                "fetch",
-                "--no-tags",
-                "--no-write-fetch-head",
-                target.push_url(),
-                &format!("+{shared}:{cached}"),
-            ],
+        target.fetch(
+            repo,
+            true,
+            &[format!("+{shared}:{cached}")],
+            &cached,
+            false,
             creds,
         )?;
         if git::run(Some(repo), &["rev-parse", &cached])?.trim()
@@ -425,20 +422,24 @@ fn publish_board(
     }
     let commit = export(repo, key, board, previous.as_deref())?;
     target.guard(repo)?;
-    git::run_unattended(
-        Some(repo),
+    target.run(
+        repo,
         &[
             "push",
             &format!(
                 "--force-with-lease={shared}:{}",
                 previous.as_deref().unwrap_or("")
             ),
-            &target.name,
+            "--",
+            target.push_url(),
             &format!("{commit}:{shared}"),
         ],
         creds,
     )?;
-    git::run(Some(repo), &["update-ref", &cached, &commit])?;
+    let old_cache = target
+        .fetched(&cached)?
+        .unwrap_or_else(|| "0".repeat(commit.len()));
+    git::run(Some(repo), &["update-ref", &cached, &commit, &old_cache])?;
     Ok(())
 }
 fn fetch_board(
@@ -449,18 +450,18 @@ fn fetch_board(
 ) -> Result<Board, String> {
     target.guard(repo)?;
     let cached = cached_ref(key, target);
-    git::run_unattended(
-        Some(repo),
-        &[
-            "fetch",
-            "--no-tags",
-            "--no-write-fetch-head",
-            &target.name,
-            &format!("+{}:{cached}", shared_ref(key)),
-        ],
+    target.fetch(
+        repo,
+        false,
+        &[format!("+{}:{cached}", shared_ref(key))],
+        &cached,
+        false,
         creds,
     )?;
-    imported(repo, &oid(repo, &cached)?)
+    let commit = target
+        .fetched(&cached)?
+        .ok_or("Shared storyboard was not fetched")?;
+    imported(repo, &commit)
 }
 impl RepoTab {
     pub(in crate::repo) fn refresh_storyboard(&mut self, ctx: &egui::Context) {

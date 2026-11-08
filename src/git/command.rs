@@ -3,6 +3,8 @@
 //! environment.
 
 pub(super) mod bounded;
+mod source;
+pub use source::CommandSource;
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -128,6 +130,7 @@ pub(super) struct Extra {
     stdout_file: Option<PathBuf>,
     pre: Vec<&'static str>,
     env: Vec<(&'static str, String)>,
+    unset: Vec<&'static str>,
     /// What git reads on its input; nothing when `None`.
     stdin: Option<Vec<u8>>,
     /// It may take minutes (a large bundle): on another machine, run where that is allowed.
@@ -148,6 +151,9 @@ const TOOL_FOR: std::time::Duration = std::time::Duration::from_secs(12 * 3600);
 /// Runs git with `args` in `dir` (on whichever machine it is), `extra` before them.
 fn execute(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Result<Ran, String> {
     let _timer = super::backend::CliTimer::new(args);
+    let mut extra = extra.clone();
+    let _source = source::bind(&mut extra, dir, args)?;
+    let extra = &extra;
     if let Some(target) = dir.and_then(remote::parse) {
         let result = execute_there(&target, extra, args);
         if let Ok(out) = &result {
@@ -203,6 +209,9 @@ pub(super) fn local_command(dir: Option<&Path>, extra: &Extra, args: &[&str]) ->
         cmd.arg("-C").arg(dir);
     }
     cmd.args(&extra.pre);
+    for name in &extra.unset {
+        cmd.env_remove(name);
+    }
     for (name, value) in &extra.env {
         cmd.env(name, value);
     }
@@ -232,7 +241,11 @@ pub(super) fn remote_request(target: &Target, extra: &Extra, args: &[&str]) -> r
             .map(|(n, v)| ((*n).to_owned(), (*v).to_owned()))
             .chain(extra.env.iter().map(|(n, v)| ((*n).to_owned(), v.clone())))
             .collect(),
-        unset: GIT_ENV_REMOVED.iter().map(|n| (*n).to_owned()).collect(),
+        unset: GIT_ENV_REMOVED
+            .iter()
+            .chain(&extra.unset)
+            .map(|n| (*n).to_owned())
+            .collect(),
         stdin: extra.stdin.clone(),
         // A tool stays open as long as the user works in it, apart from ordinary git reads.
         long: extra.tool || extra.long || goes_over_network(args),

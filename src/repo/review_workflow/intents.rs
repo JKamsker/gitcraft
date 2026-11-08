@@ -430,37 +430,35 @@ impl RepoTab {
                         seen.card.created = now();
                         save(&repo, &reference, &seen.card)?;
                     }
-                    Act::Sync(remote) => {
+                    Act::Sync(_) => {
                         let target = target.as_ref().ok_or("No captured sharing destination")?;
-                        target.guard(&repo)?;
                         let cache_key = target.cache_key();
-                        let destination = format!("refs/gitcraft/intent-remotes/{cache_key}");
-                        git::run_unattended(
-                            Some(&repo),
-                            &[
-                                "fetch",
-                                "--no-tags",
-                                "--no-write-fetch-head",
-                                "--prune",
-                                &remote,
-                                &format!("+{ROOT}*:{destination}/*"),
-                            ],
+                        let destination = format!("refs/gitcraft/intent-remotes/{cache_key}/");
+                        target.fetch(
+                            &repo,
+                            false,
+                            &[format!("+{ROOT}*:{destination}*")],
+                            &destination,
+                            true,
                             creds.as_ref(),
                         )?;
                         active_source = Some(cache_key);
                     }
-                    Act::Publish(remote) => {
-                        target
-                            .as_ref()
-                            .ok_or("No captured sharing destination")?
-                            .guard(&repo)?;
+                    Act::Publish(_) => {
+                        let target = target.as_ref().ok_or("No captured sharing destination")?;
                         let (_, email) = identity(&repo)?;
-                        let mine = format!("{ROOT}{:x}", md5::compute(email));
-                        git::run_unattended(
-                            Some(&repo),
-                            &["push", &remote, &format!("{mine}/*:{mine}/*")],
-                            creds.as_ref(),
-                        )?;
+                        let mine = format!("{ROOT}{:x}/", md5::compute(email));
+                        let refs = target.source_refs(&mine)?;
+                        if refs.is_empty() {
+                            return Err("No local intents to publish".into());
+                        }
+                        let specs: Vec<_> = refs
+                            .iter()
+                            .map(|(reference, oid)| format!("{oid}:{reference}"))
+                            .collect();
+                        let mut args = vec!["push", "--", target.push_url()];
+                        args.extend(specs.iter().map(String::as_str));
+                        target.run(&repo, &args, creds.as_ref())?;
                     }
                     Act::Read => {}
                 }
