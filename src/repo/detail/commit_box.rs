@@ -110,7 +110,7 @@ impl RepoTab {
             ui.label(
                 RichText::new(crate::i18n::message(
                     "repo-core-0898",
-                    &[("len", format!("{}", len).into())],
+                    &[("len", (len).into())],
                 ))
                 .color(t.warning)
                 .small(),

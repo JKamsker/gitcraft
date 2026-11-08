@@ -198,7 +198,7 @@ pub(in crate::repo) fn document(diff: &RichDiff, t: &Tokens) -> Document {
                                     "repo-core-2234",
                                     &[
                                         ("side", format!("{}", side).into()),
-                                        ("files", format!("{}", files).into()),
+                                        ("files", (files).into()),
                                     ],
                                 ),
                                 t.text,

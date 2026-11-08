@@ -1,5 +1,3 @@
-# Repository core presentation. Machine identifiers and Git arguments remain literal.
-
 repo-core-0006 = { $current } mit { $name } zusammenführen
 repo-core-0011 = { $current } auf { $name } vorspulen
 repo-core-0013 = { $current } auf { $name } rebasen
@@ -133,23 +131,23 @@ repo-core-0156 = { $pattern } steht in .gitignore, aber { $path } wird weiterhin
 repo-core-0162 = { $pattern } zu .gitignore hinzugefügt
 repo-core-0163 = { $pattern } stand bereits in .gitignore
 repo-core-0164 = { $verb ->
-        [Stage] { $n ->
-        [one] { $n } Zeile von { $path } bereitstellen
-       *[other] { $n } Zeilen von { $path } bereitstellen
-    }
-        [Unstage] { $n ->
-        [one] { $n } Zeile von { $path } aus der Bereitstellung nehmen
-       *[other] { $n } Zeilen von { $path } aus der Bereitstellung nehmen
-    }
-        [Discard] { $n ->
-        [one] { $n } Zeile von { $path } verwerfen
-       *[other] { $n } Zeilen von { $path } verwerfen
-    }
-       *[Revert] { $n ->
-        [one] { $n } Zeile von { $path } rückgängig machen
-       *[other] { $n } Zeilen von { $path } rückgängig machen
-    }
-    }
+                [Stage] { $n ->
+                [one] { $n } Zeile von { $path } bereitstellen
+               *[other] { $n } Zeilen von { $path } bereitstellen
+            }
+                [Unstage] { $n ->
+                [one] { $n } Zeile von { $path } aus der Bereitstellung nehmen
+               *[other] { $n } Zeilen von { $path } aus der Bereitstellung nehmen
+            }
+                [Discard] { $n ->
+                [one] { $n } Zeile von { $path } verwerfen
+               *[other] { $n } Zeilen von { $path } verwerfen
+            }
+               *[Revert] { $n ->
+                [one] { $n } Zeile von { $path } rückgängig machen
+               *[other] { $n } Zeilen von { $path } rückgängig machen
+            }
+            }
 repo-core-0166 = { $label } wird vorbereitet
 repo-core-0167 = Änderungen neu geladen; wählen Sie den Hunk vor dem Anwenden erneut aus.
 repo-core-0169 = { $label }: nicht ausgeführt
@@ -161,7 +159,7 @@ repo-core-0176 = Mergiraf konnte die Konflikte in { $path } nicht lösen
 repo-core-0177 = Mergiraf hat alle Konflikte in { $path } gelöst: Ergebnis prüfen und speichern
 repo-core-0178 = Mergiraf hat { $solved } von { $before } Konflikten in { $path } gelöst; { $left } verbleibende Entscheidungen
 repo-core-0179 = Als gelöst markieren
-repo-core-0180 = { $file } gespeichert, aber nicht als gelöst markiert
+repo-core-0180 = { $files } gespeichert, aber nicht als gelöst markiert
 repo-core-0182 = { $left }: { $busy } lief noch. Versuchen Sie es erneut, sobald der Vorgang abgeschlossen ist.
 repo-core-0191 = { $editor } konnte nicht gestartet werden: { $e }
 repo-core-0197 = Urheberschaft von { $branch } wird ermittelt…
@@ -193,7 +191,10 @@ repo-core-0241 = in { $base } gemergt
 repo-core-0242 = Commits sind in { $base } enthalten (durch Rebase oder Cherry-Pick)
 repo-core-0243 = #{ $n } hat den Branch in { $base } gemergt
 repo-core-0244 = auf dem Remote gelöscht
-repo-core-0245 = seit { $days } Tagen kein Commit
+repo-core-0245 = { $days ->
+            [one] seit { $days } Tag kein Commit
+           *[other] seit { $days } Tagen kein Commit
+        }
 repo-core-0246 = Gemergte Branches konnten nicht ermittelt werden ({ $e }). Es werden nur Branches angezeigt, die auf ihrem Remote gelöscht wurden.
 repo-core-0250 = Pfad
 repo-core-0251 = Baum
@@ -203,7 +204,7 @@ repo-core-0261 = Git-Bundle
 repo-core-0263 = Bundle-Refs lesen: { $e }
 repo-core-0264 = Bundle prüfen: { $e }
 repo-core-0265 = Bundle auf diesem Rechner speichern (neue Datei wählen)
-repo-core-0267 = Bundle nach { $file } exportieren
+repo-core-0267 = Bundle nach { $files } exportieren
 repo-core-0269 = { $label }: abgeschlossen
 repo-core-0270 = { $label } fehlgeschlagen: { $e }
 repo-core-0278 = Erster Commit erstellt
@@ -214,9 +215,9 @@ repo-core-0284 = öffnet die Builds
 repo-core-0285 = CI: { $state }
 repo-core-0286 = CI: { $tally }
 repo-core-0287 = { "" }
-    … und { $len } weitere
+            … und { $len } weitere
 repo-core-0288 = { "" }
-    Für Details klicken
+            Für Details klicken
 repo-core-0289 = bestanden
 repo-core-0290 = fehlgeschlagen
 repo-core-0291 = läuft
@@ -242,7 +243,10 @@ repo-core-0311 = Zugehöriger Spiegel wird geklont, umgeschrieben und geprüft�
 repo-core-0312 = Bereinigung abbrechen
 repo-core-0313 = Umgeschriebener Spiegel: { $report }
 repo-core-0314 = Pfad des umgeschriebenen Repositorys kopieren
-repo-core-0315 = { $count } geänderte Refs (alt → neu; ∅ bedeutet nicht vorhanden)
+repo-core-0315 = { $count ->
+            [one] { $count } geänderter Ref (alt → neu; ∅ bedeutet nicht vorhanden)
+           *[other] { $count } geänderte Refs (alt → neu; ∅ bedeutet nicht vorhanden)
+        }
 repo-core-0316 = Verwaltetes filter-repo-Ergebnis
 repo-core-0317 = Prüfen Sie commit-map/ref-map von filter-repo im Spiegel. Integritätsprüfungen und wörtliche Blob-Prüfungen sind begrenzt und beweisen nicht, dass alle Geheimnisse entfernt wurden. Restprüfungen sind auf 20000 erreichbare Objekte, 4 MiB pro Blob und insgesamt 16 MiB begrenzt; übersprungene Binär-Blobs und überschrittene Grenzen bleiben ungeprüft. Prüfen Sie die gewünschte History und alle fehlgeschlagenen Prüfungen selbst.
 repo-core-0318 = Gesonderter Veröffentlichungsschritt — dieser Assistent schreibt auf kein Remote.
@@ -259,7 +263,10 @@ repo-core-0329 = { $count } geeignete Commits; { $skipped } Massen-/generierte/n
 repo-core-0330 = ; Stichprobe ist unvollständig
 repo-core-0331 = { $companion } wird meist zusammen mit { $source } geändert ({ $count }/{ $source-changes } Quelländerungen, { $source-changes2 } %) — keine Arbeits- oder vorgemerkte Änderung vorhanden
 repo-core-0332 = Verwerfen
-repo-core-0333 = Beleg: { $count } gemeinsame Commits
+repo-core-0333 = { $count ->
+            [one] Beleg: { $count } gemeinsamer Commit
+           *[other] Beleg: { $count } gemeinsame Commits
+        }
 repo-core-0334 = Diesen früheren Commit öffnen, um beide Dateiänderungen zu prüfen
 repo-core-0335 = Keine geeigneten unverdeckten Begleitdatei-Hinweise für die vorgemerkten Pfade.
 repo-core-0336 = Verworfene Hinweise wiederherstellen
@@ -302,13 +309,16 @@ repo-core-0416 = { $hash } kann nicht gelesen werden
 repo-core-0425 = Die Suche nach dem Ursprung benötigt ein neueres Git: 2.38 für Merge, 2.40 für Rebase, Cherry-Pick oder Revert (merge-tree --write-tree)
 repo-core-0426 = Der Test-Merge ist fehlgeschlagen: { $e }
 repo-core-0432 = { "" }
-    … { $MAX-PATCH-LINES } weitere Zeilen ausgeblendet
+            … { $MAX-PATCH-LINES } weitere Zeilen ausgeblendet
 repo-core-0433 = Die Commits haben sich inzwischen geändert
 repo-core-0436 = Commits beider Seiten werden gelesen…
 repo-core-0437 = Erneut versuchen
 repo-core-0438 = Merges werden getestet…
 repo-core-0439 = Bisher 1 Test-Merge…
-repo-core-0440 = Bisher { $n } Test-Merges…
+repo-core-0440 = { $n ->
+            [one] Bisher { $n } Test-Merge…
+           *[other] Bisher { $n } Test-Merges…
+        }
 repo-core-0441 = History beider Seiten ein-/ausblenden
 repo-core-0442 = WIE DIESER KONFLIKT ENTSTAND
 repo-core-0443 = Abbrechen
@@ -317,7 +327,10 @@ repo-core-0445 = Ursprung finden
 repo-core-0446 = Das erste Commit-Paar finden, eines pro Seite, dessen Merge in dieser Datei bereits Konflikte verursacht. Jeder Test-Merge erfolgt mit git merge-tree: Dateien und Index bleiben unverändert.
 repo-core-0447 = Zuerst werden die Commits beider Seiten gelesen
 repo-core-0448 = 1 Commit
-repo-core-0449 = { $n } Commits
+repo-core-0449 = { $n ->
+            [one] { $n } Commit
+           *[other] { $n } Commits
+        }
 repo-core-0450 = { $name } · { $count } in dieser Datei
 repo-core-0451 = Seit der Trennung hat kein Commit dieser Seite die Datei geändert.
 repo-core-0454 = ⚑ Ursprung des Konflikts
@@ -344,16 +357,22 @@ repo-core-0480 = keine Ausgabe
 repo-core-0481 = Test „{ $command }“ schlägt fehl: { $last }
 repo-core-0482 = Test „{ $command }“ konnte nicht ausgeführt werden: { $e }
 repo-core-0483 = Entscheidung behalten
-repo-core-0484 = { $n } Entscheidungen behalten
+repo-core-0484 = { $n ->
+            [one] { $n } Entscheidung behalten
+           *[other] { $n } Entscheidungen behalten
+        }
 repo-core-0485 = { $others-conflicted ->
-        [one]  ({ $others-conflicted } weitere Datei hatte noch Konflikte )
-       *[other]  ({ $others-conflicted } weitere Dateien hatten noch Konflikte )
-    }
+                [one]  ({ $others-conflicted } weitere Datei hatte noch Konflikte )
+               *[other]  ({ $others-conflicted } weitere Dateien hatten noch Konflikte )
+            }
 repo-core-0486 = { $Fetching } von Konfliktentscheidungen mit { $remote }…
 repo-core-0487 = Senden
 repo-core-0488 = Abrufen
 repo-core-0489 = Frühere Entscheidung angewendet: prüfen und speichern
-repo-core-0490 = { $n } frühere Entscheidungen angewendet: prüfen und speichern
+repo-core-0490 = { $n ->
+            [one] { $n } frühere Entscheidung angewendet: prüfen und speichern
+           *[other] { $n } frühere Entscheidungen angewendet: prüfen und speichern
+        }
 repo-core-0491 = Entscheidungen behalten; Tests laufen…
 repo-core-0492 = Konfliktentscheidungen an { $remote } senden
 repo-core-0493 = Konfliktentscheidungen von { $remote } abrufen
@@ -365,13 +384,16 @@ repo-core-0510 = Entscheidung konnte nicht gespeichert werden: { $e }
 repo-core-0515 = Konfliktentscheidungen von { $remote } konnten nicht abgerufen werden: { $e }
 repo-core-0517 = Keine neueren Konfliktentscheidungen auf { $remote }
 repo-core-0518 = 1 neuere Konfliktentscheidung von { $remote } übernommen
-repo-core-0519 = { $n } neuere Konfliktentscheidungen von { $remote } übernommen
+repo-core-0519 = { $n ->
+            [one] { $n } neuere Konfliktentscheidung von { $remote } übernommen
+           *[other] { $n } neuere Konfliktentscheidungen von { $remote } übernommen
+        }
 repo-core-0520 = { $got }; keine Konfliktentscheidungen zum Senden
 repo-core-0522 = { $got }, aber Senden an { $remote } fehlgeschlagen: { $e }
 repo-core-0523 = { $count ->
-        [one] { $got }; { $count } Konfliktentscheidung an { $remote } gesendet
-       *[other] { $got }; { $count } Konfliktentscheidungen an { $remote } gesendet
-    }
+                [one] { $got }; { $count } Konfliktentscheidung an { $remote } gesendet
+               *[other] { $got }; { $count } Konfliktentscheidungen an { $remote } gesendet
+            }
 repo-core-0524 = Test „{ $test }“ bestand { $at }
 repo-core-0525 = Test „{ $test }“ schlug fehl { $at }
 repo-core-0526 = Test „{ $test }“: noch nicht ausgeführt
@@ -388,7 +410,7 @@ repo-core-0538 = Notiz und Test behalten
 repo-core-0539 = Begründung und Test für diese Lösung übernehmen: beim Speichern behalten und auf Wunsch den Test ausführen
 repo-core-0540 = Änderungen in der Umgebung
 repo-core-0541 = { "  " }⋯ der Konflikt ⋯
-    { "" }
+            { "" }
 repo-core-0543 = Damals
 repo-core-0544 = Jetzt
 repo-core-0546 = Begründung notieren…
@@ -404,10 +426,10 @@ repo-core-0556 = Wird beim Speichern mit der Lösung in Git behalten.
 repo-core-0557 = Fertig
 repo-core-0558 = Nach dem Speichern testen
 repo-core-0559 = Führt die angegebenen Tests nach dem Speichern der Datei im Repository-Ordner aus:
-    { $n }
-    Das Ergebnis wird mit der jeweiligen Entscheidung behalten.
+            { $n }
+            Das Ergebnis wird mit der jeweiligen Entscheidung behalten.
 repo-core-0569 = kein freier Name für { $path }: { $tag } und 99 weitere sind belegt
-repo-core-0571 = { $file } konnte nicht geprüft werden: { $e }
+repo-core-0571 = { $files } konnte nicht geprüft werden: { $e }
 repo-core-0573 = { $who } hat { $path } gelöscht, daher gibt es nur eine Version. Zum Behalten „Als gelöst markieren“ verwenden; zum Entfernen die Datei löschen und dann „Als gelöst markieren“ wählen
 repo-core-0574 = { $path } von { $who } ist ein symbolischer Link, keine Datei
 repo-core-0575 = { $path } von { $who } ist ein Submodul, keine Datei
@@ -439,42 +461,42 @@ repo-core-0606 = Verweise auf { $name } (Code, Stylesheets, Szenen, Dokumentatio
 repo-core-0607 = Eine .gitignore nennt diese Datei: Sie erscheint nicht in der Änderungsliste; „Beide vormerken“ fügt sie trotzdem hinzu
 repo-core-0608 = { $version } ist bereits vorhanden, daher ist dieser Name nicht möglich
 repo-core-0609 = { $k ->
-        [one] { $k } Zeile
-       *[other] { $k } Zeilen
-    }
+                [one] { $k } Zeile
+               *[other] { $k } Zeilen
+            }
 repo-core-0610 = unverändert
 repo-core-0611 = { $r ->
-        [one] die einzige Zeile gelöscht
-       *[other] alle { $r } Zeilen gelöscht
-    }
+                [one] die einzige Zeile gelöscht
+               *[other] alle { $r } Zeilen gelöscht
+            }
 repo-core-0612 = { $r ->
-        [one] { $r } Zeile gelöscht
-       *[other] { $r } Zeilen gelöscht
-    }
+                [one] { $r } Zeile gelöscht
+               *[other] { $r } Zeilen gelöscht
+            }
 repo-core-0613 = { $a ->
-        [one] { $a } Zeile eingefügt
-       *[other] { $a } Zeilen eingefügt
-    }
+                [one] { $a } Zeile eingefügt
+               *[other] { $a } Zeilen eingefügt
+            }
 repo-core-0614 = { $r ->
-        [one] { $a ->
-        [one] die einzige Zeile durch { $a } Zeile ersetzt
-       *[other] die einzige Zeile durch { $a } Zeilen ersetzt
-    }
-       *[other] { $a ->
-        [one] alle { $r } Zeilen durch { $a } Zeile ersetzt
-       *[other] alle { $r } Zeilen durch { $a } Zeilen ersetzt
-    }
-    }
+                [one] { $a ->
+                [one] die einzige Zeile durch { $a } Zeile ersetzt
+               *[other] die einzige Zeile durch { $a } Zeilen ersetzt
+            }
+               *[other] { $a ->
+                [one] alle { $r } Zeilen durch { $a } Zeile ersetzt
+               *[other] alle { $r } Zeilen durch { $a } Zeilen ersetzt
+            }
+            }
 repo-core-0615 = { $a ->
-        [one] { $r ->
-        [one] { $a } Zeile eingefügt, { $r } Zeile gelöscht
-       *[other] { $a } Zeile eingefügt, { $r } Zeilen gelöscht
-    }
-       *[other] { $r ->
-        [one] { $a } Zeilen eingefügt, { $r } Zeile gelöscht
-       *[other] { $a } Zeilen eingefügt, { $r } Zeilen gelöscht
-    }
-    }
+                [one] { $r ->
+                [one] { $a } Zeile eingefügt, { $r } Zeile gelöscht
+               *[other] { $a } Zeile eingefügt, { $r } Zeilen gelöscht
+            }
+               *[other] { $r ->
+                [one] { $a } Zeilen eingefügt, { $r } Zeile gelöscht
+               *[other] { $a } Zeilen eingefügt, { $r } Zeilen gelöscht
+            }
+            }
 repo-core-0616 = dieser Konflikt stimmt nicht mit dem aus dem Index rekonstruierten überein (die Datei wurde möglicherweise inzwischen bearbeitet oder mit hier nicht wiederholbaren Optionen oder Merge-Treibern gemergt)
 repo-core-0617 = Index konnte nicht gelesen werden: { $e }
 repo-core-0618 = Der Index führt diese Datei nicht mehr als Konflikt
@@ -577,36 +599,42 @@ repo-core-0769 = konfliktfrei anwendbar
 repo-core-0770 = Konflikte in { $len }
 repo-core-0771 = möglicher Konflikt
 repo-core-0772 = 1 Datei
-repo-core-0773 = { $n } Dateien
+repo-core-0773 = { $n ->
+            [one] { $n } Datei
+           *[other] { $n } Dateien
+        }
 repo-core-0774 = Konflikte werden geprüft; nichts im Repository wird geändert
 repo-core-0775 = Konflikte konnten nicht geprüft werden: { $e }
 repo-core-0776 = { "" }
-    { "" }
-    Nicht committete Änderungen gehören nicht zur Prüfung; Git kann den Start verweigern, wenn sie diese Dateien betreffen
+            { "" }
+            Nicht committete Änderungen gehören nicht zur Prüfung; Git kann den Start verweigern, wenn sie diese Dateien betreffen
 repo-core-0777 = Die Änderungen sind bereits im aktuellen Branch: Git würde mit einem leeren Cherry-Pick anhalten
 repo-core-0778 = Bereits gemergt: Es gibt nichts zu übernehmen
 repo-core-0779 = Der Commit lässt sich anwenden
-repo-core-0780 = Alle { $commits } Commits sind anwendbar
+repo-core-0780 = { $commits ->
+        [one] { $commits } Commit ist anwendbar
+       *[other] Alle { $commits } Commits sind anwendbar
+    }
 repo-core-0781 = { $all } ohne Konflikte
 repo-core-0782 = Keine Konflikte
 repo-core-0783 = Keine Konflikte gefunden, aber ein Konflikt ist möglich: { $why }
 repo-core-0784 = Commit { $index } von { $commits }, { $hash } „{ $summary }“, verursacht Konflikte in { $len }:
 repo-core-0785 = Konflikte in { $len }:
 repo-core-0786 = { "" }
-    { "" }
-    Nachfolgende Commits werden nicht geprüft: Sie hängen von dieser Konfliktlösung ab.
+            { "" }
+            Nachfolgende Commits werden nicht geprüft: Sie hängen von dieser Konfliktlösung ab.
 repo-core-0787 = { "" }
-    { "" }
-    Mergiraf ist installiert, konnte aber die unterstützten Dateitypen nicht auflisten: { $e }
+            { "" }
+            Mergiraf ist installiert, konnte aber die unterstützten Dateitypen nicht auflisten: { $e }
 repo-core-0788 = { "" }
-    { "" }
-    Mergiraf kann viele Textkonflikte lösen: Installation unter Einstellungen → Git → Mergiraf.
+            { "" }
+            Mergiraf kann viele Textkonflikte lösen: Installation unter Einstellungen → Git → Mergiraf.
 repo-core-0789 = Mergiraf kann ihn wahrscheinlich lösen
 repo-core-0790 = ein Mergiraf unbekannter Dateityp
 repo-core-0791 = { $kinds }: von Hand lösen
 repo-core-0792 = Textkonflikt
 repo-core-0794 = { "" }
-    …und { $LISTED } weitere
+            …und { $LISTED } weitere
 repo-core-0796 = Dieser Commit ist bereits ausgecheckt
 repo-core-0797 = Ein anderer Vorgang läuft
 repo-core-0798 = Konflikte mit
@@ -676,14 +704,17 @@ repo-core-0894 = Letzten Commit ändern
 repo-core-0895 = Letzten Commit mit den vorgemerkten Änderungen und dieser Nachricht umschreiben
 repo-core-0896 = Dieser Commit wurde bereits gepusht: Eine Änderung schreibt gemeinsame History um.
 repo-core-0897 = Der Commit behält seine Nachricht: Nach Abschluss umformulieren.
-repo-core-0898 = Zusammenfassung hat { $len } Zeichen; 50–72 sind gut lesbar
+repo-core-0898 = { $len ->
+            [one] Zusammenfassung hat { $len } Zeichen; 50–72 sind gut lesbar
+           *[other] Zusammenfassung hat { $len } Zeichen; 50–72 sind gut lesbar
+        }
 repo-core-0899 = Hooks überspringen
 repo-core-0900 = Einmal ohne pre-commit- und commit-msg-Hooks committen (git commit --no-verify); die Auswahl wird nach dem Commit zurückgesetzt
 repo-core-0901 = Stack-Neuaufbau fortsetzen
 repo-core-0902 = { $staged ->
-        [one] { $staged } Datei committen
-       *[other] { $staged } Dateien committen
-    }
+                [one] { $staged } Datei committen
+               *[other] { $staged } Dateien committen
+            }
 repo-core-0903 = Alle vormerken und committen
 repo-core-0904 = Zuerst die Nachricht bearbeiten: Sie ist noch die Vorlage
 repo-core-0905 = dieses Repository
@@ -707,9 +738,9 @@ repo-core-0929 = Merge-Basis{ " " }
 repo-core-0930 = Von
 repo-core-0931 = Nach
 repo-core-0932 = { $n ->
-        [one] { $n } Commit
-       *[other] { $n } Commits
-    }
+                [one] { $n } Commit
+               *[other] { $n } Commits
+            }
 repo-core-0933 = Gleiche History
 repo-core-0934 = { $other } ist { $a } voraus
 repo-core-0935 = { $other } ist { $b } zurück
@@ -721,9 +752,9 @@ repo-core-0942 = Mitautor hinzufügen
 repo-core-0943 = Name oder E-Mail; Enter fügt den ersten Treffer hinzu
 repo-core-0944 = Kein weiterer passender Autor
 repo-core-0945 = { $commits ->
-        [one] { $commits } Commit
-       *[other] { $commits } Commits
-    }
+                [one] { $commits } Commit
+               *[other] { $commits } Commits
+            }
 repo-core-0946 = Die Nachricht wurde beim Hinzufügen des Mitautors geändert: Erneut hinzufügen
 repo-core-0950 = ↑ ↓ zum Auswählen, Tab zum Vervollständigen, Esc zum Schließen
 repo-core-0957 = Das Muster ist leer
@@ -806,8 +837,8 @@ repo-core-1055 = Führt den prepare-commit-msg-Hook des Repositorys für die Nac
 repo-core-1056 = Dieses Repository
 repo-core-1057 = Alle Repositorys
 repo-core-1058 = Ersetzt die Nachricht (Rückgängig stellt sie wieder her) durch:
-    { "" }
-    { $text }
+            { "" }
+            { $text }
 repo-core-1059 = Vorlage { $name } löschen
 repo-core-1060 = Diese Nachricht als Vorlage speichern
 repo-core-1061 = Name
@@ -821,13 +852,13 @@ repo-core-1068 = Erneut suchen
 repo-core-1069 = Spätere Commits werden nach diesem Hash durchsucht…
 repo-core-1070 = kein späterer Commit erwähnt ihn
 repo-core-1071 = { $explicit ->
-        [one] { $explicit } Link
-       *[other] { $explicit } Links
-    }
+                [one] { $explicit } Link
+               *[other] { $explicit } Links
+            }
 repo-core-1072 = { $bare ->
-        [one] { $bare } Erwähnung
-       *[other] { $bare } Erwähnungen
-    }
+                [one] { $bare } Erwähnung
+               *[other] { $bare } Erwähnungen
+            }
 repo-core-1073 = { $text } · nur die { $BACKLINK-CAP } neuesten
 repo-core-1074 = Kein späterer Commit erwähnt den Hash: kein Revert, Cherry-Pick, Fixes:-Trailer oder einfache Erwähnung.
 repo-core-1075 = Verknüpfungen
@@ -835,10 +866,10 @@ repo-core-1076 = Erwähnungen
 repo-core-1077 = Nur die { $BACKLINK-CAP } neuesten werden aufgelistet.
 repo-core-1079 = Änderungen in { $hash } öffnen: { $subject }
 repo-core-1080 = { $hash } · { $author } · { $date }
-    { "" }
-    { $text }
-    { "" }
-    Klicken, um Änderungen und Diff dieses Commits zu öffnen
+            { "" }
+            { $text }
+            { "" }
+            Klicken, um Änderungen und Diff dieses Commits zu öffnen
 repo-core-1081 = Lesen fehlgeschlagen
 repo-core-1082 = Enthalten in
 repo-core-1083 = Erneut lesen
@@ -857,9 +888,9 @@ repo-core-1097 = Kein Branch enthält ihn, nur Tags.
 repo-core-1098 = Kein Branch oder Tag enthält ihn. Git kann ihn bei der Bereinigung löschen; zum Behalten einen Branch erstellen.
 repo-core-1099 = und { $hidden } weitere
 repo-core-1100 = { $Push ->
-        [Fetch] Notizen „{ $namespace }“ von { $remote } abrufen
-       *[Push] Notizen „{ $namespace }“ nach { $remote } pushen
-    }
+                [Fetch] Notizen „{ $namespace }“ von { $remote } abrufen
+               *[Push] Notizen „{ $namespace }“ nach { $remote } pushen
+            }
 repo-core-1101 = von
 repo-core-1102 = an
 repo-core-1103 = keine in { $namespace }
@@ -898,19 +929,22 @@ repo-core-1142 = Hauptschlüssel
 repo-core-1143 = Git lieferte keine Ausgabe.
 repo-core-1144 = Git-Ausgabe
 repo-core-1146 = { $count ->
-        [one] { $count } Datei geändert
-       *[other] { $count } Dateien geändert
-    }
+                [one] { $count } Datei geändert
+               *[other] { $count } Dateien geändert
+            }
 repo-core-1149 = Leeren
 repo-core-1150 = Stashen…
 repo-core-1151 = Nur ausgewählte Dateien stashen
 repo-core-1152 = Auf den Abschluss des aktuellen Vorgangs warten
 repo-core-1153 = { $n ->
-        [one] { $n } Datei für den Stash gewählt
-       *[other] { $n } Dateien für den Stash gewählt
-    }
+                [one] { $n } Datei für den Stash gewählt
+               *[other] { $n } Dateien für den Stash gewählt
+            }
 repo-core-1154 = Diese Datei stashen…
-repo-core-1155 = Die { $count } ausgewählten Dateien stashen…
+repo-core-1155 = { $count ->
+            [one] Die ausgewählte Datei stashen…
+           *[other] Die { $count } ausgewählten Dateien stashen…
+        }
 repo-core-1156 = Auswahl aufheben (nicht stashen)
 repo-core-1157 = Zum Stashen auswählen ({ $command }+Klick)
 repo-core-1159 = Vor der Ausführung abgebrochen
@@ -1000,11 +1034,17 @@ repo-core-1262 = Ref kopieren
 repo-core-1263 = Stoppen
 repo-core-1264 = Private Quarantäne und begrenzte Pack-Verifizierung auf dem Repository-Rechner erlauben
 repo-core-1265 = Vollständiges Pack verifizieren
-repo-core-1266 = { $count } neue Refs unter refs/bundle-import/{ $prefix }/ erstellen
+repo-core-1266 = { $count ->
+            [one] { $count } neuen Ref unter refs/bundle-import/{ $prefix }/ erstellen
+           *[other] { $count } neue Refs unter refs/bundle-import/{ $prefix }/ erstellen
+        }
 repo-core-1267 = Erneut verifizieren und ausgewählte Refs importieren
 repo-core-1268 = Schließen und Repository aktualisieren
 repo-core-1269 = 1 Branch
-repo-core-1270 = { $count } Branches
+repo-core-1270 = { $count ->
+            [one] { $count } Branch
+           *[other] { $count } Branches
+        }
 repo-core-1271 = { $count } löschen ({ $n } auch auf { $remotes })
 repo-core-1272 = { $count } löschen
 repo-core-1273 = Veraltete oder gemergte Branches auswählen
@@ -1046,14 +1086,20 @@ repo-core-1314 = Als Fixup committen
 repo-core-1315 = Einarbeiten
 repo-core-1316 = Dies ist der letzte Commit: Kein anderer Commit wird umgeschrieben.
 repo-core-1317 = Der nachfolgende Commit auf { $branch } wird ebenfalls umgeschrieben:
-repo-core-1318 = Die { $n } nachfolgenden Commits auf { $branch } werden ebenfalls umgeschrieben:
+repo-core-1318 = { $n ->
+        [one] Der nachfolgende Commit auf { $branch } wird ebenfalls umgeschrieben:
+       *[other] Die { $n } nachfolgenden Commits auf { $branch } werden ebenfalls umgeschrieben:
+    }
 repo-core-1319 = … und { $LISTED } ältere
 repo-core-1320 = Dieser Commit wurde bereits gepusht
-repo-core-1321 = Alle { $total } Commits wurden bereits gepusht
-repo-core-1322 = { $n ->
-        [one] { $n } dieser Commits wurde bereits gepusht
-       *[other] { $n } dieser Commits wurden bereits gepusht
+repo-core-1321 = { $total ->
+        [one] { $total } Commit wurde bereits gepusht
+       *[other] Alle { $total } Commits wurden bereits gepusht
     }
+repo-core-1322 = { $n ->
+                [one] { $n } dieser Commits wurde bereits gepusht
+               *[other] { $n } dieser Commits wurden bereits gepusht
+            }
 repo-core-1323 = wurde
 repo-core-1324 = wurden
 repo-core-1325 = { $what }: Das Einarbeiten schreibt gemeinsame History um; der Branch benötigt danach einen Force-Push.
@@ -1088,14 +1134,17 @@ repo-core-1356 = Zurücklassen
 repo-core-1357 = { $target } auschecken; die Commits bleiben ohne Branch
 repo-core-1358 = Mehr als { $n } hier erstellte Commits
 repo-core-1360 = Der hier erstellte Commit
-repo-core-1362 = Die { $n } hier erstellten Commits
-repo-core-1363 = { $more ->
-        [yes] Mehr als { $count } hier erstellte Commits gehören zu keinem Branch. Beim Auschecken von { $target } bleiben sie ohne sichtbaren Verweis zurück; Git bewahrt sie nur eine Zeit lang im Reflog auf.
-       *[no] { $count ->
-            [one] Der hier erstellte Commit gehört zu keinem Branch. Beim Auschecken von { $target } bleibt er ohne sichtbaren Verweis zurück; Git bewahrt ihn nur eine Zeit lang im Reflog auf.
-           *[other] Die { $count } hier erstellten Commits gehören zu keinem Branch. Beim Auschecken von { $target } bleiben sie ohne sichtbaren Verweis zurück; Git bewahrt sie nur eine Zeit lang im Reflog auf.
-        }
+repo-core-1362 = { $n ->
+        [one] Der hier erstellte Commit
+       *[other] Die { $n } hier erstellten Commits
     }
+repo-core-1363 = { $more ->
+                [yes] Mehr als { $count } hier erstellte Commits gehören zu keinem Branch. Beim Auschecken von { $target } bleiben sie ohne sichtbaren Verweis zurück; Git bewahrt sie nur eine Zeit lang im Reflog auf.
+               *[no] { $count ->
+                    [one] Der hier erstellte Commit gehört zu keinem Branch. Beim Auschecken von { $target } bleibt er ohne sichtbaren Verweis zurück; Git bewahrt ihn nur eine Zeit lang im Reflog auf.
+                   *[other] Die { $count } hier erstellten Commits gehören zu keinem Branch. Beim Auschecken von { $target } bleiben sie ohne sichtbaren Verweis zurück; Git bewahrt sie nur eine Zeit lang im Reflog auf.
+                }
+            }
 repo-core-1364 = Prüfung verknüpfter Kopien unerwartet fehlgeschlagen
 repo-core-1365 = Gleicher Code in verknüpften Kopien
 repo-core-1366 = Bis zu acht lokale, WSL- oder SSH-Repository-Pfade speichern. Die Prüfung verbindet sich mit diesen Kopien und führt Git sowie fünf feste Toolversionsbefehle aus. Gelesen werden Metadaten versionierter Dateien, sechs Git-Einstellungen und vorhandene Standard-git-test-Ergebnisse. Es werden keine Umgebungsvariablen, Zugangsdaten-Einstellungen, Remote-URLs oder Dateiinhalte angefordert.
@@ -1112,7 +1161,10 @@ repo-core-1376 = { $machine } · HEAD { $head } · gespeicherter Standard-Test: 
 repo-core-1377 = ungetestet
 repo-core-1378 = Gespeicherte Notizen können veraltet oder extern geschrieben sein; die Prüfung führt keine Tests aus und bestätigt nicht die Herkunft ihrer Befehle.
 repo-core-1379 = Zugelassene Fakten und Unterschiede
-repo-core-1380 = { $count } versionierte Pfade · Baum { $tree }
+repo-core-1380 = { $count ->
+            [one] { $count } versionierter Pfad · Baum { $tree }
+           *[other] { $count } versionierte Pfade · Baum { $tree }
+        }
 repo-core-1382 = Mögliche Unterschiede nur in Groß-/Kleinschreibung (Unicode-Kleinschreibvergleich):
 repo-core-1383 = Dateimodus-Änderungen im Arbeitsverzeichnis:
 repo-core-1384 = { $path } · Modus { $mode } · { $endings }
@@ -1145,7 +1197,10 @@ repo-core-1412 = Schlechter Commit mit dem Problem:
 repo-core-1413 = Gute Commits vor dem Problem (durch Leerzeichen getrennt):
 repo-core-1414 = Tag, Branch oder Hash
 repo-core-1415 = Der von Bisect übersprungene Commit wird nicht getestet.
-repo-core-1416 = Die { $n } von Bisect übersprungenen Commits werden nicht getestet.
+repo-core-1416 = { $n ->
+        [one] Der von Bisect übersprungene Commit wird nicht getestet.
+       *[other] Die { $n } von Bisect übersprungenen Commits werden nicht getestet.
+    }
 repo-core-1417 = Ausführen auf:
 repo-core-1418 = { $label } (Repository-Standort)
 repo-core-1420 = WSL-Distributionen werden gesucht…
@@ -1154,7 +1209,10 @@ repo-core-1422 = leer: gitcraft behält eine Kopie in ~/.cache/gitcraft/bisect
 repo-core-1423 = Fehlende Commits werden zuerst dorthin gesendet.
 repo-core-1424 = Gleichzeitig:
 repo-core-1425 = Anzahl parallel getesteter Commits, jeweils in einem eigenen Worktree
-repo-core-1426 = { $n } Kerne auf { $label }
+repo-core-1426 = { $n ->
+            [one] { $n } Kern auf { $label }
+           *[other] { $n } Kerne auf { $label }
+        }
 repo-core-1427 = Kernanzahl unbekannt
 repo-core-1428 = Kerne werden gezählt…
 repo-core-1429 = Zeitlimit:
@@ -1174,7 +1232,10 @@ repo-core-1443 = und { $more } weitere, alle nur hier
 repo-core-1444 = und { $more } weitere, davon { $n } nur hier
 repo-core-1445 = 1 hiervon umgeschriebener Commit ist
 repo-core-1446 = { $commits } hiervon umgeschriebene Commits sind
-repo-core-1447 = Bereits gepusht: { $which } auf { $upstream }; erneutes Pushen benötigt daher einen Force-Push.
+repo-core-1447 = { $commits ->
+            [one] Ein hiervon umgeschriebener Commit wurde bereits nach { $upstream } gepusht; erneutes Pushen erfordert daher einen Force-Push.
+           *[other] { $commits } hiervon umgeschriebene Commits wurden bereits nach { $upstream } gepusht; erneutes Pushen erfordert daher einen Force-Push.
+        }
 repo-core-1448 = Git-Befehle
 repo-core-1451 = { $key }+Z verschiebt den Branch zurück, nicht die nicht committeten Änderungen.
 repo-core-1452 = { $key }+Z stellt dies wieder her.
@@ -1220,9 +1281,9 @@ repo-core-1495 = Jede Änderung; die Dateien werden auf den Stand des letzten Co
 repo-core-1496 = { $command }+Klick auf Dateien in den Änderungen wählt sie aus
 repo-core-1497 = Ausgewählte Dateien
 repo-core-1498 = { $n ->
-        [one] { $n } gewählte Datei
-       *[other] { $n } gewählte Dateien
-    }
+                [one] { $n } gewählte Datei
+               *[other] { $n } gewählte Dateien
+            }
 repo-core-1499 = Nur Vorgemerktes
 repo-core-1500 = Vorgemerkte Änderungen; nicht vorgemerkte bleiben erhalten.
 repo-core-1501 = Momentaufnahme
@@ -1278,7 +1339,7 @@ repo-core-1560 = Diff-Algorithmus: Zuordnung der Zeilen beider Seiten. Für { $k
 repo-core-1561 = Diff wird mit { $label } neu gelesen; angezeigte Zeilen sind noch wie bisher zugeordnet
 repo-core-1562 = Git-Standard
 repo-core-1563 = { "" }
-    … (restlicher Text ausgeblendet)
+            … (restlicher Text ausgeblendet)
 repo-core-1564 = Vorher
 repo-core-1565 = Nachher
 repo-core-1567 = Binär
@@ -1400,7 +1461,10 @@ repo-core-1799 = Alle hier eingeklappten unveränderten Zeilen anzeigen
 repo-core-1800 = Funktion
 repo-core-1801 = Umschließende Funktion anzeigen: unveränderte Zeilen über und unter diesem Hunk
 repo-core-1802 = 1 unveränderte Zeile
-repo-core-1803 = { $hidden } unveränderte Zeilen
+repo-core-1803 = { $hidden ->
+            [one] { $hidden } unveränderte Zeile
+           *[other] { $hidden } unveränderte Zeilen
+        }
 repo-core-1807 = Einpassen
 repo-core-1808 = Bild einpassen (Doppelklick darauf)
 repo-core-1809 = Ein Bildpixel pro Bildschirmpixel
@@ -1416,7 +1480,10 @@ repo-core-1820 = { $width } × { $height }{ $scaled }
 repo-core-1821 = { $b }, gleiche Abmessungen
 repo-core-1822 = kein Pixel geändert
 repo-core-1823 = 1 Pixel geändert
-repo-core-1824 = { $n } Pixel geändert
+repo-core-1824 = { $n ->
+            [one] { $n } Pixel geändert
+           *[other] { $n } Pixel geändert
+        }
 repo-core-1825 = { NUMBER($share, minimumFractionDigits: 1, maximumFractionDigits: 1) } % der Pixel geändert
 repo-core-1830 = Bildversion { $hash }, { $summary }, { $path }
 repo-core-1832 = (keine)
@@ -1436,7 +1503,7 @@ repo-core-1866 = Notebook-Format { $major }: gitcraft liest Format 4
 repo-core-1868 = Notebook ohne Zellen
 repo-core-1881 = Fehler
 repo-core-1884 = { $at }
-    … { $more } weitere Zeilen
+            … { $more } weitere Zeilen
 repo-core-1894 = Zelle { $number } · { $status }
 repo-core-1895 = { $label } · { $label2 } · Ausführung { $execution-count }
 repo-core-1897 = Bildausgabe ({ $mime }); Pixel werden nicht durchsucht
@@ -1456,7 +1523,10 @@ repo-core-1912 = Nur Notebook-Metadaten geändert
 repo-core-1913 = Keine Zelle geändert
 repo-core-1915 = Notebook-Metadaten geändert
 repo-core-1917 = 1 unveränderte Zelle
-repo-core-1918 = { $count } unveränderte Zellen
+repo-core-1918 = { $count ->
+            [one] { $count } unveränderte Zelle
+           *[other] { $count } unveränderte Zellen
+        }
 repo-core-1919 = { $label } Zelle { $number }
 repo-core-1920 = verschoben
 repo-core-1921 = { $kind }-Zelle { $number }
@@ -1471,11 +1541,11 @@ repo-core-1935 = Traceback
 repo-core-1936 = (eine von gitcraft nicht darstellbare Ausgabe)
 repo-core-1937 = ({ $kinds }-Ausgabe)
 repo-core-1938 = { $verb ->
-        [Stage] Block bereitstellen
-        [Unstage] Block aus der Staging-Area nehmen
-        [Discard] Block verwerfen
-       *[Revert] Block rückgängig machen
-    }
+                [Stage] Block bereitstellen
+                [Unstage] Block aus der Staging-Area nehmen
+                [Discard] Block verwerfen
+               *[Revert] Block rückgängig machen
+            }
 repo-core-1940 = Diesen Hunk vormerken. Zeilen anklicken, um nur einige vorzumerken (Shift+Klick für einen Bereich).
 repo-core-1941 = Vormerkung dieses Hunks aufheben. Zeilen anklicken, um sie nur für einige aufzuheben (Shift+Klick für einen Bereich).
 repo-core-1942 = Änderungen dieses Hunks verwerfen (Ctrl+Z stellt sie wieder her).
@@ -1548,8 +1618,8 @@ repo-core-2081 = enthalten, überschreitet aber die Anzahl-/Bytegrenze aufbewahr
 repo-core-2082 = enthalten, aber kein UTF-8-Text
 repo-core-2106 = PyPI-Release-Verlauf
 repo-core-2109 = keine unterstützte Lockdatei
-repo-core-2138 = { $file } { $side } der Änderung ist ungültig ({ $e })
-repo-core-2139 = Abhängigkeiten · { $file }
+repo-core-2138 = { $files } { $side } der Änderung ist ungültig ({ $e })
+repo-core-2139 = Abhängigkeiten · { $files }
 repo-core-2140 = aktualisiert
 repo-core-2141 = zurückgestuft
 repo-core-2142 = mit neuer Lizenz
@@ -1576,9 +1646,9 @@ repo-core-2177 = nicht verfolgt
 repo-core-2178 = importiert
 repo-core-2179 = Größe nicht aufgezeichnet
 repo-core-2180 = { $files ->
-        [one] ein Ordner mit { $files } Datei
-       *[other] ein Ordner mit { $files } Dateien
-    }
+                [one] ein Ordner mit { $files } Datei
+               *[other] ein Ordner mit { $files } Dateien
+            }
 repo-core-2182 = weiterer Inhalt nach dem Dokumentende
 repo-core-2183 = Zeile { $line }: { $what }
 repo-core-2184 = nicht abgeschlossener Kommentar
@@ -1600,7 +1670,10 @@ repo-core-2207 = Die Änderung löscht die gesamte Datei.
 repo-core-2208 = Die Wörter sind unverändert: Nur Leerraum, Leerzeilen, Dateiname oder Modus wurden geändert.
 repo-core-2209 = Die Wörter sind unverändert: Nur die Zeilenumbrüche wurden geändert.
 repo-core-2213 = 1 unveränderter Absatz
-repo-core-2214 = { $count } unveränderte Absätze
+repo-core-2214 = { $count ->
+            [one] { $count } unveränderter Absatz
+           *[other] { $count } unveränderte Absätze
+        }
 repo-core-2216 = Anzeigen
 repo-core-2217 = neu umbrochen
 repo-core-2218 = bearbeitet
@@ -1618,7 +1691,10 @@ repo-core-2230 = nicht angegeben
 repo-core-2231 = Spalte · { $column } → { $column2 }
 repo-core-2232 = Vorher · { $old }
 repo-core-2233 = Nachher · { $new }
-repo-core-2234 = { $side }: Ordner mit { $files } Dateien
+repo-core-2234 = { $files ->
+            [one] { $side }: Ordner mit { $files } Datei
+           *[other] { $side }: Ordner mit { $files } Dateien
+        }
 repo-core-2236 = Hash nicht aufgezeichnet
 repo-core-2237 = über { $MAX-CELLS } Zellen
 repo-core-2238 = Zeile { $quote-line }: nicht abgeschlossene Zelle in Anführungszeichen
@@ -1633,7 +1709,10 @@ repo-core-2251 = gleiche Zellen: nur Anführungszeichen, Zeilenenden oder Leerze
 repo-core-2252 = Zeilen anhand ihrer ersten Spalte zugeordnet
 repo-core-2253 = Alle Werte sind vorhanden und eindeutig, sodass jede Zeile trotz Verschiebungen zugeordnet werden kann
 repo-core-2255 = 1 unveränderte Zeile
-repo-core-2256 = { $count } unveränderte Zeilen
+repo-core-2256 = { $count ->
+            [one] { $count } unveränderte Zeile
+           *[other] { $count } unveränderte Zeilen
+        }
 repo-core-2258 = { $label } anzeigen
 repo-core-2260 = Spalte hinzugefügt
 repo-core-2261 = Spalte entfernt
@@ -1645,9 +1724,15 @@ repo-core-2270 = Wahrheitswert
 repo-core-2271 = Datum
 repo-core-2272 = Alias
 repo-core-2276 = { "{" }1 Schlüssel{ "}" }
-repo-core-2277 = { "{" }{ $n } Schlüssel{ "}" }
+repo-core-2277 = { $n ->
+            [one] { "{" }{ $n } Schlüssel{ "}" }
+           *[other] { "{" }{ $n } Schlüssel{ "}" }
+        }
 repo-core-2278 = [1 Eintrag]
-repo-core-2279 = [{ $n } Einträge]
+repo-core-2279 = { $n ->
+            [one] [{ $n } Eintrag]
+           *[other] [{ $n } Einträge]
+        }
 repo-core-2281 = Zeile { $line }: { $info }
 repo-core-2282 = Zeile { $line }: mehr als { $MAX-DEPTH } Ebenen tief verschachtelt
 repo-core-2299 = (Alias)
@@ -1661,7 +1746,10 @@ repo-core-2313 = Beide Stellen des verschobenen Blocks und zwischenzeitliche Än
 repo-core-2314 = Diese Zeile kommentieren
 repo-core-2315 = Notiz für den Agent zu dieser Zeile
 repo-core-2316 = Alt+Klick: Notiz für den Agent zu dieser Zeile
-repo-core-2318 = { $tip }, Zeile { $number }, { $count } Kommentare
+repo-core-2318 = { $count ->
+            [one] { $tip }, Zeile { $number }, { $count } Kommentar
+           *[other] { $tip }, Zeile { $number }, { $count } Kommentare
+        }
 repo-core-2319 = gelöscht
 repo-core-2320 = Hunk
 repo-core-2321 = Kontext
@@ -1709,28 +1797,28 @@ repo-core-2371 = Beide behalten…
 repo-core-2372 = Für eine auf beiden Seiten geänderte, nicht zusammenführbare Datei (Bild, Archiv…): Jede Version als eigene, nach ihrem Branch benannte Datei schreiben. Zeigt zuerst eine Vorschau.
 repo-core-2373 = „Beide behalten“ ist bereits für eine Datei geöffnet
 repo-core-2376 = { $verb ->
-        [Stage] { $chosen ->
-        [one] { $chosen } Zeile bereitstellen
-       *[other] { $chosen } Zeilen bereitstellen
-    }
-        [Unstage] { $chosen ->
-        [one] { $chosen } Zeile aus der Bereitstellung nehmen
-       *[other] { $chosen } Zeilen aus der Bereitstellung nehmen
-    }
-        [Discard] { $chosen ->
-        [one] { $chosen } Zeile verwerfen
-       *[other] { $chosen } Zeilen verwerfen
-    }
-       *[Revert] { $chosen ->
-        [one] { $chosen } Zeile rückgängig machen
-       *[other] { $chosen } Zeilen rückgängig machen
-    }
-    }
+                [Stage] { $chosen ->
+                [one] { $chosen } Zeile bereitstellen
+               *[other] { $chosen } Zeilen bereitstellen
+            }
+                [Unstage] { $chosen ->
+                [one] { $chosen } Zeile aus der Bereitstellung nehmen
+               *[other] { $chosen } Zeilen aus der Bereitstellung nehmen
+            }
+                [Discard] { $chosen ->
+                [one] { $chosen } Zeile verwerfen
+               *[other] { $chosen } Zeilen verwerfen
+            }
+               *[Revert] { $chosen ->
+                [one] { $chosen } Zeile rückgängig machen
+               *[other] { $chosen } Zeilen rückgängig machen
+            }
+            }
 repo-core-2377 = Zeilenauswahl aufheben
 repo-core-2378 = { $chosen ->
-        [one] { $chosen } Zeile rückgängig machen
-       *[other] { $chosen } Zeilen rückgängig machen
-    }
+                [one] { $chosen } Zeile rückgängig machen
+               *[other] { $chosen } Zeilen rückgängig machen
+            }
 repo-core-2379 = Nur angeklickte Zeilen im Arbeitsverzeichnis rückgängig machen, um sie vor dem Committen zu prüfen. „Änderungen dieser Datei rückgängig machen“ steht im Menü des Dateinamens.
 repo-core-2380 = Datei reverten
 repo-core-2381 = Änderungen dieses Commits an der Datei im Arbeitsverzeichnis rückgängig machen, um sie vor dem Committen zu prüfen
@@ -1783,13 +1871,13 @@ repo-core-2444 = Zusammenfassen
 repo-core-2445 = in
 repo-core-2446 = Fixup
 repo-core-2447 = { $verb ->
-        [Move] { $word ->
-            [above] { $hash } vor { $target } verschieben
-           *[below] { $hash } hinter { $target } verschieben
-        }
-        [Squash] { $hash } mit { $target } zusammenfassen
-       *[Fixup] { $hash } in { $target } einarbeiten
-    }
+                [Move] { $word ->
+                    [above] { $hash } vor { $target } verschieben
+                   *[below] { $hash } hinter { $target } verschieben
+                }
+                [Squash] { $hash } mit { $target } zusammenfassen
+               *[Fixup] { $hash } in { $target } einarbeiten
+            }
 repo-core-2448 = Nach diesem Commit folgten Merges, die dadurch eingeebnet würden
 repo-core-2449 = Nur Commits des ausgecheckten Branches lassen sich verschieben
 repo-core-2450 = bereits an dieser Stelle
@@ -1799,11 +1887,11 @@ repo-core-2455 = { $path } ist noch nicht versioniert: Es gibt keine Vergleichsv
 repo-core-2456 = { $path } hat Konflikte: „Im Merge-Werkzeug lösen“ verwenden
 repo-core-2457 = . Läuft auf { $host }, muss also dort installiert sein
 repo-core-2458 = : Ansicht wird nach dem Schließen aktualisiert
-repo-core-2459 = { $file } wird in { $label } angezeigt{ $refreshes }{ $path }
+repo-core-2459 = { $files } wird in { $label } angezeigt{ $refreshes }{ $path }
 repo-core-2460 = { $path } ist bereits in einem Merge-Werkzeug geöffnet: zuerst dort abschließen
 repo-core-2461 = Warten auf { $label } für { $path }: Zum Abschließen speichern und schließen{ $path2 }
 repo-core-2462 = { $path } in { $label } gelöst
-repo-core-2463 = { $file } wird angezeigt in{ " " }
+repo-core-2463 = { $files } wird angezeigt in{ " " }
 repo-core-2465 = Binärdatei, { $size } Bytes
 repo-core-2466 = Leere Datei
 repo-core-2470 = Angeheftete Zeile liegt außerhalb dieser Dateiversion
@@ -1814,15 +1902,15 @@ repo-core-2474 = Jeder Commit bis zu dieser Version, der { $which } geändert ha
 repo-core-2477 = Zeile { $i }, zu Commit { $short }
 repo-core-2478 = Noch nicht committet
 repo-core-2479 = { $author } · { $now }
-    { $summary }
-    Zum Anzeigen des Commits klicken
+            { $summary }
+            Zum Anzeigen des Commits klicken
 repo-core-2482 = Noch kein Commit berührt diese Zeilen.
 repo-core-2483 = Noch kein Commit berührt diese Datei.
 repo-core-2485 = { $summary }  ·  als { $path }
 repo-core-2487 = Klick: Änderungen dieses Commits an den Zeilen (damalige Zeilennummern)
-    Doppelklick: Commit im Graphen anzeigen
+            Doppelklick: Commit im Graphen anzeigen
 repo-core-2488 = Klick: Änderungen dieses Commits an der Datei oder damalige Datei
-    Doppelklick: Commit im Graphen anzeigen
+            Doppelklick: Commit im Graphen anzeigen
 repo-core-2489 = Gesamte Datei
 repo-core-2490 = Jeder Commit, der die Datei geändert hat, nicht nur diese Zeilen
 repo-core-2491 = Zeile { $start }
@@ -1853,7 +1941,7 @@ repo-core-2522 = Nach diesem Commit folgten Merges: Umschreiben würde sie eineb
 repo-core-2523 = Ein Merge-Commit kann die vorgemerkten Änderungen nicht aufnehmen
 repo-core-2524 = Nur Commits des ausgecheckten Branches können die vorgemerkten Änderungen aufnehmen
 repo-core-2525 = Dieser Klon ist flach: Commits vor { $target } fehlen als Rebase-Basis
-repo-core-2526 = Die ignorierte Datei { $file } steht dort, wo ein umzuschreibender Commit eine Datei hat: Der Rebase würde sie überschreiben. Zuerst verschieben
+repo-core-2526 = Die ignorierte Datei { $files } steht dort, wo ein umzuschreibender Commit eine Datei hat: Der Rebase würde sie überschreiben. Zuerst verschieben
 repo-core-2527 = { $target } liegt nicht auf dem ausgecheckten Branch
 repo-core-2528 = Commit konnte nicht gelesen werden
 repo-core-2529 = fixup! für { $hash } committen
@@ -1863,7 +1951,10 @@ repo-core-2538 = { $label } (sein fixup!-Commit)
 repo-core-2539 = { $name } ist eingeklappt
 repo-core-2540 = Änderungen anzeigen
 repo-core-2541 = Einstellungen → Git → Diffs deaktiviert das Einklappen
-repo-core-2543 = { $count } generierte oder eingeklappte Dateien
+repo-core-2543 = { $count ->
+            [one] { $count } generierte oder eingeklappte Datei
+           *[other] { $count } generierte oder eingeklappte Dateien
+        }
 repo-core-2544 = Wieder einklappen
 repo-core-2545 = Anzeigen (Einstellungen → Git → Diffs deaktiviert das Einklappen)
 repo-core-2546 = Lockdatei
@@ -1962,8 +2053,8 @@ repo-core-2683 = Pull-Request-Spitze; Eintrag im linken Bereich doppelklicken, u
 repo-core-2684 = Plakette zum Auschecken doppelklicken oder auf Branch/Commit ziehen
 repo-core-2685 = Plakette zum Auschecken doppelklicken; Zeile zum Cherry-Picken oder Verschieben des Commits ziehen
 repo-core-2686 = { $n }
-    Spitzen-Commit von { $author } · { $date }
-    { $drag }
+            Spitzen-Commit von { $author } · { $date }
+            { $drag }
 repo-core-2690 = Pull-Request-Spitze
 repo-core-2691 = ausgecheckt
 repo-core-2692 = zum Pullen doppelklicken
@@ -1986,20 +2077,20 @@ repo-core-2722 = Suche läuft…
 repo-core-2723 = keine Ergebnisse
 repo-core-2724 = { $current } von { $n }
 repo-core-2725 = Operatoren, kombinierbar miteinander und mit Text:
-    { "" }
+            { "" }
 repo-core-2726 = { "" }
-    { "" }
-    Werte mit Leerzeichen in Anführungszeichen setzen: author:\"Jane Doe\".
-    Datumsangaben: { $DATE-FORMATS }.
+            { "" }
+            Werte mit Leerzeichen in Anführungszeichen setzen: author:\"Jane Doe\".
+            Datumsangaben: { $DATE-FORMATS }.
 repo-core-2729 = Merge-Commits auslassen
 repo-core-2730 = { $what } wird gelesen…
 repo-core-2731 = { $what } konnte nicht gelesen werden: { $e }
 repo-core-2732 = Autoren
 repo-core-2733 = Committer
 repo-core-2735 = { $commits ->
-        [one] { $email } · { $commits } Commit
-       *[other] { $email } · { $commits } Commits
-    }
+                [one] { $email } · { $commits } Commit
+               *[other] { $email } · { $commits } Commits
+            }
 repo-core-2736 = Keine passenden { $what }
 repo-core-2740 = Keine passende Datei oder Ordner
 repo-core-2747 = Beschreibung abgebrochen
@@ -2007,7 +2098,10 @@ repo-core-2748 = Kein geladener Commit in dieser Richtung; ältere oder ausgeble
 repo-core-2749 = Topologieanalyse wird vorbereitet
 repo-core-2750 = Verzweigung
 repo-core-2751 = Wurzel
-repo-core-2752 = { $shape }; { $count } Vorgänger, { $children } geladene Nachfolger
+repo-core-2752 = { $children ->
+        [one] { $shape }; { $count } Vorgänger, { $children } geladener Nachfolger
+       *[other] { $shape }; { $count } Vorgänger, { $children } geladene Nachfolger
+    }
 repo-core-2753 = ; Vorgänger reichen über geladene History hinaus
 repo-core-2754 = ; Branch { $name }
 repo-core-2755 = ; Upstream entfernt
@@ -2046,9 +2140,18 @@ repo-core-2788 = Commits / Sekunde
 repo-core-2789 = History-Frame
 repo-core-2790 = Frame { $cursor } wird vorbereitet…
 repo-core-2791 = Diesen Commit öffnen
-repo-core-2792 = { $count } Baumeinträge · { $count2 } geänderte Pfade in diesem Frame
+repo-core-2792 = { $count ->
+        [one] { $count2 ->
+        [one] { $count } Baumeintrag · { $count2 } geänderter Pfad in diesem Frame
+       *[other] { $count } Baumeintrag · { $count2 } geänderte Pfade in diesem Frame
+    }
+       *[other] { $count2 ->
+        [one] { $count } Baumeinträge · { $count2 } geänderter Pfad in diesem Frame
+       *[other] { $count } Baumeinträge · { $count2 } geänderte Pfade in diesem Frame
+    }
+    }
 repo-core-2793 = { "" }
-    { $name } hat bei diesem Commit hier gearbeitet
+            { $name } hat bei diesem Commit hier gearbeitet
 repo-core-2797 = { " " }… { $count } weitere Zeichen
 repo-core-2798 = History-Worker angehalten
 repo-core-2801 = Einmal ohne pre-push-Hook pushen (git push --no-verify)
@@ -2073,13 +2176,27 @@ repo-core-2820 = { $b } schlägt allein fehl: Nicht das Zusammenspiel ist die Ur
 repo-core-2821 = Commits von { $a } und { $b } sind nicht gemeinsam anwendbar: Merge proben, um Konflikte zu sehen.
 repo-core-2822 = Das gemeinsame Ergebnis wiederholt sich nicht: Der Test ist instabil.
 repo-core-2823 = 1 Test ausgeführt
-repo-core-2824 = { $n } Tests ausgeführt
+repo-core-2824 = { $n ->
+            [one] { $n } Test ausgeführt
+           *[other] { $n } Tests ausgeführt
+        }
 repo-core-2825 = { " " }· 1 nicht reproduzierbares Ergebnis beiseitegelegt
 repo-core-2826 = { " " }· { $n } nicht reproduzierbare Ergebnisse beiseitegelegt
 repo-core-2827 = bestanden
 repo-core-2828 = fehlgeschlagen
 repo-core-2829 = unklar (nicht anwendbar oder nicht reproduzierbar)
-repo-core-2831 = Test { $tests } von höchstens { $budget }: { $size } { $commits } { $said }
+repo-core-2831 = Test { $tests } von höchstens { $budget }: { $size ->
+            [one] 1 Commit { $probe ->
+            [pass] besteht den Test
+            [fail] fällt durch
+           *[unresolved] kann nicht getestet werden
+        }
+           *[other] { $size } Commits { $probe ->
+            [pass] bestehen den Test
+            [fail] fallen durch
+           *[unresolved] können nicht getestet werden
+        }
+        }
 repo-core-2832 = Zusammenspiel finden: { $a } und { $b }
 repo-core-2835 = Angehalten, bevor etwas gefunden wurde.
 repo-core-2836 = Suche fehlgeschlagen: { $e }
@@ -2159,11 +2276,11 @@ repo-core-2934 = { $label } · zuletzt vor { $d } abgerufen
 repo-core-2935 = { $label } · noch nie abgerufen
 repo-core-2938 = Hintergrundabruf, Avatare, Update-Prüfungen, Downloads sowie Abfragen von Builds und Pull Requests sind pausiert.
 repo-core-2939 = { $why }. { $what } Abrufen, Pull, Push und Ähnliches werden nicht ausgeführt.
-    Klicken, um online zu gehen.
+            Klicken, um online zu gehen.
 repo-core-2940 = { $why }. { $what } Ihre angeforderten Vorgänge laufen weiter.
-    Sie starten automatisch wieder, sobald eine Verbindung besteht.
+            Sie starten automatisch wieder, sobald eine Verbindung besteht.
 repo-core-2941 = { $why }. { $what } Ihre angeforderten Vorgänge laufen weiter.
-    Unter Einstellungen → Git können Sie sie auch bei getakteter Verbindung erlauben.
+            Unter Einstellungen → Git können Sie sie auch bei getakteter Verbindung erlauben.
 repo-core-2942 = unter einer Minute
 repo-core-2943 = { $s } min
 repo-core-2944 = { $s } h
@@ -2213,15 +2330,15 @@ repo-core-3007 = { $path } vormerken
 repo-core-3010 = Vormerkung von { $path } aufheben
 repo-core-3012 = Patch speichern
 repo-core-3013 = Patch
-repo-core-3016 = Patch in { $file } gespeichert
+repo-core-3016 = Patch in { $files } gespeichert
 repo-core-3017 = Patch-Erstellung fehlgeschlagen: { $e }
 repo-core-3018 = Patch anwenden
 repo-core-3021 = Alle Dateien
 repo-core-3022 = { $name } ist beschäftigt: { $busy }
 repo-core-3023 = { $name } wendet noch einen Patch an
-repo-core-3024 = { $file } konnte nicht gelesen werden: { $e }
+repo-core-3024 = { $files } konnte nicht gelesen werden: { $e }
 repo-core-3025 = Patch anwenden: { $why }
-repo-core-3026 = { $file } anwenden
+repo-core-3026 = { $files } anwenden
 repo-core-3028 = interner Fehler beim Kopieren dorthin
 repo-core-3029 = Auf Abschluss von { $self } warten
 repo-core-3041 = { $noun } in eigenem Fenster
@@ -2261,7 +2378,10 @@ repo-core-3079 = Begrenzte lokale Belege werden gelesen…
 repo-core-3080 = Belege für diesen ausgewählten Commit lesen. Belege des vorherigen Commits werden hier nicht angezeigt.
 repo-core-3081 = Hunk { $path }:{ $range }–{ $range2 } ({ $new })
 repo-core-3082 = Kein eindeutig aufgezeichneter Bearbeitungsausschnitt passt zu diesen Commit-Zeilen. Eine Sitzungs-/Zeitübereinstimmung allein ist keine Hunk-Zuordnung.
-repo-core-3083 = { $count } aufgezeichnete Inhaltsübereinstimmungen; jeden Kandidatenschritt prüfen
+repo-core-3083 = { $count ->
+        [one] { $count } aufgezeichnete Inhaltsübereinstimmung; jeden Kandidatenschritt prüfen
+       *[other] { $count } aufgezeichnete Inhaltsübereinstimmungen; jeden Kandidatenschritt prüfen
+    }
 repo-core-3084 = Sitzung { $i }, Schritt { $j }
 repo-core-3086 = Schritt { $j } · { $kind }{ $t }
 repo-core-3087 = { " " }· UTC-Epoche { $t }
@@ -2277,8 +2397,8 @@ repo-core-3099 = Aktuellen Branch vorspulen oder bei Abweichung mergen
 repo-core-3100 = Aktuellen Branch vorspulen
 repo-core-3101 = Aktuellen Branch auf seinen Upstream rebasen
 repo-core-3102 = { $Pull }
-    git { $self }
-    Rechtsklick oder Pfeil zum Auswählen
+            git { $self }
+            Rechtsklick oder Pfeil zum Auswählen
 repo-core-3104 = Alle abrufen
 repo-core-3105 = Vorabprüfungs-Worker wurde vor Abschluss angehalten. Kein Push ausgeführt.
 repo-core-3106 = Push-Vorabprüfung überschritt zwei Minuten. Fehlende History abrufen oder Push aufteilen, dann erneut prüfen; nichts gepusht.
@@ -2293,8 +2413,8 @@ repo-core-3116 = Alle ausgehenden Versionen der aufgelisteten großen regulären
 repo-core-3117 = Abgerufenen Ziel-Commit in diesen Branch mergen und Remote-History erhalten. Kann Konflikte hinterlassen, die Sie lösen oder abbrechen können.
 repo-core-3118 = Ausgehende History korrigieren
 repo-core-3119 = { $text }
-    { "" }
-    Dieser Branch muss mit sauberem Arbeitsverzeichnis ausgecheckt sein. Ctrl+Z stellt eine abgeschlossene Reparatur wieder her; ein späterer Push ist eine gesonderte explizite Aktion.
+            { "" }
+            Dieser Branch muss mit sauberem Arbeitsverzeichnis ausgecheckt sein. Ctrl+Z stellt eine abgeschlossene Reparatur wieder her; ein späterer Push ist eine gesonderte explizite Aktion.
 repo-core-3120 = Reparatur anwenden
 repo-core-3122 = Vor dem Bearbeiten von Nachrichten den angezeigten Branch auschecken, dann Vorabprüfung erneut öffnen.
 repo-core-3123 = Branch konnte nicht geprüft werden
@@ -2304,11 +2424,17 @@ repo-core-3132 = Push-Vorabprüfung
 repo-core-3134 = Remote-Ref löschen
 repo-core-3135 = { $destination } nur löschen, wenn die Serverspitze { $super } ist. Es werden keine ausgehenden Objekte oder LFS-Inhalte gesendet.
 repo-core-3136 = { $After } geprüfter Push: { $step }
-repo-core-3137 = { $count } ausgehende Commits ({ $count2 } mit eingebetteten Signaturen), auf { $head } festgelegt. Autorenrichtlinie: { $expected-name } <{ $expected-email }>.
+repo-core-3137 = { $count ->
+        [one] { $count } ausgehender Commit ({ $count2 } mit eingebetteten Signaturen), auf { $head } festgelegt. Autorenrichtlinie: { $expected-name } <{ $expected-email }>.
+       *[other] { $count } ausgehende Commits ({ $count2 } mit eingebetteten Signaturen), auf { $head } festgelegt. Autorenrichtlinie: { $expected-name } <{ $expected-email }>.
+    }
 repo-core-3138 = Ursprünglichen pre-push-Hook für diesen Push wie angefordert überspringen. Die geprüfte LFS-Upload-Sicherung läuft weiterhin.
 repo-core-3139 = Gewähltes Konto für { $host }: { $account } (Profilmetadaten; Serveridentität nicht abgefragt).
 repo-core-3140 = Prüfungen verwenden nur lokale/abgerufene History. Geheimniserkennung ist heuristisch; sie lädt oder prüft keine externen LFS-Inhalte, verifiziert kein Signaturvertrauen und ersetzt keinen spezialisierten Geheimnisscanner.
-repo-core-3141 = { $count } LFS-Objekte werden mit dem bestätigten Push zu { $plan } hochgeladen; ihr externer Inhalt wurde nicht geprüft. Endpunkteinstellungen verwenden committete .lfsconfig und geprüfte Git-Konfiguration; spätere Arbeitsverzeichnisänderungen werden ignoriert.
+repo-core-3141 = { $count ->
+        [one] { $count } LFS-Objekt wird mit dem bestätigten Push zu { $plan } hochgeladen; ihr externer Inhalt wurde nicht geprüft. Endpunkteinstellungen verwenden committete .lfsconfig und geprüfte Git-Konfiguration; spätere Arbeitsverzeichnisänderungen werden ignoriert.
+       *[other] { $count } LFS-Objekte werden mit dem bestätigten Push zu { $plan } hochgeladen; ihr externer Inhalt wurde nicht geprüft. Endpunkteinstellungen verwenden committete .lfsconfig und geprüfte Git-Konfiguration; spätere Arbeitsverzeichnisänderungen werden ignoriert.
+    }
 repo-core-3142 = Reparaturen erfordern den ausgecheckten zugrunde liegenden Branch. Der Push selbst sendet weiterhin das geprüfte Objekt.
 repo-core-3143 = Für Reparaturen auschecken
 repo-core-3144 = Checkpoint-/Transkriptveröffentlichung
@@ -2326,7 +2452,10 @@ repo-core-3156 = Remote-Commits, die ein Force-Push verwerfen würde
 repo-core-3157 = Remote-Commits behalten…
 repo-core-3160 = Prüfen
 repo-core-3161 = unauffällig
-repo-core-3162 = { $count } Befunde
+repo-core-3162 = { $count ->
+            [one] { $count } Befund
+           *[other] { $count } Befunde
+        }
 repo-core-3163 = Weitere Befunde vorhanden; vor dem Pushen reparieren und erneut prüfen.
 repo-core-3165 = Ziel mit explizitem force-with-lease umschreiben
 repo-core-3166 = Keine abgerufene Zielspitze verfügbar: Force-Push deaktiviert. Zuerst abrufen, um verworfene Remote-Commits zu prüfen.
@@ -2382,9 +2511,9 @@ repo-core-3240 = Abhängige Branches aktualisieren
 repo-core-3241 = Branches auf diesen Commits mitverschieben (git rebase --update-refs, Git 2.38+): untere Schichten eines von oben rebasten Stacks. In anderen Worktrees ausgecheckte Branches bleiben unverändert; „Stack neu aufbauen…“ unter STACKS behandelt sie. Rückgängig stellt alle Branches wieder her.
 repo-core-3242 = Rebase starten
 repo-core-3243 = { $n ->
-        [one] { $n } Commit , neueste oben · { $Undo } macht den Rebase rückgängig
-       *[other] { $n } Commits , neueste oben · { $Undo } macht den Rebase rückgängig
-    }
+                [one] { $n } Commit , neueste oben · { $Undo } macht den Rebase rückgängig
+               *[other] { $n } Commits , neueste oben · { $Undo } macht den Rebase rückgängig
+            }
 repo-core-3246 = Nach oben, später
 repo-core-3247 = Nach unten, früher
 repo-core-3249 = Rebase-Commit { $hash }, { $summary }, { $author }, { $label }
@@ -2404,7 +2533,7 @@ repo-core-3281 = Git lieferte keinen Prognosebaum
 repo-core-3282 = Ausgelassen: nicht neu abgespielt
 repo-core-3284 = Mit Git-Standards und simulierten Baumattributen konfliktfrei anwendbar. Merge-Einstellungen, Hooks, eigene Treiber und globale/info-Attribute der Quelle sind ausgeschlossen.
 repo-core-3286 = Konflikte hier (simulierte Baumattribute):
-    { $n }
+            { $n }
 repo-core-3288 = Wird hier leer. Git kann anhalten, damit Sie diesen Commit überspringen oder behalten.
 repo-core-3289 = Rebase-Prognose wird geprüft…
 repo-core-3292 = Unbekanntes Repository-Objektformat
@@ -2414,9 +2543,9 @@ repo-core-3309 = { $path } gemäß Änderungen in { $hash } reverten
 repo-core-3310 = Reverten
 repo-core-3311 = Hunk von { $path } aus { $hash } reverten
 repo-core-3312 = { $n ->
-        [one] { $n } Zeile von { $path } aus { $hash } rückgängig machen
-       *[other] { $n } Zeilen von { $path } aus { $hash } rückgängig machen
-    }
+                [one] { $n } Zeile von { $path } aus { $hash } rückgängig machen
+               *[other] { $n } Zeilen von { $path } aus { $hash } rückgängig machen
+            }
 repo-core-3313 = { $label }: nicht ausgeführt, { $busy } lief noch. Nach Abschluss erneut versuchen.
 repo-core-3316 = { $label }: abgeschlossen. Die Änderung liegt zur Prüfung vor dem Committen im Arbeitsverzeichnis (Ctrl+Z macht sie rückgängig).
 repo-core-3317 = { $label }: Datei inzwischen geändert; Revert wurde mit einem Drei-Wege-Merge eingearbeitet und vorgemerkt. Vor dem Committen prüfen; Ctrl+Z kann dies nicht rückgängig machen (stattdessen Vormerkung aufheben und Änderungen verwerfen).
@@ -2461,16 +2590,16 @@ repo-core-3379 = Verfolgt keinen Remote-Branch
 repo-core-3380 = { $upstream } wurde auf dem Remote gelöscht
 repo-core-3381 = Verfolgt { $upstream }
 repo-core-3382 = { "" }
-    CI: { $state }
+            CI: { $state }
 repo-core-3383 = { "" }
-    Oben angeheftet
+            Oben angeheftet
 repo-core-3384 = { $name }
-    { $tip }
-    In Worktree { $wt } ausgecheckt
-    Zum Öffnen doppelklicken oder auf Branch/Commit ziehen
+            { $tip }
+            In Worktree { $wt } ausgecheckt
+            Zum Öffnen doppelklicken oder auf Branch/Commit ziehen
 repo-core-3385 = { $name }
-    { $tip }
-    Zum Auschecken doppelklicken oder auf Branch/Commit ziehen
+            { $tip }
+            Zum Auschecken doppelklicken oder auf Branch/Commit ziehen
 repo-core-3386 = Erstellt einen Tag, mergt zurück in den Hauptbranch (und den Entwicklungsbranch), löscht ihn und pusht alles; zeigt zuerst eine Vorschau
 repo-core-3387 = Änderungen, die { $name } zu { $name2 } beiträgt
 repo-core-3388 = Änderungen seit der Trennung wie bei einem Pull Request
@@ -2521,9 +2650,9 @@ repo-core-3447 = Arbeit an einem Ihnen zugewiesenen Issue beginnen…
 repo-core-3449 = seit Ihrem letzten Blick geändert ·{ " " }
 repo-core-3450 = { " " }· Entwurf
 repo-core-3451 = { $url }
-    Klick zeigt Änderungen; Doppelklick öffnet Details
+            Klick zeigt Änderungen; Doppelklick öffnet Details
 repo-core-3452 = { $url }
-    Klick zeigt Änderungen; Doppelklick öffnet im Browser
+            Klick zeigt Änderungen; Doppelklick öffnet im Browser
 repo-core-3453 = Öffnen
 repo-core-3454 = Im Browser öffnen
 repo-core-3455 = { $branch } auschecken
@@ -2546,7 +2675,7 @@ repo-core-3480 = REMOTES
 repo-core-3481 = Remote hinzufügen…
 repo-core-3484 = Remote { $name }
 repo-core-3485 = { $name }
-    Zum Auschecken doppelklicken oder auf Branch/Commit ziehen
+            Zum Auschecken doppelklicken oder auf Branch/Commit ziehen
 repo-core-3486 = Als lokalen Branch auschecken
 repo-core-3487 = { $current } dorthin vorspulen
 repo-core-3488 = In { $current } mergen
@@ -2579,19 +2708,19 @@ repo-core-3524 = Zuerst aktualisieren oder auf dem eigenen Rechner öffnen
 repo-core-3525 = Pfad kopieren
 repo-core-3527 = geändert
 repo-core-3528 = { "" }
-    Von { $url }
+            Von { $url }
 repo-core-3530 = { "" }
-    Bei { $at }, wie aufgezeichnet
+            Bei { $at }, wie aufgezeichnet
 repo-core-3531 = { "" }
-    Noch nicht geklont; Aktualisieren klont es bei { $at }
+            Noch nicht geklont; Aktualisieren klont es bei { $at }
 repo-core-3532 = { "" }
-    Bei { $at }, nicht beim hier aufgezeichneten Commit; Aktualisieren checkt diesen aus
+            Bei { $at }, nicht beim hier aufgezeichneten Commit; Aktualisieren checkt diesen aus
 repo-core-3533 = { "" }
-    Konflikt; bei { $at }
+            Konflikt; bei { $at }
 repo-core-3534 = { "" }
-    Hat eigene Änderungen
+            Hat eigene Änderungen
 repo-core-3535 = { "" }
-    Zum Öffnen in einem Tab doppelklicken
+            Zum Öffnen in einem Tab doppelklicken
 repo-core-3536 = TAGS
 repo-core-3538 = Hotfix ab { $name } starten…
 repo-core-3539 = Hotfix-Branch hier erstellen (nächste Patchversion) und auschecken
@@ -2618,11 +2747,11 @@ repo-core-3561 = Alle anzeigen
 repo-core-3562 = WORKTREES
 repo-core-3563 = Worktree hinzufügen…
 repo-core-3564 = { "" }
-    Agent-Grenze berührt; vor dem Mergen seines Branches wird nachgefragt:
-    { $fenced }
+            Agent-Grenze berührt; vor dem Mergen seines Branches wird nachgefragt:
+            { $fenced }
 repo-core-3565 = { "" }
-    { $e }
-    Bis zur erfolgreichen Prüfung wird vor dem Mergen seines Branches nachgefragt.
+            { $e }
+            Bis zur erfolgreichen Prüfung wird vor dem Mergen seines Branches nachgefragt.
 repo-core-3567 = hier geöffnet
 repo-core-3568 = gesperrt
 repo-core-3569 = bereinigbar
@@ -2630,11 +2759,11 @@ repo-core-3571 = fehlt
 repo-core-3572 = bare
 repo-core-3573 = losgelöst bei { $head }
 repo-core-3575 = { "" }
-    Gesperrt: { $reason }
+            Gesperrt: { $reason }
 repo-core-3576 = { "" }
-    Fehlt: { $reason }
+            Fehlt: { $reason }
 repo-core-3577 = { "" }
-    Zum Öffnen doppelklicken
+            Zum Öffnen doppelklicken
 repo-core-3578 = Dieser Worktree ist hier bereits geöffnet
 repo-core-3579 = Dieser Worktree fehlt
 repo-core-3580 = In einem Tab öffnen
@@ -2698,15 +2827,15 @@ repo-core-3647 = Neu laden (F5)
 repo-core-3648 = Dateiansichten
 repo-core-3651 = Verlauf und Rückgängig-Baum ({ $Timeline })
 repo-core-3652 = { "" }
-    Jetzt klicken: Start nach { $self }
+            Jetzt klicken: Start nach { $self }
 repo-core-3653 = { $Fetch }
-    Zuletzt vor { $elapsed } abgerufen{ $waits }
+            Zuletzt vor { $elapsed } abgerufen{ $waits }
 repo-core-3654 = Alle Remotes abrufen (git fetch --all --prune)
 repo-core-3658 = Pull-Verhalten und alle abrufen
 repo-core-3659 = Commits an Gerrit senden; ändern und erneut senden, um das Patchset zu aktualisieren
 repo-core-3661 = Aktuellen Branch pushen (veröffentlicht ihn bei fehlendem Upstream)
 repo-core-3662 = Aktuellen Branch pullen, dann pushen (git { $mode }, dann git push)
-    Bei fehlgeschlagenem Pull (Konflikte oder kein Fast-Forward möglich) wird nichts gepusht
+            Bei fehlgeschlagenem Pull (Konflikte oder kein Fast-Forward möglich) wird nichts gepusht
 repo-core-3664 = Synchronisieren
 repo-core-3665 = Branch
 repo-core-3666 = Branch bei HEAD erstellen
@@ -2741,14 +2870,17 @@ repo-core-3698 = Im Finder anzeigen
 repo-core-3699 = Ordner öffnen
 repo-core-3701 = { $s } s
 repo-core-3702 = { $conflicts ->
-        [one] { $label }: Konflikt in { $conflicts } Datei; unter Änderungen lösen
-       *[other] { $label }: Konflikte in { $conflicts } Dateien; unter Änderungen lösen
-    }
+                [one] { $label }: Konflikt in { $conflicts } Datei; unter Änderungen lösen
+               *[other] { $label }: Konflikte in { $conflicts } Dateien; unter Änderungen lösen
+            }
 repo-core-3703 = { $n ->
-        [one] { $label }: { $n } Datei wie zuvor aufgelöst; unter Änderungen prüfen
-       *[other] { $label }: { $n } Dateien wie zuvor aufgelöst; unter Änderungen prüfen
+                [one] { $label }: { $n } Datei wie zuvor aufgelöst; unter Änderungen prüfen
+               *[other] { $label }: { $n } Dateien wie zuvor aufgelöst; unter Änderungen prüfen
+            }
+repo-core-3704 = { $conflicts ->
+        [one] { $label }: Konflikte in { $conflicts } Datei, davon { $n } wie zuvor aufgelöst: diese prüfen und den Rest unter Änderungen lösen
+       *[other] { $label }: Konflikte in { $conflicts } Dateien, davon { $n } wie zuvor aufgelöst: diese prüfen und den Rest unter Änderungen lösen
     }
-repo-core-3704 = { $label }: Konflikte in { $conflicts } Dateien, davon { $n } wie zuvor aufgelöst: diese prüfen und den Rest unter Änderungen lösen
 repo-core-3747 = Suche nach abgeschwächten Prüfungen konnte nicht gestartet werden: { $e }
 repo-core-3749 = Datei öffnen
 repo-core-3750 = Datei ansehen
@@ -2765,7 +2897,7 @@ repo-core-3760 = Diese Datei
 repo-core-3762 = Alle .{ $ext }-Dateien
 repo-core-3764 = Ordner { $dir }/
 repo-core-3767 = { $p }
-    Verantwortliche: { $full }
+            Verantwortliche: { $full }
 repo-core-3768 = Verantwortliche: { $full }
 repo-core-3773 = Neues Terminal mit…
 repo-core-3774 = Fenster schließen (Shells laufen weiter)
@@ -2776,15 +2908,18 @@ repo-core-3779 = Terminal schließen (beendet die Shell)
 repo-core-3780 = Worktrees durchsuchen
 repo-core-3781 = Kein passender Worktree
 repo-core-3783 = 1 Datei mit nicht committeten Änderungen
-repo-core-3784 = { $n } Dateien mit nicht committeten Änderungen
+repo-core-3784 = { $n ->
+            [one] { $n } Datei mit nicht committeten Änderungen
+           *[other] { $n } Dateien mit nicht committeten Änderungen
+        }
 repo-core-3786 = { $path } konnte nicht gespeichert werden: { $e }
 repo-core-3787 = { $path } ist jetzt ein symbolischer Link: nicht gespeichert
 repo-core-3796 = jetzt ein symbolischer Link oder keine Datei: nicht gespeichert
 repo-core-3798 = Mehr als 200 Konflikte; eine ganze Datei wählen
 repo-core-3799 = { $left ->
-        [one] { $left } Konflikt in { $path } noch ungelöst
-       *[other] { $left } Konflikte in { $path } noch ungelöst
-    }
+                [one] { $left } Konflikt in { $path } noch ungelöst
+               *[other] { $left } Konflikte in { $path } noch ungelöst
+            }
 repo-core-3800 = Upstream ({ $ours-label })
 repo-core-3801 = Ihr Commit ({ $theirs-label })
 repo-core-3802 = Unsere Seite ({ $ours-label })
@@ -2796,12 +2931,12 @@ repo-core-3808 = Das Archivverzeichnis ist beschädigt; einige Teile könnten fe
 repo-core-3814 = Nur die ersten { $MAX-TEXT } MB Text werden verglichen
 repo-core-3833 = Folie { $n } konnte nicht gelesen werden
 repo-core-3834 = — Folie { $n } —
-    { $text }
-    { "" }
+            { $text }
+            { "" }
 repo-core-3847 = Gemeinsame Zeichenfolgen konnten nicht gelesen werden
 repo-core-3849 = Blatt { $n } konnte nicht gelesen werden
 repo-core-3850 = — Blatt { $n } —
-    { "" }
+            { "" }
 repo-core-3873 = Streams nach den ersten { $PDF-BUDGET } MB entpackter Daten wurden nicht gelesen
 repo-core-3899 = keine Datei
 repo-core-3900 = die alte Version
@@ -2837,7 +2972,10 @@ repo-core-3951 = Von { $true } nach { $false } verschoben
 repo-core-3952 = dabei nur neu eingerückt
 repo-core-3953 = dabei unverändert
 repo-core-3954 = dabei 1 Zeile bearbeitet
-repo-core-3955 = dabei { $n } Zeilen bearbeitet
+repo-core-3955 = { $n ->
+            [one] dabei { $n } Zeile bearbeitet
+           *[other] dabei { $n } Zeilen bearbeitet
+        }
 repo-core-3956 = Zur aktuellen Stelle
 repo-core-3957 = Diff zum hinzugefügten Block scrollen
 repo-core-3958 = Zur früheren Stelle
@@ -2929,8 +3067,14 @@ repo-core-4104 = Kein gültiger regulärer Ausdruck: { $why }
 repo-core-4105 = Suche läuft… { $max } %
 repo-core-4106 = { $i } von { $n }{ $more }
 repo-core-4107 = { $i } von { $n }…
-repo-core-4108 = { $n }{ $more } { $n2 }
-repo-core-4109 = { $n } { $n2 }…
+repo-core-4108 = { $n ->
+            [one] { $n }{ $more } Treffer
+           *[other] { $n }{ $more } Treffer
+        }
+repo-core-4109 = { $n ->
+            [one] { $n } Treffer…
+           *[other] { $n } Treffer…
+        }
 repo-core-4110 = Treffer
 repo-core-4111 = Treffer
 repo-core-4112 = Noch keine Commits vorhanden
@@ -2960,7 +3104,10 @@ repo-core-4143 = Ein Patch aus git format-patch wird zu Commits (git am), jeder 
 repo-core-4144 = Änderungen, die { $name } zu { $current } beiträgt
 repo-core-4145 = { $current } mit { $name } vergleichen
 repo-core-4146 = Jeder Unterschied zwischen beiden
-repo-core-4147 = ⋯ { $count } dazwischenliegende Commits · aufklappen
+repo-core-4147 = { $count ->
+            [one] ⋯ { $count } dazwischenliegender Commit · aufklappen
+           *[other] ⋯ { $count } dazwischenliegende Commits · aufklappen
+        }
 repo-core-4148 = Ausgelassene History aufklappen. Gestrichelte Spuren zeigen durchgehende Grenzverläufe; interne Merges bleiben bis zum Aufklappen verborgen.
 repo-core-4149 = Zusammenspiel finden…
 repo-core-4150 = Wenn dieser und der ausgecheckte Branch einzeln bestehen, gemeinsam aber fehlschlagen: Testet Commit-Teilmengen, bis die gemeinsam fehlschlagenden gefunden sind
@@ -2971,7 +3118,7 @@ repo-core-4155 = { $name } · Suche von { $a } und { $b } abgeschlossen
 repo-core-4157 = Ziele des geprüften Pushs konnten nicht verifiziert werden; Befehl nicht gestartet: { $error }
 repo-core-4158 = Ungültiger Anmelderouten-Nachweis
 repo-core-4160 = { "" }
-    Falls Pull bereits mit Merge oder Rebase begonnen hatte, bleibt dies aktiv: Abbrechen in der Werkzeugleiste kehrt zur ursprünglichen Branch-Position zurück.
+            Falls Pull bereits mit Merge oder Rebase begonnen hatte, bleibt dies aktiv: Abbrechen in der Werkzeugleiste kehrt zur ursprünglichen Branch-Position zurück.
 repo-core-4161 = { $why }: in Werkzeugleiste oder Einstellungen → Git deaktivieren.
 repo-core-4164 = HEAD hat sich inzwischen bewegt (bei { $now }, nicht { $expected }): Zurücksetzen würde spätere Arbeit verlieren
 repo-core-4166 = HEAD hat sich beim Vorbereiten dieses Vorgangs bewegt; Vorschau erneut öffnen. Kein Vorgang ausgeführt.
@@ -3028,62 +3175,61 @@ repo-core-4241 = Commit-Nachricht
 repo-core-4242 = Editor
 repo-core-4243 = Review-Entwurf
 repo-core-contained-branches = { $count ->
-        [0] keine Branches
-        [one] { $count } Branch
-       *[other] { $count } Branches
-    }
+                [0] keine Branches
+                [one] { $count } Branch
+               *[other] { $count } Branches
+            }
 repo-core-contained-tags = { $count ->
-        [0] keine Tags
-        [one] { $count } Tag
-       *[other] { $count } Tags
-    }
+                [0] keine Tags
+                [one] { $count } Tag
+               *[other] { $count } Tags
+            }
 repo-core-table-rows-changed = { $count ->
-        [one] { $count } Zeile geändert
-       *[other] { $count } Zeilen geändert
-    }
+                [one] { $count } Zeile geändert
+               *[other] { $count } Zeilen geändert
+            }
 repo-core-table-rows-added = { $count ->
-        [one] { $count } Zeile hinzugefügt
-       *[other] { $count } Zeilen hinzugefügt
-    }
+                [one] { $count } Zeile hinzugefügt
+               *[other] { $count } Zeilen hinzugefügt
+            }
 repo-core-table-rows-removed = { $count ->
-        [one] { $count } Zeile entfernt
-       *[other] { $count } Zeilen entfernt
-    }
+                [one] { $count } Zeile entfernt
+               *[other] { $count } Zeilen entfernt
+            }
 repo-core-table-rows-renamed = { $count ->
-        [one] { $count } Zeile umbenannt
-       *[other] { $count } Zeilen umbenannt
-    }
+                [one] { $count } Zeile umbenannt
+               *[other] { $count } Zeilen umbenannt
+            }
 repo-core-table-columns-changed = { $count ->
-        [one] { $count } Spalte geändert
-       *[other] { $count } Spalten geändert
-    }
+                [one] { $count } Spalte geändert
+               *[other] { $count } Spalten geändert
+            }
 repo-core-table-columns-added = { $count ->
-        [one] { $count } Spalte hinzugefügt
-       *[other] { $count } Spalten hinzugefügt
-    }
+                [one] { $count } Spalte hinzugefügt
+               *[other] { $count } Spalten hinzugefügt
+            }
 repo-core-table-columns-removed = { $count ->
-        [one] { $count } Spalte entfernt
-       *[other] { $count } Spalten entfernt
-    }
+                [one] { $count } Spalte entfernt
+               *[other] { $count } Spalten entfernt
+            }
 repo-core-table-columns-renamed = { $count ->
-        [one] { $count } Spalte umbenannt
-       *[other] { $count } Spalten umbenannt
-    }
+                [one] { $count } Spalte umbenannt
+               *[other] { $count } Spalten umbenannt
+            }
 repo-core-toolbar-behind = { $name }, { $count } zurück
 repo-core-toolbar-ahead = { $name }, { $count } voraus
 repo-core-line-range-one = Zeile { $range }
 repo-core-line-range-many = Zeilen { $range }
 repo-core-fold-staged = { $fixup ->
-        [yes] { $count ->
-            [one] Die bereitgestellte Datei korrigiert diesen Commit mit einem Fixup:
-           *[other] Die { $count } bereitgestellten Dateien korrigieren diesen Commit mit einem Fixup:
-        }
-       *[no] { $count ->
-            [one] Die bereitgestellte Datei wird in diesen Commit eingearbeitet:
-           *[other] Die { $count } bereitgestellten Dateien werden in diesen Commit eingearbeitet:
-        }
-    }
-
+                [yes] { $count ->
+                    [one] Die bereitgestellte Datei korrigiert diesen Commit mit einem Fixup:
+                   *[other] Die { $count } bereitgestellten Dateien korrigieren diesen Commit mit einem Fixup:
+                }
+               *[no] { $count ->
+                    [one] Die bereitgestellte Datei wird in diesen Commit eingearbeitet:
+                   *[other] Die { $count } bereitgestellten Dateien werden in diesen Commit eingearbeitet:
+                }
+            }
 repo-core-operation-dco = Commits von { $branch } mit Signed-off-by versehen
 repo-core-operation-dco-here = Commits von { $branch } mit Signed-off-by versehen (nur hier)
 repo-core-change-unchanged = Unverändert
@@ -3099,48 +3245,46 @@ repo-core-change-relicensed = Lizenz geändert
 repo-core-not-executed = nicht ausgeführt
 repo-core-count-changed = { $count } geändert
 repo-core-cells-changed = { $count ->
-        [one] { $count } Zelle geändert
-       *[other] { $count } Zellen geändert
-    }
+                [one] { $count } Zelle geändert
+               *[other] { $count } Zellen geändert
+            }
 repo-core-count-added = { $count } hinzugefügt
 repo-core-cells-added = { $count ->
-        [one] { $count } Zelle hinzugefügt
-       *[other] { $count } Zellen hinzugefügt
-    }
+                [one] { $count } Zelle hinzugefügt
+               *[other] { $count } Zellen hinzugefügt
+            }
 repo-core-count-removed = { $count } entfernt
 repo-core-cells-removed = { $count ->
-        [one] { $count } Zelle entfernt
-       *[other] { $count } Zellen entfernt
-    }
+                [one] { $count } Zelle entfernt
+               *[other] { $count } Zellen entfernt
+            }
 repo-core-count-moved = { $count } verschoben
 repo-core-cells-moved = { $count ->
-        [one] { $count } Zelle verschoben
-       *[other] { $count } Zellen verschoben
-    }
+                [one] { $count } Zelle verschoben
+               *[other] { $count } Zellen verschoben
+            }
 repo-core-count-upgraded = { $count } aktualisiert
 repo-core-cells-upgraded = { $count ->
-        [one] { $count } Zelle aktualisiert
-       *[other] { $count } Zellen aktualisiert
-    }
+                [one] { $count } Zelle aktualisiert
+               *[other] { $count } Zellen aktualisiert
+            }
 repo-core-count-downgraded = { $count } zurückgestuft
 repo-core-cells-downgraded = { $count ->
-        [one] { $count } Zelle zurückgestuft
-       *[other] { $count } Zellen zurückgestuft
-    }
+                [one] { $count } Zelle zurückgestuft
+               *[other] { $count } Zellen zurückgestuft
+            }
 repo-core-count-licenses = { $count } mit Lizenzangaben
 repo-core-cells-licenses = { $count ->
-        [one] { $count } Zelle mit Lizenzangaben
-       *[other] { $count } Zellen mit Lizenzangaben
-    }
-repo-core-picture-read-error = Das Bild konnte nicht gelesen werden: { $error }
-
+                [one] { $count } Zelle mit Lizenzangaben
+               *[other] { $count } Zellen mit Lizenzangaben
+            }
 repo-core-table-old-line = Zu Zeile { $line } der Datei vor der Änderung springen
 repo-core-cancelled = Abgebrochen
 repo-core-cancelled-locks = Abgebrochen, aber Git hat { $locks } zurückgelassen.
-    { $amount ->
-        [one] Solange diese Sperrdatei existiert, verweigert Git die Arbeit in diesem Repository. Lösche sie, wenn hier kein anderes Git-Programm läuft.
-       *[many] Solange diese Sperrdateien existieren, verweigert Git die Arbeit in diesem Repository. Lösche sie, wenn hier kein anderes Git-Programm läuft.
-    }
+            { $amount ->
+                [one] Solange diese Sperrdatei existiert, verweigert Git die Arbeit in diesem Repository. Lösche sie, wenn hier kein anderes Git-Programm läuft.
+               *[many] Solange diese Sperrdateien existieren, verweigert Git die Arbeit in diesem Repository. Lösche sie, wenn hier kein anderes Git-Programm läuft.
+            }
 repo-core-forge-fallback = Die Hosting-Plattform
 repo-core-rebase-commit-accessible = Rebase-Commit { $hash }, { $summary }, { $author }, { $step }
 repo-core-cell-kind-code = Code

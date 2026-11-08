@@ -76,20 +76,18 @@ pub(crate) fn tally_line(i: &Interaction) -> String {
 
 /// Where a search is: `Test 7 of at most 40: 3 commits fail`.
 pub(crate) fn progress_line(p: &SearchProgress) -> String {
-    let said = match p.probe {
-        Probe::Pass => crate::i18n::text("repo-core-2827"),
-        Probe::Fail => crate::i18n::text("repo-core-2828"),
-        Probe::Unresolved => crate::i18n::text("repo-core-2829"),
+    let probe = match p.probe {
+        Probe::Pass => "pass",
+        Probe::Fail => "fail",
+        Probe::Unresolved => "unresolved",
     };
-    let commits = if p.size == 1 { "commit" } else { "commits" };
     crate::i18n::message(
         "repo-core-2831",
         &[
-            ("tests", format!("{}", p.tests).into()),
-            ("budget", format!("{}", p.budget).into()),
-            ("size", format!("{}", p.size).into()),
-            ("commits", format!("{}", commits).into()),
-            ("said", format!("{}", said).into()),
+            ("tests", p.tests.into()),
+            ("budget", p.budget.into()),
+            ("size", p.size.into()),
+            ("probe", probe.into()),
         ],
     )
 }

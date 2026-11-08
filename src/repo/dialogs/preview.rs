@@ -302,20 +302,9 @@ fn more_commits(more: usize, only_here: usize) -> String {
 /// The commits counted are those the operation rewrites: for a dropped commit, it and every
 /// one after it, more than the list shows.
 fn pushed_note(upstream: &str, commits: usize) -> String {
-    let which = if commits == 1 {
-        crate::i18n::text("repo-core-1445").to_owned()
-    } else {
-        crate::i18n::message(
-            "repo-core-1446",
-            &[("commits", format!("{}", commits).into())],
-        )
-    };
     crate::i18n::message(
         "repo-core-1447",
-        &[
-            ("which", format!("{}", which).into()),
-            ("upstream", format!("{}", upstream).into()),
-        ],
+        &[("commits", commits.into()), ("upstream", upstream.into())],
     )
 }
 
@@ -518,3 +507,27 @@ mod tests {
 #[cfg(test)]
 #[path = "preview_tab_tests.rs"]
 mod tab_tests;
+
+#[cfg(test)]
+mod fluent_notes_tests {
+    use super::*;
+
+    #[test]
+    fn rewrite_note_uses_whole_plural_message_and_opaque_upstream() {
+        crate::i18n::set_language("en-US");
+        assert_eq!(
+            pushed_note("origin/Commit 日本語", 1),
+            "Already pushed: 1 commit this rewrites is on origin/Commit 日本語, so pushing it again will need a force push."
+        );
+        crate::i18n::set_language("de");
+        assert_eq!(
+            pushed_note("origin/Commit 日本語", 1),
+            "Ein hiervon umgeschriebener Commit wurde bereits nach origin/Commit 日本語 gepusht; erneutes Pushen erfordert daher einen Force-Push."
+        );
+        assert_eq!(
+            pushed_note("origin/Commit 日本語", 1234),
+            "1.234 hiervon umgeschriebene Commits wurden bereits nach origin/Commit 日本語 gepusht; erneutes Pushen erfordert daher einen Force-Push."
+        );
+        crate::i18n::set_language("en-US");
+    }
+}

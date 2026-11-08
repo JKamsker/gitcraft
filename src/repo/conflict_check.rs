@@ -476,10 +476,7 @@ fn verdict_text(op: Op, verdict: &Verdict) -> String {
             let all = if commits == 1 {
                 crate::i18n::text("repo-core-0779").to_owned()
             } else {
-                crate::i18n::message(
-                    "repo-core-0780",
-                    &[("commits", format!("{}", commits).into())],
-                )
+                crate::i18n::message("repo-core-0780", &[("commits", (commits).into())])
             };
             crate::i18n::message("repo-core-0781", &[("all", format!("{}", all).into())])
         }

@@ -339,16 +339,9 @@ impl Find {
             ),
             (_, true, None) => crate::i18n::message(
                 "repo-core-4108",
-                &[
-                    ("n", (n).into()),
-                    ("more", format!("{}", more).into()),
-                    ("n2", format!("{}", results(n)).into()),
-                ],
+                &[("n", (n).into()), ("more", format!("{}", more).into())],
             ),
-            (_, false, None) => crate::i18n::message(
-                "repo-core-4109",
-                &[("n", (n).into()), ("n2", format!("{}", results(n)).into())],
-            ),
+            (_, false, None) => crate::i18n::message("repo-core-4109", &[("n", (n).into())]),
         };
         Some((text, false))
     }
@@ -366,15 +359,6 @@ impl Find {
     #[cfg(test)]
     pub(crate) fn count(&self) -> usize {
         self.order.len()
-    }
-}
-
-/// "result" or "results", for `n` of them.
-fn results(n: usize) -> &'static str {
-    if n == 1 {
-        crate::i18n::text("repo-core-4110")
-    } else {
-        crate::i18n::text("repo-core-4111")
     }
 }
 

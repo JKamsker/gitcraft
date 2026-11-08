@@ -746,7 +746,7 @@ impl<'a> Rows<'a> {
                 &[
                     ("tip", format!("{}", tip).into()),
                     ("number", format!("{}", number).into()),
-                    ("count", format!("{}", count.unwrap_or(0)).into()),
+                    ("count", (count.unwrap_or(0)).into()),
                 ],
             )
         });

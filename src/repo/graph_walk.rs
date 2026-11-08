@@ -213,7 +213,7 @@ impl RepoTab {
             &[
                 ("shape", format!("{}", shape).into()),
                 ("count", (parents.len()).into()),
-                ("children", format!("{}", children).into()),
+                ("children", (children).into()),
             ],
         );
         if parents.iter().any(|hash| !self.index.contains_key(hash)) {

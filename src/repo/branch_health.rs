@@ -481,6 +481,14 @@ mod fluent_reason_tests {
             assert!(shown.contains("Commit/日本語"));
             assert!(shown.contains(if language == "de" { "1.234" } else { "1,234" }));
             assert!(reason.is_merged());
+            assert_eq!(
+                Reason::Stale(1).describe(),
+                if language == "de" {
+                    "seit 1 Tag kein Commit"
+                } else {
+                    "no commit for 1 day"
+                }
+            );
             let stale = Reason::Stale(1234);
             assert!(!stale.is_merged());
             assert!(
