@@ -891,6 +891,111 @@ fn author_rules_rank_namespace_specificity_after_host_normalization() {
 }
 
 #[test]
+fn author_rules_normalize_namespace_directory_suffixes() {
+    use crate::settings::profiles::HostAuthor;
+    let rule = |host: String, email: &str| HostAuthor {
+        host,
+        name: "Expected author".into(),
+        email: email.into(),
+    };
+    for (scheme, host, authority) in [
+        ("https", "github.com", "github.com:443"),
+        ("http", "github.com", "github.com:80"),
+        ("ssh", "github.com", "github.com:22"),
+        ("git", "github.com", "github.com:9418"),
+        ("https", "[2001:db8::1]", "[2001:db8::1]:443"),
+        ("ssh", "github.com", "ssh.github.com:443"),
+    ] {
+        let parent = rule(format!(" {authority}/COMPANY/////// "), "team@example.org");
+        let nested = rule(format!("{host}/company/sub/"), "nested@example.org");
+        for specific in [
+            vec![parent.clone(), nested.clone()],
+            vec![nested.clone(), parent.clone()],
+        ] {
+            let mut rules = vec![rule(format!("{host}////"), "general@example.org")];
+            rules.extend(specific);
+            let profile = UserProfile {
+                author_email: "fallback@example.org".into(),
+                author_hosts: rules,
+                ..Default::default()
+            };
+            let stored = profile.author_hosts.clone();
+            for (path, expected) in [
+                ("company/repo", "team@example.org"),
+                ("company", "team@example.org"),
+                ("company/sub/repo", "nested@example.org"),
+                ("company-other/repo", "general@example.org"),
+            ] {
+                assert_eq!(
+                    profile
+                        .expected_author(&format!("{scheme}://{host}/{path}"))
+                        .1,
+                    expected
+                );
+            }
+            assert_eq!(profile.author_hosts, stored);
+        }
+        for (first, last) in [("company", "company/"), ("company///", "company")] {
+            let profile = UserProfile {
+                author_hosts: vec![
+                    rule(format!("{authority}/{first}"), "first@example.org"),
+                    rule(format!("{host}/{last}"), "last@example.org"),
+                ],
+                ..Default::default()
+            };
+            assert_eq!(
+                profile
+                    .expected_author(&format!("{scheme}://{host}/company/repo"))
+                    .1,
+                "last@example.org"
+            );
+        }
+    }
+}
+
+#[test]
+fn trailing_namespace_policy_controls_actual_preflight_identity_findings() -> Result<(), String> {
+    use crate::settings::profiles::HostAuthor;
+    for email in ["team@example.org", "fixture@work.example"] {
+        let f = Fixture::new()?;
+        let receiver_before = f.receiver_head()?;
+        f.git(&["config", "user.name", "Team"])?;
+        f.git(&["config", "user.email", email])?;
+        f.commit("next", "next", "Next")?;
+        let mut profile = f.profile();
+        profile.author_hosts = vec![
+            HostAuthor {
+                host: "github.com:443".into(),
+                name: "General".into(),
+                email: profile.author_email.clone(),
+            },
+            HostAuthor {
+                host: "github.com/company///".into(),
+                name: "Team".into(),
+                email: "team@example.org".into(),
+            },
+        ];
+        f.git(&[
+            "remote",
+            "set-url",
+            "origin",
+            "https://github.com/company/repo.git",
+        ])?;
+        let plan = f.plan(profile)?;
+        assert_eq!(plan.expected_name, "Team");
+        assert_eq!(plan.expected_email, "team@example.org");
+        assert_eq!(
+            plan.findings
+                .iter()
+                .any(|finding| finding.kind == Kind::Identity),
+            email != "team@example.org"
+        );
+        assert_eq!(f.receiver_head()?, receiver_before);
+    }
+    Ok(())
+}
+
+#[test]
 fn explicit_default_ports_keep_host_and_namespace_identity_policy() -> Result<(), String> {
     let f = Fixture::new()?;
     f.commit("next", "next", "Next")?;
