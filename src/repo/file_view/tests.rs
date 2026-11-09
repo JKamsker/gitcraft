@@ -204,3 +204,55 @@ fn unchanged_line_inputs_retry_failed_history_and_only_reuse_success() {
     let changed = ("b".repeat(40), key.1, key.2);
     assert!(!v.reuses_line_inputs(&Ok(changed)));
 }
+
+#[test]
+fn failed_reload_invalidates_mutable_views_and_submits_replacement_reads() -> Result<(), String> {
+    let ctx = egui::Context::default();
+    for pane in [FileTab::History, FileTab::File, FileTab::Blame] {
+        for successful_blame in [false, true] {
+            let mut tab = tab();
+            let mut v = view(Some("HEAD"));
+            v.tab = pane;
+            v.history = Some(Ok(Vec::new()));
+            v.text = Some(Err("cached text error".into()));
+            v.blame = Some(if successful_blame {
+                Ok(BlameData::default())
+            } else {
+                Err("cached blame error".into())
+            });
+            let old = replies(&v, "old reply");
+            tab.file_view = Some(v);
+            let (_, jobs) = crate::repo::messages::record_jobs(|| {
+                tab.handle(Msg::Loaded(Err("reload failed".into())), &ctx)
+            });
+            // Exercises the real Loaded handler and loader, without running a worker.
+            assert_eq!(jobs.len(), 1);
+            assert_eq!(tab.load_error.as_deref(), Some("reload failed"));
+            let v = tab.file_view.as_ref().ok_or("missing view")?;
+            assert!(v.history.is_none() && v.text.is_none());
+            assert_eq!(matches!(v.blame, Some(Ok(_))), successful_blame);
+            assert!(v.needs(FileTab::Blame));
+            deliver(&mut tab, old);
+            let v = tab.file_view.as_ref().ok_or("missing view")?;
+            assert!(v.history.is_none() && v.text.is_none());
+            let current = replies(v, "current reply");
+            deliver(&mut tab, current);
+            assert_label(
+                tab.file_view.as_ref().ok_or("missing view")?,
+                "current reply",
+            );
+        }
+    }
+    let mut tab = tab();
+    let mut v = view(Some(&"a".repeat(40)));
+    v.history = Some(Ok(Vec::new()));
+    let generation = v.generation;
+    tab.file_view = Some(v);
+    let (_, jobs) =
+        crate::repo::messages::record_jobs(|| tab.handle(Msg::Loaded(Err("failed".into())), &ctx));
+    assert!(jobs.is_empty());
+    let v = tab.file_view.as_ref().ok_or("missing view")?;
+    assert_eq!(v.generation, generation);
+    assert!(v.history.is_some());
+    Ok(())
+}
