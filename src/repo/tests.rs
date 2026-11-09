@@ -1080,3 +1080,62 @@ fn quick_drop_refuses_a_different_branch_at_the_same_commit() -> Result<(), Stri
     let _ = std::fs::remove_dir_all(dir);
     Ok(())
 }
+
+#[test]
+fn remote_spawn_mutation_serializes_whole_recorded_operations() -> Result<(), String> {
+    use std::sync::mpsc::channel;
+    use std::time::Duration;
+    let ctx = egui::Context::default();
+    let a = super::RepoTab::new_deferred("ssh://build/main".into(), &ctx);
+    let b = super::RepoTab::new_deferred("ssh://alias/linked".into(), &ctx);
+    assert_ne!(a.tx.repo, b.tx.repo);
+    let (release, gate) = channel::<()>();
+    let (out, events) = channel();
+    let record = out.clone();
+    super::messages::spawn_mutation(&a.tx, &ctx, super::Msg::JobPanicked, move || {
+        let _ = record.send("expect refs/stash");
+        let _ = gate.recv();
+        let _ = record.send("stash pop --index");
+        super::Msg::Then(Box::new(|_, _| {}))
+    });
+    assert_eq!(
+        events
+            .recv_timeout(Duration::from_secs(5))
+            .map_err(|e| e.to_string())?,
+        "expect refs/stash"
+    );
+    let record = out.clone();
+    super::messages::spawn_mutation(&b.tx, &ctx, super::Msg::JobPanicked, move || {
+        let _ = record.send("stash push");
+        super::Msg::Then(Box::new(|_, _| {}))
+    });
+    assert!(
+        crate::tasks::pool()?.queued_priorities_for(&b.tx.repo)
+            == vec![crate::tasks::Priority::Background]
+    );
+    // An ordinary tab read remains unkeyed and runs while A holds the bucket.
+    super::messages::spawn(&b.tx, &ctx, move || {
+        let _ = out.send("read");
+        super::Msg::Then(Box::new(|_, _| {}))
+    });
+    assert_eq!(
+        events
+            .recv_timeout(Duration::from_secs(5))
+            .map_err(|e| e.to_string())?,
+        "read"
+    );
+    drop(release);
+    assert_eq!(
+        events
+            .recv_timeout(Duration::from_secs(5))
+            .map_err(|e| e.to_string())?,
+        "stash pop --index"
+    );
+    assert_eq!(
+        events
+            .recv_timeout(Duration::from_secs(5))
+            .map_err(|e| e.to_string())?,
+        "stash push"
+    );
+    Ok(())
+}

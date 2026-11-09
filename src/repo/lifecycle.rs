@@ -211,6 +211,56 @@ mod tests {
     use super::*;
 
     #[test]
+    fn remote_mutation_schedule_survives_discovery_failure_and_suspend() {
+        use crate::repo::{RepoTab, messages::Msg};
+        use crate::tasks::{MutationScheduleKey, mutation_schedule_key};
+        let ctx = egui::Context::default();
+        let mut a = RepoTab::new_deferred("ssh://build/main".into(), &ctx);
+        let mut b = RepoTab::new_deferred("ssh://build/linked".into(), &ctx);
+        let stable = |tab: &RepoTab| {
+            assert_eq!(
+                mutation_schedule_key(tab.tx.repo.clone()),
+                MutationScheduleKey::Remote
+            );
+        };
+        assert_ne!(a.tx.repo, b.tx.repo);
+        stable(&a);
+        stable(&b);
+        // Synthetic successful discovery takes the same identity path as Loaded.
+        let discovered = vec![crate::git::Worktree {
+            path: a.path.clone(),
+            main: true,
+            ..Default::default()
+        }];
+        a.take_worktree_identity(discovered.clone(), String::new());
+        b.take_worktree_identity(discovered, String::new());
+        assert_eq!(a.tx.repo, b.tx.repo);
+        stable(&a);
+        stable(&b);
+        // Empty discovery, failed load and suspension can restore distinct identities.
+        b.take_worktree_identity(Vec::new(), String::new());
+        assert_ne!(a.tx.repo, b.tx.repo);
+        b.handle(Msg::Loaded(Err("synthetic discovery failure".into())), &ctx);
+        stable(&b);
+        a.life.phase = Phase::Suspended;
+        b.life.phase = Phase::Suspended;
+        a.suspend();
+        b.suspend();
+        assert_ne!(a.tx.repo, b.tx.repo);
+        stable(&a);
+        stable(&b);
+        // An alias or a different host is conservative too; no local path collides.
+        assert_eq!(
+            mutation_schedule_key("ssh://alias/elsewhere".into()),
+            MutationScheduleKey::Remote
+        );
+        assert_eq!(
+            mutation_schedule_key("/local/common.git".into()),
+            MutationScheduleKey::Local("/local/common.git".into())
+        );
+    }
+
+    #[test]
     fn suspension_retires_private_analysis_readers_and_their_pending_captures() -> Result<(), String>
     {
         let ctx = egui::Context::default();
