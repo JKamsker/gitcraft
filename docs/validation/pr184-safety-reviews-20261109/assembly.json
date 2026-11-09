@@ -1,0 +1,109 @@
+{
+  "base": "71ab301cf9bf976dab39956f1f22b66ab7d7f1c6",
+  "accepted": "ab46c8001068e44bad9d2a8f4b5ea8e94a740c77",
+  "accepted_tree": "4683de7e10a326b6f2f6340f963952c99db8a45a",
+  "branch": "fix/pr184-round4-final-v3-20261109",
+  "units": [
+    {
+      "title": "Explain line history in confirmed unborn repositories",
+      "paths": [
+        "src/git/line_log.rs"
+      ],
+      "source": "ab46c8001068e44bad9d2a8f4b5ea8e94a740c77",
+      "provenance": [
+        "eb12a9d71765478a6d9c94d2d3da07cd9581e955"
+      ],
+      "parent": "71ab301cf9bf976dab39956f1f22b66ab7d7f1c6",
+      "commit": "1dd4c2e78d406c11741504dd85933a08bcae1603",
+      "tree": "828e76ac3e16c0e286c39d2a499a995a07b6a290",
+      "remote": "1dd4c2e78d406c11741504dd85933a08bcae1603",
+      "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>"
+    },
+    {
+      "title": "Refresh failed file reads and configuration-sensitive blame",
+      "paths": [
+        "src/repo/file_view/mod.rs",
+        "src/repo/file_view/tests.rs",
+        "src/repo/load.rs",
+        "src/repo/messages.rs",
+        "src/repo/navigate.rs"
+      ],
+      "source": "ab46c8001068e44bad9d2a8f4b5ea8e94a740c77",
+      "provenance": [
+        "6a60ef0518a7caa0ab1a7c3deb68e2d753048fc2",
+        "fba88cfccee51a7e912274c885418bdb78c227bd",
+        "4dec686beee4e96330398098fd94c22c0c098487",
+        "ab46c8001068e44bad9d2a8f4b5ea8e94a740c77"
+      ],
+      "parent": "1dd4c2e78d406c11741504dd85933a08bcae1603",
+      "commit": "7585a76e39cc5096f374233b19dcf75b2f01e9a2",
+      "tree": "3711695ac8719aadb73566a8dd3d180a438fc412",
+      "remote": "7585a76e39cc5096f374233b19dcf75b2f01e9a2",
+      "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>"
+    },
+    {
+      "title": "Protect replayed and recursive pulls before dispatch",
+      "paths": [
+        "src/repo/operations.rs"
+      ],
+      "source": "ab46c8001068e44bad9d2a8f4b5ea8e94a740c77",
+      "provenance": [
+        "13a987cc4a2293af0ace0578ae0e01079beebfa7",
+        "c3fea67bc5cc5f862154ef8227bdd96d93e07057",
+        "8c541cb72bc2efb01b9095ba1ec6fa07c09628c3",
+        "47ecee32d0359abc240b95a4c6ff42db2f37a3dc",
+        "0fe2c606952deae3f1eea355399d1a64302567a7",
+        "e4869367f576b802983e125ac377b0753cf2f270",
+        "ab46c8001068e44bad9d2a8f4b5ea8e94a740c77"
+      ],
+      "parent": "7585a76e39cc5096f374233b19dcf75b2f01e9a2",
+      "commit": "5b0b70c75faf3c884f31c85538201e85cf0fd683",
+      "tree": "1619475bc18d3cc864f540ca697c891fe168e277",
+      "remote": "5b0b70c75faf3c884f31c85538201e85cf0fd683",
+      "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>"
+    },
+    {
+      "title": "Serialize local repository aliases by retained filesystem identity",
+      "paths": [
+        "src/repo/tests.rs",
+        "src/tasks.rs",
+        "src/tray/watch.rs",
+        "src/tray/watch_tests.rs"
+      ],
+      "source": "ab46c8001068e44bad9d2a8f4b5ea8e94a740c77",
+      "provenance": [
+        "b13b5a410a1a1dabe0138e09c41444fd9630fd73",
+        "a28dfab4145c7a9e8010528b7a30ed5d98dcf26e",
+        "8f87fa6619486af3df42a24cf6b728d9be1c3542"
+      ],
+      "parent": "5b0b70c75faf3c884f31c85538201e85cf0fd683",
+      "commit": "b124f7af9f8b2933dfe0253f42e10ac5039067e9",
+      "tree": "dc09523e073d2bfee669f1303078290e2636c869",
+      "remote": "b124f7af9f8b2933dfe0253f42e10ac5039067e9",
+      "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>"
+    },
+    {
+      "title": "Preserve excluded replacements of deleted tracked paths",
+      "paths": [
+        "src/repo/partial_stash/mod.rs",
+        "src/repo/partial_stash/tests.rs",
+        "locales/en-US/repo-workflows.ftl",
+        "locales/de/repo-workflows.ftl"
+      ],
+      "source": "ab46c8001068e44bad9d2a8f4b5ea8e94a740c77",
+      "provenance": [
+        "29792ee901ec37d0bca02e03273d86e3a299633e",
+        "09ba75459202913d526fc3961c3fb609c41d2c3b",
+        "1dacb09c95e97abc25d66964bef1dcc7a822dddd"
+      ],
+      "parent": "b124f7af9f8b2933dfe0253f42e10ac5039067e9",
+      "commit": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+      "tree": "4683de7e10a326b6f2f6340f963952c99db8a45a",
+      "remote": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+      "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>"
+    }
+  ],
+  "final": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+  "exact_tree_match": true,
+  "complete_path_mode_blob_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e"
+}
