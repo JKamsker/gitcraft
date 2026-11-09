@@ -306,6 +306,8 @@ fn escaped_and_legacy_pr_urls_match_the_canonical_repository() {
     for remote in [
         "https://dev.azure.com/team/My%20Project/_git/repo",
         "https://team.visualstudio.com/DefaultCollection/My%20Project/_git/repo",
+        "https://team.visualstudio.com/My%20Project/_git/repo",
+        "https://dev.azure.com:443/team/My%20Project/_git/repo",
         "git@ssh.dev.azure.com:v3/team/My%20Project/repo",
     ] {
         assert!(h.matches_git_remote(remote), "{remote}");
@@ -319,6 +321,14 @@ fn escaped_and_legacy_pr_urls_match_the_canonical_repository() {
         );
     }
     for wrong in [
+        "https://ssh.dev.azure.com/v3/team/My%20Project/repo",
+        "https://team.visualstudio.com/v3/team/My%20Project/repo",
+        "https://dev.azure.com@evil.invalid/team/My%20Project/_git/repo",
+        "https://evil.invalid@dev.azure.com/team/My%20Project/_git/repo",
+        "https://user:password@team.visualstudio.com/My%20Project/_git/repo",
+        "https://team.visualstudio.com:8443/My%20Project/_git/repo",
+        "https://team.visualstudio.com/My%20Project/_git/repo?other=1",
+        "https://team.visualstudio.com/My%20Project/_git/repo#fragment",
         "http://dev.azure.com/team/My%20Project/_git/repo",
         "https://dev.azure.com:8443/team/My%20Project/_git/repo",
         "https://dev.azure.com/team/My%20Project/_git/repo?other=1",
