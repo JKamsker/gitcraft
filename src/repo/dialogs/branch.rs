@@ -272,7 +272,7 @@ mod tests {
                 // Construct and record intents without dispatching any Git operation.
                 if let Outcome::Done(action) = outcome {
                     form.actions += 1;
-                    if let Action::UndoableOps { ops, .. } = action {
+                    if let Action::UndoableOps { ops, .. } = *action {
                         form.operations.push(ops);
                     }
                 }
