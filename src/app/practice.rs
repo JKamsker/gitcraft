@@ -1,9 +1,14 @@
 //! The start-page practice picker and the background setup handoff.
 
-use std::sync::mpsc::{TryRecvError, channel};
+use std::sync::mpsc::{Receiver, TryRecvError, channel};
 
 use super::App;
 use crate::practice::Scenario;
+
+pub(super) struct Practicing {
+    owner: egui::ViewportId,
+    rx: Receiver<Result<std::path::PathBuf, String>>,
+}
 
 impl App {
     pub(super) fn practice_dialog(&mut self, ctx: &egui::Context) {
@@ -41,32 +46,47 @@ impl App {
             self.report(crate::practice::display_error(&error));
             return;
         }
-        self.practicing = Some(rx);
+        self.practicing = Some(Practicing {
+            owner: self.windows.current,
+            rx,
+        });
     }
 
     pub(super) fn poll_practice(&mut self, ctx: &egui::Context) {
-        let Some(rx) = &self.practicing else {
+        let Some(practicing) = &self.practicing else {
             return;
         };
-        let result = match rx.try_recv() {
+        let result = match practicing.rx.try_recv() {
             Ok(result) => result,
             Err(TryRecvError::Empty) => return,
             Err(TryRecvError::Disconnected) => {
                 Err("Making the practice repository stopped unexpectedly. Try again.".to_owned())
             }
         };
+        let owner = practicing.owner;
         self.practicing = None;
-        match result {
+        self.in_window(owner, |app| match result {
             Ok(path) => {
-                self.practice_open = false;
+                app.practice_open = false;
                 // The worker already made and validated the repository root. No git on UI.
-                self.open_root(path, ctx);
+                app.open_root(path, ctx);
             }
             Err(error) => {
-                self.practice_open = false;
-                self.report(crate::practice::display_error(&error));
+                app.practice_open = false;
+                app.report(crate::practice::display_error(&error));
             }
-        }
+        });
+    }
+
+    #[cfg(test)]
+    pub(super) fn recorded_practice_completion(
+        &mut self,
+        owner: egui::ViewportId,
+        result: Result<std::path::PathBuf, String>,
+    ) {
+        let (tx, rx) = channel();
+        let _ = tx.send(result);
+        self.practicing = Some(Practicing { owner, rx });
     }
 }
 
