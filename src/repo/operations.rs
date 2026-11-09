@@ -1172,6 +1172,22 @@ pub(super) fn run_steps_guarded(
                 }
             }
         }
+        if command_envelope(&actual).is_ok_and(|(at, command)| {
+            command == "submodule" && actual.get(at + 1).is_some_and(|arg| arg == "update")
+        }) {
+            let check = if actual.first().is_some_and(|arg| arg != "submodule") {
+                Err("Submodule updates with global options cannot be validated safely. Run Update submodules again.".into())
+            } else {
+                check_ignored_submodules_with(|args, codes| {
+                    git::run_ok_codes(Some(path), args, codes)
+                })
+            };
+            if let Err(error) = check {
+                result = Err(error);
+                stopped = i;
+                break;
+            }
+        }
         // Recheck immediately before invoking rebase. A rejected plan never owns a rewrite.
         let rebasing = (fork_scope.is_some() || guarded_fork)
             && matches!(op.as_slice(), [c, config, rebase, _] if c == "-c" && config == "rebase.updateRefs=false" && rebase == "rebase");
@@ -1554,6 +1570,11 @@ fn check_command_envelopes(
         if let [mark, _, args @ ..] = op.as_slice()
             && mark == TRY
         {
+            if command_envelope(args)
+                .is_ok_and(|(_, command)| matches!(command, "pull" | "submodule"))
+            {
+                return Err("Pull and submodule operations require checked dispatch; run the operation again explicitly.".into());
+            }
             check_command_envelopes(&[args.to_vec()], saved_redo, &mut read)?;
             continue;
         }
@@ -1590,6 +1611,7 @@ struct PullMode {
     rebase: Option<bool>,
     ff_only: bool,
     ff_explicit: bool,
+    recurse: Option<bool>,
 }
 
 fn pull_mode(args: &[String]) -> Result<PullMode, String> {
@@ -1710,6 +1732,17 @@ fn pull_mode(args: &[String]) -> Result<PullMode, String> {
                 return Err(format!("Pull option requires a value: {token}"));
             }
             match name {
+                "recurse-submodules" => {
+                    mode.recurse = Some(if negated {
+                        false
+                    } else {
+                        match value.unwrap_or("yes") {
+                            "yes" | "on" | "true" | "1" | "on-demand" => true,
+                            "no" | "off" | "false" | "0" => false,
+                            value => return Err(format!("Invalid pull recursion value: {value}")),
+                        }
+                    });
+                }
                 "rebase" => {
                     mode.rebase = Some(if negated {
                         false
@@ -1770,6 +1803,17 @@ fn ignored_safe_pull_with(
     mut run: impl FnMut(&[&str], &[i32]) -> Result<String, String>,
 ) -> Result<Vec<String>, String> {
     let mode = pull_mode(args)?;
+    let recurse = match mode.recurse {
+        Some(value) => value,
+        None => match run(&["config", "--bool", "--get", "submodule.recurse"], &[0, 1])?.trim() {
+            "true" => true,
+            "false" | "" => false,
+            _ => return Err("Cannot determine safe pull submodule recursion".into()),
+        },
+    };
+    if recurse {
+        check_ignored_submodules_with(&mut run)?;
+    }
     let branch = run(&["symbolic-ref", "-q", "HEAD"], &[0])?;
     let branch = branch
         .trim()
@@ -1837,6 +1881,28 @@ fn ignored_safe_pull_with(
         args.to_vec(),
     ]
     .concat())
+}
+
+/// A child checkout/rebase does not honor the superproject's mergeOptions.
+/// foreach visits populated submodules recursively on the repository's own machine.
+fn check_ignored_submodules_with(
+    mut run: impl FnMut(&[&str], &[i32]) -> Result<String, String>,
+) -> Result<(), String> {
+    let ignored = run(
+        &[
+            "submodule",
+            "foreach",
+            "--quiet",
+            "--recursive",
+            "git ls-files --others --ignored --exclude-standard --directory -z",
+        ],
+        &[0],
+    )?;
+    if ignored.is_empty() {
+        Ok(())
+    } else {
+        Err("Submodule update cannot safely preserve ignored local files. Move them out of populated submodules and run the operation again.".into())
+    }
 }
 
 /// Captures only the witness from the same validator invocation; no additional Git call.
@@ -2004,6 +2070,81 @@ mod tests {
 
     mod short_rebase {
         use super::*;
+
+        #[test]
+        fn recursive_pull_inspects_nested_ignored_files_before_any_mutation() -> Result<(), String>
+        {
+            for (tail, configured, scans) in [
+                (vec!["--ff-only"], "true\n", true),
+                (vec!["--rebase"], "true\n", true),
+                (vec!["--recurse-submodules"], "false\n", true),
+                (vec!["--recurse-submodules=on-demand"], "false\n", true),
+                (
+                    vec!["--recurse-submodules", "--no-recurse-submodules"],
+                    "true\n",
+                    false,
+                ),
+                (
+                    vec!["--no-recurse-submodules", "--recurse-submodules=yes"],
+                    "false\n",
+                    true,
+                ),
+                (vec!["--strategy", "--recurse-submodules"], "false\n", false),
+                (vec!["--", "--recurse-submodules"], "false\n", false),
+            ] {
+                for inspection in [
+                    Ok(String::new()),
+                    Ok("nested/private\0".into()),
+                    Err("inspection failed".into()),
+                ] {
+                    let args = [
+                        vec!["pull".to_owned()],
+                        tail.iter().map(|s| s.to_string()).collect(),
+                    ]
+                    .concat();
+                    let mut calls = Vec::new();
+                    let result = super::super::ignored_safe_pull_with(&args, |argv, _| {
+                        calls.push(argv.join(" "));
+                        match argv {
+                            ["config", "--bool", "--get", "submodule.recurse"] => {
+                                Ok(configured.into())
+                            }
+                            [
+                                "submodule",
+                                "foreach",
+                                "--quiet",
+                                "--recursive",
+                                "git ls-files --others --ignored --exclude-standard --directory -z",
+                            ] => inspection.clone(),
+                            ["symbolic-ref", "-q", "HEAD"] => Ok("refs/heads/main\n".into()),
+                            ["config", ..] | ["ls-files", ..] => Ok(String::new()),
+                            _ => Err(format!("unexpected command: {argv:?}")),
+                        }
+                    });
+                    assert_eq!(
+                        result.is_ok(),
+                        !scans || inspection.as_ref().is_ok_and(String::is_empty),
+                        "{args:?}, {inspection:?}: {result:?}"
+                    );
+                    assert_eq!(
+                        calls
+                            .iter()
+                            .filter(|c| c.starts_with("submodule foreach"))
+                            .count(),
+                        usize::from(scans)
+                    );
+                    assert!(
+                        calls
+                            .iter()
+                            .all(|c| !c.starts_with("pull") && !c.starts_with("fetch"))
+                    );
+                    if let Ok(prepared) = result {
+                        assert_eq!(prepared[2..], args);
+                    }
+                }
+            }
+            Ok(())
+        }
 
         #[test]
         fn saved_prefixed_pulls_are_refused_by_dispatch_before_preparation() -> Result<(), String> {
@@ -2181,6 +2322,7 @@ mod tests {
                 let result = super::super::ignored_safe_pull_with(&saved.redo[0], |args, _| {
                     calls.push(args.join(" "));
                     match args[0] {
+                        "config" if args.last() == Some(&"submodule.recurse") => Ok(String::new()),
                         "symbolic-ref" => Ok("refs/heads/main\n".into()),
                         "ls-files" => Ok("private\0".into()),
                         _ => Err(format!("Unexpected command: {args:?}")),
@@ -2190,7 +2332,7 @@ mod tests {
                     result.is_err_and(|e| e.contains("ignored local files")),
                     "{option}"
                 );
-                assert_eq!(calls.len(), 2);
+                assert_eq!(calls.len(), 3);
                 assert!(
                     calls
                         .iter()
@@ -2224,6 +2366,7 @@ mod tests {
                 let result = super::super::ignored_safe_pull_with(&args, |argv, _| {
                     calls.push(argv.join(" "));
                     match argv {
+                        ["config", "--bool", "--get", "submodule.recurse"] => Ok(String::new()),
                         ["symbolic-ref", "-q", "HEAD"] => Ok("refs/heads/main\n".into()),
                         ["config", "-z", "--get", "branch.main.rebase"] => Ok(local.into()),
                         ["config", "-z", "--get", "pull.rebase"] => Ok(global.into()),
@@ -2282,6 +2425,7 @@ mod tests {
                 let result = super::super::ignored_safe_pull_with(&args, |argv, _| {
                     calls.push(argv.join(" "));
                     match argv {
+                        ["config", "--bool", "--get", "submodule.recurse"] => Ok(String::new()),
                         ["symbolic-ref", "-q", "HEAD"] => Ok("refs/heads/main\n".into()),
                         ["config", "-z", "--get", "pull.ff"] => Ok(ff.into()),
                         ["config", "-z", "--get", "branch.main.rebase"] => Ok("true\0".into()),
