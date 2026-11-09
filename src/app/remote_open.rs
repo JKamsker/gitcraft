@@ -4,7 +4,7 @@
 use std::path::PathBuf;
 use std::sync::mpsc::{Receiver, channel};
 
-use egui::{Key, RichText, Stroke, Ui, vec2};
+use egui::{RichText, Stroke, Ui, vec2};
 
 use super::panels::Toast;
 use super::{App, Tab, repo_root};
@@ -297,7 +297,8 @@ impl App {
                         .small(),
                 );
                 ui.add_space(10.0);
-                if form_fields(ui, form, &t) {
+                let (browse, enter) = form_fields(ui, form, &t);
+                if browse {
                     form.browse(ui.ctx());
                 }
                 if let Some(err) = &form.error {
@@ -314,7 +315,7 @@ impl App {
                         Kind::Ssh => !form.host.trim().is_empty(),
                     };
                 ui.horizontal(|ui| {
-                    let enter = !asked && ui.input(|i| i.key_pressed(Key::Enter));
+                    let enter = !asked && !browse && enter;
                     if crate::repo::primary_button(
                         ui,
                         crate::i18n::text("interaction-forms-open"),
@@ -345,7 +346,9 @@ impl App {
                 cancel = true;
             }
         }
-        if submit {
+        if cancel {
+            self.remote_form = None;
+        } else if submit {
             match form.target() {
                 Ok((host, path)) => {
                     self.remote_form = None;
@@ -357,8 +360,6 @@ impl App {
                 }
                 Err(e) => form.error = Some(e),
             }
-        } else if cancel {
-            self.remote_form = None;
         }
     }
 }
@@ -387,7 +388,8 @@ fn resolve_home(host: &Host, path: &str) -> Result<String, String> {
 }
 
 /// The machine (WSL distribution or SSH host) and the folder there: whether Browse was clicked.
-fn form_fields(ui: &mut Ui, form: &mut RemoteForm, t: &Tokens) -> bool {
+fn form_fields(ui: &mut Ui, form: &mut RemoteForm, t: &Tokens) -> (bool, bool) {
+    let mut enter = false;
     ui.horizontal(|ui| {
         ui.selectable_value(&mut form.kind, Kind::Wsl, "WSL");
         ui.selectable_value(&mut form.kind, Kind::Ssh, "SSH");
@@ -395,7 +397,7 @@ fn form_fields(ui: &mut Ui, form: &mut RemoteForm, t: &Tokens) -> bool {
     ui.add_space(8.0);
     match form.kind {
         Kind::Wsl => distro_field(ui, form, t),
-        Kind::Ssh => host_field(ui, form, t),
+        Kind::Ssh => enter |= host_field(ui, form, t),
     }
     ui.add_space(8.0);
     ui.label(
@@ -411,6 +413,7 @@ fn form_fields(ui: &mut Ui, form: &mut RemoteForm, t: &Tokens) -> bool {
                 .desired_width(ui.available_width() - 90.0)
                 .margin(egui::Margin::symmetric(8, 6)),
         );
+        enter |= super::clone::singleline_enter(&path);
         if std::mem::take(&mut form.focus) {
             path.request_focus();
         }
@@ -425,7 +428,7 @@ fn form_fields(ui: &mut Ui, form: &mut RemoteForm, t: &Tokens) -> bool {
             .on_hover_text(crate::i18n::text("interaction-forms-browse-tip"))
             .clicked();
     });
-    browse
+    (browse, enter)
 }
 
 fn distro_field(ui: &mut Ui, form: &mut RemoteForm, t: &Tokens) {
@@ -463,7 +466,8 @@ fn distro_field(ui: &mut Ui, form: &mut RemoteForm, t: &Tokens) {
         });
 }
 
-fn host_field(ui: &mut Ui, form: &mut RemoteForm, t: &Tokens) {
+fn host_field(ui: &mut Ui, form: &mut RemoteForm, t: &Tokens) -> bool {
+    let mut enter = false;
     ui.label(
         RichText::new(crate::i18n::text("interaction-forms-host"))
             .color(t.text_dim)
@@ -471,12 +475,13 @@ fn host_field(ui: &mut Ui, form: &mut RemoteForm, t: &Tokens) {
     );
     ui.horizontal(|ui| {
         let combo_w = if form.hosts.is_empty() { 0.0 } else { 40.0 };
-        ui.add(
+        let host = ui.add(
             egui::TextEdit::singleline(&mut form.host)
                 .hint_text(crate::i18n::text("interaction-forms-host-hint"))
                 .desired_width(ui.available_width() - combo_w)
                 .margin(egui::Margin::symmetric(8, 6)),
         );
+        enter |= super::clone::singleline_enter(&host);
         if !form.hosts.is_empty() {
             egui::ComboBox::from_id_salt("remote-ssh-hosts")
                 .selected_text("")
@@ -497,6 +502,7 @@ fn host_field(ui: &mut Ui, form: &mut RemoteForm, t: &Tokens) {
             .color(t.text_faint)
             .small(),
     );
+    enter
 }
 
 /// Known connection presentation only; host/path validation and raw errors stay stable.
@@ -585,6 +591,47 @@ mod localization_tests {
     use egui_kittest::{Harness, kittest::Queryable};
 
     #[test]
+    fn enter_on_remote_cancel_closes_without_submitting() {
+        crate::i18n::set_language("en-US");
+        let mut h = Harness::new_ui_state(
+            |ui, state: &mut Option<App>| {
+                if state.is_none() {
+                    let cc = eframe::CreationContext::_new_kittest(ui.ctx().clone());
+                    let mut app = App::launched_using(&cc, None, || {
+                        Ok("git version 2.43.0 (recorded)".into())
+                    });
+                    app.remote_form = Some(RemoteForm {
+                        kind: Kind::Ssh,
+                        distros: vec![],
+                        distro: String::new(),
+                        distros_rx: None,
+                        hosts: vec![],
+                        host: "-invalid".into(),
+                        path: "/inert/repository".into(),
+                        error: None,
+                        focus: false,
+                        browser: None,
+                    });
+                    *state = Some(app);
+                }
+                if let Some(app) = state {
+                    app.remote_dialog(ui.ctx());
+                }
+            },
+            None,
+        );
+        h.run_steps(3);
+        h.get_by_label("Cancel").focus();
+        h.key_press(egui::Key::Enter);
+        h.run_steps(3);
+        assert!(
+            h.state()
+                .as_ref()
+                .is_some_and(|app| app.remote_form.is_none() && app.connecting.is_empty())
+        );
+    }
+
+    #[test]
     fn actual_remote_fields_switch_kind_with_opaque_targets_and_no_discovery() {
         crate::i18n::set_language("de");
         let form = RemoteForm {
@@ -606,7 +653,7 @@ mod localization_tests {
                     crate::theme::install_fonts(ui.ctx());
                     return;
                 }
-                assert!(!form_fields(ui, form, &Tokens::get(ui.ctx())));
+                assert!(!form_fields(ui, form, &Tokens::get(ui.ctx())).0);
             },
             form,
         );
