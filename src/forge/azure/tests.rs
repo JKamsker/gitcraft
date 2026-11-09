@@ -297,3 +297,67 @@ fn historical_iteration_target_opens_and_current_pr_target_is_independently_boun
     assert_eq!(writes(&*state.lock().map_err(|e| e.to_string())?).len(), 1);
     Ok(())
 }
+
+#[test]
+fn escaped_and_legacy_pr_urls_match_the_canonical_repository() {
+    let h = hosting();
+    let generated = pr_url(&h, 7);
+    assert!(h.matches_pull_request(&generated));
+    for remote in [
+        "https://dev.azure.com/team/My%20Project/_git/repo",
+        "https://team.visualstudio.com/DefaultCollection/My%20Project/_git/repo",
+        "git@ssh.dev.azure.com:v3/team/My%20Project/repo",
+    ] {
+        assert!(h.matches_git_remote(remote), "{remote}");
+        let remotes = [crate::git::Remote {
+            name: "origin".into(),
+            url: remote.into(),
+        }];
+        assert_eq!(
+            crate::pull_request::remote_for(&remotes, &generated, &h),
+            Some("origin")
+        );
+    }
+    for wrong in [
+        "http://dev.azure.com/team/My%20Project/_git/repo",
+        "https://dev.azure.com:8443/team/My%20Project/_git/repo",
+        "https://dev.azure.com/team/My%20Project/_git/repo?other=1",
+        "https://dev.azure.com/team/My%20Project/_git/repo#fragment",
+        "https://dev.azure.com/team/my%20Project/_git/repo",
+        "https://dev.azure.com/team/My%2fProject/_git/repo",
+        "https://other.visualstudio.com/My%20Project/_git/repo",
+        "https://team.visualstudio.com.evil/My%20Project/_git/repo",
+    ] {
+        assert!(!h.matches_http_repository(wrong), "{wrong}");
+    }
+}
+
+#[test]
+fn azure_link_query_values_round_trip_without_extra_parameters() -> Result<(), String> {
+    use crate::forge::links::{Place, url};
+    for branch in ["topic&foo=bar", "topic+name", "feature/naïve%20"] {
+        let link = url(&hosting(), &Place::Branch(branch));
+        let parsed = ::url::Url::parse(&link).map_err(|e| e.to_string())?;
+        let pairs: Vec<_> = parsed.query_pairs().collect();
+        assert_eq!(pairs.len(), 1);
+        assert_eq!(pairs[0].0, "version");
+        assert_eq!(pairs[0].1, format!("GB{branch}"));
+    }
+    let path = "dir/a&version=GBmain+é%.rs";
+    let link = url(
+        &hosting(),
+        &Place::File {
+            sha: "abc123",
+            path,
+            lines: None,
+        },
+    );
+    let parsed = ::url::Url::parse(&link).map_err(|e| e.to_string())?;
+    let pairs: Vec<_> = parsed.query_pairs().collect();
+    assert_eq!(pairs.len(), 3);
+    assert_eq!(pairs[0].0, "path");
+    assert_eq!(pairs[0].1, format!("/{path}"));
+    assert_eq!(pairs[1], ("version".into(), "GCabc123".into()));
+    assert_eq!(pairs[2], ("_a".into(), "contents".into()));
+    Ok(())
+}
