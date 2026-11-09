@@ -32,7 +32,7 @@ impl RepoTab {
         self.load_line_history(ctx);
     }
 
-    pub(in crate::repo) fn load_line_history(&self, ctx: &egui::Context) {
+    pub(in crate::repo) fn load_line_history(&mut self, ctx: &egui::Context) {
         let Some(view) = &self.file_view else { return };
         let Some((at, range)) = view.lines.clone() else {
             return;
@@ -40,9 +40,13 @@ impl RepoTab {
         let generation = view.generation;
         let path = view.path.clone();
         let repo = self.path.clone();
-        let reply = history_reply(generation, path.clone(), at.clone(), range);
-        self.then(
+        let Some(token) = self.begin_file_load(FileTab::History) else {
+            return;
+        };
+        self.then_or(
             ctx,
+            false,
+            Err,
             move || {
                 let inputs = git::line_history_key(&repo, &at, &path, range);
                 let result =
@@ -52,17 +56,49 @@ impl RepoTab {
                         .and_then(|(rev, path, range)| {
                             git::line_history(&repo, &LinesAt::Rev(rev.clone()), path, *range)
                         });
-                (inputs.ok(), result)
+                Ok((inputs.ok(), result))
             },
-            move |tab, (inputs, result), ctx| {
-                reply(tab, result, ctx);
-                if let Some(view) = &mut tab.file_view
-                    && view.generation == generation
-                {
-                    view.line_inputs = inputs;
-                }
-            },
+            move |tab, outcome, ctx| tab.finish_line_history(generation, token, outcome, ctx),
         );
+    }
+
+    pub(super) fn finish_line_history(
+        &mut self,
+        generation: u64,
+        token: u64,
+        outcome: Result<
+            (
+                Option<(String, String, LineRange)>,
+                Result<Vec<git::FileCommit>, String>,
+            ),
+            String,
+        >,
+        ctx: &egui::Context,
+    ) {
+        if !self.finish_file_load(
+            FileTab::History,
+            token,
+            generation,
+            outcome.as_ref().err().map(String::as_str),
+            ctx,
+        ) {
+            return;
+        }
+        let (inputs, result) = outcome.unwrap_or_else(|error| (None, Err(error)));
+        if result.is_ok()
+            && let Some(view) = &self.file_view
+            && view
+                .line_observed
+                .as_ref()
+                .is_some_and(|observed| Some(observed) != inputs.as_ref())
+        {
+            self.invalidate_mutable_file_view(ctx);
+            return;
+        }
+        if let Some(view) = &mut self.file_view {
+            view.line_inputs = inputs;
+            view.history = Some(result);
+        }
     }
 
     /// The header (the file, which lines, the whole file's history) and the commits.
@@ -105,6 +141,7 @@ impl RepoTab {
     }
 }
 
+#[cfg(test)]
 /// Capture the opening as well as its range: reopening identical lines is a new request.
 pub(super) fn history_reply(
     generation: u64,

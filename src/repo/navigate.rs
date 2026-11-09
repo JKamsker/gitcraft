@@ -509,13 +509,19 @@ impl RepoTab {
             view.rev.clone(),
             view.tab,
         );
+        let blame_generation = view.blame_generation;
+        let Some(token) = self.begin_file_load(tab) else {
+            return;
+        };
         let repo = self.path.clone();
         match tab {
             file_view::FileTab::History => {
                 let requested_path = path.clone();
                 let requested_rev = rev.clone();
-                self.then(
+                self.then_or(
                     ctx,
+                    false,
+                    Err,
                     move || {
                         let input = git::resolve(
                             &repo,
@@ -527,17 +533,29 @@ impl RepoTab {
                             .as_ref()
                             .map_err(Clone::clone)
                             .and_then(|oid| git::file_history(&repo, Some(oid), &path));
-                        (input.ok(), result)
+                        Ok((input.ok(), result))
                     },
-                    move |tab, (input, result), ctx| {
-                        if tab.accept_file_inputs(
-                            generation,
-                            &requested_path,
-                            requested_rev.as_deref(),
+                    move |tab, outcome, ctx| {
+                        if !tab.finish_file_load(
                             file_view::FileTab::History,
-                            input,
+                            token,
+                            generation,
+                            outcome.as_ref().err().map(String::as_str),
                             ctx,
                         ) {
+                            return;
+                        }
+                        let (input, result) = outcome.unwrap_or_else(|error| (None, Err(error)));
+                        if result.is_err()
+                            || tab.accept_file_inputs(
+                                generation,
+                                &requested_path,
+                                requested_rev.as_deref(),
+                                file_view::FileTab::History,
+                                input,
+                                ctx,
+                            )
+                        {
                             tab.handle(
                                 Msg::FileHistory(generation, requested_path, requested_rev, result),
                                 ctx,
@@ -547,19 +565,46 @@ impl RepoTab {
                 );
             }
             file_view::FileTab::Blame => {
-                let generation = view.blame_generation;
                 let dark = Tokens::get(ctx).dark();
-                spawn(&self.tx, ctx, move || {
-                    let result = file_view::load_blame(&repo, rev.as_deref(), &path, dark);
-                    Msg::Blame(generation, path, rev, result)
-                })
+                let requested_path = path.clone();
+                let requested_rev = rev.clone();
+                self.then_or(
+                    ctx,
+                    false,
+                    Err,
+                    move || {
+                        let input = file_view::blame_input(&repo, rev.as_deref(), &path);
+                        let result = file_view::load_blame(&repo, rev.as_deref(), &path, dark);
+                        Ok((input, result))
+                    },
+                    move |tab, outcome, ctx| {
+                        if !tab.finish_file_load(
+                            file_view::FileTab::Blame,
+                            token,
+                            blame_generation,
+                            outcome.as_ref().err().map(String::as_str),
+                            ctx,
+                        ) {
+                            return;
+                        }
+                        let (input, result) = outcome.unwrap_or_else(|error| (None, Err(error)));
+                        if result.is_err() || tab.accept_blame_input(input, ctx) {
+                            tab.handle(
+                                Msg::Blame(blame_generation, requested_path, requested_rev, result),
+                                ctx,
+                            );
+                        }
+                    },
+                );
             }
             file_view::FileTab::File => {
                 let dark = Tokens::get(ctx).dark();
                 let requested_path = path.clone();
                 let requested_rev = rev.clone();
-                self.then(
+                self.then_or(
                     ctx,
+                    false,
+                    Err,
                     move || {
                         let bytes = git::file_at(&repo, rev.as_deref(), &path);
                         let input = bytes
@@ -568,17 +613,29 @@ impl RepoTab {
                             .map(|bytes| file_view::content_key(bytes));
                         let result =
                             bytes.map(|bytes| file_text::FileText::new(&bytes, &path, dark));
-                        (input, result)
+                        Ok((input, result))
                     },
-                    move |tab, (input, result), ctx| {
-                        if tab.accept_file_inputs(
-                            generation,
-                            &requested_path,
-                            requested_rev.as_deref(),
+                    move |tab, outcome, ctx| {
+                        if !tab.finish_file_load(
                             file_view::FileTab::File,
-                            input,
+                            token,
+                            generation,
+                            outcome.as_ref().err().map(String::as_str),
                             ctx,
                         ) {
+                            return;
+                        }
+                        let (input, result) = outcome.unwrap_or_else(|error| (None, Err(error)));
+                        if result.is_err()
+                            || tab.accept_file_inputs(
+                                generation,
+                                &requested_path,
+                                requested_rev.as_deref(),
+                                file_view::FileTab::File,
+                                input,
+                                ctx,
+                            )
+                        {
                             tab.handle(
                                 Msg::FileText(generation, requested_path, requested_rev, result),
                                 ctx,
