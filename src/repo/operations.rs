@@ -1946,7 +1946,21 @@ fn check_ignored_submodule_update_with(
     args: &[String],
     mut run: impl FnMut(&[&str], &[i32]) -> Result<String, String>,
 ) -> Result<(), String> {
-    let Some(separator) = args.iter().position(|arg| arg == "--") else {
+    // Scope only the canonical, value-free update envelope emitted by the app.
+    // In other forms an option such as --reference can consume a token spelled
+    // "--". Inspect every populated submodule rather than guessing its scope.
+    let mut separator = None;
+    for (index, arg) in args.iter().enumerate().skip(2) {
+        match arg.as_str() {
+            "--" => {
+                separator = Some(index);
+                break;
+            }
+            "--init" | "--recursive" => {}
+            _ => return check_ignored_submodules_with(run),
+        }
+    }
+    let Some(separator) = separator else {
         return check_ignored_submodules_with(run);
     };
     if separator + 1 == args.len() {
@@ -2208,6 +2222,49 @@ mod tests {
                         });
                     assert_eq!(result.is_ok(), ignored.as_ref().is_ok_and(String::is_empty));
                     assert_eq!(calls.len(), 2);
+                }
+            }
+            Ok(())
+        }
+
+        #[test]
+        fn value_consuming_submodule_options_never_narrow_the_ignored_scan() -> Result<(), String> {
+            for tail in [
+                vec!["--recursive", "--reference", "--", "--force"],
+                vec!["--reference=--", "--", "a"],
+                vec!["--jobs", "2", "--", "a"],
+                vec!["--unknown", "--", "a"],
+            ] {
+                let args: Vec<String> = [vec!["submodule", "update"], tail]
+                    .concat()
+                    .into_iter()
+                    .map(str::to_owned)
+                    .collect();
+                for ignored in [
+                    Ok(String::new()),
+                    Ok("private\0".into()),
+                    Err("inspection failed".into()),
+                ] {
+                    let mut calls = 0;
+                    let result = super::super::check_ignored_submodule_update_with(
+                        &args,
+                        |args, _| {
+                            calls += 1;
+                            assert_eq!(
+                                args,
+                                [
+                                    "submodule",
+                                    "foreach",
+                                    "--quiet",
+                                    "--recursive",
+                                    "git ls-files --others --ignored --exclude-standard --directory -z"
+                                ]
+                            );
+                            ignored.clone()
+                        },
+                    );
+                    assert_eq!(calls, 1);
+                    assert_eq!(result.is_ok(), ignored.as_ref().is_ok_and(String::is_empty));
                 }
             }
             Ok(())
