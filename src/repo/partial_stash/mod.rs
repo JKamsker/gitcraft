@@ -312,10 +312,15 @@ pub(super) fn validate_push(path: &Path, args: &[String]) -> Result<(), String> 
             }
         }
     }
-    if let StashMode::Files(paths) = &request.mode
-        && let Some(problem) = files_problem(paths, &work)
-    {
-        return Err(problem);
+    if let StashMode::Files(paths) = &request.mode {
+        // A queued selection can become completely clean. Preserve the existing
+        // no-op result while refusing before Git is asked to mutate anything.
+        if work.is_clean() {
+            return Err(crate::i18n::text("repo-workflows-partial_stash-run-push-a7f01d16").into());
+        }
+        if let Some(problem) = files_problem(paths, &work) {
+            return Err(problem);
+        }
     }
     Ok(())
 }
