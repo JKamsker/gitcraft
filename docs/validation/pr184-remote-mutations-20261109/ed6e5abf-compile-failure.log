@@ -1,0 +1,45 @@
+   Compiling gitcraft v0.3.4 (/home/jonas/.t3/worktrees/gitcraft/t3-c35e2e6e)
+error[E0282]: type annotations needed
+    --> src/repo/tests.rs:1092:27
+     |
+1092 |     let (release, gate) = channel();
+     |                           ^^^^^^^ cannot infer type of the type parameter `T` declared on the function `channel`
+...
+1097 |         let _ = gate.recv();
+     |                 ----------- type must be known at this point
+     |
+help: consider specifying a concrete type for the type parameter `T`
+     |
+1092 |     let (release, gate) = channel::</* Type */>();
+     |                                  ++++++++++++++
+
+error[E0282]: type annotations needed
+   --> src/tasks.rs:483:31
+    |
+483 |         let (release, gate) = mpsc::channel();
+    |                               ^^^^^^^^^^^^^ cannot infer type of the type parameter `T` declared on the function `channel`
+...
+496 |                 let _ = gate.recv();
+    |                         ----------- type must be known at this point
+    |
+help: consider specifying a concrete type for the type parameter `T`
+    |
+483 |         let (release, gate) = mpsc::channel::</* Type */>();
+    |                                            ++++++++++++++
+
+error[E0282]: type annotations needed
+   --> src/tasks.rs:589:31
+    |
+589 |         let (release, gate) = mpsc::channel();
+    |                               ^^^^^^^^^^^^^ cannot infer type of the type parameter `T` declared on the function `channel`
+...
+598 |                 let _ = gate.recv();
+    |                         ----------- type must be known at this point
+    |
+help: consider specifying a concrete type for the type parameter `T`
+    |
+589 |         let (release, gate) = mpsc::channel::</* Type */>();
+    |                                            ++++++++++++++
+
+For more information about this error, try `rustc --explain E0282`.
+error: could not compile `gitcraft` (lib test) due to 3 previous errors
