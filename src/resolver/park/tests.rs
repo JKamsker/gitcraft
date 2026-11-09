@@ -636,7 +636,17 @@ fn dropping_to_a_branch_keeps_accessible_byte_exact_recovery() -> Result<(), Str
     assert!(archived.join("index").is_file());
     assert!(archived.join("parked.json").is_file());
     let description = repo.git(&["config", &format!("branch.{branch}.description")])?;
-    assert!(description.contains(&archived.display().to_string()));
+    let recorded = description
+        .strip_prefix("Original byte-exact files and index: ")
+        .ok_or_else(|| format!("missing recovery path in branch description: {description:?}"))?
+        .trim_end_matches(['\r', '\n']);
+    // Windows accepts both separators, even when Path::join and embedded '/'
+    // produce different display strings. The advertised path must reach our archive.
+    assert_eq!(
+        std::fs::canonicalize(recorded).map_err(|e| e.to_string())?,
+        std::fs::canonicalize(&archived).map_err(|e| e.to_string())?,
+        "branch description points to the wrong recovery archive: {description:?}"
+    );
     assert!(list(repo.path())?.is_empty());
     assert!(
         repo.git(&["show", &format!("{branch}:notes.txt")])?
