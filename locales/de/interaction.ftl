@@ -3645,3 +3645,5 @@ interaction-shell-prose-description = Ein kleiner visueller Git-Client
 interaction-shell-prose-links = Öffnet gitcraft://-Links aus dem Browser in gitcraft
 
 interaction-home-fullscreen = Vollbild aktivieren
+
+interaction-setup-author-rule-syntax = Die Autorenregel „{ $host }“ passt möglicherweise nicht zum gewünschten Remote. Verwende Host/Namensraum, zum Beispiel github.com/team/x; behalte bei Bedarf einen numerischen Port hinter dem Host bei. Prüfe sie in den Profileinstellungen.

@@ -170,6 +170,18 @@ fn author_rule_has_url_scheme(host: &str) -> bool {
         && bytes.all(|b| b.is_ascii_alphanumeric() || matches!(b, b'+' | b'-' | b'.'))
 }
 
+/// Diagnose likely rule typos without rewriting imported rules or rejecting custom hosts.
+fn author_rule_has_suspicious_syntax(rule: &str) -> bool {
+    let (host, namespace) = rule.trim().split_once('/').unwrap_or((rule.trim(), ""));
+    let bad_namespace = namespace.starts_with('/') || namespace.contains(['?', '#']);
+    let bad_port = !host.starts_with('[')
+        && host.bytes().filter(|b| *b == b':').count() == 1
+        && host
+            .split_once(':')
+            .is_some_and(|(_, port)| !port.is_empty() && !port.bytes().all(|b| b.is_ascii_digit()));
+    bad_namespace || bad_port
+}
+
 fn preview_summary(ui: &mut egui::Ui, file: &Setup) {
     ui.label(crate::i18n::message(
         "interaction-setup-preview",
@@ -194,13 +206,17 @@ fn preview_summary(ui: &mut egui::Ui, file: &Setup) {
             ],
         ));
         for rule in &p.author_hosts {
-            if author_rule_has_url_scheme(&rule.host) {
+            let warning = if author_rule_has_url_scheme(&rule.host) {
+                Some("interaction-setup-author-rule-url")
+            } else if author_rule_has_suspicious_syntax(&rule.host) {
+                Some("interaction-setup-author-rule-syntax")
+            } else {
+                None
+            };
+            if let Some(warning) = warning {
                 ui.colored_label(
                     ui.visuals().warn_fg_color,
-                    crate::i18n::message(
-                        "interaction-setup-author-rule-url",
-                        &[("host", rule.host.as_str().into())],
-                    ),
+                    crate::i18n::message(warning, &[("host", rule.host.as_str().into())]),
                 );
             }
         }

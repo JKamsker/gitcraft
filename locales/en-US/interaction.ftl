@@ -3651,3 +3651,5 @@ interaction-shell-prose-description = A small visual git client
 interaction-shell-prose-links = Opens gitcraft:// links from the browser in gitcraft
 
 interaction-home-fullscreen = Enter fullscreen
+
+interaction-setup-author-rule-syntax = Author rule “{ $host }” may not match the intended remote. Use host/namespace, for example github.com/team/x; keep a numeric port after the host when needed. Review it in profile settings.
