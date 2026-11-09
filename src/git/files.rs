@@ -20,6 +20,32 @@ pub fn file_at(repo: &Path, rev: Option<&str>, path: &str) -> Result<Vec<u8>, St
     }
 }
 
+/// A commit's author, email and message (as `%an`, `%ae`, `%B`) and its note in each notes
+/// ref asked for (as `%N`), none where it has none.
+pub type Authorship = (String, String, String, Vec<Option<String>>);
+
+/// [`Authorship`] of commit `hash`, read in-process, or an error where only git reads it
+/// faithfully.
+pub fn commit_authorship(repo: &Path, hash: &str, notes: &[&str]) -> Result<Authorship, String> {
+    super::backend::dispatch(
+        repo,
+        super::backend::Read::Authorship,
+        |repo| super::backend::authorship(repo, hash, notes),
+        || Err("read by git".into()),
+    )
+}
+
+/// The textconv program of `path`'s diff driver (none without one), read in-process, or an
+/// error where only git reads it faithfully.
+pub fn textconv_of(repo: &Path, path: &str) -> Result<Option<String>, String> {
+    super::backend::dispatch(
+        repo,
+        super::backend::Read::Textconv,
+        |repo| super::backend::textconv_of(repo, path),
+        || Err("read by git".into()),
+    )
+}
+
 /// The bytes a file had before a commit and in it: none for a side it isn't on.
 pub type FileSides = (Option<Vec<u8>>, Option<Vec<u8>>);
 

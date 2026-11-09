@@ -96,6 +96,100 @@ pub(in crate::git) fn commit_file_sides(
     Ok((data(&old)?, data(&new)?))
 }
 
+/// The textconv program of `file`'s diff driver, as `check-attr diff` and `config diff.<driver>
+/// .textconv` find it (attributes of the working tree, then of the index): none without one.
+pub(in crate::git) fn textconv_of(path: &Path, file: &str) -> Result<Option<String>, String> {
+    let repo = super::native::open(path)?;
+    let roots = gix::diff::blob::pipeline::WorktreeRoots {
+        old_root: None,
+        new_root: repo.workdir().map(Path::to_owned),
+    };
+    let mut cache = repo
+        .diff_resource_cache(gix::diff::blob::pipeline::Mode::ToGit, roots)
+        .map_err(err)?;
+    let Some(driver) = diff_driver(&repo, &mut cache, file.as_bytes().as_bstr())? else {
+        return Ok(None);
+    };
+    let config = repo.config_snapshot();
+    let textconv = config
+        .plumbing()
+        .string(format!("diff.{driver}.textconv").as_str())
+        .map(|v| v.to_str_lossy().trim().to_owned())
+        .filter(|v| !v.is_empty());
+    Ok(textconv)
+}
+
+/// A commit's author, email and message as `%an`, `%ae` and `%B` give them, and its note in
+/// each of `notes` (as `%N` gives one: each line ended), none where it has none.
+pub(in crate::git) fn authorship(
+    path: &Path,
+    hash: &str,
+    notes: &[&str],
+) -> Result<super::super::Authorship, String> {
+    let repo = super::native::open(path)?;
+    super::commits::plain_history(&repo)?;
+    let id = gix::ObjectId::from_hex(hash.as_bytes()).map_err(err)?;
+    let commit = repo.find_commit(id).map_err(err)?;
+    let decoded = commit.decode().map_err(err)?;
+    if decoded
+        .encoding
+        .is_some_and(|e| !e.eq_ignore_ascii_case(b"utf-8") && !e.eq_ignore_ascii_case(b"utf8"))
+    {
+        return Err("commit encoding".into());
+    }
+    let author = decoded.author().map_err(err)?;
+    let text = |b: &BStr| b.to_str().map(str::to_owned).map_err(err);
+    let notes = notes
+        .iter()
+        .map(|notes| note(&repo, notes, id))
+        .collect::<Result<_, _>>()?;
+    Ok((
+        text(author.name)?,
+        text(author.email)?,
+        text(decoded.message)?,
+        notes,
+    ))
+}
+
+/// The note of commit `id` in the notes ref `notes`, its lines each ended with a newline.
+fn note(repo: &gix::Repository, notes: &str, id: gix::ObjectId) -> Result<Option<String>, String> {
+    let Some(mut reference) = repo.try_find_reference(notes).map_err(err)? else {
+        return Ok(None);
+    };
+    let tree = reference
+        .peel_to_commit()
+        .map_err(err)?
+        .tree()
+        .map_err(err)?;
+    let hex = id.to_string();
+    // As many levels of two-digit folders as the notes have been fanned out to.
+    for depth in 0..hex.len() / 2 {
+        let mut path = String::new();
+        for level in 0..depth {
+            path.push_str(&hex[level * 2..level * 2 + 2]);
+            path.push('/');
+        }
+        path.push_str(&hex[depth * 2..]);
+        let Some(entry) = tree.lookup_entry_by_path(&path).map_err(err)? else {
+            continue;
+        };
+        if !entry.mode().is_blob() {
+            return Err("note is not a blob".into());
+        }
+        let data = entry.object().map_err(err)?.detach().data;
+        let text = String::from_utf8(data).map_err(err)?;
+        let mut lines = String::with_capacity(text.len() + 1);
+        for line in text.split_inclusive('\n') {
+            lines.push_str(line);
+            if !line.ends_with('\n') {
+                lines.push('\n');
+            }
+        }
+        return Ok(Some(lines));
+    }
+    Ok(None)
+}
+
 /// What of the configuration changes how git prints a patch.
 struct Settings {
     algorithm: Algorithm,
@@ -408,6 +502,27 @@ fn diff_attribute(
         Some(gix::attrs::State::Value(_)) => Attribute::Driver,
         Some(gix::attrs::State::Unspecified) | None => Attribute::Unspecified,
     })
+}
+
+/// The diff driver `.gitattributes` name for a file (`diff=<driver>`), if any.
+fn diff_driver(
+    repo: &gix::Repository,
+    cache: &mut gix::diff::blob::Platform,
+    path: &BStr,
+) -> Result<Option<String>, String> {
+    let mut outcome = gix::attrs::search::Outcome::default();
+    outcome.initialize_with_selection(&Default::default(), Some("diff"));
+    let entry = cache
+        .attr_stack
+        .at_entry(path, None, &repo.objects)
+        .map_err(err)?;
+    entry.matching_attributes(&mut outcome);
+    Ok(outcome.iter_selected().next().and_then(|m| {
+        m.assignment
+            .state
+            .as_bstr()
+            .map(|name| name.to_str_lossy().into_owned())
+    }))
 }
 
 /// `prefix` and `path` as git writes a name in a patch: in quotes, with C escapes, when it has

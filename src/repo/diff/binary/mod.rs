@@ -517,6 +517,9 @@ pub fn textconv_for(repo: &Path, path: &str) -> Option<String> {
     if !has_textconv(repo) {
         return None;
     }
+    if let Ok(textconv) = git::textconv_of(repo, path) {
+        return textconv;
+    }
     let out = git::run(Some(repo), &["check-attr", "-z", "diff", "--", path]).ok()?;
     let driver = out.split('\0').nth(2)?;
     if matches!(driver, "" | "set" | "unset" | "unspecified") {

@@ -158,3 +158,57 @@ fn recent_patches_are_made_as_git_prints_them() -> Result<(), String> {
     println!("{made} of {files} patches made in-process");
     Ok(())
 }
+
+#[test]
+fn authorship_and_textconv_read_in_process_are_those_git_reads() -> Result<(), String> {
+    let repo = Repo::new("native-authorship")?;
+    repo.git(&["config", "diff.up.textconv", "cat"])?;
+    let noted = repo.commit(
+        "noted\n\nWith a body.\n",
+        &[
+            ("a.up", Some("a\n")),
+            ("b.txt", Some("b\n")),
+            (".gitattributes", Some("*.up diff=up\n")),
+        ],
+    )?;
+    let plain = repo.commit("plain", &[("c.txt", Some("c\n"))])?;
+    repo.git(&[
+        "notes",
+        "--ref=ai",
+        "add",
+        "-m",
+        "first line\nno newline at its end",
+        &noted,
+    ])?;
+    repo.git(&["notes", "--ref=agent-trace", "add", "-m", "trace", &plain])?;
+    let notes = ["refs/notes/ai", "refs/notes/agent-trace"];
+    for hash in [&noted, &plain] {
+        let (author, email, message, ours) = authorship(repo.path(), hash, &notes)?;
+        let format = "--format=%an%x00%ae%x00%B%x00%N%x00";
+        let log = repo.git(&[
+            "-c",
+            "i18n.logOutputEncoding=UTF-8",
+            "log",
+            "-1",
+            "--notes=ai",
+            format,
+            hash,
+        ])?;
+        let fields: Vec<&str> = log.split('\0').collect();
+        assert_eq!(
+            (author.as_str(), email.as_str(), message.as_str()),
+            (fields[0], fields[1], fields[2])
+        );
+        let theirs_ai = Some(fields[3]).filter(|n| !n.is_empty());
+        assert_eq!(ours[0].as_deref(), theirs_ai, "the ai note of {hash}");
+        let trace = repo.git(&["notes", "--ref=agent-trace", "show", hash]).ok();
+        assert_eq!(
+            ours[1].as_deref().map(str::trim_end),
+            trace.as_deref().map(str::trim_end),
+            "the trace of {hash}"
+        );
+    }
+    assert_eq!(textconv_of(repo.path(), "a.up")?.as_deref(), Some("cat"));
+    assert_eq!(textconv_of(repo.path(), "b.txt")?, None);
+    Ok(())
+}

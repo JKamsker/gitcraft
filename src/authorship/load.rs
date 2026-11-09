@@ -116,6 +116,14 @@ pub fn one(repo: &Path, hash: &str) -> Result<Option<Attribution>, String> {
     if hash.starts_with('-') {
         return Err(format!("{hash} is not a commit"));
     }
+    // In-process when it can be: two git processes otherwise, for every diff opened.
+    if let Ok((author, email, message, notes)) =
+        crate::git::commit_authorship(repo, hash, &[GIT_AI, AGENT_TRACE])
+    {
+        let note = notes[0].as_deref().filter(|n| !n.trim().is_empty());
+        let trace = note.is_none().then(|| notes[1].as_deref()).flatten();
+        return Ok(attribute(&author, &email, &message, note, trace));
+    }
     let out = crate::git::run(
         Some(repo),
         &[

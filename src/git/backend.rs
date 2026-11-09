@@ -19,6 +19,8 @@ pub(super) enum Read {
     FileDiff,
     FileAt,
     CommitFileSides,
+    Textconv,
+    Authorship,
 }
 impl Read {
     fn name(self) -> &'static str {
@@ -33,6 +35,8 @@ impl Read {
             Self::FileDiff => "file-diff",
             Self::FileAt => "file-at",
             Self::CommitFileSides => "commit-file-sides",
+            Self::Textconv => "textconv",
+            Self::Authorship => "authorship",
         }
     }
 }
@@ -174,6 +178,12 @@ fn capability(repo: &Path) -> Result<(), &'static str> {
                         | "GIT_EDITOR"
                         | "GIT_SEQUENCE_EDITOR"
                         | "GIT_PAGER"
+                        // Credentials and transport only, never a local read. Editors' terminals
+                        // (VS Code's) set GIT_ASKPASS for everything started from them.
+                        | "GIT_ASKPASS"
+                        | "GIT_SSH"
+                        | "GIT_SSH_COMMAND"
+                        | "GIT_SSH_VARIANT"
                 )
         })
     }) {
@@ -322,6 +332,30 @@ pub(super) fn commit_file_sides(
     #[cfg(not(feature = "native-git"))]
     {
         let _ = (repo, hash, file);
+        Err("feature disabled".into())
+    }
+}
+
+pub(super) fn textconv_of(repo: &Path, file: &str) -> Result<Option<String>, String> {
+    #[cfg(feature = "native-git")]
+    return patch::textconv_of(repo, file);
+    #[cfg(not(feature = "native-git"))]
+    {
+        let _ = (repo, file);
+        Err("feature disabled".into())
+    }
+}
+
+pub(super) fn authorship(
+    repo: &Path,
+    hash: &str,
+    notes: &[&str],
+) -> Result<super::Authorship, String> {
+    #[cfg(feature = "native-git")]
+    return patch::authorship(repo, hash, notes);
+    #[cfg(not(feature = "native-git"))]
+    {
+        let _ = (repo, hash, notes);
         Err("feature disabled".into())
     }
 }
