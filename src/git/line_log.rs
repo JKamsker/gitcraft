@@ -32,6 +32,33 @@ const PLAIN_PATCH: [&str; 5] = [
     "--dst-prefix=b/",
 ];
 
+/// Resolve precisely the commit, historical path and range consumed by a line-history read.
+/// Status alone cannot detect edits that retain the same porcelain status code.
+pub(crate) fn line_history_key(
+    repo: &Path,
+    at: &LinesAt,
+    path: &str,
+    range: LineRange,
+) -> Result<(String, String, LineRange), String> {
+    let (rev, path, range) = match at {
+        LinesAt::Rev(rev) => (rev.as_str(), path.to_owned(), ordered(range)),
+        LinesAt::Index | LinesAt::WorkTree => {
+            let (path, range) = committed_range(repo, at, path, range)?;
+            ("HEAD", path, range)
+        }
+    };
+    let oid = run(
+        Some(repo),
+        &[
+            "rev-parse",
+            "--verify",
+            "--end-of-options",
+            &format!("{rev}^{{commit}}"),
+        ],
+    )?;
+    Ok((oid.trim().to_owned(), path, range))
+}
+
 /// Every commit that touched lines `range` of `path` as it is `at`, newest first. Lines not
 /// committed yet (picked on disk or in the index) are first found in HEAD.
 pub fn line_history(

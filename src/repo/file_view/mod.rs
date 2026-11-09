@@ -61,6 +61,8 @@ pub(crate) struct FileView {
     /// The history of only these lines (where their numbers count from, and the lines), not
     /// of the whole file.
     pub lines: Option<(git::LinesAt, git::LineRange)>,
+    pub line_inputs: Option<(String, String, git::LineRange)>,
+    pub line_input_check: u64,
     /// A line to scroll to once the blame is read, and to mark (1 is the first).
     pub goto_line: std::cell::Cell<Option<usize>>,
     pub marked_line: Option<usize>,
@@ -78,6 +80,8 @@ impl FileView {
             blame_needs_refresh: false,
             text: None,
             lines: None,
+            line_inputs: None,
+            line_input_check: 0,
             goto_line: Default::default(),
             marked_line: None,
         }
@@ -111,6 +115,49 @@ impl FileView {
 
 impl RepoTab {
     /// Refresh the visible pane now; other panes load when selected.
+    /// Probe the actual line mapping in the background before rerunning expensive history.
+    pub(super) fn status_changed_file_view(&mut self, ctx: &egui::Context) {
+        let Some(view) = &mut self.file_view else {
+            return;
+        };
+        let Some((at, range)) = view.lines.clone() else {
+            self.invalidate_mutable_file_view(ctx);
+            return;
+        };
+        if view.rev.as_deref().is_some_and(git::investigations::oid) {
+            return;
+        }
+        let generation = view.generation;
+        let path = view.path.clone();
+        let requested_path = path.clone();
+        let repo = self.path.clone();
+        let check = next_generation();
+        view.line_input_check = check;
+        self.then(
+            ctx,
+            move || git::line_history_key(&repo, &at, &path, range),
+            move |tab, inputs, ctx| {
+                let Some(view) = &mut tab.file_view else {
+                    return;
+                };
+                if view.generation != generation
+                    || view.path != requested_path
+                    || view.line_input_check != check
+                {
+                    return;
+                }
+                // Errors cannot establish unchanged inputs; retry the normal read.
+                if inputs.as_ref().ok() == view.line_inputs.as_ref()
+                    && inputs.is_ok()
+                    && view.history.is_some()
+                {
+                    return;
+                }
+                tab.invalidate_mutable_file_view(ctx);
+            },
+        );
+    }
+
     pub(super) fn invalidate_mutable_file_view(&mut self, ctx: &egui::Context) {
         if let Some(view) = &mut self.file_view
             && view.invalidate_mutable()
