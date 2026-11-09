@@ -165,7 +165,21 @@ pub(crate) fn files_problem(paths: &[String], work: &WorkStatus) -> Option<Strin
             return Some(problem);
         }
     }
-    None
+    outside_staged_problem(paths, work)
+}
+
+/// Git saves the whole index even with pathspecs. Leaving staged paths outside the
+/// selection makes the generic `stash pop --index` Undo try to apply them twice.
+fn outside_staged_problem(paths: &[String], work: &WorkStatus) -> Option<String> {
+    work.staged
+        .iter()
+        .find(|f| !paths.contains(&f.path))
+        .map(|f| {
+            crate::i18n::message(
+                "repo-workflows-partial_stash-outside-staged",
+                &[("path", f.path.clone().into())],
+            )
+        })
 }
 
 /// Whether `work` has changes besides untracked files (what a stash without them can take).
@@ -297,6 +311,11 @@ pub(super) fn validate_push(path: &Path, args: &[String]) -> Result<(), String> 
                 return Err(problem);
             }
         }
+    }
+    if let StashMode::Files(paths) = &request.mode
+        && let Some(problem) = outside_staged_problem(paths, &work)
+    {
+        return Err(problem);
     }
     Ok(())
 }

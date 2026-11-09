@@ -247,7 +247,10 @@ fn a_staged_rename_or_deletion_is_refused_before_anything_happens() -> Result<()
         );
         assert!(result.is_err());
     }
-    assert_eq!(files_problem(&["a.txt".to_owned()], &work), None);
+    assert!(
+        files_problem(&["a.txt".to_owned()], &work)
+            .is_some_and(|p| p.contains("staged outside the selection"))
+    );
     assert_eq!(repo.stashes(), 0);
     assert_eq!(repo.state()?, before);
     Ok(())
@@ -970,5 +973,84 @@ fn ignored_replacements_refuse_shared_agent_stash_execution() -> Result<(), Stri
         result?;
         assert_eq!(repo.state()?, before);
     }
+    Ok(())
+}
+
+#[test]
+fn files_validation_refuses_outside_staged_but_allows_unstaged() {
+    let file = |path: &str, area| git::StatusFile {
+        path: path.into(),
+        old_path: None,
+        code: 'M',
+        area,
+    };
+    let mut work = WorkStatus {
+        staged: vec![file("a", git::Area::Staged), file("b", git::Area::Staged)],
+        unstaged: vec![file("c", git::Area::Unstaged)],
+        ..WorkStatus::default()
+    };
+    let selected = vec!["a".to_owned()];
+    assert!(files_problem(&selected, &work).is_some_and(|e| e.contains("prevents Undo")));
+    assert!(files_problem(&["a".into(), "b".into()], &work).is_none());
+    work.staged.pop();
+    work.unstaged.push(file("b", git::Area::Unstaged));
+    assert!(files_problem(&selected, &work).is_none());
+    let request = StashRequest {
+        mode: StashMode::Files(selected),
+        message: "--".into(),
+        untracked: false,
+    };
+    let args = push_args(&request, &work).expect("unrelated unstaged files supported");
+    assert_eq!(push_request(&args).expect("decode").mode, request.mode);
+}
+
+#[test]
+fn fresh_files_push_and_redo_refuse_outside_staged_paths() -> Result<(), String> {
+    let repo = Repo::new("files-outside-staged")?;
+    repo.write("a.txt", b"staged a\n")?;
+    repo.git(&["add", "a.txt"])?;
+    repo.write("old.txt", b"unrelated unstaged\n")?;
+    let request = StashRequest {
+        mode: StashMode::Files(vec!["a.txt".into()]),
+        message: String::new(),
+        untracked: false,
+    };
+    let stale_args = push_args(&request, &repo.status()?)?;
+    let before = repo.state()?;
+    let (result, kind) = repo.stash(request.mode.clone(), false);
+    result?;
+    let undone = repo.undo(entry(kind)?)?;
+    assert_eq!(repo.state()?, before);
+    // The same selection becomes unsupported after another file is staged.
+    repo.write("sp ace.txt", b"staged b\n")?;
+    repo.git(&["add", "sp ace.txt"])?;
+    let before = repo.state()?;
+    let stash_before = repo.git(&["stash", "list"])?;
+    assert!(push_args(&request, &repo.status()?).is_err_and(|e| e.contains("prevents Undo")));
+    let (result, _) = run_push(repo.path(), stale_args, git::head(repo.path()), false);
+    assert!(result.is_err_and(|e| e.contains("prevents Undo")));
+    let (result, _, stopped) = run_steps_counted(
+        repo.path(),
+        &undone.redo.clone(),
+        OpKind::Redo(undone),
+        None,
+        false,
+        None,
+    );
+    assert!(result.is_err_and(|e| e.contains("prevents Undo")));
+    assert_eq!(stopped, 0);
+    assert_eq!(repo.state()?, before);
+    assert_eq!(repo.git(&["stash", "list"])?, stash_before);
+    // Selecting every staged path still round-trips the index and unrelated unstaged bytes.
+    let (result, kind) = repo.stash(
+        StashMode::Files(vec!["a.txt".into(), "sp ace.txt".into()]),
+        false,
+    );
+    result?;
+    let undone = repo.undo(entry(kind)?)?;
+    assert_eq!(repo.state()?, before);
+    let redone = repo.redo(undone)?;
+    repo.undo(redone)?;
+    assert_eq!(repo.state()?, before);
     Ok(())
 }

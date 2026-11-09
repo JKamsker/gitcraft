@@ -326,6 +326,20 @@ mod tests {
     }
 
     #[test]
+    fn files_dialog_explains_outside_staged_undo_limitation() {
+        let mut work = WorkStatus {
+            staged: vec![file("a", 'M', Area::Staged), file("b", 'M', Area::Staged)],
+            ..WorkStatus::default()
+        };
+        let support = StagedSupport::Known(Ok(()));
+        let d = StashDialog::new(Choice::Files, vec!["a".into()]);
+        assert!(problem(&d, &work, &support).is_some_and(|p| p.contains("prevents Undo")));
+        work.staged.pop();
+        work.unstaged.push(file("b", 'M', Area::Unstaged));
+        assert!(problem(&d, &work, &support).is_none());
+    }
+
+    #[test]
     fn long_lists_of_files_are_summed_up() {
         let files = |n: usize| (0..n).map(|i| format!("f{i}")).collect::<Vec<_>>();
         assert_eq!(files_summary(&files(1)), "f0");
