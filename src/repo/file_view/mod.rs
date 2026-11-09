@@ -82,7 +82,10 @@ pub(super) struct FileInputs {
 
 pub(super) fn content_key(bytes: &[u8]) -> String {
     use sha2::{Digest, Sha256};
-    format!("{:x}", Sha256::digest(bytes))
+    Sha256::digest(bytes)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
 }
 
 fn file_inputs(repo: &std::path::Path, rev: Option<&str>, path: &str) -> FileInputs {

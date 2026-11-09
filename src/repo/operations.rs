@@ -2223,10 +2223,10 @@ mod tests {
                 let steps = vec![proof.clone(), vec![command.into(), "--quiet".into()]];
                 let mut reads = Vec::new();
                 super::super::check_command_envelopes(&steps, true, &mut |args| {
-                    reads.push(args.to_vec());
+                    reads.push(args.join(" "));
                     Ok("pull\nfetch\n".into())
                 })?;
-                assert_eq!(reads, [vec!["--list-cmds=builtins"]]);
+                assert_eq!(reads, ["--list-cmds=builtins"]);
                 let mut verified = 0;
                 super::super::check_https_routes(&steps, |actual| {
                     assert_eq!(actual, &binding);
