@@ -1578,7 +1578,7 @@ fn check_command_envelopes(
             check_command_envelopes(&[args.to_vec()], saved_redo, &mut read)?;
             continue;
         }
-        if op.first().is_some_and(|word| word.starts_with('\0')) {
+        if is_expectation(op) || op.first().is_some_and(|word| word.starts_with('\0')) {
             continue; // Application-owned expectations and try-step envelopes.
         }
         let envelope = command_envelope(op);
@@ -1589,6 +1589,12 @@ fn check_command_envelopes(
         };
         if command == "pull" && at != 0 {
             return Err("Saved pull commands with global options cannot be validated safely. Run Pull again from the toolbar.".into());
+        }
+        if command == "submodule"
+            && (op.get(at + 1).is_some_and(|word| word.starts_with('-'))
+                || (at != 0 && op.get(at + 1).is_some_and(|word| word == "update")))
+        {
+            return Err("Submodule updates with global or command-prefix options cannot be validated safely. Run Update submodules again.".into());
         }
         if saved_redo {
             let names = match &builtins {
@@ -2202,6 +2208,68 @@ mod tests {
                 )
                 .is_err()
             );
+            Ok(())
+        }
+
+        #[test]
+        fn redo_route_expectations_reach_proof_validation_and_submodule_prefixes_refuse()
+        -> Result<(), String> {
+            let binding = super::recorded_route()?;
+            let proof = vec![
+                super::super::EXPECT_HTTPS_ROUTE.into(),
+                serde_json::to_string(&binding).map_err(|e| e.to_string())?,
+            ];
+            for command in ["pull", "fetch"] {
+                let steps = vec![proof.clone(), vec![command.into(), "--quiet".into()]];
+                let mut reads = Vec::new();
+                super::super::check_command_envelopes(&steps, true, &mut |args| {
+                    reads.push(args.to_vec());
+                    Ok("pull\nfetch\n".into())
+                })?;
+                assert_eq!(reads, [vec!["--list-cmds=builtins"]]);
+                let mut verified = 0;
+                super::super::check_https_routes(&steps, |actual| {
+                    assert_eq!(actual, &binding);
+                    verified += 1;
+                    Ok(())
+                })?;
+                assert_eq!(verified, 1);
+                assert!(
+                    super::super::check_https_routes(&steps, |_| Err("route changed".into()))
+                        .is_err()
+                );
+            }
+            for argv in [
+                vec!["submodule", "--quiet", "update", "--init", "--recursive"],
+                vec!["submodule", "-q", "update"],
+                vec!["submodule", "--cached", "update"],
+                vec!["-c", "submodule.recurse=true", "submodule", "update"],
+                vec!["-C", "elsewhere", "submodule", "--quiet", "update"],
+                vec!["--unknown", "pull"],
+            ] {
+                let saved: UndoEntry = serde_json::from_value(serde_json::json!({
+                    "label":"Replay", "undo":[], "redo":[argv], "heads":null
+                }))
+                .map_err(|e| e.to_string())?;
+                let (result, _, stopped) = super::super::run_steps_counted(
+                    Path::new("/unopened-submodule-envelope-fixture"),
+                    &saved.redo,
+                    OpKind::Redo(saved.clone()),
+                    None,
+                    true,
+                    None,
+                );
+                assert!(
+                    result.is_err_and(|e| e.contains("Run") || e.contains("run")),
+                    "{argv:?}"
+                );
+                assert_eq!(stopped, 0);
+            }
+            super::super::check_command_envelopes(
+                &ops(&[&["submodule", "update", "--quiet", "--recursive"]]),
+                true,
+                &mut |_| Ok("submodule\n".into()),
+            )?;
             Ok(())
         }
 
