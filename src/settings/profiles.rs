@@ -85,7 +85,10 @@ impl UserProfile {
                         policy_host(&key).as_deref() == Some(host.as_str())
                     }
                 })
-                .max_by_key(|p| p.host.len())
+                // Host spelling (default ports, aliases, or whitespace) must not
+                // outweigh a more specific namespace. Equal specificity keeps
+                // the existing last-rule precedence.
+                .max_by_key(|p| p.host.trim().split_once('/').map_or(0, |(_, ns)| ns.len()))
         });
         policy.map_or(
             (self.author_name.as_str(), self.author_email.as_str()),
