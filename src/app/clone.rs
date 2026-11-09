@@ -605,7 +605,11 @@ mod localization_tests {
                     form.submit += 1;
                 }
             },
-            EnterForm::default(),
+            EnterForm {
+                parent: "/inert".into(),
+                name: "repo".into(),
+                ..Default::default()
+            },
         );
         // Keep the focus transition and its observations in one rendering pass.
         h.ctx
@@ -615,30 +619,42 @@ mod localization_tests {
 
     #[test]
     fn coalesced_tab_and_enter_does_not_submit() {
-        let mut h = enter_form();
-        let parent = h.state().parent_id.expect("parent rendered");
-        h.ctx.memory_mut(|m| m.request_focus(parent));
-        h.step();
-        // RawInput keeps both keys in one frame; Harness::key_press would split them.
-        h.input_mut()
-            .events
-            .extend(
-                [Key::Tab, Key::Enter]
-                    .into_iter()
-                    .map(|key| egui::Event::Key {
-                        key,
-                        physical_key: None,
-                        pressed: true,
-                        repeat: false,
-                        modifiers: egui::Modifiers::NONE,
-                    }),
-            );
-        h.step();
-        // TextEdit handles Enter before registering Tab traversal and retains focus.
-        // It must still not treat a traversal frame as a submission request.
-        assert_eq!(h.ctx.memory(|m| m.focused()), Some(parent));
-        assert_eq!(h.state().browse, 0);
-        assert_eq!(h.state().submit, 0);
+        for (empty, focus_name) in [(true, false), (false, false), (false, true)] {
+            let mut h = enter_form();
+            if empty {
+                h.state_mut().parent.clear();
+                h.state_mut().name.clear();
+                h.step();
+            }
+            let field = if focus_name {
+                h.state().name_id
+            } else {
+                h.state().parent_id
+            }
+            .expect("field rendered");
+            h.ctx.memory_mut(|m| m.request_focus(field));
+            h.step();
+            // RawInput keeps both keys in one frame; Harness::key_press would split them.
+            h.input_mut()
+                .events
+                .extend(
+                    [Key::Tab, Key::Enter]
+                        .into_iter()
+                        .map(|key| egui::Event::Key {
+                            key,
+                            physical_key: None,
+                            pressed: true,
+                            repeat: false,
+                            modifiers: egui::Modifiers::NONE,
+                        }),
+                );
+            h.step();
+            // TextEdit handles Enter before registering Tab traversal and retains focus.
+            // It must still not treat a traversal frame as a submission request.
+            assert_eq!(h.ctx.memory(|m| m.focused()), Some(field));
+            assert_eq!(h.state().browse, 0);
+            assert_eq!(h.state().submit, 0);
+        }
     }
 
     #[test]
