@@ -15,6 +15,7 @@ const LINE_H: f32 = 19.0;
 const GUTTER_W: f32 = 270.0;
 const NUM_W: f32 = 46.0;
 
+#[derive(Default)]
 pub(crate) struct BlameData {
     lines: Vec<BlameLine>,
     spans: Option<Vec<Spans>>,

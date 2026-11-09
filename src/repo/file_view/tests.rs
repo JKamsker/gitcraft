@@ -168,3 +168,25 @@ fn line_history_replies_cannot_cross_refresh_or_identical_reopening() -> Result<
     }
     Ok(())
 }
+
+#[test]
+fn blame_remains_visible_until_current_refresh_replaces_it() -> Result<(), String> {
+    let mut tab = tab();
+    let mut v = view(None);
+    let old = replies(&v, "stale failure");
+    v.blame = Some(Ok(BlameData::default()));
+    assert!(v.invalidate_mutable());
+    assert!(matches!(v.blame, Some(Ok(_))));
+    assert!(v.needs(FileTab::Blame));
+    let fresh = replies(&v, "current failure");
+    tab.file_view = Some(v);
+    deliver(&mut tab, old);
+    let v = tab.file_view.as_ref().ok_or("missing view")?;
+    assert!(matches!(v.blame, Some(Ok(_))));
+    assert!(v.needs(FileTab::Blame));
+    deliver(&mut tab, fresh);
+    let v = tab.file_view.as_ref().ok_or("missing view")?;
+    assert!(matches!(&v.blame, Some(Err(e)) if e == "current failure"));
+    assert!(!v.needs(FileTab::Blame));
+    Ok(())
+}
