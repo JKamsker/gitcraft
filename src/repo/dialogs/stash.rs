@@ -7,6 +7,7 @@ use crate::git::WorkStatus;
 use crate::repo::Action;
 use crate::repo::partial_stash::{
     StagedSupport, StashMode, StashRequest, everything_problem, files_problem, has_untracked,
+    push_everything_problem,
 };
 use crate::theme::Tokens;
 
@@ -123,7 +124,8 @@ pub(super) fn problem(
     support: &StagedSupport,
 ) -> Option<String> {
     match d.choice {
-        Choice::Everything | Choice::Snapshot => everything_problem(work, d.untracked),
+        Choice::Everything => push_everything_problem(work, d.untracked),
+        Choice::Snapshot => everything_problem(work, d.untracked),
         Choice::Files => files_problem(&d.files, work),
         Choice::Staged => staged_problem(work, support),
     }
@@ -303,6 +305,24 @@ mod tests {
             code,
             area,
         }
+    }
+
+    #[test]
+    fn excluded_overlap_blocks_everything_but_not_snapshot() {
+        let work = WorkStatus {
+            staged: vec![file("f", 'D', Area::Staged)],
+            unstaged: vec![file("f", '?', Area::Untracked)],
+            ..WorkStatus::default()
+        };
+        let support = StagedSupport::Known(Ok(()));
+        let mut d = StashDialog::new(Choice::Everything, Vec::new());
+        d.untracked = false;
+        assert!(problem(&d, &work, &support).is_some());
+        d.choice = Choice::Snapshot;
+        assert!(problem(&d, &work, &support).is_none());
+        d.choice = Choice::Everything;
+        d.untracked = true;
+        assert!(problem(&d, &work, &support).is_none());
     }
 
     #[test]

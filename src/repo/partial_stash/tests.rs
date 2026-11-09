@@ -799,3 +799,84 @@ fn stash_job_waits_in_the_shared_worktree_mutation_lane() -> Result<(), String> 
     assert!(tab.busy_op.is_none());
     Ok(())
 }
+
+#[test]
+fn excluded_overlap_validation_handles_ancestry_and_message_options() {
+    for (deleted, untracked, blocked) in [
+        ("f", "f", true),
+        ("f", "f/child", true),
+        ("dir/f", "dir", true),
+        ("f", "foo", false),
+        ("dir/f", "dir/other", false),
+    ] {
+        let work = WorkStatus {
+            staged: vec![git::StatusFile {
+                path: deleted.into(),
+                old_path: None,
+                code: 'D',
+                area: git::Area::Staged,
+            }],
+            unstaged: vec![git::StatusFile {
+                path: untracked.into(),
+                old_path: None,
+                code: '?',
+                area: git::Area::Untracked,
+            }],
+            ..WorkStatus::default()
+        };
+        assert_eq!(push_everything_problem(&work, false).is_some(), blocked);
+        assert!(push_everything_problem(&work, true).is_none());
+        assert!(everything_problem(&work, false).is_none()); // Snapshot remains eligible.
+        let request = StashRequest {
+            mode: StashMode::Everything,
+            message: "--include-untracked".into(),
+            untracked: false,
+        };
+        assert_eq!(push_args(&request, &work).is_err(), blocked);
+    }
+    for message in ["--include-untracked", "--", "--staged"] {
+        let args = ops(&[&["stash", "push", "-m", message]]).remove(0);
+        let request = push_request(&args).expect("stash push");
+        assert_eq!(request.mode, StashMode::Everything);
+        assert!(!request.untracked);
+    }
+}
+
+#[test]
+fn fresh_push_and_redo_refuse_recreated_deleted_file() -> Result<(), String> {
+    let repo = Repo::new("excluded-overlap-fresh")?;
+    repo.write("a.txt", b"changed\n")?;
+    let request = StashRequest {
+        mode: StashMode::Everything,
+        message: String::new(),
+        untracked: false,
+    };
+    let stale_args = push_args(&request, &repo.status()?)?;
+    let (result, kind) = repo.stash(StashMode::Everything, false);
+    result?;
+    let undone = repo.undo(entry(kind)?)?;
+    repo.git(&["rm", "-f", "a.txt"])?;
+    repo.write("a.txt", b"excluded new bytes\n")?;
+    let before = repo.state()?;
+    let stash_before = repo.git(&["stash", "list"])?;
+    let (result, _) = run_push(repo.path(), stale_args, git::head(repo.path()), false);
+    assert!(result.is_err_and(|e| e.contains("overlaps a staged deletion")));
+    let (result, _, stopped) = run_steps_counted(
+        repo.path(),
+        &undone.redo.clone(),
+        OpKind::Redo(undone),
+        None,
+        false,
+        None,
+    );
+    assert!(result.is_err_and(|e| e.contains("overlaps a staged deletion")));
+    assert_eq!(stopped, 0);
+    assert_eq!(repo.state()?, before);
+    assert_eq!(repo.git(&["stash", "list"])?, stash_before);
+    assert!(push_args(&request, &repo.status()?).is_err());
+    // Saving a snapshot does not run destructive stash cleanup.
+    let (result, _) = run_snapshot(repo.path(), "safe snapshot", false, git::head(repo.path()));
+    result?;
+    assert_eq!(repo.state()?, before);
+    Ok(())
+}

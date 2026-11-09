@@ -7653,3 +7653,5 @@ repo-workflows-r1-verdict-good = Good
 repo-workflows-r1-verdict-bad = Bad
 repo-workflows-r1-verdict-skip = Skipped
 repo-workflows-r1-verdict-timeout = Timed out
+
+repo-workflows-partial_stash-excluded-overlap = “{ $path }” overlaps a staged deletion: stashing without untracked files could overwrite it. Include untracked files or use a snapshot.

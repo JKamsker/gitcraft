@@ -1106,6 +1106,11 @@ pub(super) fn run_steps_guarded(
         if is_expectation(op) || op.first().is_some_and(|m| m == EXPECT_HTTPS_ROUTE) {
             continue;
         }
+        if let Err(error) = super::partial_stash::validate_push(path, op) {
+            result = Err(error);
+            stopped = i;
+            break;
+        }
         if let [mark, says, args @ ..] = &op[..]
             && mark == TRY
         {
