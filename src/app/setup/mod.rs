@@ -173,7 +173,8 @@ fn author_rule_has_url_scheme(host: &str) -> bool {
 /// Diagnose likely rule typos without rewriting imported rules or rejecting custom hosts.
 fn author_rule_has_suspicious_syntax(rule: &str) -> bool {
     let (host, namespace) = rule.trim().split_once('/').unwrap_or((rule.trim(), ""));
-    let bad_namespace = namespace.starts_with('/') || namespace.contains(['?', '#']);
+    let bad_namespace = namespace.trim_end_matches('/').starts_with('/')
+        || namespace.contains(['?', '#']);
     let bad_port = !host.starts_with('[')
         && host.bytes().filter(|b| *b == b':').count() == 1
         && host
