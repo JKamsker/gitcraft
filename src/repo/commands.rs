@@ -4,7 +4,7 @@ use std::time::Instant;
 
 use super::actions::BranchRef;
 use super::messages::spawn_or;
-use super::operations::expect_ref;
+use super::operations::{expect_ref, expect_ref_at};
 use super::{Action, Msg, OpKind, Refresh, RepoTab, Undo, ops, sidebar};
 use crate::forge::{self, NewPullRequest};
 use crate::git::{self, Branch, InProgress};
@@ -57,10 +57,7 @@ impl RepoTab {
         if refuse_option_like(branch, &mut self.status) {
             return;
         }
-        let run = ops(&[
-            &["checkout", "--no-overwrite-ignore", branch, "--"],
-            &["pull", "--ff-only"],
-        ]);
+        let run = checkout_pull_steps(branch, &was);
         let undo = checkout_pull_undo(&previous, branch, &was, &run);
         self.run_undoable(
             &format!("Checkout and pull {branch}"),
@@ -417,6 +414,19 @@ pub(super) fn checkout_pull_undo(
             .collect(),
         redo: run.to_vec(),
     }
+}
+
+/// Bind the cached before-tip used by undo before checking out or pulling. Redo keeps
+/// this same guard, so an external advance cannot become an undoable old snapshot.
+pub(super) fn checkout_pull_steps(branch: &str, was: &str) -> Vec<Vec<String>> {
+    [
+        vec![expect_ref_at(&BranchRef::local(branch).full(), was)],
+        ops(&[
+            &["checkout", "--no-overwrite-ignore", branch, "--"],
+            &["pull", "--ff-only"],
+        ]),
+    ]
+    .concat()
 }
 
 /// Refuses (saying so in `status`) a branch or commit name git would read as an option: one

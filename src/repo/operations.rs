@@ -2149,6 +2149,37 @@ mod tests {
         assert_ne!(after, since);
     }
 
+    #[test]
+    fn checkout_pull_and_redo_refuse_an_externally_advanced_cached_target() -> Result<(), String> {
+        let dir = repo("checkout-pull-stale-target");
+        let was = git::head(&dir);
+        let steps = crate::repo::commands::checkout_pull_steps("target", &was);
+        let redo = match checkout_pull_undo("main", "target", &was, &steps) {
+            Undo::Custom { redo, .. } => redo,
+            _ => return Err("missing checkout pull undo".into()),
+        };
+        assert_eq!(steps, redo);
+        git::run(Some(&dir), &["checkout", "-qb", "target"])?;
+        git::run(
+            Some(&dir),
+            &["commit", "-q", "--allow-empty", "-m", "external advance"],
+        )?;
+        let advanced = git::head(&dir);
+        git::run(Some(&dir), &["checkout", "-q", "main"])?;
+        for run in [&steps, &redo] {
+            let (result, _) = run_steps(&dir, run, OpKind::plain(), None);
+            assert!(result.is_err());
+            assert_eq!(git::head(&dir), was);
+            assert_eq!(git::resolve(&dir, "refs/heads/target")?, advanced);
+            assert_eq!(
+                git::run(Some(&dir), &["symbolic-ref", "--short", "HEAD"])?.trim(),
+                "main"
+            );
+        }
+        let _ = std::fs::remove_dir_all(dir);
+        Ok(())
+    }
+
     /// Undoing "Checkout and pull" does not put the branch back over commits made on it since.
     #[test]
     fn undoing_checkout_and_pull_keeps_commits_made_since() {
