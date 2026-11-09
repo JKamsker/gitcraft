@@ -1109,9 +1109,9 @@ fn remote_spawn_mutation_serializes_whole_recorded_operations() -> Result<(), St
         let _ = record.send("stash push");
         super::Msg::Then(Box::new(|_, _| {}))
     });
-    assert_eq!(
-        crate::tasks::pool()?.queued_priorities_for(&b.tx.repo),
-        vec![crate::tasks::Priority::Background]
+    assert!(
+        crate::tasks::pool()?.queued_priorities_for(&b.tx.repo)
+            == vec![crate::tasks::Priority::Background]
     );
     // An ordinary tab read remains unkeyed and runs while A holds the bucket.
     super::messages::spawn(&b.tx, &ctx, move || {
