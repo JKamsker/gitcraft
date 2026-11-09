@@ -1169,3 +1169,34 @@ fn remote_spawn_mutation_serializes_whole_recorded_operations() -> Result<(), St
     );
     Ok(())
 }
+
+#[test]
+fn successful_prefetch_settles_omitted_and_oversized_entries() {
+    let ctx = egui::Context::default();
+    let mut tab = super::RepoTab::new_deferred("/inert/prefetch".into(), &ctx);
+    let file = git::ChangedFile {
+        status: 'M',
+        path: "f".into(),
+        old_path: None,
+        added: None,
+        removed: None,
+    };
+    tab.files_cache.reading = true;
+    tab.handle(
+        super::Msg::FilesPrefetched(
+            vec!["kept".into(), "omitted".into(), "oversized".into()],
+            Ok(vec![
+                ("kept".into(), vec![file.clone()]),
+                ("oversized".into(), vec![file; 5001]),
+            ]),
+        ),
+        &ctx,
+    );
+    assert!(!tab.files_cache.reading);
+    assert_eq!(tab.files_cache.get("kept").unwrap().len(), 1);
+    for hash in ["kept", "omitted", "oversized"] {
+        assert!(tab.files_cache.settled(hash));
+    }
+    assert!(tab.files_cache.get("omitted").is_none());
+    assert!(tab.files_cache.get("oversized").is_none());
+}

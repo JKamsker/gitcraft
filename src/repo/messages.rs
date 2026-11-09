@@ -727,6 +727,11 @@ impl RepoTab {
                         for (hash, files) in read {
                             self.files_cache.insert(hash, files);
                         }
+                        let missed: Vec<_> = asked
+                            .into_iter()
+                            .filter(|hash| !self.files_cache.settled(hash))
+                            .collect();
+                        self.files_cache.unreadable(missed);
                     }
                     Err(_) => self.files_cache.unreadable(asked),
                 }
