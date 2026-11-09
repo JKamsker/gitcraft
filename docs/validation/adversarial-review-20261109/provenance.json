@@ -1,0 +1,143 @@
+{
+  "base": "34e54a627b38a4a282385235b9f4a82e337c3073",
+  "branch": "review/adversarial-fixes-ready-20261109",
+  "expected_tree": "b30c7149909e83da276f8f29e514d7df62521acb",
+  "commits": [
+    {
+      "title": "Fix Azure repository routing and complete review-state handling",
+      "commit": "6ad137a12ce2f48371f95b727ead8c7aeb2e1cf2",
+      "sources": [
+        "ceb2f5971c19125769ec68b8758d3dccb24519b1",
+        "ed3cd5a11466202aedaea05479bb0ba9ad7bc231",
+        "eb9f8ad07fd6fab2d6240153d682c7cd501ccb91",
+        "3616cc4304faca592cf8b78a09631c29c737d9ec",
+        "a2d6827e7080dc1b3dcb60218ccca8c21a821e73",
+        "46244096564514c8e9f28e0f71bc0687c098645b"
+      ],
+      "tree": "37550493dfff65fdf7be420d670b3f7e0fb2d096",
+      "status": "reviewed; included in validated final application (no separate intermediate-commit test claim)"
+    },
+    {
+      "title": "Protect ignored files throughout staged-change folding",
+      "commit": "249b1e376509b375f61b73220bd79536eee5da75",
+      "sources": [
+        "d3decc261ad11fcdd2ee96f5cc94c2d8cda91867",
+        "f21f187e349748e8d1aa8188df1788013319e595",
+        "ebbeaa7da944f868dcd3a944d8c39aa6a7034a4c"
+      ],
+      "tree": "abccc41246f5ea2aa41f94660a261a31a776b409",
+      "status": "reviewed; included in validated final application (no separate intermediate-commit test claim)"
+    },
+    {
+      "title": "Open inbox pull requests in their repository window",
+      "commit": "6afa71d5f5c1f20c1ec605cb72da4ef7492b45c6",
+      "sources": [
+        "0ce25a5fb795ad0141c585128725ee097fd1739f"
+      ],
+      "tree": "c36e01deede440a4243f4af77f520617f54aba52",
+      "status": "reviewed; included in validated final application (no separate intermediate-commit test claim)"
+    },
+    {
+      "title": "Keep practice dialogs and completion in the initiating window",
+      "commit": "f3b6127433db855b191bfac575a00d032363e932",
+      "sources": [
+        "f8f94df69ab6ff4dc2fc3376b4dc969b08a4b329"
+      ],
+      "tree": "fc79fc8521e430f8fc3421f3854523e2073483ba",
+      "status": "reviewed; included in validated final application (no separate intermediate-commit test claim)"
+    },
+    {
+      "title": "Bind quick commit rewrites to their initiating branch",
+      "commit": "960ed10fb9cfb96d9bbf8101c22f2ff5d1b3c5a3",
+      "sources": [
+        "0f226a81543c297a8d2e4d58ecac50276fe4c5bc",
+        "af2d05657278a541e1a2e9adb832d8477943635b"
+      ],
+      "tree": "305d779b1a6ab958bb3ea43545fef2b071ff97f9",
+      "status": "reviewed; included in validated final application (no separate intermediate-commit test claim)"
+    },
+    {
+      "title": "Preserve ignored files and branch identity during checkout and pull",
+      "commit": "98b8ef6a3c3bf6b04ff8a67a917b15bb38f1d9a3",
+      "sources": [
+        "e11cf02e48e9f91b4265dd38f6cb611b395372e4",
+        "705445ba92dafdb33f8fa8cf07852086bb7cb080",
+        "b2e6675984b07eea589c8155c0be1a44e640a3cf",
+        "c88c02ffd7ebe60520139f07f12531bf9fbf38fc",
+        "dfce4e157f75f496bce67fcb9282949f8ebcf670",
+        "7d191c745b0e726869e168fe99bb22162fc33438"
+      ],
+      "tree": "8a14f369dcdcebc126cc7e236f5f9d16ea6bfd3e",
+      "status": "reviewed; included in validated final application (no separate intermediate-commit test claim)"
+    },
+    {
+      "title": "Serialize stash jobs across linked worktrees",
+      "commit": "bef891f18b9a85491da4f6a78ff2cb343243ac73",
+      "sources": [
+        "cc7a68d4965b57a2598810283b3053e7bf2e3012",
+        "3d2cee824ee8e04407c4de91d74d98acd3177208",
+        "f8f0fe15be3dd3b34d70fef288a1e1e688fea4c9",
+        "03b4cc99a248358575a5d3dff312e1fc0538d0d1"
+      ],
+      "tree": "265c998c7bfc41818f0b90634cec6e452427b9e6",
+      "status": "reviewed; included in validated final application (no separate intermediate-commit test claim)"
+    },
+    {
+      "title": "Correct image difference heat maps and pixel counts",
+      "commit": "47beee10849fe0dd9f861149ae8a972a68014160",
+      "sources": [
+        "da08e3c1accfda5e0c63dbab19c22b7481e25bda"
+      ],
+      "tree": "c689146ae2d4a5228c6d44ee3d7ec3169e12a679",
+      "status": "reviewed; included in validated final application (no separate intermediate-commit test claim)"
+    },
+    {
+      "title": "Preserve host-specific author policies in portable profiles",
+      "commit": "fef792522ebcb27fef651dbe139c18d40e70efce",
+      "sources": [
+        "92518eccb86b44dd5bf98b0e6a65e472688cb061"
+      ],
+      "tree": "6c6cf50d082fc00eb45edb29e7db9752dd0983c3",
+      "status": "reviewed; included in validated final application (no separate intermediate-commit test claim)"
+    },
+    {
+      "title": "Respect keyboard focus when submitting connection forms",
+      "commit": "d4868114814cf68b5b15c5a6e45af6a05339edbd",
+      "sources": [
+        "5bd42b7f33c3b5058a1b3bb4ebf699603d488447",
+        "c80eb79ad04276e6da77bc1aca1f41527e4a8772"
+      ],
+      "tree": "1c1ef33d21d914a2212e2e752457f73f7eea0e92",
+      "status": "reviewed; included in validated final application (no separate intermediate-commit test claim)"
+    },
+    {
+      "title": "Refresh mutable file views and reject stale async results",
+      "commit": "7cb64f7cbc71262eb887df54e812b17de464451d",
+      "sources": [
+        "fdf8e8563f3d522f39b5bd453d7617d2927607d0",
+        "187aba24567b876dcd622a351176657539a86ed8"
+      ],
+      "tree": "d3fe29a63c282587a10e1cc7919bb703d4cb8313",
+      "status": "reviewed; included in validated final application (no separate intermediate-commit test claim)"
+    },
+    {
+      "title": "Reap rejected recovery fixtures before interpreting broken pipes",
+      "commit": "38f5212b57c1413e62c2d92a27c4f117d9573dda",
+      "sources": [
+        "b51126ed9c33b5654d12e143daa21f9dd39543ae"
+      ],
+      "tree": "71f44a968ba71cd660c9eef2a31ad597c229395a",
+      "status": "reviewed; included in validated final application (no separate intermediate-commit test claim)"
+    },
+    {
+      "title": "Wait for owned bisect children before testing cancellation cleanup",
+      "commit": "ff12c50ea2690e1b26f11141e199f6f7da410f9f",
+      "sources": [
+        "ff12c50ea2690e1b26f11141e199f6f7da410f9f"
+      ],
+      "tree": "b30c7149909e83da276f8f29e514d7df62521acb",
+      "status": "reviewed; included in validated final application (no separate intermediate-commit test claim)"
+    }
+  ],
+  "validated_application_commit": "ff12c50ea2690e1b26f11141e199f6f7da410f9f"
+}
