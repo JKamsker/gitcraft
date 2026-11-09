@@ -516,6 +516,7 @@ impl RepoTab {
                 Msg::FileHistory(generation, path, rev, result)
             }),
             file_view::FileTab::Blame => {
+                let generation = view.blame_generation;
                 let dark = Tokens::get(ctx).dark();
                 spawn(&self.tx, ctx, move || {
                     let result = file_view::load_blame(&repo, rev.as_deref(), &path, dark);
