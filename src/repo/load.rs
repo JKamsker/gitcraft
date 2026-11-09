@@ -81,6 +81,7 @@ impl RepoTab {
         }
         self.loading = true;
         self.load_started = Some(Instant::now());
+        self.last_load_started = self.load_started;
         let read = self.next_read();
         let forge_generation = self.forge_generation;
         let path = self.path.clone();

@@ -232,6 +232,8 @@ pub struct RepoTab {
     /// When the reload running started, and how long the last ones took (newest last), for
     /// the doctor.
     load_started: Option<Instant>,
+    /// Most recent reload start, retained after completion for focus deduplication.
+    last_load_started: Option<Instant>,
     load_times: std::collections::VecDeque<std::time::Duration>,
     /// A reload was asked for while one was running, which may have read too early.
     reload_again: bool,
@@ -649,6 +651,7 @@ impl RepoTab {
             shown: true,
             loading: false,
             load_started: None,
+            last_load_started: None,
             load_times: Default::default(),
             reload_again: false,
             load_error: None,

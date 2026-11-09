@@ -576,7 +576,7 @@ impl RepoTab {
     pub fn just_read(&self) -> bool {
         self.loading
             || self
-                .load_started
+                .last_load_started
                 .is_some_and(|at| at.elapsed() < std::time::Duration::from_secs(3))
     }
 

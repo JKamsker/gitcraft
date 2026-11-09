@@ -1200,3 +1200,22 @@ fn successful_prefetch_settles_omitted_and_oversized_entries() {
     assert!(tab.files_cache.get("omitted").is_none());
     assert!(tab.files_cache.get("oversized").is_none());
 }
+
+#[test]
+fn completed_read_remains_recent_for_focus_without_retaining_its_timer() {
+    let ctx = egui::Context::default();
+    let mut tab = super::RepoTab::new_deferred("/inert/focus-read".into(), &ctx);
+    assert!(!tab.just_read());
+    let started = std::time::Instant::now();
+    tab.loading = true;
+    tab.load_started = Some(started);
+    tab.last_load_started = Some(started);
+    super::messages::record_jobs(|| tab.handle(super::Msg::Loaded(Err("fixture".into())), &ctx));
+    assert!(tab.load_started.is_none());
+    assert!(!tab.loading);
+    assert!(tab.just_read());
+    tab.last_load_started = Some(started - std::time::Duration::from_secs(4));
+    assert!(!tab.just_read());
+    tab.loading = true;
+    assert!(tab.just_read());
+}
