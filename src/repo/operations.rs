@@ -1630,6 +1630,7 @@ fn pull_mode(args: &[String]) -> Result<PullMode, String> {
         ("rebase", 2),
         ("stat", 0),
         ("summary", 0),
+        ("compact-summary", 0),
         ("log", 2),
         ("signoff", 2),
         ("squash", 0),
@@ -2277,6 +2278,8 @@ mod tests {
         fn classifier_consumes_git_options_and_uses_last_mode() -> Result<(), String> {
             for (tail, rebase, ff_only) in [
                 (vec![], None, false),
+                (vec!["--compact-summary", "-r"], Some(true), false),
+                (vec!["--no-compact-summary", "--ff-only"], None, true),
                 (vec!["-r"], Some(true), false),
                 (vec!["-rtrue"], Some(true), false),
                 (vec!["-rmerges"], Some(true), false),
@@ -2425,6 +2428,8 @@ mod tests {
                 (vec!["--strategy", "--no-rebase"], "", "true\0", true),
                 (vec!["-srecursive"], "", "true\0", true),
                 (vec!["-rfalse"], "", "true\0", false),
+                (vec!["--compact-summary", "--no-rebase"], "", "true\0", false),
+                (vec!["--no-compact-summary", "--no-rebase"], "", "true\0", false),
                 (vec!["-qrfalse"], "", "true\0", false),
                 (vec!["--no-rebase", "-r"], "false\0", "", true),
                 (vec!["-r", "--ff-only"], "", "true\0", false),
