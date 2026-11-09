@@ -287,6 +287,21 @@ fn keep_context(repo: &Path, opts: DiffOptions, args: &mut Vec<&str>) {
 
 /// The patch of one file in a commit.
 pub fn file_diff(repo: &Path, hash: &str, path: &str, opts: DiffOptions) -> Result<String, String> {
+    super::backend::dispatch(
+        repo,
+        super::backend::Read::FileDiff,
+        |repo| super::backend::file_patch(repo, hash, path, opts),
+        || file_diff_by_git(repo, hash, path, opts),
+    )
+}
+
+/// [`file_diff`] as git prints it.
+pub(super) fn file_diff_by_git(
+    repo: &Path,
+    hash: &str,
+    path: &str,
+    opts: DiffOptions,
+) -> Result<String, String> {
     let mut args = vec![
         LITERAL_PATHS,
         "show",

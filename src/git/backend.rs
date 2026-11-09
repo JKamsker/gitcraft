@@ -16,6 +16,9 @@ pub(super) enum Read {
     CommitFiles,
     CommitDetail,
     DiffContext,
+    FileDiff,
+    FileAt,
+    CommitFileSides,
 }
 impl Read {
     fn name(self) -> &'static str {
@@ -27,6 +30,9 @@ impl Read {
             Self::CommitFiles => "commit-files",
             Self::CommitDetail => "commit-detail",
             Self::DiffContext => "diff-context",
+            Self::FileDiff => "file-diff",
+            Self::FileAt => "file-at",
+            Self::CommitFileSides => "commit-file-sides",
         }
     }
 }
@@ -222,6 +228,10 @@ pub(super) fn dispatch<T>(
                 "local upstream requires Git" => "local-upstream",
                 "listed by git" => "listed-by-git",
                 "commit encoding" => "commit-encoding",
+                "diff options" => "diff-options",
+                "diff driver" => "diff-driver",
+                "not a plain file" => "not-a-plain-file",
+                "not in the commit" => "not-in-the-commit",
                 _ => "native-read-error",
             },
         },
@@ -277,8 +287,49 @@ pub(super) fn diff_context(repo: &Path) -> Result<Option<i64>, String> {
     }
 }
 
+pub(super) fn file_patch(
+    repo: &Path,
+    hash: &str,
+    file: &str,
+    opts: super::DiffOptions,
+) -> Result<String, String> {
+    #[cfg(feature = "native-git")]
+    return patch::file_patch(repo, hash, file, opts);
+    #[cfg(not(feature = "native-git"))]
+    {
+        let _ = (repo, hash, file, opts);
+        Err("feature disabled".into())
+    }
+}
+
+pub(super) fn file_at(repo: &Path, rev: &str, file: &str) -> Result<Vec<u8>, String> {
+    #[cfg(feature = "native-git")]
+    return patch::file_at(repo, rev, file);
+    #[cfg(not(feature = "native-git"))]
+    {
+        let _ = (repo, rev, file);
+        Err("feature disabled".into())
+    }
+}
+
+pub(super) fn commit_file_sides(
+    repo: &Path,
+    hash: &str,
+    file: &str,
+) -> Result<super::FileSides, String> {
+    #[cfg(feature = "native-git")]
+    return patch::commit_file_sides(repo, hash, file);
+    #[cfg(not(feature = "native-git"))]
+    {
+        let _ = (repo, hash, file);
+        Err("feature disabled".into())
+    }
+}
+
 #[cfg(feature = "native-git")]
 mod commits;
+#[cfg(feature = "native-git")]
+mod patch;
 
 #[cfg(not(feature = "native-git"))]
 mod native {

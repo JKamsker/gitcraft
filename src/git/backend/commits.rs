@@ -22,7 +22,7 @@ fn text(bytes: &gix::bstr::BStr) -> Result<String, String> {
 }
 
 /// Grafts, a shallow clone and replaced objects change what git reads as a commit's parents.
-fn plain_history(repo: &gix::Repository) -> Result<(), String> {
+pub(super) fn plain_history(repo: &gix::Repository) -> Result<(), String> {
     if repo.common_dir().join("info/grafts").exists()
         || repo.common_dir().join("shallow").exists()
         || repo
@@ -70,30 +70,10 @@ fn files_in(repo: &gix::Repository, hashes: &[String]) -> Result<Vec<(String, Fi
             binary: d.is_binary,
         })
         .collect();
-    let mut options = gix::diff::Options::default();
-    // `-M`: renames at git's default similarity, no copies, whatever the config says.
-    options
-        .track_path()
-        .track_rewrites(Some(gix::diff::Rewrites::default()));
-    let empty = repo.empty_tree();
     hashes
         .iter()
         .map(|hash| {
-            let commit = repo.find_commit(commit_id(hash)?).map_err(err)?;
-            let tree = commit.tree().map_err(err)?;
-            let parent = match commit.parent_ids().next() {
-                Some(id) => id
-                    .object()
-                    .map_err(err)?
-                    .try_into_commit()
-                    .map_err(err)?
-                    .tree()
-                    .map_err(err)?,
-                None => empty.clone(),
-            };
-            let changes = repo
-                .diff_tree_to_tree(&parent, &tree, options)
-                .map_err(err)?;
+            let changes = changes(repo, hash)?;
             let files = listed(repo, &changes, &mut cache, &drivers)?;
             cache.clear_resource_cache_keep_allocation();
             Ok((hash.clone(), files))
@@ -101,12 +81,33 @@ fn files_in(repo: &gix::Repository, hashes: &[String]) -> Result<Vec<(String, Fi
         .collect()
 }
 
-fn listed(
-    repo: &gix::Repository,
-    changes: &[ChangeDetached],
-    cache: &mut gix::diff::blob::Platform,
-    drivers: &[Driver],
-) -> Result<Files, String> {
+/// What commit `hash` changed against its first parent (or nothing, for the first commit),
+/// renames found as `-M` finds them.
+pub(super) fn changes(repo: &gix::Repository, hash: &str) -> Result<Vec<ChangeDetached>, String> {
+    let mut options = gix::diff::Options::default();
+    // `-M`: renames at git's default similarity, no copies, whatever the config says.
+    options
+        .track_path()
+        .track_rewrites(Some(gix::diff::Rewrites::default()));
+    let commit = repo.find_commit(commit_id(hash)?).map_err(err)?;
+    let tree = commit.tree().map_err(err)?;
+    let parent = match commit.parent_ids().next() {
+        Some(id) => id
+            .object()
+            .map_err(err)?
+            .try_into_commit()
+            .map_err(err)?
+            .tree()
+            .map_err(err)?,
+        None => repo.empty_tree(),
+    };
+    repo.diff_tree_to_tree(&parent, &tree, options).map_err(err)
+}
+
+/// Whether git pairs `changes` up as gitoxide did: no file was renamed with changes (git and
+/// gitoxide weigh similarity differently), and none was added while another was deleted (git
+/// may see a rename where gitoxide didn't).
+pub(super) fn paired_as_git(changes: &[ChangeDetached]) -> bool {
     let file = |mode: &gix::object::tree::EntryMode| !mode.is_tree() && !mode.is_commit();
     let (mut added, mut deleted) = (false, false);
     for change in changes {
@@ -119,12 +120,20 @@ fn listed(
                 copy: false,
                 ..
             } => {}
-            ChangeDetached::Rewrite { .. } => return Ok(None),
+            ChangeDetached::Rewrite { .. } => return false,
             ChangeDetached::Modification { .. } => {}
         }
     }
-    // What was added and deleted git may see as renamed, and the other way round.
-    if added && deleted {
+    !(added && deleted)
+}
+
+fn listed(
+    repo: &gix::Repository,
+    changes: &[ChangeDetached],
+    cache: &mut gix::diff::blob::Platform,
+    drivers: &[Driver],
+) -> Result<Files, String> {
+    if !paired_as_git(changes) {
         return Ok(None);
     }
     let mut files = Vec::new();
