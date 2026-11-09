@@ -157,6 +157,7 @@ pub(super) enum Msg {
     QuickEditCommits {
         edit: quick_edit::Edit,
         hash: String,
+        branch_guard: Vec<String>,
         result: Result<Vec<git::RebaseCommit>, String>,
     },
     OpDone {
@@ -610,9 +611,12 @@ impl RepoTab {
             Msg::BundleDone(label, result, refresh) => {
                 self.bundle_done(label, result, refresh, ctx)
             }
-            Msg::QuickEditCommits { edit, hash, result } => {
-                self.run_quick_edit(edit, hash, result, ctx)
-            }
+            Msg::QuickEditCommits {
+                edit,
+                hash,
+                branch_guard,
+                result,
+            } => self.run_quick_edit(edit, hash, branch_guard, result, ctx),
             Msg::FileHistory(path, rev, result) => {
                 // Only the history of the revision shown: an older read may answer last. Nor
                 // the whole file's, once the history of some of its lines is shown.

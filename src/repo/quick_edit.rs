@@ -188,6 +188,7 @@ impl RepoTab {
                     _ => Action::QuickEdit {
                         edit,
                         hash: hash.to_owned(),
+                        branch_guard: self.same_branch(),
                     },
                 });
             }
@@ -200,6 +201,7 @@ impl RepoTab {
         let drop = Action::QuickEdit {
             edit: Edit::Drop,
             hash: hash.to_owned(),
+            branch_guard: self.same_branch(),
         };
         let (Some(commit), Some(branch)) = (
             line.iter().find(|c| c.hash == hash),
@@ -283,7 +285,13 @@ impl RepoTab {
     }
 
     /// Reads the commits the rebase for `edit` replays.
-    pub(super) fn quick_edit(&mut self, edit: Edit, hash: String, ctx: &egui::Context) {
+    pub(super) fn quick_edit(
+        &mut self,
+        edit: Edit,
+        hash: String,
+        branch_guard: Vec<String>,
+        ctx: &egui::Context,
+    ) {
         // Confirmed (a drop) while something started meanwhile (the background fetch): said,
         // not dropped without a word.
         if let Some(busy) = &self.busy_op {
@@ -306,7 +314,12 @@ impl RepoTab {
         let path = self.path.clone();
         spawn(&self.tx, ctx, move || {
             let result = git::rebase_commits(&path, &edit.base(&hash));
-            Msg::QuickEditCommits { edit, hash, result }
+            Msg::QuickEditCommits {
+                edit,
+                hash,
+                branch_guard,
+                result,
+            }
         });
     }
 
@@ -315,13 +328,14 @@ impl RepoTab {
         &mut self,
         edit: Edit,
         hash: String,
+        branch_guard: Vec<String>,
         result: Result<Vec<RebaseCommit>, String>,
         ctx: &egui::Context,
     ) {
         let label = format!("{} {}", edit.operation_label(), short(&hash));
         match result.and_then(|commits| plan(edit, &hash, commits)) {
             Ok(editor) => self.with_rebase_command(editor, ctx, move |tab, command, ctx| {
-                tab.quick_edit_ready(&label, command, ctx);
+                tab.quick_edit_ready(&label, branch_guard, command, ctx);
             }),
             Err(e) => {
                 self.status = Some(crate::repo::Notice::plain((format!("{label}: {e}"), true)))
@@ -333,6 +347,7 @@ impl RepoTab {
     fn quick_edit_ready(
         &mut self,
         label: &str,
+        branch_guard: Vec<String>,
         command: Result<(Vec<String>, String), String>,
         ctx: &egui::Context,
     ) {
@@ -363,7 +378,7 @@ impl RepoTab {
             // The todo list replaces the commits read: not one made since (in the terminal).
             Ok((command, head)) => self.run_undoable(
                 label,
-                vec![expect_ref_at("HEAD", &head), command],
+                guarded_commands(branch_guard, &head, command),
                 Refresh::All,
                 Undo::HeadMove { mode: "--keep" },
                 ctx,
@@ -375,9 +390,28 @@ impl RepoTab {
     }
 }
 
+fn guarded_commands(branch: Vec<String>, head: &str, command: Vec<String>) -> Vec<Vec<String>> {
+    vec![branch, expect_ref_at("HEAD", head), command]
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn quick_rewrites_preserve_the_original_branch_guard_before_head_and_rebase() {
+        let captured = super::super::operations::expect_symref("HEAD", "refs/heads/original");
+        let command = vec!["rebase".into(), "-i".into(), "base".into()];
+        let operations = guarded_commands(captured.clone(), "original-head", command.clone());
+        assert_eq!(
+            operations,
+            vec![captured, expect_ref_at("HEAD", "original-head"), command]
+        );
+        assert_ne!(
+            operations[0],
+            super::super::operations::expect_symref("HEAD", "refs/heads/other")
+        );
+    }
 
     fn commit(hash: &str, parents: &[&str]) -> Commit {
         Commit {

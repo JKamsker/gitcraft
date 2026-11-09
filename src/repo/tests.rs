@@ -745,6 +745,7 @@ fn a_drop_confirmed_while_busy_says_so() {
         Action::QuickEdit {
             edit: Edit::Drop,
             hash: "0123456789abcdef".to_owned(),
+            branch_guard: crate::repo::operations::expect_symref("HEAD", "refs/heads/main"),
         },
         &ctx,
     );

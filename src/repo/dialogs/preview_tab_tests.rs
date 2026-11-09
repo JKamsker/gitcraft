@@ -183,6 +183,7 @@ fn the_dialog_shows_the_preview_and_confirms_its_action() {
     let quick = Action::QuickEdit {
         edit: crate::repo::quick_edit::Edit::Drop,
         hash: "1111111111".to_owned(),
+        branch_guard: crate::repo::operations::expect_symref("HEAD", "refs/heads/main"),
     };
     let mut dialog = Dialog::confirm(
         "Drop commit",
