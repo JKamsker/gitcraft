@@ -65,19 +65,69 @@ pub(crate) enum Priority {
 /// Scheduling identity only: never use this for repository/tray/fetch ownership.
 /// Remote discovery may fail and SSH aliases need not name their real host, so
 /// conservatively serialize all remote mutations in this application. The enum
-/// namespace cannot collide with any local path; local common-metadata keys stay intact.
+/// namespace cannot collide with local identity. Paths remain repository ownership keys;
+/// only scheduling uses the identity of the resolved common-metadata directory.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum MutationScheduleKey {
     Local(PathBuf),
+    LocalFile(String),
     Remote,
 }
 
+#[cfg(test)]
 pub(crate) fn mutation_schedule_key(path: PathBuf) -> MutationScheduleKey {
-    if crate::remote::is_remote(&path) {
-        MutationScheduleKey::Remote
-    } else {
-        MutationScheduleKey::Local(path)
+    mutation_schedule_identity(path).0
+}
+
+fn local_directory_identity(path: &std::path::Path) -> std::io::Result<(String, std::fs::File)> {
+    let mut options = std::fs::OpenOptions::new();
+    options.read(true);
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::OpenOptionsExt;
+        // A directory-capable handle; permit ordinary Git rename/delete operations.
+        options.custom_flags(0x02000000).share_mode(7);
     }
+    let file = options.open(path)?;
+    if !file.metadata()?.is_dir() {
+        return Err(std::io::Error::other(
+            "mutation metadata key is not a directory",
+        ));
+    }
+    Ok((gitcraft_os::file_identity(&file)?, file))
+}
+
+fn mutation_schedule_identity(path: PathBuf) -> (MutationScheduleKey, Option<std::fs::File>) {
+    mutation_schedule_identity_with(path, local_directory_identity)
+}
+
+fn mutation_schedule_identity_with(
+    path: PathBuf,
+    lookup: impl FnOnce(&std::path::Path) -> std::io::Result<(String, std::fs::File)>,
+) -> (MutationScheduleKey, Option<std::fs::File>) {
+    if crate::remote::is_remote(&path) {
+        (MutationScheduleKey::Remote, None)
+    } else {
+        #[cfg(test)]
+        if let Some(id) = TEST_IDENTITIES.with(|ids| {
+            ids.borrow()
+                .as_ref()
+                .and_then(|ids| ids.get(&path).cloned())
+        }) {
+            return (MutationScheduleKey::LocalFile(id), None);
+        }
+        match lookup(&path) {
+            Ok((id, file)) => (MutationScheduleKey::LocalFile(id), Some(file)),
+            // Preserve path compatibility for inaccessible/unsupported metadata.
+            // Unidentified aliases cannot be guaranteed to share exclusion.
+            Err(_) => (MutationScheduleKey::Local(path), None),
+        }
+    }
+}
+
+#[cfg(test)]
+thread_local! {
+    static TEST_IDENTITIES: RefCell<Option<std::collections::HashMap<PathBuf, String>>> = const { RefCell::new(None) };
 }
 
 type Work = Box<dyn FnOnce() + Send>;
@@ -89,6 +139,8 @@ struct Job {
     priority: Priority,
     /// A whole mutation operation holds its key, including between subprocesses.
     key: Option<MutationScheduleKey>,
+    /// Retain directory identity for the entire queued/running operation.
+    _identity_handle: Option<std::fs::File>,
 }
 
 #[derive(Default)]
@@ -116,20 +168,33 @@ pub(crate) struct Pool {
 
 impl Pool {
     #[cfg(test)]
-    pub(crate) fn queued_priorities_for(&self, key: &std::path::Path) -> Vec<Priority> {
+    pub(crate) fn queued_priority_for(&self, cancel: &Cancellation) -> Option<Priority> {
         self.shared
             .state
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .queue
             .iter()
-            .filter(|job| job.key.as_ref() == Some(&mutation_schedule_key(key.to_owned())))
+            .find(|job| Arc::ptr_eq(&job.cancel.0, &cancel.0))
+            .map(|job| job.priority)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn queued_priorities_for(&self, key: &std::path::Path) -> Vec<Priority> {
+        let key = mutation_schedule_key(key.to_owned());
+        self.shared
+            .state
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .queue
+            .iter()
+            .filter(|job| job.key.as_ref() == Some(&key))
             .map(|job| job.priority)
             .collect()
     }
 
     #[cfg(test)]
-    fn new(workers: usize) -> std::io::Result<Self> {
+    pub(crate) fn new(workers: usize) -> std::io::Result<Self> {
         Self::with_capacity(workers, QUEUE_CAPACITY)
     }
 
@@ -191,6 +256,14 @@ impl Pool {
         on_cancel: Option<Work>,
         work: Work,
     ) -> Result<(), &'static str> {
+        // Filesystem lookup can block; never perform it under the queue mutex.
+        let (key, identity_handle) = match key {
+            Some(path) => {
+                let (key, handle) = mutation_schedule_identity(path);
+                (Some(key), handle)
+            }
+            None => (None, None),
+        };
         let mut state = self
             .shared
             .state
@@ -207,7 +280,6 @@ impl Pool {
         // Normalize at the common submission boundary, covering spawn_mutation,
         // tray fetches and every feature-specific mutation job. None stays an
         // unkeyed read and can run concurrently with a mutation.
-        let key = key.map(mutation_schedule_key);
         state.queue.push_back(Job {
             work,
             connections: crate::connections::current(),
@@ -215,6 +287,7 @@ impl Pool {
             cancel,
             priority,
             key,
+            _identity_handle: identity_handle,
         });
         state.peak_queued = state.peak_queued.max(state.queue.len());
         self.shared.ready.notify_all();
@@ -461,6 +534,155 @@ mod tests {
     use super::*;
     use std::sync::mpsc;
     use std::time::Duration;
+
+    #[test]
+    fn local_metadata_aliases_hold_expectation_and_pop_against_alias_push() -> Result<(), String> {
+        struct Reset;
+        impl Drop for Reset {
+            fn drop(&mut self) {
+                TEST_IDENTITIES.with(|ids| *ids.borrow_mut() = None);
+            }
+        }
+        TEST_IDENTITIES.with(|ids| {
+            *ids.borrow_mut() = Some(
+                [
+                    (
+                        PathBuf::from("/recorded/mount-a/common.git"),
+                        "unix:device1:inode7".into(),
+                    ),
+                    (
+                        PathBuf::from("/recorded/mount-b/common.git"),
+                        "unix:device1:inode7".into(),
+                    ),
+                    (
+                        PathBuf::from("/recorded/independent/common.git"),
+                        "unix:device2:inode7".into(),
+                    ),
+                ]
+                .into(),
+            )
+        });
+        let _reset = Reset;
+        assert_eq!(
+            mutation_schedule_key("/recorded/mount-a/common.git".into()),
+            mutation_schedule_key("/recorded/mount-b/common.git".into())
+        );
+        assert_ne!(
+            mutation_schedule_key("/recorded/mount-a/common.git".into()),
+            mutation_schedule_key("/recorded/independent/common.git".into())
+        );
+        let pool = Pool::new(3).map_err(|e| e.to_string())?;
+        let (release, gate) = mpsc::channel::<()>();
+        let (out, events) = mpsc::channel();
+        let stash = Arc::new(Mutex::new(vec!["stash A"]));
+        let stack = Arc::clone(&stash);
+        let record = out.clone();
+        pool.submit_cancellable(
+            Cancellation::default(),
+            Priority::Background,
+            Some("/recorded/mount-a/common.git".into()),
+            None,
+            Box::new(move || {
+                assert_eq!(stack.lock().unwrap().last(), Some(&"stash A"));
+                let _ = record.send("expect A");
+                let _ = gate.recv();
+                assert_eq!(stack.lock().unwrap().pop(), Some("stash A"));
+                let _ = record.send("pop A");
+            }),
+        )
+        .map_err(str::to_owned)?;
+        assert_eq!(
+            events
+                .recv_timeout(Duration::from_secs(5))
+                .map_err(|e| e.to_string())?,
+            "expect A"
+        );
+        let queued = Cancellation::default();
+        let stack = Arc::clone(&stash);
+        let record = out.clone();
+        pool.submit(
+            queued.clone(),
+            Priority::Interactive,
+            Some("/recorded/mount-b/common.git".into()),
+            Box::new(move || {
+                stack.lock().unwrap().push("stash B");
+                let _ = record.send("push B");
+            }),
+        )
+        .map_err(str::to_owned)?;
+        assert!(pool.queued_priority_for(&queued) == Some(Priority::Interactive));
+        for (key, event) in [
+            (None, "read"),
+            (
+                Some("/recorded/independent/common.git".into()),
+                "independent",
+            ),
+        ] {
+            let record = out.clone();
+            pool.submit(
+                Cancellation::default(),
+                Priority::Interactive,
+                key,
+                Box::new(move || {
+                    let _ = record.send(event);
+                }),
+            )
+            .map_err(str::to_owned)?;
+        }
+        let progress = [
+            events
+                .recv_timeout(Duration::from_secs(5))
+                .map_err(|e| e.to_string())?,
+            events
+                .recv_timeout(Duration::from_secs(5))
+                .map_err(|e| e.to_string())?,
+        ];
+        assert!(progress.contains(&"read") && progress.contains(&"independent"));
+        assert!(pool.queued_priority_for(&queued).is_some());
+        drop(release);
+        assert_eq!(
+            events
+                .recv_timeout(Duration::from_secs(5))
+                .map_err(|e| e.to_string())?,
+            "pop A"
+        );
+        assert_eq!(
+            events
+                .recv_timeout(Duration::from_secs(5))
+                .map_err(|e| e.to_string())?,
+            "push B"
+        );
+        assert_eq!(*stash.lock().unwrap(), ["stash B"]);
+        let (remote, handle) =
+            mutation_schedule_identity_with("ssh://unopened/repo".into(), |_| {
+                panic!("remote lookup")
+            });
+        assert_eq!(remote, MutationScheduleKey::Remote);
+        assert!(handle.is_none());
+        let missing = PathBuf::from("/recorded/unidentified/common.git");
+        let (fallback, handle) = mutation_schedule_identity_with(missing.clone(), |_| {
+            Err(std::io::Error::other("unavailable"))
+        });
+        assert_eq!(fallback, MutationScheduleKey::Local(missing));
+        assert!(handle.is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn actual_directory_identity_retains_the_open_metadata_handle() -> Result<(), String> {
+        let path = std::env::temp_dir();
+        let (key, handle) = mutation_schedule_identity(path.clone());
+        let file = handle.ok_or("directory identity unavailable")?;
+        assert_eq!(
+            key,
+            MutationScheduleKey::LocalFile(
+                gitcraft_os::file_identity(&file).map_err(|e| e.to_string())?
+            )
+        );
+        assert!(file.metadata().map_err(|e| e.to_string())?.is_dir());
+        assert_eq!(key, mutation_schedule_identity(path).0);
+        Ok(())
+    }
 
     fn submit(
         pool: &Pool,

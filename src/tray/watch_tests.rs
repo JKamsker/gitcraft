@@ -1,4 +1,73 @@
 use super::*;
+
+#[test]
+fn production_tray_submission_serializes_fetch_with_remote_mutation() -> Result<(), String> {
+    use std::sync::mpsc::channel;
+    let pool = tasks::Pool::new(2).map_err(|e| e.to_string())?;
+    let (release, gate) = channel::<()>();
+    let (out, events) = channel();
+    let record = out.clone();
+    pool.submit(
+        tasks::Cancellation::default(),
+        tasks::Priority::Background,
+        Some("ssh://host/main".into()),
+        Box::new(move || {
+            let _ = record.send("mutation started");
+            let _ = gate.recv();
+            let _ = record.send("mutation finished");
+        }),
+    )
+    .map_err(str::to_owned)?;
+    assert_eq!(
+        events
+            .recv_timeout(Duration::from_secs(5))
+            .map_err(|e| e.to_string())?,
+        "mutation started"
+    );
+    let cancel = tasks::Cancellation::default();
+    let record = out.clone();
+    submit_fetch(
+        &pool,
+        Path::new("ssh://alias/linked"),
+        cancel.clone(),
+        Box::new(move || {
+            let _ = record.send("tray fetch");
+        }),
+    )
+    .map_err(str::to_owned)?;
+    assert!(pool.queued_priority_for(&cancel) == Some(tasks::Priority::Background));
+    pool.submit(
+        tasks::Cancellation::default(),
+        tasks::Priority::Interactive,
+        None,
+        Box::new(move || {
+            let _ = out.send("read");
+        }),
+    )
+    .map_err(str::to_owned)?;
+    assert_eq!(
+        events
+            .recv_timeout(Duration::from_secs(5))
+            .map_err(|e| e.to_string())?,
+        "read"
+    );
+    assert!(pool.queued_priority_for(&cancel).is_some());
+    drop(release);
+    assert_eq!(
+        events
+            .recv_timeout(Duration::from_secs(5))
+            .map_err(|e| e.to_string())?,
+        "mutation finished"
+    );
+    assert_eq!(
+        events
+            .recv_timeout(Duration::from_secs(5))
+            .map_err(|e| e.to_string())?,
+        "tray fetch"
+    );
+    Ok(())
+}
+
 fn snapshot(oid: char, review: bool, checks: Checks) -> Observation {
     Observation {
         default: Some((
