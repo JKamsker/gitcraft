@@ -1,0 +1,19 @@
+{
+  "implementation_commit": "28e6a8b1589c95694ec9a3c042c037518bc1829c",
+  "base_commit": "e16441b23d84ffd2d54bc9f409ae0ba4ead35983",
+  "source_sha256": {
+    "src/repo/lifecycle.rs": "779662121a70ecb2ec9757811b02d0bd3afd0d3bc19f67fb3d7cc57abab42ea1",
+    "src/repo/load.rs": "f404b46850c3e56eff0e2e908e8c499442c490e03c01b9d52a86b97d354739c6",
+    "src/repo/tests.rs": "b3e66f0a9e99a5472e8d07cc4e65996a9c83034aa5c86c8efc3005b6fa96eec0",
+    "src/tasks.rs": "da61ccd8a62fa580d0f2b1cd5fe2aa5f1644123e7ccd03e55e9665908c9b3d6d",
+    "src/tray/watch_tests.rs": "5a1e271c20d5aae422e32387ea44b0ee321e33bf876ca24e2eaca5e8dddfbbc7"
+  },
+  "logs_sha256": {
+    "scheduler-regressions.log": "808a268e608e2c3fe1c75aa4daecb5660ef156d409f9392cbdf274a8bd1f720e",
+    "spawn-mutation.log": "b88942156e43714dbd4a23bf6594e094d2625fb2552d26e3b58313300657dd8f",
+    "remote-mutation.log": "d0a979b9561ee4c321785f2db77981cd308daa79f21c4f14bb963c671f2099a0",
+    "ed6e5abf-compile-failure.log": "e9a51b5daa4d72e1823ab23c5ca51bf104ef8770e6ad754e51a008b1e3fffdbe"
+  },
+  "target_directory": "/home/jonas/.t3/worktrees/gitcraft/t3-c35e2e6e/target-remote-mutations",
+  "validation": "focused local tests passed; independent final adversarial review and CI not performed"
+}
