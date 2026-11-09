@@ -17,7 +17,7 @@ const NUM_W: f32 = 46.0;
 
 #[derive(Default)]
 pub(crate) struct BlameData {
-    lines: Vec<BlameLine>,
+    pub(super) lines: Vec<BlameLine>,
     spans: Option<Vec<Spans>>,
     /// Oldest and newest commit time, for the age colour.
     span: (i64, i64),

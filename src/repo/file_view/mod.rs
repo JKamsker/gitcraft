@@ -10,6 +10,7 @@ mod line_history;
 mod tests;
 
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::{Duration, Instant};
 
 // Shared across repository tabs, and never reused when a view is closed or replaced.
 fn next_generation() -> u64 {
@@ -69,15 +70,34 @@ pub(crate) struct FileView {
     text_input: Option<String>,
     observed_inputs: Option<FileInputs>,
     input_check: u64,
+    probe: ProbeState,
+    pending: [Option<u64>; 3],
+    retry_load: Option<Instant>,
+    line_observed: Option<(String, String, git::LineRange)>,
+    blame_input: Option<String>,
+    observed_blame: Option<String>,
     /// A line to scroll to once the blame is read, and to mark (1 is the first).
     pub goto_line: std::cell::Cell<Option<usize>>,
     pub marked_line: Option<usize>,
+}
+
+#[derive(Default)]
+struct ProbeState {
+    active: Option<u64>,
+    dirty: bool,
+    retry: Option<Instant>,
+}
+
+enum ProbeInputs {
+    File(FileInputs),
+    Lines(Result<(String, String, git::LineRange), String>),
 }
 
 #[derive(Clone, Default)]
 pub(super) struct FileInputs {
     history: Option<String>,
     text: Option<String>,
+    blame: Option<String>,
 }
 
 pub(super) fn content_key(bytes: &[u8]) -> String {
@@ -88,12 +108,115 @@ pub(super) fn content_key(bytes: &[u8]) -> String {
         .collect()
 }
 
-fn file_inputs(repo: &std::path::Path, rev: Option<&str>, path: &str) -> FileInputs {
+fn file_inputs(repo: &std::path::Path, rev: Option<&str>, path: &str, blame: bool) -> FileInputs {
     FileInputs {
+        blame: blame.then(|| blame_input(repo, rev, path)).flatten(),
         history: git::resolve(repo, rev.filter(|rev| !rev.is_empty()).unwrap_or("HEAD")).ok(),
         text: git::file_at(repo, rev, path)
             .ok()
             .map(|bytes| content_key(&bytes)),
+    }
+}
+
+/// Blame depends on attribution settings even at a pinned revision. Observe effective
+/// configuration and the content/existence of its repository-side file inputs. Explicit
+/// refresh always invalidates, including external textconv programs with mutable state.
+pub(super) fn blame_input(repo: &std::path::Path, rev: Option<&str>, path: &str) -> Option<String> {
+    let mut bytes = git::run(Some(repo), &["config", "--null", "--list", "--show-origin"])
+        .ok()?
+        .into_bytes();
+    let mut add = |label: &str, value: Result<Vec<u8>, String>| {
+        bytes.extend_from_slice(&(label.len() as u64).to_le_bytes());
+        bytes.extend_from_slice(label.as_bytes());
+        let value = match value {
+            Ok(value) => [vec![0], value].concat(),
+            Err(error) => [vec![1], error.into_bytes()].concat(),
+        };
+        bytes.extend_from_slice(&(value.len() as u64).to_le_bytes());
+        bytes.extend(value);
+    };
+    add(
+        "revision",
+        git::resolve(repo, rev.filter(|r| !r.is_empty()).unwrap_or("HEAD")).map(String::into_bytes),
+    );
+    if rev.is_none() {
+        add("worktree", git::file_at(repo, None, path));
+        add("index", git::file_at(repo, Some(""), path));
+    }
+    // Ask Git to resolve effective attributes, including system/default-global
+    // sources and index fallback. Hashing only worktree .gitattributes misses both.
+    add(
+        "attributes",
+        git::run(Some(repo), &["check-attr", "-z", "--all", "--", path]).map(String::into_bytes),
+    );
+    let mut files = vec![".mailmap".to_owned()];
+    for key in ["blame.ignoreRevsFile", "mailmap.file"] {
+        let values = git::run_ok_codes(
+            Some(repo),
+            &["config", "--null", "--path", "--get-all", key],
+            &[0, 1],
+        )
+        .ok()?;
+        files.extend(
+            values
+                .split('\0')
+                .filter(|s| !s.is_empty())
+                .map(str::to_owned),
+        );
+    }
+    for file in files {
+        add(&file, attribution_file_input(repo, &file));
+    }
+    // A configured ref:path is mutable even when the viewed commit is fixed.
+    // HEAD:.mailmap also covers Git's bare-repository default conservatively.
+    let blobs = git::run_ok_codes(
+        Some(repo),
+        &["config", "--null", "--get-all", "mailmap.blob"],
+        &[0, 1],
+    )
+    .ok()?;
+    for blob in blobs
+        .split('\0')
+        .filter(|s| !s.is_empty())
+        .chain(std::iter::once("HEAD:.mailmap"))
+    {
+        add(
+            blob,
+            git::run(Some(repo), &["cat-file", "blob", blob]).map(String::into_bytes),
+        );
+    }
+    Some(content_key(&bytes))
+}
+
+/// Configuration dependencies are read by Git with ordinary symlink-following
+/// file semantics. Keep absolute paths on the repository's machine: joining an
+/// absolute dependency to an ssh:// path would silently discard the remote host.
+fn attribution_file_input(repo: &std::path::Path, file: &str) -> Result<Vec<u8>, String> {
+    attribution_file_input_with(repo, file, git::run_shell)
+}
+
+fn attribution_file_input_with(
+    repo: &std::path::Path,
+    file: &str,
+    run: impl FnOnce(&std::path::Path, &str) -> Result<git::ShellRun, String>,
+) -> Result<Vec<u8>, String> {
+    let file = crate::remote::sh_quote(file);
+    let script = format!(
+        "if test -f {file}; then printf 'file:'; git hash-object --stdin < {file}; elif test -e {file} || test -L {file}; then printf 'unreadable-or-nonregular'; else printf 'absent'; fi"
+    );
+    let result = run(repo, &script)?;
+    if result.code == 0 {
+        Ok(result.stdout)
+    } else {
+        Err(String::from_utf8_lossy(&result.stderr).into_owned())
+    }
+}
+
+fn pane_index(pane: FileTab) -> usize {
+    match pane {
+        FileTab::History => 0,
+        FileTab::Blame => 1,
+        FileTab::File => 2,
     }
 }
 
@@ -116,6 +239,12 @@ impl FileView {
             text_input: None,
             observed_inputs: None,
             input_check: 0,
+            probe: ProbeState::default(),
+            pending: [None; 3],
+            retry_load: None,
+            line_observed: None,
+            blame_input: None,
+            observed_blame: None,
             goto_line: Default::default(),
             marked_line: None,
         }
@@ -131,6 +260,7 @@ impl FileView {
         self.history_input = None;
         self.text_input = None;
         self.observed_inputs = None;
+        self.line_observed = None;
         self.input_check = next_generation();
         self.history = None;
         self.invalidate_blame();
@@ -138,8 +268,24 @@ impl FileView {
         true
     }
 
+    /// Suspension disconnects the result channel, so old callbacks cannot release
+    /// their slots. Retire those request lifetimes before installing a new sender.
+    pub(super) fn retire_reads(&mut self) {
+        if !self.invalidate_mutable() {
+            self.generation = next_generation();
+            self.invalidate_blame();
+        }
+        self.pending = [None; 3];
+        self.probe = ProbeState::default();
+        self.retry_load = None;
+        self.line_observed = None;
+        self.line_inputs = None;
+    }
+
     fn invalidate_blame(&mut self) {
         self.blame_generation = next_generation();
+        self.blame_input = None;
+        self.observed_blame = None;
         self.blame_needs_refresh = true;
         if !matches!(self.blame, Some(Ok(_))) {
             self.blame = None;
@@ -150,7 +296,8 @@ impl FileView {
         &self,
         inputs: &Result<(String, String, git::LineRange), String>,
     ) -> bool {
-        matches!(self.history, Some(Ok(_)))
+        (matches!(self.history, Some(Ok(_)))
+            || (self.history.is_none() && self.pending[0].is_some()))
             && inputs.is_ok()
             && inputs.as_ref().ok() == self.line_inputs.as_ref()
     }
@@ -166,61 +313,184 @@ impl FileView {
 }
 
 impl RepoTab {
-    /// Refresh the visible pane now; other panes load when selected.
-    /// Probe the actual line mapping in the background before rerunning expensive history.
+    /// One active probe per view. Further status observations request one follow-up,
+    /// rather than queueing work that will only be discarded later.
     pub(super) fn status_changed_file_view(&mut self, ctx: &egui::Context) {
+        if let Some(view) = &mut self.file_view {
+            view.probe.dirty = true;
+        }
+        self.poll_file_view(ctx);
+    }
+
+    pub(super) fn poll_file_view(&mut self, ctx: &egui::Context) {
+        let now = Instant::now();
         let Some(view) = &mut self.file_view else {
             return;
         };
-        let Some((at, range)) = view.lines.clone() else {
-            if view.rev.as_deref().is_some_and(git::investigations::oid) {
-                self.invalidate_mutable_file_view(ctx);
-                return;
+        if let Some(due) = view.retry_load {
+            if now >= due {
+                view.retry_load = None;
+                self.load_file_view(ctx);
+            } else {
+                ctx.request_repaint_after(due - now);
             }
-            let generation = view.generation;
-            let check = next_generation();
-            view.input_check = check;
-            let path = view.path.clone();
-            let rev = view.rev.clone();
-            let repo = self.path.clone();
-            self.then(
-                ctx,
-                move || file_inputs(&repo, rev.as_deref(), &path),
-                move |tab, inputs, ctx| {
-                    tab.file_status_inputs(generation, check, inputs, ctx);
-                },
-            );
+        }
+        let Some(view) = &mut self.file_view else {
             return;
         };
-        if view.rev.as_deref().is_some_and(git::investigations::oid) {
+        if view.probe.active.is_some() || !view.probe.dirty {
             return;
         }
-        let generation = view.generation;
-        let path = view.path.clone();
-        let requested_path = path.clone();
-        let repo = self.path.clone();
+        if let Some(due) = view.probe.retry
+            && now < due
+        {
+            ctx.request_repaint_after(due - now);
+            return;
+        }
+        view.probe.retry = None;
+        view.probe.dirty = false;
         let check = next_generation();
+        view.probe.active = Some(check);
+        view.input_check = check;
         view.line_input_check = check;
-        self.then(
+        let (generation, blame_generation, path, rev, lines) = (
+            view.generation,
+            view.blame_generation,
+            view.path.clone(),
+            view.rev.clone(),
+            view.lines.clone(),
+        );
+        let blame = view.blame.is_some() || view.pending[1].is_some() || view.tab == FileTab::Blame;
+        let repo = self.path.clone();
+        self.then_or(
             ctx,
-            move || git::line_history_key(&repo, &at, &path, range),
-            move |tab, inputs, ctx| {
-                let Some(view) = &mut tab.file_view else {
-                    return;
-                };
-                if view.generation != generation
-                    || view.path != requested_path
-                    || view.line_input_check != check
-                {
-                    return;
-                }
-                // Errors cannot establish unchanged inputs; retry the normal read.
-                if view.reuses_line_inputs(&inputs) {
-                    return;
-                }
-                tab.invalidate_mutable_file_view(ctx);
+            false,
+            Err,
+            move || {
+                Ok(match lines {
+                    Some((at, range)) => {
+                        ProbeInputs::Lines(git::line_history_key(&repo, &at, &path, range))
+                    }
+                    None => ProbeInputs::File(file_inputs(&repo, rev.as_deref(), &path, blame)),
+                })
+            },
+            move |tab, result, ctx| {
+                tab.finish_file_probe(generation, blame_generation, check, result, ctx)
             },
         );
+    }
+
+    fn finish_file_probe(
+        &mut self,
+        generation: u64,
+        blame_generation: u64,
+        check: u64,
+        result: Result<ProbeInputs, String>,
+        ctx: &egui::Context,
+    ) {
+        let Some(view) = &mut self.file_view else {
+            return;
+        };
+        if view.probe.active != Some(check) {
+            return;
+        }
+        view.probe.active = None;
+        match result {
+            Err(error) => {
+                if error == crate::tasks::BUSY {
+                    view.probe.dirty = true;
+                    view.probe.retry = Some(Instant::now() + Duration::from_millis(100));
+                } else {
+                    view.probe.dirty = false;
+                } // No automatic cancellation/panic/error loop.
+            }
+            Ok(_) if view.generation != generation || view.blame_generation != blame_generation => {
+                view.probe.dirty = true
+            }
+            Ok(ProbeInputs::File(inputs)) => {
+                self.file_status_inputs(generation, check, inputs, ctx)
+            }
+            Ok(ProbeInputs::Lines(inputs)) => {
+                let Some(view) = &mut self.file_view else {
+                    return;
+                };
+                if let Ok(inputs) = &inputs {
+                    view.line_observed = Some(inputs.clone());
+                }
+                // A pending history read supplies its own captured key on completion.
+                // Until then, a successful observation cannot establish a mismatch.
+                if view.history.is_none() && view.pending[0].is_some() && inputs.is_ok() {
+                } else if !view.reuses_line_inputs(&inputs) {
+                    self.invalidate_mutable_file_view(ctx);
+                }
+            }
+        }
+        self.poll_file_view(ctx);
+    }
+
+    pub(super) fn begin_file_load(&mut self, pane: FileTab) -> Option<u64> {
+        let view = self.file_view.as_mut()?;
+        let slot = &mut view.pending[pane_index(pane)];
+        if slot.is_some() {
+            return None;
+        }
+        let token = next_generation();
+        *slot = Some(token);
+        Some(token)
+    }
+
+    pub(super) fn finish_file_load(
+        &mut self,
+        pane: FileTab,
+        token: u64,
+        generation: u64,
+        failure: Option<&str>,
+        ctx: &egui::Context,
+    ) -> bool {
+        let Some(view) = &mut self.file_view else {
+            return false;
+        };
+        let slot = &mut view.pending[pane_index(pane)];
+        if *slot != Some(token) {
+            return false;
+        }
+        *slot = None;
+        let current = if pane == FileTab::Blame {
+            view.blame_generation
+        } else {
+            view.generation
+        };
+        if current != generation {
+            self.load_file_view(ctx);
+            return false;
+        }
+        if failure == Some(crate::tasks::BUSY) {
+            view.retry_load = Some(Instant::now() + Duration::from_millis(100));
+            ctx.request_repaint_after(Duration::from_millis(100));
+            return false;
+        }
+        true
+    }
+
+    pub(super) fn accept_blame_input(
+        &mut self,
+        input: Option<String>,
+        ctx: &egui::Context,
+    ) -> bool {
+        let Some(view) = &mut self.file_view else {
+            return false;
+        };
+        if view
+            .observed_blame
+            .as_ref()
+            .is_some_and(|observed| Some(observed) != input.as_ref())
+        {
+            view.invalidate_blame();
+            self.load_file_view(ctx);
+            return false;
+        }
+        view.blame_input = input;
+        true
     }
 
     fn file_status_inputs(
@@ -258,10 +528,18 @@ impl RepoTab {
         }
         // A request that has not replied yet compares its own captured inputs with
         // this observation upon arrival. Unrelated probes do not supersede it.
+        let blame_changed = view
+            .blame_input
+            .as_ref()
+            .is_some_and(|old| inputs.blame.as_ref() != Some(old))
+            || matches!(view.blame, Some(Err(_)));
+        view.observed_blame = inputs.blame.clone();
         view.observed_inputs = Some(inputs);
-        view.invalidate_blame();
-        if view.tab == FileTab::Blame {
-            self.load_file_view(ctx);
+        if blame_changed {
+            view.invalidate_blame();
+            if view.tab == FileTab::Blame {
+                self.load_file_view(ctx);
+            }
         }
     }
 

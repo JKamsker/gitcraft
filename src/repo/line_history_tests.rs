@@ -280,3 +280,53 @@ fn line_history_mapping_uses_pinned_commit_after_head_moves() -> Result<(), Stri
     let _ = std::fs::remove_dir_all(&dir);
     Ok(())
 }
+
+#[test]
+fn accepted_equal_status_messages_refresh_changed_line_mapping_twice() -> Result<(), String> {
+    let dir = history_repo("line-history-equal-status-dispatch")?;
+    let ctx = egui::Context::default();
+    let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+    let (_, mut jobs) = super::messages::record_jobs(|| {
+        tab.open_line_history(PATH.into(), LinesAt::WorkTree, (5, 8), &ctx)
+    });
+    assert_eq!(jobs.len(), 1);
+    let reply = jobs.pop().ok_or("missing initial history")?();
+    tab.handle(reply, &ctx);
+    let original = std::fs::read_to_string(dir.join(PATH)).map_err(|e| e.to_string())?;
+    let mut previous_status = None;
+    for (read, extra) in [(1, "new top\n"), (2, "another top\nnew top\n")] {
+        let before = tab
+            .file_view
+            .as_ref()
+            .ok_or("missing view")?
+            .line_inputs
+            .clone();
+        write(&dir, PATH, &format!("{extra}{original}"))?;
+        let status = git::run(Some(&dir), &["status", "--porcelain=v1", "-z"])?;
+        if let Some(previous) = previous_status {
+            assert_eq!(
+                status, previous,
+                "status spelling deliberately stays unchanged"
+            );
+        }
+        previous_status = Some(status);
+        let work = git::status(&dir)?;
+        let (_, mut jobs) =
+            super::messages::record_jobs(|| tab.handle(super::Msg::Status(read, Ok(work)), &ctx));
+        assert_eq!(jobs.len(), 1, "accepted status launches its input probe");
+        let probe = jobs.pop().ok_or("missing probe")?();
+        let (_, mut jobs) = super::messages::record_jobs(|| tab.handle(probe, &ctx));
+        assert_eq!(
+            jobs.len(),
+            1,
+            "changed mapping launches replacement history"
+        );
+        let history = jobs.pop().ok_or("missing replacement history")?();
+        tab.handle(history, &ctx);
+        let view = tab.file_view.as_ref().ok_or("missing view")?;
+        assert!(matches!(view.history, Some(Ok(_))));
+        assert_ne!(view.line_inputs, before);
+    }
+    std::fs::remove_dir_all(dir).map_err(|e| e.to_string())?;
+    Ok(())
+}
