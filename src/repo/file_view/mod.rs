@@ -268,6 +268,20 @@ impl FileView {
         true
     }
 
+    /// Suspension disconnects the result channel, so old callbacks cannot release
+    /// their slots. Retire those request lifetimes before installing a new sender.
+    pub(super) fn retire_reads(&mut self) {
+        if !self.invalidate_mutable() {
+            self.generation = next_generation();
+            self.invalidate_blame();
+        }
+        self.pending = [None; 3];
+        self.probe = ProbeState::default();
+        self.retry_load = None;
+        self.line_observed = None;
+        self.line_inputs = None;
+    }
+
     fn invalidate_blame(&mut self) {
         self.blame_generation = next_generation();
         self.blame_input = None;
