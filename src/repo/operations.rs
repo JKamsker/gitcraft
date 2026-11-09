@@ -1151,6 +1151,16 @@ pub(super) fn run_steps_guarded(
         let mut actual = prepared
             .as_ref()
             .map_or_else(|| op.clone(), |(args, _)| args.clone());
+        if actual.first().is_some_and(|arg| arg == "pull") {
+            match ignored_safe_pull(path, &actual) {
+                Ok(args) => actual = args,
+                Err(error) => {
+                    result = Err(error);
+                    stopped = i;
+                    break;
+                }
+            }
+        }
         // Recheck immediately before invoking rebase. A rejected plan never owns a rewrite.
         let rebasing = (fork_scope.is_some() || guarded_fork)
             && matches!(op.as_slice(), [c, config, rebase, _] if c == "-c" && config == "rebase.updateRefs=false" && rebase == "rebase");
@@ -1473,6 +1483,21 @@ pub(super) fn is_expectation(op: &[String]) -> bool {
 
 pub(super) const EXPECT_FOLD_SAFE: &str = "\u{0}expect-fold-safe";
 pub(super) const EXPECT_FOLD_IGNORED: &str = "\u{0}expect-fold-ignored";
+
+/// Keep pull's authentication, submodule and configuration behavior while making its
+/// merge refuse to overwrite ignored files. Read the effective options in the worker,
+/// after any preceding checkout, and override them only for this command.
+fn ignored_safe_pull(path: &Path, args: &[String]) -> Result<Vec<String>, String> {
+    let branch = git::run(Some(path), &["symbolic-ref", "--short", "HEAD"])?;
+    let key = format!("branch.{}.mergeOptions", branch.trim());
+    let old = git::run_ok_codes(Some(path), &["config", "-z", "--get", &key], &[0, 1])?;
+    let old = old.strip_suffix('\0').unwrap_or(&old);
+    Ok([
+        vec!["-c".into(), format!("{key}={old} --no-overwrite-ignore")],
+        args.to_vec(),
+    ]
+    .concat())
+}
 
 /// Captures only the witness from the same validator invocation; no additional Git call.
 pub(super) fn check_stack_captured(
@@ -1935,6 +1960,44 @@ mod tests {
             assert!(git::run(Some(&dir), args).is_ok());
         }
         dir
+    }
+
+    #[test]
+    fn pull_preserves_merge_options_and_refuses_ignored_file_overwrite() -> Result<(), String> {
+        let upstream = repo("pull-ignored-upstream");
+        let clone = tempfile::tempdir().map_err(|e| e.to_string())?;
+        let clone_path = clone.path().to_str().ok_or("clone path")?;
+        git::run(Some(&upstream), &["clone", "-q", ".", clone_path])?;
+        let before = git::head(clone.path());
+        std::fs::write(upstream.join("secret.env"), "upstream").map_err(|e| e.to_string())?;
+        git::run(Some(&upstream), &["add", "secret.env"])?;
+        git::run(Some(&upstream), &["commit", "-qm", "add secret path"])?;
+        std::fs::write(clone.path().join(".git/info/exclude"), "secret.env\n")
+            .map_err(|e| e.to_string())?;
+        std::fs::write(clone.path().join("secret.env"), "private").map_err(|e| e.to_string())?;
+        let key = "branch.main.mergeOptions";
+        let old = "--log=3 --no-stat";
+        git::run(Some(clone.path()), &["config", key, old])?;
+        let pull = ops(&[&["pull", "--ff-only"]]);
+        let argv = super::ignored_safe_pull(clone.path(), &pull[0])?;
+        assert_eq!(argv[1], format!("{key}={old} --no-overwrite-ignore"));
+        let (result, _) = run_steps(clone.path(), &pull, OpKind::plain(), None);
+        assert!(result.is_err(), "{result:?}");
+        assert_eq!(git::head(clone.path()), before);
+        assert_eq!(
+            std::fs::read(clone.path().join("secret.env")).map_err(|e| e.to_string())?,
+            b"private"
+        );
+        assert_eq!(
+            git::run(Some(clone.path()), &["config", "--get", key])?.trim(),
+            old
+        );
+        std::fs::remove_file(clone.path().join("secret.env")).map_err(|e| e.to_string())?;
+        let (result, _) = run_steps(clone.path(), &pull, OpKind::plain(), None);
+        assert!(result.is_ok(), "{result:?}");
+        assert_eq!(git::head(clone.path()), git::head(&upstream));
+        let _ = std::fs::remove_dir_all(upstream);
+        Ok(())
     }
 
     /// A quiet operation (the background fetch) runs its git steps, and only checks its
