@@ -17,7 +17,12 @@ fn replies(view: &FileView, label: &str) -> [Msg; 3] {
     let (g, p, r) = (view.generation, view.path.clone(), view.rev.clone());
     [
         Msg::FileHistory(g, p.clone(), r.clone(), Err(label.into())),
-        Msg::Blame(g, p.clone(), r.clone(), Err(label.into())),
+        Msg::Blame(
+            view.blame_generation,
+            p.clone(),
+            r.clone(),
+            Err(label.into()),
+        ),
         Msg::FileText(g, p, r, Err(label.into())),
     ]
 }
@@ -203,4 +208,323 @@ fn unchanged_line_inputs_retry_failed_history_and_only_reuse_success() {
     assert!(!v.reuses_line_inputs(&Err("probe failed".into())));
     let changed = ("b".repeat(40), key.1, key.2);
     assert!(!v.reuses_line_inputs(&Ok(changed)));
+}
+
+#[test]
+fn failed_reload_invalidates_mutable_views_and_submits_replacement_reads() -> Result<(), String> {
+    let ctx = egui::Context::default();
+    for pane in [FileTab::History, FileTab::File, FileTab::Blame] {
+        for successful_blame in [false, true] {
+            let mut tab = tab();
+            let mut v = view(Some("HEAD"));
+            v.tab = pane;
+            v.history = Some(Ok(Vec::new()));
+            v.text = Some(Err("cached text error".into()));
+            v.blame = Some(if successful_blame {
+                Ok(BlameData::default())
+            } else {
+                Err("cached blame error".into())
+            });
+            let old = replies(&v, "old reply");
+            tab.file_view = Some(v);
+            let (_, jobs) = crate::repo::messages::record_jobs(|| {
+                tab.handle(Msg::Loaded(Err("reload failed".into())), &ctx)
+            });
+            // Exercises the real Loaded handler and loader, without running a worker.
+            assert_eq!(jobs.len(), 1);
+            assert_eq!(tab.load_error.as_deref(), Some("reload failed"));
+            let v = tab.file_view.as_ref().ok_or("missing view")?;
+            assert!(v.history.is_none() && v.text.is_none());
+            assert_eq!(matches!(v.blame, Some(Ok(_))), successful_blame);
+            assert!(v.needs(FileTab::Blame));
+            deliver(&mut tab, old);
+            let v = tab.file_view.as_ref().ok_or("missing view")?;
+            assert!(v.history.is_none() && v.text.is_none());
+            let current = replies(v, "current reply");
+            deliver(&mut tab, current);
+            assert_label(
+                tab.file_view.as_ref().ok_or("missing view")?,
+                "current reply",
+            );
+        }
+    }
+    let mut tab = tab();
+    let mut v = view(Some(&"a".repeat(40)));
+    v.history = Some(Ok(Vec::new()));
+    let generation = v.generation;
+    tab.file_view = Some(v);
+    let (_, jobs) =
+        crate::repo::messages::record_jobs(|| tab.handle(Msg::Loaded(Err("failed".into())), &ctx));
+    assert!(jobs.is_empty());
+    let v = tab.file_view.as_ref().ok_or("missing view")?;
+    assert_eq!(v.generation, generation);
+    assert!(v.history.is_some());
+    Ok(())
+}
+
+#[test]
+fn fixed_commit_refresh_preserves_content_but_reloads_configuration_sensitive_blame()
+-> Result<(), String> {
+    let ctx = egui::Context::default();
+    for len in [40, 64] {
+        for pane in [FileTab::File, FileTab::History] {
+            for successful_blame in [false, true] {
+                let mut tab = tab();
+                let mut v = view(Some(&"a".repeat(len)));
+                v.tab = pane;
+                v.history = Some(Ok(Vec::new()));
+                v.text = Some(Err("retained immutable text".into()));
+                v.blame = Some(if successful_blame {
+                    Ok(BlameData::default())
+                } else {
+                    Err("retry configuration".into())
+                });
+                let generation = v.generation;
+                let old = replies(&v, "old");
+                tab.file_view = Some(v);
+                let (_, jobs) =
+                    crate::repo::messages::record_jobs(|| tab.invalidate_mutable_file_view(&ctx));
+                assert!(jobs.is_empty());
+                let v = tab.file_view.as_ref().ok_or("missing view")?;
+                assert_eq!(v.generation, generation);
+                assert!(matches!(v.history, Some(Ok(_))));
+                assert!(matches!(&v.text, Some(Err(e)) if e == "retained immutable text"));
+                assert_eq!(matches!(v.blame, Some(Ok(_))), successful_blame);
+                assert!(v.needs(FileTab::Blame));
+                let [_, old_blame, _] = old;
+                tab.handle(old_blame, &ctx);
+                assert!(
+                    tab.file_view
+                        .as_ref()
+                        .ok_or("missing view")?
+                        .needs(FileTab::Blame)
+                );
+                let rev = Some("a".repeat(len));
+                let (_, jobs) = crate::repo::messages::record_jobs(|| {
+                    tab.open_file_view("same.txt".into(), rev, FileTab::Blame, &ctx)
+                });
+                assert_eq!(jobs.len(), 1, "selecting dirty blame must submit a read");
+                let v = tab.file_view.as_ref().ok_or("missing view")?;
+                let current = Msg::Blame(
+                    v.blame_generation,
+                    v.path.clone(),
+                    v.rev.clone(),
+                    Ok(BlameData::default()),
+                );
+                tab.handle(current, &ctx);
+                assert!(
+                    !tab.file_view
+                        .as_ref()
+                        .ok_or("missing view")?
+                        .needs(FileTab::Blame)
+                );
+                let (_, jobs) = crate::repo::messages::record_jobs(|| tab.load_file_view(&ctx));
+                assert!(
+                    jobs.is_empty(),
+                    "ordinary pane selection reuses current blame"
+                );
+            }
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn retained_blame_is_replaced_by_the_actual_dispatched_loader() -> Result<(), String> {
+    let dir = crate::repo::revert_tests::scratch(
+        "blame-dispatch-refresh",
+        &[("same.txt", "owned fixture\n")],
+    )?;
+    let ctx = egui::Context::default();
+    let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+    let mut v = view(None);
+    v.tab = FileTab::Blame;
+    v.blame = Some(Ok(BlameData::default()));
+    tab.file_view = Some(v);
+    let (_, mut jobs) =
+        crate::repo::messages::record_jobs(|| tab.invalidate_mutable_file_view(&ctx));
+    assert_eq!(jobs.len(), 1);
+    assert!(matches!(
+        tab.file_view.as_ref().and_then(|v| v.blame.as_ref()),
+        Some(Ok(_))
+    ));
+    let reply = jobs.pop().ok_or("missing replacement job")?();
+    assert!(matches!(&reply, Msg::Blame(_, _, _, Ok(_))));
+    tab.handle(reply, &ctx);
+    assert!(
+        !tab.file_view
+            .as_ref()
+            .ok_or("missing view")?
+            .needs(FileTab::Blame)
+    );
+    std::fs::remove_dir_all(dir).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[test]
+fn status_probes_preserve_inflight_inputs_and_reject_changed_or_older_observations()
+-> Result<(), String> {
+    let ctx = egui::Context::default();
+    for pane in [FileTab::History, FileTab::File] {
+        let mut tab = tab();
+        let mut v = view(None);
+        v.tab = pane;
+        let generation = v.generation;
+        tab.file_view = Some(v);
+        let inputs = FileInputs {
+            history: Some("commit-a".into()),
+            text: Some(content_key(b"same")),
+        };
+        let mut latest_check = 0;
+        for _ in 0..3 {
+            let (_, jobs) =
+                crate::repo::messages::record_jobs(|| tab.status_changed_file_view(&ctx));
+            assert_eq!(
+                jobs.len(),
+                1,
+                "probe only; the current read is not resubmitted"
+            );
+            let v = tab.file_view.as_ref().ok_or("missing view")?;
+            assert_eq!(v.generation, generation);
+            latest_check = v.input_check;
+            tab.file_status_inputs(generation, latest_check, inputs.clone(), &ctx);
+        }
+        let input = match pane {
+            FileTab::History => inputs.history.clone(),
+            _ => inputs.text.clone(),
+        };
+        assert!(tab.accept_file_inputs(generation, "same.txt", None, pane, input, &ctx));
+        let reply = match pane {
+            FileTab::History => {
+                Msg::FileHistory(generation, "same.txt".into(), None, Ok(Vec::new()))
+            }
+            _ => Msg::FileText(
+                generation,
+                "same.txt".into(),
+                None,
+                Ok(FileText::new(b"same", "same.txt", false)),
+            ),
+        };
+        tab.handle(reply, &ctx);
+        let (_, jobs) = crate::repo::messages::record_jobs(|| tab.status_changed_file_view(&ctx));
+        assert_eq!(jobs.len(), 1);
+        let current_check = tab.file_view.as_ref().ok_or("missing view")?.input_check;
+        let changed = FileInputs {
+            history: Some("commit-b".into()),
+            text: Some(content_key(b"changed")),
+        };
+        tab.file_status_inputs(generation, latest_check, changed.clone(), &ctx);
+        assert_eq!(
+            tab.file_view.as_ref().ok_or("missing view")?.generation,
+            generation
+        );
+        let (_, jobs) = crate::repo::messages::record_jobs(|| {
+            tab.file_status_inputs(generation, current_check, changed, &ctx)
+        });
+        assert_eq!(
+            jobs.len(),
+            1,
+            "changed relevant input requests a replacement"
+        );
+        assert_ne!(
+            tab.file_view.as_ref().ok_or("missing view")?.generation,
+            generation
+        );
+        assert!(!tab.accept_file_inputs(
+            generation,
+            "same.txt",
+            None,
+            pane,
+            Some("stale".into()),
+            &ctx
+        ));
+    }
+    // A status observation can arrive before a delayed initial result. Its captured
+    // input must agree; otherwise even the current generation's result is superseded.
+    let mut tab = tab();
+    tab.file_view = Some(view(None));
+    let generation = tab.file_view.as_ref().ok_or("missing view")?.generation;
+    let (_, _) = crate::repo::messages::record_jobs(|| tab.status_changed_file_view(&ctx));
+    let check = tab.file_view.as_ref().ok_or("missing view")?.input_check;
+    tab.file_status_inputs(
+        generation,
+        check,
+        FileInputs {
+            history: Some("new".into()),
+            text: None,
+        },
+        &ctx,
+    );
+    let (accepted, jobs) = crate::repo::messages::record_jobs(|| {
+        tab.accept_file_inputs(
+            generation,
+            "same.txt",
+            None,
+            FileTab::History,
+            Some("old".into()),
+            &ctx,
+        )
+    });
+    assert!(!accepted);
+    assert_eq!(jobs.len(), 1);
+    Ok(())
+}
+
+#[test]
+fn actual_file_loaders_finish_across_unrelated_status_changes() -> Result<(), String> {
+    let ctx = egui::Context::default();
+    for pane in [FileTab::History, FileTab::File] {
+        let dir = crate::repo::revert_tests::scratch(
+            if pane == FileTab::History {
+                "history-inflight-probe"
+            } else {
+                "file-inflight-probe"
+            },
+            &[
+                ("same.txt", "selected bytes\n"),
+                ("other.txt", "unrelated\n"),
+            ],
+        )?;
+        let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+        let mut v = view(None);
+        v.tab = pane;
+        let generation = v.generation;
+        tab.file_view = Some(v);
+        let (_, mut jobs) = crate::repo::messages::record_jobs(|| tab.load_file_view(&ctx));
+        let delayed_reply = jobs.pop().ok_or("missing actual loader")?();
+        std::fs::write(dir.join("other.txt"), "unrelated edit\n").map_err(|e| e.to_string())?;
+        let (_, mut jobs) =
+            crate::repo::messages::record_jobs(|| tab.status_changed_file_view(&ctx));
+        let probe = jobs.pop().ok_or("missing status probe")?();
+        tab.handle(probe, &ctx);
+        tab.handle(delayed_reply, &ctx);
+        let v = tab.file_view.as_ref().ok_or("missing view")?;
+        assert_eq!(v.generation, generation);
+        assert!(!v.needs(pane));
+        match pane {
+            FileTab::History => assert_eq!(
+                v.history_input.as_deref(),
+                Some(git::resolve(&dir, "HEAD")?.as_str())
+            ),
+            _ => assert_eq!(v.text_input, Some(content_key(b"selected bytes\n"))),
+        }
+        if pane == FileTab::File {
+            std::fs::write(dir.join("same.txt"), "selected new bytes\n")
+                .map_err(|e| e.to_string())?;
+            let (_, mut jobs) =
+                crate::repo::messages::record_jobs(|| tab.status_changed_file_view(&ctx));
+            let probe = jobs.pop().ok_or("missing changed probe")?();
+            let (_, mut replacements) =
+                crate::repo::messages::record_jobs(|| tab.handle(probe, &ctx));
+            assert_eq!(replacements.len(), 1);
+            let replacement = replacements.pop().ok_or("missing replacement loader")?();
+            tab.handle(replacement, &ctx);
+            let v = tab.file_view.as_ref().ok_or("missing view")?;
+            assert_ne!(v.generation, generation);
+            assert_eq!(v.text_input, Some(content_key(b"selected new bytes\n")));
+            assert!(!v.needs(FileTab::File));
+        }
+        std::fs::remove_dir_all(dir).map_err(|e| e.to_string())?;
+    }
+    Ok(())
 }
