@@ -202,6 +202,21 @@ pub(crate) fn everything_problem(work: &WorkStatus, untracked: bool) -> Option<S
 
 /// Plain stash cleanup can overwrite an excluded untracked path when the index has
 /// deleted that path (or a file above/below it). Snapshots do not clean the worktree.
+fn removed_paths(work: &WorkStatus) -> impl Iterator<Item = &str> {
+    work.staged
+        .iter()
+        .chain(
+            work.unstaged
+                .iter()
+                .filter(|f| f.area != git::Area::Untracked),
+        )
+        .filter_map(|f| match f.code {
+            'D' => Some(f.path.as_str()),
+            'R' => f.old_path.as_deref(),
+            _ => None,
+        })
+}
+
 fn excluded_overlap_problem(work: &WorkStatus, untracked: bool) -> Option<String> {
     if untracked {
         return None;
@@ -215,12 +230,7 @@ fn excluded_overlap_problem(work: &WorkStatus, untracked: bool) -> Option<String
             || a.strip_prefix(b).is_some_and(|tail| tail.starts_with('/'))
             || b.strip_prefix(a).is_some_and(|tail| tail.starts_with('/'))
     };
-    let removed_paths = work.staged.iter().filter_map(|f| match f.code {
-        'D' => Some(f.path.as_str()),
-        'R' => f.old_path.as_deref(),
-        _ => None,
-    });
-    for deleted in removed_paths {
+    for deleted in removed_paths(work) {
         if let Some(excluded) = work
             .unstaged
             .iter()
@@ -233,6 +243,80 @@ fn excluded_overlap_problem(work: &WorkStatus, untracked: bool) -> Option<String
         }
     }
     None
+}
+
+/// Compare actual directory entries on the repository's machine. This also handles
+/// per-directory case rules and Unicode aliases without trusting core.ignorecase.
+/// Cached UI eligibility stays lexical; execution is the authoritative guard.
+fn filesystem_overlap_script(
+    work: &WorkStatus,
+    untracked: bool,
+    ignored: &[&str],
+) -> Result<String, String> {
+    let excluded = work
+        .unstaged
+        .iter()
+        .filter(|f| !untracked && f.area == git::Area::Untracked)
+        .map(|f| f.path.as_str())
+        .chain(ignored.iter().copied());
+    let removed: Vec<_> = removed_paths(work).collect();
+    let mut script = String::from(
+        "same() { if test \"$1\" -ef \"$2\"; then printf '%s\\000' \"$3\"; exit 0; else code=$?; test \"$code\" = 1 || exit \"$code\"; fi; }\n",
+    );
+    for excluded in excluded {
+        let b = excluded.trim_end_matches('/');
+        for removed in &removed {
+            let a = removed.trim_end_matches('/');
+            for (whole, ancestors) in [(a, b), (b, a)] {
+                for end in ancestors
+                    .match_indices('/')
+                    .map(|(i, _)| i)
+                    .chain(std::iter::once(ancestors.len()))
+                {
+                    if end == 0 {
+                        continue;
+                    }
+                    script.push_str(&format!(
+                        "same {} {} {}\n",
+                        crate::remote::sh_quote(&format!("./{whole}")),
+                        crate::remote::sh_quote(&format!("./{}", &ancestors[..end])),
+                        crate::remote::sh_quote(excluded)
+                    ));
+                    if script.len() > 48 * 1024 {
+                        return Err("Too many excluded-path comparisons to establish safe stash cleanup. Resolve the replacements or use a snapshot.".into());
+                    }
+                }
+            }
+        }
+    }
+    script.push_str("exit 0\n");
+    Ok(script)
+}
+
+fn check_filesystem_overlaps(
+    path: &Path,
+    work: &WorkStatus,
+    untracked: bool,
+    ignored: &[&str],
+) -> Result<(), String> {
+    let script = filesystem_overlap_script(work, untracked, ignored)?;
+    let result = git::run_shell(path, &script)?;
+    if result.code != 0 {
+        return Err(format!(
+            "Cannot inspect excluded paths safely before stash cleanup: {}",
+            String::from_utf8_lossy(&result.stderr)
+        ));
+    }
+    if let Some(excluded) = String::from_utf8_lossy(&result.stdout)
+        .split('\0')
+        .find(|p| !p.is_empty())
+    {
+        return Err(crate::i18n::message(
+            "repo-workflows-partial_stash-excluded-overlap",
+            &[("path", excluded.to_owned().into())],
+        ));
+    }
+    Ok(())
 }
 
 /// Everything removes changes; a snapshot only saves them.
@@ -286,7 +370,7 @@ pub(super) fn validate_push(path: &Path, args: &[String]) -> Result<(), String> 
         // Ordinary status omits ignored replacements. --include-untracked excludes them
         // too, including in the separate agent stash plan. Ask Git for their spelling;
         // do not resolve paths on the host (the repository may be remote).
-        if work.staged.iter().any(|f| matches!(f.code, 'D' | 'R')) {
+        if removed_paths(&work).next().is_some() {
             let ignored = git::run(
                 Some(path),
                 &[
@@ -297,23 +381,30 @@ pub(super) fn validate_push(path: &Path, args: &[String]) -> Result<(), String> 
                     "-z",
                 ],
             )?;
-            let ignored_work = WorkStatus {
-                staged: work.staged.clone(),
-                unstaged: ignored
-                    .split('\0')
-                    .filter(|p| !p.is_empty())
-                    .map(|p| git::StatusFile {
-                        path: p.to_owned(),
-                        old_path: None,
-                        code: '?',
-                        area: git::Area::Untracked,
-                    })
-                    .collect(),
-                ..WorkStatus::default()
-            };
+            let ignored_work =
+                WorkStatus {
+                    staged: work.staged.clone(),
+                    unstaged: work
+                        .unstaged
+                        .iter()
+                        .filter(|f| f.area != git::Area::Untracked)
+                        .cloned()
+                        .chain(ignored.split('\0').filter(|p| !p.is_empty()).map(|p| {
+                            git::StatusFile {
+                                path: p.to_owned(),
+                                old_path: None,
+                                code: '?',
+                                area: git::Area::Untracked,
+                            }
+                        }))
+                        .collect(),
+                    ..WorkStatus::default()
+                };
             if let Some(problem) = excluded_overlap_problem(&ignored_work, false) {
                 return Err(problem);
             }
+            let ignored: Vec<_> = ignored.split('\0').filter(|p| !p.is_empty()).collect();
+            check_filesystem_overlaps(path, &work, request.untracked, &ignored)?;
         }
     }
     if let StashMode::Files(paths) = &request.mode {
