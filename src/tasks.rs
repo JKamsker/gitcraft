@@ -116,6 +116,18 @@ pub(crate) struct Pool {
 
 impl Pool {
     #[cfg(test)]
+    pub(crate) fn queued_priority_for(&self, cancel: &Cancellation) -> Option<Priority> {
+        self.shared
+            .state
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .queue
+            .iter()
+            .find(|job| Arc::ptr_eq(&job.cancel.0, &cancel.0))
+            .map(|job| job.priority)
+    }
+
+    #[cfg(test)]
     pub(crate) fn queued_priorities_for(&self, key: &std::path::Path) -> Vec<Priority> {
         self.shared
             .state
