@@ -80,10 +80,19 @@ pub(super) fn read(api: &Api, n: u64) -> Result<PrDetails, String> {
         let threads = api.array(&format!(
             "{end}/threads?$iteration={iteration}&$baseIteration={iteration}"
         ));
-        let commits = api.array(&format!("{end}/commits?$top=1000"));
+        let commits = api.array(&format!("{end}/commits?$top=1000")).and_then(|rows| {
+            // A saturated result without a continuation header is ambiguous too.
+            if rows.len() >= 1000 {
+                Err("Azure DevOps commit list may be incomplete (1,000 commit limit); use the forge page".into())
+            } else {
+                Ok(rows)
+            }
+        });
         let statuses = api.array(&format!("{end}/statuses"));
         let policies = api.array(&format!(
-            "{}/_apis/policy/evaluations?artifactId={}",
+            // Policy evaluations remain preview-only in the REST 7.1 contract:
+            // https://learn.microsoft.com/en-us/rest/api/azure/devops/policy/evaluations/list?view=azure-devops-rest-7.1
+            "{}/_apis/policy/evaluations?artifactId={}&api-version=7.1-preview.1",
             segment(&s.repo.project),
             segment(&format!(
                 "vstfs:///CodeReview/CodeReviewId/{}/{n}",
@@ -176,8 +185,21 @@ pub(super) fn read(api: &Api, n: u64) -> Result<PrDetails, String> {
         let mut checks = vec![];
         if let Ok(rows) = &statuses {
             for v in rows {
+                // Only PR-global statuses and statuses for the displayed iteration
+                // describe this revision. Do not let an older success or failure leak in.
+                if v.get("iterationId")
+                    .is_some_and(|id| id.as_u64() != Some(iteration))
+                {
+                    continue;
+                }
+                let genre = text(v, "/context/genre");
+                let name = text(v, "/context/name");
                 checks.push(Check {
-                    name: text(v, "/context/name"),
+                    name: if genre.is_empty() {
+                        name
+                    } else {
+                        format!("{genre} / {name}")
+                    },
                     state: state(&text(v, "/state")),
                     detail: text(v, "/description"),
                     url: text(v, "/targetUrl"),
