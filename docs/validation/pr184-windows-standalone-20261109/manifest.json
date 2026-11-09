@@ -1,0 +1,18 @@
+{
+  "base": "590bc4b4fe6bc6a312d3373e779220935b97e553",
+  "source": "33dfd019002d5b97c151826fc297f87bea31fe91",
+  "source_tree": "ba3c04e4a2e784fd8d38cb0f89725ec413506158",
+  "changed_paths": [
+    "ci/test-shards.py"
+  ],
+  "unchanged_application_source": true,
+  "failed_run": 42688780864,
+  "failed_core_job": 129413067566,
+  "failed_raw_log_sha256": "3ed6277afc6c37110aeaa02cc229e11f41c029721659aa8b1733a51e2dd356e2",
+  "files": {
+    "failed-core.log.gz": "1a73ebbf5a17e57db8162770ee8ce1c9bdc2ef8ab7e8e02cd2066e02ffef4151",
+    "recording-tests.log": "27458cbd5c824159666495660536f891989b5b2cd6fedfc58e0ce5da99d4d6cc",
+    "recording-tests.py": "4cf04e4edff9306f6b9d7da8cad3110619294fe9bcddd7eb1f3965eec5e3696a",
+    "validation.json": "b69f1588c73323ad584025a9ffae28b9fc261261b3168fdfe488424f62f1d060"
+  }
+}
