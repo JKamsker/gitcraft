@@ -6,7 +6,7 @@
 //! While the content is laid out, a header only reserves its place. The headers are drawn over
 //! the content afterwards, when it is known where they all are.
 
-use egui::{Align2, Id, Rect, Sense, Stroke, Ui, pos2, vec2};
+use egui::{Align2, Color32, Id, Rect, Sense, Stroke, Ui, pos2, vec2};
 
 use super::Action;
 use crate::icons;
@@ -32,12 +32,20 @@ pub(super) struct Header {
     pub button: Option<Button>,
 }
 
+/// What makes a header stand out: something newer waits to be shown, which its button (at the
+/// header's right end) brings in.
+pub(super) struct Alert {
+    pub tint: Color32,
+    pub button: Button,
+}
+
 struct Placed {
     id: Id,
     header: Header,
     /// Its place in the content, on screen.
     natural: Rect,
     open: bool,
+    alert: Option<Alert>,
 }
 
 /// The headers of one pane, in order.
@@ -73,8 +81,16 @@ impl Sections {
             header,
             natural,
             open,
+            alert: None,
         });
         open
+    }
+
+    /// Makes the header added last stand out, with `alert`'s button at its right end.
+    pub fn alert(&mut self, alert: Alert) {
+        if let Some(placed) = self.placed.last_mut() {
+            placed.alert = Some(alert);
+        }
     }
 
     /// Draws the headers over the content of a pane scrolled to `offset`. Returns the offset to
@@ -122,6 +138,10 @@ fn header_row(
     });
     let painter = ui.painter();
     painter.rect_filled(rect, 0.0, t.card);
+    let tint = placed.alert.as_ref().map(|a| a.tint);
+    if let Some(tint) = tint {
+        painter.rect_filled(rect, 0.0, tint.gamma_multiply(0.22));
+    }
     if resp.hovered() {
         painter.rect_filled(rect, 0.0, t.hover);
     }
@@ -158,10 +178,12 @@ fn header_row(
         Align2::LEFT_CENTER,
         header.title,
         theme::semibold(11.5),
-        t.text_dim,
+        tint.unwrap_or(t.text_dim),
     );
+    // An alert's button takes the right end; the count moves left of it.
+    let right = if tint.is_some() { 32.0 } else { 10.0 };
     let count = painter.text(
-        pos2(rect.right() - 10.0, y),
+        pos2(rect.right() - right, y),
         Align2::RIGHT_CENTER,
         header.count.to_string(),
         theme::medium(11.0),
@@ -169,29 +191,54 @@ fn header_row(
     );
     if let Some(button) = placed.header.button.as_mut() {
         // Left of the count, however many digits it has.
-        let x = (count.left() - 16.0).min(rect.right() - 36.0);
+        let x = (count.left() - 16.0).min(rect.right() - right - 26.0);
         let r = Rect::from_center_size(pos2(x, y), vec2(20.0, 20.0));
-        let b = ui
-            .interact(r, placed.id.with("button"), Sense::click())
-            .on_hover_text(button.tooltip);
-        crate::repo::widgets::a11y(&b, egui::WidgetType::Button, button.tooltip);
-        if b.hovered() {
-            ui.painter().rect_filled(r, t.radius_sm, t.pressed);
-        }
-        icons::paint(
+        header_button(ui, r, placed.id.with("button"), button, None, acts);
+    }
+    if let Some(alert) = placed.alert.as_mut() {
+        let r = Rect::from_center_size(pos2(rect.right() - 16.0, y), vec2(20.0, 20.0));
+        header_button(
             ui,
             r,
-            button.icon,
-            13.0,
-            if b.hovered() { t.text } else { t.icon },
+            placed.id.with("alert"),
+            &mut alert.button,
+            Some(alert.tint),
+            acts,
         );
-        if b.clicked()
-            && let Some(action) = button.action.take()
-        {
-            acts.push(action);
-        }
     }
     resp.clicked()
+}
+
+/// One of a header's icon buttons at `r`, its icon in `color` when given.
+fn header_button(
+    ui: &mut Ui,
+    r: Rect,
+    id: Id,
+    button: &mut Button,
+    color: Option<Color32>,
+    acts: &mut Vec<Action>,
+) {
+    let t = Tokens::get(ui.ctx());
+    let b = ui
+        .interact(r, id, Sense::click())
+        .on_hover_text(button.tooltip);
+    crate::repo::widgets::a11y(&b, egui::WidgetType::Button, button.tooltip);
+    if b.hovered() {
+        ui.painter().rect_filled(r, t.radius_sm, t.pressed);
+    }
+    let idle = color.unwrap_or(t.icon);
+    icons::paint(
+        ui,
+        r,
+        button.icon,
+        13.0,
+        if b.hovered() { t.text } else { idle },
+    );
+    if b.clicked()
+        && let Some(action) = button.action.take()
+    {
+        acts.push(action);
+    }
 }
 
 /// Where to show the header number `index` of `count`, whose place in the scrolled content is

@@ -687,6 +687,9 @@ pub fn set_tokens(ctx: &egui::Context, t: Tokens) {
     v.weak_text_color = Some(t.text_faint);
     v.weak_text_alpha = 1.0;
     v.hyperlink_color = t.accent_fg;
+    // An icon still being drawn (in the background) is left out for the moment, not stood in
+    // for by a spinner: on a start, a spinner for each of them all over the window.
+    v.image_loading_spinners = false;
     v.warn_fg_color = t.warning;
     v.error_fg_color = t.danger;
     v.window_corner_radius = CornerRadius::same(t.radius_lg as u8);

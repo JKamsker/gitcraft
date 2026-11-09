@@ -102,8 +102,19 @@ fn commit_files_args<'a>(kind: &'a str, hash: &'a str) -> [&'a str; 10] {
 
 /// The files commit `hash` changed, with their line counts.
 pub(super) fn commit_files(repo: &Path, hash: &str) -> Result<Vec<ChangedFile>, String> {
-    let status_out = run(Some(repo), &commit_files_args("--name-status", hash))?;
-    let numstat_out = run(Some(repo), &commit_files_args("--numstat", hash))?;
+    // Both at once: two process starts in the time of one.
+    let (status_out, numstat_out) = std::thread::scope(|s| {
+        let inherited = crate::tasks::Inherited::capture();
+        let numstat = s.spawn(move || {
+            inherited.run(|| run(Some(repo), &commit_files_args("--numstat", hash)))
+        });
+        let status = run(Some(repo), &commit_files_args("--name-status", hash));
+        let numstat = numstat.join().unwrap_or_else(|_| {
+            Err(crate::i18n::text("interaction-teleport-error-stopped").into())
+        });
+        (status, numstat)
+    });
+    let (status_out, numstat_out) = (status_out?, numstat_out?);
     let mut files = parse_name_status(&status_out);
     add_line_counts(&mut files, &numstat_out);
     Ok(files)

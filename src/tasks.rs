@@ -38,10 +38,43 @@ impl Drop for Scope {
 
 thread_local! {
     static CURRENT: RefCell<Option<Cancellation>> = const { RefCell::new(None) };
+    static URGENT: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
 pub(crate) fn cancellation() -> Cancellation {
     CURRENT.with(|slot| slot.borrow().clone().unwrap_or_default())
+}
+
+/// Whether this thread runs work the user waits on ([`Priority::Urgent`]): its processes go
+/// ahead of the others (see `processes`).
+pub(crate) fn urgent() -> bool {
+    URGENT.with(std::cell::Cell::get)
+}
+
+/// What a job's own threads take over from it: its cancellation, its urgency, its connections.
+pub(crate) struct Inherited {
+    cancel: Cancellation,
+    urgent: bool,
+    connections: crate::connections::Context,
+}
+
+impl Inherited {
+    pub(crate) fn capture() -> Self {
+        Self {
+            cancel: cancellation(),
+            urgent: urgent(),
+            connections: crate::connections::current(),
+        }
+    }
+
+    pub(crate) fn run<T>(self, work: impl FnOnce() -> T) -> T {
+        let was = URGENT.with(|u| u.replace(self.urgent));
+        let out = self
+            .connections
+            .run(|| with_cancellation(self.cancel, work));
+        URGENT.with(|u| u.set(was));
+        out
+    }
 }
 
 /// Bind an inherited lifetime in a nested worker, restoring the previous token on unwind.
@@ -58,9 +91,16 @@ pub(crate) fn with_cancellation<T>(cancel: Cancellation, work: impl FnOnce() -> 
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Priority {
+    /// What the user just asked to see (the commit clicked): started at once on a thread of
+    /// its own, not queued behind the others, and its processes go first.
+    Urgent,
     Interactive,
     Background,
 }
+
+/// How many urgent jobs may have threads of their own at once; more wait in the queue's front.
+const URGENT_THREADS: usize = 4;
+static URGENT_RUNNING: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 
 type Work = Box<dyn FnOnce() + Send>;
 struct Job {
@@ -170,17 +210,33 @@ impl Pool {
         }
         // Drop cancelled queued closures promptly, releasing their captures and capacity.
         purge(&mut state);
-        if state.queue.len() >= self.capacity {
-            return Err(BUSY);
-        }
-        state.queue.push_back(Job {
+        let job = Job {
             work,
             connections: crate::connections::current(),
             on_cancel,
             cancel,
             priority,
             key,
-        });
+        };
+        if priority == Priority::Urgent {
+            drop(state);
+            let Some(job) = spawn_urgent(job) else {
+                return Ok(());
+            };
+            // No thread for it: first in the queue.
+            state = self
+                .shared
+                .state
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            state.queue.push_front(job);
+            self.shared.ready.notify_all();
+            return Ok(());
+        }
+        if state.queue.len() >= self.capacity {
+            return Err(BUSY);
+        }
+        state.queue.push_back(job);
         state.peak_queued = state.peak_queued.max(state.queue.len());
         self.shared.ready.notify_all();
         Ok(())
@@ -220,6 +276,57 @@ impl Pool {
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         (state.active, state.queue.len())
     }
+}
+
+/// Starts an urgent job on a thread of its own, or gives it back when too many already run.
+fn spawn_urgent(job: Job) -> Option<Job> {
+    if URGENT_RUNNING.fetch_add(1, Ordering::AcqRel) >= URGENT_THREADS {
+        URGENT_RUNNING.fetch_sub(1, Ordering::AcqRel);
+        return Some(job);
+    }
+    let slot = Arc::new(Mutex::new(Some(job)));
+    let taken = Arc::clone(&slot);
+    let spawned = std::thread::Builder::new()
+        .name("gitcraft-urgent".into())
+        .spawn(move || {
+            struct Done;
+            impl Drop for Done {
+                fn drop(&mut self) {
+                    URGENT_RUNNING.fetch_sub(1, Ordering::AcqRel);
+                }
+            }
+            let _done = Done;
+            let job = taken
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .take();
+            if let Some(job) = job {
+                run_urgent(job);
+            }
+        });
+    if spawned.is_ok() {
+        return None;
+    }
+    URGENT_RUNNING.fetch_sub(1, Ordering::AcqRel);
+    slot.lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .take()
+}
+
+fn run_urgent(mut job: Job) {
+    if job.cancel.is_cancelled() {
+        if let Some(done) = job.on_cancel.take() {
+            let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(done));
+        }
+        return;
+    }
+    CURRENT.with(|slot| *slot.borrow_mut() = Some(job.cancel.clone()));
+    URGENT.with(|u| u.set(true));
+    let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        job.connections.run(job.work)
+    }));
+    URGENT.with(|u| u.set(false));
+    CURRENT.with(|slot| *slot.borrow_mut() = None);
 }
 
 fn purge(state: &mut State) {
@@ -268,13 +375,19 @@ fn worker(shared: Arc<Shared>) {
                         .as_ref()
                         .is_none_or(|key| seen.insert(key.clone()) && !state.writing.contains(key));
                     if runnable
-                        && (job.priority == Priority::Interactive
+                        && (job.priority != Priority::Background
                             || state.background_active < shared.background_limit)
                     {
                         candidates.push(i);
                     }
                 }
-                let selected = candidates.first().copied();
+                // An urgent job that found no thread of its own goes first, the newest of them.
+                let selected = candidates
+                    .iter()
+                    .rev()
+                    .find(|&&i| state.queue[i].priority == Priority::Urgent)
+                    .or(candidates.first())
+                    .copied();
                 if let Some(i) = selected
                     && let Some(job) = state.queue.remove(i)
                 {
@@ -295,11 +408,13 @@ fn worker(shared: Arc<Shared>) {
             }
         };
         CURRENT.with(|slot| *slot.borrow_mut() = Some(job.cancel.clone()));
+        URGENT.with(|u| u.set(job.priority == Priority::Urgent));
         // Most callers supply an error continuation. Also contain panics from any other
         // caller so the fixed pool never silently loses a worker.
         let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             job.connections.run(job.work)
         }));
+        URGENT.with(|u| u.set(false));
         CURRENT.with(|slot| *slot.borrow_mut() = None);
         let mut state = shared
             .state

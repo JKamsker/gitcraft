@@ -93,6 +93,8 @@ impl super::RepoTab {
                         self.restore_drafts();
                     }
                     self.load_timeline(ctx);
+                    // As last read, until git has read it anew.
+                    self.show_snapshot(ctx);
                 }
                 self.watch(ctx);
                 self.reload(ctx);

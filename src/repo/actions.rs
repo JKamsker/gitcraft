@@ -127,6 +127,8 @@ pub(crate) enum Action {
     CloseReflog,
     /// Something asked of the issues assigned to you.
     Issue(issue_work::IssueAct),
+    /// Shows the pull requests read while the list was in use.
+    ApplyPendingPrs,
     /// Show the repository doctor in the big area, at a section.
     OpenDoctor(doctor::Section),
     CloseDoctor,

@@ -227,6 +227,10 @@ impl RepoTab {
         if from.credentials.is_some() && from.connection_context == crate::connections::current() {
             self.credentials = from.credentials.clone();
         }
+        // The same repository's pull requests, shown until this view reads them itself.
+        if from.connection_context == crate::connections::current() {
+            self.prs = from.prs.clone();
+        }
     }
 
     /// Coming back to this view from the background: catch up, and show the selected commit

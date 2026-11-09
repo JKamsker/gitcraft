@@ -39,6 +39,7 @@ pub(crate) mod custom_commands;
 mod dco;
 mod detached;
 mod detail;
+mod detail_cache;
 mod devcontainer;
 mod dialogs;
 mod diff;
@@ -136,6 +137,8 @@ mod running;
 mod samples;
 mod saved_views;
 mod sidebar;
+mod slow_banner;
+mod snapshot;
 mod sparse;
 mod ssh_setup;
 mod stack;
@@ -296,6 +299,9 @@ pub struct RepoTab {
     forge_repository_generation: u64,
     gerrit: Option<crate::gerrit::Server>,
     prs: Vec<PullRequest>,
+    /// A newer list, read while the pointer was on the shown one: it waits until the user is
+    /// done there, or brings it in from the header (see `sidebar::pull_requests`).
+    pending_prs: Option<Vec<PullRequest>>,
     pr_error: Option<String>,
     prs_loaded: Option<Instant>,
     /// The build status of the commits that show one.
@@ -329,6 +335,16 @@ pub struct RepoTab {
     pending_commit_diff: Option<String>,
     detail: Option<CommitDetail>,
     detail_error: Option<String>,
+    /// Details read before (or ahead), so a commit clicked again shows at once.
+    detail_cache: detail_cache::DetailCache,
+    /// Ends the reads for the selected commit (and its neighbours) when the selection moves on.
+    detail_cancel: crate::tasks::Cancellation,
+    /// When the selected commit's detail was asked of git (see `slow_banner`).
+    detail_asked: Option<Instant>,
+    /// The graph shows the last snapshot of the repository (see `snapshot`) until the first read.
+    snapshot_shown: bool,
+    /// When the last snapshot was kept.
+    snapshot_kept: Option<Instant>,
     /// The selected commit's signature, containment, notes and backlinks.
     extras: detail::Extras,
     diff: Option<DiffView>,
@@ -681,6 +697,7 @@ impl RepoTab {
             forge_repository_generation: 0,
             gerrit: None,
             prs: Vec::new(),
+            pending_prs: None,
             pr_error: None,
             prs_loaded: None,
             ci: ci_status::CiStatuses::default(),
@@ -701,6 +718,11 @@ impl RepoTab {
             pending_commit_diff: None,
             detail: None,
             detail_error: None,
+            detail_cache: Default::default(),
+            detail_cancel: Default::default(),
+            detail_asked: None,
+            snapshot_shown: false,
+            snapshot_kept: None,
             extras: Default::default(),
             diff: None,
             structural_running: None,
@@ -884,7 +906,8 @@ impl RepoTab {
 
     /// Nothing read yet: the tab shows its opening screen.
     pub fn opening(&self) -> bool {
-        (self.history_gen == 0 && self.load_error.is_none()) || self.resuming
+        (self.history_gen == 0 && !self.snapshot_shown && self.load_error.is_none())
+            || self.resuming
     }
 
     pub fn is_busy(&self) -> bool {

@@ -571,6 +571,15 @@ impl RepoTab {
         self.reload(ctx);
     }
 
+    /// Whether a read is going or began a moment ago: the window gaining the focus then (as it
+    /// does just after starting) reads nothing it won't have.
+    pub fn just_read(&self) -> bool {
+        self.loading
+            || self
+                .load_started
+                .is_some_and(|at| at.elapsed() < std::time::Duration::from_secs(3))
+    }
+
     /// A menu entry for `op` with `other`, marked with whether it would conflict.
     pub(super) fn conflict_button(
         &self,

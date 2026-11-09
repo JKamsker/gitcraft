@@ -87,6 +87,8 @@ pub(super) enum Msg {
     /// The working tree, from the read numbered so (see `RepoTab::reads`).
     Status(u64, Result<WorkStatus, String>),
     Detail(String, Result<CommitDetail, String>),
+    /// A neighbour of the selected commit, read ahead for the detail cache.
+    DetailPrefetched(Result<CommitDetail, String>),
     /// The answer to the diff request numbered so (see [`DiffView::next_request`]).
     ///
     /// [`DiffView::next_request`]: super::DiffView::next_request
@@ -272,9 +274,29 @@ pub(super) fn spawn_or(
         ctx,
         crate::tasks::Priority::Interactive,
         None,
+        tx.cancel.clone(),
         failed,
         job,
     );
+}
+
+/// [`spawn_or`] for what the user just asked to see (the commit clicked): it goes ahead of all
+/// else (see [`crate::tasks::Priority::Urgent`]) and ends with `cancel`, cancelled when the
+/// selection moves on. `prefetch` reads what may be asked next, behind everything else.
+pub(super) fn spawn_selection(
+    tx: &JobSender,
+    ctx: &egui::Context,
+    cancel: crate::tasks::Cancellation,
+    prefetch: bool,
+    failed: impl FnOnce(String) -> Msg + Send + 'static,
+    job: impl FnOnce() -> Msg + Send + 'static,
+) {
+    let priority = if prefetch {
+        crate::tasks::Priority::Background
+    } else {
+        crate::tasks::Priority::Urgent
+    };
+    spawn_with(tx, ctx, priority, None, cancel, failed, job);
 }
 
 /// Serializes a whole mutation operation across tabs of the same repository.
@@ -289,6 +311,7 @@ pub(super) fn spawn_mutation(
         ctx,
         crate::tasks::Priority::Background,
         Some(tx.repo.clone()),
+        tx.cancel.clone(),
         failed,
         job,
     );
@@ -299,6 +322,7 @@ fn spawn_with(
     ctx: &egui::Context,
     priority: crate::tasks::Priority,
     key: Option<std::path::PathBuf>,
+    cancel: crate::tasks::Cancellation,
     failed: impl FnOnce(String) -> Msg + Send + 'static,
     job: impl FnOnce() -> Msg + Send + 'static,
 ) {
@@ -313,7 +337,7 @@ fn spawn_with(
     let cancelled_ctx = ctx.clone();
     let submitted = crate::tasks::pool().and_then(|pool| {
         pool.submit_cancellable(
-            tx.cancel.clone(),
+            cancel,
             priority,
             key,
             Some(Box::new(move || {
@@ -585,15 +609,22 @@ impl RepoTab {
                 Err(e) => self.status = Some(crate::repo::Notice::plain((e, true))),
             },
             Msg::Detail(hash, result) => {
+                if let Ok(d) = &result {
+                    self.detail_cache.insert(&self.refs.head, d.clone());
+                }
                 if self.detail_hash.as_deref() == Some(hash.as_str()) {
                     match result {
-                        Ok(d) => {
-                            self.detail = Some(d);
-                            self.fill_reword();
+                        Ok(d) => self.show_detail(d, ctx),
+                        Err(e) => {
+                            self.detail_error = Some(e);
+                            self.finish_commit_changes(&hash, ctx);
                         }
-                        Err(e) => self.detail_error = Some(e),
                     }
-                    self.finish_commit_changes(&hash, ctx);
+                }
+            }
+            Msg::DetailPrefetched(result) => {
+                if let Ok(d) = result {
+                    self.detail_cache.insert(&self.refs.head, d);
                 }
             }
             Msg::RebaseCommits {
@@ -703,14 +734,7 @@ impl RepoTab {
             // the one read since), or of the forge the remotes no longer point to.
             Msg::Prs(asked, _) if self.prs_loaded != Some(asked) => {}
             Msg::Prs(_, result) => match result {
-                Ok(prs) => {
-                    self.prs = prs;
-                    self.pr_error = None;
-                    if crate::network::background_may_run() {
-                        self.refresh_ci(ctx);
-                    }
-                    self.load_seen_heads(ctx);
-                }
+                Ok(prs) => self.prs_arrived(prs, ctx),
                 Err(e) => self.pr_error = Some(e),
             },
             Msg::CiStatuses(fresh, result) => self.ci_arrived(fresh, result),

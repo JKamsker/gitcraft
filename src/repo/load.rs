@@ -93,28 +93,34 @@ impl RepoTab {
         let failed = |e| Msg::Loaded(Err(e));
         super::messages::spawn_or(&self.tx, ctx, failed, move || {
             Msg::Loaded((|| {
+                // Leaf reads share one fixed pool across every tab. The parent waits in
+                // the job pool; no reload creates its own scoped OS threads.
+                let read_log = |from: Option<Vec<String>>| {
+                    let (path, excluded) = (path.clone(), excluded.clone());
+                    crate::tasks::read(move || {
+                        git::log_scoped(&path, from.as_deref(), order, 0, count, &excluded)
+                    })
+                };
+                // With every branch shown, the history doesn't depend on the refs: read at
+                // the same time as them, not after.
+                let early_history = (!visibility.is_filtering())
+                    .then(|| read_log(None))
+                    .transpose()?;
                 let refs = git::refs(&path)?;
                 visibility.prune(&refs);
                 let log_from = visibility.revisions(&refs);
-                // Leaf reads share one fixed pool across every tab. The parent waits in
-                // the job pool; no reload creates its own scoped OS threads.
-                let history = {
-                    let (path, from, excluded) = (path.clone(), log_from.clone(), excluded.clone());
-                    crate::tasks::read(move || {
-                        git::log_scoped(&path, from.as_deref(), order, 0, count, &excluded)
-                    })?
+                let history = match early_history {
+                    Some(history) => history,
+                    None => read_log(log_from.clone())?,
                 };
                 let work_trees = {
                     let path = path.clone();
                     crate::tasks::read(move || {
                         let work = git::status(&path)?;
                         let changes = Some(work.changed_files());
-                        let worktrees = if crate::remote::is_remote(&path) {
-                            git::worktree_list(&path, changes)
-                        } else {
-                            git::worktrees(&path, changes)
-                        }
-                        .unwrap_or_default();
+                        // The other worktrees' changes are counted after the graph shows (see
+                        // `count_worktrees`): a status each, which a first read needn't wait on.
+                        let worktrees = git::worktree_list(&path, changes).unwrap_or_default();
                         Ok::<_, String>((work, worktrees))
                     })?
                 };
@@ -138,16 +144,27 @@ impl RepoTab {
                     let path = path.clone();
                     crate::tasks::read(move || super::issue_work::read(&path))?
                 };
-                let excluded_namespace_count = git::history_scope::excluded_namespace_count(
-                    &path,
-                    log_from.as_deref(),
-                    &excluded,
-                )
-                .ok();
-                let identity = git::identity(&path);
+                // Two walks of the whole history, for a count: alongside the others.
+                let excluded_namespace_count = {
+                    let (path, from, excluded) = (path.clone(), log_from.clone(), excluded.clone());
+                    crate::tasks::read(move || {
+                        git::history_scope::excluded_namespace_count(
+                            &path,
+                            from.as_deref(),
+                            &excluded,
+                        )
+                        .ok()
+                    })?
+                };
+                let identity = {
+                    let path = path.clone();
+                    crate::tasks::read(move || git::identity(&path))?
+                };
                 let worktree_root = git::read_worktree_root(&path).map_err(|e| {
                     crate::i18n::message("repo-core-2893", &[("e", e.to_string().into())])
                 })?;
+                let (excluded_namespace_count, identity) =
+                    (excluded_namespace_count.join()?, identity.join()?);
                 let history = history.join()??.into_iter().map(Arc::new).collect();
                 let (work, worktrees) = work_trees.join()??;
                 let (stashes, remotes, submodules, lfs, issues) = (
@@ -212,14 +229,11 @@ impl RepoTab {
         }
     }
 
-    /// Counts, in the background, the changes of the worktrees the last read left uncounted (on
-    /// another machine, where that takes a while), one count at a time.
+    /// Counts, in the background, the changes of the worktrees the last read left uncounted (a
+    /// status each: the graph doesn't wait for them), one count at a time.
     /// Every count is made again (those shown are the last ones, kept until then); a read
     /// coming in while one runs counts again after it.
     fn count_worktrees(&mut self, ctx: &egui::Context) {
-        if !crate::remote::is_remote(&self.path) {
-            return;
-        }
         if self.counting_worktrees {
             self.recount_worktrees = true;
             return;
@@ -326,6 +340,7 @@ impl RepoTab {
             self.dialog = None;
         }
         self.prs.clear();
+        self.pending_prs = None;
         self.pr_error = None;
         self.prs_loaded = Some(Instant::now());
         self.forget_merged_prs();
@@ -434,6 +449,8 @@ impl RepoTab {
         let Some(hosting) = self.hosting.clone() else {
             return;
         };
+        // Until the forge answers, the list it gave last time (if any).
+        self.seed_prs(&hosting, ctx);
         let asked = Instant::now();
         self.prs_loaded = Some(asked);
         let path = self.path.clone();
@@ -489,7 +506,9 @@ impl RepoTab {
         // page being read from it is in).
         self.log_stream = Default::default();
         self.loading_more = false;
-        let refs_moved = loaded.refs != self.refs;
+        // What was shown from a snapshot counts as moved: nothing was read against it.
+        let from_snapshot = std::mem::take(&mut self.snapshot_shown);
+        let refs_moved = loaded.refs != self.refs || from_snapshot;
         self.refs = loaded.refs;
         self.graph_badge_index = super::graph_view::BadgeIndex::new(&self.refs);
         self.has_more = loaded.history.len() >= loaded.requested;
@@ -557,12 +576,8 @@ impl RepoTab {
         self.timeline_read(loaded.read, ctx);
         self.celebration_loaded(loaded.read, ctx);
         self.fold_loaded(loaded.read, state, ctx);
-        let remote = crate::remote::is_remote(&self.path);
-        for wt in self
-            .worktrees
-            .iter_mut()
-            .filter(|w| remote && w.needs_count())
-        {
+        // The other worktrees' last counts stay until they are counted again (just below).
+        for wt in self.worktrees.iter_mut().filter(|w| w.needs_count()) {
             if let Some((_, changes)) = counted.iter().find(|(p, _)| *p == wt.path) {
                 wt.changes = *changes;
             }
@@ -618,6 +633,7 @@ impl RepoTab {
         self.graph_motion_loaded(loaded.read, ctx);
         // After the selection is settled: not for a commit that went (amended, rebased).
         self.extras_after_reload(refs_moved, ctx);
+        self.keep_snapshot();
         self.hint_avatars(ctx);
         self.reload_compare(ctx);
         self.reflog_after_reload(ctx);

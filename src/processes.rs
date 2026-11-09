@@ -16,6 +16,8 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 mod trace;
 
 const ACTIVE: usize = 8;
+/// Slots beyond `ACTIVE` that only urgent requests take: a click never waits for a fetch.
+const URGENT_EXTRA: usize = 6;
 const QUEUED: usize = 256;
 const OUTPUT_LIMIT: usize = 64 << 20;
 const POLL: Duration = Duration::from_millis(20);
@@ -29,6 +31,8 @@ pub(crate) struct Options {
     /// Keep the control channel open after flushing a remote request.
     pub hold_input: bool,
     pub background: bool,
+    /// Started for work the user waits on (see `tasks::urgent`): it goes ahead of the queue.
+    pub urgent: bool,
     pub timeout: Option<Duration>,
     pub cancel: Cancellation,
     pub cancelled: Option<Box<dyn Fn() -> bool + Send + Sync>>,
@@ -59,6 +63,7 @@ impl Default for Options {
             input: None,
             hold_input: false,
             background: false,
+            urgent: crate::tasks::urgent(),
             timeout: None,
             cancel: crate::tasks::cancellation(),
             cancelled: None,
@@ -395,11 +400,23 @@ impl Service {
                             }
                             !cancelled && !expired
                         });
-                        while running.len() < active {
+                        loop {
+                            // What the user waits on goes first, the newest of it, in slots
+                            // of its own beyond the others when they are all taken.
+                            let urgent = pending
+                                .iter()
+                                .rposition(|r| r.options.urgent)
+                                .filter(|_| running.len() < active + URGENT_EXTRA);
                             // Reserve two slots for short reads; dispatch the oldest eligible
                             // request so a stream of reads cannot starve long operations.
-                            let selected = pending.iter().position(|r| {
-                                !r.options.background || background < background_limit
+                            let selected = urgent.or_else(|| {
+                                (running.len() < active)
+                                    .then(|| {
+                                        pending.iter().position(|r| {
+                                            !r.options.background || background < background_limit
+                                        })
+                                    })
+                                    .flatten()
                             });
                             let Some(request) = selected.and_then(|i| pending.remove(i)) else {
                                 break;

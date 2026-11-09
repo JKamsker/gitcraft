@@ -6,6 +6,8 @@ use std::{
     sync::{Arc, Mutex},
 };
 const SOURCE_LIMIT: usize = 256 * 1024;
+/// A built-in icon at most this large is drawn where it is asked for (see `load`).
+const ICON_LIMIT: usize = 8 * 1024;
 const PIXELS: u64 = 1024 * 1024;
 type ResultImage = Result<Arc<egui::ColorImage>, String>;
 struct Job {
@@ -53,6 +55,19 @@ impl ImageLoader for Loader {
             return Err(LoadError::Loading(
                 "SVG exceeds 256 KiB; use source view".into(),
             ));
+        }
+        // The app's own icons: a few hundred bytes each, drawn in a fraction of a millisecond,
+        // so right away rather than after the queue: no icon is missing from the first frame.
+        if uri.starts_with("bytes://icons/") && bytes.len() <= ICON_LIMIT {
+            let result = render(&bytes, hint).map(Arc::new);
+            let job = Arc::new(Job {
+                result: Mutex::new(Some(result.clone())),
+                scope: crate::tasks::Scope::default(),
+            });
+            jobs.insert(key, job);
+            return result
+                .map(|image| ImagePoll::Ready { image })
+                .map_err(LoadError::Loading);
         }
         let (mut pending, mut cached_bytes) = (0, 0);
         for job in jobs.values() {

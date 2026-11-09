@@ -89,17 +89,83 @@ impl RepoTab {
         self.detail = None;
         self.detail_error = None;
         self.detail_hash = Some(hash.clone());
+        // What was still being read for the commit selected before is not waited for.
+        self.detail_cancel.cancel();
+        self.detail_cancel = self.tx.cancel.child();
+        if let Some(detail) = self.detail_cache.get(&hash, &self.refs.head) {
+            self.show_detail(detail, ctx);
+            return;
+        }
+        self.detail_asked = Some(std::time::Instant::now());
         let path = self.path.clone();
         let failed_hash = hash.clone();
-        super::messages::spawn_or(
+        let (cancel, failed_cancel) = (self.detail_cancel.clone(), self.detail_cancel.clone());
+        // A read the selection moved on from only fills the cache: should the same commit be
+        // selected again meanwhile, its "cancelled" is not that one's error.
+        super::messages::spawn_selection(
             &self.tx,
             ctx,
-            move |error| Msg::Detail(failed_hash, Err(error)),
+            self.detail_cancel.clone(),
+            false,
+            move |error| {
+                if failed_cancel.is_cancelled() {
+                    Msg::DetailPrefetched(Err(error))
+                } else {
+                    Msg::Detail(failed_hash, Err(error))
+                }
+            },
             move || {
                 let detail = git::commit_detail(&path, &hash);
-                Msg::Detail(hash, detail)
+                if cancel.is_cancelled() {
+                    Msg::DetailPrefetched(detail)
+                } else {
+                    Msg::Detail(hash, detail)
+                }
             },
         );
+    }
+
+    /// The selected commit's detail, read or from the cache; then its neighbours are read ahead.
+    pub(super) fn show_detail(&mut self, detail: git::CommitDetail, ctx: &egui::Context) {
+        let hash = detail.hash.clone();
+        self.detail = Some(detail);
+        self.fill_reword();
+        self.finish_commit_changes(&hash, ctx);
+        self.prefetch_neighbours(ctx);
+    }
+
+    /// Reads the rows above and below the selected one into the detail cache, behind all other
+    /// work, so arrowing on through the graph shows each commit at once.
+    fn prefetch_neighbours(&mut self, ctx: &egui::Context) {
+        let Some(row) = self.selected else {
+            return;
+        };
+        for neighbour in [row.checked_sub(1), row.checked_add(1)]
+            .into_iter()
+            .flatten()
+        {
+            let Some(commit) = self.commits.get(neighbour) else {
+                continue;
+            };
+            let hash = commit.hash.clone();
+            if hash == WIP_HASH
+                || hash.starts_with('\u{0}')
+                || self.stash_at(neighbour).is_some()
+                || self.parked_at(neighbour).is_some()
+                || self.detail_cache.contains(&hash, &self.refs.head)
+            {
+                continue;
+            }
+            let path = self.path.clone();
+            super::messages::spawn_selection(
+                &self.tx,
+                ctx,
+                self.detail_cancel.clone(),
+                true,
+                |error| Msg::DetailPrefetched(Err(error)),
+                move || Msg::DetailPrefetched(git::commit_detail(&path, &hash)),
+            );
+        }
     }
 
     pub(super) fn select_stash(&mut self, i: usize, ctx: &egui::Context) {

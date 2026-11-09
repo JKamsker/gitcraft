@@ -252,6 +252,7 @@ impl RepoTab {
             Action::Reflog(act) => self.reflog_act(act, ctx),
             Action::CloseReflog => self.close_reflog(ctx),
             Action::Issue(act) => self.issue_act(act, ctx),
+            Action::ApplyPendingPrs => self.apply_pending_prs(ctx),
             Action::OpenSshSetup => self.open_ssh_setup(ctx),
             Action::OpenTour => self.open_tour(true, ctx),
             Action::OpenDoctor(section) => self.open_doctor(section, ctx),

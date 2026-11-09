@@ -2225,6 +2225,10 @@ repo-core-2869 = Nothing to commit
 repo-core-2870 = This command is available in its owning view
 repo-core-2878 = Opening { $name }
 repo-core-2879 = Reading branches and history…
+
+repo-core-slow-load = Still reading { $name } — this is taking longer than usual.
+
+repo-core-slow-detail = Still reading this commit — this is taking longer than usual.
 repo-core-2891 = Hide the { $name } panel
 repo-core-2892 = Show the { $name } panel
 repo-core-2893 = Could not read the worktrees root: { $e }
@@ -2641,6 +2645,8 @@ repo-core-3440 = Worktrees
 repo-core-3443 = Stashes
 repo-core-3444 = Recovery: reflog and lost commits
 repo-core-3447 = Start work from an issue assigned to you…
+
+repo-core-pr-list-newer = Newer pull requests are ready: show them
 repo-core-3449 = changed since you last looked ·{ " " }
 repo-core-3450 = { " " }· draft
 repo-core-3451 = { $url }

@@ -696,7 +696,7 @@ impl App {
         let regained = focused && !self.was_focused;
         self.was_focused = focused;
         if let Some(Tab::Repo(r)) = self.tabs.get_mut(self.active)
-            && (refresh || regained)
+            && (refresh || (regained && !r.just_read()))
         {
             r.refresh(ctx);
         }

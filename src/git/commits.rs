@@ -9,7 +9,7 @@ use super::LogOrder;
 use super::diff::commit_files;
 use super::{END_OPTS, NO_SIGNATURE, UTF8, not_an_option, run};
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct Commit {
     pub hash: String,
     pub parents: Vec<String>,
@@ -321,35 +321,58 @@ pub struct CommitDetail {
     pub merges_after: bool,
 }
 
+/// What a read on a thread of its own gave, or that it stopped (it panicked).
+fn joined<T>(handle: std::thread::ScopedJoinHandle<'_, Result<T, String>>) -> Result<T, String> {
+    handle
+        .join()
+        .unwrap_or_else(|_| Err(crate::i18n::text("interaction-teleport-error-stopped").into()))
+}
+
 pub fn commit_detail(repo: &Path, hash: &str) -> Result<CommitDetail, String> {
     // NULs between the fields: no commit has one, unlike the unit separator.
     let format = "--format=%H%x00%P%x00%an%x00%ae%x00%ad%x00%cn%x00%cd%x00%B";
-    let out = run(
-        Some(repo),
-        &[
-            "show",
-            NO_SIGNATURE,
-            UTF8,
-            "-s",
-            "--date=format-local:%Y-%m-%d %H:%M:%S",
-            format,
-            END_OPTS,
-            hash,
-        ],
-    )?;
+    let header_args = [
+        "show",
+        NO_SIGNATURE,
+        UTF8,
+        "-s",
+        "--date=format-local:%Y-%m-%d %H:%M:%S",
+        format,
+        END_OPTS,
+        hash,
+    ];
+    let range = format!("{hash}..HEAD");
+    // The reads don't depend on each other: all at once, each of them a process start (the
+    // larger part of the wait on Windows) rather than five one after the other.
+    let (out, files, in_head, merges) = std::thread::scope(|s| {
+        let files = {
+            let inherited = crate::tasks::Inherited::capture();
+            s.spawn(move || inherited.run(|| commit_files(repo, hash)))
+        };
+        let in_head = {
+            let inherited = crate::tasks::Inherited::capture();
+            s.spawn(move || {
+                inherited.run(|| run(Some(repo), &["merge-base", "--is-ancestor", hash, "HEAD"]))
+            })
+        };
+        let merges = {
+            let inherited = crate::tasks::Inherited::capture();
+            let range = &range;
+            s.spawn(move || {
+                inherited.run(|| run(Some(repo), &["rev-list", "--merges", "--count", range]))
+            })
+        };
+        let out = run(Some(repo), &header_args);
+        (out, joined(files), joined(in_head), joined(merges))
+    });
+    let out = out?;
     let f: Vec<&str> = out.splitn(8, '\0').collect();
     let [h, parents, author, email, adate, committer, cdate, message] = f[..] else {
         return Err(crate::i18n::text("backend-unexpected-output-from-git-show-c43bf4").to_owned());
     };
-    let files = commit_files(repo, hash)?;
-
-    let in_head = run(Some(repo), &["merge-base", "--is-ancestor", h, "HEAD"]).is_ok();
-    let merges_after = in_head
-        && run(
-            Some(repo),
-            &["rev-list", "--merges", "--count", &format!("{h}..HEAD")],
-        )
-        .is_ok_and(|n| n.trim() != "0");
+    let files = files?;
+    let in_head = in_head.is_ok();
+    let merges_after = in_head && merges.is_ok_and(|n| n.trim() != "0");
     Ok(CommitDetail {
         hash: h.to_owned(),
         parents: parents.split_whitespace().map(str::to_owned).collect(),
