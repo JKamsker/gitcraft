@@ -1488,8 +1488,12 @@ pub(super) const EXPECT_FOLD_IGNORED: &str = "\u{0}expect-fold-ignored";
 /// merge refuse to overwrite ignored files. Read the effective options in the worker,
 /// after any preceding checkout, and override them only for this command.
 fn ignored_safe_pull(path: &Path, args: &[String]) -> Result<Vec<String>, String> {
-    let branch = git::run(Some(path), &["symbolic-ref", "--short", "HEAD"])?;
-    let key = format!("branch.{}.mergeOptions", branch.trim());
+    let branch = git::run(Some(path), &["symbolic-ref", "-q", "HEAD"])?;
+    let branch = branch
+        .trim()
+        .strip_prefix("refs/heads/")
+        .ok_or("Pull requires a checked-out local branch")?;
+    let key = format!("branch.{branch}.mergeOptions");
     let old = git::run_ok_codes(Some(path), &["config", "-z", "--get", &key], &[0, 1])?;
     let old = old.strip_suffix('\0').unwrap_or(&old);
     Ok([
@@ -1977,6 +1981,8 @@ mod tests {
         std::fs::write(clone.path().join("secret.env"), "private").map_err(|e| e.to_string())?;
         let key = "branch.main.mergeOptions";
         let old = "--log=3 --no-stat";
+        // --short would report heads/main when a tag uses the same name.
+        git::run(Some(clone.path()), &["tag", "main"])?;
         git::run(Some(clone.path()), &["config", key, old])?;
         let pull = ops(&[&["pull", "--ff-only"]]);
         let argv = super::ignored_safe_pull(clone.path(), &pull[0])?;
