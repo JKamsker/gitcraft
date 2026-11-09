@@ -183,8 +183,21 @@ pub(super) fn read(api: &Api, n: u64) -> Result<PrDetails, String> {
         let mut checks = vec![];
         if let Ok(rows) = &statuses {
             for v in rows {
+                // Only PR-global statuses and statuses for the displayed iteration
+                // describe this revision. Do not let an older success or failure leak in.
+                if v.get("iterationId")
+                    .is_some_and(|id| id.as_u64() != Some(iteration))
+                {
+                    continue;
+                }
+                let genre = text(v, "/context/genre");
+                let name = text(v, "/context/name");
                 checks.push(Check {
-                    name: text(v, "/context/name"),
+                    name: if genre.is_empty() {
+                        name
+                    } else {
+                        format!("{genre} / {name}")
+                    },
                     state: state(&text(v, "/state")),
                     detail: text(v, "/description"),
                     url: text(v, "/targetUrl"),

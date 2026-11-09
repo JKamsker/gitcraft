@@ -40,6 +40,7 @@ struct Model {
     calls: Vec<(String, String, Option<Value>)>,
     thread_error: bool,
     drift: bool,
+    statuses: Option<Value>,
 }
 fn recording() -> (Api, Arc<Mutex<Model>>) {
     let model = Arc::new(Mutex::new(Model {
@@ -86,7 +87,9 @@ fn recording() -> (Api, Arc<Mutex<Model>>) {
                     m.iteration["sourceRefCommit"]["commitId"] = json!("d".repeat(40));
                     m.iteration["id"] = json!(3);
                 }
-                json!({"value":[{"context":{"name":"Build"},"state":"succeeded"}]})
+                m.statuses.clone().unwrap_or_else(
+                    || json!({"value":[{"context":{"name":"Build"},"state":"succeeded"}]}),
+                )
             } else if p.ends_with("/policy/evaluations") {
                 json!({"value":[{"status":"rejected","configuration":{"isBlocking":true,"type":{"displayName":"Required review"}}}]})
             } else if p.ends_with("/pullrequests/7") {
@@ -416,5 +419,31 @@ fn incomplete_commit_reads_surface_checks_errors_including_clamped_pages() -> Re
     let d = details::read(&api, 7)?;
     assert_eq!(d.commits.len(), 1);
     assert!(d.checks_error.is_none());
+    Ok(())
+}
+
+#[test]
+fn checks_keep_only_global_and_current_iteration_with_distinct_contexts() -> Result<(), String> {
+    use crate::pull_request::CheckState;
+    let (api, state) = recording();
+    state.lock().map_err(|e| e.to_string())?.statuses = Some(json!({"value":[
+        {"iterationId":1,"context":{"genre":"ci","name":"Build"},"state":"failed","description":"old failure"},
+        {"iterationId":1,"context":{"genre":"security","name":"Build"},"state":"succeeded","description":"old success"},
+        {"context":{"genre":"global","name":"Build"},"state":"pending","description":"global status"},
+        {"iterationId":2,"context":{"genre":"ci","name":"Build"},"state":"succeeded","description":"current success"},
+        {"iterationId":2,"context":{"genre":"security","name":"Build"},"state":"failed","description":"current failure"},
+        {"iterationId":3,"context":{"name":"Future"},"state":"succeeded"},
+        {"iterationId":null,"context":{"name":"Unknown"},"state":"succeeded"}
+    ]}));
+    let d = details::read(&api, 7)?;
+    assert!(d.checks_error.is_none());
+    assert_eq!(d.checks.len(), 4); // Three relevant statuses plus the policy.
+    assert_eq!(d.checks[0].name, "global / Build");
+    assert_eq!(d.checks[0].state, CheckState::Running);
+    assert_eq!(d.checks[1].name, "ci / Build");
+    assert_eq!(d.checks[1].state, CheckState::Passed);
+    assert_eq!(d.checks[2].name, "security / Build");
+    assert_eq!(d.checks[2].state, CheckState::Failed);
+    assert!(d.checks.iter().all(|c| !c.detail.starts_with("old ")));
     Ok(())
 }
