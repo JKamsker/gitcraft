@@ -742,3 +742,60 @@ fn a_snapshot_takes_untracked_files_outside_a_sparse_cone() -> Result<(), String
     assert_eq!(stored.trim(), "out/new.txt");
     Ok(())
 }
+
+#[test]
+fn stash_job_waits_in_the_shared_worktree_mutation_lane() -> Result<(), String> {
+    use std::sync::mpsc::channel;
+    use std::time::Duration;
+    let repo = Repo::new("mutation-lane")?;
+    let peer = tempfile::tempdir().map_err(|e| e.to_string())?;
+    repo.git(&[
+        "worktree",
+        "add",
+        "-q",
+        "-b",
+        "lane-peer",
+        peer.path().to_str().ok_or("peer path")?,
+    ])?;
+    let ctx = egui::Context::default();
+    let blocker = RepoTab::new_deferred(repo.path().to_owned(), &ctx);
+    let mut tab = RepoTab::new_deferred(peer.path().to_owned(), &ctx);
+    assert_eq!(blocker.tx.repo, tab.tx.repo);
+    let (started_tx, started_rx) = channel();
+    let (release_tx, release_rx) = channel();
+    crate::repo::messages::spawn_mutation(
+        &blocker.tx,
+        &ctx,
+        |error| done("lane blocker", Err(error), OpKind::plain()),
+        move || {
+            let _ = started_tx.send(());
+            let _ = release_rx.recv();
+            done("lane blocker", Ok(String::new()), OpKind::plain())
+        },
+    );
+    started_rx
+        .recv_timeout(Duration::from_secs(20))
+        .map_err(|e| e.to_string())?;
+    let (ran_tx, ran_rx) = channel();
+    tab.stash_job("recorded stash lane", &ctx, move |_| {
+        let _ = ran_tx.send(());
+        (Ok("recorded stash finished".into()), OpKind::plain())
+    });
+    let queued = crate::tasks::pool()?.queued_priorities_for(&tab.tx.repo);
+    assert_eq!(queued, vec![crate::tasks::Priority::Background]);
+    assert!(ran_rx.try_recv().is_err());
+    drop(release_tx);
+    ran_rx
+        .recv_timeout(Duration::from_secs(20))
+        .map_err(|e| e.to_string())?;
+    let msg = tab
+        .rx
+        .recv_timeout(Duration::from_secs(20))
+        .map_err(|e| e.to_string())?;
+    assert!(
+        matches!(&msg, Msg::OpDone { label, result: Ok(_), .. } if label == "recorded stash lane")
+    );
+    tab.handle(msg, &ctx);
+    assert!(tab.busy_op.is_none());
+    Ok(())
+}
