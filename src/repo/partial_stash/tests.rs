@@ -782,7 +782,7 @@ fn stash_job_waits_in_the_shared_worktree_mutation_lane() -> Result<(), String> 
         (Ok("recorded stash finished".into()), OpKind::plain())
     });
     let queued = crate::tasks::pool()?.queued_priorities_for(&tab.tx.repo);
-    assert_eq!(queued, vec![crate::tasks::Priority::Background]);
+    assert!(queued == vec![crate::tasks::Priority::Background]);
     assert!(ran_rx.try_recv().is_err());
     drop(release_tx);
     ran_rx
