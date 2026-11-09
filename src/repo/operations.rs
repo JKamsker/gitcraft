@@ -1484,36 +1484,177 @@ pub(super) fn is_expectation(op: &[String]) -> bool {
 pub(super) const EXPECT_FOLD_SAFE: &str = "\u{0}expect-fold-safe";
 pub(super) const EXPECT_FOLD_IGNORED: &str = "\u{0}expect-fold-ignored";
 
+/// Classify the options consumed by Git's builtin/pull.c and parse-options.c.
+/// Optional arguments consume only attached text; required arguments also consume
+/// the next token, even when it looks like an option. Git permutes operands until `--`.
+#[derive(Debug, Default, PartialEq, Eq)]
+struct PullMode {
+    rebase: Option<bool>,
+    ff_only: bool,
+}
+
+fn pull_mode(args: &[String]) -> Result<PullMode, String> {
+    // (long name, argument: 0 = none, 1 = required, 2 = optional).
+    const OPTIONS: &[(&str, u8)] = &[
+        ("verbose", 0),
+        ("quiet", 0),
+        ("progress", 0),
+        ("recurse-submodules", 2),
+        ("rebase", 2),
+        ("stat", 0),
+        ("summary", 0),
+        ("log", 2),
+        ("signoff", 2),
+        ("squash", 0),
+        ("commit", 0),
+        ("edit", 0),
+        ("cleanup", 1),
+        ("ff", 0),
+        ("ff-only", 0),
+        ("verify", 0),
+        ("verify-signatures", 0),
+        ("autostash", 0),
+        ("strategy", 1),
+        ("strategy-option", 1),
+        ("gpg-sign", 2),
+        ("allow-unrelated-histories", 0),
+        ("all", 0),
+        ("append", 0),
+        ("upload-pack", 1),
+        ("force", 0),
+        ("tags", 0),
+        ("prune", 0),
+        ("jobs", 2),
+        ("dry-run", 0),
+        ("keep", 0),
+        ("depth", 1),
+        ("shallow-since", 1),
+        ("shallow-exclude", 1),
+        ("deepen", 1),
+        ("unshallow", 0),
+        ("update-shallow", 0),
+        ("refmap", 1),
+        ("server-option", 1),
+        ("ipv4", 0),
+        ("ipv6", 0),
+        ("negotiation-tip", 1),
+        ("show-forced-updates", 0),
+        ("set-upstream", 0),
+    ];
+    fn rebase_value(value: &str) -> Result<bool, String> {
+        match value.to_ascii_lowercase().as_str() {
+            "" | "false" | "no" | "off" | "0" => Ok(false),
+            "true" | "yes" | "on" | "1" => Ok(true),
+            _ if matches!(value, "merges" | "m" | "interactive" | "i") => Ok(true),
+            _ => Err(format!("Invalid pull rebase value: {value}")),
+        }
+    }
+    let mut mode = PullMode::default();
+    let mut tokens = args.iter().skip(1);
+    while let Some(token) = tokens.next() {
+        if token == "--" {
+            break;
+        }
+        if let Some(long) = token.strip_prefix("--") {
+            let (name, value) = long
+                .split_once('=')
+                .map_or((long, None), |(n, v)| (n, Some(v)));
+            let (name, negated) = name
+                .strip_prefix("no-")
+                .map_or((name, false), |n| (n, true));
+            let exact = OPTIONS.iter().find(|(n, _)| *n == name);
+            let mut matches = OPTIONS.iter().filter(|(n, _)| n.starts_with(name));
+            let option = if let Some(exact) = exact {
+                exact
+            } else {
+                let first = matches
+                    .next()
+                    .ok_or_else(|| format!("Unknown pull option: {token}"))?;
+                if matches.next().is_some() {
+                    return Err(format!("Ambiguous pull option: {token}"));
+                }
+                first
+            };
+            let (name, arity) = *option;
+            if (negated || arity == 0) && value.is_some() {
+                return Err(format!("Pull option takes no value: {token}"));
+            }
+            if negated && matches!(name, "ff-only" | "unshallow" | "refmap") {
+                return Err(format!("Pull option cannot be negated: {token}"));
+            }
+            if !negated && arity == 1 && value.is_none() && tokens.next().is_none() {
+                return Err(format!("Pull option requires a value: {token}"));
+            }
+            match name {
+                "rebase" => {
+                    mode.rebase = Some(if negated {
+                        false
+                    } else {
+                        value.map_or(Ok(true), rebase_value)?
+                    })
+                }
+                "ff-only" => mode.ff_only = true,
+                "ff" => mode.ff_only = false,
+                _ => {}
+            }
+        } else if let Some(short) = token.strip_prefix('-') {
+            let letters = short.char_indices();
+            for (at, letter) in letters {
+                let rest = &short[at + letter.len_utf8()..];
+                match letter {
+                    'r' => {
+                        mode.rebase = Some(if rest.is_empty() {
+                            true
+                        } else {
+                            rebase_value(rest)?
+                        });
+                        break;
+                    }
+                    's' | 'X' | 'o' => {
+                        if rest.is_empty() && tokens.next().is_none() {
+                            return Err(format!("Pull option requires a value: -{letter}"));
+                        }
+                        break;
+                    }
+                    'S' | 'j' => break, // optional value is the entire attached rest
+                    'v' | 'q' | 'n' | 'a' | 'f' | 't' | 'p' | 'k' | '4' | '6' => {}
+                    _ => return Err(format!("Unknown pull option: -{letter}")),
+                }
+            }
+        }
+    }
+    Ok(mode)
+}
+
 /// Keep pull's authentication, submodule and configuration behavior while making its
 /// merge refuse to overwrite ignored files. Read the effective options in the worker,
 /// after any preceding checkout, and override them only for this command.
 fn ignored_safe_pull(path: &Path, args: &[String]) -> Result<Vec<String>, String> {
-    let branch = git::run(Some(path), &["symbolic-ref", "-q", "HEAD"])?;
+    ignored_safe_pull_with(args, |args, codes| {
+        git::run_ok_codes(Some(path), args, codes)
+    })
+}
+
+fn ignored_safe_pull_with(
+    args: &[String],
+    mut run: impl FnMut(&[&str], &[i32]) -> Result<String, String>,
+) -> Result<Vec<String>, String> {
+    let mode = pull_mode(args)?;
+    let branch = run(&["symbolic-ref", "-q", "HEAD"], &[0])?;
     let branch = branch
         .trim()
         .strip_prefix("refs/heads/")
         .ok_or("Pull requires a checked-out local branch")?;
-    if !args.iter().any(|arg| arg == "--ff-only") {
-        let explicit = args.iter().rev().find_map(|arg| match arg.as_str() {
-            "--no-rebase" | "--rebase=false" => Some(false),
-            "--rebase" => Some(true),
-            value if value.starts_with("--rebase=") => Some(true),
-            _ => None,
-        });
-        let rebase = match explicit {
+    if !mode.ff_only {
+        let rebase = match mode.rebase {
             Some(value) => value,
             None => {
                 let local_key = format!("branch.{branch}.rebase");
-                let local =
-                    git::run_ok_codes(Some(path), &["config", "-z", "--get", &local_key], &[0, 1])?;
+                let local = run(&["config", "-z", "--get", &local_key], &[0, 1])?;
                 let (key, value) = if local.is_empty() {
                     (
                         "pull.rebase",
-                        git::run_ok_codes(
-                            Some(path),
-                            &["config", "-z", "--get", "pull.rebase"],
-                            &[0, 1],
-                        )?,
+                        run(&["config", "-z", "--get", "pull.rebase"], &[0, 1])?,
                     )
                 } else {
                     (local_key.as_str(), local)
@@ -1521,7 +1662,7 @@ fn ignored_safe_pull(path: &Path, args: &[String]) -> Result<Vec<String>, String
                 // A valueless boolean means true, whereas an explicitly empty value
                 // means false. Git's typed reader preserves that distinction.
                 if !value.is_empty() && value.trim_end_matches('\0').is_empty() {
-                    git::run(Some(path), &["config", "--bool", "--get", key])?.trim() == "true"
+                    run(&["config", "--bool", "--get", key], &[0])?.trim() == "true"
                 } else {
                     !matches!(
                         value
@@ -1537,8 +1678,7 @@ fn ignored_safe_pull(path: &Path, args: &[String]) -> Result<Vec<String>, String
         // Rebase's checkout does not honor mergeOptions and offers no equivalent
         // no-overwrite-ignore switch. Refuse before fetch can introduce a collision.
         if rebase
-            && !git::run(
-                Some(path),
+            && !run(
                 &[
                     "ls-files",
                     "--others",
@@ -1547,6 +1687,7 @@ fn ignored_safe_pull(path: &Path, args: &[String]) -> Result<Vec<String>, String
                     "--directory",
                     "-z",
                 ],
+                &[0],
             )?
             .is_empty()
         {
@@ -1554,7 +1695,7 @@ fn ignored_safe_pull(path: &Path, args: &[String]) -> Result<Vec<String>, String
         }
     }
     let key = format!("branch.{branch}.mergeOptions");
-    let old = git::run_ok_codes(Some(path), &["config", "-z", "--get", &key], &[0, 1])?;
+    let old = run(&["config", "-z", "--get", &key], &[0, 1])?;
     let old = old.strip_suffix('\0').unwrap_or(&old);
     Ok([
         vec!["-c".into(), format!("{key}={old} --no-overwrite-ignore")],
@@ -1725,6 +1866,189 @@ mod tests {
     use super::super::{OpKind, Undo, UndoEntry, ops};
     use super::{run_steps, stash_push_args};
     use crate::git;
+
+    mod short_rebase {
+        use super::*;
+
+        #[test]
+        fn classifier_consumes_git_options_and_uses_last_mode() -> Result<(), String> {
+            for (tail, rebase, ff_only) in [
+                (vec![], None, false),
+                (vec!["-r"], Some(true), false),
+                (vec!["-rtrue"], Some(true), false),
+                (vec!["-rmerges"], Some(true), false),
+                (vec!["-rm"], Some(true), false),
+                (vec!["-qr"], Some(true), false),
+                (vec!["-rfalse"], Some(false), false),
+                (vec!["-qrfalse"], Some(false), false),
+                (vec!["-r", "--no-rebase"], Some(false), false),
+                (vec!["--no-rebase", "-qr"], Some(true), false),
+                (vec!["-rfalse", "--rebase=merges"], Some(true), false),
+                (vec!["--rebase=false", "-rm"], Some(true), false),
+                (vec!["-r", "--rebase=false"], Some(false), false),
+                (vec!["-srecursive"], None, false),
+                (vec!["-qs", "--rebase"], None, false),
+                (vec!["-X", "-r"], None, false),
+                (vec!["-o", "--ff-only", "-r"], Some(true), false),
+                (vec!["-Sr", "-jr", "-Xours"], None, false),
+                (vec!["--strategy", "--rebase", "-r"], Some(true), false),
+                (vec!["--upload-pack", "-r"], None, false),
+                (vec!["--strategy-option=-r"], None, false),
+                (vec!["--gpg-sign=r", "--jobs=r"], None, false),
+                (vec!["--recurse-submodules", "-r"], Some(true), false),
+                (vec!["-r", "false"], Some(true), false),
+                (vec!["--rebase", "false"], Some(true), false),
+                (vec!["origin", "main", "-r"], Some(true), false),
+                (vec!["--", "-r", "--ff-only"], None, false),
+                (vec!["-r", "--", "--no-rebase"], Some(true), false),
+                (vec!["-r", "--ff-only"], Some(true), true),
+                (vec!["--ff-only", "--ff", "-r"], Some(true), false),
+                (vec!["--ff-only", "--no-ff", "-r"], Some(true), false),
+                (vec!["--reb=m"], Some(true), false),
+            ] {
+                let args = [
+                    vec!["pull".to_owned()],
+                    tail.iter().map(|s| (*s).to_owned()).collect(),
+                ]
+                .concat();
+                assert_eq!(
+                    super::super::pull_mode(&args)?,
+                    super::super::PullMode { rebase, ff_only },
+                    "{args:?}"
+                );
+            }
+            for option in [
+                "cleanup",
+                "strategy",
+                "strategy-option",
+                "upload-pack",
+                "depth",
+                "shallow-since",
+                "shallow-exclude",
+                "deepen",
+                "refmap",
+                "server-option",
+                "negotiation-tip",
+            ] {
+                let args = vec![
+                    "pull".into(),
+                    format!("--{option}"),
+                    "--ff-only".into(),
+                    "-r".into(),
+                ];
+                assert_eq!(
+                    super::super::pull_mode(&args)?.rebase,
+                    Some(true),
+                    "{args:?}"
+                );
+                assert!(!super::super::pull_mode(&args)?.ff_only, "{args:?}");
+            }
+            for tail in [
+                vec!["-r=false"],
+                vec!["-rq"],
+                vec!["-qrq"],
+                vec!["--rebase=bogus"],
+                vec!["--no-rebase=true"],
+                vec!["--strategy"],
+                vec!["-X"],
+                vec!["--str"],
+            ] {
+                let args = [
+                    vec!["pull".to_owned()],
+                    tail.iter().map(|s| (*s).to_owned()).collect(),
+                ]
+                .concat();
+                assert!(super::super::pull_mode(&args).is_err(), "{args:?}");
+            }
+            Ok(())
+        }
+
+        #[test]
+        fn recording_saved_redo_refuses_before_pull_or_fetch_dispatch() -> Result<(), String> {
+            for option in ["-r", "-rtrue", "-rmerges", "-rm", "-qr"] {
+                let saved: UndoEntry = serde_json::from_value(serde_json::json!({
+                    "label": "Pull", "undo": [], "redo": [["pull", option]], "heads": null
+                }))
+                .map_err(|e| e.to_string())?;
+                let mut calls = Vec::new();
+                let result = super::super::ignored_safe_pull_with(&saved.redo[0], |args, _| {
+                    calls.push(args.join(" "));
+                    match args[0] {
+                        "symbolic-ref" => Ok("refs/heads/main\n".into()),
+                        "ls-files" => Ok("private\0".into()),
+                        _ => Err(format!("Unexpected command: {args:?}")),
+                    }
+                });
+                assert!(
+                    result.is_err_and(|e| e.contains("ignored local files")),
+                    "{option}"
+                );
+                assert_eq!(calls.len(), 2);
+                assert!(
+                    calls
+                        .iter()
+                        .all(|c| !c.starts_with("pull") && !c.starts_with("fetch"))
+                );
+            }
+            Ok(())
+        }
+
+        #[test]
+        fn recording_config_fallback_and_overrides_preserve_ignored_files() -> Result<(), String> {
+            for (tail, local, global, refused) in [
+                (vec![], "", "true\0", true),
+                (vec![], "false\0", "true\0", false),
+                (vec!["--", "--no-rebase"], "", "true\0", true),
+                (vec!["--strategy", "--no-rebase"], "", "true\0", true),
+                (vec!["-srecursive"], "", "true\0", true),
+                (vec!["-rfalse"], "", "true\0", false),
+                (vec!["-qrfalse"], "", "true\0", false),
+                (vec!["--no-rebase", "-r"], "false\0", "", true),
+                (vec!["-r", "--ff-only"], "", "true\0", false),
+                (vec!["--ff-only", "--ff", "-r"], "", "", true),
+                (vec![], "", "", false),
+            ] {
+                let args = [
+                    vec!["pull".to_owned()],
+                    tail.iter().map(|s| (*s).to_owned()).collect(),
+                ]
+                .concat();
+                let mut calls = Vec::new();
+                let result = super::super::ignored_safe_pull_with(&args, |argv, _| {
+                    calls.push(argv.join(" "));
+                    match argv {
+                        ["symbolic-ref", "-q", "HEAD"] => Ok("refs/heads/main\n".into()),
+                        ["config", "-z", "--get", "branch.main.rebase"] => Ok(local.into()),
+                        ["config", "-z", "--get", "pull.rebase"] => Ok(global.into()),
+                        ["config", "-z", "--get", "branch.main.mergeOptions"] => {
+                            Ok("--log=3\0".into())
+                        }
+                        ["ls-files", ..] => Ok("private\0".into()),
+                        _ => Err(format!("Unexpected command: {argv:?}")),
+                    }
+                });
+                if refused {
+                    assert!(
+                        result.is_err_and(|e| e.contains("ignored local files")),
+                        "{args:?}"
+                    );
+                } else {
+                    let prepared = result?;
+                    assert_eq!(
+                        prepared[1],
+                        "branch.main.mergeOptions=--log=3 --no-overwrite-ignore"
+                    );
+                    assert_eq!(prepared[2..], args);
+                }
+                assert!(
+                    calls
+                        .iter()
+                        .all(|c| !c.starts_with("pull") && !c.starts_with("fetch"))
+                );
+            }
+            Ok(())
+        }
+    }
 
     #[test]
     fn selected_continuation_recording_retains_actual_route_receipt_and_expect_retry()
