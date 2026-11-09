@@ -9,6 +9,14 @@ use crate::icons;
 use crate::repo::{Action, RepoTab, short, widgets};
 use crate::theme::{self, Tokens};
 
+type LineHistoryOutcome = Result<
+    (
+        Option<(String, String, LineRange)>,
+        Result<Vec<git::FileCommit>, String>,
+    ),
+    String,
+>;
+
 impl RepoTab {
     /// Shows the history of lines `range` of `path`, numbered as they are `at`, and reads it.
     pub(in crate::repo) fn open_line_history(
@@ -66,13 +74,7 @@ impl RepoTab {
         &mut self,
         generation: u64,
         token: u64,
-        outcome: Result<
-            (
-                Option<(String, String, LineRange)>,
-                Result<Vec<git::FileCommit>, String>,
-            ),
-            String,
-        >,
+        outcome: LineHistoryOutcome,
         ctx: &egui::Context,
     ) {
         if !self.finish_file_load(

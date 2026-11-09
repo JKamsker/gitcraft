@@ -11,10 +11,15 @@ use crate::git;
 use crate::theme::{self, Tokens};
 
 #[cfg(test)]
+type CloneIntent = (String, String, String);
+#[cfg(test)]
+type CloneIntents = (usize, Vec<CloneIntent>);
+
+#[cfg(test)]
 thread_local! {
     /// Intent seam at the native picker and submission boundaries; tests still paint
     /// clone_dialog/form_fields and process the production keyboard responses.
-    static CLONE_INTENTS: std::cell::RefCell<Option<(usize, Vec<(String, String, String)>)>> = const { std::cell::RefCell::new(None) };
+    static CLONE_INTENTS: std::cell::RefCell<Option<CloneIntents>> = const { std::cell::RefCell::new(None) };
 }
 
 fn pick_clone_folder() -> Option<PathBuf> {
@@ -753,7 +758,7 @@ mod localization_tests {
         h
     }
 
-    fn record_clone_intents(work: impl FnOnce()) -> (usize, Vec<(String, String, String)>) {
+    fn record_clone_intents(work: impl FnOnce()) -> CloneIntents {
         struct Reset;
         impl Drop for Reset {
             fn drop(&mut self) {

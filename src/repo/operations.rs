@@ -2586,11 +2586,16 @@ mod tests {
                 "--no-autostash",
             ] {
                 let args = vec!["pull".into(), mode.into()];
+                let calls = std::cell::Cell::new(0);
                 let result = super::super::checked_pull_with(
                     &args,
                     || Err("excluded replacement".into()),
-                    |_, _| panic!("refused cleanup reached pull preparation"),
+                    |_, _| {
+                        calls.set(calls.get() + 1);
+                        Err("unexpected preparation".into())
+                    },
                 );
+                assert_eq!(calls.get(), 0);
                 assert_eq!(result, Err("excluded replacement".into()));
             }
         }

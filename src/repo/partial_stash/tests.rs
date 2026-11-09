@@ -1427,12 +1427,17 @@ fn shared_native_cleanup_guard_checks_excluded_replacements_and_failures() -> Re
                 staged: vec![row.clone()],
                 ..Default::default()
             };
+            let calls = std::cell::Cell::new(0);
             let result = validate_excluded_cleanup_with(
                 &work,
                 false,
                 || Ok(format!("{replacement}\0")),
-                |_, _, _| panic!("lexical overlap reached filesystem inspection"),
+                |_, _, _| {
+                    calls.set(calls.get() + 1);
+                    Err("unexpected filesystem inspection".into())
+                },
             );
+            assert_eq!(calls.get(), 0);
             assert!(result.is_err(), "{replacement}");
         }
     }
