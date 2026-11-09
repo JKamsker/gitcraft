@@ -7652,4 +7652,4 @@ repo-workflows-r1-verdict-bad = Schlecht
 repo-workflows-r1-verdict-skip = Übersprungen
 repo-workflows-r1-verdict-timeout = Zeitlimit überschritten
 
-repo-workflows-partial_stash-excluded-overlap = „{ $path }“ überschneidet sich mit einer vorgemerkten Löschung: Stashen ohne unversionierte Dateien könnte die Datei überschreiben. Unversionierte Dateien einschließen oder einen Snapshot erstellen.
+repo-workflows-partial_stash-excluded-overlap = Der ausgeschlossene Pfad „{ $path }“ überschneidet sich mit einer vorgemerkten Löschung oder Umbenennungsquelle: Beim Stashen könnte er überschrieben werden. Überschneidung auflösen oder einen Snapshot erstellen.

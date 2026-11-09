@@ -197,11 +197,16 @@ fn excluded_overlap_problem(work: &WorkStatus, untracked: bool) -> Option<String
             || a.strip_prefix(b).is_some_and(|tail| tail.starts_with('/'))
             || b.strip_prefix(a).is_some_and(|tail| tail.starts_with('/'))
     };
-    for deleted in work.staged.iter().filter(|f| f.code == 'D') {
+    let removed_paths = work.staged.iter().filter_map(|f| match f.code {
+        'D' => Some(f.path.as_str()),
+        'R' => f.old_path.as_deref(),
+        _ => None,
+    });
+    for deleted in removed_paths {
         if let Some(excluded) = work
             .unstaged
             .iter()
-            .find(|f| f.area == git::Area::Untracked && overlaps(&deleted.path, &f.path))
+            .find(|f| f.area == git::Area::Untracked && overlaps(deleted, &f.path))
         {
             return Some(crate::i18n::message(
                 "repo-workflows-partial_stash-excluded-overlap",
@@ -256,10 +261,42 @@ pub(super) fn validate_push(path: &Path, args: &[String]) -> Result<(), String> 
         return Ok(());
     };
     let work = git::status(path)?;
-    if request.mode == StashMode::Everything
-        && let Some(problem) = excluded_overlap_problem(&work, request.untracked)
-    {
-        return Err(problem);
+    if request.mode == StashMode::Everything {
+        if let Some(problem) = excluded_overlap_problem(&work, request.untracked) {
+            return Err(problem);
+        }
+        // Ordinary status omits ignored replacements. --include-untracked excludes them
+        // too, including in the separate agent stash plan. Ask Git for their spelling;
+        // do not resolve paths on the host (the repository may be remote).
+        if work.staged.iter().any(|f| matches!(f.code, 'D' | 'R')) {
+            let ignored = git::run(
+                Some(path),
+                &[
+                    "ls-files",
+                    "--others",
+                    "--ignored",
+                    "--exclude-standard",
+                    "-z",
+                ],
+            )?;
+            let ignored_work = WorkStatus {
+                staged: work.staged.clone(),
+                unstaged: ignored
+                    .split('\0')
+                    .filter(|p| !p.is_empty())
+                    .map(|p| git::StatusFile {
+                        path: p.to_owned(),
+                        old_path: None,
+                        code: '?',
+                        area: git::Area::Untracked,
+                    })
+                    .collect(),
+                ..WorkStatus::default()
+            };
+            if let Some(problem) = excluded_overlap_problem(&ignored_work, false) {
+                return Err(problem);
+            }
+        }
     }
     Ok(())
 }

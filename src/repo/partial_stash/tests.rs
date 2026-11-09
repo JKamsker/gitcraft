@@ -880,3 +880,95 @@ fn fresh_push_and_redo_refuse_recreated_deleted_file() -> Result<(), String> {
     assert_eq!(repo.state()?, before);
     Ok(())
 }
+
+#[test]
+fn rename_source_validation_preserves_git_path_spelling() {
+    for (source, other, blocked) in [
+        ("src", "src/child", true),
+        ("src/child", "src", true),
+        ("A", "a", false),
+        ("dir", "directory/f", false),
+        ("a\\b", "a/b", false),
+        (" f ", "f", false),
+    ] {
+        let work = WorkStatus {
+            staged: vec![git::StatusFile {
+                path: "destination".into(),
+                old_path: Some(source.into()),
+                code: 'R',
+                area: git::Area::Staged,
+            }],
+            unstaged: vec![git::StatusFile {
+                path: other.into(),
+                old_path: None,
+                code: '?',
+                area: git::Area::Untracked,
+            }],
+            ..WorkStatus::default()
+        };
+        assert_eq!(excluded_overlap_problem(&work, false).is_some(), blocked);
+        assert!(everything_problem(&work, false).is_none());
+    }
+}
+
+#[test]
+fn ignored_replacements_refuse_shared_agent_stash_execution() -> Result<(), String> {
+    for case in ["file", "file-to-dir", "dir-to-file", "rename"] {
+        let repo = Repo::new(&format!("ignored-overlap-{case}"))?;
+        let replacement = match case {
+            "dir-to-file" => {
+                std::fs::create_dir(repo.path().join("folder")).map_err(|e| e.to_string())?;
+                repo.write("folder/child", b"tracked\n")?;
+                repo.git(&["add", "folder"])?;
+                repo.git(&["commit", "-qm", "directory"])?;
+                repo.git(&["rm", "-r", "folder"])?;
+                repo.write("folder", b"excluded file\n")?;
+                "folder"
+            }
+            "rename" => {
+                repo.git(&["mv", "old.txt", "renamed.txt"])?;
+                repo.write("old.txt", b"excluded rename source\n")?;
+                "old.txt"
+            }
+            _ => {
+                repo.git(&["rm", "del.txt"])?;
+                if case == "file-to-dir" {
+                    std::fs::create_dir(repo.path().join("del.txt")).map_err(|e| e.to_string())?;
+                    repo.write("del.txt/child", b"excluded child\n")?;
+                } else {
+                    repo.write("del.txt", b"excluded replacement\n")?;
+                }
+                "del.txt"
+            }
+        };
+        std::fs::write(
+            repo.path().join(".git/info/exclude"),
+            format!("/{replacement}\n"),
+        )
+        .map_err(|e| e.to_string())?;
+        assert!(
+            !repo
+                .status()?
+                .unstaged
+                .iter()
+                .any(|f| f.area == git::Area::Untracked)
+        );
+        let before = repo.state()?;
+        let stash_before = repo.git(&["stash", "list"])?;
+        // The agent plan uses these shared arguments and the shared execution runner.
+        let args = ops(&[&stash_push_args()]);
+        let (result, _, stopped) =
+            run_steps_counted(repo.path(), &args, OpKind::plain(), None, false, None);
+        assert!(
+            result.is_err_and(|e| e.contains("overlaps a staged deletion")),
+            "{case}"
+        );
+        assert_eq!(stopped, 0);
+        assert_eq!(repo.state()?, before);
+        assert_eq!(repo.git(&["stash", "list"])?, stash_before);
+        let (result, _) = run_snapshot(repo.path(), "snapshot", false, git::head(repo.path()));
+        result?;
+        assert_eq!(repo.state()?, before);
+    }
+    Ok(())
+}
