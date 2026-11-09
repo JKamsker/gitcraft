@@ -490,29 +490,43 @@ impl RepoTab {
             }
             _ => file_view::FileView::new(&path, rev.clone(), tab),
         };
-        let needs = view.needs(tab);
         self.file_view = Some(view);
-        if !needs {
+        self.load_file_view(ctx);
+    }
+
+    pub(super) fn load_file_view(&mut self, ctx: &egui::Context) {
+        let Some(view) = &self.file_view else { return };
+        if !view.needs(view.tab) {
             return;
         }
+        if view.lines.is_some() {
+            self.load_line_history(ctx);
+            return;
+        }
+        let (generation, path, rev, tab) = (
+            view.generation,
+            view.path.clone(),
+            view.rev.clone(),
+            view.tab,
+        );
         let repo = self.path.clone();
         match tab {
             file_view::FileTab::History => spawn(&self.tx, ctx, move || {
                 let result = git::file_history(&repo, rev.as_deref(), &path);
-                Msg::FileHistory(path, rev, result)
+                Msg::FileHistory(generation, path, rev, result)
             }),
             file_view::FileTab::Blame => {
                 let dark = Tokens::get(ctx).dark();
                 spawn(&self.tx, ctx, move || {
                     let result = file_view::load_blame(&repo, rev.as_deref(), &path, dark);
-                    Msg::Blame(path, rev, result)
+                    Msg::Blame(generation, path, rev, result)
                 })
             }
             file_view::FileTab::File => {
                 let dark = Tokens::get(ctx).dark();
                 spawn(&self.tx, ctx, move || {
                     let result = file_text::load(&repo, rev.as_deref(), &path, dark);
-                    Msg::FileText(path, rev, result)
+                    Msg::FileText(generation, path, rev, result)
                 })
             }
         }

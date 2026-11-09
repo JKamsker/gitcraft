@@ -479,6 +479,7 @@ impl RepoTab {
 
     fn take_loaded(&mut self, loaded: Loaded, ctx: &egui::Context) {
         self.load_error = None;
+        self.invalidate_mutable_file_view(ctx);
         // A page asked for before this was read past the old history, which
         // this one replaces: it would leave a gap.
         self.history_gen += 1;
