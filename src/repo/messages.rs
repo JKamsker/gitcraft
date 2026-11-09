@@ -297,7 +297,7 @@ pub(super) fn spawn_selection(
     job: impl FnOnce() -> Msg + Send + 'static,
 ) {
     let priority = if prefetch {
-        crate::tasks::Priority::Background
+        crate::tasks::Priority::Speculative
     } else {
         crate::tasks::Priority::Urgent
     };

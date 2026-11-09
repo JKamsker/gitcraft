@@ -15,9 +15,11 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 #[cfg(test)]
 mod trace;
 
-const ACTIVE: usize = 8;
+const ACTIVE: usize = 12;
 /// Slots beyond `ACTIVE` that only urgent requests take: a click never waits for a fetch.
 const URGENT_EXTRA: usize = 6;
+/// How many processes may read ahead at once, and only while nothing else waits for a slot.
+const SPECULATIVE: usize = 2;
 const QUEUED: usize = 256;
 const OUTPUT_LIMIT: usize = 64 << 20;
 const POLL: Duration = Duration::from_millis(20);
@@ -33,6 +35,8 @@ pub(crate) struct Options {
     pub background: bool,
     /// Started for work the user waits on (see `tasks::urgent`): it goes ahead of the queue.
     pub urgent: bool,
+    /// Started to read ahead (see `tasks::speculative`): it waits until nothing else does.
+    pub speculative: bool,
     pub timeout: Option<Duration>,
     pub cancel: Cancellation,
     pub cancelled: Option<Box<dyn Fn() -> bool + Send + Sync>>,
@@ -64,6 +68,7 @@ impl Default for Options {
             hold_input: false,
             background: false,
             urgent: crate::tasks::urgent(),
+            speculative: crate::tasks::speculative(),
             timeout: None,
             cancel: crate::tasks::cancellation(),
             cancelled: None,
@@ -383,6 +388,7 @@ impl Service {
                     let mut running = tokio::task::JoinSet::new();
                     let mut pending: VecDeque<Request> = VecDeque::new();
                     let mut background = 0usize;
+                    let mut speculative = 0usize;
                     let background_limit = active.saturating_sub(2).max(1);
                     let mut tick = tokio::time::interval(POLL);
                     loop {
@@ -409,12 +415,24 @@ impl Service {
                                 .filter(|_| running.len() < active + URGENT_EXTRA);
                             // Reserve two slots for short reads; dispatch the oldest eligible
                             // request so a stream of reads cannot starve long operations.
+                            // Reading ahead only once nothing else waits.
                             let selected = urgent.or_else(|| {
                                 (running.len() < active)
                                     .then(|| {
-                                        pending.iter().position(|r| {
-                                            !r.options.background || background < background_limit
-                                        })
+                                        pending
+                                            .iter()
+                                            .position(|r| {
+                                                !r.options.speculative
+                                                    && (!r.options.background
+                                                        || background < background_limit)
+                                            })
+                                            .or_else(|| {
+                                                (speculative < SPECULATIVE
+                                                    && pending
+                                                        .iter()
+                                                        .all(|r| r.options.speculative))
+                                                .then_some(0)
+                                            })
                                     })
                                     .flatten()
                             });
@@ -425,6 +443,10 @@ impl Service {
                             let is_background = request.options.background;
                             if is_background {
                                 background += 1;
+                            }
+                            let is_speculative = request.options.speculative;
+                            if is_speculative {
+                                speculative += 1;
                             }
                             let stats = Arc::clone(&metrics);
                             let stop = shutdown.clone();
@@ -446,14 +468,17 @@ impl Service {
                                 .await;
                                 stats.active.fetch_sub(1, Ordering::Relaxed);
                                 let _ = request.reply.send(result);
-                                is_background
+                                (is_background, is_speculative)
                             });
                         }
                         tokio::select! {
                             _ = tick.tick() => {}
                             Some(request) = receiver.recv() => pending.push_back(request),
                             Some(result) = running.join_next(), if !running.is_empty() => {
-                                if matches!(result, Ok(true)) { background -= 1; }
+                                if let Ok((was_background, was_speculative)) = result {
+                                    background -= usize::from(was_background);
+                                    speculative -= usize::from(was_speculative);
+                                }
                             }
                         }
                     }

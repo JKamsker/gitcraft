@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Condvar, Mutex, OnceLock};
 
-pub(crate) const WORKERS: usize = 8;
+pub(crate) const WORKERS: usize = 12;
 pub(crate) const QUEUE_CAPACITY: usize = 512;
 pub(crate) const BUSY: &str = "Background queue is full; try again when current work finishes";
 
@@ -39,6 +39,7 @@ impl Drop for Scope {
 thread_local! {
     static CURRENT: RefCell<Option<Cancellation>> = const { RefCell::new(None) };
     static URGENT: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    static SPECULATIVE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
 pub(crate) fn cancellation() -> Cancellation {
@@ -51,10 +52,17 @@ pub(crate) fn urgent() -> bool {
     URGENT.with(std::cell::Cell::get)
 }
 
+/// Whether this thread reads ahead ([`Priority::Speculative`]): its processes start only in
+/// slots nothing else waits for (see `processes`).
+pub(crate) fn speculative() -> bool {
+    SPECULATIVE.with(std::cell::Cell::get)
+}
+
 /// What a job's own threads take over from it: its cancellation, its urgency, its connections.
 pub(crate) struct Inherited {
     cancel: Cancellation,
     urgent: bool,
+    speculative: bool,
     connections: crate::connections::Context,
 }
 
@@ -63,16 +71,19 @@ impl Inherited {
         Self {
             cancel: cancellation(),
             urgent: urgent(),
+            speculative: speculative(),
             connections: crate::connections::current(),
         }
     }
 
     pub(crate) fn run<T>(self, work: impl FnOnce() -> T) -> T {
         let was = URGENT.with(|u| u.replace(self.urgent));
+        let was_speculative = SPECULATIVE.with(|s| s.replace(self.speculative));
         let out = self
             .connections
             .run(|| with_cancellation(self.cancel, work));
         URGENT.with(|u| u.set(was));
+        SPECULATIVE.with(|s| s.set(was_speculative));
         out
     }
 }
@@ -96,7 +107,13 @@ pub(crate) enum Priority {
     Urgent,
     Interactive,
     Background,
+    /// Read ahead, before anyone asked (the files of the commits on screen): taken only when
+    /// nothing else waits, on at most [`SPECULATIVE_LIMIT`] workers.
+    Speculative,
 }
+
+/// How many workers may read ahead at once: the others stay free for what is asked for.
+const SPECULATIVE_LIMIT: usize = 2;
 
 /// How many urgent jobs may have threads of their own at once; more wait in the queue's front.
 const URGENT_THREADS: usize = 4;
@@ -119,6 +136,7 @@ struct State {
     writing: HashSet<PathBuf>,
     active: usize,
     background_active: usize,
+    speculative_active: usize,
     peak_queued: usize,
     stopped: bool,
     running: Vec<Cancellation>,
@@ -374,18 +392,27 @@ fn worker(shared: Arc<Shared>) {
                         .key
                         .as_ref()
                         .is_none_or(|key| seen.insert(key.clone()) && !state.writing.contains(key));
-                    if runnable
-                        && (job.priority != Priority::Background
-                            || state.background_active < shared.background_limit)
-                    {
+                    let room = match job.priority {
+                        Priority::Background => state.background_active < shared.background_limit,
+                        Priority::Speculative => state.speculative_active < SPECULATIVE_LIMIT,
+                        Priority::Urgent | Priority::Interactive => true,
+                    };
+                    if runnable && room {
                         candidates.push(i);
                     }
                 }
-                // An urgent job that found no thread of its own goes first, the newest of them.
+                let priority = |i: &usize| state.queue[*i].priority;
+                // An urgent job that found no thread of its own goes first, the newest of them;
+                // reading ahead only once nothing else is runnable.
                 let selected = candidates
                     .iter()
                     .rev()
-                    .find(|&&i| state.queue[i].priority == Priority::Urgent)
+                    .find(|i| priority(i) == Priority::Urgent)
+                    .or_else(|| {
+                        candidates
+                            .iter()
+                            .find(|i| priority(i) != Priority::Speculative)
+                    })
                     .or(candidates.first())
                     .copied();
                 if let Some(i) = selected
@@ -395,8 +422,10 @@ fn worker(shared: Arc<Shared>) {
                         state.writing.insert(key.clone());
                     }
                     state.active += 1;
-                    if job.priority == Priority::Background {
-                        state.background_active += 1;
+                    match job.priority {
+                        Priority::Background => state.background_active += 1,
+                        Priority::Speculative => state.speculative_active += 1,
+                        Priority::Urgent | Priority::Interactive => {}
                     }
                     state.running.push(job.cancel.clone());
                     break job;
@@ -409,20 +438,24 @@ fn worker(shared: Arc<Shared>) {
         };
         CURRENT.with(|slot| *slot.borrow_mut() = Some(job.cancel.clone()));
         URGENT.with(|u| u.set(job.priority == Priority::Urgent));
+        SPECULATIVE.with(|s| s.set(job.priority == Priority::Speculative));
         // Most callers supply an error continuation. Also contain panics from any other
         // caller so the fixed pool never silently loses a worker.
         let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             job.connections.run(job.work)
         }));
         URGENT.with(|u| u.set(false));
+        SPECULATIVE.with(|s| s.set(false));
         CURRENT.with(|slot| *slot.borrow_mut() = None);
         let mut state = shared
             .state
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         state.active -= 1;
-        if job.priority == Priority::Background {
-            state.background_active -= 1;
+        match job.priority {
+            Priority::Background => state.background_active -= 1,
+            Priority::Speculative => state.speculative_active -= 1,
+            Priority::Urgent | Priority::Interactive => {}
         }
         if let Some(i) = state
             .running
@@ -584,6 +617,44 @@ mod tests {
         );
         pool.shutdown();
         drop(gates);
+        Ok(())
+    }
+
+    #[test]
+    fn reading_ahead_waits_for_all_other_work() -> Result<(), String> {
+        let pool = Pool::new(1).map_err(|e| e.to_string())?;
+        let (gate_tx, gate) = mpsc::channel::<()>();
+        let (started, rx) = mpsc::channel();
+        submit(&pool, Priority::Background, None, move || {
+            let _ = started.send(());
+            let _ = gate.recv();
+        })?;
+        rx.recv_timeout(Duration::from_secs(5))
+            .map_err(|e| e.to_string())?;
+        let (out, events) = mpsc::channel();
+        for (name, priority) in [
+            ("ahead", Priority::Speculative),
+            ("background", Priority::Background),
+            ("interactive", Priority::Interactive),
+        ] {
+            let out = out.clone();
+            submit(&pool, priority, None, move || {
+                let _ = out.send((name, speculative()));
+            })?;
+        }
+        drop(gate_tx);
+        let order: Vec<_> = (0..3)
+            .map(|_| events.recv_timeout(Duration::from_secs(5)))
+            .collect::<Result<_, _>>()
+            .map_err(|e| e.to_string())?;
+        assert_eq!(
+            order,
+            [
+                ("background", false),
+                ("interactive", false),
+                ("ahead", true)
+            ]
+        );
         Ok(())
     }
 

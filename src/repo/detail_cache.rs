@@ -30,6 +30,7 @@ impl DetailCache {
         Some(detail)
     }
 
+    #[cfg(test)]
     pub(super) fn contains(&self, hash: &str, head: &str) -> bool {
         self.entries
             .iter()

@@ -125,13 +125,12 @@ impl RepoTab {
         );
     }
 
-    /// The selected commit's detail, read or from the cache; then its neighbours are read ahead.
+    /// The selected commit's detail, read or from the cache.
     pub(super) fn show_detail(&mut self, detail: git::CommitDetail, ctx: &egui::Context) {
         let hash = detail.hash.clone();
         self.detail = Some(detail);
         self.fill_reword();
         self.finish_commit_changes(&hash, ctx);
-        self.prefetch_neighbours(ctx);
     }
 
     /// Reads ahead the files of the commits on screen (`rows`, and as many again around them),
@@ -139,7 +138,8 @@ impl RepoTab {
     pub(super) fn prefetch_files(&mut self, rows: std::ops::Range<usize>, ctx: &egui::Context) {
         /// Commits a batch reads at most.
         const BATCH: usize = 64;
-        if self.files_cache.reading || self.commits.is_empty() {
+        // Not while the repository is read: that read is what the tab waits on.
+        if self.files_cache.reading || self.loading || self.commits.is_empty() {
             return;
         }
         let around = rows.len().max(20);
@@ -176,40 +176,6 @@ impl RepoTab {
             move |error| Msg::FilesPrefetched(failed_asked, Err(error)),
             move || Msg::FilesPrefetched(asked, git::commit_files_batch(&path, &hashes)),
         );
-    }
-
-    /// Reads the rows above and below the selected one into the detail cache, behind all other
-    /// work, so arrowing on through the graph shows each commit at once.
-    fn prefetch_neighbours(&mut self, ctx: &egui::Context) {
-        let Some(row) = self.selected else {
-            return;
-        };
-        for neighbour in [row.checked_sub(1), row.checked_add(1)]
-            .into_iter()
-            .flatten()
-        {
-            let Some(commit) = self.commits.get(neighbour) else {
-                continue;
-            };
-            let hash = commit.hash.clone();
-            if hash == WIP_HASH
-                || hash.starts_with('\u{0}')
-                || self.stash_at(neighbour).is_some()
-                || self.parked_at(neighbour).is_some()
-                || self.detail_cache.contains(&hash, &self.refs.head)
-            {
-                continue;
-            }
-            let path = self.path.clone();
-            super::messages::spawn_selection(
-                &self.tx,
-                ctx,
-                self.detail_cancel.clone(),
-                true,
-                |error| Msg::DetailPrefetched(Err(error)),
-                move || Msg::DetailPrefetched(git::commit_detail(&path, &hash)),
-            );
-        }
     }
 
     pub(super) fn select_stash(&mut self, i: usize, ctx: &egui::Context) {
