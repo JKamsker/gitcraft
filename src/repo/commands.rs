@@ -27,15 +27,15 @@ impl RepoTab {
             Undo::None
         } else {
             Undo::Custom {
-                undo: ops(&[&["checkout", &previous, "--"]]),
-                redo: ops(&[&["checkout", target, "--"]]),
+                undo: ops(&[&["checkout", "--no-overwrite-ignore", &previous, "--"]]),
+                redo: ops(&[&["checkout", "--no-overwrite-ignore", target, "--"]]),
             }
         };
         // `--`: a name that is no branch (any more) must not be taken for a file to discard
         // the changes of.
         self.run_undoable(
             &format!("Checkout {target}"),
-            ops(&[&["checkout", target, "--"]]),
+            ops(&[&["checkout", "--no-overwrite-ignore", target, "--"]]),
             Refresh::All,
             undo,
             ctx,
@@ -57,7 +57,10 @@ impl RepoTab {
         if refuse_option_like(branch, &mut self.status) {
             return;
         }
-        let run = ops(&[&["checkout", branch, "--"], &["pull", "--ff-only"]]);
+        let run = ops(&[
+            &["checkout", "--no-overwrite-ignore", branch, "--"],
+            &["pull", "--ff-only"],
+        ]);
         let undo = checkout_pull_undo(&previous, branch, &was, &run);
         self.run_undoable(
             &format!("Checkout and pull {branch}"),
@@ -89,6 +92,7 @@ impl RepoTab {
             &format!("Checkout {local}"),
             ops(&[&[
                 "checkout",
+                "--no-overwrite-ignore",
                 "-b",
                 &local,
                 "--track",
@@ -364,9 +368,13 @@ pub(super) fn checkout_remote_undo(previous: &str, local: &str, remote_branch: &
         return Undo::None;
     }
     Undo::Custom {
-        undo: ops(&[&["checkout", previous, "--"], &["branch", "-d", local]]),
+        undo: ops(&[
+            &["checkout", "--no-overwrite-ignore", previous, "--"],
+            &["branch", "-d", local],
+        ]),
         redo: ops(&[&[
             "checkout",
+            "--no-overwrite-ignore",
             "-b",
             local,
             "--track",
@@ -403,7 +411,7 @@ pub(super) fn checkout_pull_undo(
         undo: [expect_ref(&format!("refs/heads/{branch}"))]
             .into_iter()
             .chain(ops(&[
-                &["checkout", previous, "--"],
+                &["checkout", "--no-overwrite-ignore", previous, "--"],
                 &["branch", "-f", branch, was],
             ]))
             .collect(),
