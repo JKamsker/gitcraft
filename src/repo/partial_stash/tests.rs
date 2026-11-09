@@ -2,6 +2,8 @@
 //! what the tab runs: the arguments, the background job, then undo and redo as the history
 //! keeps them.
 
+#![allow(clippy::expect_used)] // Invalid synthetic push fixtures must fail their regression tests.
+
 use std::path::{Path, PathBuf};
 
 use super::*;
