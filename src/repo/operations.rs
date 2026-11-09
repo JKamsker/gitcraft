@@ -1567,6 +1567,7 @@ fn pull_mode(args: &[String]) -> Result<PullMode, String> {
                 };
                 i64::from_str_radix(digits, radix)
                     .ok()
+                    .filter(|_| !digits.starts_with(['+', '-']))
                     .filter(|n| *n >= 0 && *n <= i64::from(i32::MAX) / factor)
                     .map(|n| n != 0)
                     .ok_or_else(|| format!("Invalid pull rebase value: {value}"))
@@ -1995,6 +1996,8 @@ mod tests {
                 vec!["--str"],
                 vec!["--re"],
                 vec!["-r08"],
+                vec!["-r++2"],
+                vec!["-r-+2"],
                 vec!["-r2147483648"],
             ] {
                 let args = [
