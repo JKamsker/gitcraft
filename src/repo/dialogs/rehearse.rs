@@ -15,7 +15,6 @@ use super::{Outcome, buttons, field, title};
 #[allow(clippy::too_many_arguments)]
 pub(super) fn rehearse(
     ui: &mut Ui,
-    enter: bool,
     machine: &str,
     current: Option<&str>,
     other: &str,
@@ -79,7 +78,12 @@ pub(super) fn rehearse(
     );
     ui.add_space(6.0);
     ui.label(RichText::new(crate::i18n::text("repo-core-1461")).color(t.text_dim));
-    field(ui, command, "cargo test, make check, ./test.sh…", focus);
+    let enter = crate::a11y::singleline_enter(&field(
+        ui,
+        command,
+        "cargo test, make check, ./test.sh…",
+        focus,
+    ));
     ui.add_space(12.0);
     buttons(ui, crate::i18n::text("repo-core-1453"), true, enter, || {
         let first = if *rebase {
