@@ -7652,8 +7652,10 @@ repo-workflows-r1-verdict-bad = Schlecht
 repo-workflows-r1-verdict-skip = Übersprungen
 repo-workflows-r1-verdict-timeout = Zeitlimit überschritten
 
-repo-workflows-partial_stash-excluded-overlap = Der ausgeschlossene Pfad „{ $path }“ überschneidet sich mit einer vorgemerkten Löschung oder Umbenennungsquelle: Beim Stashen könnte er überschrieben werden. Überschneidung auflösen oder einen Snapshot erstellen.
+repo-workflows-partial_stash-excluded-overlap = Der ausgeschlossene Pfad „{ $path }“ überschneidet sich mit einer Löschung oder Umbenennungsquelle: Beim Stashen könnte er überschrieben werden. Überschneidung auflösen oder einen Snapshot erstellen.
 
 repo-workflows-partial_stash-outside-staged = „{ $path }“ ist außerhalb der Auswahl vorgemerkt. Git speichert den gesamten Index; dadurch wäre Rückgängig hier nicht möglich. Alle vorgemerkten Dateien auswählen, die anderen aus dem Index nehmen oder alles stashen.
 
 repo-workflows-stash-selection-changed = Die ausgewählten Dateien haben sich seit der Vorbereitung geändert. Öffne Stash erneut, um die jetzt unversionierten Dateien einzuschließen.
+
+repo-workflows-partial_stash-unresolved-link = Für den ausgeschlossenen Pfad „{ $path }“ kann wegen eines nicht auflösbaren symbolischen Links kein sicheres Stashen gewährleistet werden. Löse den Link auf oder erstelle einen Snapshot.
