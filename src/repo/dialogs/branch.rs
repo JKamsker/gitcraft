@@ -139,7 +139,7 @@ pub(super) fn tag(
         ui,
         crate::i18n::text("repo-core-1216"),
         valid,
-        enter && !message.contains('\n'),
+        enter,
         || {
             let name = name.trim().to_owned();
             let mut create = vec!["tag".to_owned()];
@@ -234,6 +234,7 @@ mod tests {
         focus: bool,
         fonts: bool,
         actions: usize,
+        operations: Vec<Vec<Vec<String>>>,
     }
 
     fn inert_form(tag_form: bool) -> Harness<'static, InertForm> {
@@ -269,8 +270,11 @@ mod tests {
                     )
                 };
                 // Construct and record intents without dispatching any Git operation.
-                if matches!(outcome, Outcome::Done(_)) {
+                if let Outcome::Done(action) = outcome {
                     form.actions += 1;
+                    if let Action::UndoableOps { ops, .. } = action {
+                        form.operations.push(ops);
+                    }
                 }
             },
             InertForm {
@@ -283,6 +287,7 @@ mod tests {
                 focus: false,
                 fonts: false,
                 actions: 0,
+                operations: Vec::new(),
             },
         );
         h.run_steps(3);
@@ -307,6 +312,8 @@ mod tests {
     #[test]
     fn tag_checkbox_enter_toggles_without_creating_and_name_enter_still_creates() {
         let mut h = inert_form(true);
+        h.state_mut().message = "summary\nbody".into();
+        h.run_steps(2);
         for label in ["Push it to origin", "This is a release tag"] {
             h.get_by_label(label).focus();
             h.key_press(egui::Key::Enter);
@@ -319,6 +326,57 @@ mod tests {
         h.key_press(egui::Key::Enter);
         h.run_steps(3);
         assert_eq!(h.state().actions, 1);
+    }
+
+    #[test]
+    fn tag_name_and_create_button_accept_multiline_annotation() {
+        for primary_button in [false, true] {
+            let mut h = inert_form(true);
+            h.state_mut().message = "summary\nbody".into();
+            h.run_steps(2);
+            if primary_button {
+                h.get_by_label("Create").focus();
+            } else {
+                h.get_by_role(egui::accesskit::Role::TextInput).focus();
+            }
+            h.key_press(egui::Key::Enter);
+            h.run_steps(3);
+            assert_eq!(h.state().actions, 1);
+            assert_eq!(
+                h.state().operations,
+                vec![vec![vec![
+                    "tag",
+                    "-a",
+                    "-m",
+                    "summary\nbody",
+                    "topic",
+                    "inert-commit",
+                ]]],
+            );
+        }
+    }
+
+    #[test]
+    fn tag_annotation_enter_inserts_newline_without_submitting() {
+        for message in ["summary", "summary\nbody"] {
+            let mut h = inert_form(true);
+            h.state_mut().message = message.into();
+            h.run_steps(2);
+            h.get_by_role(egui::accesskit::Role::MultilineTextInput)
+                .focus();
+            h.key_press(egui::Key::Enter);
+            h.run_steps(3);
+            assert_eq!(h.state().actions, 0);
+            assert!(h.state().operations.is_empty());
+            assert_eq!(
+                h.state().message.matches('\n').count(),
+                message.matches('\n').count() + 1,
+            );
+            assert!(
+                h.get_by_role(egui::accesskit::Role::MultilineTextInput)
+                    .is_focused()
+            );
+        }
     }
 
     #[test]
