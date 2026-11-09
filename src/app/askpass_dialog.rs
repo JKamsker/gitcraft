@@ -1,7 +1,7 @@
 //! ssh's questions (a password, a key's passphrase, a new host's key), asked in the window
 //! for the connection it is making to a repository's machine (see `remote::askpass`).
 
-use egui::{Key, RichText, Stroke, vec2};
+use egui::{RichText, Stroke, vec2};
 
 use super::App;
 use super::panels::Toast;
@@ -100,6 +100,15 @@ fn askpass_modal(
     state: &mut AskpassState,
     question: &Question,
 ) -> Option<Answer> {
+    askpass_modal_with_store(ctx, state, question, crate::portable::credential_store())
+}
+
+fn askpass_modal_with_store(
+    ctx: &egui::Context,
+    state: &mut AskpassState,
+    question: &Question,
+    credential_store: bool,
+) -> Option<Answer> {
     let t = Tokens::get(ctx);
     let frame = egui::Frame::new()
         .fill(t.card)
@@ -126,7 +135,6 @@ fn askpass_modal(
             }
             ui.label(&question.prompt);
             ui.add_space(10.0);
-            let enter = ui.input(|i| i.key_pressed(Key::Enter));
             match question.kind {
                 Kind::Secret => {
                     let field = ui.add(
@@ -135,11 +143,12 @@ fn askpass_modal(
                             .desired_width(f32::INFINITY)
                             .margin(egui::Margin::symmetric(8, 6)),
                     );
+                    let enter = crate::a11y::singleline_enter(&field);
                     if std::mem::take(&mut state.focus) {
                         field.request_focus();
                     }
                     ui.add_space(8.0);
-                    if crate::portable::credential_store() {
+                    if credential_store {
                         ui.checkbox(
                             &mut state.remember,
                             crate::i18n::text("interaction-dialogs-remember"),
@@ -255,7 +264,91 @@ enum Answer {
 #[cfg(test)]
 mod localization_tests {
     use super::*;
+    use egui::{Key, accesskit::Role};
     use egui_kittest::{Harness, kittest::Queryable};
+
+    fn secret_harness(remember: bool, store: bool) -> Harness<'static, (AskpassState, Option<u8>)> {
+        crate::i18n::set_language("en-US");
+        let fonts = std::cell::Cell::new(false);
+        let mut h = Harness::new_ui_state(
+            move |ui, state: &mut (AskpassState, Option<u8>)| {
+                if !fonts.replace(true) {
+                    crate::theme::install_fonts(ui.ctx());
+                    return;
+                }
+                if state.1.is_some() {
+                    return;
+                }
+                let question = Question {
+                    id: 18,
+                    host: "inert fixture".into(),
+                    prompt: "Inert prompt".into(),
+                    kind: Kind::Secret,
+                    forgotten: false,
+                };
+                state.1 = askpass_modal_with_store(ui.ctx(), &mut state.0, &question, store).map(
+                    |answer| match answer {
+                        // Record only the variant; never display or forward a payload.
+                        Answer::Remember(_) => 1,
+                        Answer::Give(_) => 2,
+                        Answer::Decline => 3,
+                    },
+                );
+            },
+            (
+                AskpassState {
+                    typed: "inert-input".into(),
+                    remember,
+                    ..Default::default()
+                },
+                None,
+            ),
+        );
+        h.run_steps(3);
+        h
+    }
+
+    #[test]
+    fn remember_checkbox_enter_does_not_answer_and_password_enter_does() {
+        for remember in [false, true] {
+            let mut h = secret_harness(remember, true);
+            h.get_by_role_and_label(Role::CheckBox, "Remember connection")
+                .focus();
+            h.key_press(Key::Enter);
+            h.run_steps(3);
+            assert_eq!(h.state().0.remember, !remember);
+            assert_eq!(h.state().1, None);
+            h.get_by_role(Role::PasswordInput).focus();
+            h.key_press(Key::Enter);
+            h.run_steps(3);
+            assert_eq!(h.state().1, Some(if remember { 2 } else { 1 }));
+        }
+    }
+
+    #[test]
+    fn secret_modal_explicit_buttons_keep_their_actions() {
+        for (label, expected) in [("Sign in", 2), ("Cancel", 3)] {
+            let mut h = secret_harness(false, true);
+            h.get_by_role_and_label(Role::Button, label).focus();
+            h.key_press(Key::Enter);
+            h.run_steps(3);
+            assert_eq!(h.state().1, Some(expected));
+        }
+    }
+
+    #[test]
+    fn storage_disabled_secret_modal_never_requests_remembering() {
+        let mut h = secret_harness(true, false);
+        assert!(
+            h.query_by_role_and_label(Role::CheckBox, "Remember connection")
+                .is_none()
+        );
+        assert!(!h.state().0.remember);
+        h.get_by_role(Role::PasswordInput).focus();
+        h.key_press(Key::Enter);
+        h.run_steps(3);
+        assert_eq!(h.state().1, Some(2));
+    }
 
     #[test]
     fn actual_host_trust_dialog_localizes_buttons_but_answers_literal_ssh_protocol() {
