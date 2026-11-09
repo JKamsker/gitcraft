@@ -27,13 +27,12 @@ pub(crate) fn singleline_enter(response: &Response) -> bool {
                 && !i.key_pressed(egui::Key::Tab)
                 && !i.pointer.any_pressed()
                 && !i.pointer.any_released()
-                // AccessKit transfers focus as the destination widget is painted, which
-                // may be after this field has already surrendered focus to Enter.
+                // Accessibility actions on later widgets may be handled after this
+                // field surrenders focus. Their activation must not submit the field.
                 && !i.events.iter().any(|event| matches!(
                     event,
                     egui::Event::AccessKitActionRequest(request)
-                        if request.action == egui::accesskit::Action::Focus
-                            && request.target_node != response.id.accesskit_id()
+                        if request.target_node != response.id.accesskit_id()
                 ))
         })
 }
