@@ -576,3 +576,47 @@ fn linked_worktree_branch_can_resolve_from_a_secondary_remote() -> Result<(), St
     );
     Ok(())
 }
+
+#[test]
+fn author_host_policy_round_trips_and_legacy_profiles_default_empty() -> Result<(), String> {
+    use crate::settings::profiles::HostAuthor;
+    let mut settings = Settings::default();
+    settings.user_profiles[0].author_hosts = vec![
+        HostAuthor {
+            host: "forge.example".into(),
+            name: "Host author".into(),
+            email: "host@example.invalid".into(),
+        },
+        HostAuthor {
+            host: "forge.example:8443/team".into(),
+            name: "Team author".into(),
+            email: "team@example.invalid".into(),
+        },
+    ];
+    let setup = Setup::new(&settings, &Default::default());
+    let decoded = Setup::decode(&setup.encode()?)?;
+    assert_eq!(
+        decoded.profiles[0].materialize(42).author_hosts,
+        settings.user_profiles[0].author_hosts
+    );
+    let mut legacy = serde_json::to_value(&setup).map_err(|e| e.to_string())?;
+    legacy["profiles"][0]
+        .as_object_mut()
+        .ok_or("profile")?
+        .remove("author_hosts");
+    let decoded = Setup::decode(&serde_json::to_vec(&legacy).map_err(|e| e.to_string())?)?;
+    assert!(decoded.profiles[0].materialize(42).author_hosts.is_empty());
+    for invalid in [
+        serde_json::json!([{"host":"x","name":"n","email":"e","command":"bad"}]),
+        serde_json::json!([{"host":"x\n","name":"n","email":"e"}]),
+        serde_json::json!([{"host":"x","name":"n".repeat(513),"email":"e"}]),
+        serde_json::Value::Array(vec![
+            serde_json::json!({"host":"x","name":"n","email":"e"});
+            65
+        ]),
+    ] {
+        legacy["profiles"][0]["author_hosts"] = invalid;
+        assert!(Setup::decode(&serde_json::to_vec(&legacy).map_err(|e| e.to_string())?).is_err());
+    }
+    Ok(())
+}
