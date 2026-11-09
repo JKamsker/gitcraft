@@ -161,6 +161,15 @@ impl SetupWindow {
         self.applied = false;
     }
 }
+fn author_rule_has_url_scheme(host: &str) -> bool {
+    let Some((scheme, _)) = host.trim().split_once("://") else {
+        return false;
+    };
+    let mut bytes = scheme.bytes();
+    bytes.next().is_some_and(|b| b.is_ascii_alphabetic())
+        && bytes.all(|b| b.is_ascii_alphanumeric() || matches!(b, b'+' | b'-' | b'.'))
+}
+
 fn preview_summary(ui: &mut egui::Ui, file: &Setup) {
     ui.label(crate::i18n::message(
         "interaction-setup-preview",
@@ -184,6 +193,17 @@ fn preview_summary(ui: &mut egui::Ui, file: &Setup) {
                 ("email", p.author_email.as_str().into()),
             ],
         ));
+        for rule in &p.author_hosts {
+            if author_rule_has_url_scheme(&rule.host) {
+                ui.colored_label(
+                    ui.visuals().warn_fg_color,
+                    crate::i18n::message(
+                        "interaction-setup-author-rule-url",
+                        &[("host", rule.host.as_str().into())],
+                    ),
+                );
+            }
+        }
         for a in &p.setup.accounts {
             ui.label(crate::i18n::message(
                 "interaction-setup-account",

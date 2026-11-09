@@ -2711,6 +2711,7 @@ interaction-setup-activate = { $profile } aktivieren
 interaction-setup-preview = Vorschau: { $profiles } Profile, { $authors } gespeicherte Autoren, { $repositories } Repositorys
 
 interaction-setup-profile = Profil: { $name } — { $author } <{ $email }>
+interaction-setup-author-rule-url = Die Autorenregel „{ $host }“ enthält ein URL-Schema und wird nicht angewendet. Verwende Host oder Host/Namensraum, zum Beispiel github.com/team. Prüfe sie in den Profileinstellungen.
 
 interaction-setup-profile-pending = Profil: { $name } — { $author } <{ $email }> · lokale Authentifizierung und Schlüsseleinrichtung erforderlich
 

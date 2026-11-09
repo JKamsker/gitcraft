@@ -593,6 +593,18 @@ fn author_host_policy_round_trips_and_legacy_profiles_default_empty() -> Result<
             email: "team@example.invalid".into(),
         },
     ];
+    for host in [
+        "https://github.com/team",
+        "",
+        "forge.example/team/subteam",
+        "[2001:db8::1]:8443/team",
+    ] {
+        settings.user_profiles[0].author_hosts.push(HostAuthor {
+            host: host.into(),
+            name: "Preserved author".into(),
+            email: "preserved@example.invalid".into(),
+        });
+    }
     let setup = Setup::new(&settings, &Default::default());
     let decoded = Setup::decode(&setup.encode()?)?;
     assert_eq!(

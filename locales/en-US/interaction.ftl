@@ -2711,6 +2711,7 @@ interaction-setup-activate = Activate { $profile }
 interaction-setup-preview = Preview: { $profiles } profiles, { $authors } saved authors, { $repositories } repositories
 
 interaction-setup-profile = Profile: { $name } — { $author } <{ $email }>
+interaction-setup-author-rule-url = Author rule “{ $host }” includes a URL scheme and will not match. Use host or host/namespace, for example github.com/team. Review it in profile settings.
 
 interaction-setup-profile-pending = Profile: { $name } — { $author } <{ $email }> · local authentication/key setup required
 

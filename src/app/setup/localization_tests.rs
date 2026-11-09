@@ -4,6 +4,61 @@ use crate::portability::{ConnectionRequirements, Identity, Provider, PublicAccou
 use egui_kittest::{Harness, kittest::Queryable};
 
 #[test]
+fn author_rule_url_advisory_preserves_supported_host_syntax() {
+    for host in [
+        "https://github.com/team",
+        " SSH://forge.example/team ",
+        "custom+scheme.1://forge.example/team",
+    ] {
+        assert!(author_rule_has_url_scheme(host), "{host}");
+    }
+    for host in [
+        "",
+        "   ",
+        "github.com",
+        "forge.example:8443/team/subteam",
+        "[2001:db8::1]:8443/team",
+        "forge.example/team/https://nested",
+        "1invalid://forge.example",
+    ] {
+        assert!(!author_rule_has_url_scheme(host), "{host}");
+    }
+}
+
+#[test]
+fn setup_preview_warns_about_url_author_rule_without_changing_import_or_export()
+-> Result<(), String> {
+    crate::i18n::set_language("en-US");
+    let mut settings = crate::settings::Settings::default();
+    settings.user_profiles[0].author_hosts = vec![crate::settings::profiles::HostAuthor {
+        host: "https://github.com/team".into(),
+        name: "Team author".into(),
+        email: "team@example.invalid".into(),
+    }];
+    let file = Setup::decode(&Setup::new(&settings, &BTreeMap::new()).encode()?)?;
+    let before = file.encode()?;
+    let fonts = std::cell::Cell::new(false);
+    let mut h = Harness::new_ui_state(
+        move |ui, file: &mut Setup| {
+            if !fonts.replace(true) {
+                crate::theme::install_fonts(ui.ctx());
+                return;
+            }
+            preview_summary(ui, file);
+        },
+        file,
+    );
+    h.run();
+    h.get_by_label("Author rule “https://github.com/team” includes a URL scheme and will not match. Use host or host/namespace, for example github.com/team. Review it in profile settings.");
+    assert_eq!(h.state().encode()?, before);
+    crate::i18n::set_language("de");
+    h.run();
+    h.get_by_label("Die Autorenregel „https://github.com/team“ enthält ein URL-Schema und wird nicht angewendet. Verwende Host oder Host/Namensraum, zum Beispiel github.com/team. Prüfe sie in den Profileinstellungen.");
+    assert_eq!(h.state().encode()?, before);
+    Ok(())
+}
+
+#[test]
 fn actual_nonempty_setup_preview_keeps_imported_fields_opaque_and_localizes_both_profile_states()
 -> Result<(), String> {
     crate::i18n::set_language("de");
