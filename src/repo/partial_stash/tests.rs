@@ -806,6 +806,64 @@ fn stash_job_waits_in_the_shared_worktree_mutation_lane() -> Result<(), String> 
 }
 
 #[test]
+fn unstaged_file_replaced_by_ignored_directory_refuses_push_and_redo() -> Result<(), String> {
+    for untracked in [false, true] {
+        let repo = Repo::new(if untracked {
+            "unstaged-ignored-with-u"
+        } else {
+            "unstaged-ignored-without-u"
+        })?;
+        repo.write(".gitignore", b"a.txt/local\n")?;
+        repo.git(&["add", ".gitignore"])?;
+        repo.git(&["commit", "-q", "-m", "ignore replacement"])?;
+        repo.write("a.txt", b"changed\n")?;
+        let request = StashRequest {
+            mode: StashMode::Everything,
+            message: String::new(),
+            untracked,
+        };
+        let stale_args = push_args(&request, &repo.status()?)?;
+        let (result, kind) = repo.stash(StashMode::Everything, untracked);
+        result?;
+        let undone = repo.undo(entry(kind)?)?;
+        std::fs::remove_file(repo.path().join("a.txt")).map_err(|e| e.to_string())?;
+        std::fs::create_dir(repo.path().join("a.txt")).map_err(|e| e.to_string())?;
+        repo.write("a.txt/local", b"excluded replacement bytes\n")?;
+        let work = repo.status()?;
+        assert!(work.staged.is_empty());
+        assert!(
+            work.unstaged
+                .iter()
+                .any(|f| f.path == "a.txt" && f.code == 'D')
+        );
+        assert!(!work.unstaged.iter().any(|f| f.path == "a.txt/local"));
+        let before = repo.state()?;
+        let head = git::head(repo.path());
+        let stash_list = repo.git(&["stash", "list"])?;
+        let (result, _) = run_push(repo.path(), stale_args, head.clone(), false);
+        assert!(result.is_err_and(|e| e.contains("overlaps a deletion")));
+        let (result, _, stopped) = run_steps_counted(
+            repo.path(),
+            &undone.redo,
+            OpKind::Redo(undone.clone()),
+            None,
+            false,
+            None,
+        );
+        assert!(result.is_err_and(|e| e.contains("overlaps a deletion")));
+        assert_eq!(stopped, 0);
+        assert_eq!(repo.state()?, before);
+        assert_eq!(git::head(repo.path()), head);
+        assert_eq!(repo.git(&["stash", "list"])?, stash_list);
+        assert!(everything_problem(&work, untracked).is_none());
+        let (result, _) = run_snapshot(repo.path(), "safe snapshot", untracked, head);
+        result?;
+        assert_eq!(repo.state()?, before);
+    }
+    Ok(())
+}
+
+#[test]
 fn excluded_overlap_validation_handles_ancestry_and_message_options() {
     for (deleted, untracked, blocked) in [
         ("f", "f", true),
@@ -870,7 +928,7 @@ fn fresh_push_and_redo_refuse_recreated_deleted_file() -> Result<(), String> {
     let before = repo.state()?;
     let stash_before = repo.git(&["stash", "list"])?;
     let (result, _) = run_push(repo.path(), stale_args, git::head(repo.path()), false);
-    assert!(result.is_err_and(|e| e.contains("overlaps a staged deletion")));
+    assert!(result.is_err_and(|e| e.contains("overlaps a deletion")));
     let (result, _, stopped) = run_steps_counted(
         repo.path(),
         &undone.redo.clone(),
@@ -879,7 +937,7 @@ fn fresh_push_and_redo_refuse_recreated_deleted_file() -> Result<(), String> {
         false,
         None,
     );
-    assert!(result.is_err_and(|e| e.contains("overlaps a staged deletion")));
+    assert!(result.is_err_and(|e| e.contains("overlaps a deletion")));
     assert_eq!(stopped, 0);
     assert_eq!(repo.state()?, before);
     assert_eq!(repo.git(&["stash", "list"])?, stash_before);
@@ -1045,7 +1103,7 @@ fn ignored_replacements_refuse_shared_agent_stash_execution() -> Result<(), Stri
         let (result, _, stopped) =
             run_steps_counted(repo.path(), &args, OpKind::plain(), None, false, None);
         assert!(
-            result.is_err_and(|e| e.contains("overlaps a staged deletion")),
+            result.is_err_and(|e| e.contains("overlaps a deletion")),
             "{case}"
         );
         assert_eq!(stopped, 0);
