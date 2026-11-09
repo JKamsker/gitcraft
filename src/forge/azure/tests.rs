@@ -469,6 +469,9 @@ fn policy_evaluations_use_the_documented_preview_contract_only() -> Result<(), S
                 parsed.query_pairs().any(|(k, v)| k == "artifactId"
                     && v == "vstfs:///CodeReview/CodeReviewId/project-id/7")
             );
+        } else if parsed.path() == "/_apis/connectionData" {
+            // Viewer identity already uses its own preview contract.
+            assert_eq!(versions, ["7.1-preview.1"]);
         } else {
             assert_eq!(versions, ["7.1"]);
         }
