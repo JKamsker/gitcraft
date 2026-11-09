@@ -1193,3 +1193,51 @@ fn fresh_files_push_and_redo_revalidate_selected_deletions_and_renames() -> Resu
     }
     Ok(())
 }
+
+#[test]
+fn newly_untracked_selection_requires_reprepare_before_push_and_redo() -> Result<(), String> {
+    let repo = Repo::new("files-now-untracked")?;
+    repo.write("new.txt", b"selected new bytes\n")?;
+    repo.git(&["add", "new.txt"])?;
+    let request = StashRequest {
+        mode: StashMode::Files(vec!["new.txt".into()]),
+        message: String::new(),
+        untracked: false,
+    };
+    let args = push_args(&request, &repo.status()?)?;
+    assert!(!args.iter().any(|a| a == "--include-untracked"));
+    let (result, kind) = repo.stash(request.mode.clone(), false);
+    result?;
+    let undone = repo.undo(entry(kind)?)?;
+    repo.git(&["reset", "HEAD", "--", "new.txt"])?;
+    assert!(has_untracked(&["new.txt".into()], &repo.status()?));
+    let before = repo.state()?;
+    let bytes = std::fs::read(repo.path().join("new.txt")).map_err(|e| e.to_string())?;
+    let stashes = repo.git(&["stash", "list"])?;
+    assert!(validate_push(repo.path(), &args).is_err_and(|e| e.contains("Open Stash again")));
+    let (result, _) = run_push(repo.path(), args, git::head(repo.path()), false);
+    assert!(result.is_err_and(|e| e.contains("Open Stash again")));
+    let (result, _, stopped) = run_steps_counted(
+        repo.path(),
+        &undone.redo.clone(),
+        OpKind::Redo(undone),
+        None,
+        false,
+        None,
+    );
+    assert!(result.is_err_and(|e| e.contains("Open Stash again")));
+    assert_eq!(stopped, 0);
+    assert_eq!(repo.state()?, before);
+    assert_eq!(
+        std::fs::read(repo.path().join("new.txt")).map_err(|e| e.to_string())?,
+        bytes
+    );
+    assert_eq!(repo.git(&["stash", "list"])?, stashes);
+    // Explicit preparation now includes -u for precisely the selected paths.
+    assert!(
+        push_args(&request, &repo.status()?)?
+            .iter()
+            .any(|a| a == "--include-untracked")
+    );
+    Ok(())
+}

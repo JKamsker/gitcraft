@@ -325,6 +325,11 @@ pub(super) fn validate_push(path: &Path, args: &[String]) -> Result<(), String> 
         if let Some(problem) = files_problem(paths, &work) {
             return Err(problem);
         }
+        // Saved operations retain their original scope. Do not silently add -u on
+        // Redo when a formerly indexed path has become an untracked file.
+        if !request.untracked && has_untracked(paths, &work) {
+            return Err(crate::i18n::text("repo-workflows-stash-selection-changed").into());
+        }
     }
     Ok(())
 }
