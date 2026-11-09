@@ -7657,3 +7657,5 @@ repo-workflows-r1-verdict-timeout = Timed out
 repo-workflows-partial_stash-excluded-overlap = excluded path “{ $path }” overlaps a staged deletion or rename source: stash cleanup could overwrite it. Resolve the overlap or use a snapshot.
 
 repo-workflows-partial_stash-outside-staged = “{ $path }” is staged outside the selection. Git saves the whole index, which prevents Undo here. Select all staged files, unstage the others, or stash everything.
+
+repo-workflows-stash-selection-changed = The selected files changed since this stash was prepared. Open Stash again to include the now untracked files.
