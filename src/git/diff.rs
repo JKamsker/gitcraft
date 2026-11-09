@@ -102,6 +102,19 @@ fn commit_files_args<'a>(kind: &'a str, hash: &'a str) -> [&'a str; 10] {
 
 /// The files commit `hash` changed, with their line counts.
 pub(super) fn commit_files(repo: &Path, hash: &str) -> Result<Vec<ChangedFile>, String> {
+    super::backend::dispatch(
+        repo,
+        super::backend::Read::CommitFiles,
+        |repo| match super::backend::commit_files(repo, &[hash.to_owned()])?.pop() {
+            Some((_, Some(files))) => Ok(files),
+            _ => Err("listed by git".into()),
+        },
+        || commit_files_by_git(repo, hash),
+    )
+}
+
+/// [`commit_files`] as git reads them.
+pub(super) fn commit_files_by_git(repo: &Path, hash: &str) -> Result<Vec<ChangedFile>, String> {
     // Both at once: two process starts in the time of one.
     let (status_out, numstat_out) = std::thread::scope(|s| {
         let inherited = crate::tasks::Inherited::capture();
@@ -123,6 +136,42 @@ pub(super) fn commit_files(repo: &Path, hash: &str) -> Result<Vec<ChangedFile>, 
 /// The files each of `hashes` changed, as [`commit_files`] lists them, read for all of them by
 /// two processes (the names, then the line counts) rather than two each: for reading ahead.
 pub fn commit_files_batch(
+    repo: &Path,
+    hashes: &[String],
+) -> Result<Vec<(String, Vec<ChangedFile>)>, String> {
+    super::backend::dispatch(
+        repo,
+        super::backend::Read::CommitFiles,
+        |repo| {
+            let read = super::backend::commit_files(repo, hashes)?;
+            // Those only git lists faithfully, all by one process.
+            let by_git: Vec<String> = read
+                .iter()
+                .filter(|(_, files)| files.is_none())
+                .map(|(hash, _)| hash.clone())
+                .collect();
+            let mut listed: std::collections::HashMap<String, Vec<ChangedFile>> =
+                if by_git.is_empty() {
+                    Default::default()
+                } else {
+                    commit_files_batch_by_git(repo, &by_git)?
+                        .into_iter()
+                        .collect()
+                };
+            Ok(read
+                .into_iter()
+                .filter_map(|(hash, files)| {
+                    let files = files.or_else(|| listed.remove(&hash))?;
+                    Some((hash, files))
+                })
+                .collect())
+        },
+        || commit_files_batch_by_git(repo, hashes),
+    )
+}
+
+/// [`commit_files_batch`] as git reads them.
+pub(super) fn commit_files_batch_by_git(
     repo: &Path,
     hashes: &[String],
 ) -> Result<Vec<(String, Vec<ChangedFile>)>, String> {
@@ -220,8 +269,17 @@ impl DiffOptions {
 /// of context around it: with `diff.context=0` in the user's config, every one. Asks for the
 /// usual three then.
 fn keep_context(repo: &Path, opts: DiffOptions, args: &mut Vec<&str>) {
-    let no_context = run(Some(repo), &["config", "--type=int", "diff.context"])
-        .is_ok_and(|n| n.trim().parse::<u64>().is_ok_and(|n| n == 0));
+    let context = super::backend::dispatch(
+        repo,
+        super::backend::Read::DiffContext,
+        super::backend::diff_context,
+        || {
+            Ok(run(Some(repo), &["config", "--type=int", "diff.context"])
+                .ok()
+                .and_then(|n| n.trim().parse().ok()))
+        },
+    );
+    let no_context = matches!(context, Ok(Some(0)));
     if no_context && !opts.whole_file {
         args.push("--unified=3");
     }
@@ -243,9 +301,9 @@ pub fn file_diff(repo: &Path, hash: &str, path: &str, opts: DiffOptions) -> Resu
     keep_context(repo, opts, &mut args);
     args.extend([END_OPTS, hash, "--", path]);
     // Limited to its new name, a file renamed in the commit looks new from top to bottom.
-    let old_path = run(Some(repo), &commit_files_args("--name-status", hash))
+    let old_path = commit_files(repo, hash)
         .ok()
-        .and_then(|out| parse_name_status(&out).into_iter().find(|f| f.path == path))
+        .and_then(|files| files.into_iter().find(|f| f.path == path))
         .and_then(|file| file.old_path);
     args.extend(old_path.as_deref());
     run(Some(repo), &args)

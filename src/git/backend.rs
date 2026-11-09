@@ -13,6 +13,9 @@ pub(super) enum Read {
     Head,
     Remotes,
     GitDir,
+    CommitFiles,
+    CommitDetail,
+    DiffContext,
 }
 impl Read {
     fn name(self) -> &'static str {
@@ -21,6 +24,9 @@ impl Read {
             Self::Head => "head",
             Self::Remotes => "remotes",
             Self::GitDir => "git-dir",
+            Self::CommitFiles => "commit-files",
+            Self::CommitDetail => "commit-detail",
+            Self::DiffContext => "diff-context",
         }
     }
 }
@@ -214,6 +220,8 @@ pub(super) fn dispatch<T>(
                 "non-commit branch requires Git" => "non-commit-branch",
                 "unsupported upstream namespace" => "upstream-namespace",
                 "local upstream requires Git" => "local-upstream",
+                "listed by git" => "listed-by-git",
+                "commit encoding" => "commit-encoding",
                 _ => "native-read-error",
             },
         },
@@ -236,6 +244,41 @@ pub(super) fn remotes(repo: &Path) -> Result<Vec<super::Remote>, String> {
 pub(super) fn git_dir(repo: &Path) -> Result<PathBuf, String> {
     native::git_dir(repo)
 }
+/// Each commit's hash and files; none for those git is to list.
+pub(super) type ListedFiles = Vec<(String, Option<Vec<super::ChangedFile>>)>;
+
+/// The files of each of `hashes`, read in-process; none for those git is to list.
+pub(super) fn commit_files(repo: &Path, hashes: &[String]) -> Result<ListedFiles, String> {
+    #[cfg(feature = "native-git")]
+    return commits::files(repo, hashes);
+    #[cfg(not(feature = "native-git"))]
+    {
+        let _ = (repo, hashes);
+        Err("feature disabled".into())
+    }
+}
+pub(super) fn commit_detail(repo: &Path, hash: &str) -> Result<super::CommitDetail, String> {
+    #[cfg(feature = "native-git")]
+    return commits::detail(repo, hash);
+    #[cfg(not(feature = "native-git"))]
+    {
+        let _ = (repo, hash);
+        Err("feature disabled".into())
+    }
+}
+
+pub(super) fn diff_context(repo: &Path) -> Result<Option<i64>, String> {
+    #[cfg(feature = "native-git")]
+    return commits::diff_context(repo);
+    #[cfg(not(feature = "native-git"))]
+    {
+        let _ = repo;
+        Err("feature disabled".into())
+    }
+}
+
+#[cfg(feature = "native-git")]
+mod commits;
 
 #[cfg(not(feature = "native-git"))]
 mod native {
@@ -265,7 +308,7 @@ mod native {
     fn text(bytes: &gix::bstr::BStr) -> Result<String, String> {
         bytes.to_str().map(str::to_owned).map_err(err)
     }
-    fn open(path: &Path) -> Result<gix::Repository, String> {
+    pub(super) fn open(path: &Path) -> Result<gix::Repository, String> {
         let mut permissions = gix::open::Permissions::default();
         permissions.config.git_binary = true;
         let repo = gix::discover_opts(

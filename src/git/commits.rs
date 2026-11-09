@@ -329,6 +329,16 @@ fn joined<T>(handle: std::thread::ScopedJoinHandle<'_, Result<T, String>>) -> Re
 }
 
 pub fn commit_detail(repo: &Path, hash: &str) -> Result<CommitDetail, String> {
+    super::backend::dispatch(
+        repo,
+        super::backend::Read::CommitDetail,
+        |repo| super::backend::commit_detail(repo, hash),
+        || commit_detail_by_git(repo, hash),
+    )
+}
+
+/// [`commit_detail`] as git reads it.
+pub(super) fn commit_detail_by_git(repo: &Path, hash: &str) -> Result<CommitDetail, String> {
     // NULs between the fields: no commit has one, unlike the unit separator.
     let format = "--format=%H%x00%P%x00%an%x00%ae%x00%ad%x00%cn%x00%cd%x00%B";
     let header_args = [
