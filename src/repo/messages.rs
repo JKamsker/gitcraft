@@ -682,7 +682,7 @@ impl RepoTab {
             }
             Msg::Blame(generation, path, rev, result) => {
                 if let Some(view) = &mut self.file_view
-                    && view.generation == generation
+                    && view.blame_generation == generation
                     && view.path == path
                     && view.rev == rev
                 {

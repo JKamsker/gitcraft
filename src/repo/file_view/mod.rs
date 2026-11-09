@@ -55,6 +55,8 @@ pub(crate) struct FileView {
     pub tab: FileTab,
     pub history: Option<Result<Vec<FileCommit>, String>>,
     pub blame: Option<Result<BlameData, String>>,
+    /// Blame also depends on configuration, even when file content has a fixed OID.
+    pub blame_generation: u64,
     /// A successful previous result remains visible until its replacement arrives.
     pub blame_needs_refresh: bool,
     pub text: Option<Result<FileText, String>>,
@@ -77,6 +79,7 @@ impl FileView {
             tab,
             history: None,
             blame: None,
+            blame_generation: next_generation(),
             blame_needs_refresh: false,
             text: None,
             lines: None,
@@ -95,12 +98,17 @@ impl FileView {
         }
         self.generation = next_generation();
         self.history = None;
+        self.invalidate_blame();
+        self.text = None;
+        true
+    }
+
+    fn invalidate_blame(&mut self) {
+        self.blame_generation = next_generation();
         self.blame_needs_refresh = true;
         if !matches!(self.blame, Some(Ok(_))) {
             self.blame = None;
         }
-        self.text = None;
-        true
     }
 
     fn reuses_line_inputs(
@@ -165,9 +173,11 @@ impl RepoTab {
     }
 
     pub(super) fn invalidate_mutable_file_view(&mut self, ctx: &egui::Context) {
-        if let Some(view) = &mut self.file_view
-            && view.invalidate_mutable()
-        {
+        if let Some(view) = &mut self.file_view {
+            if !view.invalidate_mutable() {
+                // Full OIDs pin content, but blame.ignoreRevsFile can change attribution.
+                view.invalidate_blame();
+            }
             self.load_file_view(ctx);
         }
     }
