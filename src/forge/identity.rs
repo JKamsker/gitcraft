@@ -76,6 +76,26 @@ impl Hosting {
         let (Some(actual), Some(base)) = (web(url), web(&self.web)) else {
             return false;
         };
+        // Hosted Azure web routes resolve to one canonical identity.
+        // Its stored path is decoded, so comparing it to an escaped URL path loses names
+        // containing spaces (including URLs returned by Azure itself).
+        if self.forge == Forge::Azure
+            && self.host == "dev.azure.com"
+            && same_web_instance(&self.web, "https://dev.azure.com")
+        {
+            return actual.scheme() == "https"
+                && actual.as_url().port_or_known_default() == Some(443)
+                && actual.as_url().username().is_empty()
+                && actual.as_url().password().is_none()
+                && (actual.host() == "dev.azure.com"
+                    || actual
+                        .host()
+                        .strip_suffix(".visualstudio.com")
+                        .is_some_and(|org| super::cloud::plain(org) && !org.contains('.')))
+                && super::azure::location(url).is_some_and(|(host, path)| {
+                    host == self.host && self.same_repository_path(&path)
+                });
+        }
         if !actual.host().eq_ignore_ascii_case(&self.host) || !same_authority(&actual, &base) {
             return false;
         }

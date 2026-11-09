@@ -1,0 +1,147 @@
+{
+  "base": "5988524c23e43d8862225e44b09fbc104a735cc6",
+  "accepted": "7346090eb38f4332774a06473a02d60262585f32",
+  "accepted_tree": "e52b17e34a9001bbe204447e459e5446d40d80e7",
+  "branch": "fix/pr184-final-followups-v3-20261109",
+  "units": [
+    {
+      "title": "Preserve file-view generations across supported Rust toolchains",
+      "source": "7346090eb38f4332774a06473a02d60262585f32",
+      "paths": [
+        "src/repo/file_view/mod.rs"
+      ],
+      "intermediate_paths": {},
+      "provenance": "e16441b23d84ffd2d54bc9f409ae0ba4ead35983",
+      "commit": "5577e998265b3269c864cfd6a1af23b8a609f117",
+      "tree": "fb1a7a6c59b07ff43f1c9e046239cee4e6a6bf8b",
+      "remote": "5577e998265b3269c864cfd6a1af23b8a609f117",
+      "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>"
+    },
+    {
+      "title": "Submit forms only from eligible fields or explicit primary actions",
+      "source": "7346090eb38f4332774a06473a02d60262585f32",
+      "paths": [
+        "src/a11y/mod.rs",
+        "src/a11y/enter_tests.rs",
+        "src/app/clone.rs",
+        "src/app/askpass_dialog.rs",
+        "src/repo/dialogs/branch.rs",
+        "src/repo/dialogs/enter_tests.rs",
+        "src/repo/dialogs/fold.rs",
+        "src/repo/dialogs/mod.rs",
+        "src/repo/dialogs/rehearse.rs",
+        "src/repo/dialogs/test_commits.rs",
+        "src/repo/fold/tests.rs",
+        "src/repo/dialogs/stash.rs"
+      ],
+      "intermediate_paths": {
+        "src/repo/dialogs/stash.rs": "6179204f0cade63fd200d9530abaee31a72d586f"
+      },
+      "provenance": "c01b841d, 1e7116d9, 73b8be6d, 6179204f, 9a804356, 6dc16d53, 175f5daf; latest accepted fixtures and lint scope; accessibility action repair 6f21540ef464f1c27edaf6d50881bda1fbd86086; Fold dispatcher fixture 7346090eb38f4332774a06473a02d60262585f32",
+      "commit": "8633bc039b1094cf9e5bb5e305ea07bb9c36d08e",
+      "tree": "a478e01b98122959a4b9b86063aff21ef96b72e8",
+      "remote": "8633bc039b1094cf9e5bb5e305ea07bb9c36d08e",
+      "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>"
+    },
+    {
+      "title": "Warn about URL-shaped outgoing-author rules in portable previews",
+      "source": "7346090eb38f4332774a06473a02d60262585f32",
+      "paths": [
+        "src/app/setup/mod.rs",
+        "src/app/setup/localization_tests.rs",
+        "src/portability/tests.rs",
+        "locales/de/interaction.ftl",
+        "locales/en-US/interaction.ftl"
+      ],
+      "intermediate_paths": {},
+      "provenance": "1c5babc69ac757b8360130ef089c36b3f4669a1d",
+      "commit": "e51d22d20d53b8abe5359912437df500d752ac14",
+      "tree": "44f2d68064be987fbb02e84b1e5ef2f765a59c08",
+      "remote": "e51d22d20d53b8abe5359912437df500d752ac14",
+      "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>"
+    },
+    {
+      "title": "Select outgoing-author rules by matching namespace specificity",
+      "source": "7346090eb38f4332774a06473a02d60262585f32",
+      "paths": [
+        "src/settings/profiles.rs",
+        "src/push_preflight/tests.rs"
+      ],
+      "intermediate_paths": {},
+      "provenance": "e5d67c559e1bc498e47e76ea76679215c25d8ae5",
+      "commit": "5c25db9d0021f05000c83994444d4a8e03d93b6a",
+      "tree": "fa9290f2c0e629cd80e55175116d9081e1f07b3a",
+      "remote": "5c25db9d0021f05000c83994444d4a8e03d93b6a",
+      "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>"
+    },
+    {
+      "title": "Classify saved pull options before protecting ignored files",
+      "source": "ed6428f689623795d9e767a74285e288a3a923f8",
+      "paths": [
+        "src/repo/operations.rs"
+      ],
+      "intermediate_paths": {},
+      "provenance": "ec2ffbc87cf31976ed7dcd304c02a3745eb39af6; integrated ed6428f689623795d9e767a74285e288a3a923f8",
+      "commit": "5d659a2a05c3c7e5a192429d7e23be0411e615f6",
+      "tree": "f7d8c8e1e00ebeca70e6526dc6aa023c173e9d72",
+      "remote": "5d659a2a05c3c7e5a192429d7e23be0411e615f6",
+      "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>"
+    },
+    {
+      "title": "Serialize remote mutations without changing repository identity",
+      "source": "7346090eb38f4332774a06473a02d60262585f32",
+      "paths": [
+        "src/tasks.rs",
+        "src/repo/load.rs",
+        "src/repo/lifecycle.rs",
+        "src/repo/tests.rs",
+        "src/tray/watch_tests.rs"
+      ],
+      "intermediate_paths": {},
+      "provenance": "c5415af84335672d206006191d0e87d9b51f8d0a; eb38e6d6 test-only lint scope",
+      "commit": "bdc46dd6a04081823bbea9ff4da76c4481f20000",
+      "tree": "4c72feca47e030793cdfd43c2ec41cbe8a6dee45",
+      "remote": "bdc46dd6a04081823bbea9ff4da76c4481f20000",
+      "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>"
+    },
+    {
+      "title": "Revalidate destructive stash safety and supported undo at execution",
+      "source": "7346090eb38f4332774a06473a02d60262585f32",
+      "paths": [
+        "src/repo/partial_stash/mod.rs",
+        "src/repo/partial_stash/tests.rs",
+        "src/repo/dialogs/stash.rs",
+        "src/repo/operations.rs",
+        "locales/de/repo-workflows.ftl",
+        "locales/en-US/repo-workflows.ftl"
+      ],
+      "intermediate_paths": {},
+      "provenance": "ad0a0bfc, dceb7005, f8525f4a; integrated e15af602; clean no-op ef24a624; latest test lint scope",
+      "commit": "aa1e1b58348b8c544453680984d103572e1805a6",
+      "tree": "3f81d10fa8eb8c90ed7ab125252fc622d72efe19",
+      "remote": "aa1e1b58348b8c544453680984d103572e1805a6",
+      "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>"
+    },
+    {
+      "title": "Preserve commit-bound remote scheduler validation evidence",
+      "source": "7346090eb38f4332774a06473a02d60262585f32",
+      "paths": [
+        "docs/validation/pr184-remote-mutations-20261109/README.md",
+        "docs/validation/pr184-remote-mutations-20261109/ed6e5abf-compile-failure.log.gz",
+        "docs/validation/pr184-remote-mutations-20261109/manifest.json",
+        "docs/validation/pr184-remote-mutations-20261109/remote-mutation.log.gz",
+        "docs/validation/pr184-remote-mutations-20261109/scheduler-regressions.log.gz",
+        "docs/validation/pr184-remote-mutations-20261109/spawn-mutation.log.gz"
+      ],
+      "intermediate_paths": {},
+      "provenance": "c5415af84335672d206006191d0e87d9b51f8d0a; lossless compression c5214bf827857ce3c6d1a3b92df4e807757c9a78",
+      "commit": "1eee7e703ce629441eee166b2718021394c9fe09",
+      "tree": "e52b17e34a9001bbe204447e459e5446d40d80e7",
+      "remote": "1eee7e703ce629441eee166b2718021394c9fe09",
+      "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>"
+    }
+  ],
+  "final": "1eee7e703ce629441eee166b2718021394c9fe09",
+  "complete_path_mode_blob_map_sha256": "0d093328ab45c0ee92c5e1ff48f692a5c18baf06cb8e7dbb8e16f56bac350ca3",
+  "exact_tree_match": true
+}

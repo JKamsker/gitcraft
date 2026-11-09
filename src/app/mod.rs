@@ -134,7 +134,7 @@ pub struct App {
     practice_open: bool,
     setup: setup::SetupWindow,
     practice_jobs: crate::tasks::Scope,
-    practicing: Option<Receiver<Result<PathBuf, String>>>,
+    practicing: Option<practice::Practicing>,
     /// A clone running in the background: (destination, result).
     cloning: Option<clone::Cloning>,
     /// The form of the running clone, back on screen if it needs credentials.

@@ -7,6 +7,7 @@ use crate::git::WorkStatus;
 use crate::repo::Action;
 use crate::repo::partial_stash::{
     StagedSupport, StashMode, StashRequest, everything_problem, files_problem, has_untracked,
+    push_everything_problem,
 };
 use crate::theme::Tokens;
 
@@ -123,7 +124,8 @@ pub(super) fn problem(
     support: &StagedSupport,
 ) -> Option<String> {
     match d.choice {
-        Choice::Everything | Choice::Snapshot => everything_problem(work, d.untracked),
+        Choice::Everything => push_everything_problem(work, d.untracked),
+        Choice::Snapshot => everything_problem(work, d.untracked),
         Choice::Files => files_problem(&d.files, work),
         Choice::Staged => staged_problem(work, support),
     }
@@ -148,7 +150,6 @@ pub(super) fn files_summary(files: &[String]) -> String {
 
 pub(super) fn stash(
     ui: &mut Ui,
-    enter: bool,
     d: &mut StashDialog,
     work: &WorkStatus,
     support: &StagedSupport,
@@ -209,12 +210,12 @@ pub(super) fn stash(
         &t,
     );
     ui.add_space(8.0);
-    field(
+    let enter = crate::a11y::singleline_enter(&field(
         ui,
         &mut d.message,
         crate::i18n::text("repo-core-1503"),
         &mut d.focus,
-    );
+    ));
     ui.add_space(6.0);
     untracked_box(ui, d, work);
     let problem = problem(d, work, support);
@@ -303,6 +304,38 @@ mod tests {
             code,
             area,
         }
+    }
+
+    #[test]
+    fn excluded_overlap_blocks_everything_but_not_snapshot() {
+        let work = WorkStatus {
+            staged: vec![file("f", 'D', Area::Staged)],
+            unstaged: vec![file("f", '?', Area::Untracked)],
+            ..WorkStatus::default()
+        };
+        let support = StagedSupport::Known(Ok(()));
+        let mut d = StashDialog::new(Choice::Everything, Vec::new());
+        d.untracked = false;
+        assert!(problem(&d, &work, &support).is_some());
+        d.choice = Choice::Snapshot;
+        assert!(problem(&d, &work, &support).is_none());
+        d.choice = Choice::Everything;
+        d.untracked = true;
+        assert!(problem(&d, &work, &support).is_none());
+    }
+
+    #[test]
+    fn files_dialog_explains_outside_staged_undo_limitation() {
+        let mut work = WorkStatus {
+            staged: vec![file("a", 'M', Area::Staged), file("b", 'M', Area::Staged)],
+            ..WorkStatus::default()
+        };
+        let support = StagedSupport::Known(Ok(()));
+        let d = StashDialog::new(Choice::Files, vec!["a".into()]);
+        assert!(problem(&d, &work, &support).is_some_and(|p| p.contains("prevents Undo")));
+        work.staged.pop();
+        work.unstaged.push(file("b", 'M', Area::Unstaged));
+        assert!(problem(&d, &work, &support).is_none());
     }
 
     #[test]

@@ -1,0 +1,104 @@
+{
+  "base": "c36d436e88508ebfbbbd85818b523ae44f670e3a",
+  "accepted": "71304ad5b4abe16c82e596296cb8157d8deada26",
+  "accepted_tree": "b7c87b81c796730f0671a7f274183a05cb17f946",
+  "branch": "fix/pr184-round5-final-20261109",
+  "units": [
+    {
+      "title": "Keep host-wide author rules free of namespace warnings",
+      "paths": [
+        "src/app/setup/mod.rs",
+        "src/app/setup/localization_tests.rs"
+      ],
+      "source": "71304ad5b4abe16c82e596296cb8157d8deada26",
+      "provenance": [
+        "71304ad5b4abe16c82e596296cb8157d8deada26"
+      ],
+      "parent": "c36d436e88508ebfbbbd85818b523ae44f670e3a",
+      "commit": "c79e46933924eaa5aa5576a20eeb5b7f617b41ee",
+      "tree": "f198bc49d549b2dff4f8b4bb160fcb217828bd68",
+      "remote": "c79e46933924eaa5aa5576a20eeb5b7f617b41ee",
+      "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>"
+    },
+    {
+      "title": "Serialize local mutations without synchronous identity lookup",
+      "paths": [
+        "src/tasks.rs",
+        "src/repo/tests.rs",
+        "src/tray/watch.rs",
+        "src/repo/messages.rs",
+        "src/repo/load.rs",
+        "src/repo/mod.rs",
+        "src/repo/lifecycle.rs",
+        "src/repo/partial_stash/tests.rs"
+      ],
+      "source": "7fe66c1c88adfc9ad6e84b1d0974a30d5f3ca82f",
+      "provenance": [
+        "7fe66c1c88adfc9ad6e84b1d0974a30d5f3ca82f"
+      ],
+      "parent": "c79e46933924eaa5aa5576a20eeb5b7f617b41ee",
+      "commit": "a9d4a051065b59d1ea81bf16c4cd0981534febb0",
+      "tree": "91a4069694dc6d08d6209c3b347e5eb69af50425",
+      "remote": "a9d4a051065b59d1ea81bf16c4cd0981534febb0",
+      "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>"
+    },
+    {
+      "title": "Protect native pull cleanup and literal submodule update scope",
+      "paths": [
+        "src/repo/operations.rs",
+        "src/repo/keep_submodules.rs",
+        "src/repo/partial_stash/mod.rs",
+        "src/repo/partial_stash/tests.rs"
+      ],
+      "source": "71304ad5b4abe16c82e596296cb8157d8deada26",
+      "provenance": [
+        "71304ad5b4abe16c82e596296cb8157d8deada26"
+      ],
+      "parent": "a9d4a051065b59d1ea81bf16c4cd0981534febb0",
+      "commit": "d0e8a685eac88ad64b67bcc98b9e48d77c95e7ed",
+      "tree": "38e2c03853141b1c403f9dd3ceab2ed553c144a5",
+      "remote": "d0e8a685eac88ad64b67bcc98b9e48d77c95e7ed",
+      "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>"
+    },
+    {
+      "title": "Coalesce file probes and retain current pending reads",
+      "paths": [
+        "src/repo/file_view/blame.rs",
+        "src/repo/file_view/line_history.rs",
+        "src/repo/file_view/mod.rs",
+        "src/repo/file_view/tests.rs",
+        "src/repo/line_history_tests.rs",
+        "src/repo/navigate.rs",
+        "src/repo/messages.rs",
+        "src/repo/lifecycle.rs"
+      ],
+      "source": "71304ad5b4abe16c82e596296cb8157d8deada26",
+      "provenance": [
+        "71304ad5b4abe16c82e596296cb8157d8deada26"
+      ],
+      "parent": "d0e8a685eac88ad64b67bcc98b9e48d77c95e7ed",
+      "commit": "7b170b74bbee7254172e2bbe8b327cef7e5e3bb6",
+      "tree": "f427ac151feb66a73a326806a5b008163eb609cc",
+      "remote": "7b170b74bbee7254172e2bbe8b327cef7e5e3bb6",
+      "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>"
+    },
+    {
+      "title": "Verify clone keyboard submission through production widgets",
+      "paths": [
+        "src/app/clone.rs"
+      ],
+      "source": "71304ad5b4abe16c82e596296cb8157d8deada26",
+      "provenance": [
+        "71304ad5b4abe16c82e596296cb8157d8deada26"
+      ],
+      "parent": "7b170b74bbee7254172e2bbe8b327cef7e5e3bb6",
+      "commit": "dcd0b82ed672b1fffb485f235f6864d378143c04",
+      "tree": "b7c87b81c796730f0671a7f274183a05cb17f946",
+      "remote": "dcd0b82ed672b1fffb485f235f6864d378143c04",
+      "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>"
+    }
+  ],
+  "final": "dcd0b82ed672b1fffb485f235f6864d378143c04",
+  "exact_tree_match": true,
+  "complete_path_mode_blob_map_sha256": "d006a125ce617c7cd7fb0e2f2f25ade1f9a4b02f28e1037fd25101d45e4a6005"
+}

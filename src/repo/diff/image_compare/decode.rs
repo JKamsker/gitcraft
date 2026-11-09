@@ -165,6 +165,7 @@ pub fn difference(a: &ColorImage, b: &ColorImage) -> Difference {
         for x in 0..w {
             let d = match (at(a, x, y), at(b, x, y)) {
                 (Some(p), Some(q)) => distance(p, q),
+                (None, None) => 0,
                 // Only on one side: as different as can be.
                 _ => 255,
             };
@@ -181,7 +182,8 @@ pub fn difference(a: &ColorImage, b: &ColorImage) -> Difference {
     Difference {
         image: Arc::new(ColorImage::new([w, h], pixels)),
         changed,
-        total: w * h,
+        total: a.pixels.len() + b.pixels.len()
+            - a.size[0].min(b.size[0]) * a.size[1].min(b.size[1]),
     }
 }
 
@@ -197,6 +199,21 @@ fn distance(p: Color32, q: Color32) -> u8 {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
+
+    #[test]
+    fn crossing_extents_compare_only_pixels_present_on_either_side() {
+        let a = ColorImage::filled([100, 1], Color32::BLACK);
+        let b = ColorImage::filled([1, 100], Color32::BLACK);
+        for (old, new) in [(&a, &b), (&b, &a)] {
+            let diff = difference(old, new);
+            assert_eq!(diff.image.size, [100, 100]);
+            assert_eq!((diff.changed, diff.total), (198, 199));
+            assert_eq!(diff.image.pixels[0], Color32::TRANSPARENT);
+            assert_eq!(diff.image.pixels[9999], Color32::TRANSPARENT);
+            assert_ne!(diff.image.pixels[99], Color32::TRANSPARENT);
+            assert_ne!(diff.image.pixels[9900], Color32::TRANSPARENT);
+        }
+    }
 
     #[test]
     fn corrupt_and_truncated_images_report_decode_errors() {

@@ -119,6 +119,26 @@ const SPECULATIVE_LIMIT: usize = 2;
 const URGENT_THREADS: usize = 4;
 static URGENT_RUNNING: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 
+/// App-internal exclusion for complete mutation operations. Paths can be retargeted
+/// after submission, so neither path equality nor a retained metadata handle proves
+/// that independent local jobs will execute against independent repositories.
+/// Conservatively serialize local mutations, and separately serialize remote ones.
+/// This trades unrelated-local concurrency for safety. Reads remain unkeyed; this
+/// does not anchor Git's target or coordinate external Git/application instances.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub(crate) enum MutationScheduleKey {
+    Local,
+    Remote,
+}
+
+pub(crate) fn mutation_schedule_key(path: PathBuf) -> MutationScheduleKey {
+    if crate::remote::is_remote(&path) {
+        MutationScheduleKey::Remote
+    } else {
+        MutationScheduleKey::Local
+    }
+}
+
 type Work = Box<dyn FnOnce() + Send>;
 struct Job {
     work: Work,
@@ -127,13 +147,13 @@ struct Job {
     cancel: Cancellation,
     priority: Priority,
     /// A whole mutation operation holds its key, including between subprocesses.
-    key: Option<PathBuf>,
+    key: Option<MutationScheduleKey>,
 }
 
 #[derive(Default)]
 struct State {
     queue: VecDeque<Job>,
-    writing: HashSet<PathBuf>,
+    writing: HashSet<MutationScheduleKey>,
     active: usize,
     background_active: usize,
     speculative_active: usize,
@@ -156,7 +176,33 @@ pub(crate) struct Pool {
 
 impl Pool {
     #[cfg(test)]
-    fn new(workers: usize) -> std::io::Result<Self> {
+    pub(crate) fn queued_priority_for(&self, cancel: &Cancellation) -> Option<Priority> {
+        self.shared
+            .state
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .queue
+            .iter()
+            .find(|job| Arc::ptr_eq(&job.cancel.0, &cancel.0))
+            .map(|job| job.priority)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn queued_priorities_for(&self, key: &std::path::Path) -> Vec<Priority> {
+        let key = mutation_schedule_key(key.to_owned());
+        self.shared
+            .state
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .queue
+            .iter()
+            .filter(|job| job.key.as_ref() == Some(&key))
+            .map(|job| job.priority)
+            .collect()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn new(workers: usize) -> std::io::Result<Self> {
         Self::with_capacity(workers, QUEUE_CAPACITY)
     }
 
@@ -218,6 +264,7 @@ impl Pool {
         on_cancel: Option<Work>,
         work: Work,
     ) -> Result<(), &'static str> {
+        let key = key.map(mutation_schedule_key);
         let mut state = self
             .shared
             .state
@@ -236,7 +283,9 @@ impl Pool {
             priority,
             key,
         };
-        if priority == Priority::Urgent {
+        // Dedicated urgent threads are only for reads; keyed jobs must hold the
+        // shared mutation bucket through the complete operation.
+        if priority == Priority::Urgent && job.key.is_none() {
             drop(state);
             let Some(job) = spawn_urgent(job) else {
                 return Ok(());
@@ -569,10 +618,198 @@ pub(crate) fn shutdown() {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::panic)] // Poisoned state or an executed cancelled job must fail these scheduler tests.
 mod tests {
     use super::*;
     use std::sync::mpsc;
     use std::time::Duration;
+
+    #[test]
+    fn local_metadata_aliases_hold_expectation_and_pop_against_alias_push() -> Result<(), String> {
+        // Pure classification cannot invoke filesystem lookup, even for paths that
+        // are missing, inaccessible, aliased or replaced after submission.
+        for path in [
+            "/recorded/mount-a/common.git",
+            "/recorded/mount-b/common.git",
+            "/recorded/independent/common.git",
+            "/missing/common.git",
+        ] {
+            assert_eq!(
+                mutation_schedule_key(path.into()),
+                MutationScheduleKey::Local
+            );
+        }
+        let pool = Pool::new(3).map_err(|e| e.to_string())?;
+        let (release, gate) = mpsc::channel::<()>();
+        let (out, events) = mpsc::channel();
+        let stash = Arc::new(Mutex::new(vec!["stash A"]));
+        let stack = Arc::clone(&stash);
+        let record = out.clone();
+        pool.submit_cancellable(
+            Cancellation::default(),
+            Priority::Background,
+            Some("/recorded/mount-a/common.git".into()),
+            None,
+            Box::new(move || {
+                assert_eq!(stack.lock().unwrap().last(), Some(&"stash A"));
+                let _ = record.send("expect A");
+                let _ = gate.recv();
+                assert_eq!(stack.lock().unwrap().pop(), Some("stash A"));
+                let _ = record.send("pop A");
+            }),
+        )
+        .map_err(str::to_owned)?;
+        assert_eq!(
+            events
+                .recv_timeout(Duration::from_secs(5))
+                .map_err(|e| e.to_string())?,
+            "expect A"
+        );
+        let queued = Cancellation::default();
+        let stack = Arc::clone(&stash);
+        let record = out.clone();
+        pool.submit(
+            queued.clone(),
+            Priority::Interactive,
+            Some("/recorded/mount-b/common.git".into()),
+            Box::new(move || {
+                stack.lock().unwrap().push("stash B");
+                let _ = record.send("push B");
+            }),
+        )
+        .map_err(str::to_owned)?;
+        assert!(pool.queued_priority_for(&queued) == Some(Priority::Interactive));
+        for (key, event) in [
+            (None, "read"),
+            (Some("ssh://independent/repo".into()), "remote"),
+        ] {
+            let record = out.clone();
+            pool.submit(
+                Cancellation::default(),
+                Priority::Interactive,
+                key,
+                Box::new(move || {
+                    let _ = record.send(event);
+                }),
+            )
+            .map_err(str::to_owned)?;
+        }
+        let progress = [
+            events
+                .recv_timeout(Duration::from_secs(5))
+                .map_err(|e| e.to_string())?,
+            events
+                .recv_timeout(Duration::from_secs(5))
+                .map_err(|e| e.to_string())?,
+        ];
+        assert!(progress.contains(&"read") && progress.contains(&"remote"));
+        assert!(pool.queued_priority_for(&queued).is_some());
+        drop(release);
+        assert_eq!(
+            events
+                .recv_timeout(Duration::from_secs(5))
+                .map_err(|e| e.to_string())?,
+            "pop A"
+        );
+        assert_eq!(
+            events
+                .recv_timeout(Duration::from_secs(5))
+                .map_err(|e| e.to_string())?,
+            "push B"
+        );
+        assert_eq!(*stash.lock().unwrap(), ["stash B"]);
+        assert_eq!(
+            mutation_schedule_key("ssh://unopened/repo".into()),
+            MutationScheduleKey::Remote
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn local_retargeting_and_running_cancellation_keep_the_bucket_until_completion()
+    -> Result<(), String> {
+        let pool = Pool::new(3).map_err(|e| e.to_string())?;
+        let (release, gate) = mpsc::channel::<()>();
+        let (out, events) = mpsc::channel();
+        // Routing is observed at execution, just as Git resolves captured paths then.
+        let route = Arc::new(Mutex::new("old metadata"));
+        let target = Arc::clone(&route);
+        let record = out.clone();
+        let running = Cancellation::default();
+        pool.submit(
+            running.clone(),
+            Priority::Background,
+            Some("/repo/a".into()),
+            Box::new(move || {
+                let _ = record.send("expect A");
+                let _ = gate.recv();
+                assert_eq!(*target.lock().unwrap(), "replacement metadata");
+                let _ = record.send("pop A");
+            }),
+        )
+        .map_err(str::to_owned)?;
+        assert_eq!(
+            events
+                .recv_timeout(Duration::from_secs(5))
+                .map_err(|e| e.to_string())?,
+            "expect A"
+        );
+        *route.lock().unwrap() = "replacement metadata";
+        running.cancel(); // Cancellation is a request, not completion of the closure.
+        let competing = Cancellation::default();
+        let record = out.clone();
+        let target = Arc::clone(&route);
+        pool.submit_cancellable(
+            competing.clone(),
+            Priority::Interactive,
+            Some("/repo/b".into()),
+            None,
+            Box::new(move || {
+                assert_eq!(*target.lock().unwrap(), "replacement metadata");
+                let _ = record.send("push B");
+            }),
+        )
+        .map_err(str::to_owned)?;
+        let independent = Cancellation::default();
+        let record = out.clone();
+        pool.submit(
+            independent.clone(),
+            Priority::Background,
+            Some("/independent".into()),
+            Box::new(move || {
+                let _ = record.send("independent local");
+            }),
+        )
+        .map_err(str::to_owned)?;
+        let record = out.clone();
+        pool.submit(
+            Cancellation::default(),
+            Priority::Interactive,
+            None,
+            Box::new(move || {
+                let _ = record.send("read");
+            }),
+        )
+        .map_err(str::to_owned)?;
+        assert_eq!(
+            events
+                .recv_timeout(Duration::from_secs(5))
+                .map_err(|e| e.to_string())?,
+            "read"
+        );
+        assert!(pool.queued_priority_for(&competing).is_some());
+        assert!(pool.queued_priority_for(&independent).is_some());
+        drop(release);
+        for expected in ["pop A", "push B", "independent local"] {
+            assert_eq!(
+                events
+                    .recv_timeout(Duration::from_secs(5))
+                    .map_err(|e| e.to_string())?,
+                expected
+            );
+        }
+        Ok(())
+    }
 
     fn submit(
         pool: &Pool,
@@ -587,6 +824,202 @@ mod tests {
             Box::new(work),
         )
         .map_err(str::to_owned)
+    }
+
+    #[test]
+    fn remote_mutation_bucket_holds_expectation_and_pop_against_push() -> Result<(), String> {
+        // Recording only: no Git commands, remote connection or child processes.
+        let pool = Pool::new(2).map_err(|e| e.to_string())?;
+        let (release, gate) = mpsc::channel::<()>();
+        let (out, events) = mpsc::channel();
+        let stash = Arc::new(Mutex::new(vec!["stash A"]));
+        let stack = Arc::clone(&stash);
+        let record = out.clone();
+        pool.submit_cancellable(
+            Cancellation::default(),
+            Priority::Background,
+            Some("ssh://build/main".into()),
+            None,
+            Box::new(move || {
+                assert_eq!(stack.lock().unwrap().last(), Some(&"stash A"));
+                let _ = record.send("refs/stash expectation");
+                let _ = gate.recv();
+                assert_eq!(stack.lock().unwrap().pop(), Some("stash A"));
+                let _ = record.send("stash pop --index");
+            }),
+        )
+        .map_err(str::to_owned)?;
+        assert_eq!(
+            events
+                .recv_timeout(Duration::from_secs(5))
+                .map_err(|e| e.to_string())?,
+            "refs/stash expectation"
+        );
+        let stack = Arc::clone(&stash);
+        let record = out.clone();
+        // The other submission API and priority must use the same bucket, even
+        // before linked-worktree discovery or through an SSH host alias.
+        pool.submit(
+            Cancellation::default(),
+            Priority::Interactive,
+            Some("ssh://alias/linked".into()),
+            Box::new(move || {
+                stack.lock().unwrap().push("stash B");
+                let _ = record.send("stash push");
+            }),
+        )
+        .map_err(str::to_owned)?;
+        pool.submit(
+            Cancellation::default(),
+            Priority::Interactive,
+            None,
+            Box::new(move || {
+                let _ = out.send("concurrent read");
+            }),
+        )
+        .map_err(str::to_owned)?;
+        assert_eq!(
+            events
+                .recv_timeout(Duration::from_secs(5))
+                .map_err(|e| e.to_string())?,
+            "concurrent read"
+        );
+        assert!(
+            pool.queued_priorities_for(std::path::Path::new("ssh://third/path"))
+                == vec![Priority::Interactive]
+        );
+        drop(release);
+        assert_eq!(
+            events
+                .recv_timeout(Duration::from_secs(5))
+                .map_err(|e| e.to_string())?,
+            "stash pop --index"
+        );
+        assert_eq!(
+            events
+                .recv_timeout(Duration::from_secs(5))
+                .map_err(|e| e.to_string())?,
+            "stash push"
+        );
+        assert_eq!(*stash.lock().unwrap(), vec!["stash B"]);
+        Ok(())
+    }
+
+    #[test]
+    fn remote_mutation_classification_matches_execution() {
+        for path in [
+            "ssh://host/main",
+            "SSH://alias/linked",
+            r"ssh:\\host\main",
+            r"\\wsl.localhost\Ubuntu\repo",
+            "ssh:x",
+            "/ssh:/repo",
+            "/local/common.git",
+        ] {
+            let path = PathBuf::from(path);
+            let expected = if crate::remote::is_remote(&path) {
+                MutationScheduleKey::Remote
+            } else {
+                MutationScheduleKey::Local
+            };
+            assert_eq!(mutation_schedule_key(path), expected);
+        }
+        for path in ["ssh:x", "/ssh:/repo", "/local/common.git"] {
+            assert_eq!(
+                mutation_schedule_key(path.into()),
+                MutationScheduleKey::Local
+            );
+        }
+    }
+
+    #[test]
+    fn remote_mutation_bucket_preserves_fifo_cancellation_panic_and_local_liveness()
+    -> Result<(), String> {
+        let pool = Pool::new(2).map_err(|e| e.to_string())?;
+        let (release, gate) = mpsc::channel::<()>();
+        let (out, events) = mpsc::channel();
+        let record = out.clone();
+        submit(
+            &pool,
+            Priority::Background,
+            Some("ssh://host/main"),
+            move || {
+                let _ = record.send("first host");
+                let _ = gate.recv();
+            },
+        )?;
+        assert_eq!(
+            events
+                .recv_timeout(Duration::from_secs(5))
+                .map_err(|e| e.to_string())?,
+            "first host"
+        );
+        let cancelled = Cancellation::default();
+        let (cancel_out, cancel_event) = mpsc::channel();
+        pool.submit_cancellable(
+            cancelled.clone(),
+            Priority::Interactive,
+            Some("ssh://alias/linked".into()),
+            Some(Box::new(move || {
+                let _ = cancel_out.send(());
+            })),
+            Box::new(|| panic!("cancelled mutation must not run")),
+        )
+        .map_err(str::to_owned)?;
+        cancelled.cancel();
+        for (host, label, priority) in [
+            ("ssh://second/repo", "second host", Priority::Background),
+            ("ssh://third/repo", "third host", Priority::Interactive),
+        ] {
+            let record = out.clone();
+            submit(&pool, priority, Some(host), move || {
+                let _ = record.send(label);
+            })?;
+        }
+        submit(
+            &pool,
+            Priority::Interactive,
+            Some("ssh://alias/panic"),
+            || {
+                std::panic::resume_unwind(Box::new("recorded mutation panic"));
+            },
+        )?;
+        let record = out.clone();
+        submit(
+            &pool,
+            Priority::Background,
+            Some("ssh://last/repo"),
+            move || {
+                let _ = record.send("after panic");
+            },
+        )?;
+        submit(
+            &pool,
+            Priority::Interactive,
+            Some("/local/common.git"),
+            move || {
+                let _ = out.send("local mutation");
+            },
+        )?;
+        cancel_event
+            .recv_timeout(Duration::from_secs(5))
+            .map_err(|e| e.to_string())?;
+        assert_eq!(
+            events
+                .recv_timeout(Duration::from_secs(5))
+                .map_err(|e| e.to_string())?,
+            "local mutation"
+        );
+        drop(release);
+        for expected in ["second host", "third host", "after panic"] {
+            assert_eq!(
+                events
+                    .recv_timeout(Duration::from_secs(5))
+                    .map_err(|e| e.to_string())?,
+                expected
+            );
+        }
+        Ok(())
     }
 
     #[test]
@@ -800,8 +1233,50 @@ mod tests {
     }
 
     #[test]
-    fn writers_share_a_key_while_other_repositories_and_reserved_reads_can_run()
-    -> Result<(), String> {
+    fn urgent_and_speculative_mutations_keep_exclusion_while_reads_progress() -> Result<(), String>
+    {
+        for priority in [Priority::Urgent, Priority::Speculative] {
+            let pool = Pool::new(3).map_err(|e| e.to_string())?;
+            let (release, gate) = mpsc::channel::<()>();
+            let (out, events) = mpsc::channel();
+            let first = out.clone();
+            submit(&pool, Priority::Background, Some("repo-a"), move || {
+                let _ = first.send("held");
+                let _ = gate.recv();
+            })?;
+            assert_eq!(
+                events
+                    .recv_timeout(Duration::from_secs(5))
+                    .map_err(|e| e.to_string())?,
+                "held"
+            );
+            let mutation = out.clone();
+            submit(&pool, priority, Some("repo-b"), move || {
+                let _ = mutation.send("mutation");
+            })?;
+            submit(&pool, Priority::Interactive, None, move || {
+                let _ = out.send("read");
+            })?;
+            assert_eq!(
+                events
+                    .recv_timeout(Duration::from_secs(5))
+                    .map_err(|e| e.to_string())?,
+                "read"
+            );
+            assert!(events.try_recv().is_err());
+            drop(release);
+            assert_eq!(
+                events
+                    .recv_timeout(Duration::from_secs(5))
+                    .map_err(|e| e.to_string())?,
+                "mutation"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn local_writers_share_a_bucket_while_remote_work_can_run() -> Result<(), String> {
         let pool = Pool::with_limits(3, 16, 1).map_err(|e| e.to_string())?;
         let (gate_tx, gate) = mpsc::channel::<()>();
         let (tx, events) = mpsc::channel();
@@ -824,7 +1299,7 @@ mod tests {
         submit(
             &pool,
             Priority::Interactive,
-            Some("other repo"),
+            Some("ssh://other/repo"),
             move || {
                 let _ = read.send("other repo");
             },

@@ -155,6 +155,9 @@ impl super::RepoTab {
     fn suspend(&mut self) {
         // Cancel captures and child processes from this lifetime, and disconnect their
         // results so an old read cannot repopulate a suspended/resumed view.
+        if let Some(view) = &mut self.file_view {
+            view.retire_reads();
+        }
         let (sender, receiver) = std::sync::mpsc::channel();
         self._jobs = crate::tasks::Scope::default();
         self.tx = super::messages::JobSender {
@@ -162,7 +165,7 @@ impl super::RepoTab {
             forge_generation: None,
             forge_operation: false,
             cancel: self._jobs.0.clone(),
-            repo: self.path.clone(),
+            repo: super::messages::mutation_key(&self.path),
         };
         self.rx = receiver;
         self.watcher = None;
@@ -211,6 +214,135 @@ impl super::RepoTab {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn linked_local_tabs_keep_the_local_schedule_after_suspension() -> Result<(), String> {
+        let scratch = tempfile::tempdir().map_err(|error| error.to_string())?;
+        let main = scratch.path().join("main");
+        let linked = scratch.path().join("linked");
+        std::fs::create_dir(&main).map_err(|error| error.to_string())?;
+        crate::git::run(Some(&main), &["init", "-q"])?;
+        crate::git::run(
+            Some(&main),
+            &[
+                "-c",
+                "user.name=Fixture",
+                "-c",
+                "user.email=fixture@example.invalid",
+                "commit",
+                "-qm",
+                "base",
+                "--allow-empty",
+            ],
+        )?;
+        crate::git::run(
+            Some(&main),
+            &[
+                "worktree",
+                "add",
+                "--detach",
+                linked.to_str().ok_or("fixture path")?,
+            ],
+        )?;
+        let ctx = egui::Context::default();
+        let mut a = crate::repo::RepoTab::new_deferred(main, &ctx);
+        let mut b = crate::repo::RepoTab::new_deferred(linked, &ctx);
+        let stable = |tab: &crate::repo::RepoTab| {
+            assert_eq!(
+                crate::tasks::mutation_schedule_key(tab.tx.repo.clone()),
+                crate::tasks::MutationScheduleKey::Local
+            );
+        };
+        stable(&a);
+        stable(&b);
+        a.suspend();
+        b.suspend();
+        stable(&a);
+        stable(&b);
+        Ok(())
+    }
+
+    #[test]
+    fn suspension_retires_retained_file_view_load_and_probe_slots() -> Result<(), String> {
+        use crate::repo::file_view::{FileTab, FileView};
+        let ctx = egui::Context::default();
+        for rev in [None, Some("a".repeat(40))] {
+            let mut tab =
+                crate::repo::RepoTab::new_deferred("/inert/suspended-file-view".into(), &ctx);
+            tab.file_view = Some(FileView::new("same.txt", rev, FileTab::File));
+            let generation = tab.file_view.as_ref().ok_or("missing view")?.generation;
+            let (_, old_jobs) = crate::repo::messages::record_jobs(|| {
+                tab.load_file_view(&ctx);
+                tab.status_changed_file_view(&ctx);
+            });
+            assert_eq!(old_jobs.len(), 2);
+            tab.suspend();
+            assert_ne!(
+                tab.file_view.as_ref().ok_or("missing view")?.generation,
+                generation
+            );
+            let (_, jobs) = crate::repo::messages::record_jobs(|| {
+                tab.load_file_view(&ctx);
+                tab.status_changed_file_view(&ctx);
+            });
+            assert_eq!(
+                jobs.len(),
+                2,
+                "retained requests can be resubmitted on the new lifetime"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn remote_mutation_schedule_survives_discovery_failure_and_suspend() {
+        use crate::repo::{RepoTab, messages::Msg};
+        use crate::tasks::{MutationScheduleKey, mutation_schedule_key};
+        let ctx = egui::Context::default();
+        let mut a = RepoTab::new_deferred("ssh://build/main".into(), &ctx);
+        let mut b = RepoTab::new_deferred("ssh://build/linked".into(), &ctx);
+        let stable = |tab: &RepoTab| {
+            assert_eq!(
+                mutation_schedule_key(tab.tx.repo.clone()),
+                MutationScheduleKey::Remote
+            );
+        };
+        assert_ne!(a.tx.repo, b.tx.repo);
+        stable(&a);
+        stable(&b);
+        // Synthetic successful discovery takes the same identity path as Loaded.
+        let discovered = vec![crate::git::Worktree {
+            path: a.path.clone(),
+            main: true,
+            ..Default::default()
+        }];
+        a.take_worktree_identity(discovered.clone(), String::new());
+        b.take_worktree_identity(discovered, String::new());
+        assert_eq!(a.tx.repo, b.tx.repo);
+        stable(&a);
+        stable(&b);
+        // Empty discovery, failed load and suspension can restore distinct identities.
+        b.take_worktree_identity(Vec::new(), String::new());
+        assert_ne!(a.tx.repo, b.tx.repo);
+        b.handle(Msg::Loaded(Err("synthetic discovery failure".into())), &ctx);
+        stable(&b);
+        a.life.phase = Phase::Suspended;
+        b.life.phase = Phase::Suspended;
+        a.suspend();
+        b.suspend();
+        assert_ne!(a.tx.repo, b.tx.repo);
+        stable(&a);
+        stable(&b);
+        // An alias or a different host is conservative too; no local path collides.
+        assert_eq!(
+            mutation_schedule_key("ssh://alias/elsewhere".into()),
+            MutationScheduleKey::Remote
+        );
+        assert_eq!(
+            mutation_schedule_key("/local/common.git".into()),
+            MutationScheduleKey::Local
+        );
+    }
 
     #[test]
     fn suspension_retires_private_analysis_readers_and_their_pending_captures() -> Result<(), String>

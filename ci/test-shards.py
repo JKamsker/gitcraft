@@ -41,6 +41,11 @@ ISOLATED = {
     ],
 }
 
+# Native Windows ACL fixtures start PowerShell helpers with bounded deadlines.
+# Run their whole feature group serially, outside the other core tests, without
+# changing production timeouts or omitting tests from the partition.
+SERIAL_GROUPS = {"core": ["standalone::"]}
+
 # libtest accepts multiple substring includes and --skip exclusions.
 # Catch-all shards ensure new or unusually named tests cannot silently disappear.
 SHARDS = {
@@ -64,6 +69,7 @@ SHARDS = {
         "--skip", "git::",
         "--skip", "repo::",
         *[arg for test in ISOLATED["core"] for arg in ("--skip", test)],
+        *[arg for group in SERIAL_GROUPS["core"] for arg in ("--skip", group)],
     ],
 }
 
@@ -115,6 +121,18 @@ def isolated_inventory(binaries, shard):
     return tests
 
 
+def serial_inventory(binaries, shard):
+    tests = Counter()
+    for group in SERIAL_GROUPS.get(shard, []):
+        selected = inventory(binaries, [group])
+        if not selected:
+            raise RuntimeError(f"Serial test group is empty: {group}")
+        if tests & selected:
+            raise RuntimeError(f"Serial test groups overlap: {group}")
+        tests.update(selected)
+    return tests
+
+
 def verify_partition(binaries):
     full = inventory(binaries, [])
     if not full:
@@ -123,7 +141,12 @@ def verify_partition(binaries):
     counts = {}
     for shard, filters in SHARDS.items():
         tests = inventory(binaries, filters)
-        tests.update(isolated_inventory(binaries, shard))
+        isolated = isolated_inventory(binaries, shard)
+        serial = serial_inventory(binaries, shard)
+        if tests & isolated or tests & serial or isolated & serial:
+            raise RuntimeError(f"Parallel, isolated and serial tests overlap: {shard}")
+        tests.update(isolated)
+        tests.update(serial)
         if not tests:
             raise RuntimeError(f"Shard {shard} has no tests")
         overlap = assigned & tests
@@ -152,6 +175,19 @@ def run_shard(binaries, shard):
         if result.returncode:
             return result.returncode
         ran += selected.total()
+
+    for group in SERIAL_GROUPS.get(shard, []):
+        for path, cwd in binaries:
+            selected = inventory([(path, cwd)], [group])
+            if not selected:
+                continue
+            print(f"Running serial group: {group}: {selected.total()} tests", flush=True)
+            result = subprocess.run(
+                [str(path), "--nocapture", group, "--test-threads=1"], cwd=cwd
+            )
+            if result.returncode:
+                return result.returncode
+            ran += selected.total()
 
     for name in ISOLATED.get(shard, []):
         for path, cwd in binaries:

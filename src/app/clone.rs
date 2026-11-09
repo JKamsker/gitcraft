@@ -4,11 +4,40 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::mpsc::{Receiver, channel};
 
-use egui::{Key, RichText, Stroke, Ui, vec2};
+use egui::{RichText, Stroke, Ui, vec2};
 
 use super::{App, repo_root};
 use crate::git;
 use crate::theme::{self, Tokens};
+
+#[cfg(test)]
+type CloneIntent = (String, String, String);
+#[cfg(test)]
+type CloneIntents = (usize, Vec<CloneIntent>);
+
+#[cfg(test)]
+thread_local! {
+    /// Intent seam at the native picker and submission boundaries; tests still paint
+    /// clone_dialog/form_fields and process the production keyboard responses.
+    static CLONE_INTENTS: std::cell::RefCell<Option<CloneIntents>> = const { std::cell::RefCell::new(None) };
+}
+
+fn pick_clone_folder() -> Option<PathBuf> {
+    #[cfg(test)]
+    if CLONE_INTENTS.with(|intents| {
+        if let Some((browse, _)) = &mut *intents.borrow_mut() {
+            *browse += 1;
+            true
+        } else {
+            false
+        }
+    }) {
+        return None;
+    }
+    rfd::FileDialog::new()
+        .set_title(crate::i18n::text("interaction-forms-clone-into"))
+        .pick_folder()
+}
 
 pub(super) struct CloneForm {
     options: git::CloneOptions,
@@ -103,7 +132,7 @@ impl App {
                         .font(theme::semibold(15.0)),
                 );
                 ui.add_space(10.0);
-                form_fields(ui, form, &t);
+                let enter = form_fields(ui, form, &t);
                 if let Some(err) = &form.error {
                     ui.colored_label(
                         t.danger,
@@ -115,7 +144,6 @@ impl App {
                     && !form.parent.trim().is_empty()
                     && !form.name.trim().is_empty();
                 ui.horizontal(|ui| {
-                    let enter = ui.input(|i| i.key_pressed(Key::Enter));
                     if crate::repo::primary_button(
                         ui,
                         crate::i18n::text("interaction-forms-clone"),
@@ -142,10 +170,10 @@ impl App {
             cancel = true;
         }
 
-        if submit {
-            self.submit_clone(ctx);
-        } else if cancel {
+        if cancel {
             self.clone_form = None;
+        } else if submit {
+            self.submit_clone(ctx);
         }
     }
 
@@ -154,6 +182,17 @@ impl App {
         let Some(form) = &mut self.clone_form else {
             return;
         };
+        #[cfg(test)]
+        if CLONE_INTENTS.with(|intents| {
+            if let Some((_, submit)) = &mut *intents.borrow_mut() {
+                submit.push((form.url.clone(), form.parent.clone(), form.name.clone()));
+                true
+            } else {
+                false
+            }
+        }) {
+            return;
+        }
         // One clone at a time: a second would take the first one's place, whose result
         // (and its tab) would never come.
         if let Some(running) = &self.cloning {
@@ -393,7 +432,8 @@ pub(super) fn cloning_line(ui: &mut Ui, cloning: &Cloning) {
 }
 
 /// URL, folder and name, where that puts the clone, and the credentials once asked for.
-fn form_fields(ui: &mut Ui, form: &mut CloneForm, t: &Tokens) {
+fn form_fields(ui: &mut Ui, form: &mut CloneForm, t: &Tokens) -> bool {
+    let mut enter = false;
     ui.label(
         RichText::new(crate::i18n::text("interaction-forms-url"))
             .color(t.text_dim)
@@ -405,6 +445,7 @@ fn form_fields(ui: &mut Ui, form: &mut CloneForm, t: &Tokens) {
             .desired_width(f32::INFINITY)
             .margin(egui::Margin::symmetric(8, 6)),
     );
+    enter |= singleline_enter(&url);
     if form.focus {
         url.request_focus();
         form.focus = false;
@@ -419,20 +460,19 @@ fn form_fields(ui: &mut Ui, form: &mut CloneForm, t: &Tokens) {
             .small(),
     );
     ui.horizontal(|ui| {
-        ui.add(
+        let parent = ui.add(
             egui::TextEdit::singleline(&mut form.parent)
                 .desired_width(ui.available_width() - 90.0)
                 .margin(egui::Margin::symmetric(8, 6)),
         );
+        enter |= singleline_enter(&parent);
         if ui
             .add(
                 egui::Button::new(crate::i18n::text("interaction-forms-browse"))
                     .min_size(vec2(80.0, 28.0)),
             )
             .clicked()
-            && let Some(dir) = rfd::FileDialog::new()
-                .set_title(crate::i18n::text("interaction-forms-clone-into"))
-                .pick_folder()
+            && let Some(dir) = pick_clone_folder()
         {
             form.parent = dir.display().to_string();
         }
@@ -443,14 +483,13 @@ fn form_fields(ui: &mut Ui, form: &mut CloneForm, t: &Tokens) {
             .color(t.text_dim)
             .small(),
     );
-    if ui
-        .add(
-            egui::TextEdit::singleline(&mut form.name)
-                .desired_width(f32::INFINITY)
-                .margin(egui::Margin::symmetric(8, 6)),
-        )
-        .changed()
-    {
+    let name = ui.add(
+        egui::TextEdit::singleline(&mut form.name)
+            .desired_width(f32::INFINITY)
+            .margin(egui::Margin::symmetric(8, 6)),
+    );
+    enter |= singleline_enter(&name);
+    if name.changed() {
         form.name_edited = true;
     }
     let dest = PathBuf::from(form.parent.trim()).join(form.name.trim());
@@ -464,7 +503,7 @@ fn form_fields(ui: &mut Ui, form: &mut CloneForm, t: &Tokens) {
         .show(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.label(crate::i18n::text("interaction-forms-depth"));
-                ui.text_edit_singleline(&mut form.depth);
+                enter |= singleline_enter(&ui.text_edit_singleline(&mut form.depth));
             });
             ui.checkbox(
                 &mut form.options.blobless,
@@ -491,21 +530,26 @@ fn form_fields(ui: &mut Ui, form: &mut CloneForm, t: &Tokens) {
                 .small(),
         );
         ui.add_space(4.0);
-        ui.add(
+        let username = ui.add(
             egui::TextEdit::singleline(&mut form.username)
                 .hint_text(crate::i18n::text("interaction-forms-username"))
                 .desired_width(f32::INFINITY)
                 .margin(egui::Margin::symmetric(8, 6)),
         );
-        ui.add(
+        enter |= singleline_enter(&username);
+        let password = ui.add(
             egui::TextEdit::singleline(&mut form.password)
                 .password(true)
                 .hint_text(crate::i18n::text("interaction-forms-password"))
                 .desired_width(f32::INFINITY)
                 .margin(egui::Margin::symmetric(8, 6)),
         );
+        enter |= singleline_enter(&password);
     }
+    enter
 }
+
+pub(super) use crate::a11y::singleline_enter;
 
 fn home_dir() -> Option<PathBuf> {
     std::env::var_os("USERPROFILE")
@@ -560,9 +604,292 @@ pub(super) fn display_message(raw: &str) -> Option<String> {
 }
 
 #[cfg(test)]
+#[allow(clippy::expect_used)] // Missing rendered fixture widgets must fail the test.
 mod localization_tests {
     use super::*;
+    use egui::Key;
     use egui_kittest::{Harness, kittest::Queryable};
+
+    #[derive(Default)]
+    struct EnterForm {
+        parent: String,
+        parent_id: Option<egui::Id>,
+        name: String,
+        name_id: Option<egui::Id>,
+        browse: usize,
+        submit: usize,
+        name_lost_on_enter: bool,
+        browse_focused_on_enter: bool,
+    }
+
+    fn enter_form() -> Harness<'static, EnterForm> {
+        let h = Harness::new_ui_state(
+            |ui, form: &mut EnterForm| {
+                let parent = ui.text_edit_singleline(&mut form.parent);
+                form.parent_id = Some(parent.id);
+                if singleline_enter(&parent) {
+                    form.submit += 1;
+                }
+                // Record intents only: canceling this simulated picker has no side effects.
+                let browse = ui.button("Browse");
+                if browse.clicked() {
+                    form.browse += 1;
+                }
+                let name = ui.text_edit_singleline(&mut form.name);
+                form.name_id = Some(name.id);
+                if ui.input(|i| i.key_pressed(Key::Enter)) {
+                    form.name_lost_on_enter = name.lost_focus();
+                    form.browse_focused_on_enter = browse.has_focus();
+                }
+                if singleline_enter(&name) {
+                    form.submit += 1;
+                }
+            },
+            EnterForm {
+                parent: "/inert".into(),
+                name: "repo".into(),
+                ..Default::default()
+            },
+        );
+        // Keep the focus transition and its observations in one rendering pass.
+        h.ctx
+            .options_mut(|o| o.max_passes = std::num::NonZeroUsize::MIN);
+        h
+    }
+
+    #[test]
+    fn coalesced_tab_and_enter_does_not_submit() {
+        for (empty, focus_name) in [(true, false), (false, false), (false, true)] {
+            let mut h = enter_form();
+            if empty {
+                h.state_mut().parent.clear();
+                h.state_mut().name.clear();
+                h.step();
+            }
+            let field = if focus_name {
+                h.state().name_id
+            } else {
+                h.state().parent_id
+            }
+            .expect("field rendered");
+            h.ctx.memory_mut(|m| m.request_focus(field));
+            h.step();
+            // RawInput keeps both keys in one frame; Harness::key_press would split them.
+            h.input_mut()
+                .events
+                .extend(
+                    [Key::Tab, Key::Enter]
+                        .into_iter()
+                        .map(|key| egui::Event::Key {
+                            key,
+                            physical_key: None,
+                            pressed: true,
+                            repeat: false,
+                            modifiers: egui::Modifiers::NONE,
+                        }),
+                );
+            h.step();
+            // TextEdit handles Enter before registering Tab traversal and retains focus.
+            // It must still not treat a traversal frame as a submission request.
+            assert_eq!(h.ctx.memory(|m| m.focused()), Some(field));
+            assert_eq!(h.state().browse, 0);
+            assert_eq!(h.state().submit, 0);
+        }
+    }
+
+    #[test]
+    fn enter_during_backward_focus_transition_only_activates_browse() {
+        let mut h = enter_form();
+        let name = h.state().name_id.expect("name rendered");
+        h.ctx.memory_mut(|m| m.request_focus(name));
+        h.step();
+        h.key_down_modifiers(egui::Modifiers::SHIFT, Key::Tab);
+        h.step();
+        // Backward navigation takes effect in the next frame, alongside this Enter.
+        h.key_down(Key::Enter);
+        h.step();
+        assert!(h.state().name_lost_on_enter);
+        assert!(h.state().browse_focused_on_enter);
+        assert_eq!(h.state().browse, 1);
+        assert_eq!(h.state().submit, 0);
+        h.key_up(Key::Enter);
+        h.key_up(Key::Tab);
+        h.run_steps(3);
+        assert_eq!(h.state().submit, 0, "picker cancellation must not submit");
+    }
+
+    #[test]
+    fn enter_in_singleline_field_submits_after_surrendering_focus() {
+        let mut h = enter_form();
+        let name = h.state().name_id.expect("name rendered");
+        h.ctx.memory_mut(|m| m.request_focus(name));
+        h.step();
+        h.key_press(Key::Enter);
+        h.step();
+        assert_eq!(h.state().browse, 0);
+        assert_eq!(h.state().submit, 1);
+        assert!(h.ctx.memory(|m| m.focused().is_none()));
+    }
+
+    fn production_dialog() -> Harness<'static, Option<App>> {
+        let mut h = Harness::new_ui_state(
+            |ui, state: &mut Option<App>| {
+                if state.is_none() {
+                    let cc = eframe::CreationContext::_new_kittest(ui.ctx().clone());
+                    let mut app = App::launched_using(&cc, None, || {
+                        Ok("git version 2.43.0 (recorded)".into())
+                    });
+                    app.start_clone();
+                    let form = app.clone_form.as_mut().expect("clone form");
+                    form.url = "https://example.invalid/o/r".into();
+                    form.parent = "/inert".into();
+                    form.name = "repo".into();
+                    form.focus = false;
+                    *state = Some(app);
+                    return;
+                }
+                state.as_mut().expect("app").clone_dialog(ui.ctx());
+            },
+            None,
+        );
+        h.ctx
+            .options_mut(|o| o.max_passes = std::num::NonZeroUsize::MIN);
+        h.run_steps(3);
+        h
+    }
+
+    fn record_clone_intents(work: impl FnOnce()) -> CloneIntents {
+        struct Reset;
+        impl Drop for Reset {
+            fn drop(&mut self) {
+                CLONE_INTENTS.with(|intents| *intents.borrow_mut() = None);
+            }
+        }
+        CLONE_INTENTS.with(|intents| {
+            assert!(intents.borrow().is_none());
+            *intents.borrow_mut() = Some(Default::default());
+        });
+        let _reset = Reset;
+        work();
+        CLONE_INTENTS.with(|intents| intents.borrow_mut().take().expect("recording"))
+    }
+
+    #[test]
+    fn actual_clone_dialog_traversal_and_picker_cancellation_never_submit() {
+        crate::i18n::set_language("en-US");
+        let intents = record_clone_intents(|| {
+            let mut h = production_dialog();
+            h.get_all_by_role(egui::accesskit::Role::TextInput)
+                .nth(2)
+                .expect("name")
+                .focus();
+            h.step();
+            h.key_down_modifiers(egui::Modifiers::SHIFT, Key::Tab);
+            h.step();
+            h.key_down(Key::Enter);
+            h.step();
+            h.key_up(Key::Enter);
+            h.key_up(Key::Tab);
+            h.run_steps(3);
+            assert!(
+                h.state()
+                    .as_ref()
+                    .is_some_and(|app| app.cloning.is_none() && app.clone_form.is_some())
+            );
+        });
+        assert_eq!(intents.0, 1, "production Browse intent only");
+        assert!(intents.1.is_empty());
+        for field in [1, 2] {
+            let intents = record_clone_intents(|| {
+                let mut h = production_dialog();
+                h.get_all_by_role(egui::accesskit::Role::TextInput)
+                    .nth(field)
+                    .expect("field")
+                    .focus();
+                h.step();
+                h.input_mut()
+                    .events
+                    .extend(
+                        [Key::Tab, Key::Enter]
+                            .into_iter()
+                            .map(|key| egui::Event::Key {
+                                key,
+                                physical_key: None,
+                                pressed: true,
+                                repeat: false,
+                                modifiers: egui::Modifiers::NONE,
+                            }),
+                    );
+                h.step();
+            });
+            assert_eq!(intents, (0, Vec::new()));
+        }
+    }
+
+    #[test]
+    fn actual_clone_dialog_singleline_enter_records_one_submission() {
+        crate::i18n::set_language("en-US");
+        let intents = record_clone_intents(|| {
+            let mut h = production_dialog();
+            h.get_all_by_role(egui::accesskit::Role::TextInput)
+                .nth(2)
+                .expect("name")
+                .focus();
+            h.step();
+            h.key_press(Key::Enter);
+            h.run_steps(3);
+            assert!(h.state().as_ref().is_some_and(|app| app.cloning.is_none()));
+        });
+        assert_eq!(
+            intents,
+            (
+                0,
+                vec![(
+                    "https://example.invalid/o/r".into(),
+                    "/inert".into(),
+                    "repo".into()
+                )]
+            )
+        );
+    }
+
+    #[test]
+    fn enter_on_clone_cancel_closes_without_submitting() {
+        crate::i18n::set_language("en-US");
+        let mut h = Harness::new_ui_state(
+            |ui, state: &mut Option<App>| {
+                if state.is_none() {
+                    let cc = eframe::CreationContext::_new_kittest(ui.ctx().clone());
+                    let mut app = App::launched_using(&cc, None, || {
+                        Ok("git version 2.43.0 (recorded)".into())
+                    });
+                    app.start_clone();
+                    if let Some(form) = &mut app.clone_form {
+                        form.url = "https://example.invalid/o/r".into();
+                        form.parent = "/inert".into();
+                        form.name = "repo".into();
+                        form.depth = "invalid".into();
+                        form.focus = false;
+                    }
+                    *state = Some(app);
+                    return;
+                }
+                if let Some(app) = state {
+                    app.clone_dialog(ui.ctx());
+                }
+            },
+            None,
+        );
+        h.run_steps(3);
+        h.get_by_label("Cancel").focus();
+        h.key_press(Key::Enter);
+        h.run_steps(3);
+        assert!(
+            h.state()
+                .as_ref()
+                .is_some_and(|app| app.clone_form.is_none() && app.cloning.is_none())
+        );
+    }
 
     #[test]
     fn actual_clone_fields_translate_options_without_rewriting_url_path_or_credentials() {

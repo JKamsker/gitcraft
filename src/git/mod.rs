@@ -114,6 +114,9 @@ pub use self::interaction::*;
 pub use self::lfs::*;
 pub use self::lfs_locks::*;
 pub use self::lfs_storage::*;
+pub(crate) use self::line_log::line_history_key;
+#[cfg(test)]
+pub(crate) use self::line_log::line_history_key_from_commit;
 pub use self::line_log::{LineRange, LinesAt, line_diff, line_history, unquote_path};
 pub use self::locks::*;
 pub use self::log_order::*;

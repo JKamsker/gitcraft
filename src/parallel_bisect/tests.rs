@@ -436,18 +436,34 @@ fn cancelling_stops_the_tests_and_removes_the_worktrees() -> Result<(), String> 
     let dir = scratch("cancel")?;
     let repo = Repo::new(&dir.join("repo"), 20, &|_| vec!["slow"])?;
     let started = Instant::now();
+    let mut child_started = false;
     let (outcome, _) = bisect_with(
         repo.setup(&command(&dir.join("trees")), 4),
         &TreeCache::default(),
         &mut |event, handle| {
             if matches!(event, Event::Round { .. }) {
-                // Once the tests have had time to start.
-                std::thread::sleep(Duration::from_millis(1500));
+                // Round is emitted before workspace setup and child dispatch. Wait
+                // for this fixture's actual start marker, even under suite load.
+                let deadline = Instant::now() + Duration::from_secs(30);
+                while Instant::now() < deadline {
+                    if std::fs::read_to_string(dir.join("trees.pids"))
+                        .is_ok_and(|text| text.lines().any(|line| !line.trim().is_empty()))
+                    {
+                        child_started = true;
+                        break;
+                    }
+                    std::thread::sleep(Duration::from_millis(20));
+                }
+                // Cancel even if startup failed, so the fixture always joins its work.
                 handle.cancel();
             }
         },
     );
     assert_eq!(outcome, Outcome::Cancelled);
+    assert!(
+        child_started,
+        "no owned slow child reached its start marker"
+    );
     assert!(
         started.elapsed() < Duration::from_secs(60),
         "{:?}",

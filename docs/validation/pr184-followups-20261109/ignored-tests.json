@@ -1,0 +1,122 @@
+[
+  {
+    "gate": "runtime-gitcraft-lib",
+    "name": "forge::gitea::live::live_forgejo",
+    "reason": "needs a Forgejo: see ci/forge-server.sh"
+  },
+  {
+    "gate": "runtime-gitcraft-lib",
+    "name": "forge::gitea::live::live_gitea",
+    "reason": "needs a Gitea: see ci/forge-server.sh"
+  },
+  {
+    "gate": "runtime-gitcraft-lib",
+    "name": "forge::gitea::live_inbox::live_inbox_forgejo",
+    "reason": "needs a Forgejo: see ci/forge-server.sh"
+  },
+  {
+    "gate": "runtime-gitcraft-lib",
+    "name": "forge::gitea::live_inbox::live_inbox_gitea",
+    "reason": "needs a Gitea: see ci/forge-server.sh"
+  },
+  {
+    "gate": "runtime-gitcraft-lib",
+    "name": "forge::gitea::live_issues::live_issues_forgejo",
+    "reason": "needs a Forgejo: see ci/forge-server.sh"
+  },
+  {
+    "gate": "runtime-gitcraft-lib",
+    "name": "forge::gitea::live_issues::live_issues_gitea",
+    "reason": "needs a Gitea: see ci/forge-server.sh"
+  },
+  {
+    "gate": "runtime-gitcraft-lib",
+    "name": "git::activity::tests::cancelling_a_running_analysis_stops_process_descendants",
+    "reason": "Owned-process cancellation is gated separately by the parent containment review"
+  },
+  {
+    "gate": "runtime-gitcraft-lib",
+    "name": "git::activity::tests::running_analysis_enforces_deadlines_and_output_limits",
+    "reason": "Owned-process timeout is gated separately by the parent containment review"
+  },
+  {
+    "gate": "runtime-gitcraft-lib",
+    "name": "git::command::native_https_fixture::native_https_selected_credential_contract",
+    "reason": "one owned native HTTPS gate; explicit parent containment approval and absolute Git>=2.46/Python3/OpenSSL prerequisites required"
+  },
+  {
+    "gate": "runtime-gitcraft-lib",
+    "name": "remote::native_owner::tests::owned_runtime_endpoint_roundtrip",
+    "reason": "runtime hold: exact source-reviewed invocation only"
+  },
+  {
+    "gate": "runtime-gitcraft-lib",
+    "name": "remote::owned_runtime::environment::owned_runtime_opaque_command_environment",
+    "reason": "runtime hold: exact source-reviewed invocation only"
+  },
+  {
+    "gate": "runtime-gitcraft-lib",
+    "name": "remote::transport::unix::tests::real_openssh_reuses_concurrently_and_recovers",
+    "reason": "requires a disposable real sshd; run ci/test-ssh-transport.py"
+  },
+  {
+    "gate": "runtime-gitcraft-lib",
+    "name": "remote::vault::tests::the_system_store_keeps_and_forgets",
+    "reason": "uses the system's credential store"
+  },
+  {
+    "gate": "runtime-gitcraft-lib",
+    "name": "remote::workspace_claim::tests::owned_runtime_claim_fence_turnover",
+    "reason": "runtime hold: exact source-reviewed invocation only"
+  },
+  {
+    "gate": "runtime-gitcraft-lib",
+    "name": "repo::cpu_benchmarks::real_world_cpu",
+    "reason": "real CPU workloads; run through ci/bench-cpu.py"
+  },
+  {
+    "gate": "runtime-gitcraft-lib",
+    "name": "repo::local_ci::tests::owned_fake_act_records_selection_and_stale_source_refuses_execution",
+    "reason": "owned fake-tool process gate; run only after preserving and verifying this unit"
+  },
+  {
+    "gate": "runtime-gitcraft-lib",
+    "name": "repo::process_benchmarks::workload",
+    "reason": "run with ci/bench-processes.py"
+  },
+  {
+    "gate": "runtime-gitcraft-lib",
+    "name": "repo::resolver::look_tests::the_card_in_each_state",
+    "reason": "draws pictures to look at: see the module's documentation"
+  },
+  {
+    "gate": "runtime-gitcraft-lib",
+    "name": "repo::review_workflow::contracts::tests::r2_runtime_backport_roots_survive_gc_after_source_rewrites",
+    "reason": "R2 runtime hold: owned Git/GC fixture authored, not executed"
+  },
+  {
+    "gate": "runtime-gitcraft-lib",
+    "name": "repo::review_workflow::echo_push::tests::r2_runtime_queued_echo_publishes_only_captured_oid_and_preserves_upstream",
+    "reason": "R2 runtime hold: exact source-after-queued-result and upstream fixture authored, not executed"
+  },
+  {
+    "gate": "runtime-gitcraft-lib",
+    "name": "repo::review_workflow::reproducer::materialize::tests::r2_runtime_raw_archive_does_not_execute_checkout_or_filter_sentinels",
+    "reason": "R2 runtime hold: hook/filter sentinel fixture authored, not executed"
+  },
+  {
+    "gate": "runtime-gitcraft-lib",
+    "name": "repo::review_workflow::reproducer::tests::r2_runtime_same_integration_test_observes_base_failure_head_success_without_host_checkout",
+    "reason": "R2 runtime hold: requires Docker and an explicitly preloaded Rust image; authored, not executed"
+  },
+  {
+    "gate": "runtime-gitcraft-lib",
+    "name": "repo::review_workflow::sharing::tests::r2_runtime_frozen_endpoint_survives_name_rewrite_and_profile_configuration_changes",
+    "reason": "R2 runtime hold: local Git routing/credential/ref fixture authored, not executed"
+  },
+  {
+    "gate": "runtime-gitcraft-lib",
+    "name": "resolver::e2e_tests::a_real_agent_resolves_a_merge_and_reports_each_step",
+    "reason": "runs a real agent: see the module's documentation"
+  }
+]

@@ -566,30 +566,159 @@ impl RepoTab {
             }
             _ => file_view::FileView::new(&path, rev.clone(), tab),
         };
-        let needs = view.needs(tab);
         self.file_view = Some(view);
-        if !needs {
+        self.load_file_view(ctx);
+    }
+
+    pub(super) fn load_file_view(&mut self, ctx: &egui::Context) {
+        let Some(view) = &self.file_view else { return };
+        if !view.needs(view.tab) {
             return;
         }
+        if view.lines.is_some() {
+            self.load_line_history(ctx);
+            return;
+        }
+        let (generation, path, rev, tab) = (
+            view.generation,
+            view.path.clone(),
+            view.rev.clone(),
+            view.tab,
+        );
+        let blame_generation = view.blame_generation;
+        let Some(token) = self.begin_file_load(tab) else {
+            return;
+        };
         let repo = self.path.clone();
         match tab {
-            file_view::FileTab::History => spawn(&self.tx, ctx, move || {
-                let result = git::file_history(&repo, rev.as_deref(), &path);
-                Msg::FileHistory(path, rev, result)
-            }),
+            file_view::FileTab::History => {
+                let requested_path = path.clone();
+                let requested_rev = rev.clone();
+                self.then_or(
+                    ctx,
+                    false,
+                    Err,
+                    move || {
+                        let input = git::resolve(
+                            &repo,
+                            rev.as_deref()
+                                .filter(|rev| !rev.is_empty())
+                                .unwrap_or("HEAD"),
+                        );
+                        let result = input
+                            .as_ref()
+                            .map_err(Clone::clone)
+                            .and_then(|oid| git::file_history(&repo, Some(oid), &path));
+                        Ok((input.ok(), result))
+                    },
+                    move |tab, outcome, ctx| {
+                        if !tab.finish_file_load(
+                            file_view::FileTab::History,
+                            token,
+                            generation,
+                            outcome.as_ref().err().map(String::as_str),
+                            ctx,
+                        ) {
+                            return;
+                        }
+                        let (input, result) = outcome.unwrap_or_else(|error| (None, Err(error)));
+                        if result.is_err()
+                            || tab.accept_file_inputs(
+                                generation,
+                                &requested_path,
+                                requested_rev.as_deref(),
+                                file_view::FileTab::History,
+                                input,
+                                ctx,
+                            )
+                        {
+                            tab.handle(
+                                Msg::FileHistory(generation, requested_path, requested_rev, result),
+                                ctx,
+                            );
+                        }
+                    },
+                );
+            }
             file_view::FileTab::Blame => {
                 let dark = Tokens::get(ctx).dark();
-                spawn(&self.tx, ctx, move || {
-                    let result = file_view::load_blame(&repo, rev.as_deref(), &path, dark);
-                    Msg::Blame(path, rev, result)
-                })
+                let requested_path = path.clone();
+                let requested_rev = rev.clone();
+                self.then_or(
+                    ctx,
+                    false,
+                    Err,
+                    move || {
+                        let input = file_view::blame_input(&repo, rev.as_deref(), &path);
+                        let result = file_view::load_blame(&repo, rev.as_deref(), &path, dark);
+                        Ok((input, result))
+                    },
+                    move |tab, outcome, ctx| {
+                        if !tab.finish_file_load(
+                            file_view::FileTab::Blame,
+                            token,
+                            blame_generation,
+                            outcome.as_ref().err().map(String::as_str),
+                            ctx,
+                        ) {
+                            return;
+                        }
+                        let (input, result) = outcome.unwrap_or_else(|error| (None, Err(error)));
+                        if result.is_err() || tab.accept_blame_input(input, ctx) {
+                            tab.handle(
+                                Msg::Blame(blame_generation, requested_path, requested_rev, result),
+                                ctx,
+                            );
+                        }
+                    },
+                );
             }
             file_view::FileTab::File => {
                 let dark = Tokens::get(ctx).dark();
-                spawn(&self.tx, ctx, move || {
-                    let result = file_text::load(&repo, rev.as_deref(), &path, dark);
-                    Msg::FileText(path, rev, result)
-                })
+                let requested_path = path.clone();
+                let requested_rev = rev.clone();
+                self.then_or(
+                    ctx,
+                    false,
+                    Err,
+                    move || {
+                        let bytes = git::file_at(&repo, rev.as_deref(), &path);
+                        let input = bytes
+                            .as_ref()
+                            .ok()
+                            .map(|bytes| file_view::content_key(bytes));
+                        let result =
+                            bytes.map(|bytes| file_text::FileText::new(&bytes, &path, dark));
+                        Ok((input, result))
+                    },
+                    move |tab, outcome, ctx| {
+                        if !tab.finish_file_load(
+                            file_view::FileTab::File,
+                            token,
+                            generation,
+                            outcome.as_ref().err().map(String::as_str),
+                            ctx,
+                        ) {
+                            return;
+                        }
+                        let (input, result) = outcome.unwrap_or_else(|error| (None, Err(error)));
+                        if result.is_err()
+                            || tab.accept_file_inputs(
+                                generation,
+                                &requested_path,
+                                requested_rev.as_deref(),
+                                file_view::FileTab::File,
+                                input,
+                                ctx,
+                            )
+                        {
+                            tab.handle(
+                                Msg::FileText(generation, requested_path, requested_rev, result),
+                                ctx,
+                            );
+                        }
+                    },
+                );
             }
         }
     }

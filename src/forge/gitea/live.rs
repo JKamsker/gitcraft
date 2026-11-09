@@ -759,12 +759,27 @@ fn pull_request_from_a_fork(
         forks.iter().any(|f| f.number != number && !f.cross),
         "the repository's own branch reads as a fork: {forks:?}"
     );
-    // Checked out as gitcraft does, then pushed to with the author's login.
-    let creds = git::Credentials {
-        scope: Some(git::CredentialScope::for_url(&info.clone_https, "author")?),
-        username: "author".to_owned(),
-        password: server.author_token.clone(),
-    };
+    // The owned fixture serves HTTP on loopback. Use a repository-local Git
+    // credential helper for this exact fork URL: transient application sign-in
+    // deliberately requires HTTPS. This still exercises the real checkout plan,
+    // expectation checks and push through the ordinary credential-manager path.
+    let helper = format!(
+        "!f() {{ test \"$1\" = get || return 0; printf '%s\\n' 'username=author' {}; }}; f",
+        crate::remote::sh_quote(&format!("password={}", server.author_token))
+    );
+    run(dir, &["config", "credential.helper", ""])?;
+    run(dir, &["config", "credential.useHttpPath", "true"])?;
+    // Neither the test wrapper nor Git's fallback command diagnostic may echo
+    // the helper argument: it contains the fixture's author token.
+    git::run(
+        Some(dir),
+        &[
+            "config",
+            &format!("credential.{}.helper", info.clone_https),
+            &helper,
+        ],
+    )
+    .map_err(|_| "Cannot install the loopback fixture credential helper".to_owned())?;
     let setup = crate::repo::forks::plan::read_setup(dir)?;
     let locals = vec!["main".to_owned(), "feat".to_owned(), "wip".to_owned()];
     let plan = crate::repo::forks::plan::checkout(
@@ -775,10 +790,10 @@ fn pull_request_from_a_fork(
         "main",
         Some(hosting),
     )?;
-    crate::repo::operations::run_live_checkout(dir, &plan.steps, Some(&creds))?;
+    crate::repo::operations::run_live_checkout(dir, &plan.steps, None)?;
     write(dir, "d.txt", "fixed by the maintainer\n")?;
     run(dir, &["commit", "-q", "-am", "fix: by the maintainer"])?;
-    git::run_with(Some(dir), &["push", "-q"], Some(&creds))?;
+    git::run_with(Some(dir), &["push", "-q"], None)?;
     let mine = run(dir, &["rev-parse", "HEAD"])?.trim().to_owned();
     let branch = server
         .author()

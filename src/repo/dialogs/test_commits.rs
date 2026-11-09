@@ -13,7 +13,6 @@ use super::{Outcome, buttons, field, title, usable};
 /// it runs ("on this machine", "on WSL · Ubuntu"), `remote` when that is another one.
 pub(super) fn test_commits(
     ui: &mut Ui,
-    enter: bool,
     machine: &str,
     remote: bool,
     start: &mut StartTests,
@@ -29,15 +28,16 @@ pub(super) fn test_commits(
     );
     ui.label(RichText::new(crate::i18n::text("repo-core-1510")).color(t.text_dim));
     let mut no_focus = false;
-    field(ui, &mut start.range, "main..feature", &mut no_focus);
+    let mut enter =
+        crate::a11y::singleline_enter(&field(ui, &mut start.range, "main..feature", &mut no_focus));
     ui.add_space(6.0);
     ui.label(RichText::new(crate::i18n::text("repo-core-1512")).color(t.text_dim));
-    field(
+    enter |= crate::a11y::singleline_enter(&field(
         ui,
         &mut start.command,
         "cargo test, make check, ./test.sh…",
         focus,
-    );
+    ));
     ui.label(RichText::new(crate::i18n::text("repo-core-1513")).color(t.text_faint));
     ui.add_space(6.0);
     ui.horizontal(|ui| {

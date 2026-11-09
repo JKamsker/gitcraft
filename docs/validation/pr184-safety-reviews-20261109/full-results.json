@@ -1,0 +1,982 @@
+{
+  "source_checker_sha256": "888c74252d6bf789e1150f1bba74532a351f635f440e26d04d4faedde40c995c",
+  "source_observations": [
+    {
+      "commit": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+      "expected_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "observed_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "entries": 1980,
+      "errors": []
+    },
+    {
+      "commit": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+      "expected_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "observed_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "entries": 1980,
+      "errors": []
+    },
+    {
+      "commit": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+      "expected_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "observed_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "entries": 1980,
+      "errors": []
+    },
+    {
+      "commit": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+      "expected_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "observed_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "entries": 1980,
+      "errors": []
+    },
+    {
+      "commit": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+      "expected_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "observed_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "entries": 1980,
+      "errors": []
+    },
+    {
+      "commit": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+      "expected_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "observed_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "entries": 1980,
+      "errors": []
+    },
+    {
+      "commit": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+      "expected_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "observed_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "entries": 1980,
+      "errors": []
+    },
+    {
+      "commit": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+      "expected_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "observed_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "entries": 1980,
+      "errors": []
+    },
+    {
+      "commit": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+      "expected_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "observed_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "entries": 1980,
+      "errors": []
+    },
+    {
+      "commit": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+      "expected_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "observed_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "entries": 1980,
+      "errors": []
+    },
+    {
+      "commit": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+      "expected_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "observed_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "entries": 1980,
+      "errors": []
+    },
+    {
+      "commit": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+      "expected_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "observed_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "entries": 1980,
+      "errors": []
+    },
+    {
+      "commit": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+      "expected_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "observed_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "entries": 1980,
+      "errors": []
+    },
+    {
+      "commit": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+      "expected_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "observed_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "entries": 1980,
+      "errors": []
+    },
+    {
+      "commit": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+      "expected_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "observed_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "entries": 1980,
+      "errors": []
+    },
+    {
+      "commit": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+      "expected_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "observed_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "entries": 1980,
+      "errors": []
+    },
+    {
+      "commit": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+      "expected_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "observed_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "entries": 1980,
+      "errors": []
+    },
+    {
+      "commit": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+      "expected_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "observed_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "entries": 1980,
+      "errors": []
+    },
+    {
+      "commit": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+      "expected_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "observed_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "entries": 1980,
+      "errors": []
+    },
+    {
+      "commit": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+      "expected_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "observed_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "entries": 1980,
+      "errors": []
+    },
+    {
+      "commit": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+      "expected_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "observed_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "entries": 1980,
+      "errors": []
+    },
+    {
+      "commit": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+      "expected_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "observed_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "entries": 1980,
+      "errors": []
+    },
+    {
+      "commit": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+      "expected_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "observed_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "entries": 1980,
+      "errors": []
+    },
+    {
+      "commit": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+      "expected_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "observed_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "entries": 1980,
+      "errors": []
+    },
+    {
+      "commit": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+      "expected_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "observed_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "entries": 1980,
+      "errors": []
+    },
+    {
+      "commit": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+      "expected_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "observed_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "entries": 1980,
+      "errors": []
+    },
+    {
+      "commit": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+      "expected_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "observed_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "entries": 1980,
+      "errors": []
+    },
+    {
+      "commit": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+      "expected_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "observed_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "entries": 1980,
+      "errors": []
+    },
+    {
+      "commit": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+      "expected_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "observed_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "entries": 1980,
+      "errors": []
+    },
+    {
+      "commit": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+      "expected_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "observed_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "entries": 1980,
+      "errors": []
+    },
+    {
+      "commit": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+      "expected_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "observed_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "entries": 1980,
+      "errors": []
+    },
+    {
+      "commit": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+      "expected_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "observed_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "entries": 1980,
+      "errors": []
+    },
+    {
+      "commit": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+      "expected_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "observed_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "entries": 1980,
+      "errors": []
+    },
+    {
+      "commit": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+      "expected_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "observed_map_sha256": "1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e",
+      "entries": 1980,
+      "errors": []
+    }
+  ],
+  "commit": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+  "tree": "4683de7e10a326b6f2f6340f963952c99db8a45a",
+  "started": "2026-11-09T15:42:35.438555+00:00",
+  "runner_sha256": "ac43f0f47d2b7975968dfd1352cadec264802fa1f5ba8b95fcd08c9d29ceacb0",
+  "checks": [
+    {
+      "label": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "before": {
+        "head": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+        "tree": "4683de7e10a326b6f2f6340f963952c99db8a45a",
+        "status": ""
+      },
+      "exit": 0,
+      "log": "/tmp/gitcraft-pr184-round4-full-1e48ab83-xed4ogpf/fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after": {
+        "head": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+        "tree": "4683de7e10a326b6f2f6340f963952c99db8a45a",
+        "status": ""
+      },
+      "test_summaries": []
+    },
+    {
+      "label": "check",
+      "command": [
+        "cargo",
+        "check",
+        "--locked",
+        "--all-targets"
+      ],
+      "before": {
+        "head": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+        "tree": "4683de7e10a326b6f2f6340f963952c99db8a45a",
+        "status": ""
+      },
+      "exit": 0,
+      "log": "/tmp/gitcraft-pr184-round4-full-1e48ab83-xed4ogpf/check.log",
+      "sha256": "1dcb3a162e0fb44d78a31b8d68059d95096c762b25c51cd70e4ddd25ae8d4304",
+      "after": {
+        "head": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+        "tree": "4683de7e10a326b6f2f6340f963952c99db8a45a",
+        "status": ""
+      },
+      "test_summaries": []
+    },
+    {
+      "label": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "before": {
+        "head": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+        "tree": "4683de7e10a326b6f2f6340f963952c99db8a45a",
+        "status": ""
+      },
+      "exit": 0,
+      "log": "/tmp/gitcraft-pr184-round4-full-1e48ab83-xed4ogpf/clippy.log",
+      "sha256": "54d32f1312e9ec321c58af432997bfe3bae5b14322fc06e68fd35a1f2f0e6519",
+      "after": {
+        "head": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+        "tree": "4683de7e10a326b6f2f6340f963952c99db8a45a",
+        "status": ""
+      },
+      "test_summaries": []
+    },
+    {
+      "label": "build-tests",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "before": {
+        "head": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+        "tree": "4683de7e10a326b6f2f6340f963952c99db8a45a",
+        "status": ""
+      },
+      "exit": 0,
+      "log": "/tmp/gitcraft-pr184-round4-full-1e48ab83-xed4ogpf/build-tests.log",
+      "sha256": "86fe1af165f5eba89bed14658a482f169382889fc785ca1bd3f0d7fd6269ef91",
+      "after": {
+        "head": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+        "tree": "4683de7e10a326b6f2f6340f963952c99db8a45a",
+        "status": ""
+      },
+      "test_summaries": []
+    },
+    {
+      "label": "recording-outcomes",
+      "command": [
+        "bwrap",
+        "--unshare-pid",
+        "--die-with-parent",
+        "--bind",
+        "/",
+        "/",
+        "--dev",
+        "/dev",
+        "--proc",
+        "/proc",
+        "--",
+        "/home/jonas/.t3/worktrees/gitcraft/t3-572729bb/target/debug/deps/gitcraft-47350705d36386f2",
+        "processes::recording_outcomes",
+        "--test-threads=1"
+      ],
+      "before": {
+        "head": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+        "tree": "4683de7e10a326b6f2f6340f963952c99db8a45a",
+        "status": ""
+      },
+      "application_sha256_before": "31c48841930c12f40fc789670d6b17c74030130e7fac4e6f162d67f342546b77",
+      "binary_sha256_before": "1ceafcde5967dbaa10375267337360dccaf3717a2f41873e7fac82a0d88decc5",
+      "exit": 0,
+      "log": "/tmp/gitcraft-pr184-round4-full-1e48ab83-xed4ogpf/recording-outcomes.log",
+      "sha256": "ba41ae88b9293347234ad3d89e513fc75e92e0ac0245343ec097fe324781ec83",
+      "after": {
+        "head": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+        "tree": "4683de7e10a326b6f2f6340f963952c99db8a45a",
+        "status": ""
+      },
+      "test_summaries": [
+        {
+          "passed": 3,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 5005
+        }
+      ],
+      "application_sha256_after": "31c48841930c12f40fc789670d6b17c74030130e7fac4e6f162d67f342546b77",
+      "binary_sha256_after": "1ceafcde5967dbaa10375267337360dccaf3717a2f41873e7fac82a0d88decc5"
+    },
+    {
+      "label": "recording-resolver",
+      "command": [
+        "bwrap",
+        "--unshare-pid",
+        "--die-with-parent",
+        "--bind",
+        "/",
+        "/",
+        "--dev",
+        "/dev",
+        "--proc",
+        "/proc",
+        "--",
+        "/home/jonas/.t3/worktrees/gitcraft/t3-572729bb/target/debug/deps/gitcraft-47350705d36386f2",
+        "resolver::process::tests::recording_failure_mapping_and_join_proof_fail_closed",
+        "--test-threads=1"
+      ],
+      "before": {
+        "head": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+        "tree": "4683de7e10a326b6f2f6340f963952c99db8a45a",
+        "status": ""
+      },
+      "application_sha256_before": "31c48841930c12f40fc789670d6b17c74030130e7fac4e6f162d67f342546b77",
+      "binary_sha256_before": "1ceafcde5967dbaa10375267337360dccaf3717a2f41873e7fac82a0d88decc5",
+      "exit": 0,
+      "log": "/tmp/gitcraft-pr184-round4-full-1e48ab83-xed4ogpf/recording-resolver.log",
+      "sha256": "3507ddde583f60fda9ca003a6ca3130166846f18dd9a991c90414da44f6015c6",
+      "after": {
+        "head": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+        "tree": "4683de7e10a326b6f2f6340f963952c99db8a45a",
+        "status": ""
+      },
+      "test_summaries": [
+        {
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 5007
+        }
+      ],
+      "application_sha256_after": "31c48841930c12f40fc789670d6b17c74030130e7fac4e6f162d67f342546b77",
+      "binary_sha256_after": "1ceafcde5967dbaa10375267337360dccaf3717a2f41873e7fac82a0d88decc5"
+    },
+    {
+      "label": "runtime-gitcraft_os-lib",
+      "command": [
+        "bwrap",
+        "--unshare-pid",
+        "--die-with-parent",
+        "--bind",
+        "/",
+        "/",
+        "--dev",
+        "/dev",
+        "--proc",
+        "/proc",
+        "--",
+        "/home/jonas/.t3/worktrees/gitcraft/t3-572729bb/target/debug/deps/gitcraft_os-afb9de969ac4ed8a",
+        "--test-threads=4"
+      ],
+      "before": {
+        "head": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+        "tree": "4683de7e10a326b6f2f6340f963952c99db8a45a",
+        "status": ""
+      },
+      "application_sha256_before": "31c48841930c12f40fc789670d6b17c74030130e7fac4e6f162d67f342546b77",
+      "binary_sha256_before": "d69dad02043fa081385422ac7b64467a4b53bf89e21907a213a2da846a33b2e6",
+      "exit": 0,
+      "log": "/tmp/gitcraft-pr184-round4-full-1e48ab83-xed4ogpf/runtime-gitcraft_os-lib.log",
+      "sha256": "0078fe471aba57c9f8e4f7f57c50bd40f2478c7442e59394b16af5aa54084a74",
+      "after": {
+        "head": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+        "tree": "4683de7e10a326b6f2f6340f963952c99db8a45a",
+        "status": ""
+      },
+      "test_summaries": [
+        {
+          "passed": 24,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        }
+      ],
+      "application_sha256_after": "31c48841930c12f40fc789670d6b17c74030130e7fac4e6f162d67f342546b77",
+      "binary_sha256_after": "d69dad02043fa081385422ac7b64467a4b53bf89e21907a213a2da846a33b2e6"
+    },
+    {
+      "label": "runtime-gitcraft-lib",
+      "command": [
+        "bwrap",
+        "--unshare-pid",
+        "--die-with-parent",
+        "--bind",
+        "/",
+        "/",
+        "--dev",
+        "/dev",
+        "--proc",
+        "/proc",
+        "--",
+        "/home/jonas/.t3/worktrees/gitcraft/t3-572729bb/target/debug/deps/gitcraft-47350705d36386f2",
+        "--test-threads=4",
+        "--skip",
+        "standalone::save::tests::acl_only_tightening_during_each_save_boundary_refuses_stale_policy_and_retains_recovery",
+        "--skip",
+        "git::file_comparison::index_transaction::tests::index_owner_comparison_and_real_group_drift_refuse_stale_publication",
+        "--skip",
+        "app::palette::tests::thousands_of_branches_open_and_filter_quickly"
+      ],
+      "before": {
+        "head": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+        "tree": "4683de7e10a326b6f2f6340f963952c99db8a45a",
+        "status": ""
+      },
+      "application_sha256_before": "31c48841930c12f40fc789670d6b17c74030130e7fac4e6f162d67f342546b77",
+      "binary_sha256_before": "1ceafcde5967dbaa10375267337360dccaf3717a2f41873e7fac82a0d88decc5",
+      "exit": 0,
+      "log": "/tmp/gitcraft-pr184-round4-full-1e48ab83-xed4ogpf/runtime-gitcraft-lib.log",
+      "sha256": "15c08eaf633ce70231b5531d1531975519dc0a57c1e403edc365021d1d2a53b4",
+      "after": {
+        "head": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+        "tree": "4683de7e10a326b6f2f6340f963952c99db8a45a",
+        "status": ""
+      },
+      "test_summaries": [
+        {
+          "passed": 4981,
+          "failed": 0,
+          "ignored": 24,
+          "measured": 0,
+          "filtered": 3
+        }
+      ],
+      "application_sha256_after": "31c48841930c12f40fc789670d6b17c74030130e7fac4e6f162d67f342546b77",
+      "binary_sha256_after": "1ceafcde5967dbaa10375267337360dccaf3717a2f41873e7fac82a0d88decc5"
+    },
+    {
+      "label": "runtime-checkpoint_cli-checkpoint_cli",
+      "command": [
+        "bwrap",
+        "--unshare-pid",
+        "--die-with-parent",
+        "--bind",
+        "/",
+        "/",
+        "--dev",
+        "/dev",
+        "--proc",
+        "/proc",
+        "--",
+        "/home/jonas/.t3/worktrees/gitcraft/t3-572729bb/target/debug/deps/checkpoint_cli-6955c95642b7b98f",
+        "--test-threads=4"
+      ],
+      "before": {
+        "head": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+        "tree": "4683de7e10a326b6f2f6340f963952c99db8a45a",
+        "status": ""
+      },
+      "application_sha256_before": "31c48841930c12f40fc789670d6b17c74030130e7fac4e6f162d67f342546b77",
+      "binary_sha256_before": "c3ed225c63cb729184e96b6e971e30201326f1bbf3e54bf61d5f8056c41d834e",
+      "exit": 0,
+      "log": "/tmp/gitcraft-pr184-round4-full-1e48ab83-xed4ogpf/runtime-checkpoint_cli-checkpoint_cli.log",
+      "sha256": "3cd73275f78325d439b5e48c457d7bb8b26a9015119f5c0da5a10f5afe1f2656",
+      "after": {
+        "head": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+        "tree": "4683de7e10a326b6f2f6340f963952c99db8a45a",
+        "status": ""
+      },
+      "test_summaries": [
+        {
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        }
+      ],
+      "application_sha256_after": "31c48841930c12f40fc789670d6b17c74030130e7fac4e6f162d67f342546b77",
+      "binary_sha256_after": "c3ed225c63cb729184e96b6e971e30201326f1bbf3e54bf61d5f8056c41d834e"
+    },
+    {
+      "label": "runtime-standalone_cli-standalone_cli",
+      "command": [
+        "bwrap",
+        "--unshare-pid",
+        "--die-with-parent",
+        "--bind",
+        "/",
+        "/",
+        "--dev",
+        "/dev",
+        "--proc",
+        "/proc",
+        "--",
+        "/home/jonas/.t3/worktrees/gitcraft/t3-572729bb/target/debug/deps/standalone_cli-c92181a0a0eb14a9",
+        "--test-threads=4"
+      ],
+      "before": {
+        "head": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+        "tree": "4683de7e10a326b6f2f6340f963952c99db8a45a",
+        "status": ""
+      },
+      "application_sha256_before": "31c48841930c12f40fc789670d6b17c74030130e7fac4e6f162d67f342546b77",
+      "binary_sha256_before": "96904da21e8a998819dcfb08e8876a6c808c953e34a32736bc0748e9071f0246",
+      "exit": 0,
+      "log": "/tmp/gitcraft-pr184-round4-full-1e48ab83-xed4ogpf/runtime-standalone_cli-standalone_cli.log",
+      "sha256": "d9d263aabcf5b84a352dbdbdc960a4f55f5c65b23f1b10d966d0ddf2a055b32b",
+      "after": {
+        "head": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+        "tree": "4683de7e10a326b6f2f6340f963952c99db8a45a",
+        "status": ""
+      },
+      "test_summaries": [
+        {
+          "passed": 3,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        }
+      ],
+      "application_sha256_after": "31c48841930c12f40fc789670d6b17c74030130e7fac4e6f162d67f342546b77",
+      "binary_sha256_after": "96904da21e8a998819dcfb08e8876a6c808c953e34a32736bc0748e9071f0246"
+    },
+    {
+      "label": "runtime-gitcraft-main",
+      "command": [
+        "bwrap",
+        "--unshare-pid",
+        "--die-with-parent",
+        "--bind",
+        "/",
+        "/",
+        "--dev",
+        "/dev",
+        "--proc",
+        "/proc",
+        "--",
+        "/home/jonas/.t3/worktrees/gitcraft/t3-572729bb/target/debug/deps/gitcraft-badf312742f8875e",
+        "--test-threads=4"
+      ],
+      "before": {
+        "head": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+        "tree": "4683de7e10a326b6f2f6340f963952c99db8a45a",
+        "status": ""
+      },
+      "application_sha256_before": "31c48841930c12f40fc789670d6b17c74030130e7fac4e6f162d67f342546b77",
+      "binary_sha256_before": "69df2f03877857456942ae4c5f30c93afa6cfcfdc863e9b6762dea639cc72956",
+      "exit": 0,
+      "log": "/tmp/gitcraft-pr184-round4-full-1e48ab83-xed4ogpf/runtime-gitcraft-main.log",
+      "sha256": "df166913f47ff1f04202cae9b31df67ed272d692d99a0023a8117dc3029100dd",
+      "after": {
+        "head": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+        "tree": "4683de7e10a326b6f2f6340f963952c99db8a45a",
+        "status": ""
+      },
+      "test_summaries": [
+        {
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        }
+      ],
+      "application_sha256_after": "31c48841930c12f40fc789670d6b17c74030130e7fac4e6f162d67f342546b77",
+      "binary_sha256_after": "69df2f03877857456942ae4c5f30c93afa6cfcfdc863e9b6762dea639cc72956"
+    },
+    {
+      "label": "runtime-mcp_stdio-mcp_stdio",
+      "command": [
+        "bwrap",
+        "--unshare-pid",
+        "--die-with-parent",
+        "--bind",
+        "/",
+        "/",
+        "--dev",
+        "/dev",
+        "--proc",
+        "/proc",
+        "--",
+        "/home/jonas/.t3/worktrees/gitcraft/t3-572729bb/target/debug/deps/mcp_stdio-583784c527de5c4f",
+        "--test-threads=4"
+      ],
+      "before": {
+        "head": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+        "tree": "4683de7e10a326b6f2f6340f963952c99db8a45a",
+        "status": ""
+      },
+      "application_sha256_before": "31c48841930c12f40fc789670d6b17c74030130e7fac4e6f162d67f342546b77",
+      "binary_sha256_before": "84e872c7d11914d38a56c3b434ef410b8d13baa0a8267b95ace6961a5a4eee7a",
+      "exit": 0,
+      "log": "/tmp/gitcraft-pr184-round4-full-1e48ab83-xed4ogpf/runtime-mcp_stdio-mcp_stdio.log",
+      "sha256": "470d3ebd794aece951b7cfa66c913ea0b33b44bf52bae67119080f81300c8636",
+      "after": {
+        "head": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+        "tree": "4683de7e10a326b6f2f6340f963952c99db8a45a",
+        "status": ""
+      },
+      "test_summaries": [
+        {
+          "passed": 6,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        }
+      ],
+      "application_sha256_after": "31c48841930c12f40fc789670d6b17c74030130e7fac4e6f162d67f342546b77",
+      "binary_sha256_after": "84e872c7d11914d38a56c3b434ef410b8d13baa0a8267b95ace6961a5a4eee7a"
+    },
+    {
+      "label": "acl-save",
+      "command": [
+        "/home/jonas/.t3/worktrees/gitcraft/t3-572729bb/target/debug/deps/gitcraft-47350705d36386f2",
+        "standalone::save::tests::acl_only_tightening_during_each_save_boundary_refuses_stale_policy_and_retains_recovery",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "before": {
+        "head": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+        "tree": "4683de7e10a326b6f2f6340f963952c99db8a45a",
+        "status": ""
+      },
+      "application_sha256_before": "31c48841930c12f40fc789670d6b17c74030130e7fac4e6f162d67f342546b77",
+      "binary_sha256_before": "1ceafcde5967dbaa10375267337360dccaf3717a2f41873e7fac82a0d88decc5",
+      "exit": 0,
+      "log": "/tmp/gitcraft-pr184-round4-full-1e48ab83-xed4ogpf/acl-save.log",
+      "sha256": "4045494fae1a206d72d2464d1bf0cd7ece887e0a5996421309534d604179fe74",
+      "after": {
+        "head": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+        "tree": "4683de7e10a326b6f2f6340f963952c99db8a45a",
+        "status": ""
+      },
+      "test_summaries": [
+        {
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 5007
+        }
+      ],
+      "application_sha256_after": "31c48841930c12f40fc789670d6b17c74030130e7fac4e6f162d67f342546b77",
+      "binary_sha256_after": "1ceafcde5967dbaa10375267337360dccaf3717a2f41873e7fac82a0d88decc5",
+      "containment": "native-owned-ACL-metadata-fixture"
+    },
+    {
+      "label": "acl-index",
+      "command": [
+        "/home/jonas/.t3/worktrees/gitcraft/t3-572729bb/target/debug/deps/gitcraft-47350705d36386f2",
+        "git::file_comparison::index_transaction::tests::index_owner_comparison_and_real_group_drift_refuse_stale_publication",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "before": {
+        "head": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+        "tree": "4683de7e10a326b6f2f6340f963952c99db8a45a",
+        "status": ""
+      },
+      "application_sha256_before": "31c48841930c12f40fc789670d6b17c74030130e7fac4e6f162d67f342546b77",
+      "binary_sha256_before": "1ceafcde5967dbaa10375267337360dccaf3717a2f41873e7fac82a0d88decc5",
+      "exit": 0,
+      "log": "/tmp/gitcraft-pr184-round4-full-1e48ab83-xed4ogpf/acl-index.log",
+      "sha256": "f2a4d16e730704eb41f0d9b32f1c85ac647db69de81127fa02e8ddd98bedfe8b",
+      "after": {
+        "head": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+        "tree": "4683de7e10a326b6f2f6340f963952c99db8a45a",
+        "status": ""
+      },
+      "test_summaries": [
+        {
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 5007
+        }
+      ],
+      "application_sha256_after": "31c48841930c12f40fc789670d6b17c74030130e7fac4e6f162d67f342546b77",
+      "binary_sha256_after": "1ceafcde5967dbaa10375267337360dccaf3717a2f41873e7fac82a0d88decc5",
+      "containment": "native-owned-ACL-metadata-fixture"
+    },
+    {
+      "label": "palette-isolated",
+      "command": [
+        "bwrap",
+        "--unshare-pid",
+        "--die-with-parent",
+        "--bind",
+        "/",
+        "/",
+        "--dev",
+        "/dev",
+        "--proc",
+        "/proc",
+        "--",
+        "/home/jonas/.t3/worktrees/gitcraft/t3-572729bb/target/debug/deps/gitcraft-47350705d36386f2",
+        "app::palette::tests::thousands_of_branches_open_and_filter_quickly",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "before": {
+        "head": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+        "tree": "4683de7e10a326b6f2f6340f963952c99db8a45a",
+        "status": ""
+      },
+      "application_sha256_before": "31c48841930c12f40fc789670d6b17c74030130e7fac4e6f162d67f342546b77",
+      "binary_sha256_before": "1ceafcde5967dbaa10375267337360dccaf3717a2f41873e7fac82a0d88decc5",
+      "exit": 0,
+      "log": "/tmp/gitcraft-pr184-round4-full-1e48ab83-xed4ogpf/palette-isolated.log",
+      "sha256": "7105dd8a2a49634d340e78e1d4ece9cadf7e1b296aa8b3824d3675fc12359652",
+      "after": {
+        "head": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+        "tree": "4683de7e10a326b6f2f6340f963952c99db8a45a",
+        "status": ""
+      },
+      "test_summaries": [
+        {
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 5007
+        }
+      ],
+      "application_sha256_after": "31c48841930c12f40fc789670d6b17c74030130e7fac4e6f162d67f342546b77",
+      "binary_sha256_after": "1ceafcde5967dbaa10375267337360dccaf3717a2f41873e7fac82a0d88decc5",
+      "containment": "PID/proc/dev namespace"
+    },
+    {
+      "label": "doc-tests",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--doc"
+      ],
+      "before": {
+        "head": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+        "tree": "4683de7e10a326b6f2f6340f963952c99db8a45a",
+        "status": ""
+      },
+      "exit": 0,
+      "log": "/tmp/gitcraft-pr184-round4-full-1e48ab83-xed4ogpf/doc-tests.log",
+      "sha256": "9f62ed17af89115692990d92a3af12d107a120fea8f33834f39f23d982fcbfc0",
+      "after": {
+        "head": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+        "tree": "4683de7e10a326b6f2f6340f963952c99db8a45a",
+        "status": ""
+      },
+      "test_summaries": [
+        {
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        }
+      ]
+    }
+  ],
+  "artifacts": [
+    {
+      "name": "gitcraft_os",
+      "kind": [
+        "lib"
+      ],
+      "source": "crates/gitcraft-os/src/lib.rs",
+      "executable": "/home/jonas/.t3/worktrees/gitcraft/t3-572729bb/target/debug/deps/gitcraft_os-afb9de969ac4ed8a",
+      "sha256": "d69dad02043fa081385422ac7b64467a4b53bf89e21907a213a2da846a33b2e6"
+    },
+    {
+      "name": "gitcraft",
+      "kind": [
+        "lib"
+      ],
+      "source": "src/lib.rs",
+      "executable": "/home/jonas/.t3/worktrees/gitcraft/t3-572729bb/target/debug/deps/gitcraft-47350705d36386f2",
+      "sha256": "1ceafcde5967dbaa10375267337360dccaf3717a2f41873e7fac82a0d88decc5"
+    },
+    {
+      "name": "checkpoint_cli",
+      "kind": [
+        "test"
+      ],
+      "source": "tests/checkpoint_cli.rs",
+      "executable": "/home/jonas/.t3/worktrees/gitcraft/t3-572729bb/target/debug/deps/checkpoint_cli-6955c95642b7b98f",
+      "sha256": "c3ed225c63cb729184e96b6e971e30201326f1bbf3e54bf61d5f8056c41d834e"
+    },
+    {
+      "name": "standalone_cli",
+      "kind": [
+        "test"
+      ],
+      "source": "tests/standalone_cli.rs",
+      "executable": "/home/jonas/.t3/worktrees/gitcraft/t3-572729bb/target/debug/deps/standalone_cli-c92181a0a0eb14a9",
+      "sha256": "96904da21e8a998819dcfb08e8876a6c808c953e34a32736bc0748e9071f0246"
+    },
+    {
+      "name": "gitcraft",
+      "kind": [
+        "bin"
+      ],
+      "source": "src/main.rs",
+      "executable": "/home/jonas/.t3/worktrees/gitcraft/t3-572729bb/target/debug/deps/gitcraft-badf312742f8875e",
+      "sha256": "69df2f03877857456942ae4c5f30c93afa6cfcfdc863e9b6762dea639cc72956"
+    },
+    {
+      "name": "mcp_stdio",
+      "kind": [
+        "test"
+      ],
+      "source": "tests/mcp_stdio.rs",
+      "executable": "/home/jonas/.t3/worktrees/gitcraft/t3-572729bb/target/debug/deps/mcp_stdio-583784c527de5c4f",
+      "sha256": "84e872c7d11914d38a56c3b434ef410b8d13baa0a8267b95ace6961a5a4eee7a"
+    }
+  ],
+  "environment": {
+    "PKG_CONFIG_PATH": "/tmp/gitcraft-pr179-build-deps/root/usr/lib/x86_64-linux-gnu/pkgconfig",
+    "CARGO_TARGET_DIR": "/home/jonas/.t3/worktrees/gitcraft/t3-572729bb/target",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "PATH": "/tmp/gitcraft-git252/install/bin:/tmp/gitcraft-lfs/root/usr/bin:/home/jonas/.codex/packages/standalone/releases/0.166.0-x86_64-unknown-linux-musl/codex-path:/home/jonas/.local/bin:/home/jonas/.codex/tmp/arg0-linux/codex-arg0d7wBtJ:/home/jonas/.codex/packages/standalone/releases/0.166.0-x86_64-unknown-linux-musl/codex-path:/home/jonas/.local/bin:/home/jonas/.dotnet/tools:/home/jonas/.cargo/bin:/home/jonas/.nvm/versions/node/v24.19.0/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin",
+    "GIT_CONFIG_GLOBAL": "/dev/null",
+    "GIT_CONFIG_NOSYSTEM": "1"
+  },
+  "uid": 1000,
+  "gid": 1000,
+  "supplementary_groups": [
+    4,
+    24,
+    27,
+    30,
+    46,
+    101,
+    987,
+    1000
+  ],
+  "acl_group_drift_coverage": "Conditional within test; a passing summary alone does not establish the real supplementary-group branch ran.",
+  "versions": [
+    {
+      "command": [
+        "rustc",
+        "--version"
+      ],
+      "output": "rustc 1.97.1 (8bab26f4f 2026-07-14)"
+    },
+    {
+      "command": [
+        "cargo",
+        "--version"
+      ],
+      "output": "cargo 1.97.1 (c980f4866 2026-06-30)"
+    },
+    {
+      "command": [
+        "git",
+        "--version"
+      ],
+      "output": "git version 2.52.0"
+    },
+    {
+      "command": [
+        "bwrap",
+        "--version"
+      ],
+      "output": "bubblewrap 0.9.0"
+    }
+  ],
+  "application": {
+    "executable": "/home/jonas/.t3/worktrees/gitcraft/t3-572729bb/target/debug/gitcraft",
+    "sha256": "31c48841930c12f40fc789670d6b17c74030130e7fac4e6f162d67f342546b77"
+  },
+  "finished": "2026-11-09T15:58:33.464072+00:00",
+  "final_state": {
+    "head": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+    "tree": "4683de7e10a326b6f2f6340f963952c99db8a45a",
+    "status": ""
+  },
+  "status": "passed"
+}
