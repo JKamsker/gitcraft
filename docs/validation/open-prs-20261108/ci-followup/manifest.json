@@ -1,0 +1,99 @@
+{
+  "tested_commit": "b84d4b1e1478e516da4fbbe0e6811e2a397a4253",
+  "archives": [
+    {
+      "file": "responsive-5.log.gz",
+      "sha256": "594b957e5c7f049a967f0b9213c610ae3ed9a1271cf70534ef27f9a53f58eaa0",
+      "uncompressed_sha256": "2c41aca2faa54a26897ffa176a5f152fa56693dc7cef8e4e456743ba1431dca6"
+    },
+    {
+      "file": "responsive-2.log.gz",
+      "sha256": "0b61bd9100089e4a147f1f1d82418e4bf054b1ee05924e1ef0d490e03f0284f4",
+      "uncompressed_sha256": "45772e47bd1fb4d0cc22d99140b6bdf5bf3a12b9589dce64f040ed2fe8d041e8"
+    },
+    {
+      "file": "responsive-4.log.gz",
+      "sha256": "fc33f7f1aa72c25f476b8e3623bba198cbcf98c9d20d1fb2f958e2a3f6e6f04e",
+      "uncompressed_sha256": "593decd6ed4ac91a1a66b4dbfe272b0d90a7fa3a7d329ea651e1d51740abcea3"
+    },
+    {
+      "file": "responsive-9.log.gz",
+      "sha256": "fc33f7f1aa72c25f476b8e3623bba198cbcf98c9d20d1fb2f958e2a3f6e6f04e",
+      "uncompressed_sha256": "593decd6ed4ac91a1a66b4dbfe272b0d90a7fa3a7d329ea651e1d51740abcea3"
+    },
+    {
+      "file": "responsive-0.log.gz",
+      "sha256": "bc87b40e312755107e7f08a276d10c97d2dd762395a026d4ad430a657aa1c702",
+      "uncompressed_sha256": "13adb269ed3181580f82c21066e9c83ebca146ca65e92c73eb745fcc9a7be093"
+    },
+    {
+      "file": "responsive-8.log.gz",
+      "sha256": "ab6a923c2e9491e53d14ea4094f5ccf40a3cff695f8fbc165df8ba49f563c8b9",
+      "uncompressed_sha256": "77c6e0ac28b94738af4e7f2966afa75074ab368ae58b02ff0dd15064c88d348e"
+    },
+    {
+      "file": "responsive-1.log.gz",
+      "sha256": "b21f130d3ec185bde9430cba1c07221f31a8841780e0e6857b2c1ff6be1e8a11",
+      "uncompressed_sha256": "d7731703855d93335d9f4b7fd44a63344ccfffd376e58388d3d6c0eeea4438cd"
+    },
+    {
+      "file": "responsive-6.log.gz",
+      "sha256": "71e5a34c6cd64fbbcc005471b0b3dac26c7b0cd17ddaf20e4e15c355cc49437c",
+      "uncompressed_sha256": "ead2bdf1ea93f91a4d10408eb8227a069a648194d0fcd3dced93566e27c820bb"
+    },
+    {
+      "file": "responsive-3.log.gz",
+      "sha256": "aaef6cf326ad397ae2f8626ab9336f8cf899a67f01e15d6ba70170cf0d40a904",
+      "uncompressed_sha256": "b8544ab36d6a7a49d8400cb906c81512530046275457f11cbd78726794bab693"
+    },
+    {
+      "file": "responsive-7.log.gz",
+      "sha256": "415754cc44a0f6a9e4d8ce33258bcedcb080a8ca1f4396ccd9701faf9f8f0ec9",
+      "uncompressed_sha256": "51a08dceebec0779ac62c722a45951397fdecea59617ac05fe53c3fcc31da73b"
+    },
+    {
+      "file": "responsive-suite.log.gz",
+      "sha256": "a718a947000307546c21517223f9014df84d41ca8a97784bbdea188c98f5d1f4",
+      "uncompressed_sha256": "ec103cab646122499d3d69f80bb95ba59ba84624f8f003d75b33e724cfdc4b80"
+    },
+    {
+      "file": "palette.log.gz",
+      "sha256": "9f6b2e8884557b80ecd8396e42ffd1316b24ec661d3b7bfdefdba36bd8f1df7e",
+      "uncompressed_sha256": "b566f1b9c9b68df70e83c72615869bc1fea578535ecbdede4e297490fec34289"
+    },
+    {
+      "file": "results.json.gz",
+      "sha256": "5eb71788af147f25d02d82229fbd9cca5d637875ec87311583722950357ff1cf",
+      "uncompressed_sha256": "7c29a95110a1dba35087610eaa2e2fff7a78714bcd77b9d743be732f4e6d17ce"
+    },
+    {
+      "file": "gitcraft-pr183-ci-followup-build.log.gz",
+      "sha256": "21bff5ee02c3bc4d44465f7780cecbdc4942b2b41759e48fbb8d3ec907a60cef",
+      "uncompressed_sha256": "d25f6dbeb0556651d9953853c705c375785ee0b6463133634c682d43daa2150a"
+    },
+    {
+      "file": "gitcraft-pr183-linux-job.log.gz",
+      "sha256": "d83254b00b57596cf1798acc4f2ca1974e9ed68cf7806f240c2e7268f31752d7",
+      "uncompressed_sha256": "477ba72d9ceded4b2f3739e7c3acfa1c0e2ad85b7628ca96c7c8c9d5f887d9b5"
+    },
+    {
+      "file": "gitcraft-pr183-ci-followup-tests.py.gz",
+      "sha256": "9a6b2c0a119adb12ef3d48385a8887c6e56250cd66f5074811bd8171da2465e5",
+      "uncompressed_sha256": "3f7a4df221a41514381b114fc5ea048924f8c35197850ab3bab07c0638e4ebae"
+    },
+    {
+      "file": "fmt.log.gz",
+      "sha256": "f61f27bd17de546264aa58f40f3aafaac7021e0ef69c17f6b1b4cd7664a037ec",
+      "uncompressed_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "clippy.log.gz",
+      "sha256": "67fc3d125e910cfa4c8ea1521fea197267e97688a8c3bcfb27bf1992b97ee726",
+      "uncompressed_sha256": "3d838196e8f68826a8d77782bc588398e939802e9753bae67c0f985589162dd3"
+    }
+  ],
+  "additional_checks": {
+    "fmt": 0,
+    "strict_clippy_all_targets": 0
+  }
+}
