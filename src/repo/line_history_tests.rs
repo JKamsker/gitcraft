@@ -161,7 +161,15 @@ fn the_window_opens_the_history_of_lines_and_the_diff_of_one_of_them() -> Result
     );
 
     // The whole file's history, read meanwhile, doesn't take the place of the lines'.
-    let whole = super::Msg::FileHistory(PATH.to_owned(), Some("HEAD".to_owned()), Ok(Vec::new()));
+    let whole = super::Msg::FileHistory(
+        tab.file_view
+            .as_ref()
+            .ok_or("missing file view")?
+            .generation,
+        PATH.to_owned(),
+        Some("HEAD".to_owned()),
+        Ok(Vec::new()),
+    );
     let _ = tab.tx.send(whole);
     tab.poll(&ctx);
     let shown = tab.file_view.as_ref().and_then(|v| v.history.clone());

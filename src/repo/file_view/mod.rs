@@ -6,6 +6,18 @@ mod blame;
 mod history;
 mod line_history;
 
+#[cfg(test)]
+mod tests;
+
+use std::sync::atomic::{AtomicU64, Ordering};
+
+// Shared across repository tabs, and never reused when a view is closed or replaced.
+fn next_generation() -> u64 {
+    static NEXT: AtomicU64 = AtomicU64::new(1);
+    NEXT.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| n.checked_add(1))
+        .unwrap_or_else(|_| std::process::abort())
+}
+
 use egui::{Stroke, Ui};
 
 use super::file_text::{self, FileText};
@@ -28,6 +40,7 @@ pub(crate) enum FileTab {
 }
 
 pub(crate) struct FileView {
+    pub generation: u64,
     pub path: String,
     /// The commit history, blame and the file are at; HEAD and the working tree when `None`.
     pub rev: Option<String>,
@@ -46,6 +59,7 @@ pub(crate) struct FileView {
 impl FileView {
     pub fn new(path: &str, rev: Option<String>, tab: FileTab) -> Self {
         Self {
+            generation: next_generation(),
             path: path.to_owned(),
             rev,
             tab,
@@ -56,6 +70,19 @@ impl FileView {
             goto_line: Default::default(),
             marked_line: None,
         }
+    }
+
+    /// Invalidate references that can move, including cached failures. A full object ID
+    /// identifies immutable content; abbreviations and revision expressions do not.
+    pub fn invalidate_mutable(&mut self) -> bool {
+        if self.rev.as_deref().is_some_and(git::investigations::oid) {
+            return false;
+        }
+        self.generation = next_generation();
+        self.history = None;
+        self.blame = None;
+        self.text = None;
+        true
     }
 
     /// Whether `tab` still has to be loaded.
@@ -69,6 +96,15 @@ impl FileView {
 }
 
 impl RepoTab {
+    /// Refresh the visible pane now; other panes load when selected.
+    pub(super) fn invalidate_mutable_file_view(&mut self, ctx: &egui::Context) {
+        if let Some(view) = &mut self.file_view
+            && view.invalidate_mutable()
+        {
+            self.load_file_view(ctx);
+        }
+    }
+
     pub(super) fn file_view(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
         let t = Tokens::get(ui.ctx());
         let Some(view) = &self.file_view else { return };

@@ -106,10 +106,20 @@ pub(super) enum Msg {
         (u64, u64),
         Box<Result<diff::structural::Structural, String>>,
     ),
-    FileHistory(String, Option<String>, Result<Vec<git::FileCommit>, String>),
-    Blame(String, Option<String>, Result<file_view::BlameData, String>),
+    FileHistory(
+        u64,
+        String,
+        Option<String>,
+        Result<Vec<git::FileCommit>, String>,
+    ),
+    Blame(
+        u64,
+        String,
+        Option<String>,
+        Result<file_view::BlameData, String>,
+    ),
     /// A file as it is at a revision, for the file view.
-    FileText(String, Option<String>, Result<FileText, String>),
+    FileText(u64, String, Option<String>, Result<FileText, String>),
     /// Every file in the tree of a commit.
     TreeFiles(String, Result<Vec<String>, String>),
     RebaseCommits {
@@ -571,6 +581,7 @@ impl RepoTab {
                     self.folding
                         .saw_status(&work, &self.refs.head, Instant::now());
                     self.work = work;
+                    self.invalidate_mutable_file_view(ctx);
                     self.stash_picks.keep_changed(&self.work);
                     if wip_row_changed {
                         self.rebuild(ctx);
@@ -617,10 +628,11 @@ impl RepoTab {
                 branch_guard,
                 result,
             } => self.run_quick_edit(edit, hash, branch_guard, result, ctx),
-            Msg::FileHistory(path, rev, result) => {
+            Msg::FileHistory(generation, path, rev, result) => {
                 // Only the history of the revision shown: an older read may answer last. Nor
                 // the whole file's, once the history of some of its lines is shown.
                 if let Some(view) = &mut self.file_view
+                    && view.generation == generation
                     && view.path == path
                     && view.rev == rev
                     && view.lines.is_none()
@@ -628,16 +640,18 @@ impl RepoTab {
                     view.history = Some(result);
                 }
             }
-            Msg::Blame(path, rev, result) => {
+            Msg::Blame(generation, path, rev, result) => {
                 if let Some(view) = &mut self.file_view
+                    && view.generation == generation
                     && view.path == path
                     && view.rev == rev
                 {
                     view.blame = Some(result);
                 }
             }
-            Msg::FileText(path, rev, result) => {
+            Msg::FileText(generation, path, rev, result) => {
                 if let Some(view) = &mut self.file_view
+                    && view.generation == generation
                     && view.path == path
                     && view.rev == rev
                 {
