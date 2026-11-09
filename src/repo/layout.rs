@@ -137,11 +137,11 @@ impl RepoTab {
                 } else if self.review_document.open {
                     self.review_document_ui(ui, &mut acts);
                 } else if self.split.is_some() {
-                    self.graph_diff_view(ui, &mut acts);
+                    self.split_view(ui, &mut acts);
                 } else if self.absorb.is_some() {
                     self.absorb_view(ui, &mut acts);
                 } else if self.diff_beside_graph(&ctx) {
-                    self.split_view(ui, &mut acts);
+                    self.graph_diff_view(ui, &mut acts);
                 } else if self.diff.is_some()
                     && !self.history_beside_diff()
                     && self.docked(Panel::Diff)

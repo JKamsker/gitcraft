@@ -4,6 +4,7 @@
 use std::path::PathBuf;
 
 use egui::{Event, Key, Modifiers, PointerButton, RawInput};
+use egui_kittest::kittest::Queryable;
 
 use super::super::nav_history::NavHistory;
 use super::{View, keyboard_step, nav_step, record};
@@ -720,6 +721,8 @@ fn the_keys_step_through_the_drawn_tab() {
                     egui_extras::install_image_loaders(ui.ctx());
                 } else {
                     tab.ui(ui);
+                    // Its widgets named, to be found by name.
+                    crate::a11y::end_frame(ui.ctx());
                 }
             },
             tab,
@@ -739,6 +742,14 @@ fn the_keys_step_through_the_drawn_tab() {
     harness.state_mut().queue(Action::OpenDiff(key.clone()));
     frames(&mut harness);
     assert!(harness.state().diff_beside_graph(&harness.ctx));
+    // Drawn, with its way back: not the commit-split editor's (empty) view in its place.
+    // Its close button, named without the key in its tooltip ("Close (Esc)").
+    let close = crate::i18n::text("repo-core-0711");
+    let close = close.split(" (").next().unwrap_or(close);
+    assert!(
+        harness.query_by_label(close).is_some(),
+        "the diff below the graph isn't drawn"
+    );
     // Alt+↓ is the diff's now: the graph's selection stays.
     harness.key_press_modifiers(Modifiers::ALT, Key::ArrowDown);
     frames(&mut harness);
