@@ -126,7 +126,7 @@ fn find(
             return Err(Stop::Cancelled);
         }
         let (Some(a), Some(b)) = (timelines.ours.get(i - 1), timelines.theirs_merged(j - 1)) else {
-            return Err(Stop::Failed("the commits changed meanwhile".to_owned()));
+            return Err(Stop::Failed(crate::i18n::text("repo-core-0433").to_owned()));
         };
         let conflicts = git::merge_conflicts(repo, (&a.hash, b), base, path).map_err(Stop::Failed);
         merges.fetch_add(1, Ordering::Relaxed);

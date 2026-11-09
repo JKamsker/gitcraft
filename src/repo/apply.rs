@@ -1,22 +1,74 @@
 //! Carrying out the actions the views asked for.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use super::detached::Leave;
 use super::{
-    Action, Compare, DiffKey, DiffView, Msg, OpKind, OpenRequest, Refresh, RepoTab, Undo, diff,
-    guide, ops, spawn,
+    Action, Compare, DiffKey, Msg, OpKind, OpenRequest, Refresh, RepoTab, Undo, diff, guide, ops,
+    spawn,
 };
 use crate::git;
 use crate::settings::Settings;
 
+/// Ownership retained while a partial patch is being written, possibly over SSH/WSL.
+/// A read epoch changes at reload start, before new data (or a read error) can arrive.
+pub(super) struct PreparedPick {
+    path: PathBuf,
+    read: u64,
+    epoch: u64,
+    key: DiffKey,
+    request: u64,
+    pick: diff::Pick,
+    label: String,
+    preparing: String,
+    started: Instant,
+}
+
 impl RepoTab {
     pub(crate) fn apply(&mut self, action: Action, ctx: &egui::Context) {
+        self.notice_connections(ctx);
+        let action = match action {
+            Action::OpenLinkedPr { number, remote } => {
+                if !self.select_linked_forge(&remote, ctx) {
+                    return;
+                }
+                Action::OpenPr(number)
+            }
+            action => action,
+        };
         let Some(action) = self.popout_intercept(action, ctx) else {
             return;
         };
+        // Any later user action supersedes a pending automatic backlink diff opening.
+        if !matches!(&action, Action::OpenCommitChanges(_)) {
+            self.pending_commit_diff = None;
+        }
+        if matches!(
+            &action,
+            Action::OpenDiff(_)
+                | Action::OpenCommitChanges(_)
+                | Action::FileView { .. }
+                | Action::ShowActivity(_)
+                | Action::OpenPr(_)
+                | Action::OpenCi { .. }
+        ) {
+            self.dossier.close();
+            self.symbols.close();
+        }
         let plain = OpKind::plain();
+        if matches!(
+            &action,
+            Action::Select(_)
+                | Action::SelectHash(_)
+                | Action::SelectStash(_)
+                | Action::OpenPr(_)
+                | Action::ClosePr
+                | Action::Compare { .. }
+                | Action::CloseCompare
+        ) {
+            self.keyboard_clear_cursor();
+        }
         // Fetch, Pull and Push asked for while something runs start once it is done.
         if self.busy_op.is_some()
             && let Some(waiter) = super::running::Waiter::of(&action, ctx)
@@ -27,13 +79,76 @@ impl RepoTab {
         let Some(action) = self.fence_gate(action, ctx) else {
             return;
         };
+        if matches!(
+            &action,
+            Action::OpenDiff(_)
+                | Action::OpenCommitChanges(_)
+                | Action::OpenPr(_)
+                | Action::OpenCi { .. }
+                | Action::FileView { .. }
+        ) {
+            self.file_comparison = None;
+        }
+        if matches!(
+            &action,
+            Action::OpenDiff(_)
+                | Action::FileView { .. }
+                | Action::OpenPr(_)
+                | Action::Select(_)
+                | Action::SelectHash(_)
+                | Action::SelectPr(_)
+                | Action::SelectStash(_)
+                | Action::Compare { .. }
+        ) {
+            self.review_document.open = false;
+        }
         match action {
+            Action::KeyboardStep(step) => self.keyboard_step(step),
+            Action::FocusPane(pane) => self.focus_pane(pane, ctx),
+            Action::Keyboard(request) => self.apply_keyboard(request, ctx),
+            Action::SubmitPreflight(plan) => self.submit_preflight(*plan, ctx),
+            Action::FixPreflight(plan, kind) => self.fix_preflight(*plan, &kind, ctx),
+            Action::PreflightMessages(plan) => self.preflight_messages(*plan, ctx),
+            Action::ReloadPreflight(plan) => self.reload_preflight(*plan, ctx),
+            Action::RepositoryTools(act) => self.repository_tools_act(act, ctx),
+            Action::DvcPull => {
+                self.dialog = Some(super::Dialog::confirm(
+                    "DVC: Pull",
+                    crate::i18n::text("repo-core-0143").into(),
+                    crate::i18n::text("repo-core-0144"),
+                    git::dvc::pull_steps(),
+                    None,
+                ));
+            }
+
+            Action::OpenFileComparison(page) => self.open_file_comparison(page, ctx),
+            Action::RefreshFileComparison => self.load_file_comparison(ctx),
+            Action::CloseFileComparison => self.file_comparison = None,
+            Action::ComparisonMove { request, index } => self.comparison_move(request, index, ctx),
+            Action::ComparisonCell {
+                request,
+                path,
+                column,
+            } => self.comparison_cell(request, path, column, ctx),
+            Action::ComparisonPick {
+                request,
+                boundary,
+                lines,
+                whole,
+            } => self.comparison_pick(request, boundary, lines, whole, ctx),
+            Action::ComparisonNormalPatch => self.comparison_normal_patch(ctx),
+            Action::ReviewTools(act) => self.review_tools_act(act, ctx),
+            Action::Story(act) => self.story_act(act, ctx),
+            Action::Freshness(act) => self.freshness_act(act, ctx),
+            Action::Review(act) => self.review_act(act, ctx),
             Action::Select(row) => {
                 self.leave_pages();
                 self.doctor = None;
                 self.select(row, ctx);
                 self.hint_after_select(row, ctx);
             }
+            Action::ActivityCommit(hash) => self.activity_commit(hash, ctx),
+            Action::OpenCommitChanges(hash) => self.open_commit_changes(hash, ctx),
             Action::SelectHash(hash) => {
                 self.leave_pages();
                 // Following a link is a step of its own, back and forward.
@@ -48,12 +163,14 @@ impl RepoTab {
                 self.select_stash(i, ctx);
             }
             Action::OpenDiff(key) => {
+                self.keyboard.borrow_mut().pane = Some(super::keyboard::Pane::Graph);
                 self.open_diff(key, ctx);
                 if self.diff.is_some() {
                     self.offer_hint(guide::Hint::ChangeNavigation, ctx);
                 }
             }
             Action::Custom(act) => self.custom_act(act, ctx),
+            Action::OpenLinkedPr { .. } => unreachable!("linked PR normalized above"),
             Action::OpenPr(number) => {
                 // It refuses while an editor takes the big area: the builds shown stay then.
                 let requests = self.pr_requests;
@@ -76,6 +193,7 @@ impl RepoTab {
             Action::ReloadPr => self.load_pr(ctx),
             Action::Pr(act) => self.pr_act(act, ctx),
             Action::Versions(act) => self.versions_act(act, ctx),
+            Action::Insights(act) => self.insights_act(act, ctx),
             Action::OpenCi { sha, run } => {
                 self.bakeoff.view = None;
                 self.open_ci(sha, run, ctx);
@@ -86,15 +204,64 @@ impl RepoTab {
             }
             Action::CloseCi => self.ci_view = None,
             Action::Ci(act) => self.ci_act(act, ctx),
+            Action::LoadPromptSession(hash) => self.load_prompt_session(hash, ctx),
+            Action::ShowPromptHunk(seed) => self.show_prompt_hunk(seed, ctx),
+            Action::OpenLineDossier(seed) => {
+                self.symbols.close();
+                self.open_line_dossier(seed, ctx)
+            }
+            Action::OpenSymbolBiography(seed) => self.open_symbol_biography(seed, ctx),
+            Action::CloseSymbolBiography => self.symbols.close(),
+            Action::CloseLineDossier => self.dossier.close(),
+            Action::OpenPinnedFileLine(seed) => {
+                if !git::investigations::oid(&seed.commit) || seed.line == 0 {
+                    return;
+                }
+                super::file_text::focus(
+                    ctx,
+                    ("file_view", &seed.path, Some(&seed.commit)),
+                    seed.line,
+                );
+                self.apply(
+                    Action::FileView {
+                        path: seed.path,
+                        rev: Some(seed.commit),
+                        tab: super::file_view::FileTab::File,
+                    },
+                    ctx,
+                );
+            }
+            Action::EarlierVersions => self.earlier_versions(ctx),
+            Action::DraftEnable(on) => self.enable_working_drafts(on, ctx),
+            Action::DraftSnapshot => self.save_working_draft(false, ctx),
+            Action::DraftUndo => self.undo_working_draft(ctx),
+            Action::DraftPreview { id, path, index } => {
+                self.preview_working_draft(id, path, index, ctx)
+            }
+            Action::DraftRecover { preview, hunks } => {
+                self.recover_working_draft(*preview, hunks, ctx)
+            }
+            Action::OpenContentRecovery => self.dialog = Some(super::Dialog::ContentRecovery),
+            Action::ContentSearch(query) => self.content_search(query, ctx),
+            Action::ContentInspect(hit, source) => self.content_inspect(hit, source, ctx),
+            Action::ContentPrepare(target) => self.content_prepare(target, ctx),
+            Action::ContentPerform(prepared) => self.content_perform(prepared, ctx),
+            Action::LocalCi(act) => self.local_ci_act(act, ctx),
+            Action::Email(act) => self.email_act(act, ctx),
+            Action::Devcontainer(act) => self.devcontainer_act(act, ctx),
             Action::Reflog(act) => self.reflog_act(act, ctx),
             Action::CloseReflog => self.close_reflog(ctx),
             Action::Issue(act) => self.issue_act(act, ctx),
+            Action::OpenSshSetup => self.open_ssh_setup(ctx),
+            Action::OpenTour => self.open_tour(true, ctx),
             Action::OpenDoctor(section) => self.open_doctor(section, ctx),
             Action::CloseDoctor => self.doctor = None,
             Action::Doctor(act) => self.doctor_act(act, ctx),
             Action::Agent(act) => self.agent_act(act, ctx),
+            Action::Resolver(act) => self.resolver_act(act, ctx),
             Action::Bake(act) => self.bake_act(act, ctx),
             Action::CloseDiff => {
+                self.keyboard.borrow_mut().pane = Some(super::keyboard::Pane::Detail);
                 self.diff = None;
                 self.conflict = None;
             }
@@ -124,6 +291,7 @@ impl RepoTab {
             Action::DeleteTag { name, target } => self.delete_tag(name, target, ctx),
             Action::Commit => self.commit(ctx),
             Action::Key(command) => self.run_key(command, ctx),
+            Action::CopyText(text) => ctx.copy_text(text),
             Action::FocusCommit => self.focus_commit(ctx),
             Action::Fetch => {
                 self.last_fetch = Instant::now();
@@ -189,12 +357,10 @@ impl RepoTab {
                 settings.show_detail = !settings.show_detail;
                 settings.set(ctx);
             }
-            Action::ToggleTerminal => self.toggle_terminal(ctx),
+            Action::Terminal(action) => self.terminals.apply(action, &self.path, ctx),
             Action::Popout(request) => self.popout_request(request, ctx),
-            Action::NewTerminal { shell, cwd } => self.start_terminal(shell, cwd, ctx),
-            Action::CloseTerminal(i) => self.close_terminal(i),
-            Action::SelectTerminal(i) => self.active_terminal = i,
             Action::ToggleSearch => self.toggle_search(),
+            Action::FocusSearch => self.focus_search(ctx),
             Action::SearchStep(d) => self.search_step(d, ctx),
             Action::CreatePr {
                 branch,
@@ -215,7 +381,7 @@ impl RepoTab {
                     &self.path,
                     &rel.to_string_lossy(),
                 )) {
-                    self.status = Some((e, true));
+                    self.status = Some(crate::repo::Notice::plain((e, true)));
                 }
             }
             Action::OpenInEditor(rel) => {
@@ -224,7 +390,7 @@ impl RepoTab {
                     &editor,
                     &crate::remote::join(&self.path, &rel.to_string_lossy()),
                 ) {
-                    self.status = Some((e, true));
+                    self.status = Some(crate::repo::Notice::plain((e, true)));
                 }
             }
             Action::OpenInDiffTool(key) => self.open_in_diff_tool(key, ctx),
@@ -273,6 +439,32 @@ impl RepoTab {
             Action::DiffRendered(on) => self.show_diff_rendered(on, ctx),
             Action::DiffRich(kind) => self.show_diff_rich(kind, ctx),
             Action::DiffGoToLine { old, new } => self.diff_go_to_line(old, new),
+            Action::DiffWrap(on) => {
+                let mut settings = Settings::get(ctx);
+                settings.diff_wrap = on;
+                settings.set(ctx);
+                if let Some(view) = &mut self.diff {
+                    view.text_sel = None;
+                    let logical = super::diff::logical_wrap_offset(
+                        view.wrap_offsets.as_deref().map(Vec::as_slice),
+                        view.scroll,
+                    );
+                    view.scroll_to = Some(logical);
+                    view.wrap_offsets = None;
+                }
+            }
+            Action::DiffSvgSource(on) => {
+                if let Some(view) = &mut self.diff {
+                    view.svg_source = on;
+                }
+            }
+            Action::DiffDecrypted(on) => self.show_diff_decrypted(on, ctx),
+            Action::DiffDecryptedEncoding(encoding) => {
+                if let Some(view) = &mut self.diff {
+                    view.encrypted.close();
+                    view.encrypted.json_encoding = encoding;
+                }
+            }
             Action::DiffStructural(on) => self.show_diff_structural(on, ctx),
             Action::DiffStep(delta) => {
                 // Shown in place of the lines (not fallen back to them).
@@ -343,13 +535,19 @@ impl RepoTab {
             Action::ReviewBranch { branch, base } => self.start_review(ctx, branch, base),
             Action::SavePatch { hash, summary } => self.save_patch(hash, &summary, ctx),
             Action::ApplyPatch => self.apply_patch(ctx),
+            Action::OpenBehaviour => self.open_behaviour(),
+            Action::OpenLinkedMachines => self.open_linked_machines(ctx),
             Action::OpenBundleExport => self.open_bundle_export(ctx),
             Action::OpenBundleInspect => self.open_bundle_inspect(ctx),
             Action::ExportBundle { refs, base } => self.export_bundle(refs, base, ctx),
             Action::QuickEdit { edit, hash } => self.quick_edit(edit, hash, ctx),
             Action::DropMenu(menu) => self.drop_menu = Some(menu),
             Action::CommitDrop(drop) => self.commit_drop(drop, ctx),
-            Action::RunRebase => self.run_rebase(ctx),
+            Action::RunRebase => self.ask_run_rebase(ctx),
+            Action::ConfirmedRebase(id) => {
+                self.confirmed_rebase(id, ctx);
+            }
+            Action::AskRebase { onto, label } => self.ask_plain_rebase(onto, label, ctx),
             Action::FoldInto(hash) => self.fold_into(hash, ctx),
             Action::RunFold(plan) => self.run_fold(*plan, ctx),
             Action::AbortFold => self.abort_fold(ctx),
@@ -366,6 +564,7 @@ impl RepoTab {
             Action::CloseAbsorb => self.absorb = None,
             Action::Stack(act) => self.stack_act(act, ctx),
             Action::SignIn(creds) => self.sign_in(creds, ctx),
+            Action::SwitchHttps(url) => self.switch_https(url, ctx),
             Action::Ignore { pattern, path } => self.ignore(&pattern, &path, ctx),
             Action::PickLines {
                 pick: diff::Pick::Revert,
@@ -377,6 +576,7 @@ impl RepoTab {
                 base_label,
                 target,
                 target_label,
+                captions,
                 since_fork,
             } => self.compare(
                 Compare {
@@ -384,6 +584,7 @@ impl RepoTab {
                     base_label,
                     target,
                     target_label,
+                    captions,
                     since_fork,
                     data: None,
                     request: 0,
@@ -481,12 +682,18 @@ impl RepoTab {
         ctx: &egui::Context,
     ) {
         match added {
-            Err(e) => self.status = Some((e, true)),
+            Err(e) => self.status = Some(crate::repo::Notice::plain((e, true))),
             Ok(added) => {
                 if tracked {
                     self.run_prepared(
                         &format!("Ignore {pattern}"),
-                        &format!("{pattern} is in .gitignore, but {path} is still tracked"),
+                        &crate::i18n::message(
+                            "repo-core-0156",
+                            &[
+                                ("pattern", pattern.to_string().into()),
+                                ("path", path.to_string().into()),
+                            ],
+                        ),
                         ops(&[&[
                             "--literal-pathspecs",
                             "rm",
@@ -502,11 +709,17 @@ impl RepoTab {
                     );
                 } else {
                     let msg = if added {
-                        format!("Added {pattern} to .gitignore")
+                        crate::i18n::message(
+                            "repo-core-0162",
+                            &[("pattern", pattern.to_string().into())],
+                        )
                     } else {
-                        format!("{pattern} was already in .gitignore")
+                        crate::i18n::message(
+                            "repo-core-0163",
+                            &[("pattern", pattern.to_string().into())],
+                        )
                     };
-                    self.status = Some((msg, false));
+                    self.status = Some(crate::repo::Notice::plain((msg, false)));
                     self.reload_status(ctx);
                 }
             }
@@ -520,17 +733,38 @@ impl RepoTab {
         lines: &std::collections::BTreeSet<usize>,
         ctx: &egui::Context,
     ) {
-        let Some(DiffView {
-            key: DiffKey::Work(file),
-            data: Some(Ok(data)),
-            ..
-        }) = &self.diff
-        else {
+        let Some((patch, prepared)) = self.prepare_picked(pick, lines) else {
             return;
         };
-        let Some(patch) = diff::partial_patch(&data.header, &data.lines, lines, pick) else {
-            return;
+        let repo = prepared.path.clone();
+        self.here_or_later(
+            ctx,
+            move || git::save_patch_for(&repo, &patch),
+            move |tab, saved, ctx| tab.picked_prepared(prepared, saved, ctx),
+        );
+    }
+
+    /// Capture the displayed patch and its ownership before starting any asynchronous write.
+    pub(super) fn prepare_picked(
+        &mut self,
+        pick: diff::Pick,
+        lines: &std::collections::BTreeSet<usize>,
+    ) -> Option<(String, PreparedPick)> {
+        if self.busy_op.is_some()
+            || self.loading
+            || self.load_error.is_some()
+            || self.work_pending != 0
+        {
+            return None;
+        }
+        let view = self.diff.as_ref()?;
+        let (DiffKey::Work(file), Some(Ok(data))) = (&view.key, &view.data) else {
+            return None;
         };
+        if view.encrypted.enabled || view.request != view.data_request || !data.partial {
+            return None;
+        }
+        let patch = diff::partial_patch(&data.header, &data.lines, lines, pick)?;
         let n = lines.len();
         let label = format!(
             "{} {n} line{} of {}",
@@ -538,17 +772,67 @@ impl RepoTab {
             if n == 1 { "" } else { "s" },
             file.path
         );
-        // Written where git runs: on another machine, in the background.
-        let repo = self.path.clone();
-        self.here_or_later(
-            ctx,
-            move || git::save_patch_for(&repo, &patch),
-            move |tab, saved, ctx| tab.apply_picked(pick, &label, saved, ctx),
-        );
+        let prepared = PreparedPick {
+            path: self.path.clone(),
+            read: self.work_read,
+            epoch: self.work_epoch,
+            key: view.key.clone(),
+            request: view.request,
+            pick,
+            preparing: crate::i18n::message(
+                "repo-core-0166",
+                &[(
+                    "label",
+                    crate::repo::messages::display_operation(&label).into(),
+                )],
+            ),
+            label,
+            started: Instant::now(),
+        };
+        self.busy_op = Some(prepared.preparing.clone());
+        self.op_started = Some(prepared.started);
+        Some((patch, prepared))
+    }
+
+    /// Complete the same preparation for mouse and keyboard actions. A pending or failed
+    /// full read keeps retained diff/status identities, so those alone are not sufficient.
+    pub(super) fn picked_prepared(
+        &mut self,
+        prepared: PreparedPick,
+        saved: Result<String, String>,
+        ctx: &egui::Context,
+    ) {
+        if self.busy_op.as_ref() != Some(&prepared.preparing)
+            || self.op_started != Some(prepared.started)
+        {
+            return;
+        }
+        self.busy_op = None;
+        let current = self.diff.as_ref().is_some_and(|view| {
+            !view.encrypted.enabled
+                && view.key == prepared.key
+                && view.request == prepared.request
+                && view.data_request == view.request
+        });
+        if self.path != prepared.path
+            || self.work_read != prepared.read
+            || self.work_epoch != prepared.epoch
+            || self.work_pending != 0
+            || self.loading
+            || self.load_error.is_some()
+            || !current
+        {
+            self.status = Some(crate::repo::Notice::plain((
+                crate::i18n::text("repo-core-0167").to_owned(),
+                true,
+            )));
+            return;
+        }
+        self.apply_picked(prepared.pick, &prepared.label, saved, ctx);
     }
 
     /// Applies the patch of lines picked, saved at `saved` (see [`Self::pick_lines`]).
-    fn apply_picked(
+    pub(super) fn apply_picked(
         &mut self,
         pick: diff::Pick,
         label: &str,
@@ -558,7 +842,7 @@ impl RepoTab {
         let patch = match saved {
             Ok(p) => p,
             Err(e) => {
-                self.status = Some((e, true));
+                self.status = Some(crate::repo::Notice::plain((e, true)));
                 return;
             }
         };
@@ -576,7 +860,13 @@ impl RepoTab {
         };
         self.run_prepared(
             label,
-            &format!("{label}: not done"),
+            &crate::i18n::message(
+                "repo-core-0169",
+                &[(
+                    "label",
+                    crate::repo::messages::display_operation(label).into(),
+                )],
+            ),
             ops(&[&args]),
             Refresh::Status,
             kind,
@@ -594,30 +884,36 @@ impl RepoTab {
                 (done, git::strip_state(&path))
             },
             move |tab, (result, state), ctx| {
-                tab.status = Some(match result {
+                tab.status = Some(crate::repo::Notice::plain(match result {
                     Ok(Some(command)) => {
-                        let tool = if command == "nbstripout" { "nbstripout" } else { "Python" };
+                        let tool = if command == "nbstripout" {
+                            "nbstripout"
+                        } else {
+                            "Python"
+                        };
                         (
-                            format!(
-                                "Notebooks are staged without their outputs from now on (by \
-                                 {tool}, in this clone): git status may show them changed until \
-                                 they are committed once so"
+                            crate::i18n::message(
+                                "repo-core-0172",
+                                &[("tool", tool.to_string().into())],
                             ),
                             false,
                         )
                     }
                     Ok(_) => match state {
                         git::StripState::Other(name) => (
-                            format!("gitcraft no longer strips outputs, but the repository's {name} filter still does"),
+                            crate::i18n::message(
+                                "repo-core-0173",
+                                &[("name", name.to_string().into())],
+                            ),
                             false,
                         ),
-                        _ => ("Notebooks are staged with their outputs again".to_owned(), false),
+                        _ => (crate::i18n::text("repo-core-0174").to_owned(), false),
                     },
                     Err(e) => (
-                        format!("Could not change how notebooks are staged: {e}"),
+                        crate::i18n::message("repo-core-0175", &[("e", e.to_string().into())]),
                         true,
                     ),
-                });
+                }));
                 tab.reload_status(ctx);
                 tab.refresh_diff(ctx);
             },
@@ -643,25 +939,32 @@ impl RepoTab {
             return;
         };
         ed.solving = false;
-        self.status = Some(match result {
+        self.status = Some(crate::repo::Notice::plain(match result {
             Ok(text) => {
                 let before = ed.on_disk;
                 let left = ed.take_solved(text);
                 let solved = before.saturating_sub(left);
                 let message = match (solved, left) {
-                    (0, _) => format!("Mergiraf could not solve the conflicts in {path}"),
-                    (_, 0) => format!(
-                        "Mergiraf solved every conflict in {path}: check the result, then save"
-                    ),
-                    _ => format!(
-                        "Mergiraf solved {solved} of {before} conflicts in {path}; {left} left \
-                         to choose"
+                    (0, _) => {
+                        crate::i18n::message("repo-core-0176", &[("path", path.to_string().into())])
+                    }
+                    (_, 0) => {
+                        crate::i18n::message("repo-core-0177", &[("path", path.to_string().into())])
+                    }
+                    _ => crate::i18n::message(
+                        "repo-core-0178",
+                        &[
+                            ("solved", (solved).into()),
+                            ("before", (before).into()),
+                            ("path", path.to_string().into()),
+                            ("left", (left).into()),
+                        ],
                     ),
                 };
                 (message, false)
             }
             Err(e) => (e, true),
-        });
+        }));
     }
 
     /// Writes the conflict editor's file and marks it resolved.
@@ -692,7 +995,7 @@ impl RepoTab {
                         Msg::ConflictSaved(path, saved)
                     });
                 }
-                Err(e) => self.status = Some((e, true)),
+                Err(e) => self.status = Some(crate::repo::Notice::plain((e, true))),
             }
             return;
         }
@@ -712,7 +1015,7 @@ impl RepoTab {
             Ok(()) => {
                 self.run_prepared(
                     "Mark resolved",
-                    &format!("Saved {file}, but not marked resolved"),
+                    &crate::i18n::message("repo-core-0180", &[("file", file.to_string().into())]),
                     ops(&[&["--literal-pathspecs", "add", "--", &file]]),
                     Refresh::Status,
                     OpKind::plain(),
@@ -723,7 +1026,7 @@ impl RepoTab {
             Err(e) => {
                 // Not saved: its decisions aren't kept.
                 self.decisions_pending = None;
-                self.status = Some((e, true));
+                self.status = Some(crate::repo::Notice::plain((e, true)));
             }
         }
     }
@@ -742,10 +1045,19 @@ impl RepoTab {
         ctx: &egui::Context,
     ) {
         if let Some(busy) = &self.busy_op {
-            self.status = Some((
-                format!("{left}: {busy} was still running. Try again once it's done."),
+            self.status = Some(crate::repo::Notice::plain((
+                crate::i18n::message(
+                    "repo-core-0182",
+                    &[
+                        ("left", (left).into()),
+                        (
+                            "busy",
+                            crate::repo::messages::display_operation(busy).into(),
+                        ),
+                    ],
+                ),
                 true,
-            ));
+            )));
             return;
         }
         self.run_ops(label, ops, refresh, kind, ctx);
@@ -799,9 +1111,15 @@ pub(crate) fn open_in_editor(editor: &str, path: &Path) -> Result<(), String> {
         crate::shell_path::apply(&mut c);
         c
     };
-    let mut child = cmd
-        .spawn()
-        .map_err(|e| format!("Could not run {editor}: {e}"))?;
+    let mut child = cmd.spawn().map_err(|e| {
+        crate::i18n::message(
+            "repo-core-0191",
+            &[
+                ("editor", editor.to_string().into()),
+                ("e", format!("{}", e).into()),
+            ],
+        )
+    })?;
     // Reaped once it ends (most editor commands hand the file over and exit at once), or each
     // file opened would leave a zombie process for as long as the app runs.
     std::thread::spawn(move || {

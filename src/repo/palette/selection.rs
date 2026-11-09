@@ -25,7 +25,8 @@ impl RepoTab {
         let Some(commit) = self.selected.and_then(|i| self.commits.get(i)) else {
             return Vec::new();
         };
-        if commit.hash == WIP_HASH {
+        // The changes row, a merge put aside: rows of no commit.
+        if commit.hash == WIP_HASH || commit.hash.starts_with('\u{0}') {
             return Vec::new();
         }
         let hash = commit.hash.as_str();
@@ -160,6 +161,20 @@ impl RepoTab {
                 .key("commit:test"),
             );
         }
+        // Selection keys are stable identities. Project only the new visible captions,
+        // using the already-selected immutable commit rather than parsing their text.
+        for item in &mut items {
+            let id = match item.key.as_str() {
+                "commit:release" => "dev-baseline-selection-release",
+                "commit:split" => "dev-baseline-selection-split",
+                "commit:move" => "dev-baseline-selection-move",
+                "commit:bisect" => "dev-baseline-selection-bisect",
+                "commit:parallel-bisect" => "dev-baseline-selection-parallel-bisect",
+                "commit:test" => "dev-baseline-selection-test",
+                _ => continue,
+            };
+            item.label = crate::i18n::message(id, &[("commit", at.into())]);
+        }
         items
     }
 
@@ -182,9 +197,13 @@ impl RepoTab {
         let deleted = matches!(key, DiffKey::Work(f) if f.code == 'D');
         if !deleted {
             for (label, tab, kind) in [
-                ("View", FileTab::File, "view"),
-                ("File history of", FileTab::History, "history"),
-                ("Blame", FileTab::Blame, "blame"),
+                (crate::i18n::text("repo-core-2996"), FileTab::File, "view"),
+                (
+                    crate::i18n::text("repo-core-2998"),
+                    FileTab::History,
+                    "history",
+                ),
+                (crate::i18n::text("repo-core-2498"), FileTab::Blame, "blame"),
             ] {
                 items.push(
                     PaletteItem::action(
@@ -224,16 +243,16 @@ impl RepoTab {
         match file.area {
             Area::Unstaged | Area::Untracked => {
                 let discard = if file.area == Area::Untracked {
-                    format!("Delete {path}…")
+                    crate::i18n::message("repo-core-3005", &[("path", path.to_string().into())])
                 } else {
-                    format!("Discard changes to {path}…")
+                    crate::i18n::message("repo-core-3006", &[("path", path.to_string().into())])
                 };
                 vec![
                     PaletteItem::action(
                         format!("Stage {path}"),
                         "file",
                         stage_action(
-                            "Stage",
+                            crate::i18n::text("repo-core-0836"),
                             vec![vec!["--literal-pathspecs", "add", "--", path]],
                         ),
                     )

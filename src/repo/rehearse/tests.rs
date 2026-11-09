@@ -146,9 +146,19 @@ fn both_rehearsed_with_their_conflicts() -> Result<(), String> {
 /// A clean rehearsal done for real: the branch is rebased, and Ctrl+Z can undo it.
 #[test]
 fn applying_does_it_for_real_and_it_can_be_undone() -> Result<(), String> {
+    let progress = |phase: &str| {
+        if std::env::var_os("GITCRAFT_TEST_PROCESS_TRACE").as_deref()
+            == Some(std::ffi::OsStr::new("1"))
+        {
+            eprintln!("rehearsal apply fixture: {phase}");
+        }
+    };
+    progress("create repository");
     let ctx = egui::Context::default();
     let repo = diverged("apply", false)?;
+    progress("open tab");
     let mut tab = open(&repo, &ctx)?;
+    progress("rehearse rebase and merge");
     act(&mut tab, &ctx, both(None))?;
     let Played::Clean { tree, .. } = played(&tab, RehearseKind::Rebase)? else {
         return Err("the rebase didn't go through".to_owned());
@@ -159,7 +169,25 @@ fn applying_does_it_for_real_and_it_can_be_undone() -> Result<(), String> {
         .iter()
         .filter(|e| e.undo.is_some())
         .count();
+    let before = repo.rev("feature")?;
+    let onto = repo.rev("main")?;
+    progress("prepare real rebase");
     act(&mut tab, &ctx, RehearseAct::Apply(RehearseKind::Rebase))?;
+    progress("review and accept confirmation");
+    let accepted = tab.accept_rebase_for_test(&ctx, "feature", &before, &onto)?;
+    assert_eq!(
+        tab.timeline
+            .entries
+            .iter()
+            .filter(|e| e.undo.is_some())
+            .count(),
+        undo_before
+    );
+    progress("apply accepted rebase");
+    tab.apply(accepted, &ctx);
+    progress("settle applied rebase");
+    settle(&mut tab, &ctx)?;
+    progress("verify branch, tree and undo journal");
     assert!(tab.rehearsing.run.is_none());
     // The real rebase gives what the rehearsal said.
     assert_eq!(repo.rev("main")?, repo.rev("feature~3")?);
@@ -172,6 +200,11 @@ fn applying_does_it_for_real_and_it_can_be_undone() -> Result<(), String> {
             .count(),
         undo_before + 1
     );
+    progress("drop tab");
+    drop(tab);
+    progress("remove repository");
+    drop(repo);
+    progress("finished");
     Ok(())
 }
 
@@ -185,7 +218,7 @@ fn applying_after_a_branch_moved_is_refused() -> Result<(), String> {
     let tip = repo.rev("feature")?;
     repo.git(&["branch", "-f", "main", "main~1"])?;
     act(&mut tab, &ctx, RehearseAct::Apply(RehearseKind::Merge))?;
-    let (said, bad) = tab.status.clone().ok_or("nothing said")?;
+    let (said, bad) = tab.status.as_deref().cloned().ok_or("nothing said")?;
     assert!(bad);
     assert!(said.starts_with("main moved since the rehearsal"), "{said}");
     assert_eq!(repo.rev("feature")?, tip);
@@ -206,7 +239,7 @@ fn applying_with_uncommitted_changes_is_refused() -> Result<(), String> {
     tab.reload(&ctx);
     settle(&mut tab, &ctx)?;
     act(&mut tab, &ctx, RehearseAct::Apply(RehearseKind::Rebase))?;
-    let (said, bad) = tab.status.clone().ok_or("nothing said")?;
+    let (said, bad) = tab.status.as_deref().cloned().ok_or("nothing said")?;
     assert!(bad);
     assert!(
         said.starts_with("Commit or stash your changes first"),

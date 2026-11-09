@@ -85,7 +85,7 @@ fn worktree_branches_are_ticked_and_checked_in_the_background() -> Result<(), St
     assert!(order[0].clean());
     assert_eq!(
         super::grid::step_note(m, &order[1]),
-        format!("conflicts with {} (1 file)", m.branches[order[0].branch])
+        format!("conflicts with {} (One file)", m.branches[order[0].branch])
     );
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::remove_dir_all(dir.with_extension("wt"));

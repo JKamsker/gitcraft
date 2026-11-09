@@ -55,6 +55,33 @@ pub fn persistence_path() -> Option<PathBuf> {
     portable_dir().map(|dir| dir.join("app.ron"))
 }
 
+/// Existing state for early presentation, without creating/probing portable storage or
+/// populating the mode cache. A readable saved portable language is useful even on a
+/// read-only medium; full App startup later applies its authoritative usable-mode settings.
+pub(crate) fn startup_state_path() -> Option<PathBuf> {
+    startup_state_path_by(
+        program_dir().as_deref(),
+        || eframe::storage_dir("gitcraft"),
+        |dir| dir.join(MARKER).is_file() || is_portable_data(&dir.join(DATA)),
+    )
+}
+fn startup_state_path_by(
+    program: Option<&Path>,
+    installed: impl FnOnce() -> Option<PathBuf>,
+    portable_requested: impl FnOnce(&Path) -> bool,
+) -> Option<PathBuf> {
+    if let Some(dir) = program
+        && !dir
+            .to_string_lossy()
+            .replace('\\', "/")
+            .contains("/AppTranslocation/")
+        && portable_requested(dir)
+    {
+        return Some(dir.join(DATA).join("app.ron"));
+    }
+    installed().map(|dir| dir.join("app.ron"))
+}
+
 /// Whether a portable copy may keep sign-ins in the system's credential store (Credential
 /// Manager, Keychain, Secret Service), as the settings say: off until they are applied.
 static STORE_WANTED: AtomicBool = AtomicBool::new(false);
@@ -142,6 +169,21 @@ pub(crate) fn detect(dir: &Path) -> Mode {
 const TRANSLOCATED: &str = "Portable mode is off: macOS runs this downloaded copy from a \
     temporary folder. Run xattr -dr com.apple.quarantine on gitcraft.app, then start it again.";
 
+/// Finite warning paint; portable detection/probing and raw cached Mode stay unchanged.
+pub fn display_message(raw: &str) -> Option<String> {
+    if raw == TRANSLOCATED {
+        return Some(crate::i18n::text("interaction-start-error-portable-translocated").to_owned());
+    }
+    raw.strip_prefix("Portable mode is off: gitcraft can't write to ")
+        .and_then(|s| s.strip_suffix(". Settings are kept in your user's app data this time."))
+        .map(|detail| {
+            crate::i18n::message(
+                "interaction-start-error-portable-write",
+                &[("detail", detail.into())],
+            )
+        })
+}
+
 /// A `data` folder that is gitcraft's: empty, or holding the window's saved state.
 fn is_portable_data(data: &Path) -> bool {
     if !data.is_dir() {
@@ -170,3 +212,36 @@ fn usable(data: &Path) -> Result<(), String> {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod startup_language_tests {
+    use super::*;
+    use std::cell::Cell;
+
+    #[test]
+    fn early_state_path_uses_recorded_portable_or_installed_location_without_write_probes() {
+        let queried = Cell::new(0);
+        let installed = || {
+            queried.set(queried.get() + 1);
+            Some(PathBuf::from("/recorded/installed"))
+        };
+        let portable = startup_state_path_by(Some(Path::new("/recorded/app")), installed, |_| true);
+        assert_eq!(portable, Some(PathBuf::from("/recorded/app/data/app.ron")));
+        assert_eq!(queried.get(), 0);
+        let regular = startup_state_path_by(Some(Path::new("/recorded/app")), installed, |_| false);
+        assert_eq!(regular, Some(PathBuf::from("/recorded/installed/app.ron")));
+        assert_eq!(queried.get(), 1);
+        let portable_queries = Cell::new(0);
+        let translocated = startup_state_path_by(
+            Some(Path::new("/private/AppTranslocation/token")),
+            installed,
+            |_| {
+                portable_queries.set(portable_queries.get() + 1);
+                true
+            },
+        );
+        assert_eq!(translocated, regular);
+        assert_eq!(portable_queries.get(), 0);
+        assert_eq!(startup_state_path_by(None, || None, |_| false), None);
+    }
+}

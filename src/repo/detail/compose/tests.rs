@@ -5,7 +5,9 @@
 use std::path::{Path, PathBuf};
 
 use super::{join_message, prefill, prefix, split_message};
-use crate::git::{self, MessageSource};
+use crate::git;
+#[cfg(unix)]
+use crate::git::MessageSource;
 
 /// A fresh repository with one commit, in a folder whose name has a space and an umlaut.
 fn repo(name: &str) -> PathBuf {

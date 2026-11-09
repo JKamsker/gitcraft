@@ -29,6 +29,9 @@ impl App {
             self.active = i;
             return;
         }
+        if self.focus_elsewhere(&root, ctx) {
+            return;
+        }
         let parked = self.take_parked(&root);
         let Some(Tab::Repo(current)) = self.tabs.get_mut(self.active) else {
             self.open_repo(&root, ctx);
@@ -97,10 +100,13 @@ impl App {
 
     /// Takes the parked view of the folder `path` out of whichever tab has it.
     pub(super) fn take_parked(&mut self, path: &Path) -> Option<Box<RepoTab>> {
-        self.tabs.iter_mut().find_map(|tab| match tab {
-            Tab::Repo(r) => r.take_parked(path),
-            Tab::Home | Tab::Settings => None,
-        })
+        self.tabs
+            .iter_mut()
+            .chain(self.windows.parked.values_mut().flat_map(|w| &mut w.tabs))
+            .find_map(|tab| match tab {
+                Tab::Repo(r) => r.take_parked(path),
+                Tab::Home | Tab::Settings => None,
+            })
     }
 }
 

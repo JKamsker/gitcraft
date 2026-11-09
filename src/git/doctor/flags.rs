@@ -69,8 +69,12 @@ pub enum Sparse {
 
 /// The flagged files of `repo`, and how sparse-checkout is set up.
 pub fn flagged(repo: &Path) -> Result<(Vec<Flagged>, Sparse), String> {
-    let listed = run(Some(repo), &["ls-files", "-v", "-z"])
-        .map_err(|e| format!("Could not list the tracked files: {e}"))?;
+    let listed = run(Some(repo), &["ls-files", "-v", "-z"]).map_err(|e| {
+        crate::i18n::message(
+            "backend-could-not-list-the-tracked-files-e-2471c3",
+            &[("detail", (e).to_string().into())],
+        )
+    })?;
     let sparse = sparse(repo);
     let marked = parse_ls_files_v(&listed);
     let list = marked

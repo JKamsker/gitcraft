@@ -70,6 +70,10 @@ impl RepoTab {
         let Some(payload) = self.dragged(ui.ctx()) else {
             return;
         };
+        // A merge put aside is no commit to drop anything on.
+        if self.parked_at(row.i).is_some() {
+            return;
+        }
         let pointer = ui.ctx().pointer_interact_pos();
         let over_row = resp.contains_pointer();
         // The pill takes the drop when it is under the pointer and takes what is dragged;
@@ -132,8 +136,8 @@ fn scroll_speed(top: f32, bottom: f32, y: f32) -> f32 {
 mod tests {
     use super::*;
     use crate::git;
-    use crate::repo::graph_view::{ROW_H, ROW_PITCH};
-    use egui::{Event, Modifiers, PointerButton, Pos2, pos2};
+    use crate::repo::graph_view::readability_tests::painted_text_center;
+    use egui::{Event, Modifiers, PointerButton, Pos2};
 
     /// A tab on `main` showing the commits `c` (HEAD), `b` and `a`, each on the next.
     fn tab(ctx: &egui::Context) -> RepoTab {
@@ -164,27 +168,35 @@ mod tests {
         tab
     }
 
-    /// The middle of row `i`, away from its pill.
-    fn row(i: usize) -> Pos2 {
-        // Filters row (18) + spacing (8), then the column header (26).
-        pos2(600.0, 52.0 + ROW_PITCH * i as f32 + ROW_H / 2.0)
+    /// The painted summary is inside its row and away from the branch pill.
+    fn row(ctx: &egui::Context, tab: &mut RepoTab, i: usize) -> Pos2 {
+        let (_, shapes) = paint_frame(ctx, tab, Vec::new());
+        painted_text_center(&shapes, &tab.commits[i].summary)
     }
 
     /// Runs a frame of the graph with `events`; returns what it asked for.
     fn frame(ctx: &egui::Context, tab: &mut RepoTab, events: Vec<Event>) -> Vec<Action> {
+        paint_frame(ctx, tab, events).0
+    }
+
+    fn paint_frame(
+        ctx: &egui::Context,
+        tab: &mut RepoTab,
+        events: Vec<Event>,
+    ) -> (Vec<Action>, Vec<egui::epaint::ClippedShape>) {
         let input = egui::RawInput {
             screen_rect: Some(Rect::from_min_size(Pos2::ZERO, vec2(1200.0, 800.0))),
             events,
             ..Default::default()
         };
         let mut acts = Vec::new();
-        ctx.run_ui(input, |ui| {
+        let mut output = ctx.run_ui(input, |ui| {
             egui::CentralPanel::default()
                 .frame(egui::Frame::NONE)
                 .show(ui, |ui| tab.graph_view(ui, &mut acts));
-        })
-        .drop_without_applying_deltas();
-        acts
+        });
+        output.textures_delta.clear();
+        (acts, std::mem::take(&mut output.shapes))
     }
 
     fn button(pos: Pos2, pressed: bool) -> Event {
@@ -205,7 +217,9 @@ mod tests {
         to: usize,
         between: Vec<Event>,
     ) -> Vec<Action> {
-        let (start, end) = (row(from), row(to));
+        // The first frame establishes table geometry; locate both actual painted rows.
+        frame(ctx, tab, Vec::new());
+        let (start, end) = (row(ctx, tab, from), row(ctx, tab, to));
         let mut acts = frame(ctx, tab, vec![Event::PointerMoved(start)]);
         acts.extend(frame(ctx, tab, vec![button(start, true)]));
         for n in 1..=8 {
@@ -247,9 +261,10 @@ mod tests {
         assert!(labels[0].starts_with("Move bbbbbbbb above cccccccc"));
         assert!(!acts.iter().any(|a| matches!(a, Action::Select(_))));
 
-        let mut clicks = frame(&ctx, &mut tab, vec![Event::PointerMoved(row(2))]);
-        clicks.extend(frame(&ctx, &mut tab, vec![button(row(2), true)]));
-        clicks.extend(frame(&ctx, &mut tab, vec![button(row(2), false)]));
+        let point = row(&ctx, &mut tab, 2);
+        let mut clicks = frame(&ctx, &mut tab, vec![Event::PointerMoved(point)]);
+        clicks.extend(frame(&ctx, &mut tab, vec![button(point, true)]));
+        clicks.extend(frame(&ctx, &mut tab, vec![button(point, false)]));
         assert!(clicks.iter().any(|a| matches!(a, Action::Select(2))));
         assert!(drop_menu(&clicks).is_none());
     }

@@ -28,7 +28,12 @@ pub fn notes_namespaces(repo: &Path) -> Result<NotesNamespaces, String> {
         Some(repo),
         &["for-each-ref", "--format=%(refname)", NOTES_PREFIX],
     )
-    .map_err(|e| format!("Could not list the notes namespaces: {e}"))?;
+    .map_err(|e| {
+        crate::i18n::message(
+            "backend-could-not-list-the-notes-namespaces-e-2e45d6",
+            &[("detail", (e).to_string().into())],
+        )
+    })?;
     Ok(namespace_list(&default, &out))
 }
 
@@ -57,32 +62,44 @@ pub fn short_namespace(name: &str) -> &str {
 /// The full ref of the namespace `name` (short, or already full), or why it can't be one.
 pub fn notes_ref(name: &str) -> Result<String, String> {
     let short = short_namespace(name.trim());
-    let bad = |why: &str| Err(format!("“{short}” can't be a notes namespace: {why}"));
+    let bad = |why: &str| {
+        Err(crate::i18n::message(
+            "backend-short-can-t-be-a-notes-namespace-why-87cab3",
+            &[
+                ("short", (short).to_string().into()),
+                ("why", (why).to_string().into()),
+            ],
+        ))
+    };
     if short.is_empty() {
-        return bad("it is empty");
+        return bad(crate::i18n::text("backend-it-is-empty-3079e7"));
     }
     if short.starts_with('/') || short.ends_with('/') {
-        return bad("it can't start or end with “/”");
+        return bad(crate::i18n::text(
+            "backend-it-can-t-start-or-end-with-be8a1f",
+        ));
     }
     // As git: a space or a control character, not other spaces (it is given as `--ref=`, so
     // a leading `-` is fine too).
     if short.chars().any(|c| c == ' ' || c.is_control()) {
-        return bad("it can't have spaces");
+        return bad(crate::i18n::text("backend-it-can-t-have-spaces-154bc2"));
     }
     if short.chars().any(|c| "~^:?*[\\".contains(c)) {
-        return bad("it can't have any of ~ ^ : ? * [ \\");
+        return bad(crate::i18n::text("backend-it-can-t-have-any-of-cd4544"));
     }
     if short.contains("..") || short.contains("//") || short.contains("@{") {
-        return bad("it can't have “..”, “//” or “@{”");
+        return bad(crate::i18n::text("backend-it-can-t-have-or-737c22"));
     }
     if short
         .split('/')
         .any(|part| part.starts_with('.') || part.ends_with(".lock"))
     {
-        return bad("no part of it can start with “.” or end with “.lock”");
+        return bad(crate::i18n::text(
+            "backend-no-part-of-it-can-start-with-or-end-with-lock-82baad",
+        ));
     }
     if short.ends_with('.') {
-        return bad("it can't end with “.”");
+        return bad(crate::i18n::text("backend-it-can-t-end-with-8d5e90"));
     }
     Ok(format!("{NOTES_PREFIX}{short}"))
 }
@@ -95,13 +112,22 @@ pub fn read_note(repo: &Path, namespace: &str, hash: &str) -> Result<Option<Stri
         &["notes", &format!("--ref={r}"), "list", END_OPTS, hash],
         &[0, 1],
     )
-    .map_err(|e| format!("Could not read the note: {e}"))?;
+    .map_err(|e| {
+        crate::i18n::message(
+            "backend-could-not-read-the-note-e-732d9f",
+            &[("detail", (e).to_string().into())],
+        )
+    })?;
     let blob = listed.trim();
     if blob.is_empty() {
         return Ok(None);
     }
-    let text = run(Some(repo), &["cat-file", "blob", blob])
-        .map_err(|e| format!("Could not read the note: {e}"))?;
+    let text = run(Some(repo), &["cat-file", "blob", blob]).map_err(|e| {
+        crate::i18n::message(
+            "backend-could-not-read-the-note-e-732d9f",
+            &[("detail", (e).to_string().into())],
+        )
+    })?;
     Ok(Some(text))
 }
 
@@ -119,7 +145,12 @@ pub fn write_note(repo: &Path, namespace: &str, hash: &str, text: &str) -> Resul
         text,
     )
     .map(|_| ())
-    .map_err(|e| format!("Could not save the note: {e}"))
+    .map_err(|e| {
+        crate::i18n::message(
+            "backend-could-not-save-the-note-e-29fde2",
+            &[("detail", (e).to_string().into())],
+        )
+    })
 }
 
 /// Removes the note on `hash` in `namespace`, if it has one.
@@ -136,7 +167,12 @@ pub fn remove_note(repo: &Path, namespace: &str, hash: &str) -> Result<(), Strin
         ],
     )
     .map(|_| ())
-    .map_err(|e| format!("Could not delete the note: {e}"))
+    .map_err(|e| {
+        crate::i18n::message(
+            "backend-could-not-delete-the-note-e-6dd697",
+            &[("detail", (e).to_string().into())],
+        )
+    })
 }
 
 /// The git arguments that fetch `namespace` from `remote` into the namespace of the same

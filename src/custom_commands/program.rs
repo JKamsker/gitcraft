@@ -70,28 +70,75 @@ const TOAST_CHARS: usize = 600;
 
 /// The toast for a command that ended with `code`: (text, failed). The end of what it printed
 /// (both outputs), without colours or progress lines rewritten in place.
+#[derive(Clone, Debug)]
+pub struct CapturedToast {
+    name: String,
+    code: i32,
+    // Only the already cleaned, bounded tail travels through status/toast queues.
+    tail: String,
+}
+
+impl CapturedToast {
+    pub fn capture(name: &str, code: i32, stdout: &[u8], stderr: &[u8]) -> Self {
+        let out = clean(&String::from_utf8_lossy(stdout));
+        let err = clean(&String::from_utf8_lossy(stderr));
+        let printed = match (out.is_empty(), err.is_empty()) {
+            (_, true) => out,
+            (true, false) => err,
+            (false, false) => format!("{out}\n{err}"),
+        };
+        Self {
+            name: name.to_owned(),
+            code,
+            tail: tail(&printed),
+        }
+    }
+
+    pub fn raw(&self) -> (String, bool) {
+        let head = if self.code != 0 {
+            format!("{} failed (exit status {})", self.name, self.code)
+        } else {
+            format!("{} finished", self.name)
+        };
+        (self.with_tail(head), self.code != 0)
+    }
+
+    pub fn display(&self) -> (String, bool) {
+        let head = if self.code != 0 {
+            crate::i18n::message(
+                "interaction-custom-display-failed",
+                &[
+                    ("name", self.name.as_str().into()),
+                    ("code", self.code.into()),
+                ],
+            )
+        } else {
+            crate::i18n::message(
+                "interaction-custom-display-finished",
+                &[("name", self.name.as_str().into())],
+            )
+        };
+        (self.with_tail(head), self.code != 0)
+    }
+
+    fn with_tail(&self, head: String) -> String {
+        if self.tail.is_empty() {
+            head
+        } else {
+            format!("{head}\n{}", self.tail)
+        }
+    }
+}
+
+#[cfg(test)]
 pub fn toast_text(name: &str, code: i32, stdout: &[u8], stderr: &[u8]) -> (String, bool) {
-    let failed = code != 0;
-    let out = clean(&String::from_utf8_lossy(stdout));
-    let err = clean(&String::from_utf8_lossy(stderr));
-    let printed = match (out.is_empty(), err.is_empty()) {
-        (_, true) => out,
-        (true, false) => err,
-        // stderr last: a failure's reason, which the end of the toast keeps.
-        (false, false) => format!("{out}\n{err}"),
-    };
-    let head = if failed {
-        format!("{name} failed (exit status {code})")
-    } else {
-        format!("{name} finished")
-    };
-    let tail = tail(&printed);
-    let text = if tail.is_empty() {
-        head
-    } else {
-        format!("{head}\n{tail}")
-    };
-    (text, failed)
+    CapturedToast::capture(name, code, stdout, stderr).raw()
+}
+
+/// Opt-in presentation from actual source fields; legacy callers retain their API.
+#[cfg(test)]
+pub fn display_toast_text(name: &str, code: i32, stdout: &[u8], stderr: &[u8]) -> (String, bool) {
+    CapturedToast::capture(name, code, stdout, stderr).display()
 }
 
 /// The last [`TOAST_LINES`] lines of `text`, no more than [`TOAST_CHARS`] characters.
@@ -139,4 +186,50 @@ fn clean(text: &str) -> String {
         })
         .collect();
     lines.join("\n").trim().to_owned()
+}
+
+#[cfg(test)]
+mod display_tests {
+    use super::*;
+    #[test]
+    fn typed_toast_display_keeps_failed_flag_and_cleaned_external_tail_unchanged() {
+        let name = "Name\nfailed (exit status 5): {$x} 色";
+        for code in [0, 5] {
+            let raw = toast_text(
+                name,
+                code,
+                b"opaque stdout\n",
+                b"\x1b[31mprovider error: finished\x1b[0m\n",
+            );
+            crate::i18n::set_language("de");
+            let shown = display_toast_text(
+                name,
+                code,
+                b"opaque stdout\n",
+                b"\x1b[31mprovider error: finished\x1b[0m\n",
+            );
+            assert_eq!(shown.1, raw.1);
+            assert!(shown.0.starts_with(name));
+            assert!(
+                shown
+                    .0
+                    .ends_with("\nopaque stdout\nprovider error: finished")
+            );
+            assert!(shown.0.contains(if code == 0 {
+                "abgeschlossen"
+            } else {
+                "fehlgeschlagen (Exitstatus 5)"
+            }));
+            crate::i18n::set_language("en-US");
+            assert_eq!(
+                display_toast_text(
+                    name,
+                    code,
+                    b"opaque stdout\n",
+                    b"\x1b[31mprovider error: finished\x1b[0m\n"
+                ),
+                raw
+            );
+        }
+    }
 }

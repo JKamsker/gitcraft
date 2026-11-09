@@ -23,7 +23,7 @@ pub use keep_both_view::KeepBoth;
 use self::align::split_resolutions;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-enum Segment {
+pub(in crate::repo) enum Segment {
     Common(String),
     Conflict {
         ours: String,
@@ -116,7 +116,7 @@ fn is_marker(line: &str, kind: char) -> bool {
 
 /// Splits a file with conflict markers into common text and conflicts (diff3 bases kept).
 /// A conflict that never ends (no `>>>>>>>` before the end of the file) stays text.
-fn parse(text: &str) -> (Vec<Segment>, String, String) {
+pub(in crate::repo) fn parse(text: &str) -> (Vec<Segment>, String, String) {
     enum State {
         Common,
         Ours,
@@ -290,13 +290,32 @@ fn is_link(file: &Path) -> bool {
 pub fn save_solved(repo: &Path, path: &str, text: &str) -> Result<(), String> {
     let file = crate::remote::join(repo, path);
     if let Some(target) = crate::remote::parse(&file) {
-        return save_there(&target, text).map_err(|e| format!("Could not save {path}: {e}"));
+        return save_there(&target, text).map_err(|e| {
+            crate::i18n::message(
+                "repo-core-3786",
+                &[
+                    ("path", path.to_string().into()),
+                    ("e", e.to_string().into()),
+                ],
+            )
+        });
     }
     // A link put there since it was opened is not written through.
     if is_link(&file) {
-        return Err(format!("{path} is a symbolic link now: not saved"));
+        return Err(crate::i18n::message(
+            "repo-core-3787",
+            &[("path", path.to_string().into())],
+        ));
     }
-    std::fs::write(&file, text).map_err(|e| format!("Could not save {path}: {e}"))
+    std::fs::write(&file, text).map_err(|e| {
+        crate::i18n::message(
+            "repo-core-3786",
+            &[
+                ("path", path.to_string().into()),
+                ("e", format!("{}", e).into()),
+            ],
+        )
+    })
 }
 
 /// What the save script ends with when the file is a link, or not a file, now.
@@ -338,7 +357,7 @@ fn save_there(target: &crate::remote::Target, text: &str) -> Result<(), String> 
     )?;
     match out.code {
         0 => Ok(()),
-        NOT_A_PLAIN_FILE => Err("it is a symbolic link, or not a file, now: not saved".to_owned()),
+        NOT_A_PLAIN_FILE => Err(crate::i18n::text("repo-core-3796").to_owned()),
         _ => Err(String::from_utf8_lossy(&out.stderr).trim().to_owned()),
     }
 }
@@ -362,15 +381,16 @@ impl ConflictEditor {
         let text =
             String::from_utf8(crate::git::worktree_file(&crate::remote::join(repo, path)).ok()?)
                 .ok()?;
+        let editor = Self::from_text(path, text, state);
+        (editor.on_disk > 0).then_some(editor)
+    }
+    fn from_text(path: &str, text: String, state: Option<InProgress>) -> Self {
         let (segments, ours_label, theirs_label) = parse(&text);
         let conflicts = segments
             .iter()
             .filter(|s| matches!(s, Segment::Conflict { .. }))
             .count();
-        if conflicts == 0 {
-            return None;
-        }
-        Some(Self {
+        Self {
             path: path.to_owned(),
             choices: vec![None; conflicts],
             original: original::State::new(&segments),
@@ -389,13 +409,29 @@ impl ConflictEditor {
             history: Default::default(),
             reused: None,
             memo: Default::default(),
-        })
+        }
+    }
+
+    pub(crate) fn standalone(text: String) -> Result<Self, String> {
+        let editor = Self::from_text("MERGED", text, None);
+        if editor.on_disk > 200 {
+            return Err(crate::i18n::text("repo-core-3798").into());
+        }
+        Ok(editor)
+    }
+    pub(crate) fn resolved(&self) -> bool {
+        self.unresolved() == 0
     }
 
     /// Whether the file in the repository at `repo` is no longer as it was opened (here, one
     /// that can't be read is gone).
     pub fn changed_on_disk(&self, repo: &Path) -> bool {
         changed_on_disk(repo, &self.path, &self.opened) != Some(false)
+    }
+
+    /// Whether choices or edits were made here that aren't saved.
+    pub fn has_draft(&self) -> bool {
+        self.result != self.opened
     }
 
     /// The file as it was opened (for [`changed_on_disk`] in the background).
@@ -489,10 +525,12 @@ impl ConflictEditor {
     pub fn solved(&self) -> Result<String, String> {
         let left = self.unresolved();
         if left > 0 {
-            return Err(format!(
-                "{left} conflict{} still unresolved in {}",
-                if left == 1 { "" } else { "s" },
-                self.path
+            return Err(crate::i18n::message(
+                "repo-core-3799",
+                &[
+                    ("left", (left).into()),
+                    ("path", self.path.to_string().into()),
+                ],
             ));
         }
         Ok(self.result.clone())
@@ -502,13 +540,25 @@ impl ConflictEditor {
     fn side_names(&self) -> (String, String) {
         if self.rebase {
             (
-                format!("Upstream ({})", short(&self.ours_label)),
-                format!("Your commit ({})", short(&self.theirs_label)),
+                crate::i18n::message(
+                    "repo-core-3800",
+                    &[("ours-label", short(&self.ours_label).to_string().into())],
+                ),
+                crate::i18n::message(
+                    "repo-core-3801",
+                    &[("theirs-label", short(&self.theirs_label).to_string().into())],
+                ),
             )
         } else {
             (
-                format!("Ours ({})", short(&self.ours_label)),
-                format!("Theirs ({})", short(&self.theirs_label)),
+                crate::i18n::message(
+                    "repo-core-3802",
+                    &[("ours-label", short(&self.ours_label).to_string().into())],
+                ),
+                crate::i18n::message(
+                    "repo-core-3803",
+                    &[("theirs-label", short(&self.theirs_label).to_string().into())],
+                ),
             )
         }
     }

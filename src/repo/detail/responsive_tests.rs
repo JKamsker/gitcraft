@@ -120,9 +120,23 @@ fn responsive_composer_matrix_reserves_identity_and_keeps_one_toolbar() {
                 "file scrolling widened editor"
             );
             let distribute = h.get_by_label("Distribute staged fixes…").rect();
+            let staged = h.get_by_label("STAGED  1").rect();
+            let unstage = h.get_by_label("Unstage all").rect();
+            // The file tree and the actions above it can change height. The
+            // distribute action belongs alongside its own staged-file header.
             assert!(
-                distribute.top() < 240.0,
-                "distribute moved away from files header"
+                (distribute.center().y - staged.center().y).abs() <= 1.0
+                    && (distribute.center().y - unstage.center().y).abs() <= 1.0,
+                "distribute left staged header at {width}/{scale}: {distribute:?}, {staged:?}, {unstage:?}"
+            );
+            assert!(
+                distribute.left() >= 0.0
+                    && distribute.right() <= width / scale
+                    && distribute.top() >= 0.0
+                    && distribute.bottom() < heading.top()
+                    && !distribute.intersects(staged)
+                    && !distribute.intersects(unstage),
+                "distribute overlaps or leaves files panel at {width}/{scale}: {distribute:?}, {staged:?}, {unstage:?}, {heading:?}"
             );
             evidence(&mut h, &format!("compose-{width}-{scale}"));
         }

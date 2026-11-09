@@ -135,7 +135,7 @@ fn an_interactive_rebase_does_not_start_once_the_branch_moved() {
     let _ = std::fs::remove_dir_all(&dir);
     assert!(tab.busy_op.is_none());
     assert!(tab.rebase.is_some());
-    assert!(tab.status.as_ref().is_some_and(|(_, err)| *err));
+    assert!(tab.status.as_deref().is_some_and(|(_, err)| *err));
 }
 
 #[test]
@@ -267,7 +267,7 @@ fn a_remote_branch_is_checked_out_under_its_name_on_the_remote() {
 fn names_git_would_read_as_options_are_not_checked_out() {
     let mut status = None;
     assert!(refuse_option_like("--orphan=x", &mut status));
-    assert!(status.is_some_and(|(_, err)| err));
+    assert!(status.is_some_and(|notice| notice.1));
     let mut status = None;
     assert!(!refuse_option_like("feature/-x", &mut status));
     assert!(!refuse_option_like("refs/tags/v1", &mut status));
@@ -352,6 +352,7 @@ fn an_older_read_of_the_working_tree_does_not_replace_a_newer_one() {
         gerrit: None,
         submodules: Vec::new(),
         lfs: false,
+        practice: None,
         identity: Default::default(),
         requested: git::LOG_PAGE,
         log_from: None,
@@ -408,7 +409,7 @@ Resolved 'a.rs' using previous resolution.";
 }
 
 #[test]
-fn merging_and_rebasing_onto_a_branch_ignores_a_tag_of_the_same_name() {
+fn merging_and_rebasing_onto_a_branch_ignores_a_tag_of_the_same_name() -> Result<(), String> {
     use super::actions::{
         Action, BranchRef, fast_forward_action, merge_action, merge_message, rebase_action,
     };
@@ -430,11 +431,10 @@ fn merging_and_rebasing_onto_a_branch_ignores_a_tag_of_the_same_name() {
     }
     let branch_tip = rev("refs/heads/x");
     let start = rev("HEAD");
-    let steps = |action: Action| match action {
-        Action::UndoableOps { ops, .. } => ops,
-        _ => Vec::new(),
+    let go = |action: Action| match action {
+        Action::UndoableOps { ops, .. } => run_steps(&dir, &ops, OpKind::plain(), None).0,
+        _ => Err("expected undoable branch operation".to_owned()),
     };
-    let go = |action: Action| run_steps(&dir, &steps(action), OpKind::plain(), None).0;
     let ff = go(fast_forward_action(BranchRef::local("x"), "work"));
     let ff_head = rev("HEAD");
     let back = run(&["reset", "-q", "--hard", "HEAD@{1}"]);
@@ -443,8 +443,37 @@ fn merging_and_rebasing_onto_a_branch_ignores_a_tag_of_the_same_name() {
     let merged_from = rev("HEAD^2");
     let message = run(&["log", "-1", "--format=%s"]);
     assert!(run(&["reset", "-q", "--hard", "HEAD~1"]).is_ok());
-    let rebased = go(rebase_action(BranchRef::remote("origin/x"), "work"));
+    let ctx = egui::Context::default();
+    let mut tab = super::RepoTab::new(dir.clone(), &ctx);
+    let until = std::time::Instant::now() + std::time::Duration::from_secs(30);
+    while !tab.settled() || tab.history_gen == 0 {
+        tab.poll(&ctx);
+        assert!(
+            std::time::Instant::now() < until,
+            "branch tab did not settle"
+        );
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    let before_rebase = rev("HEAD")?;
+    let action = rebase_action(BranchRef::remote("origin/x"), "work");
+    assert!(matches!(&action, Action::AskRebase { onto, .. } if onto == "refs/remotes/origin/x"));
+    tab.apply(action, &ctx);
+    let accepted =
+        tab.accept_rebase_for_test(&ctx, "work", &before_rebase, &branch_tip.clone()?)?;
+    tab.apply(accepted, &ctx);
+    let until = std::time::Instant::now() + std::time::Duration::from_secs(30);
+    while !tab.settled() || tab.status.is_none() {
+        tab.poll(&ctx);
+        assert!(
+            std::time::Instant::now() < until,
+            "rebase did not settle: {:?}",
+            tab.status
+        );
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    let rebased = tab.status.as_deref().cloned().ok_or("no rebase result")?;
     let rebased_onto = rev("HEAD~1");
+    drop(tab);
     let _ = std::fs::remove_dir_all(&dir);
     assert!(ff.is_ok(), "{ff:?}");
     assert_eq!(ff_head, branch_tip);
@@ -456,7 +485,7 @@ fn merging_and_rebasing_onto_a_branch_ignores_a_tag_of_the_same_name() {
         message.map(|m| m.trim().to_owned()).as_deref(),
         Ok("Merge branch 'x' into work")
     );
-    assert!(rebased.is_ok(), "{rebased:?}");
+    assert!(!rebased.1, "{rebased:?}");
     assert_eq!(rebased_onto, branch_tip);
     assert_eq!(
         merge_message(BranchRef::local("x"), "main"),
@@ -466,6 +495,7 @@ fn merging_and_rebasing_onto_a_branch_ignores_a_tag_of_the_same_name() {
         merge_message(BranchRef::remote("origin/x"), "feat"),
         "Merge remote-tracking branch 'origin/x' into feat"
     );
+    Ok(())
 }
 
 #[test]
@@ -525,17 +555,20 @@ fn finish(tab: &mut super::RepoTab, ctx: &egui::Context) {
     }
 }
 
-/// An operation whose later step needed signing in runs again from that step: the ones before
-/// it are done, and running them again (the tag made again) would fail before the step that
-/// needed signing in.
+/// Hook/alias text alone cannot authorize credentials. Completed steps remain
+/// completed and the failed step stays available for an explicit manual rerun.
 #[test]
-fn signing_in_runs_again_only_the_steps_that_had_not_run() {
+fn alias_authentication_text_cannot_authorize_retry_of_remaining_steps() -> Result<(), String> {
     use super::{Action, Refresh, RepoTab};
     let dir = repo("sign-in-retry");
     let ctx = egui::Context::default();
     let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
-    // A push git answers like one that needs signing in.
-    let push = ops(&[&["push", "terminal prompts disabled", "refs/tags/v1"]]);
+    // A non-transport alias imitates an authentication failure.
+    let push = ops(&[&[
+        "-c",
+        "alias.gitcraft-test-auth=!printf \"Authentication failed for 'https://fixture.invalid/team/repo'\\n\" >&2; exit 1",
+        "gitcraft-test-auth",
+    ]]);
     let steps: Vec<Vec<String>> = ops(&[&["tag", "v1"]])
         .into_iter()
         .chain(push.clone())
@@ -551,18 +584,26 @@ fn signing_in_runs_again_only_the_steps_that_had_not_run() {
     finish(&mut tab, &ctx);
     let asked = matches!(tab.dialog, Some(super::Dialog::Credentials { .. }));
     let kept = tab.last_op.as_ref().map(|op| op.ops.clone());
-    let creds = git::Credentials {
-        username: "u".to_owned(),
-        password: "p".to_owned(),
-    };
+    let creds =
+        git::Credentials::for_url("https://fixture.invalid/team/repo", "u".into(), "p".into())?;
     tab.sign_in(creds, &ctx);
     finish(&mut tab, &ctx);
-    let status = tab.status.clone().map(|(s, _)| s).unwrap_or_default();
+    let status = tab
+        .status
+        .as_deref()
+        .cloned()
+        .map(|(s, _)| s)
+        .unwrap_or_default();
     let _ = std::fs::remove_dir_all(&dir);
-    assert!(asked);
+    assert!(!asked);
     assert_eq!(kept, Some(push));
-    // The push ran again (and needs signing in again), not the tag.
-    assert!(status.contains("sign-in needed"), "{status}");
+    assert!(tab.credentials.is_none());
+    assert!(tab.busy_op.is_none() && !tab.https_checking);
+    assert!(
+        status.contains("destination or account context changed"),
+        "{status}"
+    );
+    Ok(())
 }
 
 /// Aborting a merge or rebase throws away the conflicts resolved so far, with no undo: it asks
@@ -577,10 +618,10 @@ fn aborting_asks_first() {
     assert_eq!(asks, Some(ops(&[&["merge", "--abort"]])));
 }
 
-/// An undo that needed signing in stays undoable when the sign-in is cancelled, and signing in
-/// runs it again without moving the timeline until it goes through.
+/// An undo whose alias prints authentication text remains undoable, but that
+/// text cannot authorize a credential-bearing retry or move the timeline.
 #[test]
-fn an_undo_whose_sign_in_is_cancelled_stays_undoable() {
+fn unverified_alias_authentication_keeps_undo_without_authorizing_retry() -> Result<(), String> {
     use super::timeline::{Entry, Origin, RefState};
     use super::{RepoTab, UndoEntry};
     let dir = repo("sign-in-undo");
@@ -598,7 +639,11 @@ fn an_undo_whose_sign_in_is_cancelled_stays_undoable() {
     let entry = UndoEntry {
         id: 0,
         label: "Push".to_owned(),
-        undo: ops(&[&["push", "terminal prompts disabled", "refs/tags/v1"]]),
+        undo: ops(&[&[
+            "-c",
+            "alias.gitcraft-test-auth=!printf \"Authentication failed for 'https://fixture.invalid/team/repo'\\n\" >&2; exit 1",
+            "gitcraft-test-auth",
+        ]]),
         redo: Vec::new(),
         heads: None,
         agent: None,
@@ -624,10 +669,8 @@ fn an_undo_whose_sign_in_is_cancelled_stays_undoable() {
     // Cancelled.
     tab.dialog = None;
     let after_cancel = tab.timeline.current;
-    let creds = git::Credentials {
-        username: "u".to_owned(),
-        password: "p".to_owned(),
-    };
+    let creds =
+        git::Credentials::for_url("https://fixture.invalid/team/repo", "u".into(), "p".into())?;
     tab.sign_in(creds, &ctx);
     let retrying = tab.busy_op.is_some();
     finish(&mut tab, &ctx);
@@ -635,12 +678,14 @@ fn an_undo_whose_sign_in_is_cancelled_stays_undoable() {
     let entries = tab.timeline.entries.len();
     let _ = std::fs::remove_dir_all(&dir);
     assert!(running);
-    assert!(asked);
+    assert!(!asked);
     assert_eq!(after_cancel, Some(id));
-    assert!(retrying);
-    // Refused again: still there, still only once.
+    assert!(!retrying);
+    assert!(tab.credentials.is_none());
+    // No authorized retry: still there, still only once.
     assert_eq!(after_retry, Some(id));
     assert_eq!(entries, 1);
+    Ok(())
 }
 
 /// Work that panics (a bug in a dependency) still ends: the tab isn't left busy for good.
@@ -664,7 +709,7 @@ fn an_operation_that_panics_leaves_the_tab_idle() {
         std::panic::resume_unwind(Box::new("boom"))
     });
     finish(&mut tab, &ctx);
-    let op_status = tab.status.clone().map(|(s, _)| s);
+    let op_status = tab.status.as_deref().cloned().map(|(s, _)| s);
     // Work nothing waits for says so.
     tab.status = None;
     spawn(&tab.tx, &ctx, || {
@@ -677,7 +722,7 @@ fn an_operation_that_panics_leaves_the_tab_idle() {
         }
         std::thread::sleep(std::time::Duration::from_millis(5));
     }
-    let job_status = tab.status.clone().map(|(s, _)| s);
+    let job_status = tab.status.as_deref().cloned().map(|(s, _)| s);
     let _ = std::fs::remove_dir_all(&dir);
     assert!(tab.busy_op.is_none());
     assert_eq!(
@@ -703,7 +748,7 @@ fn a_drop_confirmed_while_busy_says_so() {
         },
         &ctx,
     );
-    let status = tab.status.clone();
+    let status = tab.status.as_deref().cloned();
     let _ = std::fs::remove_dir_all(&dir);
     assert_eq!(
         status,
@@ -748,7 +793,10 @@ fn dropped_patches_are_applied() {
     let diff_file = patches.join("change.DIFF");
     let _ = std::fs::write(&diff_file, &diff);
     // Something else on the status line already says it failed: no matter.
-    tab.status = Some(("Fetch failed: offline".to_owned(), true));
+    tab.status = Some(crate::repo::Notice::plain((
+        "Fetch failed: offline".to_owned(),
+        true,
+    )));
     let given = tab.apply_dropped_patch(diff_file.clone(), &ctx);
     // A second one while the first is applied is refused, not lost silently.
     let second = tab.apply_dropped_patch(diff_file.clone(), &ctx);
@@ -920,10 +968,10 @@ fn feature_failure_continuation_runs_when_a_queued_job_is_cancelled() -> Result<
         Err,
         || Ok::<_, String>(()),
         |tab, found, _| {
-            tab.status = Some((
+            tab.status = Some(crate::repo::Notice::plain((
                 found.err().unwrap_or_else(|| "cancelled work ran".into()),
                 true,
-            ));
+            )));
         },
     );
     let start = std::time::Instant::now();
@@ -931,7 +979,10 @@ fn feature_failure_continuation_runs_when_a_queued_job_is_cancelled() -> Result<
         tab.poll(&ctx);
         std::thread::sleep(std::time::Duration::from_millis(5));
     }
-    assert_eq!(tab.status, Some(("cancelled".into(), true)));
+    assert_eq!(
+        tab.status.as_deref().cloned(),
+        Some(("cancelled".into(), true))
+    );
     Ok(())
 }
 

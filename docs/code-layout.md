@@ -66,6 +66,7 @@ Assets and their licences are listed in [ATTRIBUTION.md](../ATTRIBUTION.md).
 | `src/theme/` | colour tokens, fonts, egui style; themes: catalogue, palettes, theme files |
 | `src/icons.rs` | embedded Lucide SVG icons, tinted |
 | `src/terminal/` | integrated terminal: pty, VT parsing (`vt100`), painting, keys, selection |
+| `src/repo/terminals.rs`, `src/repo/terminals/` | terminal panel owner: private shell collection, selection/visibility/launch transitions, typed actions, palette contributions and tab strip |
 | `src/repo/mod.rs` | one repository tab: state, background git work, undo / redo, toolbar |
 | `src/mcp/` | `gitcraft mcp`: the MCP server (`rmcp`), its tools, and the token-checked channel to the window |
 | `src/repo/agent/` | agents' requests in a tab: planned as undoable steps, queued, the approval card's state |

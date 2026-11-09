@@ -30,14 +30,19 @@ pub(super) fn timeline(
     if let Some(e) = &d.inline_error {
         ui.colored_label(
             t.warning,
-            format!("Comments on lines couldn't be read: {e}"),
+            crate::i18n::message(
+                "repo-workflows-pr_view-timeline-e72570a1",
+                &[("e", (e).clone().into())],
+            ),
         );
     }
     if d.timeline.is_empty() {
         ui.label(
-            RichText::new("No comments yet.")
-                .color(t.text_faint)
-                .italics(),
+            RichText::new(crate::i18n::text(
+                "repo-workflows-pr_view-timeline-b7cba957",
+            ))
+            .color(t.text_faint)
+            .italics(),
         );
         return;
     }
@@ -107,7 +112,9 @@ fn dismiss_box(ui: &mut Ui, entry: &Entry, draft: &mut PrDraft, acts: &mut Vec<A
     ui.add_enabled(
         !draft.posting,
         egui::TextEdit::singleline(&mut draft.dismiss_text)
-            .hint_text("Why is this review dismissed?")
+            .hint_text(crate::i18n::text(
+                "repo-workflows-pr_view-dismiss-box-399675ba",
+            ))
             .desired_width(f32::INFINITY),
     );
     if let Some(error) = draft.error_at(Place::Dismiss) {
@@ -116,12 +123,22 @@ fn dismiss_box(ui: &mut Ui, entry: &Entry, draft: &mut PrDraft, acts: &mut Vec<A
     ui.horizontal(|ui| {
         let can_send = !draft.dismiss_text.trim().is_empty() && !draft.posting;
         if ui
-            .add_enabled(can_send, egui::Button::new("Dismiss review"))
+            .add_enabled(
+                can_send,
+                egui::Button::new(crate::i18n::text(
+                    "repo-workflows-pr_view-dismiss-box-152c5716",
+                )),
+            )
             .clicked()
         {
             acts.push(Action::Pr(PrAct::Dismiss));
         }
-        if ui.button("Cancel").clicked() {
+        if ui
+            .button(crate::i18n::text(
+                "repo-workflows-pr_view-dismiss-box-19766ed6",
+            ))
+            .clicked()
+        {
             acts.push(Action::Pr(PrAct::CancelDismiss));
         }
     });
@@ -139,10 +156,7 @@ fn entry_header(
         let (rect, _) = ui.allocate_exact_size(vec2(20.0, 20.0), Sense::hover());
         widgets::avatar(ui, rect.center(), 10.0, &entry.author, "");
         ui.label(RichText::new(&entry.author).font(theme::medium(12.5)));
-        let verb = match &entry.kind {
-            EntryKind::Comment | EntryKind::Inline { .. } => "commented",
-            EntryKind::Review(verdict) => verdict,
-        };
+        let verb = entry_verb(&entry.kind);
         ui.label(RichText::new(verb).color(t.text_dim));
         if let EntryKind::Inline {
             path,
@@ -153,7 +167,12 @@ fn entry_header(
         } = &entry.kind
         {
             if let (false, Some(number), Some(files)) = (*outdated, line, files)
-                && icons::small_button(ui, "file-diff", "Show it in the diff").clicked()
+                && icons::small_button(
+                    ui,
+                    "file-diff",
+                    crate::i18n::text("repo-workflows-pr_view-entry-header-2f765474"),
+                )
+                .clicked()
             {
                 show_in_diff(files, path, *number, *side, acts);
             }
@@ -169,14 +188,23 @@ fn entry_header(
                 .small(),
         );
         if pr::is_web_url(&entry.url)
-            && icons::small_button(ui, "external-link", "Open in the browser").clicked()
+            && icons::small_button(
+                ui,
+                "external-link",
+                crate::i18n::text("repo-workflows-pr_view-entry-header-a7eac6b5"),
+            )
+            .clicked()
         {
             acts.push(Action::OpenUrl(entry.url.clone()));
         }
         if let Some(review) = &entry.review_id
             && d.state == "OPEN"
             && d.extras.can_write()
-            && ui.small_button("Dismiss").clicked()
+            && ui
+                .small_button(crate::i18n::text(
+                    "repo-workflows-pr_view-entry-header-48845bff",
+                ))
+                .clicked()
         {
             acts.push(Action::Pr(PrAct::StartDismiss(review.clone())));
         }
@@ -186,13 +214,28 @@ fn entry_header(
 /// Where a comment on a line is, and what has become of its thread.
 fn inline_place(path: &str, line: Option<u64>, outdated: bool, resolved: bool) -> String {
     let place = match line {
-        Some(line) => format!("on {path}:{line}"),
-        None => format!("on {path}"),
+        Some(line) => crate::i18n::message(
+            "repo-workflows-pr_view-inline-place-0fd6d148",
+            &[("path", (path).into()), ("line", (line).into())],
+        ),
+        None => crate::i18n::message(
+            "repo-workflows-pr_view-inline-place-31c12181",
+            &[("path", (path).into())],
+        ),
     };
     match (outdated, resolved) {
-        (true, true) => format!("{place} (outdated, resolved)"),
-        (true, false) => format!("{place} (outdated)"),
-        (false, true) => format!("{place} (resolved)"),
+        (true, true) => crate::i18n::message(
+            "repo-workflows-pr_view-inline-place-b555e94a",
+            &[("place", (place).clone().into())],
+        ),
+        (true, false) => crate::i18n::message(
+            "repo-workflows-pr_view-inline-place-da1b1f25",
+            &[("place", (place).clone().into())],
+        ),
+        (false, true) => crate::i18n::message(
+            "repo-workflows-pr_view-inline-place-22e25966",
+            &[("place", (place).clone().into())],
+        ),
         (false, false) => place,
     }
 }
@@ -209,4 +252,34 @@ fn show_in_diff(files: &PrFiles, path: &str, line: u64, side: DiffSide, acts: &m
         line,
         side,
     })));
+}
+
+fn entry_verb(kind: &EntryKind) -> &str {
+    match kind {
+        EntryKind::Comment | EntryKind::Inline { .. } => {
+            crate::i18n::text("repo-workflows-r1-commented")
+        }
+        EntryKind::Review(verdict) => verdict,
+    }
+}
+#[cfg(test)]
+mod fluent_r1_word_tests {
+    use super::*;
+    #[test]
+    fn fluent_partition_r1_comment_words_repaint_but_review_provider_words_remain_opaque() {
+        let review = EntryKind::Review("commented;\nprovider 日本語");
+        for lang in ["de", "en-US", "de"] {
+            crate::i18n::set_language(lang);
+            assert_eq!(
+                entry_verb(&EntryKind::Comment),
+                if lang == "de" {
+                    "hat kommentiert"
+                } else {
+                    "commented"
+                }
+            );
+            assert_eq!(entry_verb(&review), "commented;\nprovider 日本語");
+        }
+        crate::i18n::set_language("en-US");
+    }
 }

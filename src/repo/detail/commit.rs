@@ -18,10 +18,15 @@ impl RepoTab {
         let t = Tokens::get(ui.ctx());
         let idle = self.busy_op.is_none();
         let stash = self.stash_view.and_then(|i| self.stashes.get(i)).cloned();
-        let title = if stash.is_some() { "Stash" } else { "Commit" };
+        let title = if stash.is_some() {
+            crate::i18n::text("repo-core-0862")
+        } else {
+            crate::i18n::text("repo-core-0056")
+        };
         widgets::panel_header(ui, title, |ui| {
             if let Some(stash) = &stash {
-                let more = icons::small_button(ui, "chevron-down", "Apply, pop or drop");
+                let more =
+                    icons::small_button(ui, "chevron-down", crate::i18n::text("repo-core-0863"));
                 egui::Popup::menu(&more)
                     .style(crate::theme::menu_style)
                     .show(|ui| {
@@ -30,6 +35,24 @@ impl RepoTab {
             }
             branch_tree::files_toggle(ui);
         });
+        if stash.is_none() && self.detail_hash.is_some() {
+            ui.horizontal(|ui| {
+                ui.selectable_value(
+                    &mut self.prompt_session.open,
+                    false,
+                    crate::i18n::text("repo-core-0056"),
+                );
+                ui.selectable_value(
+                    &mut self.prompt_session.open,
+                    true,
+                    crate::i18n::text("repo-core-0864"),
+                );
+            });
+            if self.prompt_session.open {
+                self.prompt_session_panel(ui, acts);
+                return;
+            }
+        }
         if let Some(stash) = &stash {
             stash_banner(ui, acts, stash, idle);
         }
@@ -39,7 +62,10 @@ impl RepoTab {
             ui.add_space(10.0);
             ui.horizontal(|ui| {
                 ui.add_space(10.0);
-                ui.colored_label(t.danger, err);
+                ui.colored_label(
+                    t.danger,
+                    crate::git::display_error(&crate::forge::inbox::display_error(err)),
+                );
             });
             return;
         }
@@ -48,12 +74,17 @@ impl RepoTab {
                 if self.selected.is_some() || self.detail_hash.is_some() {
                     ui.add(crate::spinner::Spinner::new());
                 } else {
-                    ui.label(RichText::new("Select a commit").color(t.text_dim));
+                    ui.label(RichText::new(crate::i18n::text("repo-core-0865")).color(t.text_dim));
                 }
             });
             return;
         };
 
+        self.review_all_button(
+            ui,
+            crate::repo::review_workflow::ReviewSource::Commit(detail.hash.clone()),
+            acts,
+        );
         // On a forge, the commit's builds: how they went, if that's known.
         let builds = (self.ci_project().is_some() && self.stash_view.is_none())
             .then(|| self.ci.by_sha.get(&detail.hash));
@@ -107,7 +138,8 @@ impl RepoTab {
                 let remerge = self.remerge_mode(detail);
                 let resolved = matches!(remerge, Mode::Checking | Mode::On);
                 if !resolved {
-                    let note = (detail.parents.len() > 1).then_some("vs. first parent");
+                    let note =
+                        (detail.parents.len() > 1).then_some(crate::i18n::text("repo-core-0868"));
                     files_header_with(ui, &detail.files, note, |ui| {
                         self.all_files_toggle(ui, acts)
                     });
@@ -162,7 +194,13 @@ fn stash_banner(ui: &mut Ui, acts: &mut Vec<Action>, stash: &Stash, idle: bool) 
                         ("Pop", sidebar::StashOp::Pop),
                         ("Apply", sidebar::StashOp::Apply),
                     ] {
-                        if ui.add_enabled(idle, egui::Button::new(label)).clicked() {
+                        if ui
+                            .add_enabled(
+                                idle,
+                                egui::Button::new(crate::repo::messages::display_operation(label)),
+                            )
+                            .clicked()
+                        {
                             acts.push(Action::Ops {
                                 label: format!("{label} {}", stash.name),
                                 ops: sidebar::stash_ops(stash, op),
@@ -257,9 +295,9 @@ fn fitted_message(
         fit(room, body_h).min(body_rows)
     };
     let hint = if editable {
-        Some("Double-click to edit the message")
+        Some(crate::i18n::text("repo-core-0874"))
     } else if detail.in_head && detail.merges_after {
-        Some("Merges came after this commit: editing its message would flatten them")
+        Some(crate::i18n::text("repo-core-0875"))
     } else {
         None
     };
@@ -317,7 +355,13 @@ fn author_line(ui: &mut Ui, detail: &CommitDetail) {
         });
     });
     if detail.committer != detail.author {
-        let text = format!("Committed by {} · {}", detail.committer, detail.commit_date);
+        let text = crate::i18n::message(
+            "repo-core-0877",
+            &[
+                ("committer", detail.committer.to_string().into()),
+                ("commit-date", detail.commit_date.to_string().into()),
+            ],
+        );
         ui.add(egui::Label::new(RichText::new(&text).color(t.text_faint).small()).truncate())
             .on_hover_text(text);
     }
@@ -340,8 +384,11 @@ fn meta_grid(
                 RichText::new(detail.hash.get(..12).unwrap_or(&detail.hash))
                     .font(theme::mono(11.0)),
             )
-            .named("Copy full hash")
-            .on_hover_text(format!("Copy full commit hash\n{}", detail.hash))
+            .named(crate::i18n::text("repo-core-0880"))
+            .on_hover_text(crate::i18n::message(
+                "dev-integration-ui-copy-hash",
+                &[("hash", detail.hash.clone().into())],
+            ))
             .clicked()
         {
             ui.ctx().copy_text(detail.hash.clone());
@@ -352,7 +399,10 @@ fn meta_grid(
                     RichText::new(format!("← {}", parent.get(..8).unwrap_or(parent)))
                         .font(theme::mono(11.0)),
                 )
-                .on_hover_text(format!("Select parent\n{parent}"))
+                .on_hover_text(crate::i18n::message(
+                    "dev-integration-ui-select-parent",
+                    &[("parent", parent.to_string().into())],
+                ))
                 .clicked()
             {
                 acts.push(Action::SelectHash(parent.clone()));
@@ -368,8 +418,12 @@ fn meta_grid(
                         label
                     }
                 })
-                .unwrap_or_else(|| "Builds".to_owned());
-            let b = icons::small_button(ui, "flask-conical", &format!("Show builds · {tally}"));
+                .unwrap_or_else(|| crate::i18n::text("repo-core-0883").to_owned());
+            let b = icons::small_button(
+                ui,
+                "flask-conical",
+                &crate::i18n::message("dev-integration-ui-show-builds", &[("tally", tally.into())]),
+            );
             if let Some(status) = status {
                 ci_status::paint_dot(
                     ui.painter(),
@@ -408,7 +462,7 @@ fn reword_editor(ui: &mut Ui, reword: &mut Reword) -> Option<bool> {
     let summary = ui.add(
         egui::TextEdit::singleline(&mut reword.subject)
             .font(theme::semibold(14.0))
-            .hint_text("Summary")
+            .hint_text(crate::i18n::text("repo-core-0886"))
             .desired_width(f32::INFINITY),
     );
     if reword.focus {
@@ -418,7 +472,7 @@ fn reword_editor(ui: &mut Ui, reword: &mut Reword) -> Option<bool> {
     ui.add_space(4.0);
     let body = ui.add(
         egui::TextEdit::multiline(&mut reword.body)
-            .hint_text("Description (optional)")
+            .hint_text(crate::i18n::text("repo-core-0887"))
             .desired_rows(4)
             .desired_width(f32::INFINITY),
     );
@@ -447,14 +501,16 @@ fn reword_editor(ui: &mut Ui, reword: &mut Reword) -> Option<bool> {
     });
     let mut out = None;
     ui.horizontal_wrapped(|ui| {
-        if widgets::primary_button(ui, "Save message", can_save, 110.0).clicked() {
+        if widgets::primary_button(ui, crate::i18n::text("repo-core-0888"), can_save, 110.0)
+            .clicked()
+        {
             out = Some(true);
         }
-        if ui.button("Cancel").clicked() {
+        if ui.button(crate::i18n::text("repo-core-0443")).clicked() {
             out = Some(false);
         }
         ui.label(
-            RichText::new("Ctrl+Enter saves · Esc cancels")
+            RichText::new(crate::i18n::text("repo-core-0889"))
                 .small()
                 .color(t.text_faint),
         );

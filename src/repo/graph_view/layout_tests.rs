@@ -351,11 +351,12 @@ fn released_divider_exchanges_with_description_and_restores_after_viewport_resiz
 -> Result<(), String> {
     for width in [600, 900, 1800] {
         for percent in [100, 125, 150] {
+            // Reserve the minimap strip in addition to the graph width under test.
             let ctx = egui::Context::default();
             let mut styled = false;
             let scale = percent as f32 / 100.0;
             let mut h = egui_kittest::Harness::builder()
-                .with_size([width as f32 * scale, 540.0 * scale])
+                .with_size([(width as f32 + 84.0) * scale, 540.0 * scale])
                 .build_ui_state(
                     move |ui, tab: &mut RepoTab| {
                         if !std::mem::replace(&mut styled, true) {
@@ -399,7 +400,7 @@ fn released_divider_exchanges_with_description_and_restores_after_viewport_resiz
                     .ok_or_else(|| format!("missing painted header: {label}"))
             };
             let viewport = h.ctx.content_rect().size();
-            assert!((viewport.x - width as f32).abs() < 0.1);
+            assert!((viewport.x - width as f32 - 84.0).abs() < 0.1);
             let before_graph = find(&h, "GRAPH")?;
             let before_desc = find(&h, "DESCRIPTION")?;
             let press = egui::pos2(before_graph.left() - 6.0, before_graph.center().y);
@@ -482,6 +483,15 @@ fn exchange_harness(
     width: f32,
     short_refs: bool,
 ) -> egui_kittest::Harness<'static, RepoTab> {
+    exchange_harness_height(settings, width, short_refs, 120.0)
+}
+
+fn exchange_harness_height(
+    settings: &Settings,
+    width: f32,
+    short_refs: bool,
+    height: f32,
+) -> egui_kittest::Harness<'static, RepoTab> {
     let ctx = egui::Context::default();
     let mut tab = scene(&ctx);
     if short_refs {
@@ -495,9 +505,11 @@ fn exchange_harness(
     let mut styled = false;
     let mut h = egui_kittest::Harness::builder()
         // UiState supplies eight points of outer margin on each side.
+        // Keep this divider matrix below the minimap height threshold: full-height
+        // overview reservation is covered by the dedicated integration test.
         .with_size([
             (width + 16.0) * settings.ui_scale,
-            540.0 * settings.ui_scale,
+            height * settings.ui_scale,
         ])
         .with_step_dt(0.1)
         .build_ui_state(
@@ -859,7 +871,7 @@ fn sequential_exchange_survives_restart_visibility_and_viewport_visits() -> Resu
         for width in [
             380, 500, 600, 740, 760, 780, 1000, 1800, 600, 380, 1800, 760,
         ] {
-            restarted.set_size(vec2(width as f32 + 16.0, 540.0));
+            restarted.set_size(vec2(width as f32 + 16.0, 120.0));
             restarted.run_steps(4);
             let geometry = painted(&restarted)?;
             assert_eq!(Settings::get(&restarted.ctx), saved);
@@ -882,7 +894,7 @@ fn sequential_exchange_survives_restart_visibility_and_viewport_visits() -> Resu
             }
         }
         assert_eq!(painted(&restarted)?.cols, original.cols);
-        restarted.set_size(vec2(516.0, 540.0));
+        restarted.set_size(vec2(516.0, 120.0));
         restarted.run_steps(3);
         let blocked = painted(&restarted)?;
         assert_eq!(blocked.cols.description(blocked.header).width(), 140.0);
@@ -959,5 +971,27 @@ fn automatic_refs_and_graph_modes_follow_production_inputs_after_an_exchange() -
     h.state_mut().graph.width = width;
     h.run_steps(3);
     assert_eq!(painted(&h)?.cols, start.cols);
+    Ok(())
+}
+
+#[test]
+fn full_height_minimap_reservation_keeps_visible_date_divider_interactive() -> Result<(), String> {
+    let settings = Settings {
+        show_hash: true,
+        show_date: true,
+        ..exchange_settings()
+    };
+    let mut h = exchange_harness_height(&settings, 1100.0, false, 540.0);
+    let start = painted(&h)?;
+    assert_eq!(
+        start.header.width(),
+        1016.0,
+        "the minimap owns its separate 84-point strip"
+    );
+    let saved = Settings::get(&h.ctx);
+    let press = press_divider(&mut h, Bar::Date, -4.0)?;
+    let end = pointer_delta(&mut h, press, Bar::Date, 10.0);
+    pointer_button(&mut h, end, false);
+    assert_exchange(&h, start, &saved, Bar::Date, 10.0)?;
     Ok(())
 }

@@ -326,7 +326,10 @@ fn an_unopenable_file_is_not_tried_again_until_the_next_operation() -> Result<()
     tab.reused_opened(generation, "f".to_owned(), Ok(None));
     assert!(tab.rerere.unopenable.contains("f"));
     tab.reused_opened(generation, "g".to_owned(), Err("too old".to_owned()));
-    assert_eq!(tab.status, Some(("too old".to_owned(), true)));
+    assert_eq!(
+        tab.status.as_deref().cloned(),
+        Some(("too old".to_owned(), true))
+    );
     tab.note_reused(None);
     assert!(tab.rerere.unopenable.is_empty());
     Ok(())

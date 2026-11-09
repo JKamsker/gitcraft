@@ -38,7 +38,7 @@ impl RepoTab {
     /// Why nothing can be folded now, whatever the commit, as the last read saw it.
     fn fold_blocked(&self) -> Option<String> {
         if self.refs.head.is_empty() {
-            return Some("There are no commits yet".to_owned());
+            return Some(crate::i18n::text("repo-core-4112").to_owned());
         }
         plan::blocked(
             self.work.staged.len(),
@@ -60,11 +60,9 @@ impl RepoTab {
         let button = ui
             .add_enabled(
                 idle && refused.is_none(),
-                egui::Button::new("Fold staged changes into this commit"),
+                egui::Button::new(crate::i18n::text("repo-core-4113")),
             )
-            .on_hover_text(
-                "Put the staged changes into this commit, rewriting the commits after it",
-            );
+            .on_hover_text(crate::i18n::text("repo-core-4114"));
         let button = match &refused {
             Some(why) => button.on_disabled_hover_text(why),
             None => button,
@@ -79,18 +77,18 @@ impl RepoTab {
     pub(super) fn fold_picker(&self, ui: &mut Ui, amending: bool, acts: &mut Vec<Action>) {
         let t = Tokens::get(ui.ctx());
         let idle = self.busy_op.is_none();
-        let blocked = self.fold_blocked().or_else(|| {
-            amending.then(|| "Untick Amend last commit to fold into an older commit".to_owned())
-        });
+        let blocked = self
+            .fold_blocked()
+            .or_else(|| amending.then(|| crate::i18n::text("repo-core-4115").to_owned()));
         let button = ui
             .add_enabled(idle && blocked.is_none(), |ui: &mut Ui| {
                 crate::icons::small_button(
                     ui,
                     "git-merge",
-                    "Fold staged changes into an older commit",
+                    crate::i18n::text("dev-baseline-fold-staged-label"),
                 )
             })
-            .on_hover_text("Fold the staged changes into an older commit of this branch");
+            .on_hover_text(crate::i18n::text("repo-core-4117"));
         let button = match &blocked {
             Some(why) => button.on_disabled_hover_text(why),
             None => button.on_disabled_hover_text("Wait for the operation running to end"),
@@ -102,7 +100,7 @@ impl RepoTab {
                 let line = first_parents(&self.history, &self.history_index, &self.refs.head);
                 ui.set_max_width(360.0);
                 ui.label(
-                    RichText::new("Fold the staged changes into:")
+                    RichText::new(crate::i18n::text("repo-core-4118"))
                         .color(t.text_faint)
                         .small(),
                 );
@@ -121,7 +119,7 @@ impl RepoTab {
                 }
                 if line.len() > PICKER_COMMITS {
                     ui.label(
-                        RichText::new("Older commits: right-click them in the graph")
+                        RichText::new(crate::i18n::text("repo-core-4119"))
                             .color(t.text_faint)
                             .small(),
                     );
@@ -143,7 +141,12 @@ impl RepoTab {
                     tab.dialog = Some(Dialog::Fold(Box::new(plan)));
                 }
                 Ok(_) => {}
-                Err(e) => tab.status = Some((format!("Fold staged changes: {e}"), true)),
+                Err(e) => {
+                    tab.status = Some(crate::repo::Notice::plain((
+                        crate::i18n::message("repo-core-4120", &[("e", e.to_string().into())]),
+                        true,
+                    )))
+                }
             },
         );
     }
@@ -151,13 +154,19 @@ impl RepoTab {
     /// Runs the fold the dialog confirmed.
     pub(super) fn run_fold(&mut self, plan: Plan, ctx: &egui::Context) {
         if let Some(busy) = &self.busy_op {
-            self.status = Some((
-                format!(
-                    "{}: {busy} is still running, try again when it's done",
-                    plan.label()
+            self.status = Some(crate::repo::Notice::plain((
+                crate::i18n::message(
+                    "repo-core-4121",
+                    &[
+                        ("label", plan.label().to_string().into()),
+                        (
+                            "busy",
+                            crate::repo::messages::display_operation(busy).into(),
+                        ),
+                    ],
                 ),
                 true,
-            ));
+            )));
             return;
         }
         // What is going on now, not when the dialog read it: a `git am` stopped since (which
@@ -172,16 +181,26 @@ impl RepoTab {
                 match state {
                     Ok(None) => tab.run_fold_now(plan, ctx),
                     Ok(Some(state)) => {
-                        tab.status = Some((
-                            format!(
-                                "{}: a {} is in progress now: finish or abort it first",
-                                plan.label(),
-                                state.label().to_lowercase()
+                        tab.status = Some(crate::repo::Notice::plain((
+                            crate::i18n::message(
+                                "repo-core-4122",
+                                &[
+                                    ("label", plan.label().to_string().into()),
+                                    (
+                                        "to-lowercase",
+                                        state.label().to_lowercase().to_string().into(),
+                                    ),
+                                ],
                             ),
                             true,
-                        ));
+                        )));
                     }
-                    Err(e) => tab.status = Some((format!("{}: {e}", plan.label()), true)),
+                    Err(e) => {
+                        tab.status = Some(crate::repo::Notice::plain((
+                            format!("{}: {e}", plan.label()),
+                            true,
+                        )))
+                    }
                 }
             },
         );
@@ -190,10 +209,13 @@ impl RepoTab {
     /// Runs the fold, nothing being in progress.
     fn run_fold_now(&mut self, plan: Plan, ctx: &egui::Context) {
         if self.busy_op.is_some() {
-            self.status = Some((
-                format!("{}: something else started, try again", plan.label()),
+            self.status = Some(crate::repo::Notice::plain((
+                crate::i18n::message(
+                    "repo-core-4124",
+                    &[("label", plan.label().to_string().into())],
+                ),
                 true,
-            ));
+            )));
             return;
         }
         let label = plan.label();
@@ -206,7 +228,9 @@ impl RepoTab {
             Ok(editor) => self.with_rebase_command(editor, ctx, move |tab, command, ctx| {
                 tab.fold_ready(&plan, command, ctx);
             }),
-            Err(e) => self.status = Some((format!("{label}: {e}"), true)),
+            Err(e) => {
+                self.status = Some(crate::repo::Notice::plain((format!("{label}: {e}"), true)))
+            }
         }
     }
 
@@ -222,20 +246,35 @@ impl RepoTab {
         match command {
             // Started while something else ran: say so rather than drop it.
             Ok(_) if self.busy_op.is_some() => {
-                self.status = Some((
-                    format!(
-                        "{label}: {} is still running, try again when it's done",
-                        self.busy_op.as_deref().unwrap_or_default()
+                self.status = Some(crate::repo::Notice::plain((
+                    crate::i18n::message(
+                        "repo-core-2452",
+                        &[
+                            (
+                                "label",
+                                crate::repo::messages::display_operation(&label).into(),
+                            ),
+                            (
+                                "self",
+                                self.busy_op
+                                    .as_deref()
+                                    .unwrap_or_default()
+                                    .to_string()
+                                    .into(),
+                            ),
+                        ],
                     ),
                     true,
-                ));
+                )));
             }
             Ok((rebase, _)) => {
                 let (steps, undo) = plan.fold_steps(rebase);
                 self.fold.running = Some(plan.stopped());
                 self.run_undoable(&label, steps, Refresh::All, undo, ctx);
             }
-            Err(e) => self.status = Some((format!("{label}: {e}"), true)),
+            Err(e) => {
+                self.status = Some(crate::repo::Notice::plain((format!("{label}: {e}"), true)))
+            }
         }
     }
 
@@ -254,25 +293,31 @@ impl RepoTab {
             .putting_back
             .take_if(|r| put_back_label(r) == label)
         {
-            self.status = Some(match result {
+            self.status = Some(crate::repo::Notice::plain(match result {
                 Ok(_) => (
-                    format!(
-                        "{}: nothing was changed. The staged changes undo what a later commit \
-                         does, so they would have been lost in the commit; they are staged as \
-                         before.",
-                        back.label
+                    crate::i18n::message(
+                        "repo-core-4125",
+                        &[(
+                            "label",
+                            crate::repo::messages::display_operation(&back.label).into(),
+                        )],
                     ),
                     true,
                 ),
                 Err(e) => (
-                    format!(
-                        "{}: the result lost some of the staged changes, and going back failed \
-                         ({e}). They are all in ORIG_HEAD, the fixup! commit.",
-                        back.label
+                    crate::i18n::message(
+                        "repo-core-4126",
+                        &[
+                            (
+                                "label",
+                                crate::repo::messages::display_operation(&back.label).into(),
+                            ),
+                            ("e", e.to_string().into()),
+                        ],
                     ),
                     true,
                 ),
-            });
+            }));
             return;
         }
         if let Some(mut running) = self.fold.running.take_if(|r| r.label == label) {
@@ -290,13 +335,16 @@ impl RepoTab {
                 // The changes are in the fixup commit the rebase stopped on, not lost: say how
                 // to go on rather than only that it failed.
                 if e.contains("CONFLICT") || e.contains("could not apply") {
-                    self.status = Some((
-                        format!(
-                            "{label} stopped on a conflict: resolve it and Continue rebase, or \
-                             Abort to go back with the changes staged"
+                    self.status = Some(crate::repo::Notice::plain((
+                        crate::i18n::message(
+                            "repo-core-4127",
+                            &[(
+                                "label",
+                                crate::repo::messages::display_operation(label).into(),
+                            )],
                         ),
                         true,
-                    ));
+                    )));
                 }
                 // The status read the reload after this starts tells whether it stopped.
                 running.read = Some(self.reads + 1);
@@ -358,7 +406,13 @@ impl RepoTab {
             return;
         }
         let mut undo = stopped.leftover_undo(&head);
-        let failed = format!("{} (stopped partway)", stopped.label);
+        let failed = crate::i18n::message(
+            "repo-core-4128",
+            &[(
+                "label",
+                crate::repo::messages::display_operation(&stopped.label).into(),
+            )],
+        );
         if let Some(entry) = self
             .timeline
             .entries
@@ -376,14 +430,16 @@ impl RepoTab {
         } else {
             self.remember_undo(&stopped.label, undo, ctx);
         }
-        self.status = Some((
-            format!(
-                "{}: the rebase didn't run, so the changes are in a commit on top. Ctrl+Z \
-                 stages them again.",
-                stopped.label
+        self.status = Some(crate::repo::Notice::plain((
+            crate::i18n::message(
+                "repo-core-4129",
+                &[(
+                    "label",
+                    crate::repo::messages::display_operation(&stopped.label).into(),
+                )],
             ),
             true,
-        ));
+        )));
     }
 
     /// The fold stopped in the rebase going on now: the branch is still the fixup commit on top
@@ -433,7 +489,10 @@ impl RepoTab {
             let action = match (ours, &tab.fold.stopped) {
                 (Ok(Some(fixup)), Some(stopped)) => fold_abort_dialog(stopped, &fixup),
                 (Err(e), _) => {
-                    tab.status = Some((format!("Abort rebase: {e}"), true));
+                    tab.status = Some(crate::repo::Notice::plain((
+                        crate::i18n::message("repo-core-4130", &[("e", e.to_string().into())]),
+                        true,
+                    )));
                     return;
                 }
                 _ => abort_action(InProgress::Rebase),
@@ -449,11 +508,8 @@ impl RepoTab {
 fn fold_abort_dialog(stopped: &Stopped, fixup: &str) -> Action {
     Action::Dialog(Dialog::confirm(
         &abort_label(stopped),
-        "Stop the fold and go back to where it started? The branch is put back as it was, \
-         with the changes staged again. Conflicts resolved so far are lost, and can't be \
-         brought back."
-            .to_owned(),
-        "Abort",
+        crate::i18n::text("repo-core-4131").to_owned(),
+        crate::i18n::text("repo-core-0018"),
         stopped.abort_steps(fixup),
         None,
     ))
@@ -469,16 +525,31 @@ impl RepoTab {
 }
 
 fn unfixup_label(stopped: &Stopped) -> String {
-    format!(
-        "Stage the changes of {} again",
-        stopped.label.replacen("Fold", "fold", 1)
+    crate::i18n::message(
+        "repo-core-4132",
+        &[(
+            "fold",
+            stopped.label.replacen("Fold", "fold", 1).to_string().into(),
+        )],
     )
 }
 
 fn put_back_label(stopped: &Stopped) -> String {
-    format!("Take back {}", stopped.label.replacen("Fold", "fold", 1))
+    crate::i18n::message(
+        "repo-core-4133",
+        &[(
+            "fold",
+            stopped.label.replacen("Fold", "fold", 1).to_string().into(),
+        )],
+    )
 }
 
 fn abort_label(stopped: &Stopped) -> String {
-    format!("Abort {}", stopped.label.replacen("Fold", "fold", 1))
+    crate::i18n::message(
+        "repo-core-3686",
+        &[(
+            "fold",
+            stopped.label.replacen("Fold", "fold", 1).to_string().into(),
+        )],
+    )
 }

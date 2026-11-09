@@ -2,18 +2,19 @@
 //! The safe owner returned to the event loop also covers children surviving their parent.
 
 use std::os::windows::io::{AsRawHandle, FromRawHandle, OwnedHandle};
-use windows::Win32::Foundation::HANDLE;
+use windows::Win32::Foundation::{HANDLE, WAIT_TIMEOUT};
 use windows::Win32::System::Diagnostics::ToolHelp::{
     CreateToolhelp32Snapshot, TH32CS_SNAPTHREAD, THREADENTRY32, Thread32First, Thread32Next,
 };
 use windows::Win32::System::JobObjects::{
     AssignProcessToJobObject, CreateJobObjectW, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
-    JOBOBJECT_EXTENDED_LIMIT_INFORMATION, JobObjectExtendedLimitInformation,
-    SetInformationJobObject, TerminateJobObject,
+    JOBOBJECT_BASIC_ACCOUNTING_INFORMATION, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
+    JobObjectBasicAccountingInformation, JobObjectExtendedLimitInformation,
+    QueryInformationJobObject, SetInformationJobObject, TerminateJobObject,
 };
 use windows::Win32::System::Threading::{
-    OpenProcess, OpenThread, PROCESS_SET_QUOTA, PROCESS_TERMINATE, ResumeThread,
-    THREAD_SUSPEND_RESUME,
+    GetProcessIdOfThread, OpenThread, ResumeThread, THREAD_QUERY_LIMITED_INFORMATION,
+    THREAD_SUSPEND_RESUME, WaitForSingleObject,
 };
 
 fn owned(handle: HANDLE) -> OwnedHandle {
@@ -35,14 +36,33 @@ impl ProcessJob {
     /// a fallback; kill-on-close alone can report a successful child exit on Windows.
     pub fn terminate(&self) -> Result<(), String> {
         // SAFETY: this owner holds a valid job handle created with termination access.
-        unsafe { TerminateJobObject(raw(&self.handle), 1) }.map_err(|e| e.to_string())
+        unsafe { TerminateJobObject(raw(&self.handle), 1) }.map_err(|e| e.to_string())?;
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        super::suspended::wait_empty(
+            || {
+                let mut info = JOBOBJECT_BASIC_ACCOUNTING_INFORMATION::default();
+                // SAFETY: this exact retained Job HANDLE, initialized matching structure.
+                unsafe {
+                    QueryInformationJobObject(
+                        Some(raw(&self.handle)),
+                        JobObjectBasicAccountingInformation,
+                        (&mut info as *mut JOBOBJECT_BASIC_ACCOUNTING_INFORMATION).cast(),
+                        std::mem::size_of_val(&info) as u32,
+                        None,
+                    )
+                }
+                .map_err(|e| std::io::Error::other(e.to_string()))?;
+                Ok(info.ActiveProcesses)
+            },
+            || std::time::Instant::now() >= deadline,
+            || std::thread::sleep(std::time::Duration::from_millis(10)),
+        )
+        .map_err(|e| e.to_string())
     }
 }
 
-/// `pid` must name a child created with CREATE_SUSPENDED. On success the primary thread
-/// runs, and dropping the returned job stops that child and all of its descendants. On
-/// failure the caller must kill and reap its still-suspended child.
-pub fn supervise_suspended_process(pid: u32) -> Result<ProcessJob, String> {
+/// Attach only a directly owned, still-suspended child. Resume is a separate ordered step.
+pub(super) fn assign(child: &std::process::Child) -> Result<ProcessJob, String> {
     // SAFETY: no inherited security attributes and no name; all returned handles are owned.
     let job = owned(unsafe { CreateJobObjectW(None, None) }.map_err(|e| e.to_string())?);
     let mut limits = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
@@ -57,15 +77,16 @@ pub fn supervise_suspended_process(pid: u32) -> Result<ProcessJob, String> {
         )
     }
     .map_err(|e| e.to_string())?;
-    // SAFETY: access is restricted to the rights AssignProcessToJobObject needs; an invalid
-    // or inaccessible pid yields an error. The handle is not inherited by the child.
-    let process = owned(
-        unsafe { OpenProcess(PROCESS_SET_QUOTA | PROCESS_TERMINATE, false, pid) }
-            .map_err(|e| e.to_string())?,
-    );
-    // SAFETY: valid owned job/process handles; the suspended child cannot race assignment
-    // by spawning a descendant before it belongs to the job.
-    unsafe { AssignProcessToJobObject(raw(&job), raw(&process)) }.map_err(|e| e.to_string())?;
+    // Assign the retained child HANDLE directly; never reopen a process by PID.
+    let process = HANDLE(child.as_raw_handle());
+    // SAFETY: the freshly spawned child is still suspended; its retained handle binds the
+    // actual object even if startup fails. The Job is held through resume and final drain.
+    unsafe { AssignProcessToJobObject(raw(&job), process) }.map_err(|e| e.to_string())?;
+    Ok(ProcessJob { handle: job })
+}
+
+pub(super) fn resume(child: &std::process::Child) -> Result<(), String> {
+    let pid = child.id();
     // std/Tokio expose the process handle but not its primary thread. Enumerate threads
     // while the new process is suspended; only its primary thread can exist at this point.
     // SAFETY: a thread snapshot has no pointer parameters; a failure returns no handle.
@@ -82,15 +103,28 @@ pub fn supervise_suspended_process(pid: u32) -> Result<ProcessJob, String> {
         if entry.th32OwnerProcessID == pid {
             // SAFETY: a thread ID from the snapshot, with only resume access requested.
             let thread = owned(
-                unsafe { OpenThread(THREAD_SUSPEND_RESUME, false, entry.th32ThreadID) }
-                    .map_err(|e| e.to_string())?,
+                unsafe {
+                    OpenThread(
+                        THREAD_SUSPEND_RESUME | THREAD_QUERY_LIMITED_INFORMATION,
+                        false,
+                        entry.th32ThreadID,
+                    )
+                }
+                .map_err(|e| e.to_string())?,
             );
+            // SAFETY: both retained handles remain open. A signaled process HANDLE proves
+            // the old lifetime ended even when its numeric exit code happens to be 259.
+            let actual = unsafe { GetProcessIdOfThread(raw(&thread)) };
+            let active =
+                unsafe { WaitForSingleObject(HANDLE(child.as_raw_handle()), 0) } == WAIT_TIMEOUT;
+            super::suspended::validate_thread_owner(pid, actual, active)
+                .map_err(|e| e.to_string())?;
             // SAFETY: the handle remains valid for this call; failure leaves the job owner
             // responsible for terminating the child rather than returning it suspended.
             if unsafe { ResumeThread(raw(&thread)) } == u32::MAX {
                 return Err(std::io::Error::last_os_error().to_string());
             }
-            return Ok(ProcessJob { handle: job });
+            return Ok(());
         }
         // SAFETY: same snapshot and structure as Thread32First above.
         if unsafe { Thread32Next(raw(&snapshot), &mut entry) }.is_err() {

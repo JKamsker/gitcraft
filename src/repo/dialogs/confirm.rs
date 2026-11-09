@@ -30,7 +30,10 @@ pub(super) fn confirm(
     safe: bool,
 ) -> Outcome {
     let t = Tokens::get(ui.ctx());
-    ui.label(RichText::new(asked.title).font(theme::semibold(15.0)));
+    ui.label(
+        RichText::new(crate::repo::messages::display_operation(asked.title))
+            .font(theme::semibold(15.0)),
+    );
     ui.add_space(6.0);
     ui.add(egui::Label::new(asked.body).wrap());
     preview::show(ui, preview);
@@ -89,5 +92,91 @@ fn ops_action(asked: &Asked<'_>, steps: Vec<Vec<String>>) -> Action {
             refresh,
             undo: undo.clone(),
         },
+    }
+}
+
+#[cfg(test)]
+mod fluent_identity_tests {
+    use super::*;
+    use egui_kittest::{Harness, kittest::Queryable};
+
+    /// Exercise the painted confirmation and its real click-to-action path without a repo,
+    /// preview reader, worker, Git command or rewrite. The title remains DCO's classifier key.
+    #[test]
+    fn german_dco_confirmation_preserves_raw_operation_identity() -> Result<(), String> {
+        for language in ["en-US", "de"] {
+            crate::i18n::set_language(language);
+            for local_only in [false, true] {
+                let branch = "feature/日本語 Commit";
+                let raw = format!(
+                    "Sign off the commits of {branch}{}",
+                    if local_only { " (here only)" } else { "" }
+                );
+                let expected = if language == "de" {
+                    format!(
+                        "Commits von {branch} mit Signed-off-by versehen{}",
+                        if local_only { " (nur hier)" } else { "" }
+                    )
+                } else {
+                    raw.clone()
+                };
+                let title = raw.clone();
+                let ops = vec![vec![
+                    "rewrite-inert-placeholder".to_owned(),
+                    "--literal=Commit".to_owned(),
+                    branch.to_owned(),
+                ]];
+                let expected_ops = ops.clone();
+                let mut preview = WhatItDoes::default();
+                assert!(!preview.ask.reads_git());
+                let fonts = std::cell::Cell::new(false);
+                let mut h = Harness::new_ui_state(
+                    move |ui, action: &mut Option<Action>| {
+                        if !fonts.replace(true) {
+                            crate::theme::install_fonts(ui.ctx());
+                            return;
+                        }
+                        let outcome = confirm(
+                            ui,
+                            Asked {
+                                title: &title,
+                                body: "inert fixed-data confirmation",
+                                button: "Confirm fixture",
+                                ops: &ops,
+                                alternative: &None,
+                                refresh: Refresh::All,
+                                undo: &Undo::None,
+                            },
+                            &mut false,
+                            &mut preview,
+                            false,
+                        );
+                        if let Outcome::Done(done) = outcome {
+                            *action = Some(*done);
+                        }
+                        crate::a11y::end_frame(ui.ctx());
+                    },
+                    None,
+                );
+                h.run();
+                h.get_by_label(&expected);
+                h.get_by_role_and_label(egui::accesskit::Role::Button, "Confirm fixture")
+                    .click();
+                h.run();
+                let Some(Action::Ops {
+                    label,
+                    ops,
+                    refresh,
+                }) = h.state()
+                else {
+                    return Err("confirmation must return its actual ops action".into());
+                };
+                assert_eq!(label, &raw);
+                assert_eq!(ops, &expected_ops);
+                assert_eq!(*refresh, Refresh::All);
+            }
+        }
+        crate::i18n::set_language("en-US");
+        Ok(())
     }
 }

@@ -91,7 +91,7 @@ pub fn picked_lines(
     chosen: &BTreeSet<usize>,
 ) -> Result<PickedLines, &'static str> {
     let Some(((new_at, new_path), (old_at, old_path))) = sides(key, old_path) else {
-        return Err("Untracked and conflicted files have no line history");
+        return Err(crate::i18n::text("repo-core-1856"));
     };
     match numbers(lines, sel, chosen) {
         (Some(range), _) => Ok(PickedLines {
@@ -104,7 +104,7 @@ pub fn picked_lines(
             at: old_at,
             range,
         }),
-        (None, None) => Err("Select some lines first: drag over their text"),
+        (None, None) => Err(crate::i18n::text("repo-core-1857")),
     }
 }
 

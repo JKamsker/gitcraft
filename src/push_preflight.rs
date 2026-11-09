@@ -1,0 +1,1859 @@
+//! Explicit push previews. Reads are local, bounded and never ask a credential helper.
+//! Findings contain object IDs, paths and line numbers, never matched secret values.
+
+pub(crate) mod display;
+
+use std::collections::{BTreeMap, BTreeSet};
+use std::path::Path;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex, OnceLock};
+
+use crate::git;
+use crate::settings::profiles::UserProfile;
+
+pub(crate) const APPROVED: &str = "\0push-preflight";
+pub(crate) const FIX: &str = "\0push-preflight-fix";
+mod fix;
+pub(crate) use fix::fix;
+#[cfg(test)]
+pub(crate) mod tests;
+const MAX_COMMITS: usize = 10_000;
+const MAX_OBJECTS: usize = 50_000;
+const MAX_FINDINGS: usize = 2_000;
+const LARGE: u64 = 5 * 1024 * 1024;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Kind {
+    Identity,
+    Signature,
+    Message,
+    Secret,
+    Large,
+    RemoteHistory,
+    Transcript,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct Finding {
+    pub kind: Kind,
+    pub commit: String,
+    pub path: String,
+    pub detail: String,
+}
+
+#[derive(Clone)]
+pub(crate) struct Commit {
+    pub oid: String,
+    pub parents: Vec<String>,
+    pub name: String,
+    pub email: String,
+    pub subject: String,
+    pub signed: bool,
+}
+
+#[derive(Clone)]
+pub(crate) struct Plan {
+    pub branch: String,
+    pub remote: String,
+    pub destination: String,
+    pub head: String,
+    pub base: Option<String>,
+    pub commits: Vec<Commit>,
+    pub findings: Vec<Finding>,
+    pub targets: Vec<String>,
+    pub expected_name: String,
+    pub expected_email: String,
+    pub expected_accounts: BTreeMap<String, String>,
+    pub profile: UserProfile,
+    pub force: bool,
+    pub deleting: bool,
+    pub tracking: bool,
+    pub lfs_objects: BTreeSet<String>,
+    pub skip_hooks: bool,
+    push_oid: String,
+    original: Vec<Vec<String>>,
+    urls: Vec<String>,
+    checkout: String,
+    checkout_oid: String,
+    config: String,
+    config_before_push: String,
+    local_refs: BTreeMap<String, String>,
+    extras: Vec<String>,
+    tracking_ref: Option<String>,
+    lfs_config: Vec<(String, String)>,
+    receive_pack: String,
+    selection: Option<git::repository_tools::routes::PreparedPush>,
+    // Captured lifetime survives tab invalidation, APPROVED, reload and auth retry.
+    // Never serialized or reconstructed from a label on the current tab.
+    fork_scope: Option<crate::repo::forks::ExecutionScope>,
+}
+
+fn read(repo: &Path, args: &[&str], active: &dyn Fn() -> bool) -> Result<String, String> {
+    let args: Vec<&str> = ["--no-lazy-fetch", "--no-replace-objects"]
+        .into_iter()
+        .chain(args.iter().copied())
+        .collect();
+    git::forecast_run(repo, &args, &[("GIT_NO_LAZY_FETCH", "1".into())], &[0], active)
+        .map_err(|_| "The local push preview could not be completed. Fetch missing history explicitly, then try again; no push was run.".into())
+}
+
+fn optional(repo: &Path, args: &[&str], active: &dyn Fn() -> bool) -> Result<String, String> {
+    let args: Vec<&str> = ["--no-lazy-fetch", "--no-replace-objects"]
+        .into_iter()
+        .chain(args.iter().copied())
+        .collect();
+    git::forecast_run(
+        repo,
+        &args,
+        &[("GIT_NO_LAZY_FETCH", "1".into())],
+        &[0, 1],
+        active,
+    )
+    .map_err(|_| "The local push configuration could not be read; no push was run.".into())
+}
+
+fn valid_ref(repo: &Path, name: &str, active: &dyn Fn() -> bool) -> Result<(), String> {
+    if !name.starts_with("refs/") || read(repo, &["check-ref-format", name], active).is_err() {
+        return Err("Choose one complete destination ref, such as refs/heads/main.".into());
+    }
+    Ok(())
+}
+
+fn config(repo: &Path, key: &str, active: &dyn Fn() -> bool) -> Result<String, String> {
+    optional(repo, &["config", "--get", key], active).map(|s| s.trim_end().to_owned())
+}
+
+fn config_stamp(repo: &Path, active: &dyn Fn() -> bool) -> Result<String, String> {
+    // Deliberately excludes credential helpers, HTTP headers and token stores. Signing
+    // identifiers/paths are compared, never opened. The private plan is not Debug/Serialize.
+    let values = optional(
+        repo,
+        &[
+            "config",
+            "--null",
+            "--get-regexp",
+            r"^(remote\..*\.(url|pushurl|fetch|push|mirror|receivepack)|branch\..*\.(remote|merge|pushremote|gitcraftpushbranch)|remote\.pushdefault|push\.(default|followtags|recursesubmodules)|url\..*\.(insteadof|pushinsteadof)|user\.(name|email|signingkey)|commit\.gpgsign|gpg\.(format|program)|gpg\..*\.program|core\.(sshcommand|hookspath)|ssh\.variant|lfs\.(url|pushurl|storage)|remote\..*\.(lfsurl|lfspushurl))$",
+        ],
+        active,
+    )?;
+    if values.len() > 256 * 1024 {
+        return Err("The push routing configuration exceeds the preview's size limit.".into());
+    }
+    for item in values.split('\0').filter(|s| !s.is_empty()) {
+        let (key, value) = item.split_once('\n').unwrap_or((item, ""));
+        if key.chars().any(char::is_control) || value.chars().any(char::is_control) {
+            return Err("An identity or routing value contains control characters. Correct it before opening a push preview.".into());
+        }
+    }
+    Ok(values)
+}
+
+pub(crate) fn has_push(ops: &[Vec<String>]) -> bool {
+    ops.iter().any(|op| push_words(op).is_some())
+}
+
+fn push_words(op: &[String]) -> Option<&[String]> {
+    let mut words = op;
+    while matches!(words.first().map(String::as_str), Some("-c")) {
+        words = words.get(2..)?;
+    }
+    (words.first()?.as_str() == "push").then_some(&words[1..])
+}
+
+type ParsedPush = (
+    Option<String>,
+    Option<String>,
+    bool,
+    bool,
+    Vec<String>,
+    bool,
+);
+
+fn parse(words: &[String]) -> Result<ParsedPush, String> {
+    let (mut positional, mut force, mut tracking, mut extras) =
+        (Vec::new(), false, false, Vec::new());
+    let mut ended = false;
+    let mut deleting = false;
+    for word in words {
+        if !ended && word == "--" {
+            ended = true;
+            continue;
+        }
+        if !ended && word.starts_with('-') {
+            match word.as_str() {
+                "-u" | "--set-upstream" => tracking = true,
+                "-f" | "--force" | "--force-with-lease" => force = true,
+                "--no-follow-tags" | "--porcelain" | "--no-verify" => {},
+                "--recurse-submodules=check" => extras.push(word.clone()),
+                "--delete" | "-d" => deleting = true,
+                _ if word.starts_with("--force-with-lease=") => force = true,
+                _ if word.starts_with("--push-option=") => extras.push(word.clone()),
+                _ => return Err("This push option needs an explicit single-ref preview; multi-ref, matching, mirror, atomic and recursive pushes are not sent by this checklist.".into()),
+            }
+        } else {
+            positional.push(word.clone());
+        }
+    }
+    if positional.len() > 2 {
+        return Err("Preview one destination at a time; no push was run.".into());
+    }
+    Ok((
+        positional.first().cloned(),
+        positional.get(1).cloned(),
+        force,
+        tracking,
+        extras,
+        deleting,
+    ))
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum CapturedLease {
+    Absent,
+    Object(String),
+}
+
+/// Shorthand leases still use this destination's fetched tip. Explicit absent
+/// and object expectations constrain it and may never contradict one another.
+fn lease_requirement(
+    words: &[String],
+    destination: &str,
+    deleting: bool,
+) -> Result<Option<CapturedLease>, String> {
+    let mut captured = None;
+    for lease in words
+        .iter()
+        .take_while(|word| word.as_str() != "--")
+        .filter_map(|arg| arg.strip_prefix("--force-with-lease="))
+    {
+        let Some((reference, expected)) = lease.split_once(':') else {
+            if deleting {
+                return Err("Deletion needs an exact ref lease".into());
+            }
+            if lease != destination {
+                return Err("The push lease must name this exact ref.".into());
+            }
+            continue; // DCO's tracked shorthand keeps the fetched-tip semantics.
+        };
+        if reference != destination
+            || (deleting && expected.is_empty())
+            || (!expected.is_empty() && !valid_object_id(expected))
+        {
+            return Err(if deleting {
+                "The deletion lease must name this exact ref and object."
+            } else {
+                "The push lease must name this exact ref and object."
+            }
+            .into());
+        }
+        let requirement = if expected.is_empty() {
+            CapturedLease::Absent
+        } else {
+            CapturedLease::Object(expected.to_owned())
+        };
+        if captured.as_ref().is_some_and(|prior| prior != &requirement) {
+            return Err(
+                "The push contains contradictory explicit leases; reopen its original action."
+                    .into(),
+            );
+        }
+        captured = Some(requirement);
+    }
+    Ok(captured)
+}
+
+/// An action's explicit expectation is immutable across scan/reload/approval.
+/// Tracking data may corroborate it, never replace it with a newer object.
+fn captured_lease(
+    words: &[String],
+    destination: &str,
+    base: Option<String>,
+    deleting: bool,
+) -> Result<Option<String>, String> {
+    let Some(requirement) = lease_requirement(words, destination, deleting)? else {
+        return Ok(base);
+    };
+    let expected = match requirement {
+        CapturedLease::Absent => None,
+        CapturedLease::Object(expected) => Some(expected),
+    };
+    if base
+        .as_deref()
+        .is_some_and(|tip| Some(tip) != expected.as_deref())
+    {
+        return Err(if deleting {
+            "The fetched target differs from the deletion lease; reopen its original action."
+        } else {
+            "The fetched target differs from the captured push lease; reopen its original action."
+        }
+        .into());
+    }
+    Ok(expected)
+}
+
+fn companion_branch(op: &[String]) -> Option<&str> {
+    match op {
+        [command, flag, end, name]
+            if command == "branch" && matches!(flag.as_str(), "-d" | "-D") && end == "--" =>
+        {
+            Some(name)
+        }
+        [command, end, name, oid] if command == "branch" && end == "--" && valid_object_id(oid) => {
+            Some(name)
+        }
+        [command, upstream, end, name]
+            if command == "branch" && upstream.starts_with("--set-upstream-to=") && end == "--" =>
+        {
+            Some(name)
+        }
+        [command, key, _] if command == "config" => key
+            .strip_prefix("branch.")
+            .and_then(|key| key.rsplit_once('.'))
+            .and_then(|(name, option)| matches!(option, "remote" | "merge").then_some(name)),
+        _ => None,
+    }
+}
+
+fn valid_object_id(value: &str) -> bool {
+    matches!(value.len(), 40 | 64) && value.bytes().all(|b| b.is_ascii_hexdigit())
+}
+
+// The internals branch picker extends only implicit plain pushes. Explicit refs
+// and workflow-reviewed plans keep the exact root plan chosen by their caller.
+fn saved_branch_spec(current: &str, saved: &str, implicit: bool) -> Option<String> {
+    (implicit && !current.is_empty() && !saved.is_empty())
+        .then(|| format!("refs/heads/{current}:refs/heads/{saved}"))
+}
+
+/// The scanner's existing operation gate, also usable with supplied recording argv.
+/// Rewriting commands are deliberately excluded: only the completed tip is reviewed.
+pub(crate) fn validate_operations(original: &[Vec<String>]) -> Result<(), String> {
+    for op in original {
+        if push_words(op).is_some() {
+            let mut prefix = op.as_slice();
+            while let [flag, value, rest @ ..] = prefix {
+                if flag != "-c" {
+                    break;
+                }
+                if value != "push.default=simple" {
+                    return Err(
+                        "Preview explicit refs without temporary push configuration overrides."
+                            .into(),
+                    );
+                }
+                prefix = rest;
+            }
+        } else if !op.first().is_some_and(|v| v.starts_with('\0')) && companion_branch(op).is_none()
+        {
+            return Err(
+                "Complete this local operation first, then preview its push separately.".into(),
+            );
+        }
+    }
+    Ok(())
+}
+
+pub(crate) fn scan(
+    repo: &Path,
+    original: Vec<Vec<String>>,
+    profile: UserProfile,
+    active: &dyn Fn() -> bool,
+) -> Result<Plan, String> {
+    let initial_config = config_stamp(repo, active)?;
+    validate_operations(&original)?;
+    let pushes: Vec<_> = original.iter().filter_map(|o| push_words(o)).collect();
+    if pushes.len() != 1 {
+        return Err("Preview one push at a time; no push was run.".into());
+    }
+    let skip_hooks = pushes[0].iter().any(|w| w == "--no-verify");
+    let (remote, spec, mut force, tracking, extras, delete_option) = parse(pushes[0])?;
+    let implicit_route = remote.is_none() && spec.is_none();
+    let mut local_refs = BTreeMap::new();
+    for op in &original {
+        if let Some(name) = companion_branch(op) {
+            let reference = format!("refs/heads/{name}");
+            valid_ref(repo, &reference, active)?;
+            let oid = optional(
+                repo,
+                &[
+                    "rev-parse",
+                    "--verify",
+                    "-q",
+                    "--end-of-options",
+                    &reference,
+                ],
+                active,
+            )?;
+            local_refs.insert(reference, oid.trim().to_owned());
+        }
+    }
+    let removed_before_push: Vec<_> = original
+        .iter()
+        .take_while(|op| push_words(op).is_none())
+        .filter_map(|op| match op.as_slice() {
+            [command, flag, end, name]
+                if command == "branch" && matches!(flag.as_str(), "-d" | "-D") && end == "--" =>
+            {
+                Some(format!("branch.{name}."))
+            }
+            _ => None,
+        })
+        .collect();
+    let config_before_push = initial_config
+        .split('\0')
+        .filter(|item| {
+            let key = item.split_once('\n').map_or(*item, |(key, _)| key);
+            !removed_before_push
+                .iter()
+                .any(|prefix| key.starts_with(prefix))
+        })
+        .filter(|item| !item.is_empty())
+        .map(|item| format!("{item}\0"))
+        .collect::<String>();
+    let checkout = optional(repo, &["symbolic-ref", "-q", "HEAD"], active)?
+        .trim()
+        .to_owned();
+    let checkout_oid = read(repo, &["rev-parse", "--verify", "HEAD"], active)?
+        .trim()
+        .to_owned();
+    // Explicit refs (notably release tags) are independent of the checkout. A
+    // detached HEAD is still pinned below and checked again before transmission.
+    let current = checkout.strip_prefix("refs/heads/").unwrap_or("");
+    let remote = match remote {
+        Some(r) => r,
+        None => {
+            if current.is_empty() {
+                return Err(
+                    "Choose an explicit remote and source ref when HEAD is detached.".into(),
+                );
+            }
+            let mut selected = String::new();
+            for key in [
+                format!("branch.{current}.pushRemote"),
+                "remote.pushDefault".into(),
+                format!("branch.{current}.remote"),
+            ] {
+                selected = config(repo, &key, active)?;
+                if !selected.is_empty() {
+                    break;
+                }
+            }
+            if selected.is_empty() {
+                let remotes = read(repo, &["remote"], active)?;
+                selected = if remotes.lines().any(|r| r == "origin") {
+                    "origin".into()
+                } else if remotes.lines().count() == 1 {
+                    remotes.trim().into()
+                } else {
+                    return Err("Choose a remote before pushing this branch.".into());
+                };
+            }
+            selected
+        }
+    };
+    let remotes = read(repo, &["remote"], active)?;
+    if !remotes.lines().any(|r| r == remote) || remote.starts_with('-') {
+        return Err("The push remote is no longer configured; reopen the preview.".into());
+    }
+    if config(repo, &format!("remote.{remote}.mirror"), active)?.eq_ignore_ascii_case("true") {
+        return Err("Mirror pushes need their own multi-ref review; no push was run.".into());
+    }
+    let urls: Vec<String> = read(
+        repo,
+        &["remote", "get-url", "--push", "--all", &remote],
+        active,
+    )?
+    .lines()
+    .map(str::to_owned)
+    .collect();
+    if urls.len() > 8 {
+        return Err("Preview at most eight configured push addresses; split larger mirror groups into separate remotes.".into());
+    }
+    if urls.is_empty()
+        || urls.iter().any(|u| {
+            u.chars().any(char::is_control)
+                || if let Some((scheme, _)) = u.split_once("://") {
+                    !["https", "http", "ssh", "git", "file"].contains(&scheme)
+                } else {
+                    u.contains("::")
+                }
+        })
+    {
+        return Err("The remote has no supported push address.".into());
+    }
+    let default_source = format!("refs/heads/{current}");
+    let saved_branch = if implicit_route && !current.is_empty() {
+        config(
+            repo,
+            &format!("branch.{current}.gitcraftPushBranch"),
+            active,
+        )?
+    } else {
+        String::new()
+    };
+    let spec = spec.or_else(|| saved_branch_spec(current, &saved_branch, implicit_route));
+    let spec = match spec {
+        Some(s) => s,
+        None => {
+            if current.is_empty() {
+                return Err("Choose an explicit source ref when HEAD is detached.".into());
+            }
+            let configured = optional(
+                repo,
+                &["config", "--get-all", &format!("remote.{remote}.push")],
+                active,
+            )?;
+            if configured.lines().count() > 1 {
+                return Err("The remote pushes multiple refs. Choose one explicit branch in its menu for preflight.".into());
+            }
+            if !configured.trim().is_empty() {
+                configured.trim().into()
+            } else {
+                let mode = config(repo, "push.default", active)?;
+                let upstream = config(repo, &format!("branch.{current}.merge"), active)?;
+                match mode.as_str() {
+                    "nothing" => return Err("push.default=nothing: choose an explicit branch push.".into()),
+                    "matching" => return Err("Matching pushes need a separate preview for each branch.".into()),
+                    "upstream" | "tracking" if !upstream.is_empty() => format!("{default_source}:{upstream}"),
+                    "" | "simple" if !upstream.is_empty() && upstream != default_source => return Err("The upstream branch has a different name; choose its explicit branch push from the menu.".into()),
+                    _ => default_source.clone(),
+                }
+            }
+        }
+    };
+    let spec = if delete_option {
+        format!(":{spec}")
+    } else {
+        spec
+    };
+    let spec = if let Some(s) = spec.strip_prefix('+') {
+        force = true;
+        s
+    } else {
+        &spec
+    };
+    let (source, destination) = spec.split_once(':').unwrap_or((spec, spec));
+    let deleting = source.is_empty();
+    if source.contains('*') || destination.contains('*') || destination.is_empty() {
+        return Err("Choose one complete ref; wildcard pushes are not sent.".into());
+    }
+    if deleting && tracking {
+        return Err("A deletion cannot set an upstream.".into());
+    }
+    let source = if deleting {
+        String::new()
+    } else if source == "HEAD" {
+        checkout.clone()
+    } else if matches!(source.len(), 40 | 64) && source.bytes().all(|b| b.is_ascii_hexdigit()) {
+        let refs = read(
+            repo,
+            &[
+                "for-each-ref",
+                "--format=%(refname)",
+                &format!("--points-at={source}"),
+                "refs/heads",
+            ],
+            active,
+        )?;
+        refs.lines()
+            .find(|r| *r == checkout)
+            .or_else(|| refs.lines().next())
+            .unwrap_or(source)
+            .to_owned()
+    } else if source.starts_with("refs/") {
+        source.to_owned()
+    } else {
+        format!("refs/heads/{source}")
+    };
+    if !deleting && !valid_object_id(&source) {
+        valid_ref(repo, &source, active)?;
+    }
+    let destination = if !deleting && destination == spec && !destination.starts_with("refs/") {
+        source.clone()
+    } else {
+        destination.to_owned()
+    };
+    valid_ref(repo, &destination, active)?;
+    let head = if deleting {
+        checkout_oid.clone()
+    } else {
+        read(
+            repo,
+            &[
+                "rev-parse",
+                "--verify",
+                "--end-of-options",
+                &format!("{source}^{{commit}}"),
+            ],
+            active,
+        )?
+        .trim()
+        .to_owned()
+    };
+    let push_oid = if deleting {
+        String::new()
+    } else {
+        read(
+            repo,
+            &["rev-parse", "--verify", "--end-of-options", &source],
+            active,
+        )?
+        .trim()
+        .to_owned()
+    };
+    let mut base = None;
+    let mut tracking_ref = None;
+    let fetch = optional(
+        repo,
+        &["config", "--get-all", &format!("remote.{remote}.fetch")],
+        active,
+    )?;
+    for fetch in fetch.lines() {
+        if let Some((from, to)) = fetch.trim_start_matches('+').split_once(':') {
+            let tracked = if from == destination {
+                Some(to.to_owned())
+            } else if let (Some((a, b)), Some((c, d))) = (from.split_once('*'), to.split_once('*'))
+            {
+                destination
+                    .strip_prefix(a)
+                    .and_then(|v| v.strip_suffix(b))
+                    .map(|middle| format!("{c}{middle}{d}"))
+            } else {
+                None
+            };
+            if let Some(tracked) = tracked {
+                if tracked.starts_with("refs/remotes/") && !tracked.ends_with("/HEAD") {
+                    tracking_ref = Some(tracked.clone());
+                }
+                base = optional(
+                    repo,
+                    &[
+                        "rev-parse",
+                        "--verify",
+                        "-q",
+                        "--end-of-options",
+                        &if deleting {
+                            tracked.clone()
+                        } else {
+                            format!("{tracked}^{{commit}}")
+                        },
+                    ],
+                    active,
+                )?
+                .trim()
+                .to_owned()
+                .into();
+                // Multiple fetch mappings must all corroborate a fixed lease;
+                // a later old tracking ref must not hide an earlier refreshed tip.
+                base = captured_lease(
+                    pushes[0],
+                    &destination,
+                    base.filter(|tip| !tip.is_empty()),
+                    deleting,
+                )?;
+            }
+        }
+    }
+    base = base.filter(|b| !b.is_empty());
+    if deleting && destination.starts_with("refs/tags/") && base.is_none() {
+        base = optional(
+            repo,
+            &[
+                "rev-parse",
+                "--verify",
+                "-q",
+                "--end-of-options",
+                &destination,
+            ],
+            active,
+        )?
+        .trim()
+        .to_owned()
+        .into();
+        base = base.filter(|oid| !oid.is_empty());
+    }
+    base = captured_lease(pushes[0], &destination, base, deleting)?;
+    if deleting && base.is_none() {
+        return Err(
+            "Fetch this exact target before deleting it; no remote tip was inspected.".into(),
+        );
+    }
+    if destination.starts_with("refs/for/")
+        && let Some(check) = original
+            .iter()
+            .find(|o| o.first().is_some_and(|x| x == crate::gerrit::CHECK))
+    {
+        base = check.get(1).cloned();
+    }
+    let mut args = vec![
+        "rev-list",
+        "--reverse",
+        "--topo-order",
+        "--max-count=10001",
+        head.as_str(),
+    ];
+    if let Some(base) = &base {
+        args.extend(["--not", base]);
+    }
+    let ids: Vec<String> = if deleting {
+        Vec::new()
+    } else {
+        read(repo, &args, active)?
+            .lines()
+            .map(str::to_owned)
+            .collect()
+    };
+    if ids.len() > MAX_COMMITS {
+        return Err("The outgoing history exceeds 10,000 commits; split the push or fetch its exact target before checking.".into());
+    }
+    clean_lfs_config(repo, &checkout_oid, active)?;
+    let lfs_file = read(
+        repo,
+        &["ls-tree", "-z", &checkout_oid, "--", ".lfsconfig"],
+        active,
+    )?;
+    if !lfs_file.is_empty() && !lfs_file.starts_with("100644 ") && !lfs_file.starts_with("100755 ")
+    {
+        return Err(
+            "Committed .lfsconfig must be a regular file before its endpoint can be reviewed."
+                .into(),
+        );
+    }
+    let receive_pack = config(repo, &format!("remote.{remote}.receivepack"), active)?;
+    let mut lfs_config = Vec::new();
+    for key in [
+        format!("remote.{remote}.lfsurl"),
+        format!("remote.{remote}.lfspushurl"),
+        "lfs.url".into(),
+        "lfs.pushurl".into(),
+    ] {
+        let mut value = config(repo, &key, active)?;
+        if value.is_empty() && !lfs_file.is_empty() && key.starts_with("lfs.") {
+            value = optional(
+                repo,
+                &[
+                    "config",
+                    "--blob",
+                    &format!("{checkout_oid}:.lfsconfig"),
+                    "--get",
+                    &key,
+                ],
+                active,
+            )?
+            .trim_end()
+            .to_owned();
+        }
+        if value.chars().any(char::is_control) {
+            return Err("The LFS endpoint contains control characters.".into());
+        }
+        // Empty higher-priority values freeze the default too: a later working-tree
+        // .lfsconfig edit must not redirect an already approved upload.
+        lfs_config.push((key, value));
+    }
+    let first_url = urls.first().ok_or("No push target")?;
+    let (expected_name, expected_email) = profile.expected_author(first_url);
+    let expected_name = if expected_name.is_empty() {
+        config(repo, "user.name", active)?
+    } else {
+        expected_name.to_owned()
+    };
+    let expected_email = if expected_email.is_empty() {
+        config(repo, "user.email", active)?
+    } else {
+        expected_email.to_owned()
+    };
+    let signs = profile.own_signing && profile.signing.sign_commits
+        || config(repo, "commit.gpgSign", active)?.eq_ignore_ascii_case("true");
+    let mut commits = Vec::new();
+    let mut findings = Vec::new();
+    if !deleting {
+        let names = read(
+            repo,
+            &[
+                "for-each-ref",
+                "--format=%(refname)%00%(objectname)",
+                "refs/heads/entire/checkpoints/",
+                "refs/entire/checkpoints/",
+                "refs/gitcraft/agent/",
+            ],
+            active,
+        )?;
+        if names.len() > 1024 * 1024 {
+            return Err(
+                "Checkpoint reference list exceeds 1 MiB; narrow publication before pushing".into(),
+            );
+        }
+        if let Some(detail) = crate::git::prompt_session::entire_automatic_publication(
+            repo, &names, skip_hooks, active,
+        )? {
+            findings.push(Finding {
+                kind: Kind::Transcript,
+                commit: push_oid.clone(),
+                path: String::new(),
+                detail: detail.into(),
+            });
+        }
+        if crate::git::prompt_session::checkpoint_publication(
+            &source,
+            &destination,
+            &push_oid,
+            &head,
+            &names,
+        ) {
+            findings.push(Finding { kind: Kind::Transcript, commit: push_oid.clone(), path: String::new(), detail: "Checkpoint publication may disclose prompts, local paths, assistant summaries and tool activity. This exact object or route contains agent checkpoint history. Review its contents and recipients explicitly before sending; local prompt/session viewing itself never publishes transcripts.".into() });
+        }
+    }
+
+    if !deleting && push_oid != head {
+        let tag = read(repo, &["cat-file", "tag", &push_oid], active)?;
+        if secret_lines(tag.split_once("\n\n").map_or("", |x| x.1))
+            .next()
+            .is_some()
+        {
+            findings.push(Finding{kind:Kind::Secret,commit:push_oid.clone(),path:String::new(),detail:"Likely secret in annotated tag message; value withheld. Recreate the tag before pushing.".into()});
+        }
+    }
+    let mut metadata_bytes = 0usize;
+    for oid in &ids {
+        let metadata = read(
+            repo,
+            &[
+                "show",
+                "--no-show-signature",
+                "-s",
+                "--format=%P%x00%an%x00%ae%x00%s",
+                oid,
+            ],
+            active,
+        )?;
+        metadata_bytes += metadata.len();
+        if metadata.len() > 16 * 1024 || metadata_bytes > 4 * 1024 * 1024 {
+            return Err("Outgoing commit metadata exceeds the bounded preview size; shorten large messages or split the push.".into());
+        }
+        let f: Vec<_> = metadata.trim_end().split('\0').collect();
+        if f.len() != 4 {
+            return Err("Commit metadata could not be read safely.".into());
+        }
+        let raw = read(repo, &["cat-file", "commit", oid], active)?;
+        let signed = raw
+            .split_once("\n\n")
+            .map_or(raw.as_str(), |x| x.0)
+            .lines()
+            .any(|l| l.starts_with("gpgsig ") || l.starts_with("gpgsig-sha256 "));
+        let commit = Commit {
+            oid: oid.clone(),
+            parents: f[0].split_whitespace().map(str::to_owned).collect(),
+            name: f[1].into(),
+            email: f[2].into(),
+            subject: f[3].into(),
+            signed,
+        };
+        for url in &urls {
+            let (_, email) = profile.expected_author(url);
+            let email = if email.is_empty() {
+                expected_email.as_str()
+            } else {
+                email
+            };
+            if !email.is_empty() && !commit.email.eq_ignore_ascii_case(email) {
+                findings.push(Finding {
+                    kind: Kind::Identity,
+                    commit: oid.clone(),
+                    path: String::new(),
+                    detail: format!(
+                        "Author email differs from the profile policy for {}.",
+                        target_label(url)
+                    ),
+                });
+            }
+        }
+        if signs && !signed {
+            findings.push(Finding {
+                kind: Kind::Signature,
+                commit: oid.clone(),
+                path: String::new(),
+                detail: "Commit has no embedded signature; this profile signs commits.".into(),
+            });
+        }
+        let lower = commit.subject.trim().to_ascii_lowercase();
+        if ["fixup!", "squash!", "wip", "[wip]"]
+            .iter()
+            .any(|p| lower.starts_with(p))
+        {
+            findings.push(Finding {
+                kind: Kind::Message,
+                commit: oid.clone(),
+                path: String::new(),
+                detail: "Temporary WIP/fixup message remains in outgoing history.".into(),
+            });
+        }
+        if secret_lines(raw.split_once("\n\n").map_or("", |x| x.1))
+            .next()
+            .is_some()
+        {
+            findings.push(Finding {
+                kind: Kind::Secret,
+                commit: oid.clone(),
+                path: String::new(),
+                detail: "Likely secret in commit message (value withheld).".into(),
+            });
+        }
+        commits.push(commit);
+        if findings.len() > MAX_FINDINGS {
+            return Err("More than 2,000 findings need review. Repair or split this history before pushing.".into());
+        }
+    }
+    let mut objects_args = vec!["rev-list", "--objects", "--no-object-names", head.as_str()];
+    if let Some(b) = &base {
+        objects_args.extend(["--not", b]);
+    }
+    let objects: BTreeSet<String> = read(repo, &objects_args, active)?
+        .lines()
+        .map(str::to_owned)
+        .collect();
+    if objects.len() > MAX_OBJECTS {
+        return Err("More than 50,000 outgoing objects need checking. Split the push or fetch the exact target.".into());
+    }
+    let mut seen = BTreeSet::new();
+    let mut lfs_objects = BTreeSet::new();
+    for commit in &commits {
+        let tree = read(
+            repo,
+            &["ls-tree", "-r", "-l", "-z", "--full-tree", &commit.oid],
+            active,
+        )?;
+        for item in tree.split('\0').filter(|s| !s.is_empty()) {
+            let Some((meta, path)) = item.split_once('\t') else {
+                continue;
+            };
+            let words: Vec<_> = meta.split_whitespace().collect();
+            if words.len() != 4
+                || words[1] != "blob"
+                || !objects.contains(words[2])
+                || !seen.insert((words[2].to_owned(), path.to_owned()))
+            {
+                continue;
+            }
+            let size = words[3]
+                .parse::<u64>()
+                .map_err(|_| "Unknown outgoing blob size")?;
+            if size <= 1024 {
+                let text = read(repo, &["cat-file", "blob", words[2]], active)?;
+                if let Some(pointer) = git::parse_lfs_pointer(&text) {
+                    let oid = pointer
+                        .oid
+                        .strip_prefix("sha256:")
+                        .ok_or("Unsupported LFS object hash")?;
+                    if oid.len() != 64 || !oid.bytes().all(|b| b.is_ascii_hexdigit()) {
+                        return Err("Malformed LFS object hash".into());
+                    }
+                    lfs_objects.insert(oid.to_owned());
+                }
+            }
+            if size > LARGE {
+                findings.push(Finding {
+                    kind: Kind::Large,
+                    commit: commit.oid.clone(),
+                    path: path.into(),
+                    detail: format!("{} Git blob; consider Git LFS.", git::human_size(size)),
+                });
+            }
+            for line in blob_secret_lines(repo, words[2], active)? {
+                findings.push(Finding {
+                    kind: Kind::Secret,
+                    commit: commit.oid.clone(),
+                    path: path.into(),
+                    detail: format!("Likely secret at line {line}; value withheld."),
+                });
+            }
+            if findings.len() > MAX_FINDINGS {
+                return Err("More than 2,000 findings need review. Repair or split this history before pushing.".into());
+            }
+        }
+    }
+    if !deleting && let Some(base) = &base {
+        let lost = read(
+            repo,
+            &[
+                "log",
+                "--no-show-signature",
+                "--format=%H%x00%ae",
+                base,
+                "--not",
+                &head,
+            ],
+            active,
+        )?;
+        let mut count = 0;
+        let mut others = 0;
+        for line in lost.lines() {
+            if let Some((_, email)) = line.split_once('\0') {
+                count += 1;
+                if !email.eq_ignore_ascii_case(&expected_email) {
+                    others += 1;
+                }
+            }
+        }
+        if count > 0 {
+            findings.push(Finding{kind:Kind::RemoteHistory,commit:base.clone(),path:String::new(),detail:format!("Force push would drop {count} remote commits, {others} by other authors. Based on the fetched target; the lease must still match.")});
+        }
+    }
+    let config = config_stamp(repo, active)?;
+    if config != initial_config {
+        return Err("The push configuration changed while checking. Reopen preflight.".into());
+    }
+    // This is selected profile metadata, never a guessed identity from SSH's `git`
+    // transport username. Reading it does not resolve credentials or contact a service.
+    let expected_accounts = BTreeMap::new();
+    let targets = urls.iter().map(|u| target_label(u)).collect();
+    let plan = Plan {
+        branch: source,
+        remote,
+        destination,
+        head,
+        base,
+        commits,
+        findings,
+        targets,
+        expected_name,
+        expected_email,
+        expected_accounts,
+        profile,
+        force,
+        deleting,
+        tracking,
+        lfs_objects,
+        skip_hooks,
+        push_oid,
+        original,
+        urls,
+        checkout,
+        checkout_oid,
+        config,
+        config_before_push,
+        local_refs,
+        extras,
+        tracking_ref,
+        lfs_config,
+        receive_pack,
+        selection: None,
+        fork_scope: None,
+    };
+    check_active(repo, &plan, active)?;
+    if !plan.deleting
+        && read(
+            repo,
+            &[
+                "rev-parse",
+                "--verify",
+                "--end-of-options",
+                &format!("{}^{{commit}}", plan.push_oid),
+            ],
+            active,
+        )?
+        .trim()
+            != plan.head
+    {
+        return Err("The source changed while checking. Reopen preflight.".into());
+    }
+    Ok(plan)
+}
+
+pub(crate) fn target_label(url: &str) -> String {
+    location(url)
+        .map(|(h, p)| {
+            if secret_lines(&p).next().is_some() {
+                format!("{h}/[sensitive path]")
+            } else {
+                format!("{h}/{p}")
+            }
+        })
+        .unwrap_or_else(|| {
+            let path = if let Some(rest) = url.strip_prefix("file://") {
+                let rest = rest.split(['?', '#']).next().unwrap_or(rest);
+                if let Some((authority, path)) = rest.split_once('/') {
+                    format!(
+                        "{}/{}",
+                        authority.rsplit('@').next().unwrap_or(authority),
+                        path
+                    )
+                } else {
+                    rest.rsplit('@').next().unwrap_or(rest).to_owned()
+                }
+            } else {
+                url.to_owned()
+            };
+            format!("Local repository: {}", display_path(&path))
+        })
+}
+
+pub(crate) fn display_path(path: &str) -> String {
+    if secret_lines(path).next().is_some() {
+        "[sensitive path]".into()
+    } else {
+        path.chars()
+            .flat_map(|c| {
+                if c.is_control() {
+                    c.escape_default().collect::<Vec<_>>()
+                } else {
+                    vec![c]
+                }
+            })
+            .collect()
+    }
+}
+
+impl Plan {
+    pub(crate) fn fork_scope(&self) -> Option<&crate::repo::forks::ExecutionScope> {
+        self.fork_scope.as_ref()
+    }
+
+    pub(crate) fn retain_fork_scope(&mut self, scope: crate::repo::forks::ExecutionScope) {
+        self.fork_scope = Some(scope);
+    }
+
+    fn check_fork_scope(&self, repo: &Path) -> Result<(), String> {
+        self.fork_scope
+            .as_ref()
+            .map_or(Ok(()), |scope| scope.check_remote(repo))
+    }
+
+    pub(crate) fn selection(&self) -> Option<&git::repository_tools::routes::PreparedPush> {
+        self.selection.as_ref()
+    }
+
+    /// A sidebar/dependency choice can constrain a root checklist, never approve
+    /// it. Keep the original endpoint and lease across rechecks and echo/retry.
+    pub(crate) fn retain_selection(
+        &mut self,
+        selected: git::repository_tools::routes::PreparedPush,
+    ) -> Result<(), String> {
+        self.matches_selection(&selected.route)?;
+        self.selection = Some(selected);
+        Ok(())
+    }
+
+    fn matches_selection(
+        &self,
+        selected: &git::repository_tools::routes::PushRoute,
+    ) -> Result<(), String> {
+        if self.deleting
+            || self.remote != selected.remote
+            || self.destination != selected.destination
+            || self.push_oid != selected.commit
+            || self.head != selected.commit
+            || self.urls != selected.urls
+            || selected
+                .lease
+                .as_deref()
+                .is_some_and(|lease| self.base.as_deref() != Some(lease))
+        {
+            return Err("The selected push endpoint, commit or advertised lease changed. Fetch the exact target if needed, then reopen the original push action; nothing was sent.".into());
+        }
+        Ok(())
+    }
+    pub(crate) fn is_current_branch(&self) -> bool {
+        !self.deleting && self.branch == self.checkout && self.branch.starts_with("refs/heads/")
+    }
+    pub(crate) fn lfs_targets(&self) -> Vec<String> {
+        let values: BTreeSet<_> = self
+            .lfs_config
+            .iter()
+            .filter(|(_, v)| !v.is_empty())
+            .map(|(_, v)| target_label(v))
+            .collect();
+        if values.is_empty() {
+            self.targets.clone()
+        } else {
+            values.into_iter().collect()
+        }
+    }
+
+    pub(crate) fn local_steps(&self) -> Vec<(bool, String)> {
+        let mut before = true;
+        let mut steps = Vec::new();
+        for op in &self.original {
+            if push_words(op).is_some() {
+                before = false;
+            } else if !op.first().is_some_and(|value| value.starts_with('\0')) {
+                steps.push((before, display_path(&op.join(" "))));
+            }
+        }
+        steps
+    }
+
+    pub(crate) fn again(&self) -> Vec<Vec<String>> {
+        self.original.clone()
+    }
+}
+
+pub(crate) fn location(url: &str) -> Option<(String, String)> {
+    let url = url.split(['?', '#']).next()?.trim();
+    let (host, path, default_port) = if let Some((scheme, rest)) = url.split_once("://") {
+        if !["https", "http", "ssh", "git"].contains(&scheme) {
+            return None;
+        }
+        let (authority, path) = rest.split_once('/')?;
+        let default_port = match scheme {
+            "https" => "443",
+            "http" => "80",
+            "ssh" => "22",
+            "git" => "9418",
+            _ => return None,
+        };
+        (authority.rsplit('@').next()?, path, Some(default_port))
+    } else {
+        if url.contains('\\') || url.starts_with('/') || url.starts_with('.') {
+            return None;
+        }
+        let (authority, path) = url.split_once(':')?;
+        (authority.rsplit('@').next()?, path, None)
+    };
+    if host.len() < 2 || path.is_empty() || host.chars().any(char::is_control) {
+        return None;
+    }
+    let lower = host.to_ascii_lowercase();
+    let host = default_port
+        .and_then(|port| lower.strip_suffix(&format!(":{port}")))
+        .unwrap_or(&lower);
+    let host = match host {
+        "ssh.github.com" | "ssh.github.com:443" => "github.com".to_owned(),
+        "altssh.gitlab.com" | "altssh.gitlab.com:443" => "gitlab.com".to_owned(),
+        host => host.to_owned(),
+    };
+    Some((host, path.trim_matches('/').trim_end_matches(".git").into()))
+}
+
+fn secret_lines(text: &str) -> impl Iterator<Item = usize> + '_ {
+    text.lines().enumerate().filter_map(|(i, line)| {
+        let l = line.trim();
+        let lower = l.to_ascii_lowercase();
+        let credential = [
+            "password",
+            "passwd",
+            "secret",
+            "api_key",
+            "apikey",
+            "access_token",
+            "auth_token",
+        ]
+        .iter()
+        .any(|k| lower.contains(k))
+            && (l.contains('=') || l.contains(':'))
+            && l.split_once(['=', ':'])
+                .is_some_and(|(_, v)| v.trim_matches([' ', '\'', '"', ';', ',']).len() >= 8);
+        let token = ["ghp_", "github_pat_", "glpat-", "sk_live_", "xoxb-", "AKIA"]
+            .iter()
+            .any(|p| {
+                l.find(p).is_some_and(|n| {
+                    l[n + p.len()..]
+                        .chars()
+                        .take_while(|c| c.is_ascii_alphanumeric() || *c == '_' || *c == '-')
+                        .count()
+                        >= 12
+                })
+            });
+        (credential || token || l.contains("PRIVATE KEY-----")).then_some(i + 1)
+    })
+}
+
+fn blob_secret_lines(
+    repo: &Path,
+    oid: &str,
+    active: &dyn Fn() -> bool,
+) -> Result<Vec<usize>, String> {
+    if !matches!(oid.len(), 40 | 64) || !oid.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return Err("Invalid outgoing object".into());
+    }
+    // Streaming on the repository's machine avoids downloading/allocating huge blobs. Only
+    // line numbers leave this pipeline: neither a matched line nor its secret enters a UI result.
+    let pattern = r#"PRIVATE KEY-----|ghp_[A-Za-z0-9_]{12,}|github_pat_[A-Za-z0-9_]{12,}|glpat-[A-Za-z0-9_-]{12,}|sk_live_[A-Za-z0-9_]{12,}|xoxb-[A-Za-z0-9-]{12,}|AKIA[A-Z0-9]{16}|(password|passwd|secret|api_key|apikey|access_token|auth_token)[[:space:]\"']*[:=].{8,64}"#;
+    let script = format!(
+        "!command -v grep >/dev/null && command -v cut >/dev/null && command -v head >/dev/null || exit 1; {{ {{ git --no-lazy-fetch cat-file blob {} || printf 'READ_ERROR\\n' >&3; }} | grep -ainE {} | cut -d: -f1 | head -n 257; }} 3>&1",
+        oid,
+        crate::remote::sh_quote(pattern)
+    );
+    let output = read(
+        repo,
+        &[
+            "-c",
+            &format!("alias.gitcraft-preflight-secrets={script}"),
+            "gitcraft-preflight-secrets",
+        ],
+        active,
+    )?;
+    output
+        .lines()
+        .map(|n| {
+            n.parse().map_err(|_| {
+                "The content scan failed or exceeded its finding limit; no push was run.".into()
+            })
+        })
+        .collect()
+}
+
+static PLANS: OnceLock<Mutex<BTreeMap<u64, Arc<Plan>>>> = OnceLock::new();
+pub(crate) fn register(plan: Plan) -> Vec<String> {
+    static IDS: AtomicU64 = AtomicU64::new(1);
+    let id = IDS.fetch_add(1, Ordering::Relaxed);
+    let mut plans = PLANS
+        .get_or_init(Default::default)
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    while plans.len() >= 64 {
+        plans.pop_first();
+    }
+    plans.insert(id, Arc::new(plan));
+    vec![APPROVED.into(), id.to_string()]
+}
+
+pub(crate) fn registered(id: &str) -> Result<Arc<Plan>, String> {
+    PLANS
+        .get_or_init(Default::default)
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .get(&id.parse::<u64>().map_err(|_| "Reopen push preflight")?)
+        .cloned()
+        .ok_or_else(|| "This preview expired; reopen push preflight.".into())
+}
+
+fn clean_lfs_config(repo: &Path, head: &str, active: &dyn Fn() -> bool) -> Result<(), String> {
+    let untracked = read(repo, &["ls-files", "--others", "--", ".lfsconfig"], active)?;
+    let flags = read(repo, &["ls-files", "-v", "--", ".lfsconfig"], active)?;
+    if !untracked.is_empty() || flags.lines().any(|l| !l.starts_with("H ")) {
+        return Err("Commit or remove .lfsconfig changes, and clear skip/assume-unchanged flags on it before reviewing a push.".into());
+    }
+    let filter = read(repo, &["check-attr", "filter", "--", ".lfsconfig"], active)?;
+    if !filter.trim_end().ends_with(": unspecified") && !filter.trim_end().ends_with(": unset") {
+        return Err(".lfsconfig must not pass through a content filter when reviewing endpoint configuration.".into());
+    }
+    let change = read(
+        repo,
+        &[
+            "-c",
+            "core.fsmonitor=false",
+            "diff",
+            "--no-ext-diff",
+            "--no-textconv",
+            "--raw",
+            "--no-renames",
+            head,
+            "--",
+            ".lfsconfig",
+        ],
+        active,
+    )?;
+    if !change.is_empty() {
+        return Err("The working .lfsconfig differs from the inspected commit. Commit or stash that routing change before pushing.".into());
+    }
+    Ok(())
+}
+
+pub(crate) fn check(repo: &Path, plan: &Plan) -> Result<(), String> {
+    check_active(repo, plan, &|| true)
+}
+
+fn check_active(repo: &Path, plan: &Plan, active: &dyn Fn() -> bool) -> Result<(), String> {
+    plan.check_fork_scope(repo)?;
+    check_selected_snapshot(plan, |snapshot| snapshot.check_publication(repo))?;
+    clean_lfs_config(repo, &plan.checkout_oid, active)?;
+    if read(repo, &["rev-parse", "--verify", "HEAD"], active)?.trim() != plan.checkout_oid {
+        return Err("The checked-out branch moved. Reopen push preflight.".into());
+    }
+    let config = config_stamp(repo, active)?;
+    if (config != plan.config && config != plan.config_before_push)
+        || optional(repo, &["symbolic-ref", "-q", "HEAD"], active)?.trim() != plan.checkout
+        || (!plan.deleting
+            && read(
+                repo,
+                &["rev-parse", "--verify", "--end-of-options", &plan.branch],
+                active,
+            )?
+            .trim()
+                != plan.push_oid)
+    {
+        return Err("The branch, checkout, identity or push configuration changed. Reopen push preflight; nothing was pushed.".into());
+    }
+    let urls: Vec<String> = read(
+        repo,
+        &["remote", "get-url", "--push", "--all", &plan.remote],
+        active,
+    )?
+    .lines()
+    .map(str::to_owned)
+    .collect();
+    if urls != plan.urls {
+        return Err("The push addresses changed. Reopen push preflight.".into());
+    }
+    Ok(())
+}
+
+fn check_selected_snapshot(
+    plan: &Plan,
+    check: impl FnOnce(&git::repository_tools::guard::Snapshot) -> Result<(), String>,
+) -> Result<(), String> {
+    if let Some(selected) = &plan.selection {
+        check(&selected.snapshot)?;
+    }
+    Ok(())
+}
+
+pub(crate) fn push_args(plan: &Plan) -> Result<Vec<String>, String> {
+    if let Some(selected) = &plan.selection {
+        plan.matches_selection(&selected.route)?;
+    }
+    let mut expected_absent = false;
+    for words in plan.original.iter().filter_map(|step| push_words(step)) {
+        expected_absent |= matches!(
+            lease_requirement(words, &plan.destination, plan.deleting)?,
+            Some(CapturedLease::Absent)
+        );
+        if captured_lease(words, &plan.destination, plan.base.clone(), plan.deleting)? != plan.base
+        {
+            return Err("The captured push lease changed; reopen its original action.".into());
+        }
+    }
+    if (plan.force || plan.deleting) && plan.base.is_none() && (!expected_absent || plan.deleting) {
+        return Err(
+            "Fetch this exact target before force pushing: no remote lease was inspected.".into(),
+        );
+    }
+    let mut args = vec![
+        "push".into(),
+        "--porcelain".into(),
+        "--no-follow-tags".into(),
+        if plan
+            .extras
+            .iter()
+            .any(|s| s == "--recurse-submodules=check")
+        {
+            "--recurse-submodules=check".into()
+        } else {
+            "--recurse-submodules=no".into()
+        },
+    ];
+    if !plan.destination.starts_with("refs/for/") {
+        if !plan.deleting
+            && !plan.force
+            && plan.findings.iter().any(|f| f.kind == Kind::RemoteHistory)
+        {
+            return Err("The fetched target is not an ancestor. Keep its commits or deliberately choose force-with-lease.".into());
+        }
+        // Normal mode is still a fast-forward (or absent-ref creation). The explicit
+        // expected tip makes the inspected outgoing range valid at the server too.
+        args.push(format!(
+            "--force-with-lease={}:{}",
+            plan.destination,
+            plan.base.as_deref().unwrap_or_default()
+        ));
+    }
+    args.extend(
+        plan.extras
+            .iter()
+            .filter(|s| s.as_str() != "--recurse-submodules=check")
+            .cloned(),
+    );
+    args.extend([
+        "--".into(),
+        plan.remote.clone(),
+        format!("{}:{}", plan.push_oid, plan.destination),
+    ]);
+    Ok(args)
+}
+
+pub(crate) fn approved_ops(plan: Plan) -> Vec<Vec<String>> {
+    let mut ops: Vec<_> = plan
+        .local_refs
+        .iter()
+        .map(|(name, oid)| crate::repo::operations::expect_ref_at(name, oid))
+        .collect();
+    let original = plan.original.clone();
+    let approved = register(plan);
+    ops.extend(original.into_iter().map(|step| {
+        if push_words(&step).is_some() {
+            approved.clone()
+        } else {
+            step
+        }
+    }));
+    ops
+}
+
+#[cfg(test)]
+pub(crate) fn execute(
+    repo: &Path,
+    plan: &Plan,
+    creds: Option<&git::Credentials>,
+) -> Result<String, String> {
+    execute_controlled(repo, plan, creds, None)
+}
+/// Source evidence returned by RepoTab::reviewed_send after the user's personal
+/// rulebook gate. It is bound to the exact preflight argv, never a generic approval.
+#[derive(Clone)]
+pub(crate) struct ReviewedSend {
+    original: Vec<String>,
+    source: Option<Arc<git::CommandSource>>,
+}
+impl ReviewedSend {
+    pub(crate) fn from_echo(
+        original: Vec<String>,
+        source: Option<Arc<git::CommandSource>>,
+    ) -> Self {
+        Self { original, source }
+    }
+    pub(crate) fn check_plan(&self, plan: &Plan) -> Result<(), String> {
+        if self.original != push_args(plan)? {
+            return Err("Reviewer echo belongs to a different exact push; prepare again".into());
+        }
+        Ok(())
+    }
+}
+/// Execute only after caller preflight/consent and RepoTab::reviewed_send. Retain
+/// original-route typed auth receipts and repeat route/source proof per endpoint.
+pub(crate) fn execute_bound_controlled(
+    repo: &Path,
+    plan: &Plan,
+    reviewed: &ReviewedSend,
+    creds: Option<&git::Credentials>,
+    control: Option<&Arc<git::OpControl>>,
+) -> Result<String, String> {
+    reviewed.check_plan(plan)?;
+    let captured = std::cell::RefCell::new(None);
+    crate::repo::run_reviewed_push(
+        &reviewed.original,
+        |args| {
+            let binding = git::RouteBinding::capture(repo, args)?;
+            captured.replace(Some(binding.clone()));
+            Ok(binding)
+        },
+        || {
+            let route = captured.borrow();
+            let route = route.as_ref().ok_or("Reviewed route was not captured")?;
+            execute_controlled_with_guard(repo, plan, creds, control, || {
+                route.verify(repo)?;
+                if let Some(source) = &reviewed.source {
+                    source.check_execution()?;
+                }
+                Ok(())
+            })
+        },
+        control,
+    )
+}
+
+pub(crate) fn execute_controlled(
+    repo: &Path,
+    plan: &Plan,
+    creds: Option<&git::Credentials>,
+    control: Option<&Arc<git::OpControl>>,
+) -> Result<String, String> {
+    execute_controlled_with_guard(repo, plan, creds, control, || Ok(()))
+}
+pub(crate) fn execute_controlled_with_guard(
+    repo: &Path,
+    plan: &Plan,
+    creds: Option<&git::Credentials>,
+    control: Option<&Arc<git::OpControl>>,
+    before_publish: impl Fn() -> Result<(), String>,
+) -> Result<String, String> {
+    if let Some(why) = crate::network::refused() {
+        return Err(why.why().into());
+    }
+    check(repo, plan)?;
+    let mut args = push_args(plan)?;
+    for (i, url) in plan.urls.iter().enumerate() {
+        if let Some(why) = crate::network::refused() {
+            return Err(why.why().into());
+        }
+        check(repo, plan)?;
+        let opaque = format!(
+            "gitcraft-preflight-{}-{}-{i}",
+            std::process::id(),
+            git::now()
+        );
+        let remote_at = args.len() - 2;
+        args[remote_at] = opaque.clone();
+        let objects: Vec<_> = plan.lfs_objects.iter().cloned().collect();
+        before_publish()?;
+        plan.check_fork_scope(repo)?;
+        git::push_preflight_with(
+            repo,
+            &args,
+            git::PushTarget {
+                address: url,
+                skip_hooks: plan.skip_hooks,
+                alias: &opaque,
+                original_remote: &plan.remote,
+                lfs_config: &plan.lfs_config,
+                receive_pack: &plan.receive_pack,
+                lfs_objects: &objects,
+            },
+            creds,
+            control,
+        )
+        .map_err(|error| {
+            if git::is_auth_error(&error) {
+                remember_auth_endpoint(url)
+            } else {
+                error
+            }
+        })?;
+    }
+    if let Some(reference) = &plan.tracking_ref {
+        // A background fetch may already have updated it. Never overwrite a newer tip.
+        let args = if plan.deleting {
+            vec![
+                "update-ref",
+                "-d",
+                reference,
+                plan.base.as_deref().unwrap_or(""),
+            ]
+        } else {
+            vec![
+                "update-ref",
+                reference,
+                &plan.head,
+                plan.base.as_deref().unwrap_or(""),
+            ]
+        };
+        let _ = git::forecast_run(repo, &args, &[], &[0], &|| true);
+    }
+    if plan.tracking
+        && plan.branch.starts_with("refs/heads/")
+        && plan.destination.starts_with("refs/heads/")
+    {
+        // Setting an upstream is local metadata; it is never used to choose this push's ref.
+        let branch = plan.branch.trim_start_matches("refs/heads/");
+        git::run(
+            Some(repo),
+            &["config", &format!("branch.{branch}.remote"), &plan.remote],
+        )?;
+        git::run(
+            Some(repo),
+            &[
+                "config",
+                &format!("branch.{branch}.merge"),
+                &plan.destination,
+            ],
+        )?;
+    }
+    Ok("Push completed to the reviewed target(s).".into())
+}
+
+const AUTH_ENDPOINT: &str = "[gitcraft-reviewed-auth:";
+fn auth_endpoints() -> &'static Mutex<BTreeMap<u64, String>> {
+    static ENDPOINTS: OnceLock<Mutex<BTreeMap<u64, String>>> = OnceLock::new();
+    ENDPOINTS.get_or_init(Default::default)
+}
+pub(crate) fn remember_auth_endpoint(url: &str) -> String {
+    static IDS: AtomicU64 = AtomicU64::new(1);
+    let id = IDS.fetch_add(1, Ordering::Relaxed);
+    if let Ok(mut endpoints) = auth_endpoints().lock() {
+        while endpoints.len() >= 64 {
+            if let Some(first) = endpoints.keys().next().copied() {
+                endpoints.remove(&first);
+            }
+        }
+        endpoints.insert(id, url.into());
+    }
+    // The log/status carries an opaque receipt, never URL userinfo/query values.
+    format!("Authentication failed for the reviewed push target. {AUTH_ENDPOINT}{id}]")
+}
+pub(crate) fn take_auth_endpoint(error: &str) -> Option<String> {
+    let id = error
+        .split_once(AUTH_ENDPOINT)?
+        .1
+        .strip_suffix(']')?
+        .parse::<u64>()
+        .ok()?;
+    auth_endpoints().lock().ok()?.remove(&id)
+}
+pub(crate) fn is_reviewed_auth_error(error: &str) -> bool {
+    error.contains(AUTH_ENDPOINT)
+}
+
+#[cfg(all(test, unix))]
+pub(super) fn recording_input(
+    command: std::process::Command,
+    input: Option<Vec<u8>>,
+    _active: &dyn Fn() -> bool,
+    timeout: std::time::Duration,
+    stdout: usize,
+    stderr: usize,
+) -> Result<std::process::Output, String> {
+    crate::processes::run(
+        command,
+        crate::processes::Options {
+            input,
+            timeout: Some(timeout),
+            output_limit: stdout,
+            stderr_limit: Some(stderr),
+            ..Default::default()
+        },
+    )?
+    .complete()
+}
+
+#[cfg(test)]
+mod internals_route_recording {
+    use super::*;
+    #[test]
+    fn saved_branch_enters_the_reviewed_plan_without_overriding_explicit_refs() {
+        assert_eq!(
+            saved_branch_spec("main", "dev", true),
+            Some("refs/heads/main:refs/heads/dev".into())
+        );
+        for (branch, saved, implicit) in [
+            ("main", "dev", false),
+            ("", "dev", true),
+            ("main", "", true),
+        ] {
+            assert_eq!(saved_branch_spec(branch, saved, implicit), None);
+        }
+    }
+}
+
+#[cfg(test)]
+pub(crate) mod selected_continuation_recording {
+    use super::*;
+    use git::repository_tools::routes::{PreparedPush, PushRoute};
+
+    pub(crate) fn plan(route: &PushRoute) -> Plan {
+        Plan {
+            branch: format!("refs/heads/{}", route.branch),
+            remote: route.remote.clone(),
+            destination: route.destination.clone(),
+            head: route.commit.clone(),
+            base: route.lease.clone(),
+            commits: Vec::new(),
+            findings: Vec::new(),
+            targets: route.urls.iter().map(|u| target_label(u)).collect(),
+            expected_name: String::new(),
+            expected_email: String::new(),
+            expected_accounts: BTreeMap::new(),
+            profile: UserProfile::default(),
+            force: route.lease.is_some(),
+            deleting: false,
+            tracking: false,
+            lfs_objects: BTreeSet::new(),
+            skip_hooks: false,
+            push_oid: route.commit.clone(),
+            original: route.operations(),
+            urls: route.urls.clone(),
+            checkout: "refs/heads/other-checkout".into(),
+            checkout_oid: "c".repeat(40),
+            config: String::new(),
+            config_before_push: String::new(),
+            local_refs: BTreeMap::new(),
+            extras: Vec::new(),
+            tracking_ref: None,
+            lfs_config: Vec::new(),
+            receive_pack: String::new(),
+            selection: None,
+            fork_scope: None,
+        }
+    }
+
+    #[test]
+    fn prewrite_snapshot_guard_blocks_changed_selection_and_leaves_ordinary_pushes_unchanged()
+    -> Result<(), String> {
+        let route = PushRoute {
+            branch: "topic".into(),
+            commit: "a".repeat(40),
+            remote: "publish-host".into(),
+            destination: "refs/heads/release".into(),
+            urls: vec!["https://publish.invalid/team/repo".into()],
+            lease: Some("b".repeat(40)),
+        };
+        let original = git::repository_tools::guard::Snapshot::recording();
+        for (selected, change) in [(true, 0), (true, 1), (true, 2), (false, 1)] {
+            let mut plan = plan(&route);
+            let expected_args = push_args(&plan)?;
+            if selected {
+                plan.retain_selection(PreparedPush {
+                    snapshot: original.clone(),
+                    route: route.clone(),
+                })?;
+            }
+            let mut current = original.clone();
+            match change {
+                1 => current.worktrees.push_str("new linked worktree"),
+                2 => current.status.push_str("tracked working changes"),
+                _ => {}
+            }
+            let mut checks = 0;
+            let mut endpoints = 0;
+            let result = check_selected_snapshot(&plan, |captured| {
+                checks += 1;
+                assert_eq!(captured, &original); // retained input, never recaptured
+                if *captured == current {
+                    Ok(())
+                } else {
+                    Err("selected Snapshot changed".into())
+                }
+            })
+            .and_then(|()| {
+                // Inert dispatch callback after the same production guard. No
+                // repository read, command constructor or endpoint is executed.
+                endpoints += 1;
+                push_args(&plan)
+            });
+            assert_eq!(checks, usize::from(selected));
+            if selected && change != 0 {
+                assert_eq!(result, Err("selected Snapshot changed".into()));
+                assert_eq!(endpoints, 0);
+            } else {
+                assert_eq!(result?, expected_args);
+                assert_eq!(endpoints, 1);
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn changed_endpoint_oid_destination_or_lease_cannot_enter_the_selected_checklist()
+    -> Result<(), String> {
+        let route = PushRoute {
+            branch: "topic".into(),
+            commit: "a".repeat(40),
+            remote: "publish-host".into(),
+            destination: "refs/heads/release".into(),
+            urls: vec!["https://publish.invalid/team/repo".into()],
+            lease: Some("b".repeat(40)),
+        };
+        let selected = PreparedPush {
+            snapshot: git::repository_tools::guard::Snapshot::recording(),
+            route: route.clone(),
+        };
+        let mut original = plan(&route);
+        original.retain_selection(selected.clone())?;
+        assert_eq!(original.selection().map(|s| &s.route), Some(&route));
+        assert_eq!(original.again(), route.operations());
+        assert!(push_args(&original)?.contains(&format!(
+            "--force-with-lease=refs/heads/release:{}",
+            "b".repeat(40)
+        )));
+        for change in 0..5 {
+            let mut changed = plan(&route);
+            match change {
+                0 => changed.urls = vec!["https://foreign.invalid/repo".into()],
+                1 => changed.push_oid = "d".repeat(40),
+                2 => changed.destination = "refs/heads/other".into(),
+                3 => changed.remote = "pull-host".into(),
+                _ => changed.base = Some("e".repeat(40)),
+            }
+            assert!(changed.retain_selection(selected.clone()).is_err());
+            assert!(changed.selection().is_none());
+        }
+        // A mutable UI plan also cannot substitute another lease after review.
+        original.base = Some("f".repeat(40));
+        assert!(push_args(&original).is_err());
+        Ok(())
+    }
+}
+/// Credential-free routing/identity stamp for durable outbox endpoint identity.
+pub(crate) fn outbox_config_stamp(repo: &Path) -> Result<String, String> {
+    config_stamp(repo, &|| !crate::tasks::cancellation().is_cancelled())
+}
+
+pub(crate) use fix::accept_rewrite;

@@ -61,9 +61,9 @@ impl RepoTab {
         };
         if commits.is_empty() {
             let note = if view.lines.is_some() {
-                "No commits touch these lines yet."
+                crate::i18n::text("repo-core-2482")
             } else {
-                "No commits touch this file yet."
+                crate::i18n::text("repo-core-2483")
             };
             ui.centered_and_justified(|ui| {
                 ui.label(egui::RichText::new(note).color(t.text_dim));
@@ -122,10 +122,20 @@ impl RepoTab {
                     );
                     let mut summary = c.summary.clone();
                     if c.path != view.path {
-                        summary = format!("{summary}  ·  as {}", c.path);
+                        summary = crate::i18n::message(
+                            "repo-core-2485",
+                            &[
+                                ("summary", summary.to_string().into()),
+                                ("path", c.path.to_string().into()),
+                            ],
+                        );
                     }
-                    if let (Some(&(start, _)), Some(&(_, end))) = (c.lines.first(), c.lines.last()) {
-                        summary = format!("{summary}  ·  {}", super::line_history::lines_label((start, end)).to_lowercase());
+                    if let (Some(&(start, _)), Some(&(_, end))) = (c.lines.first(), c.lines.last())
+                    {
+                        summary = format!(
+                            "{summary}  ·  {}",
+                            super::line_history::lines_label((start, end)).to_lowercase()
+                        );
                     }
                     p.with_clip_rect(Rect::from_min_max(
                         rect.min,
@@ -139,9 +149,9 @@ impl RepoTab {
                         t.text,
                     );
                     let resp = resp.on_hover_text(if view.lines.is_some() {
-                        "Click: what this commit did to the lines (numbered as they were in it)\nDouble-click: show the commit in the graph"
+                        crate::i18n::text("repo-core-2487")
                     } else {
-                        "Click: this commit's changes to the file, or the file as it was\nDouble-click: show the commit in the graph"
+                        crate::i18n::text("repo-core-2488")
                     });
                     if resp.double_clicked() {
                         acts.push(Action::CloseFileView);

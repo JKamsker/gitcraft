@@ -117,14 +117,19 @@ pub fn bisect_state(repo: &Path) -> Result<Option<Bisect>, String> {
     let log = match run(Some(repo), &["bisect", "log"]) {
         Ok(log) => log,
         Err(e) if parse::not_bisecting(&e) => return Ok(None),
-        Err(e) => return Err(format!("Couldn't read the bisect: {e}")),
+        Err(e) => {
+            return Err(crate::i18n::message(
+                "backend-couldn-t-read-the-bisect-e-ae38c3",
+                &[("detail", (e).to_string().into())],
+            ));
+        }
     };
     // Side by side: for a repository elsewhere, each is a round trip or more.
     let (files, refs, current) = std::thread::scope(|scope| {
-        let files = scope.spawn(|| Files::read(repo));
-        let refs = scope.spawn(|| bisect_refs(repo));
+        let files = scope.spawn(crate::connections::inherit(|| Files::read(repo)));
+        let refs = scope.spawn(crate::connections::inherit(|| bisect_refs(repo)));
         let current = current_commit(repo);
-        let join = |_| "could not read the bisect".to_owned();
+        let join = |_| crate::i18n::text("backend-could-not-read-the-bisect-ca28b3").to_owned();
         Ok::<_, String>((
             files.join().map_err(join)??,
             refs.join().map_err(join)??,
@@ -189,15 +194,20 @@ impl Files {
         let paths = run(Some(repo), &args)?;
         let paths: Vec<&str> = paths.lines().map(str::trim).collect();
         let [terms, start, names, first_parent] = paths[..] else {
-            return Err(format!("git named no bisect files: {}", paths.join(" ")));
+            return Err(crate::i18n::message(
+                "backend-git-named-no-bisect-files-be07d7",
+                &[("paths", (paths.join(" ")).to_string().into())],
+            ));
         };
         // Side by side: for a repository elsewhere, each is a round trip.
         std::thread::scope(|scope| {
-            let terms = scope.spawn(|| optional_file(repo, terms));
-            let start = scope.spawn(|| optional_file(repo, start));
-            let names = scope.spawn(|| optional_file(repo, names));
+            let terms = scope.spawn(crate::connections::inherit(|| optional_file(repo, terms)));
+            let start = scope.spawn(crate::connections::inherit(|| optional_file(repo, start)));
+            let names = scope.spawn(crate::connections::inherit(|| optional_file(repo, names)));
             let first_parent = optional_file(repo, first_parent)?.is_some();
-            let join = |_| "could not read the bisect's files".to_owned();
+            let join = |_| {
+                crate::i18n::text("backend-could-not-read-the-bisect-s-files-920273").to_owned()
+            };
             Ok(Self {
                 terms: terms.join().map_err(join)??,
                 start: start.join().map_err(join)??,
@@ -213,7 +223,13 @@ fn optional_file(repo: &Path, printed: &str) -> Result<Option<String>, String> {
     match crate::remote::read_to_string(&crate::remote::resolve(repo, printed)) {
         Ok(text) => Ok(Some(text)),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
-        Err(e) => Err(format!("could not read the bisect's {printed}: {e}")),
+        Err(e) => Err(crate::i18n::message(
+            "backend-could-not-read-the-bisect-s-printed-e-51160a",
+            &[
+                ("printed", (printed).to_string().into()),
+                ("detail", (e).to_string().into()),
+            ],
+        )),
     }
 }
 
@@ -235,7 +251,12 @@ fn current_commit(repo: &Path) -> Result<String, String> {
     verify("BISECT_HEAD")
         .or_else(|_| verify("HEAD"))
         .map(|h| h.trim().to_owned())
-        .map_err(|e| format!("could not read the commit being tested: {e}"))
+        .map_err(|e| {
+            crate::i18n::message(
+                "backend-could-not-read-the-commit-being-tested-e-2c5cd7",
+                &[("detail", (e).to_string().into())],
+            )
+        })
 }
 
 /// The counts of what is left between `bad` and the `good` ones, as git bisects it.
@@ -255,7 +276,12 @@ fn range_vars(
     args.push("--");
     args.extend(files.names.iter().map(String::as_str));
     let out = run(Some(repo), &args)?;
-    parse::vars(&out).ok_or_else(|| format!("git gave no counts for the bisect: {}", out.trim()))
+    parse::vars(&out).ok_or_else(|| {
+        crate::i18n::message(
+            "backend-git-gave-no-counts-for-the-bisect-fcde51",
+            &[("detail", (out.trim()).to_string().into())],
+        )
+    })
 }
 
 /// Whether `bad` is the only commit left between it and the `good` ones.
@@ -277,16 +303,23 @@ fn range_is_only(repo: &Path, bad: &str, good: &[String], files: &Files) -> bool
 /// operation left half done would be in the way.
 pub fn start_blocker(work: &WorkStatus, bisecting: bool) -> Option<String> {
     if bisecting {
-        return Some("A bisect is already going on: finish or stop it first.".to_owned());
+        return Some(
+            crate::i18n::text(
+                "backend-a-bisect-is-already-going-on-finish-or-stop-it-first-2d0b71",
+            )
+            .to_owned(),
+        );
     }
     if let Some(state) = work.in_progress {
-        return Some(format!(
-            "A {} is in progress: finish or abort it first.",
-            state.label().to_lowercase()
+        return Some(crate::i18n::message(
+            "backend-a-is-in-progress-finish-or-abort-it-first-c81bac",
+            &[("state", (state.label().to_lowercase()).to_string().into())],
         ));
     }
     if !work.conflicted.is_empty() {
-        return Some("There are conflicts: resolve them first.".to_owned());
+        return Some(
+            crate::i18n::text("backend-there-are-conflicts-resolve-them-first-24348a").to_owned(),
+        );
     }
     let changed = !work.staged.is_empty()
         || work
@@ -294,9 +327,10 @@ pub fn start_blocker(work: &WorkStatus, bisecting: bool) -> Option<String> {
             .iter()
             .any(|f| f.area != super::Area::Untracked);
     changed.then(|| {
-        "There are uncommitted changes, which every commit checked out would carry along: \
-         commit or stash them first."
-            .to_owned()
+        crate::i18n::text(
+            "backend-there-are-uncommitted-changes-which-every-commit-checked-out-woul-ce49e1",
+        )
+        .to_owned()
     })
 }
 
@@ -306,7 +340,12 @@ fn commit_of(repo: &Path, rev: &str) -> Result<String, String> {
     let spec = format!("{rev}^{{commit}}");
     run(Some(repo), &["rev-parse", "--verify", "-q", &spec])
         .map(|h| h.trim().to_owned())
-        .map_err(|_| format!("{rev} is not a commit here"))
+        .map_err(|_| {
+            crate::i18n::message(
+                "backend-rev-is-not-a-commit-here-e69bd7",
+                &[("rev", (rev).to_string().into())],
+            )
+        })
 }
 
 /// Starts a bisect between the commit `bad` and, when given, the commit `good` (else one is
@@ -315,7 +354,10 @@ pub fn bisect_start(repo: &Path, bad: &str, good: Option<&str>) -> Result<String
     let bad = commit_of(repo, bad)?;
     let good = good.map(|g| commit_of(repo, g)).transpose()?;
     if good.as_deref() == Some(bad.as_str()) {
-        return Err("The good and the bad commit are the same one".to_owned());
+        return Err(crate::i18n::text(
+            "backend-the-good-and-the-bad-commit-are-the-same-one-28117c",
+        )
+        .to_owned());
     }
     let mut args = vec!["bisect", "start", bad.as_str()];
     args.extend(good.as_deref());
@@ -350,9 +392,14 @@ pub fn bisect_reset(repo: &Path) -> Result<String, String> {
         Ok(out) => Ok(out.trim().to_owned()),
         Err(e) if e.contains("could not check out original HEAD") => {
             run(Some(repo), &["bisect", "reset", "HEAD"])?;
-            Err(format!(
-                "{} Ended the bisect where it was instead.",
-                e.lines().next().unwrap_or_default().trim()
+            Err(crate::i18n::message(
+                "backend-ended-the-bisect-where-it-was-instead-74c577",
+                &[(
+                    "detail",
+                    (e.lines().next().unwrap_or_default().trim())
+                        .to_string()
+                        .into(),
+                )],
             ))
         }
         Err(e) => Err(e),

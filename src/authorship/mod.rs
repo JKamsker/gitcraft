@@ -9,6 +9,8 @@
 //! A line or commit no source speaks of has no known author ([`Who::Unknown`]): no stripe, no
 //! badge, and it counts for neither side.
 
+pub mod display;
+
 pub mod agents;
 pub mod branch;
 pub mod gitai;
@@ -79,6 +81,7 @@ impl Attribution {
     }
 
     /// A short description for a hover: _Agent-written (Claude), from git-ai notes_.
+    #[cfg(test)]
     pub fn describe(&self) -> String {
         // Line by line, a commit may record only some of its lines: it has agent lines, it
         // isn't said to be all an agent's.

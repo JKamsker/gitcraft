@@ -13,6 +13,13 @@ pub(super) struct Toast {
     text: String,
     error: bool,
     until: Instant,
+    update_go_back: Option<UpdateGoBack>,
+    notice: Option<crate::repo::Notice>,
+}
+
+/// Created only from the failed go_back_witnessed result; never inferred from toast text.
+struct UpdateGoBack {
+    failure: update::Failure,
 }
 
 impl Toast {
@@ -27,7 +34,54 @@ impl Toast {
             text,
             error,
             until: Instant::now() + Duration::from_secs(secs),
+            update_go_back: None,
+            notice: None,
         }
+    }
+
+    pub(super) fn from_app_error(error: &super::AppError) -> Self {
+        Self::new(error.delivery_text(), true)
+    }
+
+    pub(super) fn from_go_back_failure(failure: update::Failure) -> Self {
+        let mut toast = Self::new(format!("Couldn't go back: {}", failure.raw()), true);
+        toast.update_go_back = Some(UpdateGoBack { failure });
+        toast
+    }
+
+    fn from_notice(notice: crate::repo::Notice) -> Self {
+        let mut toast = Self::new(notice.0.clone(), notice.1);
+        toast.notice = Some(notice);
+        toast
+    }
+
+    fn display_text(&self) -> String {
+        if let Some(notice) = &self.notice {
+            return if notice.raw() == &(self.text.clone(), self.error) {
+                notice
+                    .projected()
+                    .unwrap_or_else(|| display_app_message(&self.text))
+            } else {
+                self.text.clone()
+            };
+        }
+        match &self.update_go_back {
+            Some(source)
+                if self.error
+                    && self.text == format!("Couldn't go back: {}", source.failure.raw()) =>
+            {
+                crate::i18n::message(
+                    "interaction-dialogs-go-back",
+                    &[("error", source.failure.display().into())],
+                )
+            }
+            Some(_) => self.text.clone(),
+            None => display_app_message(&self.text),
+        }
+    }
+
+    fn label(&self, ui: &mut Ui) {
+        ui.add(egui::Label::new(self.display_text()).wrap());
     }
 }
 
@@ -54,11 +108,16 @@ impl App {
                 || self.teleport.is_some()
                 || self.askpass_open()
                 || self.palette.is_some()
+                || self.practice_open
+                || self.setup.open
                 || self.manual_open
                 || self.my_work.open,
             update: self.update_check(),
             check_updates_now: false,
-            previous: self.previous_version.as_ref().map(|p| p.label().to_owned()),
+            previous: self
+                .previous_version
+                .as_ref()
+                .map(|p| p.display_label().to_owned()),
             previous_is_newer: self
                 .previous_version
                 .as_ref()
@@ -68,6 +127,15 @@ impl App {
             unpin: false,
             request: None,
         };
+        let mut repositories = self.recent.clone();
+        for tab in &self.tabs {
+            if let Tab::Repo(repo) = tab
+                && !repositories.contains(&repo.path)
+            {
+                repositories.push(repo.path.clone());
+            }
+        }
+        crate::settings::network_page::repositories(&ctx, repositories);
         let tweaks = self.settings.theme_tweaks;
         if self.settings.page(ui, &mut view) {
             self.settings.set(&ctx);
@@ -110,21 +178,33 @@ impl App {
             .show(ctx, |ui| {
                 ui.set_width(640.0);
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new("Manual").font(theme::semibold(16.0)));
+                    ui.label(
+                        RichText::new(crate::i18n::text("interaction-palette-manual-caption"))
+                            .font(theme::semibold(16.0)),
+                    );
                     ui.label(
                         RichText::new(format!("gitcraft {}", update::CURRENT)).color(t.text_faint),
                     );
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if icons::small_button(ui, "x", "Close (Esc)").clicked() {
+                        if icons::small_button(
+                            ui,
+                            "x",
+                            crate::i18n::text("interaction-palette-close"),
+                        )
+                        .clicked()
+                        {
                             close = true;
                         }
-                        let tip = "Copies what a bug report needs: versions, system, graphics, \
-                                   git, gh, glab and tea (signed in or not, never a token), and \
-                                   the git settings in effect (no name or email)";
+                        let tip = crate::i18n::text("interaction-palette-diagnostic-hint");
                         if ui
-                            .add_enabled(!collecting, egui::Button::new("Copy diagnostics"))
+                            .add_enabled(
+                                !collecting,
+                                egui::Button::new(crate::i18n::text("interaction-palette-copy")),
+                            )
                             .on_hover_text(tip)
-                            .on_disabled_hover_text("Collecting…")
+                            .on_disabled_hover_text(crate::i18n::text(
+                                "interaction-palette-collecting",
+                            ))
                             .clicked()
                         {
                             copy = true;
@@ -147,13 +227,17 @@ impl App {
 
     /// Long operations that ended: a toast, and a desktop notification when away.
     pub(super) fn toast_finished(&mut self, focused: bool) {
-        for tab in &mut self.tabs {
+        for tab in self
+            .tabs
+            .iter_mut()
+            .chain(self.windows.parked.values_mut().flat_map(|w| &mut w.tabs))
+        {
             let Tab::Repo(r) = tab else { continue };
-            for (text, error) in r.finished.drain(..) {
+            for notice in r.finished.drain(..) {
                 if !focused && self.settings.notifications {
-                    notify(&text);
+                    notify(&notice.projected().unwrap_or_else(|| notice.0.clone()));
                 }
-                self.toasts.push(Toast::new(text, error));
+                self.toasts.push(Toast::from_notice(notice));
             }
         }
     }
@@ -190,7 +274,7 @@ impl App {
                                     16.0,
                                     if toast.error { t.danger } else { t.success },
                                 );
-                                ui.add(egui::Label::new(&toast.text).wrap());
+                                toast.label(ui);
                             });
                         });
                     ui.add_space(6.0);
@@ -239,5 +323,199 @@ mod tests {
         } else {
             assert!(body.contains("<a href"));
         }
+    }
+}
+
+/// App-owned status/error paint; all classification and stored values remain raw.
+pub(super) fn display_app_message(raw: &str) -> String {
+    super::clone::display_message(raw)
+        .or_else(|| super::remote_open::display_message(raw))
+        .or_else(|| super::repo_scan::display_error(raw))
+        .or_else(|| super::draft_saving::display_notice(raw))
+        .or_else(|| crate::launch::display_message(raw))
+        .or_else(|| super::startup_display::message(raw))
+        .or_else(|| crate::portable::display_message(raw))
+        .unwrap_or_else(|| {
+            let remote = crate::remote::display::diagnostic(raw);
+            if remote == raw {
+                crate::git::display_error(raw)
+            } else {
+                remote
+            }
+        })
+}
+
+#[cfg(test)]
+mod remote_display_tests {
+    #[test]
+    fn actual_app_message_paint_uses_canonical_remote_adapter_after_own_classifiers() {
+        crate::i18n::set_language("de");
+        let raw = "it is a symbolic link";
+        assert_eq!(
+            super::display_app_message(raw),
+            "Dies ist ein symbolischer Link."
+        );
+        assert_eq!(raw, "it is a symbolic link");
+        assert_eq!(
+            super::display_app_message("gitcraft isn't allowed to look in /opaque/日本語."),
+            "gitcraft darf /opaque/日本語 nicht durchsuchen."
+        );
+        let unknown = "opaque external 日本語\n: unchanged";
+        assert_eq!(super::display_app_message(unknown), unknown);
+        // No command/Host provenance is available at this generic paint boundary.
+        let command = "opaque command on SSH · opaque: invalid native request";
+        assert_eq!(super::display_app_message(command), command);
+        crate::i18n::set_language("en-US");
+        assert_eq!(super::display_app_message(raw), raw);
+    }
+}
+
+#[cfg(test)]
+mod updater_toast_display_tests {
+    use super::*;
+    use egui_kittest::{Harness, kittest::Queryable};
+
+    #[test]
+    fn retained_go_back_toast_paints_en_de_en_with_unchanged_raw_flag_and_deadline() {
+        let failure = update::Failure::NoPrevious {
+            raw: "No previous version of gitcraft is kept".into(),
+        };
+        let toast = Toast::from_go_back_failure(failure.clone());
+        let raw = toast.text.clone();
+        let until = toast.until;
+        assert_eq!(
+            raw,
+            "Couldn't go back: No previous version of gitcraft is kept"
+        );
+        crate::i18n::set_language("en-US");
+        let fonts = std::cell::Cell::new(false);
+        let mut h = Harness::new_ui_state(
+            move |ui, toast: &mut Toast| {
+                if !fonts.replace(true) {
+                    theme::install_fonts(ui.ctx());
+                    return;
+                }
+                toast.label(ui);
+            },
+            toast,
+        );
+        h.run();
+        h.get_by_label(&raw);
+        crate::i18n::set_language("de");
+        h.step();
+        h.get_by_label("Zurückwechseln fehlgeschlagen: Es wurde keine vorherige Version von gitcraft aufbewahrt");
+        assert_eq!(h.state().text, raw);
+        assert!(h.state().error);
+        assert_eq!(h.state().until, until);
+        assert_eq!(
+            h.state().update_go_back.as_ref().map(|s| &s.failure),
+            Some(&failure)
+        );
+        crate::i18n::set_language("en-US");
+        h.step();
+        h.get_by_label(&raw);
+        assert_eq!(h.state().text, raw);
+        assert_eq!(h.state().until, until);
+    }
+
+    #[test]
+    fn go_back_receipt_is_opt_in_and_never_inferred_from_equal_text_or_child_spelling() {
+        crate::i18n::set_language("de");
+        let raw = "No previous version of gitcraft is kept";
+        let opaque = Toast::from_go_back_failure(update::Failure::Opaque(raw.into()));
+        assert_eq!(
+            opaque.display_text(),
+            format!("Zurückwechseln fehlgeschlagen: {raw}")
+        );
+        let ordinary = Toast::new(opaque.text.clone(), true);
+        assert!(ordinary.update_go_back.is_none());
+        assert_eq!(ordinary.display_text(), ordinary.text);
+        let ordinary_secs = Toast::for_secs("unrelated".into(), false, 10);
+        assert!(ordinary_secs.update_go_back.is_none());
+        let mut mismatched =
+            Toast::from_go_back_failure(update::Failure::NoPrevious { raw: raw.into() });
+        mismatched.text = "Couldn't go back: unrelated raw".into();
+        assert_eq!(mismatched.display_text(), mismatched.text);
+        mismatched.text = format!("Couldn't go back: {raw}");
+        mismatched.error = false;
+        assert_eq!(mismatched.display_text(), mismatched.text);
+    }
+}
+
+#[cfg(test)]
+mod notice_toast_tests {
+    use super::*;
+    use egui_kittest::{Harness, kittest::Queryable};
+
+    #[test]
+    fn actual_notice_toast_repaints_retained_source_and_preserves_raw_lifetime() {
+        let notice = crate::repo::Notice::authorship(
+            "topic: $(keep)".into(),
+            crate::authorship::branch::Figures::default(),
+        );
+        let raw = notice.raw().clone();
+        let toast = Toast::from_notice(notice);
+        let until = toast.until;
+        crate::i18n::set_language("en-US");
+        let fonts = std::cell::Cell::new(false);
+        let mut h = Harness::new_ui_state(
+            move |ui, toast: &mut Toast| {
+                if !fonts.replace(true) {
+                    theme::install_fonts(ui.ctx());
+                    return;
+                }
+                toast.label(ui);
+            },
+            toast,
+        );
+        h.run();
+        h.get_by_label("topic: $(keep) adds no lines since it left the base");
+        crate::i18n::set_language("de");
+        h.step();
+        h.get_by_label("topic: $(keep) fügt seit der Abzweigung von der Basis keine Zeilen hinzu.");
+        assert_eq!((&h.state().text, h.state().error), (&raw.0, raw.1));
+        assert_eq!(h.state().until, until);
+        assert!(h.state().update_go_back.is_none());
+        crate::i18n::set_language("en-US");
+        h.step();
+        h.get_by_label(&raw.0);
+        assert_eq!(h.state().notice.as_ref().map(|n| n.raw()), Some(&raw));
+        // A normal toast with identical text has no authorship receipt.
+        let plain = Toast::new(raw.0.clone(), raw.1);
+        crate::i18n::set_language("de");
+        assert_eq!(plain.display_text(), raw.0);
+        let toast = h.state_mut();
+        toast.text = "unrelated provider error".into();
+        assert_eq!(toast.display_text(), "unrelated provider error");
+    }
+}
+
+#[cfg(test)]
+mod home_error_toast_tests {
+    use super::*;
+
+    #[test]
+    fn home_source_toast_keeps_delivery_text_error_flag_and_no_extra_actions() {
+        crate::i18n::set_language("de");
+        let error = super::super::AppError::init("opaque native 日本語".into());
+        let raw = error.to_string();
+        let toast = Toast::from_app_error(&error);
+        let until = toast.until;
+        assert_eq!(raw, "git init failed: opaque native 日本語");
+        assert_eq!(toast.text, "git init fehlgeschlagen: opaque native 日本語");
+        assert!(toast.error);
+        assert!(toast.notice.is_none() && toast.update_go_back.is_none());
+        crate::i18n::set_language("en-US");
+        assert_eq!(
+            toast.display_text(),
+            "git init fehlgeschlagen: opaque native 日本語"
+        );
+        assert_eq!(toast.until, until);
+        assert_eq!(error.to_string(), raw);
+        let plain = super::super::AppError::from(raw.clone());
+        let plain_toast = Toast::from_app_error(&plain);
+        assert_eq!(plain_toast.text, raw);
+        assert!(plain_toast.error);
+        assert!(plain_toast.notice.is_none() && plain_toast.update_go_back.is_none());
     }
 }

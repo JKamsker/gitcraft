@@ -64,9 +64,9 @@ pub(crate) fn read(repo: &Path, hash: &str) -> Result<Read, String> {
         &["rev-list", "--parents", "-n", "1", "--end-of-options", hash],
     )?;
     let parent = match parents.split_whitespace().collect::<Vec<_>>()[..] {
-        [_] => return Err("the first commit has no parent to split it from".to_owned()),
+        [_] => return Err(crate::i18n::text("repo-workflows-surgery-read-c35ba44e").to_owned()),
         [_, parent] => parent.to_owned(),
-        _ => return Err("a merge commit can't be split".to_owned()),
+        _ => return Err(crate::i18n::text("repo-workflows-surgery-read-6a75c5d8").to_owned()),
     };
     let message = git::run(
         Some(repo),
@@ -316,22 +316,28 @@ impl SplitEditor {
         let units: usize = self.units.iter().map(Vec::len).sum();
         if units < 2 {
             return Some((
-                "This commit has only one change: there is nothing to split".to_owned(),
+                crate::i18n::text("repo-workflows-surgery-problem-45b607f4").to_owned(),
                 false,
             ));
         }
         if let Some(g) = self.counts.iter().position(|&c| c == 0) {
             let start = self.counts.iter().filter(|&&c| c > 0).count() == 1;
             return Some((
-                format!(
-                    "Commit {} has no changes yet: click files, hunks or lines on the right to put them in it",
-                    g + 1
+                crate::i18n::message(
+                    "repo-workflows-surgery-problem-552d4c58",
+                    &[("g-1-1", (g + 1).into())],
                 ),
                 start,
             ));
         }
         if let Some(g) = self.groups.iter().position(|g| g.subject.trim().is_empty()) {
-            return Some((format!("Commit {} needs a summary", g + 1), true));
+            return Some((
+                crate::i18n::message(
+                    "repo-workflows-surgery-problem-cd79fde0",
+                    &[("g-1-1", (g + 1).into())],
+                ),
+                true,
+            ));
         }
         None
     }
@@ -361,8 +367,12 @@ pub(crate) fn prepare(
     let mut trees = vec![git::tree_of(repo, parent)?];
     for (g, patch) in patches.iter().enumerate() {
         let file = git::save_patch_for(repo, patch)?;
-        let tree = git::tree_after(repo, parent, &[file])
-            .map_err(|e| format!("commit {}: {}", g + 1, e))?;
+        let tree = git::tree_after(repo, parent, &[file]).map_err(|e| {
+            crate::i18n::message(
+                "repo-workflows-surgery-prepare-1a3632ec",
+                &[("g-1-1", (g + 1).into()), ("e-2", (e).clone().into())],
+            )
+        })?;
         trees.push(tree);
     }
     trees.push(git::tree_of(repo, hash)?);
@@ -370,9 +380,9 @@ pub(crate) fn prepare(
     for (g, pair) in trees.windows(2).enumerate() {
         let [before, after] = pair else { continue };
         if before == after {
-            return Err(format!(
-                "commit {} would change nothing: the commits before it already make its changes (a line added after a last line without a newline gives it one)",
-                g + 1
+            return Err(crate::i18n::message(
+                "repo-workflows-surgery-prepare-9ee5bdbf",
+                &[("g-1-1", (g + 1).into())],
             ));
         }
         patches_out.push((
@@ -409,17 +419,23 @@ impl RepoTab {
     /// Reads commit `hash` and opens the split editor on it.
     pub(in crate::repo) fn open_split(&mut self, hash: String, ctx: &egui::Context) {
         if let Some(why) = self.surgery_refusal(&hash) {
-            self.status = Some((format!("Split commit: {why}"), true));
+            self.status = Some(crate::repo::Notice::plain((
+                format!("Split commit: {why}"),
+                true,
+            )));
             return;
         }
         if self.absorb.is_some() {
-            self.status = Some((
+            self.status = Some(crate::repo::Notice::plain((
                 "Split commit: close the staged fixes editor first".to_owned(),
                 true,
-            ));
+            )));
             return;
         }
-        self.status = Some((format!("Split commit: reading {}…", short(&hash)), false));
+        self.status = Some(crate::repo::Notice::plain((
+            format!("Split commit: reading {}…", short(&hash)),
+            false,
+        )));
         let path = self.path.clone();
         self.then(
             ctx,
@@ -433,7 +449,12 @@ impl RepoTab {
                     tab.file_view = None;
                     tab.split = Some(Box::new(SplitEditor::new(read)));
                 }
-                Err(e) => tab.status = Some((format!("Split commit: {e}"), true)),
+                Err(e) => {
+                    tab.status = Some(crate::repo::Notice::plain((
+                        format!("Split commit: {e}"),
+                        true,
+                    )))
+                }
             },
         );
     }
@@ -505,12 +526,13 @@ impl RepoTab {
             parent.clone(),
             move |entries| {
                 let Some((first, rest)) = entries.split_first() else {
-                    return Err("the branch no longer has the commit".to_owned());
+                    return Err(
+                        crate::i18n::text("repo-workflows-surgery-run-split-609071bf").to_owned(),
+                    );
                 };
                 if first.commit.hash != hash {
                     return Err(
-                        "the commit is no longer on the checked-out branch after its parent"
-                            .to_owned(),
+                        crate::i18n::text("repo-workflows-surgery-run-split-6da7c69e").to_owned(),
                     );
                 }
                 let made = make_commits(&path, &hash, &parent, &checked.trees, &messages)?;

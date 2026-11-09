@@ -84,6 +84,124 @@ fn texts(shapes: &[ClippedShape]) -> Vec<&TextShape> {
     out
 }
 
+/// Locate the visible ink actually painted by the graph, including any headers above it.
+pub(super) fn painted_text_center(shapes: &[ClippedShape], label: &str) -> Pos2 {
+    let matching: Vec<_> = texts(shapes)
+        .into_iter()
+        .filter(|text| text.galley.job.text == label)
+        .collect();
+    assert_eq!(
+        matching.len(),
+        1,
+        "missing or duplicated painted text: {label}"
+    );
+    let bounds = matching[0].visual_bounding_rect();
+    assert!(bounds.is_positive(), "empty painted text: {label}");
+    bounds.center()
+}
+
+#[test]
+fn topology_arrows_enter_history_from_uncommitted_changes_then_follow_parents() {
+    let (ctx, mut tab) = fixture(3);
+    Arc::make_mut(&mut tab.commits[0]).hash = WIP_HASH.into();
+    tab.refs.head = tab.commits[1].hash.clone();
+    tab.index = tab
+        .commits
+        .iter()
+        .enumerate()
+        .map(|(row, commit)| (commit.hash.clone(), row))
+        .collect();
+    tab.topology = Arc::new(crate::repo::graph_walk::Topology::build(
+        &tab.commits,
+        &tab.index,
+        &Default::default(),
+    ));
+    tab.graph = crate::graph::layout(&tab.commits);
+    tab.selected = Some(0);
+    tab.rebuild_graph_labels();
+    Settings {
+        graph_lane_walk: true,
+        ..Default::default()
+    }
+    .set(&ctx);
+    let size = vec2(900.0, 600.0);
+    frame(&ctx, &mut tab, size, vec![], 0.0);
+    let key = |pressed| Event::Key {
+        key: Key::ArrowDown,
+        physical_key: None,
+        pressed,
+        repeat: false,
+        modifiers: egui::Modifiers::NONE,
+    };
+    let (_, acts) = frame(&ctx, &mut tab, size, vec![key(true)], 0.1);
+    assert!(acts.iter().any(|act| matches!(act, Action::Select(1))));
+    // Apply only the selected cursor; opening commit details would start Git reads
+    // against the deliberately nonexistent fixture repository.
+    tab.selected = Some(1);
+    frame(&ctx, &mut tab, size, vec![key(false)], 0.2);
+    let (_, acts) = frame(&ctx, &mut tab, size, vec![key(true)], 0.3);
+    assert!(acts.iter().any(|act| matches!(act, Action::Select(2))));
+
+    // A stash also has no edges in the walking topology, but must not trap focus.
+    let stash_hash = "stash-fixture".to_owned();
+    Arc::make_mut(&mut tab.commits[0]).hash = stash_hash.clone();
+    tab.stashes.push(git::Stash {
+        name: "stash@{0}".into(),
+        hash: stash_hash.clone(),
+        base: tab.refs.head.clone(),
+        message: "saved work".into(),
+        author: String::new(),
+        email: String::new(),
+        time: 0,
+        date: String::new(),
+    });
+    tab.index.remove(WIP_HASH);
+    tab.index.insert(stash_hash, 0);
+    tab.selected = Some(0);
+    tab.rebuild_graph_labels();
+    frame(&ctx, &mut tab, size, vec![key(false)], 0.4);
+    let (_, acts) = frame(&ctx, &mut tab, size, vec![key(true)], 0.5);
+    assert!(acts.iter().any(|act| matches!(act, Action::Select(1))));
+}
+
+#[test]
+fn topology_arrows_follow_the_focused_row_when_nothing_is_selected() {
+    let (ctx, mut tab) = fixture(10);
+    tab.index = tab
+        .commits
+        .iter()
+        .enumerate()
+        .map(|(row, commit)| (commit.hash.clone(), row))
+        .collect();
+    tab.topology = Arc::new(crate::repo::graph_walk::Topology::build(
+        &tab.commits,
+        &tab.index,
+        &Default::default(),
+    ));
+    tab.selected = None;
+    Settings {
+        graph_lane_walk: true,
+        ..Default::default()
+    }
+    .set(&ctx);
+    let mut acts = Vec::new();
+    let mut output = ctx.run_ui(
+        egui::RawInput {
+            events: vec![Event::Key {
+                key: Key::ArrowDown,
+                physical_key: None,
+                pressed: true,
+                repeat: false,
+                modifiers: egui::Modifiers::NONE,
+            }],
+            ..Default::default()
+        },
+        |ui| tab.arrow_keys(ui, Some(5), &mut acts),
+    );
+    output.textures_delta.clear();
+    assert!(acts.iter().any(|act| matches!(act, Action::Select(6))));
+}
+
 fn header_x(shapes: &[ClippedShape], label: &str) -> f32 {
     let matching: Vec<_> = texts(shapes)
         .into_iter()
@@ -184,8 +302,10 @@ fn manual_refs_optional_columns_and_compact_graph_survive_auto_sizing() {
     frame(&ctx, &mut tab, size, vec![], 0.0);
     tab.scroll_to = Some(50);
     let (shapes, _) = frame(&ctx, &mut tab, size, vec![], 0.1);
+    // This full-height fixture reserves 84 points for the minimap.
+    let available = size.x - 84.0;
     let shown = preferred_cols(&settings, lane_layout(&settings, 1))
-        .squeezed(size.x, settings.last_resized);
+        .squeezed(available, settings.last_resized);
     assert_eq!(
         header_x(&shapes, "GRAPH"),
         shown.refs + crate::repo::columns::CELL_PAD
@@ -242,9 +362,8 @@ fn real_git_tooltip_retains_long_message_paragraphs_and_follows_hover_not_select
     let size = vec2(900.0, 220.0);
     frame(&ctx, &mut tab, size, vec![], 0.0);
     let (shapes, _) = frame(&ctx, &mut tab, size, vec![], 0.1);
-    let x = header_x(&shapes, "DESCRIPTION") + 30.0;
-    let first_point = egui::pos2(x, summary_y(&shapes, &tab.commits[0].summary));
-    let second_point = first_point + vec2(0.0, ROW_PITCH);
+    let first_point = painted_text_center(&shapes, &tab.commits[0].summary);
+    let second_point = painted_text_center(&shapes, &tab.commits[1].summary);
     frame(
         &ctx,
         &mut tab,
@@ -263,7 +382,10 @@ fn real_git_tooltip_retains_long_message_paragraphs_and_follows_hover_not_select
     let wait_for = |tab: &mut RepoTab, hash: &str| -> Result<(), String> {
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
         while tab.graph_messages.message(&path, hash).is_none() {
-            tab.poll(&ctx);
+            // Accept the real tooltip worker's result without starting unrelated readers.
+            while let Ok(msg) = tab.rx.try_recv() {
+                tab.handle(msg, &ctx);
+            }
             if std::time::Instant::now() >= deadline {
                 return Err("message worker did not finish".to_owned());
             }
@@ -357,16 +479,46 @@ fn real_git_tooltip_retains_long_message_paragraphs_and_follows_hover_not_select
         Some(2),
         "hover must not change the selected commit"
     );
-    let events = [true, false]
-        .into_iter()
-        .map(|pressed| Event::PointerButton {
+    // Leave the scrollable popup before clicking its anchor: in this short viewport
+    // the popup can cover the row. Re-enter and click before its hover delay elapses.
+    frame(
+        &ctx,
+        &mut tab,
+        size,
+        vec![Event::PointerMoved(Pos2::new(1.0, 1.0))],
+        3.3,
+    );
+    frame(
+        &ctx,
+        &mut tab,
+        size,
+        vec![Event::PointerMoved(first_point)],
+        3.6,
+    );
+    frame(
+        &ctx,
+        &mut tab,
+        size,
+        vec![Event::PointerButton {
             pos: first_point,
             button: egui::PointerButton::Primary,
-            pressed,
+            pressed: true,
             modifiers: egui::Modifiers::NONE,
-        })
-        .collect();
-    let (_, acts) = frame(&ctx, &mut tab, size, events, 3.3);
+        }],
+        3.61,
+    );
+    let (_, acts) = frame(
+        &ctx,
+        &mut tab,
+        size,
+        vec![Event::PointerButton {
+            pos: first_point,
+            button: egui::PointerButton::Primary,
+            pressed: false,
+            modifiers: egui::Modifiers::NONE,
+        }],
+        3.62,
+    );
     assert!(acts.iter().any(|a| matches!(a, Action::Select(0))));
     drop(tab);
     assert!(git::commit_message(&path, "--output=written").is_err());
@@ -444,8 +596,9 @@ fn auto_sized_pills_keep_double_click_and_branch_context_hitboxes() {
     Arc::make_mut(&mut tab.commits[0]).refs = vec!["feature".to_owned()];
     tab.rebuild_graph_labels();
     let size = vec2(900.0, 220.0);
-    let (shapes, _) = frame(&ctx, &mut tab, size, vec![], 0.0);
-    let point = egui::pos2(25.0, summary_y(&shapes, &tab.commits[0].summary));
+    frame(&ctx, &mut tab, size, vec![], 0.0);
+    let (shapes, _) = frame(&ctx, &mut tab, size, vec![], 0.05);
+    let point = painted_text_center(&shapes, "feature");
     frame(&ctx, &mut tab, size, vec![Event::PointerMoved(point)], 0.1);
     let mut actions = Vec::new();
     for (n, pressed) in [true, false, true, false].into_iter().enumerate() {

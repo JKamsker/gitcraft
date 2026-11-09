@@ -119,8 +119,15 @@ pub(crate) struct PushFlow {
 impl RepoTab {
     /// The toolbar's Push: the checked-out branch, to where it goes.
     pub(super) fn push(&mut self, ctx: &egui::Context) {
+        if self.echo_push_pending() {
+            return;
+        }
         if let Some(dialog) = self.review_dialog() {
             self.dialog = Some(dialog);
+            return;
+        }
+        if !self.submodules.is_empty() {
+            self.repository_tools_act(super::repository_tools::Act::Dependencies, ctx);
             return;
         }
         self.push_labelled("Push", None, ctx);
@@ -164,7 +171,12 @@ impl RepoTab {
         // one picked.
         let remotes = self.remote_names();
         match remotes.len() {
-            0 => self.status = Some(("This repository has no remote to push to".to_owned(), true)),
+            0 => {
+                self.status = Some(crate::repo::Notice::plain((
+                    "This repository has no remote to push to".to_owned(),
+                    true,
+                )))
+            }
             1 => self.publish(&current, &remotes[0], label, done, ctx),
             _ => {
                 self.push_flow.banner = Some(Banner::NoUpstream {
@@ -210,6 +222,9 @@ impl RepoTab {
     }
 
     fn start_push(&mut self, attempt: Attempt, steps: Vec<Vec<String>>, ctx: &egui::Context) {
+        if self.echo_push_pending() {
+            return;
+        }
         if self.busy_op.is_some() {
             return;
         }
@@ -222,6 +237,9 @@ impl RepoTab {
     /// Sync: pulls the checked-out branch the way the settings say, then pushes it. It stops
     /// at the pull when that fails (on conflicts, which are left to resolve).
     pub(super) fn sync(&mut self, ctx: &egui::Context) {
+        if self.echo_push_pending() {
+            return;
+        }
         if let Some(dialog) = self.review_dialog() {
             self.dialog = Some(dialog);
             return;
@@ -280,6 +298,9 @@ impl RepoTab {
 
     /// What the banner asked for.
     pub(super) fn push_act(&mut self, act: PushAct, ctx: &egui::Context) {
+        if self.echo_push_pending() {
+            return;
+        }
         if self.busy_op.is_some() && !matches!(act, PushAct::Dismiss) {
             return;
         }
@@ -390,13 +411,16 @@ impl RepoTab {
             // Older git ends a push some of whose refs were refused with success all the same.
             Ok(out) if refused(out).is_some() => {
                 let out = out.clone();
-                self.status = Some((format!("{label} refused: {}", out.trim()), true));
+                self.status = Some(crate::repo::Notice::plain((
+                    format!("{label} refused: {}", out.trim()),
+                    true,
+                )));
                 self.push_failed(attempt, &out, ctx);
             }
             Ok(_) => {
                 self.push_flow.banner = None;
                 if let Some(done) = attempt.done {
-                    self.status = Some((done, false));
+                    self.status = Some(crate::repo::Notice::plain((done, false)));
                 }
             }
             // Run again once signed in, and then taken in here again. Not a refusal whose
@@ -433,7 +457,10 @@ impl RepoTab {
             Err(e) if git::is_auth_error(e) => self.push_flow.then_push = Some(chain),
             Err(e) => {
                 let what = chain.after;
-                self.status = Some((format!("{what} failed, so nothing was pushed: {e}"), true));
+                self.status = Some(crate::repo::Notice::plain((
+                    format!("{what} failed, so nothing was pushed: {e}"),
+                    true,
+                )));
             }
             Ok(_) => {}
         }
@@ -477,10 +504,10 @@ impl RepoTab {
         if self.busy_op.is_some() {
             return;
         }
-        let what = q
-            .target
-            .as_ref()
-            .map_or_else(|| "the remote".to_owned(), Target::label);
+        let what = q.target.as_ref().map_or_else(
+            || crate::i18n::text("repo-workflows-push-check-remote-d6f3f0c2").to_owned(),
+            Target::label,
+        );
         self.busy_op = Some(format!("Checking {what}"));
         let path = self.path.clone();
         let creds = self.credentials.clone();
@@ -488,7 +515,7 @@ impl RepoTab {
         let failed = |e: String| -> Msg {
             Msg::Then(Box::new(move |tab: &mut RepoTab, _: &egui::Context| {
                 tab.busy_op = None;
-                tab.status = Some((e, true));
+                tab.status = Some(crate::repo::Notice::plain((e, true)));
             }))
         };
         spawn_or(&self.tx, ctx, failed, move || {
@@ -503,7 +530,10 @@ impl RepoTab {
         self.busy_op = None;
         match checked {
             Ok(Checked::Rejected(r)) => {
-                self.status = Some((format!("Push refused: {}", banner::headline(&r)), true));
+                self.status = Some(crate::repo::Notice::plain((
+                    format!("Push refused: {}", banner::headline(&r)),
+                    true,
+                )));
                 self.push_flow.banner = Some(Banner::Rejected(r));
             }
             Ok(Checked::Gone {
@@ -511,7 +541,10 @@ impl RepoTab {
                 target,
                 publish,
             }) => {
-                self.status = Some((format!("Push refused: {} is gone", target.label()), true));
+                self.status = Some(crate::repo::Notice::plain((
+                    format!("Push refused: {} is gone", target.label()),
+                    true,
+                )));
                 self.push_flow.banner = Some(Banner::Gone {
                     branch,
                     target,
@@ -519,10 +552,10 @@ impl RepoTab {
                 });
             }
             Err(e) => {
-                self.status = Some((
+                self.status = Some(crate::repo::Notice::plain((
                     format!("Push refused, and the remote could not be checked: {e}"),
                     true,
-                ))
+                )))
             }
         }
         // The remote branch was fetched.
@@ -649,7 +682,7 @@ fn force_dialog(r: &Rejection) -> (Attempt, Dialog) {
     let dialog = Dialog::confirm(
         &title,
         banner::force_body(r),
-        "Force push",
+        crate::i18n::text("repo-workflows-push-force-dialog-1d502fc3"),
         force_push_ops(r),
         None,
     );

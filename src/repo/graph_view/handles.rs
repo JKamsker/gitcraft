@@ -84,7 +84,10 @@ impl RepoTab {
                 )
                 .on_hover_cursor(egui::CursorIcon::ResizeHorizontal);
             crate::repo::widgets::a11y(&resp, egui::WidgetType::ResizeHandle, || {
-                format!("Resize the {} column", bar_name(bar))
+                crate::i18n::message(
+                    "repo-core-2609",
+                    &[("bar", bar_name(bar).to_string().into())],
+                )
             });
             let active = resp.hovered() || resp.dragged();
             ui.painter().line_segment(
@@ -161,7 +164,7 @@ fn bar_name(bar: Bar) -> &'static str {
         Bar::Hash => "hash",
         Bar::Author => "author",
         Bar::When => "age",
-        Bar::Date => "date",
+        Bar::Date => crate::i18n::text("repo-core-2271"),
     }
 }
 

@@ -29,22 +29,29 @@ impl RepoTab {
             .and_then(|v| v.remove.as_ref())
             .filter(|s| s.id() == entry.id);
         ui.label(
-            RichText::new("REMOVE THIS, KEEP LATER WORK")
-                .font(theme::semibold(10.5))
-                .color(t.text_faint),
+            RichText::new(crate::i18n::text(
+                "repo-workflows-timeline-remove-section-e0e6aea3",
+            ))
+            .font(theme::semibold(10.5))
+            .color(t.text_faint),
         );
         ui.add_space(2.0);
         let Some(state) = state else {
             ui.label(
-                RichText::new(format!(
-                    "Plays the commits made on {branch} since this again without it, on a new \
-                     branch; {branch} stays as it is."
+                RichText::new(crate::i18n::message(
+                    "repo-workflows-timeline-remove-section-08b980d5",
+                    &[("branch", (branch).clone().into())],
                 ))
                 .size(12.0)
                 .color(t.text_dim),
             );
             if ui
-                .add_enabled(idle, egui::Button::new("Remove this, keep later work…"))
+                .add_enabled(
+                    idle,
+                    egui::Button::new(crate::i18n::text(
+                        "repo-workflows-timeline-remove-section-013b5c2e",
+                    )),
+                )
                 .clicked()
             {
                 acts.push(Action::Timeline(TimelineAct::AskRemove(entry.id)));
@@ -58,13 +65,26 @@ impl RepoTab {
             .inner_margin(egui::Margin::same(10))
             .show(ui, |ui| match state {
                 RemoveState::Planning(_) => {
-                    ui.label(RichText::new("Reading the commits…").color(t.text_dim));
+                    ui.label(
+                        RichText::new(crate::i18n::text(
+                            "repo-workflows-timeline-remove-section-17123003",
+                        ))
+                        .color(t.text_dim),
+                    );
                 }
                 RemoveState::Running { .. } => {
-                    ui.label(RichText::new("Playing the later commits again…").color(t.text_dim));
+                    ui.label(
+                        RichText::new(crate::i18n::text(
+                            "repo-workflows-timeline-remove-section-50ad636b",
+                        ))
+                        .color(t.text_dim),
+                    );
                 }
                 RemoveState::Failed { error, .. } => {
-                    ui.label(RichText::new(error).color(t.danger));
+                    ui.label(
+                        RichText::new(crate::repo::activity::display_workflow_error(error))
+                            .color(t.danger),
+                    );
                     close_button(ui, acts);
                 }
                 RemoveState::Planned { plan, name } => planned(ui, plan, name, idle, acts),
@@ -78,15 +98,27 @@ impl RepoTab {
 /// What it would take out and play again, the name, and the button that does it.
 fn planned(ui: &mut Ui, plan: &Plan, name: &str, idle: bool, acts: &mut Vec<Action>) {
     let t = Tokens::get(ui.ctx());
-    ui.label(RichText::new(format!("Taken out ({}):", plan.removed_total)).color(t.text));
+    ui.label(
+        RichText::new(crate::i18n::message(
+            "repo-workflows-timeline-planned-464cf7b4",
+            &[("plan-removed-total-1", (plan.removed_total).into())],
+        ))
+        .color(t.text),
+    );
     commits(ui, &plan.removed, plan.removed_total);
     ui.add_space(4.0);
-    ui.label(RichText::new(format!("Played again ({}):", plan.later.len())).color(t.text));
+    ui.label(
+        RichText::new(crate::i18n::message(
+            "repo-workflows-timeline-planned-bc5f9685",
+            &[("plan-later-len-1", (plan.later.len()).into())],
+        ))
+        .color(t.text),
+    );
     if plan.later.is_empty() {
         ui.label(
-            RichText::new(format!(
-                "Nothing was committed on {} since: the new branch is where it was before this.",
-                plan.branch
+            RichText::new(crate::i18n::message(
+                "repo-workflows-timeline-planned-32b970db",
+                &[("plan-branch-1", (plan.branch).clone().into())],
             ))
             .size(12.0)
             .color(t.text_faint),
@@ -96,7 +128,12 @@ fn planned(ui: &mut Ui, plan: &Plan, name: &str, idle: bool, acts: &mut Vec<Acti
     }
     ui.add_space(6.0);
     ui.horizontal(|ui| {
-        ui.label(RichText::new("New branch").color(t.text_dim));
+        ui.label(
+            RichText::new(crate::i18n::text(
+                "repo-workflows-timeline-planned-7f445154",
+            ))
+            .color(t.text_dim),
+        );
         let mut typed = name.to_owned();
         if ui
             .add(egui::TextEdit::singleline(&mut typed).desired_width(240.0))
@@ -106,17 +143,23 @@ fn planned(ui: &mut Ui, plan: &Plan, name: &str, idle: bool, acts: &mut Vec<Acti
         }
     });
     ui.label(
-        RichText::new(format!(
-            "{} stays as it is. The commits are played in a worktree beside the repository, \
-             removed again once they all apply.",
-            plan.branch
+        RichText::new(crate::i18n::message(
+            "repo-workflows-timeline-planned-5c26ac7a",
+            &[("plan-branch-1", (plan.branch).clone().into())],
         ))
         .size(11.5)
         .color(t.text_faint),
     );
     ui.add_space(6.0);
     ui.horizontal(|ui| {
-        if widgets::primary_button(ui, "Make the branch", idle, 120.0).clicked() {
+        if widgets::primary_button(
+            ui,
+            crate::i18n::text("repo-workflows-timeline-planned-9ae4d55a"),
+            idle,
+            120.0,
+        )
+        .clicked()
+        {
             acts.push(Action::Timeline(TimelineAct::RunRemove));
         }
         close_button(ui, acts);
@@ -129,11 +172,24 @@ fn finished(ui: &mut Ui, outcome: &Outcome, confirm: bool, idle: bool, acts: &mu
     match outcome {
         Outcome::Done { branch, tip } => {
             ui.label(
-                RichText::new(format!("{branch} is made, at {}.", short(tip))).color(t.success),
+                RichText::new(crate::i18n::message(
+                    "repo-workflows-timeline-finished-9f36aac7",
+                    &[
+                        ("branch", (branch).clone().into()),
+                        ("short-tip-1", (short(tip)).into()),
+                    ],
+                ))
+                .color(t.success),
             );
             ui.horizontal(|ui| {
                 if ui
-                    .add_enabled(idle, egui::Button::new(format!("Check out {branch}")))
+                    .add_enabled(
+                        idle,
+                        egui::Button::new(crate::i18n::message(
+                            "repo-workflows-timeline-finished-c36998e0",
+                            &[("branch", (branch).clone().into())],
+                        )),
+                    )
                     .clicked()
                 {
                     acts.push(Action::Checkout(branch.clone()));
@@ -151,9 +207,12 @@ fn finished(ui: &mut Ui, outcome: &Outcome, confirm: bool, idle: bool, acts: &mu
             ..
         } => {
             ui.label(
-                RichText::new(format!(
-                    "{} {summary} doesn't apply without it: conflicts in",
-                    short(commit)
+                RichText::new(crate::i18n::message(
+                    "repo-workflows-timeline-finished-69c5b35c",
+                    &[
+                        ("short-commit-1", (short(commit)).into()),
+                        ("summary", (summary).clone().into()),
+                    ],
                 ))
                 .color(t.warning),
             );
@@ -166,50 +225,90 @@ fn finished(ui: &mut Ui, outcome: &Outcome, confirm: bool, idle: bool, acts: &mu
             }
             if files.is_empty() {
                 ui.label(
-                    RichText::new("(no file is left unmerged: look in the worktree)")
-                        .color(t.text_faint),
+                    RichText::new(crate::i18n::text(
+                        "repo-workflows-timeline-finished-c8854cb8",
+                    ))
+                    .color(t.text_faint),
                 );
             }
             ui.label(
-                RichText::new(format!(
-                    "{branch} has the commits before it, in the worktree {}. Resolve the \
-                     conflicts there and continue the cherry-pick{}; once done, remove that \
-                     worktree from the sidebar (the branch stays).",
-                    crate::remote::display(folder),
-                    match left {
-                        0 => String::new(),
-                        1 => " (1 more commit follows)".to_owned(),
-                        n => format!(" ({n} more commits follow)"),
-                    }
+                RichText::new(crate::i18n::message(
+                    "repo-workflows-timeline-finished-34a13b7e",
+                    &[
+                        ("branch", (branch).clone().into()),
+                        (
+                            "crate-remote-display-folder-1",
+                            (crate::remote::display(folder)).clone().into(),
+                        ),
+                        (
+                            "match-left-0-string-new-1-1-more-2",
+                            (match left {
+                                0 => String::new(),
+                                1 => crate::i18n::text("repo-workflows-timeline-finished-635b324e")
+                                    .to_owned(),
+                                n => crate::i18n::message(
+                                    "repo-workflows-timeline-finished-c9361f4d",
+                                    &[("n", (*(n)).into())],
+                                ),
+                            })
+                            .clone()
+                            .into(),
+                        ),
+                    ],
                 ))
                 .size(12.0)
                 .color(t.text_dim),
             );
             if confirm {
                 ui.label(
-                    RichText::new(format!(
-                        "Remove the worktree and the branch {branch}? Nothing is removed if work \
-                         was done there since."
+                    RichText::new(crate::i18n::message(
+                        "repo-workflows-timeline-finished-57272758",
+                        &[("branch", (branch).clone().into())],
                     ))
                     .color(t.text),
                 );
                 ui.horizontal(|ui| {
-                    if widgets::primary_button(ui, "Discard", idle, 80.0).clicked() {
+                    if widgets::primary_button(
+                        ui,
+                        crate::i18n::text("repo-workflows-timeline-finished-eb1a70e3"),
+                        idle,
+                        80.0,
+                    )
+                    .clicked()
+                    {
                         acts.push(Action::Timeline(TimelineAct::DiscardRemove));
                     }
-                    if ui.button("Cancel").clicked() {
+                    if ui
+                        .button(crate::i18n::text(
+                            "repo-workflows-timeline-finished-19766ed6",
+                        ))
+                        .clicked()
+                    {
                         acts.push(Action::Timeline(TimelineAct::AskDiscard(false)));
                     }
                 });
                 return;
             }
             ui.horizontal(|ui| {
-                if ui.button("Open the worktree").clicked() {
+                if ui
+                    .button(crate::i18n::text(
+                        "repo-workflows-timeline-finished-65b04ffc",
+                    ))
+                    .clicked()
+                {
                     acts.push(Action::OpenWorktree(folder.clone()));
                 }
                 if ui
-                    .add_enabled(idle, egui::Button::new("Discard this attempt…"))
-                    .on_hover_text(format!("Removes the worktree and the branch {branch}"))
+                    .add_enabled(
+                        idle,
+                        egui::Button::new(crate::i18n::text(
+                            "repo-workflows-timeline-finished-475e7702",
+                        )),
+                    )
+                    .on_hover_text(crate::i18n::message(
+                        "repo-workflows-timeline-finished-f63a600e",
+                        &[("branch", (branch).clone().into())],
+                    ))
                     .clicked()
                 {
                     acts.push(Action::Timeline(TimelineAct::AskDiscard(true)));
@@ -231,12 +330,23 @@ fn commits(ui: &mut Ui, list: &[(String, String)], total: usize) {
         );
     }
     if total > list.len() {
-        ui.label(RichText::new(format!("and {} more", total - list.len())).color(t.text_faint));
+        ui.label(
+            RichText::new(crate::i18n::message(
+                "repo-workflows-timeline-commits-683768ab",
+                &[("total-list-len-1", (total - list.len()).into())],
+            ))
+            .color(t.text_faint),
+        );
     }
 }
 
 fn close_button(ui: &mut Ui, acts: &mut Vec<Action>) {
-    if ui.button("Close").clicked() {
+    if ui
+        .button(crate::i18n::text(
+            "repo-workflows-timeline-close-button-7d9eb7ac",
+        ))
+        .clicked()
+    {
         acts.push(Action::Timeline(TimelineAct::CloseRemove));
     }
 }

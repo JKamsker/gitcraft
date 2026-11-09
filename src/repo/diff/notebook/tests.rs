@@ -201,7 +201,7 @@ fn stripping_outputs_from_the_tab() -> Result<(), String> {
         }
         std::thread::sleep(std::time::Duration::from_millis(25));
     }
-    let status = tab.status.clone().unwrap_or_default();
+    let status = tab.status.as_deref().cloned().unwrap_or_default();
     assert!(!status.1, "{}", status.0);
     assert!(git::strips_outputs(&dir));
     git::run(Some(&dir), &["add", "a.ipynb"])?;

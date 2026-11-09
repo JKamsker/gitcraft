@@ -4,8 +4,10 @@
 //! added, removed and changed, and the first bytes of each side in hex.
 
 mod extract;
+mod search;
 mod sniff;
 mod view;
+pub(super) use search::document as search_document;
 mod zip;
 
 #[cfg(test)]
@@ -175,7 +177,7 @@ fn read_local(file: &Path, max: u64) -> std::io::Result<Option<Vec<u8>>> {
         return Ok(Some(target));
     }
     if !meta.is_file() {
-        return Err(std::io::Error::other("not a file"));
+        return Err(std::io::Error::other(crate::i18n::text("repo-core-3899")));
     }
     if meta.len() > max {
         return Ok(None);
@@ -183,7 +185,7 @@ fn read_local(file: &Path, max: u64) -> std::io::Result<Option<Vec<u8>>> {
     // Checked again on what was opened: a link put there since would be followed by `open`.
     let opened = std::fs::File::open(file)?;
     if !opened.metadata()?.is_file() {
-        return Err(std::io::Error::other("not a file"));
+        return Err(std::io::Error::other(crate::i18n::text("repo-core-3899")));
     }
     let mut bytes = Vec::new();
     opened.take(max.saturating_add(1)).read_to_end(&mut bytes)?;
@@ -286,12 +288,13 @@ pub(super) fn pair(old: Option<Side>, new: Option<Side>, error: Option<String>) 
     if text_of(&old).is_some() || text_of(&new).is_some() {
         if unread(&old) || unread(&new) {
             let which = if unread(&old) {
-                "the old version"
+                crate::i18n::text("repo-core-3900")
             } else {
-                "the new version"
+                crate::i18n::text("repo-core-3901")
             };
-            text_note = Some(format!(
-                "The text of {which} can't be read, so it isn't compared."
+            text_note = Some(crate::i18n::message(
+                "repo-core-3902",
+                &[("which", which.to_string().into())],
             ));
         } else {
             let a: Vec<&str> = text_of(&old)
@@ -310,15 +313,21 @@ pub(super) fn pair(old: Option<Side>, new: Option<Side>, error: Option<String>) 
     }
     let mut notes: Vec<String> = text_note.into_iter().collect();
     if text.is_some() {
-        for (s, which) in [(&old, "the old version"), (&new, "the new version")] {
+        for (s, which) in [
+            (&old, crate::i18n::text("repo-core-3900")),
+            (&new, crate::i18n::text("repo-core-3901")),
+        ] {
             let gaps = s
                 .as_ref()
                 .map(|s| s.text_gaps.as_slice())
                 .unwrap_or_default();
             if !gaps.is_empty() {
-                notes.push(format!(
-                    "The text of {which} is incomplete ({}), so this comparison may show changes that aren't there.",
-                    gaps.join("; ")
+                notes.push(crate::i18n::message(
+                    "repo-core-3903",
+                    &[
+                        ("which", which.to_string().into()),
+                        ("gaps", gaps.join("; ").to_string().into()),
+                    ],
                 ));
             }
         }
@@ -326,10 +335,7 @@ pub(super) fn pair(old: Option<Side>, new: Option<Side>, error: Option<String>) 
     if let Some(lines) = &text
         && approximate(lines)
     {
-        notes.push(
-            "The texts are too unlike to match line by line: everything between the first and the last change is shown removed and added."
-                .to_owned(),
-        );
+        notes.push(crate::i18n::text("repo-core-3904").to_owned());
     }
     let text_note = (!notes.is_empty()).then(|| notes.join(" "));
     let (members, members_note) = compare_members(&old, &new);
@@ -383,14 +389,13 @@ fn listing(s: &Option<Side>) -> (Listing<'_>, bool) {
         return (Listing::None, false);
     };
     match &s.archive {
-        _ if s.failed => (Listing::Unknown("couldn't be read"), false),
-        _ if s.kind.is_none() => (Listing::Unknown("is too big to read"), false),
+        _ if s.failed => (Listing::Unknown(crate::i18n::text("repo-core-1688")), false),
+        _ if s.kind.is_none() => (Listing::Unknown(crate::i18n::text("repo-core-3905")), false),
         Archive::No => (Listing::None, false),
-        Archive::Unreadable => (
-            Listing::Unknown("has a member list that can't be read"),
-            true,
-        ),
-        Archive::Listed(d) if !d.complete => (Listing::Unknown("has a damaged member list"), true),
+        Archive::Unreadable => (Listing::Unknown(crate::i18n::text("repo-core-3906")), true),
+        Archive::Listed(d) if !d.complete => {
+            (Listing::Unknown(crate::i18n::text("repo-core-3907")), true)
+        }
         Archive::Listed(d) => (Listing::Listed(d), true),
     }
 }
@@ -406,7 +411,13 @@ fn compare_members(
     }
     for (l, which) in [(&a, "old"), (&b, "new")] {
         if let Listing::Unknown(why) = l {
-            let note = format!("The {which} version {why}, so its members aren't compared.");
+            let note = crate::i18n::message(
+                "repo-core-3908",
+                &[
+                    ("which", which.to_string().into()),
+                    ("why", why.to_string().into()),
+                ],
+            );
             return (None, Some(note));
         }
     }
@@ -421,9 +432,12 @@ fn compare_members(
         if let Listing::Listed(d) = l
             && !d.duplicates.is_empty()
         {
-            notes.push(format!(
-                "The {which} version has more than one member named {}: the first of each is compared.",
-                d.duplicates.join(", ")
+            notes.push(crate::i18n::message(
+                "repo-core-3909",
+                &[
+                    ("which", which.to_string().into()),
+                    ("d", d.duplicates.join(", ").to_string().into()),
+                ],
             ));
         }
     }

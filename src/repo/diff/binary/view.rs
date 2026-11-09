@@ -27,22 +27,29 @@ pub(in crate::repo::diff) fn binary_view(ui: &mut Ui, pair: &BinaryPair, id: &st
         .show(ui, |ui| {
             summary(ui, &t, pair);
             if let Some(e) = &pair.error {
-                ui.colored_label(t.danger, e);
+                ui.colored_label(
+                    t.danger,
+                    crate::git::display_error(&crate::forge::inbox::display_error(e)),
+                );
             }
             ui.add_space(10.0);
             let mut options: Vec<(Show, &str, bool)> = Vec::new();
             if let Some(text) = &pair.text {
                 options.push((
                     Show::Text,
-                    "Text",
+                    crate::i18n::text("repo-core-1683"),
                     !text.is_empty() && pair.text_changes > 0,
                 ));
             }
             if let Some(m) = &pair.members {
-                options.push((Show::Members, "Members", !m.is_empty()));
+                options.push((
+                    Show::Members,
+                    crate::i18n::text("repo-core-1598"),
+                    !m.is_empty(),
+                ));
             }
             if has_bytes(pair) {
-                options.push((Show::Hex, "Bytes", true));
+                options.push((Show::Hex, crate::i18n::text("repo-core-1684"), true));
             }
             for note in [&pair.text_note, &pair.members_note].into_iter().flatten() {
                 ui.label(RichText::new(note).color(t.text_dim).small());
@@ -52,9 +59,9 @@ pub(in crate::repo::diff) fn binary_view(ui: &mut Ui, pair: &BinaryPair, id: &st
                     .iter()
                     .any(|s| s.as_ref().is_some_and(|s| s.kind.is_none() && !s.failed))
                 {
-                    let text = format!(
-                        "Too big to show: gitcraft reads files up to {}.",
-                        human_size(MAX_READ)
+                    let text = crate::i18n::message(
+                        "repo-core-1685",
+                        &[("MAX-READ", human_size(MAX_READ).to_string().into())],
                     );
                     ui.label(RichText::new(text).color(t.text_dim));
                 }
@@ -101,7 +108,7 @@ fn has_bytes(pair: &BinaryPair) -> bool {
 /// "+1.8 KB", "−300 B", "same size".
 pub(super) fn size_change(old: u64, new: u64) -> String {
     match new.cmp(&old) {
-        std::cmp::Ordering::Equal => "same size".to_owned(),
+        std::cmp::Ordering::Equal => crate::i18n::text("repo-core-1687").to_owned(),
         std::cmp::Ordering::Greater => format!("+{}", human_size(new - old)),
         std::cmp::Ordering::Less => format!("−{}", human_size(old - new)),
     }
@@ -110,13 +117,19 @@ pub(super) fn size_change(old: u64, new: u64) -> String {
 /// A side's size as the table says it: "12.0 KB", "70.2 MB, not read (over 64 MB)".
 pub(super) fn size_text(s: &Side) -> String {
     if s.failed {
-        return "couldn't be read".to_owned();
+        return crate::i18n::text("repo-core-1688").to_owned();
     }
     let limit = human_size(MAX_READ);
     match (s.size, s.kind.is_some()) {
         (Some(n), true) => human_size(n),
-        (Some(n), false) => format!("{}, not read (over {limit})", human_size(n)),
-        (None, _) => format!("over {limit}, not read"),
+        (Some(n), false) => crate::i18n::message(
+            "repo-core-1689",
+            &[
+                ("n", human_size(n).to_string().into()),
+                ("limit", limit.to_string().into()),
+            ],
+        ),
+        (None, _) => crate::i18n::message("repo-core-1690", &[("limit", limit.to_string().into())]),
     }
 }
 
@@ -125,7 +138,9 @@ fn summary(ui: &mut Ui, t: &Tokens, pair: &BinaryPair) {
     let kind = |s: &Option<Side>| s.as_ref().and_then(|s| s.kind.clone());
     let kinds = match (kind(&pair.old), kind(&pair.new)) {
         (Some(a), Some(b)) if a != b => format!("{a} → {b}"),
-        (a, b) => b.or(a).unwrap_or_else(|| "Binary file".to_owned()),
+        (a, b) => b
+            .or(a)
+            .unwrap_or_else(|| crate::i18n::text("repo-core-1600").to_owned()),
     };
     ui.horizontal(|ui| {
         icons::inline(ui, "file-diff", 16.0, t.icon);
@@ -138,7 +153,7 @@ fn summary(ui: &mut Ui, t: &Tokens, pair: &BinaryPair) {
         }
     });
     ui.add_space(6.0);
-    let mut facts: Vec<String> = vec!["Size".to_owned()];
+    let mut facts: Vec<String> = vec!["repo-core-1693".to_owned()];
     for s in [&pair.old, &pair.new].into_iter().flatten() {
         for (k, _) in &s.facts {
             if !facts.contains(k) {
@@ -148,7 +163,7 @@ fn summary(ui: &mut Ui, t: &Tokens, pair: &BinaryPair) {
     }
     let value = |s: &Option<Side>, k: &str| -> Option<String> {
         let s = s.as_ref()?;
-        if k == "Size" {
+        if k == "repo-core-1693" {
             return Some(size_text(s));
         }
         s.facts.iter().find(|(f, _)| f == k).map(|(_, v)| v.clone())
@@ -159,7 +174,10 @@ fn summary(ui: &mut Ui, t: &Tokens, pair: &BinaryPair) {
         .spacing([18.0, 4.0])
         .show(ui, |ui| {
             ui.label("");
-            for title in ["Before", "After"] {
+            for title in [
+                crate::i18n::text("repo-core-1564"),
+                crate::i18n::text("repo-core-1565"),
+            ] {
                 ui.label(
                     RichText::new(title)
                         .font(theme::semibold(12.0))
@@ -170,10 +188,22 @@ fn summary(ui: &mut Ui, t: &Tokens, pair: &BinaryPair) {
             for k in &facts {
                 let (a, b) = (value(&pair.old, k), value(&pair.new, k));
                 let changed = both && a != b;
-                ui.label(RichText::new(k).color(t.text_dim));
+                ui.label(
+                    RichText::new(if k == "repo-core-1693" {
+                        crate::i18n::text("repo-core-1693")
+                    } else {
+                        k
+                    })
+                    .color(t.text_dim),
+                );
                 for (v, side, missing, color) in [
-                    (&a, &pair.old, "(new file)", t.danger),
-                    (&b, &pair.new, "(deleted)", t.success),
+                    (&a, &pair.old, crate::i18n::text("repo-core-1695"), t.danger),
+                    (
+                        &b,
+                        &pair.new,
+                        crate::i18n::text("repo-core-1696"),
+                        t.success,
+                    ),
                 ] {
                     let shown = match (v, side) {
                         (Some(v), _) => {
@@ -192,18 +222,19 @@ fn summary(ui: &mut Ui, t: &Tokens, pair: &BinaryPair) {
 fn text_diff(ui: &mut Ui, t: &Tokens, pair: &BinaryPair) {
     let Some(lines) = &pair.text else { return };
     if lines.is_empty() {
-        ui.label(RichText::new("No text.").color(t.text_dim));
+        ui.label(RichText::new(crate::i18n::text("repo-core-1697")).color(t.text_dim));
         return;
     }
     if pair.text_changes == 0 {
         let more = if pair.members.is_some() {
-            "Members"
+            crate::i18n::text("repo-core-1598")
         } else {
-            "Bytes"
+            crate::i18n::text("repo-core-1684")
         };
         ui.label(
-            RichText::new(format!(
-                "The text is the same; see {more} for what changed."
+            RichText::new(crate::i18n::message(
+                "repo-core-1698",
+                &[("more", more.to_string().into())],
             ))
             .color(t.text_dim),
         );
@@ -251,7 +282,7 @@ fn text_diff(ui: &mut Ui, t: &Tokens, pair: &BinaryPair) {
 
 fn members(ui: &mut Ui, t: &Tokens, changes: &[MemberChange]) {
     if changes.is_empty() {
-        ui.label(RichText::new("No member changed.").color(t.text_dim));
+        ui.label(RichText::new(crate::i18n::text("repo-core-1700")).color(t.text_dim));
         return;
     }
     egui::ScrollArea::vertical()
@@ -261,15 +292,24 @@ fn members(ui: &mut Ui, t: &Tokens, changes: &[MemberChange]) {
             for c in &changes[range] {
                 ui.horizontal(|ui| {
                     let (word, color, size) = match (c.old, c.new) {
-                        (None, Some(n)) => ("added", t.success, human_size(n)),
-                        (Some(o), None) => ("removed", t.danger, human_size(o)),
+                        (None, Some(n)) => (
+                            crate::i18n::text("repo-core-1702"),
+                            t.success,
+                            human_size(n),
+                        ),
+                        (Some(o), None) => {
+                            (crate::i18n::text("repo-core-1703"), t.danger, human_size(o))
+                        }
                         (Some(o), Some(n)) if o == n => (
-                            "changed",
+                            crate::i18n::text("repo-core-1704"),
                             t.warning,
-                            format!("{}, same size", human_size(n)),
+                            crate::i18n::message(
+                                "repo-core-1705",
+                                &[("n", human_size(n).to_string().into())],
+                            ),
                         ),
                         (Some(o), Some(n)) => (
-                            "changed",
+                            crate::i18n::text("repo-core-1704"),
                             t.warning,
                             format!(
                                 "{} → {} ({})",
@@ -315,7 +355,7 @@ fn hex(ui: &mut Ui, t: &Tokens, pair: &BinaryPair) {
         .any(|s| s.size.is_none_or(|n| n > HEX_BYTES as u64));
     if cut {
         ui.label(
-            RichText::new("Showing the first 64 KB of each side.")
+            RichText::new(crate::i18n::text("repo-core-1706"))
                 .color(t.text_faint)
                 .small(),
         );
@@ -396,7 +436,7 @@ pub(in crate::repo::diff) fn textconv_note(ui: &mut Ui, program: &str, area: Opt
             ui.set_width(ui.available_width());
             ui.horizontal(|ui| {
                 ui.label(
-                    RichText::new("Text made by its textconv,")
+                    RichText::new(crate::i18n::text("repo-core-1711"))
                         .color(t.text_dim)
                         .small(),
                 );
@@ -421,9 +461,9 @@ pub(in crate::repo::diff) fn textconv_note(ui: &mut Ui, program: &str, area: Opt
 /// What the textconv line says after the program: what can be done with the file in `area`.
 pub(super) fn textconv_rest(area: Option<Area>) -> &'static str {
     match area {
-        Some(Area::Staged) => "not the file's own lines. Unstage it as a whole file.",
-        Some(Area::Conflicted) => "not the file's own lines. Mark it resolved as a whole file.",
-        Some(_) => "not the file's own lines. Stage or discard it as a whole file.",
-        None => "not the file's own lines.",
+        Some(Area::Staged) => crate::i18n::text("repo-core-1713"),
+        Some(Area::Conflicted) => crate::i18n::text("repo-core-1714"),
+        Some(_) => crate::i18n::text("repo-core-1715"),
+        None => crate::i18n::text("repo-core-1716"),
     }
 }

@@ -31,10 +31,10 @@ impl RepoTab {
             None => to_restack(&self.stacks.layers),
         };
         if layers.is_empty() {
-            self.status = Some((
+            self.status = Some(crate::repo::Notice::plain((
                 "Nothing to restack: every layer is on its parent's tip.".to_owned(),
                 false,
-            ));
+            )));
             return;
         }
         static IDS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
@@ -91,7 +91,10 @@ impl RepoTab {
         work: impl FnOnce(&Path) -> Result<Outcome, String> + Send + 'static,
     ) {
         if let Some(busy) = &self.busy_op {
-            self.status = Some((format!("{label}: run it again once {busy} is done"), true));
+            self.status = Some(crate::repo::Notice::plain((
+                format!("{label}: run it again once {busy} is done"),
+                true,
+            )));
             return;
         }
         self.busy_op = Some(label.to_owned());
@@ -123,14 +126,14 @@ impl RepoTab {
         match outcome {
             Outcome::Done(moved) => {
                 let n = moved.len();
-                self.status = Some((
+                self.status = Some(crate::repo::Notice::plain((
                     match n {
                         0 => "Restack: every branch was already on its parent's tip".to_owned(),
                         1 => "Restack: 1 branch moved · Ctrl+Z puts it back".to_owned(),
                         n => format!("Restack: {n} branches moved · Ctrl+Z puts them back"),
                     },
                     false,
-                ));
+                )));
                 if n > 0 {
                     let (undo, redo) = undo_steps(&moved);
                     self.push_undo(
@@ -147,7 +150,7 @@ impl RepoTab {
                 }
             }
             Outcome::Aborted(kept) => {
-                self.status = Some(if kept.is_empty() {
+                self.status = Some(crate::repo::Notice::plain(if kept.is_empty() {
                     (
                         "Restack aborted: every branch is back where it was".to_owned(),
                         false,
@@ -161,7 +164,7 @@ impl RepoTab {
                         ),
                         true,
                     )
-                });
+                }));
             }
             Outcome::Stopped {
                 branch, worktree, ..
@@ -170,19 +173,21 @@ impl RepoTab {
                     Some(wt) => format!(" in its worktree at {}", wt.display()),
                     None => String::new(),
                 };
-                self.status = Some((
+                self.status = Some(crate::repo::Notice::plain((
                     format!(
                         "Restack stopped at {branch} on conflicts: resolve them{place}, then \
                          Continue restack (or Abort restack)"
                     ),
                     true,
-                ));
+                )));
                 self.focus_wip = worktree.is_none();
             }
         }
-        if long && let Some((message, failed)) = self.status.clone() {
-            self.finished
-                .push((format!("{} · {message}", self.name), failed));
+        if long && let Some((message, failed)) = self.status.as_deref().cloned() {
+            self.finished.push(crate::repo::Notice::plain((
+                format!("{} · {message}", self.name),
+                failed,
+            )));
         }
         self.reload(ctx);
     }
@@ -207,19 +212,17 @@ impl RepoTab {
                 ui.set_width(460.0);
                 let n = preview.layers.len();
                 ui.label(
-                    RichText::new(format!(
-                        "Restack {n} branch{}",
-                        if n == 1 { "" } else { "es" }
+                    RichText::new(crate::i18n::message(
+                        "repo-workflows-stack-restack-title",
+                        &[("count", (n).into())],
                     ))
                     .font(theme::semibold(15.0)),
                 );
                 ui.add_space(6.0);
                 ui.label(
-                    RichText::new(
-                        "Each branch's own commits are replayed onto its parent's new tip, \
-                         parents first. A conflict stops the restack: resolve it, then Continue \
-                         restack. Ctrl+Z afterwards puts every branch back.",
-                    )
+                    RichText::new(crate::i18n::text(
+                        "repo-workflows-stack-restack-dialog-34001cc3",
+                    ))
                     .color(t.text_dim),
                 );
                 ui.add_space(10.0);
@@ -230,13 +233,22 @@ impl RepoTab {
                         ui.horizontal(|ui| {
                             ui.add(crate::spinner::Spinner::new());
                             ui.label(
-                                RichText::new("Working out the new bases…").color(t.text_faint),
+                                RichText::new(crate::i18n::text(
+                                    "repo-workflows-stack-restack-dialog-17605ec0",
+                                ))
+                                .color(t.text_faint),
                             );
                         });
                     }
                     Some(Err(e)) => {
                         can = false;
-                        ui.colored_label(t.danger, format!("Can't restack: {e}"));
+                        ui.colored_label(
+                            t.danger,
+                            crate::i18n::message(
+                                "repo-workflows-stack-restack-dialog-467c87df",
+                                &[("e", (e).clone().into())],
+                            ),
+                        );
                     }
                     Some(Ok(list)) => {
                         for (i, p) in list.iter().enumerate() {
@@ -251,8 +263,7 @@ impl RepoTab {
                             ui.add_space(6.0);
                             ui.colored_label(
                                 t.warning,
-                                "Commit or stash your changes first: restacking checks the \
-                                 branches out here.",
+                                crate::i18n::text("repo-workflows-stack-restack-dialog-9868923b"),
                             );
                         }
                         if self.work.in_progress.is_some() {
@@ -260,22 +271,57 @@ impl RepoTab {
                             ui.add_space(6.0);
                             ui.colored_label(
                                 t.warning,
-                                "Finish or abort the operation in progress first.",
+                                crate::i18n::text("repo-workflows-stack-restack-dialog-dacd5d19"),
                             );
                         }
                     }
                 }
                 if let Some(busy) = &self.busy_op {
                     ui.add_space(6.0);
-                    ui.label(RichText::new(format!("Waiting for {busy}…")).color(t.text_faint));
+                    ui.label(
+                        RichText::new(crate::i18n::message(
+                            "repo-workflows-stack-restack-dialog-ea8badd0",
+                            &[(
+                                "busy",
+                                crate::repo::messages::display_operation(busy).into(),
+                            )],
+                        ))
+                        .color(t.text_faint),
+                    );
                 }
                 ui.add_space(14.0);
                 ui.horizontal(|ui| {
-                    if widgets::primary_button(ui, "Restack", can, 90.0).clicked() {
+                    if ui
+                        .add_enabled(
+                            can,
+                            egui::Button::new(crate::i18n::text(
+                                "repo-workflows-stack-restack-dialog-fd52d182",
+                            )),
+                        )
+                        .clicked()
+                        && let Some(Ok(previews)) = &preview.previews
+                    {
+                        acts.push(Action::RepositoryTools(
+                            crate::repo::repository_tools::Act::IsolatedStack(previews.clone()),
+                        ));
+                    }
+                    if widgets::primary_button(
+                        ui,
+                        crate::i18n::text("repo-workflows-stack-restack-dialog-9fbc2915"),
+                        can,
+                        90.0,
+                    )
+                    .clicked()
+                    {
                         acts.push(Action::Stack(StackAct::StartRestack));
                     }
                     if ui
-                        .add(egui::Button::new("Cancel").min_size(egui::vec2(80.0, 30.0)))
+                        .add(
+                            egui::Button::new(crate::i18n::text(
+                                "repo-workflows-stack-restack-dialog-19766ed6",
+                            ))
+                            .min_size(egui::vec2(80.0, 30.0)),
+                        )
                         .clicked()
                     {
                         acts.push(Action::Stack(StackAct::CloseRestack));
@@ -291,23 +337,35 @@ impl RepoTab {
 /// One step of the preview: the branch, its new base, how many commits move, where.
 /// `parent_moves`: its parent is restacked first, so its new base is that one's new tip.
 fn preview_row(ui: &mut egui::Ui, t: &Tokens, p: &Preview, parent_moves: bool) {
-    let commits = |n: u32| format!("{n} commit{}", if n == 1 { "" } else { "s" });
+    let commits = |n: u32| {
+        crate::i18n::message(
+            "repo-workflows-stack-commit-count",
+            &[("count", (n).into())],
+        )
+    };
     let what = if parent_moves {
-        format!(
-            "{} onto {}'s new tip · base {} → its new tip",
-            commits(p.commits),
-            p.step.parent,
-            short(&p.step.old_base)
+        crate::i18n::message(
+            "repo-workflows-stack-preview-row-f80cf9a0",
+            &[
+                ("commits-p-commits-1", (commits(p.commits)).clone().into()),
+                ("p-step-parent-2", (p.step.parent).clone().into()),
+                ("short-p-step-old-base-3", (short(&p.step.old_base)).into()),
+            ],
         )
     } else if p.step.old_base == p.new_base {
-        format!("already on {}'s tip: nothing to replay", p.step.parent)
+        crate::i18n::message(
+            "repo-workflows-stack-preview-row-134f0bef",
+            &[("p-step-parent-1", (p.step.parent).clone().into())],
+        )
     } else {
-        format!(
-            "{} onto {} · base {} → {}",
-            commits(p.commits),
-            p.step.parent,
-            short(&p.step.old_base),
-            short(&p.new_base),
+        crate::i18n::message(
+            "repo-workflows-stack-preview-row-5302fc22",
+            &[
+                ("commits-p-commits-1", (commits(p.commits)).clone().into()),
+                ("p-step-parent-2", (p.step.parent).clone().into()),
+                ("short-p-step-old-base-3", (short(&p.step.old_base)).into()),
+                ("short-p-new-base-4", (short(&p.new_base)).into()),
+            ],
         )
     };
     ui.horizontal_wrapped(|ui| {
@@ -315,7 +373,11 @@ fn preview_row(ui: &mut egui::Ui, t: &Tokens, p: &Preview, parent_moves: bool) {
         ui.label(RichText::new(what).color(t.text_dim));
         if let Some(wt) = &p.worktree {
             ui.label(
-                RichText::new(format!("· in its worktree at {}", wt.display())).color(t.text_faint),
+                RichText::new(crate::i18n::message(
+                    "repo-workflows-stack-preview-row-c62999a7",
+                    &[("wt-display-1", (wt.display()).to_string().into())],
+                ))
+                .color(t.text_faint),
             );
         }
     });

@@ -5,6 +5,7 @@
 //! denied automatically.
 
 pub(crate) mod plan;
+pub(crate) mod preview;
 
 use std::collections::VecDeque;
 use std::sync::Arc;
@@ -58,6 +59,7 @@ impl Job {
 struct Ready {
     job: Job,
     plan: Plan,
+    preview: Option<preview::Preview>,
 }
 
 /// A request waiting for the user's Approve or Deny.
@@ -103,6 +105,7 @@ impl Default for Agents {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct CardView {
     pub agent: String,
+    pub preview: Option<preview::Preview>,
     pub ask: Ask,
     /// The git commands it runs, as they would be typed.
     pub commands: Vec<String>,
@@ -112,6 +115,15 @@ pub(crate) struct CardView {
     /// How long it has been on screen: Approve takes no click at first, which was surely meant
     /// for what the card popped up over.
     pub shown_for: Duration,
+}
+
+impl CardView {
+    /// Resolve the retained note witnesses only for the current frame's card snapshot.
+    fn for_display(mut self) -> Self {
+        self.preview = self.preview.as_ref().map(preview::Preview::for_display);
+        self.ask = self.ask.for_display();
+        self
+    }
 }
 
 /// `text` without the characters that change how text around them reads: bidirectional
@@ -171,9 +183,16 @@ impl RepoTab {
             ctx,
             move || {
                 let planned = plan::plan(&path, &job.op);
-                (job, planned)
+                let preview = if planned.as_ref().is_ok_and(|p| p.ask.is_some()) {
+                    preview::read(&path, &job.op, &|| job.abandoned())
+                } else {
+                    None
+                };
+                (job, planned, preview)
             },
-            move |tab, (job, planned), ctx| tab.agent_planned(job, planned, approved, ctx),
+            move |tab, (job, planned, preview), ctx| {
+                tab.agent_planned(job, planned, preview, approved, ctx)
+            },
         );
     }
 
@@ -182,6 +201,7 @@ impl RepoTab {
         &mut self,
         job: Job,
         planned: Result<Plan, String>,
+        preview: Option<preview::Preview>,
         approved: Option<Ask>,
         ctx: &egui::Context,
     ) {
@@ -198,11 +218,9 @@ impl RepoTab {
         };
         // What can't be undone always asks, whatever the plan made of it.
         if job.op.needs_approval() && plan.ask.is_none() {
-            plan.ask = Some(Ask {
-                title: plan.label.clone(),
-                body: plan.label.clone(),
-                undo_note: "This can't be undone from gitcraft.".to_owned(),
-            });
+            plan.ask = Some(Ask::from_presentation(plan::AskPresentation::Fallback {
+                label: plan.label.clone(),
+            }));
         }
         if self.busy_op.is_some() || self.loading {
             // Something started meanwhile: planned again when it is done, its wait counted
@@ -212,15 +230,33 @@ impl RepoTab {
             self.agent_calls.queue.push_front(job);
             return;
         }
+        if let Some(ask) = &mut plan.ask {
+            use sha2::{Digest, Sha256};
+            let guards: Vec<_> = plan
+                .ops
+                .iter()
+                .filter(|s| s.first().is_some_and(|v| v.starts_with('\0')))
+                .collect();
+            #[expect(
+                clippy::expect_used,
+                reason = "Serializing references to vectors of UTF-8 strings into a Vec cannot fail; preserve the exact approval digest bytes"
+            )]
+            let bytes = serde_json::to_vec(&guards).expect("string vectors serialize");
+            let digest = Sha256::digest(bytes)
+                .iter()
+                .map(|b| format!("{b:02x}"))
+                .collect::<String>();
+            ask.append_source_suffix(&format!("\nExact source guards: {digest}\n{guards:?}"));
+        }
         match plan.ask.take() {
             // What the user approved is still what it would do.
             Some(ask) if approved.as_ref() == Some(&ask) => {
-                self.agent_start(Ready { job, plan }, ctx)
+                self.agent_start(Ready { job, plan, preview }, ctx)
             }
             Some(ask) => {
                 plan.ask = Some(ask);
                 self.agent_calls.card = Some(Waiting {
-                    ready: Ready { job, plan },
+                    ready: Ready { job, plan, preview },
                     shown: Instant::now(),
                     until: Instant::now() + self.agent_calls.approval_wait,
                 });
@@ -229,7 +265,7 @@ impl RepoTab {
                 ));
                 ctx.request_repaint();
             }
-            None => self.agent_start(Ready { job, plan }, ctx),
+            None => self.agent_start(Ready { job, plan, preview }, ctx),
         }
     }
 
@@ -255,10 +291,12 @@ impl RepoTab {
         {
             waiting.ready.job.answer(
                 Outcome::TimedOut,
-                format!(
-                    "Nobody answered gitcraft's approval card within {} seconds, so nothing was \
-                     done. Ask the user to watch for the card in gitcraft before trying again.",
-                    agents.approval_wait.as_secs()
+                crate::i18n::message(
+                    "repo-workflows-agent-agent-step-97d87ec1",
+                    &[(
+                        "agents-approval-wait-as-secs-1",
+                        (agents.approval_wait.as_secs()).into(),
+                    )],
                 ),
             );
         }
@@ -270,10 +308,12 @@ impl RepoTab {
             if let Some(stale) = agents.queue.pop_front() {
                 stale.answer(
                     Outcome::TimedOut,
-                    format!(
-                        "gitcraft was busy for {} minutes (another operation or an approval \
-                         card), so nothing was done. Try again.",
-                        QUEUE_WAIT.as_secs() / 60
+                    crate::i18n::message(
+                        "repo-workflows-agent-agent-step-c03ca088",
+                        &[(
+                            "queue-wait-as-secs-60-1",
+                            (QUEUE_WAIT.as_secs() / 60).into(),
+                        )],
                     ),
                 );
             }
@@ -292,7 +332,7 @@ impl RepoTab {
     }
 
     fn agent_start(&mut self, ready: Ready, ctx: &egui::Context) {
-        let Ready { job, plan } = ready;
+        let Ready { job, plan, .. } = ready;
         let before = self.refs.head.clone();
         self.run_ops(
             &plan.label,
@@ -308,7 +348,10 @@ impl RepoTab {
                 reply: job.reply,
             });
         } else {
-            job.answer(Outcome::Failed, "gitcraft couldn't start it: try again");
+            job.answer(
+                Outcome::Failed,
+                crate::i18n::text("repo-workflows-agent-agent-start-917ed8ba"),
+            );
         }
     }
 
@@ -317,24 +360,29 @@ impl RepoTab {
     pub(crate) fn agent_card(&self) -> Option<CardView> {
         let waiting = self.agent_calls.card.as_ref()?;
         let plan = &waiting.ready.plan;
-        let ask = plan.ask.as_ref()?;
-        Some(CardView {
-            agent: visible(&waiting.ready.job.agent),
-            ask: Ask {
-                title: visible(&ask.title),
-                body: visible(&ask.body),
-                undo_note: visible(&ask.undo_note),
-            },
-            commands: plan
-                .ops
-                .iter()
-                .filter_map(|op| shown_command(op))
-                .map(|c| visible(&c))
-                .collect(),
-            undoable: plan.undo != Undo::None,
-            left: waiting.until.saturating_duration_since(Instant::now()),
-            shown_for: waiting.shown.elapsed(),
-        })
+        let ask = plan.ask.as_ref()?.for_display();
+        Some(
+            CardView {
+                agent: visible(&waiting.ready.job.agent),
+                preview: waiting.ready.preview.clone(),
+                ask: Ask {
+                    title: visible(&ask.title),
+                    body: visible(&ask.body),
+                    undo_note: visible(&ask.undo_note),
+                    presentation: None,
+                },
+                commands: plan
+                    .ops
+                    .iter()
+                    .filter_map(|op| shown_command(op))
+                    .map(|c| visible(&c))
+                    .collect(),
+                undoable: plan.undo != Undo::None,
+                left: waiting.until.saturating_duration_since(Instant::now()),
+                shown_for: waiting.shown.elapsed(),
+            }
+            .for_display(),
+        )
     }
 
     /// The user's answer to the card. Approved, the request is planned again, and runs if it
@@ -343,11 +391,11 @@ impl RepoTab {
         let Some(waiting) = self.agent_calls.card.take() else {
             return;
         };
-        let Ready { job, plan } = waiting.ready;
+        let Ready { job, plan, .. } = waiting.ready;
         if !approve {
             job.answer(
                 Outcome::Denied,
-                "Don't try it again unless the user asks you to.",
+                crate::i18n::text("repo-workflows-agent-agent-decide-7695bed1"),
             );
             return;
         }
@@ -367,16 +415,30 @@ impl RepoTab {
         };
         let reply = match result {
             Ok(_) => {
-                self.status = Some((format!("{}: {label}: done", running.agent), false));
+                self.status = Some(crate::repo::Notice::plain((
+                    format!("{}: {label}: done", running.agent),
+                    false,
+                )));
                 let how = if undoable {
-                    "It is the latest step of gitcraft's undo list: the user can undo it with \
-                     Ctrl+Z."
+                    crate::i18n::text("repo-workflows-agent-agent-op-done-d5e3a3af")
                 } else {
-                    "It can't be undone from gitcraft."
+                    crate::i18n::text("repo-workflows-agent-agent-op-done-cf3e44cf")
                 };
-                Reply::new(Outcome::Done, format!("{label}: done. {how}"))
+                Reply::new(
+                    Outcome::Done,
+                    crate::i18n::message(
+                        "repo-workflows-agent-agent-op-done-79a8519c",
+                        &[("label", (label).into()), ("how", (how).into())],
+                    ),
+                )
             }
-            Err(e) => Reply::new(Outcome::Failed, format!("{label} failed: {e}")),
+            Err(e) => Reply::new(
+                Outcome::Failed,
+                crate::i18n::message(
+                    "repo-workflows-agent-agent-op-done-8336fbfe",
+                    &[("label", (label).into()), ("e", (e).clone().into())],
+                ),
+            ),
         };
         let _ = running.reply.send(reply);
     }
@@ -387,9 +449,9 @@ impl RepoTab {
         if let Some(running) = self.agent_calls.running.take_if(|r| r.label == label) {
             let _ = running.reply.send(Reply::new(
                 Outcome::Failed,
-                format!(
-                    "{label} needs the user to sign in to the remote: gitcraft asked them for \
-                     it. Try again once they have."
+                crate::i18n::message(
+                    "repo-workflows-agent-agent-needs-sign-in-dc823c53",
+                    &[("label", (label).into())],
                 ),
             ));
         }

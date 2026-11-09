@@ -1,0 +1,3652 @@
+interaction-operation-fetch = Fetch
+interaction-operation-pull = Pull
+interaction-operation-push = Push
+interaction-operation-commit = Commit
+interaction-operation-amend = Amend
+interaction-operation-stage = Stage
+interaction-operation-stage-all = Stage all
+interaction-operation-unstage = Unstage
+interaction-operation-unstage-all = Unstage all
+interaction-operation-discard = Discard
+interaction-operation-stash = Stash
+interaction-operation-pop-stash = Pop stash
+interaction-operation-apply-stash = Apply stash
+interaction-operation-drop-stash = Drop stash
+interaction-operation-set-identity = Set identity
+interaction-operation-profile-author = Use the profile's author
+interaction-operation-mark-resolved = Mark resolved
+interaction-operation-reload = Reload
+interaction-operation-sync = Sync
+interaction-operation-push-review = Push for review
+interaction-operation-skip-hooks = Push, skipping hooks
+interaction-operation-apply-patch = Apply patch
+interaction-operation-cherry-pick = Cherry-pick
+interaction-operation-revert = Revert
+interaction-operation-rebase = Rebase
+interaction-operation-merge = Merge
+interaction-operation-dvc-pull = DVC: Pull
+interaction-operation-abort-merge = Abort merge
+interaction-operation-abort-rebase = Abort rebase
+interaction-operation-abort-cherry-pick = Abort cherry-pick
+interaction-operation-abort-revert = Abort revert
+interaction-operation-abort-am = Abort am
+interaction-operation-continue-merge = Continue merge
+interaction-operation-continue-rebase = Continue rebase
+interaction-operation-continue-cherry-pick = Continue cherry-pick
+interaction-operation-continue-revert = Continue revert
+interaction-operation-continue-am = Continue am
+interaction-operation-checkout-pull = Checkout and pull { $value }
+interaction-operation-checkout = Checkout { $value }
+interaction-operation-create-branch = Create branch { $value }
+interaction-operation-delete-branch = Delete branch { $value }
+interaction-operation-rename-branch = Rename branch { $value }
+interaction-operation-release-tag = Create release tag { $value }
+interaction-operation-create-tag = Create tag { $value }
+interaction-operation-delete-tag = Delete tag { $value }
+interaction-operation-pick = Cherry-pick { $value }
+interaction-operation-revert-item = Revert { $value }
+interaction-operation-stop-tracking = Stop tracking { $value }
+interaction-operation-ignore = Ignore { $value }
+interaction-operation-track-lfs = Track { $value } in LFS
+interaction-operation-apply-file = Apply { $value }
+interaction-operation-undo = Undo { $operation }
+interaction-operation-redo = Redo { $operation }
+interaction-operation-preparing = Preparing { $operation }
+interaction-operation-push-after = Push after { $operation }
+interaction-operation-push-to = Push { $branch } to { $remote }
+interaction-operation-merge-into = Merge { $branch } into { $target }
+interaction-operation-rebase-onto = Rebase { $branch } onto { $target }
+interaction-operation-fast-forward = Fast-forward { $branch } to { $target }
+interaction-settings-compact-tip = Lanes closer together, for a narrower graph column
+
+interaction-accounts-unnamed = Unnamed profile
+
+interaction-custom-display-failed = { $name } failed (exit status { NUMBER($code) })
+
+interaction-custom-display-finished = { $name } finished
+
+interaction-custom-display-index = Command { NUMBER($index) }
+
+interaction-custom-display-json = { $file } can't be read: { $detail }
+
+interaction-custom-display-large = { $file } is larger than { NUMBER($limit) } KiB, so it isn't read
+
+interaction-custom-display-name = “{ $name }”
+
+interaction-custom-display-problem = { $file }: { $command }: { $problem }
+
+interaction-gerrit-amend-invalid = Invalid Gerrit amendment
+
+interaction-gerrit-amend-message = Missing amend message
+
+interaction-gerrit-ancestor = The target branch is not an ancestor of this commit. Fetch and rebase onto the target before pushing for review.
+
+interaction-gerrit-choose = Choose a remote, a fetched target branch and a valid topic
+
+interaction-gerrit-duplicate = Two commits have the same Change-Id ({ $id }); each change needs its own
+
+interaction-gerrit-empty = There are no commits above the target branch to review
+
+interaction-gerrit-footer = Change-Id must be in the final trailer paragraph
+
+interaction-gerrit-format = Change-Id must be I followed by 40 hexadecimal digits (not all zero)
+
+interaction-gerrit-hook = { $commit }: { $reason }. Install Gerrit's commit-msg hook from your server, then amend this commit to add its Change-Id.
+
+interaction-gerrit-keep = Keep the original Change-Id when amending a Gerrit change
+
+interaction-gerrit-merge = Merge commit { $commit } cannot be pushed with this review flow; rebase the series first
+
+interaction-gerrit-missing = missing Change-Id in the message footer
+
+interaction-gerrit-multiple = more than one Change-Id in the footer
+
+interaction-gerrit-one-line = Change-Id must fit on one line
+
+interaction-gerrit-web = Invalid gitcraft.gerritUrl: use an HTTP(S) URL without credentials, query or fragment. Using the remote's web address; Gerrit review submission remains enabled.
+
+interaction-preferences-bad-variable = “{ $variable }” isn't a variable name: capital letters, digits and _, starting with a letter
+
+interaction-preferences-built-in = ${ $variable } is already set by gitcraft
+
+interaction-preferences-empty-line = Its command line is empty
+
+interaction-preferences-missing-name = It has no name
+
+interaction-preferences-nul = It contains a NUL character
+
+interaction-preferences-reserved = ${ $variable } is used by the shell or git; pick another name
+
+interaction-preferences-twice = ${ $variable } is asked for twice
+
+interaction-recipe-not-saved = The recipe isn't saved: { $problem }
+
+interaction-recipe-path = { $path }: { $reason }
+
+interaction-recipe-path-empty = empty path
+
+interaction-recipe-path-line = a path is one line
+
+interaction-recipe-path-outside = a path can't go out of the worktree (..)
+
+interaction-recipe-path-relative = give a path inside the worktree, relative to its top folder
+
+interaction-recipe-path-space = starts or ends with a space
+
+interaction-recipe-path-whole = that is the whole worktree
+
+interaction-recipe-variable-duplicate = Variable "{ $name }" is set twice
+
+interaction-recipe-variable-line = Variable "{ $name }": a value is one line
+
+interaction-recipe-variable-name = Variable "{ $name }": names are letters, digits and _, not starting with a digit
+
+interaction-recipe-variable-reserved = Variable "{ $name }": gitcraft sets that one itself, pick another name
+
+interaction-key-row-discard-current-hunk-confirmation = Discard current hunk (confirmation)
+
+interaction-key-row-unstage-current-hunk = Unstage current hunk
+
+interaction-key-row-stage-current-hunk = Stage current hunk
+
+interaction-key-row-open-selected-file-diff = Open selected file diff
+
+interaction-key-row-stage-or-unstage-selected-file = Stage or unstage selected file
+
+interaction-key-row-previous-file = Previous file
+
+interaction-key-row-next-file = Next file
+
+interaction-key-row-previous-change-alternate-binding = Previous change (alternate binding)
+
+interaction-key-row-next-change-alternate-binding = Next change (alternate binding)
+
+interaction-key-row-previous-change = Previous change
+
+interaction-key-row-next-change = Next change
+
+interaction-key-row-settings-next-page = Settings: next page
+
+interaction-key-row-settings-previous-page = Settings: previous page
+
+interaction-key-row-settings-focus-search = Settings: focus search
+
+interaction-key-row-rebase-drop = Rebase: drop
+
+interaction-key-row-rebase-fix-up = Rebase: fix up
+
+interaction-key-row-rebase-squash = Rebase: squash
+
+interaction-key-row-rebase-edit = Rebase: edit
+
+interaction-key-row-rebase-reword = Rebase: reword
+
+interaction-key-row-rebase-pick = Rebase: pick
+
+interaction-key-row-rebase-move-commit-down = Rebase: move commit down
+
+interaction-key-row-rebase-move-commit-up = Rebase: move commit up
+
+interaction-key-row-rebase-next-row = Rebase: next row
+
+interaction-key-row-rebase-previous-row = Rebase: previous row
+
+interaction-key-row-graph-lane-walk-cycle-merge-parent = Graph lane walk: cycle merge parent
+
+interaction-key-row-graph-lane-walk-jump-to-tip = Graph lane walk: jump to tip
+
+interaction-key-row-graph-next-commit = Graph: next commit
+
+interaction-key-row-graph-previous-commit = Graph: previous commit
+
+interaction-key-row-history-of-selected-lines = History of selected lines
+
+interaction-key-row-select-all-shown-lines = Select all shown lines
+
+interaction-key-row-copy-selected-lines = Copy selected lines
+
+interaction-key-row-find-previous-match = Find: previous match
+
+interaction-key-row-find-next-match = Find: next match
+
+interaction-key-row-files-copy-selected-path = Files: copy selected path
+
+interaction-key-row-files-view-selected-file = Files: view selected file
+
+interaction-key-row-files-blame-selected-file = Files: blame selected file
+
+interaction-key-row-files-history-of-selected-file = Files: history of selected file
+
+interaction-key-row-graph-copy-selected-commit-s-first-branch = Graph: copy selected commit's first branch
+
+interaction-key-row-graph-copy-selected-commit-message = Graph: copy selected commit message
+
+interaction-key-row-graph-copy-selected-commit-hash = Graph: copy selected commit hash
+
+interaction-key-row-commit-with-nothing-staged-everything-with-no-summary-yet-go-to-the-message = Commit; with nothing staged, everything; with no summary yet, go to the message. In a note editor, save the note
+
+interaction-key-row-stage-all-changes = Stage all changes
+
+interaction-key-row-show-or-hide-the-terminal-to-hide-it-from-inside-click-outside-it-first = Show or hide the terminal (to hide it from inside, click outside it first)
+
+interaction-key-row-create-a-branch-at-head = Create a branch at HEAD
+
+interaction-key-row-stash-all-changes = Stash all changes…
+
+interaction-key-row-push-the-current-branch = Push the current branch
+
+interaction-key-row-pull-the-current-branch = Pull the current branch
+
+interaction-key-row-fetch-all-remotes = Fetch all remotes
+
+interaction-key-row-focus-the-right-pane-and-its-files = Focus the right pane and its files
+
+interaction-key-row-focus-the-graph-or-diff = Focus the graph or diff
+
+interaction-key-row-focus-the-sidebar = Focus the sidebar
+
+interaction-key-row-forward-through-recent-views = Forward through recent views
+
+interaction-key-row-back-through-recent-views = Back through recent views
+
+interaction-key-row-search-the-shown-diff-file-blame-or-commits = Search the shown diff, file, blame or commits
+
+interaction-key-row-timeline-and-undo-tree = Timeline and undo tree
+
+interaction-key-row-redo = Redo
+
+interaction-key-row-undo = Undo
+
+interaction-key-row-this-manual = This manual
+
+interaction-key-row-reload-the-repository = Reload the repository
+
+interaction-key-row-settings = Settings
+
+interaction-key-row-command-palette-every-action-and-branch = Command palette: every action and branch
+
+interaction-key-row-go-to-the-last-tab = Go to the last tab
+
+interaction-key-row-go-to-tab-1-to-8 = Go to tab 1 to 8
+
+interaction-key-row-next-previous-tab-wrapping-around-ctrl-on-macos-too = Next / previous tab, wrapping around (Ctrl on macOS too)
+
+interaction-key-row-reopen-the-tab-closed-last = Reopen the tab closed last
+
+interaction-key-row-close-the-tab-or-middle-click-it = Close the tab (or middle-click it)
+
+interaction-key-row-new-tab = New tab
+
+interaction-key-action = Action
+
+interaction-control-select-change-press-up-to-four-keys-in-the-capture-control-then-tab-to-save = Select Change, press up to four keys in the capture control, then Tab to Save. Empty bindings disable an action. Escape cancels. Use Add Tab key or Add Shift+Tab key to include navigation keys in a shortcut.
+
+interaction-control-no-keys = No keys
+
+interaction-control-save-binding = Save binding
+
+interaction-control-clear-captured-keys = Clear captured keys
+
+interaction-control-cancel = Cancel
+
+interaction-control-add-tab-key = Add Tab key
+
+interaction-control-add-shift-tab-key = Add Shift+Tab key
+
+interaction-control-reset-all-shortcuts = Reset all shortcuts
+
+interaction-control-unbound = Unbound
+
+interaction-control-change = Change
+
+interaction-control-unbind = Unbind
+
+interaction-control-reset = Reset
+
+interaction-key-invalid-saved = Saved bindings are invalid; defaults are active: { $detail }
+
+interaction-key-capture = Capture shortcut: { $keys }
+
+interaction-control-invalid-key = Invalid key
+
+interaction-control-use-at-most-four-keys-in-a-chord = Use at most four keys in a chord
+
+interaction-control-escape-is-reserved-to-cancel-a-chord-or-editor = Escape is reserved to cancel a chord or editor
+
+interaction-key-unknown-action = Unknown action: { $id }
+
+interaction-key-unknown-key = Unknown key: { $key }
+
+interaction-key-conflict = { $first } conflicts with { $second } (same keys or chord prefix)
+
+interaction-control-chord-pending-escape-cancels = Chord pending · Escape cancels
+
+interaction-a11y-no-message = no message
+
+interaction-a11y-uncommitted-changes = Uncommitted changes
+
+interaction-a11y-added = added
+
+interaction-a11y-untracked = untracked
+
+interaction-a11y-modified = modified
+
+interaction-a11y-deleted = deleted
+
+interaction-a11y-renamed = renamed
+
+interaction-a11y-copied = copied
+
+interaction-a11y-type-changed = type changed
+
+interaction-a11y-conflicted = conflicted
+
+interaction-a11y-checked-out = checked out
+
+interaction-a11y-open = open
+
+interaction-a11y-closed = closed
+
+interaction-a11y-detached-head = detached HEAD
+
+interaction-a11y-draft = draft
+
+interaction-a11y-commit = commit { $hash }
+
+interaction-a11y-conflicts = { $count ->
+        [one] 1 conflict
+       *[other] { $count } conflicts
+        }
+
+interaction-a11y-staged = { $count } staged
+
+interaction-a11y-unstaged = { $count } unstaged
+
+interaction-a11y-from = from { $path }
+
+interaction-a11y-ahead = { $count } ahead
+
+interaction-a11y-behind = { $count } behind
+
+interaction-a11y-branch = branch { $name }
+
+interaction-a11y-changes = { $count ->
+        [one] 1 change
+       *[other] { $count } changes
+        }
+
+interaction-a11y-worktree = worktree { $path }
+
+interaction-a11y-pull-request = pull request { $number }
+
+interaction-a11y-submodule = submodule { $path }
+
+interaction-a11y-stash = stash { $number }
+
+interaction-control-show-gitcraft = Show gitcraft
+
+interaction-control-quit-gitcraft = Quit gitcraft
+
+interaction-control-gitcraft-is-still-running = gitcraft is still running
+
+interaction-control-this-desktop-has-no-available-tray-host-open-gitcraft-from-the-launcher-to- = This desktop has no available tray host. Open gitcraft from the launcher to show its window; use Quit gitcraft in its tab menu, or gitcraft --quit, to exit.
+
+interaction-control-save-and-quit-the-running-instance = Save and quit the running instance
+
+interaction-control-recent-repositories = Recent repositories
+
+interaction-control-gitcraft-repository-watcher = gitcraft — repository watcher
+
+interaction-watch-label-1 = Background network work is paused
+
+interaction-watch-label-2 = Background network work was paused
+
+interaction-watch-label-3 = Remote did not report a symbolic default branch
+
+interaction-watch-label-4 = Background work was stopped or paused
+
+interaction-watch-label-5 = Watcher deadline exceeded
+
+interaction-watch-label-6 = Watcher deadline exceeded; waiting for cancellation before retry
+
+interaction-watch-label-7 = Background job was cancelled
+
+interaction-watch-label-8 = Watcher paused: automatic fetch interval is zero
+
+interaction-watch-label-9 = Watcher disabled
+
+interaction-watch-label-10 = Default-branch checks failed
+
+interaction-watch-label-11 = gitcraft repository update
+
+interaction-watch-advance = { $count ->
+        [one] { $branch } moved 1 commit
+       *[other] { $branch } moved { $count } commits
+        }
+
+interaction-watch-review = Review requested: #{ $number } { $title }
+
+interaction-watch-checks = Checks failed: #{ $number } { $title }
+
+interaction-watch-branch-failed = Checks failed on { $branch }
+
+interaction-watch-unknown-default = Default branch is unknown: { $detail }
+
+interaction-watch-count = { $count ->
+        [one] Watching 1 repository
+       *[other] Watching { $count } repositories
+        }
+
+interaction-watch-retry = { $path }: { $detail } (will retry)
+
+interaction-watch-checking = Checking { $path }
+
+interaction-watch-repo-notice = { $repo }: { $text }
+
+interaction-watch-network-paused = { $reason } — background checks paused
+
+interaction-watch-no-host = No StatusNotifierWatcher: { $detail }
+
+interaction-network-label-1 = Offline
+
+interaction-network-label-2 = No connection
+
+interaction-network-label-3 = Metered network
+
+interaction-network-label-4 = Offline mode is on
+
+interaction-network-label-5 = The system reports no network connection
+
+interaction-network-label-6 = The network connection is metered
+
+interaction-manual-tip-21 = Interactive rebase reorders, rewords, squashes or drops commits.
+
+interaction-manual-tip-20 = A pull request's menu has Open in worktree, to work on it in a folder of its own.
+
+interaction-manual-tip-19 = Remote on the start page opens a repository in WSL or over SSH.
+
+interaction-manual-tip-18 = Ctrl+Shift+T reopens the tab closed last.
+
+interaction-manual-tip-17 = Right-click a tab to give it its own icon and highlight colour.
+
+interaction-manual-tip-16 = Profiles each have their own tabs, theme, git author and commit signing.
+
+interaction-manual-tip-15 = Conflicts open in a three-pane editor with Ours, Theirs and Both for each one.
+
+interaction-manual-tip-14 = Switch a diff from Diff to File to read the whole file.
+
+interaction-manual-tip-13 = Right-click a file for its history, its blame or the whole file at that commit.
+
+interaction-manual-tip-12 = Ctrl+P opens the command palette: every action, and every branch to check out.
+
+interaction-manual-tip-11 = Ctrl+Z undoes commits, merges, rebases, resets, checkouts, branches, tags and stashes.
+
+interaction-manual-tip-10 = Double-click a commit's message in the right pane to edit it.
+
+interaction-manual-tip-9 = F7 and Alt+↓ go to the next change of a diff; Shift+F7 and Alt+↑ to the previous one.
+
+interaction-manual-tip-8 = In a diff, click the lines you want to stage, unstage or discard only those.
+
+interaction-manual-tip-7 = Right-click the graph's column header to pick its columns or make the graph compact.
+
+interaction-manual-tip-6 = Search can look in the code: switch it to Code to find the commits that added some text.
+
+interaction-manual-tip-5 = Right-click a commit or a pill for merge, rebase, cherry-pick, revert, reset and more.
+
+interaction-manual-tip-4 = Hover a branch and click its eye to hide it from the graph; Solo shows only that one.
+
+interaction-manual-tip-3 = A branch's menu has “Changes x adds to main”: what it changed, like a pull request.
+
+interaction-manual-tip-2 = Ctrl+click a second commit to list the files that differ between the two.
+
+interaction-manual-tip-1 = Double-click a branch pill to check that branch out.
+
+interaction-manual-shortcut-pick-lines-of-a-file-to-link-to-view-file-or-file-in-a-commit-s-diff = Pick lines of a file to link to (View file, or File in a commit's diff)
+
+interaction-manual-shortcut-merge-rebase-fast-forward-cherry-pick-move-or-squash = Merge, rebase, fast-forward, cherry-pick, move or squash
+
+interaction-manual-shortcut-copy-the-selection-without-one-it-goes-to-the-shell = Copy the selection (without one, it goes to the shell)
+
+interaction-manual-shortcut-pick-lines-in-a-diff-or-a-file-or-a-range-of-them = Pick lines in a diff or a file, or a range of them
+
+interaction-manual-shortcut-next-previous-match-while-the-find-bar-is-open = Next / previous match (while the find bar is open)
+
+interaction-manual-shortcut-close-the-find-bar-diff-comparison-or-search = Close the find bar, diff, comparison or search
+
+interaction-manual-shortcut-preview-the-result-in-the-graph-ghost-run = Preview the result in the graph (ghost run)
+
+interaction-manual-shortcut-next-previous-button-row-or-field = Next / previous button, row or field
+
+interaction-manual-shortcut-back-forward-through-recent-views = Back / forward through recent views
+
+interaction-manual-shortcut-alt-over-rebase-reset-hard-pull = Alt over Rebase, Reset hard, Pull…
+
+interaction-manual-shortcut-compare-with-the-selected-commit = Compare with the selected commit
+
+interaction-manual-shortcut-click-the-focused-button-or-row = Click the focused button or row
+
+interaction-manual-shortcut-pick-it-to-stash-or-unpick-it = Pick it to stash (or unpick it)
+
+interaction-manual-shortcut-filter-the-recent-repositories = Filter the recent repositories
+
+interaction-manual-shortcut-next-previous-search-result = Next / previous search result
+
+interaction-manual-group-find-in-a-diff-file-or-blame = Find in a diff, file or blame
+
+interaction-manual-shortcut-check-out-that-branch-or-tag = Check out that branch or tag
+
+interaction-manual-shortcut-pick-a-recent-repository = Pick a recent repository
+
+interaction-manual-shortcut-pick-a-search-suggestion = Pick a search suggestion
+
+interaction-manual-shortcut-then-tab-or-enter = ↑ / ↓ then Tab or Enter
+
+interaction-manual-shortcut-drag-a-pill-or-a-commit = Drag a pill or a commit
+
+interaction-manual-shortcut-mouse-back-forward = Mouse back / forward
+
+interaction-manual-group-keyboard-navigation = Keyboard navigation
+
+interaction-manual-shortcut-open-the-one-picked = Open the one picked
+
+interaction-manual-shortcut-double-click-a-pill = Double-click a pill
+
+interaction-manual-shortcut-click-shift-click = Click / Shift+click
+
+interaction-manual-shortcut-close-the-find-bar = Close the find bar
+
+interaction-manual-shortcut-copy-the-selection = Copy the selection
+
+interaction-manual-shortcut-clear-the-filter = Clear the filter
+
+interaction-manual-shortcut-cmd-click-a-file = Cmd+click a file
+
+interaction-manual-group-start-page = Start page
+
+interaction-manual-shortcut-cmd-click = Cmd+click
+
+interaction-manual-group-terminal = Terminal
+
+interaction-manual-group-changes = Changes
+
+interaction-manual-group-graph = Graph
+
+interaction-manual-shortcut-type = Type
+
+interaction-manual-group-window = Window
+
+interaction-manual-group-repository = Repository
+
+interaction-manual-group-contextual-actions = Contextual actions
+
+interaction-manual-shortcut-heading = { $group } shortcuts
+
+interaction-error-title-trust = git doesn't trust this folder
+
+interaction-error-title-lock = Another git seems to be at work here
+
+interaction-error-title-to-crlf = git changes line endings here (LF to CRLF)
+
+interaction-error-title-to-lf = git changes line endings here (CRLF to LF)
+
+interaction-error-title-path = A path is too long
+
+interaction-error-title-certificate = The server's certificate couldn't be checked
+
+interaction-error-title-too-large = The server refused a request this large (HTTP 413)
+
+interaction-error-title-transfer = The connection broke during the transfer
+
+interaction-error-title-histories = These histories have nothing in common
+
+interaction-error-title-shallow = A shallow clone can't push here
+
+interaction-error-title-ssh = The SSH server didn't accept your key
+
+interaction-error-trust-advice = Trust this folder adds this folder, and only this one, to safe.directory in your global git config. Only do that if you know where the repository came from.
+
+interaction-error-lock-advice = Remove it only when no git is working in this repository.
+
+interaction-error-long-windows = Windows limits paths to 260 characters unless a program asks for longer ones. core.longpaths makes git ask: Enable long paths sets it for this repository.
+
+interaction-error-long-other = A name in it is longer than this machine's file system takes (255 bytes per name on most). git can't change that: rename the file from a machine that can check it out, or leave its folder out with a sparse checkout.
+
+interaction-error-large-advice = The server, or a proxy in front of it, limits how large a request may be. Push fewer commits at a time (an older commit first: git push origin <commit>:refs/heads/<branch> in the terminal), keep large files in Git LFS, or ask the server's administrator to raise the limit (client_max_body_size on nginx).
+
+interaction-error-transfer-advice = The server or the network stopped before the transfer was done (RPC failed, early EOF): often a proxy or server limit on long HTTPS requests, or an unreliable network. Try again. If it keeps failing, the repository's SSH address avoids the HTTP proxy and its limits; for a clone, git clone --depth 1 transfers less at once.
+
+interaction-error-histories-why = The branch being merged shares no commit with yours: usually a repository made twice (git init here, and a new repository with a README on the forge), or the wrong remote.
+
+interaction-error-histories-advice = If they are meant to be joined, run git pull --allow-unrelated-histories (or git merge --allow-unrelated-histories) in the terminal; otherwise check the remote's URL.
+
+interaction-error-shallow-advice = This clone has only part of the history (it was cloned with --depth), and the remote takes pushes only from clones that have all of it. Fetch the rest with git fetch --unshallow in the terminal, then push again.
+
+interaction-error-autocrlf-advice = core.autocrlf, wherever it is set (see below), applies to every repository it covers: true turns LF into CRLF when files are checked out and back into LF when they are committed (the usual choice on Windows); input turns CRLF into LF when committing and changes nothing on checkout; false leaves line endings alone.
+
+interaction-error-attributes-advice = .gitattributes, committed with the repository, is the same for everyone who clones it: * text=auto has text files stored with LF (which files are text, git decides); eol=lf or eol=crlf on a pattern gives those files that ending on checkout everywhere, and -text leaves them alone. eol= and -text win over core.autocrlf; text=auto alone still leaves the checkout ending to core.autocrlf.
+
+interaction-error-safecrlf-advice = core.safecrlf is set, so git refused rather than warned: change core.autocrlf or the file's .gitattributes rule, or unset core.safecrlf.
+
+interaction-error-windows-certificates = Git for Windows checks certificates against its own list by default. With http.sslBackend = schannel it uses Windows' certificate store instead, where your IT department adds its certificate (a self-signed server certificate has to be imported there first; http.sslCAInfo no longer applies then): Use Windows' certificates sets that in your global git config.
+
+interaction-error-other-certificates = Add the certificate authority to this machine's trusted ones, or point git at it with http.sslCAInfo. Turning http.sslVerify off would accept any server, an impostor too.
+
+interaction-error-remote-keys = The repository is on another machine, so it is that machine's keys and agent that count.
+
+interaction-error-server = The server
+
+interaction-error-trust-why = { $path } belongs to another user account (copied from another machine, on a drive formatted elsewhere, or on a network share). git refuses to work in such a folder, since its config could run programs as you.
+
+interaction-error-lock-why = git keeps { $lock } while it changes the repository and removes it when it is done. It is still there: either another git is working in this repository (an editor opened by git commit, an IDE, a terminal), or one crashed and left it behind.
+
+interaction-error-tls-why = TLS said: { $detail }. Usually a company network or proxy that signs HTTPS with its own certificate authority, or a server with a self-signed certificate.
+
+interaction-error-ssh-why = { $who } took none of the keys ssh offered. See what it says to { $test } in the terminal; load your key into the agent (ssh-add), or add its public key (~/.ssh/id_ed25519.pub) to your account on the forge.
+
+interaction-error-files = { $more ->
+        [0] Files: { $files }.
+       *[other] Files: { $files } and { $more } more.
+    }
+
+interaction-error-age-short = less than a minute
+
+interaction-error-age-minute = { $count ->
+        [one] { $count } minute
+       *[other] { $count } minutes
+    }
+
+interaction-error-age-hour = { $count ->
+        [one] { $count } hour
+       *[other] { $count } hours
+    }
+
+interaction-error-age-day = { $count ->
+        [one] { $count } day
+       *[other] { $count } days
+    }
+
+interaction-error-age-week = { $count ->
+        [one] { $count } week
+       *[other] { $count } weeks
+    }
+
+interaction-error-age-month = { $count ->
+        [one] { $count } month
+       *[other] { $count } months
+    }
+
+interaction-error-age-year = { $count ->
+        [one] { $count } year
+       *[other] { $count } years
+    }
+
+interaction-error-remove-lock = Remove stale lock
+
+interaction-error-trust-folder = Trust this folder
+
+interaction-error-long-paths = Enable long paths
+
+interaction-error-use-certificates = Use Windows' certificates
+
+interaction-error-fix = Fix it
+
+interaction-error-not-set = it isn't set now
+
+interaction-error-cannot-undo = Removing a lock can't be undone
+
+interaction-error-no-git = No other git is running on this machine.
+
+interaction-error-repo-config = the repository's config
+
+interaction-error-autocrlf-unset = core.autocrlf isn't set here, which is false: git leaves line endings as they are unless .gitattributes says otherwise.
+
+interaction-error-confirm-add = Adds { $line } to { $file }. Undo, on this card, takes it out again.
+
+interaction-error-confirm-set = Sets { $line } in { $file } ({ $previous }). Undo, on this card, puts it back.
+
+interaction-error-confirm-remove = Removes { $lock }, last written { $age } ago. A lock holds nothing to keep, so there is no undo; a git still using it would fail.
+
+interaction-error-removed = Removed { $lock }.
+
+interaction-error-undo-add = Took { $line } out of { $file } again.
+
+interaction-error-undo-value = Set { $key } back to { $value } in { $file }.
+
+interaction-error-undo-unset = Unset { $key } in { $file } again.
+
+interaction-error-already-trusted = { $file } lists this folder in safe.directory already, so git still refusing means the path git checks is spelled another way (a trailing slash, letter case, a network share's %(prefix)/ form): compare it with What git said.
+
+interaction-error-lock-gone = { $lock } is gone now: the git that held it is done, and nothing is left to remove.
+
+interaction-error-lock-age = { $lock } was last written { $age } ago.
+
+interaction-error-process-check-failed = Whether git is running couldn't be checked: { $error }.
+
+interaction-error-local-wins = { $key } is { $value } in { $there }, which wins over { $file }: change it there.
+
+interaction-error-already-set = { $key } is { $value } in { $file } already, so that isn't it.
+
+interaction-error-autocrlf-value = core.autocrlf is { $value } here (set in { $origin }).
+
+interaction-error-autocrlf-error = core.autocrlf couldn't be read: { $error }.
+
+interaction-error-no-attributes = No .gitattributes rule covers { $file }.
+
+interaction-error-attributes-value = .gitattributes gives { $file }: { $attributes }.
+
+interaction-error-attributes-error = The .gitattributes rules for { $file } couldn't be read: { $error }.
+
+interaction-error-current-value = it is { $value } now
+
+interaction-error-added = Added { $line } to { $file }.
+
+interaction-error-set = Set { $line } in { $file }.
+
+interaction-error-running = git is running on this machine: { $processes }. If one is working in this repository, let it finish (or close the editor it opened) instead.
+
+interaction-error-running-with-ours = git is running on this machine: { $processes }. Some may be gitcraft's own, reading the repository. If one is working in this repository, let it finish (or close the editor it opened) instead.
+
+interaction-error-close = Close
+
+interaction-error-looking = Looking closer…
+
+interaction-error-git-said = What git said
+
+interaction-error-retry = Try again
+
+interaction-error-cancel = Cancel
+
+interaction-error-working = Working…
+
+interaction-error-undo = Undo
+
+interaction-error-back = Back
+
+interaction-error-undo-earlier = Undo that
+
+interaction-error-look-error = Couldn't look closer: { $error }
+
+interaction-error-earlier = Earlier: { $what }
+
+interaction-error-undo-stopped = Internal error: the undo stopped before it was done
+
+interaction-error-check-stopped = Internal error: the check stopped before it was done
+
+interaction-error-undo-failed = Undo failed: { $error }
+
+interaction-home-inbox-heading = PULL REQUESTS FOR YOU
+
+interaction-home-ask-again = Ask again, every forge (connects to other machines)
+
+interaction-home-all-clear = Nothing waits for you: no review asked of you, and yours have no failing checks or comments you haven't seen.
+
+interaction-home-fewer = Show fewer
+
+interaction-home-unread = Not everything was read: hover for what
+
+interaction-home-open-tab = Click to open it in its repository's tab
+
+interaction-home-open-browser = Click to open it in the browser
+
+interaction-home-pick-existing = Open a git repository
+
+interaction-home-pick-new = Choose a folder for the new repository
+
+interaction-home-open = Open
+
+interaction-home-open-description = An existing local repository
+
+interaction-home-create = Create
+
+interaction-home-create-description = A new, empty repository
+
+interaction-home-clone = Clone
+
+interaction-home-clone-description = Copy a remote repository
+
+interaction-home-remote = Remote
+
+interaction-home-remote-description = In WSL or over SSH
+
+interaction-home-scan = Scan a folder for repositories…
+
+interaction-home-practice = Practice git…
+
+interaction-home-practice-tip = Real throwaway repositories with goals and checks
+
+interaction-home-export-setup = Export setup…
+
+interaction-home-import-setup = Import setup…
+
+interaction-home-app-menu = Add gitcraft to the applications menu
+
+interaction-home-git-missing = Git was not found
+
+interaction-home-git-install = gitcraft uses the git command line. Install git and make sure `git` is on your PATH.
+
+interaction-home-git-recheck = Check again
+
+interaction-home-git-download = Download git
+
+interaction-home-filter = Type to filter
+
+interaction-home-recent = RECENT
+
+interaction-home-remove = Remove from list
+
+interaction-home-dirty = Uncommitted changes
+
+interaction-home-window-drag = Drag to move the window, double-click to maximize it
+
+interaction-home-minimize = Minimize
+
+interaction-home-maximize = Maximize
+
+interaction-home-restore = Restore down
+
+interaction-home-close = Close
+
+interaction-home-connecting = Connecting to { $place }…
+
+interaction-home-init-error = git init failed: { $error }
+
+interaction-home-no-match = No recent repository matches “{ $query }”
+
+interaction-home-show-more = Show { $count } more
+
+interaction-home-ask-failed = { $count ->
+        [one] Couldn't ask 1 forge: hover for why
+       *[other] Couldn't ask { $count } forges: hover for why
+    }
+
+interaction-home-inbox-a11y = { $forge } { $noun } { $number }: { $title }, by { $author }, { $project }. { $reasons }
+
+interaction-home-pr-draft-title = #{ $number } Draft · { $title }
+
+interaction-home-pr-title = #{ $number } { $title }
+
+interaction-home-window-grip = Window grip. Enter to maximize or restore; drag to move
+
+interaction-settings-label-ai = AI
+
+interaction-settings-label-accent-colour = Accent colour
+
+interaction-settings-label-add-gitcraft-to-an-agent = Add gitcraft to an agent
+
+interaction-settings-label-after-success = After success
+
+interaction-settings-label-agents = Agents
+
+interaction-settings-label-agents-may-change-repositories = Agents may change repositories
+
+interaction-settings-label-also-fold = Also fold
+
+interaction-settings-label-appearance = Appearance
+
+interaction-settings-label-applications-menu = Applications menu
+
+interaction-settings-label-avatars = Avatars
+
+interaction-settings-label-behaviour = Behaviour
+
+interaction-settings-label-branch-column-width = Branch column width
+
+interaction-settings-label-changed-files = Changed files
+
+interaction-settings-label-changes-by-agents = Changes by agents
+
+interaction-settings-label-channel = Channel
+
+interaction-settings-label-check-now = Check now
+
+interaction-settings-label-code-colours = Code colours
+
+interaction-settings-label-columns = Columns
+
+interaction-settings-label-commit-graph = Commit graph
+
+interaction-settings-label-commit-prompt = Commit prompt
+
+interaction-settings-label-commit-signing = Commit signing
+
+interaction-settings-label-conflict-editor = Conflict editor
+
+interaction-settings-label-corners = Corners
+
+interaction-settings-label-custom-command = Custom command
+
+interaction-settings-label-custom-commands = Custom commands
+
+interaction-settings-label-default-shell = Default shell
+
+interaction-settings-label-diff-algorithms = Diff algorithms
+
+interaction-settings-label-diff-context = Diff context
+
+interaction-settings-label-diff-layout = Diff layout
+
+interaction-settings-label-diff-tool = Diff tool
+
+interaction-settings-label-diffs = Diffs
+
+interaction-settings-label-diffs-and-files = Diffs and files
+
+interaction-settings-label-editor-command = Editor command
+
+interaction-settings-label-email = Email
+
+interaction-settings-label-explanatory-motion = Explanatory motion
+
+interaction-settings-label-external-tools = External tools
+
+interaction-settings-label-fetch-in-the-background = Fetch in the background
+
+interaction-settings-label-fold-generated-files = Fold generated files
+
+interaction-settings-label-folder = Folder
+
+interaction-settings-label-font-size = Font size
+
+interaction-settings-label-forgejo-gitea-login = Forgejo / Gitea login
+
+interaction-settings-label-format = Format
+
+interaction-settings-label-general = General
+
+interaction-settings-label-git = Git
+
+interaction-settings-label-git-author = Git author
+
+interaction-settings-label-git-file-tools = Git file tools
+
+interaction-settings-label-git-merges = Git merges
+
+interaction-settings-label-graph-feedback = Graph feedback
+
+interaction-settings-label-https-sign-ins = HTTPS sign-ins
+
+interaction-settings-label-host-namespace = Host / namespace
+
+interaction-settings-label-identities = Identities
+
+interaction-settings-label-in-use = In use
+
+interaction-settings-label-installed = Installed
+
+interaction-settings-label-keyboard-shortcuts = Keyboard shortcuts
+
+interaction-settings-label-lane-colours = Lane colours
+
+interaction-settings-label-lanes = Lanes
+
+interaction-settings-label-largest-diff-sent = Largest diff sent
+
+interaction-settings-label-merge-tool = Merge tool
+
+interaction-settings-label-mergiraf = Mergiraf
+
+interaction-settings-label-name = Name
+
+interaction-settings-label-needs = Needs
+
+interaction-settings-label-network = Network
+
+interaction-settings-label-new-expectation = New expectation
+
+interaction-settings-label-new-versions = New versions
+
+interaction-settings-label-notifications = Notifications
+
+interaction-settings-label-offline = Offline
+
+interaction-settings-label-outgoing-author-per-host = Outgoing author per host
+
+interaction-settings-label-pinned = Pinned
+
+interaction-settings-label-portable-mode = Portable mode
+
+interaction-settings-label-previous-version = Previous version
+
+interaction-settings-label-profile = Profile
+
+interaction-settings-label-profile-s-commit-signing = Profile's commit signing
+
+interaction-settings-label-profile-s-connections = Profile's connections
+
+interaction-settings-label-github-account = GitHub account
+
+interaction-settings-label-gitlab-account = GitLab account
+
+interaction-settings-label-program = Program
+
+interaction-settings-label-pull = Pull
+
+interaction-settings-label-quiet-celebrations = Quiet celebrations
+
+interaction-settings-label-register-gitcraft = Register gitcraft
+
+interaction-settings-label-remote-machines = Remote machines
+
+interaction-settings-label-repository-commands = Repository commands
+
+interaction-settings-label-resident-watcher = Resident watcher
+
+interaction-settings-label-review-prompt = Review prompt
+
+interaction-settings-label-ssh-private-key = SSH private key
+
+interaction-settings-label-ssh-sign-ins = SSH sign-ins
+
+interaction-settings-label-shortened-branch-names = Shortened branch names
+
+interaction-settings-label-sign-by-default = Sign by default
+
+interaction-settings-label-sign-ins = Sign-ins
+
+interaction-settings-label-signing = Signing
+
+interaction-settings-label-signing-key = Signing key
+
+interaction-settings-label-stale-branches = Stale branches
+
+interaction-settings-label-submodules = Submodules
+
+interaction-settings-label-terminal = Terminal
+
+interaction-settings-label-theme = Theme
+
+interaction-settings-label-tips = Tips
+
+interaction-settings-label-title-bar = Title bar
+
+interaction-settings-label-tool = Tool
+
+interaction-settings-label-topology-navigation = Topology navigation
+
+interaction-settings-label-updates = Updates
+
+interaction-settings-label-variables = Variables
+
+interaction-settings-label-version = Version
+
+interaction-settings-label-worktrees = Worktrees
+
+interaction-settings-label-your-themes = Your themes
+
+interaction-settings-label-zoom = Zoom
+
+interaction-settings-label-settings = Settings
+
+interaction-settings-label-search-results = Search results
+
+interaction-settings-install = Install
+
+interaction-settings-other-ways = Other ways
+
+interaction-settings-not-installed = Not installed
+
+interaction-settings-mergiraf-download = Download the latest Mergiraf for this system from its releases on codeberg.org into gitcraft's folder. It stays Mergiraf's (GPL-3.0); gitcraft only runs it.
+
+interaction-settings-mergiraf-offer = Offer Mergiraf's answer
+
+interaction-settings-mergiraf-editor = Mergiraf solves conflicts from the syntax of the code, in many languages. Its answer shows in the editor; nothing is saved before you check it.
+
+interaction-settings-mergiraf-every-merge = Use it in every git merge
+
+interaction-settings-mergiraf-global = Git merges, rebases and cherry-picks go through Mergiraf, in every repository on this machine and in the terminal too, so fewer conflicts are left at all (not in WSL or over SSH, where git is that machine's). Sets merge.mergiraf in your global git config and adds a marked block to your global attributes file (also merge.conflictStyle = diff3, if you set none); unticking takes them out again.
+
+interaction-settings-celebration-motion = Short visual flourish
+
+interaction-settings-celebration-sound = Soft celebration sound
+
+interaction-settings-celebration-note = Opt-in acknowledgements for a first repository commit, a tag marked as a release, or a completed merge. Motion follows the system preference.
+
+interaction-settings-audio-unavailable = Audio unavailable
+
+interaction-settings-retry-audio = Retry audio
+
+interaction-settings-same-tab = Open in the same tab
+
+interaction-settings-same-tab-tip = The tab moves to the worktree and shows its branch, which also opens a list to switch between them. What you leave behind keeps running: terminals, operations, a half-written commit message.
+
+interaction-settings-notify-when = When a long operation ends in the background
+
+interaction-settings-resident = Keep gitcraft running when its window closes
+
+interaction-settings-resident-policy = Keeps recent repositories fetched and reports new reviews, failed checks and default-branch changes. Uses this profile; offline and metered policies still apply.
+
+interaction-settings-tray-ready = Tray icon available. Use its Show or Quit action.
+
+interaction-settings-tray-starting = Starting the native tray item…
+
+interaction-settings-remove-app = Remove gitcraft
+
+interaction-settings-add-app = Add gitcraft
+
+interaction-settings-appimage-note = Starts this AppImage; follows it when you replace it
+
+interaction-settings-check-updates = Check for updates
+
+interaction-settings-pinned-tip = Pinned to this version: unpin it to look for updates
+
+interaction-settings-looking = Looking…
+
+interaction-settings-newest = This is the newest version
+
+interaction-settings-updates-start = Look for a new version on GitHub on every start
+
+interaction-settings-updates-download = Download it in the background, ready to install with a restart
+
+interaction-settings-theme-scope = Each profile has its own theme; the accent and corners are for all.
+
+interaction-settings-tabs-title = Tabs in the title bar
+
+interaction-settings-tabs-title-tip = The tabs take the place of the system's title bar, as in a browser: drag the space next to them to move the window, double-click it to maximize, and the buttons to minimize, maximize and close are at the end of the strip.
+
+interaction-settings-button-place = Where its button sits: in the title bar, or in the footer of a repository's left or right panel. Drag the button itself to put it anywhere along them.
+
+interaction-settings-vscode-use = Use VS Code's colour theme
+
+interaction-settings-vscode-tip = Colours code in diffs and blame like your editor does
+
+interaction-settings-vscode-missing = No VS Code theme found
+
+interaction-settings-avatars-load = Load from the forge or Gravatar
+
+interaction-settings-avatars-tip = On a GitHub, Forgejo or Gitea repository, its commit list says which account each author is; on GitLab, the host is asked by email. Other authors: an MD5 hash of the email goes to gravatar.com. Cached on disk.
+
+interaction-settings-unified = Unified
+
+interaction-settings-side-by-side = Side by side
+
+interaction-settings-around-changes = Around the changes
+
+interaction-settings-whole-file = The whole file
+
+interaction-settings-folders = In folders
+
+interaction-settings-one-list = One list
+
+interaction-settings-ref-transitions = Short ref transitions and smooth navigation
+
+interaction-settings-reduced-motion-note = Respects system reduced motion. Incoming markers remain readable without animation.
+
+interaction-settings-walk-topology = Walk graph topology
+
+interaction-settings-graph-sounds = Soft sounds for merges and lane crossings
+
+interaction-settings-fit-refs = Fit visible refs
+
+interaction-settings-keep-end = Keep end (…xyz)
+
+interaction-settings-keep-start = Keep start (xyz…)
+
+interaction-settings-columns-tip = Or right-click the graph's header
+
+interaction-settings-author = Author
+
+interaction-settings-when = When
+
+interaction-settings-date = Date
+
+interaction-settings-hash = Hash
+
+interaction-settings-tests = Tests
+
+interaction-settings-diff-below = Show diffs below the graph
+
+interaction-settings-diff-below-tip = A diff of a commit or of the working tree opens below the graph instead of in its place; the button in a diff's header switches it too.
+
+interaction-settings-compact = Compact graph
+
+interaction-settings-fetch-off = 0 turns it off
+
+interaction-settings-offline = Offline mode
+
+interaction-settings-metered = Pause background work on a metered connection
+
+interaction-settings-submodules-update = Keep submodules up to date
+
+interaction-settings-submodules-tip = After a checkout, pull, merge or rebase in a repository with submodules, run git submodule update --init --recursive, so each one is at the commit the repository now records.
+
+interaction-settings-days = { " " }days
+
+interaction-settings-stale-tip = A local branch with no commit for this long is marked Stale in the sidebar and offered by Select stale or merged branches…
+
+interaction-settings-stale-off = 0 marks none
+
+interaction-settings-editor-hint = Opens a folder or file
+
+interaction-settings-editor-tip = Run with a folder or file path, e.g. code, subl, idea
+
+interaction-settings-mergiraf-intro = Solves merge conflicts from the syntax of the code.
+
+interaction-settings-git-tools-intro = Use gitcraft as Git's difftool and mergetool.
+
+interaction-settings-remote-intro = Repositories in WSL or over SSH run git there, with that machine's own git config: the settings above that write this machine's global git config, and a profile's author and signing, don't reach it.
+
+interaction-settings-remember-hint = Kept with "Remember connection"
+
+interaction-settings-forget-logins = Forget saved sign-ins
+
+interaction-settings-forget-tip = Takes every SSH password and passphrase gitcraft saved out of the system's credential store
+
+interaction-settings-system-default = System default
+
+interaction-settings-identities-intro = Name and email pairs you can apply to a repository from its commit box. That sets them in the repository's own config, where they win over the profile's author.
+
+interaction-settings-work-hint = Work
+
+interaction-settings-name-hint = Name
+
+interaction-settings-remove = Remove
+
+interaction-settings-add-identity = Add identity
+
+interaction-settings-none-yet = None yet
+
+interaction-settings-unpin = Unpin
+
+interaction-settings-unpin-tip = Look for new versions again, as the update settings say
+
+interaction-settings-generated = Start them folded
+
+interaction-settings-generated-tip = Files marked linguist-generated or -diff in .gitattributes, lockfiles (Cargo.lock, package-lock.json, yarn.lock…) and minified files start folded in file lists and diffs. One click opens them.
+
+interaction-settings-fold-hint = Glob patterns of your own
+
+interaction-settings-fold-pattern-tip = Separated by commas or spaces. A pattern without a / matches the file's name; one with a / its whole path, where * stays within a folder and ** goes through folders; one ending in / everything in that folder.
+
+interaction-settings-diff-default = git's default for every file type; pick one in a diff's header
+
+interaction-settings-forget = Forget
+
+interaction-settings-diff-note = Diffs read from now on use what is listed
+
+interaction-settings-tips-show = Show tips
+
+interaction-settings-hints-again = Show the hints again
+
+interaction-settings-hints-again-tip = The first-time hints already shown come back once more
+
+interaction-settings-portable-folder = Settings, open tabs, profiles and their git config files, the avatar cache, downloaded updates and Mergiraf are kept here, next to gitcraft.
+
+interaction-settings-portable-credentials = Remember SSH sign-ins in this computer's credential store
+
+interaction-settings-portable-credentials-note = Off: SSH passwords and passphrases are asked again after a restart. Those already saved stay until you forget them (Forget saved SSH sign-ins, with this on).
+
+interaction-settings-agent-register-intro = Run one of these once; it adds gitcraft for every project. The agent then starts gitcraft mcp in the repository it works in, and can read the graph, status, diffs, blame, conflicts, builds and pull requests.
+
+interaction-settings-copy-command = Copy the command
+
+interaction-settings-agent-changes-intro = Each change is a step of the repository's undo list, marked with a robot. A push, deleting a branch, a hard reset, dropping a commit or staging a conflicted file waits for you to approve it.
+
+interaction-settings-agent-writes = Stage, commit, branch, check out, stash and more
+
+interaction-settings-agent-writes-tip = Each runs in the repository's tab as a step of its undo list, marked with a robot: Ctrl+Z undoes it. A push, deleting a branch, a hard reset or dropping a commit waits for you to approve it first. Unticked, agents can only read.
+
+interaction-settings-agent-needs = Changes need the repository open in a tab of this window; reading works without it
+
+interaction-settings-finder-note = History in gitcraft and Blame in gitcraft under Quick Actions in Finder's menu of files. They may show only after you log in again.
+
+interaction-settings-files-note = History in gitcraft and Blame in gitcraft under Scripts in the Files menu of files. Dolphin has them from the .deb and .rpm packages.
+
+interaction-settings-remove-file-menu = Remove History and Blame
+
+interaction-settings-add-file-menu = Add History and Blame
+
+interaction-settings-open-page = Open this page
+
+interaction-settings-clear = Clear (Esc)
+
+interaction-settings-offline-tip = Nothing goes on the network by itself (background fetch, avatars, update checks, build and pull request polling), and Fetch, Pull, Push and the like say why they don't run instead of waiting for a network that isn't there.
+
+interaction-settings-metered-tip = When the system says the connection is metered (Windows: a metered or roaming network; Linux: NetworkManager), the background fetch, avatars, update checks and downloads and the polling of builds and pull requests wait (a repository over SSH still fetches: on that machine's network). What you ask for still runs.
+
+interaction-settings-tips-tooltip = A “Did you know” line under the graph, and a one-line hint the first time you do something that has a shortcut
+
+interaction-settings-mergiraf-version = { $version } (downloaded by gitcraft)
+
+interaction-settings-tray-fallback = Tray unavailable: { $why }. Reopen from the launcher; Quit from the tab menu or gitcraft --quit.
+
+interaction-settings-update-channel = Looks on GitHub for a newer version on the { $channel } channel
+
+interaction-settings-update-found = gitcraft { $version } is out: see the bar at the top
+
+interaction-settings-network-paused = { $reason }: background work is paused.
+
+interaction-settings-forward = Go forward to { $version }
+
+interaction-settings-back = Go back to { $version }
+
+interaction-settings-forward-tip = Restarts as gitcraft { $version }, the newer version kept when you went back; the open tabs stay, and updates are offered again.
+
+interaction-settings-back-tip = Restarts as { $version }, kept by the last update; the open tabs stay. No update is offered until you unpin it.
+
+interaction-settings-staying = Staying on gitcraft { $version }
+
+interaction-settings-file-menu-error = Couldn't change it: { $error }
+
+interaction-settings-open-page-a11y = Open the { $page } page
+
+interaction-settings-hints-seen = { $count ->
+        [one] { $count } hint seen
+       *[other] { $count } hints seen
+    }
+
+interaction-settings-vscode-dark = { $theme } is dark: gitcraft's colours meanwhile
+
+interaction-settings-vscode-light = { $theme } is light: gitcraft's colours meanwhile
+
+interaction-settings-search-matches = { $count ->
+        [0] Nothing matches “{ $query }”.
+        [one] 1 setting matches “{ $query }”.
+       *[other] { $count } settings match “{ $query }”.
+    }
+
+interaction-settings-search = Search
+
+interaction-tools-external-intro = Open in diff tool and Resolve in merge tool (a file's right-click menu, the conflict editor) start one of these and refresh the view when it closes. In WSL, a preset is the Windows program, given the files through \\wsl.localhost; over SSH, the tool runs on that machine and has to be installed there.
+
+interaction-tools-git-tool = As set in git ({ $key })
+
+interaction-tools-diff-fallback = The tool your git config names in diff.tool, or else merge.tool
+
+interaction-tools-merge-fallback = The tool your git config names in merge.tool
+
+interaction-tools-program-help = The program of this machine to run, when it isn't found by itself (on the PATH, or in Program Files on Windows and for WSL repositories, where it is the Windows .exe). Over SSH it isn't used: the tool there is found by git of that machine (its mergetool.<tool>.path).
+
+interaction-tools-program-hint = Found by itself, or the full path of { $program }
+
+interaction-tools-off = Off
+
+interaction-tools-custom = Custom command
+
+interaction-tools-no-tool = no tool
+
+interaction-tools-your-command = your command
+
+interaction-tools-ai-intro = The sparkles button in the commit box asks an AI command-line tool you already have for a commit message, and Review this branch in a branch's menu asks it for a review. It runs on the repository's machine (here, in WSL or over SSH) with its own sign-in: gitcraft keeps no API key. A message is sent the staged changes and your latest commit summaries; a review, the branch's commits and what it changes; each with its prompt below.
+
+interaction-tools-off-choice = Off
+
+interaction-tools-not-found = { $tool } — not found on this machine
+
+interaction-tools-looking = Looking for them on this machine…
+
+interaction-tools-none-found = None of claude, codex or gh copilot is on this machine's PATH
+
+interaction-tools-found = On this machine: { $tools }
+
+interaction-tools-again = Look again
+
+interaction-tools-reads-prompt = Reads the prompt, prints the answer
+
+interaction-tools-custom-help = Run by sh (cmd on Windows) in the repository's folder, on its machine. The prompt comes on its input; what it prints is the answer.
+
+interaction-tools-off-until = Off until a command is set
+
+interaction-tools-rest-named = The rest is named, with its line counts
+
+interaction-tools-conventions = { "{conventions}" } says how the repository's latest summaries are written (Conventional Commits when most of them are); { "{left_out}" } lists the files whose diff didn't fit.
+
+interaction-tools-restore = Restore default
+
+interaction-tools-no-diff = No { "{diff}" }: the changes go at the end
+
+interaction-tools-ssh-key = ~/.ssh/id_ed25519.pub, or key::ssh-ed25519 …
+
+interaction-tools-certificate = Certificate ID
+
+interaction-tools-key-id = Key ID or fingerprint
+
+interaction-tools-identity = Empty: picked from your identity
+
+interaction-tools-key-help = user.signingkey; empty lets git pick one from your identity
+
+interaction-tools-path = Empty: the one on the PATH
+
+interaction-tools-program = { $key }; empty runs { $program } from the PATH
+
+interaction-tools-commits = Commits
+
+interaction-tools-tags = Tags
+
+interaction-tools-tag-help = tag.gpgSign: annotated tags
+
+interaction-tools-global = Your global git config on this machine; a repository's own config, or a profile that signs its own way, can override it. Repositories in WSL or over SSH use that machine's own.
+
+interaction-tools-profile-override = The profile “{ $profile }” signs its own way (Settings → Profile): what is set here doesn't apply while it is in use.
+
+interaction-preferences-browse = Browse themes, import your own…
+
+interaction-preferences-all = All
+
+interaction-preferences-dark = Dark
+
+interaction-preferences-light = Light
+
+interaction-preferences-own = The theme's own
+
+interaction-preferences-any = Any colour
+
+interaction-preferences-your-accent = Yours, whatever the theme
+
+interaction-preferences-square = Square
+
+interaction-preferences-as-theme = As the theme
+
+interaction-preferences-your-themes = VS Code, Base16 or gitcraft's own
+
+interaction-preferences-import = Import theme file…
+
+interaction-preferences-import-help = A VS Code colour theme (.json, e.g. from an extension's themes folder), a Base16 or Base24 scheme (.yaml), or a theme saved by gitcraft. It is copied into the themes folder and chosen.
+
+interaction-preferences-import-title = Import a theme
+
+interaction-preferences-theme-files = Theme files
+
+interaction-preferences-copy = Save a copy to edit
+
+interaction-preferences-copy-help = Writes this theme, with every one of its colours, as a file in the themes folder and uses it: change the file in any editor and gitcraft follows as you save.
+
+interaction-preferences-open-folder = Open themes folder
+
+interaction-preferences-more = Find more:
+
+interaction-preferences-vscode = VS Code themes
+
+interaction-preferences-base16 = Base16 schemes
+
+interaction-preferences-count = { $count ->
+        [one] { $count } theme
+       *[other] { $count } themes
+    }
+
+interaction-preferences-imported = Imported as { $file }
+
+interaction-preferences-not-imported = Not imported: { $error }
+
+interaction-preferences-saved = Saved as { $file }
+
+interaction-preferences-not-saved = Not saved: { $error }
+
+interaction-preferences-colour = Colour { $hex }
+
+interaction-preferences-group-dark = Dark
+
+interaction-preferences-group-light = Light
+
+interaction-preferences-group-yours = Your themes
+
+interaction-preferences-group-editor = Your editor
+
+interaction-preferences-commands-intro = Commands of your own in a commit's, a branch's or a file's menu, or in the palette. They run with sh on the repository's machine (here, in WSL or over SSH), in its folder. With the output in a toast a command runs unattended: nothing can answer it (no editor, no password prompt), so pick Terminal for one that asks something or runs for long.
+
+interaction-preferences-variables-intro = Set for every command. Write them as shell variables, in double quotes: "$FILE". Their values are never pasted into the command line, so a name with spaces, quotes or $(…) stays one word.
+
+interaction-preferences-repo-intro = A repository can bring its own in .gitcraft/commands.json. They are offered once you have read that file and trusted it, and asked about again whenever it changes.
+
+interaction-preferences-add-command = Add command
+
+interaction-preferences-none = None yet
+
+interaction-preferences-name = Name
+
+interaction-preferences-remove = Remove
+
+interaction-preferences-up = Move up
+
+interaction-preferences-confirm = Ask before running
+
+interaction-preferences-add-prompt = Add prompt
+
+interaction-preferences-question = Question
+
+interaction-preferences-default = Default
+
+interaction-preferences-remove-prompt = Remove prompt
+
+interaction-preferences-forget = Forget
+
+interaction-preferences-forget-help = Its commands are no longer offered until trusted again
+
+interaction-preferences-none-trusted = No repository's commands are trusted
+
+interaction-preferences-output = Output: { $destination }
+
+interaction-preferences-problem = Not offered until fixed: { $problem }
+
+interaction-preferences-commit-menu = Commit menu
+
+interaction-preferences-branch-menu = Branch menu
+
+interaction-preferences-file-menu = File menu
+
+interaction-preferences-palette = Command palette
+
+interaction-preferences-toast = Toast
+
+interaction-preferences-terminal = Terminal
+
+interaction-preferences-text = Text
+
+interaction-preferences-branch = Branch
+
+interaction-preferences-variable-sha = the commit's full hash (HEAD outside a commit's menu)
+
+interaction-preferences-variable-short_sha = its first 8 characters
+
+interaction-preferences-variable-branch = the branch: the menu's (origin/x for a remote one), the commit's pill, else the checked-out one
+
+interaction-preferences-variable-remote = that branch's remote: a remote branch's own, a local one's upstream's, else origin
+
+interaction-preferences-variable-file = the file, relative to the repository (only in a file's menu)
+
+interaction-preferences-variable-repo = the repository's folder, on its machine
+
+interaction-accounts-profiles-intro = Each profile has its own tabs, recent repositories, theme, git author and commit signing; the other pages are shared. Switching closes this profile's tabs and opens the other one's.
+
+interaction-accounts-new = New
+
+interaction-accounts-new-help = A new profile, with no tabs, switched to
+
+interaction-accounts-duplicate = Duplicate
+
+interaction-accounts-duplicate-help = A copy of this profile's settings (not its tabs), switched to
+
+interaction-accounts-work = Work
+
+interaction-accounts-appearance = More on the Appearance page
+
+interaction-accounts-author-intro = Commits from gitcraft are by this author. Empty: as in your global git config (shown greyed). A repository that sets its own user.name or user.email (git config --local, or "Commit as…" in its commit box) keeps them: the repository's config wins over the profile. A repository in WSL or over SSH goes by that machine's git config instead.
+
+interaction-accounts-host-intro = Push preflight compares outgoing authors with these expectations. Use a host (github.com), or host/namespace (github.com/company). The longest matching namespace wins. These rules do not change repository Git configuration.
+
+interaction-accounts-author-name = Author name
+
+interaction-accounts-remove = Remove
+
+interaction-accounts-add-rule = Add host author rule
+
+interaction-accounts-global = As in your global git config
+
+interaction-accounts-signing-page = Set on the Commit signing page
+
+interaction-accounts-just-profile = Just for this profile
+
+interaction-accounts-signing-note = Kept with the profile, over your global git config; empty fields leave what it sets. A repository's own config can still override it.
+
+interaction-accounts-delete-it = Delete it
+
+interaction-accounts-keep = Keep
+
+interaction-accounts-delete = Delete
+
+interaction-accounts-delete-help = Deletes this profile and its list of tabs; gitcraft switches to another
+
+interaction-accounts-only = The only profile
+
+interaction-accounts-unset = { $key }, not set
+
+interaction-accounts-old-git = This git ({ $version }) is older than 2.32 and ignores what a profile sets for git: the author and signing above are not used. Update git to use them.
+
+interaction-accounts-connections-intro = Choose the identity used to push and review. Empty account names keep the CLI's usual account. These choices affect gitcraft's commands, without switching any CLI's global active account. Git in WSL or over SSH keeps that machine's keys and credentials; forge requests still run here with this profile's account.
+
+interaction-accounts-ssh-config = As in your SSH config
+
+interaction-accounts-browse = Browse…
+
+interaction-accounts-ssh-policy = An absolute path on this computer, separate from the commit-signing key. Connections authenticate directly with this key file; shared SSH masters, agent identities and certificates are not substituted. Encrypted keys can ask for their passphrase. Other IdentityFile/CertificateFile entries for the host are refused. A repository's own core.sshCommand still wins.
+
+interaction-accounts-tea-usual = tea's usual login for this server
+
+interaction-accounts-https-server = HTTPS server
+
+interaction-accounts-tea-policy = The login name from tea login add --name …. A selected login is used only on its own HTTPS server, without falling back to another account.
+
+interaction-accounts-cli-usual = CLI's usual account
+
+interaction-accounts-server = Server
+
+interaction-accounts-config-folder = Account configuration folder (optional)
+
+interaction-accounts-normal-folder = CLI's normal configuration folder
+
+interaction-accounts-gh-policy = gh selects this named signed-in account directly. A separate folder is optional.
+
+interaction-accounts-glab-policy = glab stores one account per server in a configuration folder. For a second account on the same server, choose its own folder and sign in with GLAB_CONFIG_DIR set to it. gitcraft verifies the username before sending changes.
+
+interaction-accounts-copy-login = Copy sign-in command
+
+interaction-accounts-checking = Checking…
+
+interaction-accounts-check-account = Check account
+
+interaction-accounts-https-intro = Inspect the effective helper and stored account for each HTTPS remote. Secrets are never displayed. A credential store may be shared with other profiles and applications.
+
+interaction-accounts-doctor-intro = Test a repository's actual route, including proxies, custom CAs and the selected profile. SSH and WSL repositories are checked on their own machine. Tests do not prompt for sign-in.
+
+interaction-accounts-choose-repo = Choose repository
+
+interaction-accounts-open-repo = Open a repository or choose one from this profile's recent repositories.
+
+interaction-accounts-inspect-routes = Inspect routes and remotes
+
+interaction-accounts-choose-remote = Choose remote
+
+interaction-accounts-inspect-helper = Inspect helper and account
+
+interaction-accounts-no-account = No stored account inspected, or the helper supplied none without prompting.
+
+interaction-accounts-sign-out = Sign out / switch account…
+
+interaction-accounts-reject-help = This runs git credential reject for this remote URL, following credential.useHttpPath. A shared helper may remove the host's account for other applications too.
+
+interaction-accounts-forget-login = Forget this sign-in
+
+interaction-accounts-keep-login = Keep it
+
+interaction-accounts-test = Test connection
+
+interaction-accounts-cancel = Cancel check
+
+interaction-accounts-stored-account = Stored account: { $account }
+
+interaction-accounts-doctor = Connection doctor
+
+interaction-accounts-https-accounts = HTTPS accounts
+
+interaction-accounts-repo-network = Repository network
+
+interaction-accounts-secondary = This LFS/secondary sign-in is separate from the failed Git operation. Inspect or forget only the endpoint you explicitly select here, select its account in Profile connections or your credential manager, then run the operation again. No automatic retry was authorized.
+
+interaction-accounts-working = Working…
+
+interaction-accounts-stopped = Connection check stopped
+
+interaction-accounts-unchanged = No configuration has been changed.
+
+interaction-accounts-rejected = Asked this repository's effective credential helpers to forget the selected HTTPS sign-in. The next network operation can sign in again. Named forge accounts selected by the profile must be changed in Profile connections.
+
+interaction-accounts-invoked = Helpers actually invoked by Git for this lookup (in order):
+
+interaction-accounts-none-invoked = none invoked
+
+interaction-accounts-cancelled = Check cancelled
+
+interaction-accounts-last-helper = Last URL-matched configured helper:
+
+interaction-accounts-reset = reset helper chain
+
+interaction-accounts-custom-helper = custom or profile helper (command and arguments withheld)
+
+interaction-accounts-none-configured = none configured
+
+interaction-presentation-settings = Settings
+
+interaction-presentation-palette = Command palette
+
+interaction-presentation-theme = Theme
+
+interaction-presentation-manual = Manual
+
+interaction-presentation-title-bar = Title bar
+
+interaction-presentation-bottom-left = Bottom left
+
+interaction-presentation-bottom-right = Bottom right
+
+interaction-presentation-move = Move to (or drag it)
+
+interaction-presentation-manual-tip = Manual and keyboard shortcuts
+
+interaction-presentation-lane-theme = The theme's colours
+
+interaction-presentation-lane-classic = Classic
+
+interaction-presentation-lane-colorblind = Colour-blind safe
+
+interaction-presentation-releases = Main (releases)
+
+interaction-presentation-dev = Dev (a build of every change)
+
+interaction-presentation-busy = Another operation is running
+
+interaction-preview-theme = The colours of the whole window: tabs, panels, the graph, diffs and the terminal. Point at a theme to see it here first.
+
+interaction-preview-accent = Buttons, selections, focused fields and links. Your own colour, or the one the theme comes with.
+
+interaction-preview-corners = How round buttons, fields, pills and panels are.
+
+interaction-preview-code = Code in diffs and blame, coloured as your editor colours it.
+
+interaction-preview-avatars = Beside each commit's author in the graph and the details.
+
+interaction-preview-diff-layout = How a file's changes show: old and new in one column, or beside each other.
+
+interaction-preview-context = Only the lines around each change, or the whole file with the changes in place.
+
+interaction-preview-files = The changed files of a commit or the working tree.
+
+interaction-preview-columns = The columns right of each commit's description. Their widths are dragged in the graph's header.
+
+interaction-preview-lanes = How far apart the graph's lanes are. Compact lanes keep a busy history's graph narrow.
+
+interaction-preview-lane-colours = The colour of each lane of the graph, and of its pills.
+
+interaction-preview-terminal = The integrated terminal, with the theme's colours.
+
+interaction-preview-heading = PREVIEW
+
+interaction-preview-refs = The room left of the graph for the branch and tag pills: { $width } px. Names longer than fits keep their { $part ->
+        [end] end (…xyz)
+       *[start] start (xyz…)
+    }; drag the column's edge in the graph's header to change it there.
+
+interaction-preview-pull-merge = What the toolbar's Pull does when your branch and its remote have both moved on: pull (fast-forward if possible).
+
+interaction-preview-pull-fastforwardonly = What the toolbar's Pull does when your branch and its remote have both moved on: pull (fast-forward only).
+
+interaction-preview-pull-rebase = What the toolbar's Pull does when your branch and its remote have both moved on: pull (rebase).
+
+interaction-preview-push = Push
+
+interaction-preview-branches = BRANCHES
+
+interaction-preview-gallery = Theme gallery
+
+interaction-preview-merge-tab = Merge fix/tabs
+
+interaction-preview-settings-previews = Previews in the settings
+
+interaction-preview-tabs-scroll = Tabs scroll
+
+interaction-preview-message = Commit message
+
+interaction-preview-commit = Commit
+
+interaction-preview-summary = Summary
+
+interaction-preview-radii = { $small } · { $medium } · { $large } px
+
+interaction-preview-mock-summary-1 = Preview the settings beside them
+
+interaction-preview-mock-summary-2 = Merge pull request #212 from fix/tab-overflow
+
+interaction-preview-mock-summary-3 = Theme gallery with live thumbnails
+
+interaction-preview-mock-summary-4 = Tabs scroll when there are too many
+
+interaction-preview-mock-summary-5 = Release 0.9.0
+
+interaction-preview-mock-summary-6 = Read Base16 colour schemes
+
+interaction-preview-mock-summary-7 = Initial commit
+
+interaction-preview-mock-when-1 = 5 minutes ago
+
+interaction-preview-mock-when-2 = 2 hours ago
+
+interaction-preview-mock-when-3 = yesterday
+
+interaction-preview-mock-when-4 = 2 days ago
+
+interaction-preview-mock-when-5 = last week
+
+interaction-preview-mock-when-6 = 2 weeks ago
+
+interaction-preview-mock-when-7 = a month ago
+
+interaction-preview-mock-date = { $date } { $time }
+
+interaction-preview-refs-header = BRANCH / TAG
+
+interaction-preview-graph = GRAPH
+
+interaction-preview-description = DESCRIPTION
+
+interaction-preview-commit-header = COMMIT
+
+interaction-preview-author = AUTHOR
+
+interaction-preview-when = WHEN
+
+interaction-preview-date = DATE
+
+interaction-preview-no-columns = No columns: the descriptions take the whole width
+
+interaction-preview-standard = Standard
+
+interaction-preview-compact = Compact
+
+interaction-preview-refs-width = { $width } px
+
+interaction-preview-lane-distance = { $name } · { $width } px apart
+
+interaction-preview-terminal-theme = Theme previews
+
+interaction-preview-terminal-merge = Merge fix/tab-overflow
+
+interaction-preview-merge = Merge
+
+interaction-preview-merge-dot = merge
+
+interaction-preview-theirs = theirs
+
+interaction-preview-yours = yours
+
+interaction-preview-ff = Fast-forward only
+
+interaction-preview-rebase = Rebase
+
+interaction-preview-yours-new = yours, anew
+
+interaction-preview-merge-note = A merge joins them
+
+interaction-preview-ff-note = Stops, changes nothing
+
+interaction-preview-rebase-note = Yours, on top of theirs
+
+interaction-preview-ff-all = When only the remote moved on, every way just fast-forwards your branch to it.
+
+interaction-preview-code-own = gitcraft's own colours for code
+
+interaction-preview-no-vscode = No VS Code theme found: gitcraft's own colours
+
+interaction-preview-initials = Initials
+
+interaction-preview-pictures = Pictures
+
+interaction-preview-unified = Unified
+
+interaction-preview-side = Side by side
+
+interaction-preview-around = Around the changes
+
+interaction-preview-whole = The whole file
+
+interaction-preview-folders = In folders
+
+interaction-preview-list = One list
+
+interaction-preview-code-editor = Coloured as { $theme } does
+
+interaction-preview-code-mismatch = { $theme } is { $mode ->
+        [dark] dark
+       *[light] light
+    }: gitcraft's colours meanwhile
+
+interaction-preview-unchanged = … 120 lines unchanged
+
+interaction-dialogs-agent = { $agent } wants to:
+
+interaction-dialogs-repo = In { $repository }
+
+interaction-dialogs-ghost = Ghost preview
+
+interaction-dialogs-leaving = Leaving: { $commit }
+
+interaction-dialogs-commands = Commands:
+
+interaction-dialogs-denied = Denied automatically in { $remaining } if you don't answer. Esc denies.
+
+interaction-dialogs-approve = Approve
+
+interaction-dialogs-deny = Deny
+
+interaction-dialogs-trust-host = Trust this host?
+
+interaction-dialogs-sign-in = Sign in
+
+interaction-dialogs-forgotten = The saved password wasn't accepted, and is forgotten.
+
+interaction-dialogs-remember = Remember connection
+
+interaction-dialogs-portable = Asked again after a restart: this portable copy doesn't use the credential store (Settings → General).
+
+interaction-dialogs-cancel = Cancel
+
+interaction-dialogs-trust = Trust and connect
+
+interaction-dialogs-ok = OK
+
+interaction-dialogs-remember-hint = Saved encrypted in { $store }, so it isn't asked again after a restart. Forget it from the { $palette }: Forget saved SSH sign-ins.
+
+interaction-dialogs-store-mac = the macOS Keychain
+
+interaction-dialogs-store-win = Windows Credential Manager
+
+interaction-dialogs-store-linux = your keyring (Secret Service: GNOME Keyring, KWallet)
+
+interaction-dialogs-collecting = Diagnostics are still being collected
+
+interaction-dialogs-collect = Collecting diagnostics (asking git, gh, glab, tea)…
+
+interaction-dialogs-copied = Diagnostics copied locally. Review and redact the report before opening an issue.
+
+interaction-dialogs-failed = Collecting diagnostics failed
+
+interaction-dialogs-review = Review diagnostics locally
+
+interaction-dialogs-review-help = Nothing has been sent. Review and remove private content, including panic messages. Opening the issue sends this edited report to GitHub in the URL; you can also keep only the local clipboard copy.
+
+interaction-dialogs-copy-reviewed = Copy reviewed diagnostics
+
+interaction-dialogs-open-reviewed = Open issue with reviewed diagnostics
+
+interaction-dialogs-keep-local = Keep local and close
+
+interaction-dialogs-update-state = gitcraft { $version } { $state ->
+        [ready] is downloaded, ready to install
+       *[out] is out
+    } (you have { $current }).
+
+interaction-dialogs-not-now = Not now: ask again on the next start
+
+interaction-dialogs-skip = Skip this version
+
+interaction-dialogs-release-notes = Release notes
+
+interaction-dialogs-update-now = Update now
+
+interaction-dialogs-restart = Restart gitcraft as the new version; the open tabs stay
+
+interaction-dialogs-download = Download
+
+interaction-dialogs-release-page = Open the release page
+
+interaction-dialogs-go-back = Couldn't go back: { $error }
+
+interaction-palette-new-tab = New tab
+
+interaction-palette-reopen = Reopen closed tab
+
+interaction-palette-open = Open repository…
+
+interaction-palette-create = Create repository…
+
+interaction-palette-clone = Clone repository…
+
+interaction-palette-remote = Open remote repository (WSL, SSH)…
+
+interaction-palette-teleport = Teleport to another machine…
+
+interaction-palette-forget = Forget saved SSH sign-ins
+
+interaction-palette-settings = Settings
+
+interaction-palette-manual = Manual and keyboard shortcuts
+
+interaction-palette-diagnostics = Help: Copy diagnostics
+
+interaction-palette-my-work = Where's my work? (unpushed commits, stashes, changes everywhere)
+
+interaction-palette-themes = Browse themes…
+
+interaction-palette-new-profile = New profile
+
+interaction-palette-theme = Theme: { $theme }
+
+interaction-palette-profile = Switch to profile: { $profile }
+
+interaction-palette-app = app
+
+interaction-palette-settings-kind = settings
+
+interaction-palette-profile-kind = profile
+
+interaction-palette-tab = tab
+
+interaction-palette-dark = dark theme
+
+interaction-palette-light = light theme
+
+interaction-palette-checkout = Check out { $branch }
+
+interaction-palette-query = Type a command or a branch, or paste a forge link…
+
+interaction-palette-nothing-pick = Nothing to pick
+
+interaction-palette-nothing-match = Nothing matches
+
+interaction-palette-link = Open link: { $target }
+
+interaction-palette-target-repository = { $repository } on { $host }
+
+interaction-palette-target-pr = { $repository }, pull request #{ $number } on { $host }
+
+interaction-palette-target-commit = { $repository }, commit { $hash } on { $host }
+
+interaction-palette-target-file-line = { $repository }, { $path } at line { $line } on { $host }
+
+interaction-palette-target-file = { $repository }, { $path } on { $host }
+
+interaction-palette-paste = Paste a link to a pull request, commit or file on a forge…
+
+interaction-palette-open-link = Open
+
+interaction-palette-clone-busy = No clone of { $url } among your repositories: once the clone under way is done, clone it and open the link again
+
+interaction-palette-clone-offer = No clone of { $url } among your repositories: clone it below, then open the link again.{ $non_ascii ->
+        [yes] { " " }Its name has letters outside ASCII: check it is the one you meant.
+       *[no] { "" }
+    }
+
+interaction-palette-manual-caption = Manual
+
+interaction-palette-close = Close (Esc)
+
+interaction-palette-copy = Copy diagnostics
+
+interaction-palette-collecting = Collecting…
+
+interaction-palette-diagnostic-hint = Copies diagnostics for local review: versions, system, graphics, git, gh, glab and tea (sign-in status, never tokens), and effective Git settings (no name or email). An issue opens only after review and your explicit choice.
+
+interaction-tabs-running = an operation running
+
+interaction-tabs-terminal = a terminal open
+
+interaction-tabs-message = a commit message written
+
+interaction-tabs-editor = an editor open
+
+interaction-tabs-review = a review draft
+
+interaction-tabs-wait = A repository is still being cloned or connected to: wait for it before switching profiles
+
+interaction-tabs-setup = This imported profile needs local keys and verified accounts. Open Import setup → Finish profile setup before activating it.
+
+interaction-tabs-profiles = PROFILES
+
+interaction-tabs-manage = Manage profiles…
+
+interaction-tabs-new = New profile
+
+interaction-tabs-unfinished = { $name } has { $work }: finish it, or close the tab, before switching profiles
+
+interaction-tabs-switched = Switched to the profile “{ $profile }”
+
+interaction-tabs-profile-a11y = profile { $profile }
+
+interaction-tabs-profile-tip = Profile: { $profile }{ $author }
+
+interaction-tabs-successor = { $name } still has work going on, so the tab now shows it
+
+interaction-tabs-home-tip = Open, create or clone a repository
+
+interaction-tabs-settings = Settings
+
+interaction-tabs-close = Close tab
+
+interaction-tabs-middle = Or middle-click the tab
+
+interaction-tabs-reopen = Reopen closed tab
+
+interaction-tabs-none-closed = No tab closed yet
+
+interaction-tabs-quit = Quit gitcraft
+
+interaction-tabs-tearoff = Move tab to a new window
+
+interaction-tabs-embedded = This backend embeds windows; native repository windows are unavailable
+
+interaction-tabs-teleport = Teleport to…
+
+interaction-tabs-teleport-tip = Carry the branch and its uncommitted work to another machine, in a new worktree
+
+interaction-tabs-worktree = Switch worktree
+
+interaction-tabs-close-worktree = Close this worktree
+
+interaction-tabs-close-worktree-tip = Close this worktree and go back to the main one. It stays on disk.
+
+interaction-tabs-move-target = Move tab to { $window }
+
+interaction-tabs-switch-tip = { $worktree }
+    Switch worktree
+
+interaction-tabs-background = { $count ->
+        [one] One worktree with work in the background
+       *[other] { $count } worktrees with work in the background
+    }
+
+interaction-tabs-close-name = Close the tab { $name }
+
+interaction-tabs-busy = busy
+
+interaction-tabs-new-tab = New tab
+
+interaction-tabs-overflow = { $count ->
+        [one] New tab, and one more tab
+       *[other] New tab, and { $count } more tabs
+    }
+
+interaction-tabs-main-window = Main window
+
+interaction-release-step-bump = Move the version
+
+interaction-release-step-tag = Tag
+
+interaction-release-step-push = Push
+
+interaction-release-step-publish = Make the release on the forge
+
+interaction-release-step-upload = Attach the files
+
+interaction-release-changelog = { $file } (the notes on top)
+
+interaction-release-bump = Commits { $files } on { $branch }: “chore(release): { $tag }”
+
+interaction-release-push-bump = Pushes the version commit to { $remote }'s { $branch } and the tag to { $remote }, both or neither (git push --atomic)
+
+interaction-release-push-tag = Pushes the tag to { $remote }
+
+interaction-release-publish = { $pre ->
+        [yes] Makes the pre-release { $tag } on { $forge } with the notes
+       *[no] Makes the release { $tag } on { $forge } with the notes
+    }
+
+interaction-release-forge = the forge
+
+interaction-release-upload = Attaches { $files } to it
+
+interaction-release-tag-version = { $kind ->
+        [signed] Makes the signed tag { $tag } at that commit, its message the notes (git tag -s { $tag })
+       *[annotated] Makes the annotated tag { $tag } at that commit, its message the notes (git tag -a { $tag })
+    }
+
+interaction-release-tag-object = { $kind ->
+        [signed] Makes the signed tag { $tag } at { $commit }, its message the notes (git tag -s { $tag })
+       *[annotated] Makes the annotated tag { $tag } at { $commit }, its message the notes (git tag -a { $tag })
+    }
+
+interaction-workspace-heading = WORKSPACES
+
+interaction-workspace-new = New workspace
+
+interaction-workspace-my-work = Where's my work?
+
+interaction-workspace-my-work-tip = Commits not pushed, stashes and changes in every repository gitcraft knows
+
+interaction-workspace-intro = Group repositories you work on together to see how each stands, and fetch or open them all at once. + on the right makes one.
+
+interaction-workspace-browse-title = Add a repository to the workspace
+
+interaction-workspace-name = Workspace name
+
+interaction-workspace-rename = Rename
+
+interaction-workspace-create = Create
+
+interaction-workspace-cancel = Cancel
+
+interaction-workspace-empty = No repositories yet: + on this card adds one.
+
+interaction-workspace-delete = Delete
+
+interaction-workspace-open-all = Open all
+
+interaction-workspace-more = Rename or delete the workspace
+
+interaction-workspace-rename-menu = Rename…
+
+interaction-workspace-delete-menu = Delete workspace…
+
+interaction-workspace-open-tip = Open all in tabs
+
+interaction-workspace-fetch-tip = Fetch all (asks for no password)
+
+interaction-workspace-look-tip = Look again (connects to other machines)
+
+interaction-workspace-add = Add a repository
+
+interaction-workspace-another = Another folder…
+
+interaction-workspace-remove = Remove from the workspace
+
+interaction-workspace-disconnected = not connected: look again to connect
+
+interaction-workspace-fetching = fetching…
+
+interaction-workspace-looking = looking…
+
+interaction-workspace-no-commits = no commits
+
+interaction-workspace-no-remote = no remote
+
+interaction-workspace-never = never fetched
+
+interaction-workspace-already = { $repository } is in this workspace already.
+
+interaction-workspace-failed-open = { $failed } of { $total } didn't open: { $details }
+
+interaction-workspace-delete-question = Delete the workspace “{ $name }”? Its repositories stay where they are; only the group goes.
+
+interaction-workspace-open-question = { $count ->
+        [one] Open this repository in a tab?
+       *[other] Open all { $count } repositories in tabs?
+    }
+
+interaction-workspace-count = { $count ->
+        [one] 1 repository
+       *[other] { $count } repositories
+    }
+
+interaction-workspace-remove-name = Remove { $repository } from the workspace
+
+interaction-workspace-fetch-error = fetch: { $reason }
+
+interaction-workspace-detached = detached at { $commit }
+
+interaction-workspace-changed = { $count } changed
+
+interaction-workspace-fetched = fetched { $time }
+
+interaction-workspace-look-error = Couldn't look at it: { $reason }
+
+interaction-workspace-fetch-failed = The last fetch failed: { $reason }
+
+interaction-workspace-tracks = Tracks { $upstream }
+
+interaction-workspace-click-open = Click to open
+
+interaction-workspace-reason-signin = needs a sign-in
+
+interaction-workspace-reason-timeout = timed out
+
+interaction-workspace-reason-busy = still busy
+
+interaction-workspace-reason-folder = folder not found
+
+interaction-workspace-reason-repository = not a repository
+
+interaction-workspace-reason-connection = can't connect
+
+interaction-workspace-reason-failed = failed
+
+interaction-workspace-name-gone = that workspace is gone
+
+interaction-workspace-name-required = Give the workspace a name.
+
+interaction-workspace-name-controls = A workspace's name can't have line breaks or tabs in it.
+
+interaction-workspace-name-length = A workspace's name can be at most { $limit } characters long.
+
+interaction-workspace-name-duplicate = There is a workspace called “{ $name }” already.
+
+interaction-my-work-title = Where's my work?
+
+interaction-my-work-close = Close (Esc)
+
+interaction-my-work-look = Look again
+
+interaction-my-work-intro = Commits not pushed, stashes, uncommitted changes and branches whose remote branch is gone, in every repository gitcraft knows.
+
+interaction-my-work-connect-look = Connect and look
+
+interaction-my-work-clean = Nothing is only here: everything is committed and pushed, and nothing is stashed.
+
+interaction-my-work-empty = gitcraft knows no repositories yet: open some, or find them on a machine below.
+
+interaction-my-work-forget = Forget it: it was found here once
+
+interaction-my-work-open = Open
+
+interaction-my-work-open-push = open it to push
+
+interaction-my-work-connect-push = Connect and push
+
+interaction-my-work-push = Push
+
+interaction-my-work-waiting = waiting to push…
+
+interaction-my-work-pushing = pushing…
+
+interaction-my-work-retry = Try again
+
+interaction-my-work-find = FIND MORE REPOSITORIES
+
+interaction-my-work-progress = Looked at { $done } of { $total }…
+
+interaction-my-work-unlooked = { $count ->
+        [one] One repository not looked at: gitcraft isn't connected there.
+       *[other] { $count } repositories not looked at: gitcraft isn't connected there.
+    }
+
+interaction-my-work-clean-looked = { $count ->
+        [one] Nothing is only here in the repository looked at.
+       *[other] Nothing is only here in the { $count } repositories looked at.
+    }
+
+interaction-my-work-clean-count = { $count ->
+        [one] One repository with nothing that is only there.
+       *[other] { $count } repositories with nothing that is only there.
+    }
+
+interaction-my-work-failed-look = { $count ->
+        [one] Couldn't look at one repository
+       *[other] Couldn't look at { $count } repositories
+    }
+
+interaction-my-work-push-error = push: { $reason }
+
+interaction-my-work-push-local = { $tracked ->
+        [yes] Push it to its upstream (git asks for no password)
+       *[no] Push it to origin and track it there (git asks for no password)
+    }
+
+interaction-my-work-push-remote = { $tracked ->
+        [yes] Connect to { $host } (which may ask for a password) and push it to its upstream
+       *[no] Connect to { $host } (which may ask for a password) and push it to origin and track it there
+    }
+
+interaction-my-work-search-description = Searches a machine's home folder, { $depth } folders deep (hidden ones skipped); what is found is remembered.
+
+interaction-my-work-found-cut = { $machine } (found { $count }+, the rest skipped)
+
+interaction-my-work-found = { $machine } (found { $count })
+
+interaction-my-work-search-failed = { $machine } (failed)
+
+interaction-my-work-this-computer = This computer
+
+interaction-my-work-uncommitted = { $count ->
+        [one] 1 file with uncommitted changes
+       *[other] { $count } files with uncommitted changes
+    }
+
+interaction-my-work-no-remote = no remote: its commits are only here
+
+interaction-my-work-unpushed = { $count ->
+        [one] { $branch }: 1 commit not pushed to { $upstream }
+       *[other] { $branch }: { $count } commits not pushed to { $upstream }
+    }
+
+interaction-my-work-local-branch = { $count ->
+        [one] { $branch }: 1 commit on no remote (it tracks a branch of this repository)
+       *[other] { $branch }: { $count } commits on no remote (it tracks a branch of this repository)
+    }
+
+interaction-my-work-untracked = { $count ->
+        [one] { $branch }: 1 commit on no remote
+       *[other] { $branch }: { $count } commits on no remote
+    }
+
+interaction-my-work-stashes = { $count ->
+        [one] 1 stash: { $latest }
+       *[other] { $count } stashes, the latest: { $latest }
+    }
+
+interaction-my-work-worktree = { $count ->
+        [one] worktree { $path }: 1 file with uncommitted changes
+       *[other] worktree { $path }: { $count } files with uncommitted changes
+    }
+
+interaction-my-work-gone = { $count ->
+        [one] { $branch }: its remote branch is gone, 1 commit on no remote
+       *[other] { $branch }: its remote branch is gone, { $count } commits on no remote
+    }
+
+interaction-my-work-other-name = a branch of another name
+
+interaction-my-work-why-other = { $branch } tracks { $upstream }, a branch of another name: open the repository to push it where it belongs
+
+interaction-my-work-why-local = { $branch } tracks a branch of this repository: open the repository to push it where it belongs
+
+interaction-across-home = couldn't tell where your home folder is
+
+interaction-across-stopped = stopped unexpectedly
+
+interaction-across-no-remote = the repository has no remote to push to
+
+interaction-across-no-origin = there is no origin, and several remotes: open the repository to choose one
+
+interaction-across-busy = { $kind ->
+        [look] The last look at it is still running; try again once it ends
+        [fetch] The last fetch of it is still running; try again once it ends
+       *[push] The last push of it is still running; try again once it ends
+    }
+
+interaction-across-timeout = { $unit ->
+        [minute] No answer within { $count } minutes; it may still be running
+       *[second] No answer within { $count } seconds; it may still be running
+    }
+
+interaction-across-timeout-one-minute = No answer within 1 minute; it may still be running
+
+interaction-across-timeout-one-second = No answer within 1 second; it may still be running
+
+interaction-across-separate = { $branch } uses a separate push branch ({ $destination }): open the repository to push it
+
+interaction-across-local = { $branch } tracks a local branch: there is nothing to push it to
+
+interaction-across-other = { $branch } tracks { $upstream }, a branch of another name: open the repository to push it where it belongs
+
+interaction-across-gone = { $branch }: its remote branch is gone (deleted there?): open the repository to push it again
+
+interaction-across-upstream = { $branch } has no upstream set any more
+
+interaction-across-destination = { $branch } is set to be pushed to { $destination }, not { $remote }: open the repository to push it
+
+interaction-across-search = Couldn't search { $machine }: { $reason }
+
+interaction-tab-look-icon-0 = Repository
+
+interaction-tab-look-icon-1 = Code
+
+interaction-tab-look-icon-2 = Web
+
+interaction-tab-look-icon-3 = Mobile
+
+interaction-tab-look-icon-4 = Server
+
+interaction-tab-look-icon-5 = Database
+
+interaction-tab-look-icon-6 = Library
+
+interaction-tab-look-icon-7 = Tool
+
+interaction-tab-look-icon-8 = Launch
+
+interaction-tab-look-icon-9 = Game
+
+interaction-tab-look-icon-10 = Experiment
+
+interaction-tab-look-icon-11 = Docs
+
+interaction-tab-look-icon-12 = Design
+
+interaction-tab-look-icon-13 = Config
+
+interaction-tab-look-icon-14 = Favourite
+
+interaction-tab-look-icon-15 = Personal
+
+interaction-tab-look-blue = Blue
+
+interaction-tab-look-teal = Teal
+
+interaction-tab-look-green = Green
+
+interaction-tab-look-yellow = Yellow
+
+interaction-tab-look-orange = Orange
+
+interaction-tab-look-red = Red
+
+interaction-tab-look-pink = Pink
+
+interaction-tab-look-purple = Purple
+
+interaction-tab-look-gray = Gray
+
+interaction-tab-look-icons = ICON
+
+interaction-tab-look-highlight = HIGHLIGHT
+
+interaction-tab-look-reset = Reset to the default look
+
+interaction-tab-look-icon-name = Icon { $description }
+
+interaction-tab-look-highlight-color = Highlight { $color }
+
+interaction-forms-clone-title = Clone repository
+
+interaction-forms-clone = Clone
+
+interaction-forms-cancel = Cancel
+
+interaction-forms-cancel-tip = Stop the clone and remove what it cloned so far
+
+interaction-forms-url = URL
+
+interaction-forms-parent = Into folder
+
+interaction-forms-browse = Browse…
+
+interaction-forms-clone-into = Clone into
+
+interaction-forms-name = Name
+
+interaction-forms-options = Clone options
+
+interaction-forms-depth = Depth (empty = full history)
+
+interaction-forms-blobless = Blobless: download file contents on demand
+
+interaction-forms-cone = Check out selected folders (cone mode)
+
+interaction-forms-folders = Repository-relative folders, one per line. Root files are always included.
+
+interaction-forms-download-policy = Clone downloads the selected checkout. Later history reads never download automatically; use Graph tools → Sparse checkout and downloads for consent. Passive object reads require Git with --no-lazy-fetch support.
+
+interaction-forms-credentials = The remote wants to know who you are. Most hosts take a personal access token as the password.
+
+interaction-forms-username = Username
+
+interaction-forms-password = Password or token
+
+interaction-forms-remote-title = Open remote repository
+
+interaction-forms-remote-explanation = git runs on that machine; this window shows what it reports.
+
+interaction-forms-open = Open
+
+interaction-forms-folder = Folder there
+
+interaction-forms-path-hint = /home/me/repo or ~/repo
+
+interaction-forms-browse-tip = Pick the folder among that machine's
+
+interaction-forms-distro = Distribution
+
+interaction-forms-looking-distros = Looking for distributions…
+
+interaction-forms-no-distros = No WSL distribution is installed.
+
+interaction-forms-host = Host
+
+interaction-forms-host-hint = an alias of ~/.ssh/config, or user@host
+
+interaction-forms-hosts-tip = Hosts of ~/.ssh/config
+
+interaction-forms-keys = Keys and an agent are used; a password or passphrase is asked for here.
+
+interaction-forms-cancel-progress = Cancelling the clone into { $destination }…
+
+interaction-forms-clone-progress = Cloning into { $destination }… { $progress }
+
+interaction-forms-cloning = Cloning into { $destination }…
+
+interaction-forms-depth-error = Depth must be a positive number, or empty for full history
+
+interaction-forms-refused = Those credentials were refused.
+
+interaction-forms-signin = This repository needs you to sign in.
+
+interaction-forms-wait = Wait for the clone into { $destination } to finish, or cancel it on the start page
+
+interaction-forms-occupied = { $destination } already exists and isn't empty
+
+interaction-forms-cancelled = Clone into { $destination }: cancelled
+
+interaction-forms-failed = Clone failed: { $reason }
+
+interaction-forms-remote-path = The folder is a path on that machine: /home/me/repo or ~/repo.
+
+interaction-forms-remote-distro = Pick a WSL distribution.
+
+interaction-forms-remote-host = The host is what ssh takes: an alias of ~/.ssh/config or user@host.
+
+interaction-forms-remote-failed = Connecting failed unexpectedly.
+
+interaction-forms-connecting = Connecting to { $place }…
+
+interaction-forms-remote-home = could not find the home folder on { $machine }
+
+interaction-release-note-tip = Only the tip of the branch checked out can move the version in its files
+
+interaction-release-note-dirty = Commit or stash the changes to the files the version is in first
+
+interaction-release-nothing = nothing to move
+
+interaction-release-no-remote = no remote to push to
+
+interaction-release-unknown-forge = The repository isn't on a forge gitcraft knows
+
+interaction-release-tag-empty = Name the version
+
+interaction-release-tag-taken = { $tag } is a tag already
+
+interaction-release-tag-invalid = { $tag } can't be a tag's name
+
+interaction-release-branch-moved = { $branch } isn't checked out at { $commit } any more: plan the release again
+
+interaction-release-files-changed = { $files } changed since the release was planned: commit or stash that first
+
+interaction-release-version-missing = Couldn't find the version in { $file }
+
+interaction-release-write-failed = Couldn't write { $file }: { $reason }
+
+interaction-startup-usage = Usage:
+    { "  " }gitcraft [<folder>]             open the repository the folder is in
+    { "  " }gitcraft log <file>             a file's history
+    { "  " }gitcraft blame <file>[:<line>]  a file's blame, scrolled to that line
+    { "  " }gitcraft blame -- <file>        a file's blame, its name taken as it is
+    { "  " }gitcraft show <rev>             a commit of the repository of this folder
+    { "  " }gitcraft compare <a>..<b>       the files that differ between two commits
+    { "                                  " }(a...b: what b changed since they diverged)
+    { "  " }gitcraft <forge link>           a pull request, commit or file of a forge, in its clone
+    { "                                  " }(or gitcraft://open?url=<link>)
+    { "  " }gitcraft -- <folder>            a folder named like a command
+    { "  " }gitcraft --clone | --open     the clone dialog or folder picker
+    { "  " }gitcraft --quit               save and quit the running instance
+    { "  " }gitcraft --help | --version
+
+interaction-setup-title = New machine, same setup
+
+interaction-setup-retry-info = Retries remain available during this app session while the owned clone/config is unchanged. Quitting retains files; finish them manually or choose a fresh destination. LFS content and submodules need separate setup after checkout.
+
+interaction-setup-intro = One versioned setup file carries public settings and repository descriptions. It contains no credentials, key bytes, authentication folders or executable configuration. Old paths are labels only; working files, stashes and local-only objects need a separate backup. Shell/editor/tool commands, AI tokens and trust grants require local setup. Repository config restores author, tracking branches, line endings, pull/rebase/merge/push preferences and other allowlisted values; executable, trust, credential and path settings are excluded.
+
+interaction-setup-export = Export setup
+
+interaction-setup-import = Import setup
+
+interaction-setup-selection = Select recent/open repositories to include. Metadata reads run in the background on each repository's own machine. Cloning from an imported file always targets this machine.
+
+interaction-setup-build = Build export preview
+
+interaction-setup-load = Load setup file…
+
+interaction-setup-preferences = Restore display, Git workflow and network preferences
+
+interaction-setup-add = Add profiles, authors and public settings
+
+interaction-setup-save = Save setup file…
+
+interaction-setup-detached = detached
+
+interaction-setup-select = Select this repository
+
+interaction-setup-addresses = Restoration addresses: edit unexported SSH-config aliases to literal server hostnames. Only the selected profile's explicit supported authentication is used; agent-only fallback and ambient URL redirects are not used.
+
+interaction-setup-fetch = Fetch address
+
+interaction-setup-confirm-ssh = I confirmed these SSH addresses use literal hostnames, not unexported SSH aliases
+
+interaction-setup-ssh-pending = SSH restoration pending: finish imported profile setup or choose an explicit SSH key file in this profile's Connections. A matching key may be supplied by your local agent; agent-only defaults are not restored.
+
+interaction-setup-folder = New folder name
+
+interaction-setup-parent = Choose destination parent…
+
+interaction-setup-source = Use local source folder on this machine…
+
+interaction-setup-use-remote = Use portable remote instead
+
+interaction-setup-activate-help = Add the public profiles, finish their required setup, then explicitly activate a corresponding profile before cloning.
+
+interaction-setup-retry = Retry remaining steps
+
+interaction-setup-restore = Clone and restore selected setup
+
+interaction-setup-new-destination = Choose a new destination instead
+
+interaction-setup-open = Open restored repository
+
+interaction-setup-finish = Finish profile setup
+
+interaction-setup-pending-help = Imported safety expectations remain inactive until all required local selections and account checks pass. No account is switched or signed in automatically.
+
+interaction-setup-working = Working in the background…
+
+interaction-setup-cancel = Cancel setup operation
+
+interaction-setup-close = Close
+
+interaction-setup-previous = { $name } — previous location: { $path }
+
+interaction-setup-checkout = Checkout: { $branch } · { $worktrees } linked worktrees · { $hidden } hidden branches · { $config } portable Git config values
+
+interaction-setup-push = Push: { $url }
+
+interaction-setup-worktree = Worktree { $name }: { $branch } at { $commit } ({ $path })
+
+interaction-setup-remote = Remote { $name }
+
+interaction-setup-push-address = Push address { $number }
+
+interaction-setup-clone-source = Previewed clone source: { $source }
+
+interaction-setup-destination = New destination: { $path }
+
+interaction-setup-current-source = Current-machine source: { $path }
+
+interaction-setup-worktree-root = New worktree root: { $path }
+
+interaction-setup-activate = Activate { $profile }
+
+interaction-setup-preview = Preview: { $profiles } profiles, { $authors } saved authors, { $repositories } repositories
+
+interaction-setup-profile = Profile: { $name } — { $author } <{ $email }>
+
+interaction-setup-profile-pending = Profile: { $name } — { $author } <{ $email }> · local authentication/key setup required
+
+interaction-setup-account =   { $provider }: { $user } on { $host }
+
+interaction-setup-filter = Gitcraft setup
+
+interaction-setup-key-help = Select this machine's explicit SSH key file (its matching private key may be in your local agent). Agent-only defaults and SSH-config aliases are not restored; no key is read into the setup file.
+
+interaction-setup-choose-key = Choose local SSH key…
+
+interaction-setup-signing-help = Enter this machine's signing key identifier or local public-key path
+
+interaction-setup-cli-folder = Optional local CLI authentication folder (empty uses this machine's CLI store)
+
+interaction-setup-verify = Verify required setup and enable profile
+
+interaction-setup-required = Required { $provider }: { $user } on { $host }
+
+interaction-setup-status-setup-worker-stopped-retained-destinations-are-available-for-insp = Setup worker stopped; retained destinations are available for inspection
+
+interaction-setup-status-setup-operation-cancelled-stale-results-were-discarded = Setup operation cancelled; stale results were discarded
+
+interaction-setup-status-preview-ready-only-successfully-read-selected-repositories-are-in = Preview ready. Only successfully read selected repositories are included; review the count and omissions before saving.
+
+interaction-setup-status-preview-loaded-no-settings-repositories-or-authentication-have-be = Preview loaded. No settings, repositories or authentication have been changed.
+
+interaction-setup-status-profile-setup-verified-activate-it-explicitly-before-cloning-its = Profile setup verified. Activate it explicitly before cloning its repositories.
+
+interaction-setup-status-profile-changed-during-verification-check-the-current-profile-aga = Profile changed during verification; check the current profile again.
+
+interaction-setup-status-load-an-import-preview-first = Load an import preview first
+
+interaction-setup-status-profile-id-space-is-exhausted = Profile ID space is exhausted
+
+interaction-setup-status-public-settings-and-new-profiles-added-your-active-profile-is-unc = Public settings and new profiles added. Your active profile is unchanged. Authentication, keys and signing programs require local setup.
+
+interaction-setup-status-previous-clone-worktrees-were-retained-choose-a-new-unused-destin = Previous clone/worktrees were retained. Choose a new unused destination.
+
+interaction-setup-status-import-cancelled = Import cancelled
+
+interaction-setup-status-export-cancelled = Export cancelled
+
+interaction-setup-status-choose-a-regular-setup-file-of-at-most-8-mib = Choose a regular setup file of at most 8 MiB
+
+interaction-setup-status-select-a-local-absolute-ssh-key-path = Select a local absolute SSH key path
+
+interaction-setup-status-selected-local-ssh-key-is-unavailable = Selected local SSH key is unavailable
+
+interaction-setup-status-selected-ssh-key-must-be-a-local-file = Selected SSH key must be a local file
+
+interaction-setup-status-profile-is-no-longer-pending = Profile is no longer pending
+
+interaction-setup-status-choose-this-machine-s-signing-key = Choose this machine's signing key
+
+interaction-setup-status-profile-setup-cancelled = Profile setup cancelled
+
+interaction-setup-status-the-expected-local-tea-login-is-unavailable = The expected local tea login is unavailable
+
+interaction-setup-status-the-tea-login-belongs-to-a-different-https-server = The tea login belongs to a different HTTPS server
+
+interaction-setup-status-the-imported-tea-expectation-has-no-public-owner-export-it-again = The imported tea expectation has no public owner; export it again from the original machine
+
+interaction-setup-status-the-selected-tea-alias-belongs-to-a-different-account-user = The selected tea alias belongs to a different account user
+
+interaction-setup-status-a-portable-url-needs-a-repository-path = A portable URL needs a repository path
+
+interaction-setup-status-invalid-remote-port = Invalid remote port
+
+interaction-setup-status-invalid-repository-url-path = Invalid repository URL path
+
+interaction-setup-status-invalid-ssh-transport-username = Invalid SSH transport username
+
+interaction-setup-status-use-an-explicit-ssh-username-in-scp-style-urls = Use an explicit SSH username in scp-style URLs
+
+interaction-setup-status-invalid-scp-style-repository-url = Invalid scp-style repository URL
+
+interaction-setup-status-only-credential-free-https-and-ssh-remote-urls-can-be-imported-lo = Only credential-free HTTPS and SSH remote URLs can be imported; local sources must be selected separately on this machine
+
+interaction-setup-status-import-receipt-config-was-replaced-or-exceeds-limits = Import receipt/config was replaced or exceeds limits
+
+interaction-setup-status-import-receipt-config-exceeds-limits = Import receipt/config exceeds limits
+
+interaction-setup-status-import-definition-changed-use-a-new-destination = Import definition changed; use a new destination
+
+interaction-setup-status-the-import-repository-path-was-replaced = The import repository path was replaced
+
+interaction-setup-status-the-import-clone-config-changed-finish-manually-instead-of-retryi = The import clone/config changed; finish manually instead of retrying
+
+interaction-setup-status-worktree-path-is-not-utf-8 = Worktree path is not UTF-8
+
+interaction-setup-status-import-targets-must-be-local-absolute-folders-on-this-machine = Import targets must be local absolute folders on this machine
+
+interaction-setup-status-choose-a-destination-with-a-utf-8-path = Choose a destination with a UTF-8 path
+
+interaction-setup-status-retry-destination-changed = Retry destination changed
+
+interaction-setup-status-choose-a-local-absolute-source-folder-on-this-machine = Choose a local absolute source folder on this machine
+
+interaction-setup-status-choose-a-local-source-with-a-utf-8-path = Choose a local source with a UTF-8 path
+
+interaction-setup-status-no-portable-remote-select-a-local-source-folder-on-this-machine = No portable remote; select a local source folder on this machine
+
+interaction-setup-status-missing-import-receipt = Missing import receipt
+
+interaction-setup-status-detached-commit-is-unavailable-no-substitute-was-used = Detached commit is unavailable; no substitute was used
+
+interaction-setup-status-the-named-branch-uses-the-selected-source-s-current-tip-local-onl = The named branch uses the selected source's current tip. Local-only commits and working files are not included in setup files.
+
+interaction-setup-status-import-cancelled-completed-clone-worktrees-were-retained = Import cancelled; completed clone/worktrees were retained
+
+interaction-setup-status-worktree-destination-root-was-replaced = Worktree destination root was replaced
+
+interaction-setup-status-selected-checkout-remotes-author-and-worktree-steps-completed-rev = Selected checkout, remotes, author and worktree steps completed. Review any notices above.
+
+interaction-setup-status-repository-metadata-is-not-utf-8 = Repository metadata is not UTF-8
+
+interaction-setup-status-more-than-32-remotes-narrow-the-repository-setup-first = More than 32 remotes; narrow the repository setup first
+
+interaction-setup-status-more-than-16-push-urls-narrow-the-repository-setup-first = More than 16 push URLs; narrow the repository setup first
+
+interaction-setup-status-a-bare-worktree-descriptor-was-omitted = A bare worktree descriptor was omitted
+
+interaction-setup-status-more-than-64-linked-worktrees-narrow-the-export = More than 64 linked worktrees; narrow the export
+
+interaction-setup-status-cannot-export-the-selected-tea-account-local-public-ownership-is = Cannot export the selected tea account: local public ownership is unavailable
+
+interaction-setup-status-the-selected-tea-alias-has-a-different-host-or-no-public-owner-ch = The selected tea alias has a different host or no public owner; check local profile setup before export
+
+interaction-setup-status-setup-file-exceeds-8-mib = Setup file exceeds 8 MiB
+
+interaction-setup-status-unsupported-setup-format-version = Unsupported setup format/version
+
+interaction-setup-status-setup-contains-too-many-profiles-identities-or-repositories = Setup contains too many profiles, identities or repositories
+
+interaction-setup-status-invalid-display-setting = Invalid display setting
+
+interaction-setup-status-display-setting-is-outside-supported-range = Display setting is outside supported range
+
+interaction-setup-status-invalid-fold-patterns = Invalid fold patterns
+
+interaction-setup-status-too-many-portable-preference-values = Too many portable preference values
+
+interaction-setup-status-invalid-portable-scheduling-setting = Invalid portable scheduling setting
+
+interaction-setup-status-duplicate-profile-id = Duplicate profile ID
+
+interaction-setup-status-only-built-in-themes-can-be-imported = Only built-in themes can be imported
+
+interaction-setup-status-unsupported-signing-format = Unsupported signing format
+
+interaction-setup-status-too-many-account-expectations = Too many account expectations
+
+interaction-setup-status-duplicate-provider-expectation = Duplicate provider expectation
+
+interaction-setup-status-expected-account-is-empty = Expected account is empty
+
+interaction-setup-status-expected-account-owner-is-empty = Expected account owner is empty
+
+interaction-setup-status-a-portable-tea-alias-must-include-its-expected-public-account-own = A portable tea alias must include its expected public account owner
+
+interaction-setup-status-duplicate-repository-destination-name = Duplicate repository destination name
+
+interaction-setup-status-repository-references-an-unknown-profile = Repository references an unknown profile
+
+interaction-setup-status-too-many-profile-associations = Too many profile associations
+
+interaction-setup-status-repository-metadata-exceeds-limits = Repository metadata exceeds limits
+
+interaction-setup-status-duplicate-remote-name = Duplicate remote name
+
+interaction-setup-status-remote-url-contains-credentials-or-nonportable-decorations = Remote URL contains credentials or nonportable decorations
+
+interaction-setup-status-too-many-push-urls = Too many push URLs
+
+interaction-setup-status-push-url-contains-credentials = Push URL contains credentials
+
+interaction-setup-status-duplicate-worktree-name = Duplicate worktree name
+
+interaction-setup-status-text-contains-control-characters-or-exceeds-its-limit = Text contains control characters or exceeds its limit
+
+interaction-setup-status-choose-a-plain-unique-folder-name = Choose a plain, unique folder name
+
+interaction-setup-status-invalid-portable-ref-or-remote-name = Invalid portable ref or remote name
+
+interaction-setup-status-only-branch-visibility-refs-are-portable = Only branch visibility refs are portable
+
+interaction-setup-status-invalid-expected-server-hostname = Invalid expected server hostname
+
+interaction-setup-status-invalid-stored-commit-id = Invalid stored commit ID
+
+interaction-setup-status-too-many-portable-configuration-values = Too many portable configuration values
+
+interaction-setup-status-invalid-portable-configuration-response = Invalid portable configuration response
+
+interaction-setup-status-saved = Setup saved to { $detail }
+
+interaction-setup-status-omitted = Omitted { $detail }
+
+interaction-setup-status-new-filename = Choose a new unused setup filename: { $detail }
+
+interaction-setup-status-write-failed = Writing setup failed; inspect the partial file: { $detail }
+
+interaction-setup-status-invalid-file = Invalid setup file: { $detail }
+
+interaction-setup-status-invalid-key = Unsupported portable configuration key/value: { $detail }
+
+interaction-setup-status-new-destination = Choose a new unused destination: { $detail }
+
+interaction-setup-status-clone-failed = Clone failed; destination retained for inspection: { $detail }
+
+interaction-setup-status-missing-branch = Branch { $name } is missing; no substitute was checked out
+
+interaction-setup-status-replaced-worktree = Previously restored worktree { $name } was replaced; finish manually
+
+interaction-setup-status-existing-worktree = Worktree { $name } already exists and was not overwritten
+
+interaction-setup-status-missing-commit = Worktree { $name } commit is unavailable; no substitute was used
+
+interaction-setup-status-omitted-source = { $name }: local/unsupported source omitted; choose a current-machine local source on import
+
+interaction-setup-status-fetch-cleaned = { $name }: credential material/query/fragment removed from fetch URL
+
+interaction-setup-status-push-cleaned = { $name }: credential material removed from push URL
+
+interaction-setup-status-push-omitted = { $name }: unsupported push URL omitted
+
+interaction-teleport-title = Teleport
+
+interaction-teleport-intro = The branch, its staged and unstaged changes and the untracked files arrive on the machine picked, in a new worktree (or a new repository). Nothing here is changed.
+
+interaction-teleport-to = To
+
+interaction-teleport-from = From
+
+interaction-teleport-looking = Looking there…
+
+interaction-teleport-cancel = Cancel
+
+interaction-teleport-send = Send
+
+interaction-teleport-no-machine = No other machine found: type an SSH host below, or add one to ~/.ssh/config.
+
+interaction-teleport-here = This machine
+
+interaction-teleport-distros = Listing WSL distributions…
+
+interaction-teleport-host-hint = Another SSH host: user@host
+
+interaction-teleport-use = Use
+
+interaction-teleport-into = Into
+
+interaction-teleport-clones = Looking for clones of this project there…
+
+interaction-teleport-other = A new worktree of another repository there
+
+interaction-teleport-create = A new repository, made from what is sent
+
+interaction-teleport-branch = Branch there (empty: detached)
+
+interaction-teleport-worktree = New worktree
+
+interaction-teleport-cancelling = Cancelling…
+
+interaction-teleport-stopping = Stopping at the next step; what it made is taken back.
+
+interaction-teleport-unpacking = The work is being unpacked there: it can't be stopped now. If it fails, what it made is taken back.
+
+interaction-teleport-detached = detached at { $commit }
+
+interaction-teleport-found = A new worktree of { $path }
+
+interaction-teleport-clone = A clone of { $url }, made there first
+
+interaction-teleport-confirm = The bundle is { $size }, more than { $threshold }. Send it to { $machine }?
+
+interaction-teleport-destination = To { $machine }
+
+interaction-teleport-drop = Drop the tab onto a machine to teleport its work
+
+interaction-teleport-review = Review the destination before starting.
+
+interaction-teleport-finding = Finding WSL machines…
+
+interaction-teleport-other-host = Use the tab's Teleport menu to type another SSH host.
+
+interaction-teleport-machine = this machine
+
+interaction-teleport-checking = Checking both machines…
+
+interaction-teleport-cloning = Cloning the project there…
+
+interaction-teleport-snapshot = Taking a snapshot of the work…
+
+interaction-teleport-bundling = Bundling the commits…
+
+interaction-teleport-landing = Unpacking and checking out…
+
+interaction-teleport-cleaning = Cleaning up…
+
+interaction-teleport-bundle-size = The bundle is { $size }.
+
+interaction-teleport-sending = Sending { $sent } of { $total }…
+
+interaction-teleport-bytes = { $value } B
+
+interaction-teleport-scaled = { NUMBER($value, minimumFractionDigits: 1, maximumFractionDigits: 1) } { $unit }
+
+interaction-teleport-error-stopped = It stopped unexpectedly.
+
+interaction-teleport-error-stopped-lower = it stopped unexpectedly.
+
+interaction-teleport-error-pick-machine = Pick a machine to teleport to.
+
+interaction-teleport-error-pick-repo = Pick the repository the work goes in.
+
+interaction-teleport-error-discovery = Machine discovery stopped; use the tab's Teleport menu to type a host.
+
+interaction-teleport-error-host = The host is what ssh takes: an alias of ~/.ssh/config or user@host.
+
+interaction-teleport-error-home = could not find the home folder
+
+interaction-teleport-error-cancelled = Teleport cancelled: nothing was changed.
+
+interaction-teleport-error-worktree-machine = The new worktree has to be on the machine of its repository.
+
+interaction-teleport-error-write-bundle = The bundle couldn't be written.
+
+interaction-teleport-error-no-commit = Nothing is committed here yet: commit once, then teleport.
+
+interaction-teleport-error-conflicts = Some files have conflicts: resolve them first.
+
+interaction-teleport-error-shallow = This is a shallow clone: its history stops short, and the repository there would be missing the commits it builds on. Fetch the whole history first (git fetch --unshallow).
+
+interaction-teleport-error-submodules = This repository has submodules, which teleport doesn't carry.
+
+interaction-teleport-error-head-changed = The checked-out commit changed while the teleport got ready: try again.
+
+interaction-teleport-error-copy-machine = the copy is on another machine
+
+interaction-teleport-error-lfs = Files kept in Git LFS arrived as their pointers; the palette's LFS: Pull fetches those that were pushed.
+
+interaction-teleport-error-folder-the-repository-there = Type a folder for the repository there.
+
+interaction-teleport-error-local-the-repository-there = Give the repository there as a full path on this machine.
+
+interaction-teleport-error-folder-the-clone = Type a folder for the clone.
+
+interaction-teleport-error-local-the-clone = Give the clone as a full path on this machine.
+
+interaction-teleport-error-folder-the-new-repository = Type a folder for the new repository.
+
+interaction-teleport-error-local-the-new-repository = Give the new repository as a full path on this machine.
+
+interaction-teleport-error-folder-the-new-worktree = Type a folder for the new worktree.
+
+interaction-teleport-error-local-the-new-worktree = Give the new worktree as a full path on this machine.
+
+interaction-teleport-error-failed = Teleport failed: { $detail }
+
+interaction-teleport-error-snapshot = Couldn't take a snapshot of the working tree: { $detail }
+
+interaction-teleport-error-snapshot-left = Some of the snapshot stayed on this repository's machine: { $detail }
+
+interaction-teleport-error-copy = could not copy { $detail }
+
+interaction-teleport-error-remove = could not remove { $detail }
+
+interaction-teleport-error-look = could not look at { $detail }
+
+interaction-teleport-error-make = could not make { $detail }
+
+interaction-teleport-error-write = could not write { $detail }
+
+interaction-teleport-error-open = could not open { $detail }
+
+interaction-teleport-error-read = could not read { $detail }
+
+interaction-teleport-error-ask = Could not ask { $detail }
+
+interaction-teleport-error-clone = Could not clone { $detail }
+
+interaction-teleport-error-unpack = The bundle couldn't be unpacked on { $detail }
+
+interaction-teleport-error-verify = The bundle didn't check out on { $detail }
+
+interaction-teleport-error-bundle-left = The bundle stayed on { $detail }
+
+interaction-teleport-error-home-there = could not find the home folder on { $detail }
+
+interaction-teleport-error-hidden-changes = { $path } is marked so that git doesn't look at its changes (assume-unchanged or skip-worktree), and they wouldn't be carried. Clear the mark first.
+
+interaction-teleport-error-operation-merge = A merge is in progress here: finish or abort it first.
+
+interaction-teleport-error-operation-rebase = A rebase is in progress here: finish or abort it first.
+
+interaction-teleport-error-operation-cherry-pick = A cherry-pick is in progress here: finish or abort it first.
+
+interaction-teleport-error-operation-revert = A revert is in progress here: finish or abort it first.
+
+interaction-teleport-error-the-repository-there-ssh = Give the repository there as a full path on { $machine }: /home/me/x or ~/x.
+
+interaction-teleport-error-the-repository-there-wsl = Give the repository there as a full path on { $machine }: /home/me/x.
+
+interaction-teleport-error-the-clone-ssh = Give the clone as a full path on { $machine }: /home/me/x or ~/x.
+
+interaction-teleport-error-the-clone-wsl = Give the clone as a full path on { $machine }: /home/me/x.
+
+interaction-teleport-error-the-new-repository-ssh = Give the new repository as a full path on { $machine }: /home/me/x or ~/x.
+
+interaction-teleport-error-the-new-repository-wsl = Give the new repository as a full path on { $machine }: /home/me/x.
+
+interaction-teleport-error-the-new-worktree-ssh = Give the new worktree as a full path on { $machine }: /home/me/x or ~/x.
+
+interaction-teleport-error-the-new-worktree-wsl = Give the new worktree as a full path on { $machine }: /home/me/x.
+
+interaction-teleport-error-complete = Teleported to { $machine } ({ $size }): { $path }
+
+interaction-teleport-error-existing-folder = { $path } is already there on { $machine }: pick another folder.
+
+interaction-teleport-error-appeared-folder = { $path } appeared on { $machine } meanwhile: pick another folder.
+
+interaction-teleport-error-appeared-branch = { $name } appeared on { $machine } meanwhile: pick another branch name.
+
+interaction-teleport-error-diverged = { $name } on { $machine } has commits that aren't here: pick another branch name.
+
+interaction-teleport-error-invalid-branch = { $name } isn't a name git takes for a branch.
+
+interaction-teleport-error-checked-out = { $name } is checked out on { $machine } already, in { $path }: pick another branch name.
+
+interaction-teleport-error-missing-work = The bundle that arrived on { $machine } didn't hold the work.
+
+interaction-teleport-error-hash-format = The repository on { $machine } uses { $theirs } hashes and this one { $ours }: their commits can't be mixed.
+
+interaction-teleport-error-partial = Only { $arrived } of the bundle's { $total } arrived on { $machine }.
+
+interaction-teleport-error-exit = exit status { $code }
+
+interaction-teleport-error-operation-patch = A patch is in progress here: finish or abort it first.
+
+interaction-scan-picker = Scan a folder for repositories
+
+interaction-scan-found = Repositories found
+
+interaction-scan-scanning = Scanning for repositories…
+
+interaction-scan-add = Add to the recent list
+
+interaction-scan-close = Close
+
+interaction-scan-stop = Stop
+
+interaction-scan-open = Open
+
+interaction-scan-capacity = Adds those not in it yet, as many as fit (it holds { $max })
+
+interaction-scan-repo-limit = Stopped after { $found } repositories: pick a folder further down to see the rest.
+
+interaction-scan-folder-limit = Stopped after looking in { $folders } folders: pick a folder further down to see the rest.
+
+interaction-scan-asked = Stopped: found { $found } so far.
+
+interaction-scan-progress = Looked in { $folders } folders, found { $repositories } repositories…
+
+interaction-scan-empty = No repositories found within { $depth } folders of this one. Hidden folders and folders like node_modules, target and build aren't looked in.
+
+interaction-scan-added = Added { $added ->
+        [one] 1 repository
+       *[other] { $added } repositories
+    } to the recent list
+
+interaction-scan-added-existing = Added { $added ->
+        [one] 1 repository
+       *[other] { $added } repositories
+    } to the recent list ({ $had } { $had ->
+        [one] was
+       *[other] were
+    } already there)
+
+interaction-scan-added-full = Added { $added ->
+        [one] 1 repository
+       *[other] { $added } repositories
+    } to the recent list ({ $room ->
+        [one] 1 repository
+       *[other] { $room } repositories
+    } didn't fit: it holds { $max }, remove some to make room)
+
+interaction-scan-added-both = Added { $added ->
+        [one] 1 repository
+       *[other] { $added } repositories
+    } to the recent list ({ $had } { $had ->
+        [one] was
+       *[other] were
+    } already there; { $room ->
+        [one] 1 repository
+       *[other] { $room } repositories
+    } didn't fit: it holds { $max }, remove some to make room)
+
+interaction-scan-permission = gitcraft isn't allowed to look in { $path }.
+
+interaction-scan-gone = { $path } isn't there any more.
+
+interaction-scan-read-error = Could not look in { $detail }
+
+interaction-drop-folder-not-repo = { $name } isn't in a git repository: drop a repository's folder to open it
+
+interaction-drop-folder-error = Could not open { $name }: { $error }
+
+interaction-drop-not-applied = { $name } wasn't applied: { $error }
+
+interaction-drop-closed = { $name } wasn't applied: its repository's tab was closed
+
+interaction-drop-unsupported = Can't open { $name }: drop a folder to open it, or a .patch, .diff, .eml or .mbox file to apply it
+
+interaction-drop-failed = { $name } failed: { $error }
+
+interaction-drop-failed-following = { $name } failed: { $error } (so the { $count } { $count ->
+        [one] patch dropped after it was
+       *[other] patches dropped after it were
+    } not applied)
+
+interaction-drop-show-repo = To apply { $name }, show its repository's tab, then drop the patch there
+
+interaction-drop-open-repo = Applying { $name } needs a repository open first: open one, then drop the patch on it
+
+interaction-drop-hint-repo = Drop a folder to open it, or a patch to apply it here
+
+interaction-drop-hint-folder = Drop a folder to open its repository
+
+interaction-draft-restored = gitcraft closed unexpectedly: your drafts and tabs were restored
+
+interaction-draft-cut = Some of what you typed in { $name } is too long to keep in case gitcraft closes: not all of it would come back after a crash
+
+interaction-draft-failed = Couldn't save what you typed in { $detail }
+
+interaction-browser-select = Select folder
+
+interaction-browser-select-current = Select this folder
+
+interaction-browser-back = Back
+
+interaction-browser-hidden = Hidden folders
+
+interaction-browser-up = The folder above
+
+interaction-browser-home = Home folder
+
+interaction-browser-reload = List again
+
+interaction-browser-is-repo = This folder is a git repository.
+
+interaction-browser-empty = No folders here.
+
+interaction-browser-repository = repository
+
+interaction-browser-repo-label = { $name }, repository
+
+interaction-browser-folder-label = { $name }, folder
+
+interaction-browser-connecting = Connecting to { $host }…
+
+interaction-browser-limit = Only the first { $max } folders are listed.
+
+interaction-browser-missing = There is no folder { $dir } on { $host }.
+
+interaction-browser-list-failed = Could not list { $dir } on { $host }: { $detail }
+
+interaction-browser-list-invalid = Could not list { $dir } on { $host }.
+
+interaction-launch-unknown-option = unknown option { $flag }
+
+interaction-launch-with-usage = { $reason }
+
+    { $usage }
+
+interaction-launch-scheme-0 = Not a gitcraft link gitcraft can open (too long)
+
+interaction-launch-scheme-1 = Not a gitcraft link gitcraft can open (no gitcraft://)
+
+interaction-launch-scheme-2 = Not a gitcraft link gitcraft can open (no ?url=)
+
+interaction-launch-scheme-3 = Not a gitcraft link gitcraft can open (it only opens: gitcraft://open?url=…)
+
+interaction-launch-scheme-4 = Not a gitcraft link gitcraft can open (url is given twice)
+
+interaction-launch-scheme-5 = Not a gitcraft link gitcraft can open (only url= is taken)
+
+interaction-launch-scheme-6 = Not a gitcraft link gitcraft can open (no url=)
+
+interaction-launch-web-0 = { $url } is not a link gitcraft can open: it is too long
+
+interaction-launch-web-1 = { $url } is not a link gitcraft can open: it has spaces or control characters
+
+interaction-launch-web-2 = { $url } is not a link gitcraft can open: only https:// (or http://) links are opened
+
+interaction-launch-web-3 = { $url } is not a link gitcraft can open: its host isn't a host name
+
+interaction-launch-web-4 = { $url } is not a link gitcraft can open: its path isn't a forge's
+
+interaction-launch-web-5 = { $url } is not a link gitcraft can open: it doesn't point at a repository, pull request, commit or file
+
+interaction-launch-line = { $value } is not a line number (the first line is 1)
+
+interaction-launch-compare = Name the two commits as a..b (or a...b), not { $value }
+
+interaction-launch-rev-option = { $value } is not a commit: it starts with -
+
+interaction-launch-rev-name = { $value } is not a commit name
+
+interaction-launch-file = { $path } is not a file
+
+interaction-launch-folder = No such folder: { $path }
+
+interaction-launch-editor = { $name }: finish or close the conflict or rebase editor first, then run the command again
+
+interaction-launch-directory = { $path } is a folder: give a file (or open the folder with gitcraft { $path })
+
+interaction-launch-missing-linked-file = { $path } isn't in { $root }: fetch, then open the link again
+
+interaction-launch-missing-linked-commit = Commit { $hash } isn't in { $root }: fetch, then open the link again
+
+interaction-launch-commits-text = The commits to compare are not valid text
+
+interaction-launch-commit-text = The commit is not valid text
+
+interaction-launch-no-commit = No commit given
+
+interaction-launch-too-many = too many arguments
+
+interaction-launch-log-count = log takes a file
+
+interaction-launch-blame-count = blame takes a file, and :<line> if you like
+
+interaction-launch-show-count = show takes a commit
+
+interaction-launch-compare-count = compare takes two commits, as a..b
+
+interaction-launch-dialog = This command opens a dialog in the window
+
+interaction-launch-percent = a broken %-escape
+
+interaction-launch-not-text = it isn't valid text
+
+interaction-launch-linked-pr = { $root } has { $repo } only as another remote than origin, whose pull requests it shows: open #{ $number } on the forge, or clone { $repo } itself
+
+interaction-start-error-unresponsive = gitcraft is already running, but it doesn't answer. Close it (or end it in the task manager) and start gitcraft again.
+
+interaction-start-error-cwd-text = gitcraft is already running, and this folder's name can't be handed to it: it isn't valid UTF-8.
+
+interaction-start-error-arg-text = gitcraft is already running, and a name on this command line can't be handed to it: it isn't valid UTF-8. Open it from the running window instead.
+
+interaction-start-error-native-supported = The native event did not contain a supported gitcraft link
+
+interaction-start-error-native-link = The native URL event did not contain a gitcraft:// link
+
+interaction-start-error-native-long = The gitcraft link is too long (maximum 4096 bytes)
+
+interaction-start-error-native-missing = The native URL event had no URL string
+
+interaction-start-error-native-thread = Native URL events require the main thread
+
+interaction-start-error-native-installed = The native URL handler is already installed
+
+interaction-start-error-open-first = Open a repository first
+
+interaction-start-error-no-version = no version
+
+interaction-start-error-no-cmd = no command line
+
+interaction-start-error-cmd-text = the command line isn't text
+
+interaction-start-error-no-kind = no kind
+
+interaction-start-error-no-repo = no repository, or not one
+
+interaction-start-error-unknown-op = not an operation this gitcraft knows
+
+interaction-start-error-no-path = no path
+
+interaction-start-error-path-long = the path is too long
+
+interaction-start-error-path-control = the path has control characters
+
+interaction-start-error-cmd-invalid = not a command line gitcraft takes
+
+interaction-start-error-cmd-long = the command line has control characters or is too long
+
+interaction-start-error-cwd = gitcraft can't tell which folder it was started in: { $detail }
+
+interaction-start-error-abs-path = { $path } is not an absolute path
+
+interaction-start-error-path-text = gitcraft is already running, and { $path } can't be handed to it: the name isn't valid UTF-8. Open it from the running window instead.
+
+interaction-start-error-dock-overflow = { $count } Dock actions exceeded the pending-action limit; select them again
+
+interaction-start-error-link-overflow = { $count } native links exceeded the pending-link limit; open them again
+
+interaction-start-error-refused = The running gitcraft couldn't take this: { $reason }.
+
+interaction-start-error-open-path = { $path } can't be opened: { $reason }.
+
+interaction-start-error-wire-version = this gitcraft speaks version { $version }, not { $other }
+
+interaction-start-error-wire-kind = this gitcraft can't do "{ $kind }"
+
+interaction-start-error-portable-translocated = Portable mode is off: macOS runs this downloaded copy from a temporary folder. Run xattr -dr com.apple.quarantine on gitcraft.app, then start it again.
+
+interaction-start-error-portable-write = Portable mode is off: gitcraft can't write to { $detail }. Settings are kept in your user's app data this time.
+
+interaction-diagnostics-title = gitcraft diagnostics
+
+interaction-diagnostics-system = System
+
+interaction-diagnostics-graphics = Graphics
+
+interaction-diagnostics-unknown-adapter = not known (no wgpu adapter)
+
+interaction-diagnostics-jobs = Background jobs
+
+interaction-diagnostics-processes = Managed processes
+
+interaction-diagnostics-backend = Git read backend
+
+interaction-diagnostics-missing-tool = not found (or didn't answer)
+
+interaction-diagnostics-channel = { $version } ({ $channel } channel)
+
+interaction-diagnostics-jobs-count = { $active }/{ $workers } active, { $queued }/{ $capacity } queued (peak { $peak })
+
+interaction-diagnostics-process-count = { $active } active, { $queued } queued, { $started } started, peak { $peak }
+
+interaction-diagnostics-backend-count = { $native } native reads, { $fallback } read fallbacks, { $cli } CLI invocations
+
+interaction-diagnostics-backend-fallback = Git { $operation } fallback
+
+interaction-diagnostics-auth-ok = { $version }, auth status ok
+
+interaction-diagnostics-auth-failed = { $version }, auth status failed
+
+interaction-diagnostics-signed-in = { $version }, signed in
+
+interaction-diagnostics-signed-out = { $version }, not signed in
+
+interaction-diagnostics-auth-unknown = { $version }, sign-in not known
+
+interaction-diagnostics-no-repo = No repository open: no git settings.
+
+interaction-diagnostics-settings-failed = Git settings: could not be read.
+
+interaction-diagnostics-settings-empty = Git settings: none of the reported ones is set.
+
+interaction-diagnostics-settings-heading = Git settings in effect (value · scope · file name):
+
+interaction-diagnostics-panic-heading = Last panic (local log; paths and known secret forms redacted):
+
+interaction-diagnostics-recent-heading = Recent operations (arguments, output and paths omitted):
+
+interaction-diagnostics-repository-here = # repository on this machine
+
+interaction-diagnostics-repository-there = # repository on another machine (WSL or SSH)
+
+interaction-diagnostics-withheld-value = (configured; value withheld)
+
+interaction-diagnostics-withheld-file = (origin filename withheld)
+
+interaction-diagnostics-scope-system = System
+
+interaction-diagnostics-scope-global = Global
+
+interaction-diagnostics-scope-local = Repository
+
+interaction-diagnostics-scope-worktree = Worktree
+
+interaction-diagnostics-scope-command = Command line
+
+interaction-diagnostics-git-missing = not found ({ $detail })
+
+interaction-diagnostics-issue-prompt = Please describe what happened and how to reproduce it.
+
+interaction-diagnostics-issue-rest = [Remaining diagnostics are on the clipboard.]
+
+interaction-diagnostics-issue-title = Bug report
+
+interaction-doctor-invalid-config = Invalid network configuration response
+
+interaction-doctor-tls-unverified = TLS chain: NOT verified — certificate verification is disabled in Git's configuration or environment
+
+interaction-doctor-http-unencrypted = TLS chain: not used for an unencrypted HTTP remote
+
+interaction-doctor-ssl-env = Git GIT_SSL_NO_VERIFY: certificate verification disabled
+
+interaction-doctor-ssh-env = Git SSH environment override: configured (command withheld; may override SSH config)
+
+interaction-doctor-cli-config = GitHub / GitLab CLI clients use their own CLI configuration and environment.
+
+interaction-doctor-ssh-unavailable = SSH ProxyJump / ProxyCommand: ssh -G unavailable; inspect SSH config on the repository machine
+
+interaction-doctor-ssh-remotes = SSH ProxyJump / ProxyCommand: applies to SSH remotes
+
+interaction-doctor-endpoint-gone = The selected endpoint no longer exists
+
+interaction-doctor-fetch-only = Connection tests read the fetch route. Push sign-ins can be inspected and rejected on the HTTPS sign-ins page; write permissions are checked by the actual push.
+
+interaction-doctor-network-only = Choose an HTTPS, HTTP or SSH remote to test a network connection
+
+interaction-doctor-proxy-auth = 407: the proxy wants a password
+
+interaction-doctor-dns-failed = DNS: the host or proxy could not be resolved
+
+interaction-doctor-ssh-host = SSH host verification failed; verify the server's host key on the repository machine
+
+interaction-doctor-tls-failed = TLS: certificate chain or handshake failed; check the configured CA and hostname
+
+interaction-doctor-auth-failed = Authentication: the server refused this account or no unattended sign-in is available
+
+interaction-doctor-tcp-failed = TCP: could not connect to the server or proxy, or the connection failed
+
+interaction-doctor-unknown-trace = Git could not complete ls-remote; inspect the repository operation log for details. No transport stage can be safely inferred.
+
+interaction-doctor-stage-dns = DNS
+
+interaction-doctor-stage-tcp = TCP
+
+interaction-doctor-stage-tls = TLS chain (Git's configured CA trust)
+
+interaction-doctor-stage-ssh = SSH transport handshake
+
+interaction-doctor-stage-authentication = Authentication
+
+interaction-doctor-state-accepted = accepted for this read (the repository may be public)
+
+interaction-doctor-state-complete = completed through the configured transport
+
+interaction-doctor-state-earlier = completed earlier in this trace
+
+interaction-doctor-state-before-failure = completed before the failure
+
+interaction-doctor-state-failed = failed
+
+interaction-doctor-state-unconfirmed = not confirmed
+
+interaction-doctor-stage-state = { $stage }: { $state }
+
+interaction-doctor-value-none = none
+
+interaction-doctor-value-withheld = configured (value withheld)
+
+interaction-doctor-value-proxy-env = not configured; environment applies
+
+interaction-doctor-value-disabled = explicitly disabled
+
+interaction-doctor-value-direct = direct (including NO_PROXY bypass)
+
+interaction-doctor-value-default = Git default
+
+interaction-doctor-value-ca = custom CA location configured
+
+interaction-doctor-value-command = configured (command withheld; may override SSH config)
+
+interaction-doctor-value-bypass = configured bypass list
+
+interaction-doctor-proxy = Git http.proxy: { $value }
+
+interaction-doctor-remote-proxy = Git remote proxy override: { $value }
+
+interaction-doctor-rest = Forge REST client (this computer): { $value }
+
+interaction-doctor-ssh-command = SSH command override: { $value }
+
+interaction-doctor-ssh-jump = SSH proxyjump: { $value }
+
+interaction-doctor-ssh-proxy = SSH proxycommand: { $value }
+
+interaction-doctor-key-value = { $key }: { $value }
+
+interaction-doctor-elapsed-ok = ls-remote: completed in { NUMBER($seconds, minimumFractionDigits: 2, maximumFractionDigits: 2) } s
+
+interaction-doctor-elapsed-failed = ls-remote: failed in { NUMBER($seconds, minimumFractionDigits: 2, maximumFractionDigits: 2) } s
+
+interaction-theme-file-base16 = not a Base16 or Base24 scheme
+
+interaction-theme-file-json = not readable JSON
+
+interaction-theme-file-vscode = a broken VS Code theme
+
+interaction-theme-file-extension = not a .json or .yaml file
+
+interaction-theme-file-base = no base theme
+
+interaction-theme-file-folder = no folder to keep themes in
+
+interaction-theme-file-extends = no theme “{ $name }” to extend
+
+interaction-theme-file-colour = “{ $key }” is not a colour like #1e1e2e
+
+interaction-theme-file-unknown = no colour called { $keys } (see the keys of a saved copy)
+
+interaction-theme-file-list = “{ $key }” is not a list of colours
+
+interaction-theme-file-item = “{ $key }” has something that is not a colour
+
+interaction-theme-file-length = “{ $key }” needs { NUMBER($needed) } colours, has { NUMBER($actual) }
+
+interaction-theme-file-credit-base16 = Base16 scheme
+
+interaction-theme-file-credit-base16-author = Base16 scheme · { $author }
+
+interaction-theme-file-credit-vscode = VS Code theme
+
+interaction-theme-file-credit-vscode-author = VS Code theme · { $author }
+
+interaction-theme-file-credit-own = Your theme
+
+interaction-theme-file-credit-own-author = Your theme · { $author }
+
+interaction-theme-file-file-error = { $file }: { $error }
+
+interaction-recent-status-unborn = { $branch } · no commits yet
+
+interaction-recent-status-detached = detached at { $hash }
+
+interaction-recent-status-missing = folder not found
+
+interaction-recent-status-not-repo = not a repository any more
+
+interaction-recent-status-timeout = didn't answer in time
+
+interaction-recent-status-failed = couldn't read it
+
+interaction-shell-prose-home = No home folder
+
+interaction-shell-prose-files = Files (GNOME)
+
+interaction-shell-prose-description = A small visual git client
+
+interaction-shell-prose-links = Opens gitcraft:// links from the browser in gitcraft
+
+interaction-home-fullscreen = Enter fullscreen

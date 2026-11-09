@@ -98,7 +98,7 @@ fn testing_a_branch_fills_the_lane() -> Result<(), String> {
         progress_text(run),
         "Tested main..feature with `test ! -e broken`: 4 done · 2 passed · 2 failed"
     );
-    let (said, bad) = tab.status.clone().ok_or("nothing said")?;
+    let (said, bad) = tab.status.as_deref().cloned().ok_or("nothing said")?;
     assert!(bad);
     assert_eq!(
         said,
@@ -205,7 +205,7 @@ fn stop_ends_the_run() -> Result<(), String> {
     assert_eq!(dot_of(&tab, &repo, &commits[0])?, Some(DotState::Running));
     tab.apply(Action::TestLane(LaneAct::Stop), &ctx);
     settle(&mut tab, &ctx)?;
-    let (said, _) = tab.status.clone().ok_or("nothing said")?;
+    let (said, _) = tab.status.as_deref().cloned().ok_or("nothing said")?;
     assert!(
         said.starts_with("Testing main..feature stopped after 0 commits"),
         "{said}"
@@ -255,7 +255,7 @@ fn a_bad_range_says_why() -> Result<(), String> {
     asked.command = "true".to_owned();
     asked.range = "no-such..feature".to_owned();
     start(&mut tab, &ctx, asked)?;
-    let (said, bad) = tab.status.clone().ok_or("nothing said")?;
+    let (said, bad) = tab.status.as_deref().cloned().ok_or("nothing said")?;
     assert!(bad);
     assert!(
         said.starts_with("Couldn't test no-such..feature:"),
@@ -426,7 +426,7 @@ fn a_stored_command_with_spaces_is_the_same() -> Result<(), String> {
     assert_eq!(asked.command, "true");
     asked.forget = true;
     start(&mut tab, &ctx, asked)?;
-    let (said, _) = tab.status.clone().ok_or("nothing said")?;
+    let (said, _) = tab.status.as_deref().cloned().ok_or("nothing said")?;
     assert!(said.contains("1 had a result already"), "{said}");
     assert_eq!(dot_of(&tab, &repo, &commits[0])?, Some(DotState::Good));
     Ok(())

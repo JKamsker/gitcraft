@@ -296,6 +296,27 @@ fn going_back_and_unpinning_show_only_when_they_can_be_done() {
 }
 
 #[test]
+fn localized_editable_number_parser_matches_formatter_and_rejects_malformed_grouping() {
+    for (locale, grouped, decimal) in [("de", "1.234", "12,5"), ("en-US", "1,234", "12.5")] {
+        crate::i18n::set_language(locale);
+        assert_eq!(super::parse_localized_number(grouped), Some(1234.0));
+        assert_eq!(super::parse_localized_number(decimal), Some(12.5));
+        assert_eq!(
+            super::parse_localized_number(&crate::i18n::number(1234.5)),
+            Some(1234.5)
+        );
+        assert_eq!(super::parse_localized_number("-2"), Some(-2.0));
+        for invalid in ["1..234", "1,,234", "NaN", "inf", "1.2.3,4", "1,2,3.4"] {
+            assert_eq!(
+                super::parse_localized_number(invalid),
+                None,
+                "{locale}: {invalid}"
+            );
+        }
+    }
+}
+
+#[test]
 fn area_d_optional_settings_persist_without_changing_permissions() {
     let old: Settings = ron::from_str("(agent_writes: true)").unwrap_or_default();
     assert!(!old.show_agents);

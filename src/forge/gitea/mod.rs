@@ -71,7 +71,7 @@ impl GiteaFamily {
             &hosting.host,
             find_login(&hosting.web),
         )
-        .on_refused(forget_login)
+        .on_refused_key(forget_login, &login_key(&hosting.web))
     }
 }
 
@@ -136,7 +136,8 @@ impl Provider for GiteaFamily {
     /// unlocked, which the inbox, asking unasked, mustn't bring up.
     fn inbox(&self, _: &Path, hosting: &Hosting) -> Result<Answer, String> {
         let login = known_login(&hosting.web);
-        let api = Api::new(self.name, &hosting.web, &hosting.host, login).on_refused(forget_login);
+        let api = Api::new(self.name, &hosting.web, &hosting.host, login)
+            .on_refused_key(forget_login, &login_key(&hosting.web));
         inbox::inbox(&api, hosting)
     }
 
@@ -274,9 +275,9 @@ fn create(api: &Api, hosting: &Hosting, new: &NewPullRequest) -> Result<String, 
     };
     let url = match at(&answer, "/html_url") {
         "" => {
-            return Err(format!(
-                "{} didn't say which pull request it opened",
-                api.name()
+            return Err(crate::i18n::message(
+                "backend-didn-t-say-which-pull-request-it-opened-56835e",
+                &[("name", (api.name()).to_string().into())],
             ));
         }
         url => url.to_owned(),
@@ -286,9 +287,12 @@ fn create(api: &Api, hosting: &Hosting, new: &NewPullRequest) -> Result<String, 
         return Ok(url);
     }
     if number == 0 {
-        return Err(format!(
-            "Opened {url}, but {} didn't say its number: ask for the reviews on its page",
-            api.name()
+        return Err(crate::i18n::message(
+            "backend-opened-url-but-didn-t-say-its-number-ask-for-the-reviews-on-its-p-449045",
+            &[
+                ("url", (url).to_string().into()),
+                ("name", (api.name()).to_string().into()),
+            ],
         ));
     }
     let endpoint = format!("repos/{}/pulls/{number}/requested_reviewers", hosting.path);
@@ -325,9 +329,13 @@ fn create_release(api: &Api, hosting: &Hosting, new: &super::NewRelease) -> Resu
     // The tag must be on the server: without it, the forge would make one of the default branch.
     api.get(&format!("repos/{}/tags/{tag}", hosting.path))
         .map_err(|e| {
-            format!(
-                "{} isn't on {} yet: push it first ({})",
-                new.tag, hosting.host, e.message
+            crate::i18n::message(
+                "backend-isn-t-on-yet-push-it-first-1584cd",
+                &[
+                    ("tag", (new.tag).to_string().into()),
+                    ("host", (hosting.host).to_string().into()),
+                    ("message", (e.message).to_string().into()),
+                ],
             )
         })?;
     let answer = api.send(
@@ -356,10 +364,15 @@ fn upload_assets(api: &Api, hosting: &Hosting, tag: &str, files: &[PathBuf]) -> 
         .and_then(Value::as_array)
         .map(|a| a.iter().map(|x| at(x, "/name").to_owned()).collect())
         .unwrap_or_default();
-    let id = release
-        .get("id")
-        .and_then(Value::as_u64)
-        .ok_or_else(|| format!("{} didn't say which release {tag} is", api.name()))?;
+    let id = release.get("id").and_then(Value::as_u64).ok_or_else(|| {
+        crate::i18n::message(
+            "backend-didn-t-say-which-release-tag-is-1ede89",
+            &[
+                ("name", (api.name()).to_string().into()),
+                ("tag", (tag).to_string().into()),
+            ],
+        )
+    })?;
     for file in files {
         let name = file
             .file_name()
@@ -369,8 +382,15 @@ fn upload_assets(api: &Api, hosting: &Hosting, tag: &str, files: &[PathBuf]) -> 
         if attached.contains(&name) {
             continue;
         }
-        let bytes =
-            std::fs::read(file).map_err(|e| format!("Couldn't read {}: {e}", file.display()))?;
+        let bytes = std::fs::read(file).map_err(|e| {
+            crate::i18n::message(
+                "backend-couldn-t-read-e-decf41",
+                &[
+                    ("path", (file.display()).to_string().into()),
+                    ("detail", (e).to_string().into()),
+                ],
+            )
+        })?;
         let query = encode(&name);
         api.upload(
             &format!("repos/{}/releases/{id}/assets?name={query}", hosting.path),
@@ -378,7 +398,15 @@ fn upload_assets(api: &Api, hosting: &Hosting, tag: &str, files: &[PathBuf]) -> 
             &name,
             &bytes,
         )
-        .map_err(|e| format!("Couldn't attach {name}: {}", e.message))?;
+        .map_err(|e| {
+            crate::i18n::message(
+                "backend-couldn-t-attach-name-30c34d",
+                &[
+                    ("name", (name).to_string().into()),
+                    ("message", (e.message).to_string().into()),
+                ],
+            )
+        })?;
     }
     Ok(())
 }
@@ -460,11 +488,15 @@ fn forget_login(web: &str) {
 /// The login to send to the forge at `web` (`https://host[:port]`), if the user has one. What's
 /// found is kept: a login until the server refuses it, the lack of one for a while. One lookup
 /// runs at a time, so that a credential helper asks once.
+fn login_key(web: &str) -> String {
+    let c = crate::connections::current();
+    format!("{web}\0{:?}\0{}", c.git_config, c.choices.tea_login)
+}
 fn find_login(web: &str) -> Option<Login> {
     let Ok(mut found) = found_logins().lock() else {
         return None;
     };
-    let entry = found.entry(web.to_owned()).or_default();
+    let entry = found.entry(login_key(web)).or_default();
     let fresh = match (&entry.login, entry.at) {
         (Some(_), _) => true,
         (None, Some(at)) => at.elapsed() < NO_LOGIN_FOR,
@@ -477,6 +509,9 @@ fn find_login(web: &str) -> Option<Login> {
             .filter(usable)
             .or_else(|| tea_login(web).filter(usable))
             .or_else(|| {
+                if !crate::connections::current().choices.tea_login.is_empty() {
+                    return None;
+                }
                 crate::git::stored_credentials(web)
                     .map(|c| Login::Basic {
                         user: c.username,
@@ -495,7 +530,7 @@ fn find_login(web: &str) -> Option<Login> {
 /// keyring asks to be unlocked; nothing is kept, so a tab still looks for itself.
 fn known_login(web: &str) -> Option<Login> {
     let found = found_logins().lock().ok()?;
-    let entry = found.get(web);
+    let entry = found.get(&login_key(web));
     if let Some(login) = entry.and_then(|e| e.login.clone()) {
         return Some(login);
     }
@@ -507,16 +542,58 @@ fn known_login(web: &str) -> Option<Login> {
 
 /// `tea`'s variables, for the server they name only.
 fn env_login(web: &str) -> Option<Login> {
+    if !crate::connections::current().choices.tea_login.is_empty() {
+        return None;
+    }
     let url = std::env::var("GITEA_SERVER_URL").ok()?;
     let token = std::env::var("GITEA_SERVER_TOKEN").ok()?;
     (same_server(&url, web) && !token.is_empty()).then_some(Login::Token(token))
 }
 
 fn tea_login(web: &str) -> Option<Login> {
+    let choices = crate::connections::current().choices;
+    if !choices.tea_login.is_empty() {
+        if !same_server(web, &format!("https://{}", choices.tea_host)) {
+            return None;
+        }
+        return selected_tea_login(&tea_logins(), web, &choices.tea_login)
+            .map(|l| Login::Token(l.token.clone()));
+    }
     tea_logins()
         .into_iter()
         .find(|login| same_server(&login.url, web) && !login.token.is_empty())
         .map(|login| Login::Token(login.token))
+}
+
+fn selected_tea_login<'a>(logins: &'a [TeaLogin], web: &str, alias: &str) -> Option<&'a TeaLogin> {
+    logins.iter().find(|login| {
+        login.name == alias && same_server(&login.url, web) && !login.token.is_empty()
+    })
+}
+
+pub(crate) fn selected_tea_metadata(alias: &str) -> Option<(String, String)> {
+    let logins = tea_logins();
+    let login = logins.iter().find(|login| login.name == alias)?;
+    let web = login.url.trim().trim_end_matches('/');
+    let authority = web.strip_prefix("https://")?;
+    if authority.is_empty() || authority.contains(['/', '@', '\n', '\r']) {
+        return None;
+    }
+    Some((authority.to_owned(), login.user.clone()))
+}
+
+pub(crate) fn selected_tea_secret(alias: &str, host: &str) -> Result<(String, String), String> {
+    let logins = tea_logins();
+    let login = selected_tea_login(&logins, &format!("https://{host}"), alias).ok_or(
+        crate::i18n::text("backend-the-selected-tea-login-is-unavailable-for-this-server-7ec179"),
+    )?;
+    if login.user.is_empty() {
+        return Err(crate::i18n::text(
+            "backend-the-tea-login-must-include-its-account-username-70a13b",
+        )
+        .to_owned());
+    }
+    Ok((login.user.clone(), login.token.clone()))
 }
 
 /// A login belongs to one web instance, including its case-sensitive proxy prefix.
@@ -540,6 +617,8 @@ pub(super) fn tea_servers() -> Vec<(String, String)> {
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 struct TeaLogin {
+    name: String,
+    user: String,
     url: String,
     token: String,
 }
@@ -611,6 +690,8 @@ fn parse_tea_config(text: &str) -> Vec<TeaLogin> {
             .or_else(|| value.strip_prefix('\'').and_then(|v| v.strip_suffix('\'')))
             .unwrap_or(value);
         match key.trim() {
+            "name" => login.name = value.to_owned(),
+            "user" => login.user = value.to_owned(),
             "url" => login.url = value.to_owned(),
             "token" => login.token = value.to_owned(),
             _ => {}
@@ -618,6 +699,25 @@ fn parse_tea_config(text: &str) -> Vec<TeaLogin> {
     }
     logins.extend(current);
     logins
+}
+
+pub(super) fn ssh_key_api(hosting: &Hosting) -> Api {
+    Api::new(
+        hosting.forge.provider().name(),
+        &hosting.web,
+        &hosting.host,
+        tea_login(&hosting.web),
+    )
+}
+
+pub(super) fn history_api(hosting: &Hosting) -> Api {
+    Api::new(
+        "Gitea / Forgejo",
+        &hosting.web,
+        &hosting.host,
+        find_login(&hosting.web),
+    )
+    .on_refused_key(forget_login, &login_key(&hosting.web))
 }
 
 #[cfg(test)]
@@ -694,10 +794,14 @@ mod tests {
             logins,
             [
                 TeaLogin {
+                    name: "codeberg".into(),
+                    user: String::new(),
                     url: "https://codeberg.org".into(),
                     token: "abc123".into()
                 },
                 TeaLogin {
+                    name: "home".into(),
+                    user: "me".into(),
                     url: "https://git.home.example:3000/".into(),
                     token: "def".into()
                 },

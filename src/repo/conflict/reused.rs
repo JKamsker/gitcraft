@@ -12,55 +12,53 @@ use crate::theme::{self, Tokens};
 /// What the banner says for a file opened without its markers. `whole`: the result couldn't be
 /// matched conflict by conflict, so it shows the whole file.
 fn banner_text(reused: Reused, whole: bool) -> String {
-    let check = "Check it: nothing is staged until you click Save and mark resolved.";
+    let check = crate::i18n::text("repo-core-0680");
     match (reused, whole) {
-        (Reused::Rerere, false) => format!(
-            "Resolved as you did before (git rerere). Each conflict below shows the text reused \
-             for it. {check}"
-        ),
-        (Reused::Rerere, true) => format!(
-            "Resolved as you did before (git rerere), but the result can't be matched conflict \
-             by conflict, so it shows the whole file as it is now. {check}"
-        ),
-        (Reused::NoMarkers, false) => "This file has no conflict markers left, but git still \
-                                       lists it as conflicted: a resolution was reused (git \
-                                       rerere), or it was edited elsewhere. Each conflict \
-                                       below shows the text now in its place."
-            .to_owned(),
-        (Reused::NoMarkers, true) => "This file has no conflict markers left, but git still \
-                                      lists it as conflicted: a resolution was reused (git \
-                                      rerere), or it was edited elsewhere. The result shows the \
-                                      whole file as it is now."
-            .to_owned(),
+        (Reused::Rerere, false) => {
+            crate::i18n::message("repo-core-0681", &[("check", check.to_string().into())])
+        }
+        (Reused::Rerere, true) => {
+            crate::i18n::message("repo-core-0682", &[("check", check.to_string().into())])
+        }
+        (Reused::NoMarkers, false) => crate::i18n::text("repo-core-0683").to_owned(),
+        (Reused::NoMarkers, true) => crate::i18n::text("repo-core-0684").to_owned(),
     }
 }
 
 /// The banner's way back to the conflicts, asked about first: what is in the file is lost.
 fn back_action(path: &str, reused: Reused) -> (&'static str, &'static str, Action) {
-    let lost = "What is in the file now is lost, saved or not.";
+    let lost = crate::i18n::text("repo-core-0685");
     match reused {
         Reused::Rerere => (
-            "Forget this resolution",
-            "git forgets how these conflicts were resolved before and puts the conflict \
-             markers back in the file",
+            crate::i18n::text("repo-core-0686"),
+            crate::i18n::text("repo-core-0687"),
             Action::Dialog(Dialog::confirm(
                 "Forget this resolution?",
-                format!(
-                    "git forgets how the conflicts of {path} were resolved before (git rerere \
-                     forget), and puts their conflict markers back. {lost}"
+                crate::i18n::message(
+                    "repo-core-0689",
+                    &[
+                        ("path", path.to_string().into()),
+                        ("lost", lost.to_string().into()),
+                    ],
                 ),
-                "Forget it",
+                crate::i18n::text("repo-core-0690"),
                 forget_ops(path, true),
                 None,
             )),
         ),
         Reused::NoMarkers => (
-            "Bring the conflicts back",
-            "Puts the conflict markers back in the file (git checkout -m)",
+            crate::i18n::text("repo-core-0691"),
+            crate::i18n::text("repo-core-0692"),
             Action::Dialog(Dialog::confirm(
                 "Bring the conflicts back?",
-                format!("{path} gets its conflict markers back (git checkout -m). {lost}"),
-                "Bring them back",
+                crate::i18n::message(
+                    "repo-core-0694",
+                    &[
+                        ("path", path.to_string().into()),
+                        ("lost", lost.to_string().into()),
+                    ],
+                ),
+                crate::i18n::text("repo-core-0695"),
                 forget_ops(path, false),
                 None,
             )),
@@ -112,12 +110,12 @@ pub(super) fn recorded_box(ui: &mut Ui, t: &Tokens, k: usize, text: &str, picked
         .show(ui, |ui| {
             ui.set_width(ui.available_width());
             ui.label(
-                RichText::new("Reused: the text now in place of this conflict")
+                RichText::new(crate::i18n::text("repo-core-0696"))
                     .color(t.text_faint)
                     .small(),
             );
             let body = if text.is_empty() {
-                "(nothing)"
+                crate::i18n::text("repo-core-0697")
             } else {
                 text.trim_end_matches(['\r', '\n'])
             };
@@ -142,14 +140,9 @@ pub(super) fn rerere_switch(
     if ui
         .add_enabled(
             enabled,
-            egui::Checkbox::new(&mut checked, "Remember resolutions"),
+            egui::Checkbox::new(&mut checked, crate::i18n::text("repo-core-0699")),
         )
-        .on_hover_text(
-            "git rerere, for this repository: how you resolve a conflict is recorded when you \
-             commit or continue, and reused when the same conflict comes back. A reused \
-             resolution shows here, and isn't staged until you save it. Turning it on also \
-             sets rerere.autoUpdate to false here.",
-        )
+        .on_hover_text(crate::i18n::text("repo-core-0700"))
         .changed()
     {
         acts.push(Action::Rerere(RerereAct::SetEnabled(checked)));
@@ -157,21 +150,21 @@ pub(super) fn rerere_switch(
     if setup.on && setup.stages {
         let t = Tokens::get(ui.ctx());
         if ui
-            .add_enabled(enabled, egui::Button::new("Leave them unstaged"))
-            .on_hover_text("Sets rerere.autoUpdate to false for this repository")
+            .add_enabled(
+                enabled,
+                egui::Button::new(crate::i18n::text("repo-core-0701")),
+            )
+            .on_hover_text(crate::i18n::text("repo-core-0702"))
             .clicked()
         {
             acts.push(Action::Rerere(RerereAct::LeaveUnstaged));
         }
         ui.label(
-            RichText::new("git stages reused resolutions by itself here")
+            RichText::new(crate::i18n::text("repo-core-0703"))
                 .color(t.warning)
                 .small(),
         )
-        .on_hover_text(
-            "rerere.autoUpdate is on: a file resolved as before is staged at once, so it never \
-             shows here to be checked",
-        );
+        .on_hover_text(crate::i18n::text("repo-core-0704"));
     }
 }
 

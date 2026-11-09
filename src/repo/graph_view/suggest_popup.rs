@@ -119,7 +119,13 @@ fn into_source<T>(found: Result<Arc<T>, String>) -> Source<T> {
 fn suggestion_row(ui: &mut Ui, t: &Tokens, label: &str, detail: &str, chosen: bool) -> bool {
     let full_label = label;
     let width = ui.available_width();
-    let (rect, resp) = ui.allocate_exact_size(vec2(width, ROW_H), Sense::click());
+    let (_, rect) = ui.allocate_space(vec2(width, ROW_H));
+    let resp = ui.interact(
+        rect,
+        ui.id().with(("search-suggestion", full_label, detail)),
+        Sense::click(),
+    );
+    crate::a11y::a11y_selected(&resp, || format!("{full_label}, {detail}"), chosen);
     if chosen || resp.hovered() {
         let fill = if chosen { t.row_selected } else { t.hover };
         ui.painter().rect_filled(rect, t.radius_sm, fill);
@@ -191,4 +197,45 @@ fn elide_middle(ui: &Ui, text: &str, font: &egui::FontId, max: f32) -> String {
         }
     }
     cut(lo)
+}
+
+#[cfg(test)]
+mod accessibility_tests {
+    use super::*;
+    use egui_kittest::{
+        Harness,
+        kittest::{NodeT, Queryable},
+    };
+    #[test]
+    fn suggestion_retains_full_path_and_selection_and_keyboard_activation() {
+        let path = "src/a-very-long-unicode-directory/日本語/file.rs";
+        let fonts = std::cell::Cell::new(false);
+        let mut h = Harness::builder().with_size([220.0, 120.0]).build_ui_state(
+            move |ui, count: &mut usize| {
+                if !fonts.replace(true) {
+                    crate::theme::install_fonts(ui.ctx());
+                    return;
+                }
+                let t = Tokens::get(ui.ctx());
+                if suggestion_row(ui, &t, path, "12 matching commits", true) {
+                    *count += 1;
+                }
+                crate::a11y::end_frame(ui.ctx());
+            },
+            0usize,
+        );
+        h.run();
+        let label = format!("{path}, 12 matching commits");
+        let node = h.get_by_label(&label);
+        assert_eq!(
+            node.accesskit_node().toggled(),
+            Some(egui::accesskit::Toggled::True)
+        );
+        h.key_press(egui::Key::Tab);
+        h.run();
+        assert!(h.get_by_label(&label).is_focused());
+        h.key_press(egui::Key::Enter);
+        h.run();
+        assert_eq!(*h.state(), 1);
+    }
 }

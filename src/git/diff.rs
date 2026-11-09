@@ -196,6 +196,26 @@ pub fn diff_files(repo: &Path, from: &str, to: Option<&str>) -> Result<Vec<Chang
     Ok(files)
 }
 
+pub(crate) fn investigation_diff_files(
+    reader: &super::investigations::Reader<'_>,
+    from: &str,
+    to: &str,
+) -> Result<Vec<ChangedFile>, String> {
+    if !super::investigations::oid(from) || !super::investigations::oid(to) {
+        return Err(crate::i18n::text("backend-invalid-pinned-diff-request-18c062").into());
+    }
+    let read = |kind| -> Result<String, String> {
+        let mut args = range_args(kind, from, Some(to));
+        args.splice(1..1, ["--no-ext-diff", "--no-textconv"]);
+        String::from_utf8(reader.run(&args, vec![], &[0])?).map_err(|_| {
+            crate::i18n::text("backend-local-diff-returned-non-utf-8-paths-c5fd7b").into()
+        })
+    };
+    let mut files = parse_name_status(&read("--name-status")?);
+    add_line_counts(&mut files, &read("--numstat")?);
+    Ok(files)
+}
+
 /// `diff` arguments that list the files that differ from `from` to `to` (`kind` is
 /// `--name-status` or `--numstat`).
 fn range_args<'a>(kind: &'a str, from: &'a str, to: Option<&'a str>) -> Vec<&'a str> {
@@ -245,7 +265,7 @@ pub fn work_diff(repo: &Path, file: &StatusFile, opts: DiffOptions) -> Result<St
     if file.area == Area::Untracked {
         // An untracked file has no history: show it as all added.
         let mut args = vec!["diff"];
-        args.extend(PATCH_ARGS);
+        opts.push_args(&mut args);
         args.extend(["--no-index", "--", "/dev/null", path]);
         return run_ok_codes(Some(repo), &args, &[0, 1]);
     }
@@ -298,13 +318,24 @@ pub fn save_patch(patch: &str) -> Result<PathBuf, String> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        let not_ours = |e: std::io::Error| format!("{} isn't gitcraft's: {e}", dir.display());
+        let not_ours = |e: std::io::Error| {
+            crate::i18n::message(
+                "backend-isn-t-gitcraft-s-e-77dde3",
+                &[
+                    ("path", (dir.display()).to_string().into()),
+                    ("detail", (e).to_string().into()),
+                ],
+            )
+        };
         if std::fs::symlink_metadata(&dir)
             .map_err(not_ours)?
             .file_type()
             .is_symlink()
         {
-            return Err(format!("{} is a link", dir.display()));
+            return Err(crate::i18n::message(
+                "backend-is-a-link-6a3d7b",
+                &[("path", (dir.display()).to_string().into())],
+            ));
         }
         std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).map_err(not_ours)?;
     }

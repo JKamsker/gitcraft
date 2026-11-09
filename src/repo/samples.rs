@@ -59,11 +59,17 @@ impl RepoTab {
                 let target = self.refs.current.as_deref().unwrap_or("HEAD");
                 let head = &self.refs.head;
                 acts.push(Action::Dialog(
-                    Dialog::confirm("Hard reset", String::new(), "Reset", Vec::new(), None)
-                        .preview(
-                            crate::git::PreviewAsk::reset(target, head, head, None, true),
-                            String::new(),
-                        ),
+                    Dialog::confirm(
+                        "Hard reset",
+                        String::new(),
+                        crate::i18n::text("repo-core-3356"),
+                        Vec::new(),
+                        None,
+                    )
+                    .preview(
+                        crate::git::PreviewAsk::reset(target, head, head, None, true),
+                        String::new(),
+                    ),
                 ));
                 acts.push(Action::Dialog(Dialog::add_worktree(
                     &self.path, None, "HEAD",

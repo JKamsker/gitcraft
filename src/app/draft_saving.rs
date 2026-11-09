@@ -19,6 +19,20 @@ const RESTORED_FOR: u64 = 15;
 /// How long the exit waits for the last drafts to be written.
 const EXIT_WAIT: Duration = Duration::from_secs(2);
 
+/// Translates only presentation of known notices; the writer/session values stay raw.
+pub(super) fn display_notice(raw: &str) -> Option<String> {
+    if raw == RESTORED {
+        return Some(crate::i18n::text("interaction-draft-restored").to_owned());
+    }
+    if let Some(name)=raw.strip_prefix("Some of what you typed in ").and_then(|s|s.strip_suffix(" is too long to keep in case gitcraft closes: not all of it would come back after a crash")) {
+        return Some(crate::i18n::message("interaction-draft-cut",&[("name",name.into())]));
+    }
+    raw.strip_prefix("Couldn't save what you typed in ")
+        .map(|detail| {
+            crate::i18n::message("interaction-draft-failed", &[("detail", detail.into())])
+        })
+}
+
 impl App {
     /// Says so, once, when the last run ended without closing: on the first frame, which can be
     /// a while after the start, and for long enough to be read.
@@ -68,10 +82,13 @@ impl App {
     }
 
     fn repo_tabs(&self) -> impl Iterator<Item = &crate::repo::RepoTab> {
-        self.tabs.iter().filter_map(|tab| match tab {
-            Tab::Repo(r) => Some(&**r),
-            _ => None,
-        })
+        self.tabs
+            .iter()
+            .chain(self.windows.parked.values().flat_map(|w| &w.tabs))
+            .filter_map(|tab| match tab {
+                Tab::Repo(r) => Some(&**r),
+                _ => None,
+            })
     }
 
     fn all_drafts(&self) -> Vec<(PathBuf, RepoDrafts)> {
@@ -95,4 +112,53 @@ pub(super) fn save_now(tab: &crate::repo::RepoTab) {
 /// (`examples/ui_shot.rs`), which must not touch the user's.
 pub fn keep_no_drafts() {
     drafts::turn_off();
+}
+
+#[cfg(test)]
+mod localization_tests {
+    use super::*;
+
+    #[test]
+    fn actual_notice_paint_keeps_raw_session_and_worker_values_and_opaque_details() {
+        crate::i18n::set_language("de");
+        let raw = RESTORED.to_owned();
+        assert_eq!(
+            super::super::panels::display_app_message(&raw),
+            "gitcraft wurde unerwartet beendet: Deine Entwürfe und Tabs wurden wiederhergestellt"
+        );
+        assert_eq!(
+            raw,
+            "gitcraft closed unexpectedly: your drafts and tabs were restored"
+        );
+        let name = "日本語 is too long: literal";
+        let cut = format!(
+            "Some of what you typed in {name} is too long to keep in case gitcraft closes: not all of it would come back after a crash"
+        );
+        assert_eq!(
+            display_notice(&cut),
+            Some(format!(
+                "Ein Teil deiner Eingaben in {name} ist zu lang für die Wiederherstellung nach einem Absturz: Nicht alles könnte danach wiederhergestellt werden"
+            ))
+        );
+        let detail = "日本語: C:\\path: external\ndiagnostic";
+        let failed = format!("Couldn't save what you typed in {detail}");
+        assert_eq!(
+            display_notice(&failed),
+            Some(format!(
+                "Deine Eingaben konnten nicht gespeichert werden: {detail}"
+            ))
+        );
+        assert_eq!(
+            display_notice("Some of what you typed in external unknown detail"),
+            None
+        );
+        assert_eq!(
+            super::super::panels::display_app_message("opaque external 日本語"),
+            "opaque external 日本語"
+        );
+        crate::i18n::set_language("en-US");
+        for original in [&raw, &cut, &failed] {
+            assert_eq!(display_notice(original).as_ref(), Some(original));
+        }
+    }
 }

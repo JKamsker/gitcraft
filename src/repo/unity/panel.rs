@@ -42,7 +42,12 @@ impl RepoTab {
                 close = header(ui, &t, state, acts);
                 ui.add_space(8.0);
                 if state.project.is_none() {
-                    ui.label(RichText::new("No Unity project here any more.").color(t.text_dim));
+                    ui.label(
+                        RichText::new(crate::i18n::text(
+                            "repo-workflows-unity-unity-panel-a07caecd",
+                        ))
+                        .color(t.text_dim),
+                    );
                     return;
                 }
                 checks(ui, &t, state, &here, acts);
@@ -60,12 +65,18 @@ fn header(ui: &mut Ui, t: &Tokens, state: &UnityState, acts: &mut Vec<Action>) -
     let mut close = false;
     ui.horizontal(|ui| {
         icons::inline(ui, "gamepad-2", 16.0, t.icon);
-        ui.label(RichText::new("Unity set-up").font(theme::semibold(16.0)));
+        ui.label(
+            RichText::new(crate::i18n::text("repo-workflows-unity-header-77866eb1"))
+                .font(theme::semibold(16.0)),
+        );
         if let Some(p) = &state.project {
             let at = if p.root.is_empty() {
-                "at the root".to_owned()
+                crate::i18n::text("repo-workflows-unity-header-464ed4ae").to_owned()
             } else {
-                format!("in {}", p.root)
+                crate::i18n::message(
+                    "repo-workflows-unity-header-2fd224a8",
+                    &[("p-root-1", (p.root).clone().into())],
+                )
             };
             let version = p
                 .version
@@ -75,10 +86,22 @@ fn header(ui: &mut Ui, t: &Tokens, state: &UnityState, acts: &mut Vec<Action>) -
             ui.label(RichText::new(format!("{at}{version}")).color(t.text_dim));
         }
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if icons::small_button(ui, "x", "Close (Esc)").clicked() {
+            if icons::small_button(
+                ui,
+                "x",
+                crate::i18n::text("repo-workflows-unity-header-961b2a04"),
+            )
+            .clicked()
+            {
                 close = true;
             }
-            if icons::small_button(ui, "refresh-cw", "Check again").clicked() {
+            if icons::small_button(
+                ui,
+                "refresh-cw",
+                crate::i18n::text("repo-workflows-unity-header-fb7099ad"),
+            )
+            .clicked()
+            {
                 acts.push(Action::Unity(UnityAct::Check));
             }
         });
@@ -86,7 +109,13 @@ fn header(ui: &mut Ui, t: &Tokens, state: &UnityState, acts: &mut Vec<Action>) -
     if let Some(busy) = &state.busy {
         ui.horizontal(|ui| {
             ui.add(crate::spinner::Spinner::new());
-            ui.label(RichText::new(format!("{busy}…")).color(t.text_dim));
+            ui.label(
+                RichText::new(format!(
+                    "{}…",
+                    crate::repo::messages::display_operation(busy)
+                ))
+                .color(t.text_dim),
+            );
         });
     }
     close
@@ -137,9 +166,9 @@ fn vcs_place(version: Option<&str>) -> &'static str {
         .and_then(|m| m.parse().ok())
         .unwrap_or(9999);
     if major >= 2020 {
-        "In Unity: Edit → Project Settings → Version Control → Mode: Visible Meta Files"
+        crate::i18n::text("repo-workflows-unity-vcs-place-bc141862")
     } else {
-        "In Unity: Edit → Project Settings → Editor → Version Control → Mode: Visible Meta Files"
+        crate::i18n::text("repo-workflows-unity-vcs-place-49a234f8")
     }
 }
 
@@ -148,12 +177,21 @@ fn checks(ui: &mut Ui, t: &Tokens, state: &UnityState, here: &Context, acts: &mu
         None => {
             ui.horizontal(|ui| {
                 ui.add(crate::spinner::Spinner::new());
-                ui.label(RichText::new("Checking the project…").color(t.text_dim));
+                ui.label(
+                    RichText::new(crate::i18n::text("repo-workflows-unity-checks-78c80640"))
+                        .color(t.text_dim),
+                );
             });
             return;
         }
         Some(Err(e)) => {
-            ui.colored_label(t.danger, format!("Could not check the project: {e}"));
+            ui.colored_label(
+                t.danger,
+                crate::i18n::message(
+                    "repo-workflows-unity-checks-d41c81db",
+                    &[("e", (e).clone().into())],
+                ),
+            );
             return;
         }
         Some(Ok(s)) => s,
@@ -162,17 +200,15 @@ fn checks(ui: &mut Ui, t: &Tokens, state: &UnityState, here: &Context, acts: &mu
     let version = state.project.as_ref().and_then(|p| p.version.as_deref());
     let (text, advice) = match setup.force_text {
         Some(true) => (
-            "Assets are saved as text (Force Text): git can diff and merge them.",
+            crate::i18n::text("repo-workflows-unity-checks-1ba49cd4"),
             None,
         ),
         Some(false) => (
-            "Assets aren't saved as text: git can't merge scenes and prefabs.",
-            Some(
-                "In Unity: Edit → Project Settings → Editor → Asset Serialization → Mode: Force Text",
-            ),
+            crate::i18n::text("repo-workflows-unity-checks-d4b3a742"),
+            Some(crate::i18n::text("repo-workflows-unity-checks-50526421")),
         ),
         None => (
-            "Couldn't read how assets are saved (ProjectSettings/EditorSettings.asset).",
+            crate::i18n::text("repo-workflows-unity-checks-395e243e"),
             None,
         ),
     };
@@ -180,31 +216,37 @@ fn checks(ui: &mut Ui, t: &Tokens, state: &UnityState, here: &Context, acts: &mu
     let mode = setup.vcs_mode.as_deref();
     let text = match (setup.visible_meta(), mode) {
         (Some(true), Some(m)) if m.contains("Visible Meta Files") => {
-            ".meta files are visible, so they can be committed with their assets.".to_owned()
+            crate::i18n::text("repo-workflows-unity-checks-b10c6093").to_owned()
         }
-        (Some(true), Some(m)) => format!("Version Control mode is {m}: for git, use Visible Meta Files."),
-        (Some(false), _) => ".meta files are hidden: make them visible so they are committed with their assets.".to_owned(),
-        _ => "Couldn't read whether .meta files are visible (ProjectSettings/VersionControlSettings.asset).".to_owned(),
+        (Some(true), Some(m)) => {
+            crate::i18n::message("repo-workflows-unity-checks-a5316b9c", &[("m", (m).into())])
+        }
+        (Some(false), _) => crate::i18n::text("repo-workflows-unity-checks-36e9ce17").to_owned(),
+        _ => crate::i18n::text("repo-workflows-unity-checks-905615a3").to_owned(),
     };
     let fine = mode.map(|m| m.contains("Visible Meta Files"));
     let advice = (fine == Some(false)).then(|| vcs_place(version));
     check_row(ui, t, fine, &text, advice, |_| {});
     let yaml = &setup.missing_yaml;
     let text = if yaml.is_empty() {
-        "Scenes, prefabs and Unity's other YAML files merge with Smart Merge, with LF line ends."
-            .to_owned()
+        crate::i18n::text("repo-workflows-unity-checks-45316f68").to_owned()
     } else {
-        format!(
-            "No Smart Merge for {} of Unity's YAML types ({}).",
-            yaml.len(),
-            some_of(yaml)
+        crate::i18n::message(
+            "repo-workflows-unity-checks-1c43ea2f",
+            &[
+                ("yaml-len-1", (yaml.len()).into()),
+                ("some-of-yaml-2", (some_of(yaml)).clone().into()),
+            ],
         )
     };
     check_row(ui, t, Some(yaml.is_empty()), &text, None, |ui| {
         if !yaml.is_empty()
             && ui
-                .add_enabled(idle, egui::Button::new("Add them"))
-                .on_hover_text("Appends merge=unityyamlmerge eol=lf lines to .gitattributes. Commit it to share them.")
+                .add_enabled(
+                    idle,
+                    egui::Button::new(crate::i18n::text("repo-workflows-unity-checks-aa43c4de")),
+                )
+                .on_hover_text(crate::i18n::text("repo-workflows-unity-checks-27b09b87"))
                 .clicked()
         {
             acts.push(Action::Unity(UnityAct::AddAttributes { lfs: false }));
@@ -212,16 +254,18 @@ fn checks(ui: &mut Ui, t: &Tokens, state: &UnityState, here: &Context, acts: &mu
     });
     let bins = &setup.missing_lfs;
     let text = if bins.is_empty() {
-        "Unity's usual binaries (textures, models, audio) are kept in LFS.".to_owned()
+        crate::i18n::text("repo-workflows-unity-checks-bfe76618").to_owned()
     } else {
-        format!(
-            "Not in LFS: {} binary types ({}).",
-            bins.len(),
-            some_of(bins)
+        crate::i18n::message(
+            "repo-workflows-unity-checks-d4bedd88",
+            &[
+                ("bins-len-1", (bins.len()).into()),
+                ("some-of-bins-2", (some_of(bins)).clone().into()),
+            ],
         )
     };
     let advice = (!bins.is_empty() && !here.lfs)
-        .then_some("Optional: this repository doesn't use LFS (or git-lfs isn't installed).");
+        .then_some(crate::i18n::text("repo-workflows-unity-checks-be32fbfa"));
     check_row(
         ui,
         t,
@@ -230,43 +274,60 @@ fn checks(ui: &mut Ui, t: &Tokens, state: &UnityState, here: &Context, acts: &mu
         advice,
         |ui| {
             if !bins.is_empty()
-            && here.lfs
-            && ui
-                .add_enabled(idle, egui::Button::new("Add them"))
-                .on_hover_text(
-                    "Appends filter=lfs lines to .gitattributes. Files already committed stay as \
-                     they are until `git lfs migrate import` moves them.",
-                )
-                .clicked()
-        {
-            acts.push(Action::Unity(UnityAct::AddAttributes { lfs: true }));
-        }
+                && here.lfs
+                && ui
+                    .add_enabled(
+                        idle,
+                        egui::Button::new(crate::i18n::text(
+                            "repo-workflows-unity-checks-aa43c4de",
+                        )),
+                    )
+                    .on_hover_text(crate::i18n::text("repo-workflows-unity-checks-9d25cdb4"))
+                    .clicked()
+            {
+                acts.push(Action::Unity(UnityAct::AddAttributes { lfs: true }));
+            }
         },
     );
     let text = if setup.unignored.is_empty() {
-        "Unity's generated folders (Library, Temp, Logs…) are ignored.".to_owned()
+        crate::i18n::text("repo-workflows-unity-checks-83893d2c").to_owned()
     } else {
-        format!("Not ignored: {}.", setup.unignored.join(", "))
+        crate::i18n::message(
+            "repo-workflows-unity-checks-3cdb2b44",
+            &[(
+                "setup-unignored-join-1",
+                (setup.unignored.join(", ")).clone().into(),
+            )],
+        )
     };
     check_row(ui, t, Some(setup.unignored.is_empty()), &text, None, |ui| {
         if !setup.unignored.is_empty()
             && ui
-                .add_enabled(idle, egui::Button::new("Ignore them"))
-                .on_hover_text("Appends them to .gitignore. Commit it to share it.")
+                .add_enabled(
+                    idle,
+                    egui::Button::new(crate::i18n::text("repo-workflows-unity-checks-f64c2525")),
+                )
+                .on_hover_text(crate::i18n::text("repo-workflows-unity-checks-def8323f"))
                 .clicked()
         {
             acts.push(Action::Unity(UnityAct::AddIgnores));
         }
     });
     if !setup.tracked_generated.is_empty() {
-        let text = format!(
-            "Committed although Unity makes them: {}.",
-            setup.tracked_generated.join(", ")
+        let text = crate::i18n::message(
+            "repo-workflows-unity-checks-aa9a77c3",
+            &[(
+                "setup-tracked-generated-join-1",
+                (setup.tracked_generated.join(", ")).clone().into(),
+            )],
         );
         check_row(ui, t, Some(false), &text, None, |ui| {
             if ui
-                .add_enabled(idle, egui::Button::new("Stop tracking"))
-                .on_hover_text("git rm -r --cached: out of git, kept on disk. Commit to share it.")
+                .add_enabled(
+                    idle,
+                    egui::Button::new(crate::i18n::text("repo-workflows-unity-checks-b18a0b47")),
+                )
+                .on_hover_text(crate::i18n::text("repo-workflows-unity-checks-07cd7cdf"))
                 .clicked()
             {
                 acts.push(Action::Unity(UnityAct::UntrackGenerated));
@@ -282,25 +343,35 @@ fn smart_merge(
     here: &Context,
     acts: &mut Vec<Action>,
 ) {
-    ui.label(RichText::new("Smart Merge").font(theme::semibold(13.0)));
     ui.label(
-        RichText::new(
-            "UnityYAMLMerge merges scenes and prefabs by their structure. Once registered, git \
-             runs it itself for the files .gitattributes marks merge=unityyamlmerge. Either way, \
-             the conflict editor offers Solve with UnityYAMLMerge.",
-        )
+        RichText::new(crate::i18n::text(
+            "repo-workflows-unity-smart-merge-c7b982e4",
+        ))
+        .font(theme::semibold(13.0)),
+    );
+    ui.label(
+        RichText::new(crate::i18n::text(
+            "repo-workflows-unity-smart-merge-6b8c12f4",
+        ))
         .color(t.text_dim)
         .small(),
     );
     let idle = state.busy.is_none();
     let found = match &state.tool {
         Some(tool) => format!("UnityYAMLMerge: {}", tool.display()),
-        None => "UnityYAMLMerge wasn't found in Unity Hub's editors: choose it if Unity is installed elsewhere.".to_owned(),
+        None => crate::i18n::text("repo-workflows-unity-smart-merge-1ff6c570").to_owned(),
     };
     check_row(ui, t, Some(state.tool.is_some()), &found, None, |ui| {
         if ui
-            .add_enabled(idle, egui::Button::new("Choose…"))
-            .on_hover_text("Pick UnityYAMLMerge from an editor's Tools folder")
+            .add_enabled(
+                idle,
+                egui::Button::new(crate::i18n::text(
+                    "repo-workflows-unity-smart-merge-7ca41615",
+                )),
+            )
+            .on_hover_text(crate::i18n::text(
+                "repo-workflows-unity-smart-merge-cf3161f1",
+            ))
             .clicked()
         {
             acts.push(Action::Unity(UnityAct::ChooseTool));
@@ -308,29 +379,41 @@ fn smart_merge(
     });
     let registered = state.driver.is_some();
     let text = match (&state.driver, here.remote) {
-        (Some(_), _) => "Registered as the merge driver for Unity's YAML files.",
-        (None, true) => {
-            "This repository is on another machine: register UnityYAMLMerge there. Solve with UnityYAMLMerge still works from here."
-        }
-        (None, false) => "Not registered as this repository's merge driver.",
+        (Some(_), _) => crate::i18n::text("repo-workflows-unity-smart-merge-8fec67ee"),
+        (None, true) => crate::i18n::text("repo-workflows-unity-smart-merge-52f6735a"),
+        (None, false) => crate::i18n::text("repo-workflows-unity-smart-merge-a4fecc79"),
     };
     check_row(ui, t, Some(registered), text, None, |ui| {
         let can = idle && state.tool.is_some() && !here.remote;
         let label = if registered {
-            "Register again"
+            crate::i18n::text("repo-workflows-unity-smart-merge-dfedc705")
         } else {
-            "Register"
+            crate::i18n::text("repo-workflows-unity-smart-merge-bb7234ec")
         };
         let why = if state.tool.is_none() {
-            "Choose UnityYAMLMerge first"
+            crate::i18n::text("repo-workflows-unity-smart-merge-4822ac9a")
         } else {
-            "Register it on the repository's own machine"
+            crate::i18n::text("repo-workflows-unity-smart-merge-58740afb")
         };
         let r = ui
             .add_enabled(can, egui::Button::new(label))
-            .on_hover_text(format!(
-                "Sets merge.unityyamlmerge and mergetool.unityyamlmerge in this repository's config{}",
-                state.driver.as_deref().map(|d| format!(" (now: {d})")).unwrap_or_default()
+            .on_hover_text(crate::i18n::message(
+                "repo-workflows-unity-smart-merge-f6ef6d29",
+                &[(
+                    "state-driver-as-deref-map-d-form-1",
+                    (state
+                        .driver
+                        .as_deref()
+                        .map(|d| {
+                            crate::i18n::message(
+                                "repo-workflows-unity-smart-merge-a472cbc6",
+                                &[("d", (d).into())],
+                            )
+                        })
+                        .unwrap_or_default())
+                    .clone()
+                    .into(),
+                )],
             ))
             .on_disabled_hover_text(why);
         if r.clicked() {

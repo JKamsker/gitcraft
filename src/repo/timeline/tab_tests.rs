@@ -223,11 +223,12 @@ fn a_rebase_gives_its_old_tip_back_after_a_restart_and_a_gc() {
     git_ok(&dir, &["commit", "-q", "-m", "m1"]);
     git_ok(&dir, &["checkout", "-q", "feat"]);
     let mut tab = open(&dir, &ctx);
-    act(
-        &mut tab,
-        &ctx,
-        rebase_action(BranchRef::local("main"), "feat"),
-    );
+    let onto = git_ok(&dir, &["rev-parse", "refs/heads/main"]);
+    tab.apply(rebase_action(BranchRef::local("main"), "feat"), &ctx);
+    let accepted = tab
+        .accept_rebase_for_test(&ctx, "feat", &old_tip, &onto)
+        .unwrap_or_else(|error| unreachable!("rebase confirmation: {error}"));
+    act(&mut tab, &ctx, accepted);
     let entry = tab.timeline.current_entry().cloned();
     let id = entry.as_ref().map_or(0, |e| e.id);
     let kept = wait(&mut tab, &ctx, |t| keeper_exists(&t.path, id));
@@ -365,7 +366,12 @@ fn a_jump_refuses_once_a_branch_moved_since_it_was_read() {
     tab.toggle_timeline();
     tab.apply(Action::Timeline(TimelineAct::Jump(None)), &ctx);
     let ran = wait(&mut tab, &ctx, |t| t.busy_op.is_none() && !t.loading);
-    let status = tab.status.clone().map(|(s, _)| s).unwrap_or_default();
+    let status = tab
+        .status
+        .as_deref()
+        .cloned()
+        .map(|(s, _)| s)
+        .unwrap_or_default();
     let head = git::head(&dir);
     let _ = std::fs::remove_dir_all(&dir);
     assert!(ran);
@@ -407,7 +413,13 @@ fn back_to_back_operations_are_both_kept() {
         None
     } else {
         tab.undo(&ctx);
-        Some(tab.status.clone().map(|(s, _)| s).unwrap_or_default())
+        Some(
+            tab.status
+                .as_deref()
+                .cloned()
+                .map(|(s, _)| s)
+                .unwrap_or_default(),
+        )
     };
     let _ = std::fs::write(dir.join("b.txt"), "b");
     // The cached status may still show the first commit's staged file. Give
@@ -417,7 +429,7 @@ fn back_to_back_operations_are_both_kept() {
     tab.apply(Action::Commit, &ctx);
     let second_ran = tab.busy_op.is_some();
     assert!(wait(&mut tab, &ctx, settled));
-    let status = tab.status.clone();
+    let status = tab.status.as_deref().cloned();
     let labels: Vec<String> = tab
         .timeline
         .entries

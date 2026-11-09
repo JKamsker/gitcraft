@@ -65,9 +65,7 @@ impl RepoTab {
         };
         if !settings.enabled() {
             review.state = State::Failed(
-                "No AI tool is picked: choose one in Settings → AI, or with the sparkles button \
-                 of the commit box."
-                    .to_owned(),
+                crate::i18n::text("repo-workflows-ai-start-review-62f579d4").to_owned(),
             );
             self.ai.review = Some(review);
             return;
@@ -111,20 +109,23 @@ impl RepoTab {
         let t = Tokens::get(ctx);
         let mut open = true;
         let mut asked = None;
-        egui::Window::new(format!("Review of {}", review.branch))
-            .id(egui::Id::new(("ai-review", self.path.clone())))
-            .open(&mut open)
-            .collapsible(false)
-            .resizable(true)
-            .default_size([620.0, 560.0])
-            .pivot(egui::Align2::CENTER_CENTER)
-            .default_pos(ctx.content_rect().center())
-            .frame(
-                egui::Frame::window(&ctx.global_style())
-                    .fill(t.card)
-                    .stroke(egui::Stroke::new(1.0, t.field_border)),
-            )
-            .show(ctx, |ui| asked = review_ui(ui, review));
+        egui::Window::new(crate::i18n::message(
+            "repo-workflows-ai-ai-review-window-04dc8d04",
+            &[("review-branch-1", (review.branch).clone().into())],
+        ))
+        .id(egui::Id::new(("ai-review", self.path.clone())))
+        .open(&mut open)
+        .collapsible(false)
+        .resizable(true)
+        .default_size([620.0, 560.0])
+        .pivot(egui::Align2::CENTER_CENTER)
+        .default_pos(ctx.content_rect().center())
+        .frame(
+            egui::Frame::window(&ctx.global_style())
+                .fill(t.card)
+                .stroke(egui::Stroke::new(1.0, t.field_border)),
+        )
+        .show(ctx, |ui| asked = review_ui(ui, review));
         if !open {
             asked = Some(Asked::Close);
         }
@@ -155,9 +156,12 @@ fn review_ui(ui: &mut Ui, review: &mut Review) -> Option<Asked> {
     let t = Tokens::get(ui.ctx());
     let mut asked = None;
     ui.label(
-        RichText::new(format!(
-            "What {} adds to {} since they diverged",
-            review.branch, review.base
+        RichText::new(crate::i18n::message(
+            "repo-workflows-ai-review-ui-b43c02f3",
+            &[
+                ("review-branch-1", (review.branch).clone().into()),
+                ("review-base-2", (review.base).clone().into()),
+            ],
         ))
         .color(t.text_faint)
         .small(),
@@ -169,14 +173,22 @@ fn review_ui(ui: &mut Ui, review: &mut Review) -> Option<Asked> {
             ui.horizontal(|ui| {
                 ui.add(crate::spinner::Spinner::new());
                 ui.label(
-                    RichText::new(format!(
-                        "{} is reviewing… {}",
-                        running.tool.short(),
-                        elapsed(running.started)
+                    RichText::new(crate::i18n::message(
+                        "repo-workflows-ai-review-ui-3ccec26f",
+                        &[
+                            ("running-tool-short-1", (running.tool.short()).into()),
+                            (
+                                "elapsed-running-started-2",
+                                (elapsed(running.started)).clone().into(),
+                            ),
+                        ],
                     ))
                     .color(t.text_dim),
                 );
-                if ui.button("Cancel").clicked() {
+                if ui
+                    .button(crate::i18n::text("repo-workflows-ai-review-ui-19766ed6"))
+                    .clicked()
+                {
                     asked = Some(Asked::Cancel);
                 }
             });
@@ -186,10 +198,16 @@ fn review_ui(ui: &mut Ui, review: &mut Review) -> Option<Asked> {
                 ui.label(RichText::new(note).color(t.text_faint).small());
             }
             ui.horizontal(|ui| {
-                if ui.button("Copy").clicked() {
+                if ui
+                    .button(crate::i18n::text("repo-workflows-ai-review-ui-e21f935f"))
+                    .clicked()
+                {
                     ui.ctx().copy_text(answer.text.clone());
                 }
-                if ui.button("Review again").clicked() {
+                if ui
+                    .button(crate::i18n::text("repo-workflows-ai-review-ui-d4ea61c7"))
+                    .clicked()
+                {
                     asked = Some(Asked::Again);
                 }
             });
@@ -204,13 +222,23 @@ fn review_ui(ui: &mut Ui, review: &mut Review) -> Option<Asked> {
         State::Failed(e) => {
             ui.add(egui::Label::new(RichText::new(e).color(t.danger)).wrap());
             // With no tool picked, trying again is the same answer: the message says what to do.
-            if Settings::get(ui.ctx()).ai.enabled() && ui.button("Try again").clicked() {
+            if Settings::get(ui.ctx()).ai.enabled()
+                && ui
+                    .button(crate::i18n::text("repo-workflows-ai-review-ui-d8b8392e"))
+                    .clicked()
+            {
                 asked = Some(Asked::Again);
             }
         }
         State::Stopped => {
-            ui.label(RichText::new("Stopped.").color(t.text_dim));
-            if ui.button("Review again").clicked() {
+            ui.label(
+                RichText::new(crate::i18n::text("repo-workflows-ai-review-ui-f8ec77e7"))
+                    .color(t.text_dim),
+            );
+            if ui
+                .button(crate::i18n::text("repo-workflows-ai-review-ui-d4ea61c7"))
+                .clicked()
+            {
                 asked = Some(Asked::Again);
             }
         }

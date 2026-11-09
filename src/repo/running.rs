@@ -79,6 +79,12 @@ impl RepoTab {
         let control =
             git::OpControl::scoped(move || repaint.request_repaint(), self.tx.cancel.child());
         let network = ops.iter().any(|op| {
+            if op
+                .first()
+                .is_some_and(|s| s == crate::push_preflight::APPROVED)
+            {
+                return true;
+            }
             let args: Vec<&str> = op.iter().map(String::as_str).collect();
             git::goes_over_network(&args)
         });
@@ -123,13 +129,20 @@ impl RepoTab {
             return;
         }
         if self.waiting.len() >= MAX_WAITING {
-            self.status = Some((
-                format!(
-                    "{}: not started, {MAX_WAITING} operations already wait for {busy}",
-                    waiter.label()
+            self.status = Some(crate::repo::Notice::plain((
+                crate::i18n::message(
+                    "repo-core-3347",
+                    &[
+                        ("label", waiter.label().to_string().into()),
+                        ("MAX-WAITING", format!("{}", MAX_WAITING).into()),
+                        (
+                            "busy",
+                            crate::repo::messages::display_operation(&busy).into(),
+                        ),
+                    ],
                 ),
                 true,
-            ));
+            )));
             return;
         }
         self.waiting.push_back(waiter);
@@ -143,7 +156,7 @@ impl RepoTab {
         if !ok && !quiet {
             let dropped = std::mem::take(&mut self.waiting);
             if !dropped.is_empty()
-                && let Some((msg, _)) = &mut self.status
+                && let Some((msg, _)) = self.status.as_mut().map(super::Notice::edit_raw)
             {
                 *msg = with_not_run(msg, &dropped);
             }
@@ -213,7 +226,10 @@ impl RepoTab {
 /// "Fetch failed (Pull not run): …", which is what the toolbar shows of it.
 pub(super) fn with_not_run(msg: &str, dropped: &Waiting) -> String {
     let names: Vec<&str> = dropped.iter().map(|w| w.label()).collect();
-    let note = format!(" ({} not run)", names.join(", "));
+    let note = crate::i18n::message(
+        "repo-core-3348",
+        &[("names", names.join(", ").to_string().into())],
+    );
     match msg.split_once(": ") {
         Some((head, rest)) => format!("{head}{note}: {rest}"),
         None => match msg.split_once('\n') {
@@ -225,10 +241,14 @@ pub(super) fn with_not_run(msg: &str, dropped: &Waiting) -> String {
 
 #[cfg(test)]
 mod tests {
-    use std::path::{Path, PathBuf};
+    #[cfg(unix)]
+    use std::path::Path;
+    use std::path::PathBuf;
     use std::time::{Duration, Instant};
 
-    use super::super::{Action, OpKind, Refresh, RepoTab, UndoEntry, ops};
+    #[cfg(unix)]
+    use super::super::UndoEntry;
+    use super::super::{Action, OpKind, Refresh, RepoTab, ops};
     use super::{Waiter, Waiting, with_not_run};
     use crate::git;
 
@@ -309,7 +329,7 @@ mod tests {
             OpKind::plain(),
             &ctx,
         );
-        let refused = tab.status.clone();
+        let refused = tab.status.as_deref().cloned();
         let pid_file = dir.join("pid");
         let start = Instant::now();
         while !pid_file.exists() && start.elapsed() < Duration::from_secs(10) {
@@ -328,7 +348,7 @@ mod tests {
         assert!(tab.waiting.is_empty());
         assert!(!tab.can_cancel());
         assert_eq!(
-            tab.status.as_ref().map(|(s, e)| (s.as_str(), *e)),
+            tab.status.as_deref().map(|(s, e)| (s.as_str(), *e)),
             Some(("Fetch (Push not run): cancelled", false))
         );
         assert_eq!(
@@ -365,7 +385,7 @@ mod tests {
             tab.apply(action, &ctx);
         }
         let waiting = tab.waiting.clone();
-        let refused = tab.status.clone();
+        let refused = tab.status.as_deref().cloned();
         let mut ran = Vec::new();
         let start = Instant::now();
         while (tab.busy_op.is_some() || !tab.waiting.is_empty())
@@ -389,7 +409,11 @@ mod tests {
         // nothing to pull from), and the push it was asked before is dropped.
         assert_eq!(ran[..2], ["Tag a".to_owned(), "Fetch".to_owned()]);
         assert_eq!(ran.get(2).map(String::as_str), Some(modes[0].label()));
-        let status = tab.status.map(|(s, _)| s).unwrap_or_default();
+        let status = tab
+            .status
+            .map(crate::repo::Notice::into_raw)
+            .map(|(s, _)| s)
+            .unwrap_or_default();
         assert!(status.contains("(Push not run)"), "{status}");
     }
 
@@ -413,7 +437,10 @@ mod tests {
             t.busy_op.is_none() && t.waiting.is_empty()
         });
         let _ = std::fs::remove_dir_all(&dir);
-        assert_eq!(tab.status, Some(("Fetch: done".to_owned(), false)));
+        assert_eq!(
+            tab.status.as_deref().cloned(),
+            Some(("Fetch: done".to_owned(), false))
+        );
     }
 
     #[test]

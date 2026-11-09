@@ -169,8 +169,11 @@ impl RepoTab {
             "Stop bisect"
         };
         let back = match state.and_then(Bisect::start_branch) {
-            Some(branch) => format!("back on {branch}"),
-            None => "back on the commit it began at".to_owned(),
+            Some(branch) => crate::i18n::message(
+                "repo-workflows-bisect-reset-bisect-fd58b76b",
+                &[("branch", (branch).into())],
+            ),
+            None => crate::i18n::text("repo-workflows-bisect-reset-bisect-b63b6486").to_owned(),
         };
         self.bisect_step(label, ctx, move |path| {
             git::bisect_reset(path).map(|_| back)
@@ -180,14 +183,20 @@ impl RepoTab {
     /// Why a bisect can't start now, if it can't.
     pub(super) fn bisect_blocker(&self) -> Option<String> {
         if let Some(busy) = &self.busy_op {
-            return Some(format!("Wait for {busy} to finish first."));
+            return Some(crate::i18n::message(
+                "repo-workflows-bisect-bisect-blocker-cff28fea",
+                &[("busy", (busy).clone().into())],
+            ));
         }
         git::start_blocker(&self.work, self.bisect.state.is_some())
     }
 
     fn start_bisect(&mut self, bad: String, good: Option<String>, ctx: &egui::Context) {
         if let Some(why) = self.bisect_blocker() {
-            self.status = Some((format!("Can't start a bisect: {why}"), true));
+            self.status = Some(crate::repo::Notice::plain((
+                format!("Can't start a bisect: {why}"),
+                true,
+            )));
             return;
         }
         self.bisect_step("Start bisect", ctx, move |path| {
@@ -197,7 +206,10 @@ impl RepoTab {
 
     fn mark_bisect(&mut self, mark: Mark, rev: Option<String>, ctx: &egui::Context) {
         let Some(bisect) = self.bisect.state.clone() else {
-            self.status = Some(("No bisect is going on".to_owned(), true));
+            self.status = Some(crate::repo::Notice::plain((
+                "No bisect is going on".to_owned(),
+                true,
+            )));
             return;
         };
         let label = match (&rev, mark) {
@@ -241,10 +253,10 @@ impl RepoTab {
     ) {
         self.busy_op = None;
         self.op_started = None;
-        self.status = Some(match result {
+        self.status = Some(crate::repo::Notice::plain(match result {
             Ok(said) => (format!("{label}: {}", said_briefly(&said)), false),
             Err(e) => (format!("{label} failed: {e}"), true),
-        });
+        }));
         self.reload(ctx);
     }
 
@@ -344,11 +356,13 @@ impl RepoTab {
             .unwrap_or_default();
         let (message, failed) = run_message(&ended, &last_line, only_skipped);
         if run.started.elapsed() > LONG_RUN {
-            self.finished
-                .push((format!("{} · {message}", self.name), failed));
+            self.finished.push(crate::repo::Notice::plain((
+                format!("{} · {message}", self.name),
+                failed,
+            )));
         }
         run.ended = Some(ended);
-        self.status = Some((message, failed));
+        self.status = Some(crate::repo::Notice::plain((message, failed)));
         self.reload(ctx);
     }
 
@@ -372,14 +386,16 @@ impl RepoTab {
             .state
             .as_ref()
             .and_then(|b| b.start_branch().map(str::to_owned))
-            .unwrap_or_else(|| "what was checked out when it began".to_owned());
+            .unwrap_or_else(|| {
+                crate::i18n::text("repo-workflows-bisect-stop-bisect-action-fff2c8f7").to_owned()
+            });
         Action::Dialog(Dialog::confirm(
             "Stop bisect",
-            format!(
-                "Stop bisecting and check out {back} again? The commits marked so far are \
-                 forgotten."
+            crate::i18n::message(
+                "repo-workflows-bisect-stop-bisect-action-c380662a",
+                &[("back", (back).clone().into())],
             ),
-            "Stop bisect",
+            crate::i18n::text("repo-workflows-bisect-stop-bisect-action-0ddac35c"),
             ops(&[&["bisect", "reset"]]),
             None,
         ))
@@ -427,20 +443,46 @@ fn run_message(
     only_skipped: bool,
 ) -> (String, bool) {
     match ended {
-        Ok(e) if e.stopped => ("Bisect run stopped".to_owned(), false),
-        Ok(e) if e.code == Some(0) => ("Bisect run: found the first bad commit".to_owned(), false),
+        Ok(e) if e.stopped => (
+            crate::i18n::text("repo-workflows-bisect-run-message-96334386").to_owned(),
+            false,
+        ),
+        Ok(e) if e.code == Some(0) => (
+            crate::i18n::text("repo-workflows-bisect-run-message-de2346a5").to_owned(),
+            false,
+        ),
         Ok(_) if only_skipped => (
-            "Bisect run: only skipped commits are left, the first bad commit is one of them"
-                .to_owned(),
+            crate::i18n::text("repo-workflows-bisect-run-message-dc9c7971").to_owned(),
             false,
         ),
         Ok(e) => {
-            let code = e
-                .code
-                .map_or_else(|| "a signal".to_owned(), |c| format!("exit code {c}"));
-            (format!("Bisect run ended with {code}: {last_line}"), true)
+            let code = e.code.map_or_else(
+                || crate::i18n::text("repo-workflows-bisect-run-message-e8e581bc").to_owned(),
+                |c| {
+                    crate::i18n::message(
+                        "repo-workflows-bisect-run-message-b1d63bd2",
+                        &[("c", (c).into())],
+                    )
+                },
+            );
+            (
+                crate::i18n::message(
+                    "repo-workflows-bisect-run-message-b4eba258",
+                    &[
+                        ("code", (code).clone().into()),
+                        ("last-line", (last_line).into()),
+                    ],
+                ),
+                true,
+            )
         }
-        Err(e) => (format!("Bisect run failed: {e}"), true),
+        Err(e) => (
+            crate::i18n::message(
+                "repo-workflows-bisect-run-message-3a24171a",
+                &[("e", (e).clone().into())],
+            ),
+            true,
+        ),
     }
 }
 

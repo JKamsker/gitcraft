@@ -137,7 +137,8 @@ impl super::RepoTab {
 
     /// Nothing goes on that suspending would end or lose.
     fn idle(&mut self) -> bool {
-        !self.is_busy()
+        !self.local_ci.busy()
+            && !self.is_busy()
             && !self.loading_more
             && !self.counting_worktrees
             && self.queued.is_empty()
@@ -178,10 +179,23 @@ impl super::RepoTab {
         self.history_index.clear();
         self.commits = Vec::new();
         self.graph = crate::graph::Graph {
-            rows: Vec::new(),
+            rows: Vec::new().into(),
             width: 0,
         };
         self.index = Default::default();
+        // These readers have private result channels as well as the tab channel.
+        // Retire both queued captures and completed results with the old lifetime.
+        self.band_reader = Default::default();
+        self.topology_reader = Default::default();
+        self.topology = Default::default();
+        self.graph_narration = Default::default();
+        self.history_minimap = Default::default();
+        self.history_activity = None;
+        self.atlas = None;
+        self.growth = None;
+        self.postcards = Default::default();
+        self.graph_motion = Default::default();
+        self.celebration = Default::default();
         self.has_more = false;
         self.selected = None;
         self.scroll_to = None;
@@ -195,6 +209,55 @@ impl super::RepoTab {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn suspension_retires_private_analysis_readers_and_their_pending_captures() -> Result<(), String>
+    {
+        let ctx = egui::Context::default();
+        let mut tab =
+            crate::repo::RepoTab::new_deferred("/nonexistent/suspend-analysis".into(), &ctx);
+        tab.life.phase = Phase::Live;
+        let (entered_tx, entered_rx) = std::sync::mpsc::channel();
+        let (release_tx, release_rx) = std::sync::mpsc::channel();
+        let (finished_tx, finished_rx) = std::sync::mpsc::channel();
+        tab.band_reader.queue(move |active| {
+            entered_tx.send(()).map_err(|e| e.to_string())?;
+            release_rx
+                .recv_timeout(Duration::from_secs(5))
+                .map_err(|e| e.to_string())?;
+            finished_tx.send(active()).map_err(|e| e.to_string())?;
+            // A late success must be discarded even if its worker ignores cancellation.
+            Ok(crate::graph::Graph {
+                rows: Vec::new().into(),
+                width: 42,
+            })
+        });
+        tab.band_reader.poll(&tab.tx, &ctx);
+        entered_rx
+            .recv_timeout(Duration::from_secs(5))
+            .map_err(|e| e.to_string())?;
+        tab.topology_reader.queue(|_| Ok(Default::default()));
+        tab.atlas = Some(Default::default());
+        tab.growth = Some(Default::default());
+        tab.life.phase = Phase::Suspended;
+        tab.suspend();
+        release_tx.send(()).map_err(|e| e.to_string())?;
+        assert!(
+            !finished_rx
+                .recv_timeout(Duration::from_secs(5))
+                .map_err(|e| e.to_string())?
+        );
+        assert!(!tab.band_reader.busy());
+        assert!(!tab.topology_reader.busy());
+        assert!(tab.atlas.is_none());
+        assert!(tab.growth.is_none());
+        tab.poll_parked_view(&ctx);
+        assert_eq!(tab.graph.width, 0);
+        assert!(tab.topology.parents.is_empty());
+        assert!(!tab.band_reader.busy());
+        assert!(!tab.topology_reader.busy());
+        Ok(())
+    }
 
     #[test]
     fn a_restored_tab_starts_only_when_first_shown() {

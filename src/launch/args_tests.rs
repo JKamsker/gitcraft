@@ -208,3 +208,13 @@ fn launcher_dialogs_share_the_command_line_and_handoff_parser() {
         Some(Command::Open("--clone".into()))
     );
 }
+
+#[test]
+fn resident_quit_is_an_explicit_literal_flag_not_a_folder_or_shell_command() {
+    assert_eq!(run(&["--quit"]), Some(Command::Quit));
+    assert_eq!(run(&["--", "--quit"]), Some(Command::Open("--quit".into())));
+    assert!(matches!(
+        parse(["--quit".into(), "extra".into()]),
+        Parsed::Fail(_)
+    ));
+}

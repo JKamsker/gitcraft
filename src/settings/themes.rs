@@ -46,6 +46,7 @@ pub fn theme_menu(ui: &mut Ui, current: &ThemeId) -> Option<ThemePick> {
                     let tokens = info.palette.tokens();
                     let (rect, resp) =
                         ui.allocate_exact_size(vec2(ui.available_width(), 26.0), Sense::click());
+                    crate::a11y::a11y_selected(&resp, &info.name, chosen);
                     if resp.hovered() {
                         ui.painter().rect_filled(rect, 0.0, t.hover);
                     }
@@ -101,7 +102,10 @@ pub fn theme_menu(ui: &mut Ui, current: &ThemeId) -> Option<ThemePick> {
             }
         });
     ui.separator();
-    if ui.button("Browse themes, import your own…").clicked() {
+    if ui
+        .button(crate::i18n::text("interaction-preferences-browse"))
+        .clicked()
+    {
         pick = Some(ThemePick::Browse);
     }
     if pick.is_some() {
@@ -131,15 +135,27 @@ fn gallery(ui: &mut Ui, f: &Filter, view: &mut SettingsView, tweaks: &theme::Twe
     let mut shown: Shown = ui.data(|d| d.get_temp(shown_id)).unwrap_or_default();
     ui.horizontal_wrapped(|ui| {
         for (option, label) in [
-            (Shown::All, "All"),
-            (Shown::Dark, "Dark"),
-            (Shown::Light, "Light"),
+            (Shown::All, crate::i18n::text("interaction-preferences-all")),
+            (
+                Shown::Dark,
+                crate::i18n::text("interaction-preferences-dark"),
+            ),
+            (
+                Shown::Light,
+                crate::i18n::text("interaction-preferences-light"),
+            ),
         ] {
             if ui.selectable_label(shown == option, label).clicked() {
                 shown = option;
             }
         }
-        layout::note(ui, format!("{} themes", theme::themes().len()));
+        layout::note(
+            ui,
+            crate::i18n::message(
+                "interaction-preferences-count",
+                &[("count", theme::themes().len().into())],
+            ),
+        );
     });
     ui.data_mut(|d| d.insert_temp(shown_id, shown));
     ui.add_space(6.0);
@@ -169,18 +185,34 @@ fn gallery(ui: &mut Ui, f: &Filter, view: &mut SettingsView, tweaks: &theme::Twe
         if group == Group::Dark {
             ui.add_space(4.0);
             if ui
-                .button(if more { "Show less" } else { "Show more" })
+                .button(if more {
+                    crate::i18n::text("dev-integration-ui-themes-less")
+                } else {
+                    crate::i18n::text("dev-integration-ui-themes-more")
+                })
                 .clicked()
             {
                 more = !more;
                 ui.data_mut(|d| d.insert_temp(more_id, more));
             }
-            layout::note(ui, format!("{external_count} other themes"));
+            layout::note(
+                ui,
+                crate::i18n::message(
+                    "dev-integration-ui-themes-external-count",
+                    &[("count", external_count.into())],
+                ),
+            );
             if let Some(active) = external_active {
-                layout::note(ui, format!("Active theme: {}", active.name));
+                layout::note(
+                    ui,
+                    crate::i18n::message(
+                        "dev-integration-ui-theme-active",
+                        &[("name", active.name.clone().into())],
+                    ),
+                );
             }
             if search_external && more {
-                layout::note(ui, "Showing themes matching your search");
+                layout::note(ui, crate::i18n::text("dev-integration-ui-themes-search"));
             }
         }
         if group != Group::Gitcraft && !more {
@@ -224,6 +256,7 @@ fn gallery(ui: &mut Ui, f: &Filter, view: &mut SettingsView, tweaks: &theme::Twe
                     let tokens = info.tokens(tweaks);
                     preview::thumbnail(ui.painter(), thumb, &tokens);
                     let chosen = info.id == view.theme;
+                    crate::a11y::a11y_selected(&resp, &info.name, chosen);
                     if chosen {
                         ui.painter().rect_stroke(
                             thumb.expand(2.0),
@@ -257,7 +290,7 @@ fn gallery(ui: &mut Ui, f: &Filter, view: &mut SettingsView, tweaks: &theme::Twe
                     }
                     let resp = resp
                         .on_hover_cursor(egui::CursorIcon::PointingHand)
-                        .on_hover_text(format!("{}\n{}", info.name, info.credit));
+                        .on_hover_text(format!("{}\n{}", info.name, theme_credit(info)));
                     resp.widget_info(|| {
                         egui::WidgetInfo::selected(
                             egui::WidgetType::SelectableLabel,
@@ -337,7 +370,7 @@ impl Settings {
                     ui.spacing_mut().item_spacing.x = 6.0;
                     let own = theme::resolve(&view.theme).palette.accent;
                     if swatch(ui, own, self.theme_tweaks.accent.is_none(), &t)
-                        .on_hover_text("The theme's own")
+                        .on_hover_text(crate::i18n::text("interaction-preferences-own"))
                         .clicked()
                     {
                         self.theme_tweaks.accent = None;
@@ -354,7 +387,7 @@ impl Settings {
                         .accent
                         .unwrap_or([own.r(), own.g(), own.b()]);
                     if egui::color_picker::color_edit_button_srgb(ui, &mut rgb)
-                        .on_hover_text("Any colour")
+                        .on_hover_text(crate::i18n::text("interaction-preferences-any"))
                         .changed()
                     {
                         self.theme_tweaks.accent = Some(rgb);
@@ -363,9 +396,9 @@ impl Settings {
                 layout::note(
                     ui,
                     if self.theme_tweaks.accent.is_none() {
-                        "The theme's own"
+                        crate::i18n::text("interaction-preferences-own")
                     } else {
-                        "Yours, whatever the theme"
+                        crate::i18n::text("interaction-preferences-your-accent")
                     },
                 );
             },
@@ -377,8 +410,12 @@ impl Settings {
                 egui::Slider::new(&mut self.theme_tweaks.roundness, 0.0..=2.5)
                     .step_by(0.25)
                     .custom_formatter(|v, _| match v {
-                        v if v <= 0.0 => "Square".to_owned(),
-                        v if (v - 1.0).abs() < 0.01 => "As the theme".to_owned(),
+                        v if v <= 0.0 => {
+                            crate::i18n::text("interaction-preferences-square").to_owned()
+                        }
+                        v if (v - 1.0).abs() < 0.01 => {
+                            crate::i18n::text("interaction-preferences-as-theme").to_owned()
+                        }
                         v => format!("{:.0} %", v * 100.0),
                     }),
             ));
@@ -386,39 +423,46 @@ impl Settings {
         card.preview(Preview::Theme);
         card.row_hint(
             "Your themes",
-            "VS Code, Base16 or gitcraft's own",
+            crate::i18n::text("interaction-preferences-your-themes"),
             "import file folder vscode base16 base24 json yaml custom edit export copy",
             |ui| {
                 ui.horizontal_wrapped(|ui| {
                     if ui
-                        .button("Import theme file…")
-                        .on_hover_text(
-                            "A VS Code colour theme (.json, e.g. from an extension's themes \
-                             folder), a Base16 or Base24 scheme (.yaml), or a theme saved by \
-                             gitcraft. It is copied into the themes folder and chosen.",
-                        )
+                        .button(crate::i18n::text("interaction-preferences-import"))
+                        .on_hover_text(crate::i18n::text("interaction-preferences-import-help"))
                         .clicked()
                         && let Some(path) = rfd::FileDialog::new()
-                            .set_title("Import a theme")
-                            .add_filter("Theme files", &["json", "jsonc", "yaml", "yml"])
+                            .set_title(crate::i18n::text("interaction-preferences-import-title"))
+                            .add_filter(
+                                crate::i18n::text("interaction-preferences-theme-files"),
+                                &["json", "jsonc", "yaml", "yml"],
+                            )
                             .pick_file()
                     {
                         match theme::files::import(&path) {
                             Ok(file) => {
                                 theme::refresh();
                                 view.request = Some(ProfileRequest::Theme(ThemeId::file(&file)));
-                                set_message(ui.ctx(), Ok(format!("Imported as {file}")));
+                                set_message(
+                                    ui.ctx(),
+                                    Ok(crate::i18n::message(
+                                        "interaction-preferences-imported",
+                                        &[("file", file.into())],
+                                    )),
+                                );
                             }
-                            Err(e) => set_message(ui.ctx(), Err(format!("Not imported: {e}"))),
+                            Err(e) => set_message(
+                                ui.ctx(),
+                                Err(crate::i18n::message(
+                                    "interaction-preferences-not-imported",
+                                    &[("error", theme::files::display_diagnostic(&e).into())],
+                                )),
+                            ),
                         }
                     }
                     if ui
-                        .button("Save a copy to edit")
-                        .on_hover_text(
-                            "Writes this theme, with every one of its colours, as a file in the \
-                             themes folder and uses it: change the file in any editor and \
-                             gitcraft follows as you save.",
-                        )
+                        .button(crate::i18n::text("interaction-preferences-copy"))
+                        .on_hover_text(crate::i18n::text("interaction-preferences-copy-help"))
                         .clicked()
                     {
                         let info = theme::resolve(&view.theme);
@@ -440,12 +484,26 @@ impl Settings {
                             Ok(file) => {
                                 theme::refresh();
                                 view.request = Some(ProfileRequest::Theme(ThemeId::file(&file)));
-                                set_message(ui.ctx(), Ok(format!("Saved as {file}")));
+                                set_message(
+                                    ui.ctx(),
+                                    Ok(crate::i18n::message(
+                                        "interaction-preferences-saved",
+                                        &[("file", file.into())],
+                                    )),
+                                );
                             }
-                            Err(e) => set_message(ui.ctx(), Err(format!("Not saved: {e}"))),
+                            Err(e) => set_message(
+                                ui.ctx(),
+                                Err(crate::i18n::message(
+                                    "interaction-preferences-not-saved",
+                                    &[("error", theme::files::display_diagnostic(&e).into())],
+                                )),
+                            ),
                         }
                     }
-                    if ui.button("Open themes folder").clicked()
+                    if ui
+                        .button(crate::i18n::text("interaction-preferences-open-folder"))
+                        .clicked()
                         && let Some(dir) = theme::files::dir()
                     {
                         let _ = std::fs::create_dir_all(&dir);
@@ -461,21 +519,21 @@ impl Settings {
                 }
                 for (file, why) in theme::theme_errors() {
                     ui.label(
-                        RichText::new(format!("{file}: {why}"))
+                        RichText::new(theme_file_error(&file, &why))
                             .color(t.warning)
                             .small(),
                     );
                 }
                 ui.horizontal_wrapped(|ui| {
                     ui.spacing_mut().item_spacing.x = 4.0;
-                    layout::note(ui, "Find more:");
+                    layout::note(ui, crate::i18n::text("interaction-preferences-more"));
                     ui.hyperlink_to(
-                        RichText::new("VS Code themes").small(),
+                        RichText::new(crate::i18n::text("interaction-preferences-vscode")).small(),
                         "https://vscodethemes.com",
                     );
                     layout::note(ui, "·");
                     ui.hyperlink_to(
-                        RichText::new("Base16 schemes").small(),
+                        RichText::new(crate::i18n::text("interaction-preferences-base16")).small(),
                         "https://github.com/tinted-theming/schemes",
                     );
                 });
@@ -484,9 +542,41 @@ impl Settings {
     }
 }
 
+/// Only file-generated credit kinds are presentation; built-in attribution is opaque.
+fn theme_credit(info: &theme::ThemeInfo) -> String {
+    if info.group == Group::Yours {
+        theme::files::display_credit(&info.credit)
+    } else {
+        info.credit.clone()
+    }
+}
+
+fn theme_file_error(file: &str, raw: &str) -> String {
+    crate::i18n::message(
+        "interaction-theme-file-file-error",
+        &[
+            ("file", file.into()),
+            ("error", theme::files::display_diagnostic(raw).into()),
+        ],
+    )
+}
+
 /// A round swatch of `c`, ringed when `chosen`.
 fn swatch(ui: &mut Ui, c: Color32, chosen: bool, t: &Tokens) -> egui::Response {
     let (rect, resp) = ui.allocate_exact_size(vec2(22.0, 22.0), Sense::click());
+    crate::a11y::a11y_selected(
+        &resp,
+        || {
+            crate::i18n::message(
+                "interaction-preferences-colour",
+                &[(
+                    "hex",
+                    format!("#{:02X}{:02X}{:02X}", c.r(), c.g(), c.b()).into(),
+                )],
+            )
+        },
+        chosen,
+    );
     let p = ui.painter();
     if chosen {
         p.circle_stroke(rect.center(), 10.5, Stroke::new(2.0, t.text));
@@ -512,6 +602,69 @@ fn message(ctx: &egui::Context) -> Option<Result<String, String>> {
     ctx.data(|d| d.get_temp::<(f64, Result<String, String>)>(message_id()))
         .filter(|(at, _)| now - at < 8.0)
         .map(|(_, m)| m)
+}
+
+#[cfg(test)]
+mod localization_tests {
+    use super::*;
+    use egui_kittest::{Harness, kittest::Queryable};
+
+    #[test]
+    fn actual_theme_file_paint_helpers_keep_names_and_builtin_attribution_opaque() {
+        let mut info = theme::ThemeInfo {
+            id: ThemeId::file("Theme 色.json"),
+            name: "Theme 色".to_owned(),
+            credit: "Your theme · Author {$x}".to_owned(),
+            group: Group::Yours,
+            palette: theme::catalog::BUILTIN[0].palette(),
+        };
+        let original = info.clone();
+        crate::i18n::set_language("de");
+        assert_eq!(theme_credit(&info), "Eigenes Farbschema · Author {$x}");
+        assert_eq!(
+            theme_file_error("Theme 色.json", "not readable JSON"),
+            "Theme 色.json: kein lesbares JSON"
+        );
+        assert_eq!(info, original);
+        info.group = Group::Gitcraft;
+        assert_eq!(theme_credit(&info), info.credit);
+        crate::i18n::set_language("en-US");
+        assert_eq!(
+            theme_file_error("Theme 色.json", "not readable JSON"),
+            "Theme 色.json: not readable JSON"
+        );
+    }
+
+    #[test]
+    fn actual_colour_swatch_translates_name_and_retains_rgb_and_selection() {
+        crate::i18n::set_language("de");
+        let fonts = std::cell::Cell::new(false);
+        let colour = Color32::from_rgb(0x23, 0x68, 0xA2);
+        let mut h = Harness::new_ui_state(
+            move |ui, chosen: &mut bool| {
+                if !fonts.replace(true) {
+                    crate::theme::install_fonts(ui.ctx());
+                    return;
+                }
+                let t = Tokens::get(ui.ctx());
+                if swatch(ui, colour, *chosen, &t).clicked() {
+                    *chosen = !*chosen;
+                }
+            },
+            false,
+        );
+        h.run();
+        h.get_by_label("Farbe #2368A2").click();
+        h.run();
+        assert!(*h.state());
+        assert_eq!(colour.to_array(), [0x23, 0x68, 0xA2, 0xFF]);
+        assert_eq!(Group::Dark.label(), "Dunkel");
+        crate::i18n::set_language("en-US");
+        h.step();
+        h.get_by_label("Colour #2368A2");
+        assert!(*h.state());
+        assert_eq!(Group::Dark.label(), "Dark");
+    }
 }
 
 #[cfg(test)]

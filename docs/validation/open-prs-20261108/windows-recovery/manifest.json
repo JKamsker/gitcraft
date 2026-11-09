@@ -1,0 +1,50 @@
+{
+  "tested_commit": "acdd060448af9859fc47c1931fc34f054c16e6ef",
+  "archives": [
+    {
+      "file": "recovery-path.log.gz",
+      "sha256": "a890e9534236e34354f4e5a2cfb433ace3fc1e9690e2af77497d0e68ea22f7db",
+      "uncompressed_sha256": "c0e8a7cd152d823a3fecc73598be3b431576bbf008424677a5530abe8ea78e89"
+    },
+    {
+      "file": "parking-suite.log.gz",
+      "sha256": "19444ebe8c51ee15b6adf47fe220ce37d2b1bb78dd9e8034b2aa7622847ba98f",
+      "uncompressed_sha256": "ef9068b2f9464b452569f11ffd76d901194a0a5c32bf4f794653a9cbb659906f"
+    },
+    {
+      "file": "clippy.log.gz",
+      "sha256": "a618f42c27aa4ff1f05112754799522e55fc8e85424688c8a4a3e06b1d0c83f6",
+      "uncompressed_sha256": "5c5a10698cb1e91feb7bdaaddf44936d56496e00737c6842458154b016d323ff"
+    },
+    {
+      "file": "fmt.log.gz",
+      "sha256": "f61f27bd17de546264aa58f40f3aafaac7021e0ef69c17f6b1b4cd7664a037ec",
+      "uncompressed_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "results.json.gz",
+      "sha256": "5fd26e489c9f089c37946479e1f0b1a67c473d9785f89365f6a914249126b64c",
+      "uncompressed_sha256": "cde6fcbc6f47867c21a1cf82fc5339280e03d6baa085c739a992b39d2ad1af5d"
+    },
+    {
+      "file": "gitcraft-pr183-windows-recovery-build.log.gz",
+      "sha256": "c789e6b7ec081505023fcacc6bd21aa004e8f5dff7b493a8883bdcae005d93fb",
+      "uncompressed_sha256": "d5bcc8007995002405520444c4f1509ab34c9753027f8bd348b5d0a5aa691d02"
+    },
+    {
+      "file": "gitcraft-pr183-windows-core-235a6b3.log.gz",
+      "sha256": "13e777594676817eb21eb7d937273f1e6678f944ffa7621809cc1bc7a3760be5",
+      "uncompressed_sha256": "0f1df85eca4bf4d185060d4e45b9959497d1851e3480bb5fbac5b05bbdb03ae7"
+    },
+    {
+      "file": "gitcraft-pr183-ci-235a6b3.json.gz",
+      "sha256": "5558434ff95344469524e0238a065d0f414f005af531f5f522f0dd6256d7854a",
+      "uncompressed_sha256": "4055abe7f272520cbcf7e6a9e76e547cc5fe04f99000e771f03ecf0f0d2f7b6c"
+    },
+    {
+      "file": "gitcraft-pr183-windows-recovery-tests.py.gz",
+      "sha256": "b2eace9bacfe5c92cba2eabc3a5ab18301014e52e994b3170065bbb196d95d19",
+      "uncompressed_sha256": "4be935cfc0be7675de3261b7d2da074f9b40fef93f93bee40a3c9a03b3388826"
+    }
+  ]
+}

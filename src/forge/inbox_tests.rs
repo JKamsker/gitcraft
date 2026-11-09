@@ -230,3 +230,44 @@ fn a_full_list_says_it_was_cut() {
         Some("only the 50 latest of yours were read")
     );
 }
+
+#[test]
+fn backend_fluent_inbox_presentation_preserves_numeric_counts_and_login_identity()
+-> Result<(), String> {
+    let protocol = "no Forgejo login known for forge.example: add one with `tea login add`, or open one of its repositories with a login, for gitcraft to know which pull requests are yours";
+    for (locale, one, many, grouped, login) in [
+        (
+            "en-US",
+            "1 new comment",
+            "2 new comments",
+            "1,234 new comments",
+            "No Forgejo login is known for forge.example",
+        ),
+        (
+            "de",
+            "1 neuer Kommentar",
+            "2 neue Kommentare",
+            "1.234 neue Kommentare",
+            "Für forge.example ist keine Forgejo-Anmeldung bekannt",
+        ),
+    ] {
+        crate::i18n::set_language(locale);
+        assert_eq!(Reason::NewComments(1).label(), one);
+        assert_eq!(Reason::NewComments(2).label(), many);
+        assert_eq!(Reason::NewComments(1234).label(), grouped);
+        assert!(Reason::NewComments(0).label().starts_with('0'));
+        assert!(is_no_login(protocol));
+        assert!(gives_up(protocol));
+        assert!(display_error(protocol).starts_with(login));
+        assert_eq!(
+            display_error("external provider detail: HTTP 409 /refs/main"),
+            "external provider detail: HTTP 409 /refs/main"
+        );
+        let json = r#"[{"iid":7,"title":"User title","source_branch":"de/untranslated","target_branch":"main","web_url":"https://git.example/mr/7","author":{"username":"user"}}]"#;
+        let prs = parse_gitlab(json, false)?;
+        assert_eq!(prs[0].title, "User title");
+        assert_eq!(prs[0].url, "https://git.example/mr/7");
+    }
+    crate::i18n::set_language("en-US");
+    Ok(())
+}

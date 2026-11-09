@@ -53,7 +53,7 @@ struct Step {
 
 /// What the palette's entries were made from: the active tab, and its repository (a tab's
 /// view can change to another worktree) and what that repository's entries are made from.
-type EntriesKey = (usize, Option<(PathBuf, PaletteGeneration)>);
+type EntriesKey = (usize, Option<(PathBuf, PaletteGeneration)>, String, u64);
 
 /// What the list shown was ranked for: the query, the step, and the entries' key.
 type RankedFor = (String, bool, EntriesKey);
@@ -87,12 +87,14 @@ impl App {
                 Some(Tab::Repo(repo)) => Some((repo.path.clone(), repo.palette_generation())),
                 _ => None,
             },
+            serde_json::to_string(&self.settings.key_bindings).unwrap_or_default(),
+            crate::i18n::generation(),
         )
     }
 
     /// Makes the entries again when what they are made from changed, and the second step's
     /// choices with them (a branch deleted meanwhile is gone from them).
-    fn refresh_palette(&mut self, key: &EntriesKey) {
+    fn refresh_palette(&mut self, key: &EntriesKey, ctx: &egui::Context) {
         let Some(palette) = &self.palette else {
             return;
         };
@@ -103,12 +105,21 @@ impl App {
         {
             return;
         }
-        let entries = self.palette_entries();
+        let entries = self.palette_entries(ctx);
         let choices = palette.step.as_ref().map(|s| self.palette_choices(&s.pick));
+        let step_title = palette.step.as_ref().and_then(|step| {
+            entries
+                .iter()
+                .find(|item| item.key == step.key)
+                .map(|item| item.label.clone())
+        });
         if let Some(palette) = &mut self.palette {
             palette.entries = Some((key.clone(), entries));
             if let (Some(step), Some(choices)) = (&mut palette.step, choices) {
                 step.choices = choices;
+                if let Some(title) = step_title {
+                    step.title = title;
+                }
             }
         }
     }
@@ -124,7 +135,7 @@ impl App {
             return;
         }
         let key = self.entries_key();
-        self.refresh_palette(&key);
+        self.refresh_palette(&key, ctx);
         let outcome = match &mut self.palette {
             Some(palette) => palette.show(ctx, &key, &self.palette_recent),
             None => return,
@@ -284,7 +295,13 @@ impl Palette {
                 match &link {
                     Some(Ok(link)) => {
                         let what = super::links::describe(link);
-                        if ui.button(format!("Open link: {what}")).clicked() {
+                        if ui
+                            .button(crate::i18n::message(
+                                "interaction-palette-link",
+                                &[("target", what.into())],
+                            ))
+                            .clicked()
+                        {
                             open_link = true;
                         }
                     }
@@ -334,7 +351,7 @@ impl Palette {
                 ui.add_space(4.0);
                 step.pick.placeholder()
             }
-            None => "Type a command or a branch, or paste a forge link…",
+            None => crate::i18n::text("interaction-palette-query"),
         };
         let edit = ui.add(
             egui::TextEdit::singleline(&mut self.query)
@@ -365,9 +382,9 @@ impl Palette {
     ) -> Option<usize> {
         if count == 0 {
             let text = if self.step.is_some() && self.query.is_empty() {
-                "Nothing to pick"
+                crate::i18n::text("interaction-palette-nothing-pick")
             } else {
-                "Nothing matches"
+                crate::i18n::text("interaction-palette-nothing-match")
             };
             ui.label(RichText::new(text).color(t.text_faint));
             return None;

@@ -83,6 +83,7 @@ fn notes_collect_in_the_tray_mark_their_lines_and_outlive_the_tab() {
 #[cfg(unix)]
 #[test]
 fn the_tray_is_typed_into_the_agent_terminal_as_one_paste() {
+    use crate::repo::terminals::TerminalAct;
     use crate::terminal::{ShellSpec, Terminal};
     let dir = repo("send");
     let ctx = egui::Context::default();
@@ -97,14 +98,14 @@ fn the_tray_is_typed_into_the_agent_terminal_as_one_paste() {
     // A program that never turned on bracketed paste: refused, the notes stay.
     let plain = agent("Claude Code", format!("exec cat > '{}'", got.display()));
     if let Ok(term) = Terminal::spawn(&dir, &plain, &ctx) {
-        tab.terminals.push(term);
+        tab.terminals.opened(Ok(term));
     }
     add_note(&mut tab, &ctx, "a.rs", 1, "Fix\nthis");
     std::thread::sleep(Duration::from_millis(300));
     tab.apply(Action::Agent(AgentAct::Tray(TrayAct::SendNotes)), &ctx);
     let refused = tab
         .status
-        .as_ref()
+        .as_deref()
         .is_some_and(|(s, err)| *err && s.contains("doesn't take a pasted message"));
     let kept = tab.agents.tray.notes.len() == 1;
     tab.terminals.clear();
@@ -118,8 +119,27 @@ fn the_tray_is_typed_into_the_agent_terminal_as_one_paste() {
         ),
     );
     if let Ok(term) = Terminal::spawn(&dir, &pasting, &ctx) {
-        tab.terminals.push(term);
+        tab.terminals.opened(Ok(term));
     }
+    // Keep the agent as the explicit handoff target while another shell is selected
+    // and the panel is hidden. Successful paste must reveal the destination again.
+    let other = agent("Other shell", "exec cat >/dev/null".to_owned());
+    if let Ok(term) = Terminal::spawn(&dir, &other, &ctx) {
+        tab.terminals.opened(Ok(term));
+    }
+    tab.apply(Action::Agent(AgentAct::Tray(TrayAct::SendTo(0))), &ctx);
+    tab.apply(Action::Terminal(TerminalAct::Select(0)), &ctx);
+    let selected_agent = tab
+        .terminals
+        .active()
+        .is_some_and(|term| term.shell == "Claude Code");
+    tab.apply(Action::Terminal(TerminalAct::Select(1)), &ctx);
+    let selected_other = tab
+        .terminals
+        .active()
+        .is_some_and(|term| term.shell == "Other shell");
+    tab.apply(Action::Terminal(TerminalAct::Hide), &ctx);
+    let hidden = !tab.terminals.is_open();
     let start = Instant::now();
     let mut sent = false;
     while start.elapsed() < Duration::from_secs(10) && !sent {
@@ -133,9 +153,21 @@ fn the_tray_is_typed_into_the_agent_terminal_as_one_paste() {
         std::fs::read_to_string(&got).is_ok_and(|s| s.contains("\u{1b}[201~"))
     });
     let typed = std::fs::read_to_string(&got).unwrap_or_default();
+    let revealed = tab.terminals.is_open()
+        && tab
+            .terminals
+            .active()
+            .is_some_and(|term| term.shell == "Claude Code");
+    tab.apply(Action::Terminal(TerminalAct::Close(0)), &ctx);
+    let closed = tab.terminals.len() == 1
+        && tab
+            .terminals
+            .active()
+            .is_some_and(|term| term.shell == "Other shell");
     tab.terminals.clear();
     let _ = std::fs::remove_dir_all(&dir);
     assert!(refused && kept, "{:?}", tab.status);
+    assert!(selected_agent && selected_other && hidden && revealed && closed);
     assert!(sent && arrived, "{:?} {typed:?}", tab.status);
     assert!(typed.starts_with("\u{1b}[200~Review notes."), "{typed:?}");
     assert!(

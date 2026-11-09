@@ -90,13 +90,17 @@ fn ask(
         ui.add_space(6.0);
     }
     *focus = false;
-    ui.label(RichText::new("Runs").color(t.text_dim).small());
+    ui.label(
+        RichText::new(crate::i18n::text("repo-core-1287"))
+            .color(t.text_dim)
+            .small(),
+    );
     command_line(ui, "custom-ask", &command.command);
     ui.add_space(12.0);
     // Enter runs it only from an answer typed: a confirmation alone wants a click, so that a
     // stray Enter never runs a command.
     let enter = enter && !command.prompts.is_empty();
-    buttons(ui, "Run", true, enter, || {
+    buttons(ui, crate::i18n::text("repo-core-1212"), true, enter, || {
         Action::Custom(CustomAct::Run {
             command: Box::new(command.clone()),
             scope: scope.clone(),
@@ -118,7 +122,7 @@ fn about(scope: &Scope) -> String {
     .filter(|p| !p.is_empty())
     .collect();
     if parts.is_empty() {
-        "Custom command".to_owned()
+        crate::i18n::text("repo-core-1289").to_owned()
     } else {
         parts.join(" · ")
     }
@@ -172,18 +176,20 @@ fn review(ui: &mut Ui, repo: &str, file: &RepoFile) -> Outcome {
     ui.set_width(520.0);
     title(
         ui,
-        "Repository commands",
-        &format!(
-            "These come from {} in {repo}. They run on the repository's machine as you: \
-             trust them only if you trust whoever can change this file.",
-            cc::REPO_FILE
+        crate::i18n::text("repo-core-1292"),
+        &crate::i18n::message(
+            "repo-core-1293",
+            &[
+                ("REPO-FILE", cc::REPO_FILE.to_string().into()),
+                ("repo", repo.to_string().into()),
+            ],
         ),
         &t,
     );
     let commands = match &file.commands {
         Ok(list) => list,
         Err(e) => {
-            ui.colored_label(t.danger, e);
+            ui.colored_label(t.danger, file.display_error().unwrap_or_else(|| e.clone()));
             ui.add_space(12.0);
             return if cancel_button(ui) {
                 Outcome::Cancel
@@ -197,7 +203,7 @@ fn review(ui: &mut Ui, repo: &str, file: &RepoFile) -> Outcome {
         .max_height(360.0)
         .show(ui, |ui| {
             if commands.is_empty() {
-                ui.label(RichText::new("It lists no commands.").color(t.text_dim));
+                ui.label(RichText::new(crate::i18n::text("repo-core-1295")).color(t.text_dim));
             }
             for (i, c) in commands.iter().enumerate() {
                 ui.add(
@@ -205,28 +211,39 @@ fn review(ui: &mut Ui, repo: &str, file: &RepoFile) -> Outcome {
                         .wrap(),
                 );
                 ui.label(
-                    RichText::new(format!(
-                        "{} · output: {}",
-                        c.placement.label(),
-                        c.output.label()
+                    RichText::new(crate::i18n::message(
+                        "repo-core-1296",
+                        &[
+                            ("label", c.placement.label().to_string().into()),
+                            ("label2", c.output.label().to_string().into()),
+                        ],
                     ))
                     .color(t.text_faint)
                     .small(),
                 );
                 if !c.confirm && c.prompts.is_empty() {
                     ui.label(
-                        RichText::new("Runs at once when picked, without asking")
+                        RichText::new(crate::i18n::text("repo-core-1297"))
                             .color(t.danger)
                             .small(),
                     );
                 }
                 for p in &c.prompts {
-                    let mut asks = format!("Asks for ${} ({})", p.variable, p.kind.label());
+                    let mut asks = crate::i18n::message(
+                        "repo-core-1298",
+                        &[
+                            ("variable", p.variable.to_string().into()),
+                            ("label", p.kind.label().to_string().into()),
+                        ],
+                    );
                     if !p.label.trim().is_empty() {
                         asks.push_str(&format!(": {}", p.label.trim()));
                     }
                     if !p.default.is_empty() {
-                        asks.push_str(&format!(", “{}” by default", p.default));
+                        asks.push_str(&crate::i18n::message(
+                            "repo-core-1299",
+                            &[("default", p.default.to_string().into())],
+                        ));
                     }
                     ui.label(RichText::new(asks).color(t.text_dim).small());
                 }
@@ -236,10 +253,55 @@ fn review(ui: &mut Ui, repo: &str, file: &RepoFile) -> Outcome {
         });
     ui.add_space(8.0);
     let (digest, count) = (file.digest.clone(), commands.len());
-    buttons(ui, "Trust and use", true, false, move || {
-        Action::Custom(CustomAct::Trust {
-            digest,
-            commands: count,
-        })
-    })
+    buttons(
+        ui,
+        crate::i18n::text("repo-core-1300"),
+        true,
+        false,
+        move || {
+            Action::Custom(CustomAct::Trust {
+                digest,
+                commands: count,
+            })
+        },
+    )
+}
+
+#[cfg(test)]
+mod contextual_review_tests {
+    use super::*;
+
+    #[test]
+    fn actual_trust_review_repaints_parser_errors_and_preserves_unreadable_lookalikes() {
+        let parsed = RepoFile::new(r#"{"commands":[{"name":"","command":"true"}]}"#.to_owned());
+        let raw = parsed.commands.as_ref().err().cloned().unwrap_or_default();
+        assert_eq!(raw, ".gitcraft/commands.json: Command 1: It has no name");
+        let unreadable = RepoFile::unreadable(raw.clone());
+        for (file, parser_origin) in [(parsed, true), (unreadable, false)] {
+            let original = file.clone();
+            let ctx = egui::Context::default();
+            for locale in ["en-US", "de", "en-US"] {
+                crate::i18n::set_language(locale);
+                let shown =
+                    crate::repo::push_preflight::core_guard_paint_tests::paint(&ctx, |ui| {
+                        assert!(matches!(
+                            review(ui, "opaque/repository, on/auf/1234", &file),
+                            Outcome::Open
+                        ));
+                    });
+                let expected = if locale == "de" && parser_origin {
+                    ".gitcraft/commands.json: Befehl 1: Der Name fehlt"
+                } else {
+                    raw.as_str()
+                };
+                assert!(shown.contains(expected), "{shown}");
+                if locale == "de" && parser_origin {
+                    assert!(!shown.contains(&raw), "{shown}");
+                }
+                assert_eq!(file, original);
+                assert_eq!(file.commands.as_ref().err(), Some(&raw));
+            }
+        }
+        crate::i18n::set_language("en-US");
+    }
 }

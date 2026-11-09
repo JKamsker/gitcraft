@@ -38,15 +38,15 @@ pub(in crate::repo::diff) fn compare_view(ui: &mut Ui, cmp: &Compare, acts: &mut
             ui.add_space(12.0);
         }
         if ui
-            .button("Fit")
-            .on_hover_text("Fit the picture (double-click it)")
+            .button(crate::i18n::text("repo-core-1807"))
+            .on_hover_text(crate::i18n::text("repo-core-1808"))
             .clicked()
         {
             state.zoom = None;
         }
         if ui
             .button("100%")
-            .on_hover_text("One picture pixel a screen pixel")
+            .on_hover_text(crate::i18n::text("repo-core-1809"))
             .clicked()
         {
             state.zoom = Some(1.0 / ppp);
@@ -61,11 +61,22 @@ pub(in crate::repo::diff) fn compare_view(ui: &mut Ui, cmp: &Compare, acts: &mut
     match mode {
         Mode::Swipe => slider(
             ui,
-            ("All new", "All old"),
+            (
+                crate::i18n::text("repo-core-1810"),
+                crate::i18n::text("repo-core-1811"),
+            ),
             &mut state.swipe,
-            Some("or drag the line"),
+            Some(crate::i18n::text("repo-core-1812")),
         ),
-        Mode::Onion => slider(ui, ("Old", "New"), &mut state.onion, None),
+        Mode::Onion => slider(
+            ui,
+            (
+                crate::i18n::text("repo-core-1813"),
+                crate::i18n::text("repo-core-1814"),
+            ),
+            &mut state.onion,
+            None,
+        ),
         _ => {}
     }
     let history = cmp.versions(ui.ctx());
@@ -100,7 +111,10 @@ pub(in crate::repo::diff) fn compare_view(ui: &mut Ui, cmp: &Compare, acts: &mut
             let half = vec2((area.width() - gap) / 2.0, area.height());
             let left = Rect::from_min_size(area.min, half);
             let right = Rect::from_min_size(pos2(left.right() + gap, area.top()), half);
-            for (rect, side, missing) in [(left, &old, "(new file)"), (right, &new, "(deleted)")] {
+            for (rect, side, missing) in [
+                (left, &old, crate::i18n::text("repo-core-1695")),
+                (right, &new, crate::i18n::text("repo-core-1696")),
+            ] {
                 let p = ui.painter_at(rect);
                 match side {
                     Some((tex, d)) => {
@@ -158,7 +172,7 @@ pub(in crate::repo::diff) fn compare_view(ui: &mut Ui, cmp: &Compare, acts: &mut
                                 painter.text(
                                     area.center(),
                                     egui::Align2::CENTER_CENTER,
-                                    "Working out the difference…",
+                                    crate::i18n::text("repo-core-1817"),
                                     theme::medium(13.0),
                                     t.text_dim,
                                 );
@@ -169,6 +183,43 @@ pub(in crate::repo::diff) fn compare_view(ui: &mut Ui, cmp: &Compare, acts: &mut
             }
             input(ui, &resp, &mut state, canvas, (area, None), swipe_line);
         }
+    }
+    let pane = if mode == Mode::TwoUp {
+        Rect::from_min_size(area.min, vec2((area.width() - 12.0) / 2.0, area.height()))
+    } else {
+        area
+    };
+    let zoom = state.scale(canvas, pane.size());
+    let center = if state.zoom.is_some() {
+        state.center
+    } else {
+        vec2(0.5, 0.5)
+    };
+    if let Some(percent) = crate::a11y::value::slider(
+        &resp,
+        || {
+            crate::i18n::message(
+                "repo-core-1818",
+                &[
+                    ("path", cmp.path.to_string().into()),
+                    ("x", (center.x * 100.0).into()),
+                    ("y", (center.y * 100.0).into()),
+                ],
+            )
+        },
+        zoom * ppp * 100.0,
+        super::view_state::MIN_ZOOM.min(zoom) * ppp * 100.0
+            ..=super::view_state::MAX_ZOOM * ppp * 100.0,
+        10.0,
+        false,
+    ) {
+        state.zoom_at(
+            percent / (zoom * ppp * 100.0).max(0.001),
+            pane.center(),
+            canvas,
+            pane,
+        );
+        ui.ctx().request_repaint();
     }
     ui.data_mut(|d| d.insert_temp(key, state));
     if let Some(history) = history.filter(|h| h.len() > 1) {
@@ -196,14 +247,25 @@ fn canvas(cmp: &Compare) -> egui::Vec2 {
 /// "640 × 480 → 800 × 600 · 12.0 KB → 14.1 KB · 3.2% of pixels changed".
 pub(super) fn changes(cmp: &Compare, diff: Option<&Difference>) -> String {
     let dims = |d: &Decoded| {
-        let scaled = if d.scaled { " (shown smaller)" } else { "" };
-        format!("{} × {}{scaled}", d.width, d.height)
+        let scaled = if d.scaled {
+            crate::i18n::text("repo-core-1819")
+        } else {
+            ""
+        };
+        crate::i18n::message(
+            "repo-core-1820",
+            &[
+                ("width", format!("{}", d.width).into()),
+                ("height", format!("{}", d.height).into()),
+                ("scaled", scaled.to_string().into()),
+            ],
+        )
     };
     let mut parts = Vec::new();
     match (&cmp.old, &cmp.new) {
-        (Some(a), Some(b)) if (a.width, a.height) == (b.width, b.height) => {
-            parts.push(format!("{}, same dimensions", dims(b)))
-        }
+        (Some(a), Some(b)) if (a.width, a.height) == (b.width, b.height) => parts.push(
+            crate::i18n::message("repo-core-1821", &[("b", dims(b).to_string().into())]),
+        ),
         (Some(a), Some(b)) => parts.push(format!("{} → {}", dims(a), dims(b))),
         (None, Some(b)) => parts.push(dims(b)),
         (Some(a), None) => parts.push(dims(a)),
@@ -219,14 +281,14 @@ pub(super) fn changes(cmp: &Compare, diff: Option<&Difference>) -> String {
     }
     if let Some(d) = diff {
         parts.push(match d.changed {
-            0 => "no pixel changed".to_owned(),
-            1 => "1 pixel changed".to_owned(),
+            0 => crate::i18n::text("repo-core-1822").to_owned(),
+            1 => crate::i18n::text("repo-core-1823").to_owned(),
             n => {
                 let share = n as f64 * 100.0 / d.total.max(1) as f64;
                 if share < 0.1 {
-                    format!("{n} pixels changed")
+                    crate::i18n::message("repo-core-1824", &[("n", (n).into())])
                 } else {
-                    format!("{share:.1}% of pixels changed")
+                    crate::i18n::message("repo-core-1825", &[("share", (share).into())])
                 }
             }
         });
@@ -258,6 +320,40 @@ fn input(
     swipe: Option<(f32, Rect)>,
 ) {
     let pane = left.unwrap_or(area);
+    if resp.has_focus() {
+        ui.memory_mut(|m| {
+            m.set_focus_lock_filter(
+                resp.id,
+                egui::EventFilter {
+                    vertical_arrows: true,
+                    horizontal_arrows: true,
+                    ..Default::default()
+                },
+            )
+        });
+        for (key, delta) in [
+            (egui::Key::ArrowLeft, vec2(32.0, 0.0)),
+            (egui::Key::ArrowRight, vec2(-32.0, 0.0)),
+            (egui::Key::ArrowUp, vec2(0.0, 32.0)),
+            (egui::Key::ArrowDown, vec2(0.0, -32.0)),
+        ] {
+            if ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, key)) {
+                state.pan(delta, size, pane);
+            }
+        }
+        for (key, factor) in [
+            (egui::Key::Plus, 1.25),
+            (egui::Key::Equals, 1.25),
+            (egui::Key::Minus, 0.8),
+        ] {
+            if ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, key)) {
+                state.zoom_at(factor, pane.center(), size, pane);
+            }
+        }
+        if ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Home)) {
+            state.zoom = None;
+        }
+    }
     if resp.double_clicked() {
         state.zoom = None;
         return;
@@ -392,6 +488,20 @@ fn filmstrip(
                         vec2(THUMB as f32 + 8.0, THUMB as f32 + 30.0),
                         Sense::click(),
                     );
+                    crate::a11y::a11y_selected(
+                        &resp,
+                        || {
+                            crate::i18n::message(
+                                "repo-core-1830",
+                                &[
+                                    ("hash", crate::repo::short(&v.hash).to_string().into()),
+                                    ("summary", v.summary.to_string().into()),
+                                    ("path", v.path.to_string().into()),
+                                ],
+                            )
+                        },
+                        current,
+                    );
                     let p = ui.painter_at(rect);
                     if current {
                         p.rect_filled(rect, 4.0, t.row_selected);
@@ -430,7 +540,7 @@ fn filmstrip(
                                 p.text(
                                     frame.center(),
                                     egui::Align2::CENTER_CENTER,
-                                    "(none)",
+                                    crate::i18n::text("repo-core-1832"),
                                     theme::medium(11.0),
                                     t.text_faint,
                                 );
@@ -455,4 +565,131 @@ fn filmstrip(
                 }
             });
         });
+}
+
+#[cfg(test)]
+mod accessibility_tests {
+    use super::*;
+    #[test]
+    fn focused_canvas_pans_zooms_and_fits_without_a_pointer() {
+        let ctx = egui::Context::default();
+        let mut state = ViewState::default();
+        for key in [egui::Key::ArrowRight, egui::Key::Equals, egui::Key::Home] {
+            ctx.run_ui(
+                egui::RawInput {
+                    events: vec![egui::Event::Key {
+                        key,
+                        physical_key: Some(key),
+                        pressed: true,
+                        repeat: false,
+                        modifiers: egui::Modifiers::NONE,
+                    }],
+                    ..Default::default()
+                },
+                |ui| {
+                    let (_, resp) =
+                        ui.allocate_exact_size(vec2(400.0, 300.0), Sense::click_and_drag());
+                    resp.request_focus();
+                    input(
+                        ui,
+                        &resp,
+                        &mut state,
+                        vec2(800.0, 600.0),
+                        (resp.rect, None),
+                        None,
+                    );
+                },
+            )
+            .drop_without_applying_deltas();
+            match key {
+                egui::Key::ArrowRight => assert!(state.center.x > 0.5),
+                egui::Key::Equals => assert!(state.zoom.is_some_and(|zoom| zoom > 0.5)),
+                egui::Key::Home => assert!(state.zoom.is_none()),
+                _ => unreachable!(),
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod value_accessibility_tests {
+    use super::*;
+    use egui_kittest::{
+        Harness,
+        kittest::{NodeT, Queryable},
+    };
+
+    #[test]
+    fn image_zoom_exposes_percent_and_applies_assistive_value_to_actual_view_state()
+    -> Result<(), String> {
+        // All lazies are precompleted: rendering cannot start Git/history/difference work.
+        let compare = Compare {
+            old: None,
+            new: Some(Decoded {
+                image: Arc::new(ColorImage::filled([2, 2], Color32::WHITE)),
+                width: 2,
+                height: 2,
+                scaled: false,
+            }),
+            diff: super::super::lazy::Lazy::ready(None),
+            history: super::super::lazy::Lazy::ready(Arc::new(Vec::new())),
+            old_bytes: None,
+            new_bytes: Some(4),
+            id: "a11y-recorded-image".into(),
+            repo: std::path::PathBuf::from("/recorded"),
+            path: "picture.png".into(),
+            from: None,
+            current: None,
+            textures: Default::default(),
+        };
+        let key = egui::Id::new(("image-compare", &compare.repo, &compare.path));
+        let mut h = Harness::new_ui_state(
+            move |ui, initialized: &mut bool| {
+                if !std::mem::replace(initialized, true) {
+                    crate::theme::install_fonts(ui.ctx());
+                    egui_extras::install_image_loaders(ui.ctx());
+                    return;
+                }
+                compare_view(ui, &compare, &mut Vec::new());
+                crate::a11y::end_frame(ui.ctx());
+            },
+            false,
+        );
+        h.run_steps(2);
+        let node = h.get_by_role(egui::accesskit::Role::Slider);
+        let data = node.accesskit_node().data();
+        assert!(
+            node.accesskit_node()
+                .label()
+                .is_some_and(|label| label.starts_with("Image comparison zoom for picture.png."))
+        );
+        assert_eq!(data.numeric_value(), Some(100.0));
+        assert_eq!(
+            data.orientation(),
+            Some(egui::accesskit::Orientation::Horizontal)
+        );
+        let (target_node, target_tree) = node.accesskit_node().locate();
+        h.event(egui::Event::AccessKitActionRequest(
+            egui::accesskit::ActionRequest {
+                action: egui::accesskit::Action::SetValue,
+                target_tree,
+                target_node,
+                data: Some(egui::accesskit::ActionData::NumericValue(200.0)),
+            },
+        ));
+        h.run();
+        let state: ViewState = h
+            .ctx
+            .data(|data| data.get_temp(key))
+            .ok_or("actual image state missing")?;
+        assert_eq!(state.zoom, Some(2.0));
+        assert_eq!(
+            h.get_by_role(egui::accesskit::Role::Slider)
+                .accesskit_node()
+                .data()
+                .numeric_value(),
+            Some(200.0)
+        );
+        Ok(())
+    }
 }

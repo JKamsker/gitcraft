@@ -195,8 +195,17 @@ pub fn file_row_owned(
         None => None,
     };
     let tip = match (shown, owners) {
-        (Some(p), Some(o)) => Some(format!("{p}\nOwners: {}", o.full)),
-        (None, Some(o)) => Some(format!("Owners: {}", o.full)),
+        (Some(p), Some(o)) => Some(crate::i18n::message(
+            "repo-core-3767",
+            &[
+                ("p", p.to_string().into()),
+                ("full", o.full.to_string().into()),
+            ],
+        )),
+        (None, Some(o)) => Some(crate::i18n::message(
+            "repo-core-3768",
+            &[("full", o.full.to_string().into())],
+        )),
         (shown, None) => shown,
     };
     let row = match tip {

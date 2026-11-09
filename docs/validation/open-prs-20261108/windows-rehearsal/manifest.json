@@ -1,0 +1,65 @@
+{
+  "tested_commit": "82c2d590613b8f02a250b8f9023a128c957d0b47",
+  "archives": [
+    {
+      "file": "rehearsal-2.log.gz",
+      "sha256": "b2be9f12c3adc93a050345ba81f99ae85fffdc761d272f6a3ee7f68b0a70a7f1",
+      "uncompressed_sha256": "9bd52cd1f684f8bd8cce850f9fd2f9fbcc90a1a3956f9d4ea5edb4b2e59e6fb9"
+    },
+    {
+      "file": "partition.log.gz",
+      "sha256": "359e80899a6970ff31e19535d41adafe868cc7f8acd0133117aa3bf90a21a64a",
+      "uncompressed_sha256": "8f0cfc33c319209127c793723d635af04406a415987b6f25e541d84d56cb577f"
+    },
+    {
+      "file": "rehearsal-0.log.gz",
+      "sha256": "88038370944577e36f650bed36321d9c0fbc1d0832e48e95c6cb3770a9155626",
+      "uncompressed_sha256": "0513b4797ae612cbfffeaa1b60726ade4cad5820d42aaa59525cd27392e12ed4"
+    },
+    {
+      "file": "clippy.log.gz",
+      "sha256": "fe4e43b7a9fa6e8062afb1730218d2b7a4e844d140c60aabc92cde828ac35739",
+      "uncompressed_sha256": "ffab30926b52623bf97d82c2542b3d82007f6ed5859bde5e0920c25f56c2a312"
+    },
+    {
+      "file": "rehearsal-1.log.gz",
+      "sha256": "1b82577ca767fe563041cf03b6ece6634a2faf21da5367b52f7537dd7d2adc1b",
+      "uncompressed_sha256": "0ed721d3bf9625e354e7876405f62f5b263ad4fd510ed326d759d3fd0bcea591"
+    },
+    {
+      "file": "qr-schedule.log.gz",
+      "sha256": "7d03ecaaad7948faca4e4fe568d9420129b8bf6098267a2b2d085b5362f1d915",
+      "uncompressed_sha256": "50143a07581617bb93c020b57ec6eedec2c2a70424d45ec7be066818e270cf94"
+    },
+    {
+      "file": "fmt.log.gz",
+      "sha256": "f61f27bd17de546264aa58f40f3aafaac7021e0ef69c17f6b1b4cd7664a037ec",
+      "uncompressed_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "results.json.gz",
+      "sha256": "63eb604e3c00c0d2036798f291609e7b9367da464b66ac036b1ee597fc903236",
+      "uncompressed_sha256": "ad7cd6fc762106db7e387b2001c41c451557ca79922198e277ff343b9081312d"
+    },
+    {
+      "file": "gitcraft-pr183-windows-rehearsal-build.log.gz",
+      "sha256": "05525feb941c164d4e2ecd3bfe8ca725b8788a1574b399fd6bbcf8ac0899e3ba",
+      "uncompressed_sha256": "5e27a63db8929ddc487bb479b65fa4ffddba852fefdfa9b0ab1d4fe1a2733f9a"
+    },
+    {
+      "file": "gitcraft-pr183-windows-qr-625edb0.log.gz",
+      "sha256": "3db71e9b2680dc9808a1b94524b5e84bc61c59af29cba2ac3bab02f111777446",
+      "uncompressed_sha256": "f34108dcf13c7c46d4928270b5ecadb0af0f903f713ba615b18884d18293f9ad"
+    },
+    {
+      "file": "gitcraft-pr183-ci-625edb0.json.gz",
+      "sha256": "b5c6035eee14dbedbbed47cee92dafbe247382778810ad736f8cf866824cb62b",
+      "uncompressed_sha256": "8045d24d1e6c8aafb3b06d1faf3c537eea5a5cf681d70ae7a54abdcf3b96d18f"
+    },
+    {
+      "file": "gitcraft-pr183-windows-rehearsal-tests.py.gz",
+      "sha256": "cd92e2f9116aefda9e207263a81cd37574cae240d048afdc48e114e8086e200d",
+      "uncompressed_sha256": "0e49c26eed42910c24817919273f1a8c632e5ff78892e0b9547bcc5525cc8189"
+    }
+  ]
+}

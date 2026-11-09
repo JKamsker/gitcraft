@@ -329,7 +329,12 @@ fn a_conflict_aborted_goes_back_to_before_the_fold() {
     );
     assert_eq!(tab.work.in_progress, Some(InProgress::Rebase));
     assert!(tab.fold.stopped.is_some());
-    let said = tab.status.clone().map(|(s, _)| s).unwrap_or_default();
+    let said = tab
+        .status
+        .as_deref()
+        .cloned()
+        .map(|(s, _)| s)
+        .unwrap_or_default();
     assert!(said.contains("stopped on a conflict"), "{said}");
     assert!(tab.fold_stopped_here(InProgress::Rebase).is_some());
     assert!(matches!(
@@ -750,7 +755,12 @@ fn staged_changes_a_later_commit_would_undo_are_never_lost() {
     assert!(!dir.join("f2.txt").exists());
     assert_eq!(read(&dir, "f3.txt"), "3 unstaged\n");
     assert_eq!(git::in_progress(&dir), Ok(None));
-    let said = tab.status.clone().map(|(s, _)| s).unwrap_or_default();
+    let said = tab
+        .status
+        .as_deref()
+        .cloned()
+        .map(|(s, _)| s)
+        .unwrap_or_default();
     assert!(said.contains("nothing was changed"), "{said}");
     let _ = std::fs::remove_dir_all(&dir);
 }
@@ -833,7 +843,12 @@ fn a_merge_started_since_the_dialog_stops_the_fold() {
     let before = git::head(&dir);
     tab.apply(Action::RunFold(Box::new(found.clone())), &ctx);
     settle(&mut tab, &ctx);
-    let said = tab.status.clone().map(|(s, _)| s).unwrap_or_default();
+    let said = tab
+        .status
+        .as_deref()
+        .cloned()
+        .map(|(s, _)| s)
+        .unwrap_or_default();
     assert!(said.contains("merge is in progress"), "{said}");
     assert_eq!(git::head(&dir), before);
     // And should it start between that check and the commit, the steps' own checks refuse.
@@ -880,7 +895,12 @@ fn a_patch_stopped_since_the_dialog_stops_the_fold() {
         "the preflight check holds the operation busy"
     );
     settle(&mut tab, &ctx);
-    let said = tab.status.clone().map(|(s, _)| s).unwrap_or_default();
+    let said = tab
+        .status
+        .as_deref()
+        .cloned()
+        .map(|(s, _)| s)
+        .unwrap_or_default();
     assert!(said.contains("patch is in progress"), "{said}");
     assert_eq!(git::head(&dir), before);
     let _ = git::run(Some(&dir), &["am", "--abort"]);

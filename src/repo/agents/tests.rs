@@ -159,11 +159,11 @@ fn a_worktree_added_from_the_tab_is_set_up_in_a_terminal() {
         &ctx,
     );
     let started = pump(&mut tab, &ctx, |tab| {
-        !tab.terminals.is_empty() || tab.terminal_error.is_some()
+        !tab.terminals.is_empty() || tab.terminals.error().is_some()
     });
     let arrived = pump(&mut tab, &ctx, |_| folder.join("setup-ran.txt").is_file());
     let copied = std::fs::read_to_string(folder.join(".env.local")).unwrap_or_default();
-    let error = tab.terminal_error.clone();
+    let error = tab.terminals.error().map(str::to_owned);
     tab.terminals.clear();
     let _ = std::fs::remove_dir_all(dir.parent().unwrap_or(&dir));
     assert!(started && error.is_none(), "{error:?} {:?}", tab.status);

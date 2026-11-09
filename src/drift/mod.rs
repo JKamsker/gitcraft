@@ -3,6 +3,8 @@
 //! the task doesn't mention apart), new dependencies, public signatures changed, the share of
 //! the change that is formatting only. Matching with an LLM is optional (see [`llm`]).
 
+pub mod display;
+
 mod deps;
 pub mod llm;
 mod signatures;
@@ -74,6 +76,7 @@ impl Report {
 
     /// The figures in one line: _also touched 14 files in 5 unrelated folders, added 2
     /// dependencies, changed 3 public signatures, 40% formatting only_.
+    #[cfg(test)]
     pub fn headline(&self) -> String {
         let unrelated: Vec<&Folder> = self.unrelated().collect();
         let in_unrelated: usize = unrelated.iter().map(|f| f.files.len()).sum();
@@ -102,6 +105,7 @@ impl Report {
     }
 }
 
+#[cfg(test)]
 fn plural(n: usize, one: &str, many: &str) -> String {
     format!("{n} {}", if n == 1 { one } else { many })
 }

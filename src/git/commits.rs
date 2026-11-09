@@ -339,7 +339,7 @@ pub fn commit_detail(repo: &Path, hash: &str) -> Result<CommitDetail, String> {
     )?;
     let f: Vec<&str> = out.splitn(8, '\0').collect();
     let [h, parents, author, email, adate, committer, cdate, message] = f[..] else {
-        return Err("unexpected output from git show".to_owned());
+        return Err(crate::i18n::text("backend-unexpected-output-from-git-show-c43bf4").to_owned());
     };
     let files = commit_files(repo, hash)?;
 
@@ -372,15 +372,20 @@ pub const MAX_TOOLTIP_MESSAGE_BYTES: usize = 256 * 1024;
 /// Check object size before reading it, and cap the decoded text retained by the UI.
 pub fn commit_message(repo: &Path, hash: &str) -> Result<String, String> {
     if !matches!(hash.len(), 40 | 64) || !hash.bytes().all(|b| b.is_ascii_hexdigit()) {
-        return Err("Expected a full commit object ID".to_owned());
+        return Err(
+            crate::i18n::text("backend-expected-a-full-commit-object-id-edce46").to_owned(),
+        );
     }
     let commit = format!("{hash}^{{commit}}");
     let size = run(Some(repo), &["cat-file", "-s", &commit])?
         .trim()
         .parse::<usize>()
-        .map_err(|_| "Invalid commit object size".to_owned())?;
+        .map_err(|_| crate::i18n::text("backend-invalid-commit-object-size-0ac3de").to_owned())?;
     let too_large = || {
-        "Message exceeds the 256 KiB tooltip limit; select the commit to read it in the detail pane.".to_owned()
+        crate::i18n::text(
+            "backend-message-exceeds-the-256-kib-tooltip-limit-select-the-commit-to-re-ebcc66",
+        )
+        .to_owned()
     };
     if size > MAX_TOOLTIP_MESSAGE_BYTES {
         return Err(too_large());
@@ -425,7 +430,12 @@ pub fn resolve(repo: &Path, rev: &str) -> Result<String, String> {
         &["rev-parse", "--verify", "-q", &format!("{rev}^{{commit}}")],
     )
     .map(|s| s.trim().to_owned())
-    .map_err(|_| format!("{rev} is not a commit"))
+    .map_err(|_| {
+        crate::i18n::message(
+            "backend-rev-is-not-a-commit-081a0f",
+            &[("rev", (rev).to_string().into())],
+        )
+    })
 }
 
 /// How many commits `a` has that `b` hasn't, and the other way round.
@@ -590,6 +600,90 @@ fn parse_rebase_commits(out: &str) -> Vec<RebaseCommit> {
                 summary: (*summary).to_owned(),
                 message: message.trim_end().to_owned(),
             })
+        })
+        .collect()
+}
+
+/// The relation view's explicit older-context read; reuse the ordinary log format/parser.
+pub(crate) fn investigation_page(
+    reader: &super::investigations::Reader<'_>,
+    tips: &[String],
+    order: LogOrder,
+    skip: usize,
+    limit: usize,
+) -> Result<Vec<Commit>, String> {
+    let max = format!("--max-count={limit}");
+    let args = log_args(Some(tips), order, skip, Some(&max), &[]);
+    let output = reader.run(
+        &args
+            .as_args()
+            .iter()
+            .map(String::as_str)
+            .collect::<Vec<_>>(),
+        Vec::new(),
+        &[0],
+    )?;
+    parse_investigation_commits(&output)
+}
+
+pub(crate) fn investigation_commits_of(
+    reader: &super::investigations::Reader<'_>,
+    hashes: &[String],
+) -> Result<Vec<Commit>, String> {
+    if hashes.len() > super::LOG_PAGE || hashes.iter().any(|s| !super::investigations::oid(s)) {
+        return Err(crate::i18n::text("backend-invalid-pinned-commit-request-ed2691").into());
+    }
+    if hashes.is_empty() {
+        return Ok(Vec::new());
+    }
+    let format = log_args(None, LogOrder::default(), 0, None, &[]).format;
+    let mut result = Vec::new();
+    for chunk in hashes.chunks(100) {
+        let mut args = vec![
+            "log",
+            NO_SIGNATURE,
+            UTF8,
+            "--no-walk=unsorted",
+            "--date=format-local:%Y-%m-%d %H:%M",
+            &format,
+            END_OPTS,
+        ];
+        args.extend(chunk.iter().map(String::as_str));
+        args.push("--");
+        result.extend(parse_investigation_commits(&reader.run(
+            &args,
+            vec![],
+            &[0],
+        )?)?);
+    }
+    Ok(result)
+}
+
+fn parse_investigation_commits(output: &[u8]) -> Result<Vec<Commit>, String> {
+    let text = std::str::from_utf8(output).map_err(|_| {
+        crate::i18n::text("backend-history-page-returned-non-utf-8-metadata-333f22")
+    })?;
+    let fields: Vec<_> = text.split('\0').collect();
+    let (records, tail) = fields.as_chunks::<LOG_FIELDS>();
+    if !tail.iter().all(|s| s.trim().is_empty()) {
+        return Err(
+            crate::i18n::text("backend-history-page-returned-truncated-metadata-cc11d9").into(),
+        );
+    }
+    records
+        .iter()
+        .map(|record| {
+            parse_record(record)
+                .filter(|c| {
+                    super::investigations::oid(&c.hash)
+                        && c.parents.iter().all(|p| super::investigations::oid(p))
+                })
+                .ok_or_else(|| {
+                    crate::i18n::text(
+                        "backend-history-page-returned-invalid-commit-identity-8d0985",
+                    )
+                    .into()
+                })
         })
         .collect()
 }

@@ -32,7 +32,12 @@ impl RepoTab {
                 ui.add_space(20.0);
                 ui.vertical_centered(|ui| {
                     ui.add(crate::spinner::Spinner::new());
-                    ui.label(RichText::new("Comparing the attempts…").color(t.text_dim));
+                    ui.label(
+                        RichText::new(crate::i18n::text(
+                            "repo-workflows-bakeoff-bakeoff-view-9754333a",
+                        ))
+                        .color(t.text_dim),
+                    );
                 });
             }
             Some(Err(e)) => {
@@ -54,12 +59,22 @@ impl RepoTab {
 fn header(ui: &mut Ui, view: &mut Bakeoff, t: &Tokens, act: &mut Option<BakeAct>) {
     ui.horizontal(|ui| {
         ui.add_space(8.0);
-        ui.label(RichText::new("Bake-off").font(theme::semibold(15.0)));
+        ui.label(
+            RichText::new(crate::i18n::text("repo-workflows-bakeoff-header-43c40423"))
+                .font(theme::semibold(15.0)),
+        );
         if let Some(Ok(cmp)) = &view.comparison {
             ui.label(
-                RichText::new(format!("from {}", crate::repo::short(&cmp.base))).color(t.text_dim),
+                RichText::new(crate::i18n::message(
+                    "repo-workflows-bakeoff-header-50cd264e",
+                    &[(
+                        "crate-repo-short-cmp-base-1",
+                        (crate::repo::short(&cmp.base)).into(),
+                    )],
+                ))
+                .color(t.text_dim),
             )
-            .on_hover_text("The commit they all start from (their merge base)");
+            .on_hover_text(crate::i18n::text("repo-workflows-bakeoff-header-bb683fa4"));
             let elsewhere: Vec<&str> = cmp
                 .attempts
                 .iter()
@@ -70,50 +85,62 @@ fn header(ui: &mut Ui, view: &mut Bakeoff, t: &Tokens, act: &mut Option<BakeAct>
             if !cmp.same_base && !elsewhere.is_empty() {
                 ui.colored_label(
                     t.warning,
-                    format!("⚠ {} started elsewhere", elsewhere.join(", ")),
+                    crate::i18n::message(
+                        "repo-workflows-bakeoff-header-acb0a622",
+                        &[("elsewhere-join-1", (elsewhere.join(", ")).clone().into())],
+                    ),
                 )
-                .on_hover_text(
-                    "It didn't start from the same commit as the others: its column also \
-                     shows what came before it started",
-                );
+                .on_hover_text(crate::i18n::text("repo-workflows-bakeoff-header-dd4159a5"));
             }
         }
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if ui.button("Close").on_hover_text("Esc").clicked() {
+            if ui
+                .button(crate::i18n::text("repo-workflows-bakeoff-header-7d9eb7ac"))
+                .on_hover_text("Esc")
+                .clicked()
+            {
                 *act = Some(BakeAct::Close);
             }
             if ui
-                .button("Compare again")
-                .on_hover_text("Reads the attempts again, uncommitted work included")
+                .button(crate::i18n::text("repo-workflows-bakeoff-header-502f6dbd"))
+                .on_hover_text(crate::i18n::text("repo-workflows-bakeoff-header-b1ce0225"))
                 .clicked()
             {
                 *act = Some(BakeAct::Refresh);
             }
-            if ui.button("Other attempts…").clicked() {
+            if ui
+                .button(crate::i18n::text("repo-workflows-bakeoff-header-0e2a45b6"))
+                .clicked()
+            {
                 *act = Some(BakeAct::OpenPicker);
             }
         });
     });
     ui.horizontal(|ui| {
         ui.add_space(8.0);
-        ui.label(RichText::new("Build with").color(t.text_dim));
+        ui.label(
+            RichText::new(crate::i18n::text("repo-workflows-bakeoff-header-46334791"))
+                .color(t.text_dim),
+        );
         ui.add(
             egui::TextEdit::singleline(&mut view.build_command)
                 .hint_text("cargo build, npm run build…")
                 .font(theme::mono(12.0))
                 .desired_width(280.0),
         )
-        .on_hover_text("Kept for the repository");
-        let can = !view.build_command.trim().is_empty()
-            && view.attempts.iter().any(|a| a.worktree.is_some());
+        .on_hover_text(crate::i18n::text("repo-workflows-bakeoff-header-c38e956d"));
+        let can = !view.build_command.trim().is_empty() && matches!(view.comparison, Some(Ok(_)));
         let why = if view.build_command.trim().is_empty() {
-            "Type the command that builds the project"
+            crate::i18n::text("repo-workflows-bakeoff-header-a195ce68")
         } else {
-            "Only attempts with a worktree can be built"
+            crate::i18n::text("repo-workflows-bakeoff-header-9cec669f")
         };
         if ui
-            .add_enabled(can, egui::Button::new("Build all"))
-            .on_hover_text("Runs it in a terminal in each attempt's worktree")
+            .add_enabled(
+                can,
+                egui::Button::new(crate::i18n::text("repo-workflows-bakeoff-header-175f9ff6")),
+            )
+            .on_hover_text(crate::i18n::text("repo-workflows-bakeoff-header-862a0723"))
             .on_disabled_hover_text(why)
             .clicked()
         {
@@ -131,12 +158,12 @@ fn body(ui: &mut Ui, view: &Bakeoff, t: &Tokens, act: &mut Option<BakeAct>) {
     ui.horizontal(|ui| {
         ui.add_space(8.0);
         ui.label(
-            RichText::new("FILES")
+            RichText::new(crate::i18n::text("repo-workflows-bakeoff-body-faff10f7"))
                 .font(theme::semibold(10.5))
                 .color(t.text_faint),
         );
         ui.label(
-            RichText::new("click one to see it across the attempts and pick from it")
+            RichText::new(crate::i18n::text("repo-workflows-bakeoff-body-bfd30d1e"))
                 .small()
                 .color(t.text_faint),
         );
@@ -167,12 +194,18 @@ fn grid(ui: &mut Ui, view: &Bakeoff, cmp: &Comparison, t: &Tokens, act: &mut Opt
                 ui.label(RichText::new(&a.name).font(theme::semibold(12.5)));
             }
             ui.end_row();
-            ui.label(RichText::new("Files touched").color(t.text_dim));
+            ui.label(
+                RichText::new(crate::i18n::text("repo-workflows-bakeoff-grid-ce199c9e"))
+                    .color(t.text_dim),
+            );
             for c in &cmp.attempts {
-                ui.label(c.files.len().to_string());
+                ui.label(crate::i18n::number(c.files.len()));
             }
             ui.end_row();
-            ui.label(RichText::new("Size").color(t.text_dim));
+            ui.label(
+                RichText::new(crate::i18n::text("repo-workflows-bakeoff-grid-1af85190"))
+                    .color(t.text_dim),
+            );
             for c in &cmp.attempts {
                 ui.horizontal(|ui| {
                     ui.colored_label(t.success, format!("+{}", c.added));
@@ -180,10 +213,16 @@ fn grid(ui: &mut Ui, view: &Bakeoff, cmp: &Comparison, t: &Tokens, act: &mut Opt
                 });
             }
             ui.end_row();
-            ui.label(RichText::new("New dependencies").color(t.text_dim));
+            ui.label(
+                RichText::new(crate::i18n::text("repo-workflows-bakeoff-grid-9c37d9c9"))
+                    .color(t.text_dim),
+            );
             for c in &cmp.attempts {
                 if c.new_deps.is_empty() {
-                    ui.label(RichText::new("none").color(t.text_faint));
+                    ui.label(
+                        RichText::new(crate::i18n::text("repo-workflows-bakeoff-grid-140bedbf"))
+                            .color(t.text_faint),
+                    );
                 } else {
                     ui.vertical(|ui| {
                         for dep in &c.new_deps {
@@ -193,19 +232,37 @@ fn grid(ui: &mut Ui, view: &Bakeoff, cmp: &Comparison, t: &Tokens, act: &mut Opt
                 }
             }
             ui.end_row();
-            ui.label(RichText::new("Uncommitted work").color(t.text_dim));
+            ui.label(
+                RichText::new(crate::i18n::text("repo-workflows-bakeoff-grid-7a44bde0"))
+                    .color(t.text_dim),
+            );
             for c in &cmp.attempts {
                 ui.label(if c.uncommitted {
-                    "yes, compared too"
+                    crate::i18n::text("repo-workflows-bakeoff-grid-1f19288a")
                 } else {
-                    "no"
+                    crate::i18n::text("repo-workflows-paint-no")
                 });
             }
             ui.end_row();
-            ui.label(RichText::new("Builds").color(t.text_dim));
+            ui.label(
+                RichText::new(crate::i18n::text("repo-workflows-bakeoff-grid-6a3fe887"))
+                    .color(t.text_dim),
+            );
             for (i, a) in view.attempts.iter().enumerate() {
                 let built = view.builds.get(i).copied().flatten();
-                build_cell(ui, built, a.worktree.is_some(), i, t, act);
+                ui.vertical(|ui| {
+                    build_cell(ui, built, a.worktree.is_some(), i, t, act);
+                    if view.statuses.get(i).is_some_and(Option::is_some)
+                        && ui
+                            .small_button(crate::i18n::text("repo-workflows-bakeoff-grid-7cbda0dd"))
+                            .on_hover_text(crate::i18n::text(
+                                "repo-workflows-bakeoff-grid-6263bbf3",
+                            ))
+                            .clicked()
+                    {
+                        *act = Some(BakeAct::Output(i));
+                    }
+                });
             }
             ui.end_row();
         });
@@ -214,45 +271,83 @@ fn grid(ui: &mut Ui, view: &Bakeoff, cmp: &Comparison, t: &Tokens, act: &mut Opt
 fn build_cell(
     ui: &mut Ui,
     built: Option<Built>,
-    has_worktree: bool,
+    _has_worktree: bool,
     i: usize,
     t: &Tokens,
     act: &mut Option<BakeAct>,
 ) {
     ui.horizontal(|ui| {
         match built {
+            Some(Built::Preparing) => {
+                ui.label(crate::i18n::text(
+                    "repo-workflows-bakeoff-build-cell-98cd8a0b",
+                ));
+            }
+            Some(Built::Unavailable) => {
+                ui.colored_label(
+                    t.warning,
+                    crate::i18n::text("repo-workflows-bakeoff-build-cell-5dac180d"),
+                )
+                .on_hover_text(crate::i18n::text(
+                    "repo-workflows-bakeoff-build-cell-63f96d79",
+                ));
+            }
             Some(Built::Running) => {
                 ui.add(crate::spinner::Spinner::new().size(12.0));
-                ui.label(RichText::new("building…").color(t.text_dim))
-                    .on_hover_text("Its output is in the terminal tab");
+                ui.label(
+                    RichText::new(crate::i18n::text(
+                        "repo-workflows-bakeoff-build-cell-899686f3",
+                    ))
+                    .color(t.text_dim),
+                )
+                .on_hover_text(crate::i18n::text(
+                    "repo-workflows-bakeoff-build-cell-ef24cfb5",
+                ));
             }
             Some(Built::Passed) => {
-                ui.colored_label(t.success, "✔ builds");
+                ui.colored_label(
+                    t.success,
+                    crate::i18n::text("repo-workflows-bakeoff-build-cell-d07e6c18"),
+                );
             }
             Some(Built::Failed(code)) => {
-                ui.colored_label(t.danger, format!("✘ fails ({code})"))
-                    .on_hover_text("Its output is in the terminal tab");
-            }
-            None if has_worktree => {
-                ui.label(RichText::new("not built").color(t.text_faint));
+                ui.colored_label(
+                    t.danger,
+                    crate::i18n::message(
+                        "repo-workflows-bakeoff-build-cell-301c453c",
+                        &[("code", (code).into())],
+                    ),
+                )
+                .on_hover_text(crate::i18n::text(
+                    "repo-workflows-bakeoff-build-cell-ef24cfb5",
+                ));
             }
             None => {
-                ui.label(RichText::new("a branch: no worktree to build in").color(t.text_faint))
-                    .on_hover_text(
-                        "Add a worktree for it (WORKTREES +), then pick it with Other attempts…",
-                    );
+                ui.label(
+                    RichText::new(crate::i18n::text(
+                        "repo-workflows-bakeoff-build-cell-26c16489",
+                    ))
+                    .color(t.text_faint),
+                );
             }
         }
-        if has_worktree {
+        if built != Some(Built::Preparing) {
             let (label, tip) = match built {
                 Some(Built::Running) => (
-                    "Build again",
-                    "Stopped or closed its terminal? Starts the build over",
+                    crate::i18n::text("repo-workflows-bakeoff-build-cell-6fe4abd4"),
+                    crate::i18n::text("repo-workflows-bakeoff-build-cell-17824e4b"),
                 ),
-                Some(_) => ("Build again", "Runs the build command again"),
+                Some(Built::Unavailable) => (
+                    crate::i18n::text("repo-workflows-bakeoff-build-cell-6fe4abd4"),
+                    crate::i18n::text("repo-workflows-bakeoff-build-cell-84b604d3"),
+                ),
+                Some(_) => (
+                    crate::i18n::text("repo-workflows-bakeoff-build-cell-af81e9e4"),
+                    crate::i18n::text("repo-workflows-bakeoff-build-cell-adccacb7"),
+                ),
                 None => (
-                    "Build",
-                    "Runs the build command in a terminal of its worktree",
+                    crate::i18n::text("repo-workflows-bakeoff-build-cell-bdd254b6"),
+                    crate::i18n::text("repo-workflows-bakeoff-build-cell-3149d8b3"),
                 ),
             };
             if ui.small_button(label).on_hover_text(tip).clicked() {
@@ -265,7 +360,10 @@ fn build_cell(
 /// Every file an attempt touched: who touched it, what is picked of it.
 fn files(ui: &mut Ui, view: &Bakeoff, height: f32, t: &Tokens, act: &mut Option<BakeAct>) {
     if view.rows.is_empty() {
-        ui.label(RichText::new("None of the attempts changed anything").color(t.text_faint));
+        ui.label(
+            RichText::new(crate::i18n::text("repo-workflows-bakeoff-files-7e17d722"))
+                .color(t.text_faint),
+        );
         return;
     }
     let names = |ui: &mut Ui| {
@@ -298,7 +396,10 @@ fn files(ui: &mut Ui, view: &Bakeoff, height: f32, t: &Tokens, act: &mut Option<
                             [PATH_W, ROW_H],
                             egui::Button::selectable(open, label).truncate(),
                         )
-                        .on_hover_text(format!("{path}\nOpen it side by side across the attempts"))
+                        .on_hover_text(crate::i18n::message(
+                            "repo-workflows-bakeoff-files-fe616a60",
+                            &[("path", (path).clone().into())],
+                        ))
                         .clicked()
                     {
                         *act = Some(if open {
@@ -309,9 +410,23 @@ fn files(ui: &mut Ui, view: &Bakeoff, height: f32, t: &Tokens, act: &mut Option<
                     }
                     for (on, a) in touched.iter().zip(&view.attempts) {
                         let (dot, color, tip) = if *on {
-                            ("●", t.accent, format!("{} changed it", a.name))
+                            (
+                                "●",
+                                t.accent,
+                                crate::i18n::message(
+                                    "repo-workflows-bakeoff-files-83d88f06",
+                                    &[("a-name-1", (a.name).clone().into())],
+                                ),
+                            )
                         } else {
-                            ("·", t.text_faint, format!("{} left it as it was", a.name))
+                            (
+                                "·",
+                                t.text_faint,
+                                crate::i18n::message(
+                                    "repo-workflows-bakeoff-files-51aec897",
+                                    &[("a-name-1", (a.name).clone().into())],
+                                ),
+                            )
                         };
                         ui.add_sized(
                             [DOT_W, ROW_H],
@@ -347,9 +462,17 @@ fn short_name(name: &str) -> String {
 fn pick_label(view: &Bakeoff, take: &Take) -> String {
     let name = |n: usize| view.attempts.get(n).map_or("?", |a| a.name.as_str());
     match take {
-        Take::File(n) => format!("← whole file from {}", name(*n)),
-        Take::Hunks(list) if list.len() == 1 => "← 1 hunk".to_owned(),
-        Take::Hunks(list) => format!("← {} hunks", list.len()),
+        Take::File(n) => crate::i18n::message(
+            "repo-workflows-bakeoff-pick-label-77dbc108",
+            &[("name-n-1", (name(*n)).into())],
+        ),
+        Take::Hunks(list) if list.len() == 1 => {
+            crate::i18n::text("repo-workflows-bakeoff-pick-label-d3d98b5d").to_owned()
+        }
+        Take::Hunks(list) => crate::i18n::message(
+            "repo-workflows-bakeoff-pick-label-c708de81",
+            &[("list-len-1", (list.len()).into())],
+        ),
     }
 }
 
@@ -357,10 +480,24 @@ fn pick_label(view: &Bakeoff, take: &Take) -> String {
 fn hunk_label(hunk: &Hunk) -> String {
     let (removed, added) = (hunk.removed.len(), hunk.added.len());
     let place = match removed {
-        0 if hunk.old_start == 0 => "At the top".to_owned(),
-        0 => format!("After line {}", hunk.old_start),
-        1 => format!("Line {}", hunk.old_start),
-        n => format!("Lines {}–{}", hunk.old_start, hunk.old_start + n - 1),
+        0 if hunk.old_start == 0 => {
+            crate::i18n::text("repo-workflows-bakeoff-hunk-label-0cf292e8").to_owned()
+        }
+        0 => crate::i18n::message(
+            "repo-workflows-bakeoff-hunk-label-7647677f",
+            &[("hunk-old-start-1", (hunk.old_start).into())],
+        ),
+        1 => crate::i18n::message(
+            "repo-workflows-bakeoff-hunk-label-4d9d8a81",
+            &[("hunk-old-start-1", (hunk.old_start).into())],
+        ),
+        n => crate::i18n::message(
+            "repo-workflows-bakeoff-hunk-label-a3052fdf",
+            &[
+                ("hunk-old-start-1", (hunk.old_start).into()),
+                ("hunk-old-start-n-1-2", (hunk.old_start + n - 1).into()),
+            ],
+        ),
     };
     format!("{place}: −{removed} +{added}")
 }
@@ -415,8 +552,12 @@ fn side_by_side(
         ui.label(RichText::new(path).font(theme::semibold(13.0)));
         if view.picks.contains_key(path)
             && ui
-                .small_button("Clear pick")
-                .on_hover_text("The assembled branch keeps the base's version of this file")
+                .small_button(crate::i18n::text(
+                    "repo-workflows-bakeoff-side-by-side-6bdfa343",
+                ))
+                .on_hover_text(crate::i18n::text(
+                    "repo-workflows-bakeoff-side-by-side-76215eb4",
+                ))
                 .clicked()
         {
             *act = Some(BakeAct::ClearPick(path.to_owned()));
@@ -442,7 +583,7 @@ fn side_by_side(
     if !clashing.is_empty() {
         ui.colored_label(
             t.danger,
-            "Hunks of two attempts picked here change the same lines: untick one of them",
+            crate::i18n::text("repo-workflows-bakeoff-side-by-side-f280944f"),
         );
     }
     let changed: Vec<usize> = (0..sides.len())
@@ -454,9 +595,12 @@ fn side_by_side(
         .collect();
     if !unchanged.is_empty() {
         ui.label(
-            RichText::new(format!("Unchanged in {}", unchanged.join(", ")))
-                .small()
-                .color(t.text_faint),
+            RichText::new(crate::i18n::message(
+                "repo-workflows-bakeoff-side-by-side-47c58b04",
+                &[("unchanged-join-1", (unchanged.join(", ")).clone().into())],
+            ))
+            .small()
+            .color(t.text_faint),
         );
     }
     ui.columns(changed.len().max(1), |cols| {
@@ -480,16 +624,18 @@ fn column(
     t: &Tokens,
     act: &mut Option<BakeAct>,
 ) {
-    ui.label(RichText::new(format!("{name} · {}", side.kind())).font(theme::semibold(12.0)));
+    ui.label(
+        RichText::new(format!("{name} · {}", side.display_kind())).font(theme::semibold(12.0)),
+    );
     let whole = take == Some(&Take::File(n));
     let label = match side.kind() {
-        "deleted" => "Take the deletion",
-        "added" => "Take the new file",
-        _ => "Take the whole file",
+        "deleted" => crate::i18n::text("repo-workflows-bakeoff-column-772841f1"),
+        "added" => crate::i18n::text("repo-workflows-bakeoff-column-badecf50"),
+        _ => crate::i18n::text("repo-workflows-bakeoff-column-a533487d"),
     };
     if ui
         .selectable_label(whole, label)
-        .on_hover_text("Replaces the hunks picked; click again to take it back")
+        .on_hover_text(crate::i18n::text("repo-workflows-bakeoff-column-6e86718f"))
         .clicked()
     {
         *act = Some(BakeAct::TakeFile(path.to_owned(), n));
@@ -501,7 +647,7 @@ fn column(
         .show(ui, |ui| {
             if side.hunks.is_empty() {
                 ui.label(
-                    RichText::new("No hunks to pick (a binary file): take it whole")
+                    RichText::new(crate::i18n::text("repo-workflows-bakeoff-column-2ed1ade8"))
                         .small()
                         .color(t.text_faint),
                 );
@@ -571,26 +717,34 @@ fn patch_line(ui: &mut Ui, line: &str, t: &Tokens) {
 fn assemble_bar(ui: &mut Ui, view: &mut Bakeoff, t: &Tokens, act: &mut Option<BakeAct>) {
     ui.horizontal(|ui| {
         ui.add_space(8.0);
-        ui.label(RichText::new("Assemble into").color(t.text_dim));
+        ui.label(
+            RichText::new(crate::i18n::text(
+                "repo-workflows-bakeoff-assemble-bar-8462ef57",
+            ))
+            .color(t.text_dim),
+        );
         ui.add(egui::TextEdit::singleline(&mut view.branch).desired_width(220.0));
         let picks = view.picks.len();
         let ready = picks > 0 && !view.branch.trim().is_empty() && !view.assembling;
         let tip = if view.assembling {
-            "Assembling…"
+            crate::i18n::text("repo-workflows-bakeoff-assemble-bar-5a22f453")
         } else if picks == 0 {
-            "Open a file below and take it whole, or some of its hunks, from any attempt"
+            crate::i18n::text("repo-workflows-bakeoff-assemble-bar-3766ae43")
         } else {
-            "Name the new branch first"
+            crate::i18n::text("repo-workflows-bakeoff-assemble-bar-f19adc05")
         };
         let label = if picks == 1 {
-            "Assemble (1 file)".to_owned()
+            crate::i18n::text("repo-workflows-bakeoff-assemble-bar-ccbdbfe8").to_owned()
         } else {
-            format!("Assemble ({picks} files)")
+            crate::i18n::message(
+                "repo-workflows-bakeoff-assemble-bar-86fd9bbb",
+                &[("picks", (picks).into())],
+            )
         };
         if crate::repo::primary_button(ui, &label, ready, 130.0)
-            .on_hover_text(
-                "A new branch from the base with what is picked; the rest stays as the base has it. Nothing checked out changes",
-            )
+            .on_hover_text(crate::i18n::text(
+                "repo-workflows-bakeoff-assemble-bar-aee10357",
+            ))
             .on_disabled_hover_text(tip)
             .clicked()
         {
@@ -600,9 +754,18 @@ fn assemble_bar(ui: &mut Ui, view: &mut Bakeoff, t: &Tokens, act: &mut Option<Ba
             ui.add(crate::spinner::Spinner::new().size(14.0));
         }
         if let Some((note, error)) = &view.note {
-            ui.colored_label(if *error { t.danger } else { t.success }, note);
+            ui.colored_label(
+                if *error { t.danger } else { t.success },
+                view.display_note(note),
+            );
         }
-        if view.made.is_some() && ui.button("Show in graph").clicked() {
+        if view.made.is_some()
+            && ui
+                .button(crate::i18n::text(
+                    "repo-workflows-bakeoff-assemble-bar-916e34d4",
+                ))
+                .clicked()
+        {
             *act = Some(BakeAct::ShowMade);
         }
     });
@@ -650,5 +813,67 @@ mod tests {
         assert_eq!(super::super::next_name("bakeoff/x"), "bakeoff/x-2");
         assert_eq!(super::super::next_name("bakeoff/x-2"), "bakeoff/x-3");
         assert_eq!(super::super::next_name("agent/fix-1"), "agent/fix-1-2");
+    }
+}
+
+#[cfg(test)]
+mod lifecycle_tests {
+    use super::*;
+    #[test]
+    fn pure_bakeoff_unavailable_and_running_cells_offer_explicit_fresh_workspace_retry()
+    -> Result<(), String> {
+        for built in [Built::Unavailable, Built::Running] {
+            let ctx = egui::Context::default();
+            let mut act = None;
+            let mut output = ctx.run_ui(
+                egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(1000.0, 400.0),
+                    )),
+                    ..Default::default()
+                },
+                |ui| {
+                    let tokens = Tokens::get(ui.ctx());
+                    build_cell(ui, Some(built), false, 0, &tokens, &mut act);
+                },
+            );
+            let position = output.shapes.iter().find_map(|shape| match &shape.shape {
+                egui::Shape::Text(text) if text.galley.text() == "Retry in fresh workspace" => {
+                    Some(text.pos + text.galley.size() / 2.0)
+                }
+                _ => None,
+            });
+            output.textures_delta.clear();
+            let position =
+                position.ok_or("retry remains reachable without a completion receipt")?;
+            let mut output = ctx.run_ui(
+                egui::RawInput {
+                    events: vec![
+                        egui::Event::PointerMoved(position),
+                        egui::Event::PointerButton {
+                            pos: position,
+                            button: egui::PointerButton::Primary,
+                            pressed: true,
+                            modifiers: egui::Modifiers::NONE,
+                        },
+                        egui::Event::PointerButton {
+                            pos: position,
+                            button: egui::PointerButton::Primary,
+                            pressed: false,
+                            modifiers: egui::Modifiers::NONE,
+                        },
+                    ],
+                    ..Default::default()
+                },
+                |ui| {
+                    let tokens = Tokens::get(ui.ctx());
+                    build_cell(ui, Some(built), false, 0, &tokens, &mut act);
+                },
+            );
+            output.textures_delta.clear();
+            assert!(matches!(act, Some(BakeAct::Build(0))));
+        }
+        Ok(())
     }
 }

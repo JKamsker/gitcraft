@@ -33,7 +33,7 @@ impl RepoTab {
                 .find(|b| b.kind == BadgeKind::Branch || b.kind == BadgeKind::DetachedHead)
             {
                 let name = if badge.kind == BadgeKind::DetachedHead {
-                    "detached".to_owned()
+                    crate::i18n::text("repo-core-2699").to_owned()
                 } else {
                     badge.git_ref()
                 };
@@ -48,10 +48,19 @@ impl RepoTab {
         range: Range<usize>,
         shown_lanes: usize,
     ) -> Viewport {
+        self.readable_rows(ui, range, shown_lanes)
+    }
+
+    pub(super) fn readable_rows(
+        &self,
+        ui: &Ui,
+        rows: impl Iterator<Item = usize>,
+        shown_lanes: usize,
+    ) -> Viewport {
         let mut first = HashMap::new();
         let mut decorated = HashSet::new();
         let mut width = MIN_REFS_W;
-        for i in range {
+        for i in rows {
             let Some(row) = self.graph.rows.get(i) else {
                 continue;
             };
@@ -62,6 +71,7 @@ impl RepoTab {
             if row.col < shown_lanes
                 && self.commits[i].hash != WIP_HASH
                 && self.stash_at(i).is_none()
+                && self.parked_at(i).is_none()
             {
                 first.entry(row.origin).or_insert(i);
             }
@@ -75,7 +85,7 @@ impl RepoTab {
                     self.graph_labels
                         .get(&origin)
                         .cloned()
-                        .unwrap_or_else(|| "detached".to_owned()),
+                        .unwrap_or_else(|| crate::i18n::text("repo-core-2699").to_owned()),
                 )
             })
             .collect();

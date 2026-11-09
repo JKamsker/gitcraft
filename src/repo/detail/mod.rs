@@ -31,6 +31,8 @@ impl RepoTab {
             self.compare_panel(ui, acts);
         } else if wip {
             self.changes_panel(ui, acts);
+        } else if self.selected_parked().is_some() {
+            self.parked_panel(ui, acts);
         } else {
             self.commit_panel(ui, acts);
         }
@@ -53,6 +55,19 @@ impl RepoTab {
         key: impl Fn(&str) -> DiffKey,
     ) {
         let id = egui::Id::new(("file-folder", self.repo_key(), tree));
+        let keyboard_scope = match files.first().map(|f| key(&f.path)) {
+            Some(DiffKey::Commit { hash, .. }) => egui::Id::new((tree, hash)),
+            Some(DiffKey::Range { from, to, .. }) => egui::Id::new((tree, from, to)),
+            _ => egui::Id::new(tree),
+        };
+        self.keyboard_files(
+            ui,
+            (keyboard_scope, Some(id)),
+            files,
+            |f| f.path.as_str(),
+            |f| key(&f.path),
+            acts,
+        );
         let rules = folding::Rules::from_settings(&Settings::get(ui.ctx()));
         let group = folding::split(
             ui,
@@ -62,7 +77,9 @@ impl RepoTab {
             (&self.folding, &rules),
             acts,
         );
-        let selected = |f: &&&ChangedFile| self.open_key() == Some(&key(&f.path));
+        let selected = |f: &&&ChangedFile| {
+            self.open_key() == Some(&key(&f.path)) || self.keyboard_file_selected(&key(&f.path))
+        };
         let (scope, generation) = super::weakened_marks::scope_of(&key(""), self.work_read);
         let found = self.weakened.get(ui.ctx(), &self.path, scope, generation);
         let paths: Vec<&str> = files.iter().map(|f| f.path.as_str()).collect();
@@ -76,10 +93,11 @@ impl RepoTab {
                 &f.path,
                 f.old_path.as_deref(),
                 indent,
-                self.open_key() == Some(&key(&f.path)),
+                selected(&&f),
                 extra,
                 self.owner_tag(&f.path).as_ref(),
             );
+            self.keyboard_file_row(keyboard_scope, &r.row, &key(&f.path));
             super::weakened_marks::hover(ui, &r, flags);
             // A file the commit deleted isn't in it, and has nothing to link to.
             let links = || self.link_menu(None).filter(|_| f.status != 'D');
@@ -90,25 +108,29 @@ impl RepoTab {
                 false,
                 Some(&key(&f.path)),
                 &links,
+                self.keyboard_file_selected(&key(&f.path)),
                 acts,
             );
             if r.row.clicked() {
+                self.keyboard_select_file(keyboard_scope, key(&f.path));
                 acts.push(Action::OpenDiff(key(&f.path)));
                 acts.push(Action::UnfoldDiff);
             }
         };
         // Rows are known by their path within the list of this commit (or range): a menu left
         // open while another one is shown is not that one's file of the same path.
+        let mut reveal = None;
         horizontal_files(ui, ("changed-files-scroll", tree, rev), &paths, |ui| {
             ui.push_id(("file-list", tree, rev), |ui| {
-                branch_tree::files(
+                reveal = branch_tree::files(
                     ui,
                     (id, true),
                     &group.shown,
                     |f| &f.path,
                     &selected,
                     &mut |ui, indent, f| row(ui, indent, f, acts),
-                );
+                )
+                .or(reveal);
                 let stats = group.folded.iter().fold((0u32, 0u32), |(a, d), f| {
                     (
                         a.saturating_add(f.added.unwrap_or(0)),
@@ -118,17 +140,23 @@ impl RepoTab {
                 let holds_open = group.folded.iter().any(|f| selected(&f));
                 let open_id = id.with(("folded-open", rev));
                 if group.header(ui, open_id, Some(stats), holds_open) {
-                    branch_tree::files(
+                    reveal = branch_tree::files(
                         ui,
                         (id.with("folded"), true),
                         &group.folded,
                         |f| &f.path,
                         &selected,
                         &mut |ui, indent, f| row(ui, indent, f, acts),
-                    );
+                    )
+                    .or(reveal);
                 }
             });
         });
+        // egui consumes both scroll targets at the inner horizontal list. Forward the
+        // same typed row rectangle to its outer vertical scroller after that list ends.
+        if let Some(rect) = reveal {
+            ui.scroll_to_rect(rect, Some(egui::Align::Center));
+        }
         super::weakened_marks::error_note(ui, found.as_ref());
     }
 }
@@ -152,9 +180,8 @@ pub(super) fn files_header_with(
         )
     });
     let summary = format!(
-        "{} file{} changed  +{adds}  −{dels}",
-        files.len(),
-        if files.len() == 1 { "" } else { "s" }
+        "{}  +{adds}  −{dels}",
+        crate::i18n::message("repo-core-1146", &[("count", files.len().into())])
     );
     egui::Frame::new()
         .fill(t.tab_strip)

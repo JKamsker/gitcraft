@@ -65,8 +65,28 @@ impl RepoTab {
             return (resp, None);
         };
         let (rect, mid, gx, cols) = (row.rect, row.mid(), row.gx, row.cols);
-        let refs_clip = Rect::from_min_max(rect.min, pos2(gx - 4.0, rect.bottom()));
-        let mut rp = painter.with_clip_rect(refs_clip);
+        let identity = first.full_refs().into_iter().next().unwrap_or_default();
+        let offset = if self.ghost.drawing() {
+            0.0
+        } else {
+            self.graph_motion
+                .pill_offset(ui.ctx(), &identity, &row.commit.hash, row.i)
+        };
+        let mid = mid + offset;
+        let refs_clip = Rect::from_min_max(
+            pos2(rect.left(), ui.clip_rect().top()),
+            pos2(gx - 4.0, ui.clip_rect().bottom()),
+        );
+        let mut rp = if offset.abs() > 0.1 {
+            ui.ctx()
+                .layer_painter(egui::LayerId::new(
+                    egui::Order::Middle,
+                    ui.id().with("moving-ref-pills"),
+                ))
+                .with_clip_rect(refs_clip)
+        } else {
+            painter.with_clip_rect(refs_clip)
+        };
         // In a ghost run: a pill where the operation would put it, or one it would delete.
         let (moved, gone) = self.ghost.pill(&first.full_refs());
         if moved || gone {
@@ -86,8 +106,14 @@ impl RepoTab {
             self.marks(first, &row.commit.hash),
         );
         ghost_pill_marks(&rp, &t, pill, moved, gone);
-        self.pill_clicks(ui, &resp, pill, first, &row.commit.hash, acts);
-        let hit = PillHit::of(first, pill, &row.commit.hash);
+        if offset.abs() <= 0.1 {
+            self.pill_clicks(ui, &resp, pill, first, &row.commit.hash, acts);
+        }
+        let hit = if offset.abs() <= 0.1 {
+            Some(PillHit::of(first, pill, &row.commit.hash))
+        } else {
+            None
+        };
         let mut end = pill.right();
         let mut more_rect = None;
         if more > 0 {
@@ -119,21 +145,24 @@ impl RepoTab {
                     .filter_map(|b| self.stack_line(&b.label)),
             );
             let drag = if first.kind == BadgeKind::PullRequest {
-                "Pull request tip; double-click its entry in the left pane to open details"
+                crate::i18n::text("repo-core-2683")
             } else if first.kind == BadgeKind::Branch {
-                "Double-click a pill to check it out, or drag it onto a branch or a commit"
+                crate::i18n::text("repo-core-2684")
             } else {
-                "Double-click a pill to check it out; drag the row to cherry-pick or move the commit"
+                crate::i18n::text("repo-core-2685")
             };
-            let resp = resp.on_hover_text(format!(
-                "{}\nTip commit by {} · {}\n{drag}",
-                lines.join("\n"),
-                row.commit.author,
-                row.commit.date
+            let resp = resp.on_hover_text(crate::i18n::message(
+                "repo-core-2686",
+                &[
+                    ("n", lines.join("\n").to_string().into()),
+                    ("author", row.commit.author.to_string().into()),
+                    ("date", crate::i18n::date_iso(&row.commit.date).into()),
+                    ("drag", drag.to_string().into()),
+                ],
             ));
-            return (resp, Some(hit));
+            return (resp, hit);
         }
-        (resp, Some(hit))
+        (resp, hit)
     }
 
     /// What a pill of `badge` on commit `hash` carries besides its name: whether the branch has
@@ -302,10 +331,10 @@ impl RepoTab {
     /// Clicks on one pill of a row's stack, which act like those on the row's own pill.
     fn stack_slot_clicks(&self, resp: Response, b: &Badge, i: usize, acts: &mut Vec<Action>) {
         let hint = match self.pill_checkout(b) {
-            _ if b.kind == BadgeKind::PullRequest => "pull request tip",
-            _ if b.head => "checked out",
-            Some(Action::Pull) => "double-click to pull",
-            _ => "double-click to check out",
+            _ if b.kind == BadgeKind::PullRequest => crate::i18n::text("repo-core-2690"),
+            _ if b.head => crate::i18n::text("repo-core-2691"),
+            Some(Action::Pull) => crate::i18n::text("repo-core-2692"),
+            _ => crate::i18n::text("repo-core-2693"),
         };
         let resp = resp.on_hover_text(format!("{} ({hint})", b.describe()));
         widgets::a11y(&resp, egui::WidgetType::Button, || b.spoken());
@@ -318,7 +347,7 @@ impl RepoTab {
         }
         // The same menu as right-clicking the row's own pill.
         let branch = (b.kind == BadgeKind::Branch).then(|| b.git_ref());
-        egui::Popup::context_menu(&resp)
+        crate::menu_item::context(&resp)
             .style(crate::theme::menu_style)
             .show(|ui| self.commit_menu_items(ui, i, branch, self.busy_op.is_none(), acts));
     }

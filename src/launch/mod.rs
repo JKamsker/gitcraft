@@ -2,6 +2,8 @@
 //! it ([`args`]) and making sense of it on disk ([`resolve`]).
 
 pub mod args;
+mod display;
+pub use display::message as display_message;
 pub mod link;
 pub mod open_link;
 pub mod resolve;
@@ -53,7 +55,7 @@ pub(crate) fn actions(then: Then) -> Vec<Action> {
             line: line as usize,
         }],
         Then::Commit(hash) => vec![Action::SelectHash(hash)],
-        Then::PullRequest(number) => vec![Action::OpenPr(number)],
+        Then::PullRequest { number, remote } => vec![Action::OpenLinkedPr { number, remote }],
         // Cloned first, by the window (see `app::launch`).
         Then::Clone(_) => Vec::new(),
         Then::Compare {
@@ -67,7 +69,26 @@ pub(crate) fn actions(then: Then) -> Vec<Action> {
             base_label,
             target: Some(target),
             target_label,
+            captions: [None, None],
             since_fork,
         }],
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn linked_pr_keeps_its_remote_until_the_tab_opens_it() {
+        for remote in ["origin", "upstream"] {
+            let actions = actions(Then::PullRequest {
+                number: 42,
+                remote: remote.into(),
+            });
+            assert!(
+                matches!(actions.as_slice(), [Action::OpenLinkedPr { number: 42, remote: name }] if name == remote)
+            );
+        }
     }
 }

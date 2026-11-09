@@ -1,0 +1,55 @@
+{
+  "commit": "0fed49da19be2c9bc5b1f4feeb9bf369e03678b3",
+  "binary": "/home/jonas/.t3/worktrees/gitcraft/t3-01301ba9/target/debug/deps/gitcraft-ac6d378822b31a47",
+  "results": [
+    {
+      "name": "recording-mapping",
+      "pattern": "resolver::process::tests::recording_failure_mapping_and_join_proof_fail_closed",
+      "code": 0,
+      "seconds": 0.06,
+      "log": "gitcraft-repair-recording-mapping.log.gz"
+    },
+    {
+      "name": "recording-service",
+      "pattern": "processes::recording_outcomes::",
+      "code": 0,
+      "seconds": 0.02,
+      "log": "gitcraft-repair-recording-service.log.gz"
+    },
+    {
+      "name": "resolver-process",
+      "pattern": "resolver::process::tests::",
+      "code": 0,
+      "seconds": 0.12,
+      "log": "gitcraft-repair-resolver-process.log.gz"
+    },
+    {
+      "name": "parking",
+      "pattern": "resolver::park::tests::",
+      "code": 0,
+      "seconds": 58.38,
+      "log": "gitcraft-repair-parking.log.gz"
+    },
+    {
+      "name": "uncertain-retention",
+      "pattern": "repo::resolver::flow_tests::uncertain_cleanup_preserves_workspace_record_and_blocks_apply",
+      "code": 0,
+      "seconds": 1.15,
+      "log": "gitcraft-repair-uncertain-retention.log.gz"
+    },
+    {
+      "name": "insights-dispatch",
+      "pattern": "repo::resolver::flow_tests::insights_action_closes_only_the_read_only_resolver_review",
+      "code": 0,
+      "seconds": 1.06,
+      "log": "gitcraft-repair-insights-dispatch.log.gz"
+    },
+    {
+      "name": "resolver-flow",
+      "pattern": "repo::resolver::flow_tests::",
+      "code": 0,
+      "seconds": 18.54,
+      "log": "gitcraft-repair-resolver-flow.log.gz"
+    }
+  ]
+}

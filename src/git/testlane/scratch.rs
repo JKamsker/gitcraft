@@ -5,7 +5,7 @@
 //! that crashed is removed the next time one is made.
 
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 use crate::git::run;
 use crate::remote;
@@ -14,7 +14,7 @@ use crate::remote;
 pub const SCRATCH_DIR: &str = "gitcraft-scratch";
 
 /// What the worktrees are made for: the first part of their names.
-const LABELS: [&str; 3] = ["test", "rehearse", "interaction"];
+const LABELS: [&str; 4] = ["test", "rehearse", "interaction", "resolve"];
 
 /// Numbers the worktrees this process makes.
 static MADE: AtomicU64 = AtomicU64::new(0);
@@ -26,6 +26,7 @@ pub struct Scratch {
     /// Where it is, in the form the command layer takes (another machine's, encoded).
     pub path: PathBuf,
     removed: bool,
+    preserved: AtomicBool,
 }
 
 impl Scratch {
@@ -52,12 +53,28 @@ impl Scratch {
             &there,
             rev,
         ];
-        run(Some(repo), &args).map_err(|e| format!("could not make a scratch worktree: {e}"))?;
+        run(Some(repo), &args).map_err(|e| {
+            crate::i18n::message(
+                "backend-could-not-make-a-scratch-worktree-e-76b327",
+                &[("detail", (e).to_string().into())],
+            )
+        })?;
         Ok(Scratch {
             repo: repo.to_owned(),
             path,
             removed: false,
+            preserved: AtomicBool::new(false),
         })
+    }
+
+    /// Retain uncertain resolver work across drop and future stale-worktree sweeps.
+    pub(crate) fn preserve(&self) -> Result<(), String> {
+        self.preserved.store(true, Ordering::Release);
+        std::fs::write(
+            self.path.with_extension("preserved"),
+            b"cleanup unconfirmed\n",
+        )
+        .map_err(|e| e.to_string())
     }
 
     /// Checks out `rev` in it, whatever was changed there.
@@ -69,7 +86,13 @@ impl Scratch {
         .map(|_| ())
         .map_err(|e| {
             let at = rev.get(..8).unwrap_or(rev);
-            format!("could not check out {at} in a scratch worktree: {e}")
+            crate::i18n::message(
+                "backend-could-not-check-out-at-in-a-scratch-worktree-e-e85eed",
+                &[
+                    ("at", (at).to_string().into()),
+                    ("detail", (e).to_string().into()),
+                ],
+            )
         })
     }
 
@@ -78,11 +101,31 @@ impl Scratch {
         self.removed = true;
         remove_worktree(&self.repo, &self.path)
     }
+
+    /// Removes it now, trying `attempts` times `pause` apart while it can't be (a program that
+    /// worked in it may hold its folder a moment longer).
+    pub fn remove_retrying(
+        mut self,
+        attempts: u32,
+        pause: std::time::Duration,
+    ) -> Result<(), String> {
+        self.removed = true;
+        let mut tried = 1;
+        loop {
+            match remove_worktree(&self.repo, &self.path) {
+                Err(_) if tried < attempts => {
+                    tried += 1;
+                    std::thread::sleep(pause);
+                }
+                done => return done,
+            }
+        }
+    }
 }
 
 impl Drop for Scratch {
     fn drop(&mut self) {
-        if !self.removed {
+        if !self.removed && !self.preserved.load(Ordering::Acquire) {
             self.removed = true;
             let _ = remove_worktree(&self.repo, &self.path);
         }
@@ -101,8 +144,12 @@ fn remove_worktree(repo: &Path, path: &Path) -> Result<(), String> {
     match (removed, pruned) {
         (Ok(_), _) => Ok(()),
         (Err(_), Ok(_)) if !is_listed(repo, path) => Ok(()),
-        (Err(e), _) => Err(format!(
-            "could not remove the scratch worktree {there}: {e}"
+        (Err(e), _) => Err(crate::i18n::message(
+            "backend-could-not-remove-the-scratch-worktree-there-e-a9a777",
+            &[
+                ("there", (there).to_string().into()),
+                ("detail", (e).to_string().into()),
+            ],
         )),
     }
 }
@@ -122,7 +169,10 @@ fn common_dir_there(repo: &Path) -> Result<String, String> {
     let out = run(Some(repo), &["rev-parse", "--git-common-dir"])?;
     let printed = out.trim_end_matches(['\n', '\r']);
     if printed.is_empty() {
-        return Err("git didn't say where the repository's git folder is".to_owned());
+        return Err(crate::i18n::text(
+            "backend-git-didn-t-say-where-the-repository-s-git-folder-is-ecfd5a",
+        )
+        .to_owned());
     }
     Ok(remote::git_path(&remote::resolve(repo, printed)))
 }
@@ -227,6 +277,10 @@ fn sweep_left_over(repo: &Path, root: &Path) {
         let Some(name) = scratch_name_in(printed, &key) else {
             continue;
         };
+        let path = remote::resolve(repo, printed);
+        if path.with_extension("preserved").exists() {
+            continue;
+        }
         if name.machine == me && name.pid != std::process::id() && !process_alive(name.pid) {
             let _ = remove_worktree(repo, &remote::resolve(repo, printed));
         }

@@ -151,15 +151,41 @@ impl Offer {
     /// The menu entry.
     pub(crate) fn label(&self) -> String {
         match self {
-            Offer::Merge { from, into } => format!("Merge {} into {into}", from.label()),
-            Offer::Rebase { branch, onto } => format!("Rebase {branch} onto {}", onto.label()),
-            Offer::InteractiveRebase { branch, onto } => {
-                format!("Interactive rebase {branch} onto {}…", onto.label())
-            }
-            Offer::FastForward { branch, to, .. } => {
-                format!("Fast-forward {branch} to {}", to.label())
-            }
-            Offer::CherryPick { hash, onto } => format!("Cherry-pick {} onto {onto}", short(hash)),
+            Offer::Merge { from, into } => crate::i18n::message(
+                "repo-core-2422",
+                &[
+                    ("hash", from.label().to_string().into()),
+                    ("into", into.to_string().into()),
+                ],
+            ),
+            Offer::Rebase { branch, onto } => crate::i18n::message(
+                "repo-core-2423",
+                &[
+                    ("branch", branch.to_string().into()),
+                    ("hash", onto.label().to_string().into()),
+                ],
+            ),
+            Offer::InteractiveRebase { branch, onto } => crate::i18n::message(
+                "repo-core-2424",
+                &[
+                    ("branch", branch.to_string().into()),
+                    ("label", onto.label().to_string().into()),
+                ],
+            ),
+            Offer::FastForward { branch, to, .. } => crate::i18n::message(
+                "repo-core-2425",
+                &[
+                    ("branch", branch.to_string().into()),
+                    ("label", to.label().to_string().into()),
+                ],
+            ),
+            Offer::CherryPick { hash, onto } => crate::i18n::message(
+                "repo-core-2426",
+                &[
+                    ("hash", short(hash).to_string().into()),
+                    ("onto", onto.to_string().into()),
+                ],
+            ),
             Offer::Rewrite(drop) => drop.label(),
         }
     }
@@ -167,34 +193,44 @@ impl Offer {
     /// What the entry does, naming the branch it changes, for its tooltip.
     pub(crate) fn explain(&self) -> String {
         match self {
-            Offer::Merge { from, into } => format!(
-                "Changes {into}: a merge commit bringing in {}'s changes (git merge)",
-                from.label()
+            Offer::Merge { from, into } => crate::i18n::message(
+                "repo-core-2427",
+                &[
+                    ("into", into.to_string().into()),
+                    ("label", from.label().to_string().into()),
+                ],
             ),
-            Offer::Rebase { branch, onto } => format!(
-                "Changes {branch}: replays its own commits on top of {} (git rebase)",
-                onto.label()
+            Offer::Rebase { branch, onto } => crate::i18n::message(
+                "repo-core-2428",
+                &[
+                    ("branch", branch.to_string().into()),
+                    ("label", onto.label().to_string().into()),
+                ],
             ),
-            Offer::InteractiveRebase { branch, .. } => format!(
-                "Changes {branch}: reorder, reword, squash or drop its commits first, then rebase"
-            ),
+            Offer::InteractiveRebase { branch, .. } => {
+                crate::i18n::message("repo-core-2429", &[("branch", branch.to_string().into())])
+            }
             Offer::FastForward {
                 branch,
                 to,
                 checked_out: false,
                 ..
-            } => format!(
-                "Moves {branch} forward to {} without checking it out; {} stays as it is",
-                to.label(),
-                to.label()
+            } => crate::i18n::message(
+                "repo-core-2430",
+                &[
+                    ("branch", branch.to_string().into()),
+                    ("label", to.label().to_string().into()),
+                ],
             ),
-            Offer::FastForward { branch, to, .. } => format!(
-                "Moves {branch} forward to {}: it has nothing {} lacks",
-                to.label(),
-                to.label()
+            Offer::FastForward { branch, to, .. } => crate::i18n::message(
+                "repo-core-2431",
+                &[
+                    ("branch", branch.to_string().into()),
+                    ("label", to.label().to_string().into()),
+                ],
             ),
             Offer::CherryPick { onto, .. } => {
-                format!("Copies the commit's changes onto {onto} as a new commit")
+                crate::i18n::message("repo-core-2432", &[("onto", onto.to_string().into())])
             }
             Offer::Rewrite(drop) => drop.place.explain().to_owned(),
         }

@@ -64,8 +64,22 @@ impl Filter {
         self.found.get()
     }
 
+    /// Count and select a shortcut editor row using the same search as settings cards.
+    pub fn include_shortcut(&self, keywords: &str) -> bool {
+        if !self.matches(&[self.page, keywords]) {
+            return false;
+        }
+        self.found.set(self.found() + 1);
+        !self.counting
+    }
+
     fn matches(&self, parts: &[&str]) -> bool {
-        let text = parts.join(" ").to_lowercase();
+        let text = parts
+            .iter()
+            .flat_map(|raw| [*raw, super::labels::display(raw)])
+            .collect::<Vec<_>>()
+            .join(" ")
+            .to_lowercase();
         self.words.iter().all(|w| text.contains(w.as_str()))
     }
 }
@@ -127,7 +141,7 @@ pub(super) fn section(
     if title != filter.page {
         ui.add_space(18.0);
         ui.label(
-            RichText::new(title)
+            RichText::new(super::labels::display(title))
                 .font(theme::semibold(14.0))
                 .color(t.text),
         );
@@ -193,7 +207,7 @@ impl Card<'_> {
         let found_by = [label, hint.unwrap_or_default(), keywords];
         self.full_with(&found_by, |ui| {
             let name = |ui: &mut Ui| {
-                ui.label(RichText::new(label).color(t.text));
+                ui.label(RichText::new(super::labels::display(label)).color(t.text));
                 if let Some(hint) = hint {
                     ui.spacing_mut().item_spacing.y = 2.0;
                     ui.label(RichText::new(hint).color(t.text_faint).small());
@@ -309,4 +323,56 @@ pub(super) fn field(text: &mut String) -> egui::TextEdit<'_> {
         .margin(vec2(6.0, 4.0))
         .min_size(vec2(0.0, 24.0))
         .vertical_align(Align::Center)
+}
+
+#[cfg(test)]
+mod localization_tests {
+    use super::*;
+    use egui_kittest::{Harness, kittest::Queryable};
+
+    #[test]
+    fn actual_row_translates_and_keeps_control_identity_and_both_search_languages() {
+        crate::i18n::set_language("de");
+        let german = Filter::new("Verhalten Worktrees", "General", true);
+        let english = Filter::new("Behaviour Worktrees", "General", true);
+        assert!(german.matches(&["General", "Behaviour", "Worktrees"]));
+        assert!(english.matches(&["General", "Behaviour", "Worktrees"]));
+        assert_eq!(super::super::Page::General.title(), "General");
+        assert_eq!(
+            super::super::labels::display("user-owned opaque name"),
+            "user-owned opaque name"
+        );
+        let fonts = Cell::new(false);
+        let mut h = Harness::new_ui_state(
+            move |ui, state: &mut (bool, Option<egui::Id>)| {
+                if !fonts.replace(true) {
+                    crate::theme::install_fonts(ui.ctx());
+                    return;
+                }
+                let filter = Filter::new("", "General", false).on_page(Page::General);
+                section(ui, &filter, "Behaviour", None, |card| {
+                    card.row("Worktrees", "open same tab switch", |ui| {
+                        let response = ui.checkbox(
+                            &mut state.0,
+                            crate::i18n::text("interaction-settings-same-tab"),
+                        );
+                        state.1 = Some(response.id);
+                    });
+                });
+            },
+            (false, None),
+        );
+        h.run();
+        h.get_by_label("Verhalten");
+        h.get_by_label("Worktrees");
+        h.get_by_label("Im selben Tab öffnen").click();
+        h.run();
+        assert!(h.state().0);
+        let german_id = h.state().1;
+        crate::i18n::set_language("en-US");
+        h.step();
+        h.get_by_label("Behaviour");
+        h.get_by_label("Open in the same tab");
+        assert_eq!(h.state().1, german_id);
+    }
 }

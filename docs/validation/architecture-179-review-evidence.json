@@ -1,0 +1,30 @@
+{
+  "tested_revision": "2045b1bae77939e7fbdb8c5c005c90ea4bd53142",
+  "prior_reviewed_revision": "bfceb9f456d0ee0f14932a1900e301880399f7bb",
+  "results": {
+    "python_fixtures": 6,
+    "inert_owner_tests": 6,
+    "handoff_tests": 1,
+    "clippy_macos_allowance": "pass",
+    "baseline_byte_identical": true,
+    "historical_results_summary_unchanged": true
+  },
+  "logs": {
+    "python": {
+      "sha256": "f6d8987bb181fd9b468884fa67f7f194bca355b73446119f7c7861ed6bd9f0d0",
+      "text": "test_history_pins_rename_algorithm_and_path_quoting (test_architecture.GitMetricsTests.test_history_pins_rename_algorithm_and_path_quoting) ... ok\ntest_report_selects_action_by_name_after_another_enum (test_architecture.GitMetricsTests.test_report_selects_action_by_name_after_another_enum) ... ok\ntest_sources_are_raw_tracked_blobs_despite_export_attributes (test_architecture.GitMetricsTests.test_sources_are_raw_tracked_blobs_despite_export_attributes) ... ok\ntest_literals_comments_lifetimes_and_nested_blocks (test_architecture.MetricsTests.test_literals_comments_lifetimes_and_nested_blocks) ... ok\ntest_nested_field_types_are_not_struct_fields (test_architecture.MetricsTests.test_nested_field_types_are_not_struct_fields) ... ok\ntest_trait_methods_and_named_fields (test_architecture.MetricsTests.test_trait_methods_and_named_fields) ... ok\n\n----------------------------------------------------------------------\nRan 6 tests in 0.274s\n\nOK\n"
+    },
+    "inert": {
+      "sha256": "ae99d9ddd7a77343b6db83eff2d1c6cac4ae30a7d420d4957ae6c76a588db085",
+      "text": "   Compiling gitcraft v0.3.4 (/Users/jonas/.t3/worktrees/gitcraft/t3-6d0d75e7)\nwarning: constant `PACKAGE_ENTRY` is never used\n   --> src/desktop_entry.rs:118:7\n    |\n118 | const PACKAGE_ENTRY: &str = \"/usr/share/applications/gitcraft.desktop\";\n    |       ^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `set_actions` is never used\n   --> src/desktop_entry.rs:123:8\n    |\n123 | pub fn set_actions(items: &[crate::os_shell::MenuItem]) {\n    |        ^^^^^^^^^^^\n\nwarning: function `desktop_id` is never used\n   --> src/desktop_entry.rs:160:8\n    |\n160 | pub fn desktop_id() -> &'static str {\n    |        ^^^^^^^^^^\n\nwarning: `gitcraft` (lib test) generated 3 warnings\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 21.62s\n     Running unittests src/lib.rs (target/debug/deps/gitcraft-3fe163d12211b9a2)\n\nrunning 6 tests\ntest repo::terminals::tests::closing_preserves_the_selected_shell_or_selects_its_neighbour ... ok\ntest repo::terminals::tests::stale_indices_do_not_break_selection_or_drop_a_shell ... ok\ntest repo::terminals::tests::failed_launch_keeps_existing_shells_and_success_clears_the_error ... ok\ntest repo::terminals::tests::hiding_and_failed_launches_preserve_owned_sessions_until_close_or_drop ... ok\ntest repo::terminals::tests::terminal_palette_labels_hints_and_routes_stay_compatible ... ok\ntest repo::terminals::tests::repeated_hide_actions_do_not_reopen_or_start_a_shell ... ok\n\ntest result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 3345 filtered out; finished in 0.00s\n\n     Running unittests src/lib.rs (target/debug/deps/gitcraft_os-f792e6e5c14eb1c3)\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s\n\n"
+    },
+    "handoff": {
+      "sha256": "63bcb4320fc699b0a455256a6bfefdaa4f8f0c12ce720f23cb191e03555428c5",
+      "text": "warning: constant `PACKAGE_ENTRY` is never used\n   --> src/desktop_entry.rs:118:7\n    |\n118 | const PACKAGE_ENTRY: &str = \"/usr/share/applications/gitcraft.desktop\";\n    |       ^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `set_actions` is never used\n   --> src/desktop_entry.rs:123:8\n    |\n123 | pub fn set_actions(items: &[crate::os_shell::MenuItem]) {\n    |        ^^^^^^^^^^^\n\nwarning: function `desktop_id` is never used\n   --> src/desktop_entry.rs:160:8\n    |\n160 | pub fn desktop_id() -> &'static str {\n    |        ^^^^^^^^^^\n\nwarning: `gitcraft` (lib test) generated 3 warnings\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.25s\n     Running unittests src/lib.rs (target/debug/deps/gitcraft-3fe163d12211b9a2)\n\nrunning 1 test\ntest repo::agents::handoff::handoff_tests::the_tray_is_typed_into_the_agent_terminal_as_one_paste ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3350 filtered out; finished in 0.68s\n\n"
+    },
+    "clippy": {
+      "sha256": "32c32d0e08eee0be09da7a4a5b4079a793af3879eeb6372c2376a96d10a64a66",
+      "text": "    Checking gitcraft v0.3.4 (/Users/jonas/.t3/worktrees/gitcraft/t3-6d0d75e7)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 12.53s\n"
+    }
+  }
+}

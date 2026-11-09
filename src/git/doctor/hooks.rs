@@ -28,17 +28,41 @@ pub const KNOWN: &[(&str, &str)] = &[
     ("post-merge", "git merge, pull"),
     ("pre-push", "git push"),
     ("post-rewrite", "git commit --amend, rebase"),
-    ("reference-transaction", "every change of a ref"),
+    (
+        "reference-transaction",
+        "backend-every-change-of-a-ref-a1092b",
+    ),
     ("pre-auto-gc", "git gc --auto"),
-    ("post-index-change", "every write of the index"),
+    (
+        "post-index-change",
+        "backend-every-write-of-the-index-51ed6f",
+    ),
     ("sendemail-validate", "git send-email"),
     ("fsmonitor-watchman", "git status (core.fsmonitor)"),
-    ("push-to-checkout", "a push into this repository"),
-    ("pre-receive", "a push into this repository (server side)"),
-    ("update", "a push into this repository (server side)"),
-    ("proc-receive", "a push into this repository (server side)"),
-    ("post-receive", "a push into this repository (server side)"),
-    ("post-update", "a push into this repository (server side)"),
+    (
+        "push-to-checkout",
+        "backend-a-push-into-this-repository-576e18",
+    ),
+    (
+        "pre-receive",
+        "backend-a-push-into-this-repository-server-side-c63be7",
+    ),
+    (
+        "update",
+        "backend-a-push-into-this-repository-server-side-c63be7",
+    ),
+    (
+        "proc-receive",
+        "backend-a-push-into-this-repository-server-side-c63be7",
+    ),
+    (
+        "post-receive",
+        "backend-a-push-into-this-repository-server-side-c63be7",
+    ),
+    (
+        "post-update",
+        "backend-a-push-into-this-repository-server-side-c63be7",
+    ),
     ("p4-changelist", "git p4 submit"),
     ("p4-prepare-changelist", "git p4 submit"),
     ("p4-post-changelist", "git p4 submit"),
@@ -47,7 +71,10 @@ pub const KNOWN: &[(&str, &str)] = &[
 
 /// What runs the hook `name`, `None` for a name git doesn't run.
 pub fn runs_on(name: &str) -> Option<&'static str> {
-    KNOWN.iter().find(|(n, _)| *n == name).map(|(_, on)| *on)
+    KNOWN
+        .iter()
+        .find(|(n, _)| *n == name)
+        .map(|(_, on)| crate::i18n::text(on))
 }
 
 /// Something that keeps a hook from running as meant.
@@ -72,31 +99,34 @@ pub enum Problem {
 impl Problem {
     pub fn describe(&self) -> String {
         match self {
-            Problem::NotExecutable => "Not executable: git skips it, prints a hint and goes \
-                                       ahead without it. Make it executable (chmod +x)."
-                .to_owned(),
-            Problem::IsFolder => "A folder with a hook's name: git tries to run it and the \
-                                  operation fails (\"cannot exec … Permission denied\"). Remove or \
-                                  rename it."
-                .to_owned(),
-            Problem::CrlfShebang => "Its #! line ends in CRLF: the system looks for an \
-                                     interpreter whose name ends in a carriage return, and git \
-                                     fails with \"cannot exec … No such file or directory\". \
-                                     Save it with LF line endings."
-                .to_owned(),
-            Problem::CrlfLines => "CRLF line endings near the top: the shell reads the carriage \
-                                   returns as part of each command. Save it with LF line endings."
-                .to_owned(),
-            Problem::NoShebang => "No #! line: Git for Windows can't tell what runs it. Start it \
-                                   with #!/bin/sh (or the interpreter it needs)."
-                .to_owned(),
-            Problem::MissingInterpreter(i) => {
-                format!("Its interpreter, {i}, isn't installed where git runs.")
-            }
-            Problem::UnknownName => {
-                "Git runs no hook of this name: it never runs (a typo, or a copy kept aside)."
-                    .to_owned()
-            }
+            Problem::NotExecutable => crate::i18n::text(
+                "backend-not-executable-git-skips-it-prints-a-hint-and-goes-ahead-without-66d22e",
+            )
+            .to_owned(),
+            Problem::IsFolder => crate::i18n::text(
+                "backend-a-folder-with-a-hook-s-name-git-tries-to-run-it-and-the-operation-11b107",
+            )
+            .to_owned(),
+            Problem::CrlfShebang => crate::i18n::text(
+                "backend-its-line-ends-in-crlf-the-system-looks-for-an-interpreter-whose-n-74193c",
+            )
+            .to_owned(),
+            Problem::CrlfLines => crate::i18n::text(
+                "backend-crlf-line-endings-near-the-top-the-shell-reads-the-carriage-retur-dff8d9",
+            )
+            .to_owned(),
+            Problem::NoShebang => crate::i18n::text(
+                "backend-no-line-git-for-windows-can-t-tell-what-runs-it-start-it-with-bin-779e3f",
+            )
+            .to_owned(),
+            Problem::MissingInterpreter(i) => crate::i18n::message(
+                "backend-its-interpreter-i-isn-t-installed-where-git-runs-4d4fc2",
+                &[("index", (i).to_string().into())],
+            ),
+            Problem::UnknownName => crate::i18n::text(
+                "backend-git-runs-no-hook-of-this-name-it-never-runs-a-typo-or-a-copy-kept-3a6983",
+            )
+            .to_owned(),
         }
     }
 }
@@ -135,15 +165,15 @@ impl Manager {
     /// What to change rather than the hooks it writes.
     pub fn advice(self) -> &'static str {
         match self {
-            Manager::Husky => {
-                "the hooks in .husky/_ are husky's stubs, rewritten on install: \
-                               edit the scripts in .husky/ (checked below)."
-            }
-            Manager::Lefthook => "edit lefthook.yml; lefthook install writes the hooks again.",
-            Manager::PreCommit => {
-                "edit .pre-commit-config.yaml; its hooks read it each time \
-                                   they run."
-            }
+            Manager::Husky => crate::i18n::text(
+                "backend-the-hooks-in-husky-are-husky-s-stubs-rewritten-on-install-edit-th-583641",
+            ),
+            Manager::Lefthook => crate::i18n::text(
+                "backend-edit-lefthook-yml-lefthook-install-writes-the-hooks-again-9f7ab5",
+            ),
+            Manager::PreCommit => crate::i18n::text(
+                "backend-edit-pre-commit-config-yaml-its-hooks-read-it-each-time-they-run-e85dff",
+            ),
         }
     }
 }
@@ -184,8 +214,12 @@ const HEAD: usize = 512;
 
 /// The repository's hooks, with their problems.
 pub fn hooks(repo: &Path) -> Result<Hooks, String> {
-    let printed = run(Some(repo), &["rev-parse", "--git-path", "hooks"])
-        .map_err(|e| format!("Could not find the hooks folder: {e}"))?;
+    let printed = run(Some(repo), &["rev-parse", "--git-path", "hooks"]).map_err(|e| {
+        crate::i18n::message(
+            "backend-could-not-find-the-hooks-folder-e-acd76c",
+            &[("detail", (e).to_string().into())],
+        )
+    })?;
     let folder = printed.trim_end_matches(['\n', '\r']).to_owned();
     // Unset (`None`) and set to nothing (hooks turned off) are told apart.
     let hooks_path = run(Some(repo), &["config", "--get", "core.hooksPath"])
@@ -373,7 +407,15 @@ fn scan_here(dir: &Path) -> Result<Option<Vec<Scanned>>, String> {
         {
             return Ok(None);
         }
-        Err(e) => return Err(format!("Could not read {}: {e}", dir.display())),
+        Err(e) => {
+            return Err(crate::i18n::message(
+                "backend-could-not-read-e-6dfcf3",
+                &[
+                    ("path", (dir.display()).to_string().into()),
+                    ("detail", (e).to_string().into()),
+                ],
+            ));
+        }
     };
     let mut out = Vec::new();
     for entry in entries.flatten() {
@@ -450,13 +492,21 @@ fn scan_there(t: &crate::remote::Target) -> Result<Option<Vec<Scanned>>, String>
             ..Default::default()
         },
     )
-    .map_err(|e| format!("Could not read the hooks folder: {e}"))?;
+    .map_err(|e| {
+        crate::i18n::message(
+            "backend-could-not-read-the-hooks-folder-e-4e4558",
+            &[("detail", (e).to_string().into())],
+        )
+    })?;
     match out.code {
         0 => Ok(Some(parse_scan(&String::from_utf8_lossy(&out.stdout)))),
         3 => Ok(None),
-        _ => Err(format!(
-            "Could not read the hooks folder: {}",
-            String::from_utf8_lossy(&out.stderr).trim()
+        _ => Err(crate::i18n::message(
+            "backend-could-not-read-the-hooks-folder-1444e9",
+            &[(
+                "from_utf8_lossy",
+                crate::git::display_error(String::from_utf8_lossy(&out.stderr).trim()).into(),
+            )],
         )),
     }
 }
@@ -560,10 +610,19 @@ fn installed_there(t: &crate::remote::Target, wanted: &[&String]) -> Vec<String>
 
 /// Fixes a hook that isn't executable (`chmod +x`), on whichever machine it is.
 pub fn make_executable(file: &Path) -> Result<(), String> {
-    let failed = |e: String| format!("Could not make {} executable: {e}", file.display());
+    let failed = |e: String| {
+        crate::i18n::message(
+            "backend-could-not-make-executable-e-5be1af",
+            &[
+                ("path", (file.display()).to_string().into()),
+                ("detail", (e).to_string().into()),
+            ],
+        )
+    };
     if crate::remote::try_is_link(file).map_err(|e| failed(e.to_string()))? {
         return Err(failed(
-            "it is a symbolic link: change the file it points to".to_owned(),
+            crate::i18n::text("backend-it-is-a-symbolic-link-change-the-file-it-points-to-6ef20a")
+                .to_owned(),
         ));
     }
     match crate::remote::parse(file) {
@@ -605,9 +664,19 @@ fn chmod_here(_file: &Path) -> std::io::Result<()> {
 /// Rewrites a hook with LF line endings, keeping it executable (the file is written in place,
 /// so its mode stays). Never through a symbolic link.
 pub fn to_lf(file: &Path) -> Result<(), String> {
-    let failed = |e: String| format!("Could not convert {}: {e}", file.display());
+    let failed = |e: String| {
+        crate::i18n::message(
+            "backend-could-not-convert-e-08b705",
+            &[
+                ("path", (file.display()).to_string().into()),
+                ("detail", (e).to_string().into()),
+            ],
+        )
+    };
     if crate::remote::try_is_link(file).map_err(|e| failed(e.to_string()))? {
-        return Err(failed("it is a symbolic link".to_owned()));
+        return Err(failed(
+            crate::i18n::text("backend-it-is-a-symbolic-link-f4fd09").to_owned(),
+        ));
     }
     let bytes = crate::remote::read(file).map_err(|e| failed(e.to_string()))?;
     let fixed = crlf_to_lf(&bytes);

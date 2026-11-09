@@ -39,15 +39,15 @@ pub fn menu_items(recent: &[PathBuf]) -> Vec<MenuItem> {
         }
     }
     items.push(MenuItem {
-        title: "Clone…".to_owned(),
+        title: crate::i18n::text("shell-clone").to_owned(),
         args: vec![CLONE_ARG.to_owned()],
-        tooltip: "Clone a repository".to_owned(),
+        tooltip: crate::i18n::text("shell-clone-description").to_owned(),
         recent: false,
     });
     items.push(MenuItem {
-        title: "Open…".to_owned(),
+        title: crate::i18n::text("shell-open").to_owned(),
         args: vec![OPEN_ARG.to_owned()],
-        tooltip: "Open a repository on this computer".to_owned(),
+        tooltip: crate::i18n::text("shell-open-description").to_owned(),
         recent: false,
     });
     items

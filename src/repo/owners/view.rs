@@ -40,7 +40,13 @@ pub(crate) fn summary_text(owners: &[String], unowned: usize, files: usize) -> O
     let mut text = if owners.is_empty() {
         String::new()
     } else {
-        format!("Needs {}", codeowners::and_list(&short_names(owners)))
+        crate::i18n::message(
+            "repo-workflows-owners-summary-text-a198627d",
+            &[(
+                "codeowners-and-list-short-names--1",
+                (codeowners::and_list(&short_names(owners))).clone().into(),
+            )],
+        )
     };
     if unowned > 0 {
         if !text.is_empty() {
@@ -48,14 +54,17 @@ pub(crate) fn summary_text(owners: &[String], unowned: usize, files: usize) -> O
         }
         text.push_str(&if unowned == files {
             if files == 1 {
-                "No owner".to_owned()
+                crate::i18n::text("repo-workflows-owners-summary-text-4339bb43").to_owned()
             } else {
-                "No file here has an owner".to_owned()
+                crate::i18n::text("repo-workflows-owners-summary-text-9655d0de").to_owned()
             }
         } else if unowned == 1 {
-            "1 file without an owner".to_owned()
+            crate::i18n::text("repo-workflows-owners-summary-text-6a5cbe9f").to_owned()
         } else {
-            format!("{unowned} files without an owner")
+            crate::i18n::message(
+                "repo-workflows-owners-summary-text-3ff108bf",
+                &[("unowned", (unowned).into())],
+            )
         });
     }
     Some(text)
@@ -63,9 +72,9 @@ pub(crate) fn summary_text(owners: &[String], unowned: usize, files: usize) -> O
 
 fn rules(n: usize) -> String {
     if n == 1 {
-        "1 rule".to_owned()
+        crate::i18n::text("repo-workflows-owners-rules-343bb384").to_owned()
     } else {
-        format!("{n} rules")
+        crate::i18n::message("repo-workflows-owners-rules-4d726f4a", &[("n", (n).into())])
     }
 }
 
@@ -120,7 +129,13 @@ impl RepoTab {
             .show(ui, |ui| {
                 ui.add(egui::Label::new(RichText::new(text).color(t.text_dim).small()).truncate())
                     .on_hover_ui(|ui| {
-                        ui.label(format!("From {path} at HEAD ({})", rules(count)));
+                        ui.label(crate::i18n::message(
+                            "repo-workflows-owners-owners-summary-db29b096",
+                            &[
+                                ("path", (path).clone().into()),
+                                ("rules-count-1", (rules(count)).clone().into()),
+                            ],
+                        ));
                         if !owners.is_empty() {
                             ui.label(owners.join(", "));
                         }

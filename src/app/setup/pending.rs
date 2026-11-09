@@ -1,0 +1,244 @@
+use crate::{
+    connections::{self, Account, Choices},
+    portability::Provider,
+    settings::UserProfile,
+};
+#[derive(Clone, Default)]
+pub(super) struct Fresh {
+    pub(super) ssh: String,
+    pub(super) signing: String,
+    folders: Vec<String>,
+}
+pub(super) fn fields(ui: &mut egui::Ui, profile: &UserProfile, fresh: &mut Fresh) -> bool {
+    let Some(requirements) = &profile.pending_setup else {
+        return false;
+    };
+    if requirements.ssh_key_reselection_required {
+        ui.label(crate::i18n::text("interaction-setup-key-help"));
+        if ui
+            .button(crate::i18n::text("interaction-setup-choose-key"))
+            .clicked()
+            && let Some(path) = rfd::FileDialog::new().pick_file()
+        {
+            fresh.ssh = path.to_string_lossy().into_owned();
+        }
+        ui.label(&fresh.ssh);
+    }
+    if requirements.signing_key_reselection_required {
+        ui.label(crate::i18n::text("interaction-setup-signing-help"));
+        ui.text_edit_singleline(&mut fresh.signing);
+    }
+    fresh
+        .folders
+        .resize(requirements.accounts.len(), String::new());
+    for (a, folder) in requirements.accounts.iter().zip(&mut fresh.folders) {
+        ui.label(crate::i18n::message(
+            "interaction-setup-required",
+            &[
+                ("provider", format!("{:?}", a.provider).into()),
+                ("user", a.user_or_alias.as_str().into()),
+                ("host", a.host.as_str().into()),
+            ],
+        ));
+        if a.provider != Provider::Tea {
+            ui.label(crate::i18n::text("interaction-setup-cli-folder"));
+            ui.text_edit_singleline(folder);
+        }
+    }
+    ui.button(crate::i18n::text("interaction-setup-verify"))
+        .clicked()
+}
+fn local_key(path: &str) -> Result<(), String> {
+    let path = std::path::Path::new(path);
+    if !path.is_absolute() {
+        return Err("Select a local absolute SSH key path".into());
+    }
+    let m = std::fs::metadata(path).map_err(|_| "Selected local SSH key is unavailable")?;
+    if !m.is_file() {
+        return Err("Selected SSH key must be a local file".into());
+    }
+    Ok(())
+}
+pub(super) fn verify(
+    profile: &UserProfile,
+    fresh: &Fresh,
+    active: &dyn Fn() -> bool,
+) -> Result<UserProfile, String> {
+    let requirements = profile
+        .pending_setup
+        .as_ref()
+        .ok_or("Profile is no longer pending")?;
+    let mut choices = Choices::default();
+    if requirements.ssh_key_reselection_required {
+        local_key(&fresh.ssh)?;
+        choices.ssh_key = fresh.ssh.clone();
+    }
+    if requirements.signing_key_reselection_required
+        && (fresh.signing.trim().is_empty() || fresh.signing.chars().any(char::is_control))
+    {
+        return Err("Choose this machine's signing key".into());
+    }
+    for (index, a) in requirements.accounts.iter().enumerate() {
+        if !active() {
+            return Err("Profile setup cancelled".into());
+        }
+        let account = Account {
+            host: a.host.clone(),
+            user: a.user_or_alias.clone(),
+            config_dir: fresh.folders.get(index).cloned().unwrap_or_default(),
+        };
+        match a.provider {
+            Provider::Github => {
+                connections::check_account("gh", &account)?;
+                choices.github = account;
+            }
+            Provider::Gitlab => {
+                connections::check_account("glab", &account)?;
+                choices.gitlab = account;
+            }
+            Provider::Tea => {
+                let (host, user) = crate::forge::selected_tea_metadata(&account.user)
+                    .ok_or("The expected local tea login is unavailable")?;
+                if !host.eq_ignore_ascii_case(&a.host) {
+                    return Err("The tea login belongs to a different HTTPS server".into());
+                }
+                let expected=a.account_user.as_ref().ok_or("The imported tea expectation has no public owner; export it again from the original machine")?;
+                if !user.eq_ignore_ascii_case(expected) {
+                    return Err("The selected tea alias belongs to a different account user".into());
+                }
+                connections::check_account("tea", &account)?;
+                choices.tea_login = account.user;
+                choices.tea_host = host;
+            }
+        }
+    }
+    choices.validate()?;
+    if !active() {
+        return Err("Profile setup cancelled".into());
+    }
+    let mut ready = profile.clone();
+    ready.connections = choices;
+    if requirements.signing_key_reselection_required {
+        ready.signing.key = fresh.signing.clone();
+        ready.signing.program.clear();
+    }
+    ready.pending_setup = None;
+    Ok(ready)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn tea_round_trip_pins_public_owner_and_host_without_exporting_token_or_auth_folder()
+    -> Result<(), String> {
+        const CHILD: &str = "GITCRAFT_PORTABLE_TEA_FIXTURE";
+        if let Some(root) = std::env::var_os(CHILD) {
+            let root = std::path::PathBuf::from(root);
+            let config = root.join("tea/config.yml");
+            let write = |host: &str, user: &str| {
+                std::fs::write(&config,format!("logins:\n- name: work\n  url: https://{host}\n  user: {user}\n  token: FIXTURE_TOKEN_MUST_NOT_EXPORT\n")).map_err(|e|e.to_string())
+            };
+            write("forge.fixture.invalid", "expected-work-user")?;
+            let mut settings = crate::settings::Settings::default();
+            settings.user_profiles[0].connections.tea_login = "work".into();
+            settings.user_profiles[0].connections.tea_host = "forge.fixture.invalid".into();
+            let mut file = crate::portability::Setup::new(&settings, &Default::default());
+            file.resolve_public_accounts()?;
+            let bytes = file.encode()?;
+            assert!(!String::from_utf8_lossy(&bytes).contains("FIXTURE_TOKEN"));
+            assert!(!String::from_utf8_lossy(&bytes).contains(root.to_str().ok_or("UTF-8 root")?));
+            let profile = crate::portability::Setup::decode(&bytes)?.profiles[0].materialize(99);
+            assert!(profile.pending_setup());
+            let ready = verify(&profile, &Fresh::default(), &|| true)?;
+            assert_eq!(ready.connections.tea_login, "work");
+            assert!(!ready.pending_setup());
+            write("forge.fixture.invalid", "different-personal-user")?;
+            assert!(
+                verify(&profile, &Fresh::default(), &|| true)
+                    .is_err_and(|e| e.contains("different account"))
+            );
+            write("different.fixture.invalid", "expected-work-user")?;
+            assert!(
+                verify(&profile, &Fresh::default(), &|| true)
+                    .is_err_and(|e| e.contains("different HTTPS"))
+            );
+            return Ok(());
+        }
+        let repo = crate::practice::create(crate::practice::Scenario::Published)?;
+        let root = repo.parent().ok_or("root")?.join("portable-tea-config");
+        std::fs::create_dir_all(root.join("tea")).map_err(|e| e.to_string())?;
+        let output=std::process::Command::new(std::env::current_exe().map_err(|e|e.to_string())?).args(["--exact","app::setup::pending::tests::tea_round_trip_pins_public_owner_and_host_without_exporting_token_or_auth_folder","--nocapture"]).env(CHILD,&root).env("XDG_CONFIG_HOME",&root).output().map_err(|e|e.to_string())?;
+        assert!(
+            output.status.success(),
+            "{}\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        std::fs::remove_dir_all(repo.parent().ok_or("root")?).map_err(|e| e.to_string())?;
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod localization_tests {
+    use super::*;
+    use crate::portability::{ConnectionRequirements, PublicAccountExpectation};
+    use egui_kittest::{Harness, kittest::Queryable};
+
+    #[test]
+    fn actual_required_setup_fields_only_return_the_original_verification_request()
+    -> Result<(), String> {
+        crate::i18n::set_language("de");
+        let profile = UserProfile {
+            name: "literal 日本語".into(),
+            pending_setup: Some(ConnectionRequirements {
+                ssh_key_reselection_required: true,
+                signing_key_reselection_required: true,
+                accounts: vec![PublicAccountExpectation {
+                    provider: Provider::Github,
+                    host: "forge.example.invalid".into(),
+                    user_or_alias: "literal-user".into(),
+                    account_user: None,
+                }],
+            }),
+            ..Default::default()
+        };
+        let before = serde_json::to_string(&profile).map_err(|e| e.to_string())?;
+        let fresh = Fresh {
+            ssh: "/opaque/日本語.pub".into(),
+            signing: "literal-key".into(),
+            folders: vec!["/opaque/CLI".into()],
+        };
+        let fonts = std::cell::Cell::new(false);
+        let mut h = Harness::new_ui_state(
+            move |ui, state: &mut (UserProfile, Fresh, bool)| {
+                if !fonts.replace(true) {
+                    crate::theme::install_fonts(ui.ctx());
+                    return;
+                }
+                state.2 |= fields(ui, &state.0, &mut state.1);
+            },
+            (profile, fresh, false),
+        );
+        h.run();
+        h.get_by_label("Lokalen SSH-Schlüssel auswählen…");
+        h.get_by_label("Erforderlich für Github: literal-user auf forge.example.invalid");
+        h.get_by_label("Erforderliche Einrichtung prüfen und Profil freigeben")
+            .click();
+        h.run();
+        assert!(h.state().2);
+        assert_eq!(h.state().1.ssh, "/opaque/日本語.pub");
+        assert_eq!(h.state().1.signing, "literal-key");
+        assert_eq!(h.state().1.folders, ["/opaque/CLI"]);
+        assert_eq!(
+            serde_json::to_string(&h.state().0).map_err(|e| e.to_string())?,
+            before
+        );
+        crate::i18n::set_language("en-US");
+        h.run();
+        h.get_by_label("Choose local SSH key…");
+        h.get_by_label("Verify required setup and enable profile");
+        Ok(())
+    }
+}

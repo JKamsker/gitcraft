@@ -156,47 +156,55 @@ fn late_output_stays_out(host: &Host) -> Result<(), String> {
 
 /// A command that hangs is stopped at its deadline, there too, and the shells go on.
 fn hung_commands_are_stopped(host: &Host) -> Result<(), String> {
-    let marker = format!("{}.{}", std::process::id() % 1000 + 100, 25);
-    let hung = exec(
+    let private = exec(
         host,
         &Request {
-            script: format!("exec sleep {marker}"),
-            timeout: Some(std::time::Duration::from_secs(2)),
-            ..Request::default()
-        },
-    );
-    let err = hung.err().unwrap_or_default();
-    assert!(err.contains("was stopped"), "{err}");
-    // Stopped in the background, within a few seconds.
-    std::thread::sleep(std::time::Duration::from_secs(4));
-    let left = exec(
-        host,
-        &Request {
-            script: format!("ps -eo args | grep -c '^sleep {marker}$' || true"),
+            script: "umask 077; mktemp -d /tmp/gitcraft-live-owned.XXXXXXXXXX".into(),
             ..Request::default()
         },
     )?;
-    assert_eq!(String::from_utf8_lossy(&left.stdout).trim(), "0");
-    // What it started started something in turn (a hook running a program): stopped as well.
-    let deep = format!("{}.{}", std::process::id() % 1000 + 100, 75);
-    let hung = exec(
+    if private.code != 0 {
+        return Err("could not create private fixture".into());
+    }
+    let path = String::from_utf8(private.stdout).map_err(|e| e.to_string())?;
+    let path = path.trim();
+    if !path.starts_with("/tmp/gitcraft-live-owned.") || path.contains('\n') {
+        return Err("unexpected fixture directory".into());
+    }
+    for body in [
+        "sleep 4; printf leaked > \"$1/late\"",
+        "sh -c 'sleep 4; printf leaked > \"$1/late\"' nested \"$1\"; true",
+    ] {
+        let hung = exec(
+            host,
+            &Request {
+                script: format!("sh -c {} fixture {}", sh_quote(body), sh_quote(path)),
+                timeout: Some(std::time::Duration::from_secs(2)),
+                ..Request::default()
+            },
+        );
+        let err = hung.err().unwrap_or_default();
+        assert!(err.contains("was stopped"), "{err}");
+        assert!(!err.contains("unconfirmed"), "{err}");
+        std::thread::sleep(std::time::Duration::from_secs(5));
+        let check = exec(
+            host,
+            &Request {
+                script: format!("test ! -e {}/late", sh_quote(path)),
+                ..Request::default()
+            },
+        )?;
+        assert_eq!(check.code, 0, "an owned descendant survived cancellation");
+    }
+    let cleaned = exec(
         host,
         &Request {
-            script: format!("sh -c 'sleep {deep}; true'; true"),
-            timeout: Some(std::time::Duration::from_secs(2)),
-            ..Request::default()
-        },
-    );
-    assert!(hung.is_err());
-    std::thread::sleep(std::time::Duration::from_secs(4));
-    let left = exec(
-        host,
-        &Request {
-            script: format!("ps -eo args | grep -c '^sleep {deep}$' || true"),
+            script: format!("rmdir -- {}", sh_quote(path)),
             ..Request::default()
         },
     )?;
-    assert_eq!(String::from_utf8_lossy(&left.stdout).trim(), "0");
+    assert_eq!(cleaned.code, 0);
+
     Ok(())
 }
 

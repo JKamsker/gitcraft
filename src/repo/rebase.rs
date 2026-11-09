@@ -4,6 +4,8 @@
 //! it over as `sequence.editor`; rewords become an `exec git commit --amend -F`.
 
 mod rows;
+mod weather;
+mod weather_git;
 
 use std::path::{Path, PathBuf};
 
@@ -39,25 +41,25 @@ impl Step {
         Step::Drop,
     ];
 
-    fn label(self) -> &'static str {
+    pub(super) fn label(self) -> &'static str {
         match self {
-            Step::Pick => "Pick",
-            Step::Reword => "Reword",
-            Step::Squash => "Squash",
-            Step::Fixup => "Fixup",
-            Step::Drop => "Drop",
-            Step::Edit => "Edit",
+            Step::Pick => crate::i18n::text("repo-core-3200"),
+            Step::Reword => crate::i18n::text("repo-core-3201"),
+            Step::Squash => crate::i18n::text("repo-core-2444"),
+            Step::Fixup => crate::i18n::text("repo-core-2446"),
+            Step::Drop => crate::i18n::text("repo-core-3197"),
+            Step::Edit => crate::i18n::text("repo-core-1116"),
         }
     }
 
     fn explain(self) -> &'static str {
         match self {
-            Step::Pick => "Keep the commit as it is",
-            Step::Reword => "Keep the changes, edit the message",
-            Step::Squash => "Meld into the commit below, keeping both messages",
-            Step::Fixup => "Meld into the commit below, dropping this message",
-            Step::Drop => "Remove the commit and its changes",
-            Step::Edit => "Stop after this commit to change it, then Continue rebase",
+            Step::Pick => crate::i18n::text("repo-core-3202"),
+            Step::Reword => crate::i18n::text("repo-core-3203"),
+            Step::Squash => crate::i18n::text("repo-core-3204"),
+            Step::Fixup => crate::i18n::text("repo-core-3205"),
+            Step::Drop => crate::i18n::text("repo-core-3206"),
+            Step::Edit => crate::i18n::text("repo-core-3207"),
         }
     }
 }
@@ -70,7 +72,6 @@ pub(crate) struct Entry {
     pub message: String,
 }
 
-#[derive(Clone)]
 pub(crate) struct RebaseEditor {
     /// What the commits are replayed onto (a commit or a branch); empty to rewrite from the
     /// root commit on (`--root`).
@@ -102,6 +103,42 @@ pub(crate) struct RebaseEditor {
     /// Move the branches on the commits rewritten along with them (`--update-refs`): the lower
     /// layers of a stack rebased from its top.
     pub update_refs: bool,
+    /// Captured when the editor is opened; approval never rebinds it to a later
+    /// branch at the same commit. None keeps non-UI command builders compatible.
+    pub branch_guard: Option<Vec<String>>,
+    approval: Option<Approval>,
+    weather: weather::Weather,
+}
+
+#[derive(Clone, PartialEq, Eq)]
+struct Approval {
+    branch: Vec<String>,
+    head: String,
+    onto: String,
+    no_ff: bool,
+    update_refs: bool,
+    entries: Vec<(String, Step, String)>,
+}
+
+impl Clone for RebaseEditor {
+    fn clone(&self) -> Self {
+        Self {
+            onto: self.onto.clone(),
+            onto_label: self.onto_label.clone(),
+            entries: self.entries.clone(),
+            head: self.head.clone(),
+            id: self.id,
+            starting: self.starting,
+            selected: self.selected,
+            heights: self.heights.clone(),
+            typing: self.typing,
+            no_ff: self.no_ff,
+            update_refs: self.update_refs,
+            branch_guard: self.branch_guard.clone(),
+            approval: self.approval.clone(),
+            weather: weather::Weather::default(),
+        }
+    }
 }
 
 impl RebaseEditor {
@@ -131,35 +168,73 @@ impl RebaseEditor {
             typing: false,
             no_ff: false,
             update_refs: false,
+            branch_guard: None,
+            approval: None,
+            weather: weather::Weather::default(),
         }
+    }
+
+    fn approval_key(&self, branch: &[String]) -> Approval {
+        Approval {
+            branch: branch.to_vec(),
+            head: self.head.clone(),
+            onto: self.onto.clone(),
+            no_ff: self.no_ff,
+            update_refs: self.update_refs,
+            entries: self
+                .entries
+                .iter()
+                .map(|e| (e.commit.hash.clone(), e.step, e.message.clone()))
+                .collect(),
+        }
+    }
+    pub fn approve(&mut self, branch: &[String]) -> Result<(), String> {
+        if self
+            .branch_guard
+            .as_ref()
+            .is_some_and(|original| original != branch)
+        {
+            return Err(crate::i18n::text("repo-core-3208").into());
+        }
+        self.branch_guard = Some(branch.to_vec());
+        self.approval = Some(self.approval_key(branch));
+        Ok(())
+    }
+    pub fn approved(&self, branch: &[String], head: &str) -> bool {
+        self.head == head
+            && self.branch_guard.as_deref() == Some(branch)
+            && self
+                .approval
+                .as_ref()
+                .is_some_and(|key| key == &self.approval_key(branch))
+    }
+    pub fn has_approval(&self) -> bool {
+        self.approval.is_some()
     }
 
     /// Why the commits listed are no longer the branch's, when HEAD is at `head` now.
     pub fn moved(&self, head: &str) -> Option<String> {
-        (!self.head.is_empty() && self.head != head).then(|| {
-            "The branch has moved since these commits were read: rebasing would drop the new ones. Cancel and start again."
-                .to_owned()
-        })
+        (!self.head.is_empty() && self.head != head)
+            .then(|| crate::i18n::text("repo-core-3209").to_owned())
     }
 
     /// Why the rebase can't start as set up, if it can't.
     pub fn problem(&self) -> Option<String> {
         if self.entries.iter().any(|e| e.commit.merge) {
-            return Some(
-                "These commits include merges, which this editor would flatten. Use git rebase -i --rebase-merges in the terminal."
-                    .to_owned(),
-            );
+            return Some(crate::i18n::text("repo-core-3210").to_owned());
         }
         let mut kept = self.entries.iter().filter(|e| e.step != Step::Drop);
         match kept.next() {
             None => {
-                return Some("Keep at least one commit (or reset the branch instead).".to_owned());
+                return Some(crate::i18n::text("repo-core-3211").to_owned());
             }
             Some(e) if matches!(e.step, Step::Squash | Step::Fixup) => {
-                return Some(format!(
-                    "{} {} has no commit below it to meld into.",
-                    e.step.label(),
-                    short(&e.commit.hash)
+                return Some(crate::i18n::message(
+                    "repo-core-3212",
+                    &[
+                        ("label", e.step.label().to_string().into()),
+                        ("hash", short(&e.commit.hash).to_string().into()),
+                    ],
                 ));
             }
             _ => {}
@@ -169,7 +244,7 @@ impl RebaseEditor {
             .iter()
             .any(|e| e.step == Step::Reword && e.message.trim().is_empty())
         {
-            return Some("A reworded commit needs a message.".to_owned());
+            return Some(crate::i18n::text("repo-core-3213").to_owned());
         }
         None
     }
@@ -191,12 +266,14 @@ impl RebaseEditor {
         if let Some(target) = crate::remote::parse(repo) {
             return self.command_there(repo, &target);
         }
-        let dir = private_dir(&std::env::temp_dir())
-            .map_err(|e| format!("could not prepare the rebase: {e}"))?;
+        let dir = private_dir(&std::env::temp_dir()).map_err(|e| {
+            crate::i18n::message("repo-core-3214", &[("e", format!("{}", e).into())])
+        })?;
         let write = |name: &str, text: &str| -> Result<PathBuf, String> {
             let path = dir.join(name);
-            std::fs::write(&path, text)
-                .map_err(|e| format!("could not prepare the rebase: {e}"))?;
+            std::fs::write(&path, text).map_err(|e| {
+                crate::i18n::message("repo-core-3214", &[("e", format!("{}", e).into())])
+            })?;
             Ok(path)
         };
         let mut files = Vec::new();
@@ -222,7 +299,7 @@ impl RebaseEditor {
     fn command_there(&self, repo: &Path, target: &crate::remote::Target) -> Result<Moving, String> {
         let write = |name: &str, text: &str| {
             crate::remote::host_temp_file(target, name, text.as_bytes())
-                .map_err(|e| format!("could not prepare the rebase: {e}"))
+                .map_err(|e| crate::i18n::message("repo-core-3214", &[("e", e.to_string().into())]))
         };
         let mut files = Vec::new();
         for (i, e) in self.entries.iter().enumerate() {
@@ -390,7 +467,38 @@ fn sh_path(path: &Path) -> String {
 }
 
 /// How the rows are moved and their actions set, for the footer's tooltip.
-const KEYS_HINT: &str = "Drag a row by its handle, or Alt+↑ / Alt+↓, to move it. Click a row, then P / R / E / S / F / D set its action and ↑ / ↓ select another.";
+fn keys_hint(ctx: &egui::Context) -> String {
+    use crate::keymap::{self, Command};
+    let steps = Step::ALL
+        .map(|step| format!("{}: {}", step.label(), keymap::label(ctx, step.command())))
+        .join("; ");
+    crate::i18n::message(
+        "repo-core-3235",
+        &[
+            (
+                "RebaseMoveUp",
+                keymap::label(ctx, Command::RebaseMoveUp).to_string().into(),
+            ),
+            (
+                "RebaseMoveDown",
+                keymap::label(ctx, Command::RebaseMoveDown)
+                    .to_string()
+                    .into(),
+            ),
+            (
+                "RebasePrevious",
+                keymap::label(ctx, Command::RebasePrevious)
+                    .to_string()
+                    .into(),
+            ),
+            (
+                "RebaseNext",
+                keymap::label(ctx, Command::RebaseNext).to_string().into(),
+            ),
+            ("steps", steps.to_string().into()),
+        ],
+    )
+}
 
 fn short(hash: &str) -> &str {
     hash.get(..7).unwrap_or(hash)
@@ -398,6 +506,7 @@ fn short(hash: &str) -> &str {
 
 impl RepoTab {
     pub(super) fn rebase_view(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
+        self.poll_rebase_weather(ui.ctx());
         let t = Tokens::get(ui.ctx());
         let idle = self.busy_op.is_none();
         let branch = self
@@ -420,15 +529,29 @@ impl RepoTab {
                 ui.horizontal(|ui| {
                     icons::inline(ui, "git-merge", 16.0, t.icon);
                     ui.label(
-                        egui::RichText::new(format!(
-                            "Interactive rebase · {branch} onto {}",
-                            editor.onto_label
+                        egui::RichText::new(crate::i18n::message(
+                            "repo-core-3236",
+                            &[
+                                ("branch", branch.to_string().into()),
+                                ("onto-label", editor.onto_label.to_string().into()),
+                            ],
                         ))
                         .font(theme::medium(13.0)),
                     );
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if icons::small_button(ui, "x", "Cancel (Esc)").clicked() {
+                        if icons::small_button(ui, "x", crate::i18n::text("repo-core-3237"))
+                            .clicked()
+                        {
                             acts.push(Action::CloseRebase);
+                        }
+                        if icons::small_button(
+                            ui,
+                            "refresh-cw",
+                            crate::i18n::text("repo-core-3238"),
+                        )
+                        .clicked()
+                        {
+                            editor.weather.refresh(ui.ctx());
                         }
                     });
                 });
@@ -446,20 +569,18 @@ impl RepoTab {
                 // An option of the rebase, above what starts it.
                 ui.add_enabled(
                     !editor.starting,
-                    egui::Checkbox::new(&mut editor.update_refs, "Update dependent branches"),
+                    egui::Checkbox::new(
+                        &mut editor.update_refs,
+                        crate::i18n::text("repo-core-3240"),
+                    ),
                 )
-                .on_hover_text(
-                    "Move the branches on these commits along with them (git rebase \
-                     --update-refs, git 2.38+): the lower layers of a stack rebased from its \
-                     top. Branches checked out in other worktrees are left where they are; \
-                     Restack… in STACKS handles those. One Ctrl+Z puts every branch back.",
-                );
+                .on_hover_text(crate::i18n::text("repo-core-3241"));
                 ui.add_space(4.0);
                 // The buttons first, from the right: the text takes what is left, cut short.
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     if widgets::primary_button(
                         ui,
-                        "Start rebase",
+                        crate::i18n::text("repo-core-3242"),
                         idle && problem.is_none() && !editor.starting,
                         120.0,
                     )
@@ -467,7 +588,7 @@ impl RepoTab {
                     {
                         acts.push(Action::RunRebase);
                     }
-                    if ui.button("Cancel").clicked() {
+                    if ui.button(crate::i18n::text("repo-core-0443")).clicked() {
                         acts.push(Action::CloseRebase);
                     }
                     if editor.starting {
@@ -478,15 +599,26 @@ impl RepoTab {
                             Some(p) => egui::RichText::new(p).color(t.danger),
                             None => {
                                 let n = editor.entries.len();
-                                egui::RichText::new(format!(
-                                    "{n} commit{}, newest on top · Ctrl+Z undoes the rebase",
-                                    if n == 1 { "" } else { "s" }
+                                egui::RichText::new(crate::i18n::message(
+                                    "repo-core-3243",
+                                    &[
+                                        ("n", (n).into()),
+                                        (
+                                            "Undo",
+                                            crate::keymap::label(
+                                                ui.ctx(),
+                                                crate::keymap::Command::Undo,
+                                            )
+                                            .to_string()
+                                            .into(),
+                                        ),
+                                    ],
                                 ))
                                 .color(t.text_dim)
                             }
                         };
                         ui.add(egui::Label::new(note).truncate())
-                            .on_hover_text(KEYS_HINT);
+                            .on_hover_text(keys_hint(ui.ctx()));
                     });
                 });
             });
@@ -494,6 +626,7 @@ impl RepoTab {
         // The row keys act on this frame, unless something else has the keyboard.
         let keys = editor.keys(ui, keys_free);
         editor.list(ui, keys);
+        editor.weather.observe(&editor.entries, ui.ctx());
         editor.typing = ui.ctx().memory(|m| m.focused().is_some());
     }
 }

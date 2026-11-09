@@ -135,11 +135,17 @@ fn capability(repo: &Path) -> Result<(), &'static str> {
     if !cfg!(feature = "native-git") {
         return Err("feature-disabled");
     }
+    if crate::practice::is_repository(repo) {
+        return Err("practice-environment");
+    }
     if std::env::var_os("GITCRAFT_GIT_BACKEND").is_some_and(|v| v == "cli") {
         return Err("explicit-cli");
     }
     if crate::remote::is_remote(repo) {
         return Err("remote-context");
+    }
+    if crate::connections::current().error.is_some() {
+        return Err("invalid-profile");
     }
     if super::profile_config().is_some() {
         return Err("profile-config");

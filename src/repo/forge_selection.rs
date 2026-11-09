@@ -101,6 +101,25 @@ pub(super) fn lifetime(ctx: &egui::Context, repo: &Path) -> (Arc<AtomicU64>, u64
 }
 
 impl RepoTab {
+    /// A deep link must never fall back to another repository's PR with the same number.
+    pub(super) fn select_linked_forge(&mut self, remote: &str, ctx: &egui::Context) -> bool {
+        let available = self.forge_remotes.iter().any(|(name, _)| name == remote);
+        if available && self.primary_forge_remote() == Some(remote) {
+            return true;
+        }
+        if self.forge_change_blocked() || !available {
+            self.status = Some(super::Notice::plain((
+                format!(
+                    "Cannot open the linked pull request on remote {remote}: finish any running operation and refresh the repository, then try again"
+                ),
+                true,
+            )));
+            return false;
+        }
+        self.set_primary_forge(Some(remote.to_owned()), ctx);
+        self.primary_forge_remote() == Some(remote)
+    }
+
     pub(super) fn primary_forge_remote(&self) -> Option<&str> {
         self.forge_selection
             .resolve_current(&self.forge_remotes, &self.remotes)

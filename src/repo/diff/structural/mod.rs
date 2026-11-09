@@ -22,6 +22,9 @@ pub(in crate::repo) struct State {
 }
 
 impl State {
+    pub(in crate::repo) fn generation(&self) -> u64 {
+        self.load
+    }
     pub(in crate::repo) fn shows_patch(&self) -> bool {
         !self.enabled || matches!(self.result, Some(Err(_)))
     }
@@ -49,6 +52,7 @@ impl State {
 
 impl RepoTab {
     pub(in crate::repo) fn show_diff_structural(&mut self, on: bool, ctx: &egui::Context) {
+        self.discard_decrypted();
         let Some(view) = &mut self.diff else { return };
         view.structural.enabled = on;
         view.chosen.clear();
@@ -115,10 +119,52 @@ impl RepoTab {
 /// A reading-mode control, separate from staging and the patch's presentation options.
 pub(super) fn toggle(ui: &mut egui::Ui, on: bool, acts: &mut Vec<Action>) {
     if ui
-        .selectable_label(on, "Syntax")
-        .on_hover_text("Compare syntax with Difftastic (difft), installed locally. SSH/WSL use the patch. Use the patch to stage changes.")
+        .selectable_label(on, crate::i18n::text("repo-core-4046"))
+        .on_hover_text(crate::i18n::text("repo-core-4047"))
         .clicked()
     {
         acts.push(Action::DiffStructural(!on));
     }
+}
+
+pub(in crate::repo) fn search_document(
+    data: &Structural,
+    t: &crate::theme::Tokens,
+) -> crate::repo::find::rendered::Document {
+    let mut doc = crate::repo::find::rendered::Document::default();
+    for row in &data.rows {
+        match row {
+            model::Row::Heading(n) => doc.text(
+                &crate::i18n::message("repo-core-2343", &[("n", (n).into())]),
+                t.accent,
+            ),
+            model::Row::Pair(old, new) => {
+                if let Some(old) = old {
+                    doc.text(
+                        &crate::i18n::message(
+                            "repo-core-4048",
+                            &[
+                                ("number", format!("{}", old.number).into()),
+                                ("text", old.text.to_string().into()),
+                            ],
+                        ),
+                        t.danger,
+                    );
+                }
+                if let Some(new) = new {
+                    doc.text(
+                        &crate::i18n::message(
+                            "repo-core-4049",
+                            &[
+                                ("number", format!("{}", new.number).into()),
+                                ("text", new.text.to_string().into()),
+                            ],
+                        ),
+                        t.success,
+                    );
+                }
+            }
+        }
+    }
+    doc
 }

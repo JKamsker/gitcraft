@@ -28,6 +28,8 @@ pub struct Gitcraft {
     repo: Arc<std::sync::OnceLock<PathBuf>>,
     link_dir: Option<PathBuf>,
     wait: Duration,
+    /// The background resolving run this server reports for (`--run`), if one.
+    run: Option<String>,
 }
 
 impl Gitcraft {
@@ -37,7 +39,14 @@ impl Gitcraft {
             repo: Arc::default(),
             link_dir,
             wait,
+            run: None,
         }
+    }
+
+    /// The server of an agent gitcraft started to resolve conflicts: it offers the tools that
+    /// report on that run.
+    pub fn for_run(self, run: Option<String>) -> Self {
+        Self { run, ..self }
     }
 }
 
@@ -53,6 +62,30 @@ const INSTRUCTIONS: &str = "gitcraft is the user's git client. Its tools read th
 /// The largest answer a tool gives, in bytes.
 const MAX_ANSWER: usize = 512 * 1024;
 
+/// Whether a tool of `kind` is offered: the reports only to an agent of a resolving run
+/// (`run`), and to that one nothing that changes the repository. It works in a worktree of
+/// its own that no tab has open, and is there only to resolve its files.
+fn offered(kind: Kind, run: bool) -> bool {
+    match kind {
+        Kind::Read => true,
+        Kind::Report => run,
+        Kind::Write | Kind::Approve => !run,
+    }
+}
+
+/// The tools offered to an agent of a run (`run`) or not, as `tools/list` lists them.
+fn offered_tools(run: bool) -> Vec<&'static ToolDef> {
+    tools::all()
+        .into_iter()
+        .filter(|t| offered(t.kind, run))
+        .collect()
+}
+
+/// The tool `name` that `tools/call` runs: none that isn't offered, whatever its name.
+fn callable(name: &str, run: bool) -> Option<&'static ToolDef> {
+    tools::find(name).filter(|t| offered(t.kind, run))
+}
+
 /// The tool as MCP lists it.
 fn listed(def: &ToolDef) -> Tool {
     let schema = match (def.schema)() {
@@ -60,7 +93,7 @@ fn listed(def: &ToolDef) -> Tool {
         _ => Default::default(),
     };
     let annotations = ToolAnnotations::with_title(def.title)
-        .read_only(def.kind == Kind::Read)
+        .read_only(matches!(def.kind, Kind::Read | Kind::Report))
         // `reset` asks first only in its `hard` mode, but the hint is per tool.
         .destructive(def.kind == Kind::Approve || def.name == "reset")
         .idempotent(def.kind == Kind::Read)
@@ -134,7 +167,10 @@ impl ServerHandler for Gitcraft {
         _context: RequestContext<RoleServer>,
     ) -> Result<ListToolsResult, ErrorData> {
         Ok(ListToolsResult::with_all_items(
-            tools::all().into_iter().map(listed).collect(),
+            offered_tools(self.run.is_some())
+                .into_iter()
+                .map(listed)
+                .collect(),
         ))
     }
 
@@ -143,7 +179,7 @@ impl ServerHandler for Gitcraft {
         request: CallToolRequestParams,
         context: RequestContext<RoleServer>,
     ) -> Result<CallToolResponse, ErrorData> {
-        let Some(def) = tools::find(&request.name) else {
+        let Some(def) = callable(&request.name, self.run.is_some()) else {
             return Err(ErrorData::invalid_params(
                 format!("Unknown tool: {}", request.name),
                 None,
@@ -159,7 +195,7 @@ impl ServerHandler for Gitcraft {
             },
         );
         let (start, found) = (self.start.clone(), self.repo.clone());
-        let (link_dir, wait) = (self.link_dir.clone(), self.wait);
+        let (link_dir, wait, run) = (self.link_dir.clone(), self.wait, self.run.clone());
         // Cancelled by the client, or the session ended: a wait for the window stops.
         let token = context.ct.clone();
         let cancelled: Arc<dyn Fn() -> bool + Send + Sync> = Arc::new(move || token.is_cancelled());
@@ -178,6 +214,7 @@ impl ServerHandler for Gitcraft {
                 link_dir,
                 wait,
                 cancelled,
+                run,
             };
             tools::call(def, &ctx, &args)
         })
@@ -190,6 +227,31 @@ impl ServerHandler for Gitcraft {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_agent_of_a_run_is_offered_reading_and_reporting_only() {
+        assert!(offered(Kind::Read, true) && offered(Kind::Read, false));
+        assert!(offered(Kind::Report, true) && !offered(Kind::Report, false));
+        assert!(!offered(Kind::Write, true) && offered(Kind::Write, false));
+        assert!(!offered(Kind::Approve, true) && offered(Kind::Approve, false));
+        // What `tools/list` and `tools/call` go by.
+        let names = |run| {
+            offered_tools(run)
+                .iter()
+                .map(|t| t.name)
+                .collect::<Vec<_>>()
+        };
+        let (of_run, of_user) = (names(true), names(false));
+        assert!(of_run.contains(&"resolve_finish") && of_run.contains(&"conflicts"));
+        assert!(!of_user.contains(&"resolve_finish"));
+        for changing in ["commit", "stage", "push", "reset", "checkout"] {
+            assert!(!of_run.contains(&changing), "{changing}");
+            assert!(callable(changing, true).is_none(), "{changing}");
+            assert!(callable(changing, false).is_some(), "{changing}");
+        }
+        assert!(callable("resolve_step", false).is_none());
+        assert!(callable("log", true).is_some());
+    }
 
     #[test]
     fn agents_are_named_as_people_know_them() {

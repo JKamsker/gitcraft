@@ -27,6 +27,7 @@ const SOURCES: &[(&str, &str)] = icons![
     "book-open",
     "brush",
     "bot",
+    "chart-column",
     "check",
     "chevron-down",
     "chevron-right",
@@ -34,6 +35,7 @@ const SOURCES: &[(&str, &str)] = icons![
     "circle-alert",
     "circle-user-round",
     "cloud",
+    "cloud-lightning",
     "cloud-download",
     "code",
     "columns-2",
@@ -86,6 +88,7 @@ const SOURCES: &[(&str, &str)] = icons![
     "sparkles",
     "square-terminal",
     "star",
+    "sun",
     "tag",
     "undo-2",
     "unfold-vertical",
@@ -105,6 +108,12 @@ fn white_icons() -> &'static HashMap<&'static str, Arc<[u8]>> {
             })
             .collect()
     })
+}
+
+/// Whether an icon of that name is embedded.
+#[cfg(test)]
+pub fn known(name: &str) -> bool {
+    white_icons().contains_key(name)
 }
 
 /// An egui image for an icon, tinted. Unknown names give an empty image.
@@ -270,7 +279,21 @@ pub fn toggle_button(ui: &mut Ui, icon: &str, label: &str, on: bool) -> Response
             egui::Stroke::new(2.0, t.accent),
         );
     }
-    resp.on_hover_text(format!("{label} · {}", if on { "On" } else { "Off" }))
+    resp.on_hover_text(crate::i18n::message(
+        "dev-baseline-toggle",
+        &[
+            ("label", label.into()),
+            (
+                "state",
+                (if on {
+                    crate::i18n::text("dev-baseline-on")
+                } else {
+                    crate::i18n::text("dev-baseline-off")
+                })
+                .into(),
+            ),
+        ],
+    ))
 }
 
 /// An icon laid out inline, like a label.

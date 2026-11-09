@@ -16,7 +16,12 @@ pub(super) fn set_menu(items: &[MenuItem]) {
     };
     let recent: Vec<_> = items.iter().filter(|i| i.recent).map(link).collect();
     let tasks: Vec<_> = items.iter().filter(|i| !i.recent).map(link).collect();
-    let _ = gitcraft_os::set_jump_list(&exe, "Recent repositories", &recent, &tasks);
+    let _ = gitcraft_os::set_jump_list(
+        &exe,
+        crate::i18n::text("interaction-control-recent-repositories"),
+        &recent,
+        &tasks,
+    );
 }
 
 /// Shows `state` on the taskbar button of the window `hwnd`; whether that went through.

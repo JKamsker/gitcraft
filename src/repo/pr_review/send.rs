@@ -39,8 +39,20 @@ impl RepoTab {
         if *from != files.from || *to != files.to || files.to != details.head_oid {
             return None;
         }
+        let mut marks = line_marks(&details.extras.threads, path);
+        for (id, target) in view.relocations().into_iter().flatten() {
+            if target.path == *path {
+                let count = details
+                    .extras
+                    .threads
+                    .iter()
+                    .find(|t| &t.id == id)
+                    .map_or(0, |t| t.comments.len());
+                *marks.entry((target.side, target.line)).or_insert(0) += count;
+            }
+        }
         Some(DiffReview {
-            marks: line_marks(&details.extras.threads, path),
+            marks,
             target: self
                 .pr_drafts
                 .get(&view.number)
@@ -148,7 +160,9 @@ impl RepoTab {
             what,
             result: match pages.target(&repo, &hosting, &details) {
                 Some(target) => job(target.as_ref()),
-                None => Err("This pull request can't be acted on from here".to_owned()),
+                None => {
+                    Err(crate::i18n::text("repo-workflows-pr_review-pr-send-73ed2a2f").to_owned())
+                }
             },
         });
     }
@@ -176,7 +190,7 @@ impl RepoTab {
                 (e, true)
             }
         };
-        self.finished.push(outcome);
+        self.finished.push(crate::repo::Notice::plain(outcome));
         // Until the page shows the new state, anything sent would go by the old one.
         if self.pr_view.as_ref().is_some_and(|v| v.number == number) {
             draft.posting = true;
@@ -241,6 +255,10 @@ fn post_job(act: PrAct, draft: &PrDraft, details: &PrDetails) -> Option<(Posted,
                 Box::new(move |t| t.reply(&thread, &body)),
             )
         }
+        PrAct::ReplyConversation(thread) => {
+            let body = draft.comment.clone();
+            (Posted::Comment, Box::new(move |t| t.reply(&thread, &body)))
+        }
         PrAct::SetResolved(thread, resolved) => (
             Posted::Resolve(resolved),
             Box::new(move |t| t.set_resolved(&thread, resolved)),
@@ -258,7 +276,10 @@ fn post_job(act: PrAct, draft: &PrDraft, details: &PrDetails) -> Option<(Posted,
                     t.apply_suggestion(&suggestion)?;
                     if resolve {
                         t.set_resolved(&thread, true).map_err(|e| {
-                            format!("The change is committed, but the thread wasn't resolved: {e}")
+                            crate::i18n::message(
+                                "repo-workflows-pr_review-post-job-76c33b59",
+                                &[("e", (e).clone().into())],
+                            )
                         })?;
                     }
                     Ok(())

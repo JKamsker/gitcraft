@@ -224,19 +224,17 @@ fn sections_there(target: &crate::remote::Target, limit: Duration) -> Result<Vec
     };
     let out = crate::remote::exec(&target.host, &req)?;
     if out.code == 1 && crate::remote::is_missing_folder(&out.stderr) {
-        return Err(format!(
-            "{} isn't a folder on {}",
-            target.path,
-            target.host.label()
-        ));
+        return Err(super::command::missing_folder(target));
     }
     if out.code != 0 {
         let why = String::from_utf8_lossy(&out.stderr).trim().to_owned();
         return Err(if why.is_empty() {
-            format!(
-                "couldn't look at {} on {}",
-                target.path,
-                target.host.label()
+            crate::i18n::message(
+                "backend-couldn-t-look-at-on-6360b7",
+                &[
+                    ("path", (target.path).to_string().into()),
+                    ("target", (target.host.label()).to_string().into()),
+                ],
             )
         } else {
             why
@@ -256,6 +254,8 @@ fn script() -> String {
             .join(" ")
     };
     let mut s = String::from(concat!(
+        "GIT_NO_LAZY_FETCH=1; export GIT_NO_LAZY_FETCH\n",
+        "git() { command git --no-lazy-fetch \"$@\"; }\n",
         "d=$(mktemp -d \"${TMPDIR:-/tmp}/gitcraft-look.XXXXXX\") || exit 1\n",
         "trap 'rm -rf \"$d\"' EXIT HUP INT TERM\n",
         "s() { k=$1; shift\n",
@@ -415,11 +415,12 @@ fn text(section: Option<&Section>) -> String {
 
 /// The overview the sections say; `path` gives a worktree's path in the app's form.
 fn parse(sections: &[Section], path: impl Fn(&str) -> PathBuf) -> Result<Overview, String> {
-    let status = find(sections, "status").ok_or("git gave no answer")?;
+    let status =
+        find(sections, "status").ok_or(crate::i18n::text("backend-git-gave-no-answer-f59da3"))?;
     if status.code != 0 {
         let why = String::from_utf8_lossy(&status.out).trim().to_owned();
         return Err(if why.is_empty() {
-            "git status failed".to_owned()
+            crate::i18n::text("backend-git-status-failed-5adb43").to_owned()
         } else {
             why
         });

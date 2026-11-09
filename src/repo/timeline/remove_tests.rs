@@ -223,7 +223,12 @@ fn nothing_is_lost_or_left_behind() {
     );
     tab.apply(Action::Timeline(TimelineAct::AskDiscard(true)), &ctx);
     act(&mut tab, &ctx, Action::Timeline(TimelineAct::DiscardRemove));
-    let refused = tab.status.clone().map(|(s, _)| s).unwrap_or_default();
+    let refused = tab
+        .status
+        .as_deref()
+        .cloned()
+        .map(|(s, _)| s)
+        .unwrap_or_default();
     let kept = git::resolve(&dir, &format!("refs/heads/{branch}")).is_ok() && folder.exists();
     let _ = git::run(
         Some(&dir),

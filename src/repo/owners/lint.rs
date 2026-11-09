@@ -35,7 +35,10 @@ impl RepoTab {
             OwnersAct::Close => self.owners.lint = None,
             OwnersAct::Check => {
                 let Some(file) = self.owners.file.clone() else {
-                    self.status = Some(("This repository has no CODEOWNERS file".to_owned(), true));
+                    self.status = Some(crate::repo::Notice::plain((
+                        "This repository has no CODEOWNERS file".to_owned(),
+                        true,
+                    )));
                     return;
                 };
                 self.owners.lint_requests += 1;
@@ -59,8 +62,10 @@ impl RepoTab {
                             .filter(|p| !p.is_empty())
                             .map(str::to_owned)
                             .collect();
-                        std::panic::catch_unwind(|| file.lint(&files))
-                            .map_err(|_| "checking it failed".to_owned())
+                        std::panic::catch_unwind(|| file.lint(&files)).map_err(|_| {
+                            crate::i18n::text("repo-workflows-owners-owners-act-b11dc59d")
+                                .to_owned()
+                        })
                     },
                     move |tab, result, _| {
                         if let Some(view) = &mut tab.owners.lint
@@ -99,31 +104,46 @@ impl RepoTab {
 fn contents(ui: &mut Ui, view: &LintView, acts: &mut Vec<Action>) {
     let t = Tokens::get(ui.ctx());
     let file = &view.file;
-    ui.label(RichText::new("Check CODEOWNERS").font(theme::semibold(15.0)));
+    ui.label(
+        RichText::new(crate::i18n::text("repo-workflows-owners-contents-e1e62224"))
+            .font(theme::semibold(15.0)),
+    );
     let rules = match file.rule_count() {
-        1 => "1 rule".to_owned(),
-        n => format!("{n} rules"),
+        1 => crate::i18n::text("repo-workflows-owners-contents-343bb384").to_owned(),
+        n => crate::i18n::message(
+            "repo-workflows-owners-contents-4d726f4a",
+            &[("n", (n).into())],
+        ),
     };
     ui.label(
-        RichText::new(format!(
-            "{} at HEAD, read as {} reads it · {rules}",
-            file.path,
-            file.flavor.name(),
+        RichText::new(crate::i18n::message(
+            "repo-workflows-owners-contents-96978c8c",
+            &[
+                ("file-path-1", (file.path).clone().into()),
+                ("file-flavor-name-2", (file.flavor.name()).into()),
+                ("rules", (rules).clone().into()),
+            ],
         ))
         .color(t.text_dim),
     );
     if let Some(e) = &view.stale {
         ui.colored_label(
             t.warning,
-            format!("Couldn't read it again lately ({e}): this is the one read before."),
+            crate::i18n::message(
+                "repo-workflows-owners-contents-c72a165d",
+                &[("e", (e).clone().into())],
+            ),
         );
     }
     let sections = file.section_labels();
     if !sections.is_empty() {
         ui.label(
-            RichText::new(format!("Sections: {}", sections.join(" · ")))
-                .color(t.text_faint)
-                .small(),
+            RichText::new(crate::i18n::message(
+                "repo-workflows-owners-contents-4adeeb91",
+                &[("sections-join-1", (sections.join(" · ")).clone().into())],
+            ))
+            .color(t.text_faint)
+            .small(),
         );
     }
     ui.add_space(8.0);
@@ -133,16 +153,29 @@ fn contents(ui: &mut Ui, view: &LintView, acts: &mut Vec<Action>) {
         .show(ui, |ui| {
             heading(
                 ui,
-                &format!(
-                    "LINES THE FORGE READS DIFFERENTLY ({})",
-                    file.problems.len()
+                &crate::i18n::message(
+                    "repo-workflows-owners-contents-64feb239",
+                    &[("file-problems-len-1", (file.problems.len()).into())],
                 ),
             );
             if file.problems.is_empty() {
-                faint(ui, "None: the forge reads every line as written.");
+                faint(
+                    ui,
+                    crate::i18n::text("repo-workflows-owners-contents-bd73a6b1"),
+                );
             }
             for p in &file.problems {
-                line(ui, &format!("line {}: {}", p.line, p.text), t.warning);
+                line(
+                    ui,
+                    &crate::i18n::message(
+                        "repo-workflows-owners-contents-8f8353f4",
+                        &[
+                            ("p-line-1", (p.line).into()),
+                            ("p-text-2", (p.text).clone().into()),
+                        ],
+                    ),
+                    t.warning,
+                );
             }
             match &view.result {
                 None => {
@@ -153,7 +186,10 @@ fn contents(ui: &mut Ui, view: &LintView, acts: &mut Vec<Action>) {
                     ui.add_space(10.0);
                     ui.colored_label(
                         t.danger,
-                        format!("Couldn't list the repository's files: {e}"),
+                        crate::i18n::message(
+                            "repo-workflows-owners-contents-3203b0df",
+                            &[("e", (e).clone().into())],
+                        ),
                     );
                 }
                 Some(Ok(lint)) => results(ui, lint),
@@ -162,14 +198,20 @@ fn contents(ui: &mut Ui, view: &LintView, acts: &mut Vec<Action>) {
     ui.add_space(12.0);
     ui.horizontal(|ui| {
         if ui
-            .add(egui::Button::new("Open the file").min_size(egui::vec2(100.0, 30.0)))
-            .on_hover_text("In your editor")
+            .add(
+                egui::Button::new(crate::i18n::text("repo-workflows-owners-contents-bd5f6b1d"))
+                    .min_size(egui::vec2(100.0, 30.0)),
+            )
+            .on_hover_text(crate::i18n::text("repo-workflows-owners-contents-4b99390e"))
             .clicked()
         {
             acts.push(Action::OpenInEditor(file.path.clone().into()));
         }
         if ui
-            .add(egui::Button::new("Close").min_size(egui::vec2(80.0, 30.0)))
+            .add(
+                egui::Button::new(crate::i18n::text("repo-workflows-owners-contents-7d9eb7ac"))
+                    .min_size(egui::vec2(80.0, 30.0)),
+            )
             .clicked()
         {
             acts.push(Action::Owners(OwnersAct::Close));
@@ -181,30 +223,57 @@ fn results(ui: &mut Ui, lint: &Lint) {
     let t = Tokens::get(ui.ctx());
     heading(
         ui,
-        &format!("PATTERNS THAT MATCH NO FILE ({})", lint.unmatched.len()),
+        &crate::i18n::message(
+            "repo-workflows-owners-results-85d177f5",
+            &[("lint-unmatched-len-1", (lint.unmatched.len()).into())],
+        ),
     );
     if lint.unmatched.is_empty() {
-        faint(ui, "None: every pattern matches a file.");
+        faint(
+            ui,
+            crate::i18n::text("repo-workflows-owners-results-9c0433a9"),
+        );
     }
     for (n, pattern) in &lint.unmatched {
-        line(ui, &format!("line {n}: {pattern}"), t.warning);
+        line(
+            ui,
+            &crate::i18n::message(
+                "repo-workflows-owners-results-a6551c12",
+                &[("n", (*(n)).into()), ("pattern", (pattern).clone().into())],
+            ),
+            t.warning,
+        );
     }
     heading(
         ui,
-        &format!(
-            "FILES WITHOUT AN OWNER ({} of {})",
-            lint.unowned.len(),
-            lint.files
+        &crate::i18n::message(
+            "repo-workflows-owners-results-a92df9d7",
+            &[
+                ("lint-unowned-len-1", (lint.unowned.len()).into()),
+                ("lint-files-2", (lint.files).into()),
+            ],
         ),
     );
     if lint.unowned.is_empty() {
-        faint(ui, "None: every file has an owner.");
+        faint(
+            ui,
+            crate::i18n::text("repo-workflows-owners-results-26e406d1"),
+        );
     }
     for path in lint.unowned.iter().take(LISTED) {
         line(ui, path, t.text_dim);
     }
     if lint.unowned.len() > LISTED {
-        faint(ui, &format!("and {} more", lint.unowned.len() - LISTED));
+        faint(
+            ui,
+            &crate::i18n::message(
+                "repo-workflows-owners-results-683768ab",
+                &[(
+                    "lint-unowned-len-listed-1",
+                    (lint.unowned.len() - LISTED).into(),
+                )],
+            ),
+        );
     }
 }
 

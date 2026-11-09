@@ -79,23 +79,28 @@ pub(crate) fn load_from(path: &Path) -> Result<Saved, String> {
         Ok(text) => text,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Saved::default()),
         Err(e) => {
-            return Err(format!(
-                "The timeline in {} can't be read: {e}",
-                path.display()
+            return Err(crate::i18n::message(
+                "repo-workflows-timeline-load-from-7d803910",
+                &[
+                    ("path-display-1", (path.display()).to_string().into()),
+                    ("e", (e).to_string().into()),
+                ],
             ));
         }
     };
     let saved: Saved = serde_json::from_str(&text).map_err(|e| {
-        format!(
-            "The timeline in {} is damaged ({e}); it is left as it is and a new one isn't kept",
-            path.display()
+        crate::i18n::message(
+            "repo-workflows-timeline-load-from-199a3034",
+            &[
+                ("path-display-1", (path.display()).to_string().into()),
+                ("e", (e).to_string().into()),
+            ],
         )
     })?;
     if saved.version > VERSION {
-        return Err(format!(
-            "The timeline in {} was written by a newer gitcraft; it is left as it is and this \
-             one doesn't keep one",
-            path.display()
+        return Err(crate::i18n::message(
+            "repo-workflows-timeline-load-from-ac62d083",
+            &[("path-display-1", (path.display()).to_string().into())],
         ));
     }
     Ok(saved)
@@ -130,12 +135,24 @@ pub(crate) fn save_to(path: &Path, saved: &Saved, generation: u64) -> Result<(),
     if map.get(path).is_some_and(|g| *g > generation) {
         return Ok(());
     }
-    let fail = |e: std::io::Error| format!("The timeline can't be kept in {}: {e}", path.display());
+    let fail = |e: std::io::Error| {
+        crate::i18n::message(
+            "repo-workflows-timeline-save-to-a23306bd",
+            &[
+                ("path-display-1", (path.display()).to_string().into()),
+                ("e", (e).to_string().into()),
+            ],
+        )
+    };
     if let Some(dir) = path.parent() {
         std::fs::create_dir_all(dir).map_err(fail)?;
     }
-    let text =
-        serde_json::to_string(saved).map_err(|e| format!("The timeline can't be kept: {e}"))?;
+    let text = serde_json::to_string(saved).map_err(|e| {
+        crate::i18n::message(
+            "repo-workflows-timeline-save-to-8a68e68f",
+            &[("e", (e).to_string().into())],
+        )
+    })?;
     // Its own part file: another gitcraft writing the same timeline can't interleave with it.
     let part = path.with_extension(format!("json.{}.part", std::process::id()));
     std::fs::write(&part, text).map_err(fail)?;

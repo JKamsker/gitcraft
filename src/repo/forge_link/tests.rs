@@ -296,7 +296,10 @@ fn status_after(
         tab.poll(ctx);
         std::thread::sleep(Duration::from_millis(10));
     }
-    tab.status.clone().ok_or_else(|| "no status".to_owned())
+    tab.status
+        .as_deref()
+        .cloned()
+        .ok_or_else(|| "no status".to_owned())
 }
 
 #[test]

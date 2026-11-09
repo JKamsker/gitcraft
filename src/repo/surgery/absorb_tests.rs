@@ -16,7 +16,7 @@ const HISTORY: &str = "printf '1\\n2\\n3\\n4\\n5\\n6\\n7\\n8\\n9\\n10\\n' > 'f Ã
 fn open(tab: &mut RepoTab, ctx: &egui::Context) {
     tab.open_absorb(ctx);
     pump(tab, ctx, |t| {
-        t.absorb.is_some() || t.status.as_ref().is_some_and(|s| s.1)
+        t.absorb.is_some() || t.status.as_deref().is_some_and(|s| s.1)
     });
     assert!(tab.absorb.is_some(), "{:?}", tab.status);
 }
@@ -240,7 +240,7 @@ fn pushed_commits_are_marked_and_nothing_staged_is_said() {
     );
     let (mut tab, ctx) = opened(&dir);
     tab.open_absorb(&ctx);
-    let nothing = tab.status.clone();
+    let nothing = tab.status.as_deref().cloned();
     sh(
         &dir,
         "printf '1\\nZWEI\\n3\\n4\\n5\\n6\\n7\\n8\\nneun\\n10\\n' > 'f Ã©.txt' && git add -A",

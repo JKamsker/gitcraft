@@ -144,6 +144,12 @@ impl LinePick {
 /// and the lines picked in it (click, Shift+click or drag over them). `history`: why the lines
 /// picked can have no history, if they can't. Returns the lines (from 1) whose history was
 /// asked for from their right-click menu.
+pub(crate) fn focus(ctx: &egui::Context, id: impl std::hash::Hash + std::fmt::Debug, line: usize) {
+    ctx.data_mut(|d| d.insert_temp(egui::Id::new(("file-text-focus", id)), line));
+}
+
+// The optional logical location accompanies the existing search/history/menu inputs.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn show(
     ui: &mut Ui,
     id: impl std::hash::Hash + std::fmt::Debug,
@@ -152,6 +158,7 @@ pub(crate) fn show(
     source: impl FnOnce() -> Source,
     history: Result<(), &str>,
     mut links: Option<LineMenu<'_>>,
+    location: Option<(&std::cell::Cell<Option<usize>>, Option<usize>)>,
 ) -> Option<(u32, u32)> {
     let t = Tokens::get(ui.ctx());
     let data = match text {
@@ -163,15 +170,21 @@ pub(crate) fn show(
             ui.add_space(12.0);
             ui.horizontal(|ui| {
                 ui.add_space(12.0);
-                ui.colored_label(t.danger, e);
+                ui.colored_label(
+                    t.danger,
+                    crate::git::display_error(&crate::forge::inbox::display_error(e)),
+                );
             });
             return None;
         }
         Some(Ok(data)) => data,
     };
     let note = match data.binary {
-        Some(size) => Some(format!("Binary file, {size} bytes")),
-        None if data.lines.is_empty() => Some("Empty file".to_owned()),
+        Some(size) => Some(crate::i18n::message(
+            "repo-core-2465",
+            &[("size", (size).into())],
+        )),
+        None if data.lines.is_empty() => Some(crate::i18n::text("repo-core-2466").to_owned()),
         None => None,
     };
     if let Some(note) = note {
@@ -182,7 +195,22 @@ pub(crate) fn show(
     }
     let pick_id = egui::Id::new(("file_text_pick", &id));
     let mut pick: Option<LinePick> = ui.data(|d| d.get_temp(pick_id)).flatten();
-    let mut asked = None;
+    let free = !crate::a11y::keyboard_taken(ui.ctx());
+    if free && crate::keymap::take(ui.ctx(), crate::keymap::Command::SelectionAll) {
+        pick = Some(LinePick {
+            anchor: 0,
+            cursor: data.lines.len() - 1,
+        });
+        ui.ctx().request_repaint();
+    }
+    let mut asked = if free
+        && history.is_ok()
+        && crate::keymap::take(ui.ctx(), crate::keymap::Command::SelectionHistory)
+    {
+        pick.map(LinePick::numbers)
+    } else {
+        None
+    };
     let extend = ui.input(|i| i.modifiers.shift);
     let drag_id = pick_id.with("drag");
     let (down, pointer_y) = ui.input(|i| {
@@ -215,9 +243,13 @@ pub(crate) fn show(
             Layout::Lines,
         );
     }
+    let reveal = ui.data_mut(|d| d.remove_temp::<usize>(egui::Id::new(("file-text-focus", &id))));
     let mut scroll = egui::ScrollArea::both()
         .id_salt(("file_text", id))
         .auto_shrink(false);
+    if let Some(line) = reveal {
+        scroll = scroll.vertical_scroll_offset(line.saturating_sub(3) as f32 * LINE_H);
+    }
     if let Some(hit) = find.take_reveal() {
         scroll = find.scroll_to(
             scroll,
@@ -226,6 +258,17 @@ pub(crate) fn show(
             char_w,
         );
     }
+    if let Some((goto, _)) = location
+        && let Some(line) = goto.take()
+    {
+        if (1..=lines.len()).contains(&line) {
+            scroll = scroll.vertical_scroll_offset(
+                (line.saturating_sub(1) as f32 * LINE_H - 2.0 * LINE_H).max(0.0),
+            );
+        } else {
+            ui.weak(crate::i18n::text("repo-core-2470"));
+        }
+    }
     let found = &*find;
     let out = scroll.show_rows(ui, LINE_H, data.lines.len(), |ui, range| {
         for i in range {
@@ -233,6 +276,16 @@ pub(crate) fn show(
                 continue;
             };
             let (rect, resp) = ui.allocate_exact_size(vec2(width, LINE_H), Sense::click_and_drag());
+            crate::a11y::a11y_selected(
+                &resp,
+                || {
+                    crate::i18n::message(
+                        "repo-core-2471",
+                        &[("i", format!("{}", i + 1).into()), ("line", (line).into())],
+                    )
+                },
+                pick.is_some_and(|p| p.contains(i)),
+            );
             if resp.drag_started() {
                 // A drag picks the lines it goes over, from where it started.
                 dragging = true;
@@ -256,7 +309,9 @@ pub(crate) fn show(
                 p.cursor = i;
             }
             let p = ui.painter().with_clip_rect(rect.intersect(ui.clip_rect()));
-            if pick.is_some_and(|p| p.contains(i)) {
+            if location.is_some_and(|(_, line)| line == Some(i + 1))
+                || pick.is_some_and(|p| p.contains(i))
+            {
                 p.rect_filled(rect, 0.0, t.row_selected);
             }
             if let Some(picked) = pick {
@@ -285,10 +340,9 @@ pub(crate) fn show(
         text_w: out.inner_rect.width() - NUM_W - 10.0,
         line_h: LINE_H,
     });
-    // Ctrl+C copies the lines picked.
-    let copy = !ui.ctx().egui_wants_keyboard_input()
-        && ui.input(|i| i.events.iter().any(|e| matches!(e, egui::Event::Copy)));
-    if copy && let Some(picked) = pick {
+    if crate::keymap::copy_requested(ui.ctx())
+        && let Some(picked) = pick
+    {
         ui.ctx().copy_text(picked_text(data, picked));
     }
     ui.data_mut(|d| {
@@ -316,16 +370,27 @@ fn lines_menu(
     asked: &mut Option<(u32, u32)>,
     links: &mut Option<LineMenu<'_>>,
 ) {
-    egui::Popup::context_menu(resp)
+    crate::menu_item::context(resp)
         .style(theme::menu_style)
         .show(|ui| {
             let (start, end) = picked.numbers();
             let which = if start == end {
-                format!("line {start}")
+                crate::i18n::message("repo-core-2472", &[("start", format!("{}", start).into())])
             } else {
-                format!("lines {start}–{end}")
+                crate::i18n::message(
+                    "repo-core-2473",
+                    &[
+                        ("start", format!("{}", start).into()),
+                        ("end", format!("{}", end).into()),
+                    ],
+                )
             };
-            if ui.button("Copy").clicked() {
+            if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-1133"))
+                .icon("copy")
+                .keys(crate::keymap::Command::SelectionCopy)
+                .show(ui)
+                .clicked()
+            {
                 ui.ctx().copy_text(picked_text(data, picked));
             }
             if let (Some(menu), Some(lines)) = (links.as_deref_mut(), Lines::new(start, end)) {
@@ -333,16 +398,24 @@ fn lines_menu(
             }
             match history {
                 Ok(()) => {
-                    let b = ui.button("History of these lines").on_hover_text(format!(
-                        "Every commit up to this version that changed {which}, followed back \
-                         through earlier edits and renames"
-                    ));
+                    let b = crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-2327"))
+                        .icon("history")
+                        .keys(crate::keymap::Command::SelectionHistory)
+                        .show(ui)
+                        .on_hover_text(crate::i18n::message(
+                            "repo-core-2474",
+                            &[("which", which.to_string().into())],
+                        ));
                     if b.clicked() {
                         *asked = Some((start, end));
                     }
                 }
                 Err(why) => {
-                    ui.add_enabled(false, egui::Button::new("History of these lines"))
+                    crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-2327"))
+                        .icon("history")
+                        .keys(crate::keymap::Command::SelectionHistory)
+                        .refused(Some(why))
+                        .show(ui)
                         .on_disabled_hover_text(why);
                 }
             }
@@ -382,6 +455,98 @@ pub(crate) fn line_galley(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn selection_registry_runs_actual_file_view_and_preserves_text_ownership() {
+        use crate::keymap::{self, Command, Scope, Stroke};
+        use egui::{Event, Key, Modifiers};
+        let ctx = egui::Context::default();
+        crate::theme::install_fonts(&ctx);
+        let mut settings = crate::settings::Settings::default();
+        for (command, key) in [
+            (Command::SelectionAll, Key::F8),
+            (Command::SelectionCopy, Key::F9),
+            (Command::SelectionHistory, Key::F10),
+        ] {
+            settings
+                .key_bindings
+                .insert(command.id().into(), vec![Stroke::new(key, Modifiers::NONE)]);
+        }
+        settings.put_for_test(&ctx);
+        let data = Ok(FileText::new(
+            "one\n日本語\nthree\n".as_bytes(),
+            "test.txt",
+            true,
+        ));
+        let mut find = Find::default();
+        let source_calls = std::cell::Cell::new(0);
+        let mut frame = |key: Option<Key>, text_owned, history| {
+            let mut asked = None;
+            let out = ctx.run_ui(
+                egui::RawInput {
+                    events: key
+                        .into_iter()
+                        .flat_map(|key| {
+                            [true, false].map(|pressed| Event::Key {
+                                key,
+                                physical_key: None,
+                                pressed,
+                                repeat: false,
+                                modifiers: Modifiers::NONE,
+                            })
+                        })
+                        .collect(),
+                    ..Default::default()
+                },
+                |ui| {
+                    keymap::active(
+                        &ctx,
+                        vec![Scope::Window, Scope::Repository, Scope::Selection],
+                    );
+                    if text_owned {
+                        ui.text_edit_singleline(&mut String::new()).request_focus();
+                    }
+                    asked = show(
+                        ui,
+                        "registry-file",
+                        Some(&data),
+                        &mut find,
+                        || {
+                            source_calls.set(source_calls.get() + 1);
+                            Source::DiffFile("recorded".into())
+                        },
+                        history,
+                        None,
+                        None,
+                    );
+                },
+            );
+            let copied: Vec<_> = out
+                .platform_output
+                .commands
+                .iter()
+                .filter_map(|c| match c {
+                    egui::OutputCommand::CopyText(text) => Some(text.clone()),
+                    _ => None,
+                })
+                .collect();
+            out.drop_without_applying_deltas();
+            (asked, copied)
+        };
+        frame(None, false, Ok(()));
+        frame(Some(Key::F8), false, Ok(()));
+        assert_eq!(
+            frame(Some(Key::F9), false, Ok(())).1,
+            ["one\n日本語\nthree"]
+        );
+        assert_eq!(frame(Some(Key::F10), false, Ok(())).0, Some((1, 3)));
+        assert_eq!(
+            frame(Some(Key::F10), false, Err("No committed version")).0,
+            None
+        );
+        assert!(frame(Some(Key::F9), true, Ok(())).1.is_empty());
+        assert_eq!(source_calls.get(), 0);
+    }
 
     #[test]
     fn lines_are_picked_by_click_and_shift_click() {
@@ -460,5 +625,58 @@ mod tests {
             (vec!["two".to_owned()], true)
         );
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod r2_navigation_tests {
+    use super::*;
+    #[test]
+    fn r2_pure_pinned_file_reveal_waits_for_text_and_scrolls_to_logical_line() {
+        let ctx = egui::Context::default();
+        let goto = std::cell::Cell::new(Some(90));
+        let mut find = Find::default();
+        let mut frame = |text: Option<&Result<FileText, String>>| {
+            let mut output = ctx.run_ui(
+                egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(900.0, 300.0),
+                    )),
+                    ..Default::default()
+                },
+                |ui| {
+                    show(
+                        ui,
+                        "pinned",
+                        text,
+                        &mut find,
+                        || Source::File {
+                            path: "unchanged.rs".into(),
+                            rev: Some("pinned".into()),
+                        },
+                        Ok(()),
+                        None,
+                        Some((&goto, Some(90))),
+                    );
+                },
+            );
+            output.textures_delta.clear();
+            output
+        };
+        let _ = frame(None);
+        assert_eq!(goto.get(), Some(90));
+        let text = Ok(FileText::new(
+            (1..=100)
+                .map(|n| format!("row{n}\n"))
+                .collect::<String>()
+                .as_bytes(),
+            "unchanged.rs",
+            false,
+        ));
+        let _ = frame(Some(&text));
+        let output = frame(Some(&text));
+        assert_eq!(goto.get(), None);
+        assert!(output.shapes.iter().any(|shape|matches!(&shape.shape,egui::epaint::Shape::Text(text) if text.galley.text().contains("row90"))));
     }
 }

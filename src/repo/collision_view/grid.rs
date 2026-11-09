@@ -17,7 +17,10 @@ pub(super) fn results(ui: &mut Ui, m: &Matrix, order: &[Step], acts: &mut Vec<Ac
     if let Some(e) = m.first_error() {
         ui.colored_label(
             readable(&t, t.warning),
-            format!("Some pairs couldn't be merged in memory: {e}"),
+            crate::i18n::message(
+                "repo-workflows-collision_view-results-45512235",
+                &[("e", crate::collision::display::diagnostic(e).into())],
+            ),
         );
         ui.add_space(6.0);
     }
@@ -26,16 +29,20 @@ pub(super) fn results(ui: &mut Ui, m: &Matrix, order: &[Step], acts: &mut Vec<Ac
         .max_height(300.0)
         .show(ui, |ui| matrix(ui, m, acts));
     ui.label(
-        egui::RichText::new(format!(
-            "→ is each branch merged into {}. A number is how many files conflict: hover for \
-             them, click to compare the two.",
-            m.target
+        egui::RichText::new(crate::i18n::message(
+            "repo-workflows-collision_view-results-87f3fc81",
+            &[("m-target-1", (m.target).clone().into())],
         ))
         .size(11.5)
         .color(t.text_faint),
     );
     ui.add_space(12.0);
-    ui.label(egui::RichText::new("Suggested landing order").font(theme::semibold(13.0)));
+    ui.label(
+        egui::RichText::new(crate::i18n::text(
+            "repo-workflows-collision_view-results-9b24a27f",
+        ))
+        .font(theme::semibold(13.0)),
+    );
     ui.add_space(4.0);
     landing(ui, m, order);
 }
@@ -68,7 +75,10 @@ fn matrix(ui: &mut Ui, m: &Matrix, acts: &mut Vec<Action>) {
         ui.id().with("collision-target-head"),
         Sense::hover(),
     )
-    .on_hover_text(format!("Merged into {}", m.target));
+    .on_hover_text(crate::i18n::message(
+        "repo-workflows-collision_view-matrix-f5346a60",
+        &[("m-target-1", (m.target).clone().into())],
+    ));
     for i in 0..n {
         let y = rect.top() + CELL * (i as f32 + 1.0);
         let name = format!("{}  {}", i + 1, m.branches[i]);
@@ -109,6 +119,15 @@ fn matrix(ui: &mut Ui, m: &Matrix, acts: &mut Vec<Action>) {
                 other,
                 cell,
             ));
+            crate::a11y::a11y(
+                &r,
+                if cell.as_ref().is_ok_and(|p| !p.clean()) {
+                    egui::WidgetType::Button
+                } else {
+                    egui::WidgetType::Label
+                },
+                || cell_tip(&m.branches[i], other, cell),
+            );
             if r.clicked() && cell.as_ref().is_ok_and(|p| !p.clean()) {
                 acts.push(compare(other, &m.branches[i]));
             }
@@ -122,7 +141,7 @@ fn paint_cell(ui: &mut Ui, rect: Rect, cell: &Cell, id: egui::Id) -> egui::Respo
         Ok(pair) if pair.clean() => (t.success.gamma_multiply(0.18), String::new(), t.success),
         Ok(pair) => (
             t.danger.gamma_multiply(0.25),
-            pair.files.len().to_string(),
+            crate::i18n::number(pair.files.len()),
             readable(&t, t.danger),
         ),
         Err(_) => (
@@ -153,23 +172,31 @@ const LISTED: usize = 12;
 
 fn cell_tip(a: &str, b: &str, cell: &Cell) -> String {
     match cell {
-        Ok(pair) if pair.clean() => format!("{a} and {b} merge cleanly"),
+        Ok(pair) if pair.clean() => crate::i18n::message(
+            "repo-workflows-collision_view-cell-tip-b3f28cca",
+            &[("a", (a).into()), ("b", (b).into())],
+        ),
         Ok(pair) => {
             let n = pair.files.len();
-            let mut tip = format!(
-                "{a} and {b} conflict on {n} file{}:",
-                if n == 1 { "" } else { "s" }
+            let mut tip = crate::i18n::message(
+                "repo-workflows-collision-conflicts",
+                &[("a", (a).into()), ("b", (b).into()), ("count", (n).into())],
             );
             for f in pair.files.iter().take(LISTED) {
                 tip.push_str(&format!("\n  {f}"));
             }
             if n > LISTED {
-                tip.push_str(&format!("\n  and {} more", n - LISTED));
+                tip.push_str(&crate::i18n::message(
+                    "repo-workflows-collision_view-cell-tip-81bf5184",
+                    &[("n-listed-1", (n - LISTED).into())],
+                ));
             }
-            tip.push_str("\nClick to compare them");
+            tip.push_str(crate::i18n::text(
+                "repo-workflows-collision_view-cell-tip-9b99b61c",
+            ));
             tip
         }
-        Err(e) => e.clone(),
+        Err(e) => crate::collision::display::diagnostic(e),
     }
 }
 
@@ -197,7 +224,7 @@ fn landing(ui: &mut Ui, m: &Matrix, order: &[Step]) {
 /// "lands cleanly", or what the branch conflicts with by then.
 pub(super) fn step_note(m: &Matrix, step: &Step) -> String {
     if step.clean() {
-        return "merges cleanly with each one before it".to_owned();
+        return crate::i18n::text("repo-workflows-collision_view-step-note-cb1d05dc").to_owned();
     }
     let mut parts: Vec<String> = Vec::new();
     if step.with_target > 0 {
@@ -213,12 +240,15 @@ pub(super) fn step_note(m: &Matrix, step: &Step) -> String {
         .collect();
     let mut note = Vec::new();
     if !parts.is_empty() {
-        note.push(format!("conflicts with {}", parts.join(", ")));
+        note.push(crate::i18n::message(
+            "repo-workflows-collision_view-step-note-5ef5ed3f",
+            &[("parts-join-1", (parts.join(", ")).clone().into())],
+        ));
     }
     if !unknown.is_empty() {
-        note.push(format!(
-            "couldn't be merged with {} in memory",
-            unknown.join(", ")
+        note.push(crate::i18n::message(
+            "repo-workflows-collision_view-step-note-5896a7b7",
+            &[("unknown-join-1", (unknown.join(", ")).clone().into())],
         ));
     }
     note.join("; ")
@@ -235,5 +265,27 @@ fn readable(t: &Tokens, color: egui::Color32) -> egui::Color32 {
 }
 
 fn files(n: usize) -> String {
-    format!("{n} file{}", if n == 1 { "" } else { "s" })
+    crate::i18n::message("repo-workflows-collision-files", &[("count", (n).into())])
+}
+
+#[cfg(test)]
+mod fluent_guard_tests {
+    use super::*;
+    #[test]
+    fn fluent_partition_collision_actual_cell_tip_preserves_raw_classification() {
+        let raw = "The collision matrix needs git 2.38 or later (git merge-tree --write-tree)";
+        let cell: Cell = Err(raw.into());
+        for lang in ["en-US", "de"] {
+            crate::i18n::set_language(lang);
+            let tip = cell_tip("feature/1234", "target/ß", &cell);
+            assert_eq!(tip, crate::collision::display::diagnostic(raw));
+            assert_eq!(tip.contains("benötigt"), lang == "de");
+            assert!(cell.as_ref().is_err_and(|e| e.contains("needs git")));
+            assert_eq!(
+                cell_tip("a", "b", &Err("Provider opaque: ß\n1234".into())),
+                "Provider opaque: ß\n1234"
+            );
+        }
+        crate::i18n::set_language("en-US");
+    }
 }

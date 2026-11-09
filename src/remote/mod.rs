@@ -10,16 +10,28 @@
 
 pub mod askpass;
 pub(crate) use pool::shutdown;
+mod deadline_io;
 mod discover;
+pub mod display;
 mod fs;
+pub(crate) mod native_owner;
+#[cfg(all(test, unix))]
+mod owned_runtime;
 mod pool;
+mod private_marker;
 mod session;
 mod shell;
+mod supervisor;
 mod transport;
 mod ui_guard;
 mod vault;
+pub(crate) mod workspace_authority;
+pub(crate) mod workspace_claim;
+mod workspace_ledger;
 
 use std::path::{Path, PathBuf};
+
+pub(crate) use fs::read_within_script;
 
 pub use discover::{ssh_config_hosts, wsl_distros};
 pub use fs::{
@@ -27,15 +39,42 @@ pub use fs::{
     is_same_dir_as, read, read_to_string, read_within, remove_file, remove_host_scratch_dir,
     same_dir, try_is_dir, try_is_file, try_is_link, worktree_file, write,
 };
+pub use session::LONG_FOR as NETWORK_LIMIT;
 #[cfg(all(test, unix))]
 pub use session::LOOPBACK;
-#[cfg(test)]
-pub use session::stop_script;
-pub(crate) use session::streaming_command;
-pub use session::{LONG_FOR as NETWORK_LIMIT, stop_now};
-pub use session::{
-    Output, Request, exec, exec_if_connected, is_missing_folder, spawn, stop, stop_process,
+pub use session::{Output, Request, exec, exec_if_connected, is_missing_folder};
+pub(crate) use session::{
+    Streaming, streaming_command, streaming_command_authority, streaming_command_bounded,
 };
+
+/// Authenticate a persisted owner without accepting a process number as authority.
+/// Missing receipt and unavailable owner remain unknown and must preserve the workspace.
+pub(crate) fn recover_owner(record: &Path) -> Result<Vec<u8>, String> {
+    let parent = record.parent().ok_or("owner record has no parent")?;
+    let name = record
+        .file_name()
+        .and_then(|s| s.to_str())
+        .ok_or("invalid owner name")?;
+    let read_record = || -> Result<Vec<u8>, String> {
+        let bytes = match read_within(parent, name, 2048) {
+            Some(result) => result.map_err(|e| e.to_string())?,
+            None => crate::safe_read::read_inside(parent, name, 2048),
+        };
+        bytes.ok_or_else(|| "missing, replaced or invalid owner record; cleanup unknown".into())
+    };
+    let bytes = read_record()?;
+    let endpoint = workspace_authority::endpoint(&bytes)?;
+    if let Some(target) = parse(record) {
+        session::stop_endpoint(&target.host, &supervisor::Endpoint::from_record(&endpoint)?)?;
+    } else {
+        native_owner::Endpoint::from_record(&endpoint)?.stop()?;
+    }
+    if read_record()? != bytes {
+        return Err("owner record changed during recovery; workspace preserved".into());
+    }
+    Ok(bytes)
+}
+
 pub use ui_guard::{mark_ui_thread, refused_on_ui_thread};
 
 /// Whether gitcraft has a connection open to `host` now: asking it something won't connect

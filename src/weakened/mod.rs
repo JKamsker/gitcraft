@@ -5,6 +5,8 @@
 //! Read from the diff alone, line by line, the same way every time: each flag says which line
 //! made it and why. Nothing is guessed from what the code does.
 
+pub mod display;
+
 mod ci;
 mod lines;
 mod load;
@@ -19,9 +21,6 @@ mod tests;
 
 pub use load::{Area, Scope, scan};
 use patch::{FilePatch, Hunk, Mark};
-
-/// The badge's label.
-pub const BADGE: &str = "weakens checks";
 
 /// Why a file or hunk weakens the checks.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -106,6 +105,7 @@ pub struct FileFlags {
 
 impl FileFlags {
     /// The whole list as a hover text: each reason once, then its evidence.
+    #[cfg(test)]
     pub fn summary(&self) -> String {
         summary(self.flags.iter())
     }

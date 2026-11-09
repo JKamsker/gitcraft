@@ -517,6 +517,7 @@ mod tests {
             link_dir: Some(dir),
             wait: std::time::Duration::from_secs(2),
             cancelled: std::sync::Arc::new(|| false),
+            run: None,
         };
         let paths = args(json!({"paths": ["a"]}));
         let e = (STAGE.run)(&ctx, &Args::new(&paths));

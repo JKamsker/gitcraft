@@ -3,7 +3,7 @@
 //! area shows is noted after each frame; going back or forward shows a place again through the
 //! same actions that opened it.
 
-use egui::{Key, PointerButton, Ui};
+use egui::{PointerButton, Ui};
 
 use super::nav_history::NavHistory;
 use super::{Action, DiffKey, RepoTab, WIP_HASH, file_view, short};
@@ -30,6 +30,8 @@ pub(crate) enum View {
     Pr(u64),
     /// The builds of a commit.
     Ci(String),
+    /// A view of the insights page.
+    Insights(super::insights::Kind),
 }
 
 impl View {
@@ -47,29 +49,50 @@ impl View {
     /// already (above a diff), so going to it means closing the diff.
     pub(super) fn label(&self, graph_shown: bool) -> String {
         match self {
-            View::Graph { .. } if graph_shown => "the graph without the diff".to_owned(),
+            View::Graph { .. } if graph_shown => crate::i18n::text("repo-core-2901").to_owned(),
             View::Graph {
                 selected: Some(hash),
-            } if hash == WIP_HASH => "the graph at the changes".to_owned(),
+            } if hash == WIP_HASH => crate::i18n::text("repo-core-2902").to_owned(),
             View::Graph {
                 selected: Some(hash),
-            } => format!("the graph at {}", short(hash)),
-            View::Graph { selected: None } => "the graph".to_owned(),
+            } => crate::i18n::message(
+                "repo-core-2903",
+                &[("hash", short(hash).to_string().into())],
+            ),
+            View::Graph { selected: None } => crate::i18n::text("repo-core-2904").to_owned(),
             View::Diff { key, .. } => diff_label(key),
             View::File { path, rev, tab } => {
                 let what = match tab {
-                    file_view::FileTab::History => "the history",
-                    file_view::FileTab::Blame => "the blame",
-                    file_view::FileTab::File => "the contents",
+                    file_view::FileTab::History => crate::i18n::text("repo-core-2905"),
+                    file_view::FileTab::Blame => crate::i18n::text("repo-core-2512"),
+                    file_view::FileTab::File => crate::i18n::text("repo-core-2906"),
                 };
                 let at = rev
                     .as_deref()
-                    .map(|r| format!(" at {}", short(r)))
+                    .map(|r| {
+                        crate::i18n::message(
+                            "repo-core-2907",
+                            &[("r", short(r).to_string().into())],
+                        )
+                    })
                     .unwrap_or_default();
-                format!("{what} of {}{at}", file_name(path))
+                crate::i18n::message(
+                    "repo-core-2908",
+                    &[
+                        ("what", what.to_string().into()),
+                        ("path", file_name(path).to_string().into()),
+                        ("at", at.to_string().into()),
+                    ],
+                )
             }
-            View::Pr(number) => format!("pull request #{number}"),
-            View::Ci(sha) => format!("the builds of {}", short(sha)),
+            View::Pr(number) => crate::i18n::message(
+                "repo-core-2909",
+                &[("number", format!("{}", number).into())],
+            ),
+            View::Ci(sha) => {
+                crate::i18n::message("repo-core-2910", &[("sha", short(sha).to_string().into())])
+            }
+            View::Insights(kind) => format!("insights: {}", kind.title().to_lowercase()),
         }
     }
 }
@@ -78,20 +101,51 @@ impl View {
 fn diff_label(key: &DiffKey) -> String {
     let name = file_name(key.path());
     match key {
-        DiffKey::Remerge { hash, .. } => format!("{name}, resolution of {}", short(hash)),
-        DiffKey::Commit { hash, .. } => format!("{name} in {}", short(hash)),
+        DiffKey::Remerge { hash, .. } => crate::i18n::message(
+            "repo-core-2911",
+            &[
+                ("name", name.to_string().into()),
+                ("hash", short(hash).to_string().into()),
+            ],
+        ),
+        DiffKey::Commit { hash, .. } => crate::i18n::message(
+            "repo-core-2912",
+            &[
+                ("name", name.to_string().into()),
+                ("hash", short(hash).to_string().into()),
+            ],
+        ),
         DiffKey::Work(file) => match file.area {
-            Area::Unstaged => format!("the unstaged changes of {name}"),
-            Area::Staged => format!("the staged changes of {name}"),
-            Area::Conflicted => format!("the conflict in {name}"),
-            Area::Untracked => format!("the new file {name}"),
+            Area::Unstaged => {
+                crate::i18n::message("repo-core-2913", &[("name", name.to_string().into())])
+            }
+            Area::Staged => {
+                crate::i18n::message("repo-core-2914", &[("name", name.to_string().into())])
+            }
+            Area::Conflicted => {
+                crate::i18n::message("repo-core-2915", &[("name", name.to_string().into())])
+            }
+            Area::Untracked => {
+                crate::i18n::message("repo-core-2916", &[("name", name.to_string().into())])
+            }
         },
         DiffKey::Range {
             from, to: Some(to), ..
-        } => format!("{name} from {} to {}", short(from), short(to)),
-        DiffKey::Range { from, to: None, .. } => {
-            format!("{name} from {} to the working tree", short(from))
-        }
+        } => crate::i18n::message(
+            "repo-core-2917",
+            &[
+                ("name", name.to_string().into()),
+                ("from", short(from).to_string().into()),
+                ("to", short(to).to_string().into()),
+            ],
+        ),
+        DiffKey::Range { from, to: None, .. } => crate::i18n::message(
+            "repo-core-2918",
+            &[
+                ("name", name.to_string().into()),
+                ("from", short(from).to_string().into()),
+            ],
+        ),
     }
 }
 
@@ -99,10 +153,18 @@ fn diff_label(key: &DiffKey) -> String {
 fn gone_change(file: &git::StatusFile) -> String {
     let path = &file.path;
     match file.area {
-        Area::Unstaged => format!("{path} has no unstaged changes any more"),
-        Area::Staged => format!("{path} has no staged changes any more"),
-        Area::Conflicted => format!("{path} is no longer conflicted"),
-        Area::Untracked => format!("{path} is no longer a new file"),
+        Area::Unstaged => {
+            crate::i18n::message("repo-core-2919", &[("path", path.to_string().into())])
+        }
+        Area::Staged => {
+            crate::i18n::message("repo-core-2920", &[("path", path.to_string().into())])
+        }
+        Area::Conflicted => {
+            crate::i18n::message("repo-core-2921", &[("path", path.to_string().into())])
+        }
+        Area::Untracked => {
+            crate::i18n::message("repo-core-2922", &[("path", path.to_string().into())])
+        }
     }
 }
 
@@ -123,16 +185,21 @@ pub(super) fn record(history: &mut NavHistory<View>, view: View, jump: bool) {
     }
 }
 
-/// Alt+← or the mouse's back button (`-1`), Alt+→ or its forward button (`1`). `keys`: the
-/// keyboard is free (no text field has it), else only the mouse buttons count, as Alt+← and
-/// Alt+→ move by words in a text field.
-pub(super) fn nav_step(i: &egui::InputState, keys: bool) -> Option<i32> {
-    let alt = keys && i.modifiers.alt && !i.modifiers.command && !i.modifiers.shift;
-    if (alt && i.key_pressed(Key::ArrowLeft)) || i.pointer.button_pressed(PointerButton::Extra1) {
+/// Mouse navigation remains available while a text editor owns its keyboard shortcuts.
+pub(super) fn nav_step(i: &egui::InputState) -> Option<i32> {
+    if i.pointer.button_pressed(PointerButton::Extra1) {
         Some(-1)
-    } else if (alt && i.key_pressed(Key::ArrowRight))
-        || i.pointer.button_pressed(PointerButton::Extra2)
-    {
+    } else if i.pointer.button_pressed(PointerButton::Extra2) {
+        Some(1)
+    } else {
+        None
+    }
+}
+
+pub(super) fn keyboard_step(ctx: &egui::Context, free: bool) -> Option<i32> {
+    if free && crate::keymap::take(ctx, crate::keymap::Command::Back) {
+        Some(-1)
+    } else if free && crate::keymap::take(ctx, crate::keymap::Command::Forward) {
         Some(1)
     } else {
         None
@@ -143,7 +210,7 @@ impl RepoTab {
     /// What the big area shows now, as a place to come back to. `None` while an editor (the
     /// conflict editor, the interactive rebase) takes it: those are not places of the history.
     pub(super) fn current_view(&self) -> Option<View> {
-        if self.conflict.is_some() || self.rebase.is_some() {
+        if self.tour.is_some() || self.conflict.is_some() || self.rebase.is_some() {
             return None;
         }
         if let Some(diff) = self.diff.as_ref().filter(|_| !self.history_beside_diff()) {
@@ -175,6 +242,9 @@ impl RepoTab {
         if let Some(pr) = &self.pr_view {
             return Some(View::Pr(pr.number));
         }
+        if let Some(insights) = &self.insights {
+            return Some(View::Insights(insights.kind));
+        }
         Some(View::Graph {
             selected: self.selected_hash(),
         })
@@ -192,7 +262,10 @@ impl RepoTab {
     /// change since staged or committed) are passed over, and said so.
     pub(super) fn navigate(&mut self, step: i32, ctx: &egui::Context) {
         if let Some(editor) = self.navigation_editor_open() {
-            self.status = Some((format!("Finish or close the {editor} first"), true));
+            self.status = Some(crate::repo::Notice::plain((
+                crate::i18n::message("repo-core-2923", &[("editor", editor.to_string().into())]),
+                true,
+            )));
             return;
         }
         let mut passed = None;
@@ -209,7 +282,7 @@ impl RepoTab {
             }
         };
         if let Some(why) = passed {
-            self.status = Some((why, false));
+            self.status = Some(crate::repo::Notice::plain((why, false)));
         }
         if let Some(view) = view {
             self.restore_navigation(&view, ctx);
@@ -226,11 +299,11 @@ impl RepoTab {
     /// message being edited in the commit pane.
     fn navigation_editor_open(&self) -> Option<&'static str> {
         if self.conflict.is_some() {
-            Some("conflict editor")
+            Some(crate::i18n::text("repo-core-2924"))
         } else if self.rebase.is_some() {
-            Some("interactive rebase")
+            Some(crate::i18n::text("repo-core-2925"))
         } else if self.reword.is_some() {
-            Some("commit message being edited")
+            Some(crate::i18n::text("repo-core-2926"))
         } else {
             None
         }
@@ -274,9 +347,11 @@ impl RepoTab {
 
     /// Shows `view` again through the actions that open it.
     fn restore_navigation(&mut self, view: &View, ctx: &egui::Context) {
+        self.tour = None;
         match view {
             View::Graph { selected } => {
                 self.close_pages(true, ctx);
+                self.insights = None;
                 if self.diff.is_some() {
                     self.apply(Action::CloseDiff, ctx);
                 }
@@ -334,6 +409,16 @@ impl RepoTab {
                     );
                 }
             }
+            View::Insights(kind) => {
+                self.close_pages(true, ctx);
+                if self.diff.is_some() {
+                    self.apply(Action::CloseDiff, ctx);
+                }
+                self.apply(
+                    Action::Insights(super::insights::InsightsAct::Open(*kind)),
+                    ctx,
+                );
+            }
         }
     }
 
@@ -348,10 +433,13 @@ impl RepoTab {
         } else if self.history_index.contains_key(hash) || self.has_more {
             self.goto(hash, ctx);
         } else {
-            self.status = Some((
-                format!("Commit {} is no longer in the graph", short(hash)),
+            self.status = Some(crate::repo::Notice::plain((
+                crate::i18n::message(
+                    "repo-core-2927",
+                    &[("hash", short(hash).to_string().into())],
+                ),
                 false,
-            ));
+            )));
         }
     }
 
@@ -360,8 +448,8 @@ impl RepoTab {
         if self.dialog.is_some() || self.keys_blocked {
             return;
         }
-        let keys = !ctx.egui_wants_keyboard_input();
-        if let Some(step) = ctx.input(|i| nav_step(i, keys)) {
+        let keys = !ctx.egui_wants_keyboard_input() && !crate::a11y::keyboard_taken(ctx);
+        if let Some(step) = keyboard_step(ctx, keys).or_else(|| ctx.input(nav_step)) {
             acts.push(Action::Navigate(step));
         }
     }
@@ -370,14 +458,38 @@ impl RepoTab {
     /// toolbar is full at the window's narrowest.
     pub(super) fn nav_buttons(&self, ui: &mut Ui, acts: &mut Vec<Action>) {
         let graph_shown = self.diff_beside_graph(ui.ctx());
-        for (step, icon, name, keys) in [
-            (-1, "arrow-left", "Back", "Alt+←"),
-            (1, "arrow-right", "Forward", "Alt+→"),
+        for (step, icon, name, command) in [
+            (
+                -1,
+                "arrow-left",
+                crate::i18n::text("repo-core-2929"),
+                crate::keymap::Command::Back,
+            ),
+            (
+                1,
+                "arrow-right",
+                crate::i18n::text("repo-core-2930"),
+                crate::keymap::Command::Forward,
+            ),
         ] {
+            let keys = crate::keymap::label(ui.ctx(), command);
             let target = self.nav.peek(step);
             let tip = match target {
-                Some(view) => format!("{name} to {} ({keys})", view.label(graph_shown)),
-                None => format!("Nothing to go {} to ({keys})", name.to_lowercase()),
+                Some(view) => crate::i18n::message(
+                    "repo-core-2931",
+                    &[
+                        ("name", name.to_string().into()),
+                        ("graph-shown", view.label(graph_shown).to_string().into()),
+                        ("keys", keys.to_string().into()),
+                    ],
+                ),
+                None => crate::i18n::message(
+                    "repo-core-2932",
+                    &[
+                        ("to-lowercase", name.to_lowercase().to_string().into()),
+                        ("keys", keys.to_string().into()),
+                    ],
+                ),
             };
             let button =
                 ui.add_enabled_ui(target.is_some(), |ui| icons::small_button(ui, icon, &tip));

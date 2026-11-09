@@ -3,6 +3,7 @@
 use std::path::Path;
 
 use super::super::{END_OPTS, run, run_ok_codes};
+use super::Failure;
 use super::picks::parse_merge_tree;
 use super::{Engine, GitVersion, commit_oid, is_oid, scratch};
 
@@ -18,7 +19,12 @@ pub struct Merge {
 }
 
 /// Merging `theirs` into `ours`, as `git merge` would (both commits).
-pub fn merge(repo: &Path, ours: &str, theirs: &str, version: GitVersion) -> Result<Merge, String> {
+pub(crate) fn merge_with_witness(
+    repo: &Path,
+    ours: &str,
+    theirs: &str,
+    version: GitVersion,
+) -> Result<Merge, Failure> {
     // Names may mean something else (or nothing) in a scratch clone: their commits don't.
     let (ours, theirs) = (&commit_oid(repo, ours)?, &commit_oid(repo, theirs)?);
     super::not_partial(repo)?;
@@ -62,15 +68,38 @@ fn literal_pattern(name: &str) -> String {
 /// too) go from the commits `old` to `new` (`git rev-list old --not new`, and not the other
 /// refs either), newest first, at most `limit`. Stashes and other worktrees' checkouts keep
 /// their commits.
-pub fn unreachable(
+pub(crate) fn unreachable_with_witness(
     repo: &Path,
     old: &[String],
     new: &[String],
     moved: &[String],
     limit: usize,
-) -> Result<Vec<String>, String> {
+) -> Result<Vec<String>, Failure> {
+    let args = unreachable_args(old, new, moved, limit)?;
+    if old.is_empty() {
+        return Ok(Vec::new());
+    }
+    Ok(run(
+        Some(repo),
+        &args.iter().map(String::as_str).collect::<Vec<_>>(),
+    )?
+    .lines()
+    .map(str::trim)
+    .filter(|s| !s.is_empty())
+    .map(str::to_owned)
+    .collect())
+}
+
+fn unreachable_args(
+    old: &[String],
+    new: &[String],
+    moved: &[String],
+    limit: usize,
+) -> Result<Vec<String>, Failure> {
     if let Some(bad) = old.iter().chain(new).find(|h| !is_oid(h)) {
-        return Err(format!("{bad} is not a commit id"));
+        return Err(Failure::InvalidCommitId {
+            bad: bad.to_owned(),
+        });
     }
     if old.is_empty() {
         return Ok(Vec::new());
@@ -86,18 +115,51 @@ pub fn unreachable(
     args.extend(["--all", "--not", END_OPTS]);
     args.extend(old.iter().map(String::as_str));
     args.extend(negated.iter().map(String::as_str));
-    Ok(run(Some(repo), &args)?
+    Ok(args.into_iter().map(str::to_owned).collect())
+}
+
+pub(crate) fn unreachable_bounded_with_witness(
+    reader: &super::super::investigations::Reader<'_>,
+    old: &[String],
+    new: &[String],
+    moved: &[String],
+    limit: usize,
+) -> Result<Vec<String>, Failure> {
+    let args = unreachable_args(old, new, moved, limit)?;
+    if args.is_empty() {
+        return Ok(Vec::new());
+    }
+    let bytes = reader.run(
+        &args.iter().map(String::as_str).collect::<Vec<_>>(),
+        vec![],
+        &[0],
+    )?;
+    let text = std::str::from_utf8(&bytes).map_err(|_| Failure::InvalidReachability)?;
+    let hashes: Vec<_> = text
         .lines()
-        .map(|l| l.trim().to_owned())
-        .filter(|l| !l.is_empty())
-        .collect())
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_owned)
+        .collect();
+    if hashes.len() > limit || hashes.iter().any(|s| !is_oid(s)) {
+        return Err(Failure::InvalidReachability);
+    }
+    Ok(hashes)
 }
 
 /// The commits `old` has that `new` hasn't (`git rev-list old --not new`), newest first, at
 /// most `limit`: what leaves a branch that moves from `old` to `new`, wherever else they are.
-pub fn leaving(repo: &Path, old: &str, new: &str, limit: usize) -> Result<Vec<String>, String> {
+pub(crate) fn leaving_with_witness(
+    repo: &Path,
+    old: &str,
+    new: &str,
+    limit: usize,
+) -> Result<Vec<String>, Failure> {
     if !is_oid(old) || !is_oid(new) {
-        return Err(format!("{old} or {new} is not a commit id"));
+        return Err(Failure::InvalidCommitPair {
+            old: old.to_owned(),
+            new: new.to_owned(),
+        });
     }
     let max = format!("--max-count={limit}");
     Ok(run(
@@ -119,6 +181,26 @@ pub fn is_ancestor(repo: &Path, ancestor: &str, descendant: &str) -> bool {
             &["merge-base", "--is-ancestor", ancestor, descendant],
         )
         .is_ok()
+}
+
+/// Compatibility String interface; cached previews retain the typed witness instead.
+#[cfg(test)]
+pub fn merge(repo: &Path, ours: &str, theirs: &str, version: GitVersion) -> Result<Merge, String> {
+    merge_with_witness(repo, ours, theirs, version).map_err(|failure| failure.display())
+}
+#[cfg(test)]
+pub fn unreachable(
+    repo: &Path,
+    old: &[String],
+    new: &[String],
+    moved: &[String],
+    limit: usize,
+) -> Result<Vec<String>, String> {
+    unreachable_with_witness(repo, old, new, moved, limit).map_err(|failure| failure.display())
+}
+#[cfg(test)]
+pub fn leaving(repo: &Path, old: &str, new: &str, limit: usize) -> Result<Vec<String>, String> {
+    leaving_with_witness(repo, old, new, limit).map_err(|failure| failure.display())
 }
 
 #[cfg(test)]

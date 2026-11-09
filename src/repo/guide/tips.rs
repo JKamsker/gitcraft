@@ -37,10 +37,15 @@ pub(crate) fn candidates<'a>(points: impl IntoIterator<Item = &'a str>) -> Vec<S
         .collect()
 }
 
-/// The manual's tips, made once.
+/// The selected manual tips, made once per supported language.
 pub(crate) fn manual_tips() -> &'static [String] {
-    static TIPS: OnceLock<Vec<String>> = OnceLock::new();
-    TIPS.get_or_init(|| candidates(crate::manual::tips().iter().copied()))
+    static ENGLISH: OnceLock<Vec<String>> = OnceLock::new();
+    static GERMAN: OnceLock<Vec<String>> = OnceLock::new();
+    let tips = match crate::i18n::language() {
+        crate::i18n::Language::English => &ENGLISH,
+        crate::i18n::Language::German => &GERMAN,
+    };
+    tips.get_or_init(|| candidates(crate::manual::tips().iter().copied()))
 }
 
 /// The tip for `seed`: the same one for the same seed, the next one for the next seed.
@@ -64,6 +69,26 @@ pub(crate) fn day_seed(now: SystemTime) -> u64 {
 mod tests {
     use super::*;
     use std::time::Duration;
+
+    #[test]
+    fn fluent_partition_manual_tip_caches_follow_language_without_changing_day_or_fit() {
+        crate::i18n::set_language("en-US");
+        let english = manual_tips();
+        assert!(!english.is_empty());
+        crate::i18n::set_language("de");
+        let german = manual_tips();
+        assert!(!german.is_empty());
+        assert_ne!(english.as_ptr(), german.as_ptr());
+        assert_eq!(manual_tips().as_ptr(), german.as_ptr());
+        crate::i18n::set_language("en-US");
+        assert_eq!(manual_tips().as_ptr(), english.as_ptr());
+        assert_eq!(pick(english, 20_000), pick(manual_tips(), 20_000));
+        assert_eq!(day_seed(UNIX_EPOCH + Duration::from_secs(86_400)), 1);
+        assert_eq!(
+            fit("First sentence. Another sentence.", 16).as_deref(),
+            Some("First sentence.")
+        );
+    }
 
     #[test]
     fn a_short_point_is_kept_whole() {

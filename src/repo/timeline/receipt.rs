@@ -128,25 +128,33 @@ impl Receipt {
     /// signatures replaced".
     pub(crate) fn sentence(&self) -> String {
         let mut parts = vec![if self.same_files {
-            "final files identical".to_owned()
+            crate::i18n::text("repo-workflows-timeline-sentence-31b36481").to_owned()
         } else {
-            "final files differ".to_owned()
+            crate::i18n::text("repo-workflows-timeline-sentence-99e79f74").to_owned()
         }];
         if self.unpaired {
-            parts.push("too many commits to follow one by one".to_owned());
+            parts.push(crate::i18n::text("repo-workflows-timeline-sentence-4a61e684").to_owned());
             return capitalised(&parts.join(", "));
         }
         let c = self.counts();
         let paired = c.same + c.changed > 0;
         match c.authors_changed {
-            0 if paired => parts.push("authors kept".to_owned()),
+            0 if paired => parts
+                .push(crate::i18n::text("repo-workflows-timeline-sentence-d30ebcc6").to_owned()),
             0 => {}
-            n => parts.push(format!("{} changed", plural(n, "author", "authors"))),
+            n => parts.push(crate::i18n::message(
+                "repo-workflows-timeline-authors-changed",
+                &[("count", (n).into())],
+            )),
         }
         match c.messages_changed {
-            0 if c.same + c.changed > 0 => parts.push("messages kept".to_owned()),
+            0 if c.same + c.changed > 0 => parts
+                .push(crate::i18n::text("repo-workflows-timeline-sentence-360c0cec").to_owned()),
             0 => {}
-            n => parts.push(format!("{} changed", plural(n, "message", "messages"))),
+            n => parts.push(crate::i18n::message(
+                "repo-workflows-timeline-messages-changed",
+                &[("count", (n).into())],
+            )),
         }
         if let Some(signatures) = signatures(&c) {
             parts.push(signatures);
@@ -154,7 +162,10 @@ impl Receipt {
         let old = c.same + c.changed + c.dropped;
         let new = c.same + c.changed + c.added;
         if old != new {
-            parts.push(format!("{old} commits → {new}"));
+            parts.push(crate::i18n::message(
+                "repo-workflows-timeline-sentence-b5ea0271",
+                &[("old", (old).into()), ("new", (new).into())],
+            ));
         }
         capitalised(&parts.join(", "))
     }
@@ -165,19 +176,23 @@ fn signatures(c: &Counts) -> Option<String> {
     let (before, after) = (c.signed_before, c.signed_after);
     match (before, after) {
         (0, 0) => None,
-        (0, n) => Some(format!("{} now signed", plural(n, "commit", "commits"))),
-        (n, 0) => Some(format!("{} dropped", plural(n, "signature", "signatures"))),
-        (b, a) if a < b => Some(format!("signatures replaced, {} dropped", b - a)),
-        (b, a) if a > b => Some(format!("signatures replaced, {} more signed", a - b)),
-        _ => Some("signatures replaced".to_owned()),
-    }
-}
-
-fn plural(n: usize, one: &str, many: &str) -> String {
-    if n == 1 {
-        format!("1 {one}")
-    } else {
-        format!("{n} {many}")
+        (0, n) => Some(crate::i18n::message(
+            "repo-workflows-timeline-commits-signed",
+            &[("count", (n).into())],
+        )),
+        (n, 0) => Some(crate::i18n::message(
+            "repo-workflows-timeline-signatures-dropped",
+            &[("count", (n).into())],
+        )),
+        (b, a) if a < b => Some(crate::i18n::message(
+            "repo-workflows-timeline-signatures-b59d95ba",
+            &[("b-a-1", (b - a).into())],
+        )),
+        (b, a) if a > b => Some(crate::i18n::message(
+            "repo-workflows-timeline-signatures-33c87627",
+            &[("a-b-1", (a - b).into())],
+        )),
+        _ => Some(crate::i18n::text("repo-workflows-timeline-signatures-aa14a1ba").to_owned()),
     }
 }
 
@@ -504,4 +519,49 @@ pub(crate) fn parse_raw(out: &str) -> Vec<Commit> {
         c.message = c.message.trim_end().to_owned();
     }
     list
+}
+
+#[cfg(test)]
+mod fluent_receipt_tests {
+    use super::*;
+    #[test]
+    fn fluent_partition_actual_receipt_sentence_localizes_counts_and_keeps_reflog_identity() {
+        let receipt = Receipt {
+            branch: "Kunde/ü".into(),
+            old_tip: "a".repeat(40),
+            new_tip: "b".repeat(40),
+            same_files: true,
+            unpaired: false,
+            pairs: vec![
+                Pair {
+                    kind: PairKind::Same,
+                    old: Some(Commit {
+                        author: "Raw Author <raw@example.test>".into(),
+                        ..Commit::default()
+                    }),
+                    new: Some(Commit {
+                        author: "Raw Author <raw@example.test>".into(),
+                        signed: true,
+                        ..Commit::default()
+                    }),
+                    message_changed: false
+                };
+                1234
+            ],
+        };
+        for (lang, expected) in [
+            ("en-US", "1,234 commits now signed"),
+            ("de", "1.234 Commits jetzt signiert"),
+        ] {
+            crate::i18n::set_language(lang);
+            let sentence = receipt.sentence();
+            assert!(sentence.contains(expected), "{sentence}");
+            assert_eq!(
+                super::super::observe::describe_reflog("commit (amend): Raw subject"),
+                "Amend “Raw subject”"
+            );
+            assert_eq!(receipt.branch, "Kunde/ü");
+            assert_eq!(receipt.counts().signed_after, 1234);
+        }
+    }
 }

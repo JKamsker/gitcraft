@@ -121,17 +121,22 @@ impl CiView {
 impl RepoTab {
     /// Shows the builds of commit `sha` in the big area, run `run` first if it's given.
     pub(super) fn open_ci(&mut self, sha: String, run: Option<u64>, ctx: &egui::Context) {
+        self.local_ci_context_default();
         if self.conflict.is_some() || self.rebase.is_some() {
             let editor = if self.conflict.is_some() {
-                "conflict editor"
+                crate::i18n::text("repo-workflows-ci_view-open-ci-d509b2ee")
             } else {
-                "interactive rebase"
+                crate::i18n::text("repo-workflows-ci_view-open-ci-680d5c5f")
             };
-            self.status = Some((format!("Finish or close the {editor} first"), true));
+            self.status = Some(crate::repo::Notice::plain((
+                format!("Finish or close the {editor} first"),
+                true,
+            )));
             return;
         }
         self.diff = None;
         self.file_view = None;
+        self.tour = None;
         self.ci_view = Some(CiView {
             sha,
             request: 0,
@@ -163,7 +168,10 @@ impl RepoTab {
         view.next = None;
         if projects.is_empty() {
             view.loading = false;
-            view.runs = Some(Err("This repository isn't on GitHub or GitLab.".to_owned()));
+            view.runs = Some(Err(crate::i18n::text(
+                "repo-workflows-ci_view-load-ci-view-4c1d2d4e",
+            )
+            .to_owned()));
             return;
         };
         view.request = next_request();
@@ -283,10 +291,10 @@ impl RepoTab {
 
     /// A re-run or a cancel went through, or didn't.
     pub(super) fn ci_acted(&mut self, label: String, result: Result<(), String>) {
-        self.status = Some(match result {
+        self.status = Some(crate::repo::Notice::plain(match result {
             Ok(()) => (label, false),
             Err(e) => (format!("{label}: {e}"), true),
-        });
+        }));
         if let Some(view) = &mut self.ci_view {
             view.acting = false;
             view.next = Some(Instant::now() + AFTER_ACTING);
@@ -341,10 +349,19 @@ impl RepoTab {
                     let what = format!("{} #{}", run.name, run.number);
                     let (label, result) = if rerun {
                         let result = ci::rerun_failed(&path, &project, run.id);
-                        (format!("Re-ran the failed jobs of {what}"), result)
+                        (
+                            crate::i18n::message(
+                                "repo-workflows-ci_view-ci-act-da60943b",
+                                &[("what", (what).clone().into())],
+                            ),
+                            result,
+                        )
                     } else {
                         (
-                            format!("Cancelled {what}"),
+                            crate::i18n::message(
+                                "repo-workflows-ci_view-ci-act-07fe25a7",
+                                &[("what", (what).clone().into())],
+                            ),
                             ci::cancel(&path, &project, run.id),
                         )
                     };

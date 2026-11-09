@@ -7,22 +7,32 @@
 //! - [`workspace`] and [`runner`]: the worktrees on that machine, and the tests run there;
 //! - [`cache`]: answers by tree, so that no tree is tested twice.
 
+pub(crate) mod bundle;
 mod cache;
 mod dag;
+pub(crate) mod display;
 mod machine;
+pub(crate) mod observe;
+pub(crate) mod presentation;
 mod runner;
 mod search;
 mod session;
 mod verdict;
 mod workspace;
+#[cfg(test)]
+pub(crate) use workspace::{close_finished, supplied_transfer};
 
 #[cfg(test)]
 mod tests;
 
 pub use cache::TreeCache;
 pub use machine::Machine;
-pub(crate) use session::shutdown;
-pub use session::{Event, Handle, Outcome, Setup, start};
+#[cfg(test)]
+pub use session::start;
+pub use session::{Event, Handle, Outcome, Setup};
+#[cfg(test)]
+pub(crate) use session::{cleanup_warning, done_with_presentation};
+pub(crate) use session::{shutdown, start_with_presentation};
 pub use verdict::Verdict;
 
 /// The most commits tested at once.
@@ -44,7 +54,15 @@ pub(crate) fn short(hash: &str) -> &str {
 /// worktrees, its folder): when a tab opens on it. A bisect running there (in this window or
 /// another) is left alone.
 pub fn clear_leftovers(repo: std::path::PathBuf) {
-    std::thread::spawn(move || {
-        workspace::clear_leftovers(&repo);
-    });
+    let Ok(pool) = crate::tasks::pool() else {
+        return;
+    };
+    // Shared workers propagate cancellation to every nested process operation and are
+    // joined before process/remote services shut down. A full queue preserves leftovers.
+    let _ = pool.submit(
+        crate::tasks::cancellation().child(),
+        crate::tasks::Priority::Background,
+        Some(repo.clone()),
+        Box::new(move || workspace::clear_leftovers(&repo)),
+    );
 }

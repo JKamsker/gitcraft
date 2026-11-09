@@ -579,3 +579,49 @@ fn commands_round_trip_through_the_settings() -> Result<(), String> {
     assert_eq!(back.trusted_command_files, settings.trusted_command_files);
     Ok(())
 }
+
+#[test]
+fn german_validation_display_keeps_raw_errors_and_eligibility_stable() -> Result<(), String> {
+    crate::i18n::set_language("de");
+    let mut c = command("X", "echo \"$A\"");
+    c.prompts = vec![
+        Prompt {
+            variable: "A".into(),
+            ..Prompt::default()
+        };
+        2
+    ];
+    let raw = c.problem().ok_or("missing test value")?;
+    assert_eq!(raw, "$A is asked for twice");
+    assert_eq!(display_problem(&raw), "$A wird zweimal abgefragt");
+    assert_eq!(c.problem().as_deref(), Some("$A is asked for twice"));
+    assert!(offered_at(Placement::Commit, &[c], &[]).next().is_none());
+    for (variable, expected) in [
+        ("SHA", "$SHA wird bereits von gitcraft gesetzt"),
+        (
+            "PATH",
+            "$PATH wird von der Shell oder Git verwendet; wähle einen anderen Namen",
+        ),
+        (
+            "bad name",
+            "„bad name“ ist kein Variablenname: Großbuchstaben, Ziffern und _, beginnend mit einem Buchstaben",
+        ),
+    ] {
+        let raw = variable_error(variable).ok_or("missing test value")?;
+        assert_eq!(display_problem(&raw), expected);
+        assert_eq!(variable_error(variable).as_deref(), Some(raw.as_str()));
+    }
+    assert_eq!(
+        display_problem("unknown provider failure 日本語"),
+        "unknown provider failure 日本語"
+    );
+    assert_eq!(BUILT_IN[1], ("SHORT_SHA", "its first 8 characters"));
+    assert_eq!(
+        variable_description(BUILT_IN[1].0, BUILT_IN[1].1),
+        "die ersten 8 Zeichen davon"
+    );
+    crate::i18n::set_language("en-US");
+    assert_eq!(display_problem(&raw), raw);
+
+    Ok(())
+}

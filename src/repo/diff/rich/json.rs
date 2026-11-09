@@ -23,14 +23,20 @@ pub fn parse(text: &str) -> Result<Node, String> {
     let node = r.value()?;
     r.space()?;
     if r.pos < r.text.len() {
-        return Err(r.error("more after the end of the document"));
+        return Err(r.error(crate::i18n::text("repo-core-2182")));
     }
     Ok(node)
 }
 
 impl Reader<'_> {
     fn error(&self, what: &str) -> String {
-        format!("line {}: {what}", self.line)
+        crate::i18n::message(
+            "repo-core-2183",
+            &[
+                ("line", format!("{}", self.line).into()),
+                ("what", what.to_string().into()),
+            ],
+        )
     }
 
     fn peek(&self) -> Option<u8> {
@@ -60,7 +66,7 @@ impl Reader<'_> {
                 }
                 Some(b'/') if self.text[self.pos..].starts_with("/*") => {
                     let Some(end) = self.text[self.pos + 2..].find("*/") else {
-                        return Err(self.error("a comment that never ends"));
+                        return Err(self.error(crate::i18n::text("repo-core-2184")));
                     };
                     let stop = self.pos + 2 + end + 2;
                     while self.pos < stop {
@@ -77,7 +83,10 @@ impl Reader<'_> {
             self.bump();
             Ok(())
         } else {
-            Err(self.error(&format!("expected `{}`", b as char)))
+            Err(self.error(&crate::i18n::message(
+                "repo-core-2185",
+                &[("char", format!("{}", b as char).into())],
+            )))
         }
     }
 
@@ -93,15 +102,18 @@ impl Reader<'_> {
             Some(b'f') => self.word("false", Ty::Bool),
             Some(b'n') => self.word("null", Ty::Null),
             Some(b'-' | b'0'..=b'9') => self.number(),
-            Some(_) => Err(self.error("expected a value")),
-            None => Err(self.error("the document ends where a value should be")),
+            Some(_) => Err(self.error(crate::i18n::text("repo-core-2186"))),
+            None => Err(self.error(crate::i18n::text("repo-core-2187"))),
         }
     }
 
     fn nested(&mut self, read: fn(&mut Self) -> Result<Node, String>) -> Result<Node, String> {
         self.depth += 1;
         if self.depth > MAX_DEPTH {
-            return Err(self.error(&format!("nested deeper than {MAX_DEPTH} levels")));
+            return Err(self.error(&crate::i18n::message(
+                "repo-core-2188",
+                &[("MAX-DEPTH", format!("{}", MAX_DEPTH).into())],
+            )));
         }
         let node = read(self);
         self.depth -= 1;
@@ -116,7 +128,7 @@ impl Reader<'_> {
                 ty,
             })
         } else {
-            Err(self.error("expected a value"))
+            Err(self.error(crate::i18n::text("repo-core-2186")))
         }
     }
 
@@ -138,7 +150,10 @@ impl Reader<'_> {
                 || text.ends_with('.')
                 || digits.starts_with('.'));
         if !strict || text.parse::<f64>().is_err() {
-            return Err(self.error(&format!("`{text}` isn't a number")));
+            return Err(self.error(&crate::i18n::message(
+                "repo-core-2191",
+                &[("text", text.to_string().into())],
+            )));
         }
         Ok(Node::Scalar {
             text: text.to_owned(),
@@ -152,7 +167,7 @@ impl Reader<'_> {
         loop {
             let rest = &self.text[self.pos..];
             let Some(at) = rest.find(|c: char| c == '"' || c == '\\' || c < ' ') else {
-                return Err(self.error("a string that never ends"));
+                return Err(self.error(crate::i18n::text("repo-core-2192")));
             };
             out.push_str(&rest[..at]);
             self.pos += at;
@@ -160,9 +175,7 @@ impl Reader<'_> {
                 Some(b'"') => return Ok(out),
                 Some(b'\\') => out.push(self.escape()?),
                 _ => {
-                    return Err(
-                        self.error("a control character (a line break, a tab) inside a string")
-                    );
+                    return Err(self.error(crate::i18n::text("repo-core-2193")));
                 }
             }
         }
@@ -195,7 +208,7 @@ impl Reader<'_> {
                     char::from_u32(hi).unwrap_or(char::REPLACEMENT_CHARACTER)
                 }
             }
-            _ => return Err(self.error("an unknown escape in a string")),
+            _ => return Err(self.error(crate::i18n::text("repo-core-2195"))),
         };
         Ok(c)
     }
@@ -208,7 +221,7 @@ impl Reader<'_> {
                 self.pos += 4;
                 Ok(v)
             }
-            _ => Err(self.error("a `\\u` escape without four hex digits")),
+            _ => Err(self.error(crate::i18n::text("repo-core-2196"))),
         }
     }
 
@@ -223,7 +236,7 @@ impl Reader<'_> {
             }
             let line = self.line;
             if self.peek() != Some(b'"') {
-                return Err(self.error("expected a key in quotes or `}`"));
+                return Err(self.error(crate::i18n::text("repo-core-2197")));
             }
             let key = self.string()?;
             self.space()?;
@@ -237,7 +250,7 @@ impl Reader<'_> {
                     self.bump();
                 }
                 Some(b'}') => {}
-                _ => return Err(self.error("expected `,` or `}`")),
+                _ => return Err(self.error(crate::i18n::text("repo-core-2198"))),
             }
         }
     }
@@ -260,7 +273,7 @@ impl Reader<'_> {
                     self.bump();
                 }
                 Some(b']') => {}
-                _ => return Err(self.error("expected `,` or `]`")),
+                _ => return Err(self.error(crate::i18n::text("repo-core-2199"))),
             }
         }
     }

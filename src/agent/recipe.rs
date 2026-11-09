@@ -10,6 +10,8 @@ use serde::{Deserialize, Serialize};
 
 use super::sh;
 
+mod display;
+
 /// The file of the repository's git folder the recipe is kept in.
 pub(crate) const FILE: &str = "worktree-setup.json";
 

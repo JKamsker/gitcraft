@@ -132,6 +132,18 @@ impl PreviewAsk {
         }
     }
 
+    /// Replaying the commits unique to this branch. IDs change even where patches survive.
+    pub fn rebase(branch: &str, head: &str, onto: &str, upstream: Option<String>) -> Self {
+        let range = Range::new(head, Some(onto));
+        Self {
+            leaving: Some(range.clone()),
+            rewritten: Some(range),
+            upstream,
+            moving: vec![branch_ref(branch)],
+            files: LostFiles::None,
+        }
+    }
+
     /// Discarding the changes to these files, or deleting them.
     pub fn files(paths: Vec<String>) -> Self {
         PreviewAsk {
@@ -297,9 +309,12 @@ fn count(repo: &Path, walk: &[String], revs: &[String]) -> Result<usize, String>
     args.extend(revs.iter().map(String::as_str));
     args.push("--");
     let out = run(Some(repo), &args)?;
-    out.trim()
-        .parse()
-        .map_err(|_| format!("git counted no commits: {}", out.trim()))
+    out.trim().parse().map_err(|_| {
+        crate::i18n::message(
+            "backend-git-counted-no-commits-e38477",
+            &[("detail", (out.trim()).to_string().into())],
+        )
+    })
 }
 
 /// The first `max` commits of `revs` (after `walk`), newest first.

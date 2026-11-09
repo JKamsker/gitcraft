@@ -21,35 +21,32 @@ impl Settings {
             ui,
             f,
             "Optional tools",
-            Some(
-                "Keep common branch and commit actions close at hand. Optional tools stay available \
-             in the command palette when hidden here; select a commit first to act on it.",
-            ),
+            Some(crate::i18n::text("dev-baseline-optional-tip")),
             |card| {
                 for (label, keywords, enabled, text) in [
                     (
                         "History / diagnostics",
                         "bisect parallel test commits",
                         &mut self.context_menus.diagnostics,
-                        "Show bisect and commit tests",
+                        crate::i18n::text("dev-baseline-optional-0"),
                     ),
                     (
                         "Commit surgery",
                         "rewrite split move changes",
                         &mut self.context_menus.surgery,
-                        "Show split and move changes",
+                        crate::i18n::text("dev-baseline-optional-1"),
                     ),
                     (
                         "Branch rehearsal",
                         "rehearse interaction merge rebase",
                         &mut self.context_menus.rehearsal,
-                        "Show rehearsal and interaction tools",
+                        crate::i18n::text("dev-baseline-optional-2"),
                     ),
                     (
                         "Releases",
                         "cut release tag publish",
                         &mut self.context_menus.release,
-                        "Show Cut release",
+                        crate::i18n::text("dev-baseline-optional-3"),
                     ),
                 ] {
                     card.row(label, keywords, |ui| {

@@ -43,7 +43,12 @@ fn flag(v: &Value, pointer: &str) -> bool {
 }
 
 fn items(json: &str) -> Result<Vec<Value>, String> {
-    let v: Value = serde_json::from_str(json).map_err(|e| format!("unexpected answer: {e}"))?;
+    let v: Value = serde_json::from_str(json).map_err(|e| {
+        crate::i18n::message(
+            "backend-unexpected-answer-e-f4b436",
+            &[("detail", (e).to_string().into())],
+        )
+    })?;
     Ok(v.as_array().cloned().unwrap_or_default())
 }
 
@@ -136,7 +141,12 @@ fn github_one(pr: &Value) -> ForkInfo {
 /// The workflow runs waiting for approval (GitHub's `actions/runs?status=action_required`):
 /// `(commit, run id)`.
 pub(crate) fn parse_waiting_runs(json: &str) -> Result<Vec<(String, u64)>, String> {
-    let v: Value = serde_json::from_str(json).map_err(|e| format!("unexpected answer: {e}"))?;
+    let v: Value = serde_json::from_str(json).map_err(|e| {
+        crate::i18n::message(
+            "backend-unexpected-answer-e-f4b436",
+            &[("detail", (e).to_string().into())],
+        )
+    })?;
     Ok(v.get("workflow_runs")
         .and_then(Value::as_array)
         .map(|runs| {
@@ -174,7 +184,12 @@ pub(crate) fn parse_gitlab(json: &str) -> Result<Vec<ForkInfo>, String> {
 
 /// Fills in the fork's place and clone URLs from GitLab's project (`projects/:id`).
 pub(crate) fn fill_gitlab_project(info: &mut ForkInfo, json: &str) -> Result<(), String> {
-    let v: Value = serde_json::from_str(json).map_err(|e| format!("unexpected answer: {e}"))?;
+    let v: Value = serde_json::from_str(json).map_err(|e| {
+        crate::i18n::message(
+            "backend-unexpected-answer-e-f4b436",
+            &[("detail", (e).to_string().into())],
+        )
+    })?;
     info.repo_path = at(&v, "/path_with_namespace").to_owned();
     info.clone_https = at(&v, "/http_url_to_repo").to_owned();
     info.clone_ssh = at(&v, "/ssh_url_to_repo").to_owned();

@@ -30,6 +30,20 @@ use crate::theme::{self, Tokens};
 
 impl RepoTab {
     pub(in crate::repo) fn diff_view(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
+        let locale_changed = self.diff.as_mut().is_some_and(|view| {
+            let generation = crate::i18n::generation();
+            if view.presentation_generation == generation {
+                return false;
+            }
+            view.presentation_generation = generation;
+            view.rich = None;
+            view.rich_state = Default::default();
+            true
+        });
+        if locale_changed {
+            self.refresh_diff(ui.ctx());
+            self.load_diff_rich(ui.ctx());
+        }
         let t = Tokens::get(ui.ctx());
         let settings = Settings::get(ui.ctx());
         if let Some(view) = &mut self.diff {
@@ -49,14 +63,17 @@ impl RepoTab {
         let idle = self.busy_op.is_none();
 
         let (path, origin) = self.diff_origin(&view.key);
-        let partial =
-            matches!(&view.data, Some(Ok(d)) if d.partial) && idle && !view.structural.enabled;
+        let partial = matches!(&view.data, Some(Ok(d)) if d.partial)
+            && idle
+            && !view.structural.enabled
+            && !view.encrypted.enabled;
         // Lines and hunks can be picked: to stage, unstage or discard, or to revert.
         // A stash's changes aren't a commit's to revert.
         let revert = self.stash_view.is_none();
         let pickable = matches!(&view.data, Some(Ok(d)) if d.partial || d.revertable && revert)
             && idle
-            && !view.structural.enabled;
+            && !view.structural.enabled
+            && !view.encrypted.enabled;
         let (split, ignore_ws, whole_file) = (
             settings.diff_split,
             self.diff_ignore_ws,
@@ -65,7 +82,7 @@ impl RepoTab {
         let as_file = self.diff_as_file;
         // A Markdown file can show rendered: `Some(whether it does)`.
         let markdown = view.key.renders().then_some(self.diff_rendered);
-        let folded = if as_file || markdown == Some(true) {
+        let folded = if as_file || markdown == Some(true) || view.encrypted.enabled {
             None
         } else {
             self.fold_reason(view, &settings, acts)
@@ -87,6 +104,53 @@ impl RepoTab {
             acts,
         );
 
+        if matches!(&view.data, Some(Ok(data)) if data.sops) {
+            ui.horizontal_wrapped(|ui| {
+                ui.label(crate::i18n::text("repo-core-2344"));
+                if view.lines.is_some() {
+                    ui.label(crate::i18n::text("repo-core-2345"));
+                }
+                let mut encoding = view.encrypted.json_encoding;
+                egui::ComboBox::from_id_salt("sops_json_encoding")
+                    .selected_text(encoding.label())
+                    .show_ui(ui, |ui| {
+                        use super::encrypted::JsonEncoding;
+                        for choice in [
+                            JsonEncoding::Ask,
+                            JsonEncoding::Document,
+                            JsonEncoding::Binary,
+                        ] {
+                            ui.selectable_value(&mut encoding, choice, choice.label());
+                        }
+                    });
+                if encoding != view.encrypted.json_encoding {
+                    acts.push(Action::DiffDecryptedEncoding(encoding));
+                }
+                if view.encrypted.enabled {
+                    if ui.button(crate::i18n::text("repo-core-2347")).clicked() {
+                        acts.push(Action::DiffDecrypted(false));
+                    }
+                } else if ui
+                    .add_enabled(
+                        idle && !self.loading && view.request == view.data_request,
+                        egui::Button::new(crate::i18n::text("repo-core-2348")),
+                    )
+                    .on_hover_text(crate::i18n::text("repo-core-2349"))
+                    .clicked()
+                {
+                    acts.push(Action::DiffDecrypted(true));
+                }
+            });
+        }
+        if view.encrypted.enabled {
+            if let Some(view) = &mut self.diff {
+                super::encrypted::show(ui, &mut view.encrypted);
+            }
+            return;
+        }
+        if let Some(what) = self.find_in() {
+            self.find.bar(ui, what.name());
+        }
         if markdown == Some(true) {
             let Some(view) = &mut self.diff else { return };
             match &view.rendered {
@@ -97,15 +161,43 @@ impl RepoTab {
                     ui.add_space(12.0);
                     ui.horizontal(|ui| {
                         ui.add_space(12.0);
-                        ui.colored_label(t.danger, e);
+                        ui.colored_label(
+                            t.danger,
+                            crate::git::display_error(&crate::forge::inbox::display_error(e)),
+                        );
                     });
                 }
-                Some(Ok(md)) => rendered::show(ui, &path, md, &mut view.markdown, !as_file),
+                Some(Ok(md)) => {
+                    if self.find.open {
+                        self.find.rendered(
+                            ui,
+                            format!(
+                                "markdown:{:?}:{}:{}:{as_file}",
+                                view.key, view.request, view.rendered_load
+                            ),
+                            |t| {
+                                let mut doc = find::rendered::Document::default();
+                                if as_file {
+                                    doc.markdown(&md.file, t.text);
+                                } else {
+                                    for (change, text) in &md.blocks {
+                                        let color = match change {
+                                            rendered::Change::Kept => t.text,
+                                            rendered::Change::Removed => t.danger,
+                                            rendered::Change::Added => t.success,
+                                        };
+                                        doc.markdown(text, color);
+                                    }
+                                }
+                                doc
+                            },
+                        );
+                    } else {
+                        rendered::show(ui, &path, md, &mut view.markdown, !as_file);
+                    }
+                }
             }
             return;
-        }
-        if let Some(what) = self.find_in() {
-            self.find.bar(ui, what.name());
         }
         if as_file {
             let before = matches!(&view.file, Some(Ok(f)) if f.before);
@@ -132,7 +224,7 @@ impl RepoTab {
             let pick = |range| picked_in_file(&view.key, old_path.as_deref(), before, range);
             let history = pick((1, 1))
                 .map(|_| ())
-                .ok_or("Untracked and conflicted files have no line history");
+                .ok_or(crate::i18n::text("repo-core-1856"));
             // Lines picked in one version aren't those of another one of the same file.
             let id = ("diff_file", &path, format!("{:?}", view.key));
             if let Some(p) = file_text::show(
@@ -143,6 +235,7 @@ impl RepoTab {
                 || find::Source::DiffFile(path.clone()),
                 history,
                 links,
+                None,
             )
             .and_then(pick)
             {
@@ -165,12 +258,27 @@ impl RepoTab {
                     ui.add_space(12.0);
                     ui.horizontal(|ui| {
                         ui.add_space(12.0);
-                        ui.colored_label(t.danger, e);
+                        ui.colored_label(
+                            t.danger,
+                            crate::git::display_error(&crate::forge::inbox::display_error(e)),
+                        );
                     });
                     return;
                 }
                 Some((_, Ok(rich::Rich::Ready(diff)))) => {
-                    rich::show(ui, diff, &mut view.rich_state, acts);
+                    let metadata_generation = view.rich_state.search_generation(ui.ctx());
+                    if self.find.open {
+                        self.find.rendered(
+                            ui,
+                            format!(
+                                "rich:{:?}:{}:{}:{metadata_generation}",
+                                view.key, view.request, view.rich_load
+                            ),
+                            |t| rich::search_document(diff, &view.rich_state, t),
+                        );
+                    } else {
+                        rich::show(ui, diff, &mut view.rich_state, acts);
+                    }
                     return;
                 }
                 Some((_, Ok(rich::Rich::Plain(note)))) => rich::fallback_note(ui, kind, note),
@@ -194,17 +302,30 @@ impl RepoTab {
                     return;
                 }
                 Some(Ok(data)) => {
-                    structural::show(ui, data);
+                    if self.find.open {
+                        self.find.rendered(
+                            ui,
+                            format!(
+                                "syntax:{:?}:{}:{}",
+                                view.key,
+                                view.request,
+                                view.structural.generation()
+                            ),
+                            |t| structural::search_document(data, t),
+                        );
+                    } else {
+                        structural::show(ui, data);
+                    }
                     return;
                 }
                 Some(Err(reason)) => {
                     ui.colored_label(t.warning, reason);
-                    ui.label("Showing the patch. Turn off Syntax to stage changes.");
+                    ui.label(crate::i18n::text("repo-core-2354"));
                     ui.separator();
                 }
             }
         }
-        let Some(data) = ready_data(ui, view, ignore_ws, &t, acts) else {
+        let Some(data) = ready_data(ui, view, ignore_ws, &t, &mut self.find, acts) else {
             return;
         };
 
@@ -267,12 +388,25 @@ impl RepoTab {
         rows.links = links.as_ref();
         let sel = rows.show(ui, &path, acts);
         let (clicked, offset, jumped, seen) = (rows.clicked, rows.offset, rows.jumped, rows.seen);
+        let wrap_offsets = rows.geometry.as_ref().map(|g| g.offsets.clone());
         self.find.saw(seen);
+        let hunk = if let Some(line) = clicked {
+            data.hunk_at(false, line)
+        } else if view.keyboard_hunk.is_none()
+            || (view.scroll - offset).abs() > 0.5
+            || jumped.is_some()
+        {
+            data.hunk_at(split, (offset / super::LINE_H) as usize + 3)
+        } else {
+            view.keyboard_hunk
+        };
 
         if let Some(view) = &mut self.diff {
+            view.keyboard_hunk = hunk;
             view.auto_opened.extend(auto_opened);
             view.text_sel = sel;
             view.scroll = offset;
+            view.wrap_offsets = wrap_offsets;
             view.jump = None;
             view.scroll_to = None;
             view.jump_line = None;
@@ -287,6 +421,7 @@ impl RepoTab {
                 view.pick_line(i, shift);
             }
         }
+        self.keyboard_hunk(ui, acts);
     }
 
     /// Why the diff shown starts folded, while it does (a conflicted file never does, nor one
@@ -323,15 +458,18 @@ impl RepoTab {
         match key {
             DiffKey::Commit { hash, path } => (
                 path.clone(),
-                format!("Commit {}", hash.get(..8).unwrap_or(hash)),
+                crate::i18n::message(
+                    "repo-core-2355",
+                    &[("hash", hash.get(..8).unwrap_or(hash).to_string().into())],
+                ),
             ),
             DiffKey::Work(file) => (
                 file.path.clone(),
                 match file.area {
-                    Area::Staged => "Staged changes".to_owned(),
-                    Area::Unstaged => "Unstaged changes".to_owned(),
-                    Area::Untracked => "New file".to_owned(),
-                    Area::Conflicted => "Conflicted".to_owned(),
+                    Area::Staged => crate::i18n::text("repo-core-2356").to_owned(),
+                    Area::Unstaged => crate::i18n::text("repo-core-2357").to_owned(),
+                    Area::Untracked => crate::i18n::text("repo-core-2358").to_owned(),
+                    Area::Conflicted => crate::i18n::text("repo-core-2359").to_owned(),
                 },
             ),
             DiffKey::Range { from, to, path } => (path.clone(), self.range_label(from, to)),
@@ -362,6 +500,8 @@ impl RepoTab {
         let rendered = markdown == Some(true) || rich_ready;
         let t = Tokens::get(ui.ctx());
         let mut clear = false;
+        self.intent_badge(ui, path);
+        self.reproducer_badge(ui, &view.key);
         egui::Frame::new()
             .fill(t.chrome)
             .inner_margin(egui::Margin::symmetric(10, 6))
@@ -372,14 +512,30 @@ impl RepoTab {
                 ui.horizontal(|ui| {
                     ui.spacing_mut().item_spacing.x = 4.0;
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if icons::small_button(ui, "x", "Close (Esc)").clicked() {
+                        if icons::small_button(ui, "x", crate::i18n::text("repo-core-0711"))
+                            .clicked()
+                        {
                             acts.push(Action::CloseDiff);
                         }
                         popout::button(ui, Panel::Diff, !self.docked(Panel::Diff), acts);
-                        if icons::toggle_button(ui, "book-open", "File", as_file).clicked() {
+                        if icons::toggle_button(
+                            ui,
+                            "book-open",
+                            crate::i18n::text("repo-core-2368"),
+                            as_file,
+                        )
+                        .clicked()
+                        {
                             acts.push(Action::DiffAsFile(true));
                         }
-                        if icons::toggle_button(ui, "file-diff", "Diff", !as_file).clicked() {
+                        if icons::toggle_button(
+                            ui,
+                            "file-diff",
+                            crate::i18n::text("repo-core-2367"),
+                            !as_file,
+                        )
+                        .clicked()
+                        {
                             acts.push(Action::DiffAsFile(false));
                         }
                         ui.vertical(|ui| {
@@ -421,6 +577,7 @@ impl RepoTab {
                                 ignorable,
                                 (!view.structural.enabled).then_some(&view.key),
                                 &links,
+                                false,
                                 acts,
                                 |ui, acts| {
                                     self.lock_menu_items(ui, path, rev, acts);
@@ -437,7 +594,8 @@ impl RepoTab {
                                 matches!(&view.file, Some(Ok(f)) if f.before)
                             };
                             if as_file && before {
-                                source.push_str(" · before the change");
+                                source.push_str(" · ");
+                                source.push_str(crate::i18n::text("repo-core-2360"));
                             }
                             ui.add(
                                 egui::Label::new(
@@ -454,6 +612,7 @@ impl RepoTab {
                         ui.spacing_mut().item_spacing.x = 4.0;
                         if let DiffKey::Work(file) = &view.key
                             && !view.structural.enabled
+                            && !view.encrypted.enabled
                         {
                             let partial = partial && !as_file && !rendered;
                             clear = self.file_actions(ui, view, file, partial, acts);
@@ -462,19 +621,40 @@ impl RepoTab {
                             && view.lines.is_none()
                             && self.stash_view.is_none()
                             && !view.structural.enabled
+                            && !view.encrypted.enabled
                         {
                             let lines = !as_file && !rendered;
                             clear = self.commit_actions(ui, view, (hash, path), lines, acts);
                         }
                         ui.add_space(8.0);
                         if !as_file && !rendered && !folded && !rich_ready && view.lines.is_none() {
+                            if matches!(view.key, DiffKey::Work(_))
+                                && ui.button(crate::i18n::text("repo-core-2361")).clicked()
+                            {
+                                acts.push(Action::OpenFileComparison(
+                                    crate::repo::file_comparison::Page::Lens,
+                                ));
+                            }
+                            if !matches!(view.key, DiffKey::Remerge { .. })
+                                && ui.button(crate::i18n::text("repo-core-2362")).clicked()
+                            {
+                                acts.push(Action::OpenFileComparison(
+                                    crate::repo::file_comparison::Page::CodeMoves,
+                                ));
+                            }
                             structural::toggle(ui, view.structural.enabled, acts);
                             ui.add_space(4.0);
                         }
                         // A folded diff shows no lines to arrange.
-                        if !as_file && !rendered && !folded && view.structural.shows_patch() {
+                        if !as_file
+                            && !rendered
+                            && !folded
+                            && !view.encrypted.enabled
+                            && view.structural.shows_patch()
+                        {
                             // A diff of some lines only (`git log -L`) shows them whole, with
                             // whitespace: those options don't apply to it.
+                            wrap_control(ui, acts);
                             if view.lines.is_none() {
                                 view_options(ui, &t, (split, ignore_ws, whole_file), acts);
                                 ui.add_space(4.0);
@@ -499,9 +679,9 @@ impl RepoTab {
                         }
                         if markdown.is_some() {
                             let tip = match (markdown == Some(true), as_file) {
-                                (true, _) => "Show the Markdown as text",
-                                (false, false) => "Show the changes rendered",
-                                (false, true) => "Show the file rendered",
+                                (true, _) => crate::i18n::text("repo-core-2363"),
+                                (false, false) => crate::i18n::text("repo-core-2364"),
+                                (false, true) => crate::i18n::text("repo-core-2365"),
                             };
                             let r = icons::small_button(ui, "eye", tip);
                             if markdown == Some(true) {
@@ -515,8 +695,11 @@ impl RepoTab {
                     });
                 };
                 if ui.available_width() < 620.0 {
-                    let button =
-                        icons::small_button(ui, "settings", "Diff actions and view options");
+                    let button = icons::small_button(
+                        ui,
+                        "settings",
+                        crate::i18n::text("dev-integration-ui-diff-options"),
+                    );
                     egui::Popup::menu(&button)
                         .style(theme::menu_style)
                         .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
@@ -543,11 +726,11 @@ impl RepoTab {
         let add = || ops(&[&["--literal-pathspecs", "add", "--", &file.path]]);
         let (label, steps) = match file.area {
             Area::Staged => (
-                "Unstage file",
+                crate::i18n::text("repo-core-2369"),
                 vec![unstage_args(&self.refs.head, &file.path)],
             ),
-            Area::Conflicted => ("Mark resolved", add()),
-            _ => ("Stage file", add()),
+            Area::Conflicted => (crate::i18n::text("repo-core-0179"), add()),
+            _ => (crate::i18n::text("repo-core-2370"), add()),
         };
         if ui.add_enabled(idle, egui::Button::new(label)).clicked() {
             acts.push(Action::Ops {
@@ -560,14 +743,10 @@ impl RepoTab {
             && ui
                 .add_enabled(
                     idle && self.keep_both.is_none(),
-                    egui::Button::new("Keep both…"),
+                    egui::Button::new(crate::i18n::text("repo-core-2371")),
                 )
-                .on_hover_text(
-                    "For a file both sides changed that can't be merged (an image, an \
-                     archive…): write each side's version as a file of its own, named after its \
-                     branch. Shows what it would write first.",
-                )
-                .on_disabled_hover_text("Keep both is already open for a file")
+                .on_hover_text(crate::i18n::text("repo-core-2372"))
+                .on_disabled_hover_text(crate::i18n::text("repo-core-2373"))
                 .clicked()
         {
             acts.push(Action::KeepBoth(file.path.clone()));
@@ -578,14 +757,20 @@ impl RepoTab {
             return false;
         }
         ui.add_space(8.0);
-        let lines = if chosen == 1 { "line" } else { "lines" };
+
         let picks: &[Pick] = if file.area == Area::Staged {
             &[Pick::Unstage]
         } else {
             &[Pick::Stage, Pick::Discard]
         };
         for &pick in picks {
-            let b = egui::Button::new(format!("{} {chosen} {lines}", pick.verb()));
+            let b = egui::Button::new(crate::i18n::message(
+                "repo-core-2376",
+                &[
+                    ("verb", pick.verb().to_string().into()),
+                    ("chosen", (chosen).into()),
+                ],
+            ));
             if ui.add(b).clicked() {
                 acts.push(Action::PickLines {
                     pick,
@@ -593,8 +778,8 @@ impl RepoTab {
                 });
             }
         }
-        ui.button("Clear")
-            .on_hover_text("Unselect the lines")
+        ui.button(crate::i18n::text("repo-core-1149"))
+            .on_hover_text(crate::i18n::text("repo-core-2377"))
             .clicked()
     }
 
@@ -614,16 +799,19 @@ impl RepoTab {
         // Selected lines take the place of the file action. Whole-file revert remains
         // available in the file name's menu while the selection is active.
         if lines && revertable && chosen > 0 {
-            let noun = if chosen == 1 { "line" } else { "lines" };
             let b = ui
                 .add_enabled(idle, |ui: &mut Ui| {
-                    icons::small_button(ui, "undo-2", &format!("Revert {chosen} selected {noun}"))
+                    icons::small_button(
+                        ui,
+                        "undo-2",
+                        &crate::i18n::message(
+                            "dev-integration-ui-revert-selected",
+                            &[("count", chosen.into())],
+                        ),
+                    )
                 })
-                .on_disabled_hover_text("Wait for the operation running to end")
-                .on_hover_text(
-                    "Undo only the lines clicked in the working tree, to look over before \
-                     committing. Revert changes to this file is in the file name's menu.",
-                );
+                .on_disabled_hover_text(crate::i18n::text("repo-core-1125"))
+                .on_hover_text(crate::i18n::text("repo-core-2379"));
             if b.clicked() {
                 acts.push(Action::PickLines {
                     pick: Pick::Revert,
@@ -631,19 +819,16 @@ impl RepoTab {
                 });
             }
             return ui
-                .button("Clear")
-                .on_hover_text("Unselect the lines")
+                .button(crate::i18n::text("repo-core-1149"))
+                .on_hover_text(crate::i18n::text("repo-core-2377"))
                 .clicked();
         }
         let b = ui
             .add_enabled(idle, |ui: &mut Ui| {
-                icons::small_button(ui, "undo-2", "Revert file")
+                icons::small_button(ui, "undo-2", crate::i18n::text("repo-core-2380"))
             })
-            .on_disabled_hover_text("Wait for the operation running to end")
-            .on_hover_text(
-                "Undo this commit's changes to the file in the working tree, to look over \
-                 before committing",
-            );
+            .on_disabled_hover_text(crate::i18n::text("repo-core-1125"))
+            .on_hover_text(crate::i18n::text("repo-core-2381"));
         if b.clicked() {
             acts.push(Action::RevertFile {
                 hash: hash.to_owned(),
@@ -664,7 +849,9 @@ impl RepoTab {
         };
         match to {
             Some(to) => format!("{} → {}", name(from), name(to)),
-            None => format!("{} → working tree", name(from)),
+            None => {
+                crate::i18n::message("repo-core-2382", &[("from", name(from).to_string().into())])
+            }
         }
     }
 }
@@ -715,12 +902,25 @@ fn lines_chip(ranges: &[crate::git::LineRange]) -> String {
             }
         })
         .collect();
-    let noun = if ranges.len() == 1 && ranges[0].0 == ranges[0].1 {
-        "Line"
-    } else {
-        "Lines"
-    };
-    format!("{noun} {}", parts.join(", "))
+    crate::i18n::message(
+        if ranges.len() == 1 && ranges[0].0 == ranges[0].1 {
+            "repo-core-line-range-one"
+        } else {
+            "repo-core-line-range-many"
+        },
+        &[("range", parts.join(", ").into())],
+    )
+}
+
+fn wrap_control(ui: &mut Ui, acts: &mut Vec<Action>) {
+    let wrap = crate::settings::Settings::get(ui.ctx()).diff_wrap;
+    if ui
+        .selectable_label(wrap, crate::i18n::text("repo-core-1785"))
+        .on_hover_text(crate::i18n::text("repo-core-2387"))
+        .clicked()
+    {
+        acts.push(Action::DiffWrap(!wrap));
+    }
 }
 
 /// Whitespace, whole file, side by side and unified toggles, laid out right to left.
@@ -734,9 +934,9 @@ fn view_options(
         ui,
         "pilcrow",
         if ignore_ws {
-            "Show whitespace changes"
+            crate::i18n::text("repo-core-2389")
         } else {
-            "Ignore whitespace changes"
+            crate::i18n::text("repo-core-2390")
         },
     );
     if ignore_ws {
@@ -753,9 +953,9 @@ fn view_options(
         ui,
         "unfold-vertical",
         if whole_file {
-            "Show only the changes"
+            crate::i18n::text("repo-core-2392")
         } else {
-            "Show the whole file"
+            crate::i18n::text("repo-core-2393")
         },
     );
     if whole_file {
@@ -768,7 +968,7 @@ fn view_options(
             whole_file: !whole_file,
         });
     }
-    let s = icons::small_button(ui, "columns-2", "Side by side");
+    let s = icons::small_button(ui, "columns-2", crate::i18n::text("repo-core-2395"));
     if split {
         widgets::active_underline(ui, s.rect, t.accent);
     }
@@ -779,7 +979,7 @@ fn view_options(
             whole_file,
         });
     }
-    let u = icons::small_button(ui, "rows-2", "Unified");
+    let u = icons::small_button(ui, "rows-2", crate::i18n::text("repo-core-2397"));
     if !split {
         widgets::active_underline(ui, u.rect, t.accent);
     }
@@ -794,10 +994,54 @@ fn view_options(
 
 /// The previous and next change buttons, laid out right to left.
 fn change_steps(ui: &mut Ui, acts: &mut Vec<Action>) {
-    if icons::small_button(ui, "arrow-down", "Next change (F7, Alt+↓)").clicked() {
+    if icons::small_button(
+        ui,
+        "arrow-down",
+        &crate::i18n::message(
+            "repo-core-2399",
+            &[
+                (
+                    "NextChange",
+                    crate::keymap::label(ui.ctx(), crate::keymap::Command::NextChange)
+                        .to_string()
+                        .into(),
+                ),
+                (
+                    "NextChangeAlt",
+                    crate::keymap::label(ui.ctx(), crate::keymap::Command::NextChangeAlt)
+                        .to_string()
+                        .into(),
+                ),
+            ],
+        ),
+    )
+    .clicked()
+    {
         acts.push(Action::DiffStep(1));
     }
-    if icons::small_button(ui, "arrow-up", "Previous change (Shift+F7, Alt+↑)").clicked() {
+    if icons::small_button(
+        ui,
+        "arrow-up",
+        &crate::i18n::message(
+            "repo-core-2401",
+            &[
+                (
+                    "PreviousChange",
+                    crate::keymap::label(ui.ctx(), crate::keymap::Command::PreviousChange)
+                        .to_string()
+                        .into(),
+                ),
+                (
+                    "PreviousChangeAlt",
+                    crate::keymap::label(ui.ctx(), crate::keymap::Command::PreviousChangeAlt)
+                        .to_string()
+                        .into(),
+                ),
+            ],
+        ),
+    )
+    .clicked()
+    {
         acts.push(Action::DiffStep(-1));
     }
 }
@@ -809,6 +1053,7 @@ fn ready_data<'a>(
     view: &'a DiffView,
     ignore_ws: bool,
     t: &Tokens,
+    find: &mut find::Find,
     acts: &mut Vec<Action>,
 ) -> Option<&'a DiffData> {
     let data = match &view.data {
@@ -820,12 +1065,53 @@ fn ready_data<'a>(
             ui.add_space(12.0);
             ui.horizontal(|ui| {
                 ui.add_space(12.0);
-                ui.colored_label(t.danger, e);
+                ui.colored_label(
+                    t.danger,
+                    crate::git::display_error(&crate::forge::inbox::display_error(e)),
+                );
             });
             return None;
         }
         Some(Ok(data)) => data,
     };
+    if find.open {
+        let identity = format!("rich-data:{:?}:{}", view.key, view.request);
+        if let Some(binary) = &data.binary {
+            find.rendered(ui, identity, |t| super::binary::search_document(binary, t));
+            return None;
+        }
+        if let Some(notebook) = &data.notebook {
+            find.rendered(ui, identity, |t| {
+                super::notebook::search_document(notebook, t)
+            });
+            return None;
+        }
+        if let Some(lfs) = &data.lfs {
+            find.rendered(ui, identity, |t| {
+                let mut doc = find::rendered::Document::default();
+                for (side, pointer) in [
+                    (crate::i18n::text("repo-core-1564"), &lfs.old),
+                    (crate::i18n::text("repo-core-1565"), &lfs.new),
+                ] {
+                    if let Some(pointer) = pointer {
+                        doc.text(
+                            &format!(
+                                "{side} · Git LFS · {} · {}",
+                                crate::git::human_size(pointer.size),
+                                pointer.oid
+                            ),
+                            t.text,
+                        );
+                    }
+                }
+                doc
+            });
+            return None;
+        }
+        if data.compare.is_some() || data.image.is_some() {
+            ui.label(crate::i18n::text("repo-core-2404"));
+        }
+    }
     if let Some(lfs) = &data.lfs {
         lfs_view(ui, lfs);
         return None;
@@ -835,8 +1121,26 @@ fn ready_data<'a>(
         return None;
     }
     if let Some(images) = &data.image {
-        image_view(ui, images);
-        return None;
+        if images.svg {
+            ui.horizontal(|ui| {
+                if ui
+                    .selectable_label(!view.svg_source, crate::i18n::text("repo-core-2405"))
+                    .clicked()
+                {
+                    acts.push(Action::DiffSvgSource(false));
+                }
+                if ui
+                    .selectable_label(view.svg_source, crate::i18n::text("repo-core-2406"))
+                    .clicked()
+                {
+                    acts.push(Action::DiffSvgSource(true));
+                }
+            });
+        }
+        if !images.svg || !view.svg_source {
+            image_view(ui, images);
+            return None;
+        }
     }
     if let Some(binary) = &data.binary {
         binary_view(ui, binary, view.key.path());
@@ -851,9 +1155,9 @@ fn ready_data<'a>(
     if data.lines.is_empty() {
         ui.centered_and_justified(|ui| {
             let msg = if ignore_ws {
-                "No changes besides whitespace"
+                crate::i18n::text("repo-core-2407")
             } else {
-                "No textual changes"
+                crate::i18n::text("repo-core-2408")
             };
             ui.label(egui::RichText::new(msg).color(t.text_dim));
         });

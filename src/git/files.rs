@@ -31,12 +31,16 @@ pub fn worktree_file(file: &Path) -> std::io::Result<Vec<u8>> {
             .into_encoded_bytes());
     }
     if !meta.is_file() {
-        return Err(std::io::Error::other("not a file"));
+        return Err(std::io::Error::other(crate::i18n::text(
+            "backend-not-a-file-2cd310",
+        )));
     }
     // Checked again on what was opened: a link put there since would be followed by `open`.
     let mut opened = std::fs::File::open(file)?;
     if !opened.metadata()?.is_file() {
-        return Err(std::io::Error::other("not a file"));
+        return Err(std::io::Error::other(crate::i18n::text(
+            "backend-not-a-file-2cd310",
+        )));
     }
     let mut bytes = Vec::new();
     std::io::Read::read_to_end(&mut opened, &mut bytes)?;
@@ -72,18 +76,38 @@ pub fn add_to_gitignore(repo: &Path, pattern: &str) -> Result<bool, String> {
     // line added comes from a file name the repository chose too.
     match crate::remote::try_is_link(&file) {
         Ok(false) => {}
-        Ok(true) => return Err(".gitignore is a symbolic link: not changed".to_owned()),
-        Err(e) => return Err(format!("could not check .gitignore: {e}")),
+        Ok(true) => {
+            return Err(crate::i18n::text(
+                "backend-gitignore-is-a-symbolic-link-not-changed-0d6ca8",
+            )
+            .to_owned());
+        }
+        Err(e) => {
+            return Err(crate::i18n::message(
+                "backend-could-not-check-gitignore-e-27d776",
+                &[("detail", (e).to_string().into())],
+            ));
+        }
     }
     let existing = match crate::remote::read_to_string(&file) {
         Ok(s) => s,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
-        Err(e) => return Err(format!("could not read .gitignore: {e}")),
+        Err(e) => {
+            return Err(crate::i18n::message(
+                "backend-could-not-read-gitignore-e-3886bb",
+                &[("detail", (e).to_string().into())],
+            ));
+        }
     };
     match gitignore_with(&existing, pattern) {
         Some(updated) => crate::remote::write(&file, updated.as_bytes())
             .map(|_| true)
-            .map_err(|e| format!("could not write .gitignore: {e}")),
+            .map_err(|e| {
+                crate::i18n::message(
+                    "backend-could-not-write-gitignore-e-9b2199",
+                    &[("detail", (e).to_string().into())],
+                )
+            }),
         None => Ok(false),
     }
 }

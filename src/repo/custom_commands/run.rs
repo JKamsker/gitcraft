@@ -15,7 +15,10 @@ impl RepoTab {
         ctx: &egui::Context,
     ) {
         if let Some(problem) = command.problem() {
-            self.status = Some((format!("{}: {problem}", command.name.trim()), true));
+            self.status = Some(crate::repo::Notice::plain((
+                format!("{}: {problem}", command.name.trim()),
+                true,
+            )));
             return;
         }
         let named: Vec<(String, String)> = command
@@ -25,7 +28,10 @@ impl RepoTab {
             .map(|(p, a)| (p.variable.clone(), a.clone()))
             .collect();
         if let Some((name, _)) = named.iter().find(|(_, a)| a.contains('\0')) {
-            self.status = Some((format!("${name} can't hold a NUL character"), true));
+            self.status = Some(crate::repo::Notice::plain((
+                format!("${name} can't hold a NUL character"),
+                true,
+            )));
             return;
         }
         let repo = crate::remote::git_path(&self.path);
@@ -50,16 +56,22 @@ impl RepoTab {
     ) {
         let script = cc::captured_program(vars, command);
         let repo = self.path.clone();
-        self.finished.push((format!("Running {name}…"), false));
+        self.finished
+            .push(crate::repo::Notice::custom_started(name.clone()));
         self.then(
             ctx,
             move || crate::git::run_shell(&repo, &script),
             move |tab, ran, _| {
-                let toast = match ran {
-                    Ok(out) => cc::toast_text(&name, out.code, &out.stdout, &out.stderr),
-                    Err(e) => (format!("{name} couldn't be run: {e}"), true),
+                let notice = match ran {
+                    Ok(out) => crate::repo::Notice::custom_completed(
+                        &name,
+                        out.code,
+                        &out.stdout,
+                        &out.stderr,
+                    ),
+                    Err(e) => crate::repo::Notice::custom_start_failed(name, e),
                 };
-                tab.finished.push(toast);
+                tab.finished.push(notice);
             },
         );
     }
@@ -76,15 +88,13 @@ impl RepoTab {
                 (shell_spec(name, program, args), self.path.clone())
             }
         };
-        match Terminal::spawn(&cwd, &spec, ctx) {
-            Ok(term) => {
-                self.terminals.push(term);
-                self.active_terminal = self.terminals.len() - 1;
-                self.terminal_error = None;
-            }
-            Err(e) => self.terminal_error = Some(format!("{name} couldn't be started: {e}")),
-        }
-        self.terminal_open = true;
+        self.terminals
+            .opened(Terminal::spawn(&cwd, &spec, ctx).map_err(|e| {
+                crate::i18n::message(
+                    "repo-workflows-custom_commands-run-custom-in-terminal-f33b19b3",
+                    &[("name", name.into()), ("e", e.into())],
+                )
+            }));
     }
 }
 

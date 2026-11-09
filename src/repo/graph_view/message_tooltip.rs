@@ -159,7 +159,7 @@ pub(super) fn show(
                     ui.label(match message {
                         Some(Ok(message)) => message.as_str(),
                         Some(Err(error)) => error.as_str(),
-                        None => "Loading full commit message…",
+                        None => crate::i18n::text("repo-core-2668"),
                     });
                 });
         }) {

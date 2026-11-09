@@ -76,13 +76,16 @@ fn body(
         Read::NotAsked | Read::Reading => {
             ui.horizontal(|ui| {
                 ui.add(crate::spinner::Spinner::new());
-                ui.label(RichText::new("Reading each side's commits…").color(t.text_dim));
+                ui.label(RichText::new(crate::i18n::text("repo-core-0436")).color(t.text_dim));
             });
         }
         Read::Failed(e) => {
             ui.horizontal_wrapped(|ui| {
                 ui.label(RichText::new(e).color(t.danger));
-                if ui.small_button("Try again").clicked() {
+                if ui
+                    .small_button(crate::i18n::text("repo-core-0437"))
+                    .clicked()
+                {
                     acts.push(Action::Archaeology(Act::Load));
                 }
             });
@@ -109,9 +112,9 @@ fn found_pair(history: &History) -> Option<(usize, usize)> {
 /// "N test merges so far".
 fn merges_text(merges: usize) -> String {
     match merges {
-        0 => "Testing merges…".to_owned(),
-        1 => "1 test merge so far…".to_owned(),
-        n => format!("{n} test merges so far…"),
+        0 => crate::i18n::text("repo-core-0438").to_owned(),
+        1 => crate::i18n::text("repo-core-0439").to_owned(),
+        n => crate::i18n::message("repo-core-0440", &[("n", (n).into())]),
     }
 }
 
@@ -129,11 +132,11 @@ fn history_header(
         } else {
             "chevron-down"
         };
-        if crate::icons::small_button(ui, chevron, "Show or hide each side's history").clicked() {
+        if crate::icons::small_button(ui, chevron, crate::i18n::text("repo-core-0441")).clicked() {
             *folded = !*folded;
         }
         ui.label(
-            RichText::new("HOW THIS CONFLICT CAME ABOUT")
+            RichText::new(crate::i18n::text("repo-core-0442"))
                 .font(theme::semibold(10.5))
                 .color(t.text_faint),
         );
@@ -148,20 +151,22 @@ fn history_header(
                 .filter(|s| s.result == Read::Reading)
             {
                 let merges = search.merges.load(std::sync::atomic::Ordering::Relaxed);
-                let cancel = ui.button("Cancel").on_hover_text("Stop looking").clicked();
+                let cancel = ui
+                    .button(crate::i18n::text("repo-core-0443"))
+                    .on_hover_text(crate::i18n::text("repo-core-0444"))
+                    .clicked();
                 ui.label(RichText::new(merges_text(merges)).color(t.text_dim));
                 ui.add(crate::spinner::Spinner::new());
                 if cancel {
                     history.cancel();
                 }
             } else if ui
-                .add_enabled(ready, egui::Button::new("Find where it started"))
-                .on_hover_text(
-                    "Find the first pair of commits, one from each side, whose merge already \
-                     conflicts in this file. Each test merge is done with git merge-tree: \
-                     your files and the index are left as they are.",
+                .add_enabled(
+                    ready,
+                    egui::Button::new(crate::i18n::text("repo-core-0445")),
                 )
-                .on_disabled_hover_text("Each side's commits are read first")
+                .on_hover_text(crate::i18n::text("repo-core-0446"))
+                .on_disabled_hover_text(crate::i18n::text("repo-core-0447"))
                 .clicked()
             {
                 acts.push(Action::Archaeology(Act::Find));
@@ -209,17 +214,20 @@ fn side_ui(
     (found, picked): (Option<usize>, &mut Option<usize>),
 ) {
     let count = match steps.len() {
-        1 => "1 commit".to_owned(),
-        n => format!("{n} commits"),
+        1 => crate::i18n::text("repo-core-0448").to_owned(),
+        n => crate::i18n::message("repo-core-0449", &[("n", (n).into())]),
     };
     ui.label(
-        RichText::new(format!("{name} · {count} on this file"))
-            .color(t.text_faint)
-            .small(),
+        RichText::new(crate::i18n::message(
+            "repo-core-0450",
+            &[("name", name.to_string().into()), ("count", (count).into())],
+        ))
+        .color(t.text_faint)
+        .small(),
     );
     if steps.is_empty() {
         ui.label(
-            RichText::new("No commit of this side touched the file since they diverged.")
+            RichText::new(crate::i18n::text("repo-core-0451"))
                 .color(t.text_dim)
                 .small(),
         );
@@ -249,9 +257,9 @@ fn side_ui(
                     .on_hover_ui(|ui| {
                         ui.label(format!("{} {}\n{}", step.short, step.summary, step.author));
                         if found == Some(k) {
-                            ui.label("⚑ where the conflict started");
+                            ui.label(crate::i18n::text("repo-core-0454"));
                         }
-                        ui.label("Click to pick it: what it changed, and a test merge");
+                        ui.label(crate::i18n::text("repo-core-0455"));
                     });
                 if response.clicked() {
                     *picked = if *picked == Some(k) { None } else { Some(k) };
@@ -277,8 +285,11 @@ fn picked_ui(
     ui.horizontal_wrapped(|ui| {
         for step in [ours, theirs].into_iter().flatten() {
             if ui
-                .small_button(format!("What {} changed", step.short))
-                .on_hover_text("Its change to this file")
+                .small_button(crate::i18n::message(
+                    "repo-core-0456",
+                    &[("short", step.short.to_string().into())],
+                ))
+                .on_hover_text(crate::i18n::text("repo-core-0457"))
                 .clicked()
             {
                 acts.push(Action::Archaeology(Act::ShowChange(
@@ -289,8 +300,8 @@ fn picked_ui(
         }
         if let (Some(i), Some(j), Some(a), Some(b)) = (o, th, ours, theirs) {
             if ui
-                .small_button("Test these two")
-                .on_hover_text("Merge them with git merge-tree: does this file conflict?")
+                .small_button(crate::i18n::text("repo-core-0458"))
+                .on_hover_text(crate::i18n::text("repo-core-0459"))
                 .clicked()
             {
                 acts.push(Action::Archaeology(Act::TestPair(i, j)));
@@ -302,12 +313,24 @@ fn picked_ui(
                 Some((_, Read::Done(conflicts))) => {
                     let (text, color) = if *conflicts {
                         (
-                            format!("{} and {} conflict in this file", a.short, b.short),
+                            crate::i18n::message(
+                                "repo-core-0460",
+                                &[
+                                    ("short", a.short.to_string().into()),
+                                    ("short2", b.short.to_string().into()),
+                                ],
+                            ),
                             t.warning,
                         )
                     } else {
                         (
-                            format!("{} and {} merge without a conflict here", a.short, b.short),
+                            crate::i18n::message(
+                                "repo-core-0461",
+                                &[
+                                    ("short", a.short.to_string().into()),
+                                    ("short2", b.short.to_string().into()),
+                                ],
+                            ),
                             t.success,
                         )
                     };
@@ -366,42 +389,34 @@ fn answer_text(found: &Found, timelines: &Timelines, names: (&str, &str)) -> Str
         } => {
             let (Some(a), Some(b)) = (timelines.ours.get(*ours), timelines.theirs.get(*theirs))
             else {
-                return "The commits changed meanwhile: close the file and open it again"
-                    .to_owned();
+                return crate::i18n::text("repo-core-0463").to_owned();
             };
-            let mut text = format!(
-                "⚑ Where it started: {} ({}) and {} ({}). Their merge already conflicts in \
-                 this file",
-                named(a),
-                names.0,
-                named(b),
-                names.1
+            let mut text = crate::i18n::message(
+                "repo-core-0464",
+                &[
+                    ("a", named(a).to_string().into()),
+                    ("names", names.0.to_string().into()),
+                    ("b", named(b).to_string().into()),
+                    ("names2", names.1.to_string().into()),
+                ],
             );
             text.push_str(if *checked {
-                ", while the commits just before each don't (found by halving each side, as git \
-                 bisect does: a conflict that came and went earlier can be missed)."
+                crate::i18n::text("repo-core-0465")
             } else {
-                ". The history isn't a straight line here, so an earlier pair may conflict too."
+                crate::i18n::text("repo-core-0466")
             });
             let cut =
                 (*ours == 0 && timelines.truncated.0) || (*theirs == 0 && timelines.truncated.1);
             if cut {
-                text.push_str(&format!(
-                    " It may have started earlier: only the latest {} commits of a side are read.",
-                    super::git::MAX_COMMITS
+                text.push_str(&crate::i18n::message(
+                    "repo-core-0467",
+                    &[("MAX-COMMITS", format!("{}", super::git::MAX_COMMITS).into())],
                 ));
             }
             text
         }
-        Found::OneSided => "Only one side has commits on this file since they diverged, so no \
-                            pair of them conflicts: the conflict may come from a rename (not \
-                            followed here), a deletion or the file's mode."
-            .to_owned(),
-        Found::TipsMergeCleanly => "Merged on their own, the two sides' latest commits don't \
-                                    conflict in this file: the conflict may come from a rename, \
-                                    or from how the operation merges (its options, what it \
-                                    replayed before)."
-            .to_owned(),
+        Found::OneSided => crate::i18n::text("repo-core-0468").to_owned(),
+        Found::TipsMergeCleanly => crate::i18n::text("repo-core-0469").to_owned(),
     }
 }
 
@@ -412,11 +427,16 @@ fn change_ui(ui: &mut Ui, t: &Tokens, history: &mut History) {
     };
     let mut close = false;
     ui.horizontal(|ui| {
-        close = ui.small_button("← Back to the commits").clicked();
+        close = ui
+            .small_button(crate::i18n::text("repo-core-0470"))
+            .clicked();
         ui.label(
-            RichText::new(format!("What {short} changed in this file"))
-                .color(t.text_faint)
-                .small(),
+            RichText::new(crate::i18n::message(
+                "repo-core-0471",
+                &[("short", short.to_string().into())],
+            ))
+            .color(t.text_faint)
+            .small(),
         );
     });
     match read {
@@ -427,7 +447,7 @@ fn change_ui(ui: &mut Ui, t: &Tokens, history: &mut History) {
             ui.label(RichText::new(e).color(t.danger));
         }
         Read::Done(text) if text.trim().is_empty() => {
-            ui.label(RichText::new("(no change to this file)").color(t.text_dim));
+            ui.label(RichText::new(crate::i18n::text("repo-core-0472")).color(t.text_dim));
         }
         Read::Done(text) => {
             let lines: Vec<&str> = text.lines().collect();

@@ -14,13 +14,16 @@ impl Settings {
             ui,
             f,
             "Sidebar",
-            Some("Task visibility does not change agent permissions or stop running tasks."),
+            Some(crate::i18n::text("dev-baseline-agents-tip")),
             |card| {
                 card.row(
                     "Show Agents section",
                     "sidebar feature flag tasks visibility robot",
                     |ui| {
-                        ui.checkbox(&mut self.show_agents, "Show Agents section");
+                        ui.checkbox(
+                            &mut self.show_agents,
+                            crate::i18n::text("dev-baseline-agents-show"),
+                        );
                     },
                 );
             },
@@ -30,11 +33,9 @@ impl Settings {
             ui,
             f,
             "Add gitcraft to an agent",
-            Some(
-                "Run one of these once; it adds gitcraft for every project. The agent then starts \
-                 gitcraft mcp in the repository it works in, and can read the graph, status, \
-                 diffs, blame, conflicts, builds and pull requests.",
-            ),
+            Some(crate::i18n::text(
+                "interaction-settings-agent-register-intro",
+            )),
             |card| {
                 for (agent, command) in crate::mcp::register_commands(&program) {
                     card.row(
@@ -50,8 +51,12 @@ impl Settings {
                                     )
                                     .wrap(),
                                 );
-                                if crate::icons::small_button(ui, "copy", "Copy the command")
-                                    .clicked()
+                                if crate::icons::small_button(
+                                    ui,
+                                    "copy",
+                                    crate::i18n::text("interaction-settings-copy-command"),
+                                )
+                                .clicked()
                                 {
                                     ui.ctx().copy_text(command.clone());
                                 }
@@ -65,11 +70,9 @@ impl Settings {
             ui,
             f,
             "Changes by agents",
-            Some(
-                "Each change is a step of the repository's undo list, marked with a robot. A \
-                 push, deleting a branch, a hard reset, dropping a commit or staging a \
-                 conflicted file waits for you to approve it.",
-            ),
+            Some(crate::i18n::text(
+                "interaction-settings-agent-changes-intro",
+            )),
             |card| {
                 card.row(
                 "Agents may change repositories",
@@ -77,22 +80,16 @@ impl Settings {
                 |ui| {
                     ui.checkbox(
                         &mut self.agent_writes,
-                        "Stage, commit, branch, check out, stash and more",
+                        crate::i18n::text("interaction-settings-agent-writes"),
                     )
                     .on_hover_text(
-                        "Each runs in the repository's tab as a step of its undo list, marked \
-                         with a robot: Ctrl+Z undoes it. A push, deleting a branch, a hard \
-                         reset or dropping a commit waits for you to approve it first. \
-                         Unticked, agents can only read.",
+                        crate::i18n::text("interaction-settings-agent-writes-tip"),
                     );
                 },
             );
                 card.row("Needs", "window open tab", |ui| {
-                layout::note(
-                    ui,
-                    "Changes need the repository open in a tab of this window; reading works without it",
-                );
-            });
+                    layout::note(ui, crate::i18n::text("interaction-settings-agent-needs"));
+                });
             },
         );
     }

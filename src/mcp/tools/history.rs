@@ -316,6 +316,7 @@ mod tests {
             link_dir: None,
             wait: std::time::Duration::from_secs(1),
             cancelled: std::sync::Arc::new(|| false),
+            run: None,
         };
         let at = |rev: Option<&str>| {
             let mut args = serde_json::Map::new();

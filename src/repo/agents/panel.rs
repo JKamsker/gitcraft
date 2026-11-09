@@ -1,6 +1,7 @@
 //! The AGENTS section of the left pane: the repository's agent tasks, each with its worktree's
 //! uncommitted changes, to open and review with the normal diff.
 
+use crate::repo::terminals::TerminalAct;
 use egui::{Align2, Rect, Ui, pos2, vec2};
 
 use super::AgentAct;
@@ -23,13 +24,17 @@ impl Row<'_> {
     fn sub(&self) -> String {
         let agent = agent_label(&self.task.agent);
         let state = match self.worktree {
-            None => "worktree removed".to_owned(),
-            Some(w) if w.prunable.is_some() => "folder missing: prune it in WORKTREES".to_owned(),
+            None => crate::i18n::text("repo-workflows-agents-sub-25ba7976").to_owned(),
+            Some(w) if w.prunable.is_some() => {
+                crate::i18n::text("repo-workflows-agents-sub-96b72d81").to_owned()
+            }
             Some(w) => match w.changes {
-                Some(0) => "no uncommitted changes".to_owned(),
-                Some(1) => "1 file changed".to_owned(),
-                Some(n) => format!("{n} files changed"),
-                None => "counting changes…".to_owned(),
+                Some(0) => crate::i18n::text("repo-workflows-agents-sub-b2c35ddf").to_owned(),
+                Some(1) => crate::i18n::text("repo-workflows-agents-sub-32dfcdbc").to_owned(),
+                Some(n) => {
+                    crate::i18n::message("repo-workflows-agents-sub-a7109ae6", &[("n", (n).into())])
+                }
+                None => crate::i18n::text("repo-workflows-agents-sub-308560dc").to_owned(),
             },
         };
         format!("{agent} · {state}")
@@ -57,12 +62,12 @@ impl RepoTab {
             Header {
                 key: "agents",
                 icon: "square-terminal",
-                title: "AGENTS",
+                title: crate::i18n::text("repo-workflows-agents-agent-section-370f346f"),
                 count: self.agents.tasks.len(),
                 default_open: true,
                 button: Some(Button {
                     icon: "plus",
-                    tooltip: "Start agent task…",
+                    tooltip: crate::i18n::text("repo-workflows-agents-agent-section-d3a1dde8"),
                     action: idle.then_some(Action::Agent(AgentAct::OpenStart)),
                 }),
             },
@@ -81,9 +86,11 @@ impl RepoTab {
             ui.horizontal_wrapped(|ui| {
                 ui.add_space(12.0);
                 ui.label(
-                    egui::RichText::new("No agent tasks. + starts one in a worktree of its own.")
-                        .small()
-                        .color(t.text_faint),
+                    egui::RichText::new(crate::i18n::text(
+                        "repo-workflows-agents-agent-section-736dbccf",
+                    ))
+                    .small()
+                    .color(t.text_faint),
                 );
             });
             return;
@@ -101,7 +108,7 @@ impl RepoTab {
             if r.clicked() && row.openable() {
                 acts.push(Action::OpenWorktree(std::path::PathBuf::from(&task.path)));
             }
-            egui::Popup::context_menu(&r)
+            crate::menu_item::context(&r)
                 .style(theme::menu_style)
                 .show(|ui| menu(ui, &row, acts));
         }
@@ -109,10 +116,12 @@ impl RepoTab {
             ui.horizontal(|ui| {
                 ui.add_space(12.0);
                 if ui
-                    .small_button("Compare them (bake-off)…")
-                    .on_hover_text(
-                        "Puts the tasks' worktrees side by side, to assemble the best of them",
-                    )
+                    .small_button(crate::i18n::text(
+                        "repo-workflows-agents-agent-section-c37ddff4",
+                    ))
+                    .on_hover_text(crate::i18n::text(
+                        "repo-workflows-agents-agent-section-a6153a60",
+                    ))
                     .clicked()
                 {
                     acts.push(Action::Bake(crate::repo::bakeoff::BakeAct::OpenPicker));
@@ -173,49 +182,61 @@ fn paint_row(ui: &mut Ui, row: &Row, t: &Tokens) -> egui::Response {
 fn tip(row: &Row) -> String {
     let mut tip = crate::remote::display(std::path::Path::new(&row.task.path));
     if !row.task.prompt.is_empty() {
-        tip.push_str(&format!("\nTask: {}", row.task.prompt));
+        tip.push_str(&crate::i18n::message(
+            "repo-workflows-agents-tip-7d8e5553",
+            &[("row-task-prompt-1", (row.task.prompt).clone().into())],
+        ));
     }
-    tip.push_str(&format!("\nAgent: {}", row.task.agent));
+    tip.push_str(&crate::i18n::message(
+        "repo-workflows-agents-tip-95d5fbf7",
+        &[("row-task-agent-1", (row.task.agent).clone().into())],
+    ));
     if row.openable() {
-        tip.push_str("\nClick to open it and review its changes");
+        tip.push_str(crate::i18n::text("repo-workflows-agents-tip-5c1b8dd5"));
     } else if row.worktree.is_some_and(|w| w.current) {
-        tip.push_str("\nShown in this tab: its changes are in Uncommitted changes");
+        tip.push_str(crate::i18n::text("repo-workflows-agents-tip-1c0ba476"));
     }
     tip
 }
 
 fn menu(ui: &mut Ui, row: &Row, acts: &mut Vec<Action>) {
     let path = std::path::PathBuf::from(&row.task.path);
-    if ui
-        .add_enabled(row.openable(), egui::Button::new("Open and review changes"))
+    if crate::menu_item::MenuItem::new(crate::i18n::text("repo-workflows-agents-menu-13b97894"))
+        .icon("eye")
+        .refused(
+            (!row.openable()).then_some(crate::i18n::text("repo-workflows-agents-menu-b1e3c6b9")),
+        )
+        .show(ui)
         .clicked()
     {
         acts.push(Action::OpenWorktree(path.clone()));
     }
     let there = row.worktree.is_some_and(|w| w.prunable.is_none());
-    if ui
-        .add_enabled(there, egui::Button::new("Start the agent again"))
-        .on_hover_text(
-            "In a new terminal of its worktree, without the setup recipe and without the task \
-             as its first message",
-        )
+    if crate::menu_item::MenuItem::new(crate::i18n::text("repo-workflows-agents-menu-cbc89e47"))
+        .icon("command")
+        .refused((!there).then_some(crate::i18n::text("repo-workflows-agents-menu-11b6670c")))
+        .show(ui)
+        .on_hover_text(crate::i18n::text("repo-workflows-agents-menu-d4604b9b"))
         .clicked()
     {
         acts.push(Action::Agent(AgentAct::Restart(row.task.clone())));
     }
-    if ui
-        .add_enabled(there, egui::Button::new("Open a terminal there"))
+    if crate::menu_item::MenuItem::new(crate::i18n::text("repo-workflows-agents-menu-04eb42a7"))
+        .icon("square-terminal")
+        .refused((!there).then_some(crate::i18n::text("repo-workflows-agents-menu-11b6670c")))
+        .show(ui)
         .clicked()
     {
-        acts.push(Action::NewTerminal {
+        acts.push(Action::Terminal(TerminalAct::New {
             shell: None,
             cwd: Some(path),
-        });
+        }));
     }
     ui.separator();
-    if ui
-        .button("Take off the list")
-        .on_hover_text("The worktree and its branch stay; remove them in WORKTREES")
+    if crate::menu_item::MenuItem::new(crate::i18n::text("repo-workflows-agents-menu-7b4c6a5c"))
+        .icon("minus")
+        .show(ui)
+        .on_hover_text(crate::i18n::text("repo-workflows-agents-menu-24b65605"))
         .clicked()
     {
         acts.push(Action::Agent(AgentAct::Forget(row.task.path.clone())));

@@ -14,29 +14,17 @@ use crate::theme::Tokens;
 const SHOWN: usize = 500;
 
 pub(super) fn ui(ui: &mut Ui, state: &mut FlagsState, locked: bool, acts: &mut Vec<Action>) {
-    faint(
+    faint(ui, crate::i18n::text("repo-workflows-doctor-ui-195ee0f7"));
+    card(
         ui,
-        "Files changed on disk that never show under Changes are often flagged in git's \
-         index. Both flags hide a file's changes; they mean different things, and git \
-         supports neither as a way to ignore changes to tracked files.",
+        crate::i18n::text("repo-workflows-doctor-ui-56146558"),
+        None,
+        |ui| {
+            dim(ui, crate::i18n::text("repo-workflows-doctor-ui-282e3905"));
+            ui.add_space(6.0);
+            dim(ui, crate::i18n::text("repo-workflows-doctor-ui-99079609"));
+        },
     );
-    card(ui, "The two flags", None, |ui| {
-        dim(
-            ui,
-            "assume-unchanged: a promise to git that the file won't change, so it doesn't \
-             check it, for speed on slow disks. Git may still overwrite the file (a pull, a \
-             checkout) and drop the flag; it is not for keeping local edits.",
-        );
-        ui.add_space(6.0);
-        dim(
-            ui,
-            "skip-worktree: git keeps the working-tree version and doesn't compare it with \
-             the index. Sparse-checkout uses it; people also use it to keep local edits to a \
-             tracked file, which git warns isn't supported: a pull, checkout or merge that \
-             changes the file may refuse to run until the flag is cleared. For local \
-             settings, an untracked override file is safer.",
-        );
-    });
     let FlagsState { list, ticked } = state;
     let Some(data) = reading(ui, list) else {
         return;
@@ -55,31 +43,37 @@ fn manual_card(
 ) {
     let t = Tokens::get(ui.ctx());
     let title = match manual.len() {
-        0 => "No flagged files".to_owned(),
-        1 => "1 flagged file".to_owned(),
-        n => format!("{n} flagged files"),
+        0 => crate::i18n::text("repo-workflows-doctor-manual-card-261a3c3d").to_owned(),
+        1 => crate::i18n::text("repo-workflows-doctor-manual-card-f01d6b0e").to_owned(),
+        n => crate::i18n::message(
+            "repo-workflows-doctor-manual-card-70727cd6",
+            &[("n", (n).into())],
+        ),
     };
     card(ui, &title, None, |ui| {
         if manual.is_empty() {
             faint(
                 ui,
-                "No tracked file is marked assume-unchanged or skip-worktree.",
+                crate::i18n::text("repo-workflows-doctor-manual-card-eb376b6a"),
             );
             return;
         }
         ui.horizontal(|ui| {
             let some = !ticked.is_empty();
             let text = if some {
-                format!("Clear the {} ticked", ticked.len())
+                crate::i18n::message(
+                    "repo-workflows-doctor-manual-card-14faa67e",
+                    &[("ticked-len-1", (ticked.len()).into())],
+                )
             } else {
-                "Clear ticked".to_owned()
+                crate::i18n::text("repo-workflows-doctor-manual-card-6c8cdf68").to_owned()
             };
             let clear_ticked = ui
                 .add_enabled(!locked && some, egui::Button::new(text))
                 .on_disabled_hover_text(if locked {
-                    "Wait for the running operation"
+                    crate::i18n::text("repo-workflows-doctor-manual-card-b5c82673")
                 } else {
-                    "Tick the files to clear first"
+                    crate::i18n::text("repo-workflows-doctor-manual-card-98cd282b")
                 });
             if clear_ticked.clicked() {
                 let chosen: Vec<Flagged> = manual
@@ -90,9 +84,18 @@ fn manual_card(
                 acts.push(clear(&chosen));
             }
             let clear_all = ui
-                .add_enabled(!locked, egui::Button::new("Clear all"))
-                .on_hover_text("Git looks at every one of these files again")
-                .on_disabled_hover_text("Wait for the running operation");
+                .add_enabled(
+                    !locked,
+                    egui::Button::new(crate::i18n::text(
+                        "repo-workflows-doctor-manual-card-29a390f9",
+                    )),
+                )
+                .on_hover_text(crate::i18n::text(
+                    "repo-workflows-doctor-manual-card-febfc014",
+                ))
+                .on_disabled_hover_text(crate::i18n::text(
+                    "repo-workflows-doctor-manual-card-b5c82673",
+                ));
             if clear_all.clicked() {
                 acts.push(clear(manual));
             }
@@ -104,9 +107,9 @@ fn manual_card(
                 let mut on = ticked.contains(&file.path);
                 let check = ui
                     .add_enabled(readable, egui::Checkbox::without_text(&mut on))
-                    .on_disabled_hover_text(
-                        "Its name isn't valid UTF-8: clear it with git update-index in a terminal",
-                    );
+                    .on_disabled_hover_text(crate::i18n::text(
+                        "repo-workflows-doctor-manual-card-bf185132",
+                    ));
                 if check.changed() {
                     if on {
                         ticked.insert(file.path.clone());
@@ -135,17 +138,23 @@ fn clear(files: &[Flagged]) -> Action {
             format!("{} files", files.len()),
         ),
     };
-    Action::Doctor(DoctorAct::Confirm(Confirm {
-        title: "Clear the flags?".to_owned(),
-        body: format!(
-            "Git will look at {what} again: local edits show under Changes, where Discard \
+    Action::Doctor(DoctorAct::Confirm(
+        Confirm {
+            title: "Clear the flags?".to_owned(),
+            body: format!(
+                "Git will look at {what} again: local edits show under Changes, where Discard \
              would throw them away. Which files were flagged isn't kept, so this can't be \
              undone here."
-        ),
-        button: "Clear".to_owned(),
-        label,
-        ops: flags::clear_ops(files),
-    }))
+            ),
+            button: "Clear".to_owned(),
+            label,
+            ops: flags::clear_ops(files),
+            presentation: None,
+        }
+        .with_presentation(super::ConfirmKind::Clear {
+            paths: files.iter().map(|f| f.path.clone()).collect(),
+        }),
+    ))
 }
 
 /// What sparse-checkout leaves out.
@@ -154,23 +163,24 @@ fn sparse_card(ui: &mut Ui, sparse: &Sparse, left_out: &[Flagged]) {
     let note = match sparse {
         Sparse::Off => return,
         Sparse::Cone(dirs) if dirs.is_empty() => {
-            "Sparse-checkout is on in cone mode with only the files at the top checked out."
-                .to_owned()
+            crate::i18n::text("repo-workflows-doctor-sparse-card-9cff4083").to_owned()
         }
-        Sparse::Cone(dirs) => format!(
-            "Sparse-checkout is on in cone mode; checked out: {}.",
-            dirs.join(", ")
+        Sparse::Cone(dirs) => crate::i18n::message(
+            "repo-workflows-doctor-sparse-card-ce4ee135",
+            &[("dirs-join-1", (dirs.join(", ")).clone().into())],
         ),
-        Sparse::Patterns => "Sparse-checkout is on with patterns: every skip-worktree file \
-                             counts as left out by them, so none of them is cleared here."
-            .to_owned(),
+        Sparse::Patterns => {
+            crate::i18n::text("repo-workflows-doctor-sparse-card-f364e530").to_owned()
+        }
     };
-    let title = format!("Left out by sparse-checkout ({})", left_out.len());
+    let title = crate::i18n::message(
+        "repo-workflows-doctor-sparse-card-04bc71e9",
+        &[("left-out-len-1", (left_out.len()).into())],
+    );
     card(ui, &title, Some(&note), |ui| {
         faint(
             ui,
-            "Git marks these skip-worktree too, but they are sparse-checkout's: change what is \
-             checked out with git sparse-checkout (set, add, disable), not by clearing flags.",
+            crate::i18n::text("repo-workflows-doctor-sparse-card-7bb29a8c"),
         );
         ui.add_space(6.0);
         for file in left_out.iter().take(SHOWN) {
@@ -185,9 +195,89 @@ fn more(ui: &mut Ui, total: usize) {
     if total > SHOWN {
         ui.add_space(4.0);
         ui.label(
-            RichText::new(format!("and {} more", total - SHOWN))
-                .italics()
-                .color(Tokens::get(ui.ctx()).text_faint),
+            RichText::new(crate::i18n::message(
+                "repo-workflows-doctor-more-683768ab",
+                &[("total-shown-1", (total - SHOWN).into())],
+            ))
+            .italics()
+            .color(Tokens::get(ui.ctx()).text_faint),
         );
+    }
+}
+
+#[cfg(test)]
+mod fluent_r1_confirmation_tests {
+    use super::*;
+    use egui_kittest::{Harness, kittest::Queryable};
+    #[test]
+    fn fluent_partition_r1_cached_doctor_confirmation_repaints_without_changing_label_or_argv()
+    -> Result<(), String> {
+        let files: Vec<_> = (0..1234)
+            .map(|i| Flagged {
+                path: format!("raw/{i}.txt"),
+                flag: Flag::AssumeUnchanged,
+            })
+            .collect();
+        crate::i18n::set_language("de");
+        let Action::Doctor(DoctorAct::Confirm(confirm)) = clear(&files) else {
+            return Err("actual clear must confirm".into());
+        };
+        assert_eq!(confirm.label, "Clear the flags of 1234 files");
+        let ops = confirm.ops.clone();
+        let raw = (
+            confirm.title.clone(),
+            confirm.body.clone(),
+            confirm.button.clone(),
+        );
+        let mut h = Harness::new_ui_state(
+            |ui, state: &mut (super::super::Confirm, Vec<Action>, bool)| {
+                if !std::mem::replace(&mut state.2, true) {
+                    crate::theme::install_fonts(ui.ctx());
+                    return;
+                }
+                let (t, b, button) = state.0.displayed();
+                super::super::page::ask(
+                    ui,
+                    &t,
+                    &b,
+                    &button,
+                    crate::i18n::text("repo-workflows-doctor-confirm-modal-19766ed6"),
+                    |yes| Action::Doctor(DoctorAct::Answer(yes)),
+                    &mut state.1,
+                );
+            },
+            (confirm, Vec::new(), false),
+        );
+        for lang in ["de", "en-US", "de"] {
+            crate::i18n::set_language(lang);
+            h.run();
+            let (title, body, button) = h.state().0.displayed();
+            h.get_by_label(&title);
+            h.get_by_label(&body);
+            h.get_by_label(&button);
+            assert_eq!(h.state().0.ops, ops);
+            assert_eq!(h.state().0.label, "Clear the flags of 1234 files");
+            assert_eq!(
+                (
+                    h.state().0.title.clone(),
+                    h.state().0.body.clone(),
+                    h.state().0.button.clone()
+                ),
+                raw
+            );
+            assert!(h.state().1.is_empty());
+            if lang == "de" {
+                assert!(body.contains("1.234"));
+            }
+        }
+        h.get_by_label(&h.state().0.displayed().2).click();
+        h.run();
+        assert!(matches!(
+            h.state().1.as_slice(),
+            [Action::Doctor(DoctorAct::Answer(true))]
+        ));
+        crate::i18n::set_language("en-US");
+
+        Ok(())
     }
 }

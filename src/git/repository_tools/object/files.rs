@@ -1,0 +1,320 @@
+//! Bounded filesystem metadata on the repository's machine. Paths are data, never shell code.
+use crate::remote;
+use std::path::{Path, PathBuf};
+use std::time::Duration;
+
+fn remote_read(
+    path: &Path,
+    body: impl FnOnce(&str) -> String,
+    cap: usize,
+    active: &dyn Fn() -> bool,
+) -> Result<Option<Vec<u8>>, String> {
+    let Some(t) = remote::parse(path) else {
+        return Ok(None);
+    };
+    if !active() {
+        return Err("Object inspection cancelled".into());
+    }
+    let request = remote::Request {
+        script: body(&remote::sh_path(&t.path)),
+        timeout: Some(Duration::from_secs(20)),
+        long: true,
+        ..Default::default()
+    };
+    let out = remote::exec(&t.host, &request)?;
+    if out.code != 0 {
+        return Err(crate::i18n::message(
+            "backend-cannot-inspect-object-store-path-91f926",
+            &[
+                ("path", (remote::display(path)).to_string().into()),
+                (
+                    "from_utf8_lossy",
+                    display_helper_error(String::from_utf8_lossy(&out.stderr).trim()).into(),
+                ),
+            ],
+        ));
+    }
+    if !active() {
+        return Err("Object inspection cancelled".into());
+    }
+    if out.stdout.len() > cap {
+        return Err(crate::i18n::text(
+            "backend-object-store-metadata-exceeds-the-inspection-limit-f6596e",
+        )
+        .into());
+    }
+    Ok(Some(out.stdout))
+}
+pub(super) fn size(path: &Path, active: &dyn Fn() -> bool) -> Result<Option<u64>, String> {
+    if let Some(out) = remote_read(
+        path,
+        |p| {
+            format!(
+                "if [ -f {p} ]; then wc -c < {p}; elif [ -e {p} ]; then echo 'not a regular file' >&2; exit 1; else printf 'missing'; fi"
+            )
+        },
+        128,
+        active,
+    )? {
+        let s = String::from_utf8(out)
+            .map_err(|_| crate::i18n::text("backend-invalid-file-size-13be78"))?;
+        return if s == "missing" {
+            Ok(None)
+        } else {
+            s.trim()
+                .parse()
+                .map(Some)
+                .map_err(|_| crate::i18n::text("backend-invalid-file-size-13be78").into())
+        };
+    }
+    if !active() {
+        return Err("Object inspection cancelled".into());
+    }
+    match std::fs::metadata(path) {
+        Ok(m) if m.is_file() => Ok(Some(m.len())),
+        Ok(_) => Err(crate::i18n::message(
+            "backend-is-not-a-regular-object-file-9ade90",
+            &[("path", (path.display()).to_string().into())],
+        )),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(e) => Err(e.to_string()),
+    }
+}
+pub(super) fn packs(
+    store: &Path,
+    max: usize,
+    active: &dyn Fn() -> bool,
+) -> Result<Vec<PathBuf>, String> {
+    let directory = remote::join(store, "pack");
+    let mut names = if let Some(out) = remote_read(
+        &directory,
+        |p| {
+            format!(
+                "[ ! -e {p} ] && exit 0\n[ -d {p} ] || exit 1\nn=0\nfor f in {p}/pack-*.idx; do [ -f \"$f\" ] || continue; n=$((n+1)); [ \"$n\" -le {max} ] || {{ echo 'More than {max} packs; use Git in the terminal' >&2; exit 1; }}; printf '%s\\0' \"${{f##*/}}\"; done"
+            )
+        },
+        max * 128,
+        active,
+    )? {
+        out.split(|b| *b == 0)
+            .filter(|s| !s.is_empty())
+            .map(|s| {
+                String::from_utf8(s.to_vec()).map_err(|_| {
+                    crate::i18n::text("backend-pack-filename-is-not-utf-8-acd160").to_owned()
+                })
+            })
+            .collect::<Result<Vec<_>, _>>()?
+    } else {
+        let mut names = Vec::new();
+        match std::fs::read_dir(&directory) {
+            Ok(entries) => {
+                for entry in entries {
+                    let entry = entry.map_err(|e| e.to_string())?;
+                    let name = entry.file_name().to_string_lossy().into_owned();
+                    if name.starts_with("pack-") && name.ends_with(".idx") {
+                        if names.len() >= max {
+                            return Err(crate::i18n::message(
+                                "backend-more-than-max-packs-use-git-in-the-terminal-40f8d7",
+                                &[("max", (max).into())],
+                            ));
+                        }
+                        names.push(name);
+                    }
+                }
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => (),
+            Err(e) => return Err(e.to_string()),
+        }
+        names
+    };
+    names.sort();
+    names
+        .into_iter()
+        .map(|name| {
+            let hash = name
+                .strip_prefix("pack-")
+                .and_then(|s| s.strip_suffix(".idx"))
+                .ok_or(crate::i18n::text("backend-invalid-pack-filename-11bc5f"))?;
+            if !super::valid_oid(hash) {
+                return Err(crate::i18n::text(
+                    "backend-unexpected-pack-index-filename-inspect-with-git-7bfbd1",
+                )
+                .into());
+            }
+            Ok(remote::join(&directory, &name))
+        })
+        .collect()
+}
+
+/// Bounded optional file contents, on the repository machine.
+pub(crate) fn read(
+    path: &Path,
+    cap: usize,
+    active: &dyn Fn() -> bool,
+) -> Result<Option<Vec<u8>>, String> {
+    if let Some(out) = remote_read(
+        path,
+        |p| {
+            format!(
+                "if [ -f {p} ]; then printf '1'; head -c {} < {p}; elif [ -e {p} ]; then echo 'not a regular file' >&2; exit 1; else printf '0'; fi",
+                cap + 1
+            )
+        },
+        cap + 2,
+        active,
+    )? {
+        return match out.first() {
+            Some(b'0') => Ok(None),
+            Some(b'1') if out.len() - 1 <= cap => Ok(Some(out[1..].to_vec())),
+            _ => Err(crate::i18n::text(
+                "backend-object-store-metadata-exceeds-the-inspection-limit-f6596e",
+            )
+            .into()),
+        };
+    }
+    if !active() {
+        return Err("Object inspection cancelled".into());
+    }
+    // O_NONBLOCK prevents a substituted FIFO from blocking open before fstat.
+    // O_NOFOLLOW rejects symlink substitution; only a pinned regular file is read.
+    #[cfg(unix)]
+    let opened: Result<std::fs::File, std::io::Error> = rustix::fs::open(
+        path,
+        rustix::fs::OFlags::RDONLY
+            | rustix::fs::OFlags::NONBLOCK
+            | rustix::fs::OFlags::NOFOLLOW
+            | rustix::fs::OFlags::CLOEXEC,
+        rustix::fs::Mode::empty(),
+    )
+    .map(std::fs::File::from)
+    .map_err(Into::into);
+    #[cfg(not(unix))]
+    let opened = match std::fs::symlink_metadata(path) {
+        Ok(m) if m.is_file() => std::fs::File::open(path),
+        Ok(_) => {
+            return Err(crate::i18n::text(
+                "backend-object-store-metadata-is-not-a-regular-file-aaed30",
+            )
+            .into());
+        }
+        Err(e) => Err(e),
+    };
+    let file = match opened {
+        Ok(f) => f,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(e) => {
+            return Err(crate::i18n::message(
+                "backend-cannot-read-regular-metadata-e-c69939",
+                &[
+                    ("path", (remote::display(path)).to_string().into()),
+                    ("detail", (e).to_string().into()),
+                ],
+            ));
+        }
+    };
+    let metadata = file.metadata().map_err(|e| e.to_string())?;
+    if !metadata.is_file() {
+        return Err(crate::i18n::text(
+            "backend-object-store-metadata-is-not-a-regular-file-aaed30",
+        )
+        .into());
+    }
+    if metadata.len() > cap as u64 {
+        return Err(crate::i18n::text(
+            "backend-object-store-metadata-exceeds-the-inspection-limit-f6596e",
+        )
+        .into());
+    }
+    let bytes = bounded_bytes(file, cap, active)?;
+    Ok(Some(bytes))
+}
+
+fn bounded_bytes(
+    mut reader: impl std::io::Read,
+    cap: usize,
+    active: &dyn Fn() -> bool,
+) -> Result<Vec<u8>, String> {
+    let mut bytes = Vec::new();
+    let mut chunk = [0u8; 8192];
+    loop {
+        if !active() {
+            return Err("Object inspection cancelled".into());
+        }
+        let remaining = (cap + 1).saturating_sub(bytes.len()).min(chunk.len());
+        if remaining == 0 {
+            return Err(crate::i18n::text(
+                "backend-object-store-metadata-exceeds-the-inspection-limit-f6596e",
+            )
+            .into());
+        }
+        let n = reader
+            .read(&mut chunk[..remaining])
+            .map_err(|e| e.to_string())?;
+        if n == 0 {
+            return Ok(bytes);
+        }
+        bytes.extend_from_slice(&chunk[..n]);
+        if bytes.len() > cap {
+            return Err(crate::i18n::text(
+                "backend-object-store-metadata-exceeds-the-inspection-limit-f6596e",
+            )
+            .into());
+        }
+    }
+}
+#[cfg(test)]
+mod bounded_metadata_pure {
+    use super::*;
+    #[test]
+    fn bounds_and_cancellation_apply_between_chunks() -> Result<(), String> {
+        assert_eq!(bounded_bytes(&b"abcd"[..], 4, &|| true)?, b"abcd");
+        assert!(bounded_bytes(&b"abcde"[..], 4, &|| true).is_err());
+        let checks = std::cell::Cell::new(0);
+        assert!(
+            bounded_bytes(&[0u8; 16384][..], 16384, &|| {
+                checks.set(checks.get() + 1);
+                checks.get() < 2
+            })
+            .is_err()
+        );
+        assert_eq!(checks.get(), 2);
+        Ok(())
+    }
+}
+
+fn display_helper_error(error: &str) -> String {
+    if error == "not a regular file" {
+        return crate::i18n::text("backend-object-store-metadata-is-not-a-regular-file-aaed30")
+            .into();
+    }
+    if let Some(count) = error
+        .strip_prefix("More than ")
+        .and_then(|s| s.strip_suffix(" packs; use Git in the terminal"))
+        .and_then(|s| s.parse::<usize>().ok())
+    {
+        return crate::i18n::message(
+            "backend-more-than-max-packs-use-git-in-the-terminal-40f8d7",
+            &[("max", count.into())],
+        );
+    }
+    error.into()
+}
+
+#[cfg(test)]
+mod backend_fluent_helper_tests {
+    #[test]
+    fn backend_fluent_object_helper_keeps_unrecognized_diagnostics_opaque() {
+        crate::i18n::set_language("de");
+        assert_eq!(
+            super::display_helper_error("not a regular file"),
+            "Die Objektspeichermetadaten liegen nicht in einer regulären Datei."
+        );
+        assert_eq!(
+            super::display_helper_error("More than 1234 packs; use Git in the terminal"),
+            "Mehr als 1.234 Packs; verwende Git im Terminal."
+        );
+        let unknown = "provider HTTP 409: More than abc packs; use Git in the terminal";
+        assert_eq!(super::display_helper_error(unknown), unknown);
+        crate::i18n::set_language("en-US");
+    }
+}

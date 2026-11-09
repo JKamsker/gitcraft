@@ -1,6 +1,7 @@
 //! What the views ask the tab to do, and the actions several views build.
 
 use super::toolbar::reveal_label;
+use crate::repo::terminals::TerminalAct;
 use std::path::PathBuf;
 
 use super::dialogs::StashChoice;
@@ -10,13 +11,45 @@ use super::{
     file_view, issue_work, ops, partial_stash, pr_review, quick_edit, reflog, timeline, versions,
 };
 use crate::git::{self, InProgress};
-use crate::keymap::{Command, label, written};
-use crate::terminal::ShellSpec;
+use crate::keymap::{Command, label};
 
 /// Everything the views ask for; applied after drawing so views only borrow the state.
 pub(crate) enum Action {
+    LoadPromptSession(String),
+    ShowPromptHunk(super::prompt_session::Hunk),
+    Keyboard(super::keyboard::Request),
+    KeyboardStep(i32),
+    FocusPane(super::keyboard::Pane),
+    OpenLineDossier(Option<git::investigations::dossier::Seed>),
+    CloseLineDossier,
+    OpenSymbolBiography(Option<git::investigations::dossier::Seed>),
+    CloseSymbolBiography,
+    OpenPinnedFileLine(git::investigations::dossier::Seed),
+    EarlierVersions,
+    DraftEnable(bool),
+    DraftSnapshot,
+    DraftUndo,
+    DraftPreview {
+        id: crate::git::drafts::Id,
+        path: String,
+        index: bool,
+    },
+    DraftRecover {
+        preview: Box<crate::git::drafts::RestorePreview>,
+        hunks: Vec<usize>,
+    },
+    OpenContentRecovery,
+    ContentSearch(String),
+    ContentInspect(usize, Option<usize>),
+    ContentPrepare(crate::git::recovery::Target),
+    ContentPerform(std::sync::Arc<crate::git::recovery::Prepared>),
+    RepositoryTools(super::repository_tools::Act),
+    /// What the background resolving run is asked (see `resolver`).
+    Resolver(super::resolver::ResolverAct),
     /// What a key of the tab does (see [`crate::keymap`]), or why it can't now.
     Key(crate::keymap::Command),
+    /// A read-only clipboard payload resolved from the current selected commit.
+    CopyText(String),
     /// Show the changes and put the cursor in the commit summary.
     FocusCommit,
     /// Stop the operation running (one that goes over the network).
@@ -28,13 +61,45 @@ pub(crate) enum Action {
     /// Turn offline mode on or off.
     SetOffline(bool),
     Select(usize),
+    DvcPull,
+    OpenFileComparison(super::file_comparison::Page),
+    RefreshFileComparison,
+    CloseFileComparison,
+    ComparisonMove {
+        request: u64,
+        index: usize,
+    },
+    ComparisonCell {
+        request: u64,
+        path: Vec<u8>,
+        column: usize,
+    },
+    ComparisonPick {
+        request: u64,
+        boundary: usize,
+        lines: std::collections::BTreeSet<usize>,
+        whole: bool,
+    },
+    ComparisonNormalPatch,
     SelectHash(String),
+    /// Follow a backlink directly to changed files and the first file diff.
+    OpenCommitChanges(String),
+    ActivityCommit(String),
     /// Focus a pull request's branch and compare all of its proposed changes.
     SelectPr(u64),
     SelectStash(usize),
     OpenDiff(DiffKey),
+    Review(super::review_workflow::ReviewAct),
+    Freshness(super::review_workflow::FreshnessAct),
+    Story(super::review_workflow::StoryAct),
+    ReviewTools(super::review_workflow::ToolsAct),
     /// Show a pull request in the big area.
     OpenPr(u64),
+    /// Select a linked forge remote before opening its pull request.
+    OpenLinkedPr {
+        number: u64,
+        remote: String,
+    },
     /// Open the worktree of a pull request (proposing `branch`, at `sha`), making it first
     /// when there is none.
     OpenPrWorktree {
@@ -54,6 +119,9 @@ pub(crate) enum Action {
     CloseCi,
     /// Something done in the pipeline view.
     Ci(ci_view::CiAct),
+    LocalCi(super::local_ci::Act),
+    Email(super::email::Act),
+    Devcontainer(super::devcontainer::Act),
     /// Something done in the reflog view (opening it on a reflog, or on the lost commits).
     Reflog(reflog::ReflogAct),
     CloseReflog,
@@ -62,6 +130,8 @@ pub(crate) enum Action {
     /// Show the repository doctor in the big area, at a section.
     OpenDoctor(doctor::Section),
     CloseDoctor,
+    OpenTour,
+    OpenSshSetup,
     /// Something done in the repository doctor.
     Doctor(doctor::DoctorAct),
     /// Agent tasks and the worktree setup recipe.
@@ -93,6 +163,10 @@ pub(crate) enum Action {
     Pull,
     PullWith(PullMode),
     Push,
+    SubmitPreflight(Box<crate::push_preflight::Plan>),
+    FixPreflight(Box<crate::push_preflight::Plan>, String),
+    PreflightMessages(Box<crate::push_preflight::Plan>),
+    ReloadPreflight(Box<crate::push_preflight::Plan>),
     /// Pull, then push the checked-out branch.
     Sync,
     /// A button of the banner after a refused push.
@@ -116,7 +190,7 @@ pub(crate) enum Action {
     OpenTab(PathBuf),
     /// Open a worktree the way the settings say: in this tab, or in its own.
     OpenWorktree(PathBuf),
-    ToggleTerminal,
+    Terminal(TerminalAct),
     /// Pop a view out into its own window, or bring it back.
     Popout(super::popout::Request),
     /// Collapse or bring back the branches panel.
@@ -130,13 +204,8 @@ pub(crate) enum Action {
     GraphOrder(git::LogOrder),
     /// Collapse or bring back the detail panel.
     ToggleDetail,
-    NewTerminal {
-        shell: Option<ShellSpec>,
-        cwd: Option<PathBuf>,
-    },
-    CloseTerminal(usize),
-    SelectTerminal(usize),
     ToggleSearch,
+    FocusSearch,
     /// Open the checklist of stale or merged branches to delete.
     SelectStaleBranches,
     SearchStep(i32),
@@ -193,6 +262,10 @@ pub(crate) enum Action {
     },
     /// Read syntax changes through Difftastic; staging stays in the patch.
     DiffStructural(bool),
+    DiffDecrypted(bool),
+    DiffSvgSource(bool),
+    DiffWrap(bool),
+    DiffDecryptedEncoding(super::diff::encrypted::JsonEncoding),
     /// Scroll the diff to the next change (`1`) or the previous one (`-1`).
     DiffStep(i32),
     /// Show the two places of a moved block of the diff together (by its index), or stop.
@@ -286,6 +359,8 @@ pub(crate) enum Action {
     DropMenu(drag_drop::DropMenu),
     /// Move or squash a commit of the checked-out branch onto another of it.
     CommitDrop(drag_drop::CommitDrop),
+    OpenBehaviour,
+    OpenLinkedMachines,
     OpenBundleExport,
     OpenBundleInspect,
     ExportBundle {
@@ -310,6 +385,11 @@ pub(crate) enum Action {
     /// the fold's.
     AbortFold,
     RunRebase,
+    ConfirmedRebase(u64),
+    AskRebase {
+        onto: String,
+        label: String,
+    },
     CloseRebase,
     /// Open the split editor on a commit of the checked-out branch.
     OpenSplit(String),
@@ -330,6 +410,8 @@ pub(crate) enum Action {
     Stack(super::stack::StackAct),
     /// Remember these HTTPS credentials and run the operation that needed them again.
     SignIn(git::Credentials),
+    /// Forget the effective HTTPS helper login, then reopen the tab sign-in dialog.
+    SwitchHttps(String),
     /// Ask before deleting the local tag `name` (at the commit `target`), once what it points
     /// at is known (read in the background for a repository on another machine).
     DeleteTag {
@@ -352,6 +434,7 @@ pub(crate) enum Action {
         base_label: String,
         target: Option<String>,
         target_label: String,
+        captions: [Option<super::state::CompareCaption>; 2],
         since_fork: bool,
     },
     /// Show only the target's changes since the two diverged, or every difference.
@@ -374,6 +457,8 @@ pub(crate) enum Action {
     OpenCollisions,
     /// Something about comparing two versions of a series of commits.
     Versions(versions::VersionsAct),
+    /// Something done on the insights page (opening it at a view, in a view).
+    Insights(super::insights::InsightsAct),
     /// The check of the CODEOWNERS file.
     Owners(super::owners::OwnersAct),
     /// Open the agent fence's window.
@@ -412,6 +497,7 @@ pub(crate) fn compare_branches_action(
         base_label: base.name.to_owned(),
         target: Some(target.full()),
         target_label: target.name.to_owned(),
+        captions: [None, None],
         since_fork,
     }
 }
@@ -485,11 +571,9 @@ pub(crate) fn fast_forward_action(branch: BranchRef<'_>, current: &str) -> Actio
 }
 
 pub(crate) fn rebase_action(onto: BranchRef<'_>, current: &str) -> Action {
-    Action::UndoableOps {
+    Action::AskRebase {
+        onto: onto.full(),
         label: format!("Rebase {current} onto {}", onto.name),
-        ops: ops(&[&["rebase", &onto.full()]]),
-        refresh: Refresh::All,
-        undo: Undo::HeadMove { mode: "--keep" },
     }
 }
 
@@ -517,11 +601,8 @@ pub(super) fn abort_action(state: InProgress) -> Action {
     let what = state.label().to_lowercase();
     Action::Dialog(Dialog::confirm(
         &format!("Abort {what}"),
-        format!(
-            "Stop the {what} and go back to where it started? Conflicts resolved so far are \
-             lost, and can't be brought back."
-        ),
-        "Abort",
+        crate::i18n::message("repo-core-0017", &[("what", what.to_string().into())]),
+        crate::i18n::text("repo-core-0018"),
         ops(&[&[state.command(), "--abort"]]),
         None,
     ))
@@ -529,10 +610,38 @@ pub(super) fn abort_action(state: InProgress) -> Action {
 
 impl RepoTab {
     /// What the command palette offers for this repository.
-    pub(crate) fn additional_palette_items(&self) -> Vec<(String, String, Action)> {
+    pub(crate) fn additional_palette_items(
+        &self,
+        ctx: &egui::Context,
+    ) -> Vec<(String, String, Action)> {
         let mut items: Vec<(String, String, Action)> = vec![
-            ("Fetch".into(), label(Command::Fetch), Action::Fetch),
-            ("Pull".into(), label(Command::Pull), Action::Pull),
+            (
+                "DVC: Pull".into(),
+                "data download remote".into(),
+                Action::DvcPull,
+            ),
+            (
+                "Code moved across files".into(),
+                "refactor moved block".into(),
+                Action::OpenFileComparison(super::file_comparison::Page::CodeMoves),
+            ),
+            (
+                "File migration map".into(),
+                "files".into(),
+                Action::OpenFileComparison(super::file_comparison::Page::Migration),
+            ),
+            (
+                "Three-state staging lens".into(),
+                "staging".into(),
+                Action::OpenFileComparison(super::file_comparison::Page::Lens),
+            ),
+            (
+                "File versions across branches".into(),
+                "files".into(),
+                Action::OpenFileComparison(super::file_comparison::Page::Matrix),
+            ),
+            ("Fetch".into(), label(ctx, Command::Fetch), Action::Fetch),
+            ("Pull".into(), label(ctx, Command::Pull), Action::Pull),
             (
                 if self.gerrit.is_some() {
                     "Push for review"
@@ -540,7 +649,7 @@ impl RepoTab {
                     "Push"
                 }
                 .into(),
-                label(Command::Push),
+                label(ctx, Command::Push),
                 Action::Push,
             ),
             (
@@ -567,6 +676,16 @@ impl RepoTab {
         );
         items.extend([
             (
+                "Behaviour timeline…".into(),
+                "command output benchmark screenshot".into(),
+                Action::OpenBehaviour,
+            ),
+            (
+                "Linked project copies…".into(),
+                "machines".into(),
+                Action::OpenLinkedMachines,
+            ),
+            (
                 "Export Git bundle…".into(),
                 "offline backup".into(),
                 Action::OpenBundleExport,
@@ -591,31 +710,31 @@ impl RepoTab {
                 "absorb".into(),
                 Action::OpenAbsorb,
             ),
-            ("Undo".into(), written("Cmd+Z"), Action::Undo),
-            ("Redo".into(), written("Cmd+Y"), Action::Redo),
+            ("Undo".into(), label(ctx, Command::Undo), Action::Undo),
+            ("Redo".into(), label(ctx, Command::Redo), Action::Redo),
             (
                 "Timeline and undo tree".into(),
-                "Ctrl+Shift+Z".into(),
+                label(ctx, Command::Timeline),
                 Action::ToggleTimeline,
             ),
             (
                 "Stash changes…".into(),
-                label(Command::Stash),
+                label(ctx, Command::Stash),
                 Action::Dialog(Dialog::stash()),
             ),
             (
                 "Stage all changes".into(),
-                label(Command::StageAll),
+                label(ctx, Command::StageAll),
                 Action::Key(Command::StageAll),
             ),
             (
                 "Commit".into(),
-                label(Command::Commit),
+                label(ctx, Command::Commit),
                 Action::Key(Command::Commit),
             ),
             (
                 "Search commits".into(),
-                written("Cmd+F"),
+                label(ctx, Command::Search),
                 Action::ToggleSearch,
             ),
             (
@@ -628,11 +747,7 @@ impl RepoTab {
                 "recovery".into(),
                 Action::Reflog(reflog::ReflogAct::FindLost),
             ),
-            (
-                "Toggle terminal".into(),
-                label(Command::Terminal),
-                Action::ToggleTerminal,
-            ),
+            super::terminals::toggle_palette_item(ctx),
             if crate::network::refused().is_some() {
                 (
                     "Go online".into(),
@@ -651,19 +766,87 @@ impl RepoTab {
                 "log".into(),
                 Action::ToggleActivity,
             ),
-            (
-                "New terminal".into(),
-                "terminal".into(),
-                Action::NewTerminal {
-                    shell: None,
-                    cwd: None,
-                },
-            ),
-            ("Reload".into(), label(Command::Reload), Action::Reload),
+            super::terminals::new_palette_item(),
+            ("Reload".into(), label(ctx, Command::Reload), Action::Reload),
             (
                 "Select stale or merged branches…".into(),
                 "branch".into(),
                 Action::SelectStaleBranches,
+            ),
+            (
+                "Conflicts that can wait: isolated rebase and restack…".into(),
+                "Deferred rewrites".into(),
+                Action::RepositoryTools(super::repository_tools::Act::Deferred),
+            ),
+            (
+                "Parallel branches in this folder: hunk ownership…".into(),
+                "Virtual branches".into(),
+                Action::RepositoryTools(super::repository_tools::Act::Virtuals),
+            ),
+            (
+                "Inspect state publication receipts…".into(),
+                "Working-state transaction recovery".into(),
+                Action::RepositoryTools(super::repository_tools::Act::StateReceipts),
+            ),
+            (
+                "Named changelists: messages, commit and shelve…".into(),
+                "Working changes".into(),
+                Action::RepositoryTools(super::repository_tools::Act::Lists),
+            ),
+            (
+                "Push outbox: queue exact commit or send selected entries…".into(),
+                "Offline publication".into(),
+                Action::RepositoryTools(super::repository_tools::Act::Outbox),
+            ),
+            (
+                "Subtrees: register, update, inspect and publish vendored folders…".into(),
+                "Vendored source history".into(),
+                Action::RepositoryTools(super::repository_tools::Act::Subtrees(String::new())),
+            ),
+            (
+                "Shared and borrowed objects".into(),
+                "Inspect shared Git directories and donors; make a clone independent".into(),
+                Action::RepositoryTools(super::repository_tools::Act::Sharing),
+            ),
+            (
+                "Publish submodule dependencies before parent…".into(),
+                "submodules publish remote".into(),
+                Action::RepositoryTools(super::repository_tools::Act::Dependencies),
+            ),
+            (
+                "Pull and push routes…".into(),
+                "triangular upstream ahead behind".into(),
+                Action::RepositoryTools(super::repository_tools::Act::Routes(String::new())),
+            ),
+            (
+                "Publish to several hosts…".into(),
+                "publication group retry mirrors".into(),
+                Action::RepositoryTools(super::repository_tools::Act::Publication(String::new())),
+            ),
+            (
+                "Remote URLs, refspecs and mirror policy…".into(),
+                "fetch push mapping prune".into(),
+                Action::RepositoryTools(super::repository_tools::Act::Remote(String::new())),
+            ),
+            (
+                "Replace refs and temporary history joins…".into(),
+                "grafts original effective history".into(),
+                Action::RepositoryTools(super::repository_tools::Act::Replacements),
+            ),
+            (
+                "Ref storage and reftable migration…".into(),
+                "refs compatibility".into(),
+                Action::RepositoryTools(super::repository_tools::Act::Reftable),
+            ),
+            (
+                "How an object is stored…".into(),
+                "objects pack delta file version".into(),
+                Action::RepositoryTools(super::repository_tools::Act::Object("HEAD".into())),
+            ),
+            (
+                "All refs and namespace history…".into(),
+                "refs internals".into(),
+                Action::RepositoryTools(super::repository_tools::Act::AllRefs(String::new())),
             ),
             (
                 "Repository doctor".into(),
@@ -722,6 +905,7 @@ impl RepoTab {
             ));
         }
         items.extend(self.versions_palette_item());
+        items.extend(self.insights_palette_items());
         if self.owners.file().is_some() {
             items.push((
                 "Check CODEOWNERS".into(),
@@ -790,7 +974,7 @@ impl RepoTab {
                 Action::LfsStorage(super::lfs_storage::StorageAct::OpenPanel),
             ));
         }
-        if self.hosting.is_some() {
+        {
             items.push((
                 "Start work from an issue…".into(),
                 "issue".into(),
@@ -827,7 +1011,7 @@ impl RepoTab {
             ));
             items.push((
                 "Create branch".into(),
-                label(Command::NewBranch),
+                label(ctx, Command::NewBranch),
                 Action::Dialog(Dialog::create_branch(&self.refs.head, "HEAD")),
             ));
             items.push((
@@ -842,5 +1026,27 @@ impl RepoTab {
         items.extend(self.rehearse_palette_items());
         items.extend(self.custom_palette_items());
         items
+    }
+}
+
+impl Action {
+    /// Registry identity of actions that have a user-editable shortcut. Dynamic targets
+    /// remain in their action; a new-branch key always uses HEAD rather than the selection.
+    pub(crate) fn key_command(&self) -> Option<Command> {
+        Some(match self {
+            Self::Key(command) => *command,
+            Self::Undo => Command::Undo,
+            Self::Redo => Command::Redo,
+            Self::ToggleSearch | Self::FocusSearch => Command::Search,
+            Self::ToggleTimeline => Command::Timeline,
+            Self::Fetch => Command::Fetch,
+            Self::Pull => Command::Pull,
+            Self::Push => Command::Push,
+            Self::Terminal(TerminalAct::Toggle) => Command::Terminal,
+            Self::Commit => Command::Commit,
+            Self::Reload => Command::Reload,
+            Self::Dialog(Dialog::Stash(_)) => Command::Stash,
+            _ => return None,
+        })
     }
 }

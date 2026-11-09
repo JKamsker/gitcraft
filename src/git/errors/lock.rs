@@ -42,7 +42,13 @@ pub fn inspect(repo: &Path, lock: &str) -> Result<Option<LockFile>, String> {
             let text = String::from_utf8_lossy(&out.stdout);
             let mut words = text.split_whitespace().map(str::parse::<i64>);
             let (Some(Ok(modified)), Some(Ok(now))) = (words.next(), words.next()) else {
-                return Err(format!("could not read the age of {lock}: {text}"));
+                return Err(crate::i18n::message(
+                    "backend-could-not-read-the-age-of-lock-text-850917",
+                    &[
+                        ("lock", (lock).to_string().into()),
+                        ("text", (text).to_string().into()),
+                    ],
+                ));
             };
             Ok(Some(LockFile {
                 shown: lock,
@@ -98,12 +104,28 @@ fn exec(host: &remote::Host, script: String) -> Result<remote::Output, String> {
 
 fn refused(lock: &str, code: i32, stderr: &[u8]) -> String {
     match code {
-        IS_LINK => format!("{lock} is a symbolic link, not a lock git made: left alone"),
-        NOT_A_FILE => format!("{lock} is not a file: left alone"),
-        CHANGED => format!("{lock} was written again since: a git is using it, left alone"),
+        IS_LINK => crate::i18n::message(
+            "backend-lock-is-a-symbolic-link-not-a-lock-git-made-left-alone-096826",
+            &[("lock", (lock).to_string().into())],
+        ),
+        NOT_A_FILE => crate::i18n::message(
+            "backend-lock-is-not-a-file-left-alone-18d385",
+            &[("lock", (lock).to_string().into())],
+        ),
+        CHANGED => crate::i18n::message(
+            "backend-lock-was-written-again-since-a-git-is-using-it-left-alone-91d27e",
+            &[("lock", (lock).to_string().into())],
+        ),
         _ => {
             let said = String::from_utf8_lossy(stderr).trim().to_owned();
-            format!("could not reach {lock}: {said} (exit status {code})")
+            crate::i18n::message(
+                "backend-could-not-reach-lock-said-exit-status-code-3ef736",
+                &[
+                    ("lock", (lock).to_string().into()),
+                    ("said", (said).to_string().into()),
+                    ("code", (code).to_string().into()),
+                ],
+            )
         }
     }
 }
@@ -113,7 +135,15 @@ fn inspect_here(lock: &str) -> Result<Option<LockFile>, String> {
     let meta = match std::fs::symlink_metadata(&path) {
         Ok(meta) => meta,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-        Err(e) => return Err(format!("could not read {lock}: {e}")),
+        Err(e) => {
+            return Err(crate::i18n::message(
+                "backend-could-not-read-lock-e-647482",
+                &[
+                    ("lock", (lock).to_string().into()),
+                    ("detail", (e).to_string().into()),
+                ],
+            ));
+        }
     };
     if meta.file_type().is_symlink() {
         return Err(refused(lock, IS_LINK, &[]));
@@ -137,7 +167,15 @@ fn remove_here(lock: &str, modified: i64) -> Result<(), String> {
     match inspect_here(lock)? {
         None => Ok(()),
         Some(now) if now.modified != modified => Err(refused(lock, CHANGED, &[])),
-        Some(_) => std::fs::remove_file(lock).map_err(|e| format!("could not remove {lock}: {e}")),
+        Some(_) => std::fs::remove_file(lock).map_err(|e| {
+            crate::i18n::message(
+                "backend-could-not-remove-lock-e-c14874",
+                &[
+                    ("lock", (lock).to_string().into()),
+                    ("detail", (e).to_string().into()),
+                ],
+            )
+        }),
     }
 }
 
@@ -146,10 +184,16 @@ fn remove_here(lock: &str, modified: i64) -> Result<(), String> {
 fn within_git_dir(repo: &Path, lock: &str) -> Result<String, String> {
     let name = lock.rsplit(['/', '\\']).next().unwrap_or_default();
     if !name.ends_with(".lock") || name == ".lock" {
-        return Err(format!("{lock} is not a lock file"));
+        return Err(crate::i18n::message(
+            "backend-lock-is-not-a-lock-file-c8de79",
+            &[("lock", (lock).to_string().into())],
+        ));
     }
     if lock.split(['/', '\\']).any(|part| part == "..") {
-        return Err(format!("{lock} is not a path git makes locks at"));
+        return Err(crate::i18n::message(
+            "backend-lock-is-not-a-path-git-makes-locks-at-7401cd",
+            &[("lock", (lock).to_string().into())],
+        ));
     }
     let dirs = run(
         Some(repo),
@@ -171,8 +215,9 @@ fn within_git_dir(repo: &Path, lock: &str) -> Result<String, String> {
     if inside {
         Ok(lock.to_owned())
     } else {
-        Err(format!(
-            "{lock} is not in this repository's git folder: left alone"
+        Err(crate::i18n::message(
+            "backend-lock-is-not-in-this-repository-s-git-folder-left-alone-043d3a",
+            &[("lock", (lock).to_string().into())],
         ))
     }
 }
@@ -222,9 +267,14 @@ pub fn git_processes(repo: &Path) -> Result<Vec<String>, String> {
         Some(t) => {
             let out = exec(&t.host, "exec ps -A -o pid= -o ppid= -o args=".to_owned())?;
             if out.code != 0 {
-                return Err(format!(
-                    "could not list the processes there: {}",
-                    String::from_utf8_lossy(&out.stderr).trim()
+                return Err(crate::i18n::message(
+                    "backend-could-not-list-the-processes-there-bdb181",
+                    &[(
+                        "from_utf8_lossy",
+                        (String::from_utf8_lossy(&out.stderr).trim())
+                            .to_string()
+                            .into(),
+                    )],
                 ));
             }
             Ok(git_lines(&String::from_utf8_lossy(&out.stdout), None))
@@ -238,9 +288,16 @@ fn processes_here() -> Result<Vec<String>, String> {
     let out = std::process::Command::new("ps")
         .args(["-A", "-o", "pid=", "-o", "ppid=", "-o", "args="])
         .output()
-        .map_err(|e| format!("could not list the processes: {e}"))?;
+        .map_err(|e| {
+            crate::i18n::message(
+                "backend-could-not-list-the-processes-e-248d65",
+                &[("detail", (e).to_string().into())],
+            )
+        })?;
     if !out.status.success() {
-        return Err("could not list the processes: ps failed".to_owned());
+        return Err(
+            crate::i18n::text("backend-could-not-list-the-processes-ps-failed-a4a467").to_owned(),
+        );
     }
     Ok(git_lines(
         &String::from_utf8_lossy(&out.stdout),
@@ -256,7 +313,12 @@ fn processes_here() -> Result<Vec<String>, String> {
         .args(["/FO", "CSV", "/NH", "/FI", "IMAGENAME eq git.exe"])
         .creation_flags(CREATE_NO_WINDOW)
         .output()
-        .map_err(|e| format!("could not list the processes: {e}"))?;
+        .map_err(|e| {
+            crate::i18n::message(
+                "backend-could-not-list-the-processes-e-248d65",
+                &[("detail", (e).to_string().into())],
+            )
+        })?;
     Ok(tasklist_git(&String::from_utf8_lossy(&out.stdout)))
 }
 

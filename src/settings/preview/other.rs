@@ -52,9 +52,18 @@ pub(super) fn terminal(ui: &mut Ui, t: &Tokens, s: &Settings, width: f32) {
         vec![
             ("3f9a2c1 ", t.ansi[3]),
             ("(HEAD -> main) ", t.ansi[6]),
-            ("Theme previews", t.text),
+            (
+                crate::i18n::text("interaction-preview-terminal-theme"),
+                t.text,
+            ),
         ],
-        vec![("b81e07d ", t.ansi[3]), ("Merge fix/tab-overflow", t.text)],
+        vec![
+            ("b81e07d ", t.ansi[3]),
+            (
+                crate::i18n::text("interaction-preview-terminal-merge"),
+                t.text,
+            ),
+        ],
         {
             let mut l = prompt;
             l.push(("▌", t.text_dim));
@@ -123,27 +132,62 @@ pub(super) fn pull(ui: &mut Ui, t: &Tokens, s: &Settings, width: f32) {
         p.rect_filled(r, t.radius, t.dock);
         let (name, rows): (&str, Vec<Dot>) = match mode {
             PullMode::Merge => (
-                "Merge",
+                crate::i18n::text("interaction-preview-merge"),
                 vec![
-                    dot(0, "merge", false, true),
-                    dot(1, "theirs", false, false),
-                    dot(0, "yours", false, false),
+                    dot(
+                        0,
+                        crate::i18n::text("interaction-preview-merge-dot"),
+                        false,
+                        true,
+                    ),
+                    dot(
+                        1,
+                        crate::i18n::text("interaction-preview-theirs"),
+                        false,
+                        false,
+                    ),
+                    dot(
+                        0,
+                        crate::i18n::text("interaction-preview-yours"),
+                        false,
+                        false,
+                    ),
                     dot(0, "", false, false),
                 ],
             ),
             PullMode::FastForwardOnly => (
-                "Fast-forward only",
+                crate::i18n::text("interaction-preview-ff"),
                 vec![
-                    dot(1, "theirs", false, false),
-                    dot(0, "yours", false, false),
+                    dot(
+                        1,
+                        crate::i18n::text("interaction-preview-theirs"),
+                        false,
+                        false,
+                    ),
+                    dot(
+                        0,
+                        crate::i18n::text("interaction-preview-yours"),
+                        false,
+                        false,
+                    ),
                     dot(0, "", false, false),
                 ],
             ),
             PullMode::Rebase => (
-                "Rebase",
+                crate::i18n::text("interaction-preview-rebase"),
                 vec![
-                    dot(0, "yours, anew", true, false),
-                    dot(0, "theirs", false, false),
+                    dot(
+                        0,
+                        crate::i18n::text("interaction-preview-yours-new"),
+                        true,
+                        false,
+                    ),
+                    dot(
+                        0,
+                        crate::i18n::text("interaction-preview-theirs"),
+                        false,
+                        false,
+                    ),
                     dot(0, "", false, false),
                 ],
             ),
@@ -209,9 +253,17 @@ pub(super) fn pull(ui: &mut Ui, t: &Tokens, s: &Settings, width: f32) {
         // Where the branch ends up, or why it doesn't move.
         let note_y = r.bottom() - 14.0;
         let (note, color) = match mode {
-            PullMode::Merge => ("A merge joins them", t.text_faint),
-            PullMode::FastForwardOnly => ("Stops, changes nothing", t.warning),
-            PullMode::Rebase => ("Yours, on top of theirs", t.text_faint),
+            PullMode::Merge => (
+                crate::i18n::text("interaction-preview-merge-note"),
+                t.text_faint,
+            ),
+            PullMode::FastForwardOnly => {
+                (crate::i18n::text("interaction-preview-ff-note"), t.warning)
+            }
+            PullMode::Rebase => (
+                crate::i18n::text("interaction-preview-rebase-note"),
+                t.text_faint,
+            ),
         };
         draw::text(
             &p,
@@ -225,10 +277,7 @@ pub(super) fn pull(ui: &mut Ui, t: &Tokens, s: &Settings, width: f32) {
         draw::choice(&p, t, r, name, s.pull_mode == mode);
     }
     ui.add_space(4.0);
-    super::super::layout::note(
-        ui,
-        "When only the remote moved on, every way just fast-forwards your branch to it.",
-    );
+    super::super::layout::note(ui, crate::i18n::text("interaction-preview-ff-all"));
 }
 
 /// Code in diffs and blame: a few lines of Rust as a diff colours them.
@@ -292,16 +341,21 @@ pub(super) fn code(ui: &mut Ui, t: &Tokens, s: &Settings, width: f32) {
     }
     ui.add_space(6.0);
     let note = if !s.vscode_colors {
-        "gitcraft's own colours for code".to_owned()
+        crate::i18n::text("interaction-preview-code-own").to_owned()
     } else {
         match crate::vscode_theme::current() {
-            Some(found) if found.dark == t.dark => format!("Coloured as {} does", found.name),
-            Some(found) => format!(
-                "{} is {}: gitcraft's colours meanwhile",
-                found.name,
-                if found.dark { "dark" } else { "light" }
+            Some(found) if found.dark == t.dark => crate::i18n::message(
+                "interaction-preview-code-editor",
+                &[("theme", found.name.as_str().into())],
             ),
-            None => "No VS Code theme found: gitcraft's own colours".to_owned(),
+            Some(found) => crate::i18n::message(
+                "interaction-preview-code-mismatch",
+                &[
+                    ("theme", found.name.as_str().into()),
+                    ("mode", if found.dark { "dark" } else { "light" }.into()),
+                ],
+            ),
+            None => crate::i18n::text("interaction-preview-no-vscode").to_owned(),
         }
     };
     super::super::layout::note(ui, note);
@@ -315,9 +369,12 @@ pub(super) fn avatars(ui: &mut Ui, t: &Tokens, s: &Settings, width: f32) {
     let rect = area(ui, width, h + 26.0);
     let p = ui.painter_at(rect);
     let people = ["Ada Lovelace", "Grace Hopper", "Linus Torvalds"];
-    for (i, (name, pictures)) in [("Initials", false), ("Pictures", true)]
-        .into_iter()
-        .enumerate()
+    for (i, (name, pictures)) in [
+        (crate::i18n::text("interaction-preview-initials"), false),
+        (crate::i18n::text("interaction-preview-pictures"), true),
+    ]
+    .into_iter()
+    .enumerate()
     {
         let r = Rect::from_min_size(
             pos2(rect.left() + i as f32 * (each + gap), rect.top()),
@@ -396,7 +453,13 @@ pub(super) fn diff_layout(ui: &mut Ui, t: &Tokens, s: &Settings, width: f32) {
     for (i, (kind, w)) in rows.iter().enumerate() {
         diff_line(&p, t, u, i, *kind, *w);
     }
-    draw::choice(&p, t, u, "Unified", !s.diff_split);
+    draw::choice(
+        &p,
+        t,
+        u,
+        crate::i18n::text("interaction-preview-unified"),
+        !s.diff_split,
+    );
     // Side by side: the old lines left, the new right.
     let sx = Rect::from_min_size(pos2(rect.left() + each + gap, rect.top()), vec2(each, h));
     p.rect_filled(sx, t.radius, t.field);
@@ -422,7 +485,13 @@ pub(super) fn diff_layout(ui: &mut Ui, t: &Tokens, s: &Settings, width: f32) {
         diff_line(&p, t, left, i, *l, *w);
         diff_line(&p, t, right, i, *r, *w * 0.9);
     }
-    draw::choice(&p, t, sx, "Side by side", s.diff_split);
+    draw::choice(
+        &p,
+        t,
+        sx,
+        crate::i18n::text("interaction-preview-side"),
+        s.diff_split,
+    );
 }
 
 /// Line `i` of a diff drawn in `r`: its number, sign, background and a bar for its text.
@@ -497,11 +566,17 @@ pub(super) fn diff_context(ui: &mut Ui, t: &Tokens, s: &Settings, width: f32) {
     p.text(
         pos2(around.center().x, fold_y),
         Align2::CENTER_CENTER,
-        "… 120 lines unchanged",
+        crate::i18n::text("interaction-preview-unchanged"),
         FontId::proportional(10.5),
         t.text_faint,
     );
-    draw::choice(&p, t, around, "Around the changes", !s.diff_whole_file);
+    draw::choice(
+        &p,
+        t,
+        around,
+        crate::i18n::text("interaction-preview-around"),
+        !s.diff_whole_file,
+    );
     let whole = Rect::from_min_size(pos2(rect.left() + each + gap, rect.top()), vec2(each, h));
     p.rect_filled(whole, t.radius, t.field);
     let rows = [
@@ -517,7 +592,13 @@ pub(super) fn diff_context(ui: &mut Ui, t: &Tokens, s: &Settings, width: f32) {
     for (i, (k, w)) in rows.iter().enumerate() {
         diff_line(&p, t, whole, i, *k, *w);
     }
-    draw::choice(&p, t, whole, "The whole file", s.diff_whole_file);
+    draw::choice(
+        &p,
+        t,
+        whole,
+        crate::i18n::text("interaction-preview-whole"),
+        s.diff_whole_file,
+    );
 }
 
 /// The changed files in their folders, or in one list.
@@ -543,7 +624,13 @@ pub(super) fn file_list(ui: &mut Ui, t: &Tokens, s: &Settings, width: f32) {
         let x = tree.left() + 10.0 + *depth as f32 * 14.0;
         file_entry(&p, t, tree, x, y, name, *status);
     }
-    draw::choice(&p, t, tree, "In folders", s.files_as_tree);
+    draw::choice(
+        &p,
+        t,
+        tree,
+        crate::i18n::text("interaction-preview-folders"),
+        s.files_as_tree,
+    );
     let list = Rect::from_min_size(pos2(rect.left() + each + gap, rect.top()), vec2(each, h));
     p.rect_filled(list, t.radius, t.card);
     let files: [(&str, &str, char); 4] = [
@@ -567,7 +654,13 @@ pub(super) fn file_list(ui: &mut Ui, t: &Tokens, s: &Settings, width: f32) {
             );
         }
     }
-    draw::choice(&p, t, list, "One list", !s.files_as_tree);
+    draw::choice(
+        &p,
+        t,
+        list,
+        crate::i18n::text("interaction-preview-list"),
+        !s.files_as_tree,
+    );
 }
 
 /// A file or folder of a changed-files list; returns the rect of its name.

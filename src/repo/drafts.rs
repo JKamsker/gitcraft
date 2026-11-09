@@ -103,10 +103,10 @@ impl RepoTab {
         match crate::drafts::load(&self.path) {
             Ok(drafts) => self.put_back(drafts),
             Err(e) => {
-                self.status = Some((
-                    format!("What you typed here last time couldn't be restored: {e}"),
+                self.status = Some(crate::repo::Notice::plain((
+                    crate::i18n::message("repo-core-4076", &[("e", e.to_string().into())]),
                     true,
-                ));
+                )));
             }
         }
     }
@@ -141,19 +141,16 @@ impl RepoTab {
         match drafts.rebase.map(rebase_editor) {
             Some(Some(editor)) => {
                 self.rebase = Some(editor);
-                self.status = Some((
-                    "The interactive rebase you were setting up is back: start it, or cancel it"
-                        .to_owned(),
+                self.status = Some(crate::repo::Notice::plain((
+                    crate::i18n::text("repo-core-4077").to_owned(),
                     false,
-                ));
+                )));
             }
             Some(None) => {
-                self.status = Some((
-                    "The interactive rebase you were setting up was saved by another version of \
-                     gitcraft and couldn't be restored"
-                        .to_owned(),
+                self.status = Some(crate::repo::Notice::plain((
+                    crate::i18n::text("repo-core-4078").to_owned(),
                     true,
-                ));
+                )));
             }
             None => {}
         }

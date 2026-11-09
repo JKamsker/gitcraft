@@ -5,7 +5,9 @@
 use std::path::Path;
 use std::time::Duration;
 
-use super::command::{Extra, git_cmd, remote_request, with_profile};
+#[cfg(all(test, unix))]
+use super::command::git_cmd;
+use super::command::{Extra, remote_request, repository_command};
 use crate::remote;
 
 /// Runs git with `args` in `dir`, `input` on its standard input, and stops it (with what it
@@ -45,8 +47,17 @@ pub fn run_timed(
     };
     Err(if said.is_empty() {
         match code {
-            Some(code) => format!("{what} failed (exit status {code})"),
-            None => format!("{what} was stopped by a signal"),
+            Some(code) => crate::i18n::message(
+                "backend-what-failed-exit-status-code-4558d1",
+                &[
+                    ("what", (what).to_string().into()),
+                    ("code", (code).to_string().into()),
+                ],
+            ),
+            None => crate::i18n::message(
+                "backend-what-was-stopped-by-a-signal-d75f6c",
+                &[("what", (what).to_string().into())],
+            ),
         }
     } else {
         said
@@ -69,9 +80,8 @@ fn run_here(
     limit: Duration,
     what: &str,
 ) -> Result<Finished, String> {
-    let mut cmd = git_cmd();
-    with_profile(&mut cmd, args);
-    cmd.arg("-C").arg(dir).args(args);
+    let mut cmd = repository_command(Some(dir), args);
+    cmd.args(args);
     let out = crate::processes::run(
         cmd,
         crate::processes::Options {
@@ -103,6 +113,7 @@ fn run_here(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(unix)]
     use std::time::Instant;
 
     fn scratch(name: &str) -> std::path::PathBuf {
@@ -187,5 +198,34 @@ mod tests {
         assert!(started.elapsed() < Duration::from_secs(10));
         assert!(out.is_ok(), "{out:?}");
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod backend_fluent_identity_tests {
+    #[test]
+    fn backend_fluent_timeout_keeps_timeout_classification() {
+        for locale in ["en-US", "de"] {
+            crate::i18n::set_language(locale);
+            let raw = super::stopped(
+                "git interpret-trailers",
+                std::time::Duration::from_millis(2100),
+            );
+            assert_eq!(
+                raw,
+                "git interpret-trailers didn't finish within 3 seconds and was stopped"
+            );
+            assert!(raw.contains("didn't finish within"));
+            assert_eq!(crate::across::short_reason(&raw), "timed out");
+            assert_eq!(
+                crate::git::display_error(&raw),
+                if locale == "de" {
+                    "git interpret-trailers wurde nicht innerhalb von 3 Sekunden fertig und wurde gestoppt."
+                } else {
+                    &raw
+                }
+            );
+        }
+        crate::i18n::set_language("en-US");
     }
 }

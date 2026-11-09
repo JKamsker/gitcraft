@@ -28,11 +28,11 @@ impl RepoTab {
             self.hosting.clone(),
             self.primary_forge_remote().map(str::to_owned),
         ) else {
-            self.status = Some((
+            self.status = Some(crate::repo::Notice::plain((
                 "This repository isn't on a forge gitcraft knows: there is nowhere to publish to."
                     .to_owned(),
                 true,
-            ));
+            )));
             return;
         };
         let Some(tree) = trees(&self.stacks.layers)
@@ -42,13 +42,13 @@ impl RepoTab {
             return;
         };
         if let Some(layer) = tree.rows.iter().map(|(_, l)| l).find(|l| l.parent_missing) {
-            self.status = Some((
+            self.status = Some(crate::repo::Notice::plain((
                 format!(
                     "{} is gone: pick what {} is based on first.",
                     layer.parent, layer.branch
                 ),
                 true,
-            ));
+            )));
             return;
         }
         let inputs: Vec<Input> = tree
@@ -101,7 +101,10 @@ impl RepoTab {
             return;
         };
         if let Some(busy) = &self.busy_op {
-            self.status = Some((format!("Publish: run it again once {busy} is done"), true));
+            self.status = Some(crate::repo::Notice::plain((
+                format!("Publish: run it again once {busy} is done"),
+                true,
+            )));
             return;
         }
         let noun = hosting.forge.noun();
@@ -163,7 +166,7 @@ impl RepoTab {
             .op_started
             .take()
             .is_some_and(|t| t.elapsed() > crate::repo::operations::LONG_OP);
-        self.status = Some(match &report.failed {
+        self.status = Some(crate::repo::Notice::plain(match &report.failed {
             None => (summary(noun, &report), false),
             Some((branch, e)) => (
                 format!(
@@ -173,10 +176,12 @@ impl RepoTab {
                 ),
                 true,
             ),
-        });
-        if long && let Some((message, failed)) = self.status.clone() {
-            self.finished
-                .push((format!("{} · {message}", self.name), failed));
+        }));
+        if long && let Some((message, failed)) = self.status.as_deref().cloned() {
+            self.finished.push(crate::repo::Notice::plain((
+                format!("{} · {message}", self.name),
+                failed,
+            )));
         }
         // Asked again now, whenever they were last.
         self.prs_loaded = None;
@@ -190,7 +195,10 @@ impl RepoTab {
             return;
         };
         let t = Tokens::get(ctx);
-        let noun = self.forge().map_or("pull request", |f| f.noun());
+        let noun = self
+            .forge()
+            .unwrap_or(crate::forge::Forge::GitHub)
+            .noun_label();
         let frame = egui::Frame::new()
             .fill(t.card)
             .stroke(egui::Stroke::new(1.0, t.field_border))
@@ -204,15 +212,20 @@ impl RepoTab {
             .show(ctx, |ui| {
                 ui.set_width(500.0);
                 ui.label(
-                    RichText::new(format!("The {noun}s of the stack on {}", preview.root))
-                        .font(theme::semibold(15.0)),
+                    RichText::new(crate::i18n::message(
+                        "repo-workflows-stack-publish-dialog-e512538a",
+                        &[
+                            ("noun", (noun).into()),
+                            ("preview-root-1", (preview.root).clone().into()),
+                        ],
+                    ))
+                    .font(theme::semibold(15.0)),
                 );
                 ui.add_space(6.0);
                 ui.label(
-                    RichText::new(format!(
-                        "Each branch is pushed, bottom first, and its {noun} goes into the branch \
-                         below it. Publish again later to update them all: none is opened twice, \
-                         and a branch is never pushed over commits it doesn't have."
+                    RichText::new(crate::i18n::message(
+                        "repo-workflows-stack-publish-dialog-55798dde",
+                        &[("noun", (noun).into())],
                     ))
                     .color(t.text_dim),
                 );
@@ -225,14 +238,23 @@ impl RepoTab {
                         ui.horizontal(|ui| {
                             ui.add(crate::spinner::Spinner::new());
                             ui.label(
-                                RichText::new(format!("Asking which {noun}s are open…"))
-                                    .color(t.text_faint),
+                                RichText::new(crate::i18n::message(
+                                    "repo-workflows-stack-publish-dialog-64d68875",
+                                    &[("noun", (noun).into())],
+                                ))
+                                .color(t.text_faint),
                             );
                         });
                     }
                     Some(Err(e)) => {
                         can = false;
-                        ui.colored_label(t.danger, format!("Can't publish: {e}"));
+                        ui.colored_label(
+                            t.danger,
+                            crate::i18n::message(
+                                "repo-workflows-stack-publish-dialog-1638800f",
+                                &[("e", (e).clone().into())],
+                            ),
+                        );
                     }
                     Some(Ok(plans)) => {
                         egui::ScrollArea::vertical()
@@ -247,14 +269,19 @@ impl RepoTab {
                             .any(|p| matches!(p.step(), Step::Create { .. }))
                         {
                             ui.add_space(6.0);
-                            ui.checkbox(&mut draft, format!("Open new {noun}s as drafts"));
+                            ui.checkbox(
+                                &mut draft,
+                                crate::i18n::message(
+                                    "repo-workflows-stack-publish-dialog-d530df80",
+                                    &[("noun", (noun).into())],
+                                ),
+                            );
                         }
                         if plans.iter().any(|p| p.reparent_from.is_some()) {
                             ui.label(
-                                RichText::new(
-                                    "Restack the branches moved down afterwards, so their \
-                                     changes are only their own.",
-                                )
+                                RichText::new(crate::i18n::text(
+                                    "repo-workflows-stack-publish-dialog-44cb25f8",
+                                ))
                                 .color(t.text_faint),
                             );
                         }
@@ -265,11 +292,23 @@ impl RepoTab {
                 }
                 ui.add_space(14.0);
                 ui.horizontal(|ui| {
-                    if widgets::primary_button(ui, "Publish", can, 90.0).clicked() {
+                    if widgets::primary_button(
+                        ui,
+                        crate::i18n::text("repo-workflows-stack-publish-dialog-859390eb"),
+                        can,
+                        90.0,
+                    )
+                    .clicked()
+                    {
                         acts.push(Action::Stack(StackAct::StartPublish));
                     }
                     if ui
-                        .add(egui::Button::new("Cancel").min_size(egui::vec2(80.0, 30.0)))
+                        .add(
+                            egui::Button::new(crate::i18n::text(
+                                "repo-workflows-stack-publish-dialog-19766ed6",
+                            ))
+                            .min_size(egui::vec2(80.0, 30.0)),
+                        )
                         .clicked()
                     {
                         acts.push(Action::Stack(StackAct::ClosePublish));
@@ -296,22 +335,57 @@ fn plan_row(
 ) {
     let step = plan.step();
     let (what, color) = match &step {
-        Step::Create { replaces: None } => (format!("new {noun} into {}", plan.base), t.accent),
+        Step::Create { replaces: None } => (
+            crate::i18n::message(
+                "repo-workflows-stack-plan-row-512a4ebf",
+                &[
+                    ("noun", (noun).into()),
+                    ("plan-base-1", (plan.base).clone().into()),
+                ],
+            ),
+            t.accent,
+        ),
         Step::Create { replaces: Some(n) } => (
-            format!(
-                "new {noun} into {} (#{n} was closed without merging)",
-                plan.base
+            crate::i18n::message(
+                "repo-workflows-stack-plan-row-3c8950f2",
+                &[
+                    ("noun", (noun).into()),
+                    ("plan-base-1", (plan.base).clone().into()),
+                    ("n", (n).to_string().into()),
+                ],
             ),
             t.accent,
         ),
         Step::Retarget { number, from } => (
-            format!("#{number}: into {} instead of {from}", plan.base),
+            crate::i18n::message(
+                "repo-workflows-stack-plan-row-1004d25d",
+                &[
+                    ("number", (number).to_string().into()),
+                    ("plan-base-1", (plan.base).clone().into()),
+                    ("from", (from).clone().into()),
+                ],
+            ),
             t.warning,
         ),
-        Step::Push(n) => (format!("#{n}: push the new commits"), t.text_dim),
-        Step::Merged(n) => (format!("#{n} is merged: left alone"), t.text_faint),
+        Step::Push(n) => (
+            crate::i18n::message(
+                "repo-workflows-stack-plan-row-c5790350",
+                &[("n", (n).to_string().into())],
+            ),
+            t.text_dim,
+        ),
+        Step::Merged(n) => (
+            crate::i18n::message(
+                "repo-workflows-stack-plan-row-6a96cf4f",
+                &[("n", (n).to_string().into())],
+            ),
+            t.text_faint,
+        ),
         Step::Empty => (
-            format!("nothing of its own: pushed, no {noun}"),
+            crate::i18n::message(
+                "repo-workflows-stack-plan-row-25b842ca",
+                &[("noun", (noun).into())],
+            ),
             t.text_faint,
         ),
     };
@@ -320,10 +394,13 @@ fn plan_row(
         ui.label(RichText::new(what).color(color));
         if !matches!(step, Step::Merged(_))
             && ui
-                .small_button("Changes")
-                .on_hover_text(format!(
-                    "What {} adds to {}, in full",
-                    plan.branch, plan.base
+                .small_button(crate::i18n::text("repo-workflows-stack-plan-row-bbd4b6a8"))
+                .on_hover_text(crate::i18n::message(
+                    "repo-workflows-stack-plan-row-ff1f70b3",
+                    &[
+                        ("plan-branch-1", (plan.branch).clone().into()),
+                        ("plan-base-2", (plan.base).clone().into()),
+                    ],
                 ))
                 .clicked()
         {
@@ -342,7 +419,7 @@ fn plan_row(
             ui.add_enabled(
                 idle,
                 egui::TextEdit::singleline(&mut title)
-                    .hint_text("Title")
+                    .hint_text(crate::i18n::text("repo-workflows-stack-plan-row-7e8cd205"))
                     .desired_width(ui.available_width() - 8.0),
             );
         });
@@ -352,16 +429,22 @@ fn plan_row(
     }
     if let Some(from) = &plan.reparent_from {
         ui.label(
-            RichText::new(format!(
-                "   {from}'s {noun} was merged: {} goes into {} now",
-                plan.branch, plan.base
+            RichText::new(crate::i18n::message(
+                "repo-workflows-stack-plan-row-96f34b27",
+                &[
+                    ("from", (from).clone().into()),
+                    ("noun", (noun).into()),
+                    ("plan-branch-1", (plan.branch).clone().into()),
+                    ("plan-base-2", (plan.base).clone().into()),
+                ],
             ))
             .color(t.text_faint),
         );
     }
     if !matches!(step, Step::Merged(_)) {
         let n = plan.commits.len();
-        let mut patch = format!("   {n} commit{}", if n == 1 { "" } else { "s" });
+        let mut patch =
+            crate::i18n::message("repo-workflows-stack-patch-count", &[("count", (n).into())]);
         if !plan.stat.is_empty() {
             patch.push_str(&format!(" · {}", plan.stat));
         }
@@ -375,9 +458,12 @@ fn plan_row(
         }
         if n > 4 {
             ui.label(
-                RichText::new(format!("     and {} more", n - 4))
-                    .color(t.text_faint)
-                    .small(),
+                RichText::new(crate::i18n::message(
+                    "repo-workflows-stack-plan-row-140261ea",
+                    &[("n-4-1", (n - 4).into())],
+                ))
+                .color(t.text_faint)
+                .small(),
             );
         }
     }
