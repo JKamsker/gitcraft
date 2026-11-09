@@ -982,6 +982,12 @@ pub(super) fn run_steps_guarded(
     control: Option<&Arc<git::OpControl>>,
     fork_scope: Option<&super::forks::guard::Scope>,
 ) -> (Result<String, String>, OpKind, usize) {
+    // Validate the complete saved envelope before preparation or any mutating step.
+    if let Err(error) = check_command_envelopes(ops, matches!(kind, OpKind::Redo(_)), &mut |args| {
+        git::run(Some(path), args)
+    }) {
+        return (Err(error), kind, 0);
+    }
     if let Some(scope) = fork_scope {
         scope.reset_rewrite();
     }
@@ -1164,6 +1170,22 @@ pub(super) fn run_steps_guarded(
                     stopped = i;
                     break;
                 }
+            }
+        }
+        if command_envelope(&actual).is_ok_and(|(at, command)| {
+            command == "submodule" && actual.get(at + 1).is_some_and(|arg| arg == "update")
+        }) {
+            let check = if actual.first().is_some_and(|arg| arg != "submodule") {
+                Err("Submodule updates with global options cannot be validated safely. Run Update submodules again.".into())
+            } else {
+                check_ignored_submodules_with(|args, codes| {
+                    git::run_ok_codes(Some(path), args, codes)
+                })
+            };
+            if let Err(error) = check {
+                result = Err(error);
+                stopped = i;
+                break;
             }
         }
         // Recheck immediately before invoking rebase. A rejected plan never owns a rewrite.
@@ -1489,6 +1511,104 @@ pub(super) fn is_expectation(op: &[String]) -> bool {
 pub(super) const EXPECT_FOLD_SAFE: &str = "\u{0}expect-fold-safe";
 pub(super) const EXPECT_FOLD_IGNORED: &str = "\u{0}expect-fold-ignored";
 
+/// Parse only Git's command envelope; option values never become command names.
+fn command_envelope(args: &[String]) -> Result<(usize, &str), String> {
+    let mut at = 0;
+    while let Some(word) = args.get(at) {
+        if !word.starts_with('-') {
+            return Ok((at, word));
+        }
+        match word.as_str() {
+            "-c" | "-C" | "--git-dir" | "--work-tree" | "--namespace" | "--config-env"
+            | "--super-prefix" => {
+                at += 1;
+                if args.get(at).is_none() {
+                    return Err("Saved Git command has an incomplete global option; run the operation again".into());
+                }
+            }
+            "--bare"
+            | "--no-pager"
+            | "--paginate"
+            | "-p"
+            | "-P"
+            | "--no-replace-objects"
+            | "--no-lazy-fetch"
+            | "--no-optional-locks"
+            | "--literal-pathspecs"
+            | "--glob-pathspecs"
+            | "--noglob-pathspecs"
+            | "--icase-pathspecs" => {}
+            w if (w.starts_with("-c") || w.starts_with("-C")) && w.len() > 2 => {}
+            w if [
+                "--git-dir=",
+                "--work-tree=",
+                "--namespace=",
+                "--config-env=",
+                "--super-prefix=",
+            ]
+            .iter()
+            .any(|p| w.starts_with(p)) => {}
+            _ => {
+                return Err(
+                    "Saved Git command has unsupported global options; run the operation again"
+                        .into(),
+                );
+            }
+        }
+        at += 1;
+    }
+    Err("Saved Git command has no subcommand; run the operation again".into())
+}
+
+fn check_command_envelopes(
+    ops: &[Vec<String>],
+    saved_redo: bool,
+    mut read: &mut dyn FnMut(&[&str]) -> Result<String, String>,
+) -> Result<(), String> {
+    let mut builtins = None;
+    for op in ops {
+        if let [mark, _, args @ ..] = op.as_slice()
+            && mark == TRY
+        {
+            if command_envelope(args)
+                .is_ok_and(|(_, command)| matches!(command, "pull" | "submodule"))
+            {
+                return Err("Pull and submodule operations require checked dispatch; run the operation again explicitly.".into());
+            }
+            check_command_envelopes(&[args.to_vec()], saved_redo, &mut read)?;
+            continue;
+        }
+        if is_expectation(op) || op.first().is_some_and(|word| word.starts_with('\0')) {
+            continue; // Application-owned expectations and try-step envelopes.
+        }
+        let envelope = command_envelope(op);
+        let (at, command) = match envelope {
+            Ok(value) => value,
+            Err(error) if saved_redo => return Err(error),
+            Err(_) => continue, // Git diagnoses unsupported normal commands.
+        };
+        if command == "pull" && at != 0 {
+            return Err("Saved pull commands with global options cannot be validated safely. Run Pull again from the toolbar.".into());
+        }
+        if command == "submodule"
+            && (op.get(at + 1).is_some_and(|word| word.starts_with('-'))
+                || (at != 0 && op.get(at + 1).is_some_and(|word| word == "update")))
+        {
+            return Err("Submodule updates with global or command-prefix options cannot be validated safely. Run Update submodules again.".into());
+        }
+        if saved_redo {
+            let names = match &builtins {
+                Some(names) => names,
+                None => builtins.insert(read(&["--list-cmds=builtins"])?),
+            };
+            if !names.lines().any(|name| name == command) {
+                return Err("Saved Git aliases or external commands cannot be replayed safely. Run the operation again explicitly.".into());
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Classify the options consumed by Git's builtin/pull.c and parse-options.c.
 /// Optional arguments consume only attached text; required arguments also consume
 /// the next token, even when it looks like an option. Git permutes operands until `--` or `--end-of-options`.
@@ -1496,6 +1616,8 @@ pub(super) const EXPECT_FOLD_IGNORED: &str = "\u{0}expect-fold-ignored";
 struct PullMode {
     rebase: Option<bool>,
     ff_only: bool,
+    ff_explicit: bool,
+    recurse: Option<bool>,
 }
 
 fn pull_mode(args: &[String]) -> Result<PullMode, String> {
@@ -1546,11 +1668,10 @@ fn pull_mode(args: &[String]) -> Result<PullMode, String> {
         ("show-forced-updates", 0),
         ("set-upstream", 0),
     ];
-    fn rebase_value(value: &str) -> Result<bool, String> {
+    fn boolean_value(value: &str) -> Result<bool, String> {
         match value.to_ascii_lowercase().as_str() {
             "" | "false" | "no" | "off" | "0" => Ok(false),
             "true" | "yes" | "on" | "1" => Ok(true),
-            _ if matches!(value, "merges" | "m" | "interactive" | "i") => Ok(true),
             _ => {
                 // git_parse_maybe_bool also accepts base-0 integers with k/m/g
                 // suffixes, bounded symmetrically by INT_MAX (parse.c).
@@ -1575,8 +1696,15 @@ fn pull_mode(args: &[String]) -> Result<PullMode, String> {
                     .filter(|_| !digits.starts_with(['+', '-']))
                     .filter(|n| *n >= 0 && *n <= i64::from(i32::MAX) / factor)
                     .map(|n| n != 0)
-                    .ok_or_else(|| format!("Invalid pull rebase value: {value}"))
+                    .ok_or_else(|| format!("Invalid pull boolean value: {value}"))
             }
+        }
+    }
+    fn rebase_value(value: &str) -> Result<bool, String> {
+        if matches!(value, "merges" | "m" | "interactive" | "i") {
+            Ok(true)
+        } else {
+            boolean_value(value)
         }
     }
     let mut mode = PullMode::default();
@@ -1616,6 +1744,14 @@ fn pull_mode(args: &[String]) -> Result<PullMode, String> {
                 return Err(format!("Pull option requires a value: {token}"));
             }
             match name {
+                "recurse-submodules" => {
+                    mode.recurse = Some(if negated {
+                        false
+                    } else {
+                        let value = value.unwrap_or("yes");
+                        value == "on-demand" || boolean_value(value)?
+                    });
+                }
                 "rebase" => {
                     mode.rebase = Some(if negated {
                         false
@@ -1623,8 +1759,14 @@ fn pull_mode(args: &[String]) -> Result<PullMode, String> {
                         value.map_or(Ok(true), rebase_value)?
                     })
                 }
-                "ff-only" => mode.ff_only = true,
-                "ff" => mode.ff_only = false,
+                "ff-only" => {
+                    mode.ff_only = true;
+                    mode.ff_explicit = true;
+                }
+                "ff" => {
+                    mode.ff_only = false;
+                    mode.ff_explicit = true;
+                }
                 _ => {}
             }
         } else if let Some(short) = token.strip_prefix('-') {
@@ -1670,12 +1812,28 @@ fn ignored_safe_pull_with(
     mut run: impl FnMut(&[&str], &[i32]) -> Result<String, String>,
 ) -> Result<Vec<String>, String> {
     let mode = pull_mode(args)?;
+    let recurse = match mode.recurse {
+        Some(value) => value,
+        None => match run(&["config", "--bool", "--get", "submodule.recurse"], &[0, 1])?.trim() {
+            "true" => true,
+            "false" | "" => false,
+            _ => return Err("Cannot determine safe pull submodule recursion".into()),
+        },
+    };
+    if recurse {
+        check_ignored_submodules_with(&mut run)?;
+    }
     let branch = run(&["symbolic-ref", "-q", "HEAD"], &[0])?;
     let branch = branch
         .trim()
         .strip_prefix("refs/heads/")
         .ok_or("Pull requires a checked-out local branch")?;
-    if !mode.ff_only {
+    let configured_ff_only = if !mode.ff_explicit && mode.rebase.is_none() {
+        run(&["config", "-z", "--get", "pull.ff"], &[0, 1])?.strip_suffix('\0') == Some("only")
+    } else {
+        false
+    };
+    if !mode.ff_only && !configured_ff_only {
         let rebase = match mode.rebase {
             Some(value) => value,
             None => {
@@ -1732,6 +1890,28 @@ fn ignored_safe_pull_with(
         args.to_vec(),
     ]
     .concat())
+}
+
+/// A child checkout/rebase does not honor the superproject's mergeOptions.
+/// foreach visits populated submodules recursively on the repository's own machine.
+fn check_ignored_submodules_with(
+    mut run: impl FnMut(&[&str], &[i32]) -> Result<String, String>,
+) -> Result<(), String> {
+    let ignored = run(
+        &[
+            "submodule",
+            "foreach",
+            "--quiet",
+            "--recursive",
+            "git ls-files --others --ignored --exclude-standard --directory -z",
+        ],
+        &[0],
+    )?;
+    if ignored.is_empty() {
+        Ok(())
+    } else {
+        Err("Submodule update cannot safely preserve ignored local files. Move them out of populated submodules and run the operation again.".into())
+    }
 }
 
 /// Captures only the witness from the same validator invocation; no additional Git call.
@@ -1901,6 +2081,199 @@ mod tests {
         use super::*;
 
         #[test]
+        fn recursive_pull_inspects_nested_ignored_files_before_any_mutation() -> Result<(), String>
+        {
+            for (tail, configured, scans) in [
+                (vec!["--ff-only"], "true\n", true),
+                (vec!["--rebase"], "true\n", true),
+                (vec!["--recurse-submodules"], "false\n", true),
+                (vec!["--recurse-submodules=on-demand"], "false\n", true),
+                (vec!["--recurse-submodules=FALSE"], "true\n", false),
+                (vec!["--recurse-submodules=2"], "false\n", true),
+                (vec!["--recurse-submodules="], "true\n", false),
+                (
+                    vec!["--recurse-submodules", "--no-recurse-submodules"],
+                    "true\n",
+                    false,
+                ),
+                (
+                    vec!["--no-recurse-submodules", "--recurse-submodules=yes"],
+                    "false\n",
+                    true,
+                ),
+                (vec!["--strategy", "--recurse-submodules"], "false\n", false),
+                (vec!["--", "--recurse-submodules"], "false\n", false),
+            ] {
+                for inspection in [
+                    Ok(String::new()),
+                    Ok("nested/private\0".into()),
+                    Err("inspection failed".into()),
+                ] {
+                    let args = [
+                        vec!["pull".to_owned()],
+                        tail.iter().map(|s| s.to_string()).collect(),
+                    ]
+                    .concat();
+                    let mut calls = Vec::new();
+                    let result = super::super::ignored_safe_pull_with(&args, |argv, _| {
+                        calls.push(argv.join(" "));
+                        match argv {
+                            ["config", "--bool", "--get", "submodule.recurse"] => {
+                                Ok(configured.into())
+                            }
+                            [
+                                "submodule",
+                                "foreach",
+                                "--quiet",
+                                "--recursive",
+                                "git ls-files --others --ignored --exclude-standard --directory -z",
+                            ] => inspection.clone(),
+                            ["symbolic-ref", "-q", "HEAD"] => Ok("refs/heads/main\n".into()),
+                            ["config", ..] | ["ls-files", ..] => Ok(String::new()),
+                            _ => Err(format!("unexpected command: {argv:?}")),
+                        }
+                    });
+                    assert_eq!(
+                        result.is_ok(),
+                        !scans || inspection.as_ref().is_ok_and(String::is_empty),
+                        "{args:?}, {inspection:?}: {result:?}"
+                    );
+                    assert_eq!(
+                        calls
+                            .iter()
+                            .filter(|c| c.starts_with("submodule foreach"))
+                            .count(),
+                        usize::from(scans)
+                    );
+                    assert!(
+                        calls
+                            .iter()
+                            .all(|c| !c.starts_with("pull") && !c.starts_with("fetch"))
+                    );
+                    if let Ok(prepared) = result {
+                        assert_eq!(prepared[2..], args);
+                    }
+                }
+            }
+            Ok(())
+        }
+
+        #[test]
+        fn saved_prefixed_pulls_are_refused_by_dispatch_before_preparation() -> Result<(), String> {
+            for argv in [
+                vec!["-c", "pull.rebase=true", "pull"],
+                vec!["-cpull.rebase=true", "pull"],
+                vec!["--config-env", "pull.rebase=SETTING", "pull"],
+                vec!["--config-env=pull.rebase=SETTING", "pull"],
+                vec!["-C", "other", "pull"],
+                vec!["--git-dir", "elsewhere", "pull"],
+                vec!["--work-tree=elsewhere", "pull"],
+                vec!["--unknown", "pull"],
+                vec!["-c"],
+            ] {
+                let saved: UndoEntry = serde_json::from_value(serde_json::json!({
+                    "label": "Pull", "undo": [], "redo": [argv], "heads": null
+                }))
+                .map_err(|e| e.to_string())?;
+                let (result, _, stopped) = super::super::run_steps_counted(
+                    Path::new("/unopened-recording-repository"),
+                    &saved.redo,
+                    OpKind::Redo(saved.clone()),
+                    None,
+                    true,
+                    None,
+                );
+                assert!(
+                    result.is_err_and(|e| e.contains("run") || e.contains("Run")),
+                    "{argv:?}"
+                );
+                assert_eq!(stopped, 0);
+            }
+            let mut reads = Vec::new();
+            for argv in [
+                ops(&[&["pull", "--ff-only"]]),
+                ops(&[&["-c", "x=y", "rebase", "--continue"]]),
+            ] {
+                super::super::check_command_envelopes(&argv, true, &mut |args| {
+                    reads.push(args.join(" "));
+                    Ok("pull\nrebase\n".into())
+                })?;
+            }
+            assert_eq!(reads, ["--list-cmds=builtins", "--list-cmds=builtins"]);
+            assert!(
+                super::super::check_command_envelopes(
+                    &ops(&[&["saved-pull-alias"]]),
+                    true,
+                    &mut |_| Ok("pull\n".into())
+                )
+                .is_err()
+            );
+            Ok(())
+        }
+
+        #[test]
+        fn redo_route_expectations_reach_proof_validation_and_submodule_prefixes_refuse()
+        -> Result<(), String> {
+            let binding = super::recorded_route()?;
+            let proof = vec![
+                super::super::EXPECT_HTTPS_ROUTE.into(),
+                serde_json::to_string(&binding).map_err(|e| e.to_string())?,
+            ];
+            for command in ["pull", "fetch"] {
+                let steps = vec![proof.clone(), vec![command.into(), "--quiet".into()]];
+                let mut reads = Vec::new();
+                super::super::check_command_envelopes(&steps, true, &mut |args| {
+                    reads.push(args.join(" "));
+                    Ok("pull\nfetch\n".into())
+                })?;
+                assert_eq!(reads, ["--list-cmds=builtins"]);
+                let mut verified = 0;
+                super::super::check_https_routes(&steps, |actual| {
+                    assert_eq!(actual, &binding);
+                    verified += 1;
+                    Ok(())
+                })?;
+                assert_eq!(verified, 1);
+                assert!(
+                    super::super::check_https_routes(&steps, |_| Err("route changed".into()))
+                        .is_err()
+                );
+            }
+            for argv in [
+                vec!["submodule", "--quiet", "update", "--init", "--recursive"],
+                vec!["submodule", "-q", "update"],
+                vec!["submodule", "--cached", "update"],
+                vec!["-c", "submodule.recurse=true", "submodule", "update"],
+                vec!["-C", "elsewhere", "submodule", "--quiet", "update"],
+                vec!["--unknown", "pull"],
+            ] {
+                let saved: UndoEntry = serde_json::from_value(serde_json::json!({
+                    "label":"Replay", "undo":[], "redo":[argv], "heads":null
+                }))
+                .map_err(|e| e.to_string())?;
+                let (result, _, stopped) = super::super::run_steps_counted(
+                    Path::new("/unopened-submodule-envelope-fixture"),
+                    &saved.redo,
+                    OpKind::Redo(saved.clone()),
+                    None,
+                    true,
+                    None,
+                );
+                assert!(
+                    result.is_err_and(|e| e.contains("Run") || e.contains("run")),
+                    "{argv:?}"
+                );
+                assert_eq!(stopped, 0);
+            }
+            super::super::check_command_envelopes(
+                &ops(&[&["submodule", "update", "--quiet", "--recursive"]]),
+                true,
+                &mut |_| Ok("submodule\n".into()),
+            )?;
+            Ok(())
+        }
+
+        #[test]
         fn classifier_consumes_git_options_and_uses_last_mode() -> Result<(), String> {
             for (tail, rebase, ff_only) in [
                 (vec![], None, false),
@@ -1958,11 +2331,8 @@ mod tests {
                     tail.iter().map(|s| (*s).to_owned()).collect(),
                 ]
                 .concat();
-                assert_eq!(
-                    super::super::pull_mode(&args)?,
-                    super::super::PullMode { rebase, ff_only },
-                    "{args:?}"
-                );
+                let mode = super::super::pull_mode(&args)?;
+                assert_eq!((mode.rebase, mode.ff_only), (rebase, ff_only), "{args:?}");
             }
             for option in [
                 "cleanup",
@@ -2026,6 +2396,7 @@ mod tests {
                 let result = super::super::ignored_safe_pull_with(&saved.redo[0], |args, _| {
                     calls.push(args.join(" "));
                     match args[0] {
+                        "config" if args.last() == Some(&"submodule.recurse") => Ok(String::new()),
                         "symbolic-ref" => Ok("refs/heads/main\n".into()),
                         "ls-files" => Ok("private\0".into()),
                         _ => Err(format!("Unexpected command: {args:?}")),
@@ -2035,7 +2406,7 @@ mod tests {
                     result.is_err_and(|e| e.contains("ignored local files")),
                     "{option}"
                 );
-                assert_eq!(calls.len(), 2);
+                assert_eq!(calls.len(), 3);
                 assert!(
                     calls
                         .iter()
@@ -2069,9 +2440,11 @@ mod tests {
                 let result = super::super::ignored_safe_pull_with(&args, |argv, _| {
                     calls.push(argv.join(" "));
                     match argv {
+                        ["config", "--bool", "--get", "submodule.recurse"] => Ok(String::new()),
                         ["symbolic-ref", "-q", "HEAD"] => Ok("refs/heads/main\n".into()),
                         ["config", "-z", "--get", "branch.main.rebase"] => Ok(local.into()),
                         ["config", "-z", "--get", "pull.rebase"] => Ok(global.into()),
+                        ["config", "-z", "--get", "pull.ff"] => Ok(String::new()),
                         ["config", "-z", "--get", "branch.main.mergeOptions"] => {
                             Ok("--log=3\0".into())
                         }
@@ -2098,6 +2471,63 @@ mod tests {
                         .all(|c| !c.starts_with("pull") && !c.starts_with("fetch"))
                 );
             }
+            Ok(())
+        }
+
+        #[test]
+        fn configured_ff_only_respects_explicit_pull_option_precedence() -> Result<(), String> {
+            for (tail, ff, allowed) in [
+                (vec![], "only\0", true),
+                (vec![], "true\0", false),
+                (vec![], "ONLY\0", false),
+                (vec![], "only \0", false),
+                (vec!["--rebase"], "only\0", false),
+                (vec!["--ff"], "only\0", false),
+                (vec!["--no-ff"], "only\0", false),
+                (vec!["--ff-only", "--ff"], "only\0", false),
+                (vec!["--ff", "--ff-only"], "only\0", true),
+                (vec!["--no-rebase"], "only\0", true),
+                (vec!["--strategy", "--ff-only"], "only\0", true),
+                (vec!["--", "--rebase"], "only\0", true),
+            ] {
+                let args = [
+                    vec!["pull".to_owned()],
+                    tail.iter().map(|s| s.to_string()).collect(),
+                ]
+                .concat();
+                let mut calls = Vec::new();
+                let result = super::super::ignored_safe_pull_with(&args, |argv, _| {
+                    calls.push(argv.join(" "));
+                    match argv {
+                        ["config", "--bool", "--get", "submodule.recurse"] => Ok(String::new()),
+                        ["symbolic-ref", "-q", "HEAD"] => Ok("refs/heads/main\n".into()),
+                        ["config", "-z", "--get", "pull.ff"] => Ok(ff.into()),
+                        ["config", "-z", "--get", "branch.main.rebase"] => Ok("true\0".into()),
+                        ["config", "-z", "--get", "branch.main.mergeOptions"] => Ok(String::new()),
+                        ["ls-files", ..] => Ok("private\0".into()),
+                        _ => Err(format!("Unexpected read: {argv:?}")),
+                    }
+                });
+                assert_eq!(result.is_ok(), allowed, "{args:?}, {ff:?}: {result:?}");
+                if let Ok(prepared) = result {
+                    assert_eq!(prepared[2..], args);
+                    assert!(prepared[1].ends_with("--no-overwrite-ignore"));
+                }
+                assert!(
+                    calls
+                        .iter()
+                        .all(|c| !c.starts_with("pull") && !c.starts_with("fetch"))
+                );
+            }
+            assert!(
+                super::super::ignored_safe_pull_with(&ops(&[&["pull"]])[0], |argv, _| {
+                    match argv[0] {
+                        "symbolic-ref" => Ok("refs/heads/main\n".into()),
+                        _ => Err("config read failed".into()),
+                    }
+                })
+                .is_err()
+            );
             Ok(())
         }
     }
