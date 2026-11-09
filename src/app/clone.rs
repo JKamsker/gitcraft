@@ -515,7 +515,9 @@ fn form_fields(ui: &mut Ui, form: &mut CloneForm, t: &Tokens) -> bool {
 pub(super) fn singleline_enter(response: &egui::Response) -> bool {
     (response.has_focus()
         || (response.lost_focus() && response.ctx.memory(|m| m.focused().is_none())))
-        && response.ctx.input(|i| i.key_pressed(Key::Enter))
+        && response
+            .ctx
+            .input(|i| i.key_pressed(Key::Enter) && !i.key_pressed(Key::Tab))
 }
 
 fn home_dir() -> Option<PathBuf> {
@@ -577,17 +579,28 @@ mod localization_tests {
 
     #[derive(Default)]
     struct EnterForm {
+        parent: String,
+        parent_id: Option<egui::Id>,
         name: String,
         name_id: Option<egui::Id>,
         browse: usize,
         submit: usize,
         name_lost_on_enter: bool,
         browse_focused_on_enter: bool,
+        parent_lost_on_enter: bool,
     }
 
     fn enter_form() -> Harness<'static, EnterForm> {
         Harness::new_ui_state(
             |ui, form: &mut EnterForm| {
+                let parent = ui.text_edit_singleline(&mut form.parent);
+                form.parent_id = Some(parent.id);
+                if ui.input(|i| i.key_pressed(Key::Enter)) {
+                    form.parent_lost_on_enter = parent.lost_focus();
+                }
+                if singleline_enter(&parent) {
+                    form.submit += 1;
+                }
                 // Record intents only: canceling this simulated picker has no side effects.
                 let browse = ui.button("Browse");
                 if browse.clicked() {
@@ -605,6 +618,33 @@ mod localization_tests {
             },
             EnterForm::default(),
         )
+    }
+
+    #[test]
+    fn coalesced_forward_tab_and_enter_only_activates_browse() {
+        let mut h = enter_form();
+        let parent = h.state().parent_id.expect("parent rendered");
+        h.ctx.memory_mut(|m| m.request_focus(parent));
+        h.step();
+        // RawInput keeps both keys in one frame; Harness::key_press would split them.
+        h.input_mut()
+            .events
+            .extend(
+                [Key::Tab, Key::Enter]
+                    .into_iter()
+                    .map(|key| egui::Event::Key {
+                        key,
+                        physical_key: None,
+                        pressed: true,
+                        repeat: false,
+                        modifiers: egui::Modifiers::NONE,
+                    }),
+            );
+        h.step();
+        assert!(h.state().parent_lost_on_enter);
+        assert!(h.state().browse_focused_on_enter);
+        assert_eq!(h.state().browse, 1);
+        assert_eq!(h.state().submit, 0);
     }
 
     #[test]
