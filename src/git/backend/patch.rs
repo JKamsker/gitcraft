@@ -410,7 +410,13 @@ fn patch(
         }
     };
     let (from, to) = (label(&old, &a), label(&new, &b));
-    let binary = match diff_attribute(repo, cache, new.path)? {
+    // Git loads userdiff drivers only for regular files, never for links.
+    let attribute = if old.mode.or(new.mode).is_some_and(|mode| mode.is_link()) {
+        Attribute::Unspecified
+    } else {
+        diff_attribute(repo, cache, new.path)?
+    };
+    let binary = match attribute {
         Attribute::Unset => true,
         Attribute::Set => false,
         Attribute::Unspecified => {

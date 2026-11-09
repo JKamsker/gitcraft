@@ -212,3 +212,40 @@ fn authorship_and_textconv_read_in_process_are_those_git_reads() -> Result<(), S
     assert_eq!(textconv_of(repo.path(), "b.txt")?, None);
     Ok(())
 }
+
+#[test]
+fn symlink_patches_ignore_binary_and_named_diff_attributes() -> Result<(), String> {
+    // Construct symlinks in the index so this also works without OS symlink privileges.
+    for (i, attribute) in ["-diff", "diff", "diff=custom"].into_iter().enumerate() {
+        let repo = Repo::new(&format!("native-link-attributes-{i}"))?;
+        repo.commit(
+            "attributes",
+            &[(".gitattributes", Some(&format!("link {attribute}\n")))],
+        )?;
+        let mut hashes = Vec::new();
+        for target in ["old-target", "new-target"] {
+            std::fs::write(repo.path().join(".git/link-blob"), target).map_err(err)?;
+            let blob = repo.git(&["hash-object", "-w", ".git/link-blob"])?;
+            repo.git(&[
+                "update-index",
+                "--add",
+                "--cacheinfo",
+                &format!("120000,{},link", blob.trim()),
+            ])?;
+            repo.git(&["commit", "-q", "-m", "link target"])?;
+            hashes.push(repo.rev("HEAD")?);
+        }
+        repo.git(&["update-index", "--force-remove", "link"])?;
+        repo.git(&["commit", "-q", "-m", "delete link"])?;
+        hashes.push(repo.rev("HEAD")?);
+        for hash in hashes {
+            let options = DiffOptions::default();
+            let ours = file_patch(repo.path(), &hash, "link", options)?;
+            let git = crate::git::diff::file_diff_by_git(repo.path(), &hash, "link", options)?;
+            assert_eq!(ours, git, "{attribute} {hash}");
+            assert!(!ours.contains("Binary files"));
+            assert!(ours.contains("target"));
+        }
+    }
+    Ok(())
+}
