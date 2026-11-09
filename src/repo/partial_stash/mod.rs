@@ -207,6 +207,10 @@ fn excluded_overlap_problem(work: &WorkStatus, untracked: bool) -> Option<String
         return None;
     }
     let overlaps = |a: &str, b: &str| {
+        // Git reports embedded repositories as directory entries ending in `/`.
+        // Normalize only the comparison; retain Git's spelling in paths and errors.
+        let a = a.trim_end_matches('/');
+        let b = b.trim_end_matches('/');
         a == b
             || a.strip_prefix(b).is_some_and(|tail| tail.starts_with('/'))
             || b.strip_prefix(a).is_some_and(|tail| tail.starts_with('/'))
