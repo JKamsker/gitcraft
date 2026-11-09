@@ -39,16 +39,47 @@ impl std::ops::Deref for JobSender {
     }
 }
 
-/// Linked local worktrees share refs/stashes, hence one mutation key. Resolve the
-/// existing .git/commondir metadata without starting a process on the UI thread.
+/// Scheduling inputs are lexical only: submission must never inspect a filesystem.
+/// The pool classifies every local path into one local mutation bucket.
 pub(crate) fn mutation_key(path: &std::path::Path) -> std::path::PathBuf {
-    if crate::remote::is_remote(path) {
-        return path.to_owned();
+    path.to_owned()
+}
+
+static FETCH_KEYS: std::sync::Mutex<Vec<(std::path::PathBuf, std::path::PathBuf)>> =
+    std::sync::Mutex::new(Vec::new());
+
+/// Cached ownership identity, separate from scheduling. Before discovery, each
+/// path owns itself; background reads refine linked-worktree fetch deduplication.
+pub(crate) fn fetch_key(path: &std::path::Path) -> std::path::PathBuf {
+    FETCH_KEYS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .iter()
+        .find(|(p, _)| p == path)
+        .map_or_else(|| path.to_owned(), |(_, key)| key.clone())
+}
+
+/// Called only from background repository/tray reads, never during submission.
+pub(crate) fn discover_fetch_key(path: &std::path::Path) {
+    let key = if crate::remote::is_remote(path) {
+        path.to_owned()
+    } else {
+        super::watch::linked_git_dirs(path)
+            .map(|(_, common)| common)
+            .or_else(|| std::fs::canonicalize(path.join(".git")).ok())
+            .unwrap_or_else(|| std::fs::canonicalize(path).unwrap_or_else(|_| path.to_owned()))
+    };
+    let mut keys = FETCH_KEYS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    if let Some((_, cached)) = keys.iter_mut().find(|(p, _)| p == path) {
+        *cached = key;
+    } else {
+        if keys.len() >= 1024 {
+            keys.remove(0);
+        }
+        keys.push((path.to_owned(), key));
     }
-    super::watch::linked_git_dirs(path)
-        .map(|(_, common)| common)
-        .or_else(|| std::fs::canonicalize(path.join(".git")).ok())
-        .unwrap_or_else(|| std::fs::canonicalize(path).unwrap_or_else(|_| path.to_owned()))
 }
 
 /// What a background job leaves to do on the UI thread, with the tab (see `RepoTab::then`).
@@ -500,7 +531,7 @@ impl RepoTab {
         // Background fetch.
         let minutes = Settings::get(ctx).auto_fetch_minutes;
         if minutes > 0
-            && !crate::tray::watch::owns_fetch(&self.tx.repo)
+            && !crate::tray::watch::owns_fetch(&fetch_key(&self.path))
             && !self.remotes.is_empty()
             && self.busy_op.is_none()
             && super::offline::background_fetch_may_run(&self.path)

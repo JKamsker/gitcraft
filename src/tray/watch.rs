@@ -151,7 +151,7 @@ impl Model {
     }
 }
 fn paths(open: &[PathBuf], recent: &[PathBuf]) -> Vec<PathBuf> {
-    paths_by(open, recent, crate::repo::mutation_key)
+    paths_by(open, recent, crate::repo::fetch_key)
 }
 fn paths_by(open: &[PathBuf], recent: &[PathBuf], key: impl Fn(&Path) -> PathBuf) -> Vec<PathBuf> {
     let mut paths = Vec::new();
@@ -528,7 +528,7 @@ impl Watcher {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner) = paths
             .iter()
-            .map(|path| crate::repo::mutation_key(path))
+            .map(|path| crate::repo::fetch_key(path))
             .collect();
         let changed = self.model.configure(profile, connections::current(), paths);
         if changed {
@@ -727,6 +727,7 @@ impl Watcher {
                 cancel.clone(),
                 Box::new(move || {
                     let result = context.run(|| {
+                        crate::repo::discover_fetch_key(&work_path);
                         observe(
                             &mut LiveProbe {
                                 path: &work_path,

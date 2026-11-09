@@ -62,72 +62,24 @@ pub(crate) enum Priority {
     Background,
 }
 
-/// Scheduling identity only: never use this for repository/tray/fetch ownership.
-/// Remote discovery may fail and SSH aliases need not name their real host, so
-/// conservatively serialize all remote mutations in this application. The enum
-/// namespace cannot collide with local identity. Paths remain repository ownership keys;
-/// only scheduling uses the identity of the resolved common-metadata directory.
+/// App-internal exclusion for complete mutation operations. Paths can be retargeted
+/// after submission, so neither path equality nor a retained metadata handle proves
+/// that independent local jobs will execute against independent repositories.
+/// Conservatively serialize local mutations, and separately serialize remote ones.
+/// This trades unrelated-local concurrency for safety. Reads remain unkeyed; this
+/// does not anchor Git's target or coordinate external Git/application instances.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum MutationScheduleKey {
-    Local(PathBuf),
-    LocalFile(String),
+    Local,
     Remote,
 }
 
-#[cfg(test)]
 pub(crate) fn mutation_schedule_key(path: PathBuf) -> MutationScheduleKey {
-    mutation_schedule_identity(path).0
-}
-
-fn local_directory_identity(path: &std::path::Path) -> std::io::Result<(String, std::fs::File)> {
-    let mut options = std::fs::OpenOptions::new();
-    options.read(true);
-    #[cfg(windows)]
-    {
-        use std::os::windows::fs::OpenOptionsExt;
-        // A directory-capable handle; permit ordinary Git rename/delete operations.
-        options.custom_flags(0x02000000).share_mode(7);
-    }
-    let file = options.open(path)?;
-    if !file.metadata()?.is_dir() {
-        return Err(std::io::Error::other(
-            "mutation metadata key is not a directory",
-        ));
-    }
-    Ok((gitcraft_os::file_identity(&file)?, file))
-}
-
-fn mutation_schedule_identity(path: PathBuf) -> (MutationScheduleKey, Option<std::fs::File>) {
-    mutation_schedule_identity_with(path, local_directory_identity)
-}
-
-fn mutation_schedule_identity_with(
-    path: PathBuf,
-    lookup: impl FnOnce(&std::path::Path) -> std::io::Result<(String, std::fs::File)>,
-) -> (MutationScheduleKey, Option<std::fs::File>) {
     if crate::remote::is_remote(&path) {
-        (MutationScheduleKey::Remote, None)
+        MutationScheduleKey::Remote
     } else {
-        #[cfg(test)]
-        if let Some(id) = TEST_IDENTITIES.with(|ids| {
-            ids.borrow()
-                .as_ref()
-                .and_then(|ids| ids.get(&path).cloned())
-        }) {
-            return (MutationScheduleKey::LocalFile(id), None);
-        }
-        match lookup(&path) {
-            Ok((id, file)) => (MutationScheduleKey::LocalFile(id), Some(file)),
-            // Preserve path compatibility for inaccessible/unsupported metadata.
-            // Unidentified aliases cannot be guaranteed to share exclusion.
-            Err(_) => (MutationScheduleKey::Local(path), None),
-        }
+        MutationScheduleKey::Local
     }
-}
-
-#[cfg(test)]
-thread_local! {
-    static TEST_IDENTITIES: RefCell<Option<std::collections::HashMap<PathBuf, String>>> = const { RefCell::new(None) };
 }
 
 type Work = Box<dyn FnOnce() + Send>;
@@ -139,8 +91,6 @@ struct Job {
     priority: Priority,
     /// A whole mutation operation holds its key, including between subprocesses.
     key: Option<MutationScheduleKey>,
-    /// Retain directory identity for the entire queued/running operation.
-    _identity_handle: Option<std::fs::File>,
 }
 
 #[derive(Default)]
@@ -256,14 +206,7 @@ impl Pool {
         on_cancel: Option<Work>,
         work: Work,
     ) -> Result<(), &'static str> {
-        // Filesystem lookup can block; never perform it under the queue mutex.
-        let (key, identity_handle) = match key {
-            Some(path) => {
-                let (key, handle) = mutation_schedule_identity(path);
-                (Some(key), handle)
-            }
-            None => (None, None),
-        };
+        let key = key.map(mutation_schedule_key);
         let mut state = self
             .shared
             .state
@@ -287,7 +230,6 @@ impl Pool {
             cancel,
             priority,
             key,
-            _identity_handle: identity_handle,
         });
         state.peak_queued = state.peak_queued.max(state.queue.len());
         self.shared.ready.notify_all();
@@ -537,40 +479,19 @@ mod tests {
 
     #[test]
     fn local_metadata_aliases_hold_expectation_and_pop_against_alias_push() -> Result<(), String> {
-        struct Reset;
-        impl Drop for Reset {
-            fn drop(&mut self) {
-                TEST_IDENTITIES.with(|ids| *ids.borrow_mut() = None);
-            }
+        // Pure classification cannot invoke filesystem lookup, even for paths that
+        // are missing, inaccessible, aliased or replaced after submission.
+        for path in [
+            "/recorded/mount-a/common.git",
+            "/recorded/mount-b/common.git",
+            "/recorded/independent/common.git",
+            "/missing/common.git",
+        ] {
+            assert_eq!(
+                mutation_schedule_key(path.into()),
+                MutationScheduleKey::Local
+            );
         }
-        TEST_IDENTITIES.with(|ids| {
-            *ids.borrow_mut() = Some(
-                [
-                    (
-                        PathBuf::from("/recorded/mount-a/common.git"),
-                        "unix:device1:inode7".into(),
-                    ),
-                    (
-                        PathBuf::from("/recorded/mount-b/common.git"),
-                        "unix:device1:inode7".into(),
-                    ),
-                    (
-                        PathBuf::from("/recorded/independent/common.git"),
-                        "unix:device2:inode7".into(),
-                    ),
-                ]
-                .into(),
-            )
-        });
-        let _reset = Reset;
-        assert_eq!(
-            mutation_schedule_key("/recorded/mount-a/common.git".into()),
-            mutation_schedule_key("/recorded/mount-b/common.git".into())
-        );
-        assert_ne!(
-            mutation_schedule_key("/recorded/mount-a/common.git".into()),
-            mutation_schedule_key("/recorded/independent/common.git".into())
-        );
         let pool = Pool::new(3).map_err(|e| e.to_string())?;
         let (release, gate) = mpsc::channel::<()>();
         let (out, events) = mpsc::channel();
@@ -613,10 +534,7 @@ mod tests {
         assert!(pool.queued_priority_for(&queued) == Some(Priority::Interactive));
         for (key, event) in [
             (None, "read"),
-            (
-                Some("/recorded/independent/common.git".into()),
-                "independent",
-            ),
+            (Some("ssh://independent/repo".into()), "remote"),
         ] {
             let record = out.clone();
             pool.submit(
@@ -637,7 +555,7 @@ mod tests {
                 .recv_timeout(Duration::from_secs(5))
                 .map_err(|e| e.to_string())?,
         ];
-        assert!(progress.contains(&"read") && progress.contains(&"independent"));
+        assert!(progress.contains(&"read") && progress.contains(&"remote"));
         assert!(pool.queued_priority_for(&queued).is_some());
         drop(release);
         assert_eq!(
@@ -653,34 +571,96 @@ mod tests {
             "push B"
         );
         assert_eq!(*stash.lock().unwrap(), ["stash B"]);
-        let (remote, handle) =
-            mutation_schedule_identity_with("ssh://unopened/repo".into(), |_| {
-                panic!("remote lookup")
-            });
-        assert_eq!(remote, MutationScheduleKey::Remote);
-        assert!(handle.is_none());
-        let missing = PathBuf::from("/recorded/unidentified/common.git");
-        let (fallback, handle) = mutation_schedule_identity_with(missing.clone(), |_| {
-            Err(std::io::Error::other("unavailable"))
-        });
-        assert_eq!(fallback, MutationScheduleKey::Local(missing));
-        assert!(handle.is_none());
+        assert_eq!(
+            mutation_schedule_key("ssh://unopened/repo".into()),
+            MutationScheduleKey::Remote
+        );
         Ok(())
     }
 
     #[test]
-    fn actual_directory_identity_retains_the_open_metadata_handle() -> Result<(), String> {
-        let path = std::env::temp_dir();
-        let (key, handle) = mutation_schedule_identity(path.clone());
-        let file = handle.ok_or("directory identity unavailable")?;
+    fn local_retargeting_and_running_cancellation_keep_the_bucket_until_completion()
+    -> Result<(), String> {
+        let pool = Pool::new(3).map_err(|e| e.to_string())?;
+        let (release, gate) = mpsc::channel::<()>();
+        let (out, events) = mpsc::channel();
+        // Routing is observed at execution, just as Git resolves captured paths then.
+        let route = Arc::new(Mutex::new("old metadata"));
+        let target = Arc::clone(&route);
+        let record = out.clone();
+        let running = Cancellation::default();
+        pool.submit(
+            running.clone(),
+            Priority::Background,
+            Some("/repo/a".into()),
+            Box::new(move || {
+                let _ = record.send("expect A");
+                let _ = gate.recv();
+                assert_eq!(*target.lock().unwrap(), "replacement metadata");
+                let _ = record.send("pop A");
+            }),
+        )
+        .map_err(str::to_owned)?;
         assert_eq!(
-            key,
-            MutationScheduleKey::LocalFile(
-                gitcraft_os::file_identity(&file).map_err(|e| e.to_string())?
-            )
+            events
+                .recv_timeout(Duration::from_secs(5))
+                .map_err(|e| e.to_string())?,
+            "expect A"
         );
-        assert!(file.metadata().map_err(|e| e.to_string())?.is_dir());
-        assert_eq!(key, mutation_schedule_identity(path).0);
+        *route.lock().unwrap() = "replacement metadata";
+        running.cancel(); // Cancellation is a request, not completion of the closure.
+        let competing = Cancellation::default();
+        let record = out.clone();
+        let target = Arc::clone(&route);
+        pool.submit_cancellable(
+            competing.clone(),
+            Priority::Interactive,
+            Some("/repo/b".into()),
+            None,
+            Box::new(move || {
+                assert_eq!(*target.lock().unwrap(), "replacement metadata");
+                let _ = record.send("push B");
+            }),
+        )
+        .map_err(str::to_owned)?;
+        let independent = Cancellation::default();
+        let record = out.clone();
+        pool.submit(
+            independent.clone(),
+            Priority::Background,
+            Some("/independent".into()),
+            Box::new(move || {
+                let _ = record.send("independent local");
+            }),
+        )
+        .map_err(str::to_owned)?;
+        let record = out.clone();
+        pool.submit(
+            Cancellation::default(),
+            Priority::Interactive,
+            None,
+            Box::new(move || {
+                let _ = record.send("read");
+            }),
+        )
+        .map_err(str::to_owned)?;
+        assert_eq!(
+            events
+                .recv_timeout(Duration::from_secs(5))
+                .map_err(|e| e.to_string())?,
+            "read"
+        );
+        assert!(pool.queued_priority_for(&competing).is_some());
+        assert!(pool.queued_priority_for(&independent).is_some());
+        drop(release);
+        for expected in ["pop A", "push B", "independent local"] {
+            assert_eq!(
+                events
+                    .recv_timeout(Duration::from_secs(5))
+                    .map_err(|e| e.to_string())?,
+                expected
+            );
+        }
         Ok(())
     }
 
@@ -793,14 +773,14 @@ mod tests {
             let expected = if crate::remote::is_remote(&path) {
                 MutationScheduleKey::Remote
             } else {
-                MutationScheduleKey::Local(path.clone())
+                MutationScheduleKey::Local
             };
             assert_eq!(mutation_schedule_key(path), expected);
         }
         for path in ["ssh:x", "/ssh:/repo", "/local/common.git"] {
             assert_eq!(
                 mutation_schedule_key(path.into()),
-                MutationScheduleKey::Local(path.into())
+                MutationScheduleKey::Local
             );
         }
     }
@@ -1068,8 +1048,7 @@ mod tests {
     }
 
     #[test]
-    fn writers_share_a_key_while_other_repositories_and_reserved_reads_can_run()
-    -> Result<(), String> {
+    fn local_writers_share_a_bucket_while_remote_work_can_run() -> Result<(), String> {
         let pool = Pool::with_limits(3, 16, 1).map_err(|e| e.to_string())?;
         let (gate_tx, gate) = mpsc::channel::<()>();
         let (tx, events) = mpsc::channel();
@@ -1092,7 +1071,7 @@ mod tests {
         submit(
             &pool,
             Priority::Interactive,
-            Some("other repo"),
+            Some("ssh://other/repo"),
             move || {
                 let _ = read.send("other repo");
             },

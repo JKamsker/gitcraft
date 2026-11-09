@@ -951,8 +951,16 @@ fn linked_worktrees_share_a_mutation_key_before_the_first_load() -> Result<(), S
         ],
     )?;
     assert_eq!(
-        super::messages::mutation_key(&dir),
-        super::messages::mutation_key(&linked)
+        crate::tasks::mutation_schedule_key(super::messages::mutation_key(&dir)),
+        crate::tasks::mutation_schedule_key(super::messages::mutation_key(&linked))
+    );
+    // Ownership is refined by the same background discovery used by reloads,
+    // independently of the conservative scheduling bucket.
+    super::messages::discover_fetch_key(&dir);
+    super::messages::discover_fetch_key(&linked);
+    assert_eq!(
+        super::messages::fetch_key(&dir),
+        super::messages::fetch_key(&linked)
     );
     let _ = std::fs::remove_dir_all(dir);
     Ok(())
