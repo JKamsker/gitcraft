@@ -571,7 +571,28 @@ impl App {
     fn has_repo_tab(&self, repo: &std::path::Path) -> bool {
         self.tabs
             .iter()
+            .chain(self.windows.parked.values().flat_map(|w| &w.tabs))
             .any(|t| matches!(t, super::Tab::Repo(r) if r.path == repo))
+    }
+
+    #[cfg(test)]
+    pub(super) fn recorded_inbox_open(&mut self, repo: PathBuf, ctx: &egui::Context) -> bool {
+        self.open_from_inbox(
+            Item {
+                repo: Some(repo),
+                forge: Forge::GitHub,
+                pr: InboxPr {
+                    number: 7,
+                    url: "https://github.com/o/r/pull/7".into(),
+                    ..Default::default()
+                },
+            },
+            ctx,
+        );
+        self.inbox
+            .opening
+            .as_ref()
+            .is_some_and(|opening| opening.number == 7)
     }
 
     fn connecting_to(&self, repo: &std::path::Path) -> bool {
