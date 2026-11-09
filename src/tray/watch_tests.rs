@@ -596,3 +596,19 @@ fn german_watcher_transitions_and_live_status_preserve_protocol_and_delivery_own
     );
     Ok(())
 }
+
+#[test]
+fn remote_mutation_bucket_does_not_merge_tray_subscriptions() {
+    let a = PathBuf::from("ssh://build/main");
+    let b = PathBuf::from("ssh://build/linked");
+    let alias = PathBuf::from("ssh://alias/other");
+    let selected = paths(&[a.clone(), b.clone()], std::slice::from_ref(&alias));
+    assert_eq!(selected, vec![a.clone(), b.clone(), alias.clone()]);
+    let mut model = Model::default();
+    model.configure(0, connections::current(), selected);
+    assert_eq!(model.subscriptions.len(), 3);
+    for path in [a, b, alias] {
+        assert!(model.subscriptions.contains_key(&path));
+        assert_eq!(crate::repo::mutation_key(&path), path);
+    }
+}

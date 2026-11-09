@@ -62,6 +62,24 @@ pub(crate) enum Priority {
     Background,
 }
 
+/// Scheduling identity only: never use this for repository/tray/fetch ownership.
+/// Remote discovery may fail and SSH aliases need not name their real host, so
+/// conservatively serialize all remote mutations in this application. The enum
+/// namespace cannot collide with any local path; local common-metadata keys stay intact.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub(crate) enum MutationScheduleKey {
+    Local(PathBuf),
+    Remote,
+}
+
+pub(crate) fn mutation_schedule_key(path: PathBuf) -> MutationScheduleKey {
+    if crate::remote::is_remote(&path) {
+        MutationScheduleKey::Remote
+    } else {
+        MutationScheduleKey::Local(path)
+    }
+}
+
 type Work = Box<dyn FnOnce() + Send>;
 struct Job {
     work: Work,
@@ -70,13 +88,13 @@ struct Job {
     cancel: Cancellation,
     priority: Priority,
     /// A whole mutation operation holds its key, including between subprocesses.
-    key: Option<PathBuf>,
+    key: Option<MutationScheduleKey>,
 }
 
 #[derive(Default)]
 struct State {
     queue: VecDeque<Job>,
-    writing: HashSet<PathBuf>,
+    writing: HashSet<MutationScheduleKey>,
     active: usize,
     background_active: usize,
     peak_queued: usize,
@@ -105,7 +123,7 @@ impl Pool {
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .queue
             .iter()
-            .filter(|job| job.key.as_deref() == Some(key))
+            .filter(|job| job.key.as_ref() == Some(&mutation_schedule_key(key.to_owned())))
             .map(|job| job.priority)
             .collect()
     }
@@ -186,6 +204,10 @@ impl Pool {
         if state.queue.len() >= self.capacity {
             return Err(BUSY);
         }
+        // Normalize at the common submission boundary, covering spawn_mutation,
+        // tray fetches and every feature-specific mutation job. None stays an
+        // unkeyed read and can run concurrently with a mutation.
+        let key = key.map(mutation_schedule_key);
         state.queue.push_back(Job {
             work,
             connections: crate::connections::current(),
@@ -452,6 +474,85 @@ mod tests {
             Box::new(work),
         )
         .map_err(str::to_owned)
+    }
+
+    #[test]
+    fn remote_mutation_bucket_holds_expectation_and_pop_against_push() -> Result<(), String> {
+        // Recording only: no Git commands, remote connection or child processes.
+        let pool = Pool::new(2).map_err(|e| e.to_string())?;
+        let (release, gate) = mpsc::channel();
+        let (out, events) = mpsc::channel();
+        let stash = Arc::new(Mutex::new(vec!["stash A"]));
+        let stack = Arc::clone(&stash);
+        let record = out.clone();
+        pool.submit_cancellable(
+            Cancellation::default(),
+            Priority::Background,
+            Some("ssh://build/main".into()),
+            None,
+            Box::new(move || {
+                assert_eq!(stack.lock().unwrap().last(), Some(&"stash A"));
+                let _ = record.send("refs/stash expectation");
+                let _ = gate.recv();
+                assert_eq!(stack.lock().unwrap().pop(), Some("stash A"));
+                let _ = record.send("stash pop --index");
+            }),
+        )
+        .map_err(str::to_owned)?;
+        assert_eq!(
+            events
+                .recv_timeout(Duration::from_secs(5))
+                .map_err(|e| e.to_string())?,
+            "refs/stash expectation"
+        );
+        let stack = Arc::clone(&stash);
+        let record = out.clone();
+        // The other submission API and priority must use the same bucket, even
+        // before linked-worktree discovery or through an SSH host alias.
+        pool.submit(
+            Cancellation::default(),
+            Priority::Interactive,
+            Some("ssh://alias/linked".into()),
+            Box::new(move || {
+                stack.lock().unwrap().push("stash B");
+                let _ = record.send("stash push");
+            }),
+        )
+        .map_err(str::to_owned)?;
+        pool.submit(
+            Cancellation::default(),
+            Priority::Interactive,
+            None,
+            Box::new(move || {
+                let _ = out.send("concurrent read");
+            }),
+        )
+        .map_err(str::to_owned)?;
+        assert_eq!(
+            events
+                .recv_timeout(Duration::from_secs(5))
+                .map_err(|e| e.to_string())?,
+            "concurrent read"
+        );
+        assert_eq!(
+            pool.queued_priorities_for(std::path::Path::new("ssh://third/path")),
+            vec![Priority::Interactive]
+        );
+        drop(release);
+        assert_eq!(
+            events
+                .recv_timeout(Duration::from_secs(5))
+                .map_err(|e| e.to_string())?,
+            "stash pop --index"
+        );
+        assert_eq!(
+            events
+                .recv_timeout(Duration::from_secs(5))
+                .map_err(|e| e.to_string())?,
+            "stash push"
+        );
+        assert_eq!(*stash.lock().unwrap(), vec!["stash B"]);
+        Ok(())
     }
 
     #[test]
