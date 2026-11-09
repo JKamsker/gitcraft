@@ -549,12 +549,8 @@ impl RepoTab {
             .iter()
             .map(|w| (w.path.clone(), w.changes))
             .collect();
-        self.worktrees = loaded.worktrees;
-        self.worktree_root = loaded.worktree_root;
+        self.take_worktree_identity(loaded.worktrees, loaded.worktree_root);
         self.sync_branch_bands(ctx);
-        if crate::remote::is_remote(&self.path) {
-            self.tx.repo = self.repo_key().to_owned();
-        }
         self.timeline_read(loaded.read, ctx);
         self.celebration_loaded(loaded.read, ctx);
         self.fold_loaded(loaded.read, state, ctx);
@@ -626,6 +622,15 @@ impl RepoTab {
         self.read_bisect(ctx);
         self.clear_parallel_leftovers();
         self.read_test_lane(ctx);
+    }
+
+    /// Discovery refines repository identity; mutation scheduling remains separate.
+    pub(super) fn take_worktree_identity(&mut self, worktrees: Vec<Worktree>, root: String) {
+        self.worktrees = worktrees;
+        self.worktree_root = root;
+        if crate::remote::is_remote(&self.path) {
+            self.tx.repo = self.repo_key().to_owned();
+        }
     }
 
     /// Appends a page of older history that `load_more` read.
