@@ -1151,6 +1151,16 @@ pub(super) fn run_steps_guarded(
         let mut actual = prepared
             .as_ref()
             .map_or_else(|| op.clone(), |(args, _)| args.clone());
+        if actual.first().is_some_and(|arg| arg == "pull") {
+            match ignored_safe_pull(path, &actual) {
+                Ok(args) => actual = args,
+                Err(error) => {
+                    result = Err(error);
+                    stopped = i;
+                    break;
+                }
+            }
+        }
         // Recheck immediately before invoking rebase. A rejected plan never owns a rewrite.
         let rebasing = (fork_scope.is_some() || guarded_fork)
             && matches!(op.as_slice(), [c, config, rebase, _] if c == "-c" && config == "rebase.updateRefs=false" && rebase == "rebase");
@@ -1473,6 +1483,85 @@ pub(super) fn is_expectation(op: &[String]) -> bool {
 
 pub(super) const EXPECT_FOLD_SAFE: &str = "\u{0}expect-fold-safe";
 pub(super) const EXPECT_FOLD_IGNORED: &str = "\u{0}expect-fold-ignored";
+
+/// Keep pull's authentication, submodule and configuration behavior while making its
+/// merge refuse to overwrite ignored files. Read the effective options in the worker,
+/// after any preceding checkout, and override them only for this command.
+fn ignored_safe_pull(path: &Path, args: &[String]) -> Result<Vec<String>, String> {
+    let branch = git::run(Some(path), &["symbolic-ref", "-q", "HEAD"])?;
+    let branch = branch
+        .trim()
+        .strip_prefix("refs/heads/")
+        .ok_or("Pull requires a checked-out local branch")?;
+    if !args.iter().any(|arg| arg == "--ff-only") {
+        let explicit = args.iter().rev().find_map(|arg| match arg.as_str() {
+            "--no-rebase" | "--rebase=false" => Some(false),
+            "--rebase" => Some(true),
+            value if value.starts_with("--rebase=") => Some(true),
+            _ => None,
+        });
+        let rebase = match explicit {
+            Some(value) => value,
+            None => {
+                let local_key = format!("branch.{branch}.rebase");
+                let local =
+                    git::run_ok_codes(Some(path), &["config", "-z", "--get", &local_key], &[0, 1])?;
+                let (key, value) = if local.is_empty() {
+                    (
+                        "pull.rebase",
+                        git::run_ok_codes(
+                            Some(path),
+                            &["config", "-z", "--get", "pull.rebase"],
+                            &[0, 1],
+                        )?,
+                    )
+                } else {
+                    (local_key.as_str(), local)
+                };
+                // A valueless boolean means true, whereas an explicitly empty value
+                // means false. Git's typed reader preserves that distinction.
+                if !value.is_empty() && value.trim_end_matches('\0').is_empty() {
+                    git::run(Some(path), &["config", "--bool", "--get", key])?.trim() == "true"
+                } else {
+                    !matches!(
+                        value
+                            .trim_end_matches('\0')
+                            .trim()
+                            .to_ascii_lowercase()
+                            .as_str(),
+                        "" | "false" | "no" | "off" | "0"
+                    )
+                }
+            }
+        };
+        // Rebase's checkout does not honor mergeOptions and offers no equivalent
+        // no-overwrite-ignore switch. Refuse before fetch can introduce a collision.
+        if rebase
+            && !git::run(
+                Some(path),
+                &[
+                    "ls-files",
+                    "--others",
+                    "--ignored",
+                    "--exclude-standard",
+                    "--directory",
+                    "-z",
+                ],
+            )?
+            .is_empty()
+        {
+            return Err("Rebase pull cannot safely preserve ignored local files. Move them out of the repository or use fast-forward-only or merge pull.".into());
+        }
+    }
+    let key = format!("branch.{branch}.mergeOptions");
+    let old = git::run_ok_codes(Some(path), &["config", "-z", "--get", &key], &[0, 1])?;
+    let old = old.strip_suffix('\0').unwrap_or(&old);
+    Ok([
+        vec!["-c".into(), format!("{key}={old} --no-overwrite-ignore")],
+        args.to_vec(),
+    ]
+    .concat())
+}
 
 /// Captures only the witness from the same validator invocation; no additional Git call.
 pub(super) fn check_stack_captured(
@@ -1937,6 +2026,83 @@ mod tests {
         dir
     }
 
+    #[test]
+    fn pull_preserves_merge_options_and_refuses_ignored_file_overwrite() -> Result<(), String> {
+        let upstream = repo("pull-ignored-upstream");
+        let clone = tempfile::tempdir().map_err(|e| e.to_string())?;
+        let clone_path = clone.path().to_str().ok_or("clone path")?;
+        git::run(Some(&upstream), &["clone", "-q", ".", clone_path])?;
+        let before = git::head(clone.path());
+        std::fs::write(upstream.join("secret.env"), "upstream").map_err(|e| e.to_string())?;
+        git::run(Some(&upstream), &["add", "secret.env"])?;
+        git::run(Some(&upstream), &["commit", "-qm", "add secret path"])?;
+        std::fs::write(clone.path().join(".git/info/exclude"), "secret.env\n")
+            .map_err(|e| e.to_string())?;
+        std::fs::write(clone.path().join("secret.env"), "private").map_err(|e| e.to_string())?;
+        let key = "branch.main.mergeOptions";
+        let old = "--log=3 --no-stat";
+        // --short would report heads/main when a tag uses the same name.
+        git::run(Some(clone.path()), &["tag", "main"])?;
+        git::run(Some(clone.path()), &["config", key, old])?;
+        let pull = ops(&[&["pull", "--ff-only"]]);
+        let argv = super::ignored_safe_pull(clone.path(), &pull[0])?;
+        assert_eq!(argv[1], format!("{key}={old} --no-overwrite-ignore"));
+        let (result, _) = run_steps(clone.path(), &pull, OpKind::plain(), None);
+        assert!(result.is_err(), "{result:?}");
+        assert_eq!(git::head(clone.path()), before);
+        assert_eq!(
+            std::fs::read(clone.path().join("secret.env")).map_err(|e| e.to_string())?,
+            b"private"
+        );
+        assert_eq!(
+            git::run(Some(clone.path()), &["config", "--get", key])?.trim(),
+            old
+        );
+        std::fs::remove_file(clone.path().join("secret.env")).map_err(|e| e.to_string())?;
+        let (result, _) = run_steps(clone.path(), &pull, OpKind::plain(), None);
+        assert!(result.is_ok(), "{result:?}");
+        assert_eq!(git::head(clone.path()), git::head(&upstream));
+        let _ = std::fs::remove_dir_all(upstream);
+        Ok(())
+    }
+
+    #[test]
+    fn rebase_pull_refuses_ignored_files_before_fetch_and_honors_explicit_modes()
+    -> Result<(), String> {
+        let dir = repo("rebase-pull-ignored");
+        std::fs::write(dir.join(".git/info/exclude"), "private\n").map_err(|e| e.to_string())?;
+        std::fs::write(dir.join("private"), "precious").map_err(|e| e.to_string())?;
+        let before = git::head(&dir);
+        let rebase = ops(&[&["pull", "--rebase", "--autostash"]]);
+        let (result, _) = run_steps(&dir, &rebase, OpKind::plain(), None);
+        assert!(result.is_err_and(|e| e.contains("ignored local files")));
+        assert_eq!(git::head(&dir), before);
+        assert!(!dir.join(".git/FETCH_HEAD").exists());
+        assert_eq!(
+            std::fs::read(dir.join("private")).map_err(|e| e.to_string())?,
+            b"precious"
+        );
+        git::run(Some(&dir), &["config", "pull.rebase", "true"])?;
+        assert!(super::ignored_safe_pull(&dir, &ops(&[&["pull"]])[0]).is_err());
+        for args in [&["pull", "--ff-only"][..], &["pull", "--no-rebase"][..]] {
+            assert!(super::ignored_safe_pull(&dir, &ops(&[args])[0]).is_ok());
+        }
+        git::run(Some(&dir), &["config", "branch.main.rebase", "false"])?;
+        assert!(super::ignored_safe_pull(&dir, &ops(&[&["pull"]])[0]).is_ok());
+        git::run(Some(&dir), &["config", "--unset", "branch.main.rebase"])?;
+        let config = dir.join(".git/config");
+        let mut text = std::fs::read_to_string(&config).map_err(|e| e.to_string())?;
+        text.push_str("\n[branch \"main\"]\n rebase\n");
+        std::fs::write(&config, &text).map_err(|e| e.to_string())?;
+        assert!(super::ignored_safe_pull(&dir, &ops(&[&["pull"]])[0]).is_err());
+        git::run(Some(&dir), &["config", "branch.main.rebase", ""])?;
+        assert!(super::ignored_safe_pull(&dir, &ops(&[&["pull"]])[0]).is_ok());
+        std::fs::remove_file(dir.join("private")).map_err(|e| e.to_string())?;
+        assert!(super::ignored_safe_pull(&dir, &rebase[0]).is_ok());
+        let _ = std::fs::remove_dir_all(dir);
+        Ok(())
+    }
+
     /// A quiet operation (the background fetch) runs its git steps, and only checks its
     /// expectations: git is not given them.
     #[test]
@@ -2084,6 +2250,37 @@ mod tests {
         assert_eq!(still, since);
         assert!(ran.is_ok());
         assert_ne!(after, since);
+    }
+
+    #[test]
+    fn checkout_pull_and_redo_refuse_an_externally_advanced_cached_target() -> Result<(), String> {
+        let dir = repo("checkout-pull-stale-target");
+        let was = git::head(&dir);
+        let steps = crate::repo::commands::checkout_pull_steps("target", &was);
+        let redo = match checkout_pull_undo("main", "target", &was, &steps) {
+            Undo::Custom { redo, .. } => redo,
+            _ => return Err("missing checkout pull undo".into()),
+        };
+        assert_eq!(steps, redo);
+        git::run(Some(&dir), &["checkout", "-qb", "target"])?;
+        git::run(
+            Some(&dir),
+            &["commit", "-q", "--allow-empty", "-m", "external advance"],
+        )?;
+        let advanced = git::head(&dir);
+        git::run(Some(&dir), &["checkout", "-q", "main"])?;
+        for run in [&steps, &redo] {
+            let (result, _) = run_steps(&dir, run, OpKind::plain(), None);
+            assert!(result.is_err());
+            assert_eq!(git::head(&dir), was);
+            assert_eq!(git::resolve(&dir, "refs/heads/target")?, advanced);
+            assert_eq!(
+                git::run(Some(&dir), &["symbolic-ref", "--short", "HEAD"])?.trim(),
+                "main"
+            );
+        }
+        let _ = std::fs::remove_dir_all(dir);
+        Ok(())
     }
 
     /// Undoing "Checkout and pull" does not put the branch back over commits made on it since.
