@@ -511,10 +511,41 @@ impl RepoTab {
         );
         let repo = self.path.clone();
         match tab {
-            file_view::FileTab::History => spawn(&self.tx, ctx, move || {
-                let result = git::file_history(&repo, rev.as_deref(), &path);
-                Msg::FileHistory(generation, path, rev, result)
-            }),
+            file_view::FileTab::History => {
+                let requested_path = path.clone();
+                let requested_rev = rev.clone();
+                self.then(
+                    ctx,
+                    move || {
+                        let input = git::resolve(
+                            &repo,
+                            rev.as_deref()
+                                .filter(|rev| !rev.is_empty())
+                                .unwrap_or("HEAD"),
+                        );
+                        let result = input
+                            .as_ref()
+                            .map_err(Clone::clone)
+                            .and_then(|oid| git::file_history(&repo, Some(oid), &path));
+                        (input.ok(), result)
+                    },
+                    move |tab, (input, result), ctx| {
+                        if tab.accept_file_inputs(
+                            generation,
+                            &requested_path,
+                            requested_rev.as_deref(),
+                            file_view::FileTab::History,
+                            input,
+                            ctx,
+                        ) {
+                            tab.handle(
+                                Msg::FileHistory(generation, requested_path, requested_rev, result),
+                                ctx,
+                            );
+                        }
+                    },
+                );
+            }
             file_view::FileTab::Blame => {
                 let generation = view.blame_generation;
                 let dark = Tokens::get(ctx).dark();
@@ -525,10 +556,36 @@ impl RepoTab {
             }
             file_view::FileTab::File => {
                 let dark = Tokens::get(ctx).dark();
-                spawn(&self.tx, ctx, move || {
-                    let result = file_text::load(&repo, rev.as_deref(), &path, dark);
-                    Msg::FileText(generation, path, rev, result)
-                })
+                let requested_path = path.clone();
+                let requested_rev = rev.clone();
+                self.then(
+                    ctx,
+                    move || {
+                        let bytes = git::file_at(&repo, rev.as_deref(), &path);
+                        let input = bytes
+                            .as_ref()
+                            .ok()
+                            .map(|bytes| file_view::content_key(bytes));
+                        let result =
+                            bytes.map(|bytes| file_text::FileText::new(&bytes, &path, dark));
+                        (input, result)
+                    },
+                    move |tab, (input, result), ctx| {
+                        if tab.accept_file_inputs(
+                            generation,
+                            &requested_path,
+                            requested_rev.as_deref(),
+                            file_view::FileTab::File,
+                            input,
+                            ctx,
+                        ) {
+                            tab.handle(
+                                Msg::FileText(generation, requested_path, requested_rev, result),
+                                ctx,
+                            );
+                        }
+                    },
+                );
             }
         }
     }

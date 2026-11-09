@@ -65,9 +65,33 @@ pub(crate) struct FileView {
     pub lines: Option<(git::LinesAt, git::LineRange)>,
     pub line_inputs: Option<(String, String, git::LineRange)>,
     pub line_input_check: u64,
+    history_input: Option<String>,
+    text_input: Option<String>,
+    observed_inputs: Option<FileInputs>,
+    input_check: u64,
     /// A line to scroll to once the blame is read, and to mark (1 is the first).
     pub goto_line: std::cell::Cell<Option<usize>>,
     pub marked_line: Option<usize>,
+}
+
+#[derive(Clone, Default)]
+pub(super) struct FileInputs {
+    history: Option<String>,
+    text: Option<String>,
+}
+
+pub(super) fn content_key(bytes: &[u8]) -> String {
+    use sha2::{Digest, Sha256};
+    format!("{:x}", Sha256::digest(bytes))
+}
+
+fn file_inputs(repo: &std::path::Path, rev: Option<&str>, path: &str) -> FileInputs {
+    FileInputs {
+        history: git::resolve(repo, rev.filter(|rev| !rev.is_empty()).unwrap_or("HEAD")).ok(),
+        text: git::file_at(repo, rev, path)
+            .ok()
+            .map(|bytes| content_key(&bytes)),
+    }
 }
 
 impl FileView {
@@ -85,6 +109,10 @@ impl FileView {
             lines: None,
             line_inputs: None,
             line_input_check: 0,
+            history_input: None,
+            text_input: None,
+            observed_inputs: None,
+            input_check: 0,
             goto_line: Default::default(),
             marked_line: None,
         }
@@ -97,6 +125,10 @@ impl FileView {
             return false;
         }
         self.generation = next_generation();
+        self.history_input = None;
+        self.text_input = None;
+        self.observed_inputs = None;
+        self.input_check = next_generation();
         self.history = None;
         self.invalidate_blame();
         self.text = None;
@@ -138,7 +170,23 @@ impl RepoTab {
             return;
         };
         let Some((at, range)) = view.lines.clone() else {
-            self.invalidate_mutable_file_view(ctx);
+            if view.rev.as_deref().is_some_and(git::investigations::oid) {
+                self.invalidate_mutable_file_view(ctx);
+                return;
+            }
+            let generation = view.generation;
+            let check = next_generation();
+            view.input_check = check;
+            let path = view.path.clone();
+            let rev = view.rev.clone();
+            let repo = self.path.clone();
+            self.then(
+                ctx,
+                move || file_inputs(&repo, rev.as_deref(), &path),
+                move |tab, inputs, ctx| {
+                    tab.file_status_inputs(generation, check, inputs, ctx);
+                },
+            );
             return;
         };
         if view.rev.as_deref().is_some_and(git::investigations::oid) {
@@ -170,6 +218,80 @@ impl RepoTab {
                 tab.invalidate_mutable_file_view(ctx);
             },
         );
+    }
+
+    fn file_status_inputs(
+        &mut self,
+        generation: u64,
+        check: u64,
+        inputs: FileInputs,
+        ctx: &egui::Context,
+    ) {
+        let Some(view) = &mut self.file_view else {
+            return;
+        };
+        if view.generation != generation || view.input_check != check {
+            return;
+        }
+        let history_changed = view
+            .history_input
+            .as_ref()
+            .is_some_and(|old| inputs.history.as_ref() != Some(old))
+            || view
+                .history
+                .as_ref()
+                .is_some_and(|result| result.is_err() || view.history_input.is_none());
+        let text_changed = view
+            .text_input
+            .as_ref()
+            .is_some_and(|old| inputs.text.as_ref() != Some(old))
+            || view
+                .text
+                .as_ref()
+                .is_some_and(|result| result.is_err() || view.text_input.is_none());
+        if history_changed || text_changed {
+            self.invalidate_mutable_file_view(ctx);
+            return;
+        }
+        // A request that has not replied yet compares its own captured inputs with
+        // this observation upon arrival. Unrelated probes do not supersede it.
+        view.observed_inputs = Some(inputs);
+        view.invalidate_blame();
+        if view.tab == FileTab::Blame {
+            self.load_file_view(ctx);
+        }
+    }
+
+    pub(super) fn accept_file_inputs(
+        &mut self,
+        generation: u64,
+        path: &str,
+        rev: Option<&str>,
+        tab: FileTab,
+        input: Option<String>,
+        ctx: &egui::Context,
+    ) -> bool {
+        let Some(view) = &mut self.file_view else {
+            return false;
+        };
+        if view.generation != generation || view.path != path || view.rev.as_deref() != rev {
+            return false;
+        }
+        let observed = view.observed_inputs.as_ref().map(|inputs| match tab {
+            FileTab::History => &inputs.history,
+            FileTab::File => &inputs.text,
+            FileTab::Blame => unreachable!("blame uses its independent epoch"),
+        });
+        if observed.is_some_and(|expected| expected != &input) {
+            self.invalidate_mutable_file_view(ctx);
+            return false;
+        }
+        match tab {
+            FileTab::History => view.history_input = input,
+            FileTab::File => view.text_input = input,
+            FileTab::Blame => unreachable!("blame uses its independent epoch"),
+        }
+        true
     }
 
     pub(super) fn invalidate_mutable_file_view(&mut self, ctx: &egui::Context) {

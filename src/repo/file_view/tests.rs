@@ -360,3 +360,171 @@ fn retained_blame_is_replaced_by_the_actual_dispatched_loader() -> Result<(), St
     std::fs::remove_dir_all(dir).map_err(|e| e.to_string())?;
     Ok(())
 }
+
+#[test]
+fn status_probes_preserve_inflight_inputs_and_reject_changed_or_older_observations()
+-> Result<(), String> {
+    let ctx = egui::Context::default();
+    for pane in [FileTab::History, FileTab::File] {
+        let mut tab = tab();
+        let mut v = view(None);
+        v.tab = pane;
+        let generation = v.generation;
+        tab.file_view = Some(v);
+        let inputs = FileInputs {
+            history: Some("commit-a".into()),
+            text: Some(content_key(b"same")),
+        };
+        let mut latest_check = 0;
+        for _ in 0..3 {
+            let (_, jobs) =
+                crate::repo::messages::record_jobs(|| tab.status_changed_file_view(&ctx));
+            assert_eq!(
+                jobs.len(),
+                1,
+                "probe only; the current read is not resubmitted"
+            );
+            let v = tab.file_view.as_ref().ok_or("missing view")?;
+            assert_eq!(v.generation, generation);
+            latest_check = v.input_check;
+            tab.file_status_inputs(generation, latest_check, inputs.clone(), &ctx);
+        }
+        let input = match pane {
+            FileTab::History => inputs.history.clone(),
+            _ => inputs.text.clone(),
+        };
+        assert!(tab.accept_file_inputs(generation, "same.txt", None, pane, input, &ctx));
+        let reply = match pane {
+            FileTab::History => {
+                Msg::FileHistory(generation, "same.txt".into(), None, Ok(Vec::new()))
+            }
+            _ => Msg::FileText(
+                generation,
+                "same.txt".into(),
+                None,
+                Ok(FileText::new(b"same", "same.txt", false)),
+            ),
+        };
+        tab.handle(reply, &ctx);
+        let (_, jobs) = crate::repo::messages::record_jobs(|| tab.status_changed_file_view(&ctx));
+        assert_eq!(jobs.len(), 1);
+        let current_check = tab.file_view.as_ref().ok_or("missing view")?.input_check;
+        let changed = FileInputs {
+            history: Some("commit-b".into()),
+            text: Some(content_key(b"changed")),
+        };
+        tab.file_status_inputs(generation, latest_check, changed.clone(), &ctx);
+        assert_eq!(
+            tab.file_view.as_ref().ok_or("missing view")?.generation,
+            generation
+        );
+        let (_, jobs) = crate::repo::messages::record_jobs(|| {
+            tab.file_status_inputs(generation, current_check, changed, &ctx)
+        });
+        assert_eq!(
+            jobs.len(),
+            1,
+            "changed relevant input requests a replacement"
+        );
+        assert_ne!(
+            tab.file_view.as_ref().ok_or("missing view")?.generation,
+            generation
+        );
+        assert!(!tab.accept_file_inputs(
+            generation,
+            "same.txt",
+            None,
+            pane,
+            Some("stale".into()),
+            &ctx
+        ));
+    }
+    // A status observation can arrive before a delayed initial result. Its captured
+    // input must agree; otherwise even the current generation's result is superseded.
+    let mut tab = tab();
+    tab.file_view = Some(view(None));
+    let generation = tab.file_view.as_ref().ok_or("missing view")?.generation;
+    let (_, _) = crate::repo::messages::record_jobs(|| tab.status_changed_file_view(&ctx));
+    let check = tab.file_view.as_ref().ok_or("missing view")?.input_check;
+    tab.file_status_inputs(
+        generation,
+        check,
+        FileInputs {
+            history: Some("new".into()),
+            text: None,
+        },
+        &ctx,
+    );
+    let (accepted, jobs) = crate::repo::messages::record_jobs(|| {
+        tab.accept_file_inputs(
+            generation,
+            "same.txt",
+            None,
+            FileTab::History,
+            Some("old".into()),
+            &ctx,
+        )
+    });
+    assert!(!accepted);
+    assert_eq!(jobs.len(), 1);
+    Ok(())
+}
+
+#[test]
+fn actual_file_loaders_finish_across_unrelated_status_changes() -> Result<(), String> {
+    let ctx = egui::Context::default();
+    for pane in [FileTab::History, FileTab::File] {
+        let dir = crate::repo::revert_tests::scratch(
+            if pane == FileTab::History {
+                "history-inflight-probe"
+            } else {
+                "file-inflight-probe"
+            },
+            &[
+                ("same.txt", "selected bytes\n"),
+                ("other.txt", "unrelated\n"),
+            ],
+        )?;
+        let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+        let mut v = view(None);
+        v.tab = pane;
+        let generation = v.generation;
+        tab.file_view = Some(v);
+        let (_, mut jobs) = crate::repo::messages::record_jobs(|| tab.load_file_view(&ctx));
+        let delayed_reply = jobs.pop().ok_or("missing actual loader")?();
+        std::fs::write(dir.join("other.txt"), "unrelated edit\n").map_err(|e| e.to_string())?;
+        let (_, mut jobs) =
+            crate::repo::messages::record_jobs(|| tab.status_changed_file_view(&ctx));
+        let probe = jobs.pop().ok_or("missing status probe")?();
+        tab.handle(probe, &ctx);
+        tab.handle(delayed_reply, &ctx);
+        let v = tab.file_view.as_ref().ok_or("missing view")?;
+        assert_eq!(v.generation, generation);
+        assert!(!v.needs(pane));
+        match pane {
+            FileTab::History => assert_eq!(
+                v.history_input.as_deref(),
+                Some(git::resolve(&dir, "HEAD")?.as_str())
+            ),
+            _ => assert_eq!(v.text_input, Some(content_key(b"selected bytes\n"))),
+        }
+        if pane == FileTab::File {
+            std::fs::write(dir.join("same.txt"), "selected new bytes\n")
+                .map_err(|e| e.to_string())?;
+            let (_, mut jobs) =
+                crate::repo::messages::record_jobs(|| tab.status_changed_file_view(&ctx));
+            let probe = jobs.pop().ok_or("missing changed probe")?();
+            let (_, mut replacements) =
+                crate::repo::messages::record_jobs(|| tab.handle(probe, &ctx));
+            assert_eq!(replacements.len(), 1);
+            let replacement = replacements.pop().ok_or("missing replacement loader")?();
+            tab.handle(replacement, &ctx);
+            let v = tab.file_view.as_ref().ok_or("missing view")?;
+            assert_ne!(v.generation, generation);
+            assert_eq!(v.text_input, Some(content_key(b"selected new bytes\n")));
+            assert!(!v.needs(FileTab::File));
+        }
+        std::fs::remove_dir_all(dir).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
