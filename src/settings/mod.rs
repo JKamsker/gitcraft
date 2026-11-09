@@ -219,7 +219,7 @@ impl Default for Settings {
             show_branches: true,
             show_detail: true,
             worktrees_in_same_tab: true,
-            tabs_in_title_bar: false,
+            tabs_in_title_bar: true,
             button_layout: Default::default(),
             files_as_tree: true,
             diff_split: false,
