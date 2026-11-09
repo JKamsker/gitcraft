@@ -247,7 +247,10 @@ fn a_staged_rename_or_deletion_is_refused_before_anything_happens() -> Result<()
         );
         assert!(result.is_err());
     }
-    assert_eq!(files_problem(&["a.txt".to_owned()], &work), None);
+    assert!(
+        files_problem(&["a.txt".to_owned()], &work)
+            .is_some_and(|p| p.contains("staged outside the selection"))
+    );
     assert_eq!(repo.stashes(), 0);
     assert_eq!(repo.state()?, before);
     Ok(())
@@ -797,5 +800,314 @@ fn stash_job_waits_in_the_shared_worktree_mutation_lane() -> Result<(), String> 
     );
     tab.handle(msg, &ctx);
     assert!(tab.busy_op.is_none());
+    Ok(())
+}
+
+#[test]
+fn excluded_overlap_validation_handles_ancestry_and_message_options() {
+    for (deleted, untracked, blocked) in [
+        ("f", "f", true),
+        ("f", "f/child", true),
+        ("dir/f", "dir", true),
+        ("f", "foo", false),
+        ("dir/f", "dir/other", false),
+    ] {
+        let work = WorkStatus {
+            staged: vec![git::StatusFile {
+                path: deleted.into(),
+                old_path: None,
+                code: 'D',
+                area: git::Area::Staged,
+            }],
+            unstaged: vec![git::StatusFile {
+                path: untracked.into(),
+                old_path: None,
+                code: '?',
+                area: git::Area::Untracked,
+            }],
+            ..WorkStatus::default()
+        };
+        assert_eq!(push_everything_problem(&work, false).is_some(), blocked);
+        assert!(push_everything_problem(&work, true).is_none());
+        assert!(everything_problem(&work, false).is_none()); // Snapshot remains eligible.
+        let request = StashRequest {
+            mode: StashMode::Everything,
+            message: "--include-untracked".into(),
+            untracked: false,
+        };
+        assert_eq!(push_args(&request, &work).is_err(), blocked);
+    }
+    for message in ["--include-untracked", "--", "--staged"] {
+        let args = ops(&[&["stash", "push", "-m", message]]).remove(0);
+        let request = push_request(&args).expect("stash push");
+        assert_eq!(request.mode, StashMode::Everything);
+        assert!(!request.untracked);
+    }
+}
+
+#[test]
+fn fresh_push_and_redo_refuse_recreated_deleted_file() -> Result<(), String> {
+    let repo = Repo::new("excluded-overlap-fresh")?;
+    repo.write("a.txt", b"changed\n")?;
+    let request = StashRequest {
+        mode: StashMode::Everything,
+        message: String::new(),
+        untracked: false,
+    };
+    let stale_args = push_args(&request, &repo.status()?)?;
+    let (result, kind) = repo.stash(StashMode::Everything, false);
+    result?;
+    let undone = repo.undo(entry(kind)?)?;
+    repo.git(&["rm", "-f", "a.txt"])?;
+    repo.write("a.txt", b"excluded new bytes\n")?;
+    let before = repo.state()?;
+    let stash_before = repo.git(&["stash", "list"])?;
+    let (result, _) = run_push(repo.path(), stale_args, git::head(repo.path()), false);
+    assert!(result.is_err_and(|e| e.contains("overlaps a staged deletion")));
+    let (result, _, stopped) = run_steps_counted(
+        repo.path(),
+        &undone.redo.clone(),
+        OpKind::Redo(undone),
+        None,
+        false,
+        None,
+    );
+    assert!(result.is_err_and(|e| e.contains("overlaps a staged deletion")));
+    assert_eq!(stopped, 0);
+    assert_eq!(repo.state()?, before);
+    assert_eq!(repo.git(&["stash", "list"])?, stash_before);
+    assert!(push_args(&request, &repo.status()?).is_err());
+    // Saving a snapshot does not run destructive stash cleanup.
+    let (result, _) = run_snapshot(repo.path(), "safe snapshot", false, git::head(repo.path()));
+    result?;
+    assert_eq!(repo.state()?, before);
+    Ok(())
+}
+
+#[test]
+fn rename_source_validation_preserves_git_path_spelling() {
+    for (source, other, blocked) in [
+        ("src", "src/child", true),
+        ("src/child", "src", true),
+        ("A", "a", false),
+        ("dir", "directory/f", false),
+        ("a\\b", "a/b", false),
+        (" f ", "f", false),
+    ] {
+        let work = WorkStatus {
+            staged: vec![git::StatusFile {
+                path: "destination".into(),
+                old_path: Some(source.into()),
+                code: 'R',
+                area: git::Area::Staged,
+            }],
+            unstaged: vec![git::StatusFile {
+                path: other.into(),
+                old_path: None,
+                code: '?',
+                area: git::Area::Untracked,
+            }],
+            ..WorkStatus::default()
+        };
+        assert_eq!(excluded_overlap_problem(&work, false).is_some(), blocked);
+        assert!(everything_problem(&work, false).is_none());
+    }
+}
+
+#[test]
+fn ignored_replacements_refuse_shared_agent_stash_execution() -> Result<(), String> {
+    for case in ["file", "file-to-dir", "dir-to-file", "rename"] {
+        let repo = Repo::new(&format!("ignored-overlap-{case}"))?;
+        let replacement = match case {
+            "dir-to-file" => {
+                std::fs::create_dir(repo.path().join("folder")).map_err(|e| e.to_string())?;
+                repo.write("folder/child", b"tracked\n")?;
+                repo.git(&["add", "folder"])?;
+                repo.git(&["commit", "-qm", "directory"])?;
+                repo.git(&["rm", "-r", "folder"])?;
+                repo.write("folder", b"excluded file\n")?;
+                "folder"
+            }
+            "rename" => {
+                repo.git(&["mv", "old.txt", "renamed.txt"])?;
+                repo.write("old.txt", b"excluded rename source\n")?;
+                "old.txt"
+            }
+            _ => {
+                repo.git(&["rm", "del.txt"])?;
+                if case == "file-to-dir" {
+                    std::fs::create_dir(repo.path().join("del.txt")).map_err(|e| e.to_string())?;
+                    repo.write("del.txt/child", b"excluded child\n")?;
+                } else {
+                    repo.write("del.txt", b"excluded replacement\n")?;
+                }
+                "del.txt"
+            }
+        };
+        std::fs::write(
+            repo.path().join(".git/info/exclude"),
+            format!("/{replacement}\n"),
+        )
+        .map_err(|e| e.to_string())?;
+        assert!(
+            !repo
+                .status()?
+                .unstaged
+                .iter()
+                .any(|f| f.area == git::Area::Untracked)
+        );
+        let before = repo.state()?;
+        let stash_before = repo.git(&["stash", "list"])?;
+        // The agent plan uses these shared arguments and the shared execution runner.
+        let args = ops(&[&stash_push_args()]);
+        let (result, _, stopped) =
+            run_steps_counted(repo.path(), &args, OpKind::plain(), None, false, None);
+        assert!(
+            result.is_err_and(|e| e.contains("overlaps a staged deletion")),
+            "{case}"
+        );
+        assert_eq!(stopped, 0);
+        assert_eq!(repo.state()?, before);
+        assert_eq!(repo.git(&["stash", "list"])?, stash_before);
+        let (result, _) = run_snapshot(repo.path(), "snapshot", false, git::head(repo.path()));
+        result?;
+        assert_eq!(repo.state()?, before);
+    }
+    Ok(())
+}
+
+#[test]
+fn files_validation_refuses_outside_staged_but_allows_unstaged() {
+    let file = |path: &str, area| git::StatusFile {
+        path: path.into(),
+        old_path: None,
+        code: 'M',
+        area,
+    };
+    let mut work = WorkStatus {
+        staged: vec![file("a", git::Area::Staged), file("b", git::Area::Staged)],
+        unstaged: vec![file("c", git::Area::Unstaged)],
+        ..WorkStatus::default()
+    };
+    let selected = vec!["a".to_owned()];
+    assert!(files_problem(&selected, &work).is_some_and(|e| e.contains("prevents Undo")));
+    assert!(files_problem(&["a".into(), "b".into()], &work).is_none());
+    work.staged.pop();
+    work.unstaged.push(file("b", git::Area::Unstaged));
+    assert!(files_problem(&selected, &work).is_none());
+    let request = StashRequest {
+        mode: StashMode::Files(selected),
+        message: "--".into(),
+        untracked: false,
+    };
+    let args = push_args(&request, &work).expect("unrelated unstaged files supported");
+    assert_eq!(push_request(&args).expect("decode").mode, request.mode);
+}
+
+#[test]
+fn fresh_files_push_and_redo_refuse_outside_staged_paths() -> Result<(), String> {
+    let repo = Repo::new("files-outside-staged")?;
+    repo.write("a.txt", b"staged a\n")?;
+    repo.git(&["add", "a.txt"])?;
+    repo.write("old.txt", b"unrelated unstaged\n")?;
+    let request = StashRequest {
+        mode: StashMode::Files(vec!["a.txt".into()]),
+        message: String::new(),
+        untracked: false,
+    };
+    let stale_args = push_args(&request, &repo.status()?)?;
+    let before = repo.state()?;
+    let (result, kind) = repo.stash(request.mode.clone(), false);
+    result?;
+    let undone = repo.undo(entry(kind)?)?;
+    assert_eq!(repo.state()?, before);
+    // The same selection becomes unsupported after another file is staged.
+    repo.write("sp ace.txt", b"staged b\n")?;
+    repo.git(&["add", "sp ace.txt"])?;
+    let before = repo.state()?;
+    let stash_before = repo.git(&["stash", "list"])?;
+    assert!(push_args(&request, &repo.status()?).is_err_and(|e| e.contains("prevents Undo")));
+    let (result, _) = run_push(repo.path(), stale_args, git::head(repo.path()), false);
+    assert!(result.is_err_and(|e| e.contains("prevents Undo")));
+    let (result, _, stopped) = run_steps_counted(
+        repo.path(),
+        &undone.redo.clone(),
+        OpKind::Redo(undone),
+        None,
+        false,
+        None,
+    );
+    assert!(result.is_err_and(|e| e.contains("prevents Undo")));
+    assert_eq!(stopped, 0);
+    assert_eq!(repo.state()?, before);
+    assert_eq!(repo.git(&["stash", "list"])?, stash_before);
+    // Selecting every staged path still round-trips the index and unrelated unstaged bytes.
+    let (result, kind) = repo.stash(
+        StashMode::Files(vec!["a.txt".into(), "sp ace.txt".into()]),
+        false,
+    );
+    result?;
+    let undone = repo.undo(entry(kind)?)?;
+    assert_eq!(repo.state()?, before);
+    let redone = repo.redo(undone)?;
+    repo.undo(redone)?;
+    assert_eq!(repo.state()?, before);
+    Ok(())
+}
+
+#[test]
+fn fresh_files_push_and_redo_revalidate_selected_deletions_and_renames() -> Result<(), String> {
+    for renamed in [false, true] {
+        let repo = Repo::new(if renamed {
+            "fresh-selected-rename"
+        } else {
+            "fresh-selected-deletion"
+        })?;
+        let selected = if renamed { "picked.txt" } else { "a.txt" };
+        repo.write(selected, b"selected modification\n")?;
+        let request = StashRequest {
+            mode: StashMode::Files(vec![selected.into()]),
+            message: String::new(),
+            untracked: renamed,
+        };
+        let stale_args = push_args(&request, &repo.status()?)?;
+        let (result, kind) = repo.stash(request.mode.clone(), renamed);
+        result?;
+        let undone = repo.undo(entry(kind)?)?;
+        if renamed {
+            std::fs::remove_file(repo.path().join(selected)).map_err(|e| e.to_string())?;
+            repo.git(&["mv", "old.txt", selected])?;
+        } else {
+            repo.git(&["rm", "-f", selected])?;
+        }
+        let work = repo.status()?;
+        assert!(
+            work.staged
+                .iter()
+                .any(|row| row.path == selected && row.code == if renamed { 'R' } else { 'D' })
+        );
+        let expected =
+            files_problem(&[selected.into()], &work).ok_or("selected row must be refused")?;
+        assert_eq!(
+            validate_push(repo.path(), &stale_args),
+            Err(expected.clone())
+        );
+        let before = repo.state()?;
+        let stashes = repo.git(&["stash", "list"])?;
+        let (result, _) = run_push(repo.path(), stale_args, git::head(repo.path()), false);
+        assert_eq!(result, Err(expected.clone()));
+        let (result, _, stopped) = run_steps_counted(
+            repo.path(),
+            &undone.redo.clone(),
+            OpKind::Redo(undone),
+            None,
+            false,
+            None,
+        );
+        assert_eq!(result, Err(expected));
+        assert_eq!(stopped, 0);
+        assert_eq!(repo.state()?, before);
+        assert_eq!(repo.git(&["stash", "list"])?, stashes);
+    }
     Ok(())
 }

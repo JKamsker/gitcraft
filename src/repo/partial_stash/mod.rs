@@ -165,7 +165,21 @@ pub(crate) fn files_problem(paths: &[String], work: &WorkStatus) -> Option<Strin
             return Some(problem);
         }
     }
-    None
+    outside_staged_problem(paths, work)
+}
+
+/// Git saves the whole index even with pathspecs. Leaving staged paths outside the
+/// selection makes the generic `stash pop --index` Undo try to apply them twice.
+fn outside_staged_problem(paths: &[String], work: &WorkStatus) -> Option<String> {
+    work.staged
+        .iter()
+        .find(|f| !paths.contains(&f.path))
+        .map(|f| {
+            crate::i18n::message(
+                "repo-workflows-partial_stash-outside-staged",
+                &[("path", f.path.clone().into())],
+            )
+        })
 }
 
 /// Whether `work` has changes besides untracked files (what a stash without them can take).
@@ -184,6 +198,126 @@ pub(crate) fn everything_problem(work: &WorkStatus, untracked: bool) -> Option<S
     } else {
         None
     }
+}
+
+/// Plain stash cleanup can overwrite an excluded untracked path when the index has
+/// deleted that path (or a file above/below it). Snapshots do not clean the worktree.
+fn excluded_overlap_problem(work: &WorkStatus, untracked: bool) -> Option<String> {
+    if untracked {
+        return None;
+    }
+    let overlaps = |a: &str, b: &str| {
+        a == b
+            || a.strip_prefix(b).is_some_and(|tail| tail.starts_with('/'))
+            || b.strip_prefix(a).is_some_and(|tail| tail.starts_with('/'))
+    };
+    let removed_paths = work.staged.iter().filter_map(|f| match f.code {
+        'D' => Some(f.path.as_str()),
+        'R' => f.old_path.as_deref(),
+        _ => None,
+    });
+    for deleted in removed_paths {
+        if let Some(excluded) = work
+            .unstaged
+            .iter()
+            .find(|f| f.area == git::Area::Untracked && overlaps(deleted, &f.path))
+        {
+            return Some(crate::i18n::message(
+                "repo-workflows-partial_stash-excluded-overlap",
+                &[("path", excluded.path.clone().into())],
+            ));
+        }
+    }
+    None
+}
+
+/// Everything removes changes; a snapshot only saves them.
+pub(crate) fn push_everything_problem(work: &WorkStatus, untracked: bool) -> Option<String> {
+    everything_problem(work, untracked).or_else(|| excluded_overlap_problem(work, untracked))
+}
+
+/// Decode the arguments the app saves for Redo without changing their serialization.
+/// Message values must never be interpreted as options or path separators.
+fn push_request(args: &[String]) -> Option<StashRequest> {
+    if args.len() < 2 || args[0] != "stash" || args[1] != "push" {
+        return None;
+    }
+    let mut request = StashRequest {
+        mode: StashMode::Everything,
+        message: String::new(),
+        untracked: false,
+    };
+    let mut i = 2;
+    while i < args.len() {
+        match args[i].as_str() {
+            "-m" | "--message" => i += 1,
+            "--staged" => request.mode = StashMode::Staged,
+            "-u" | "--include-untracked" | "-a" | "--all" => request.untracked = true,
+            "--" => {
+                request.mode = StashMode::Files(
+                    args[i + 1..]
+                        .iter()
+                        .map(|p| p.strip_prefix(":(literal)").unwrap_or(p).to_owned())
+                        .collect(),
+                );
+                break;
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    Some(request)
+}
+
+/// Run immediately before each stash push, including Redo, using fresh repository state.
+pub(super) fn validate_push(path: &Path, args: &[String]) -> Result<(), String> {
+    let Some(request) = push_request(args) else {
+        return Ok(());
+    };
+    let work = git::status(path)?;
+    if request.mode == StashMode::Everything {
+        if let Some(problem) = excluded_overlap_problem(&work, request.untracked) {
+            return Err(problem);
+        }
+        // Ordinary status omits ignored replacements. --include-untracked excludes them
+        // too, including in the separate agent stash plan. Ask Git for their spelling;
+        // do not resolve paths on the host (the repository may be remote).
+        if work.staged.iter().any(|f| matches!(f.code, 'D' | 'R')) {
+            let ignored = git::run(
+                Some(path),
+                &[
+                    "ls-files",
+                    "--others",
+                    "--ignored",
+                    "--exclude-standard",
+                    "-z",
+                ],
+            )?;
+            let ignored_work = WorkStatus {
+                staged: work.staged.clone(),
+                unstaged: ignored
+                    .split('\0')
+                    .filter(|p| !p.is_empty())
+                    .map(|p| git::StatusFile {
+                        path: p.to_owned(),
+                        old_path: None,
+                        code: '?',
+                        area: git::Area::Untracked,
+                    })
+                    .collect(),
+                ..WorkStatus::default()
+            };
+            if let Some(problem) = excluded_overlap_problem(&ignored_work, false) {
+                return Err(problem);
+            }
+        }
+    }
+    if let StashMode::Files(paths) = &request.mode
+        && let Some(problem) = files_problem(paths, &work)
+    {
+        return Err(problem);
+    }
+    Ok(())
 }
 
 /// Keeps of `files` those that still have changes in `work`.
@@ -208,7 +342,7 @@ pub(crate) fn push_args(request: &StashRequest, work: &WorkStatus) -> Result<Vec
             );
         }
         StashMode::Everything => {
-            if let Some(problem) = everything_problem(work, request.untracked) {
+            if let Some(problem) = push_everything_problem(work, request.untracked) {
                 return Err(problem);
             }
             if request.untracked {
