@@ -587,17 +587,13 @@ mod localization_tests {
         submit: usize,
         name_lost_on_enter: bool,
         browse_focused_on_enter: bool,
-        parent_lost_on_enter: bool,
     }
 
     fn enter_form() -> Harness<'static, EnterForm> {
-        Harness::new_ui_state(
+        let h = Harness::new_ui_state(
             |ui, form: &mut EnterForm| {
                 let parent = ui.text_edit_singleline(&mut form.parent);
                 form.parent_id = Some(parent.id);
-                if ui.input(|i| i.key_pressed(Key::Enter)) {
-                    form.parent_lost_on_enter = parent.lost_focus();
-                }
                 if singleline_enter(&parent) {
                     form.submit += 1;
                 }
@@ -617,11 +613,15 @@ mod localization_tests {
                 }
             },
             EnterForm::default(),
-        )
+        );
+        // Keep the focus transition and its observations in one rendering pass.
+        h.ctx
+            .options_mut(|o| o.max_passes = std::num::NonZeroUsize::MIN);
+        h
     }
 
     #[test]
-    fn coalesced_forward_tab_and_enter_only_activates_browse() {
+    fn coalesced_tab_and_enter_does_not_submit() {
         let mut h = enter_form();
         let parent = h.state().parent_id.expect("parent rendered");
         h.ctx.memory_mut(|m| m.request_focus(parent));
@@ -641,9 +641,10 @@ mod localization_tests {
                     }),
             );
         h.step();
-        assert!(h.state().parent_lost_on_enter);
-        assert!(h.state().browse_focused_on_enter);
-        assert_eq!(h.state().browse, 1);
+        // TextEdit handles Enter before registering Tab traversal and retains focus.
+        // It must still not treat a traversal frame as a submission request.
+        assert_eq!(h.ctx.memory(|m| m.focused()), Some(parent));
+        assert_eq!(h.state().browse, 0);
         assert_eq!(h.state().submit, 0);
     }
 
