@@ -828,6 +828,69 @@ fn explicit_annotated_tag_push_works_with_detached_head() -> Result<(), String> 
 }
 
 #[test]
+fn author_rules_rank_namespace_specificity_after_host_normalization() {
+    use crate::settings::profiles::HostAuthor;
+    let rule = |host: &str, email: &str| HostAuthor {
+        host: host.into(),
+        name: "Expected author".into(),
+        email: email.into(),
+    };
+    for (scheme, host, broad) in [
+        ("https", "github.com", "github.com:443"),
+        ("http", "github.com", "github.com:80"),
+        ("ssh", "github.com", "github.com:22"),
+        ("git", "github.com", "github.com:9418"),
+        ("https", "[2001:db8::1]", "[2001:db8::1]:443"),
+        ("ssh", "github.com", "ssh.github.com:443"),
+        ("https", "github.com", "  github.com  "),
+    ] {
+        let specific = rule(&format!("{host}/a"), "team@example.org");
+        let general = rule(broad, "general@example.org");
+        for rules in [
+            vec![specific.clone(), general.clone()],
+            vec![general.clone(), specific.clone()],
+        ] {
+            let profile = UserProfile {
+                author_hosts: rules,
+                ..Default::default()
+            };
+            assert_eq!(
+                profile
+                    .expected_author(&format!("{scheme}://{host}/a/repo.git"))
+                    .1,
+                "team@example.org",
+                "{scheme}: {broad}",
+            );
+        }
+    }
+    let profile = UserProfile {
+        author_email: "fallback@example.org".into(),
+        author_hosts: vec![
+            rule("github.com/a/sub", "nested@example.org"),
+            rule("  GITHUB.COM:443/A  ", "first@example.org"),
+            rule("github.com/a", "last@example.org"),
+        ],
+        ..Default::default()
+    };
+    assert_eq!(
+        profile.expected_author("https://github.com/a/sub/repo").1,
+        "nested@example.org"
+    );
+    assert_eq!(
+        profile.expected_author("https://github.com/a/repo").1,
+        "last@example.org"
+    );
+    assert_eq!(
+        profile.expected_author("https://github.com/another/repo").1,
+        "fallback@example.org"
+    );
+    assert_eq!(
+        profile.expected_author("https://github.com:8443/a/repo").1,
+        "fallback@example.org"
+    );
+}
+
+#[test]
 fn explicit_default_ports_keep_host_and_namespace_identity_policy() -> Result<(), String> {
     let f = Fixture::new()?;
     f.commit("next", "next", "Next")?;
@@ -838,6 +901,13 @@ fn explicit_default_ports_keep_host_and_namespace_identity_policy() -> Result<()
             host: "github.com/personal".into(),
             name: "Personal".into(),
             email: "personal@example.org".into(),
+        });
+    profile
+        .author_hosts
+        .push(crate::settings::profiles::HostAuthor {
+            host: "github.com:443".into(),
+            name: "General".into(),
+            email: profile.author_email.clone(),
         });
     for url in [
         "https://github.com/personal/repo.git",
