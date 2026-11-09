@@ -265,7 +265,10 @@ enum Answer {
 mod localization_tests {
     use super::*;
     use egui::{Key, accesskit::Role};
-    use egui_kittest::{Harness, kittest::Queryable};
+    use egui_kittest::{
+        Harness,
+        kittest::{NodeT, Queryable},
+    };
 
     fn secret_harness(remember: bool, store: bool) -> Harness<'static, (AskpassState, Option<u8>)> {
         crate::i18n::set_language("en-US");
