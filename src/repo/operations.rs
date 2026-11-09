@@ -1493,6 +1493,59 @@ fn ignored_safe_pull(path: &Path, args: &[String]) -> Result<Vec<String>, String
         .trim()
         .strip_prefix("refs/heads/")
         .ok_or("Pull requires a checked-out local branch")?;
+    if !args.iter().any(|arg| arg == "--ff-only") {
+        let explicit = args.iter().rev().find_map(|arg| match arg.as_str() {
+            "--no-rebase" | "--rebase=false" => Some(false),
+            "--rebase" => Some(true),
+            value if value.starts_with("--rebase=") => Some(true),
+            _ => None,
+        });
+        let rebase = match explicit {
+            Some(value) => value,
+            None => {
+                let local = git::run_ok_codes(
+                    Some(path),
+                    &["config", "-z", "--get", &format!("branch.{branch}.rebase")],
+                    &[0, 1],
+                )?;
+                let value = if local.is_empty() {
+                    git::run_ok_codes(
+                        Some(path),
+                        &["config", "-z", "--get", "pull.rebase"],
+                        &[0, 1],
+                    )?
+                } else {
+                    local
+                };
+                !matches!(
+                    value
+                        .trim_end_matches('\0')
+                        .trim()
+                        .to_ascii_lowercase()
+                        .as_str(),
+                    "" | "false" | "no" | "off" | "0"
+                )
+            }
+        };
+        // Rebase's checkout does not honor mergeOptions and offers no equivalent
+        // no-overwrite-ignore switch. Refuse before fetch can introduce a collision.
+        if rebase
+            && !git::run(
+                Some(path),
+                &[
+                    "ls-files",
+                    "--others",
+                    "--ignored",
+                    "--exclude-standard",
+                    "--directory",
+                    "-z",
+                ],
+            )?
+            .is_empty()
+        {
+            return Err("Rebase pull cannot safely preserve ignored local files. Move them out of the repository or use fast-forward-only or merge pull.".into());
+        }
+    }
     let key = format!("branch.{branch}.mergeOptions");
     let old = git::run_ok_codes(Some(path), &["config", "-z", "--get", &key], &[0, 1])?;
     let old = old.strip_suffix('\0').unwrap_or(&old);
@@ -2003,6 +2056,35 @@ mod tests {
         assert!(result.is_ok(), "{result:?}");
         assert_eq!(git::head(clone.path()), git::head(&upstream));
         let _ = std::fs::remove_dir_all(upstream);
+        Ok(())
+    }
+
+    #[test]
+    fn rebase_pull_refuses_ignored_files_before_fetch_and_honors_explicit_modes()
+    -> Result<(), String> {
+        let dir = repo("rebase-pull-ignored");
+        std::fs::write(dir.join(".git/info/exclude"), "private\n").map_err(|e| e.to_string())?;
+        std::fs::write(dir.join("private"), "precious").map_err(|e| e.to_string())?;
+        let before = git::head(&dir);
+        let rebase = ops(&[&["pull", "--rebase", "--autostash"]]);
+        let (result, _) = run_steps(&dir, &rebase, OpKind::plain(), None);
+        assert!(result.is_err_and(|e| e.contains("ignored local files")));
+        assert_eq!(git::head(&dir), before);
+        assert!(!dir.join(".git/FETCH_HEAD").exists());
+        assert_eq!(
+            std::fs::read(dir.join("private")).map_err(|e| e.to_string())?,
+            b"precious"
+        );
+        git::run(Some(&dir), &["config", "pull.rebase", "true"])?;
+        assert!(super::ignored_safe_pull(&dir, &ops(&[&["pull"]])[0]).is_err());
+        for args in [&["pull", "--ff-only"][..], &["pull", "--no-rebase"][..]] {
+            assert!(super::ignored_safe_pull(&dir, &ops(&[args])[0]).is_ok());
+        }
+        git::run(Some(&dir), &["config", "branch.main.rebase", "false"])?;
+        assert!(super::ignored_safe_pull(&dir, &ops(&[&["pull"]])[0]).is_ok());
+        std::fs::remove_file(dir.join("private")).map_err(|e| e.to_string())?;
+        assert!(super::ignored_safe_pull(&dir, &rebase[0]).is_ok());
+        let _ = std::fs::remove_dir_all(dir);
         Ok(())
     }
 
