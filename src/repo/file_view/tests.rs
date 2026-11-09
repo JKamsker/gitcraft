@@ -742,13 +742,23 @@ fn pinned_pending_blame_survives_status_but_changed_dependencies_and_refresh_sup
             .ok_or("missing view")?
             .blame_generation;
         assert_ne!(newer, blame);
+        let replacement = tab.file_view.as_ref().ok_or("missing view")?.pending[1]
+            .ok_or("missing replacement blame")?;
+        assert_ne!(replacement, token);
         let (_, jobs) =
             crate::repo::messages::record_jobs(|| tab.invalidate_mutable_file_view(&ctx));
         assert!(
             jobs.is_empty(),
             "superseded loader retains its slot until completion"
         );
-        assert!(!tab.finish_file_load(FileTab::Blame, token, blame, None, &ctx));
+        let (_, jobs) = crate::repo::messages::record_jobs(|| {
+            assert!(!tab.finish_file_load(FileTab::Blame, replacement, newer, None, &ctx));
+        });
+        assert_eq!(jobs.len(), 1, "retired epoch submits a fresh replacement");
+        assert_ne!(
+            tab.file_view.as_ref().ok_or("missing view")?.pending[1],
+            Some(replacement)
+        );
     }
     Ok(())
 }
