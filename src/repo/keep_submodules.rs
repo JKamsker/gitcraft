@@ -20,7 +20,8 @@ pub(super) fn update_all() -> Action {
 /// Updates the submodule at `path`.
 pub(super) fn update_one(path: &str) -> Action {
     let mut args = UPDATE.to_vec();
-    args.extend(["--", path]);
+    let literal = format!(":(literal){path}");
+    args.extend(["--", &literal]);
     Action::Ops {
         label: format!("Update submodule {path}"),
         ops: ops(&[&args]),

@@ -374,21 +374,24 @@ fn push_request(args: &[String]) -> Option<StashRequest> {
     Some(request)
 }
 
-/// Run immediately before each stash push, including Redo, using fresh repository state.
-pub(super) fn validate_push(path: &Path, args: &[String]) -> Result<(), String> {
-    let Some(request) = push_request(args) else {
-        return Ok(());
-    };
-    let work = git::status(path)?;
-    if request.mode == StashMode::Everything {
-        if let Some(problem) = excluded_overlap_problem(&work, request.untracked) {
-            return Err(problem);
-        }
-        // Ordinary status omits ignored replacements. --include-untracked excludes them
-        // too, including in the separate agent stash plan. Ask Git for their spelling;
-        // do not resolve paths on the host (the repository may be remote).
-        if removed_paths(&work).next().is_some() {
-            let ignored = git::run(
+/// Native pull autostash performs the same excluded-file cleanup as plain stash.
+/// Check conservatively even when autostash is disabled rather than duplicating
+/// Git's version-dependent configuration precedence. This can refuse an overlap
+/// unnecessarily, but never expands the operation's capture scope.
+pub(super) fn validate_excluded_cleanup(path: &Path) -> Result<(), String> {
+    validate_excluded_cleanup_state(path, &git::status(path)?, false)
+}
+
+fn validate_excluded_cleanup_state(
+    path: &Path,
+    work: &WorkStatus,
+    untracked: bool,
+) -> Result<(), String> {
+    validate_excluded_cleanup_with(
+        work,
+        untracked,
+        || {
+            git::run(
                 Some(path),
                 &[
                     "ls-files",
@@ -397,32 +400,64 @@ pub(super) fn validate_push(path: &Path, args: &[String]) -> Result<(), String> 
                     "--exclude-standard",
                     "-z",
                 ],
-            )?;
-            let ignored_work =
-                WorkStatus {
-                    staged: work.staged.clone(),
-                    unstaged: work
-                        .unstaged
-                        .iter()
-                        .filter(|f| f.area != git::Area::Untracked)
-                        .cloned()
-                        .chain(ignored.split('\0').filter(|p| !p.is_empty()).map(|p| {
-                            git::StatusFile {
-                                path: p.to_owned(),
-                                old_path: None,
-                                code: '?',
-                                area: git::Area::Untracked,
-                            }
-                        }))
-                        .collect(),
-                    ..WorkStatus::default()
-                };
-            if let Some(problem) = excluded_overlap_problem(&ignored_work, false) {
-                return Err(problem);
-            }
-            let ignored: Vec<_> = ignored.split('\0').filter(|p| !p.is_empty()).collect();
-            check_filesystem_overlaps(path, &work, request.untracked, &ignored)?;
+            )
+        },
+        |work, untracked, ignored| check_filesystem_overlaps(path, work, untracked, ignored),
+    )
+}
+
+fn validate_excluded_cleanup_with(
+    work: &WorkStatus,
+    untracked: bool,
+    mut read_ignored: impl FnMut() -> Result<String, String>,
+    mut check_aliases: impl FnMut(&WorkStatus, bool, &[&str]) -> Result<(), String>,
+) -> Result<(), String> {
+    if let Some(problem) = excluded_overlap_problem(work, untracked) {
+        return Err(problem);
+    }
+    // Ordinary status omits ignored replacements. --include-untracked excludes them
+    // too, including in the separate agent stash plan. Ask Git for their spelling;
+    // do not resolve paths on the host (the repository may be remote).
+    if removed_paths(work).next().is_some() {
+        let ignored = read_ignored()?;
+        let ignored_work = WorkStatus {
+            staged: work.staged.clone(),
+            unstaged: work
+                .unstaged
+                .iter()
+                .filter(|f| f.area != git::Area::Untracked)
+                .cloned()
+                .chain(
+                    ignored
+                        .split('\0')
+                        .filter(|p| !p.is_empty())
+                        .map(|p| git::StatusFile {
+                            path: p.to_owned(),
+                            old_path: None,
+                            code: '?',
+                            area: git::Area::Untracked,
+                        }),
+                )
+                .collect(),
+            ..WorkStatus::default()
+        };
+        if let Some(problem) = excluded_overlap_problem(&ignored_work, false) {
+            return Err(problem);
         }
+        let ignored: Vec<_> = ignored.split('\0').filter(|p| !p.is_empty()).collect();
+        check_aliases(work, untracked, &ignored)?;
+    }
+    Ok(())
+}
+
+/// Run immediately before each stash push, including Redo, using fresh repository state.
+pub(super) fn validate_push(path: &Path, args: &[String]) -> Result<(), String> {
+    let Some(request) = push_request(args) else {
+        return Ok(());
+    };
+    let work = git::status(path)?;
+    if request.mode == StashMode::Everything {
+        validate_excluded_cleanup_state(path, &work, request.untracked)?;
     }
     if let StashMode::Files(paths) = &request.mode {
         // A queued selection can become completely clean. Preserve the existing
