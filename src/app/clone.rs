@@ -10,6 +10,30 @@ use super::{App, repo_root};
 use crate::git;
 use crate::theme::{self, Tokens};
 
+#[cfg(test)]
+thread_local! {
+    /// Intent seam at the native picker and submission boundaries; tests still paint
+    /// clone_dialog/form_fields and process the production keyboard responses.
+    static CLONE_INTENTS: std::cell::RefCell<Option<(usize, Vec<(String, String, String)>)>> = const { std::cell::RefCell::new(None) };
+}
+
+fn pick_clone_folder() -> Option<PathBuf> {
+    #[cfg(test)]
+    if CLONE_INTENTS.with(|intents| {
+        if let Some((browse, _)) = &mut *intents.borrow_mut() {
+            *browse += 1;
+            true
+        } else {
+            false
+        }
+    }) {
+        return None;
+    }
+    rfd::FileDialog::new()
+        .set_title(crate::i18n::text("interaction-forms-clone-into"))
+        .pick_folder()
+}
+
 pub(super) struct CloneForm {
     options: git::CloneOptions,
     depth: String,
@@ -153,6 +177,17 @@ impl App {
         let Some(form) = &mut self.clone_form else {
             return;
         };
+        #[cfg(test)]
+        if CLONE_INTENTS.with(|intents| {
+            if let Some((_, submit)) = &mut *intents.borrow_mut() {
+                submit.push((form.url.clone(), form.parent.clone(), form.name.clone()));
+                true
+            } else {
+                false
+            }
+        }) {
+            return;
+        }
         // One clone at a time: a second would take the first one's place, whose result
         // (and its tab) would never come.
         if let Some(running) = &self.cloning {
@@ -432,9 +467,7 @@ fn form_fields(ui: &mut Ui, form: &mut CloneForm, t: &Tokens) -> bool {
                     .min_size(vec2(80.0, 28.0)),
             )
             .clicked()
-            && let Some(dir) = rfd::FileDialog::new()
-                .set_title(crate::i18n::text("interaction-forms-clone-into"))
-                .pick_folder()
+            && let Some(dir) = pick_clone_folder()
         {
             form.parent = dir.display().to_string();
         }
@@ -691,6 +724,128 @@ mod localization_tests {
         assert_eq!(h.state().browse, 0);
         assert_eq!(h.state().submit, 1);
         assert!(h.ctx.memory(|m| m.focused().is_none()));
+    }
+
+    fn production_dialog() -> Harness<'static, Option<App>> {
+        let mut h = Harness::new_ui_state(
+            |ui, state: &mut Option<App>| {
+                if state.is_none() {
+                    let cc = eframe::CreationContext::_new_kittest(ui.ctx().clone());
+                    let mut app = App::launched_using(&cc, None, || {
+                        Ok("git version 2.43.0 (recorded)".into())
+                    });
+                    app.start_clone();
+                    let form = app.clone_form.as_mut().expect("clone form");
+                    form.url = "https://example.invalid/o/r".into();
+                    form.parent = "/inert".into();
+                    form.name = "repo".into();
+                    form.focus = false;
+                    *state = Some(app);
+                    return;
+                }
+                state.as_mut().expect("app").clone_dialog(ui.ctx());
+            },
+            None,
+        );
+        h.ctx
+            .options_mut(|o| o.max_passes = std::num::NonZeroUsize::MIN);
+        h.run_steps(3);
+        h
+    }
+
+    fn record_clone_intents(work: impl FnOnce()) -> (usize, Vec<(String, String, String)>) {
+        struct Reset;
+        impl Drop for Reset {
+            fn drop(&mut self) {
+                CLONE_INTENTS.with(|intents| *intents.borrow_mut() = None);
+            }
+        }
+        CLONE_INTENTS.with(|intents| {
+            assert!(intents.borrow().is_none());
+            *intents.borrow_mut() = Some(Default::default());
+        });
+        let _reset = Reset;
+        work();
+        CLONE_INTENTS.with(|intents| intents.borrow_mut().take().expect("recording"))
+    }
+
+    #[test]
+    fn actual_clone_dialog_traversal_and_picker_cancellation_never_submit() {
+        crate::i18n::set_language("en-US");
+        let intents = record_clone_intents(|| {
+            let mut h = production_dialog();
+            h.get_all_by_role(egui::accesskit::Role::TextInput)
+                .nth(2)
+                .expect("name")
+                .focus();
+            h.step();
+            h.key_down_modifiers(egui::Modifiers::SHIFT, Key::Tab);
+            h.step();
+            h.key_down(Key::Enter);
+            h.step();
+            h.key_up(Key::Enter);
+            h.key_up(Key::Tab);
+            h.run_steps(3);
+            assert!(
+                h.state()
+                    .as_ref()
+                    .is_some_and(|app| app.cloning.is_none() && app.clone_form.is_some())
+            );
+        });
+        assert_eq!(intents.0, 1, "production Browse intent only");
+        assert!(intents.1.is_empty());
+        for field in [1, 2] {
+            let intents = record_clone_intents(|| {
+                let mut h = production_dialog();
+                h.get_all_by_role(egui::accesskit::Role::TextInput)
+                    .nth(field)
+                    .expect("field")
+                    .focus();
+                h.step();
+                h.input_mut()
+                    .events
+                    .extend(
+                        [Key::Tab, Key::Enter]
+                            .into_iter()
+                            .map(|key| egui::Event::Key {
+                                key,
+                                physical_key: None,
+                                pressed: true,
+                                repeat: false,
+                                modifiers: egui::Modifiers::NONE,
+                            }),
+                    );
+                h.step();
+            });
+            assert_eq!(intents, (0, Vec::new()));
+        }
+    }
+
+    #[test]
+    fn actual_clone_dialog_singleline_enter_records_one_submission() {
+        crate::i18n::set_language("en-US");
+        let intents = record_clone_intents(|| {
+            let mut h = production_dialog();
+            h.get_all_by_role(egui::accesskit::Role::TextInput)
+                .nth(2)
+                .expect("name")
+                .focus();
+            h.step();
+            h.key_press(Key::Enter);
+            h.run_steps(3);
+            assert!(h.state().as_ref().is_some_and(|app| app.cloning.is_none()));
+        });
+        assert_eq!(
+            intents,
+            (
+                0,
+                vec![(
+                    "https://example.invalid/o/r".into(),
+                    "/inert".into(),
+                    "repo".into()
+                )]
+            )
+        );
     }
 
     #[test]
