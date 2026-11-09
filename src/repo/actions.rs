@@ -371,6 +371,7 @@ pub(crate) enum Action {
     QuickEdit {
         edit: quick_edit::Edit,
         hash: String,
+        branch_guard: Vec<String>,
     },
     InteractiveRebase {
         onto: String,

@@ -745,6 +745,7 @@ fn a_drop_confirmed_while_busy_says_so() {
         Action::QuickEdit {
             edit: Edit::Drop,
             hash: "0123456789abcdef".to_owned(),
+            branch_guard: crate::repo::operations::expect_symref("HEAD", "refs/heads/main"),
         },
         &ctx,
     );
@@ -1019,4 +1020,58 @@ fn rapid_reloads_finish_and_coalesce() {
     assert_eq!(tab.reads, before + 2);
     drop(tab);
     let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
+fn quick_drop_refuses_a_different_branch_at_the_same_commit() -> Result<(), String> {
+    use super::{Action, Msg, RepoTab, quick_edit::Edit};
+    let dir = repo("quick-drop-same-sha");
+    git::run(Some(&dir), &["checkout", "-qb", "original"])?;
+    let base = git::head(&dir);
+    git::run(Some(&dir), &["commit", "-q", "--allow-empty", "-m", "tip"])?;
+    let tip = git::head(&dir);
+    git::run(Some(&dir), &["branch", "other"])?;
+    let ctx = egui::Context::default();
+    let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+    tab.refs.current = Some("original".into());
+    tab.refs.head = tip.clone();
+    let captured = Action::QuickEdit {
+        edit: Edit::Drop,
+        hash: tip.clone(),
+        branch_guard: tab.same_branch(),
+    };
+    git::run(Some(&dir), &["checkout", "-q", "other"])?;
+    tab.refs.current = Some("other".into());
+    let execute = |tab: &mut RepoTab, action: Action| -> Result<bool, String> {
+        tab.apply(action, &ctx);
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(20);
+        loop {
+            let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+            let msg = tab.rx.recv_timeout(remaining).map_err(|e| e.to_string())?;
+            let completed = match &msg {
+                Msg::OpDone { result, .. } => Some(result.is_ok()),
+                _ => None,
+            };
+            tab.handle(msg, &ctx);
+            if let Some(ok) = completed {
+                return Ok(ok);
+            }
+        }
+    };
+    assert!(!execute(&mut tab, captured)?);
+    assert_eq!(git::head(&dir), tip);
+    assert_eq!(git::resolve(&dir, "refs/heads/original")?, tip);
+    assert_eq!(git::resolve(&dir, "refs/heads/other")?, tip);
+    assert!(tab.undo.is_empty());
+    assert!(git::in_progress(&dir)?.is_none());
+    let fresh = Action::QuickEdit {
+        edit: Edit::Drop,
+        hash: tip.clone(),
+        branch_guard: tab.same_branch(),
+    };
+    assert!(execute(&mut tab, fresh)?);
+    assert_eq!(git::head(&dir), base);
+    assert_eq!(git::resolve(&dir, "refs/heads/original")?, tip);
+    let _ = std::fs::remove_dir_all(dir);
+    Ok(())
 }
