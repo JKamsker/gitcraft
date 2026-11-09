@@ -762,7 +762,7 @@ fn stash_job_waits_in_the_shared_worktree_mutation_lane() -> Result<(), String> 
     let mut tab = RepoTab::new_deferred(peer.path().to_owned(), &ctx);
     assert_eq!(blocker.tx.repo, tab.tx.repo);
     let (started_tx, started_rx) = channel();
-    let (release_tx, release_rx) = channel();
+    let (release_tx, release_rx) = channel::<()>();
     crate::repo::messages::spawn_mutation(
         &blocker.tx,
         &ctx,
