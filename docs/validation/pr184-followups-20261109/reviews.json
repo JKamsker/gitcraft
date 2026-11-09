@@ -1,0 +1,303 @@
+[
+  {
+    "task_id": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A2b1c930c-da60-4117-9c64-25c041705c35",
+    "reviewer": {
+      "provider": "codex",
+      "model": "gpt-6.1-sol",
+      "options": [
+        {
+          "id": "reasoningEffort",
+          "value": "high"
+        },
+        {
+          "id": "serviceTier",
+          "value": "default"
+        }
+      ]
+    },
+    "scope": "source",
+    "verdict": "PASS",
+    "reviewed_commit": "1eee7e703ce629441eee166b2718021394c9fe09",
+    "reviewed_tree": "e52b17e34a9001bbe204447e459e5446d40d80e7",
+    "summary": "**SOURCE PASS** \u2014 no blocking source findings.\n\nReviewed candidate: `1eee7e703ce629441eee166b2718021394c9fe09`  \nTree: `e52b17e34a9001bbe204447e459e5446d40d80e7`\n\nThe complete recursive path/mode/blob maps match accepted commit `7346090eb38f4332774a06473a02d60262585f32` and the specified tree exactly: **1,883 identical entries**.\n\nReviewed all seven follow-up features and their shared paths:\n\n- File-view generation allocation preserves uniqueness and overflow handling.\n- Form submission respects eligible field focus and explicit primary activation.\n- Portable previews warn about URL-shaped author rules without rewriting imported data.\n- Author-rule precedence ranks matching namespace specificity.\n- Saved pull-option classification preserves argument consumption and effective mode ordering.\n- Remote mutation serialization covers whole queued operations while retaining repository identity and concurrent reads.\n- Stash execution revalidates excluded overlaps and selected-file Undo constraints, including Redo.\n\nThe latest accessibility guard suppresses submission for foreign-node actions, including **Click**. Production askpass fixtures cover Focus/Click in both event orders and remember states, plus explicit primary activation.\n\nThe revised Fold fixture exercises `RepoTab::dialogs`, rejects unfocused Enter, and verifies focused primary-button activation emits `RunFold` with the expected `keep_fixup` value and closes the dialog. Separate coverage checks checkbox toggles across pushed states.\n\n**Required source remedies: none.** This is source approval only. No builds/tests, process-control, CI, PR actions, or live-run inspection were performed. Final combined execution and evidence packaging remain with the parent; published head `5988524` was untouched.\n\nPR https://github.com/JKamsker/gitcraft/pull/184, head reviewed 1eee7e703ce629441eee166b2718021394c9fe09, checks/reviews state: source PASS; final combined checks pending parent evidence.",
+    "disposition": "Accepted within the recorded scope."
+  },
+  {
+    "task_id": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Aa5b19f4e-1a44-494c-8ece-85438faa701c",
+    "reviewer": {
+      "provider": "codex",
+      "model": "gpt-6.1-sol",
+      "options": [
+        {
+          "id": "reasoningEffort",
+          "value": "high"
+        },
+        {
+          "id": "serviceTier",
+          "value": "default"
+        }
+      ]
+    },
+    "scope": "source_accessibility",
+    "verdict": "PASS",
+    "reviewed_commit": "1eee7e703ce629441eee166b2718021394c9fe09",
+    "reviewed_tree": "e52b17e34a9001bbe204447e459e5446d40d80e7",
+    "summary": "**PASS** \u2014 scoped review of `1eee7e703ce629441eee166b2718021394c9fe09`, tree `e52b17e34a9001bbe204447e459e5446d40d80e7`.\n\nSource equivalence is established:\n\n- The complete candidate tree equals approved `7346090eb38f4332774a06473a02d60262585f32`.\n- Helper, helper tests, and askpass blobs match both `7346090\u2026` and `6f21540\u2026` exactly:\n  - `src/a11y/mod.rs`: `05b44da468d9fe0a769160781352a8f2956fb93d`\n  - `src/a11y/enter_tests.rs`: `48a0c01e7d92ff7b7e5f62afd0193ec37b84a9f2`\n  - `src/app/askpass_dialog.rs`: `68bc9ff738a39a49adea0b4c278e3dcc3a04fd0a`\n- `Cargo.toml` and `Cargo.lock` also match across all three commits.\n\nThe reviewed fixtures cover all eight raw coalesced Focus/Click \u00d7 event-order \u00d7 remember-state combinations. They establish password focus before injection, assert no answer immediately and after three further steps, and verify checkbox focus or an actual remember-state toggle. These activation checks are nonvacuous.\n\nThe answer recorder latches the first answer and stops rendering afterward, so later frames cannot erase an unintended answer. Explicit coalesced **Sign in** activation positively returns the correct Give/Remember variant for both remember states. Keyboard button activation and ordinary password Enter remain covered; the helper test also asserts exactly one ordinary Enter submission after focus surrender.\n\nNo blocking finding or remedy within this scope. Source identity makes the prior scoped review and parent-reported passing `7346090\u2026` tests applicable to this candidate. I ran no builds/tests and made no edits, process-control, CI, or PR actions. Full v2 validation and evidence packaging remain parent-owned; published head `5988524\u2026` was untouched.\n\nPR https://github.com/JKamsker/gitcraft/pull/184, head reviewed `1eee7e703ce629441eee166b2718021394c9fe09`, checks: parent-reported scoped PASS; review: PASS; full v2: parent-owned.",
+    "disposition": "Accepted within the recorded scope."
+  },
+  {
+    "task_id": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Aa1f70d58-12eb-45a0-b75d-a266ed2ce367",
+    "reviewer": {
+      "provider": "codex",
+      "model": "gpt-6.1-sol",
+      "options": [
+        {
+          "id": "reasoningEffort",
+          "value": "high"
+        },
+        {
+          "id": "serviceTier",
+          "value": "default"
+        }
+      ]
+    },
+    "scope": "source_fold",
+    "verdict": "PASS",
+    "reviewed_commit": "1eee7e703ce629441eee166b2718021394c9fe09",
+    "reviewed_tree": "e52b17e34a9001bbe204447e459e5446d40d80e7",
+    "summary": "PASS \u2014 no blocking findings within the requested scope.\n\nReviewed SHA: `1eee7e703ce629441eee166b2718021394c9fe09`  \nTree: `e52b17e34a9001bbe204447e459e5446d40d80e7`, identical to evidence commit `7346090e`.\n\n- Fold production code is unchanged from `049a29c0`. Unfocused Enter cannot submit; focused primary-button Enter returns `RunFold` with the displayed plan cloned, and the dispatcher closes the dialog. Fold execution safeguards remain unchanged.\n- Other reviewed dialogs restrict submission to eligible single-line fields or explicit primary activation. Checkbox Enter retains its native toggle behavior. The shared helper rejects competing pointer, Tab, and accessibility actions.\n- The old run records exactly one failure: the obsolete unpushed global-Enter expectation (`None` versus `Some(false)`). The replacement fixture exercises the actual `RepoTab::dialogs` dispatcher and records a pass.\n- Supplied Fold, helper, and askpass log hashes match their manifest entries.\n\nEvidence SHA-256:\n\n- `results.json`: `77d178a523ed169e2164b86f99b414b3c9fc99bdf62e3de6fd57c0fa2be3fdb3`\n- `fold-dialog.log`: `1f31dc959cd2df271909db95867a825feec929677f221747d719d3c5d5a13fd7`\n\nOptional hardening: assert the complete action vector and every returned plan field; the fixture currently checks the `RunFold` variant, `keep_fixup`, and closure.\n\nNo tests executed or files changed. Full v2 validation and evidence packaging remain with the parent; published head `5988524c` was untouched.\n\nPR https://github.com/JKamsker/gitcraft/pull/184, head reviewed 1eee7e703ce629441eee166b2718021394c9fe09, checks/reviews focused evidence PASS; scoped read-only review PASS; full v2 validation pending parent.",
+    "disposition": "Accepted within the recorded scope."
+  },
+  {
+    "task_id": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Aae86e01d-d0d7-468d-8d87-fd31f2a9293d",
+    "reviewer": {
+      "provider": "codex",
+      "model": "gpt-6.1-sol",
+      "options": [
+        {
+          "id": "reasoningEffort",
+          "value": "high"
+        },
+        {
+          "id": "serviceTier",
+          "value": "default"
+        }
+      ]
+    },
+    "scope": "evidence_packaging",
+    "verdict": "BLOCK",
+    "reviewed_commit": "1eee7e703ce629441eee166b2718021394c9fe09",
+    "reviewed_tree": "e52b17e34a9001bbe204447e459e5446d40d80e7",
+    "summary": "**BLOCK** \u2014 static packaging review only.\n\nReviewed candidate: `1eee7e703ce629441eee166b2718021394c9fe09`  \nTree: `e52b17e34a9001bbe204447e459e5446d40d80e7`  \nReviewed script SHA-256: `dc38dc73d434848d4231101d026043f2d08350befecc0679fcb48253d4a3b355`.\n\nConcrete gaps in [the packager](/tmp/gitcraft-pr184-package-v2.py):\n\n- **Binary bindings are optional and insufficiently specific** (lines 35\u201337). Removing binding fields skips validation entirely; a supplied harness hash need only match *any* artifact. Require bindings for all eleven recording/runtime/isolated gates and match each command\u2019s executable to its expected artifact and hash.\n- **Exactly 24 ignored tests is not enforced** (lines 53\u201358). Enumeration is compared only with supplied summaries; zero names and zero summaries pass. Require 24 entries, preserve their reasons, and reconcile each gate\u2019s enumeration with its summary.\n- **Execution approval is not bound to the execution records** (lines 29\u201331). An approval for another run of the same commit/tree passes. Require the execution-evidence approval to identify and match the full-results and executed-runner digests.\n- **Validation failures leave an incomplete, non-rerunnable package** (lines 41\u201361). The directory is created before ignored-test and historical-run validation; subsequent failure leaves a directory rejected by the existence guard. Complete those validations before creating the destination.\n\nThe sixteen unique labels, per-gate clean states, accepted/tested map equality, raw/gzip log hashing, and distinct review-task checks are present. Immutable commit records confirm eight follow-ups descend from published `5988524\u2026`, with the required authors. The historical library log supports the stated **4,952 passed, one failed, 24 ignored, three filtered** narrative.\n\nNo script execution, edits, builds/tests, process control, CI, PR actions, or subagents. This does not approve application source or the active full run. Post-commit inheritance proof remains outstanding; published head `5988524c23e43d8862225e44b09fbc104a735cc6` was untouched.\n\nPR https://github.com/JKamsker/gitcraft/pull/184, head reviewed 1eee7e703ce629441eee166b2718021394c9fe09, checks/reviews: full run active at supplied status; packaging static review BLOCK.",
+    "disposition": "Four packager checks corrected; independent script re-review pending."
+  },
+  {
+    "task_id": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A8ae9cb1b-cb91-4441-8cc3-4328c3079310",
+    "reviewer": {
+      "provider": "codex",
+      "model": "gpt-6.1-sol",
+      "options": [
+        {
+          "id": "reasoningEffort",
+          "value": "high"
+        },
+        {
+          "id": "serviceTier",
+          "value": "default"
+        }
+      ]
+    },
+    "scope": "assembly",
+    "verdict": "PASS",
+    "reviewed_commit": "1eee7e703ce629441eee166b2718021394c9fe09",
+    "reviewed_tree": "e52b17e34a9001bbe204447e459e5446d40d80e7",
+    "summary": "PASS \u2014 assembly review of `1eee7e703ce629441eee166b2718021394c9fe09`, tree `e52b17e34a9001bbe204447e459e5446d40d80e7`.\n\nRead `AGENTS.md` and checked the assembly JSON against immutable Git objects:\n\n- Exactly eight single-parent commits descend directly from published base `5988524c23e43d8862225e44b09fbc104a735cc6`.\n- All eight authors and committers match `Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>`. Recorded tree and pushed SHA fields match their respective commits. Push records were checked for consistency; live remote state was not queried.\n- Every unit\u2019s changed paths exactly match its feature map: **36 unique paths**, all remaining changed at the final candidate.\n- Every mapped file matches its declared source or intermediate source byte-for-byte.\n- Form unit `8633bc03` includes the repaired Fold dispatcher test in `src/repo/fold/tests.rs`, fixing the known omission, and stash content exactly from `6179204f`.\n- Pull unit `5d659a2a` contains `operations.rs` exactly from `ed6428f6`. Stash unit `aa1e1b58` subsequently adds execution-time `validate_push` and final stash-dialog safety changes.\n- The complete final tree equals accepted `7346090eb38f4332774a06473a02d60262585f32`, proving identical paths, modes, and blob identities across the whole repository.\n\nNo assembly remedies required. Parent retains the full v2 run and evidence packaging gates; this PASS covers assembly integrity only. No edits, source/test execution, CI, process control, or PR actions occurred. Published head `5988524` was left untouched.\n\nPR https://github.com/JKamsker/gitcraft/pull/184, head reviewed 1eee7e703ce629441eee166b2718021394c9fe09, checks not run; assembly review PASS; parent validation/evidence pending.",
+    "disposition": "Accepted within the recorded scope."
+  },
+  {
+    "task_id": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A29cb7b27-3378-4bca-ab7c-96440ce0d71e",
+    "reviewer": {
+      "provider": "codex",
+      "model": "gpt-6.1-sol",
+      "options": [
+        {
+          "id": "reasoningEffort",
+          "value": "high"
+        },
+        {
+          "id": "serviceTier",
+          "value": "default"
+        }
+      ]
+    },
+    "scope": "execution_partial",
+    "verdict": "BLOCK",
+    "reviewed_commit": "1eee7e703ce629441eee166b2718021394c9fe09",
+    "reviewed_tree": "e52b17e34a9001bbe204447e459e5446d40d80e7",
+    "summary": "**BLOCK \u2014 full execution evidence remains incomplete.** No new failure is established in the inspected current snapshot.\n\nReviewed candidate: `1eee7e703ce629441eee166b2718021394c9fe09`, tree `e52b17e34a9001bbe204447e459e5446d40d80e7`. Scope: one-time, read-only inspection of existing evidence, runner source, and immutable commits; no execution or polling.\n\n- **Runner verified:** v2 SHA-256 `f74ec1212d46068a3c1b006576b7f47270e3e0b98f728cc4036e2dce9a648e5a` matches the recorded runner hash.\n- **Completed evidence verified:** fmt, check, clippy, test build, recording outcomes (3), recording resolver (1), and OS library (24) passed. All seven log hashes match. Their captured source states are clean and bound to the candidate. Completed runtime records preserve unchanged application and test-binary hashes; the build log identifies those executables.\n- **Old failure:** `049a29c0` recorded library exit 101: 4,952 passed, one failed, 24 ignored. Fold\u2019s dialog test expected `Some(false)` from unfocused Enter and received `None`.\n- **Focused correction:** `7346090e` changes that test to require explicit primary-button focus and keyboard activation, while checking that unfocused Enter does nothing. Its Fold test passed, alongside three Enter-helper and six askpass tests. These log hashes match. Its tree and library-binary hash equal the current candidate\u2019s.\n- **Pending gates:** the captured current library entry has no exit, summary, or after-state. Remaining runtime artifacts, isolated ACL/palette cases, doc tests, and final clean-state/completion evidence are absent. The focused pass cannot establish those gates passed.\n\nNarrow remedy: parent completes and packages v2 evidence, then requests the planned independent completion review. Any real supplementary-group coverage claim still needs branch-specific evidence. Published head `5988524` was untouched.\n\nPR https://github.com/JKamsker/gitcraft/pull/184, head reviewed 1eee7e703ce629441eee166b2718021394c9fe09, checks/reviews partial; completion review BLOCK.",
+    "disposition": "Snapshot was incomplete; no failing gate was observed. A new independent completed-run review is required."
+  },
+  {
+    "task_id": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A80655d97-0df6-48a5-98e5-3cfff9ec0326",
+    "reviewer": {
+      "provider": "codex",
+      "model": "gpt-6.1-sol",
+      "options": [
+        {
+          "id": "reasoningEffort",
+          "value": "high"
+        },
+        {
+          "id": "serviceTier",
+          "value": "default"
+        }
+      ]
+    },
+    "scope": "source_stash_pull",
+    "verdict": "PASS",
+    "reviewed_commit": "1eee7e703ce629441eee166b2718021394c9fe09",
+    "reviewed_tree": "e52b17e34a9001bbe204447e459e5446d40d80e7",
+    "summary": "PASS \u2014 source-only review of `1eee7e703ce629441eee166b2718021394c9fe09`, tree `e52b17e34a9001bbe204447e459e5446d40d80e7`.\n\n- Entire tree matches accepted `7346090eb38f4332774a06473a02d60262585f32`.\n- Against previous `049a29c`, changes are limited to the Enter helper, askpass tests, and Fold test. Operations and partial-stash sources remain byte-identical.\n- Clean queued stash retains \u201cthere are no changes to stash\u201d and `Undo::None`. Shared-runner validation still checks fresh state before stash dispatch, including Redo and ignored replacement protection.\n- Pull parser\u2019s last-option precedence and required/optional value handling are unchanged.\n- Helper blocks competing accessibility actions; explicit primary activation remains available. Fold test matches production\u2019s explicit activation behavior.\n\nNo blocking findings or remedies. Read-only review only; no tests executed. Reported stash 29, dialog 6, and parser 3 passes remain prior evidence, not final-candidate execution. Parent owns full v2 validation and packaging. Published head `5988524` was untouched.\n\nPR https://github.com/JKamsker/gitcraft/pull/184, head reviewed 1eee7e703ce629441eee166b2718021394c9fe09, checks/reviews source PASS; final execution pending parent.",
+    "disposition": "Accepted within the recorded scope."
+  },
+  {
+    "task_id": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Ade1e0275-e7cd-4683-84e2-05a2a902db32",
+    "reviewer": {
+      "provider": "codex",
+      "model": "gpt-6.1-sol",
+      "options": [
+        {
+          "id": "reasoningEffort",
+          "value": "high"
+        },
+        {
+          "id": "serviceTier",
+          "value": "default"
+        }
+      ]
+    },
+    "scope": "source_policy_scheduler",
+    "verdict": "PASS",
+    "reviewed_commit": "1eee7e703ce629441eee166b2718021394c9fe09",
+    "reviewed_tree": "e52b17e34a9001bbe204447e459e5446d40d80e7",
+    "summary": "PASS \u2014 no concrete source findings in the requested scope.\n\nReviewed SHA: `1eee7e703ce629441eee166b2718021394c9fe09`  \nTree: `e52b17e34a9001bbe204447e459e5446d40d80e7`\n\n- The complete tree equals accepted `7346090eb38f4332774a06473a02d60262585f32`. All 12 author-warning, ranking, and scheduler feature files also match accepted `049a29c06adf3d1afe8cdd5f2639873c4e8e87d6` byte-for-byte. No history-assembly clobber found.\n- Author warnings preserve imported/exported rules. Ranking selects matching namespace specificity while retaining last-rule precedence for ties.\n- Scheduler normalization occurs at the common submission boundary. Typed local/remote keys preserve local keys and unkeyed concurrency. Repository identity, tray deduplication, `OWNED`, and `owns_fetch` remain separate; the discovery identity update preserves prior behavior.\n- Historical evidence matches `c5214bf` and `049a29c`; all four compressed-log hashes and decompressed hashes verify. Manifest source hashes match historical implementation `28e6a8b`.\n- The exact `src/tasks.rs` difference from that historically tested implementation is one allowance on the `#[cfg(test)]` module: `#[allow(clippy::unwrap_used, clippy::panic)]`. Production code is unaffected.\n\nHistorical logs record focused executions of **5, 1, and 12 tests**, with overlapping filters. They do not establish current-candidate gates or final approval. The parent owns the active full v2 run and evidence packaging.\n\nNo remedies required within this scope. No edits, builds/tests, CI, process-control, PR actions, or subagents performed. Published head `5988524` was untouched.\n\nPR https://github.com/JKamsker/gitcraft/pull/184, head reviewed `1eee7e703ce629441eee166b2718021394c9fe09`, checks/reviews state: scoped source review PASS; current-candidate gates pending parent evidence.",
+    "disposition": "Accepted within the recorded scope."
+  },
+  {
+    "task_id": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A876dffb4-f706-4c79-8257-435c027f9fd5",
+    "reviewer": {
+      "provider": "codex",
+      "model": "gpt-6.1-sol",
+      "options": {
+        "reasoningEffort": "high"
+      }
+    },
+    "scope": "inheritance_verifier",
+    "verdict": "PASS",
+    "reviewed_commit": "1eee7e703ce629441eee166b2718021394c9fe09",
+    "reviewed_tree": "e52b17e34a9001bbe204447e459e5446d40d80e7",
+    "script_sha256": "df65adf80f9c57e90dd7fcac1c94a6c7f644a5faddce418ad32964f1fd061382",
+    "summary": "**PASS \u2014 `inheritance_verifier` design review.** No blocking findings.\n\nCandidate: `1eee7e703ce629441eee166b2718021394c9fe09`  \nTree: `e52b17e34a9001bbe204447e459e5446d40d80e7`\n\nRead `AGENTS.md` and inspected the verifier. It enforces the pinned tested SHA, sole-parent successor, clean checked-out successor, newly added regular nonexecutable files under the exact evidence prefix, full path/mode/blob equality outside that prefix, and executing/archived verifier equality. Its external proof records both commits, both trees, and map digests. AST inspection confirms the serialization suffix is an actual newline.\n\nVerified SHA-256 values:\n\n- `script_sha256`: `df65adf80f9c57e90dd7fcac1c94a6c7f644a5faddce418ad32964f1fd061382`\n- Aggregate: `986d4ff06221d304cf22a4d98117811dd916ae3583e2faede48c381d6c254e14`\n- Completion runner: `14d66bca4f120221f1b8d91ff7cb611a5ff4e18648e2ad1a78c7011a970f4eda`\n- Packager: `da0952364f0e876835a4b6defb52fb40d09a8c1d19ee1045942232f0c4b19759`\n\nThis is **design approval only**. HEAD remains the tested candidate; post-commit inheritance execution and proof remain outstanding. I inspected supplied records and Git objects; I executed no verifier, builds, tests, process-control commands, CI, or mutations.\n\nPR https://github.com/JKamsker/gitcraft/pull/184, head published 5988524c23e43d8862225e44b09fbc104a735cc6 unchanged; checks and reviews: recorded aggregate PASS, scoped verifier design PASS, post-commit proof pending.",
+    "disposition": "Design approved; execution on the evidence-only successor remains pending."
+  },
+  {
+    "task_id": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A51aca226-fe5d-407b-bd2e-3a17682f8993",
+    "reviewer": {
+      "provider": "codex",
+      "model": "gpt-6.1-sol",
+      "options": {
+        "reasoningEffort": "high"
+      }
+    },
+    "scope": "evidence_packaging",
+    "verdict": "PASS",
+    "reviewed_commit": "1eee7e703ce629441eee166b2718021394c9fe09",
+    "reviewed_tree": "e52b17e34a9001bbe204447e459e5446d40d80e7",
+    "summary": "**PASS \u2014 scope: `evidence_packaging`. No blocking findings.**\n\nCandidate: `1eee7e703ce629441eee166b2718021394c9fe09`  \nTree: `e52b17e34a9001bbe204447e459e5446d40d80e7`\n\nRead-only inspection confirmed:\n\n- Snapshot bytes are reused for parsing, hashing, and archiving.\n- Exactly sixteen unique gates and eleven executable/application bindings are enforced.\n- Twelve inherited records match the original results; native ACL completions preserve the failed EINVAL attempt. All sixteen final log hashes and current executable hashes match.\n- The library records **4,954 passed, zero failed, 24 ignored, three filtered**. All three separately executed cases passed. Ignored enumeration contains exactly 24 distinct names.\n- Execution approval requires the exact aggregate and runner digests; inheritance approval requires the exact verifier digest.\n- Gzip uses zero timestamps. Validation precedes staging, with atomic directory publication.\n- AST inspection confirms valid newline and ignored-test regex literals.\n\nVerified SHA-256 values:\n\n- Packager: `da0952364f0e876835a4b6defb52fb40d09a8c1d19ee1045942232f0c4b19759`\n- Aggregate: `986d4ff06221d304cf22a4d98117811dd916ae3583e2faede48c381d6c254e14`\n- Executed completion runner: `14d66bca4f120221f1b8d91ff7cb611a5ff4e18648e2ad1a78c7011a970f4eda`\n- Inheritance verifier: `df65adf80f9c57e90dd7fcac1c94a6c7f644a5faddce418ad32964f1fd061382`\n\nThis approves the inspected packaging source and evidence. **I did not execute the packager or run builds/tests.** The inspected review file lacks the required completed execution and inheritance approvals; the packager correctly blocks publication until those records exist. Package execution and post-commit inheritance verification remain unperformed.\n\nPR https://github.com/JKamsker/gitcraft/pull/184, head reviewed `1eee7e703ce629441eee166b2718021394c9fe09`, checks and reviews: inspected gate evidence passed; packaging review PASS; packaging execution unperformed.",
+    "script_sha256": "da0952364f0e876835a4b6defb52fb40d09a8c1d19ee1045942232f0c4b19759",
+    "disposition": "Independent completed review; package publication and successor proof remain pending."
+  },
+  {
+    "task_id": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A2dc72580-be1d-415c-bb13-21e0cf98b268",
+    "reviewer": {
+      "provider": "codex",
+      "model": "gpt-6.1-sol",
+      "options": {
+        "reasoningEffort": "high"
+      }
+    },
+    "scope": "source_binding",
+    "verdict": "PASS",
+    "reviewed_commit": "1eee7e703ce629441eee166b2718021394c9fe09",
+    "reviewed_tree": "e52b17e34a9001bbe204447e459e5446d40d80e7",
+    "summary": "**PASS \u2014 scope: `source_binding`. No blocking findings.**\n\nCandidate: `1eee7e703ce629441eee166b2718021394c9fe09`  \nTree: `e52b17e34a9001bbe204447e459e5446d40d80e7`\n\nRead AGENTS.md and independently verified:\n\n- All **1,883 path/mode/blob entries** match accepted `7346090eb38f4332774a06473a02d60262585f32`.\n- Eight sequential assembly commits preserve all seven features: file-view generations, form submission, portable author warnings, author-rule specificity, pull-option classification, remote mutation serialization, and stash safety/Undo.\n- All 36 mapped paths match their declared source or intermediate source. Authors, committers, parent chain, trees, and recorded push SHAs are consistent.\n- Structured source and assembly PASS records identify this exact candidate/tree and remain applicable. Historical execution/packaging BLOCK records do not establish a source failure.\n- Inspected aggregate records and verified raw-log hashes: twelve inherited gates plus four completion gates; library **4,954 passed, 0 failed, 24 ignored, 3 filtered**, with all three separately executed cases passing. The failed contained ACL attempt remains preserved.\n\nA future documentation-only successor may inherit application gates **only after the reviewed verifier produces proof** that every path/mode/blob outside `docs/validation/pr184-followups-20261109/` is unchanged. No successor proof was supplied or claimed here.\n\nVerified SHA-256 digests:\n\n- Complete source map: `0d093328ab45c0ee92c5e1ff48f692a5c18baf06cb8e7dbb8e16f56bac350ca3`\n- Aggregate: `986d4ff06221d304cf22a4d98117811dd916ae3583e2faede48c381d6c254e14`\n- Completion runner: `14d66bca4f120221f1b8d91ff7cb611a5ff4e18648e2ad1a78c7011a970f4eda`\n- Packager: `da0952364f0e876835a4b6defb52fb40d09a8c1d19ee1045942232f0c4b19759`\n- Inheritance verifier: `df65adf80f9c57e90dd7fcac1c94a6c7f644a5faddce418ad32964f1fd061382`\n\nRead-only evidence inspection; no builds/tests, process-control actions, CI, edits, or PR changes.\n\nPR https://github.com/JKamsker/gitcraft/pull/184, head reviewed `1eee7e703ce629441eee166b2718021394c9fe09`; checks: inspected completed records only; review: source_binding PASS.",
+    "disposition": "Independent completed review; package publication and successor proof remain pending."
+  },
+  {
+    "task_id": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Abeb6ac68-c9ac-446c-927f-93a71785e63b",
+    "reviewer": {
+      "provider": "codex",
+      "model": "gpt-6.1-sol",
+      "options": {
+        "reasoningEffort": "high"
+      }
+    },
+    "scope": "description",
+    "verdict": "PASS",
+    "reviewed_commit": "1eee7e703ce629441eee166b2718021394c9fe09",
+    "reviewed_tree": "e52b17e34a9001bbe204447e459e5446d40d80e7",
+    "summary": "**PASS \u2014 description review; no blocking findings.**\n\nCandidate: `1eee7e703ce629441eee166b2718021394c9fe09`  \nTree: `e52b17e34a9001bbe204447e459e5446d40d80e7`, identical to accepted `7346090eb38f4332774a06473a02d60262585f32`.\n\nScope: checked the [description draft](/tmp/gitcraft-pr184-final-description-draft.md) against relevant source, assembly/review records, and completed execution evidence. All 16 log hashes and summaries match; the 12 inherited entries match their original records. No builds/tests, process-control commands, CI, edits, or external changes performed. This approves description accuracy, not packaging or post-archive inheritance.\n\nSuggested validation text:\n\n> Local validation passed 16 gates: 12 inherited v2 gates plus four completion gates. The library recorded 4,954 passed, zero failed, 24 ignored, and three filtered; all three filtered tests passed separately. Completion covered two native filesystem-metadata fixtures, the contained palette test, and doctest commands (zero doctests). Native metadata execution does not independently establish conditional supplementary-group coverage. The original contained ACL attempt failed with EINVAL under a single-UID mapping and remains preserved; source and binaries were unchanged, and the library suite was not rerun.\n\nThe intentional archive/link placeholders are acceptable at this draft stage. Preserve the CodeRabbit section unchanged.\n\nVerified SHA-256 bindings:\n\n```text\ndescription  85d900577d677bebcaae76efbbd6d0e21487674076ec2ff4b94d029dd9c8280d\naggregate    986d4ff06221d304cf22a4d98117811dd916ae3583e2faede48c381d6c254e14\ncompletion   14d66bca4f120221f1b8d91ff7cb611a5ff4e18648e2ad1a78c7011a970f4eda\npackager     da0952364f0e876835a4b6defb52fb40d09a8c1d19ee1045942232f0c4b19759\ninheritance  df65adf80f9c57e90dd7fcac1c94a6c7f644a5faddce418ad32964f1fd061382\n```\n\nPackager/verifier digests were checked; their correctness is outside this review\u2019s scope.\n\nPR https://github.com/JKamsker/gitcraft/pull/184, head reviewed `1eee7e703ce629441eee166b2718021394c9fe09`, checks and reviews: inspected aggregate PASS; scoped description review PASS.",
+    "disposition": "Independent completed review; package publication and successor proof remain pending."
+  },
+  {
+    "task_id": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Aed408c15-232a-4878-a9a4-345bb9de49b8",
+    "reviewer": {
+      "provider": "codex",
+      "model": "gpt-6.1-sol",
+      "options": {
+        "reasoningEffort": "high"
+      }
+    },
+    "scope": "execution_evidence",
+    "verdict": "PASS",
+    "reviewed_commit": "1eee7e703ce629441eee166b2718021394c9fe09",
+    "reviewed_tree": "e52b17e34a9001bbe204447e459e5446d40d80e7",
+    "summary": "**PASS \u2014 scope: `execution_evidence`.** No blocking findings.\n\nCandidate: `1eee7e703ce629441eee166b2718021394c9fe09`  \nTree: `e52b17e34a9001bbe204447e459e5446d40d80e7`\n\nIndependently verified:\n\n- Clean checkout and complete tree equality with accepted `7346090eb38f4332774a06473a02d60262585f32`.\n- Sixteen unique successful gates: 12 inherited records exactly equivalent to the original records, plus four completion records.\n- All 17 raw-log hashes, including the preserved failed ACL attempt.\n- Original and completion runner bindings, Cargo artifact identities, six harness hashes, application hash, and all 11 runtime executable bindings.\n- Library: **4,954 passed, zero failed, 24 distinct ignored, three filtered**. Each filtered case subsequently passed by exact name. Both doctest suites completed successfully with zero tests.\n\nThe preserved ACL failure reports `EINVAL`; the fixture explicitly names UID+1, consistent with the recorded single-UID namespace restriction. Native completion used unchanged executables and source. This infrastructure failure does not require another whole-library run. Actual supplementary-group branch coverage remains conditional and is not established by the passing summary alone.\n\nThis PASS is explicitly bound to:\n\n```text\nfull_results_sha256:\n986d4ff06221d304cf22a4d98117811dd916ae3583e2faede48c381d6c254e14\n\nexecuted_runner_sha256:\n14d66bca4f120221f1b8d91ff7cb611a5ff4e18648e2ad1a78c7011a970f4eda\n\noriginal_executed_runner_sha256:\nf74ec1212d46068a3c1b006576b7f47270e3e0b98f728cc4036e2dce9a648e5a\n```\n\nI inspected existing evidence and runner source; I executed no builds/tests, process-control commands, CI, or mutations.\n\nPR https://github.com/JKamsker/gitcraft/pull/184, head reviewed `1eee7e703ce629441eee166b2718021394c9fe09`, checks and reviews: recorded execution gates PASS; independent execution-evidence review PASS.",
+    "full_results_sha256": "986d4ff06221d304cf22a4d98117811dd916ae3583e2faede48c381d6c254e14",
+    "executed_runner_sha256": "14d66bca4f120221f1b8d91ff7cb611a5ff4e18648e2ad1a78c7011a970f4eda",
+    "original_executed_runner_sha256": "f74ec1212d46068a3c1b006576b7f47270e3e0b98f728cc4036e2dce9a648e5a",
+    "disposition": "Independent completed review passed; package publication and successor proof remain pending."
+  },
+  {
+    "task_id": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Afcff19dc-198b-4153-930b-37cb51051934",
+    "reviewer": {
+      "provider": "codex",
+      "model": "gpt-6.1-sol",
+      "options": {
+        "reasoningEffort": "high"
+      }
+    },
+    "scope": "test_accounting",
+    "verdict": "PASS",
+    "reviewed_commit": "1eee7e703ce629441eee166b2718021394c9fe09",
+    "reviewed_tree": "e52b17e34a9001bbe204447e459e5446d40d80e7",
+    "summary": "**PASS \u2014 scope: `test_accounting`. No concrete findings.**\n\nCandidate: `1eee7e703ce629441eee166b2718021394c9fe09`  \nTree: `e52b17e34a9001bbe204447e459e5446d40d80e7`, matching accepted `7346090eb38f4332774a06473a02d60262585f32`.\n\nInspected completed records, raw logs, runner source and immutable candidate source:\n\n- All 16 successful gates reconcile: **12 inherited + four completion gates**. Inherited records are unchanged; all log hashes and parsed summaries match.\n- Six harness pass counts: OS **24**, library **4,954**, checkpoint **1**, main **0**, standalone **3**, MCP **6**. Library records **0 failed, 24 ignored, three filtered**.\n- All **24 distinct ignored names and reasons** match candidate source.\n- The three filtered ACL-save/index/palette tests each passed separately by exact name, **one test each**. Two ran natively; palette ran contained.\n- Recording **3+1** passes overlap library coverage and add no distinct tests. Both documentation harnesses report **zero tests**.\n- The initial contained ACL-save attempt remains separately preserved: exit **101**, one failure, `EINVAL`. It is excluded from successful gates; the library was not rerun.\n- Supplementary-group branch coverage is correctly disclosed as conditional; the passing summary does not establish branch execution.\n\nVerified SHA-256 digests:\n\n- Aggregate: `986d4ff06221d304cf22a4d98117811dd916ae3583e2faede48c381d6c254e14`\n- Completion runner: `14d66bca4f120221f1b8d91ff7cb611a5ff4e18648e2ad1a78c7011a970f4eda`\n- Packager: `da0952364f0e876835a4b6defb52fb40d09a8c1d19ee1045942232f0c4b19759`\n- Inheritance verifier: `df65adf80f9c57e90dd7fcac1c94a6c7f644a5faddce418ad32964f1fd061382`\n\nRead-only evidence inspection; no builds/tests, process control, CI, edits or PR actions.\n\nPR https://github.com/JKamsker/gitcraft/pull/184, head reviewed 1eee7e703ce629441eee166b2718021394c9fe09, checks and reviews: inspected completed local evidence; test_accounting PASS.",
+    "disposition": "Independent completed review passed; package publication and successor proof remain pending."
+  },
+  {
+    "task_id": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Ad5ded6e9-4fe9-40d8-ad19-b5411a30aa3f",
+    "reviewer": {
+      "provider": "codex",
+      "model": "gpt-6.1-sol",
+      "options": {
+        "reasoningEffort": "high"
+      }
+    },
+    "scope": "provenance",
+    "verdict": "PASS",
+    "reviewed_commit": "1eee7e703ce629441eee166b2718021394c9fe09",
+    "reviewed_tree": "e52b17e34a9001bbe204447e459e5446d40d80e7",
+    "summary": "**PASS \u2014 provenance scope. No blocking findings.**\n\nCandidate: `1eee7e703ce629441eee166b2718021394c9fe09`  \nTree: `e52b17e34a9001bbe204447e459e5446d40d80e7`\n\nRead `AGENTS.md` and independently inspected immutable Git objects, manifests, logs, runner sources, assembly records, review records, and the packager\u2019s archival narrative.\n\n- All 1,883 path/mode/blob entries equal accepted `7346090eb38f4332774a06473a02d60262585f32`. Eight assembly commits have the recorded parents, paths, source blobs, trees, and required authorship.\n- The aggregate preserves twelve successful v2 gates exactly, adding explicit original-runner attribution. Four completion gates have separate completion-runner attribution.\n- Current library evidence records **4,954 passed, zero failed, 24 ignored, three filtered**. Both native ACL fixtures and the contained palette case each record one exact-name pass. Documentation gates passed with zero doctests.\n- The initial contained ACL-save failure remains preserved verbatim, including exit 101 and `EINVAL`. The UID+1 fixture supports the recorded namespace explanation. No library rerun is represented.\n- Historical `049a29c0` evidence separately records **4,952 passed, one failed**, caused by the obsolete Fold expectation. The packager keeps this history separate from current validation.\n- All inspected log hashes match; current six harnesses and application binary match their recorded hashes.\n\nVerified SHA-256 values:\n\n| Evidence | SHA-256 |\n|---|---|\n| Completion aggregate | `986d4ff06221d304cf22a4d98117811dd916ae3583e2faede48c381d6c254e14` |\n| Initial v2 manifest | `3d6d4146d506b111dd9ed8dcc760b76ba7cca45c250336067e7154a5863db56d` |\n| Original v2 runner | `f74ec1212d46068a3c1b006576b7f47270e3e0b98f728cc4036e2dce9a648e5a` |\n| Completion runner | `14d66bca4f120221f1b8d91ff7cb611a5ff4e18648e2ad1a78c7011a970f4eda` |\n| Packager | `da0952364f0e876835a4b6defb52fb40d09a8c1d19ee1045942232f0c4b19759` |\n| Inheritance verifier | `df65adf80f9c57e90dd7fcac1c94a6c7f644a5faddce418ad32964f1fd061382` |\n\nThis approves inspected provenance only. The archive directory is absent, so packaging and successor inheritance were reviewed statically. No supplied scripts, builds/tests, process-control commands, CI, or PR actions were executed. Conditional supplementary-group coverage remains explicitly unproven.\n\nPR https://github.com/JKamsker/gitcraft/pull/184, head reviewed `1eee7e703ce629441eee166b2718021394c9fe09`, checks and reviews: preserved execution evidence inspected; provenance review PASS.",
+    "disposition": "Independent completed review passed; package publication and successor proof remain pending."
+  }
+]
