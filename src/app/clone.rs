@@ -511,14 +511,7 @@ fn form_fields(ui: &mut Ui, form: &mut CloneForm, t: &Tokens) -> bool {
     enter
 }
 
-/// Only an eligible text field may turn Enter into submission.
-pub(super) fn singleline_enter(response: &egui::Response) -> bool {
-    (response.has_focus()
-        || (response.lost_focus() && response.ctx.memory(|m| m.focused().is_none())))
-        && response
-            .ctx
-            .input(|i| i.key_pressed(Key::Enter) && !i.key_pressed(Key::Tab))
-}
+pub(super) use crate::a11y::singleline_enter;
 
 fn home_dir() -> Option<PathBuf> {
     std::env::var_os("USERPROFILE")

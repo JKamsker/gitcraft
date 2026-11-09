@@ -630,9 +630,7 @@ impl RepoTab {
                     name,
                     checkout,
                     focus,
-                } => {
-                    branch::create_branch(ui, enter, &previous, at, at_label, name, checkout, focus)
-                }
+                } => branch::create_branch(ui, &previous, at, at_label, name, checkout, focus),
                 Dialog::AddWorktree {
                     repo,
                     root,
@@ -673,7 +671,7 @@ impl RepoTab {
                     release,
                     focus,
                 } => branch::tag(
-                    ui, enter, at, at_label, name, message, remote, push, release, focus,
+                    ui, at, at_label, name, message, remote, push, release, focus,
                 ),
                 Dialog::RenameBranch { old, new, focus } => {
                     let children = crate::git::stack::children(stack_parents, old);
