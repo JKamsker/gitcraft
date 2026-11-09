@@ -613,6 +613,7 @@ mod localization_tests {
                         browser: None,
                     });
                     *state = Some(app);
+                    return;
                 }
                 if let Some(app) = state {
                     app.remote_dialog(ui.ctx());

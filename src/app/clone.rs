@@ -593,6 +593,7 @@ mod localization_tests {
                         form.focus = false;
                     }
                     *state = Some(app);
+                    return;
                 }
                 if let Some(app) = state {
                     app.clone_dialog(ui.ctx());
