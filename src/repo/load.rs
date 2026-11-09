@@ -463,6 +463,9 @@ impl RepoTab {
                 }
             }
             Err(e) => {
+                // The mutation may have succeeded before the subsequent reload failed.
+                // Reject pre-mutation file reads even when no fresh repository data arrives.
+                self.invalidate_mutable_file_view(ctx);
                 self.explain_failure(&e, super::error_help::RELOAD, ctx);
                 self.load_error = Some(e);
             }

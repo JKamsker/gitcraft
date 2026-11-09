@@ -305,6 +305,33 @@ pub(super) fn spawn_mutation(
     );
 }
 
+#[cfg(test)]
+type RecordedJob = Box<dyn FnOnce() -> Msg + Send>;
+
+#[cfg(test)]
+thread_local! {
+    static RECORDED_JOBS: std::cell::RefCell<Option<Vec<RecordedJob>>> = const { std::cell::RefCell::new(None) };
+}
+
+/// Capture submissions on this test thread without executing their Git/process work.
+#[cfg(test)]
+pub(super) fn record_jobs<T>(work: impl FnOnce() -> T) -> (T, Vec<RecordedJob>) {
+    struct Reset;
+    impl Drop for Reset {
+        fn drop(&mut self) {
+            RECORDED_JOBS.with(|slot| *slot.borrow_mut() = None);
+        }
+    }
+    RECORDED_JOBS.with(|slot| {
+        assert!(slot.borrow().is_none(), "nested job recording");
+        *slot.borrow_mut() = Some(Vec::new());
+    });
+    let _reset = Reset;
+    let result = work();
+    let jobs = RECORDED_JOBS.with(|slot| slot.borrow_mut().take().unwrap_or_default());
+    (result, jobs)
+}
+
 fn spawn_with(
     tx: &JobSender,
     ctx: &egui::Context,
@@ -313,6 +340,19 @@ fn spawn_with(
     failed: impl FnOnce(String) -> Msg + Send + 'static,
     job: impl FnOnce() -> Msg + Send + 'static,
 ) {
+    #[cfg(test)]
+    let job = {
+        let mut job: Option<RecordedJob> = Some(Box::new(job));
+        RECORDED_JOBS.with(|slot| {
+            if let Some(jobs) = &mut *slot.borrow_mut()
+                && let Some(job) = job.take()
+            {
+                jobs.push(job);
+            }
+        });
+        let Some(job) = job else { return };
+        job
+    };
     let tx = tx.clone();
     let ctx = ctx.clone();
     let rejected_tx = tx.clone();
@@ -642,7 +682,7 @@ impl RepoTab {
             }
             Msg::Blame(generation, path, rev, result) => {
                 if let Some(view) = &mut self.file_view
-                    && view.generation == generation
+                    && view.blame_generation == generation
                     && view.path == path
                     && view.rev == rev
                 {
