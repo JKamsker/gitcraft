@@ -190,3 +190,17 @@ fn blame_remains_visible_until_current_refresh_replaces_it() -> Result<(), Strin
     assert!(!v.needs(FileTab::Blame));
     Ok(())
 }
+
+#[test]
+fn unchanged_line_inputs_retry_failed_history_and_only_reuse_success() {
+    let mut v = view(None);
+    let key = ("a".repeat(40), "same.txt".to_owned(), (4, 9));
+    v.line_inputs = Some(key.clone());
+    v.history = Some(Err("transient connection failure".into()));
+    assert!(!v.reuses_line_inputs(&Ok(key.clone())));
+    v.history = Some(Ok(Vec::new()));
+    assert!(v.reuses_line_inputs(&Ok(key.clone())));
+    assert!(!v.reuses_line_inputs(&Err("probe failed".into())));
+    let changed = ("b".repeat(40), key.1, key.2);
+    assert!(!v.reuses_line_inputs(&Ok(changed)));
+}

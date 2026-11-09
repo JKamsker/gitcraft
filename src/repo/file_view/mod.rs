@@ -103,6 +103,15 @@ impl FileView {
         true
     }
 
+    fn reuses_line_inputs(
+        &self,
+        inputs: &Result<(String, String, git::LineRange), String>,
+    ) -> bool {
+        matches!(self.history, Some(Ok(_)))
+            && inputs.is_ok()
+            && inputs.as_ref().ok() == self.line_inputs.as_ref()
+    }
+
     /// Whether `tab` still has to be loaded.
     pub fn needs(&self, tab: FileTab) -> bool {
         match tab {
@@ -147,10 +156,7 @@ impl RepoTab {
                     return;
                 }
                 // Errors cannot establish unchanged inputs; retry the normal read.
-                if inputs.as_ref().ok() == view.line_inputs.as_ref()
-                    && inputs.is_ok()
-                    && view.history.is_some()
-                {
+                if view.reuses_line_inputs(&inputs) {
                     return;
                 }
                 tab.invalidate_mutable_file_view(ctx);
