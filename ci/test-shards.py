@@ -29,7 +29,12 @@ ISOLATED = {
     # This rewrite test can race with concurrent Git-heavy test processes on Windows.
     # Run it separately from the main repo-d-f libtest harness.
     "repo-d-f": ["repo::drag_drop::tests::a_commit_dropped_on_another_of_the_branch_is_squashed_into_it"],
-    "repo-q-r": ["repo::reflog::tests::a_commit_lost_in_the_terminal_comes_back_as_a_branch"],
+    "repo-q-r": [
+        "repo::reflog::tests::a_commit_lost_in_the_terminal_comes_back_as_a_branch",
+        # This end-to-end UI/rebase fixture has hung amid concurrent Windows
+        # fixtures. Keep its real confirmation and undo checks in a separate process.
+        "repo::rehearse::tests::applying_does_it_for_real_and_it_can_be_undone",
+    ],
     "core": [
         "parallel_bisect::tests::finds_the_first_bad_commit_with_any_parallelism",
         "app::palette::tests::thousands_of_branches_open_and_filter_quickly",
@@ -45,7 +50,10 @@ SHARDS = {
     "repo-d-f": [*REPO_D_F, "--skip", "git::", "--skip", ISOLATED["repo-d-f"][0]],
     "repo-g-m": [*REPO_G_M, "--skip", "git::"],
     "repo-n-p": [*REPO_N_P, "--skip", "git::"],
-    "repo-q-r": [*REPO_Q_R, "--skip", "git::", "--skip", ISOLATED["repo-q-r"][0]],
+    "repo-q-r": [
+        *REPO_Q_R, "--skip", "git::",
+        *[arg for test in ISOLATED["repo-q-r"] for arg in ("--skip", test)],
+    ],
     "repo-s": [*REPO_S, "--skip", "git::"],
     "repo-rest": [
         "repo::",
