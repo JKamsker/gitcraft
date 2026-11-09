@@ -160,7 +160,7 @@ impl super::RepoTab {
             forge_generation: None,
             forge_operation: false,
             cancel: self._jobs.0.clone(),
-            repo: self.path.clone(),
+            repo: super::messages::mutation_key(&self.path),
         };
         self.rx = receiver;
         self.watcher = None;
@@ -211,6 +211,53 @@ mod tests {
     use super::*;
 
     #[test]
+    fn linked_local_tabs_keep_the_local_schedule_after_suspension() -> Result<(), String> {
+        let scratch = tempfile::tempdir().map_err(|error| error.to_string())?;
+        let main = scratch.path().join("main");
+        let linked = scratch.path().join("linked");
+        std::fs::create_dir(&main).map_err(|error| error.to_string())?;
+        crate::git::run(Some(&main), &["init", "-q"])?;
+        crate::git::run(
+            Some(&main),
+            &[
+                "-c",
+                "user.name=Fixture",
+                "-c",
+                "user.email=fixture@example.invalid",
+                "commit",
+                "-qm",
+                "base",
+                "--allow-empty",
+            ],
+        )?;
+        crate::git::run(
+            Some(&main),
+            &[
+                "worktree",
+                "add",
+                "--detach",
+                linked.to_str().ok_or("fixture path")?,
+            ],
+        )?;
+        let ctx = egui::Context::default();
+        let mut a = crate::repo::RepoTab::new_deferred(main, &ctx);
+        let mut b = crate::repo::RepoTab::new_deferred(linked, &ctx);
+        let stable = |tab: &crate::repo::RepoTab| {
+            assert_eq!(
+                crate::tasks::mutation_schedule_key(tab.tx.repo.clone()),
+                crate::tasks::MutationScheduleKey::Local
+            );
+        };
+        stable(&a);
+        stable(&b);
+        a.suspend();
+        b.suspend();
+        stable(&a);
+        stable(&b);
+        Ok(())
+    }
+
+    #[test]
     fn remote_mutation_schedule_survives_discovery_failure_and_suspend() {
         use crate::repo::{RepoTab, messages::Msg};
         use crate::tasks::{MutationScheduleKey, mutation_schedule_key};
@@ -256,7 +303,7 @@ mod tests {
         );
         assert_eq!(
             mutation_schedule_key("/local/common.git".into()),
-            MutationScheduleKey::Local("/local/common.git".into())
+            MutationScheduleKey::Local
         );
     }
 

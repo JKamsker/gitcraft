@@ -765,7 +765,10 @@ fn stash_job_waits_in_the_shared_worktree_mutation_lane() -> Result<(), String> 
     let ctx = egui::Context::default();
     let blocker = RepoTab::new_deferred(repo.path().to_owned(), &ctx);
     let mut tab = RepoTab::new_deferred(peer.path().to_owned(), &ctx);
-    assert_eq!(blocker.tx.repo, tab.tx.repo);
+    assert_eq!(
+        crate::tasks::mutation_schedule_key(blocker.tx.repo.clone()),
+        crate::tasks::mutation_schedule_key(tab.tx.repo.clone())
+    );
     let (started_tx, started_rx) = channel();
     let (release_tx, release_rx) = channel::<()>();
     crate::repo::messages::spawn_mutation(
@@ -786,8 +789,10 @@ fn stash_job_waits_in_the_shared_worktree_mutation_lane() -> Result<(), String> 
         let _ = ran_tx.send(());
         (Ok("recorded stash finished".into()), OpKind::plain())
     });
-    let queued = crate::tasks::pool()?.queued_priorities_for(&tab.tx.repo);
-    assert!(queued == vec![crate::tasks::Priority::Background]);
+    assert!(
+        crate::tasks::pool()?.queued_priority_for(&tab.tx.cancel)
+            == Some(crate::tasks::Priority::Background)
+    );
     assert!(ran_rx.try_recv().is_err());
     drop(release_tx);
     ran_rx

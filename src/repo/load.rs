@@ -92,6 +92,7 @@ impl RepoTab {
         // Answered all the same if it panics: the tab reloads only once it is.
         let failed = |e| Msg::Loaded(Err(e));
         super::messages::spawn_or(&self.tx, ctx, failed, move || {
+            super::messages::discover_fetch_key(&path);
             Msg::Loaded((|| {
                 let refs = git::refs(&path)?;
                 visibility.prune(&refs);
