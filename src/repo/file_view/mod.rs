@@ -55,6 +55,8 @@ pub(crate) struct FileView {
     pub tab: FileTab,
     pub history: Option<Result<Vec<FileCommit>, String>>,
     pub blame: Option<Result<BlameData, String>>,
+    /// A successful previous result remains visible until its replacement arrives.
+    pub blame_needs_refresh: bool,
     pub text: Option<Result<FileText, String>>,
     /// The history of only these lines (where their numbers count from, and the lines), not
     /// of the whole file.
@@ -73,6 +75,7 @@ impl FileView {
             tab,
             history: None,
             blame: None,
+            blame_needs_refresh: false,
             text: None,
             lines: None,
             goto_line: Default::default(),
@@ -88,7 +91,10 @@ impl FileView {
         }
         self.generation = next_generation();
         self.history = None;
-        self.blame = None;
+        self.blame_needs_refresh = true;
+        if !matches!(self.blame, Some(Ok(_))) {
+            self.blame = None;
+        }
         self.text = None;
         true
     }
@@ -97,7 +103,7 @@ impl FileView {
     pub fn needs(&self, tab: FileTab) -> bool {
         match tab {
             FileTab::History => self.history.is_none(),
-            FileTab::Blame => self.blame.is_none(),
+            FileTab::Blame => self.blame.is_none() || self.blame_needs_refresh,
             FileTab::File => self.text.is_none(),
         }
     }

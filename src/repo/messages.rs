@@ -647,6 +647,7 @@ impl RepoTab {
                     && view.rev == rev
                 {
                     view.blame = Some(result);
+                    view.blame_needs_refresh = false;
                 }
             }
             Msg::FileText(generation, path, rev, result) => {
