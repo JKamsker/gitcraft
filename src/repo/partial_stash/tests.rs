@@ -806,6 +806,56 @@ fn stash_job_waits_in_the_shared_worktree_mutation_lane() -> Result<(), String> 
 }
 
 #[test]
+fn filesystem_alias_guard_uses_repository_entries_and_preserves_distinct_case() -> Result<(), String>
+{
+    let repo = Repo::new("filesystem-alias-guard")?;
+    // Two names for one owned file model filesystem aliases without mounts or a
+    // destructive stash. -ef also handles true case aliases on the target filesystem.
+    repo.write("A", b"excluded bytes\n")?;
+    std::fs::hard_link(repo.path().join("A"), repo.path().join("alias"))
+        .map_err(|e| e.to_string())?;
+    let work = WorkStatus {
+        staged: vec![git::StatusFile {
+            path: "A".into(),
+            old_path: None,
+            code: 'D',
+            area: git::Area::Staged,
+        }],
+        unstaged: vec![git::StatusFile {
+            path: "alias".into(),
+            old_path: None,
+            code: '?',
+            area: git::Area::Untracked,
+        }],
+        ..Default::default()
+    };
+    assert!(check_filesystem_overlaps(repo.path(), &work, false, &[]).is_err());
+    assert!(check_filesystem_overlaps(repo.path(), &work, true, &[]).is_ok());
+    assert!(check_filesystem_overlaps(repo.path(), &work, true, &["alias"]).is_err());
+    std::fs::create_dir(repo.path().join("directory")).map_err(|e| e.to_string())?;
+    let mut nested = work.clone();
+    nested.staged[0].path = "directory/removed".into();
+    assert!(check_filesystem_overlaps(repo.path(), &nested, false, &["directory"]).is_err());
+    assert!(check_filesystem_overlaps(repo.path(), &work, false, &["unrelated"]).is_err()); // ordinary alias still excluded
+    let mut distinct = work.clone();
+    distinct.unstaged.clear();
+    repo.write("a", b"other bytes\n")?;
+    let case_alias = same_file::is_same_file(repo.path().join("A"), repo.path().join("a"))
+        .map_err(|e| e.to_string())?;
+    assert_eq!(
+        check_filesystem_overlaps(repo.path(), &distinct, false, &["a"]).is_err(),
+        case_alias
+    );
+    // Paths remain original quoted data, including shell metacharacters.
+    distinct.staged[0].path = "quote'$(never-run)".into();
+    let script = filesystem_overlap_script(&distinct, true, &["quote'$(never-run)/child"])?;
+    assert!(script.contains("'\\''"));
+    assert!(script.contains("./quote"));
+    assert!(check_filesystem_overlaps(repo.path(), &distinct, true, &["unrelated"]).is_ok());
+    Ok(())
+}
+
+#[test]
 fn unstaged_file_replaced_by_ignored_directory_refuses_push_and_redo() -> Result<(), String> {
     for untracked in [false, true] {
         let repo = Repo::new(if untracked {
