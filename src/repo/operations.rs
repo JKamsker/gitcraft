@@ -1563,9 +1563,28 @@ fn command_envelope(args: &[String]) -> Result<(usize, &str), String> {
 fn check_command_envelopes(
     ops: &[Vec<String>],
     saved_redo: bool,
-    mut read: &mut dyn FnMut(&[&str]) -> Result<String, String>,
+    read: &mut dyn FnMut(&[&str]) -> Result<String, String>,
 ) -> Result<(), String> {
-    let mut builtins = None;
+    let mut commands = Vec::new();
+    collect_command_envelopes(ops, saved_redo, &mut commands)?;
+    if saved_redo && !commands.is_empty() {
+        let names = read(&["--list-cmds=builtins"])?;
+        if commands
+            .iter()
+            .any(|command| !names.lines().any(|name| name == command))
+        {
+            return Err("Saved Git aliases or external commands cannot be replayed safely. Run the operation again explicitly.".into());
+        }
+    }
+    Ok(())
+}
+
+/// Validate the entire envelope before even read-only repository preparation.
+fn collect_command_envelopes(
+    ops: &[Vec<String>],
+    saved_redo: bool,
+    commands: &mut Vec<String>,
+) -> Result<(), String> {
     for op in ops {
         if let [mark, _, args @ ..] = op.as_slice()
             && mark == TRY
@@ -1575,7 +1594,7 @@ fn check_command_envelopes(
             {
                 return Err("Pull, stash and submodule operations require checked dispatch; run the operation again explicitly.".into());
             }
-            check_command_envelopes(&[args.to_vec()], saved_redo, &mut read)?;
+            collect_command_envelopes(&[args.to_vec()], saved_redo, commands)?;
             continue;
         }
         if is_expectation(op) || op.first().is_some_and(|word| word.starts_with('\0')) {
@@ -1599,15 +1618,7 @@ fn check_command_envelopes(
         {
             return Err("Submodule updates with global or command-prefix options cannot be validated safely. Run Update submodules again.".into());
         }
-        if saved_redo {
-            let names = match &builtins {
-                Some(names) => names,
-                None => builtins.insert(read(&["--list-cmds=builtins"])?),
-            };
-            if !names.lines().any(|name| name == command) {
-                return Err("Saved Git aliases or external commands cannot be replayed safely. Run the operation again explicitly.".into());
-            }
-        }
+        commands.push(command.to_owned());
     }
     Ok(())
 }
