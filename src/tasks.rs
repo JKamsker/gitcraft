@@ -194,7 +194,7 @@ impl Pool {
     }
 
     #[cfg(test)]
-    fn new(workers: usize) -> std::io::Result<Self> {
+    pub(crate) fn new(workers: usize) -> std::io::Result<Self> {
         Self::with_capacity(workers, QUEUE_CAPACITY)
     }
 
