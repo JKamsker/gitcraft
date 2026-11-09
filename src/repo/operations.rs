@@ -1662,11 +1662,10 @@ fn pull_mode(args: &[String]) -> Result<PullMode, String> {
         ("show-forced-updates", 0),
         ("set-upstream", 0),
     ];
-    fn rebase_value(value: &str) -> Result<bool, String> {
+    fn boolean_value(value: &str) -> Result<bool, String> {
         match value.to_ascii_lowercase().as_str() {
             "" | "false" | "no" | "off" | "0" => Ok(false),
             "true" | "yes" | "on" | "1" => Ok(true),
-            _ if matches!(value, "merges" | "m" | "interactive" | "i") => Ok(true),
             _ => {
                 // git_parse_maybe_bool also accepts base-0 integers with k/m/g
                 // suffixes, bounded symmetrically by INT_MAX (parse.c).
@@ -1691,8 +1690,15 @@ fn pull_mode(args: &[String]) -> Result<PullMode, String> {
                     .filter(|_| !digits.starts_with(['+', '-']))
                     .filter(|n| *n >= 0 && *n <= i64::from(i32::MAX) / factor)
                     .map(|n| n != 0)
-                    .ok_or_else(|| format!("Invalid pull rebase value: {value}"))
+                    .ok_or_else(|| format!("Invalid pull boolean value: {value}"))
             }
+        }
+    }
+    fn rebase_value(value: &str) -> Result<bool, String> {
+        if matches!(value, "merges" | "m" | "interactive" | "i") {
+            Ok(true)
+        } else {
+            boolean_value(value)
         }
     }
     let mut mode = PullMode::default();
@@ -1736,11 +1742,8 @@ fn pull_mode(args: &[String]) -> Result<PullMode, String> {
                     mode.recurse = Some(if negated {
                         false
                     } else {
-                        match value.unwrap_or("yes") {
-                            "yes" | "on" | "true" | "1" | "on-demand" => true,
-                            "no" | "off" | "false" | "0" => false,
-                            value => return Err(format!("Invalid pull recursion value: {value}")),
-                        }
+                        let value = value.unwrap_or("yes");
+                        value == "on-demand" || boolean_value(value)?
                     });
                 }
                 "rebase" => {
@@ -2079,6 +2082,9 @@ mod tests {
                 (vec!["--rebase"], "true\n", true),
                 (vec!["--recurse-submodules"], "false\n", true),
                 (vec!["--recurse-submodules=on-demand"], "false\n", true),
+                (vec!["--recurse-submodules=FALSE"], "true\n", false),
+                (vec!["--recurse-submodules=2"], "false\n", true),
+                (vec!["--recurse-submodules="], "true\n", false),
                 (
                     vec!["--recurse-submodules", "--no-recurse-submodules"],
                     "true\n",
