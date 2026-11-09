@@ -16,6 +16,9 @@ fn author_rule_syntax_advisory_preserves_ports_ipv6_and_nested_namespaces() {
     for rule in [
         "",
         "custom-host/team",
+        "github.com/",
+        "github.com////",
+        "custom-host/team////",
         "github.com:443/team",
         "[2001:db8::1]:8443/team",
         "2001:db8::1/team",
