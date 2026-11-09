@@ -1806,9 +1806,20 @@ fn pull_mode(args: &[String]) -> Result<PullMode, String> {
 /// merge refuse to overwrite ignored files. Read the effective options in the worker,
 /// after any preceding checkout, and override them only for this command.
 fn ignored_safe_pull(path: &Path, args: &[String]) -> Result<Vec<String>, String> {
-    ignored_safe_pull_with(args, |args, codes| {
-        git::run_ok_codes(Some(path), args, codes)
-    })
+    checked_pull_with(
+        args,
+        || super::partial_stash::validate_excluded_cleanup(path),
+        |args, codes| git::run_ok_codes(Some(path), args, codes),
+    )
+}
+
+fn checked_pull_with(
+    args: &[String],
+    cleanup: impl FnOnce() -> Result<(), String>,
+    run: impl FnMut(&[&str], &[i32]) -> Result<String, String>,
+) -> Result<Vec<String>, String> {
+    cleanup()?;
+    ignored_safe_pull_with(args, run)
 }
 
 fn ignored_safe_pull_with(
@@ -2445,6 +2456,25 @@ mod tests {
                 assert!(super::super::pull_mode(&args).is_err(), "{args:?}");
             }
             Ok(())
+        }
+
+        #[test]
+        fn native_autostash_cleanup_refusal_precedes_all_pull_preparation() {
+            for mode in [
+                "--ff-only",
+                "--no-rebase",
+                "--rebase",
+                "--autostash",
+                "--no-autostash",
+            ] {
+                let args = vec!["pull".into(), mode.into()];
+                let result = super::super::checked_pull_with(
+                    &args,
+                    || Err("excluded replacement".into()),
+                    |_, _| panic!("refused cleanup reached pull preparation"),
+                );
+                assert_eq!(result, Err("excluded replacement".into()));
+            }
         }
 
         #[test]

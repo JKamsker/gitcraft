@@ -1403,3 +1403,69 @@ fn newly_untracked_selection_requires_reprepare_before_push_and_redo() -> Result
     );
     Ok(())
 }
+
+#[test]
+fn shared_native_cleanup_guard_checks_excluded_replacements_and_failures() -> Result<(), String> {
+    let removed = |path: &str, code, old: Option<&str>, area| git::StatusFile {
+        path: path.into(),
+        old_path: old.map(str::to_owned),
+        code,
+        area,
+    };
+    for row in [
+        removed("private", 'D', None, git::Area::Staged),
+        removed("renamed", 'R', Some("private"), git::Area::Staged),
+        removed("private", 'D', None, git::Area::Unstaged),
+    ] {
+        for replacement in ["private", "private/content", "private/"] {
+            let work = WorkStatus {
+                staged: vec![row.clone()],
+                ..Default::default()
+            };
+            let result = validate_excluded_cleanup_with(
+                &work,
+                false,
+                || Ok(format!("{replacement}\0")),
+                |_, _, _| panic!("lexical overlap reached filesystem inspection"),
+            );
+            assert!(result.is_err(), "{replacement}");
+        }
+    }
+    let work = WorkStatus {
+        staged: vec![removed("private", 'D', None, git::Area::Staged)],
+        ..Default::default()
+    };
+    assert!(
+        validate_excluded_cleanup_with(
+            &work,
+            false,
+            || Err("inspection failed".into()),
+            |_, _, _| Ok(())
+        )
+        .is_err()
+    );
+    assert!(
+        validate_excluded_cleanup_with(
+            &work,
+            false,
+            || Ok("PRIVATE/content\0".into()),
+            |_, _, paths| {
+                assert_eq!(paths, &["PRIVATE/content"]);
+                Err("filesystem alias".into())
+            }
+        )
+        .is_err()
+    );
+    validate_excluded_cleanup_with(
+        &work,
+        false,
+        || Ok("private-other/content\0".into()),
+        |seen, untracked, paths| {
+            assert_eq!(seen.staged[0].path, "private");
+            assert!(!untracked);
+            assert_eq!(paths, &["private-other/content"]);
+            Ok(())
+        },
+    )?;
+    Ok(())
+}
