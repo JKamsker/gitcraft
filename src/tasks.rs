@@ -480,7 +480,7 @@ mod tests {
     fn remote_mutation_bucket_holds_expectation_and_pop_against_push() -> Result<(), String> {
         // Recording only: no Git commands, remote connection or child processes.
         let pool = Pool::new(2).map_err(|e| e.to_string())?;
-        let (release, gate) = mpsc::channel();
+        let (release, gate) = mpsc::channel::<()>();
         let (out, events) = mpsc::channel();
         let stash = Arc::new(Mutex::new(vec!["stash A"]));
         let stack = Arc::clone(&stash);
@@ -586,7 +586,7 @@ mod tests {
     fn remote_mutation_bucket_preserves_fifo_cancellation_panic_and_local_liveness()
     -> Result<(), String> {
         let pool = Pool::new(2).map_err(|e| e.to_string())?;
-        let (release, gate) = mpsc::channel();
+        let (release, gate) = mpsc::channel::<()>();
         let (out, events) = mpsc::channel();
         let record = out.clone();
         submit(

@@ -1089,7 +1089,7 @@ fn remote_spawn_mutation_serializes_whole_recorded_operations() -> Result<(), St
     let a = super::RepoTab::new_deferred("ssh://build/main".into(), &ctx);
     let b = super::RepoTab::new_deferred("ssh://alias/linked".into(), &ctx);
     assert_ne!(a.tx.repo, b.tx.repo);
-    let (release, gate) = channel();
+    let (release, gate) = channel::<()>();
     let (out, events) = channel();
     let record = out.clone();
     super::messages::spawn_mutation(&a.tx, &ctx, super::Msg::JobPanicked, move || {
