@@ -1571,9 +1571,9 @@ fn check_command_envelopes(
             && mark == TRY
         {
             if command_envelope(args)
-                .is_ok_and(|(_, command)| matches!(command, "pull" | "submodule"))
+                .is_ok_and(|(_, command)| matches!(command, "pull" | "submodule" | "stash"))
             {
-                return Err("Pull and submodule operations require checked dispatch; run the operation again explicitly.".into());
+                return Err("Pull, stash and submodule operations require checked dispatch; run the operation again explicitly.".into());
             }
             check_command_envelopes(&[args.to_vec()], saved_redo, &mut read)?;
             continue;
@@ -1587,6 +1587,9 @@ fn check_command_envelopes(
             Err(error) if saved_redo => return Err(error),
             Err(_) => continue, // Git diagnoses unsupported normal commands.
         };
+        if command == "stash" && at != 0 {
+            return Err("Stash commands with global options cannot be validated safely. Run Stash again from the toolbar.".into());
+        }
         if command == "pull" && at != 0 {
             return Err("Saved pull commands with global options cannot be validated safely. Run Pull again from the toolbar.".into());
         }
@@ -2271,6 +2274,62 @@ mod tests {
                 true,
                 &mut |_| Ok("submodule\n".into()),
             )?;
+            Ok(())
+        }
+
+        #[test]
+        fn prefixed_and_try_stash_commands_refuse_before_any_operation_step() -> Result<(), String>
+        {
+            for command in [
+                vec!["-c", "advice.statusHints=false", "stash", "push", "-u"],
+                vec!["-cadvice.statusHints=false", "stash", "push"],
+                vec!["-C", "elsewhere", "stash", "push"],
+                vec!["-Celsewhere", "stash", "push"],
+                vec!["--git-dir=elsewhere", "stash", "push"],
+                vec!["--work-tree", "elsewhere", "stash", "push"],
+                vec!["--config-env=x=SETTING", "stash", "push"],
+                vec![super::super::TRY, "optional stash", "stash", "push"],
+                vec![
+                    super::super::TRY,
+                    "optional stash",
+                    "-c",
+                    "x=y",
+                    "stash",
+                    "push",
+                ],
+            ] {
+                let steps = ops(&[&["reset", "--hard"], &command]);
+                let saved: UndoEntry = serde_json::from_value(serde_json::json!({
+                    "label":"Stash", "undo":[], "redo":steps, "heads":null
+                }))
+                .map_err(|e| e.to_string())?;
+                for kind in [OpKind::plain(), OpKind::Redo(saved.clone())] {
+                    let (result, _, stopped) = super::super::run_steps_counted(
+                        Path::new("/unopened-stash-envelope-fixture"),
+                        &saved.redo,
+                        kind,
+                        None,
+                        true,
+                        None,
+                    );
+                    assert!(
+                        result.is_err_and(
+                            |e| e.contains("checked dispatch") || e.contains("Stash again")
+                        ),
+                        "{command:?}"
+                    );
+                    assert_eq!(stopped, 0);
+                }
+            }
+            for command in [
+                vec!["stash", "push", "--include-untracked"],
+                vec!["-c", "x=stash", "status"],
+                vec!["-C", "stash", "status"],
+            ] {
+                super::super::check_command_envelopes(&ops(&[&command]), true, &mut |_| {
+                    Ok("stash\nstatus\n".into())
+                })?;
+            }
             Ok(())
         }
 
