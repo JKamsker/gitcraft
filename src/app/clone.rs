@@ -513,7 +513,8 @@ fn form_fields(ui: &mut Ui, form: &mut CloneForm, t: &Tokens) -> bool {
 
 /// Only an eligible text field may turn Enter into submission.
 pub(super) fn singleline_enter(response: &egui::Response) -> bool {
-    (response.has_focus() || response.lost_focus())
+    (response.has_focus()
+        || (response.lost_focus() && response.ctx.memory(|m| m.focused().is_none())))
         && response.ctx.input(|i| i.key_pressed(Key::Enter))
 }
 
@@ -573,6 +574,72 @@ pub(super) fn display_message(raw: &str) -> Option<String> {
 mod localization_tests {
     use super::*;
     use egui_kittest::{Harness, kittest::Queryable};
+
+    #[derive(Default)]
+    struct EnterForm {
+        name: String,
+        name_id: Option<egui::Id>,
+        browse: usize,
+        submit: usize,
+        name_lost_on_enter: bool,
+        browse_focused_on_enter: bool,
+    }
+
+    fn enter_form() -> Harness<'static, EnterForm> {
+        Harness::new_ui_state(
+            |ui, form: &mut EnterForm| {
+                // Record intents only: canceling this simulated picker has no side effects.
+                let browse = ui.button("Browse");
+                if browse.clicked() {
+                    form.browse += 1;
+                }
+                let name = ui.text_edit_singleline(&mut form.name);
+                form.name_id = Some(name.id);
+                if ui.input(|i| i.key_pressed(Key::Enter)) {
+                    form.name_lost_on_enter = name.lost_focus();
+                    form.browse_focused_on_enter = browse.has_focus();
+                }
+                if singleline_enter(&name) {
+                    form.submit += 1;
+                }
+            },
+            EnterForm::default(),
+        )
+    }
+
+    #[test]
+    fn enter_during_backward_focus_transition_only_activates_browse() {
+        let mut h = enter_form();
+        let name = h.state().name_id.expect("name rendered");
+        h.ctx.memory_mut(|m| m.request_focus(name));
+        h.step();
+        h.key_down_modifiers(egui::Modifiers::SHIFT, Key::Tab);
+        h.step();
+        // Backward navigation takes effect in the next frame, alongside this Enter.
+        h.key_down(Key::Enter);
+        h.step();
+        assert!(h.state().name_lost_on_enter);
+        assert!(h.state().browse_focused_on_enter);
+        assert_eq!(h.state().browse, 1);
+        assert_eq!(h.state().submit, 0);
+        h.key_up(Key::Enter);
+        h.key_up(Key::Tab);
+        h.run_steps(3);
+        assert_eq!(h.state().submit, 0, "picker cancellation must not submit");
+    }
+
+    #[test]
+    fn enter_in_singleline_field_submits_after_surrendering_focus() {
+        let mut h = enter_form();
+        let name = h.state().name_id.expect("name rendered");
+        h.ctx.memory_mut(|m| m.request_focus(name));
+        h.step();
+        h.key_press(Key::Enter);
+        h.step();
+        assert_eq!(h.state().browse, 0);
+        assert_eq!(h.state().submit, 1);
+        assert!(h.ctx.memory(|m| m.focused().is_none()));
+    }
 
     #[test]
     fn enter_on_clone_cancel_closes_without_submitting() {
