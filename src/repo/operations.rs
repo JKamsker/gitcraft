@@ -1178,7 +1178,7 @@ pub(super) fn run_steps_guarded(
             let check = if actual.first().is_some_and(|arg| arg != "submodule") {
                 Err("Submodule updates with global options cannot be validated safely. Run Update submodules again.".into())
             } else {
-                check_ignored_submodules_with(|args, codes| {
+                check_ignored_submodule_update_with(&actual, |args, codes| {
                     git::run_ok_codes(Some(path), args, codes)
                 })
             };
@@ -1929,6 +1929,67 @@ fn check_ignored_submodules_with(
     }
 }
 
+/// Resolve precisely the execution pathspecs to indexed gitlinks. foreach itself
+/// has no pathspec interface, so quote the resolved paths as literal shell data.
+fn check_ignored_submodule_update_with(
+    args: &[String],
+    mut run: impl FnMut(&[&str], &[i32]) -> Result<String, String>,
+) -> Result<(), String> {
+    let Some(separator) = args.iter().position(|arg| arg == "--") else {
+        return check_ignored_submodules_with(run);
+    };
+    if separator + 1 == args.len() {
+        return check_ignored_submodules_with(run);
+    }
+    let mut query = vec!["ls-files", "--stage", "-z", "--"];
+    query.extend(args[separator + 1..].iter().map(String::as_str));
+    let entries = run(&query, &[0])?;
+    let mut paths = Vec::new();
+    for entry in entries.split('\0').filter(|entry| !entry.is_empty()) {
+        let (metadata, path) = entry
+            .split_once('\t')
+            .ok_or("Cannot resolve submodule update scope safely")?;
+        let metadata: Vec<_> = metadata.split_whitespace().collect();
+        if metadata.len() != 3 {
+            return Err("Cannot resolve submodule update scope safely".into());
+        }
+        if metadata[0] == "160000" {
+            if metadata[2] != "0" || path.is_empty() {
+                return Err("Resolve conflicted submodules before updating".into());
+            }
+            paths.push(path);
+        }
+    }
+    if paths.is_empty() {
+        return Ok(());
+    } // Git diagnoses unmatched execution pathspecs.
+    let recursive = args[..separator].iter().any(|arg| arg == "--recursive");
+    let mut patterns = Vec::new();
+    for path in paths {
+        let literal = crate::remote::sh_quote(path);
+        patterns.push(literal.clone());
+        if recursive {
+            patterns.push(format!("{literal}/*"));
+        }
+    }
+    let script = format!(
+        "case \"$displaypath\" in {}) git ls-files --others --ignored --exclude-standard --directory -z ;; *) : ;; esac",
+        patterns.join("|")
+    );
+    if script.len() > 48 * 1024 {
+        return Err("Too many selected submodules to inspect safely".into());
+    }
+    let ignored = run(
+        &["submodule", "foreach", "--quiet", "--recursive", &script],
+        &[0],
+    )?;
+    if ignored.is_empty() {
+        Ok(())
+    } else {
+        Err("Submodule update cannot safely preserve ignored local files. Move them out of selected submodules and run the operation again.".into())
+    }
+}
+
 /// Captures only the witness from the same validator invocation; no additional Git call.
 pub(super) fn check_stack_captured(
     base: &str,
@@ -2094,6 +2155,52 @@ mod tests {
 
     mod short_rebase {
         use super::*;
+
+        #[test]
+        fn selected_submodule_scope_is_literal_and_excludes_ignored_siblings() -> Result<(), String>
+        {
+            for path in [
+                "a",
+                "with space",
+                "-leading",
+                "[a]*",
+                ":(glob)literal",
+                "quote'path",
+            ] {
+                let action = crate::repo::keep_submodules::update_one(path);
+                let crate::repo::Action::Ops { ops, .. } = action else {
+                    return Err("unexpected update action".into());
+                };
+                assert_eq!(ops[0].last(), Some(&format!(":(literal){path}")));
+                for ignored in [
+                    Ok(String::new()),
+                    Ok("private\0".into()),
+                    Err("inspection failed".into()),
+                ] {
+                    let mut calls = Vec::new();
+                    let result =
+                        super::super::check_ignored_submodule_update_with(&ops[0], |args, _| {
+                            calls.push(args.iter().map(|s| s.to_string()).collect::<Vec<_>>());
+                            match args {
+                                ["ls-files", "--stage", "-z", "--", selected] => {
+                                    assert_eq!(*selected, format!(":(literal){path}"));
+                                    Ok(format!("160000 {} 0\t{path}\0", "a".repeat(40)))
+                                }
+                                ["submodule", "foreach", "--quiet", "--recursive", script] => {
+                                    let quoted = crate::remote::sh_quote(path);
+                                    assert!(script.contains(&format!("{quoted}|{quoted}/*")));
+                                    assert!(script.contains("case \"$displaypath\""));
+                                    ignored.clone()
+                                }
+                                _ => Err(format!("unexpected inspection {args:?}")),
+                            }
+                        });
+                    assert_eq!(result.is_ok(), ignored.as_ref().is_ok_and(String::is_empty));
+                    assert_eq!(calls.len(), 2);
+                }
+            }
+            Ok(())
+        }
 
         #[test]
         fn recursive_pull_inspects_nested_ignored_files_before_any_mutation() -> Result<(), String>
