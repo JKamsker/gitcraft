@@ -1062,7 +1062,12 @@ fn quick_drop_refuses_a_different_branch_at_the_same_commit() -> Result<(), Stri
     assert_eq!(git::head(&dir), tip);
     assert_eq!(git::resolve(&dir, "refs/heads/original")?, tip);
     assert_eq!(git::resolve(&dir, "refs/heads/other")?, tip);
-    assert!(tab.undo.is_empty());
+    assert!(
+        tab.timeline
+            .entries
+            .iter()
+            .all(|entry| entry.undo.is_none())
+    );
     assert!(git::in_progress(&dir)?.is_none());
     let fresh = Action::QuickEdit {
         edit: Edit::Drop,
