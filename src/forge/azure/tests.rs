@@ -40,6 +40,7 @@ struct Model {
     calls: Vec<(String, String, Option<Value>)>,
     thread_error: bool,
     drift: bool,
+    statuses: Option<Value>,
 }
 fn recording() -> (Api, Arc<Mutex<Model>>) {
     let model = Arc::new(Mutex::new(Model {
@@ -86,7 +87,9 @@ fn recording() -> (Api, Arc<Mutex<Model>>) {
                     m.iteration["sourceRefCommit"]["commitId"] = json!("d".repeat(40));
                     m.iteration["id"] = json!(3);
                 }
-                json!({"value":[{"context":{"name":"Build"},"state":"succeeded"}]})
+                m.statuses.clone().unwrap_or_else(
+                    || json!({"value":[{"context":{"name":"Build"},"state":"succeeded"}]}),
+                )
             } else if p.ends_with("/policy/evaluations") {
                 json!({"value":[{"status":"rejected","configuration":{"isBlocking":true,"type":{"displayName":"Required review"}}}]})
             } else if p.ends_with("/pullrequests/7") {
@@ -295,5 +298,184 @@ fn historical_iteration_target_opens_and_current_pr_target_is_independently_boun
         json!("e".repeat(40));
     assert!(current.comment("Iteration target also changed").is_err());
     assert_eq!(writes(&*state.lock().map_err(|e| e.to_string())?).len(), 1);
+    Ok(())
+}
+
+#[test]
+fn escaped_and_legacy_pr_urls_match_the_canonical_repository() {
+    let h = hosting();
+    let generated = pr_url(&h, 7);
+    assert!(h.matches_pull_request(&generated));
+    for remote in [
+        "https://dev.azure.com/team/My%20Project/_git/repo",
+        "https://team.visualstudio.com/DefaultCollection/My%20Project/_git/repo",
+        "https://team.visualstudio.com/My%20Project/_git/repo",
+        "https://dev.azure.com:443/team/My%20Project/_git/repo",
+        "git@ssh.dev.azure.com:v3/team/My%20Project/repo",
+    ] {
+        assert!(h.matches_git_remote(remote), "{remote}");
+        let remotes = [crate::git::Remote {
+            name: "origin".into(),
+            url: remote.into(),
+        }];
+        assert_eq!(
+            crate::pull_request::remote_for(&remotes, &generated, &h),
+            Some("origin")
+        );
+    }
+    for wrong in [
+        "https://ssh.dev.azure.com/v3/team/My%20Project/repo",
+        "https://team.visualstudio.com/v3/team/My%20Project/repo",
+        "https://dev.azure.com@evil.invalid/team/My%20Project/_git/repo",
+        "https://evil.invalid@dev.azure.com/team/My%20Project/_git/repo",
+        "https://user:password@team.visualstudio.com/My%20Project/_git/repo",
+        "https://team.visualstudio.com:8443/My%20Project/_git/repo",
+        "https://team.visualstudio.com/My%20Project/_git/repo?other=1",
+        "https://team.visualstudio.com/My%20Project/_git/repo#fragment",
+        "http://dev.azure.com/team/My%20Project/_git/repo",
+        "https://dev.azure.com:8443/team/My%20Project/_git/repo",
+        "https://dev.azure.com/team/My%20Project/_git/repo?other=1",
+        "https://dev.azure.com/team/My%20Project/_git/repo#fragment",
+        "https://dev.azure.com/team/my%20Project/_git/repo",
+        "https://dev.azure.com/team/My%2fProject/_git/repo",
+        "https://other.visualstudio.com/My%20Project/_git/repo",
+        "https://team.visualstudio.com.evil/My%20Project/_git/repo",
+    ] {
+        assert!(!h.matches_http_repository(wrong), "{wrong}");
+    }
+}
+
+#[test]
+fn azure_link_query_values_round_trip_without_extra_parameters() -> Result<(), String> {
+    use crate::forge::links::{Place, url};
+    for branch in ["topic&foo=bar", "topic+name", "feature/naïve%20"] {
+        let link = url(&hosting(), &Place::Branch(branch));
+        let parsed = ::url::Url::parse(&link).map_err(|e| e.to_string())?;
+        let pairs: Vec<_> = parsed.query_pairs().collect();
+        assert_eq!(pairs.len(), 1);
+        assert_eq!(pairs[0].0, "version");
+        assert_eq!(pairs[0].1, format!("GB{branch}"));
+    }
+    let path = "dir/a&version=GBmain+é%.rs";
+    let link = url(
+        &hosting(),
+        &Place::File {
+            sha: "abc123",
+            path,
+            lines: None,
+        },
+    );
+    let parsed = ::url::Url::parse(&link).map_err(|e| e.to_string())?;
+    let pairs: Vec<_> = parsed.query_pairs().collect();
+    assert_eq!(pairs.len(), 3);
+    assert_eq!(pairs[0].0, "path");
+    assert_eq!(pairs[0].1, format!("/{path}"));
+    assert_eq!(pairs[1], ("version".into(), "GCabc123".into()));
+    assert_eq!(pairs[2], ("_a".into(), "contents".into()));
+    Ok(())
+}
+
+#[test]
+fn incomplete_commit_reads_surface_checks_errors_including_clamped_pages() -> Result<(), String> {
+    for (count, continuation) in [
+        (1, Some("next-page")),
+        (999, Some("next-page")),
+        (1000, None),
+    ] {
+        let (mut api, _) = recording();
+        let record = api.record.clone().ok_or("missing recorder")?;
+        api.record = Some(Arc::new(move |method, path, body, accept| {
+            if path
+                .split('?')
+                .next()
+                .is_some_and(|p| p.ends_with("/commits"))
+            {
+                let rows = vec![json!({"commitId":"a".repeat(40),"comment":"Change"}); count];
+                let body = json!({"value":rows}).to_string();
+                let header = continuation
+                    .map(|t| format!("X-MS-ContinuationToken: {t}\r\n"))
+                    .unwrap_or_default();
+                // Feed an actual recorded HTTP header through the production reader.
+                return format!(
+                    "HTTP/1.1 200 OK\r\n{header}Content-Length: {}\r\n\r\n{body}",
+                    body.len()
+                )
+                .parse::<ureq::Response>()
+                .map_err(|e| e.to_string());
+            }
+            record(method, path, body, accept)
+        }));
+        let d = details::read(&api, 7)?;
+        assert!(d.commits.is_empty());
+        let error = d
+            .checks_error
+            .as_deref()
+            .ok_or("incomplete read was silent")?;
+        assert!(error.contains("incomplete"), "{error}");
+        assert!(error.contains("forge page"), "{error}");
+        assert!(!d.checks.is_empty());
+    }
+    let (api, _) = recording();
+    let d = details::read(&api, 7)?;
+    assert_eq!(d.commits.len(), 1);
+    assert!(d.checks_error.is_none());
+    Ok(())
+}
+
+#[test]
+fn checks_keep_only_global_and_current_iteration_with_distinct_contexts() -> Result<(), String> {
+    use crate::pull_request::CheckState;
+    let (api, state) = recording();
+    state.lock().map_err(|e| e.to_string())?.statuses = Some(json!({"value":[
+        {"iterationId":1,"context":{"genre":"ci","name":"Build"},"state":"failed","description":"old failure"},
+        {"iterationId":1,"context":{"genre":"security","name":"Build"},"state":"succeeded","description":"old success"},
+        {"context":{"genre":"global","name":"Build"},"state":"pending","description":"global status"},
+        {"iterationId":2,"context":{"genre":"ci","name":"Build"},"state":"succeeded","description":"current success"},
+        {"iterationId":2,"context":{"genre":"security","name":"Build"},"state":"failed","description":"current failure"},
+        {"iterationId":3,"context":{"name":"Future"},"state":"succeeded"},
+        {"iterationId":null,"context":{"name":"Unknown"},"state":"succeeded"}
+    ]}));
+    let d = details::read(&api, 7)?;
+    assert!(d.checks_error.is_none());
+    assert_eq!(d.checks.len(), 4); // Three relevant statuses plus the policy.
+    assert_eq!(d.checks[0].name, "global / Build");
+    assert_eq!(d.checks[0].state, CheckState::Running);
+    assert_eq!(d.checks[1].name, "ci / Build");
+    assert_eq!(d.checks[1].state, CheckState::Passed);
+    assert_eq!(d.checks[2].name, "security / Build");
+    assert_eq!(d.checks[2].state, CheckState::Failed);
+    assert!(d.checks.iter().all(|c| !c.detail.starts_with("old ")));
+    Ok(())
+}
+
+#[test]
+fn policy_evaluations_use_the_documented_preview_contract_only() -> Result<(), String> {
+    let (api, state) = recording();
+    details::read(&api, 7)?;
+    let m = state.lock().map_err(|e| e.to_string())?;
+    let mut policies = 0;
+    for (_, path, _) in &m.calls {
+        let parsed =
+            url::Url::parse(&format!("https://dev.azure.com/{path}")).map_err(|e| e.to_string())?;
+        let versions = parsed
+            .query_pairs()
+            .filter(|(k, _)| k == "api-version")
+            .map(|(_, v)| v.into_owned())
+            .collect::<Vec<_>>();
+        if parsed.path().ends_with("/policy/evaluations") {
+            policies += 1;
+            assert_eq!(versions, ["7.1-preview.1"]);
+            assert!(
+                parsed.query_pairs().any(|(k, v)| k == "artifactId"
+                    && v == "vstfs:///CodeReview/CodeReviewId/project-id/7")
+            );
+        } else if parsed.path() == "/_apis/connectionData" {
+            // Viewer identity already uses its own preview contract.
+            assert_eq!(versions, ["7.1-preview.1"]);
+        } else {
+            assert_eq!(versions, ["7.1"]);
+        }
+    }
+    assert_eq!(policies, 1);
     Ok(())
 }
