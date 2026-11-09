@@ -143,15 +143,14 @@ pub(super) fn blame_input(repo: &std::path::Path, rev: Option<&str>, path: &str)
         add("worktree", git::file_at(repo, None, path));
         add("index", git::file_at(repo, Some(""), path));
     }
-    let mut files = vec![".mailmap".to_owned(), ".gitattributes".to_owned()];
-    for (at, _) in path.match_indices('/') {
-        files.push(format!("{}/.gitattributes", &path[..at]));
-    }
-    for key in [
-        "blame.ignoreRevsFile",
-        "mailmap.file",
-        "core.attributesFile",
-    ] {
+    // Ask Git to resolve effective attributes, including system/default-global
+    // sources and index fallback. Hashing only worktree .gitattributes misses both.
+    add(
+        "attributes",
+        git::run(Some(repo), &["check-attr", "-z", "--all", "--", path]).map(String::into_bytes),
+    );
+    let mut files = vec![".mailmap".to_owned()];
+    for key in ["blame.ignoreRevsFile", "mailmap.file"] {
         let values = git::run_ok_codes(
             Some(repo),
             &["config", "--null", "--path", "--get-all", key],
@@ -165,12 +164,52 @@ pub(super) fn blame_input(repo: &std::path::Path, rev: Option<&str>, path: &str)
                 .map(str::to_owned),
         );
     }
-    let info = git::run(Some(repo), &["rev-parse", "--git-path", "info/attributes"]).ok()?;
-    files.push(info.trim_end_matches(['\r', '\n']).to_owned());
     for file in files {
-        add(&file, git::file_at(repo, None, &file));
+        add(&file, attribution_file_input(repo, &file));
+    }
+    // A configured ref:path is mutable even when the viewed commit is fixed.
+    // HEAD:.mailmap also covers Git's bare-repository default conservatively.
+    let blobs = git::run_ok_codes(
+        Some(repo),
+        &["config", "--null", "--get-all", "mailmap.blob"],
+        &[0, 1],
+    )
+    .ok()?;
+    for blob in blobs
+        .split('\0')
+        .filter(|s| !s.is_empty())
+        .chain(std::iter::once("HEAD:.mailmap"))
+    {
+        add(
+            blob,
+            git::run(Some(repo), &["cat-file", "blob", blob]).map(String::into_bytes),
+        );
     }
     Some(content_key(&bytes))
+}
+
+/// Configuration dependencies are read by Git with ordinary symlink-following
+/// file semantics. Keep absolute paths on the repository's machine: joining an
+/// absolute dependency to an ssh:// path would silently discard the remote host.
+fn attribution_file_input(repo: &std::path::Path, file: &str) -> Result<Vec<u8>, String> {
+    attribution_file_input_with(repo, file, git::run_shell)
+}
+
+fn attribution_file_input_with(
+    repo: &std::path::Path,
+    file: &str,
+    run: impl FnOnce(&std::path::Path, &str) -> Result<git::ShellRun, String>,
+) -> Result<Vec<u8>, String> {
+    let file = crate::remote::sh_quote(file);
+    let script = format!(
+        "if test -f {file}; then printf 'file:'; git hash-object --stdin < {file}; elif test -e {file} || test -L {file}; then printf 'unreadable-or-nonregular'; else printf 'absent'; fi"
+    );
+    let result = run(repo, &script)?;
+    if result.code == 0 {
+        Ok(result.stdout)
+    } else {
+        Err(String::from_utf8_lossy(&result.stderr).into_owned())
+    }
 }
 
 fn pane_index(pane: FileTab) -> usize {

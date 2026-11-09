@@ -93,7 +93,9 @@ mod line_history_tests;
 mod load;
 mod local_ci;
 mod messages;
-pub(crate) use messages::{discover_fetch_key, fetch_key, mutation_key};
+#[cfg(not(test))]
+pub(crate) use messages::discover_fetch_key;
+pub(crate) use messages::{fetch_key, mutation_key};
 mod nav_history;
 mod navigate;
 mod navigation;
