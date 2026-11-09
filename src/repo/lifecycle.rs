@@ -153,9 +153,6 @@ impl super::RepoTab {
     fn suspend(&mut self) {
         // Cancel captures and child processes from this lifetime, and disconnect their
         // results so an old read cannot repopulate a suspended/resumed view.
-        if let Some(view) = &mut self.file_view {
-            view.retire_reads();
-        }
         let (sender, receiver) = std::sync::mpsc::channel();
         self._jobs = crate::tasks::Scope::default();
         self.tx = super::messages::JobSender {
@@ -257,38 +254,6 @@ mod tests {
         b.suspend();
         stable(&a);
         stable(&b);
-        Ok(())
-    }
-
-    #[test]
-    fn suspension_retires_retained_file_view_load_and_probe_slots() -> Result<(), String> {
-        use crate::repo::file_view::{FileTab, FileView};
-        let ctx = egui::Context::default();
-        for rev in [None, Some("a".repeat(40))] {
-            let mut tab =
-                crate::repo::RepoTab::new_deferred("/inert/suspended-file-view".into(), &ctx);
-            tab.file_view = Some(FileView::new("same.txt", rev, FileTab::File));
-            let generation = tab.file_view.as_ref().ok_or("missing view")?.generation;
-            let (_, old_jobs) = crate::repo::messages::record_jobs(|| {
-                tab.load_file_view(&ctx);
-                tab.status_changed_file_view(&ctx);
-            });
-            assert_eq!(old_jobs.len(), 2);
-            tab.suspend();
-            assert_ne!(
-                tab.file_view.as_ref().ok_or("missing view")?.generation,
-                generation
-            );
-            let (_, jobs) = crate::repo::messages::record_jobs(|| {
-                tab.load_file_view(&ctx);
-                tab.status_changed_file_view(&ctx);
-            });
-            assert_eq!(
-                jobs.len(),
-                2,
-                "retained requests can be resubmitted on the new lifetime"
-            );
-        }
         Ok(())
     }
 

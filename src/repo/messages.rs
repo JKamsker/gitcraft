@@ -507,9 +507,6 @@ impl RepoTab {
         self.poll_symbol_biography(ctx);
         self.poll_cochanges(ctx);
         self.poll_working_drafts(ctx);
-        if shown {
-            self.poll_file_view(ctx);
-        }
         if !shown || self.sleeping() {
             return;
         }
