@@ -134,6 +134,50 @@ impl RepoTab {
         self.prefetch_neighbours(ctx);
     }
 
+    /// Reads ahead the files of the commits on screen (`rows`, and as many again around them),
+    /// one batch at a time behind all other work: a click on any of them shows its files at once.
+    pub(super) fn prefetch_files(&mut self, rows: std::ops::Range<usize>, ctx: &egui::Context) {
+        /// Commits a batch reads at most.
+        const BATCH: usize = 64;
+        if self.files_cache.reading || self.commits.is_empty() {
+            return;
+        }
+        let around = rows.len().max(20);
+        let start = rows.start.saturating_sub(around);
+        let end = (rows.end + around).min(self.commits.len());
+        // Those on screen first, then those just off it.
+        let order = rows
+            .clone()
+            .chain(rows.end..end)
+            .chain((start..rows.start).rev());
+        let hashes: Vec<String> = order
+            .filter_map(|row| {
+                let hash = &self.commits.get(row)?.hash;
+                (hash != WIP_HASH
+                    && !hash.starts_with('\u{0}')
+                    && self.stash_at(row).is_none()
+                    && self.parked_at(row).is_none()
+                    && !self.files_cache.settled(hash))
+                .then(|| hash.clone())
+            })
+            .take(BATCH)
+            .collect();
+        if hashes.is_empty() {
+            return;
+        }
+        self.files_cache.reading = true;
+        let path = self.path.clone();
+        let (asked, failed_asked) = (hashes.clone(), hashes.clone());
+        super::messages::spawn_selection(
+            &self.tx,
+            ctx,
+            self.tx.cancel.clone(),
+            true,
+            move |error| Msg::FilesPrefetched(failed_asked, Err(error)),
+            move || Msg::FilesPrefetched(asked, git::commit_files_batch(&path, &hashes)),
+        );
+    }
+
     /// Reads the rows above and below the selected one into the detail cache, behind all other
     /// work, so arrowing on through the graph shows each commit at once.
     fn prefetch_neighbours(&mut self, ctx: &egui::Context) {

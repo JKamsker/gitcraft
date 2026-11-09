@@ -89,6 +89,11 @@ pub(super) enum Msg {
     Detail(String, Result<CommitDetail, String>),
     /// A neighbour of the selected commit, read ahead for the detail cache.
     DetailPrefetched(Result<CommitDetail, String>),
+    /// The files of the commits asked for (those on screen), read ahead in one batch.
+    FilesPrefetched(
+        Vec<String>,
+        Result<Vec<(String, Vec<git::ChangedFile>)>, String>,
+    ),
     /// The answer to the diff request numbered so (see [`DiffView::next_request`]).
     ///
     /// [`DiffView::next_request`]: super::DiffView::next_request
@@ -610,6 +615,7 @@ impl RepoTab {
             },
             Msg::Detail(hash, result) => {
                 if let Ok(d) = &result {
+                    self.files_cache.insert(d.hash.clone(), d.files.clone());
                     self.detail_cache.insert(&self.refs.head, d.clone());
                 }
                 if self.detail_hash.as_deref() == Some(hash.as_str()) {
@@ -624,8 +630,22 @@ impl RepoTab {
             }
             Msg::DetailPrefetched(result) => {
                 if let Ok(d) = result {
+                    self.files_cache.insert(d.hash.clone(), d.files.clone());
                     self.detail_cache.insert(&self.refs.head, d);
                 }
+            }
+            Msg::FilesPrefetched(asked, result) => {
+                self.files_cache.reading = false;
+                match result {
+                    Ok(read) => {
+                        for (hash, files) in read {
+                            self.files_cache.insert(hash, files);
+                        }
+                    }
+                    Err(_) => self.files_cache.unreadable(asked),
+                }
+                // On to the rows on screen not read yet, if any.
+                ctx.request_repaint();
             }
             Msg::RebaseCommits {
                 onto,

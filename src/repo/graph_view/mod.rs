@@ -339,6 +339,8 @@ impl RepoTab {
                 }
                 self.test_lane_frame(&settings, ui.ctx());
                 let mut hovered_message = None;
+                // The rows on screen, whose files are read ahead (see `prefetch_files`).
+                let mut on_screen = None;
                 let out = scroll.show_rows(ui, ROW_PITCH, total, |ui, range| {
                     // show_rows includes overscan and partially clipped rows. Require the text's
                     // centre to be inside the viewport with enough room for its glyphs: a label on
@@ -352,6 +354,7 @@ impl RepoTab {
                     });
                     let first = visible.clone().next().unwrap_or(range.start);
                     let end = visible.next_back().map_or(first, |i| i + 1);
+                    on_screen = Some(first..end);
                     let readable = if filtered {
                         self.readable_rows(
                             ui,
@@ -478,6 +481,9 @@ impl RepoTab {
                     }
                 });
                 ui.data_mut(|d| d.insert_temp(offset_id, out.state.offset.y));
+                if let Some(rows) = on_screen.filter(|_| !filtered && !ghost) {
+                    self.prefetch_files(rows, ui.ctx());
+                }
                 if let Some(steps) = first_steps {
                     self.first_steps_view(ui, steps, acts);
                 }

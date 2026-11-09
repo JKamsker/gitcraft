@@ -94,7 +94,8 @@ impl RepoTab {
                 }
             },
         };
-        let reading = self.detail.is_none();
+        // Files still on their way (not read ahead either).
+        let reading = self.detail.is_none() && self.files_cache.get(&detail.hash).is_none();
 
         self.review_all_button(
             ui,
@@ -204,7 +205,8 @@ impl RepoTab {
     }
 
     /// The selected commit as the graph read it, for the detail pane while git's read of it is
-    /// still on its way: not editable (whether HEAD contains it isn't known yet), no files.
+    /// still on its way: not editable (whether HEAD contains it isn't known yet); its files if they
+    /// were read ahead (see `prefetch_files`).
     fn provisional_detail(&self) -> Option<CommitDetail> {
         if self.stash_view.is_some() {
             return None;
@@ -228,7 +230,11 @@ impl RepoTab {
             committer: commit.author.clone(),
             commit_date: commit.date.clone(),
             message,
-            files: Vec::new(),
+            files: self
+                .files_cache
+                .get(hash)
+                .map(|files| files.as_ref().clone())
+                .unwrap_or_default(),
             in_head: false,
             merges_after: false,
         })

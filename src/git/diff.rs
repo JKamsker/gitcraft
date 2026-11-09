@@ -120,6 +120,61 @@ pub(super) fn commit_files(repo: &Path, hash: &str) -> Result<Vec<ChangedFile>, 
     Ok(files)
 }
 
+/// The files each of `hashes` changed, as [`commit_files`] lists them, read for all of them by
+/// two processes (the names, then the line counts) rather than two each: for reading ahead.
+pub fn commit_files_batch(
+    repo: &Path,
+    hashes: &[String],
+) -> Result<Vec<(String, Vec<ChangedFile>)>, String> {
+    let input = hashes.join("\n") + "\n";
+    let args = |kind: &'static str| {
+        [
+            "log",
+            NO_SIGNATURE,
+            "--no-walk=unsorted",
+            "--stdin",
+            "-z",
+            // A mark before each commit's hash: its files follow.
+            "--format=%x01%H",
+            "--diff-merges=first-parent",
+            "--root",
+            "-M",
+            kind,
+        ]
+    };
+    let (names, counts) = std::thread::scope(|s| {
+        let inherited = crate::tasks::Inherited::capture();
+        let input = &input;
+        let counts = s.spawn(move || {
+            inherited.run(|| super::run_input(Some(repo), &args("--numstat"), input))
+        });
+        let names = super::run_input(Some(repo), &args("--name-status"), input);
+        let counts = counts.join().unwrap_or_else(|_| {
+            Err(crate::i18n::text("interaction-teleport-error-stopped").into())
+        });
+        (names, counts)
+    });
+    let (names, counts) = (names?, counts?);
+    let counts: std::collections::HashMap<&str, &str> = per_commit(&counts).collect();
+    Ok(per_commit(&names)
+        .map(|(hash, names)| {
+            let mut files = parse_name_status(names);
+            if let Some(counts) = counts.get(hash) {
+                add_line_counts(&mut files, counts);
+            }
+            (hash.to_owned(), files)
+        })
+        .collect())
+}
+
+/// `git log -z --format=%x01%H`'s output, by commit: its hash and what follows it.
+fn per_commit(out: &str) -> impl Iterator<Item = (&str, &str)> {
+    out.split('\u{1}').filter_map(|part| {
+        let (hash, rest) = part.split_once('\0')?;
+        Some((hash, rest.strip_prefix('\n').unwrap_or(rest)))
+    })
+}
+
 /// What makes git print a plain patch.
 const PATCH_ARGS: [&str; 4] = [
     "--no-color",
@@ -415,6 +470,64 @@ mod tests {
         }
         assert!(kept);
         assert!(cleaned);
+        Ok(())
+    }
+
+    #[test]
+    fn files_read_in_a_batch_are_those_read_one_by_one() -> Result<(), String> {
+        let text = |e: std::io::Error| e.to_string();
+        let dir = std::env::temp_dir().join(format!("gitcraft-batch-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).map_err(text)?;
+        let git = |args: &[&str]| run(Some(&dir), args);
+        git(&["init", "-q", "-b", "main"])?;
+        git(&["config", "user.name", "T"])?;
+        git(&["config", "user.email", "t@t"])?;
+        std::fs::write(dir.join("a.txt"), "one\ntwo\nthree\nfour\n").map_err(text)?;
+        git(&["add", "."])?;
+        git(&["commit", "-q", "-m", "root"])?;
+        git(&["switch", "-q", "-c", "side"])?;
+        git(&["mv", "a.txt", "b.txt"])?;
+        std::fs::write(dir.join("b.txt"), "one\ntwo\nthree\nfive\n").map_err(text)?;
+        git(&["commit", "-q", "-am", "rename"])?;
+        git(&["switch", "-q", "main"])?;
+        std::fs::write(dir.join("c.txt"), "c\n").map_err(text)?;
+        git(&["add", "."])?;
+        git(&["commit", "-q", "-m", "other"])?;
+        git(&["merge", "-q", "--no-edit", "side"])?;
+        let hashes: Vec<String> = git(&["log", "--format=%H", "--all"])?
+            .lines()
+            .map(str::to_owned)
+            .collect();
+        let batch = commit_files_batch(&dir, &hashes);
+        let single: Result<Vec<_>, String> = hashes
+            .iter()
+            .map(|h| commit_files(&dir, h).map(|files| (h.clone(), files)))
+            .collect();
+        let _ = std::fs::remove_dir_all(&dir);
+        let describe = |files: &[(String, Vec<ChangedFile>)]| {
+            files
+                .iter()
+                .map(|(h, files)| {
+                    let files: Vec<_> = files
+                        .iter()
+                        .map(|f| {
+                            (
+                                f.status,
+                                f.path.clone(),
+                                f.old_path.clone(),
+                                f.added,
+                                f.removed,
+                            )
+                        })
+                        .collect();
+                    format!("{h}: {files:?}")
+                })
+                .collect::<Vec<_>>()
+        };
+        let (batch, single) = (batch?, single?);
+        assert_eq!(batch.len(), 4);
+        assert_eq!(describe(&batch), describe(&single));
         Ok(())
     }
 

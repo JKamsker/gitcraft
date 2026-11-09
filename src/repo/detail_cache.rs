@@ -2,9 +2,10 @@
 //! the one selected) shows at once. Whether HEAD contains it is part of a detail, so each is
 //! kept with the HEAD it was read at and only given back while HEAD is still that.
 
-use std::collections::VecDeque;
+use std::collections::{HashMap, HashSet, VecDeque};
+use std::sync::Arc;
 
-use crate::git::CommitDetail;
+use crate::git::{ChangedFile, CommitDetail};
 
 /// How many details are kept, the least recently used going first.
 const CAPACITY: usize = 256;
@@ -47,9 +48,67 @@ impl DetailCache {
     }
 }
 
+/// How many commits' files are kept, the oldest read going first.
+const FILES_CAPACITY: usize = 4_000;
+
+/// The files of commits (as their detail lists them), read ahead in batches for the rows on
+/// screen: a commit clicked shows its files at once, before (or without) its whole detail. A
+/// commit's files never change, so nothing is ever stale.
+#[derive(Default)]
+pub(super) struct FilesCache {
+    files: HashMap<String, Arc<Vec<ChangedFile>>>,
+    /// In the order read, for letting the oldest go.
+    order: VecDeque<String>,
+    /// Asked for and not given (a batch failed): not asked for again by the read-ahead.
+    unreadable: HashSet<String>,
+    /// A batch is being read.
+    pub(super) reading: bool,
+}
+
+impl FilesCache {
+    pub(super) fn get(&self, hash: &str) -> Option<Arc<Vec<ChangedFile>>> {
+        self.files.get(hash).cloned()
+    }
+
+    /// Whether `hash` is either known or not to be asked for again.
+    pub(super) fn settled(&self, hash: &str) -> bool {
+        self.files.contains_key(hash) || self.unreadable.contains(hash)
+    }
+
+    pub(super) fn insert(&mut self, hash: String, files: Vec<ChangedFile>) {
+        if files.len() > MAX_FILES || self.files.contains_key(&hash) {
+            return;
+        }
+        self.order.push_back(hash.clone());
+        self.files.insert(hash, Arc::new(files));
+        while self.order.len() > FILES_CAPACITY {
+            if let Some(old) = self.order.pop_front() {
+                self.files.remove(&old);
+            }
+        }
+    }
+
+    pub(super) fn unreadable(&mut self, hashes: impl IntoIterator<Item = String>) {
+        self.unreadable.extend(hashes);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn files_read_ahead_are_kept_and_the_oldest_go_first() {
+        let mut cache = FilesCache::default();
+        for i in 0..FILES_CAPACITY + 1 {
+            cache.insert(i.to_string(), Vec::new());
+        }
+        assert!(cache.get("0").is_none());
+        assert!(cache.get("1").is_some());
+        assert!(!cache.settled("x"));
+        cache.unreadable(["x".to_owned()]);
+        assert!(cache.settled("x"));
+    }
 
     fn detail(hash: &str) -> CommitDetail {
         CommitDetail {

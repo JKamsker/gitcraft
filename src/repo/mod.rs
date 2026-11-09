@@ -337,6 +337,8 @@ pub struct RepoTab {
     detail_error: Option<String>,
     /// Details read before (or ahead), so a commit clicked again shows at once.
     detail_cache: detail_cache::DetailCache,
+    /// The files of the commits on screen, read ahead so a click shows them at once.
+    files_cache: detail_cache::FilesCache,
     /// Ends the reads for the selected commit (and its neighbours) when the selection moves on.
     detail_cancel: crate::tasks::Cancellation,
     /// When the selected commit's detail was asked of git (see `slow_banner`).
@@ -719,6 +721,7 @@ impl RepoTab {
             detail: None,
             detail_error: None,
             detail_cache: Default::default(),
+            files_cache: Default::default(),
             detail_cancel: Default::default(),
             detail_asked: None,
             snapshot_shown: false,
