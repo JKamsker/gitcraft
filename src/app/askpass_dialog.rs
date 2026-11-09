@@ -326,6 +326,52 @@ mod localization_tests {
     }
 
     #[test]
+    fn same_frame_accessibility_focus_transfer_and_enter_does_not_answer() {
+        for remember in [false, true] {
+            for focus_first in [false, true] {
+                let mut h = secret_harness(remember, true);
+                h.get_by_role(Role::PasswordInput).focus();
+                h.run_steps(3);
+                let (password, _) = h.get_by_role(Role::PasswordInput).accesskit_node().locate();
+                assert_eq!(
+                    h.ctx.memory(|m| m.focused().map(|id| id.accesskit_id())),
+                    Some(password)
+                );
+                let (target_node, target_tree) = h
+                    .get_by_role_and_label(Role::CheckBox, "Remember connection")
+                    .accesskit_node()
+                    .locate();
+                let focus = egui::Event::AccessKitActionRequest(egui::accesskit::ActionRequest {
+                    action: egui::accesskit::Action::Focus,
+                    target_node,
+                    target_tree,
+                    data: None,
+                });
+                let enter = egui::Event::Key {
+                    key: Key::Enter,
+                    physical_key: None,
+                    pressed: true,
+                    repeat: false,
+                    modifiers: egui::Modifiers::NONE,
+                };
+                h.input_mut().events.extend(if focus_first {
+                    [focus, enter]
+                } else {
+                    [enter, focus]
+                });
+                h.step();
+                assert_eq!(h.state().1, None);
+                assert_eq!(
+                    h.ctx.memory(|m| m.focused().map(|id| id.accesskit_id())),
+                    Some(target_node)
+                );
+                h.run_steps(3);
+                assert_eq!(h.state().1, None);
+            }
+        }
+    }
+
+    #[test]
     fn secret_modal_explicit_buttons_keep_their_actions() {
         for (label, expected) in [("Sign in", 2), ("Cancel", 3)] {
             let mut h = secret_harness(false, true);
