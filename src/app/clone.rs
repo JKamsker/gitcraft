@@ -103,7 +103,7 @@ impl App {
                         .font(theme::semibold(15.0)),
                 );
                 ui.add_space(10.0);
-                form_fields(ui, form, &t);
+                let enter = form_fields(ui, form, &t);
                 if let Some(err) = &form.error {
                     ui.colored_label(
                         t.danger,
@@ -115,7 +115,6 @@ impl App {
                     && !form.parent.trim().is_empty()
                     && !form.name.trim().is_empty();
                 ui.horizontal(|ui| {
-                    let enter = ui.input(|i| i.key_pressed(Key::Enter));
                     if crate::repo::primary_button(
                         ui,
                         crate::i18n::text("interaction-forms-clone"),
@@ -142,10 +141,10 @@ impl App {
             cancel = true;
         }
 
-        if submit {
-            self.submit_clone(ctx);
-        } else if cancel {
+        if cancel {
             self.clone_form = None;
+        } else if submit {
+            self.submit_clone(ctx);
         }
     }
 
@@ -393,7 +392,8 @@ pub(super) fn cloning_line(ui: &mut Ui, cloning: &Cloning) {
 }
 
 /// URL, folder and name, where that puts the clone, and the credentials once asked for.
-fn form_fields(ui: &mut Ui, form: &mut CloneForm, t: &Tokens) {
+fn form_fields(ui: &mut Ui, form: &mut CloneForm, t: &Tokens) -> bool {
+    let mut enter = false;
     ui.label(
         RichText::new(crate::i18n::text("interaction-forms-url"))
             .color(t.text_dim)
@@ -405,6 +405,7 @@ fn form_fields(ui: &mut Ui, form: &mut CloneForm, t: &Tokens) {
             .desired_width(f32::INFINITY)
             .margin(egui::Margin::symmetric(8, 6)),
     );
+    enter |= singleline_enter(&url);
     if form.focus {
         url.request_focus();
         form.focus = false;
@@ -419,11 +420,12 @@ fn form_fields(ui: &mut Ui, form: &mut CloneForm, t: &Tokens) {
             .small(),
     );
     ui.horizontal(|ui| {
-        ui.add(
+        let parent = ui.add(
             egui::TextEdit::singleline(&mut form.parent)
                 .desired_width(ui.available_width() - 90.0)
                 .margin(egui::Margin::symmetric(8, 6)),
         );
+        enter |= singleline_enter(&parent);
         if ui
             .add(
                 egui::Button::new(crate::i18n::text("interaction-forms-browse"))
@@ -443,14 +445,13 @@ fn form_fields(ui: &mut Ui, form: &mut CloneForm, t: &Tokens) {
             .color(t.text_dim)
             .small(),
     );
-    if ui
-        .add(
-            egui::TextEdit::singleline(&mut form.name)
-                .desired_width(f32::INFINITY)
-                .margin(egui::Margin::symmetric(8, 6)),
-        )
-        .changed()
-    {
+    let name = ui.add(
+        egui::TextEdit::singleline(&mut form.name)
+            .desired_width(f32::INFINITY)
+            .margin(egui::Margin::symmetric(8, 6)),
+    );
+    enter |= singleline_enter(&name);
+    if name.changed() {
         form.name_edited = true;
     }
     let dest = PathBuf::from(form.parent.trim()).join(form.name.trim());
@@ -464,7 +465,7 @@ fn form_fields(ui: &mut Ui, form: &mut CloneForm, t: &Tokens) {
         .show(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.label(crate::i18n::text("interaction-forms-depth"));
-                ui.text_edit_singleline(&mut form.depth);
+                enter |= singleline_enter(&ui.text_edit_singleline(&mut form.depth));
             });
             ui.checkbox(
                 &mut form.options.blobless,
@@ -491,20 +492,29 @@ fn form_fields(ui: &mut Ui, form: &mut CloneForm, t: &Tokens) {
                 .small(),
         );
         ui.add_space(4.0);
-        ui.add(
+        let username = ui.add(
             egui::TextEdit::singleline(&mut form.username)
                 .hint_text(crate::i18n::text("interaction-forms-username"))
                 .desired_width(f32::INFINITY)
                 .margin(egui::Margin::symmetric(8, 6)),
         );
-        ui.add(
+        enter |= singleline_enter(&username);
+        let password = ui.add(
             egui::TextEdit::singleline(&mut form.password)
                 .password(true)
                 .hint_text(crate::i18n::text("interaction-forms-password"))
                 .desired_width(f32::INFINITY)
                 .margin(egui::Margin::symmetric(8, 6)),
         );
+        enter |= singleline_enter(&password);
     }
+    enter
+}
+
+/// Only an eligible text field may turn Enter into submission.
+pub(super) fn singleline_enter(response: &egui::Response) -> bool {
+    (response.has_focus() || response.lost_focus())
+        && response.ctx.input(|i| i.key_pressed(Key::Enter))
 }
 
 fn home_dir() -> Option<PathBuf> {
@@ -563,6 +573,44 @@ pub(super) fn display_message(raw: &str) -> Option<String> {
 mod localization_tests {
     use super::*;
     use egui_kittest::{Harness, kittest::Queryable};
+
+    #[test]
+    fn enter_on_clone_cancel_closes_without_submitting() {
+        crate::i18n::set_language("en-US");
+        let mut h = Harness::new_ui_state(
+            |ui, state: &mut Option<App>| {
+                if state.is_none() {
+                    let cc = eframe::CreationContext::_new_kittest(ui.ctx().clone());
+                    let mut app = App::launched_using(&cc, None, || {
+                        Ok("git version 2.43.0 (recorded)".into())
+                    });
+                    app.start_clone();
+                    if let Some(form) = &mut app.clone_form {
+                        form.url = "https://example.invalid/o/r".into();
+                        form.parent = "/inert".into();
+                        form.name = "repo".into();
+                        form.depth = "invalid".into();
+                        form.focus = false;
+                    }
+                    *state = Some(app);
+                    return;
+                }
+                if let Some(app) = state {
+                    app.clone_dialog(ui.ctx());
+                }
+            },
+            None,
+        );
+        h.run_steps(3);
+        h.get_by_label("Cancel").focus();
+        h.key_press(Key::Enter);
+        h.run_steps(3);
+        assert!(
+            h.state()
+                .as_ref()
+                .is_some_and(|app| app.clone_form.is_none() && app.cloning.is_none())
+        );
+    }
 
     #[test]
     fn actual_clone_fields_translate_options_without_rewriting_url_path_or_credentials() {
