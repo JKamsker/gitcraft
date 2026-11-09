@@ -1,4 +1,5 @@
 //! Inert input sequencing: real text edits and buttons, with recording-only actions.
+#![allow(clippy::expect_used)] // Missing fixture widgets must fail the test.
 use super::singleline_enter;
 use egui::{Event, Key, Modifiers, PointerButton, Pos2, Rect};
 use egui_kittest::Harness;

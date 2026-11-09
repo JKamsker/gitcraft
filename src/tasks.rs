@@ -456,6 +456,7 @@ pub(crate) fn shutdown() {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::panic)] // Poisoned state or an executed cancelled job must fail these scheduler tests.
 mod tests {
     use super::*;
     use std::sync::mpsc;

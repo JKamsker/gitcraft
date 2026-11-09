@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::mpsc::{Receiver, channel};
 
-use egui::{Key, RichText, Stroke, Ui, vec2};
+use egui::{RichText, Stroke, Ui, vec2};
 
 use super::{App, repo_root};
 use crate::git;
@@ -566,8 +566,10 @@ pub(super) fn display_message(raw: &str) -> Option<String> {
 }
 
 #[cfg(test)]
+#[allow(clippy::expect_used)] // Missing rendered fixture widgets must fail the test.
 mod localization_tests {
     use super::*;
+    use egui::Key;
     use egui_kittest::{Harness, kittest::Queryable};
 
     #[derive(Default)]
