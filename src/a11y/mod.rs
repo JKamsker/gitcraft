@@ -14,6 +14,32 @@ use egui::{Response, WidgetInfo, WidgetType};
 
 pub use focus::{keyboard_on, keyboard_taken, list_has_focus, list_row_sense, list_stop};
 
+/// A single-line field may submit after Enter surrenders its focus. Focus transfers
+/// to another widget, including Tab and Enter in one frame, must not submit it.
+pub(crate) fn singleline_enter(response: &Response) -> bool {
+    (response.has_focus()
+        || (response.lost_focus()
+            && response
+                .ctx
+                .memory(|m| m.had_focus_last_frame(response.id) && m.focused().is_none())))
+        && response.ctx.input(|i| {
+            i.key_pressed(egui::Key::Enter)
+                && !i.key_pressed(egui::Key::Tab)
+                && !i.pointer.any_pressed()
+                && !i.pointer.any_released()
+                // Accessibility actions on later widgets may be handled after this
+                // field surrenders focus. Their activation must not submit the field.
+                && !i.events.iter().any(|event| matches!(
+                    event,
+                    egui::Event::AccessKitActionRequest(request)
+                        if request.target_node != response.id.accesskit_id()
+                ))
+        })
+}
+
+#[cfg(test)]
+mod enter_tests;
+
 /// What a widget is called, built only when a screen reader or an event asks: a graph row's
 /// name joins several fields, and rows are drawn every frame.
 pub trait Label {

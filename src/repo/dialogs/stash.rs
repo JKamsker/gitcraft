@@ -148,7 +148,6 @@ pub(super) fn files_summary(files: &[String]) -> String {
 
 pub(super) fn stash(
     ui: &mut Ui,
-    enter: bool,
     d: &mut StashDialog,
     work: &WorkStatus,
     support: &StagedSupport,
@@ -209,12 +208,12 @@ pub(super) fn stash(
         &t,
     );
     ui.add_space(8.0);
-    field(
+    let enter = crate::a11y::singleline_enter(&field(
         ui,
         &mut d.message,
         crate::i18n::text("repo-core-1503"),
         &mut d.focus,
-    );
+    ));
     ui.add_space(6.0);
     untracked_box(ui, d, work);
     let problem = problem(d, work, support);
