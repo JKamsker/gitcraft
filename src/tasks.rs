@@ -98,6 +98,19 @@ pub(crate) struct Pool {
 
 impl Pool {
     #[cfg(test)]
+    pub(crate) fn queued_priorities_for(&self, key: &std::path::Path) -> Vec<Priority> {
+        self.shared
+            .state
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .queue
+            .iter()
+            .filter(|job| job.key.as_deref() == Some(key))
+            .map(|job| job.priority)
+            .collect()
+    }
+
+    #[cfg(test)]
     fn new(workers: usize) -> std::io::Result<Self> {
         Self::with_capacity(workers, QUEUE_CAPACITY)
     }
