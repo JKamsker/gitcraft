@@ -1193,7 +1193,10 @@ fn successful_prefetch_settles_omitted_and_oversized_entries() {
         &ctx,
     );
     assert!(!tab.files_cache.reading);
-    assert_eq!(tab.files_cache.get("kept").unwrap().len(), 1);
+    assert_eq!(
+        tab.files_cache.get("kept").map(|files| files.len()),
+        Some(1)
+    );
     for hash in ["kept", "omitted", "oversized"] {
         assert!(tab.files_cache.settled(hash));
     }
