@@ -644,13 +644,14 @@ mod tests {
                 .stderr(Stdio::piped())
                 .spawn()
                 .map_err(|e| e.to_string())?;
-            child
-                .stdin
-                .take()
-                .ok_or("stdin")?
-                .write_all(bytes)
-                .map_err(|e| e.to_string())?;
-            child.wait_with_output().map_err(|e| e.to_string())
+            let written = child.stdin.take().ok_or("stdin")?.write_all(bytes);
+            let output = child.wait_with_output().map_err(|e| e.to_string())?;
+            if let Err(error) = written
+                && (error.kind() != std::io::ErrorKind::BrokenPipe || output.status.success())
+            {
+                return Err(error.to_string());
+            }
+            Ok(output)
         };
         let name = "literal ' $(touch marker) ü";
         assert!(run(name, b"raw\0bytes")?.status.success());

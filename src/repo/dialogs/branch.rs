@@ -12,7 +12,6 @@ use super::{Outcome, buttons, dash_spaces, field, title, usable};
 #[allow(clippy::too_many_arguments)]
 pub(super) fn create_branch(
     ui: &mut Ui,
-    enter: bool,
     previous: &str,
     at: &str,
     at_label: &str,
@@ -30,7 +29,7 @@ pub(super) fn create_branch(
         ),
         &t,
     );
-    field(ui, name, "feature/my-branch", focus);
+    let enter = crate::a11y::singleline_enter(&field(ui, name, "feature/my-branch", focus));
     dash_spaces(name);
     ui.add_space(6.0);
     ui.checkbox(checkout, crate::i18n::text("repo-core-1215"));
@@ -97,7 +96,6 @@ pub(in crate::repo) fn create_branch_undo(
 #[allow(clippy::too_many_arguments)]
 pub(super) fn tag(
     ui: &mut Ui,
-    enter: bool,
     at: &str,
     at_label: &str,
     name: &mut String,
@@ -117,7 +115,7 @@ pub(super) fn tag(
         ),
         &t,
     );
-    field(ui, name, "v1.2.0", focus);
+    let enter = crate::a11y::singleline_enter(&field(ui, name, "v1.2.0", focus));
     dash_spaces(name);
     ui.add_space(4.0);
     ui.add(
@@ -141,7 +139,7 @@ pub(super) fn tag(
         ui,
         crate::i18n::text("repo-core-1216"),
         valid,
-        enter && !message.contains('\n'),
+        enter,
         || {
             let name = name.trim().to_owned();
             let mut create = vec!["tag".to_owned()];
@@ -224,6 +222,171 @@ pub(super) fn rename_branch(
 mod tests {
     use super::*;
     use crate::git;
+    use egui_kittest::{Harness, kittest::Queryable};
+
+    struct InertForm {
+        tag: bool,
+        name: String,
+        message: String,
+        checkout: bool,
+        push: bool,
+        release: bool,
+        focus: bool,
+        fonts: bool,
+        actions: usize,
+        operations: Vec<Vec<Vec<String>>>,
+    }
+
+    fn inert_form(tag_form: bool) -> Harness<'static, InertForm> {
+        crate::i18n::set_language("en-US");
+        let mut h = Harness::new_ui_state(
+            |ui, form: &mut InertForm| {
+                if !form.fonts {
+                    form.fonts = true;
+                    crate::theme::install_fonts(ui.ctx());
+                    return;
+                }
+                let outcome = if form.tag {
+                    tag(
+                        ui,
+                        "inert-commit",
+                        "main",
+                        &mut form.name,
+                        &mut form.message,
+                        &Some("origin".into()),
+                        &mut form.push,
+                        &mut form.release,
+                        &mut form.focus,
+                    )
+                } else {
+                    create_branch(
+                        ui,
+                        "main",
+                        "inert-commit",
+                        "main",
+                        &mut form.name,
+                        &mut form.checkout,
+                        &mut form.focus,
+                    )
+                };
+                // Construct and record intents without dispatching any Git operation.
+                if let Outcome::Done(action) = outcome {
+                    form.actions += 1;
+                    if let Action::UndoableOps { ops, .. } = *action {
+                        form.operations.push(ops);
+                    }
+                }
+            },
+            InertForm {
+                tag: tag_form,
+                name: "topic".into(),
+                message: String::new(),
+                checkout: true,
+                push: false,
+                release: false,
+                focus: false,
+                fonts: false,
+                actions: 0,
+                operations: Vec::new(),
+            },
+        );
+        h.run_steps(3);
+        h
+    }
+
+    #[test]
+    fn branch_checkbox_enter_toggles_without_creating_and_name_enter_still_creates() {
+        let mut h = inert_form(false);
+        h.get_by_label("Check it out").focus();
+        h.key_press(egui::Key::Enter);
+        h.run_steps(3);
+        assert!(!h.state().checkout);
+        assert_eq!(h.state().actions, 0);
+        h.state_mut().focus = true;
+        h.run_steps(2);
+        h.key_press(egui::Key::Enter);
+        h.run_steps(3);
+        assert_eq!(h.state().actions, 1);
+    }
+
+    #[test]
+    fn tag_checkbox_enter_toggles_without_creating_and_name_enter_still_creates() {
+        let mut h = inert_form(true);
+        h.state_mut().message = "summary\nbody".into();
+        h.run_steps(2);
+        for label in ["Push it to origin", "This is a release tag"] {
+            h.get_by_label(label).focus();
+            h.key_press(egui::Key::Enter);
+            h.run_steps(3);
+            assert_eq!(h.state().actions, 0, "{label}");
+        }
+        assert!(h.state().push && h.state().release);
+        h.state_mut().focus = true;
+        h.run_steps(2);
+        h.key_press(egui::Key::Enter);
+        h.run_steps(3);
+        assert_eq!(h.state().actions, 1);
+    }
+
+    #[test]
+    fn tag_name_and_create_button_accept_multiline_annotation() {
+        for primary_button in [false, true] {
+            let mut h = inert_form(true);
+            h.state_mut().message = "summary\nbody".into();
+            h.run_steps(2);
+            if primary_button {
+                h.get_by_label("Create").focus();
+            } else {
+                h.get_by_role(egui::accesskit::Role::TextInput).focus();
+            }
+            h.key_press(egui::Key::Enter);
+            h.run_steps(3);
+            assert_eq!(h.state().actions, 1);
+            assert_eq!(
+                h.state().operations,
+                vec![vec![vec![
+                    "tag",
+                    "-a",
+                    "-m",
+                    "summary\nbody",
+                    "topic",
+                    "inert-commit",
+                ]]],
+            );
+        }
+    }
+
+    #[test]
+    fn tag_annotation_enter_inserts_newline_without_submitting() {
+        for message in ["summary", "summary\nbody"] {
+            let mut h = inert_form(true);
+            h.state_mut().message = message.into();
+            h.run_steps(2);
+            h.get_by_role(egui::accesskit::Role::MultilineTextInput)
+                .focus();
+            h.key_press(egui::Key::Enter);
+            h.run_steps(3);
+            assert_eq!(h.state().actions, 0);
+            assert!(h.state().operations.is_empty());
+            assert_eq!(
+                h.state().message.matches('\n').count(),
+                message.matches('\n').count() + 1,
+            );
+            assert!(
+                h.get_by_role(egui::accesskit::Role::MultilineTextInput)
+                    .is_focused()
+            );
+        }
+    }
+
+    #[test]
+    fn explicit_create_button_enter_creates() {
+        let mut h = inert_form(false);
+        h.get_by_label("Create").focus();
+        h.key_press(egui::Key::Enter);
+        h.run_steps(3);
+        assert_eq!(h.state().actions, 1);
+    }
 
     /// Undoing a branch's creation deletes it while it is where it was made, and not once
     /// commits were made on it since.

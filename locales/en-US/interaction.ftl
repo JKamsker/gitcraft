@@ -2711,6 +2711,7 @@ interaction-setup-activate = Activate { $profile }
 interaction-setup-preview = Preview: { $profiles } profiles, { $authors } saved authors, { $repositories } repositories
 
 interaction-setup-profile = Profile: { $name } — { $author } <{ $email }>
+interaction-setup-author-rule-url = Author rule “{ $host }” includes a URL scheme and will not match. Use host or host/namespace, for example github.com/team. Review it in profile settings.
 
 interaction-setup-profile-pending = Profile: { $name } — { $author } <{ $email }> · local authentication/key setup required
 
@@ -3650,3 +3651,5 @@ interaction-shell-prose-description = A small visual git client
 interaction-shell-prose-links = Opens gitcraft:// links from the browser in gitcraft
 
 interaction-home-fullscreen = Enter fullscreen
+
+interaction-setup-author-rule-syntax = Author rule “{ $host }” may not match the intended remote. Use host/namespace, for example github.com/team/x; keep a numeric port after the host when needed. Review it in profile settings.

@@ -1,0 +1,11 @@
+{
+  "candidate": "33dfd019002d5b97c151826fc297f87bea31fe91",
+  "tree": "ba3c04e4a2e784fd8d38cb0f89725ec413506158",
+  "base": "590bc4b4fe6bc6a312d3373e779220935b97e553",
+  "remote_verified": "33dfd019002d5b97c151826fc297f87bea31fe91",
+  "files": {
+    "ci/test-shards.py": "734027050b7d290e24dd0f4e68ee32f3eb96928ca7648d0f008ca107c4e5742d",
+    "/tmp/gitcraft-pr184-serial-tests.py": "4cf04e4edff9306f6b9d7da8cad3110619294fe9bcddd7eb1f3965eec5e3696a",
+    "/tmp/gitcraft-pr184-serial-tests.log": "27458cbd5c824159666495660536f891989b5b2cd6fedfc58e0ce5da99d4d6cc"
+  }
+}

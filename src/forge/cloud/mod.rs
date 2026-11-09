@@ -199,8 +199,12 @@ pub(super) fn required<'a>(v: &'a Value, p: &str) -> Result<&'a str, String> {
         })
 }
 #[cfg(test)]
-type Recording =
+type JsonRecording =
     std::sync::Arc<dyn Fn(&str, &str, Option<&Value>) -> Result<Value, String> + Send + Sync>;
+#[cfg(test)]
+type Recording = std::sync::Arc<
+    dyn Fn(&str, &str, Option<&Value>, &str) -> Result<ureq::Response, String> + Send + Sync,
+>;
 #[derive(Clone)]
 pub(in crate::forge) struct Api {
     pub service: Service,
@@ -359,14 +363,9 @@ impl Api {
         };
         #[cfg(test)]
         if let Some(record) = &self.record {
-            return record(method, &path, body).map(|v| {
-                if accept == "text/plain" {
-                    v.as_str().unwrap_or_default().as_bytes().to_vec()
-                } else {
-                    serde_json::to_vec(&v).unwrap_or_default()
-                }
-            });
+            return self.read_response(record(method, &path, body, accept)?, method);
         }
+
         if crate::tasks::cancellation().is_cancelled() {
             return Err("Provider request cancelled".into());
         }
@@ -399,11 +398,24 @@ impl Api {
                     crate::i18n::text("backend-the-write-outcome-is-uncertain-refresh-before-trying-again-c04611")
                 }).to_string().into())]),
         })?;
+        self.read_response(response, method)
+    }
+    fn read_response(&self, response: ureq::Response, method: &str) -> Result<Vec<u8>, String> {
         if !(200..300).contains(&response.status()) {
             return Err(crate::i18n::text(
                 "backend-provider-redirect-refused-credentials-were-not-forwarded-71c0f0",
             )
             .into());
+        }
+        // Azure may clamp a page below the requested $top. A short body is not
+        // evidence of completeness when the server supplies a continuation header.
+        if self.service == Service::Azure
+            && method == "GET"
+            && response
+                .header("x-ms-continuationtoken")
+                .is_some_and(|t| !t.trim().is_empty())
+        {
+            return Err("Azure DevOps returned an incomplete result (continuation token); use the forge page".into());
         }
         let mut bytes = vec![];
         response
@@ -434,7 +446,7 @@ impl Api {
             })
     }
     #[cfg(test)]
-    pub fn recording(service: Service, h: Hosting, viewer: &str, record: Recording) -> Self {
+    pub fn recording(service: Service, h: Hosting, viewer: &str, record: JsonRecording) -> Self {
         Self {
             service,
             context: connections::current(),
@@ -445,7 +457,15 @@ impl Api {
             agent: ureq::AgentBuilder::new().redirects(0).build(),
             began: Instant::now(),
             expires: None,
-            record: Some(record),
+            record: Some(std::sync::Arc::new(move |method, path, body, accept| {
+                let value = record(method, path, body)?;
+                let body = if accept == "text/plain" {
+                    value.as_str().unwrap_or_default().to_owned()
+                } else {
+                    serde_json::to_string(&value).map_err(|e| e.to_string())?
+                };
+                ureq::Response::new(200, "OK", &body).map_err(|e| e.to_string())
+            })),
         }
     }
 }

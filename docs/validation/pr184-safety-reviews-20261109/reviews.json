@@ -1,0 +1,1297 @@
+[
+  {
+    "task_id": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A3eedab43-8435-4ff8-8aa6-456976ce5dae",
+    "scope": "historical_pull_envelope",
+    "verdict": "BLOCK",
+    "reviewer": {
+      "provider": "codex",
+      "model": "gpt-6.1-sol",
+      "options": [
+        {
+          "id": "reasoningEffort",
+          "value": "high"
+        },
+        {
+          "id": "serviceTier",
+          "value": "default"
+        }
+      ]
+    },
+    "reviewed_commit": null,
+    "reviewed_tree": null,
+    "raw_summary": "**BLOCK \u2014 `pull_envelope` scope**, candidate `47ecee32d0359abc240b95a4c6ff42db2f37a3dc`, verified tree `ca2530643df7b1d917048c7ff8ef75e55faff857`.\n\n**P2: Saved redo cannot resume after scoped HTTPS sign-in.**\n\n- Sign-in prepends the application-owned `[\"--gitcraft-expect-https-route\", json]` step. Retry preserves `OpKind::Redo`. See [sign-in and retry dispatch](https://github.com/JKamsker/gitcraft/blob/47ecee32d0359abc240b95a4c6ff42db2f37a3dc/src/repo/operations.rs#L398-L446).\n- The new validator exempts only NUL-prefixed markers. It parses this existing marker as an unsupported Git global option and returns an error for saved redo. See [envelope validation](https://github.com/JKamsker/gitcraft/blob/47ecee32d0359abc240b95a4c6ff42db2f37a3dc/src/repo/operations.rs#L1581-L1588).\n- Consequently, an accepted saved redo containing a direct pull or fetch can fail authentication, accept valid credentials, then fail before its route proof is verified or its command retried.\n\n**Minimal remedy:** recognize the exact application-owned expectation through `is_expectation(op)` before parsing Git envelopes. Preserve the existing route-proof verification during preparation. Add an inert recording regression covering a redo with this proof followed by a legitimate command, plus a control showing unknown globals remain refused.\n\nThe recognized prefixed-pull refusal, saved-alias rejection, and TRY pull/submodule refusal appear correctly connected to preflight. I found no additional concrete pull-envelope bypass.\n\nThis is source inference from immutable `git show`/`diff`, not runtime reproduction. No edits, builds/tests, runner execution, process control, CI, network writes, subagents, or active-validation inspection occurred. The parent-owned focused build remains pending as supplied; historical gates do not validate this candidate.\n\nPR https://github.com/JKamsker/gitcraft/pull/184, reviewed SHA 47ecee32d0359abc240b95a4c6ff42db2f37a3dc, checks: not run or queried; parent focused build pending; review: BLOCK for pull_envelope.",
+    "task_status": {
+      "taskId": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A3eedab43-8435-4ff8-8aa6-456976ce5dae",
+      "childThreadId": "thread:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A3eedab43-8435-4ff8-8aa6-456976ce5dae",
+      "link": "<t3-thread://v2/a1d1eb4b-1d57-477d-bba8-514be0fd0d48/thread:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A3eedab43-8435-4ff8-8aa6-456976ce5dae>",
+      "childRunId": "run:thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253A3eedab43-8435-4ff8-8aa6-456976ce5dae:ordinal:1",
+      "childNodeId": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A3eedab43-8435-4ff8-8aa6-456976ce5dae",
+      "status": "completed",
+      "workState": "result_available",
+      "hasPendingChildRuns": false,
+      "latestTerminalRunId": "run:thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253A3eedab43-8435-4ff8-8aa6-456976ce5dae:ordinal:1",
+      "latestTerminalStatus": "completed",
+      "latestTerminalSummary": null,
+      "latestTerminalResultContextTransferId": null,
+      "providerInstanceId": "codex",
+      "model": "gpt-6.1-sol",
+      "options": [
+        {
+          "id": "reasoningEffort",
+          "value": "high"
+        },
+        {
+          "id": "serviceTier",
+          "value": "default"
+        }
+      ],
+      "summary": "**BLOCK \u2014 `pull_envelope` scope**, candidate `47ecee32d0359abc240b95a4c6ff42db2f37a3dc`, verified tree `ca2530643df7b1d917048c7ff8ef75e55faff857`.\n\n**P2: Saved redo cannot resume after scoped HTTPS sign-in.**\n\n- Sign-in prepends the application-owned `[\"--gitcraft-expect-https-route\", json]` step. Retry preserves `OpKind::Redo`. See [sign-in and retry dispatch](https://github.com/JKamsker/gitcraft/blob/47ecee32d0359abc240b95a4c6ff42db2f37a3dc/src/repo/operations.rs#L398-L446).\n- The new validator exempts only NUL-prefixed markers. It parses this existing marker as an unsupported Git global option and returns an error for saved redo. See [envelope validation](https://github.com/JKamsker/gitcraft/blob/47ecee32d0359abc240b95a4c6ff42db2f37a3dc/src/repo/operations.rs#L1581-L1588).\n- Consequently, an accepted saved redo containing a direct pull or fetch can fail authentication, accept valid credentials, then fail before its route proof is verified or its command retried.\n\n**Minimal remedy:** recognize the exact application-owned expectation through `is_expectation(op)` before parsing Git envelopes. Preserve the existing route-proof verification during preparation. Add an inert recording regression covering a redo with this proof followed by a legitimate command, plus a control showing unknown globals remain refused.\n\nThe recognized prefixed-pull refusal, saved-alias rejection, and TRY pull/submodule refusal appear correctly connected to preflight. I found no additional concrete pull-envelope bypass.\n\nThis is source inference from immutable `git show`/`diff`, not runtime reproduction. No edits, builds/tests, runner execution, process control, CI, network writes, subagents, or active-validation inspection occurred. The parent-owned focused build remains pending as supplied; historical gates do not validate this candidate.\n\nPR https://github.com/JKamsker/gitcraft/pull/184, reviewed SHA 47ecee32d0359abc240b95a4c6ff42db2f37a3dc, checks: not run or queried; parent focused build pending; review: BLOCK for pull_envelope.",
+      "resultContextTransferId": "context-transfer:type:subagent_result:source-thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253A3eedab43-8435-4ff8-8aa6-456976ce5dae:target-thread:a45a5b1a-9219-41c5-a934-73656395f4ff:70d8f490-144f-4c23-a6f5-fee996da6453",
+      "hasPendingQuestion": false,
+      "pendingApproval": null,
+      "waitTimedOut": false
+    },
+    "disposition": "Scoped historical snapshot; preserve original findings. Later source corrections and exact final approvals supersede this stage; this record grants no current execution gate."
+  },
+  {
+    "task_id": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A48066142-e324-42fb-b162-36d1b6d29a8f",
+    "scope": "historical_submodule_safety",
+    "verdict": "PASS",
+    "reviewer": {
+      "provider": "codex",
+      "model": "gpt-6.1-sol",
+      "options": [
+        {
+          "id": "reasoningEffort",
+          "value": "high"
+        },
+        {
+          "id": "serviceTier",
+          "value": "default"
+        }
+      ]
+    },
+    "reviewed_commit": null,
+    "reviewed_tree": null,
+    "raw_summary": "**PASS \u2014 scoped source review** of `47ecee32d0359abc240b95a4c6ff42db2f37a3dc`, tree `ca2530643df7b1d917048c7ff8ef75e55faff857`. No blocking finding in the recursive pull and automatic/manual update paths emitted by this candidate.\n\n- Pull resolves explicit recursion before configuration, respects option ordering and consumed values, and scans populated submodules recursively before dispatch.\n- The fixed `foreach` command contains no interpolated repository data. Ignored-file output or inspection failure refuses the operation.\n- Manual updates, single-submodule updates, initialization, and automatic updates use the guarded `submodule update` form.\n- Inspection uses the remote-aware Git runner, without local filesystem assumptions.\n- Refusal breaks before `run_step`: no refused pull/update is dispatched. An automatic update\u2019s preceding checkout may already have completed.\n\n**Nonblocking hardening:** `operations.rs:1175\u20131176` recognizes only an immediate `submodule update`. Git also accepts `submodule --quiet update`; that form would miss this check under normal dispatch. I found no current producer emitting it. Before supporting additional forms, parse submodule options or reject noncanonical forms.\n\nThe new recording tests cover the pull helper; they do not establish worker-level zero-dispatch coverage for manual/automatic updates. Add that recording coverage when extending validation.\n\nRead `AGENTS.md` and the supplied review evidence. No edits, builds, tests, runner execution, process control, CI, network writes, subagents, or active-validation inspection. The parent-owned focused build remains pending; historical gates do not validate this source.\n\nPR https://github.com/JKamsker/gitcraft/pull/184, reviewed SHA 47ecee32d0359abc240b95a4c6ff42db2f37a3dc, checks: not run by this reviewer, focused build pending; reviews: submodule_safety source PASS only.",
+    "task_status": {
+      "taskId": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A48066142-e324-42fb-b162-36d1b6d29a8f",
+      "childThreadId": "thread:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A48066142-e324-42fb-b162-36d1b6d29a8f",
+      "link": "<t3-thread://v2/a1d1eb4b-1d57-477d-bba8-514be0fd0d48/thread:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A48066142-e324-42fb-b162-36d1b6d29a8f>",
+      "childRunId": "run:thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253A48066142-e324-42fb-b162-36d1b6d29a8f:ordinal:1",
+      "childNodeId": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A48066142-e324-42fb-b162-36d1b6d29a8f",
+      "status": "completed",
+      "workState": "result_available",
+      "hasPendingChildRuns": false,
+      "latestTerminalRunId": "run:thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253A48066142-e324-42fb-b162-36d1b6d29a8f:ordinal:1",
+      "latestTerminalStatus": "completed",
+      "latestTerminalSummary": null,
+      "latestTerminalResultContextTransferId": null,
+      "providerInstanceId": "codex",
+      "model": "gpt-6.1-sol",
+      "options": [
+        {
+          "id": "reasoningEffort",
+          "value": "high"
+        },
+        {
+          "id": "serviceTier",
+          "value": "default"
+        }
+      ],
+      "summary": "**PASS \u2014 scoped source review** of `47ecee32d0359abc240b95a4c6ff42db2f37a3dc`, tree `ca2530643df7b1d917048c7ff8ef75e55faff857`. No blocking finding in the recursive pull and automatic/manual update paths emitted by this candidate.\n\n- Pull resolves explicit recursion before configuration, respects option ordering and consumed values, and scans populated submodules recursively before dispatch.\n- The fixed `foreach` command contains no interpolated repository data. Ignored-file output or inspection failure refuses the operation.\n- Manual updates, single-submodule updates, initialization, and automatic updates use the guarded `submodule update` form.\n- Inspection uses the remote-aware Git runner, without local filesystem assumptions.\n- Refusal breaks before `run_step`: no refused pull/update is dispatched. An automatic update\u2019s preceding checkout may already have completed.\n\n**Nonblocking hardening:** `operations.rs:1175\u20131176` recognizes only an immediate `submodule update`. Git also accepts `submodule --quiet update`; that form would miss this check under normal dispatch. I found no current producer emitting it. Before supporting additional forms, parse submodule options or reject noncanonical forms.\n\nThe new recording tests cover the pull helper; they do not establish worker-level zero-dispatch coverage for manual/automatic updates. Add that recording coverage when extending validation.\n\nRead `AGENTS.md` and the supplied review evidence. No edits, builds, tests, runner execution, process control, CI, network writes, subagents, or active-validation inspection. The parent-owned focused build remains pending; historical gates do not validate this source.\n\nPR https://github.com/JKamsker/gitcraft/pull/184, reviewed SHA 47ecee32d0359abc240b95a4c6ff42db2f37a3dc, checks: not run by this reviewer, focused build pending; reviews: submodule_safety source PASS only.",
+      "resultContextTransferId": "context-transfer:type:subagent_result:source-thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253A48066142-e324-42fb-b162-36d1b6d29a8f:target-thread:a45a5b1a-9219-41c5-a934-73656395f4ff:6aa5ec0a-4dd2-430e-93cd-3bee451332d2",
+      "hasPendingQuestion": false,
+      "pendingApproval": null,
+      "waitTimedOut": false
+    },
+    "disposition": "Scoped historical snapshot; preserve original findings. Later source corrections and exact final approvals supersede this stage; this record grants no current execution gate."
+  },
+  {
+    "task_id": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A296ef83c-de58-4d6d-91cf-23becc999472",
+    "scope": "historical_pull_modes",
+    "verdict": "PASS",
+    "reviewer": {
+      "provider": "codex",
+      "model": "gpt-6.1-sol",
+      "options": [
+        {
+          "id": "reasoningEffort",
+          "value": "high"
+        },
+        {
+          "id": "serviceTier",
+          "value": "default"
+        }
+      ]
+    },
+    "reviewed_commit": null,
+    "reviewed_tree": null,
+    "raw_summary": "**PASS for `pull_modes` source review**, with one nonblocking P3 compatibility finding.\n\nReviewed immutable commit `47ecee32d0359abc240b95a4c6ff42db2f37a3dc`, tree `ca2530643df7b1d917048c7ff8ef75e55faff857`, against base `71ab301cf9bf976dab39956f1f22b66ab7d7f1c6`. Read `AGENTS.md` and supplied review evidence.\n\n- **FF/rebase precedence passes.** Explicit ff-only wins over rebase; configured `pull.ff=only` applies only without explicit FF or rebase selection. This matches [Git\u2019s implementation](https://github.com/git/git/blob/v2.43.0/builtin/pull.c#L959-L979).\n- **Option consumption passes for the reviewed cases.** Required arguments consume option-looking tokens; optional arguments consume attached values; terminators stop classification. No blocking parsing discrepancy found.\n- **Recursive protection passes by source inspection.** Effective recursion triggers recursive populated-submodule inspection before pull dispatch, and ignored content or inspection failure refuses the operation.\n\n**P3 \u2014 valid recursion boolean spellings are rejected.** At [operations.rs:1739](https://github.com/JKamsker/gitcraft/blob/47ecee32d0359abc240b95a4c6ff42db2f37a3dc/src/repo/operations.rs#L1739), `--recurse-submodules=FALSE`, `=2`, and `=` return an error. Git accepts these as false, true, and false respectively through its [recursion parser](https://github.com/git/git/blob/v2.43.0/submodule-config.c) and [boolean parser](https://github.com/git/git/blob/v2.43.0/parse.c#L121-L144). This unnecessarily refuses valid saved commands; it does not bypass protection. Minimal remedy: share Git-compatible boolean parsing with rebase classification, retaining exact `on-demand` handling, and add inert classifier cases.\n\nNo edits, builds/tests, runners, process control, CI actions, network writes, or active-validation inspection performed. The parent-owned focused build remains pending; historical gates do not validate this candidate.\n\nPR https://github.com/JKamsker/gitcraft/pull/184, reviewed SHA `47ecee32d0359abc240b95a4c6ff42db2f37a3dc`, checks: parent-owned build pending, not inspected; review: **PASS for `pull_modes`, one nonblocking P3**.",
+    "task_status": {
+      "taskId": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A296ef83c-de58-4d6d-91cf-23becc999472",
+      "childThreadId": "thread:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A296ef83c-de58-4d6d-91cf-23becc999472",
+      "link": "<t3-thread://v2/a1d1eb4b-1d57-477d-bba8-514be0fd0d48/thread:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A296ef83c-de58-4d6d-91cf-23becc999472>",
+      "childRunId": "run:thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253A296ef83c-de58-4d6d-91cf-23becc999472:ordinal:1",
+      "childNodeId": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A296ef83c-de58-4d6d-91cf-23becc999472",
+      "status": "completed",
+      "workState": "result_available",
+      "hasPendingChildRuns": false,
+      "latestTerminalRunId": "run:thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253A296ef83c-de58-4d6d-91cf-23becc999472:ordinal:1",
+      "latestTerminalStatus": "completed",
+      "latestTerminalSummary": null,
+      "latestTerminalResultContextTransferId": null,
+      "providerInstanceId": "codex",
+      "model": "gpt-6.1-sol",
+      "options": [
+        {
+          "id": "reasoningEffort",
+          "value": "high"
+        },
+        {
+          "id": "serviceTier",
+          "value": "default"
+        }
+      ],
+      "summary": "**PASS for `pull_modes` source review**, with one nonblocking P3 compatibility finding.\n\nReviewed immutable commit `47ecee32d0359abc240b95a4c6ff42db2f37a3dc`, tree `ca2530643df7b1d917048c7ff8ef75e55faff857`, against base `71ab301cf9bf976dab39956f1f22b66ab7d7f1c6`. Read `AGENTS.md` and supplied review evidence.\n\n- **FF/rebase precedence passes.** Explicit ff-only wins over rebase; configured `pull.ff=only` applies only without explicit FF or rebase selection. This matches [Git\u2019s implementation](https://github.com/git/git/blob/v2.43.0/builtin/pull.c#L959-L979).\n- **Option consumption passes for the reviewed cases.** Required arguments consume option-looking tokens; optional arguments consume attached values; terminators stop classification. No blocking parsing discrepancy found.\n- **Recursive protection passes by source inspection.** Effective recursion triggers recursive populated-submodule inspection before pull dispatch, and ignored content or inspection failure refuses the operation.\n\n**P3 \u2014 valid recursion boolean spellings are rejected.** At [operations.rs:1739](https://github.com/JKamsker/gitcraft/blob/47ecee32d0359abc240b95a4c6ff42db2f37a3dc/src/repo/operations.rs#L1739), `--recurse-submodules=FALSE`, `=2`, and `=` return an error. Git accepts these as false, true, and false respectively through its [recursion parser](https://github.com/git/git/blob/v2.43.0/submodule-config.c) and [boolean parser](https://github.com/git/git/blob/v2.43.0/parse.c#L121-L144). This unnecessarily refuses valid saved commands; it does not bypass protection. Minimal remedy: share Git-compatible boolean parsing with rebase classification, retaining exact `on-demand` handling, and add inert classifier cases.\n\nNo edits, builds/tests, runners, process control, CI actions, network writes, or active-validation inspection performed. The parent-owned focused build remains pending; historical gates do not validate this candidate.\n\nPR https://github.com/JKamsker/gitcraft/pull/184, reviewed SHA `47ecee32d0359abc240b95a4c6ff42db2f37a3dc`, checks: parent-owned build pending, not inspected; review: **PASS for `pull_modes`, one nonblocking P3**.",
+      "resultContextTransferId": "context-transfer:type:subagent_result:source-thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253A296ef83c-de58-4d6d-91cf-23becc999472:target-thread:a45a5b1a-9219-41c5-a934-73656395f4ff:9f115036-d4cf-4c90-93fb-b61373763403",
+      "hasPendingQuestion": false,
+      "pendingApproval": null,
+      "waitTimedOut": false
+    },
+    "disposition": "Scoped historical snapshot; preserve original findings. Later source corrections and exact final approvals supersede this stage; this record grants no current execution gate."
+  },
+  {
+    "task_id": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A1df3bf65-87a5-42db-8483-140a4e3c5b20",
+    "scope": "historical_file_refresh",
+    "verdict": "PASS",
+    "reviewer": {
+      "provider": "codex",
+      "model": "gpt-6.1-sol",
+      "options": [
+        {
+          "id": "reasoningEffort",
+          "value": "high"
+        },
+        {
+          "id": "serviceTier",
+          "value": "default"
+        }
+      ]
+    },
+    "reviewed_commit": null,
+    "reviewed_tree": null,
+    "raw_summary": "**PASS \u2014 read-only source review, scope `file_refresh`.**\n\nVerified candidate `47ecee32d0359abc240b95a4c6ff42db2f37a3dc`, tree `ca2530643df7b1d917048c7ff8ef75e55faff857`, against base `71ab301cf9bf976dab39956f1f22b66ab7d7f1c6`. No blocking source findings.\n\n- Reload failure now invalidates mutable content and rejects previous-generation replies while requesting the visible pane again.\n- Blame has an independent epoch, used by both dispatch and reply acceptance. Fixed-OID refresh preserves content/history while invalidating configuration-sensitive blame.\n- Successful blame remains visible during replacement; cached failures become retryable. Stale blame replies cannot clear the refresh flag.\n- Tests capture actual loader submissions, and the retained-blame test executes the captured production loader closure.\n- Line-history selection and range survive invalidation; old callbacks fail their generation guard. Unchanged-input status refresh still preserves successful line history.\n\nOptional coverage improvement: add a recorded `Loaded(Err)` case with mutable line history and deliver its old callback afterward. Existing source and separate tests support the behavior, but that combined path lacks direct coverage.\n\nNo edits, builds, tests, runners, process control, CI, network writes, or active-validation inspection performed. The parent-owned focused build remains pending; historical gates do not validate this candidate.\n\nPR https://github.com/JKamsker/gitcraft/pull/184, reviewed SHA `47ecee32d0359abc240b95a4c6ff42db2f37a3dc`, checks pending/unverified; review PASS for `file_refresh` only.",
+    "task_status": {
+      "taskId": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A1df3bf65-87a5-42db-8483-140a4e3c5b20",
+      "childThreadId": "thread:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A1df3bf65-87a5-42db-8483-140a4e3c5b20",
+      "link": "<t3-thread://v2/a1d1eb4b-1d57-477d-bba8-514be0fd0d48/thread:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A1df3bf65-87a5-42db-8483-140a4e3c5b20>",
+      "childRunId": "run:thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253A1df3bf65-87a5-42db-8483-140a4e3c5b20:ordinal:1",
+      "childNodeId": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A1df3bf65-87a5-42db-8483-140a4e3c5b20",
+      "status": "completed",
+      "workState": "result_available",
+      "hasPendingChildRuns": false,
+      "latestTerminalRunId": "run:thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253A1df3bf65-87a5-42db-8483-140a4e3c5b20:ordinal:1",
+      "latestTerminalStatus": "completed",
+      "latestTerminalSummary": null,
+      "latestTerminalResultContextTransferId": null,
+      "providerInstanceId": "codex",
+      "model": "gpt-6.1-sol",
+      "options": [
+        {
+          "id": "reasoningEffort",
+          "value": "high"
+        },
+        {
+          "id": "serviceTier",
+          "value": "default"
+        }
+      ],
+      "summary": "**PASS \u2014 read-only source review, scope `file_refresh`.**\n\nVerified candidate `47ecee32d0359abc240b95a4c6ff42db2f37a3dc`, tree `ca2530643df7b1d917048c7ff8ef75e55faff857`, against base `71ab301cf9bf976dab39956f1f22b66ab7d7f1c6`. No blocking source findings.\n\n- Reload failure now invalidates mutable content and rejects previous-generation replies while requesting the visible pane again.\n- Blame has an independent epoch, used by both dispatch and reply acceptance. Fixed-OID refresh preserves content/history while invalidating configuration-sensitive blame.\n- Successful blame remains visible during replacement; cached failures become retryable. Stale blame replies cannot clear the refresh flag.\n- Tests capture actual loader submissions, and the retained-blame test executes the captured production loader closure.\n- Line-history selection and range survive invalidation; old callbacks fail their generation guard. Unchanged-input status refresh still preserves successful line history.\n\nOptional coverage improvement: add a recorded `Loaded(Err)` case with mutable line history and deliver its old callback afterward. Existing source and separate tests support the behavior, but that combined path lacks direct coverage.\n\nNo edits, builds, tests, runners, process control, CI, network writes, or active-validation inspection performed. The parent-owned focused build remains pending; historical gates do not validate this candidate.\n\nPR https://github.com/JKamsker/gitcraft/pull/184, reviewed SHA `47ecee32d0359abc240b95a4c6ff42db2f37a3dc`, checks pending/unverified; review PASS for `file_refresh` only.",
+      "resultContextTransferId": "context-transfer:type:subagent_result:source-thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253A1df3bf65-87a5-42db-8483-140a4e3c5b20:target-thread:a45a5b1a-9219-41c5-a934-73656395f4ff:65f19c7f-c586-49fc-bbf4-3039112297f2",
+      "hasPendingQuestion": false,
+      "pendingApproval": null,
+      "waitTimedOut": false
+    },
+    "disposition": "Scoped historical snapshot; preserve original findings. Later source corrections and exact final approvals supersede this stage; this record grants no current execution gate."
+  },
+  {
+    "task_id": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A3501ea23-60c8-426c-9627-9dc5bb727e11",
+    "scope": "historical_local_identity",
+    "verdict": "PASS",
+    "reviewer": {
+      "provider": "codex",
+      "model": "gpt-6.1-sol",
+      "options": [
+        {
+          "id": "reasoningEffort",
+          "value": "high"
+        },
+        {
+          "id": "serviceTier",
+          "value": "default"
+        }
+      ]
+    },
+    "reviewed_commit": null,
+    "reviewed_tree": null,
+    "raw_summary": "**PASS \u2014 `local_identity` source review** for commit `47ecee32d0359abc240b95a4c6ff42db2f37a3dc`, tree `ca2530643df7b1d917048c7ff8ef75e55faff857`.\n\nNo blocking correctness or cross-platform compile problems found in the scoped source.\n\n- Unix identity includes device and inode; Windows identity includes volume serial and the complete 128-bit file ID.\n- Windows opens directories with backup semantics and read/write/delete sharing.\n- Each queued/running job retains its identity handle through operation completion, including panic containment.\n- Opening and querying identity happen before acquiring the scheduler mutex.\n- Remote classification bypasses local filesystem lookup; unkeyed reads remain unkeyed.\n- Failed identity lookup preserves the documented path fallback.\n- Repository ownership, tray subscriptions, and fetch deduplication retain their path keys.\n\nThe fallback intentionally cannot guarantee exclusion between unidentified aliases, or between successful identity lookup and a failed lookup for the same directory. This matches the previously specified compatibility policy.\n\nNo edits, builds/tests, process control, CI, network writes, or active-validation inspection performed. This is source-review approval only; the parent-owned focused build remains pending, and historical gates do not validate this candidate.\n\nPR https://github.com/JKamsker/gitcraft/pull/184, reviewed SHA 47ecee32d0359abc240b95a4c6ff42db2f37a3dc, checks: parent-owned focused build pending; reviews: local_identity PASS.",
+    "task_status": {
+      "taskId": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A3501ea23-60c8-426c-9627-9dc5bb727e11",
+      "childThreadId": "thread:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A3501ea23-60c8-426c-9627-9dc5bb727e11",
+      "link": "<t3-thread://v2/a1d1eb4b-1d57-477d-bba8-514be0fd0d48/thread:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A3501ea23-60c8-426c-9627-9dc5bb727e11>",
+      "childRunId": "run:thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253A3501ea23-60c8-426c-9627-9dc5bb727e11:ordinal:1",
+      "childNodeId": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A3501ea23-60c8-426c-9627-9dc5bb727e11",
+      "status": "completed",
+      "workState": "result_available",
+      "hasPendingChildRuns": false,
+      "latestTerminalRunId": "run:thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253A3501ea23-60c8-426c-9627-9dc5bb727e11:ordinal:1",
+      "latestTerminalStatus": "completed",
+      "latestTerminalSummary": null,
+      "latestTerminalResultContextTransferId": null,
+      "providerInstanceId": "codex",
+      "model": "gpt-6.1-sol",
+      "options": [
+        {
+          "id": "reasoningEffort",
+          "value": "high"
+        },
+        {
+          "id": "serviceTier",
+          "value": "default"
+        }
+      ],
+      "summary": "**PASS \u2014 `local_identity` source review** for commit `47ecee32d0359abc240b95a4c6ff42db2f37a3dc`, tree `ca2530643df7b1d917048c7ff8ef75e55faff857`.\n\nNo blocking correctness or cross-platform compile problems found in the scoped source.\n\n- Unix identity includes device and inode; Windows identity includes volume serial and the complete 128-bit file ID.\n- Windows opens directories with backup semantics and read/write/delete sharing.\n- Each queued/running job retains its identity handle through operation completion, including panic containment.\n- Opening and querying identity happen before acquiring the scheduler mutex.\n- Remote classification bypasses local filesystem lookup; unkeyed reads remain unkeyed.\n- Failed identity lookup preserves the documented path fallback.\n- Repository ownership, tray subscriptions, and fetch deduplication retain their path keys.\n\nThe fallback intentionally cannot guarantee exclusion between unidentified aliases, or between successful identity lookup and a failed lookup for the same directory. This matches the previously specified compatibility policy.\n\nNo edits, builds/tests, process control, CI, network writes, or active-validation inspection performed. This is source-review approval only; the parent-owned focused build remains pending, and historical gates do not validate this candidate.\n\nPR https://github.com/JKamsker/gitcraft/pull/184, reviewed SHA 47ecee32d0359abc240b95a4c6ff42db2f37a3dc, checks: parent-owned focused build pending; reviews: local_identity PASS.",
+      "resultContextTransferId": "context-transfer:type:subagent_result:source-thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253A3501ea23-60c8-426c-9627-9dc5bb727e11:target-thread:a45a5b1a-9219-41c5-a934-73656395f4ff:8e898bad-731b-47d7-a964-f18b7e59309b",
+      "hasPendingQuestion": false,
+      "pendingApproval": null,
+      "waitTimedOut": false
+    },
+    "disposition": "Scoped historical snapshot; preserve original findings. Later source corrections and exact final approvals supersede this stage; this record grants no current execution gate."
+  },
+  {
+    "task_id": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Aea57e3e8-df85-419a-b304-db38579ad813",
+    "scope": "historical_regression_source",
+    "verdict": "PASS",
+    "reviewer": {
+      "provider": "codex",
+      "model": "gpt-6.1-sol",
+      "options": [
+        {
+          "id": "reasoningEffort",
+          "value": "high"
+        },
+        {
+          "id": "serviceTier",
+          "value": "default"
+        }
+      ]
+    },
+    "reviewed_commit": null,
+    "reviewed_tree": null,
+    "raw_summary": "**PASS \u2014 `regression_source`** for candidate `47ecee32d0359abc240b95a4c6ff42db2f37a3dc`, tree `ca2530643df7b1d917048c7ff8ef75e55faff857`, against base `71ab301cf9bf976dab39956f1f22b66ab7d7f1c6`.\n\nRead AGENTS.md, the saved comments, both nitpicks, and verification results. Reviewed every added test through immutable source. No blocking source or apparent compilation defect found.\n\n- Remote queue assertions identify the intended job by cancellation-token identity, avoiding unrelated queued fetches.\n- Tray coverage exercises the submission helper used by production `Watcher::start`; the helper derives its mutation key internally. Recording closures perform no Git or network work.\n- Retained-blame coverage executes the captured loader against its scratch repository and delivers the actual reply.\n- Synthetic file-view tests intercept submissions before workers run. Channel release handles drop before isolated pools join, including failure paths.\n\n**Nonblocking coverage gap:** `recursive_pull_inspects_nested_ignored_files_before_any_mutation` exercises preparation only. Its \u201cno pull/fetch\u201d assertion cannot detect removal of the production dispatch guard, and the added standalone submodule-update guard lacks equivalent dispatch coverage. Minimal remedy: inject recording readers/executor into the production dispatch path and assert refusal with zero mutating dispatches, plus a successful empty-scan control.\n\nNo edits, builds/tests, runners, process control, CI, network writes, or active-validation inspection performed. Compilation remains unverified; the parent-owned focused build is pending. Historical gates do not validate this candidate.\n\nPR https://github.com/JKamsker/gitcraft/pull/184, reviewed SHA `47ecee32d0359abc240b95a4c6ff42db2f37a3dc`, checks: parent-owned build pending; review: source-only PASS with the nonblocking coverage finding above.",
+    "task_status": {
+      "taskId": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Aea57e3e8-df85-419a-b304-db38579ad813",
+      "childThreadId": "thread:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Aea57e3e8-df85-419a-b304-db38579ad813",
+      "link": "<t3-thread://v2/a1d1eb4b-1d57-477d-bba8-514be0fd0d48/thread:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Aea57e3e8-df85-419a-b304-db38579ad813>",
+      "childRunId": "run:thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253Aea57e3e8-df85-419a-b304-db38579ad813:ordinal:1",
+      "childNodeId": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Aea57e3e8-df85-419a-b304-db38579ad813",
+      "status": "completed",
+      "workState": "result_available",
+      "hasPendingChildRuns": false,
+      "latestTerminalRunId": "run:thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253Aea57e3e8-df85-419a-b304-db38579ad813:ordinal:1",
+      "latestTerminalStatus": "completed",
+      "latestTerminalSummary": null,
+      "latestTerminalResultContextTransferId": null,
+      "providerInstanceId": "codex",
+      "model": "gpt-6.1-sol",
+      "options": [
+        {
+          "id": "reasoningEffort",
+          "value": "high"
+        },
+        {
+          "id": "serviceTier",
+          "value": "default"
+        }
+      ],
+      "summary": "**PASS \u2014 `regression_source`** for candidate `47ecee32d0359abc240b95a4c6ff42db2f37a3dc`, tree `ca2530643df7b1d917048c7ff8ef75e55faff857`, against base `71ab301cf9bf976dab39956f1f22b66ab7d7f1c6`.\n\nRead AGENTS.md, the saved comments, both nitpicks, and verification results. Reviewed every added test through immutable source. No blocking source or apparent compilation defect found.\n\n- Remote queue assertions identify the intended job by cancellation-token identity, avoiding unrelated queued fetches.\n- Tray coverage exercises the submission helper used by production `Watcher::start`; the helper derives its mutation key internally. Recording closures perform no Git or network work.\n- Retained-blame coverage executes the captured loader against its scratch repository and delivers the actual reply.\n- Synthetic file-view tests intercept submissions before workers run. Channel release handles drop before isolated pools join, including failure paths.\n\n**Nonblocking coverage gap:** `recursive_pull_inspects_nested_ignored_files_before_any_mutation` exercises preparation only. Its \u201cno pull/fetch\u201d assertion cannot detect removal of the production dispatch guard, and the added standalone submodule-update guard lacks equivalent dispatch coverage. Minimal remedy: inject recording readers/executor into the production dispatch path and assert refusal with zero mutating dispatches, plus a successful empty-scan control.\n\nNo edits, builds/tests, runners, process control, CI, network writes, or active-validation inspection performed. Compilation remains unverified; the parent-owned focused build is pending. Historical gates do not validate this candidate.\n\nPR https://github.com/JKamsker/gitcraft/pull/184, reviewed SHA `47ecee32d0359abc240b95a4c6ff42db2f37a3dc`, checks: parent-owned build pending; review: source-only PASS with the nonblocking coverage finding above.",
+      "resultContextTransferId": "context-transfer:type:subagent_result:source-thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253Aea57e3e8-df85-419a-b304-db38579ad813:target-thread:a45a5b1a-9219-41c5-a934-73656395f4ff:58773c1c-01e8-4e45-a57b-216d6f09e866",
+      "hasPendingQuestion": false,
+      "pendingApproval": null,
+      "waitTimedOut": false
+    },
+    "disposition": "Scoped historical snapshot; preserve original findings. Later source corrections and exact final approvals supersede this stage; this record grants no current execution gate."
+  },
+  {
+    "task_id": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Ae8070bf2-e92b-4e43-9308-459f02bd8622",
+    "scope": "historical_whole_source",
+    "verdict": "BLOCK",
+    "reviewer": {
+      "provider": "codex",
+      "model": "gpt-6.1-sol",
+      "options": [
+        {
+          "id": "reasoningEffort",
+          "value": "high"
+        },
+        {
+          "id": "serviceTier",
+          "value": "default"
+        }
+      ]
+    },
+    "reviewed_commit": null,
+    "reviewed_tree": null,
+    "raw_summary": "**BLOCK \u2014 `whole_source` review** of candidate `47ecee32d0359abc240b95a4c6ff42db2f37a3dc`, tree `ca2530643df7b1d917048c7ff8ef75e55faff857`, against base `71ab301cf9bf976dab39956f1f22b66ab7d7f1c6`.\n\nReviewed all changes covering the eight findings and both nitpicks. Two issues remain:\n\n1. **P1: Saved submodule updates can bypass ignored-file protection.** [operations.rs:1175](https://github.com/JKamsker/gitcraft/blob/47ecee32d0359abc240b95a4c6ff42db2f37a3dc/src/repo/operations.rs#L1175) recognizes only an immediately adjacent `submodule update`. A saved redo such as `[\"submodule\", \"--quiet\", \"update\", \"--init\", \"--recursive\"]` passes envelope validation but skips the ignored-file scan. Git accepts this option placement; advancing a populated submodule can consequently overwrite colliding ignored files. This uses the same persisted-command reachability as finding `4513808247`. **Minimal remedy:** parse submodule options before locating `update`, or reject noncanonical saved submodule envelopes before preparation. Add recording-only coverage for this spelling and global prefixes.\n\n2. **P3: Unrelated status changes still supersede current File/History requests.** [file_view/mod.rs:140](https://github.com/JKamsker/gitcraft/blob/47ecee32d0359abc240b95a4c6ff42db2f37a3dc/src/repo/file_view/mod.rs#L140) unconditionally invalidates ordinary mutable views on every accepted status update. Editing another file advances the selected view\u2019s generation, discards its current replies, and submits replacement reads. Repeated unrelated updates can keep a slow remote pane loading. This leaves the second concern within comment `4513808224` unresolved. **Minimal remedy:** retain these generations when their inputs remain current; preserve invalidation for relevant content, revision, or configuration changes.\n\nNo additional concrete compile/lint defect or unnecessary scope expansion was established. This was read-only source inspection: no builds/tests, runners, process control, CI, writes, or active-validation inspection. The parent-owned focused build remains pending per the brief; historical gates do not validate this candidate.\n\nPR https://github.com/JKamsker/gitcraft/pull/184, reviewed SHA `47ecee32d0359abc240b95a4c6ff42db2f37a3dc`, checks not run or queried; independent source review **BLOCK**.",
+    "task_status": {
+      "taskId": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Ae8070bf2-e92b-4e43-9308-459f02bd8622",
+      "childThreadId": "thread:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Ae8070bf2-e92b-4e43-9308-459f02bd8622",
+      "link": "<t3-thread://v2/a1d1eb4b-1d57-477d-bba8-514be0fd0d48/thread:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Ae8070bf2-e92b-4e43-9308-459f02bd8622>",
+      "childRunId": "run:thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253Ae8070bf2-e92b-4e43-9308-459f02bd8622:ordinal:1",
+      "childNodeId": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Ae8070bf2-e92b-4e43-9308-459f02bd8622",
+      "status": "completed",
+      "workState": "result_available",
+      "hasPendingChildRuns": false,
+      "latestTerminalRunId": "run:thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253Ae8070bf2-e92b-4e43-9308-459f02bd8622:ordinal:1",
+      "latestTerminalStatus": "completed",
+      "latestTerminalSummary": null,
+      "latestTerminalResultContextTransferId": null,
+      "providerInstanceId": "codex",
+      "model": "gpt-6.1-sol",
+      "options": [
+        {
+          "id": "reasoningEffort",
+          "value": "high"
+        },
+        {
+          "id": "serviceTier",
+          "value": "default"
+        }
+      ],
+      "summary": "**BLOCK \u2014 `whole_source` review** of candidate `47ecee32d0359abc240b95a4c6ff42db2f37a3dc`, tree `ca2530643df7b1d917048c7ff8ef75e55faff857`, against base `71ab301cf9bf976dab39956f1f22b66ab7d7f1c6`.\n\nReviewed all changes covering the eight findings and both nitpicks. Two issues remain:\n\n1. **P1: Saved submodule updates can bypass ignored-file protection.** [operations.rs:1175](https://github.com/JKamsker/gitcraft/blob/47ecee32d0359abc240b95a4c6ff42db2f37a3dc/src/repo/operations.rs#L1175) recognizes only an immediately adjacent `submodule update`. A saved redo such as `[\"submodule\", \"--quiet\", \"update\", \"--init\", \"--recursive\"]` passes envelope validation but skips the ignored-file scan. Git accepts this option placement; advancing a populated submodule can consequently overwrite colliding ignored files. This uses the same persisted-command reachability as finding `4513808247`. **Minimal remedy:** parse submodule options before locating `update`, or reject noncanonical saved submodule envelopes before preparation. Add recording-only coverage for this spelling and global prefixes.\n\n2. **P3: Unrelated status changes still supersede current File/History requests.** [file_view/mod.rs:140](https://github.com/JKamsker/gitcraft/blob/47ecee32d0359abc240b95a4c6ff42db2f37a3dc/src/repo/file_view/mod.rs#L140) unconditionally invalidates ordinary mutable views on every accepted status update. Editing another file advances the selected view\u2019s generation, discards its current replies, and submits replacement reads. Repeated unrelated updates can keep a slow remote pane loading. This leaves the second concern within comment `4513808224` unresolved. **Minimal remedy:** retain these generations when their inputs remain current; preserve invalidation for relevant content, revision, or configuration changes.\n\nNo additional concrete compile/lint defect or unnecessary scope expansion was established. This was read-only source inspection: no builds/tests, runners, process control, CI, writes, or active-validation inspection. The parent-owned focused build remains pending per the brief; historical gates do not validate this candidate.\n\nPR https://github.com/JKamsker/gitcraft/pull/184, reviewed SHA `47ecee32d0359abc240b95a4c6ff42db2f37a3dc`, checks not run or queried; independent source review **BLOCK**.",
+      "resultContextTransferId": "context-transfer:type:subagent_result:source-thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253Ae8070bf2-e92b-4e43-9308-459f02bd8622:target-thread:a45a5b1a-9219-41c5-a934-73656395f4ff:b36f49e8-045f-4313-a9df-efb1fc0c949f",
+      "hasPendingQuestion": false,
+      "pendingApproval": null,
+      "waitTimedOut": false
+    },
+    "disposition": "Scoped historical snapshot; preserve original findings. Later source corrections and exact final approvals supersede this stage; this record grants no current execution gate."
+  },
+  {
+    "task_id": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Aff3b0f5a-1214-461a-a46f-64b2e7fa8f6f",
+    "scope": "historical_source_preservation",
+    "verdict": "PASS",
+    "reviewer": {
+      "provider": "codex",
+      "model": "gpt-6.1-sol",
+      "options": [
+        {
+          "id": "reasoningEffort",
+          "value": "high"
+        },
+        {
+          "id": "serviceTier",
+          "value": "default"
+        }
+      ]
+    },
+    "reviewed_commit": null,
+    "reviewed_tree": null,
+    "raw_summary": "**PASS \u2014 `source_preservation`**, candidate `47ecee32d0359abc240b95a4c6ff42db2f37a3dc`, tree `ca2530643df7b1d917048c7ff8ef75e55faff857`.\n\nNo blocking findings or required remedies.\n\n- Reviewed all 11 changed paths using immutable diffs against `71ab301cf9bf976dab39956f1f22b66ab7d7f1c6`.\n- Verified the ten-commit linear ancestry and required Jonas Kamsker authorship. Prior feature commits remain ancestors.\n- Historical documentation/evidence is byte-identical. Partial-stash, remote transport, accessibility, localization, ownership and deduplication source remains unchanged.\n- Production wiring preserves stash expectations, pinned line-history inputs, retained successful blame, and remote mutation serialization. New local filesystem identities affect scheduling only. Pull and automatic submodule-update paths reach the new protection.\n- Reviewed regression-test source and supplied review/verification records; no tests executed.\n\nThis is source-review approval only. The parent-owned focused build remains pending; historical gates do not validate this candidate. No active-validation state or live checks were inspected.\n\nPR https://github.com/JKamsker/gitcraft/pull/184, reviewed SHA `47ecee32d0359abc240b95a4c6ff42db2f37a3dc`, checks pending/unverified; independent source-preservation review PASS.",
+    "task_status": {
+      "taskId": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Aff3b0f5a-1214-461a-a46f-64b2e7fa8f6f",
+      "childThreadId": "thread:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Aff3b0f5a-1214-461a-a46f-64b2e7fa8f6f",
+      "link": "<t3-thread://v2/a1d1eb4b-1d57-477d-bba8-514be0fd0d48/thread:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Aff3b0f5a-1214-461a-a46f-64b2e7fa8f6f>",
+      "childRunId": "run:thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253Aff3b0f5a-1214-461a-a46f-64b2e7fa8f6f:ordinal:1",
+      "childNodeId": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Aff3b0f5a-1214-461a-a46f-64b2e7fa8f6f",
+      "status": "completed",
+      "workState": "result_available",
+      "hasPendingChildRuns": false,
+      "latestTerminalRunId": "run:thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253Aff3b0f5a-1214-461a-a46f-64b2e7fa8f6f:ordinal:1",
+      "latestTerminalStatus": "completed",
+      "latestTerminalSummary": null,
+      "latestTerminalResultContextTransferId": null,
+      "providerInstanceId": "codex",
+      "model": "gpt-6.1-sol",
+      "options": [
+        {
+          "id": "reasoningEffort",
+          "value": "high"
+        },
+        {
+          "id": "serviceTier",
+          "value": "default"
+        }
+      ],
+      "summary": "**PASS \u2014 `source_preservation`**, candidate `47ecee32d0359abc240b95a4c6ff42db2f37a3dc`, tree `ca2530643df7b1d917048c7ff8ef75e55faff857`.\n\nNo blocking findings or required remedies.\n\n- Reviewed all 11 changed paths using immutable diffs against `71ab301cf9bf976dab39956f1f22b66ab7d7f1c6`.\n- Verified the ten-commit linear ancestry and required Jonas Kamsker authorship. Prior feature commits remain ancestors.\n- Historical documentation/evidence is byte-identical. Partial-stash, remote transport, accessibility, localization, ownership and deduplication source remains unchanged.\n- Production wiring preserves stash expectations, pinned line-history inputs, retained successful blame, and remote mutation serialization. New local filesystem identities affect scheduling only. Pull and automatic submodule-update paths reach the new protection.\n- Reviewed regression-test source and supplied review/verification records; no tests executed.\n\nThis is source-review approval only. The parent-owned focused build remains pending; historical gates do not validate this candidate. No active-validation state or live checks were inspected.\n\nPR https://github.com/JKamsker/gitcraft/pull/184, reviewed SHA `47ecee32d0359abc240b95a4c6ff42db2f37a3dc`, checks pending/unverified; independent source-preservation review PASS.",
+      "resultContextTransferId": "context-transfer:type:subagent_result:source-thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253Aff3b0f5a-1214-461a-a46f-64b2e7fa8f6f:target-thread:a45a5b1a-9219-41c5-a934-73656395f4ff:e467c31d-f88b-4bb9-8ed6-1a0024aa412e",
+      "hasPendingQuestion": false,
+      "pendingApproval": null,
+      "waitTimedOut": false
+    },
+    "disposition": "Scoped historical snapshot; preserve original findings. Later source corrections and exact final approvals supersede this stage; this record grants no current execution gate."
+  },
+  {
+    "task_id": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A9fcc7488-fc81-46f8-8657-9999bfb17d44",
+    "scope": "historical_stash_case",
+    "verdict": "BLOCK",
+    "reviewer": {
+      "provider": "codex",
+      "model": "gpt-6.1-sol",
+      "options": [
+        {
+          "id": "reasoningEffort",
+          "value": "high"
+        },
+        {
+          "id": "serviceTier",
+          "value": "default"
+        }
+      ]
+    },
+    "reviewed_commit": null,
+    "reviewed_tree": null,
+    "raw_summary": "**P1 \u2014 block the candidate for `stash_case`.** Saved comment 4513819106 remains valid at `47ecee32d0359abc240b95a4c6ff42db2f37a3dc`, whose tree matches `ca2530643df7b1d917048c7ff8ef75e55faff857`. The relevant stash implementation and tests are unchanged from published base `71ab301c\u2026`.\n\nThe verified trigger is:\n\n- HEAD contains `A`; the index stages its deletion, or a rename whose source is `A`.\n- An excluded replacement is reported as `a` on a filesystem where those spellings address the same entry.\n- Plain `stash push` excludes an ordinary untracked replacement. An ignored replacement remains excluded with `--include-untracked` too.\n- [`excluded_overlap_problem`, lines 205\u2013235](https://github.com/JKamsker/gitcraft/blob/47ecee32d0359abc240b95a4c6ff42db2f37a3dc/src/repo/partial_stash/mod.rs#L205) compares strings exactly. `A` versus `a` passes; case variants in ancestor/descendant paths pass likewise.\n\nFresh execution validation repeats the same comparison for both status rows and the separate ignored-file listing. Consequently, it permits stash cleanup to restore the tracked path over an excluded replacement whose bytes were never saved. This affects fresh pushes and Redo through the shared runner. **The guard bypass is verified statically; destructive overwrite was not reproduced.**\n\nThe repository-side filesystem determines whether names alias. Neither the host OS nor an SSH/WSL target label establishes that. Existing facilities provide:\n\n- `core.ignoreCase` in doctor configuration and `core.ignorecase` in machine diagnostics, but no shared stash comparison policy.\n- `git::run(Some(path), \u2026)`, which executes in the target repository, including remotely.\n- Remote filesystem predicates, but no authoritative case-sensitivity API. `same_dir` compares remote targets lexically; local canonicalization failures also fall back to lexical comparison. It is unsuitable for this guard.\n\n`core.ignorecase` is useful repository-side evidence, **not proof of actual filesystem behavior**: it can be overridden or stale. I did not probe this checkout or any remote filesystem.\n\nThe smallest practical remedy is to resolve a comparison policy inside `validate_push`, through the existing repository-aware command layer, and pass it explicitly to both overlap checks:\n\n- Known case-sensitive: retain the existing exact comparisons.\n- Known case-insensitive: compare equality and slash-delimited ancestry without case, retaining Git\u2019s original spelling for commands and errors.\n- Failed, malformed, or indeterminate lookup: refuse the affected cleanup before executing stash; never convert lookup failure into \u201ccase-sensitive.\u201d\n\nKeep the existing staged `D.path` and `R.old_path` handling, trailing-slash normalization, ignored-file check, and snapshot exemption. A configuration-only implementation must document its trust assumption; if actual filesystem semantics are required despite stale configuration, add a target-side, read-only alias check with errors propagated. Host canonicalization or unconditional lowercasing does not meet that requirement.\n\nExisting tests cover exact overlaps, ancestry, embedded repositories, ignored replacements, fresh execution and Redo. However, [`rename_source_validation_preserves_git_path_spelling`](https://github.com/JKamsker/gitcraft/blob/47ecee32d0359abc240b95a4c6ff42db2f37a3dc/src/repo/partial_stash/tests.rs#L895) explicitly expects `A`/`a` to pass without a filesystem policy.\n\nA meaningful **inert regression** should inject synthetic status, ignored listings, policy results and a recording-only mutation sink. Cover deletion and rename-source equality, both ancestry directions, trailing slashes, ordinary versus ignored exclusions, and remote targets with policy opposite the host. Assert rejection records **zero mutation commands**, including on policy lookup failure. Under a known case-sensitive policy, assert distinct-case paths remain eligible; retain non-overlap boundaries such as `dir`/`directory`.\n\nNo edits, builds, tests, supplied verifiers, process control, or CI inspection/execution were performed. Prior green CI does not cover this missing policy branch.\n\nPR https://github.com/JKamsker/gitcraft/pull/184, head 47ecee32d0359abc240b95a4c6ff42db2f37a3dc, checks not inspected; independent read-only review: changes requested, blocking P1.",
+    "task_status": {
+      "taskId": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A9fcc7488-fc81-46f8-8657-9999bfb17d44",
+      "childThreadId": "thread:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A9fcc7488-fc81-46f8-8657-9999bfb17d44",
+      "link": "<t3-thread://v2/a1d1eb4b-1d57-477d-bba8-514be0fd0d48/thread:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A9fcc7488-fc81-46f8-8657-9999bfb17d44>",
+      "childRunId": "run:thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253A9fcc7488-fc81-46f8-8657-9999bfb17d44:ordinal:1",
+      "childNodeId": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A9fcc7488-fc81-46f8-8657-9999bfb17d44",
+      "status": "completed",
+      "workState": "result_available",
+      "hasPendingChildRuns": false,
+      "latestTerminalRunId": "run:thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253A9fcc7488-fc81-46f8-8657-9999bfb17d44:ordinal:1",
+      "latestTerminalStatus": "completed",
+      "latestTerminalSummary": null,
+      "latestTerminalResultContextTransferId": null,
+      "providerInstanceId": "codex",
+      "model": "gpt-6.1-sol",
+      "options": [
+        {
+          "id": "reasoningEffort",
+          "value": "high"
+        },
+        {
+          "id": "serviceTier",
+          "value": "default"
+        }
+      ],
+      "summary": "**P1 \u2014 block the candidate for `stash_case`.** Saved comment 4513819106 remains valid at `47ecee32d0359abc240b95a4c6ff42db2f37a3dc`, whose tree matches `ca2530643df7b1d917048c7ff8ef75e55faff857`. The relevant stash implementation and tests are unchanged from published base `71ab301c\u2026`.\n\nThe verified trigger is:\n\n- HEAD contains `A`; the index stages its deletion, or a rename whose source is `A`.\n- An excluded replacement is reported as `a` on a filesystem where those spellings address the same entry.\n- Plain `stash push` excludes an ordinary untracked replacement. An ignored replacement remains excluded with `--include-untracked` too.\n- [`excluded_overlap_problem`, lines 205\u2013235](https://github.com/JKamsker/gitcraft/blob/47ecee32d0359abc240b95a4c6ff42db2f37a3dc/src/repo/partial_stash/mod.rs#L205) compares strings exactly. `A` versus `a` passes; case variants in ancestor/descendant paths pass likewise.\n\nFresh execution validation repeats the same comparison for both status rows and the separate ignored-file listing. Consequently, it permits stash cleanup to restore the tracked path over an excluded replacement whose bytes were never saved. This affects fresh pushes and Redo through the shared runner. **The guard bypass is verified statically; destructive overwrite was not reproduced.**\n\nThe repository-side filesystem determines whether names alias. Neither the host OS nor an SSH/WSL target label establishes that. Existing facilities provide:\n\n- `core.ignoreCase` in doctor configuration and `core.ignorecase` in machine diagnostics, but no shared stash comparison policy.\n- `git::run(Some(path), \u2026)`, which executes in the target repository, including remotely.\n- Remote filesystem predicates, but no authoritative case-sensitivity API. `same_dir` compares remote targets lexically; local canonicalization failures also fall back to lexical comparison. It is unsuitable for this guard.\n\n`core.ignorecase` is useful repository-side evidence, **not proof of actual filesystem behavior**: it can be overridden or stale. I did not probe this checkout or any remote filesystem.\n\nThe smallest practical remedy is to resolve a comparison policy inside `validate_push`, through the existing repository-aware command layer, and pass it explicitly to both overlap checks:\n\n- Known case-sensitive: retain the existing exact comparisons.\n- Known case-insensitive: compare equality and slash-delimited ancestry without case, retaining Git\u2019s original spelling for commands and errors.\n- Failed, malformed, or indeterminate lookup: refuse the affected cleanup before executing stash; never convert lookup failure into \u201ccase-sensitive.\u201d\n\nKeep the existing staged `D.path` and `R.old_path` handling, trailing-slash normalization, ignored-file check, and snapshot exemption. A configuration-only implementation must document its trust assumption; if actual filesystem semantics are required despite stale configuration, add a target-side, read-only alias check with errors propagated. Host canonicalization or unconditional lowercasing does not meet that requirement.\n\nExisting tests cover exact overlaps, ancestry, embedded repositories, ignored replacements, fresh execution and Redo. However, [`rename_source_validation_preserves_git_path_spelling`](https://github.com/JKamsker/gitcraft/blob/47ecee32d0359abc240b95a4c6ff42db2f37a3dc/src/repo/partial_stash/tests.rs#L895) explicitly expects `A`/`a` to pass without a filesystem policy.\n\nA meaningful **inert regression** should inject synthetic status, ignored listings, policy results and a recording-only mutation sink. Cover deletion and rename-source equality, both ancestry directions, trailing slashes, ordinary versus ignored exclusions, and remote targets with policy opposite the host. Assert rejection records **zero mutation commands**, including on policy lookup failure. Under a known case-sensitive policy, assert distinct-case paths remain eligible; retain non-overlap boundaries such as `dir`/`directory`.\n\nNo edits, builds, tests, supplied verifiers, process control, or CI inspection/execution were performed. Prior green CI does not cover this missing policy branch.\n\nPR https://github.com/JKamsker/gitcraft/pull/184, head 47ecee32d0359abc240b95a4c6ff42db2f37a3dc, checks not inspected; independent read-only review: changes requested, blocking P1.",
+      "resultContextTransferId": "context-transfer:type:subagent_result:source-thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253A9fcc7488-fc81-46f8-8657-9999bfb17d44:target-thread:a45a5b1a-9219-41c5-a934-73656395f4ff:36c71227-2bd4-4728-9177-0c7335bd8081",
+      "hasPendingQuestion": false,
+      "pendingApproval": null,
+      "waitTimedOut": false
+    },
+    "disposition": "Scoped historical snapshot; preserve original findings. Later source corrections and exact final approvals supersede this stage; this record grants no current execution gate."
+  },
+  {
+    "task_id": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Ae4505bf9-a94a-4558-9782-43657a1a552b",
+    "scope": "historical_stash_unstaged",
+    "verdict": "BLOCK",
+    "reviewer": {
+      "provider": "codex",
+      "model": "gpt-6.1-sol",
+      "options": [
+        {
+          "id": "reasoningEffort",
+          "value": "high"
+        },
+        {
+          "id": "serviceTier",
+          "value": "default"
+        }
+      ]
+    },
+    "reviewed_commit": null,
+    "reviewed_tree": null,
+    "raw_summary": "**P1 \u2014 block approval: comment 4513819115 remains valid.**\n\nVerified candidate `47ecee32d0359abc240b95a4c6ff42db2f37a3dc`, tree `ca2530643df7b1d917048c7ff8ef75e55faff857`. The affected partial-stash code is unchanged from published base `71ab301cf9bf976dab39956f1f22b66ab7d7f1c6`.\n\nConcrete trigger: HEAD/index track file `f`; the working tree replaces it with directory `f/` containing ignored file `f/local`. The deletion is **unstaged**, with nothing staged. Ordinary status omits the ignored descendant and represents `f` only in `work.unstaged`.\n\nThe candidate misses this state at three points in [partial_stash/mod.rs](https://github.com/JKamsker/gitcraft/blob/47ecee32d0359abc240b95a4c6ff42db2f37a3dc/src/repo/partial_stash/mod.rs#L203):\n\n- `excluded_overlap_problem` collects removed paths only from `work.staged` (line 218).\n- `validate_push` queries ignored paths only when a staged `D`/`R` exists (line 289).\n- Its synthetic `ignored_work` retains only staged removals (line 300), so broadening the query condition alone would still miss the overlap.\n\nConsequently, Everything stash reaches cleanup with either untracked setting. `-u` still excludes ignored files: restoring tracked `f` can remove `f/local` without saving its bytes in the stash. Undo cannot recover those bytes. This is a statically confirmed validation gap and data-loss risk; I did not reproduce destructive cleanup.\n\nNormal execution and Redo both reach the same [pre-dispatch validation hook](https://github.com/JKamsker/gitcraft/blob/47ecee32d0359abc240b95a4c6ff42db2f37a3dc/src/repo/operations.rs#L1115), so both need the shared fix.\n\nMinimal remedy:\n\n- Share removal-path extraction between overlap checking and ignored-query eligibility, including staged deletions/rename sources and tracked unstaged deletions.\n- Preserve those unstaged removal rows when checking the returned ignored paths.\n- Check ignored overlaps regardless of `request.untracked`; retain the existing exemption for ordinary untracked files when `-u` includes them. Do not simply remove the helper\u2019s early return globally.\n- Keep snapshot eligibility on `everything_problem`. [Snapshots use a separate path](https://github.com/JKamsker/gitcraft/blob/47ecee32d0359abc240b95a4c6ff42db2f37a3dc/src/repo/partial_stash/mod.rs#L603) without stash cleanup and should remain eligible. Broaden the diagnostic\u2019s \u201cstaged deletion\u201d wording accordingly.\n\nA meaningful inert regression should supply synthetic status `\" D f\\0\"` and ignored-list output `\"f/local\\0\"` through a recording read/dispatch seam. For plain push, `-u`, and `--include-untracked`, assert rejection before any mutating command under normal and Redo contexts. Include unrelated ignored-path and component-boundary controls, preserve existing staged deletion/rename coverage, and assert snapshot eligibility. Existing ignored-replacement tests stage their removals, leaving this trigger uncovered.\n\nRead-only review only: no edits, builds, tests, runner execution, CI access, or destructive reproduction. Prior green CI does not resolve the uncovered path.\n\nPR https://github.com/JKamsker/gitcraft/pull/184, head `47ecee32d0359abc240b95a4c6ff42db2f37a3dc`, checks not queried or run; independent review requests changes.",
+    "task_status": {
+      "taskId": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Ae4505bf9-a94a-4558-9782-43657a1a552b",
+      "childThreadId": "thread:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Ae4505bf9-a94a-4558-9782-43657a1a552b",
+      "link": "<t3-thread://v2/a1d1eb4b-1d57-477d-bba8-514be0fd0d48/thread:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Ae4505bf9-a94a-4558-9782-43657a1a552b>",
+      "childRunId": "run:thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253Ae4505bf9-a94a-4558-9782-43657a1a552b:ordinal:1",
+      "childNodeId": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Ae4505bf9-a94a-4558-9782-43657a1a552b",
+      "status": "completed",
+      "workState": "result_available",
+      "hasPendingChildRuns": false,
+      "latestTerminalRunId": "run:thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253Ae4505bf9-a94a-4558-9782-43657a1a552b:ordinal:1",
+      "latestTerminalStatus": "completed",
+      "latestTerminalSummary": null,
+      "latestTerminalResultContextTransferId": null,
+      "providerInstanceId": "codex",
+      "model": "gpt-6.1-sol",
+      "options": [
+        {
+          "id": "reasoningEffort",
+          "value": "high"
+        },
+        {
+          "id": "serviceTier",
+          "value": "default"
+        }
+      ],
+      "summary": "**P1 \u2014 block approval: comment 4513819115 remains valid.**\n\nVerified candidate `47ecee32d0359abc240b95a4c6ff42db2f37a3dc`, tree `ca2530643df7b1d917048c7ff8ef75e55faff857`. The affected partial-stash code is unchanged from published base `71ab301cf9bf976dab39956f1f22b66ab7d7f1c6`.\n\nConcrete trigger: HEAD/index track file `f`; the working tree replaces it with directory `f/` containing ignored file `f/local`. The deletion is **unstaged**, with nothing staged. Ordinary status omits the ignored descendant and represents `f` only in `work.unstaged`.\n\nThe candidate misses this state at three points in [partial_stash/mod.rs](https://github.com/JKamsker/gitcraft/blob/47ecee32d0359abc240b95a4c6ff42db2f37a3dc/src/repo/partial_stash/mod.rs#L203):\n\n- `excluded_overlap_problem` collects removed paths only from `work.staged` (line 218).\n- `validate_push` queries ignored paths only when a staged `D`/`R` exists (line 289).\n- Its synthetic `ignored_work` retains only staged removals (line 300), so broadening the query condition alone would still miss the overlap.\n\nConsequently, Everything stash reaches cleanup with either untracked setting. `-u` still excludes ignored files: restoring tracked `f` can remove `f/local` without saving its bytes in the stash. Undo cannot recover those bytes. This is a statically confirmed validation gap and data-loss risk; I did not reproduce destructive cleanup.\n\nNormal execution and Redo both reach the same [pre-dispatch validation hook](https://github.com/JKamsker/gitcraft/blob/47ecee32d0359abc240b95a4c6ff42db2f37a3dc/src/repo/operations.rs#L1115), so both need the shared fix.\n\nMinimal remedy:\n\n- Share removal-path extraction between overlap checking and ignored-query eligibility, including staged deletions/rename sources and tracked unstaged deletions.\n- Preserve those unstaged removal rows when checking the returned ignored paths.\n- Check ignored overlaps regardless of `request.untracked`; retain the existing exemption for ordinary untracked files when `-u` includes them. Do not simply remove the helper\u2019s early return globally.\n- Keep snapshot eligibility on `everything_problem`. [Snapshots use a separate path](https://github.com/JKamsker/gitcraft/blob/47ecee32d0359abc240b95a4c6ff42db2f37a3dc/src/repo/partial_stash/mod.rs#L603) without stash cleanup and should remain eligible. Broaden the diagnostic\u2019s \u201cstaged deletion\u201d wording accordingly.\n\nA meaningful inert regression should supply synthetic status `\" D f\\0\"` and ignored-list output `\"f/local\\0\"` through a recording read/dispatch seam. For plain push, `-u`, and `--include-untracked`, assert rejection before any mutating command under normal and Redo contexts. Include unrelated ignored-path and component-boundary controls, preserve existing staged deletion/rename coverage, and assert snapshot eligibility. Existing ignored-replacement tests stage their removals, leaving this trigger uncovered.\n\nRead-only review only: no edits, builds, tests, runner execution, CI access, or destructive reproduction. Prior green CI does not resolve the uncovered path.\n\nPR https://github.com/JKamsker/gitcraft/pull/184, head `47ecee32d0359abc240b95a4c6ff42db2f37a3dc`, checks not queried or run; independent review requests changes.",
+      "resultContextTransferId": "context-transfer:type:subagent_result:source-thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253Ae4505bf9-a94a-4558-9782-43657a1a552b:target-thread:a45a5b1a-9219-41c5-a934-73656395f4ff:5fd12973-3b1f-43b4-87cc-0bc4de5ebd4c",
+      "hasPendingQuestion": false,
+      "pendingApproval": null,
+      "waitTimedOut": false
+    },
+    "disposition": "Scoped historical snapshot; preserve original findings. Later source corrections and exact final approvals supersede this stage; this record grants no current execution gate."
+  },
+  {
+    "task_id": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Ac940143b-9355-47e6-9410-cd7101ebca85",
+    "scope": "historical_archive_findings",
+    "verdict": "BLOCK",
+    "reviewer": {
+      "provider": "codex",
+      "model": "gpt-6.1-sol",
+      "options": [
+        {
+          "id": "reasoningEffort",
+          "value": "high"
+        },
+        {
+          "id": "serviceTier",
+          "value": "default"
+        }
+      ]
+    },
+    "reviewed_commit": null,
+    "reviewed_tree": null,
+    "raw_summary": "**Archive review: one current provenance defect; five verified tooling gaps requiring successor hardening.** No historical artifact corruption established.\n\nReviewed candidate `47ecee32d0359abc240b95a4c6ff42db2f37a3dc`; verified tree `ca2530643df7b1d917048c7ff8ef75e55faff857`. Read `AGENTS.md`, all six saved findings, and all four named `/tmp` scripts without executing them. Those scripts match their respective archived versions byte-for-byte.\n\nAll three historical packages are unchanged from published base `71ab301cf9bf976dab39956f1f22b66ab7d7f1c6`. Their listed file hashes, compressed/raw log hashes, and actual assembly chains match.\n\n1. **4513819044 \u2014 assembler ref race: P2, successor hardening.**  \n   Archived `assemble-v3.py:49` updates the ref without an expected old value. Another writer creating or advancing that ref after preflight can have its tip replaced. No such overwrite is established historically. The named remaining assembler already fixes this at line 63: empty expected value for creation, previous unit SHA thereafter. Preserve this behavior in the new assembler.  \n   **Inert regression:** recording-only Git responses simulate concurrent creation and advancement; assert expected-old arguments and that a failed update prevents push and advancement.\n\n2. **4513819058 \u2014 completion identity: P2, current evidence disclosure defect.**  \n   `complete-gates.py:13\u201314` copies prior metadata; line 32 reconstructs environment values without collecting completion identity or versions. The archived UID/GID/groups/versions equal the initial run\u2019s values. They establish initial-process metadata, not completion-process metadata. The README\u2019s unqualified \u201cExecution identity and groups are recorded\u201d therefore overstates completion provenance. Different completion groups could affect native ACL behavior; actual group drift is not established.  \n   **Minimal remedy:** add a separate erratum naming the historical package/result digest: completion UID, GID, supplementary groups and tool versions are **unknown**, unless independently evidenced. Preserve every archived executed byte and result. New completion tooling must record separate identity/version/environment metadata and associate its gates with that execution stage.  \n   **Inert regression:** distinct synthetic initial/completion identities remain distinct; absent historical completion metadata yields `unknown`, never copied values. **Block unqualified completion-identity claims until disclosed.**\n\n3. **4513819065 \u2014 assembly-chain packaging: P2, successor hardening.**  \n   Historical `package-evidence.py` checks individual units but does not enforce the advertised base, eight-unit count, ordered ancestry or last-unit identity. Reordering or omitting units can retain valid individual checks while contradicting the README. The actual historical record contains eight correctly chained commits from `5988524c\u2026` to `1eee7e70\u2026`; no current chain defect exists.  \n   **Minimal remedy:** successor packaging pins its expected base and ordered unit plan, requires each commit\u2019s complete parent list to equal `[previous]`, and requires the final unit to equal the tested SHA. Existing later packagers check count/order but accept the supplied base and inspect only the first parent.  \n   **Inert regression:** reject omitted/reordered/duplicate units, substituted base, merge parents and wrong terminal commit using synthetic immutable-commit responses.\n\n4. **4513819074 \u2014 approval identities: P2, successor blocker.**  \n   Both later packagers accept matching source/execution approvals with task IDs `null` and `\"\"`, absent reviewers, because those task IDs compare unequal. Actual archived approvals have populated reviewer objects and distinct nonempty task IDs; historical independence metadata is not defective on this path.  \n   **Minimal remedy:** before scope selection, require nonblank string task IDs and structured reviewer identities with nonblank provider/model fields; preserve recorded settings. Require distinct source/execution task IDs. Same provider/model does not invalidate independence, and different strings alone do not authenticate it.  \n   **Inert regression:** reject missing/null/empty/whitespace IDs and malformed reviewer objects; reject the same task across both scopes; accept distinct tasks using the same model.\n\n5. **4513819087 \u2014 inheritance approval binding: P2, successor blocker.**  \n   Both later verifiers validate file checksums but never parse and match the execution approval. Changed results plus a refreshed manifest file checksum can reach PASS despite a stale approval; updating the top-level result digest also bypasses a digest-only fix. Actual archived results, manifest digests and execution approvals currently agree.  \n   **Required additions:** before PASS, require:\n   \n   - Committed result digest equals `manifest.full_results_sha256`.\n   - Result commit/tree equal the pinned tested commit/tree.\n   - Committed runner digest equals the result and manifest runner digests.\n   - A valid execution PASS matches that commit/tree and both digests.\n   - A valid source PASS has a distinct task ID.\n   - Verifier/packager design approvals match the corresponding archived script digests.\n\n   Record the committed `reviews.json` digest in the external proof; its manifest file entry already supplies archive integrity. Do not introduce a circular self-digest inside reviews.  \n   **Inert regression:** reject changed results with refreshed file checksum, refreshed top-level digest but stale approval, wrong runner, and malformed/same-task approvals. **Printing digests without these comparisons is insufficient.**\n\n6. **4513819095 \u2014 source attribution: P2, successor blocker.**  \n   `/tmp/gitcraft-pr184-review-run.py:20\u201321` relies on HEAD/tree/status. An edited assume-unchanged Rust file can leave this state clean while Cargo consumes different bytes. Binary hashes subsequently bind the produced executable, not its source identity. No historical hidden edit is established.  \n   **Minimal remedy:** independently compare consumed tracked file bytes, modes and symlink targets with the candidate\u2019s immutable tree before gates and after execution; include Cargo manifests, lockfile, build scripts and tracked inputs. Prefer an isolated immutable source materialization. Reject hidden/sparse-index conditions unless explicitly supported. Preserve the historical runner and disclose its attribution limitation.  \n   **Inert regression:** a synthetic clean status with a mismatching source blob must refuse gate launch; also cover missing files and mode/symlink changes.\n\nThe candidate changes eleven application files relative to the published base. Historical gates alone therefore cannot validate this candidate. Prior green CI does not resolve these uncovered paths.\n\nNo edits, builds/tests, supplied-script execution, process control, CI, network writes, delegation, polling or active-validation inspection occurred.\n\nPR https://github.com/JKamsker/gitcraft/pull/184, head `47ecee32d0359abc240b95a4c6ff42db2f37a3dc`, checks and reviews: checks not run; live CI unqueried; archive review requires provenance disclosure and successor remedies before claiming those guarantees.",
+    "task_status": {
+      "taskId": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Ac940143b-9355-47e6-9410-cd7101ebca85",
+      "childThreadId": "thread:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Ac940143b-9355-47e6-9410-cd7101ebca85",
+      "link": "<t3-thread://v2/a1d1eb4b-1d57-477d-bba8-514be0fd0d48/thread:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Ac940143b-9355-47e6-9410-cd7101ebca85>",
+      "childRunId": "run:thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253Ac940143b-9355-47e6-9410-cd7101ebca85:ordinal:1",
+      "childNodeId": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Ac940143b-9355-47e6-9410-cd7101ebca85",
+      "status": "completed",
+      "workState": "result_available",
+      "hasPendingChildRuns": false,
+      "latestTerminalRunId": "run:thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253Ac940143b-9355-47e6-9410-cd7101ebca85:ordinal:1",
+      "latestTerminalStatus": "completed",
+      "latestTerminalSummary": null,
+      "latestTerminalResultContextTransferId": null,
+      "providerInstanceId": "codex",
+      "model": "gpt-6.1-sol",
+      "options": [
+        {
+          "id": "reasoningEffort",
+          "value": "high"
+        },
+        {
+          "id": "serviceTier",
+          "value": "default"
+        }
+      ],
+      "summary": "**Archive review: one current provenance defect; five verified tooling gaps requiring successor hardening.** No historical artifact corruption established.\n\nReviewed candidate `47ecee32d0359abc240b95a4c6ff42db2f37a3dc`; verified tree `ca2530643df7b1d917048c7ff8ef75e55faff857`. Read `AGENTS.md`, all six saved findings, and all four named `/tmp` scripts without executing them. Those scripts match their respective archived versions byte-for-byte.\n\nAll three historical packages are unchanged from published base `71ab301cf9bf976dab39956f1f22b66ab7d7f1c6`. Their listed file hashes, compressed/raw log hashes, and actual assembly chains match.\n\n1. **4513819044 \u2014 assembler ref race: P2, successor hardening.**  \n   Archived `assemble-v3.py:49` updates the ref without an expected old value. Another writer creating or advancing that ref after preflight can have its tip replaced. No such overwrite is established historically. The named remaining assembler already fixes this at line 63: empty expected value for creation, previous unit SHA thereafter. Preserve this behavior in the new assembler.  \n   **Inert regression:** recording-only Git responses simulate concurrent creation and advancement; assert expected-old arguments and that a failed update prevents push and advancement.\n\n2. **4513819058 \u2014 completion identity: P2, current evidence disclosure defect.**  \n   `complete-gates.py:13\u201314` copies prior metadata; line 32 reconstructs environment values without collecting completion identity or versions. The archived UID/GID/groups/versions equal the initial run\u2019s values. They establish initial-process metadata, not completion-process metadata. The README\u2019s unqualified \u201cExecution identity and groups are recorded\u201d therefore overstates completion provenance. Different completion groups could affect native ACL behavior; actual group drift is not established.  \n   **Minimal remedy:** add a separate erratum naming the historical package/result digest: completion UID, GID, supplementary groups and tool versions are **unknown**, unless independently evidenced. Preserve every archived executed byte and result. New completion tooling must record separate identity/version/environment metadata and associate its gates with that execution stage.  \n   **Inert regression:** distinct synthetic initial/completion identities remain distinct; absent historical completion metadata yields `unknown`, never copied values. **Block unqualified completion-identity claims until disclosed.**\n\n3. **4513819065 \u2014 assembly-chain packaging: P2, successor hardening.**  \n   Historical `package-evidence.py` checks individual units but does not enforce the advertised base, eight-unit count, ordered ancestry or last-unit identity. Reordering or omitting units can retain valid individual checks while contradicting the README. The actual historical record contains eight correctly chained commits from `5988524c\u2026` to `1eee7e70\u2026`; no current chain defect exists.  \n   **Minimal remedy:** successor packaging pins its expected base and ordered unit plan, requires each commit\u2019s complete parent list to equal `[previous]`, and requires the final unit to equal the tested SHA. Existing later packagers check count/order but accept the supplied base and inspect only the first parent.  \n   **Inert regression:** reject omitted/reordered/duplicate units, substituted base, merge parents and wrong terminal commit using synthetic immutable-commit responses.\n\n4. **4513819074 \u2014 approval identities: P2, successor blocker.**  \n   Both later packagers accept matching source/execution approvals with task IDs `null` and `\"\"`, absent reviewers, because those task IDs compare unequal. Actual archived approvals have populated reviewer objects and distinct nonempty task IDs; historical independence metadata is not defective on this path.  \n   **Minimal remedy:** before scope selection, require nonblank string task IDs and structured reviewer identities with nonblank provider/model fields; preserve recorded settings. Require distinct source/execution task IDs. Same provider/model does not invalidate independence, and different strings alone do not authenticate it.  \n   **Inert regression:** reject missing/null/empty/whitespace IDs and malformed reviewer objects; reject the same task across both scopes; accept distinct tasks using the same model.\n\n5. **4513819087 \u2014 inheritance approval binding: P2, successor blocker.**  \n   Both later verifiers validate file checksums but never parse and match the execution approval. Changed results plus a refreshed manifest file checksum can reach PASS despite a stale approval; updating the top-level result digest also bypasses a digest-only fix. Actual archived results, manifest digests and execution approvals currently agree.  \n   **Required additions:** before PASS, require:\n   \n   - Committed result digest equals `manifest.full_results_sha256`.\n   - Result commit/tree equal the pinned tested commit/tree.\n   - Committed runner digest equals the result and manifest runner digests.\n   - A valid execution PASS matches that commit/tree and both digests.\n   - A valid source PASS has a distinct task ID.\n   - Verifier/packager design approvals match the corresponding archived script digests.\n\n   Record the committed `reviews.json` digest in the external proof; its manifest file entry already supplies archive integrity. Do not introduce a circular self-digest inside reviews.  \n   **Inert regression:** reject changed results with refreshed file checksum, refreshed top-level digest but stale approval, wrong runner, and malformed/same-task approvals. **Printing digests without these comparisons is insufficient.**\n\n6. **4513819095 \u2014 source attribution: P2, successor blocker.**  \n   `/tmp/gitcraft-pr184-review-run.py:20\u201321` relies on HEAD/tree/status. An edited assume-unchanged Rust file can leave this state clean while Cargo consumes different bytes. Binary hashes subsequently bind the produced executable, not its source identity. No historical hidden edit is established.  \n   **Minimal remedy:** independently compare consumed tracked file bytes, modes and symlink targets with the candidate\u2019s immutable tree before gates and after execution; include Cargo manifests, lockfile, build scripts and tracked inputs. Prefer an isolated immutable source materialization. Reject hidden/sparse-index conditions unless explicitly supported. Preserve the historical runner and disclose its attribution limitation.  \n   **Inert regression:** a synthetic clean status with a mismatching source blob must refuse gate launch; also cover missing files and mode/symlink changes.\n\nThe candidate changes eleven application files relative to the published base. Historical gates alone therefore cannot validate this candidate. Prior green CI does not resolve these uncovered paths.\n\nNo edits, builds/tests, supplied-script execution, process control, CI, network writes, delegation, polling or active-validation inspection occurred.\n\nPR https://github.com/JKamsker/gitcraft/pull/184, head `47ecee32d0359abc240b95a4c6ff42db2f37a3dc`, checks and reviews: checks not run; live CI unqueried; archive review requires provenance disclosure and successor remedies before claiming those guarantees.",
+      "resultContextTransferId": "context-transfer:type:subagent_result:source-thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253Ac940143b-9355-47e6-9410-cd7101ebca85:target-thread:a45a5b1a-9219-41c5-a934-73656395f4ff:bd159ede-9be8-484b-b61f-3ae0d2ecc4f9",
+      "hasPendingQuestion": false,
+      "pendingApproval": null,
+      "waitTimedOut": false
+    },
+    "disposition": "Scoped historical snapshot; preserve original findings. Later source corrections and exact final approvals supersede this stage; this record grants no current execution gate."
+  },
+  {
+    "task_id": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Aabd48f62-7802-4fb3-af92-706615d19230",
+    "scope": "historical_whole_source",
+    "verdict": "PASS",
+    "reviewer": {
+      "provider": "codex",
+      "model": "gpt-6.1-sol",
+      "options": [
+        {
+          "id": "reasoningEffort",
+          "value": "high"
+        },
+        {
+          "id": "serviceTier",
+          "value": "default"
+        }
+      ]
+    },
+    "reviewed_commit": null,
+    "reviewed_tree": null,
+    "raw_summary": "**Verdict: APPROVED for source scope.** No concrete reachable safety or user-visible regression found; no remedies requested.\n\nReviewed immutable candidate:\n\n- Commit: `67e20ff44a1b1ab5cefc0287549411fd62216d39`\n- Tree: `699604f1c87d086591240753bd8fe97d60cd1afb`\n- Branch: `fix/pr184-round4-final-20261109`\n- Diff base: `71ab301cf9bf976dab39956f1f22b66ab7d7f1c6`\n\nScope covered the complete 15-path diff, production callers, and meaningful regressions across all five units: unborn line history, file-view refresh and blame generations, pull/replay/submodule guards, mutation scheduling by retained filesystem identity, and stash excluded-path preservation\u2014including unstaged deletions, filesystem aliases, and Git boolean recursion parsing.\n\nThe five-commit assembly matches the manifest\u2019s parents, paths, trees, and required author identity. Candidate and accepted source `0fe2c606952deae3f1eea355399d1a64302567a7` have identical trees. Accepted-source and candidate branches remain present locally with matching remote-tracking SHAs; live remote preservation was not queried.\n\nEvidence limits: inspected the completed focused-results manifest and relevant logs, which report passing checks against the identical accepted tree. I executed no builds, tests, or scripts, made no edits or network writes, and did not inspect, poll, or wait on the active full run. **This approval does not establish a candidate full-run pass.**",
+    "task_status": {
+      "taskId": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Aabd48f62-7802-4fb3-af92-706615d19230",
+      "childThreadId": "thread:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Aabd48f62-7802-4fb3-af92-706615d19230",
+      "link": "<t3-thread://v2/a1d1eb4b-1d57-477d-bba8-514be0fd0d48/thread:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Aabd48f62-7802-4fb3-af92-706615d19230>",
+      "childRunId": "run:thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253Aabd48f62-7802-4fb3-af92-706615d19230:ordinal:1",
+      "childNodeId": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Aabd48f62-7802-4fb3-af92-706615d19230",
+      "status": "completed",
+      "workState": "result_available",
+      "hasPendingChildRuns": false,
+      "latestTerminalRunId": "run:thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253Aabd48f62-7802-4fb3-af92-706615d19230:ordinal:1",
+      "latestTerminalStatus": "completed",
+      "latestTerminalSummary": null,
+      "latestTerminalResultContextTransferId": null,
+      "providerInstanceId": "codex",
+      "model": "gpt-6.1-sol",
+      "options": [
+        {
+          "id": "reasoningEffort",
+          "value": "high"
+        },
+        {
+          "id": "serviceTier",
+          "value": "default"
+        }
+      ],
+      "summary": "**Verdict: APPROVED for source scope.** No concrete reachable safety or user-visible regression found; no remedies requested.\n\nReviewed immutable candidate:\n\n- Commit: `67e20ff44a1b1ab5cefc0287549411fd62216d39`\n- Tree: `699604f1c87d086591240753bd8fe97d60cd1afb`\n- Branch: `fix/pr184-round4-final-20261109`\n- Diff base: `71ab301cf9bf976dab39956f1f22b66ab7d7f1c6`\n\nScope covered the complete 15-path diff, production callers, and meaningful regressions across all five units: unborn line history, file-view refresh and blame generations, pull/replay/submodule guards, mutation scheduling by retained filesystem identity, and stash excluded-path preservation\u2014including unstaged deletions, filesystem aliases, and Git boolean recursion parsing.\n\nThe five-commit assembly matches the manifest\u2019s parents, paths, trees, and required author identity. Candidate and accepted source `0fe2c606952deae3f1eea355399d1a64302567a7` have identical trees. Accepted-source and candidate branches remain present locally with matching remote-tracking SHAs; live remote preservation was not queried.\n\nEvidence limits: inspected the completed focused-results manifest and relevant logs, which report passing checks against the identical accepted tree. I executed no builds, tests, or scripts, made no edits or network writes, and did not inspect, poll, or wait on the active full run. **This approval does not establish a candidate full-run pass.**",
+      "resultContextTransferId": "context-transfer:type:subagent_result:source-thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253Aabd48f62-7802-4fb3-af92-706615d19230:target-thread:a45a5b1a-9219-41c5-a934-73656395f4ff:a1d03c11-78af-4418-84bb-993052cf41e5",
+      "hasPendingQuestion": false,
+      "pendingApproval": null,
+      "waitTimedOut": false
+    },
+    "disposition": "Scoped historical snapshot; preserve original findings. Later source corrections and exact final approvals supersede this stage; this record grants no current execution gate."
+  },
+  {
+    "task_id": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Ae18d991b-97fa-4bb0-bcf7-c0c74fe61d13",
+    "scope": "historical_stash_source",
+    "verdict": "BLOCK",
+    "reviewer": {
+      "provider": "codex",
+      "model": "gpt-6.1-sol",
+      "options": [
+        {
+          "id": "reasoningEffort",
+          "value": "high"
+        },
+        {
+          "id": "serviceTier",
+          "value": "default"
+        }
+      ]
+    },
+    "reviewed_commit": null,
+    "reviewed_tree": null,
+    "raw_summary": "Verdict: **request changes \u2014 one P1 data-loss bypass** in `stash_source`.\n\nReviewed candidate `67e20ff44a1b1ab5cefc0287549411fd62216d39`, tree `699604f1c87d086591240753bd8fe97d60cd1afb`, branch `fix/pr184-round4-final-20261109`. Its tree exactly matches accepted source `0fe2c606952deae3f1eea355399d1a64302567a7`. Scope: fixes for 4513819106/4513819115 in `src/repo/partial_stash/{mod.rs,tests.rs}`, the English/German diagnostic, and supporting execution/routing code, against published base `71ab301cf9bf976dab39956f1f22b66ab7d7f1c6`.\n\n**P1: dangling symlink aliases bypass the authoritative guard.** At [mod.rs:264](/home/jonas/.t3/worktrees/gitcraft/t3-572729bb/src/repo/partial_stash/mod.rs:264), `test -ef` follows symlinks. A failed target lookup returns false/status 1, which `same()` accepts as a safe non-match.\n\nConcrete trigger on a case-insensitive filesystem supporting symlinks:\n\n1. Commit tracked regular file `A`, then stage its deletion.\n2. Create excluded `a` as a symlink to a nonexistent target.\n3. Request plain stash. Alternatively, ignore `a`; then both plain stash and `-u` reach this defect.\n\nThe lexical guard distinguishes `A` from `a`. Both filesystem comparisons fail because they dereference the dangling link, so validation succeeds. Stash cleanup restores tracked `A`, replacing the same directory entry occupied by excluded `a`; the excluded link contents were never stashed. Redo uses the same validation and inherits the bypass. An inaccessible symlink target has the same lookup problem.\n\nMinimal remedy: compare repository-side entry identity without dereferencing the final symlink, or conservatively refuse unresolved symlink comparisons. Add a regression covering the excluded dangling alias through normal execution and Redo, including ignored `-u`.\n\nThe shared staged/unstaged removal collection and retained removals during ignored lookup address the specified ordinary `f/local` replacement. Remote routing, original spelling, and snapshot exemption showed no additional concrete defect.\n\nEvidence limits: read-only source review; no execution or active-run inspection. Existing focused evidence records **33 passing stash tests** against the identical accepted tree. The alias test uses hard links and conditionally checks case identity; it does not cover dangling aliases. The finding above is source-derived, not experimentally reproduced.",
+    "task_status": {
+      "taskId": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Ae18d991b-97fa-4bb0-bcf7-c0c74fe61d13",
+      "childThreadId": "thread:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Ae18d991b-97fa-4bb0-bcf7-c0c74fe61d13",
+      "link": "<t3-thread://v2/a1d1eb4b-1d57-477d-bba8-514be0fd0d48/thread:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Ae18d991b-97fa-4bb0-bcf7-c0c74fe61d13>",
+      "childRunId": "run:thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253Ae18d991b-97fa-4bb0-bcf7-c0c74fe61d13:ordinal:1",
+      "childNodeId": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Ae18d991b-97fa-4bb0-bcf7-c0c74fe61d13",
+      "status": "completed",
+      "workState": "result_available",
+      "hasPendingChildRuns": false,
+      "latestTerminalRunId": "run:thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253Ae18d991b-97fa-4bb0-bcf7-c0c74fe61d13:ordinal:1",
+      "latestTerminalStatus": "completed",
+      "latestTerminalSummary": null,
+      "latestTerminalResultContextTransferId": null,
+      "providerInstanceId": "codex",
+      "model": "gpt-6.1-sol",
+      "options": [
+        {
+          "id": "reasoningEffort",
+          "value": "high"
+        },
+        {
+          "id": "serviceTier",
+          "value": "default"
+        }
+      ],
+      "summary": "Verdict: **request changes \u2014 one P1 data-loss bypass** in `stash_source`.\n\nReviewed candidate `67e20ff44a1b1ab5cefc0287549411fd62216d39`, tree `699604f1c87d086591240753bd8fe97d60cd1afb`, branch `fix/pr184-round4-final-20261109`. Its tree exactly matches accepted source `0fe2c606952deae3f1eea355399d1a64302567a7`. Scope: fixes for 4513819106/4513819115 in `src/repo/partial_stash/{mod.rs,tests.rs}`, the English/German diagnostic, and supporting execution/routing code, against published base `71ab301cf9bf976dab39956f1f22b66ab7d7f1c6`.\n\n**P1: dangling symlink aliases bypass the authoritative guard.** At [mod.rs:264](/home/jonas/.t3/worktrees/gitcraft/t3-572729bb/src/repo/partial_stash/mod.rs:264), `test -ef` follows symlinks. A failed target lookup returns false/status 1, which `same()` accepts as a safe non-match.\n\nConcrete trigger on a case-insensitive filesystem supporting symlinks:\n\n1. Commit tracked regular file `A`, then stage its deletion.\n2. Create excluded `a` as a symlink to a nonexistent target.\n3. Request plain stash. Alternatively, ignore `a`; then both plain stash and `-u` reach this defect.\n\nThe lexical guard distinguishes `A` from `a`. Both filesystem comparisons fail because they dereference the dangling link, so validation succeeds. Stash cleanup restores tracked `A`, replacing the same directory entry occupied by excluded `a`; the excluded link contents were never stashed. Redo uses the same validation and inherits the bypass. An inaccessible symlink target has the same lookup problem.\n\nMinimal remedy: compare repository-side entry identity without dereferencing the final symlink, or conservatively refuse unresolved symlink comparisons. Add a regression covering the excluded dangling alias through normal execution and Redo, including ignored `-u`.\n\nThe shared staged/unstaged removal collection and retained removals during ignored lookup address the specified ordinary `f/local` replacement. Remote routing, original spelling, and snapshot exemption showed no additional concrete defect.\n\nEvidence limits: read-only source review; no execution or active-run inspection. Existing focused evidence records **33 passing stash tests** against the identical accepted tree. The alias test uses hard links and conditionally checks case identity; it does not cover dangling aliases. The finding above is source-derived, not experimentally reproduced.",
+      "resultContextTransferId": "context-transfer:type:subagent_result:source-thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253Ae18d991b-97fa-4bb0-bcf7-c0c74fe61d13:target-thread:a45a5b1a-9219-41c5-a934-73656395f4ff:32b60f37-17b9-495e-8044-7aa35461ba8d",
+      "hasPendingQuestion": false,
+      "pendingApproval": null,
+      "waitTimedOut": false
+    },
+    "disposition": "Scoped historical snapshot; preserve original findings. Later source corrections and exact final approvals supersede this stage; this record grants no current execution gate."
+  },
+  {
+    "task_id": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A23e662e1-439d-465b-b2d3-c2013054cc6a",
+    "scope": "historical_tooling_mixed",
+    "verdict": "MIXED",
+    "reviewer": {
+      "provider": "codex",
+      "model": "gpt-6.1-sol",
+      "options": [
+        {
+          "id": "reasoningEffort",
+          "value": "high"
+        },
+        {
+          "id": "serviceTier",
+          "value": "default"
+        }
+      ]
+    },
+    "reviewed_commit": null,
+    "reviewed_tree": null,
+    "raw_summary": "**Design verdict: FAIL overall**, due to one reachable inheritance-verifier defect.\n\nReview target: commit `67e20ff44a1b1ab5cefc0287549411fd62216d39`, tree `699604f1c87d086591240753bd8fe97d60cd1afb`, branch `fix/pr184-round4-final-20261109`. These candidate identities were supplied; all six permitted script SHA-256 values were independently verified.\n\n| Scope | Verdict |\n|---|---|\n| `runner_readiness` | **PASS** \u2014 design only |\n| `evidence_packaging` | **PASS** \u2014 design only |\n| `inheritance_verifier` | **FAIL** |\n| `archive_provenance` | **PASS** \u2014 qualifications below |\n\n**Finding \u2014 P2: substituted archived logs can inherit unchanged execution approval.**\n\nAt [inheritance verifier line 43](/tmp/gitcraft-pr184-round4-inheritance.py:43), compressed and raw log hashes are checked against `manifest['logs']`. The committed-results validation at [line 55](/tmp/gitcraft-pr184-round4-inheritance.py:55) binds approved result and runner bytes, but never reconciles archived logs with `results['checks']`.\n\nA successor can replace an archived gate log and update its manifest file/compressed/raw hashes while preserving the approved results, runner and reviews. Every current check still passes, producing `archive_integrity=True` for logs that differ from the approved execution.\n\nMinimal remedy: require an exact, duplicate-free correspondence between committed result checks and manifest log entries by gate label, and require each decompressed archived log\u2019s digest to equal that check\u2019s committed `sha256`.\n\nThe six requested remedies are present in the inspected design:\n\n- CAS ref creation and advancement.\n- Historical completion identity explicitly **UNKNOWN**.\n- Pinned base, ordered feature plan, complete sole-parent checks and terminal candidate.\n- Nonblank task/provider/model identities and distinct source/execution tasks.\n- Committed result, runner and exact approval bindings.\n- Tracked byte, executable-mode and symlink-target comparisons independent of clean status.\n\nApproved `evidence_packaging` script_sha256:\n\n`be8c4859e90f52a7de474e8e7c95a248422cfa773999b2b498193c3a114d1816`\n\nNo `inheritance_verifier` script hash is approved.\n\nEvidence limits: read AGENTS.md and only the permitted sources, inert test sources/log and errata. Executed no tooling, tests or builds; inspected no active-run evidence; performed no network operations or edits. Historical assertions in the errata were assessed for qualification, not independently corroborated. Pending reviews/findings and the intentionally absent package are not defects. Full evidence acceptance remains outstanding.",
+    "task_status": {
+      "taskId": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A23e662e1-439d-465b-b2d3-c2013054cc6a",
+      "childThreadId": "thread:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A23e662e1-439d-465b-b2d3-c2013054cc6a",
+      "link": "<t3-thread://v2/a1d1eb4b-1d57-477d-bba8-514be0fd0d48/thread:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A23e662e1-439d-465b-b2d3-c2013054cc6a>",
+      "childRunId": "run:thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253A23e662e1-439d-465b-b2d3-c2013054cc6a:ordinal:1",
+      "childNodeId": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A23e662e1-439d-465b-b2d3-c2013054cc6a",
+      "status": "completed",
+      "workState": "result_available",
+      "hasPendingChildRuns": false,
+      "latestTerminalRunId": "run:thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253A23e662e1-439d-465b-b2d3-c2013054cc6a:ordinal:1",
+      "latestTerminalStatus": "completed",
+      "latestTerminalSummary": null,
+      "latestTerminalResultContextTransferId": null,
+      "providerInstanceId": "codex",
+      "model": "gpt-6.1-sol",
+      "options": [
+        {
+          "id": "reasoningEffort",
+          "value": "high"
+        },
+        {
+          "id": "serviceTier",
+          "value": "default"
+        }
+      ],
+      "summary": "**Design verdict: FAIL overall**, due to one reachable inheritance-verifier defect.\n\nReview target: commit `67e20ff44a1b1ab5cefc0287549411fd62216d39`, tree `699604f1c87d086591240753bd8fe97d60cd1afb`, branch `fix/pr184-round4-final-20261109`. These candidate identities were supplied; all six permitted script SHA-256 values were independently verified.\n\n| Scope | Verdict |\n|---|---|\n| `runner_readiness` | **PASS** \u2014 design only |\n| `evidence_packaging` | **PASS** \u2014 design only |\n| `inheritance_verifier` | **FAIL** |\n| `archive_provenance` | **PASS** \u2014 qualifications below |\n\n**Finding \u2014 P2: substituted archived logs can inherit unchanged execution approval.**\n\nAt [inheritance verifier line 43](/tmp/gitcraft-pr184-round4-inheritance.py:43), compressed and raw log hashes are checked against `manifest['logs']`. The committed-results validation at [line 55](/tmp/gitcraft-pr184-round4-inheritance.py:55) binds approved result and runner bytes, but never reconciles archived logs with `results['checks']`.\n\nA successor can replace an archived gate log and update its manifest file/compressed/raw hashes while preserving the approved results, runner and reviews. Every current check still passes, producing `archive_integrity=True` for logs that differ from the approved execution.\n\nMinimal remedy: require an exact, duplicate-free correspondence between committed result checks and manifest log entries by gate label, and require each decompressed archived log\u2019s digest to equal that check\u2019s committed `sha256`.\n\nThe six requested remedies are present in the inspected design:\n\n- CAS ref creation and advancement.\n- Historical completion identity explicitly **UNKNOWN**.\n- Pinned base, ordered feature plan, complete sole-parent checks and terminal candidate.\n- Nonblank task/provider/model identities and distinct source/execution tasks.\n- Committed result, runner and exact approval bindings.\n- Tracked byte, executable-mode and symlink-target comparisons independent of clean status.\n\nApproved `evidence_packaging` script_sha256:\n\n`be8c4859e90f52a7de474e8e7c95a248422cfa773999b2b498193c3a114d1816`\n\nNo `inheritance_verifier` script hash is approved.\n\nEvidence limits: read AGENTS.md and only the permitted sources, inert test sources/log and errata. Executed no tooling, tests or builds; inspected no active-run evidence; performed no network operations or edits. Historical assertions in the errata were assessed for qualification, not independently corroborated. Pending reviews/findings and the intentionally absent package are not defects. Full evidence acceptance remains outstanding.",
+      "resultContextTransferId": "context-transfer:type:subagent_result:source-thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253A23e662e1-439d-465b-b2d3-c2013054cc6a:target-thread:a45a5b1a-9219-41c5-a934-73656395f4ff:dcad5347-b4d1-439d-b706-5a067c936a6a",
+      "hasPendingQuestion": false,
+      "pendingApproval": null,
+      "waitTimedOut": false
+    },
+    "disposition": "Scoped historical snapshot; preserve original findings. Later source corrections and exact final approvals supersede this stage; this record grants no current execution gate."
+  },
+  {
+    "task_id": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Ae59da513-b1b1-45f9-825c-ab1fb498663b",
+    "scope": "historical_whole_source",
+    "verdict": "PASS",
+    "reviewer": {
+      "provider": "codex",
+      "model": "gpt-6.1-sol",
+      "options": [
+        {
+          "id": "reasoningEffort",
+          "value": "high"
+        },
+        {
+          "id": "serviceTier",
+          "value": "default"
+        }
+      ]
+    },
+    "reviewed_commit": null,
+    "reviewed_tree": null,
+    "raw_summary": "**Source review: approved. No concrete reachable defect found in the complete 15-path diff. No remedy requested.**\n\nReviewed candidate: `a0f3586fc2ee033dca3a2081c3e5a4fd698946d9`  \nReviewed tree: `13015a8feff044505ca6ad15cee5236bb855d09d`\n\nThe tree exactly matches accepted source `1dacb09c95e97abc25d66964bef1dcc7a822dddd`. The five-unit assembly matches the actual commit chain from base `71ab301cf9bf976dab39956f1f22b66ab7d7f1c6`, including unit paths, provenance messages, and required authorship.\n\n| Scope | Verdict and concrete basis |\n|---|---|\n| Dangling-symlink bypass | **Pass.** Both comparison operands undergo `-L` plus unresolved-target checks before `-ef`. An unresolved link produces exit 3 and the localized actionable refusal, closing the reported excluded case-alias bypass conservatively. |\n| Cached/fresh stash and ignored guards | **Pass.** Cached eligibility retains lexical checks. Execution rereads status, includes staged and unstaged deletion/rename sources, and separately discovers ignored paths even with `-u`. Normal push and Redo reach validation before stash mutation. |\n| Ancestry, slash spelling, remote routing, snapshots | **Pass.** Comparisons cover both ancestor directions. Trailing-slash normalization affects comparisons only; original paths remain quoted data and error text. Filesystem inspection runs through repository-routed `git::run_shell`. Snapshots retain their separate non-cleanup path. |\n| File refresh and blame epochs | **Pass.** Failed reloads invalidate mutable reads. Blame has its own submission/reply epoch, including fixed-OID refresh; stale replies cannot clear the refresh requirement. Successful blame remains visible pending replacement. |\n| Unborn HEAD | **Pass.** The explanation requires symbolic HEAD under `refs/heads/` and confirmed absent branch ref. Explicit revisions and other resolution failures retain their original errors. |\n| Protected pull, replay, submodules | **Pass for reachable application-generated operations.** Envelope validation precedes preparation; prefixed saved pulls and alias replay are refused. Recursive pull and generated submodule updates inspect populated descendants before dispatch. |\n| Local scheduling identities | **Pass.** Common-directory filesystem identity determines exclusion, with a retained directory handle through queued/running work. Ownership paths remain separate; remote mutations retain their shared scheduling bucket. |\n\nRelative to previously reviewed tree `699604f1c87d086591240753bd8fe97d60cd1afb`, only the two stash files and two locale files changed; the other reviewed implementations are preserved exactly.\n\nEvidence limits: I executed no builds, tests, scripts, or process-control work. I inspected the permitted focused results and verified all six log hashes against the manifest: it records successful compilation, formatting, Clippy, 34 stash tests, and four recording tests. The new Unix fixture covers normal/Redo refusal, zero Redo steps, link target, staged/unstaged state, HEAD, and stash-list preservation. It does not establish native case-insensitive, Windows, or remote runtime coverage.\n\nThe superseded full run supplies no candidate gate. I did not inspect the parent-owned full run, CI, or active processes. Status: **source-reviewed; full combined validation remains unassessed.**",
+    "task_status": {
+      "taskId": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Ae59da513-b1b1-45f9-825c-ab1fb498663b",
+      "childThreadId": "thread:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Ae59da513-b1b1-45f9-825c-ab1fb498663b",
+      "link": "<t3-thread://v2/a1d1eb4b-1d57-477d-bba8-514be0fd0d48/thread:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Ae59da513-b1b1-45f9-825c-ab1fb498663b>",
+      "childRunId": "run:thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253Ae59da513-b1b1-45f9-825c-ab1fb498663b:ordinal:1",
+      "childNodeId": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Ae59da513-b1b1-45f9-825c-ab1fb498663b",
+      "status": "completed",
+      "workState": "result_available",
+      "hasPendingChildRuns": false,
+      "latestTerminalRunId": "run:thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253Ae59da513-b1b1-45f9-825c-ab1fb498663b:ordinal:1",
+      "latestTerminalStatus": "completed",
+      "latestTerminalSummary": null,
+      "latestTerminalResultContextTransferId": null,
+      "providerInstanceId": "codex",
+      "model": "gpt-6.1-sol",
+      "options": [
+        {
+          "id": "reasoningEffort",
+          "value": "high"
+        },
+        {
+          "id": "serviceTier",
+          "value": "default"
+        }
+      ],
+      "summary": "**Source review: approved. No concrete reachable defect found in the complete 15-path diff. No remedy requested.**\n\nReviewed candidate: `a0f3586fc2ee033dca3a2081c3e5a4fd698946d9`  \nReviewed tree: `13015a8feff044505ca6ad15cee5236bb855d09d`\n\nThe tree exactly matches accepted source `1dacb09c95e97abc25d66964bef1dcc7a822dddd`. The five-unit assembly matches the actual commit chain from base `71ab301cf9bf976dab39956f1f22b66ab7d7f1c6`, including unit paths, provenance messages, and required authorship.\n\n| Scope | Verdict and concrete basis |\n|---|---|\n| Dangling-symlink bypass | **Pass.** Both comparison operands undergo `-L` plus unresolved-target checks before `-ef`. An unresolved link produces exit 3 and the localized actionable refusal, closing the reported excluded case-alias bypass conservatively. |\n| Cached/fresh stash and ignored guards | **Pass.** Cached eligibility retains lexical checks. Execution rereads status, includes staged and unstaged deletion/rename sources, and separately discovers ignored paths even with `-u`. Normal push and Redo reach validation before stash mutation. |\n| Ancestry, slash spelling, remote routing, snapshots | **Pass.** Comparisons cover both ancestor directions. Trailing-slash normalization affects comparisons only; original paths remain quoted data and error text. Filesystem inspection runs through repository-routed `git::run_shell`. Snapshots retain their separate non-cleanup path. |\n| File refresh and blame epochs | **Pass.** Failed reloads invalidate mutable reads. Blame has its own submission/reply epoch, including fixed-OID refresh; stale replies cannot clear the refresh requirement. Successful blame remains visible pending replacement. |\n| Unborn HEAD | **Pass.** The explanation requires symbolic HEAD under `refs/heads/` and confirmed absent branch ref. Explicit revisions and other resolution failures retain their original errors. |\n| Protected pull, replay, submodules | **Pass for reachable application-generated operations.** Envelope validation precedes preparation; prefixed saved pulls and alias replay are refused. Recursive pull and generated submodule updates inspect populated descendants before dispatch. |\n| Local scheduling identities | **Pass.** Common-directory filesystem identity determines exclusion, with a retained directory handle through queued/running work. Ownership paths remain separate; remote mutations retain their shared scheduling bucket. |\n\nRelative to previously reviewed tree `699604f1c87d086591240753bd8fe97d60cd1afb`, only the two stash files and two locale files changed; the other reviewed implementations are preserved exactly.\n\nEvidence limits: I executed no builds, tests, scripts, or process-control work. I inspected the permitted focused results and verified all six log hashes against the manifest: it records successful compilation, formatting, Clippy, 34 stash tests, and four recording tests. The new Unix fixture covers normal/Redo refusal, zero Redo steps, link target, staged/unstaged state, HEAD, and stash-list preservation. It does not establish native case-insensitive, Windows, or remote runtime coverage.\n\nThe superseded full run supplies no candidate gate. I did not inspect the parent-owned full run, CI, or active processes. Status: **source-reviewed; full combined validation remains unassessed.**",
+      "resultContextTransferId": "context-transfer:type:subagent_result:source-thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253Ae59da513-b1b1-45f9-825c-ab1fb498663b:target-thread:a45a5b1a-9219-41c5-a934-73656395f4ff:2cb612bc-115b-4ca4-895f-389b51a6e6a9",
+      "hasPendingQuestion": false,
+      "pendingApproval": null,
+      "waitTimedOut": false
+    },
+    "disposition": "Scoped historical snapshot; preserve original findings. Later source corrections and exact final approvals supersede this stage; this record grants no current execution gate."
+  },
+  {
+    "task_id": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Aff60d880-c9e8-4421-81e3-1a30772ffde5",
+    "scope": "historical_tooling_mixed",
+    "verdict": "MIXED",
+    "reviewer": {
+      "provider": "codex",
+      "model": "gpt-6.1-sol",
+      "options": [
+        {
+          "id": "reasoningEffort",
+          "value": "high"
+        },
+        {
+          "id": "serviceTier",
+          "value": "default"
+        }
+      ]
+    },
+    "reviewed_commit": null,
+    "reviewed_tree": null,
+    "raw_summary": "Reviewed candidate **`a0f3586fc2ee033dca3a2081c3e5a4fd698946d9`**, tree **`13015a8feff044505ca6ad15cee5236bb855d09d`**. All six supplied tool hashes match.\n\n- **evidence_packaging \u2014 FAIL (P2): accepted-source identity is not pinned.** [Package lines 40\u201346](/tmp/gitcraft-pr184-round4-package.py:40) accept `assembly['accepted']` and each unit\u2019s `source` from the input. Replacing these with the tested candidate SHA passes the comparisons: its tree equals accepted source, and each unit\u2019s disjoint paths retain their final contents. Even mutable `HEAD` references are accepted. This permits incorrect accepted-source provenance despite preserving application bytes. Minimal remedy: require `assembly['accepted']` and every unit\u2019s `source` to equal `1dacb09c95e97abc25d66964bef1dcc7a822dddd`.\n\n- **inheritance_verifier \u2014 FAIL (P2): committed assembly provenance can be rewritten without invalidating approvals.** [Verifier lines 33\u201358](/tmp/gitcraft-pr184-round4-inheritance.py:33) check self-declared file hashes but never validate `assembly.json`. A successor can change its accepted source, base, or unit provenance and refresh the manifest hashes while retaining approved results, runner, reviews, and logs; verification still reaches PASS. Minimal remedy: revalidate committed assembly against the pinned base, accepted source, feature plan, and immutable Git objects, or require an independently approved assembly digest.\n\n- **archive_provenance \u2014 PASS, historical-disclosure design only.** The errata correctly qualify unknown completion-stage identity and historical status-only source attribution. The preserved completion runner copies the initial identity metadata. Historical evidence files are unchanged between the published base and candidate. This verdict does not approve the assembly-provenance gaps above.\n\nThe previous **gate-log substitution flaw is closed**: the pinned helper requires duplicate-free, exact gate-label correspondence and binds every decompressed archived log to its approved result digest. Source/execution records require populated identities and distinct nonblank task IDs; package/verifier approvals bind exact script hashes. Archived source-checker bytes are bound to approved execution results.\n\nI read AGENTS.md and inspected the regression sources and preserved log without executing them. The recorded test-source hashes match; the log reports one source-integrity test and five binding/tooling tests passing. **No scripts, tests, builds, CI, writes, or active-run inspection occurred.** The destination is absent, so no completed archive or successor was verified. Full-run evidence acceptance remains separate.",
+    "task_status": {
+      "taskId": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Aff60d880-c9e8-4421-81e3-1a30772ffde5",
+      "childThreadId": "thread:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Aff60d880-c9e8-4421-81e3-1a30772ffde5",
+      "link": "<t3-thread://v2/a1d1eb4b-1d57-477d-bba8-514be0fd0d48/thread:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Aff60d880-c9e8-4421-81e3-1a30772ffde5>",
+      "childRunId": "run:thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253Aff60d880-c9e8-4421-81e3-1a30772ffde5:ordinal:1",
+      "childNodeId": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Aff60d880-c9e8-4421-81e3-1a30772ffde5",
+      "status": "completed",
+      "workState": "result_available",
+      "hasPendingChildRuns": false,
+      "latestTerminalRunId": "run:thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253Aff60d880-c9e8-4421-81e3-1a30772ffde5:ordinal:1",
+      "latestTerminalStatus": "completed",
+      "latestTerminalSummary": null,
+      "latestTerminalResultContextTransferId": null,
+      "providerInstanceId": "codex",
+      "model": "gpt-6.1-sol",
+      "options": [
+        {
+          "id": "reasoningEffort",
+          "value": "high"
+        },
+        {
+          "id": "serviceTier",
+          "value": "default"
+        }
+      ],
+      "summary": "Reviewed candidate **`a0f3586fc2ee033dca3a2081c3e5a4fd698946d9`**, tree **`13015a8feff044505ca6ad15cee5236bb855d09d`**. All six supplied tool hashes match.\n\n- **evidence_packaging \u2014 FAIL (P2): accepted-source identity is not pinned.** [Package lines 40\u201346](/tmp/gitcraft-pr184-round4-package.py:40) accept `assembly['accepted']` and each unit\u2019s `source` from the input. Replacing these with the tested candidate SHA passes the comparisons: its tree equals accepted source, and each unit\u2019s disjoint paths retain their final contents. Even mutable `HEAD` references are accepted. This permits incorrect accepted-source provenance despite preserving application bytes. Minimal remedy: require `assembly['accepted']` and every unit\u2019s `source` to equal `1dacb09c95e97abc25d66964bef1dcc7a822dddd`.\n\n- **inheritance_verifier \u2014 FAIL (P2): committed assembly provenance can be rewritten without invalidating approvals.** [Verifier lines 33\u201358](/tmp/gitcraft-pr184-round4-inheritance.py:33) check self-declared file hashes but never validate `assembly.json`. A successor can change its accepted source, base, or unit provenance and refresh the manifest hashes while retaining approved results, runner, reviews, and logs; verification still reaches PASS. Minimal remedy: revalidate committed assembly against the pinned base, accepted source, feature plan, and immutable Git objects, or require an independently approved assembly digest.\n\n- **archive_provenance \u2014 PASS, historical-disclosure design only.** The errata correctly qualify unknown completion-stage identity and historical status-only source attribution. The preserved completion runner copies the initial identity metadata. Historical evidence files are unchanged between the published base and candidate. This verdict does not approve the assembly-provenance gaps above.\n\nThe previous **gate-log substitution flaw is closed**: the pinned helper requires duplicate-free, exact gate-label correspondence and binds every decompressed archived log to its approved result digest. Source/execution records require populated identities and distinct nonblank task IDs; package/verifier approvals bind exact script hashes. Archived source-checker bytes are bound to approved execution results.\n\nI read AGENTS.md and inspected the regression sources and preserved log without executing them. The recorded test-source hashes match; the log reports one source-integrity test and five binding/tooling tests passing. **No scripts, tests, builds, CI, writes, or active-run inspection occurred.** The destination is absent, so no completed archive or successor was verified. Full-run evidence acceptance remains separate.",
+      "resultContextTransferId": "context-transfer:type:subagent_result:source-thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253Aff60d880-c9e8-4421-81e3-1a30772ffde5:target-thread:a45a5b1a-9219-41c5-a934-73656395f4ff:8ce161de-b8d1-413f-88ac-541b71266d97",
+      "hasPendingQuestion": false,
+      "pendingApproval": null,
+      "waitTimedOut": false
+    },
+    "disposition": "Scoped historical snapshot; preserve original findings. Later source corrections and exact final approvals supersede this stage; this record grants no current execution gate."
+  },
+  {
+    "task_id": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Aae0795bc-f185-4b21-b882-c334e92517b8",
+    "scope": "accepted_whole_source",
+    "verdict": "PASS",
+    "reviewer": {
+      "provider": "codex",
+      "model": "gpt-6.1-sol",
+      "options": [
+        {
+          "id": "reasoningEffort",
+          "value": "high"
+        },
+        {
+          "id": "serviceTier",
+          "value": "default"
+        }
+      ]
+    },
+    "reviewed_commit": "ab46c8001068e44bad9d2a8f4b5ea8e94a740c77",
+    "reviewed_tree": "4683de7e10a326b6f2f6340f963952c99db8a45a",
+    "raw_summary": "**PASS \u2014 `whole_source` and `pull_envelope`.** No concrete reachable blocker found.\n\n- Candidate: `ab46c8001068e44bad9d2a8f4b5ea8e94a740c77`\n- Tree: `4683de7e10a326b6f2f6340f963952c99db8a45a`\n- Base: `71ab301cf9bf976dab39956f1f22b66ab7d7f1c6`\n\nRead AGENTS.md and reviewed all 15 changed paths plus relevant callers. HTTPS-route proofs retain validation; saved prefixed pull/submodule forms are refused; generated updates retain ignored-file checks. Reviewed stash replacements, dangling links, unstaged deletions, pull configuration, file-view callbacks, and scheduling identity retention.\n\nVerified the focused-results digest matches the supplied value. No edits, tests, builds, scripts, process inspection, CI queries, remote writes, or delegates. **Source approval only; full execution remains unassessed.**\n\nPR https://github.com/JKamsker/gitcraft/pull/184, published head `71ab301cf9bf976dab39956f1f22b66ab7d7f1c6`; checks not queried; candidate source review PASS.",
+    "task_status": {
+      "taskId": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Aae0795bc-f185-4b21-b882-c334e92517b8",
+      "childThreadId": "thread:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Aae0795bc-f185-4b21-b882-c334e92517b8",
+      "link": "<t3-thread://v2/a1d1eb4b-1d57-477d-bba8-514be0fd0d48/thread:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Aae0795bc-f185-4b21-b882-c334e92517b8>",
+      "childRunId": "run:thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253Aae0795bc-f185-4b21-b882-c334e92517b8:ordinal:1",
+      "childNodeId": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Aae0795bc-f185-4b21-b882-c334e92517b8",
+      "status": "completed",
+      "workState": "result_available",
+      "hasPendingChildRuns": false,
+      "latestTerminalRunId": "run:thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253Aae0795bc-f185-4b21-b882-c334e92517b8:ordinal:1",
+      "latestTerminalStatus": "completed",
+      "latestTerminalSummary": null,
+      "latestTerminalResultContextTransferId": null,
+      "providerInstanceId": "codex",
+      "model": "gpt-6.1-sol",
+      "options": [
+        {
+          "id": "reasoningEffort",
+          "value": "high"
+        },
+        {
+          "id": "serviceTier",
+          "value": "default"
+        }
+      ],
+      "summary": "**PASS \u2014 `whole_source` and `pull_envelope`.** No concrete reachable blocker found.\n\n- Candidate: `ab46c8001068e44bad9d2a8f4b5ea8e94a740c77`\n- Tree: `4683de7e10a326b6f2f6340f963952c99db8a45a`\n- Base: `71ab301cf9bf976dab39956f1f22b66ab7d7f1c6`\n\nRead AGENTS.md and reviewed all 15 changed paths plus relevant callers. HTTPS-route proofs retain validation; saved prefixed pull/submodule forms are refused; generated updates retain ignored-file checks. Reviewed stash replacements, dangling links, unstaged deletions, pull configuration, file-view callbacks, and scheduling identity retention.\n\nVerified the focused-results digest matches the supplied value. No edits, tests, builds, scripts, process inspection, CI queries, remote writes, or delegates. **Source approval only; full execution remains unassessed.**\n\nPR https://github.com/JKamsker/gitcraft/pull/184, published head `71ab301cf9bf976dab39956f1f22b66ab7d7f1c6`; checks not queried; candidate source review PASS.",
+      "resultContextTransferId": "context-transfer:type:subagent_result:source-thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253Aae0795bc-f185-4b21-b882-c334e92517b8:target-thread:a45a5b1a-9219-41c5-a934-73656395f4ff:d3ad25e1-c385-4b0f-8d31-804bd3d12b8c",
+      "hasPendingQuestion": false,
+      "pendingApproval": null,
+      "waitTimedOut": false
+    }
+  },
+  {
+    "task_id": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A90e6dd70-ea6f-4e09-bf0b-b7eb77d92a87",
+    "scope": "accepted_file_inputs",
+    "verdict": "PASS",
+    "reviewer": {
+      "provider": "codex",
+      "model": "gpt-6.1-sol",
+      "options": [
+        {
+          "id": "reasoningEffort",
+          "value": "high"
+        },
+        {
+          "id": "serviceTier",
+          "value": "default"
+        }
+      ]
+    },
+    "reviewed_commit": "ab46c8001068e44bad9d2a8f4b5ea8e94a740c77",
+    "reviewed_tree": "4683de7e10a326b6f2f6340f963952c99db8a45a",
+    "raw_summary": "PASS \u2014 no concrete reachable blocker found in the requested source scope.\n\n- Candidate: `ab46c8001068e44bad9d2a8f4b5ea8e94a740c77`\n- Tree: `4683de7e10a326b6f2f6340f963952c99db8a45a`\n- Base: `71ab301cf9bf976dab39956f1f22b66ab7d7f1c6`\n\nRead `AGENTS.md`. Reviewed `file_view/{mod.rs,tests.rs}`, `navigate.rs`, `messages.rs`, `load.rs`, and relevant callers.\n\nUnchanged status preserves pending ordinary File/History reads. Captured loader keys reconcile with the latest accepted observation; changed inputs trigger replacement, and generation guards reject superseded replies. Cached mutable failures retry. Line-history routing, fixed-OID blame epochs, reload-error invalidation, and pane selection remain consistent.\n\nThe production-loader tests meaningfully exercise dispatch and delayed delivery; the synthetic arbitration test covers older-probe rejection and initial-input disagreement.\n\nVerified the supplied results manifest\u2019s digest matches `ad160928c51c204838b2b8fa17761608a687098b699b99721a8652c2795757ab`. No tests, builds, scripts, process inspection, CI access, edits, or remote writes performed. This is source-review approval only, not full execution approval.\n\nPR https://github.com/JKamsker/gitcraft/pull/184 \u2014 published head remains the supplied base; PASS applies to the exact local candidate above.",
+    "task_status": {
+      "taskId": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A90e6dd70-ea6f-4e09-bf0b-b7eb77d92a87",
+      "childThreadId": "thread:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A90e6dd70-ea6f-4e09-bf0b-b7eb77d92a87",
+      "link": "<t3-thread://v2/a1d1eb4b-1d57-477d-bba8-514be0fd0d48/thread:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A90e6dd70-ea6f-4e09-bf0b-b7eb77d92a87>",
+      "childRunId": "run:thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253A90e6dd70-ea6f-4e09-bf0b-b7eb77d92a87:ordinal:1",
+      "childNodeId": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A90e6dd70-ea6f-4e09-bf0b-b7eb77d92a87",
+      "status": "completed",
+      "workState": "result_available",
+      "hasPendingChildRuns": false,
+      "latestTerminalRunId": "run:thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253A90e6dd70-ea6f-4e09-bf0b-b7eb77d92a87:ordinal:1",
+      "latestTerminalStatus": "completed",
+      "latestTerminalSummary": null,
+      "latestTerminalResultContextTransferId": null,
+      "providerInstanceId": "codex",
+      "model": "gpt-6.1-sol",
+      "options": [
+        {
+          "id": "reasoningEffort",
+          "value": "high"
+        },
+        {
+          "id": "serviceTier",
+          "value": "default"
+        }
+      ],
+      "summary": "PASS \u2014 no concrete reachable blocker found in the requested source scope.\n\n- Candidate: `ab46c8001068e44bad9d2a8f4b5ea8e94a740c77`\n- Tree: `4683de7e10a326b6f2f6340f963952c99db8a45a`\n- Base: `71ab301cf9bf976dab39956f1f22b66ab7d7f1c6`\n\nRead `AGENTS.md`. Reviewed `file_view/{mod.rs,tests.rs}`, `navigate.rs`, `messages.rs`, `load.rs`, and relevant callers.\n\nUnchanged status preserves pending ordinary File/History reads. Captured loader keys reconcile with the latest accepted observation; changed inputs trigger replacement, and generation guards reject superseded replies. Cached mutable failures retry. Line-history routing, fixed-OID blame epochs, reload-error invalidation, and pane selection remain consistent.\n\nThe production-loader tests meaningfully exercise dispatch and delayed delivery; the synthetic arbitration test covers older-probe rejection and initial-input disagreement.\n\nVerified the supplied results manifest\u2019s digest matches `ad160928c51c204838b2b8fa17761608a687098b699b99721a8652c2795757ab`. No tests, builds, scripts, process inspection, CI access, edits, or remote writes performed. This is source-review approval only, not full execution approval.\n\nPR https://github.com/JKamsker/gitcraft/pull/184 \u2014 published head remains the supplied base; PASS applies to the exact local candidate above.",
+      "resultContextTransferId": "context-transfer:type:subagent_result:source-thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253A90e6dd70-ea6f-4e09-bf0b-b7eb77d92a87:target-thread:a45a5b1a-9219-41c5-a934-73656395f4ff:b97e084d-24bd-4ebe-9321-af65a15cab43",
+      "hasPendingQuestion": false,
+      "pendingApproval": null,
+      "waitTimedOut": false
+    }
+  },
+  {
+    "task_id": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A0aaaa333-ed65-452e-b5dc-e4dc231ef3b7",
+    "scope": "assembly",
+    "verdict": "PASS",
+    "reviewer": {
+      "provider": "codex",
+      "model": "gpt-6.1-sol",
+      "options": [
+        {
+          "id": "reasoningEffort",
+          "value": "high"
+        },
+        {
+          "id": "serviceTier",
+          "value": "default"
+        }
+      ]
+    },
+    "reviewed_commit": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+    "reviewed_tree": "4683de7e10a326b6f2f6340f963952c99db8a45a",
+    "raw_summary": "PASS for all four requested scopes. No actionable bypass found under the stated trusted-review-record model.\n\nReviewed candidate `1e48ab83f98a8c34dc536408ee31915707365bcf`, tree `4683de7e10a326b6f2f6340f963952c99db8a45a`.\n\nExplicit binding: `assembly_sha256=a5b3a7aef1ea157136f6ec702b021b15772d079cc1f63708c5939e50ca02e443`.\n\n| Scope | Verdict | Reviewed script SHA-256 |\n|---|---|---|\n| assembly | PASS | `0bd9ba9565bdb5a513f733b11b569470739c0381e7d59dfa1695401a4b43c834` |\n| evidence_packaging | PASS | `591adb9476e81b0384c9862b6b18379be228029694eb3059f678576208c8bc8c` |\n| inheritance_verifier | PASS | `aab20c50ce603b9b1a96d2099d104b725f08b0127b1cfa1284b25c1e71fea133` |\n| runner_readiness | PASS | `ac43f0f47d2b7975968dfd1352cadec264802fa1f5ba8b95fcd08c9d29ceacb0` |\n\nHelper bindings:\n\n- Approval binding: `fb057098987d40161211fb593084ee19cca19758a7269cc1582d1c1071336b7f`\n- Source integrity: `888c74252d6bf789e1150f1bba74532a351f635f440e26d04d4faedde40c995c`\n\nImmutable Git inspection confirmed five ordered units covering all 15 changed paths, sole-parent ancestry from `71ab301cf9bf976dab39956f1f22b66ab7d7f1c6`, required Jonas author/committer identities, preserved provenance references, and per-unit accepted-source equality. The final tree equals accepted `ab46c8001068e44bad9d2a8f4b5ea8e94a740c77`.\n\nThe previous substitution gaps are closed: accepted source is pinned literally, assembly bytes require digest-bound approval, and archived logs require duplicate-free exact gate correspondence plus equality with approved results\u2019 raw-log digests. Source/execution approvals require distinct nonblank task IDs; execution and design approvals bind their respective bytes.\n\nThe tracked-source checker supports the stated boundary-observation claim. Ref updates use expected-old CAS before push. Neither mechanism establishes continuous filesystem immutability or a distributed ref transaction; the documented claims stay within those limits.\n\nThis was read-only static review. I executed no scripts, tests, builds, or CI and inspected no active validation. The supplied completed regression log records 1+6 passing tests. These verdicts approve assembly and tooling readiness; they do not claim completed full-run evidence, a generated archive, or runtime approval.",
+    "task_status": {
+      "taskId": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A0aaaa333-ed65-452e-b5dc-e4dc231ef3b7",
+      "childThreadId": "thread:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A0aaaa333-ed65-452e-b5dc-e4dc231ef3b7",
+      "link": "<t3-thread://v2/a1d1eb4b-1d57-477d-bba8-514be0fd0d48/thread:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A0aaaa333-ed65-452e-b5dc-e4dc231ef3b7>",
+      "childRunId": "run:thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253A0aaaa333-ed65-452e-b5dc-e4dc231ef3b7:ordinal:1",
+      "childNodeId": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A0aaaa333-ed65-452e-b5dc-e4dc231ef3b7",
+      "status": "completed",
+      "workState": "result_available",
+      "hasPendingChildRuns": false,
+      "latestTerminalRunId": "run:thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253A0aaaa333-ed65-452e-b5dc-e4dc231ef3b7:ordinal:1",
+      "latestTerminalStatus": "completed",
+      "latestTerminalSummary": null,
+      "latestTerminalResultContextTransferId": null,
+      "providerInstanceId": "codex",
+      "model": "gpt-6.1-sol",
+      "options": [
+        {
+          "id": "reasoningEffort",
+          "value": "high"
+        },
+        {
+          "id": "serviceTier",
+          "value": "default"
+        }
+      ],
+      "summary": "PASS for all four requested scopes. No actionable bypass found under the stated trusted-review-record model.\n\nReviewed candidate `1e48ab83f98a8c34dc536408ee31915707365bcf`, tree `4683de7e10a326b6f2f6340f963952c99db8a45a`.\n\nExplicit binding: `assembly_sha256=a5b3a7aef1ea157136f6ec702b021b15772d079cc1f63708c5939e50ca02e443`.\n\n| Scope | Verdict | Reviewed script SHA-256 |\n|---|---|---|\n| assembly | PASS | `0bd9ba9565bdb5a513f733b11b569470739c0381e7d59dfa1695401a4b43c834` |\n| evidence_packaging | PASS | `591adb9476e81b0384c9862b6b18379be228029694eb3059f678576208c8bc8c` |\n| inheritance_verifier | PASS | `aab20c50ce603b9b1a96d2099d104b725f08b0127b1cfa1284b25c1e71fea133` |\n| runner_readiness | PASS | `ac43f0f47d2b7975968dfd1352cadec264802fa1f5ba8b95fcd08c9d29ceacb0` |\n\nHelper bindings:\n\n- Approval binding: `fb057098987d40161211fb593084ee19cca19758a7269cc1582d1c1071336b7f`\n- Source integrity: `888c74252d6bf789e1150f1bba74532a351f635f440e26d04d4faedde40c995c`\n\nImmutable Git inspection confirmed five ordered units covering all 15 changed paths, sole-parent ancestry from `71ab301cf9bf976dab39956f1f22b66ab7d7f1c6`, required Jonas author/committer identities, preserved provenance references, and per-unit accepted-source equality. The final tree equals accepted `ab46c8001068e44bad9d2a8f4b5ea8e94a740c77`.\n\nThe previous substitution gaps are closed: accepted source is pinned literally, assembly bytes require digest-bound approval, and archived logs require duplicate-free exact gate correspondence plus equality with approved results\u2019 raw-log digests. Source/execution approvals require distinct nonblank task IDs; execution and design approvals bind their respective bytes.\n\nThe tracked-source checker supports the stated boundary-observation claim. Ref updates use expected-old CAS before push. Neither mechanism establishes continuous filesystem immutability or a distributed ref transaction; the documented claims stay within those limits.\n\nThis was read-only static review. I executed no scripts, tests, builds, or CI and inspected no active validation. The supplied completed regression log records 1+6 passing tests. These verdicts approve assembly and tooling readiness; they do not claim completed full-run evidence, a generated archive, or runtime approval.",
+      "resultContextTransferId": "context-transfer:type:subagent_result:source-thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253A0aaaa333-ed65-452e-b5dc-e4dc231ef3b7:target-thread:a45a5b1a-9219-41c5-a934-73656395f4ff:defcae9e-bd3f-4016-af6d-cd54dd20743f",
+      "hasPendingQuestion": false,
+      "pendingApproval": null,
+      "waitTimedOut": false
+    },
+    "script_sha256": "0bd9ba9565bdb5a513f733b11b569470739c0381e7d59dfa1695401a4b43c834",
+    "assembly_sha256": "a5b3a7aef1ea157136f6ec702b021b15772d079cc1f63708c5939e50ca02e443"
+  },
+  {
+    "task_id": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A0aaaa333-ed65-452e-b5dc-e4dc231ef3b7",
+    "scope": "evidence_packaging",
+    "verdict": "PASS",
+    "reviewer": {
+      "provider": "codex",
+      "model": "gpt-6.1-sol",
+      "options": [
+        {
+          "id": "reasoningEffort",
+          "value": "high"
+        },
+        {
+          "id": "serviceTier",
+          "value": "default"
+        }
+      ]
+    },
+    "reviewed_commit": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+    "reviewed_tree": "4683de7e10a326b6f2f6340f963952c99db8a45a",
+    "raw_summary": "PASS for all four requested scopes. No actionable bypass found under the stated trusted-review-record model.\n\nReviewed candidate `1e48ab83f98a8c34dc536408ee31915707365bcf`, tree `4683de7e10a326b6f2f6340f963952c99db8a45a`.\n\nExplicit binding: `assembly_sha256=a5b3a7aef1ea157136f6ec702b021b15772d079cc1f63708c5939e50ca02e443`.\n\n| Scope | Verdict | Reviewed script SHA-256 |\n|---|---|---|\n| assembly | PASS | `0bd9ba9565bdb5a513f733b11b569470739c0381e7d59dfa1695401a4b43c834` |\n| evidence_packaging | PASS | `591adb9476e81b0384c9862b6b18379be228029694eb3059f678576208c8bc8c` |\n| inheritance_verifier | PASS | `aab20c50ce603b9b1a96d2099d104b725f08b0127b1cfa1284b25c1e71fea133` |\n| runner_readiness | PASS | `ac43f0f47d2b7975968dfd1352cadec264802fa1f5ba8b95fcd08c9d29ceacb0` |\n\nHelper bindings:\n\n- Approval binding: `fb057098987d40161211fb593084ee19cca19758a7269cc1582d1c1071336b7f`\n- Source integrity: `888c74252d6bf789e1150f1bba74532a351f635f440e26d04d4faedde40c995c`\n\nImmutable Git inspection confirmed five ordered units covering all 15 changed paths, sole-parent ancestry from `71ab301cf9bf976dab39956f1f22b66ab7d7f1c6`, required Jonas author/committer identities, preserved provenance references, and per-unit accepted-source equality. The final tree equals accepted `ab46c8001068e44bad9d2a8f4b5ea8e94a740c77`.\n\nThe previous substitution gaps are closed: accepted source is pinned literally, assembly bytes require digest-bound approval, and archived logs require duplicate-free exact gate correspondence plus equality with approved results\u2019 raw-log digests. Source/execution approvals require distinct nonblank task IDs; execution and design approvals bind their respective bytes.\n\nThe tracked-source checker supports the stated boundary-observation claim. Ref updates use expected-old CAS before push. Neither mechanism establishes continuous filesystem immutability or a distributed ref transaction; the documented claims stay within those limits.\n\nThis was read-only static review. I executed no scripts, tests, builds, or CI and inspected no active validation. The supplied completed regression log records 1+6 passing tests. These verdicts approve assembly and tooling readiness; they do not claim completed full-run evidence, a generated archive, or runtime approval.",
+    "task_status": {
+      "taskId": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A0aaaa333-ed65-452e-b5dc-e4dc231ef3b7",
+      "childThreadId": "thread:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A0aaaa333-ed65-452e-b5dc-e4dc231ef3b7",
+      "link": "<t3-thread://v2/a1d1eb4b-1d57-477d-bba8-514be0fd0d48/thread:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A0aaaa333-ed65-452e-b5dc-e4dc231ef3b7>",
+      "childRunId": "run:thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253A0aaaa333-ed65-452e-b5dc-e4dc231ef3b7:ordinal:1",
+      "childNodeId": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A0aaaa333-ed65-452e-b5dc-e4dc231ef3b7",
+      "status": "completed",
+      "workState": "result_available",
+      "hasPendingChildRuns": false,
+      "latestTerminalRunId": "run:thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253A0aaaa333-ed65-452e-b5dc-e4dc231ef3b7:ordinal:1",
+      "latestTerminalStatus": "completed",
+      "latestTerminalSummary": null,
+      "latestTerminalResultContextTransferId": null,
+      "providerInstanceId": "codex",
+      "model": "gpt-6.1-sol",
+      "options": [
+        {
+          "id": "reasoningEffort",
+          "value": "high"
+        },
+        {
+          "id": "serviceTier",
+          "value": "default"
+        }
+      ],
+      "summary": "PASS for all four requested scopes. No actionable bypass found under the stated trusted-review-record model.\n\nReviewed candidate `1e48ab83f98a8c34dc536408ee31915707365bcf`, tree `4683de7e10a326b6f2f6340f963952c99db8a45a`.\n\nExplicit binding: `assembly_sha256=a5b3a7aef1ea157136f6ec702b021b15772d079cc1f63708c5939e50ca02e443`.\n\n| Scope | Verdict | Reviewed script SHA-256 |\n|---|---|---|\n| assembly | PASS | `0bd9ba9565bdb5a513f733b11b569470739c0381e7d59dfa1695401a4b43c834` |\n| evidence_packaging | PASS | `591adb9476e81b0384c9862b6b18379be228029694eb3059f678576208c8bc8c` |\n| inheritance_verifier | PASS | `aab20c50ce603b9b1a96d2099d104b725f08b0127b1cfa1284b25c1e71fea133` |\n| runner_readiness | PASS | `ac43f0f47d2b7975968dfd1352cadec264802fa1f5ba8b95fcd08c9d29ceacb0` |\n\nHelper bindings:\n\n- Approval binding: `fb057098987d40161211fb593084ee19cca19758a7269cc1582d1c1071336b7f`\n- Source integrity: `888c74252d6bf789e1150f1bba74532a351f635f440e26d04d4faedde40c995c`\n\nImmutable Git inspection confirmed five ordered units covering all 15 changed paths, sole-parent ancestry from `71ab301cf9bf976dab39956f1f22b66ab7d7f1c6`, required Jonas author/committer identities, preserved provenance references, and per-unit accepted-source equality. The final tree equals accepted `ab46c8001068e44bad9d2a8f4b5ea8e94a740c77`.\n\nThe previous substitution gaps are closed: accepted source is pinned literally, assembly bytes require digest-bound approval, and archived logs require duplicate-free exact gate correspondence plus equality with approved results\u2019 raw-log digests. Source/execution approvals require distinct nonblank task IDs; execution and design approvals bind their respective bytes.\n\nThe tracked-source checker supports the stated boundary-observation claim. Ref updates use expected-old CAS before push. Neither mechanism establishes continuous filesystem immutability or a distributed ref transaction; the documented claims stay within those limits.\n\nThis was read-only static review. I executed no scripts, tests, builds, or CI and inspected no active validation. The supplied completed regression log records 1+6 passing tests. These verdicts approve assembly and tooling readiness; they do not claim completed full-run evidence, a generated archive, or runtime approval.",
+      "resultContextTransferId": "context-transfer:type:subagent_result:source-thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253A0aaaa333-ed65-452e-b5dc-e4dc231ef3b7:target-thread:a45a5b1a-9219-41c5-a934-73656395f4ff:defcae9e-bd3f-4016-af6d-cd54dd20743f",
+      "hasPendingQuestion": false,
+      "pendingApproval": null,
+      "waitTimedOut": false
+    },
+    "script_sha256": "591adb9476e81b0384c9862b6b18379be228029694eb3059f678576208c8bc8c"
+  },
+  {
+    "task_id": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A0aaaa333-ed65-452e-b5dc-e4dc231ef3b7",
+    "scope": "inheritance_verifier",
+    "verdict": "PASS",
+    "reviewer": {
+      "provider": "codex",
+      "model": "gpt-6.1-sol",
+      "options": [
+        {
+          "id": "reasoningEffort",
+          "value": "high"
+        },
+        {
+          "id": "serviceTier",
+          "value": "default"
+        }
+      ]
+    },
+    "reviewed_commit": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+    "reviewed_tree": "4683de7e10a326b6f2f6340f963952c99db8a45a",
+    "raw_summary": "PASS for all four requested scopes. No actionable bypass found under the stated trusted-review-record model.\n\nReviewed candidate `1e48ab83f98a8c34dc536408ee31915707365bcf`, tree `4683de7e10a326b6f2f6340f963952c99db8a45a`.\n\nExplicit binding: `assembly_sha256=a5b3a7aef1ea157136f6ec702b021b15772d079cc1f63708c5939e50ca02e443`.\n\n| Scope | Verdict | Reviewed script SHA-256 |\n|---|---|---|\n| assembly | PASS | `0bd9ba9565bdb5a513f733b11b569470739c0381e7d59dfa1695401a4b43c834` |\n| evidence_packaging | PASS | `591adb9476e81b0384c9862b6b18379be228029694eb3059f678576208c8bc8c` |\n| inheritance_verifier | PASS | `aab20c50ce603b9b1a96d2099d104b725f08b0127b1cfa1284b25c1e71fea133` |\n| runner_readiness | PASS | `ac43f0f47d2b7975968dfd1352cadec264802fa1f5ba8b95fcd08c9d29ceacb0` |\n\nHelper bindings:\n\n- Approval binding: `fb057098987d40161211fb593084ee19cca19758a7269cc1582d1c1071336b7f`\n- Source integrity: `888c74252d6bf789e1150f1bba74532a351f635f440e26d04d4faedde40c995c`\n\nImmutable Git inspection confirmed five ordered units covering all 15 changed paths, sole-parent ancestry from `71ab301cf9bf976dab39956f1f22b66ab7d7f1c6`, required Jonas author/committer identities, preserved provenance references, and per-unit accepted-source equality. The final tree equals accepted `ab46c8001068e44bad9d2a8f4b5ea8e94a740c77`.\n\nThe previous substitution gaps are closed: accepted source is pinned literally, assembly bytes require digest-bound approval, and archived logs require duplicate-free exact gate correspondence plus equality with approved results\u2019 raw-log digests. Source/execution approvals require distinct nonblank task IDs; execution and design approvals bind their respective bytes.\n\nThe tracked-source checker supports the stated boundary-observation claim. Ref updates use expected-old CAS before push. Neither mechanism establishes continuous filesystem immutability or a distributed ref transaction; the documented claims stay within those limits.\n\nThis was read-only static review. I executed no scripts, tests, builds, or CI and inspected no active validation. The supplied completed regression log records 1+6 passing tests. These verdicts approve assembly and tooling readiness; they do not claim completed full-run evidence, a generated archive, or runtime approval.",
+    "task_status": {
+      "taskId": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A0aaaa333-ed65-452e-b5dc-e4dc231ef3b7",
+      "childThreadId": "thread:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A0aaaa333-ed65-452e-b5dc-e4dc231ef3b7",
+      "link": "<t3-thread://v2/a1d1eb4b-1d57-477d-bba8-514be0fd0d48/thread:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A0aaaa333-ed65-452e-b5dc-e4dc231ef3b7>",
+      "childRunId": "run:thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253A0aaaa333-ed65-452e-b5dc-e4dc231ef3b7:ordinal:1",
+      "childNodeId": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A0aaaa333-ed65-452e-b5dc-e4dc231ef3b7",
+      "status": "completed",
+      "workState": "result_available",
+      "hasPendingChildRuns": false,
+      "latestTerminalRunId": "run:thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253A0aaaa333-ed65-452e-b5dc-e4dc231ef3b7:ordinal:1",
+      "latestTerminalStatus": "completed",
+      "latestTerminalSummary": null,
+      "latestTerminalResultContextTransferId": null,
+      "providerInstanceId": "codex",
+      "model": "gpt-6.1-sol",
+      "options": [
+        {
+          "id": "reasoningEffort",
+          "value": "high"
+        },
+        {
+          "id": "serviceTier",
+          "value": "default"
+        }
+      ],
+      "summary": "PASS for all four requested scopes. No actionable bypass found under the stated trusted-review-record model.\n\nReviewed candidate `1e48ab83f98a8c34dc536408ee31915707365bcf`, tree `4683de7e10a326b6f2f6340f963952c99db8a45a`.\n\nExplicit binding: `assembly_sha256=a5b3a7aef1ea157136f6ec702b021b15772d079cc1f63708c5939e50ca02e443`.\n\n| Scope | Verdict | Reviewed script SHA-256 |\n|---|---|---|\n| assembly | PASS | `0bd9ba9565bdb5a513f733b11b569470739c0381e7d59dfa1695401a4b43c834` |\n| evidence_packaging | PASS | `591adb9476e81b0384c9862b6b18379be228029694eb3059f678576208c8bc8c` |\n| inheritance_verifier | PASS | `aab20c50ce603b9b1a96d2099d104b725f08b0127b1cfa1284b25c1e71fea133` |\n| runner_readiness | PASS | `ac43f0f47d2b7975968dfd1352cadec264802fa1f5ba8b95fcd08c9d29ceacb0` |\n\nHelper bindings:\n\n- Approval binding: `fb057098987d40161211fb593084ee19cca19758a7269cc1582d1c1071336b7f`\n- Source integrity: `888c74252d6bf789e1150f1bba74532a351f635f440e26d04d4faedde40c995c`\n\nImmutable Git inspection confirmed five ordered units covering all 15 changed paths, sole-parent ancestry from `71ab301cf9bf976dab39956f1f22b66ab7d7f1c6`, required Jonas author/committer identities, preserved provenance references, and per-unit accepted-source equality. The final tree equals accepted `ab46c8001068e44bad9d2a8f4b5ea8e94a740c77`.\n\nThe previous substitution gaps are closed: accepted source is pinned literally, assembly bytes require digest-bound approval, and archived logs require duplicate-free exact gate correspondence plus equality with approved results\u2019 raw-log digests. Source/execution approvals require distinct nonblank task IDs; execution and design approvals bind their respective bytes.\n\nThe tracked-source checker supports the stated boundary-observation claim. Ref updates use expected-old CAS before push. Neither mechanism establishes continuous filesystem immutability or a distributed ref transaction; the documented claims stay within those limits.\n\nThis was read-only static review. I executed no scripts, tests, builds, or CI and inspected no active validation. The supplied completed regression log records 1+6 passing tests. These verdicts approve assembly and tooling readiness; they do not claim completed full-run evidence, a generated archive, or runtime approval.",
+      "resultContextTransferId": "context-transfer:type:subagent_result:source-thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253A0aaaa333-ed65-452e-b5dc-e4dc231ef3b7:target-thread:a45a5b1a-9219-41c5-a934-73656395f4ff:defcae9e-bd3f-4016-af6d-cd54dd20743f",
+      "hasPendingQuestion": false,
+      "pendingApproval": null,
+      "waitTimedOut": false
+    },
+    "script_sha256": "aab20c50ce603b9b1a96d2099d104b725f08b0127b1cfa1284b25c1e71fea133"
+  },
+  {
+    "task_id": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A0aaaa333-ed65-452e-b5dc-e4dc231ef3b7",
+    "scope": "runner_readiness",
+    "verdict": "PASS",
+    "reviewer": {
+      "provider": "codex",
+      "model": "gpt-6.1-sol",
+      "options": [
+        {
+          "id": "reasoningEffort",
+          "value": "high"
+        },
+        {
+          "id": "serviceTier",
+          "value": "default"
+        }
+      ]
+    },
+    "reviewed_commit": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+    "reviewed_tree": "4683de7e10a326b6f2f6340f963952c99db8a45a",
+    "raw_summary": "PASS for all four requested scopes. No actionable bypass found under the stated trusted-review-record model.\n\nReviewed candidate `1e48ab83f98a8c34dc536408ee31915707365bcf`, tree `4683de7e10a326b6f2f6340f963952c99db8a45a`.\n\nExplicit binding: `assembly_sha256=a5b3a7aef1ea157136f6ec702b021b15772d079cc1f63708c5939e50ca02e443`.\n\n| Scope | Verdict | Reviewed script SHA-256 |\n|---|---|---|\n| assembly | PASS | `0bd9ba9565bdb5a513f733b11b569470739c0381e7d59dfa1695401a4b43c834` |\n| evidence_packaging | PASS | `591adb9476e81b0384c9862b6b18379be228029694eb3059f678576208c8bc8c` |\n| inheritance_verifier | PASS | `aab20c50ce603b9b1a96d2099d104b725f08b0127b1cfa1284b25c1e71fea133` |\n| runner_readiness | PASS | `ac43f0f47d2b7975968dfd1352cadec264802fa1f5ba8b95fcd08c9d29ceacb0` |\n\nHelper bindings:\n\n- Approval binding: `fb057098987d40161211fb593084ee19cca19758a7269cc1582d1c1071336b7f`\n- Source integrity: `888c74252d6bf789e1150f1bba74532a351f635f440e26d04d4faedde40c995c`\n\nImmutable Git inspection confirmed five ordered units covering all 15 changed paths, sole-parent ancestry from `71ab301cf9bf976dab39956f1f22b66ab7d7f1c6`, required Jonas author/committer identities, preserved provenance references, and per-unit accepted-source equality. The final tree equals accepted `ab46c8001068e44bad9d2a8f4b5ea8e94a740c77`.\n\nThe previous substitution gaps are closed: accepted source is pinned literally, assembly bytes require digest-bound approval, and archived logs require duplicate-free exact gate correspondence plus equality with approved results\u2019 raw-log digests. Source/execution approvals require distinct nonblank task IDs; execution and design approvals bind their respective bytes.\n\nThe tracked-source checker supports the stated boundary-observation claim. Ref updates use expected-old CAS before push. Neither mechanism establishes continuous filesystem immutability or a distributed ref transaction; the documented claims stay within those limits.\n\nThis was read-only static review. I executed no scripts, tests, builds, or CI and inspected no active validation. The supplied completed regression log records 1+6 passing tests. These verdicts approve assembly and tooling readiness; they do not claim completed full-run evidence, a generated archive, or runtime approval.",
+    "task_status": {
+      "taskId": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A0aaaa333-ed65-452e-b5dc-e4dc231ef3b7",
+      "childThreadId": "thread:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A0aaaa333-ed65-452e-b5dc-e4dc231ef3b7",
+      "link": "<t3-thread://v2/a1d1eb4b-1d57-477d-bba8-514be0fd0d48/thread:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A0aaaa333-ed65-452e-b5dc-e4dc231ef3b7>",
+      "childRunId": "run:thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253A0aaaa333-ed65-452e-b5dc-e4dc231ef3b7:ordinal:1",
+      "childNodeId": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A0aaaa333-ed65-452e-b5dc-e4dc231ef3b7",
+      "status": "completed",
+      "workState": "result_available",
+      "hasPendingChildRuns": false,
+      "latestTerminalRunId": "run:thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253A0aaaa333-ed65-452e-b5dc-e4dc231ef3b7:ordinal:1",
+      "latestTerminalStatus": "completed",
+      "latestTerminalSummary": null,
+      "latestTerminalResultContextTransferId": null,
+      "providerInstanceId": "codex",
+      "model": "gpt-6.1-sol",
+      "options": [
+        {
+          "id": "reasoningEffort",
+          "value": "high"
+        },
+        {
+          "id": "serviceTier",
+          "value": "default"
+        }
+      ],
+      "summary": "PASS for all four requested scopes. No actionable bypass found under the stated trusted-review-record model.\n\nReviewed candidate `1e48ab83f98a8c34dc536408ee31915707365bcf`, tree `4683de7e10a326b6f2f6340f963952c99db8a45a`.\n\nExplicit binding: `assembly_sha256=a5b3a7aef1ea157136f6ec702b021b15772d079cc1f63708c5939e50ca02e443`.\n\n| Scope | Verdict | Reviewed script SHA-256 |\n|---|---|---|\n| assembly | PASS | `0bd9ba9565bdb5a513f733b11b569470739c0381e7d59dfa1695401a4b43c834` |\n| evidence_packaging | PASS | `591adb9476e81b0384c9862b6b18379be228029694eb3059f678576208c8bc8c` |\n| inheritance_verifier | PASS | `aab20c50ce603b9b1a96d2099d104b725f08b0127b1cfa1284b25c1e71fea133` |\n| runner_readiness | PASS | `ac43f0f47d2b7975968dfd1352cadec264802fa1f5ba8b95fcd08c9d29ceacb0` |\n\nHelper bindings:\n\n- Approval binding: `fb057098987d40161211fb593084ee19cca19758a7269cc1582d1c1071336b7f`\n- Source integrity: `888c74252d6bf789e1150f1bba74532a351f635f440e26d04d4faedde40c995c`\n\nImmutable Git inspection confirmed five ordered units covering all 15 changed paths, sole-parent ancestry from `71ab301cf9bf976dab39956f1f22b66ab7d7f1c6`, required Jonas author/committer identities, preserved provenance references, and per-unit accepted-source equality. The final tree equals accepted `ab46c8001068e44bad9d2a8f4b5ea8e94a740c77`.\n\nThe previous substitution gaps are closed: accepted source is pinned literally, assembly bytes require digest-bound approval, and archived logs require duplicate-free exact gate correspondence plus equality with approved results\u2019 raw-log digests. Source/execution approvals require distinct nonblank task IDs; execution and design approvals bind their respective bytes.\n\nThe tracked-source checker supports the stated boundary-observation claim. Ref updates use expected-old CAS before push. Neither mechanism establishes continuous filesystem immutability or a distributed ref transaction; the documented claims stay within those limits.\n\nThis was read-only static review. I executed no scripts, tests, builds, or CI and inspected no active validation. The supplied completed regression log records 1+6 passing tests. These verdicts approve assembly and tooling readiness; they do not claim completed full-run evidence, a generated archive, or runtime approval.",
+      "resultContextTransferId": "context-transfer:type:subagent_result:source-thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253A0aaaa333-ed65-452e-b5dc-e4dc231ef3b7:target-thread:a45a5b1a-9219-41c5-a934-73656395f4ff:defcae9e-bd3f-4016-af6d-cd54dd20743f",
+      "hasPendingQuestion": false,
+      "pendingApproval": null,
+      "waitTimedOut": false
+    },
+    "script_sha256": "ac43f0f47d2b7975968dfd1352cadec264802fa1f5ba8b95fcd08c9d29ceacb0"
+  },
+  {
+    "task_id": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Acd4daf4e-a858-4f12-8e48-115005b5831c",
+    "scope": "source",
+    "verdict": "PASS",
+    "reviewer": {
+      "provider": "codex",
+      "model": "gpt-6.1-sol",
+      "options": [
+        {
+          "id": "reasoningEffort",
+          "value": "high"
+        },
+        {
+          "id": "serviceTier",
+          "value": "default"
+        }
+      ]
+    },
+    "reviewed_commit": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+    "reviewed_tree": "4683de7e10a326b6f2f6340f963952c99db8a45a",
+    "raw_summary": "**PASS \u2014 source binding and adversarial source review** for commit `1e48ab83f98a8c34dc536408ee31915707365bcf`, tree `4683de7e10a326b6f2f6340f963952c99db8a45a`.\n\n- Read `AGENTS.md`. Independently compared all 1,980 recursive path/mode/blob entries: byte-for-byte equality with accepted source `ab46c8001068e44bad9d2a8f4b5ea8e94a740c77`.\n- Verified the five-unit parent chain from base `71ab301cf9bf976dab39956f1f22b66ab7d7f1c6`, each unit\u2019s tree and path scope, required author identity, and provenance against immutable Git objects.\n- Assembly manifest SHA-256 matches `a5b3a7aef1ea157136f6ec702b021b15772d079cc1f63708c5939e50ca02e443`.\n- Full recursive map SHA-256: `1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e`.\n\nNo concrete reachable blocker found in the combined 15-file diff. Saved HTTPS proofs still reach route validation; noncanonical submodule replay is refused before preparation or mutation; File/History loaders capture actual input keys and reject superseded replies; stash guards cover unstaged ignored replacements and unresolved symlinks. Scheduling retains directory identity throughout queued/running work.\n\nThe supplied whole-source and file-input approvals bind to this candidate through exact tree equality. The focused-results digest also matches. **This is source approval only.** No tests, builds, scripts, edits, process inspection, CI access, or network actions were performed; the active full run was untouched.\n\nPR https://github.com/JKamsker/gitcraft/pull/184, candidate head `1e48ab83f98a8c34dc536408ee31915707365bcf`, checks unassessed; source review PASS.",
+    "task_status": {
+      "taskId": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Acd4daf4e-a858-4f12-8e48-115005b5831c",
+      "childThreadId": "thread:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Acd4daf4e-a858-4f12-8e48-115005b5831c",
+      "link": "<t3-thread://v2/a1d1eb4b-1d57-477d-bba8-514be0fd0d48/thread:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Acd4daf4e-a858-4f12-8e48-115005b5831c>",
+      "childRunId": "run:thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253Acd4daf4e-a858-4f12-8e48-115005b5831c:ordinal:1",
+      "childNodeId": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Acd4daf4e-a858-4f12-8e48-115005b5831c",
+      "status": "completed",
+      "workState": "result_available",
+      "hasPendingChildRuns": false,
+      "latestTerminalRunId": "run:thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253Acd4daf4e-a858-4f12-8e48-115005b5831c:ordinal:1",
+      "latestTerminalStatus": "completed",
+      "latestTerminalSummary": null,
+      "latestTerminalResultContextTransferId": null,
+      "providerInstanceId": "codex",
+      "model": "gpt-6.1-sol",
+      "options": [
+        {
+          "id": "reasoningEffort",
+          "value": "high"
+        },
+        {
+          "id": "serviceTier",
+          "value": "default"
+        }
+      ],
+      "summary": "**PASS \u2014 source binding and adversarial source review** for commit `1e48ab83f98a8c34dc536408ee31915707365bcf`, tree `4683de7e10a326b6f2f6340f963952c99db8a45a`.\n\n- Read `AGENTS.md`. Independently compared all 1,980 recursive path/mode/blob entries: byte-for-byte equality with accepted source `ab46c8001068e44bad9d2a8f4b5ea8e94a740c77`.\n- Verified the five-unit parent chain from base `71ab301cf9bf976dab39956f1f22b66ab7d7f1c6`, each unit\u2019s tree and path scope, required author identity, and provenance against immutable Git objects.\n- Assembly manifest SHA-256 matches `a5b3a7aef1ea157136f6ec702b021b15772d079cc1f63708c5939e50ca02e443`.\n- Full recursive map SHA-256: `1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e`.\n\nNo concrete reachable blocker found in the combined 15-file diff. Saved HTTPS proofs still reach route validation; noncanonical submodule replay is refused before preparation or mutation; File/History loaders capture actual input keys and reject superseded replies; stash guards cover unstaged ignored replacements and unresolved symlinks. Scheduling retains directory identity throughout queued/running work.\n\nThe supplied whole-source and file-input approvals bind to this candidate through exact tree equality. The focused-results digest also matches. **This is source approval only.** No tests, builds, scripts, edits, process inspection, CI access, or network actions were performed; the active full run was untouched.\n\nPR https://github.com/JKamsker/gitcraft/pull/184, candidate head `1e48ab83f98a8c34dc536408ee31915707365bcf`, checks unassessed; source review PASS.",
+      "resultContextTransferId": "context-transfer:type:subagent_result:source-thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253Acd4daf4e-a858-4f12-8e48-115005b5831c:target-thread:a45a5b1a-9219-41c5-a934-73656395f4ff:e5f96817-744a-446f-a248-fbff0705d829",
+      "hasPendingQuestion": false,
+      "pendingApproval": null,
+      "waitTimedOut": false
+    }
+  },
+  {
+    "task_id": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Ae9d5d507-034f-496c-ab0e-a1202882ba0b",
+    "scope": "execution_evidence",
+    "verdict": "PASS",
+    "reviewer": {
+      "provider": "codex",
+      "model": "gpt-6.1-sol",
+      "options": [
+        {
+          "id": "reasoningEffort",
+          "value": "high"
+        },
+        {
+          "id": "serviceTier",
+          "value": "default"
+        }
+      ]
+    },
+    "reviewed_commit": "1e48ab83f98a8c34dc536408ee31915707365bcf",
+    "reviewed_tree": "4683de7e10a326b6f2f6340f963952c99db8a45a",
+    "raw_summary": "**PASS \u2014 `execution_evidence`, including accounting, binary binding, and containment.** No concrete gaps found.\n\nApproval binds exactly to:\n\n- Candidate: `1e48ab83f98a8c34dc536408ee31915707365bcf`\n- Tree: `4683de7e10a326b6f2f6340f963952c99db8a45a`\n- `full_results_sha256`: `fa47630220fee0475db5d5acbb61a1afd100bb1b127bf218c997c45a7c27f877`\n- `executed_runner_sha256`: `ac43f0f47d2b7975968dfd1352cadec264802fa1f5ba8b95fcd08c9d29ceacb0`\n\nIndependently reconciled all 16 unique gates and raw-log hashes, recorded exit codes of zero, exact clean before/after/final states, and 34 matching source observations covering 1,980 tracked entries. The immutable Git map matches `1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e`.\n\nRaw Cargo JSON identifies all six harnesses and the application. All 11 runtime records have matching executable/application hashes before and after; current hashes of all seven binaries also match.\n\nRaw test lines confirm library **4,981 passed, zero failed, 24 ignored, three filtered**; each filtered test passed separately. OS/checkpoint/standalone/MCP passed **24/1/3/6**; main and both doctest suites ran zero tests. The recording gates\u2019 **3+1** passes overlap the library. All 24 ignored tests are distinct and correspond to source ignore annotations.\n\nNine runtime commands use PID isolation with private `/proc` and `/dev`. The two native exceptions select exact tests operating on owned fixtures. The supplementary-group branch remains conditional and is not established by its passing summary.\n\nSuperseded runs contribute no gates. Archive creation remains pending as expected. This review performed no validation execution or mutations.\n\nPR https://github.com/JKamsker/gitcraft/pull/184, candidate head `1e48ab83f98a8c34dc536408ee31915707365bcf`, checks: completed local evidence PASS; source review PASS; CI unassessed.",
+    "task_status": {
+      "taskId": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Ae9d5d507-034f-496c-ab0e-a1202882ba0b",
+      "childThreadId": "thread:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Ae9d5d507-034f-496c-ab0e-a1202882ba0b",
+      "link": "<t3-thread://v2/a1d1eb4b-1d57-477d-bba8-514be0fd0d48/thread:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Ae9d5d507-034f-496c-ab0e-a1202882ba0b>",
+      "childRunId": "run:thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253Ae9d5d507-034f-496c-ab0e-a1202882ba0b:ordinal:1",
+      "childNodeId": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Ae9d5d507-034f-496c-ab0e-a1202882ba0b",
+      "status": "completed",
+      "workState": "result_available",
+      "hasPendingChildRuns": false,
+      "latestTerminalRunId": "run:thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253Ae9d5d507-034f-496c-ab0e-a1202882ba0b:ordinal:1",
+      "latestTerminalStatus": "completed",
+      "latestTerminalSummary": null,
+      "latestTerminalResultContextTransferId": null,
+      "providerInstanceId": "codex",
+      "model": "gpt-6.1-sol",
+      "options": [
+        {
+          "id": "reasoningEffort",
+          "value": "high"
+        },
+        {
+          "id": "serviceTier",
+          "value": "default"
+        }
+      ],
+      "summary": "**PASS \u2014 `execution_evidence`, including accounting, binary binding, and containment.** No concrete gaps found.\n\nApproval binds exactly to:\n\n- Candidate: `1e48ab83f98a8c34dc536408ee31915707365bcf`\n- Tree: `4683de7e10a326b6f2f6340f963952c99db8a45a`\n- `full_results_sha256`: `fa47630220fee0475db5d5acbb61a1afd100bb1b127bf218c997c45a7c27f877`\n- `executed_runner_sha256`: `ac43f0f47d2b7975968dfd1352cadec264802fa1f5ba8b95fcd08c9d29ceacb0`\n\nIndependently reconciled all 16 unique gates and raw-log hashes, recorded exit codes of zero, exact clean before/after/final states, and 34 matching source observations covering 1,980 tracked entries. The immutable Git map matches `1650c9ce87aa354fd9aa55a7741273ebb1b3938b49d91eb66c4ca508120a2a2e`.\n\nRaw Cargo JSON identifies all six harnesses and the application. All 11 runtime records have matching executable/application hashes before and after; current hashes of all seven binaries also match.\n\nRaw test lines confirm library **4,981 passed, zero failed, 24 ignored, three filtered**; each filtered test passed separately. OS/checkpoint/standalone/MCP passed **24/1/3/6**; main and both doctest suites ran zero tests. The recording gates\u2019 **3+1** passes overlap the library. All 24 ignored tests are distinct and correspond to source ignore annotations.\n\nNine runtime commands use PID isolation with private `/proc` and `/dev`. The two native exceptions select exact tests operating on owned fixtures. The supplementary-group branch remains conditional and is not established by its passing summary.\n\nSuperseded runs contribute no gates. Archive creation remains pending as expected. This review performed no validation execution or mutations.\n\nPR https://github.com/JKamsker/gitcraft/pull/184, candidate head `1e48ab83f98a8c34dc536408ee31915707365bcf`, checks: completed local evidence PASS; source review PASS; CI unassessed.",
+      "resultContextTransferId": "context-transfer:type:subagent_result:source-thread:thread%3Adelegated-task%3Acommand%253Amcp%253Ae36d9dad-9e22-4dff-869d-12967c771f89%253Adelegate-task%253Ae9d5d507-034f-496c-ab0e-a1202882ba0b:target-thread:a45a5b1a-9219-41c5-a934-73656395f4ff:ce59bf09-1ba5-4d76-82e9-561d99713fc1",
+      "hasPendingQuestion": false,
+      "pendingApproval": null,
+      "waitTimedOut": false
+    },
+    "full_results_sha256": "fa47630220fee0475db5d5acbb61a1afd100bb1b127bf218c997c45a7c27f877",
+    "executed_runner_sha256": "ac43f0f47d2b7975968dfd1352cadec264802fa1f5ba8b95fcd08c9d29ceacb0"
+  }
+]

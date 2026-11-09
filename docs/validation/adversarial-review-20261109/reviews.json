@@ -1,0 +1,21 @@
+{
+  "commit": "ff12c50ea2690e1b26f11141e199f6f7da410f9f",
+  "tree": "b30c7149909e83da276f8f29e514d7df62521acb",
+  "kind": "independent static adversarial reviews with verified immutable source equivalence",
+  "reviews": {
+    "pool_git": "PASS exactff12: immutable Git fold/checkout/pull scope identical to approved38 and prior7d; no new execution claimed.",
+    "pool_azure": "PASS exactff12: forge/pr_post/pr_threads/pull_request scope identical to approved38, d772 and462; no new execution claimed.",
+    "pool_views": "PASS exactff12: FileView source/tests and navigate/load/messages/line_history_tests identical to approved38 and187; no new execution claimed.",
+    "pool_ui": "PASS exactff12: allapp sources identical to approved38 including test font setup; no new execution claimed.",
+    "pool_config": "PASS exactff12: portable policy and Azure identity/cloud files identical to approved38; no new execution claimed.",
+    "pool_content": "PASS exactff12: image/FileView/integrations/recovery helper identical to approved38; no new execution claimed.",
+    "pool_async": "PASS exactff12: source unchanged in quickedit/stash/pull scopes; owned-child fixture bounded startup marker fixes confirmed timing race while preserving cancellation, timeout and cleanup assertions. No new execution claimed.",
+    "pool_validation": "PASS exactff12 source/history AND final execution/evidence audit: all16 exitszero, all archive/log/binary SHA256 values verified, six test artifacts matched Cargo JSON, library4915pass0fail24ignored3filtered, separate ACL/palette cases each1pass, recording gates3+1pass before contained runtimes, HEAD bound before/after commands. Independent provenance reconstruction matches final tree. Audit only; no new test execution."
+  },
+  "limitations": [
+    "No independent new test execution claimed",
+    "Native Windows/macOS manual UX not run",
+    "Form positive and secondary-control Enter paths source reviewed rather than dedicated behavioral cases"
+  ],
+  "method": "Eight GPT-6.1-sol high-reasoning independent static adversarial scope reviews, bound by immutable source comparisons. This file summarizes their session messages; it does not claim independent test execution."
+}

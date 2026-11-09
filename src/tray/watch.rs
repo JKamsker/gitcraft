@@ -19,6 +19,22 @@ const JOB_LIMIT: Duration = Duration::from_secs(120);
 #[cfg(not(test))]
 const STEP_LIMIT: Duration = Duration::from_secs(30);
 static OWNED: Mutex<Vec<PathBuf>> = Mutex::new(Vec::new());
+
+/// The same submission boundary is used by live observation and inert scheduling tests.
+fn submit_fetch(
+    pool: &tasks::Pool,
+    path: &Path,
+    cancel: tasks::Cancellation,
+    job: Box<dyn FnOnce() + Send>,
+) -> Result<(), &'static str> {
+    pool.submit(
+        cancel,
+        tasks::Priority::Background,
+        Some(crate::repo::mutation_key(path)),
+        job,
+    )
+}
+
 pub(crate) fn owns_fetch(path: &Path) -> bool {
     OWNED
         .lock()
@@ -135,7 +151,7 @@ impl Model {
     }
 }
 fn paths(open: &[PathBuf], recent: &[PathBuf]) -> Vec<PathBuf> {
-    paths_by(open, recent, crate::repo::mutation_key)
+    paths_by(open, recent, crate::repo::fetch_key)
 }
 fn paths_by(open: &[PathBuf], recent: &[PathBuf], key: impl Fn(&Path) -> PathBuf) -> Vec<PathBuf> {
     let mut paths = Vec::new();
@@ -512,7 +528,7 @@ impl Watcher {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner) = paths
             .iter()
-            .map(|path| crate::repo::mutation_key(path))
+            .map(|path| crate::repo::fetch_key(path))
             .collect();
         let changed = self.model.configure(profile, connections::current(), paths);
         if changed {
@@ -705,12 +721,13 @@ impl Watcher {
         let context = connections::current();
         let wake = ctx.clone();
         let submitted = tasks::pool().and_then(|pool| {
-            pool.submit(
+            submit_fetch(
+                pool,
+                &path,
                 cancel.clone(),
-                tasks::Priority::Background,
-                Some(crate::repo::mutation_key(&path)),
                 Box::new(move || {
                     let result = context.run(|| {
+                        crate::repo::discover_fetch_key(&work_path);
                         observe(
                             &mut LiveProbe {
                                 path: &work_path,

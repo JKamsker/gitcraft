@@ -1,0 +1,26 @@
+# Confirmed findings and repairs
+
+These findings were discovered adversarially, independently verified, and fixed. Final source review is bound to application candidate `ff12c50ea2690e1b26f11141e199f6f7da410f9f`; this is a targeted review, not a claim that every repository path was exhaustively audited.
+
+| Priority | Trigger and consequence | Repair |
+|---|---|---|
+| P1 | Fold staged changes while an ignored file is an ancestor of a historical tracked path: rebase could delete private contents. Staged deletions and commit-hook-created collisions also escaped the original check. | Check path-component overlap in both directions, include staged paths, and validate inside the mutation worker both before fixup and after hooks before rebase. |
+| P1 | Switch to a branch tracking a currently ignored local path, or pull a commit introducing that path: Git could overwrite its ignored contents. | Use protected checkout for forward/undo/redo; preserve merge options while enforcing ignored-file refusal for merge pulls; refuse rebase pulls with ignored paths. Resolve the full symbolic branch name, including tag-shadow cases and valueless boolean configuration. |
+| P1 | Open a quick-drop confirmation on branch A, switch externally to branch B at the same commit, then confirm: only the hash was checked and B could be rewritten. | Carry the initiating symbolic-branch expectation through confirmation and async preparation to execution. |
+| P1 | A target branch advances externally after checkout-and-pull captured its undo state: later undo could reset it to the stale tip. | Check the captured full branch ref before checkout and when replaying the operation. |
+| P1 | A partial stash or snapshot runs concurrently with another worktree's stash mutation: numbered stash refs could change between identity validation and deletion. | Hold the common-repository mutation lane for the complete stash operation, including preparation and rollback. |
+| P2 | Click an inbox PR whose clone is in another window: the repository was focused but the browser opened instead of queuing PR navigation. | Search parked windows consistently when determining whether the repository is open. |
+| P2 | Start practice creation in a detached window: another window could display its modal or receive its result/error. | Store dialog state per window and route completion through its captured owner, with the existing closed-owner fallback. |
+| P2 | Press Enter on Cancel, a secondary button, or a clone option: the global Enter handler could submit the form. | Submit implicitly only from eligible single-line fields, retain primary-button activation, and give cancellation precedence. |
+| P2 | Refresh a working-tree/index/symbolic-revision file view or reopen the same path while an older read is pending: stale data remained or an old result could replace new data. | Invalidate mutable caches and bind every history/blame/file/line-history response to a unique opening generation. |
+| P2 | Open Azure PRs from projects with escaped characters or supported legacy remotes: raw and decoded identities differed; HTTPS SSH routes were also accepted incorrectly. | Canonicalize only proper hosted web routes with strict HTTPS authority checks and compare decoded repository identities. |
+| P2 | Link an Azure branch or file containing `&`, `+`, or `=`: path escaping changed the meaning of query parameters. | Serialize query values safely and verify decoded round trips. |
+| P2 | Azure returns a continued or saturated list: a partial PR commit list was presented as complete. Historical statuses and an incorrect policy API version could also misstate review readiness. | Surface incomplete reads explicitly, retain global/current-iteration statuses with full context identity, and use the documented policy API version. |
+| P2 | Export and import a profile with host-specific author policies: the policies disappeared and push author expectations changed. | Preserve bounded, strictly validated policy fields and rule ordering in the portable schema, with legacy omission support. |
+| P2 | Compare crossing-aspect-ratio images: pixels outside both extents were highlighted and inflated change counts. | Ignore absent-on-both pixels and compute the denominator from the occupied union. |
+
+The broad local run also exposed regression-fixture defects: custom fonts needed an initialization-only frame, and an intentionally refusing recovery child could close stdin before the helper wrote to it. The latter now always reaps the child and tolerates only `BrokenPipe` accompanied by a failing child status. Strict lint failures in the new FileView code/tests were corrected without relaxing the lint policy or substantive assertions.
+
+Remaining practical limits: rebase pull with ignored paths is deliberately conservative; Azure incomplete results use a forge-page fallback; native Windows/macOS manual interaction was not exercised. Some positive and secondary-control keyboard cases remain covered by source review rather than dedicated UI tests.
+
+A preexisting cancellation regression also assumed children had started after a fixed delay. The fixture now waits boundedly for its owned child start marker, always requests cancellation, and retains the stopped-child and worktree-cleanup assertions.

@@ -71,21 +71,25 @@ impl UserProfile {
             crate::push_preflight::location(&format!("{scheme}://{host}/_")).map(|(host, _)| host)
         };
         let policy = crate::push_preflight::location(url).and_then(|(host, path)| {
+            let path = path.to_ascii_lowercase();
             self.author_hosts
                 .iter()
-                .filter(|p| {
+                .filter_map(|p| {
                     let key = p.host.trim().to_ascii_lowercase();
-                    if let Some((h, namespace)) = key.split_once('/') {
-                        policy_host(h).as_deref() == Some(host.as_str())
-                            && path
-                                .to_ascii_lowercase()
+                    let (h, namespace) = key.split_once('/').unwrap_or((&key, ""));
+                    let namespace = namespace.trim_end_matches('/');
+                    (policy_host(h).as_deref() == Some(host.as_str())
+                        && (namespace.is_empty()
+                            || path
                                 .strip_prefix(namespace)
-                                .is_some_and(|tail| tail.is_empty() || tail.starts_with('/'))
-                    } else {
-                        policy_host(&key).as_deref() == Some(host.as_str())
-                    }
+                                .is_some_and(|tail| tail.is_empty() || tail.starts_with('/'))))
+                    .then_some((p, namespace.len()))
                 })
-                .max_by_key(|p| p.host.len())
+                // Host spelling (default ports, aliases, or whitespace) must not
+                // outweigh a more specific namespace. Match and rank the same
+                // namespace, ignoring directory suffixes. Equal ranks keep the last rule.
+                .max_by_key(|(_, specificity)| *specificity)
+                .map(|(p, _)| p)
         });
         policy.map_or(
             (self.author_name.as_str(), self.author_email.as_str()),

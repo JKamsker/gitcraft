@@ -69,11 +69,21 @@ theme_tweaks:crate::theme::Tweaks,keep_submodules:bool,stale_branch_days:u32,tip
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+pub(crate) struct PublicAuthorRule {
+    pub host: String,
+    pub name: String,
+    pub email: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct PublicProfile {
     pub source_id: u64,
     pub name: String,
     pub author_name: String,
     pub author_email: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub author_hosts: Vec<PublicAuthorRule>,
     pub theme: String,
     pub own_signing: bool,
     pub signing_format: String,
@@ -115,6 +125,15 @@ impl PublicProfile {
             name: p.name.clone(),
             author_name: p.author_name.clone(),
             author_email: p.author_email.clone(),
+            author_hosts: p
+                .author_hosts
+                .iter()
+                .map(|rule| PublicAuthorRule {
+                    host: rule.host.clone(),
+                    name: rule.name.clone(),
+                    email: rule.email.clone(),
+                })
+                .collect(),
             theme: if crate::theme::portable_theme(theme) {
                 theme.0.clone()
             } else {
@@ -133,6 +152,15 @@ impl PublicProfile {
             name: self.name.clone(),
             author_name: self.author_name.clone(),
             author_email: self.author_email.clone(),
+            author_hosts: self
+                .author_hosts
+                .iter()
+                .map(|rule| crate::settings::profiles::HostAuthor {
+                    host: rule.host.clone(),
+                    name: rule.name.clone(),
+                    email: rule.email.clone(),
+                })
+                .collect(),
             own_signing: self.own_signing,
             ..Default::default()
         };
@@ -333,6 +361,14 @@ impl Setup {
             }
             for s in [&p.name, &p.author_name, &p.author_email] {
                 text(s, 512)?;
+            }
+            if p.author_hosts.len() > 64 {
+                return Err("Too many author host rules".into());
+            }
+            for rule in &p.author_hosts {
+                for value in [&rule.host, &rule.name, &rule.email] {
+                    text(value, 512)?;
+                }
             }
             if !crate::theme::portable_theme(&ThemeId(p.theme.clone())) {
                 return Err("Only built-in themes can be imported".into());

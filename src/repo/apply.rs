@@ -540,7 +540,11 @@ impl RepoTab {
             Action::OpenBundleExport => self.open_bundle_export(ctx),
             Action::OpenBundleInspect => self.open_bundle_inspect(ctx),
             Action::ExportBundle { refs, base } => self.export_bundle(refs, base, ctx),
-            Action::QuickEdit { edit, hash } => self.quick_edit(edit, hash, ctx),
+            Action::QuickEdit {
+                edit,
+                hash,
+                branch_guard,
+            } => self.quick_edit(edit, hash, branch_guard, ctx),
             Action::DropMenu(menu) => self.drop_menu = Some(menu),
             Action::CommitDrop(drop) => self.commit_drop(drop, ctx),
             Action::RunRebase => self.ask_run_rebase(ctx),

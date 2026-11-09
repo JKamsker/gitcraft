@@ -1,0 +1,34 @@
+{
+  "commit": "fdf8e8563f3d522f39b5bd453d7617d2927607d0",
+  "branch": "t3/file-view-cache-generation",
+  "remote": "https://github.com/JKamsker/gitcraft",
+  "remote_sha_verified": "fdf8e8563f3d522f39b5bd453d7617d2927607d0",
+  "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>",
+  "checks": [
+    {
+      "command": "cargo test --locked file_view:: --no-default-features",
+      "exit_code": 0,
+      "result": "6 passed; 0 failed; 4909 filtered out; no real process tests executed"
+    },
+    {
+      "command": "cargo fmt --all -- --check",
+      "exit_code": 0
+    },
+    {
+      "command": "git diff --check",
+      "exit_code": 0
+    }
+  ],
+  "status": "locally validated; independent review and combined/default-feature validation deferred to parent",
+  "scope": [
+    "src/repo/file_view/line_history.rs",
+    "src/repo/file_view/mod.rs",
+    "src/repo/file_view/tests.rs",
+    "src/repo/line_history_tests.rs",
+    "src/repo/load.rs",
+    "src/repo/messages.rs",
+    "src/repo/navigate.rs"
+  ],
+  "ci": "not started or waited on",
+  "pr": "not opened"
+}

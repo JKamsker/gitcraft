@@ -745,6 +745,7 @@ fn a_drop_confirmed_while_busy_says_so() {
         Action::QuickEdit {
             edit: Edit::Drop,
             hash: "0123456789abcdef".to_owned(),
+            branch_guard: crate::repo::operations::expect_symref("HEAD", "refs/heads/main"),
         },
         &ctx,
     );
@@ -950,8 +951,16 @@ fn linked_worktrees_share_a_mutation_key_before_the_first_load() -> Result<(), S
         ],
     )?;
     assert_eq!(
-        super::messages::mutation_key(&dir),
-        super::messages::mutation_key(&linked)
+        crate::tasks::mutation_schedule_key(super::messages::mutation_key(&dir)),
+        crate::tasks::mutation_schedule_key(super::messages::mutation_key(&linked))
+    );
+    // Ownership is refined by the same background discovery used by reloads,
+    // independently of the conservative scheduling bucket.
+    super::messages::discover_fetch_key(&dir);
+    super::messages::discover_fetch_key(&linked);
+    assert_eq!(
+        super::messages::fetch_key(&dir),
+        super::messages::fetch_key(&linked)
     );
     let _ = std::fs::remove_dir_all(dir);
     Ok(())
@@ -1019,4 +1028,144 @@ fn rapid_reloads_finish_and_coalesce() {
     assert_eq!(tab.reads, before + 2);
     drop(tab);
     let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
+fn quick_drop_refuses_a_different_branch_at_the_same_commit() -> Result<(), String> {
+    use super::{Action, Msg, RepoTab, quick_edit::Edit};
+    let dir = repo("quick-drop-same-sha");
+    git::run(Some(&dir), &["checkout", "-qb", "original"])?;
+    let base = git::head(&dir);
+    git::run(Some(&dir), &["commit", "-q", "--allow-empty", "-m", "tip"])?;
+    let tip = git::head(&dir);
+    git::run(Some(&dir), &["branch", "other"])?;
+    let ctx = egui::Context::default();
+    let mut tab = RepoTab::new_deferred(dir.clone(), &ctx);
+    tab.refs.current = Some("original".into());
+    tab.refs.head = tip.clone();
+    let captured = Action::QuickEdit {
+        edit: Edit::Drop,
+        hash: tip.clone(),
+        branch_guard: tab.same_branch(),
+    };
+    git::run(Some(&dir), &["checkout", "-q", "other"])?;
+    tab.refs.current = Some("other".into());
+    let execute = |tab: &mut RepoTab, action: Action| -> Result<bool, String> {
+        tab.apply(action, &ctx);
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(20);
+        loop {
+            let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+            let msg = tab.rx.recv_timeout(remaining).map_err(|e| e.to_string())?;
+            let completed = match &msg {
+                Msg::OpDone { result, .. } => Some(result.is_ok()),
+                _ => None,
+            };
+            tab.handle(msg, &ctx);
+            if let Some(ok) = completed {
+                return Ok(ok);
+            }
+        }
+    };
+    assert!(!execute(&mut tab, captured)?);
+    assert_eq!(git::head(&dir), tip);
+    assert_eq!(git::resolve(&dir, "refs/heads/original")?, tip);
+    assert_eq!(git::resolve(&dir, "refs/heads/other")?, tip);
+    assert!(
+        tab.timeline
+            .entries
+            .iter()
+            .all(|entry| entry.undo.is_none())
+    );
+    assert!(git::in_progress(&dir)?.is_none());
+    let fresh = Action::QuickEdit {
+        edit: Edit::Drop,
+        hash: tip.clone(),
+        branch_guard: tab.same_branch(),
+    };
+    assert!(execute(&mut tab, fresh)?);
+    assert_eq!(git::head(&dir), base);
+    assert_eq!(git::resolve(&dir, "refs/heads/original")?, tip);
+    let _ = std::fs::remove_dir_all(dir);
+    Ok(())
+}
+
+#[test]
+fn remote_spawn_mutation_serializes_whole_recorded_operations() -> Result<(), String> {
+    use std::sync::mpsc::channel;
+    use std::time::Duration;
+    let ctx = egui::Context::default();
+    let a = super::RepoTab::new_deferred("ssh://build/main".into(), &ctx);
+    let b = super::RepoTab::new_deferred("ssh://alias/linked".into(), &ctx);
+    assert_ne!(a.tx.repo, b.tx.repo);
+    let (release, gate) = channel::<()>();
+    let (out, events) = channel();
+    let record = out.clone();
+    super::messages::spawn_mutation(&a.tx, &ctx, super::Msg::JobPanicked, move || {
+        let _ = record.send("expect refs/stash");
+        let _ = gate.recv();
+        let _ = record.send("stash pop --index");
+        super::Msg::Then(Box::new(|_, _| {}))
+    });
+    assert_eq!(
+        events
+            .recv_timeout(Duration::from_secs(5))
+            .map_err(|e| e.to_string())?,
+        "expect refs/stash"
+    );
+    let unrelated = crate::tasks::Cancellation::default();
+    let unrelated_out = out.clone();
+    crate::tasks::pool()?
+        .submit(
+            unrelated.clone(),
+            crate::tasks::Priority::Background,
+            Some("ssh://unrelated/fixture".into()),
+            Box::new(move || {
+                let _ = unrelated_out.send("unrelated remote job");
+            }),
+        )
+        .map_err(str::to_owned)?;
+    let record = out.clone();
+    super::messages::spawn_mutation(&b.tx, &ctx, super::Msg::JobPanicked, move || {
+        let _ = record.send("stash push");
+        super::Msg::Then(Box::new(|_, _| {}))
+    });
+    assert!(
+        crate::tasks::pool()?.queued_priority_for(&b.tx.cancel)
+            == Some(crate::tasks::Priority::Background)
+    );
+    assert!(
+        crate::tasks::pool()?.queued_priority_for(&unrelated)
+            == Some(crate::tasks::Priority::Background)
+    );
+    // An ordinary tab read remains unkeyed and runs while A holds the bucket.
+    super::messages::spawn(&b.tx, &ctx, move || {
+        let _ = out.send("read");
+        super::Msg::Then(Box::new(|_, _| {}))
+    });
+    assert_eq!(
+        events
+            .recv_timeout(Duration::from_secs(5))
+            .map_err(|e| e.to_string())?,
+        "read"
+    );
+    drop(release);
+    assert_eq!(
+        events
+            .recv_timeout(Duration::from_secs(5))
+            .map_err(|e| e.to_string())?,
+        "stash pop --index"
+    );
+    assert_eq!(
+        events
+            .recv_timeout(Duration::from_secs(5))
+            .map_err(|e| e.to_string())?,
+        "unrelated remote job"
+    );
+    assert_eq!(
+        events
+            .recv_timeout(Duration::from_secs(5))
+            .map_err(|e| e.to_string())?,
+        "stash push"
+    );
+    Ok(())
 }

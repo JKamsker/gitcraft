@@ -39,16 +39,47 @@ impl std::ops::Deref for JobSender {
     }
 }
 
-/// Linked local worktrees share refs/stashes, hence one mutation key. Resolve the
-/// existing .git/commondir metadata without starting a process on the UI thread.
+/// Scheduling inputs are lexical only: submission must never inspect a filesystem.
+/// The pool classifies every local path into one local mutation bucket.
 pub(crate) fn mutation_key(path: &std::path::Path) -> std::path::PathBuf {
-    if crate::remote::is_remote(path) {
-        return path.to_owned();
+    path.to_owned()
+}
+
+static FETCH_KEYS: std::sync::Mutex<Vec<(std::path::PathBuf, std::path::PathBuf)>> =
+    std::sync::Mutex::new(Vec::new());
+
+/// Cached ownership identity, separate from scheduling. Before discovery, each
+/// path owns itself; background reads refine linked-worktree fetch deduplication.
+pub(crate) fn fetch_key(path: &std::path::Path) -> std::path::PathBuf {
+    FETCH_KEYS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .iter()
+        .find(|(p, _)| p == path)
+        .map_or_else(|| path.to_owned(), |(_, key)| key.clone())
+}
+
+/// Called only from background repository/tray reads, never during submission.
+pub(crate) fn discover_fetch_key(path: &std::path::Path) {
+    let key = if crate::remote::is_remote(path) {
+        path.to_owned()
+    } else {
+        super::watch::linked_git_dirs(path)
+            .map(|(_, common)| common)
+            .or_else(|| std::fs::canonicalize(path.join(".git")).ok())
+            .unwrap_or_else(|| std::fs::canonicalize(path).unwrap_or_else(|_| path.to_owned()))
+    };
+    let mut keys = FETCH_KEYS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    if let Some((_, cached)) = keys.iter_mut().find(|(p, _)| p == path) {
+        *cached = key;
+    } else {
+        if keys.len() >= 1024 {
+            keys.remove(0);
+        }
+        keys.push((path.to_owned(), key));
     }
-    super::watch::linked_git_dirs(path)
-        .map(|(_, common)| common)
-        .or_else(|| std::fs::canonicalize(path.join(".git")).ok())
-        .unwrap_or_else(|| std::fs::canonicalize(path).unwrap_or_else(|_| path.to_owned()))
 }
 
 /// What a background job leaves to do on the UI thread, with the tab (see `RepoTab::then`).
@@ -106,10 +137,20 @@ pub(super) enum Msg {
         (u64, u64),
         Box<Result<diff::structural::Structural, String>>,
     ),
-    FileHistory(String, Option<String>, Result<Vec<git::FileCommit>, String>),
-    Blame(String, Option<String>, Result<file_view::BlameData, String>),
+    FileHistory(
+        u64,
+        String,
+        Option<String>,
+        Result<Vec<git::FileCommit>, String>,
+    ),
+    Blame(
+        u64,
+        String,
+        Option<String>,
+        Result<file_view::BlameData, String>,
+    ),
     /// A file as it is at a revision, for the file view.
-    FileText(String, Option<String>, Result<FileText, String>),
+    FileText(u64, String, Option<String>, Result<FileText, String>),
     /// Every file in the tree of a commit.
     TreeFiles(String, Result<Vec<String>, String>),
     RebaseCommits {
@@ -157,6 +198,7 @@ pub(super) enum Msg {
     QuickEditCommits {
         edit: quick_edit::Edit,
         hash: String,
+        branch_guard: Vec<String>,
         result: Result<Vec<git::RebaseCommit>, String>,
     },
     OpDone {
@@ -294,6 +336,33 @@ pub(super) fn spawn_mutation(
     );
 }
 
+#[cfg(test)]
+type RecordedJob = Box<dyn FnOnce() -> Msg + Send>;
+
+#[cfg(test)]
+thread_local! {
+    static RECORDED_JOBS: std::cell::RefCell<Option<Vec<RecordedJob>>> = const { std::cell::RefCell::new(None) };
+}
+
+/// Capture submissions on this test thread without executing their Git/process work.
+#[cfg(test)]
+pub(super) fn record_jobs<T>(work: impl FnOnce() -> T) -> (T, Vec<RecordedJob>) {
+    struct Reset;
+    impl Drop for Reset {
+        fn drop(&mut self) {
+            RECORDED_JOBS.with(|slot| *slot.borrow_mut() = None);
+        }
+    }
+    RECORDED_JOBS.with(|slot| {
+        assert!(slot.borrow().is_none(), "nested job recording");
+        *slot.borrow_mut() = Some(Vec::new());
+    });
+    let _reset = Reset;
+    let result = work();
+    let jobs = RECORDED_JOBS.with(|slot| slot.borrow_mut().take().unwrap_or_default());
+    (result, jobs)
+}
+
 fn spawn_with(
     tx: &JobSender,
     ctx: &egui::Context,
@@ -302,6 +371,19 @@ fn spawn_with(
     failed: impl FnOnce(String) -> Msg + Send + 'static,
     job: impl FnOnce() -> Msg + Send + 'static,
 ) {
+    #[cfg(test)]
+    let job = {
+        let mut job: Option<RecordedJob> = Some(Box::new(job));
+        RECORDED_JOBS.with(|slot| {
+            if let Some(jobs) = &mut *slot.borrow_mut()
+                && let Some(job) = job.take()
+            {
+                jobs.push(job);
+            }
+        });
+        let Some(job) = job else { return };
+        job
+    };
     let tx = tx.clone();
     let ctx = ctx.clone();
     let rejected_tx = tx.clone();
@@ -425,6 +507,9 @@ impl RepoTab {
         self.poll_symbol_biography(ctx);
         self.poll_cochanges(ctx);
         self.poll_working_drafts(ctx);
+        if shown {
+            self.poll_file_view(ctx);
+        }
         if !shown || self.sleeping() {
             return;
         }
@@ -449,7 +534,7 @@ impl RepoTab {
         // Background fetch.
         let minutes = Settings::get(ctx).auto_fetch_minutes;
         if minutes > 0
-            && !crate::tray::watch::owns_fetch(&self.tx.repo)
+            && !crate::tray::watch::owns_fetch(&fetch_key(&self.path))
             && !self.remotes.is_empty()
             && self.busy_op.is_none()
             && super::offline::background_fetch_may_run(&self.path)
@@ -570,6 +655,7 @@ impl RepoTab {
                     self.folding
                         .saw_status(&work, &self.refs.head, Instant::now());
                     self.work = work;
+                    self.status_changed_file_view(ctx);
                     self.stash_picks.keep_changed(&self.work);
                     if wip_row_changed {
                         self.rebuild(ctx);
@@ -610,13 +696,17 @@ impl RepoTab {
             Msg::BundleDone(label, result, refresh) => {
                 self.bundle_done(label, result, refresh, ctx)
             }
-            Msg::QuickEditCommits { edit, hash, result } => {
-                self.run_quick_edit(edit, hash, result, ctx)
-            }
-            Msg::FileHistory(path, rev, result) => {
+            Msg::QuickEditCommits {
+                edit,
+                hash,
+                branch_guard,
+                result,
+            } => self.run_quick_edit(edit, hash, branch_guard, result, ctx),
+            Msg::FileHistory(generation, path, rev, result) => {
                 // Only the history of the revision shown: an older read may answer last. Nor
                 // the whole file's, once the history of some of its lines is shown.
                 if let Some(view) = &mut self.file_view
+                    && view.generation == generation
                     && view.path == path
                     && view.rev == rev
                     && view.lines.is_none()
@@ -624,16 +714,19 @@ impl RepoTab {
                     view.history = Some(result);
                 }
             }
-            Msg::Blame(path, rev, result) => {
+            Msg::Blame(generation, path, rev, result) => {
                 if let Some(view) = &mut self.file_view
+                    && view.blame_generation == generation
                     && view.path == path
                     && view.rev == rev
                 {
                     view.blame = Some(result);
+                    view.blame_needs_refresh = false;
                 }
             }
-            Msg::FileText(path, rev, result) => {
+            Msg::FileText(generation, path, rev, result) => {
                 if let Some(view) = &mut self.file_view
+                    && view.generation == generation
                     && view.path == path
                     && view.rev == rev
                 {

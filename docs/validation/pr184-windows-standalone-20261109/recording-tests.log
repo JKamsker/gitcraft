@@ -1,0 +1,15 @@
+Running precompiled Windows test shard core
+fixture: 1 tests
+Running serial group: standalone::: 2 tests
+Running isolated test: parallel_bisect::tests::finds_the_first_bad_commit_with_any_parallelism
+Running isolated test: app::palette::tests::thousands_of_branches_open_and_filter_quickly
+Passed 5 tests in core
+..Running precompiled Windows test shard core
+fixture: 1 tests
+Running serial group: standalone::: 2 tests
+..
+----------------------------------------------------------------------
+Ran 4 tests in 0.001s
+
+OK
+Verified complete, disjoint partition: {'git-a-m': 504, 'git-rest': 377, 'repo-a-c': 320, 'repo-d-f': 766, 'repo-g-m': 419, 'repo-n-p': 273, 'repo-q-r': 200, 'repo-s': 103, 'repo-rest': 175, 'core': 1887}; total=5024
