@@ -371,3 +371,50 @@ fn azure_link_query_values_round_trip_without_extra_parameters() -> Result<(), S
     assert_eq!(pairs[2], ("_a".into(), "contents".into()));
     Ok(())
 }
+
+#[test]
+fn incomplete_commit_reads_surface_checks_errors_including_clamped_pages() -> Result<(), String> {
+    for (count, continuation) in [
+        (1, Some("next-page")),
+        (999, Some("next-page")),
+        (1000, None),
+    ] {
+        let (mut api, _) = recording();
+        let record = api.record.clone().ok_or("missing recorder")?;
+        api.record = Some(Arc::new(move |method, path, body, accept| {
+            if path
+                .split('?')
+                .next()
+                .is_some_and(|p| p.ends_with("/commits"))
+            {
+                let rows = vec![json!({"commitId":"a".repeat(40),"comment":"Change"}); count];
+                let body = json!({"value":rows}).to_string();
+                let header = continuation
+                    .map(|t| format!("X-MS-ContinuationToken: {t}\r\n"))
+                    .unwrap_or_default();
+                // Feed an actual recorded HTTP header through the production reader.
+                return format!(
+                    "HTTP/1.1 200 OK\r\n{header}Content-Length: {}\r\n\r\n{body}",
+                    body.len()
+                )
+                .parse::<ureq::Response>()
+                .map_err(|e| e.to_string());
+            }
+            record(method, path, body, accept)
+        }));
+        let d = details::read(&api, 7)?;
+        assert!(d.commits.is_empty());
+        let error = d
+            .checks_error
+            .as_deref()
+            .ok_or("incomplete read was silent")?;
+        assert!(error.contains("incomplete"), "{error}");
+        assert!(error.contains("forge page"), "{error}");
+        assert!(!d.checks.is_empty());
+    }
+    let (api, _) = recording();
+    let d = details::read(&api, 7)?;
+    assert_eq!(d.commits.len(), 1);
+    assert!(d.checks_error.is_none());
+    Ok(())
+}

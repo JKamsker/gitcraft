@@ -80,7 +80,14 @@ pub(super) fn read(api: &Api, n: u64) -> Result<PrDetails, String> {
         let threads = api.array(&format!(
             "{end}/threads?$iteration={iteration}&$baseIteration={iteration}"
         ));
-        let commits = api.array(&format!("{end}/commits?$top=1000"));
+        let commits = api.array(&format!("{end}/commits?$top=1000")).and_then(|rows| {
+            // A saturated result without a continuation header is ambiguous too.
+            if rows.len() >= 1000 {
+                Err("Azure DevOps commit list may be incomplete (1,000 commit limit); use the forge page".into())
+            } else {
+                Ok(rows)
+            }
+        });
         let statuses = api.array(&format!("{end}/statuses"));
         let policies = api.array(&format!(
             "{}/_apis/policy/evaluations?artifactId={}",
