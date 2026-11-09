@@ -7,6 +7,8 @@ mod bundles;
 mod cleanup;
 mod confirm;
 mod custom;
+#[cfg(test)]
+mod enter_tests;
 mod fold;
 mod gerrit;
 mod interaction;
@@ -660,7 +662,7 @@ impl RepoTab {
                         focus,
                     )
                 }
-                Dialog::Stash(d) => stash::stash(ui, enter, d, work, staged_support),
+                Dialog::Stash(d) => stash::stash(ui, d, work, staged_support),
                 Dialog::Tag {
                     at,
                     at_label,
@@ -722,7 +724,7 @@ impl RepoTab {
                 } => {
                     remote::create_pr(ui, noun, branch, base, title, body, draft, reviewers, focus)
                 }
-                Dialog::Fold(plan) => fold::fold(ui, enter, plan),
+                Dialog::Fold(plan) => fold::fold(ui, plan),
                 Dialog::Custom(custom) => custom::custom(ui, enter, custom),
                 Dialog::KeepDetached(keep) => keep_detached::keep_detached(ui, enter, keep, local),
                 Dialog::Cleanup(dialog) => cleanup::cleanup(ui, dialog),
@@ -753,7 +755,6 @@ impl RepoTab {
                     focus,
                 } => rehearse::rehearse(
                     ui,
-                    enter,
                     &machine,
                     current_branch.as_deref(),
                     other,
@@ -772,7 +773,6 @@ impl RepoTab {
                     focus,
                 } => test_commits::test_commits(
                     ui,
-                    enter,
                     &machine,
                     is_remote,
                     start,
