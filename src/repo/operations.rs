@@ -1589,6 +1589,7 @@ fn check_command_envelopes(
 struct PullMode {
     rebase: Option<bool>,
     ff_only: bool,
+    ff_explicit: bool,
 }
 
 fn pull_mode(args: &[String]) -> Result<PullMode, String> {
@@ -1716,8 +1717,14 @@ fn pull_mode(args: &[String]) -> Result<PullMode, String> {
                         value.map_or(Ok(true), rebase_value)?
                     })
                 }
-                "ff-only" => mode.ff_only = true,
-                "ff" => mode.ff_only = false,
+                "ff-only" => {
+                    mode.ff_only = true;
+                    mode.ff_explicit = true;
+                }
+                "ff" => {
+                    mode.ff_only = false;
+                    mode.ff_explicit = true;
+                }
                 _ => {}
             }
         } else if let Some(short) = token.strip_prefix('-') {
@@ -1768,7 +1775,12 @@ fn ignored_safe_pull_with(
         .trim()
         .strip_prefix("refs/heads/")
         .ok_or("Pull requires a checked-out local branch")?;
-    if !mode.ff_only {
+    let configured_ff_only = if !mode.ff_explicit && mode.rebase.is_none() {
+        run(&["config", "-z", "--get", "pull.ff"], &[0, 1])?.strip_suffix('\0') == Some("only")
+    } else {
+        false
+    };
+    if !mode.ff_only && !configured_ff_only {
         let rebase = match mode.rebase {
             Some(value) => value,
             None => {
@@ -2104,11 +2116,8 @@ mod tests {
                     tail.iter().map(|s| (*s).to_owned()).collect(),
                 ]
                 .concat();
-                assert_eq!(
-                    super::super::pull_mode(&args)?,
-                    super::super::PullMode { rebase, ff_only },
-                    "{args:?}"
-                );
+                let mode = super::super::pull_mode(&args)?;
+                assert_eq!((mode.rebase, mode.ff_only), (rebase, ff_only), "{args:?}");
             }
             for option in [
                 "cleanup",
@@ -2218,6 +2227,7 @@ mod tests {
                         ["symbolic-ref", "-q", "HEAD"] => Ok("refs/heads/main\n".into()),
                         ["config", "-z", "--get", "branch.main.rebase"] => Ok(local.into()),
                         ["config", "-z", "--get", "pull.rebase"] => Ok(global.into()),
+                        ["config", "-z", "--get", "pull.ff"] => Ok(String::new()),
                         ["config", "-z", "--get", "branch.main.mergeOptions"] => {
                             Ok("--log=3\0".into())
                         }
@@ -2244,6 +2254,62 @@ mod tests {
                         .all(|c| !c.starts_with("pull") && !c.starts_with("fetch"))
                 );
             }
+            Ok(())
+        }
+
+        #[test]
+        fn configured_ff_only_respects_explicit_pull_option_precedence() -> Result<(), String> {
+            for (tail, ff, allowed) in [
+                (vec![], "only\0", true),
+                (vec![], "true\0", false),
+                (vec![], "ONLY\0", false),
+                (vec![], "only \0", false),
+                (vec!["--rebase"], "only\0", false),
+                (vec!["--ff"], "only\0", false),
+                (vec!["--no-ff"], "only\0", false),
+                (vec!["--ff-only", "--ff"], "only\0", false),
+                (vec!["--ff", "--ff-only"], "only\0", true),
+                (vec!["--no-rebase"], "only\0", true),
+                (vec!["--strategy", "--ff-only"], "only\0", true),
+                (vec!["--", "--rebase"], "only\0", true),
+            ] {
+                let args = [
+                    vec!["pull".to_owned()],
+                    tail.iter().map(|s| s.to_string()).collect(),
+                ]
+                .concat();
+                let mut calls = Vec::new();
+                let result = super::super::ignored_safe_pull_with(&args, |argv, _| {
+                    calls.push(argv.join(" "));
+                    match argv {
+                        ["symbolic-ref", "-q", "HEAD"] => Ok("refs/heads/main\n".into()),
+                        ["config", "-z", "--get", "pull.ff"] => Ok(ff.into()),
+                        ["config", "-z", "--get", "branch.main.rebase"] => Ok("true\0".into()),
+                        ["config", "-z", "--get", "branch.main.mergeOptions"] => Ok(String::new()),
+                        ["ls-files", ..] => Ok("private\0".into()),
+                        _ => Err(format!("Unexpected read: {argv:?}")),
+                    }
+                });
+                assert_eq!(result.is_ok(), allowed, "{args:?}, {ff:?}: {result:?}");
+                if let Ok(prepared) = result {
+                    assert_eq!(prepared[2..], args);
+                    assert!(prepared[1].ends_with("--no-overwrite-ignore"));
+                }
+                assert!(
+                    calls
+                        .iter()
+                        .all(|c| !c.starts_with("pull") && !c.starts_with("fetch"))
+                );
+            }
+            assert!(
+                super::super::ignored_safe_pull_with(&ops(&[&["pull"]])[0], |argv, _| {
+                    match argv[0] {
+                        "symbolic-ref" => Ok("refs/heads/main\n".into()),
+                        _ => Err("config read failed".into()),
+                    }
+                })
+                .is_err()
+            );
             Ok(())
         }
     }
