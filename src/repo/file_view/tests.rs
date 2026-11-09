@@ -29,13 +29,13 @@ fn deliver(tab: &mut RepoTab, messages: [Msg; 3]) {
 }
 
 fn assert_label(view: &FileView, label: &str) {
-    assert_eq!(view.history.as_ref().unwrap().as_ref().unwrap_err(), label);
-    assert_eq!(view.blame.as_ref().unwrap().as_ref().err().unwrap(), label);
-    assert_eq!(view.text.as_ref().unwrap().as_ref().err().unwrap(), label);
+    assert!(matches!(&view.history, Some(Err(error)) if error == label));
+    assert!(matches!(&view.blame, Some(Err(error)) if error == label));
+    assert!(matches!(&view.text, Some(Err(error)) if error == label));
 }
 
 #[test]
-fn mutable_refresh_clears_errors_and_rejects_stale_replies() {
+fn mutable_refresh_clears_errors_and_rejects_stale_replies() -> Result<(), String> {
     for rev in [
         None,
         Some(""),
@@ -46,26 +46,30 @@ fn mutable_refresh_clears_errors_and_rejects_stale_replies() {
     ] {
         let mut tab = tab();
         tab.file_view = Some(view(rev));
-        let old = replies(tab.file_view.as_ref().unwrap(), "old");
+        let old = replies(tab.file_view.as_ref().ok_or("missing file view")?, "old");
         deliver(&mut tab, replies(&view(rev), "unrelated"));
-        let cached = replies(tab.file_view.as_ref().unwrap(), "cached error");
+        let cached = replies(
+            tab.file_view.as_ref().ok_or("missing file view")?,
+            "cached error",
+        );
         deliver(&mut tab, cached);
-        let v = tab.file_view.as_mut().unwrap();
+        let v = tab.file_view.as_mut().ok_or("missing file view")?;
         assert!(v.invalidate_mutable());
         assert!(v.needs(FileTab::History) && v.needs(FileTab::Blame) && v.needs(FileTab::File));
         let fresh = replies(v, "fresh");
         deliver(&mut tab, fresh);
         deliver(&mut tab, old);
-        assert_label(tab.file_view.as_ref().unwrap(), "fresh");
+        assert_label(tab.file_view.as_ref().ok_or("missing file view")?, "fresh");
     }
+    Ok(())
 }
 
 #[test]
-fn close_reopen_and_a_b_a_reject_previous_openings() {
+fn close_reopen_and_a_b_a_reject_previous_openings() -> Result<(), String> {
     for via_b in [false, true] {
         let mut tab = tab();
         tab.file_view = Some(view(Some("HEAD")));
-        let old = replies(tab.file_view.as_ref().unwrap(), "old A");
+        let old = replies(tab.file_view.as_ref().ok_or("missing file view")?, "old A");
         tab.file_view = None;
         if via_b {
             let mut b = view(Some("HEAD"));
@@ -74,32 +78,43 @@ fn close_reopen_and_a_b_a_reject_previous_openings() {
         }
         tab.file_view = Some(view(Some("HEAD")));
         deliver(&mut tab, old);
-        let v = tab.file_view.as_ref().unwrap();
+        let v = tab.file_view.as_ref().ok_or("missing file view")?;
         assert!(v.history.is_none() && v.blame.is_none() && v.text.is_none());
     }
+    Ok(())
 }
 
 #[test]
-fn ordinary_pane_switches_and_parallel_tabs_preserve_their_own_replies() {
+fn ordinary_pane_switches_and_parallel_tabs_preserve_their_own_replies() -> Result<(), String> {
     let mut a = tab();
     let mut b = tab();
     a.file_view = Some(view(None));
     b.file_view = Some(view(None));
-    let a_reply = replies(a.file_view.as_ref().unwrap(), "A");
-    let b_reply = replies(b.file_view.as_ref().unwrap(), "B");
-    let generation = a.file_view.as_ref().unwrap().generation;
+    let a_reply = replies(a.file_view.as_ref().ok_or("missing file view")?, "A");
+    let b_reply = replies(b.file_view.as_ref().ok_or("missing file view")?, "B");
+    let generation = a.file_view.as_ref().ok_or("missing file view")?.generation;
     // Preload panes so switching needs no background IO.
-    deliver(&mut a, replies(b.file_view.as_ref().unwrap(), "wrong tab"));
-    let cached = replies(a.file_view.as_ref().unwrap(), "cached");
+    deliver(
+        &mut a,
+        replies(
+            b.file_view.as_ref().ok_or("missing file view")?,
+            "wrong tab",
+        ),
+    );
+    let cached = replies(a.file_view.as_ref().ok_or("missing file view")?, "cached");
     deliver(&mut a, cached);
     for pane in [FileTab::Blame, FileTab::File, FileTab::History] {
         a.open_file_view("same.txt".into(), None, pane, &egui::Context::default());
-        assert_eq!(a.file_view.as_ref().unwrap().generation, generation);
+        assert_eq!(
+            a.file_view.as_ref().ok_or("missing file view")?.generation,
+            generation
+        );
     }
     deliver(&mut a, a_reply);
     deliver(&mut b, b_reply);
-    assert_label(a.file_view.as_ref().unwrap(), "A");
-    assert_label(b.file_view.as_ref().unwrap(), "B");
+    assert_label(a.file_view.as_ref().ok_or("missing file view")?, "A");
+    assert_label(b.file_view.as_ref().ok_or("missing file view")?, "B");
+    Ok(())
 }
 
 #[test]
@@ -115,7 +130,7 @@ fn full_object_ids_retain_their_cache_and_generation() {
 }
 
 #[test]
-fn line_history_replies_cannot_cross_refresh_or_identical_reopening() {
+fn line_history_replies_cannot_cross_refresh_or_identical_reopening() -> Result<(), String> {
     for reopen in [false, true] {
         let mut tab = tab();
         let mut v = view(None);
@@ -128,13 +143,16 @@ fn line_history_replies_cannot_cross_refresh_or_identical_reopening() {
             v.lines = Some((git::LinesAt::Index, (4, 9)));
             tab.file_view = Some(v);
         } else {
-            tab.file_view.as_mut().unwrap().invalidate_mutable();
+            tab.file_view
+                .as_mut()
+                .ok_or("missing file view")?
+                .invalidate_mutable();
         }
         tab.handle(
             Msg::Then(Box::new(move |tab, ctx| old(tab, Err("stale".into()), ctx))),
             &egui::Context::default(),
         );
-        let v = tab.file_view.as_ref().unwrap();
+        let v = tab.file_view.as_ref().ok_or("missing file view")?;
         assert!(v.history.is_none());
         assert_eq!(v.lines, Some((git::LinesAt::Index, (4, 9))));
         let fresh =
@@ -143,14 +161,10 @@ fn line_history_replies_cannot_cross_refresh_or_identical_reopening() {
             Msg::Then(Box::new(move |tab, ctx| fresh(tab, Ok(Vec::new()), ctx))),
             &egui::Context::default(),
         );
-        assert!(
-            tab.file_view
-                .as_ref()
-                .unwrap()
-                .history
-                .as_ref()
-                .unwrap()
-                .is_ok()
-        );
+        assert!(matches!(
+            tab.file_view.as_ref().and_then(|v| v.history.as_ref()),
+            Some(Ok(_))
+        ));
     }
+    Ok(())
 }

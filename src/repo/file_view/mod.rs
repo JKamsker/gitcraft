@@ -15,7 +15,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 fn next_generation() -> u64 {
     static NEXT: AtomicU64 = AtomicU64::new(1);
     NEXT.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| n.checked_add(1))
-        .expect("file view generation exhausted")
+        .unwrap_or_else(|_| std::process::abort())
 }
 
 use egui::{Stroke, Ui};
