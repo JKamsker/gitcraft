@@ -855,6 +855,60 @@ fn filesystem_alias_guard_uses_repository_entries_and_preserves_distinct_case() 
     Ok(())
 }
 
+#[cfg(unix)]
+#[test]
+fn unresolved_excluded_symlinks_refuse_normal_push_and_redo() -> Result<(), String> {
+    for (ignored, untracked) in [(false, false), (true, false), (true, true)] {
+        let repo = Repo::new(&format!("dangling-alias-{ignored}-{untracked}"))?;
+        repo.write("A", b"tracked contents\n")?;
+        repo.git(&["add", "A"])?;
+        repo.git(&["commit", "-qm", "tracked alias candidate"])?;
+        repo.write("a.txt", b"eligible queued change\n")?;
+        let request = StashRequest {
+            mode: StashMode::Everything,
+            message: String::new(),
+            untracked,
+        };
+        let stale_args = push_args(&request, &repo.status()?)?;
+        let (result, kind) = repo.stash(StashMode::Everything, untracked);
+        result?;
+        let undone = repo.undo(entry(kind)?)?;
+        repo.git(&["rm", "A"])?;
+        std::os::unix::fs::symlink("missing-target", repo.path().join("a"))
+            .map_err(|e| e.to_string())?;
+        if ignored {
+            std::fs::write(repo.path().join(".git/info/exclude"), "/a\n")
+                .map_err(|e| e.to_string())?;
+        }
+        // On a case-insensitive target A and a can be one dangling directory entry.
+        // Refuse unresolved links conservatively even on this case-sensitive fixture.
+        let before = repo.state()?;
+        let head = git::head(repo.path());
+        let stashes = repo.git(&["stash", "list"])?;
+        let (result, _) = run_push(repo.path(), stale_args, head.clone(), false);
+        assert!(result.is_err_and(|e| e.contains("unresolved symbolic link")));
+        let (result, _, stopped) = run_steps_counted(
+            repo.path(),
+            &undone.redo,
+            OpKind::Redo(undone.clone()),
+            None,
+            false,
+            None,
+        );
+        assert!(result.is_err_and(|e| e.contains("unresolved symbolic link")));
+        assert_eq!(stopped, 0);
+        assert_eq!(repo.state()?, before);
+        assert_eq!(git::head(repo.path()), head);
+        assert_eq!(repo.git(&["stash", "list"])?, stashes);
+        assert_eq!(
+            std::fs::read_link(repo.path().join("a")).map_err(|e| e.to_string())?,
+            PathBuf::from("missing-target")
+        );
+        assert!(everything_problem(&repo.status()?, untracked).is_none());
+    }
+    Ok(())
+}
+
 #[test]
 fn unstaged_file_replaced_by_ignored_directory_refuses_push_and_redo() -> Result<(), String> {
     for untracked in [false, true] {

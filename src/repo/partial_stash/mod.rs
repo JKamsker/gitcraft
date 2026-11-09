@@ -261,7 +261,7 @@ fn filesystem_overlap_script(
         .chain(ignored.iter().copied());
     let removed: Vec<_> = removed_paths(work).collect();
     let mut script = String::from(
-        "same() { if test \"$1\" -ef \"$2\"; then printf '%s\\000' \"$3\"; exit 0; else code=$?; test \"$code\" = 1 || exit \"$code\"; fi; }\n",
+        "same() { for path in \"$1\" \"$2\"; do if test -L \"$path\" && ! test -e \"$path\"; then printf '%s\\000' \"$3\"; exit 3; fi; done; if test \"$1\" -ef \"$2\"; then printf '%s\\000' \"$3\"; exit 0; else code=$?; test \"$code\" = 1 || exit \"$code\"; fi; }\n",
     );
     for excluded in excluded {
         let b = excluded.trim_end_matches('/');
@@ -301,6 +301,23 @@ fn check_filesystem_overlaps(
 ) -> Result<(), String> {
     let script = filesystem_overlap_script(work, untracked, ignored)?;
     let result = git::run_shell(path, &script)?;
+    if result.code == 3 {
+        // -ef dereferences links; an unresolved target cannot prove distinct entry
+        // identity, even when the status spellings differ only in case.
+        let output = String::from_utf8_lossy(&result.stdout);
+        return Err(crate::i18n::message(
+            "repo-workflows-partial_stash-unresolved-link",
+            &[(
+                "path",
+                output
+                    .split('\0')
+                    .next()
+                    .unwrap_or_default()
+                    .to_owned()
+                    .into(),
+            )],
+        ));
+    }
     if result.code != 0 {
         return Err(format!(
             "Cannot inspect excluded paths safely before stash cleanup: {}",
