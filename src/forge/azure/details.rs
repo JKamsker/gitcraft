@@ -90,7 +90,9 @@ pub(super) fn read(api: &Api, n: u64) -> Result<PrDetails, String> {
         });
         let statuses = api.array(&format!("{end}/statuses"));
         let policies = api.array(&format!(
-            "{}/_apis/policy/evaluations?artifactId={}",
+            // Policy evaluations remain preview-only in the REST 7.1 contract:
+            // https://learn.microsoft.com/en-us/rest/api/azure/devops/policy/evaluations/list?view=azure-devops-rest-7.1
+            "{}/_apis/policy/evaluations?artifactId={}&api-version=7.1-preview.1",
             segment(&s.repo.project),
             segment(&format!(
                 "vstfs:///CodeReview/CodeReviewId/{}/{n}",

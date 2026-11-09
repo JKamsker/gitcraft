@@ -447,3 +447,32 @@ fn checks_keep_only_global_and_current_iteration_with_distinct_contexts() -> Res
     assert!(d.checks.iter().all(|c| !c.detail.starts_with("old ")));
     Ok(())
 }
+
+#[test]
+fn policy_evaluations_use_the_documented_preview_contract_only() -> Result<(), String> {
+    let (api, state) = recording();
+    details::read(&api, 7)?;
+    let m = state.lock().map_err(|e| e.to_string())?;
+    let mut policies = 0;
+    for (_, path, _) in &m.calls {
+        let parsed =
+            url::Url::parse(&format!("https://dev.azure.com/{path}")).map_err(|e| e.to_string())?;
+        let versions = parsed
+            .query_pairs()
+            .filter(|(k, _)| k == "api-version")
+            .map(|(_, v)| v.into_owned())
+            .collect::<Vec<_>>();
+        if parsed.path().ends_with("/policy/evaluations") {
+            policies += 1;
+            assert_eq!(versions, ["7.1-preview.1"]);
+            assert!(
+                parsed.query_pairs().any(|(k, v)| k == "artifactId"
+                    && v == "vstfs:///CodeReview/CodeReviewId/project-id/7")
+            );
+        } else {
+            assert_eq!(versions, ["7.1"]);
+        }
+    }
+    assert_eq!(policies, 1);
+    Ok(())
+}
