@@ -160,7 +160,7 @@ impl super::RepoTab {
             forge_generation: None,
             forge_operation: false,
             cancel: self._jobs.0.clone(),
-            repo: self.path.clone(),
+            repo: super::messages::mutation_key(&self.path),
         };
         self.rx = receiver;
         self.watcher = None;
@@ -209,6 +209,27 @@ impl super::RepoTab {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn linked_local_tabs_keep_the_common_mutation_key_after_suspension() -> Result<(), String> {
+        let scratch = tempfile::tempdir().map_err(|error| error.to_string())?;
+        let main = scratch.path().join("main");
+        let linked = scratch.path().join("linked");
+        std::fs::create_dir(&main).map_err(|error| error.to_string())?;
+        crate::git::run(Some(&main), &["init", "-q"])?;
+        crate::git::run(Some(&main), &["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "base", "--allow-empty"])?;
+        crate::git::run(Some(&main), &["worktree", "add", "--detach", linked.to_str().ok_or("fixture path")?])?;
+        let ctx = egui::Context::default();
+        let mut a = crate::repo::RepoTab::new_deferred(main, &ctx);
+        let mut b = crate::repo::RepoTab::new_deferred(linked, &ctx);
+        let common = a.tx.repo.clone();
+        assert_eq!(b.tx.repo, common);
+        a.suspend();
+        b.suspend();
+        assert_eq!(a.tx.repo, common);
+        assert_eq!(b.tx.repo, common);
+        Ok(())
+    }
 
     #[test]
     fn remote_mutation_schedule_survives_discovery_failure_and_suspend() {
