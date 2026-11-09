@@ -29,20 +29,22 @@ impl RepoTab {
         let mut view = FileView::new(&path, rev, FileTab::History);
         view.lines = Some((at.clone(), range));
         self.file_view = Some(view);
+        self.load_line_history(ctx);
+    }
+
+    pub(in crate::repo) fn load_line_history(&self, ctx: &egui::Context) {
+        let Some(view) = &self.file_view else { return };
+        let Some((at, range)) = view.lines.clone() else {
+            return;
+        };
+        let generation = view.generation;
+        let path = view.path.clone();
         let repo = self.path.clone();
-        let asked = (path.clone(), at.clone(), range);
+        let reply = history_reply(generation, path.clone(), at.clone(), range);
         self.then(
             ctx,
             move || git::line_history(&repo, &at, &path, range),
-            move |tab, result, _| {
-                // Only for the lines still shown: another history may have been opened since.
-                if let Some(view) = &mut tab.file_view
-                    && view.path == asked.0
-                    && view.lines == Some((asked.1, asked.2))
-                {
-                    view.history = Some(result);
-                }
-            },
+            reply,
         );
     }
 
@@ -83,6 +85,24 @@ impl RepoTab {
                 });
             });
         self.file_history(ui, acts);
+    }
+}
+
+/// Capture the opening as well as its range: reopening identical lines is a new request.
+pub(super) fn history_reply(
+    generation: u64,
+    path: String,
+    at: LinesAt,
+    range: LineRange,
+) -> impl FnOnce(&mut RepoTab, Result<Vec<git::FileCommit>, String>, &egui::Context) {
+    move |tab, result, _| {
+        if let Some(view) = &mut tab.file_view
+            && view.generation == generation
+            && view.path == path
+            && view.lines.as_ref() == Some(&(at, range))
+        {
+            view.history = Some(result);
+        }
     }
 }
 
