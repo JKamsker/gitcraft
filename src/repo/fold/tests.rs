@@ -1001,3 +1001,80 @@ fn ignored_files_named_with_spaces_or_renamed_away_are_refused() {
         let _ = std::fs::remove_dir_all(&dir);
     }
 }
+
+#[test]
+fn ignored_file_created_after_dialog_is_refused_by_the_mutation_worker() -> Result<(), String> {
+    let dir = repo("ignored-since-dialog", 1);
+    write(&dir, "build.log", "tracked once\n");
+    git_ok(&dir, &["add", "build.log"]);
+    git_ok(&dir, &["commit", "-qm", "log"]);
+    git_ok(&dir, &["rm", "-q", "build.log"]);
+    write(&dir, ".gitignore", "build.log\n");
+    git_ok(&dir, &["add", ".gitignore"]);
+    git_ok(&dir, &["commit", "-qm", "ignore"]);
+    write(&dir, "f1.txt", "fixed\n");
+    git_ok(&dir, &["add", "f1.txt"]);
+    let found = plan(&dir, "HEAD~2")?;
+    let before = git::head(&dir);
+    write(&dir, "build.log", "private ignored content\n");
+    let (steps, _) = found.fold_steps(vec!["--must-never-run".into()]);
+    let (result, _) =
+        crate::repo::operations::run_steps(&dir, &steps, crate::repo::OpKind::plain(), None);
+    assert!(result.is_err());
+    assert!(result.err().unwrap_or_default().contains("build.log"));
+    assert_eq!(git::head(&dir), before);
+    assert_eq!(read(&dir, "build.log"), "private ignored content\n");
+    let _ = std::fs::remove_dir_all(&dir);
+    Ok(())
+}
+
+#[test]
+fn staged_deletion_is_included_in_fold_collision_paths() -> Result<(), String> {
+    let dir = repo("staged-delete-collision", 2);
+    write(&dir, ".git/info/exclude", "root.txt\n");
+    git_ok(&dir, &["rm", "--cached", "root.txt"]);
+    let read = git::fold_read(&dir, "HEAD~1")?;
+    assert_eq!(read.ignored_in_way.as_deref(), Some("root.txt"));
+    assert!(Plan::from_read(read).is_err());
+    assert_eq!(self::read(&dir, "root.txt"), "root\n");
+    let _ = std::fs::remove_dir_all(dir);
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn fixup_hook_ignored_collision_stops_before_rebase() -> Result<(), String> {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = repo("hook-ignored-collision", 1);
+    write(&dir, "build.log", "historical\n");
+    git_ok(&dir, &["add", "build.log"]);
+    git_ok(&dir, &["commit", "-qm", "historical log"]);
+    git_ok(&dir, &["rm", "build.log"]);
+    write(&dir, ".gitignore", "build.log\n");
+    git_ok(&dir, &["add", ".gitignore"]);
+    git_ok(&dir, &["commit", "-qm", "ignore log"]);
+    write(&dir, "f1.txt", "fixed\n");
+    git_ok(&dir, &["add", "f1.txt"]);
+    let found = plan(&dir, "HEAD~2")?;
+    let before = git::head(&dir);
+    write(
+        &dir,
+        ".git/hooks/pre-commit",
+        "#!/bin/sh\nprintf 'private hook output\\n' > build.log\n",
+    );
+    std::fs::set_permissions(
+        dir.join(".git/hooks/pre-commit"),
+        std::fs::Permissions::from_mode(0o700),
+    )
+    .map_err(|e| e.to_string())?;
+    let (steps, _) = found.fold_steps(vec!["--must-never-run".into()]);
+    let (result, _) =
+        crate::repo::operations::run_steps(&dir, &steps, crate::repo::OpKind::plain(), None);
+    assert!(result.err().unwrap_or_default().contains("build.log"));
+    assert_ne!(git::head(&dir), before);
+    assert_eq!(git_ok(&dir, &["rev-parse", "HEAD^"]).trim(), before);
+    assert_eq!(read(&dir, "build.log"), "private hook output\n");
+    assert!(git::in_progress(&dir)?.is_none());
+    let _ = std::fs::remove_dir_all(dir);
+    Ok(())
+}

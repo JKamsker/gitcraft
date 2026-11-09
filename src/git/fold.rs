@@ -42,9 +42,14 @@ fn in_the_way(ignored: &str, touched: &str) -> Option<String> {
     let hit = |path: &str| {
         ignored
             .iter()
-            .find(|i| match i.strip_suffix('/') {
-                Some(dir) => path == dir || path.starts_with(**i),
-                None => path == **i,
+            .find(|i| {
+                let ignored = i.trim_end_matches('/');
+                let below = |child: &str, parent: &str| {
+                    child
+                        .strip_prefix(parent)
+                        .is_some_and(|rest| rest.starts_with('/'))
+                };
+                path == ignored || below(path, ignored) || below(ignored, path)
             })
             .map(|i| (*i).to_owned())
     };
@@ -133,7 +138,7 @@ pub fn fold_read(repo: &Path, target: &str) -> Result<FoldRead, String> {
         } else {
             // Without renames: a renamed file's old name is written too (checking out the
             // commit before the rename).
-            let touched = run(
+            let mut touched = run(
                 Some(repo),
                 &[
                     "log",
@@ -144,6 +149,20 @@ pub fn fold_read(repo: &Path, target: &str) -> Result<FoldRead, String> {
                     &range,
                 ],
             )?;
+            // The fixup's staged paths are replayed too, including deletion of a file
+            // unchanged throughout the historical range.
+            touched.push('\0');
+            touched.push_str(&run(
+                Some(repo),
+                &[
+                    "diff",
+                    "--cached",
+                    "--name-only",
+                    "--no-renames",
+                    "-z",
+                    "--",
+                ],
+            )?);
             in_the_way(&ignored, &touched)
         }
     } else {
@@ -192,5 +211,57 @@ mod tests {
         assert_eq!(in_the_way("x\0", "a\0\nx\0"), Some("x".into()));
         assert_eq!(in_the_way("\nx\0", "a\0\n\nx\0"), Some("\nx".into()));
         assert_eq!(in_the_way("", "a\0"), None);
+    }
+
+    #[test]
+    fn ignored_files_and_directories_block_ancestor_replacements() {
+        for (ignored, touched) in [
+            ("secret\0", "secret/data\0"),
+            ("secret/data\0", "secret\0"),
+            ("secret/data/\0", "secret\0"),
+            ("secret\0", "\nsecret/data\0"),
+        ] {
+            assert!(
+                in_the_way(ignored, touched).is_some(),
+                "{ignored:?} / {touched:?}"
+            );
+        }
+        assert_eq!(in_the_way("secret\0", "secret2/data\0"), None);
+        assert_eq!(in_the_way("secret2/data\0", "secret\0"), None);
+    }
+
+    #[test]
+    fn fold_read_protects_ignored_file_replacing_historical_directory() -> Result<(), String> {
+        let temp = tempfile::tempdir().map_err(|e| e.to_string())?;
+        let repo = temp.path();
+        let git = |args: &[&str]| super::run(Some(repo), args);
+        git(&["init", "-q"])?;
+        git(&["config", "user.name", "Fold regression"])?;
+        git(&["config", "user.email", "fold@example.invalid"])?;
+        git(&["config", "commit.gpgsign", "false"])?;
+        std::fs::create_dir(repo.join("secret")).map_err(|e| e.to_string())?;
+        std::fs::write(repo.join("secret/data"), "historical").map_err(|e| e.to_string())?;
+        std::fs::write(repo.join("other"), "base").map_err(|e| e.to_string())?;
+        git(&["add", "."])?;
+        git(&["commit", "-qm", "base"])?;
+        std::fs::write(repo.join("other"), "target").map_err(|e| e.to_string())?;
+        git(&["commit", "-qam", "target"])?;
+        let target = git(&["rev-parse", "HEAD"])?;
+        git(&["rm", "-r", "secret"])?;
+        std::fs::write(repo.join(".gitignore"), "secret\n").map_err(|e| e.to_string())?;
+        git(&["add", ".gitignore"])?;
+        git(&["commit", "-qm", "remove directory"])?;
+        std::fs::write(repo.join("secret"), "private ignored data").map_err(|e| e.to_string())?;
+        std::fs::write(repo.join("other"), "fix").map_err(|e| e.to_string())?;
+        git(&["add", "other"])?;
+        let before = git(&["rev-parse", "HEAD"])?;
+        let read = super::fold_read(repo, target.trim())?;
+        assert_eq!(read.ignored_in_way.as_deref(), Some("secret"));
+        assert_eq!(git(&["rev-parse", "HEAD"])?, before);
+        assert_eq!(
+            std::fs::read(repo.join("secret")).map_err(|e| e.to_string())?,
+            b"private ignored data"
+        );
+        Ok(())
     }
 }

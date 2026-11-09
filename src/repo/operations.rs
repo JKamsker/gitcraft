@@ -1085,6 +1085,24 @@ pub(super) fn run_steps_guarded(
             stopped = i;
             break;
         }
+        if let [mark, target] = op.as_slice()
+            && mark == EXPECT_FOLD_SAFE
+            && let Err(error) =
+                git::fold_read(path, target).and_then(super::fold::plan::Plan::from_read)
+        {
+            result = Err(error);
+            stopped = i;
+            break;
+        }
+        if let [mark, target] = op.as_slice()
+            && mark == EXPECT_FOLD_IGNORED
+            && let Err(error) =
+                git::fold_read(path, target).and_then(super::fold::plan::Plan::check_ignored)
+        {
+            result = Err(error);
+            stopped = i;
+            break;
+        }
         if is_expectation(op) || op.first().is_some_and(|m| m == EXPECT_HTTPS_ROUTE) {
             continue;
         }
@@ -1449,7 +1467,12 @@ pub(super) fn is_expectation(op: &[String]) -> bool {
         || expected_tree(op).is_some()
         || matches!(op, [mark, _, _] if mark == crate::gerrit::CHECK)
         || matches!(op, [mark, _] if mark == EXPECT_HTTPS_ROUTE)
+        || matches!(op, [mark, _] if mark == EXPECT_FOLD_SAFE)
+        || matches!(op, [mark, _] if mark == EXPECT_FOLD_IGNORED)
 }
+
+pub(super) const EXPECT_FOLD_SAFE: &str = "\u{0}expect-fold-safe";
+pub(super) const EXPECT_FOLD_IGNORED: &str = "\u{0}expect-fold-ignored";
 
 /// Captures only the witness from the same validator invocation; no additional Git call.
 pub(super) fn check_stack_captured(
