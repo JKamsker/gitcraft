@@ -104,11 +104,11 @@ pub fn url(hosting: &Hosting, place: &Place) -> String {
     if hosting.forge == Forge::Azure {
         return match place {
             Place::Commit(sha) => format!("{repo}/commit/{sha}"),
-            Place::Branch(name) => format!("{repo}?version=GB{}", encode_segment(name)),
+            Place::Branch(name) => format!("{repo}?version=GB{}", super::cloud::segment(name)),
             Place::File { sha, path, lines } => {
                 let mut url = format!(
                     "{repo}?path={}&version=GC{sha}&_a=contents",
-                    encode_segment(&format!("/{path}"))
+                    super::cloud::segment(&format!("/{path}"))
                 );
                 if let Some(l) = lines {
                     url.push_str(&format!(
