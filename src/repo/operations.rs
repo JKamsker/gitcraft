@@ -1503,28 +1503,35 @@ fn ignored_safe_pull(path: &Path, args: &[String]) -> Result<Vec<String>, String
         let rebase = match explicit {
             Some(value) => value,
             None => {
-                let local = git::run_ok_codes(
-                    Some(path),
-                    &["config", "-z", "--get", &format!("branch.{branch}.rebase")],
-                    &[0, 1],
-                )?;
-                let value = if local.is_empty() {
-                    git::run_ok_codes(
-                        Some(path),
-                        &["config", "-z", "--get", "pull.rebase"],
-                        &[0, 1],
-                    )?
+                let local_key = format!("branch.{branch}.rebase");
+                let local =
+                    git::run_ok_codes(Some(path), &["config", "-z", "--get", &local_key], &[0, 1])?;
+                let (key, value) = if local.is_empty() {
+                    (
+                        "pull.rebase",
+                        git::run_ok_codes(
+                            Some(path),
+                            &["config", "-z", "--get", "pull.rebase"],
+                            &[0, 1],
+                        )?,
+                    )
                 } else {
-                    local
+                    (local_key.as_str(), local)
                 };
-                !matches!(
-                    value
-                        .trim_end_matches('\0')
-                        .trim()
-                        .to_ascii_lowercase()
-                        .as_str(),
-                    "" | "false" | "no" | "off" | "0"
-                )
+                // A valueless boolean means true, whereas an explicitly empty value
+                // means false. Git's typed reader preserves that distinction.
+                if !value.is_empty() && value.trim_end_matches('\0').is_empty() {
+                    git::run(Some(path), &["config", "--bool", "--get", key])?.trim() == "true"
+                } else {
+                    !matches!(
+                        value
+                            .trim_end_matches('\0')
+                            .trim()
+                            .to_ascii_lowercase()
+                            .as_str(),
+                        "" | "false" | "no" | "off" | "0"
+                    )
+                }
             }
         };
         // Rebase's checkout does not honor mergeOptions and offers no equivalent
@@ -2081,6 +2088,14 @@ mod tests {
             assert!(super::ignored_safe_pull(&dir, &ops(&[args])[0]).is_ok());
         }
         git::run(Some(&dir), &["config", "branch.main.rebase", "false"])?;
+        assert!(super::ignored_safe_pull(&dir, &ops(&[&["pull"]])[0]).is_ok());
+        git::run(Some(&dir), &["config", "--unset", "branch.main.rebase"])?;
+        let config = dir.join(".git/config");
+        let mut text = std::fs::read_to_string(&config).map_err(|e| e.to_string())?;
+        text.push_str("\n[branch \"main\"]\n rebase\n");
+        std::fs::write(&config, &text).map_err(|e| e.to_string())?;
+        assert!(super::ignored_safe_pull(&dir, &ops(&[&["pull"]])[0]).is_err());
+        git::run(Some(&dir), &["config", "branch.main.rebase", ""])?;
         assert!(super::ignored_safe_pull(&dir, &ops(&[&["pull"]])[0]).is_ok());
         std::fs::remove_file(dir.join("private")).map_err(|e| e.to_string())?;
         assert!(super::ignored_safe_pull(&dir, &rebase[0]).is_ok());
