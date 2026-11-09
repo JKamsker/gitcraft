@@ -25,6 +25,7 @@ pub(super) struct Window {
     active: usize,
     palette: Option<Palette>,
     clone_form: Option<super::clone::CloneForm>,
+    practice_open: bool,
     remote_form: Option<super::remote_open::RemoteForm>,
     teleport: Option<super::teleport::TeleportForm>,
     teleport_drag: Option<super::teleport::drag::DragTargets>,
@@ -57,6 +58,7 @@ impl Window {
             active: 0,
             palette: None,
             clone_form: None,
+            practice_open: false,
             remote_form: None,
             teleport: None,
             teleport_drag: None,
@@ -90,6 +92,7 @@ impl Window {
         std::mem::swap(&mut self.active, &mut app.active);
         std::mem::swap(&mut self.palette, &mut app.palette);
         std::mem::swap(&mut self.clone_form, &mut app.clone_form);
+        std::mem::swap(&mut self.practice_open, &mut app.practice_open);
         std::mem::swap(&mut self.remote_form, &mut app.remote_form);
         std::mem::swap(&mut self.teleport, &mut app.teleport);
         std::mem::swap(&mut self.teleport_drag, &mut app.teleport_drag);
@@ -409,6 +412,7 @@ impl App {
 
     pub(super) fn window_has_dialog(&self) -> bool {
         self.clone_form.is_some()
+            || self.practice_open
             || self.remote_form.is_some()
             || self.teleport.is_some()
             || self.repo_scan.is_some()
@@ -1585,6 +1589,50 @@ mod tests {
                 );
             }
         }
+        Ok(())
+    }
+
+    #[test]
+    fn practice_modal_and_completion_belong_to_the_initiating_window() -> Result<(), String> {
+        let h = recorded_harness();
+        let ctx = h.ctx.clone();
+        let mut app = h
+            .state()
+            .as_ref()
+            .ok_or("App")?
+            .app
+            .lock()
+            .map_err(|e| e.to_string())?;
+        let child = ViewportId::from_hash_of("practice-owner");
+        let path = PathBuf::from("/virtual/practice-repo");
+        app.tabs = vec![Tab::Home];
+        app.windows.parked.insert(
+            child,
+            Window::new(
+                vec![deferred(path.to_str().ok_or("path")?, &ctx), Tab::Home],
+                ViewportId::ROOT,
+                None,
+            ),
+        );
+        app.in_window(child, |app| {
+            app.active = 1;
+            app.practice_open = true;
+            assert!(app.window_has_dialog());
+        });
+        assert!(!app.practice_open);
+        assert!(!app.window_has_dialog());
+        app.recorded_practice_completion(child, Ok(path));
+        app.poll_practice(&ctx);
+        assert_eq!(app.windows.parked[&child].active, 0);
+        assert!(!app.windows.parked[&child].practice_open);
+        assert!(matches!(app.tabs[0], Tab::Home));
+        app.recorded_practice_completion(child, Err("recorded practice failure".into()));
+        app.poll_practice(&ctx);
+        assert!(app.error.is_none());
+        assert_eq!(
+            app.windows.parked[&child].error.as_deref(),
+            Some("recorded practice failure")
+        );
         Ok(())
     }
 
