@@ -1,0 +1,741 @@
+{
+  "commit": "0d651f0279021bba63764f6725a337223408a879",
+  "tree": "662fabc6a616da1298bb776c9bec3aa8982d08ef",
+  "started": "2026-11-09T11:17:45.716780+00:00",
+  "runner_sha256": "435573ad5a920a81766ae1e48f92745c2ff7bbe8754b84e18fdfe96fa8696f0b",
+  "checks": [
+    {
+      "label": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "before": {
+        "head": "0d651f0279021bba63764f6725a337223408a879",
+        "tree": "662fabc6a616da1298bb776c9bec3aa8982d08ef",
+        "status": ""
+      },
+      "exit": 0,
+      "log": "/tmp/gitcraft-pr184-final-0d651f02-jlg5036n/fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after": {
+        "head": "0d651f0279021bba63764f6725a337223408a879",
+        "tree": "662fabc6a616da1298bb776c9bec3aa8982d08ef",
+        "status": ""
+      },
+      "test_summaries": []
+    },
+    {
+      "label": "check",
+      "command": [
+        "cargo",
+        "check",
+        "--locked",
+        "--all-targets"
+      ],
+      "before": {
+        "head": "0d651f0279021bba63764f6725a337223408a879",
+        "tree": "662fabc6a616da1298bb776c9bec3aa8982d08ef",
+        "status": ""
+      },
+      "exit": 0,
+      "log": "/tmp/gitcraft-pr184-final-0d651f02-jlg5036n/check.log",
+      "sha256": "23084d363173bdaed3234f4bbbd607f99c1a7c6d89979b4e0924cfa090b8cd14",
+      "after": {
+        "head": "0d651f0279021bba63764f6725a337223408a879",
+        "tree": "662fabc6a616da1298bb776c9bec3aa8982d08ef",
+        "status": ""
+      },
+      "test_summaries": []
+    },
+    {
+      "label": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "before": {
+        "head": "0d651f0279021bba63764f6725a337223408a879",
+        "tree": "662fabc6a616da1298bb776c9bec3aa8982d08ef",
+        "status": ""
+      },
+      "exit": 0,
+      "log": "/tmp/gitcraft-pr184-final-0d651f02-jlg5036n/clippy.log",
+      "sha256": "80a72ab0b6d57f57833fbff08eb4f1c216d4bb98fd0953be701bdd8ef1a25c8e",
+      "after": {
+        "head": "0d651f0279021bba63764f6725a337223408a879",
+        "tree": "662fabc6a616da1298bb776c9bec3aa8982d08ef",
+        "status": ""
+      },
+      "test_summaries": []
+    },
+    {
+      "label": "build-tests",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "before": {
+        "head": "0d651f0279021bba63764f6725a337223408a879",
+        "tree": "662fabc6a616da1298bb776c9bec3aa8982d08ef",
+        "status": ""
+      },
+      "exit": 0,
+      "log": "/tmp/gitcraft-pr184-final-0d651f02-jlg5036n/build-tests.log",
+      "sha256": "607c96343a1e17cc677294e16e27638305fab35c3740674a9ba0f8bd3820066e",
+      "after": {
+        "head": "0d651f0279021bba63764f6725a337223408a879",
+        "tree": "662fabc6a616da1298bb776c9bec3aa8982d08ef",
+        "status": ""
+      },
+      "test_summaries": []
+    },
+    {
+      "label": "recording-outcomes",
+      "command": [
+        "bwrap",
+        "--unshare-pid",
+        "--die-with-parent",
+        "--bind",
+        "/",
+        "/",
+        "--dev",
+        "/dev",
+        "--proc",
+        "/proc",
+        "--",
+        "/home/jonas/.t3/worktrees/gitcraft/t3-572729bb/target/debug/deps/gitcraft-47350705d36386f2",
+        "processes::recording_outcomes",
+        "--test-threads=1"
+      ],
+      "before": {
+        "head": "0d651f0279021bba63764f6725a337223408a879",
+        "tree": "662fabc6a616da1298bb776c9bec3aa8982d08ef",
+        "status": ""
+      },
+      "application_sha256_before": "b8226c27543d4736e6ced7ec76342570e6743f4a8327dba27540eb62d07d6dd7",
+      "binary_sha256_before": "d598a0f69832b1367bbfd978469733271f2e4c4ca88f2f16b50fe7b06106ffa4",
+      "exit": 0,
+      "log": "/tmp/gitcraft-pr184-final-0d651f02-jlg5036n/recording-outcomes.log",
+      "sha256": "732757fd3c89d177ab02e24b47a7cd8230d029faea22d52f6021d5ed6cf7078c",
+      "after": {
+        "head": "0d651f0279021bba63764f6725a337223408a879",
+        "tree": "662fabc6a616da1298bb776c9bec3aa8982d08ef",
+        "status": ""
+      },
+      "test_summaries": [
+        {
+          "passed": 3,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 4983
+        }
+      ],
+      "application_sha256_after": "b8226c27543d4736e6ced7ec76342570e6743f4a8327dba27540eb62d07d6dd7",
+      "binary_sha256_after": "d598a0f69832b1367bbfd978469733271f2e4c4ca88f2f16b50fe7b06106ffa4"
+    },
+    {
+      "label": "recording-resolver",
+      "command": [
+        "bwrap",
+        "--unshare-pid",
+        "--die-with-parent",
+        "--bind",
+        "/",
+        "/",
+        "--dev",
+        "/dev",
+        "--proc",
+        "/proc",
+        "--",
+        "/home/jonas/.t3/worktrees/gitcraft/t3-572729bb/target/debug/deps/gitcraft-47350705d36386f2",
+        "resolver::process::tests::recording_failure_mapping_and_join_proof_fail_closed",
+        "--test-threads=1"
+      ],
+      "before": {
+        "head": "0d651f0279021bba63764f6725a337223408a879",
+        "tree": "662fabc6a616da1298bb776c9bec3aa8982d08ef",
+        "status": ""
+      },
+      "application_sha256_before": "b8226c27543d4736e6ced7ec76342570e6743f4a8327dba27540eb62d07d6dd7",
+      "binary_sha256_before": "d598a0f69832b1367bbfd978469733271f2e4c4ca88f2f16b50fe7b06106ffa4",
+      "exit": 0,
+      "log": "/tmp/gitcraft-pr184-final-0d651f02-jlg5036n/recording-resolver.log",
+      "sha256": "39d4793f25c5bbe5ba7cd6f3c9ff4eb39640ec31e5604257b3163b690755ed1f",
+      "after": {
+        "head": "0d651f0279021bba63764f6725a337223408a879",
+        "tree": "662fabc6a616da1298bb776c9bec3aa8982d08ef",
+        "status": ""
+      },
+      "test_summaries": [
+        {
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 4985
+        }
+      ],
+      "application_sha256_after": "b8226c27543d4736e6ced7ec76342570e6743f4a8327dba27540eb62d07d6dd7",
+      "binary_sha256_after": "d598a0f69832b1367bbfd978469733271f2e4c4ca88f2f16b50fe7b06106ffa4"
+    },
+    {
+      "label": "runtime-gitcraft_os-lib",
+      "command": [
+        "bwrap",
+        "--unshare-pid",
+        "--die-with-parent",
+        "--bind",
+        "/",
+        "/",
+        "--dev",
+        "/dev",
+        "--proc",
+        "/proc",
+        "--",
+        "/home/jonas/.t3/worktrees/gitcraft/t3-572729bb/target/debug/deps/gitcraft_os-afb9de969ac4ed8a",
+        "--test-threads=4"
+      ],
+      "before": {
+        "head": "0d651f0279021bba63764f6725a337223408a879",
+        "tree": "662fabc6a616da1298bb776c9bec3aa8982d08ef",
+        "status": ""
+      },
+      "application_sha256_before": "b8226c27543d4736e6ced7ec76342570e6743f4a8327dba27540eb62d07d6dd7",
+      "binary_sha256_before": "d69dad02043fa081385422ac7b64467a4b53bf89e21907a213a2da846a33b2e6",
+      "exit": 0,
+      "log": "/tmp/gitcraft-pr184-final-0d651f02-jlg5036n/runtime-gitcraft_os-lib.log",
+      "sha256": "25ecb268fc7ca9916b360011ca49113a363bbb3ad195e0d4b03cb91c4d248eec",
+      "after": {
+        "head": "0d651f0279021bba63764f6725a337223408a879",
+        "tree": "662fabc6a616da1298bb776c9bec3aa8982d08ef",
+        "status": ""
+      },
+      "test_summaries": [
+        {
+          "passed": 24,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        }
+      ],
+      "application_sha256_after": "b8226c27543d4736e6ced7ec76342570e6743f4a8327dba27540eb62d07d6dd7",
+      "binary_sha256_after": "d69dad02043fa081385422ac7b64467a4b53bf89e21907a213a2da846a33b2e6"
+    },
+    {
+      "label": "runtime-gitcraft-lib",
+      "command": [
+        "bwrap",
+        "--unshare-pid",
+        "--die-with-parent",
+        "--bind",
+        "/",
+        "/",
+        "--dev",
+        "/dev",
+        "--proc",
+        "/proc",
+        "--",
+        "/home/jonas/.t3/worktrees/gitcraft/t3-572729bb/target/debug/deps/gitcraft-47350705d36386f2",
+        "--test-threads=4",
+        "--skip",
+        "standalone::save::tests::acl_only_tightening_during_each_save_boundary_refuses_stale_policy_and_retains_recovery",
+        "--skip",
+        "git::file_comparison::index_transaction::tests::index_owner_comparison_and_real_group_drift_refuse_stale_publication",
+        "--skip",
+        "app::palette::tests::thousands_of_branches_open_and_filter_quickly"
+      ],
+      "before": {
+        "head": "0d651f0279021bba63764f6725a337223408a879",
+        "tree": "662fabc6a616da1298bb776c9bec3aa8982d08ef",
+        "status": ""
+      },
+      "application_sha256_before": "b8226c27543d4736e6ced7ec76342570e6743f4a8327dba27540eb62d07d6dd7",
+      "binary_sha256_before": "d598a0f69832b1367bbfd978469733271f2e4c4ca88f2f16b50fe7b06106ffa4",
+      "exit": 0,
+      "log": "/tmp/gitcraft-pr184-final-0d651f02-jlg5036n/runtime-gitcraft-lib.log",
+      "sha256": "19ac2c1de94eef6e5552225c9e07e194a5c26e402fa20aa0585acaed79ac3468",
+      "after": {
+        "head": "0d651f0279021bba63764f6725a337223408a879",
+        "tree": "662fabc6a616da1298bb776c9bec3aa8982d08ef",
+        "status": ""
+      },
+      "test_summaries": [
+        {
+          "passed": 4959,
+          "failed": 0,
+          "ignored": 24,
+          "measured": 0,
+          "filtered": 3
+        }
+      ],
+      "application_sha256_after": "b8226c27543d4736e6ced7ec76342570e6743f4a8327dba27540eb62d07d6dd7",
+      "binary_sha256_after": "d598a0f69832b1367bbfd978469733271f2e4c4ca88f2f16b50fe7b06106ffa4"
+    },
+    {
+      "label": "runtime-standalone_cli-standalone_cli",
+      "command": [
+        "bwrap",
+        "--unshare-pid",
+        "--die-with-parent",
+        "--bind",
+        "/",
+        "/",
+        "--dev",
+        "/dev",
+        "--proc",
+        "/proc",
+        "--",
+        "/home/jonas/.t3/worktrees/gitcraft/t3-572729bb/target/debug/deps/standalone_cli-c92181a0a0eb14a9",
+        "--test-threads=4"
+      ],
+      "before": {
+        "head": "0d651f0279021bba63764f6725a337223408a879",
+        "tree": "662fabc6a616da1298bb776c9bec3aa8982d08ef",
+        "status": ""
+      },
+      "application_sha256_before": "b8226c27543d4736e6ced7ec76342570e6743f4a8327dba27540eb62d07d6dd7",
+      "binary_sha256_before": "96904da21e8a998819dcfb08e8876a6c808c953e34a32736bc0748e9071f0246",
+      "exit": 0,
+      "log": "/tmp/gitcraft-pr184-final-0d651f02-jlg5036n/runtime-standalone_cli-standalone_cli.log",
+      "sha256": "3ad31e81b593d21a4c4db6fda59840211ac0e4a74e04a56e2f450faf348a79b1",
+      "after": {
+        "head": "0d651f0279021bba63764f6725a337223408a879",
+        "tree": "662fabc6a616da1298bb776c9bec3aa8982d08ef",
+        "status": ""
+      },
+      "test_summaries": [
+        {
+          "passed": 3,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        }
+      ],
+      "application_sha256_after": "b8226c27543d4736e6ced7ec76342570e6743f4a8327dba27540eb62d07d6dd7",
+      "binary_sha256_after": "96904da21e8a998819dcfb08e8876a6c808c953e34a32736bc0748e9071f0246"
+    },
+    {
+      "label": "runtime-checkpoint_cli-checkpoint_cli",
+      "command": [
+        "bwrap",
+        "--unshare-pid",
+        "--die-with-parent",
+        "--bind",
+        "/",
+        "/",
+        "--dev",
+        "/dev",
+        "--proc",
+        "/proc",
+        "--",
+        "/home/jonas/.t3/worktrees/gitcraft/t3-572729bb/target/debug/deps/checkpoint_cli-6955c95642b7b98f",
+        "--test-threads=4"
+      ],
+      "before": {
+        "head": "0d651f0279021bba63764f6725a337223408a879",
+        "tree": "662fabc6a616da1298bb776c9bec3aa8982d08ef",
+        "status": ""
+      },
+      "application_sha256_before": "b8226c27543d4736e6ced7ec76342570e6743f4a8327dba27540eb62d07d6dd7",
+      "binary_sha256_before": "c3ed225c63cb729184e96b6e971e30201326f1bbf3e54bf61d5f8056c41d834e",
+      "exit": 0,
+      "log": "/tmp/gitcraft-pr184-final-0d651f02-jlg5036n/runtime-checkpoint_cli-checkpoint_cli.log",
+      "sha256": "a90957349947b8c97d5cb1701c835295e0eaa4c8533960a82dcb827e24e39ae0",
+      "after": {
+        "head": "0d651f0279021bba63764f6725a337223408a879",
+        "tree": "662fabc6a616da1298bb776c9bec3aa8982d08ef",
+        "status": ""
+      },
+      "test_summaries": [
+        {
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        }
+      ],
+      "application_sha256_after": "b8226c27543d4736e6ced7ec76342570e6743f4a8327dba27540eb62d07d6dd7",
+      "binary_sha256_after": "c3ed225c63cb729184e96b6e971e30201326f1bbf3e54bf61d5f8056c41d834e"
+    },
+    {
+      "label": "runtime-gitcraft-main",
+      "command": [
+        "bwrap",
+        "--unshare-pid",
+        "--die-with-parent",
+        "--bind",
+        "/",
+        "/",
+        "--dev",
+        "/dev",
+        "--proc",
+        "/proc",
+        "--",
+        "/home/jonas/.t3/worktrees/gitcraft/t3-572729bb/target/debug/deps/gitcraft-badf312742f8875e",
+        "--test-threads=4"
+      ],
+      "before": {
+        "head": "0d651f0279021bba63764f6725a337223408a879",
+        "tree": "662fabc6a616da1298bb776c9bec3aa8982d08ef",
+        "status": ""
+      },
+      "application_sha256_before": "b8226c27543d4736e6ced7ec76342570e6743f4a8327dba27540eb62d07d6dd7",
+      "binary_sha256_before": "69df2f03877857456942ae4c5f30c93afa6cfcfdc863e9b6762dea639cc72956",
+      "exit": 0,
+      "log": "/tmp/gitcraft-pr184-final-0d651f02-jlg5036n/runtime-gitcraft-main.log",
+      "sha256": "df166913f47ff1f04202cae9b31df67ed272d692d99a0023a8117dc3029100dd",
+      "after": {
+        "head": "0d651f0279021bba63764f6725a337223408a879",
+        "tree": "662fabc6a616da1298bb776c9bec3aa8982d08ef",
+        "status": ""
+      },
+      "test_summaries": [
+        {
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        }
+      ],
+      "application_sha256_after": "b8226c27543d4736e6ced7ec76342570e6743f4a8327dba27540eb62d07d6dd7",
+      "binary_sha256_after": "69df2f03877857456942ae4c5f30c93afa6cfcfdc863e9b6762dea639cc72956"
+    },
+    {
+      "label": "runtime-mcp_stdio-mcp_stdio",
+      "command": [
+        "bwrap",
+        "--unshare-pid",
+        "--die-with-parent",
+        "--bind",
+        "/",
+        "/",
+        "--dev",
+        "/dev",
+        "--proc",
+        "/proc",
+        "--",
+        "/home/jonas/.t3/worktrees/gitcraft/t3-572729bb/target/debug/deps/mcp_stdio-583784c527de5c4f",
+        "--test-threads=4"
+      ],
+      "before": {
+        "head": "0d651f0279021bba63764f6725a337223408a879",
+        "tree": "662fabc6a616da1298bb776c9bec3aa8982d08ef",
+        "status": ""
+      },
+      "application_sha256_before": "b8226c27543d4736e6ced7ec76342570e6743f4a8327dba27540eb62d07d6dd7",
+      "binary_sha256_before": "ba22f182cd9177ac9d086d1110bd2cd4ed6d71cf5acedd2bb9f620b714aae679",
+      "exit": 0,
+      "log": "/tmp/gitcraft-pr184-final-0d651f02-jlg5036n/runtime-mcp_stdio-mcp_stdio.log",
+      "sha256": "6dfcc78f3434b214d336cd01c54f8619c84b54de80537ab516771b34a68654f7",
+      "after": {
+        "head": "0d651f0279021bba63764f6725a337223408a879",
+        "tree": "662fabc6a616da1298bb776c9bec3aa8982d08ef",
+        "status": ""
+      },
+      "test_summaries": [
+        {
+          "passed": 6,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        }
+      ],
+      "application_sha256_after": "b8226c27543d4736e6ced7ec76342570e6743f4a8327dba27540eb62d07d6dd7",
+      "binary_sha256_after": "ba22f182cd9177ac9d086d1110bd2cd4ed6d71cf5acedd2bb9f620b714aae679"
+    },
+    {
+      "label": "acl-save",
+      "command": [
+        "/home/jonas/.t3/worktrees/gitcraft/t3-572729bb/target/debug/deps/gitcraft-47350705d36386f2",
+        "standalone::save::tests::acl_only_tightening_during_each_save_boundary_refuses_stale_policy_and_retains_recovery",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "before": {
+        "head": "0d651f0279021bba63764f6725a337223408a879",
+        "tree": "662fabc6a616da1298bb776c9bec3aa8982d08ef",
+        "status": ""
+      },
+      "application_sha256_before": "b8226c27543d4736e6ced7ec76342570e6743f4a8327dba27540eb62d07d6dd7",
+      "binary_sha256_before": "d598a0f69832b1367bbfd978469733271f2e4c4ca88f2f16b50fe7b06106ffa4",
+      "exit": 0,
+      "log": "/tmp/gitcraft-pr184-final-0d651f02-jlg5036n/acl-save.log",
+      "sha256": "45d5cd1b17fba0341dac6d3ac4b2e8c20bbe972c86fde2b914b2a40805b4e6da",
+      "after": {
+        "head": "0d651f0279021bba63764f6725a337223408a879",
+        "tree": "662fabc6a616da1298bb776c9bec3aa8982d08ef",
+        "status": ""
+      },
+      "test_summaries": [
+        {
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 4985
+        }
+      ],
+      "application_sha256_after": "b8226c27543d4736e6ced7ec76342570e6743f4a8327dba27540eb62d07d6dd7",
+      "binary_sha256_after": "d598a0f69832b1367bbfd978469733271f2e4c4ca88f2f16b50fe7b06106ffa4",
+      "containment": "native-owned-ACL-metadata-fixture"
+    },
+    {
+      "label": "acl-index",
+      "command": [
+        "/home/jonas/.t3/worktrees/gitcraft/t3-572729bb/target/debug/deps/gitcraft-47350705d36386f2",
+        "git::file_comparison::index_transaction::tests::index_owner_comparison_and_real_group_drift_refuse_stale_publication",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "before": {
+        "head": "0d651f0279021bba63764f6725a337223408a879",
+        "tree": "662fabc6a616da1298bb776c9bec3aa8982d08ef",
+        "status": ""
+      },
+      "application_sha256_before": "b8226c27543d4736e6ced7ec76342570e6743f4a8327dba27540eb62d07d6dd7",
+      "binary_sha256_before": "d598a0f69832b1367bbfd978469733271f2e4c4ca88f2f16b50fe7b06106ffa4",
+      "exit": 0,
+      "log": "/tmp/gitcraft-pr184-final-0d651f02-jlg5036n/acl-index.log",
+      "sha256": "3a6eb22b4f1e40395f0392e7d20f1dfee387519b289a0e797fbdb9e0af962b25",
+      "after": {
+        "head": "0d651f0279021bba63764f6725a337223408a879",
+        "tree": "662fabc6a616da1298bb776c9bec3aa8982d08ef",
+        "status": ""
+      },
+      "test_summaries": [
+        {
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 4985
+        }
+      ],
+      "application_sha256_after": "b8226c27543d4736e6ced7ec76342570e6743f4a8327dba27540eb62d07d6dd7",
+      "binary_sha256_after": "d598a0f69832b1367bbfd978469733271f2e4c4ca88f2f16b50fe7b06106ffa4",
+      "containment": "native-owned-ACL-metadata-fixture"
+    },
+    {
+      "label": "palette-isolated",
+      "command": [
+        "bwrap",
+        "--unshare-pid",
+        "--die-with-parent",
+        "--bind",
+        "/",
+        "/",
+        "--dev",
+        "/dev",
+        "--proc",
+        "/proc",
+        "--",
+        "/home/jonas/.t3/worktrees/gitcraft/t3-572729bb/target/debug/deps/gitcraft-47350705d36386f2",
+        "app::palette::tests::thousands_of_branches_open_and_filter_quickly",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "before": {
+        "head": "0d651f0279021bba63764f6725a337223408a879",
+        "tree": "662fabc6a616da1298bb776c9bec3aa8982d08ef",
+        "status": ""
+      },
+      "application_sha256_before": "b8226c27543d4736e6ced7ec76342570e6743f4a8327dba27540eb62d07d6dd7",
+      "binary_sha256_before": "d598a0f69832b1367bbfd978469733271f2e4c4ca88f2f16b50fe7b06106ffa4",
+      "exit": 0,
+      "log": "/tmp/gitcraft-pr184-final-0d651f02-jlg5036n/palette-isolated.log",
+      "sha256": "2f160e6a8f7b09c5e7e4c1ae7cd743ee46a43e7baeeb4c92c3a5d1d0823782ed",
+      "after": {
+        "head": "0d651f0279021bba63764f6725a337223408a879",
+        "tree": "662fabc6a616da1298bb776c9bec3aa8982d08ef",
+        "status": ""
+      },
+      "test_summaries": [
+        {
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 4985
+        }
+      ],
+      "application_sha256_after": "b8226c27543d4736e6ced7ec76342570e6743f4a8327dba27540eb62d07d6dd7",
+      "binary_sha256_after": "d598a0f69832b1367bbfd978469733271f2e4c4ca88f2f16b50fe7b06106ffa4",
+      "containment": "PID/proc/dev namespace"
+    },
+    {
+      "label": "doc-tests",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--doc"
+      ],
+      "before": {
+        "head": "0d651f0279021bba63764f6725a337223408a879",
+        "tree": "662fabc6a616da1298bb776c9bec3aa8982d08ef",
+        "status": ""
+      },
+      "exit": 0,
+      "log": "/tmp/gitcraft-pr184-final-0d651f02-jlg5036n/doc-tests.log",
+      "sha256": "4707137ae20b9f1b707eca0d3520f2061ddff3af4e472ef8aaea917ab8a86b55",
+      "after": {
+        "head": "0d651f0279021bba63764f6725a337223408a879",
+        "tree": "662fabc6a616da1298bb776c9bec3aa8982d08ef",
+        "status": ""
+      },
+      "test_summaries": [
+        {
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        }
+      ]
+    }
+  ],
+  "artifacts": [
+    {
+      "name": "gitcraft_os",
+      "kind": [
+        "lib"
+      ],
+      "source": "crates/gitcraft-os/src/lib.rs",
+      "executable": "/home/jonas/.t3/worktrees/gitcraft/t3-572729bb/target/debug/deps/gitcraft_os-afb9de969ac4ed8a",
+      "sha256": "d69dad02043fa081385422ac7b64467a4b53bf89e21907a213a2da846a33b2e6"
+    },
+    {
+      "name": "gitcraft",
+      "kind": [
+        "lib"
+      ],
+      "source": "src/lib.rs",
+      "executable": "/home/jonas/.t3/worktrees/gitcraft/t3-572729bb/target/debug/deps/gitcraft-47350705d36386f2",
+      "sha256": "d598a0f69832b1367bbfd978469733271f2e4c4ca88f2f16b50fe7b06106ffa4"
+    },
+    {
+      "name": "standalone_cli",
+      "kind": [
+        "test"
+      ],
+      "source": "tests/standalone_cli.rs",
+      "executable": "/home/jonas/.t3/worktrees/gitcraft/t3-572729bb/target/debug/deps/standalone_cli-c92181a0a0eb14a9",
+      "sha256": "96904da21e8a998819dcfb08e8876a6c808c953e34a32736bc0748e9071f0246"
+    },
+    {
+      "name": "checkpoint_cli",
+      "kind": [
+        "test"
+      ],
+      "source": "tests/checkpoint_cli.rs",
+      "executable": "/home/jonas/.t3/worktrees/gitcraft/t3-572729bb/target/debug/deps/checkpoint_cli-6955c95642b7b98f",
+      "sha256": "c3ed225c63cb729184e96b6e971e30201326f1bbf3e54bf61d5f8056c41d834e"
+    },
+    {
+      "name": "gitcraft",
+      "kind": [
+        "bin"
+      ],
+      "source": "src/main.rs",
+      "executable": "/home/jonas/.t3/worktrees/gitcraft/t3-572729bb/target/debug/deps/gitcraft-badf312742f8875e",
+      "sha256": "69df2f03877857456942ae4c5f30c93afa6cfcfdc863e9b6762dea639cc72956"
+    },
+    {
+      "name": "mcp_stdio",
+      "kind": [
+        "test"
+      ],
+      "source": "tests/mcp_stdio.rs",
+      "executable": "/home/jonas/.t3/worktrees/gitcraft/t3-572729bb/target/debug/deps/mcp_stdio-583784c527de5c4f",
+      "sha256": "ba22f182cd9177ac9d086d1110bd2cd4ed6d71cf5acedd2bb9f620b714aae679"
+    }
+  ],
+  "environment": {
+    "PKG_CONFIG_PATH": "/tmp/gitcraft-pr179-build-deps/root/usr/lib/x86_64-linux-gnu/pkgconfig",
+    "CARGO_TARGET_DIR": "/home/jonas/.t3/worktrees/gitcraft/t3-572729bb/target",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "PATH": "/tmp/gitcraft-git252/install/bin:/tmp/gitcraft-lfs/root/usr/bin:/home/jonas/.codex/packages/standalone/releases/0.166.0-x86_64-unknown-linux-musl/codex-path:/home/jonas/.local/bin:/home/jonas/.codex/tmp/arg0-linux/codex-arg0d7wBtJ:/home/jonas/.codex/packages/standalone/releases/0.166.0-x86_64-unknown-linux-musl/codex-path:/home/jonas/.local/bin:/home/jonas/.dotnet/tools:/home/jonas/.cargo/bin:/home/jonas/.nvm/versions/node/v24.19.0/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin",
+    "GIT_CONFIG_GLOBAL": "/dev/null",
+    "GIT_CONFIG_NOSYSTEM": "1"
+  },
+  "uid": 1000,
+  "gid": 1000,
+  "supplementary_groups": [
+    4,
+    24,
+    27,
+    30,
+    46,
+    101,
+    987,
+    1000
+  ],
+  "acl_group_drift_coverage": "Conditional within test; a passing summary alone does not establish the real supplementary-group branch ran.",
+  "versions": [
+    {
+      "command": [
+        "rustc",
+        "--version"
+      ],
+      "output": "rustc 1.97.1 (8bab26f4f 2026-07-14)"
+    },
+    {
+      "command": [
+        "cargo",
+        "--version"
+      ],
+      "output": "cargo 1.97.1 (c980f4866 2026-06-30)"
+    },
+    {
+      "command": [
+        "git",
+        "--version"
+      ],
+      "output": "git version 2.52.0"
+    },
+    {
+      "command": [
+        "bwrap",
+        "--version"
+      ],
+      "output": "bubblewrap 0.9.0"
+    }
+  ],
+  "application": {
+    "executable": "/home/jonas/.t3/worktrees/gitcraft/t3-572729bb/target/debug/gitcraft",
+    "sha256": "b8226c27543d4736e6ced7ec76342570e6743f4a8327dba27540eb62d07d6dd7"
+  },
+  "finished": "2026-11-09T11:32:16.842163+00:00",
+  "final_state": {
+    "head": "0d651f0279021bba63764f6725a337223408a879",
+    "tree": "662fabc6a616da1298bb776c9bec3aa8982d08ef",
+    "status": ""
+  },
+  "status": "passed"
+}

@@ -1,0 +1,262 @@
+[
+  {
+    "task_id": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Ad8c37098-b82a-4190-85da-a61f70940640",
+    "reviewer": {
+      "provider": "codex",
+      "model": "gpt-6.1-sol",
+      "options": {
+        "reasoningEffort": "high"
+      }
+    },
+    "scope": "inheritance_verifier",
+    "verdict": "PASS",
+    "reviewed_commit": "0d651f0279021bba63764f6725a337223408a879",
+    "reviewed_tree": "662fabc6a616da1298bb776c9bec3aa8982d08ef",
+    "script_sha256": "93c235bc01f3163d89b69157ce6e2eca7f951c153388de4adb198a35266035ab",
+    "summary": "PASS \u2014 scope: `inheritance_verifier`, static review only. No blocking findings.\n\nCandidate: `0d651f0279021bba63764f6725a337223408a879`  \nTree: `662fabc6a616da1298bb776c9bec3aa8982d08ef`\n\nThe verifier enforces the pinned sole parent, clean successor checkout, exact new evidence prefix, regular-file additions, complete application-map equality, executing/archived verifier identity, manifest inventory and hashes, declared compressed/raw log hashes, and archived tested-map identity. Its only explicit write creates a temporary JSON record.\n\nVerified digests:\n\n- `script_sha256`: `93c235bc01f3163d89b69157ce6e2eca7f951c153388de4adb198a35266035ab`\n- Candidate complete path/mode/blob map: `0e872e9f63b2036ccf047210d3e794b7b78b57c81c40c72a3fbfdc8a8231df03`\n\nCandidate files match accepted commit `0f72c535f0b0ed7c72532d67b399eef28feb8e71`. This approves the reviewed script\u2019s static logic; it does not attest to a future evidence successor or claim verifier/test execution.",
+    "disposition": "Design approval; successor execution remains pending."
+  },
+  {
+    "task_id": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Ab24f5776-013b-44c0-892e-dde73b6ab2c6",
+    "reviewer": {
+      "provider": "codex",
+      "model": "gpt-6.1-sol",
+      "options": {
+        "reasoningEffort": "high"
+      }
+    },
+    "scope": "source",
+    "verdict": "PASS",
+    "reviewed_commit": "0d651f0279021bba63764f6725a337223408a879",
+    "reviewed_tree": "662fabc6a616da1298bb776c9bec3aa8982d08ef",
+    "summary": "**PASS \u2014 whole-candidate source review.** No blocking findings across the three feature diffs and corrected test recorder for [PR #184](https://github.com/JKamsker/gitcraft/pull/184).\n\n- Candidate: `0d651f0279021bba63764f6725a337223408a879`\n- Tree: `662fabc6a616da1298bb776c9bec3aa8982d08ef`\n- Exactly three feature commits above `f5919c97296560951166eea1ed43f15425bcaf27`, with the required author identity.\n- Exactly five changed files; no unrelated changes.\n- Complete tree matches accepted `0f72c535f0b0ed7c72532d67b399eef28feb8e71`.\n\nThe stash comparison preserves Git\u2019s path spelling while handling directory suffixes. Tag submission remains focus-aware with multiline annotations. Author namespace matching and specificity ranking use consistent normalization. The test recorder correctly dereferences `Box<Action>` without dispatching operations.\n\nVerified complete path/mode/blob map SHA-256:\n`0e872e9f63b2036ccf047210d3e794b7b78b57c81c40c72a3fbfdc8a8231df03`\n\nEvidence SHA-256:\n\n- Assembly record: `6e9c8838a58edc849fc77ac1748fc65c834eefa2d0691af3dff8ece28f77d47d`\n- Focused results: `53b362b92e4fd1278ed8cc232d9900fc9c14969d7b7dad03bc910c3a939ef2a4`\n\nAll seven recorded log digests match; completed records show 30 stash, 5 branch/tag, 2 author-rule, and 1 preflight tests passing, plus build/fmt/clippy success. I ran no tests and did not inspect or wait on the active full run. This approves the candidate\u2019s source; it does not certify the outstanding full-run gate.",
+    "disposition": "Scoped independent approval; full execution evidence remains pending."
+  },
+  {
+    "task_id": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A4b5a3e84-0c20-41e7-bfcc-a5221fb53743",
+    "reviewer": {
+      "provider": "codex",
+      "model": "gpt-6.1-sol",
+      "options": {
+        "reasoningEffort": "high"
+      }
+    },
+    "scope": "evidence_packaging",
+    "verdict": "PASS",
+    "reviewed_commit": "0d651f0279021bba63764f6725a337223408a879",
+    "reviewed_tree": "662fabc6a616da1298bb776c9bec3aa8982d08ef",
+    "summary": "**PASS \u2014 scope: `evidence_packaging` design.** No concrete current blocker found.\n\n- Candidate: `0d651f0279021bba63764f6725a337223408a879`\n- Tree: `662fabc6a616da1298bb776c9bec3aa8982d08ef`\n- Reviewed packager SHA-256: `fe1c5d487ee35848bb06c0ad34002e03781282e3c6e4bbf165727b983382c944`\n\nThe packager snapshots input bytes once, requires 16 unique successful gates, validates six harness identities and eleven runtime executable/application bindings, and requires independent source and digest-bound execution approvals plus exact verifier/packager approvals. It verifies assembly ancestry, authorship and accepted source-map equality; archives digest-bound logs and 24 distinct ignored tests; and publishes through a staging-directory rename.\n\nIndependently confirmed the three feature commits and complete source-map digest: `0e872e9f63b2036ccf047210d3e794b7b78b57c81c40c72a3fbfdc8a8231df03`.\n\nThis approves packaging design only. The completed full run and resulting archive remain unreviewed. No edits, builds, tests, active-run inspection, process control, CI, PR actions or subagents.\n\nPR https://github.com/JKamsker/gitcraft/pull/184, head f5919c97296560951166eea1ed43f15425bcaf27 (supplied; unqueried), checks unqueried; candidate packaging-design review PASS.",
+    "script_sha256": "fe1c5d487ee35848bb06c0ad34002e03781282e3c6e4bbf165727b983382c944",
+    "disposition": "Scoped independent approval; full execution evidence remains pending."
+  },
+  {
+    "task_id": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A6d233bfb-46bd-4af4-8980-b53f6847a159",
+    "reviewer": {
+      "provider": "codex",
+      "model": "gpt-6.1-sol",
+      "options": {
+        "reasoningEffort": "high"
+      }
+    },
+    "scope": "regression_source",
+    "verdict": "PASS",
+    "reviewed_commit": "0d651f0279021bba63764f6725a337223408a879",
+    "reviewed_tree": "662fabc6a616da1298bb776c9bec3aa8982d08ef",
+    "summary": "**PASS \u2014 scope `regression_source`.** No blocking findings.\n\nReviewed candidate `0d651f0279021bba63764f6725a337223408a879`, tree `662fabc6a616da1298bb776c9bec3aa8982d08ef`.\n\n- Tag tests exercise actual form rendering and keyboard events, capture boxed operation intents correctly, and verify exact multiline annotation arguments. Negative cases verify checkbox toggles and annotation newlines do not submit.\n- Embedded repository tests cover ordinary and ignored replacements, stale queued push, and Redo refusal before step zero. Assertions preserve file bytes, staged/unstaged diffs, stash list, and HEAD.\n- Namespace tests cover specificity, equal-rank precedence, boundary rejection, and unchanged stored rules. Actual preflight scanning verifies both matching and mismatching author emails.\n- Complete path/mode/blob maps match accepted `0f72c535f0b0ed7c72532d67b399eef28feb8e71`. Exactly three feature commits follow `f5919c97`, with the required authorship.\n\nAll seven completed focused-log digests match their records: 30 stash, 5 branch/tag, 2 namespace, 1 actual-preflight tests passed; build, formatting, and Clippy succeeded.\n\nVerified SHA-256:\n- Path map: `0e872e9f63b2036ccf047210d3e794b7b78b57c81c40c72a3fbfdc8a8231df03`\n- Focused results manifest: `53b362b92e4fd1278ed8cc232d9900fc9c14969d7b7dad03bc910c3a939ef2a4`\n\nNo edits or tests performed; active full run untouched. This verdict does not establish full-suite completion.\n\nPR https://github.com/JKamsker/gitcraft/pull/184, head `f5919c97296560951166eea1ed43f15425bcaf27` (supplied), checks uninspected; candidate regression-source review PASS.",
+    "disposition": "Scoped independent approval; full execution evidence remains pending."
+  },
+  {
+    "task_id": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Ade2d4d3d-4799-41a0-ac62-e87cffaff00b",
+    "reviewer": {
+      "provider": "codex",
+      "model": "gpt-6.1-sol",
+      "options": {
+        "reasoningEffort": "high"
+      }
+    },
+    "scope": "assembly",
+    "verdict": "PASS",
+    "reviewed_commit": "0d651f0279021bba63764f6725a337223408a879",
+    "reviewed_tree": "662fabc6a616da1298bb776c9bec3aa8982d08ef",
+    "summary": "**PASS \u2014 assembly scope only.** No blocking findings.\n\nReviewed candidate `0d651f0279021bba63764f6725a337223408a879`, tree `662fabc6a616da1298bb776c9bec3aa8982d08ef`.\n\n- Exactly three new, linear feature commits descend from published `f5919c97296560951166eea1ed43f15425bcaf27`: `006429538ea61b5d3894d1c3a9479729141943b9` \u2192 `2a69defa37993e7dd85b006be46dcc856b03427c` \u2192 candidate.\n- Each commit changes exactly its recorded feature paths. Git author **and committer** match `Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>`. Parent/tree metadata and recorded remote verification match.\n- All 1,924 path/mode/object entries equal accepted `0f72c535f0b0ed7c72532d67b399eef28feb8e71`. Provenance is preserved; the accepted `Box<Action>` dereference fix changes only the regression harness.\n- The assembler advances only the new final branch. Source/WIP branches remain at their preserved tips; recovery refs remain present. No live remote revalidation was performed.\n- Temporary-file handling passes review: exclusive `NamedTemporaryFile`, retained descriptor for manifest updates, and a private `TemporaryDirectory` for the alternate index. The historical archive finding does not apply.\n\nSHA-256 digests:\n\n| Evidence | Digest |\n|---|---|\n| Complete tree map | `0e872e9f63b2036ccf047210d3e794b7b78b57c81c40c72a3fbfdc8a8231df03` |\n| Assembly JSON | `6e9c8838a58edc849fc77ac1748fc65c834eefa2d0691af3dff8ece28f77d47d` |\n| Assembler script | `65db43d81df684c29129561257b4335cc6083a58a32850acaa11df5186cdd04d` |\n\nStatus: **reviewed for assembly**. No edits, builds, tests, process control, CI actions, or active-run inspection performed. Full validation remains outside this verdict.\n\nPR https://github.com/JKamsker/gitcraft/pull/184, head `f5919c97296560951166eea1ed43f15425bcaf27` (reported unchanged), checks and reviews: full checks not inspected; candidate assembly review PASS.",
+    "disposition": "Scoped independent approval; full execution evidence remains pending."
+  },
+  {
+    "task_id": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Adfbcfca1-0585-47dd-b36c-ea918ca7d762",
+    "reviewer": {
+      "provider": "codex",
+      "model": "gpt-6.1-sol",
+      "options": {
+        "reasoningEffort": "high"
+      }
+    },
+    "scope": "package_integrity",
+    "verdict": "PASS",
+    "reviewed_commit": "0d651f0279021bba63764f6725a337223408a879",
+    "reviewed_tree": "662fabc6a616da1298bb776c9bec3aa8982d08ef",
+    "summary": "**PASS \u2014 scope: `package_integrity`. No blocking findings.**\n\nReviewed candidate: `0d651f0279021bba63764f6725a337223408a879`  \nTree: `662fabc6a616da1298bb776c9bec3aa8982d08ef`\n\nStatic inspection confirms:\n\n- Complete portable file inventory, excluding the manifest itself, with raw/gzip log hashes.\n- Lossless NUL-delimited source map matching accepted source across all 1,924 entries.\n- Actual newline literals in JSON serialization, verified through AST inspection.\n- Exclusively created assembly/proof files, retained assembly descriptor, private index directory, and owned packaging staging directory.\n- Historical evidence remains explicitly historical.\n- The new verifier hashes committed blobs and **rejects an altered committed file with a stale manifest hash**.\n\nSHA-256 bindings:\n\n```text\npackager   fe1c5d487ee35848bb06c0ad34002e03781282e3c6e4bbf165727b983382c944\nverifier   93c235bc01f3163d89b69157ce6e2eca7f951c153388de4adb198a35266035ab\nassembler  65db43d81df684c29129561257b4335cc6083a58a32850acaa11df5186cdd04d\nassembly   6e9c8838a58edc849fc77ac1748fc65c834eefa2d0691af3dff8ece28f77d47d\nsource map 0e872e9f63b2036ccf047210d3e794b7b78b57c81c40c72a3fbfdc8a8231df03\n```\n\nThis approves the inspected packaging/verifier design. Packaging and successor-proof execution remain unperformed. Pending reviews are expected. No edits, builds/tests, process control, CI, PR actions, or active-full-run inspection occurred.\n\nPR https://github.com/JKamsker/gitcraft/pull/184, head `f5919c97296560951166eea1ed43f15425bcaf27` unchanged, checks and reviews: CI unqueried; `package_integrity` PASS.",
+    "disposition": "Scoped independent approval; full execution evidence remains pending."
+  },
+  {
+    "task_id": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Aa2482071-2340-4538-8eae-d2a431379070",
+    "reviewer": {
+      "provider": "codex",
+      "model": "gpt-6.1-sol",
+      "options": {
+        "reasoningEffort": "high"
+      }
+    },
+    "scope": "finding_dispositions",
+    "verdict": "PASS",
+    "reviewed_commit": "0d651f0279021bba63764f6725a337223408a879",
+    "reviewed_tree": "662fabc6a616da1298bb776c9bec3aa8982d08ef",
+    "summary": "**PASS \u2014 scope: `finding_dispositions`.** No blocking disposition error found.\n\nReviewed candidate `0d651f0279021bba63764f6725a337223408a879`, tree `662fabc6a616da1298bb776c9bec3aa8982d08ef`. Its complete path/mode/blob map equals accepted `0f72c535f0b0ed7c72532d67b399eef28feb8e71`. Confirmed exactly three feature commits above published `f591`, with the required author identity.\n\n| Finding | Disposition verified |\n|---|---|\n| Stash directory overlap | Fixed: both comparison operands lose trailing `/`; original Git spelling remains intact. Cached and fresh execution guards share the fix. |\n| Tag multiline annotation | Fixed: eligible name-field Enter submits; annotation editing retains its focus guard. The test recorder correctly dereferences the boxed action. |\n| Author namespace suffix | Fixed: matching and specificity use the same trimmed namespace; component boundaries and last-rule precedence remain. |\n| Malformed colon advisory | Optional deferral justified. The warning gap remains; textual matching and import compatibility are preserved. |\n| Stale Files stash arguments | Nonblocking deferral justified. Git rejects an absent-index pathspec without saved `-u` before mutation; automatic scope expansion is unnecessary. |\n| Global remote bucket | Intentional alias-safety/availability tradeoff retained. Unrelated remote work can wait; local mutations and unkeyed reads remain runnable. |\n| Historical assembler | Preserved unchanged. The new assembler uses an exclusively created manifest, retained descriptor, and private temporary index directory. |\n| Archive verifier | Historical verifier preserved. Independently matched all **40 file hashes and 25 compressed/raw log pairs**. The new validator checks those categories; inspected its source without executing it. |\n\nConfirmed the completed focused logs\u2019 hashes and recorded passes: stash 30, branch/tag 5, author rules 2, actual preflight 1, compilation, formatting and Clippy. No new tests ran. The active full run was neither inspected nor awaited; this verdict does not approve that gate.\n\nSHA-256 bindings:\n\n```text\ncandidate complete map:\n0e872e9f63b2036ccf047210d3e794b7b78b57c81c40c72a3fbfdc8a8231df03\nfinding-dispositions input:\n82b228b5a6d0623288449e1a7d641a6282176fb4862c64691efa5eb3c7d30993\nassembly record:\n6e9c8838a58edc849fc77ac1748fc65c834eefa2d0691af3dff8ece28f77d47d\nfocused results:\n53b362b92e4fd1278ed8cc232d9900fc9c14969d7b7dad03bc910c3a939ef2a4\nhistorical archive manifest:\nc59eda6485d35ee1e702164a5d27247a79511fcf2f0dd23c0a389373579a57f0\n```\n\nPR https://github.com/JKamsker/gitcraft/pull/184, head f5919c97296560951166eea1ed43f15425bcaf27 (supplied, unchanged), checks and reviews: CI unqueried; candidate finding-disposition review PASS.",
+    "disposition": "Scoped independent approval; full execution evidence remains pending."
+  },
+  {
+    "task_id": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A73418450-1918-4457-b766-5b04e55815bb",
+    "reviewer": {
+      "provider": "codex",
+      "model": "gpt-6.1-sol",
+      "options": {
+        "reasoningEffort": "high"
+      }
+    },
+    "scope": "preservation",
+    "verdict": "PASS",
+    "reviewed_commit": "0d651f0279021bba63764f6725a337223408a879",
+    "reviewed_tree": "662fabc6a616da1298bb776c9bec3aa8982d08ef",
+    "summary": "**PASS \u2014 preservation and completed focused-evidence review. No concrete findings.**\n\nCandidate: `0d651f0279021bba63764f6725a337223408a879`  \nTree: `662fabc6a616da1298bb776c9bec3aa8982d08ef`\n\n- Exactly three feature commits descend from published `f5919c97296560951166eea1ed43f15425bcaf27`, with the required author identity.\n- Only the five stated files changed. Prior pull/parser, remote queue, import warning, and accessibility code remain unchanged.\n- Complete path/mode/blob map equals accepted `0f72c535f0b0ed7c72532d67b399eef28feb8e71`.\n- All 242 historical validation files remain byte-identical.\n- The accepted compile correction only dereferences the boxed action in test code; production code is unchanged by that correction.\n- Completed focused records bind the exact candidate SHA/tree. All seven log hashes match: stash **30**, branch/tag **5**, author rules **2**, actual preflight **1**, plus build, formatting, and Clippy passed.\n\nVerified SHA-256 digests:\n\n```text\nComplete path map:\n0e872e9f63b2036ccf047210d3e794b7b78b57c81c40c72a3fbfdc8a8231df03\nFocused results.json:\n53b362b92e4fd1278ed8cc232d9900fc9c14969d7b7dad03bc910c3a939ef2a4\nAssembly/provenance record:\n6e9c8838a58edc849fc77ac1748fc65c834eefa2d0691af3dff8ece28f77d47d\nApproved full runner:\n435573ad5a920a81766ae1e48f92745c2ff7bbe8754b84e18fdfe96fa8696f0b\n```\n\nThe full runner statically defines 16 gates, including native ACL fixtures and PID-contained runtime tests. **Full validation remains pending**; its active run was neither inspected nor polled. No edits, builds, tests, process control, CI, or PR actions were performed.\n\nPR https://github.com/JKamsker/gitcraft/pull/184, head `f5919c97296560951166eea1ed43f15425bcaf27` (reported), checks and reviews: scoped review PASS; focused evidence PASS; full gates pending.",
+    "disposition": "Scoped independent approval; full execution evidence remains pending."
+  },
+  {
+    "task_id": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Ab228a913-4f92-4c02-b0f7-6e27fd334216",
+    "reviewer": {
+      "provider": "codex",
+      "model": "gpt-6.1-sol",
+      "options": {
+        "reasoningEffort": "high"
+      }
+    },
+    "scope": "execution_evidence",
+    "verdict": "PASS",
+    "reviewed_commit": "0d651f0279021bba63764f6725a337223408a879",
+    "reviewed_tree": "662fabc6a616da1298bb776c9bec3aa8982d08ef",
+    "summary": "**PASS \u2014 scope: `execution_evidence`. No blocking findings.**\n\n- Reviewed commit: `0d651f0279021bba63764f6725a337223408a879`\n- Reviewed tree: `662fabc6a616da1298bb776c9bec3aa8982d08ef`\n- Complete tree equals accepted `0f72c535f0b0ed7c72532d67b399eef28feb8e71`; current checkout is clean.\n\nIndependently verified one completed full run containing **16 unique gates**, all exit 0, with matching candidate/tree and clean status before and after every gate and at completion. All **16 raw-log SHA-256 hashes** match.\n\nCargo\u2019s raw artifact records establish all **six test-harness identities** and the separate non-test application. All **11 runtime commands** invoke the corresponding recorded executable, with matching before/after harness and application hashes. Current executable hashes also match.\n\nRaw logs confirm:\n\n- Library: **4,959 passed, 0 failed, 24 ignored, 3 filtered**; 24 distinct ignored-test records.\n- OS: **24**; checkpoint CLI: **1**; standalone CLI: **3**; MCP: **6**; main: **0**; documentation: **0 + 0**.\n- Recording gates: **3 + 1** passed before broader runtime gates.\n- Each special gate passed exactly one test with the exact success name:\n  - `standalone::save::tests::acl_only_tightening_during_each_save_boundary_refuses_stale_policy_and_retains_recovery`\n  - `git::file_comparison::index_transaction::tests::index_owner_comparison_and_real_group_drift_refuse_stale_publication`\n  - `app::palette::tests::thousands_of_branches_open_and_filter_quickly`\n\nThe two native ACL exceptions are justified by fixture-owned file ACL/group metadata operations, rather than process-control fixtures. Palette and other runtime gates use PID/proc/dev containment. The index test\u2019s supplementary-group branch remains conditional; its passing summary alone does not prove that branch executed.\n\nExplicitly approved digest bindings:\n\n- `full_results_sha256`: `e9f7fab3661f8a7f671b6cdfa4555a966e40776329d40e1fc2b48c0dd226df3b`\n- `executed_runner_sha256`: `435573ad5a920a81766ae1e48f92745c2ff7bbe8754b84e18fdfe96fa8696f0b`\n\nThe runner bytes match the recorded self-digest and enforce the reviewed checks. Packager and inheritance-script hashes also match the supplied digests. This approves the completed execution evidence; no tests or evidence scripts were executed, files changed, or process-control/CI/PR actions taken.\n\nPR https://github.com/JKamsker/gitcraft/pull/184, head unqueried; checks and reviews: CI unqueried, candidate execution-evidence review **PASS**.",
+    "disposition": "Completed evidence independently approved; archive successor remains subject to committed inheritance verification.",
+    "full_results_sha256": "e9f7fab3661f8a7f671b6cdfa4555a966e40776329d40e1fc2b48c0dd226df3b",
+    "executed_runner_sha256": "435573ad5a920a81766ae1e48f92745c2ff7bbe8754b84e18fdfe96fa8696f0b"
+  },
+  {
+    "task_id": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A4c9360d7-2edd-4260-a85b-61b4126d2b98",
+    "reviewer": {
+      "provider": "codex",
+      "model": "gpt-6.1-sol",
+      "options": {
+        "reasoningEffort": "high"
+      }
+    },
+    "scope": "test_accounting",
+    "verdict": "PASS",
+    "reviewed_commit": "0d651f0279021bba63764f6725a337223408a879",
+    "reviewed_tree": "662fabc6a616da1298bb776c9bec3aa8982d08ef",
+    "summary": "**PASS \u2014 scope: `test_accounting`.** No blocking findings.\n\nReviewed commit `0d651f0279021bba63764f6725a337223408a879`, tree `662fabc6a616da1298bb776c9bec3aa8982d08ef`. Complete source map matches accepted `0f72c535f0b0ed7c72532d67b399eef28feb8e71`.\n\n- All 16 completed gates have matching log digests and successful records from this single full run.\n- Library: **4,959 passed + 24 ignored + 3 filtered = 4,986 registered tests**. The three filtered cases each passed separately under their exact names: two native ACL fixtures and contained palette.\n- All **24 distinct ignored names and reasons** match immutable Linux source. The additional Windows-only ignored case is correctly excluded.\n- Other suites: OS **24**, checkpoint **1**, standalone **3**, MCP **6**, main **0**; doctests **0+0**.\n- Recording **3+1** are duplicates of library passes.\n- Across all suites: **4,996 distinct passes**, **24 ignored**; **5,000 passing executions** including recording duplicates. Thus **4,986 describes the library inventory**, not total new or passing tests.\n\nVerified SHA-256:\n\n- Results: `e9f7fab3661f8a7f671b6cdfa4555a966e40776329d40e1fc2b48c0dd226df3b`\n- Executed runner: `435573ad5a920a81766ae1e48f92745c2ff7bbe8754b84e18fdfe96fa8696f0b`\n- Packager: `fe1c5d487ee35848bb06c0ad34002e03781282e3c6e4bbf165727b983382c944`\n- Inheritance verifier: `93c235bc01f3163d89b69157ce6e2eca7f951c153388de4adb198a35266035ab`\n\nRead-only inspection of parent-produced records; no test, build, or runner reexecution.\n\nPR https://github.com/JKamsker/gitcraft/pull/184, head `0d651f0279021bba63764f6725a337223408a879` (reviewed candidate; live head unqueried), checks and reviews: completed accounting evidence PASS; CI unqueried.",
+    "disposition": "Completed evidence independently approved; archive successor remains subject to committed inheritance verification."
+  },
+  {
+    "task_id": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A12d2419d-3bbb-4b12-91b0-6e8fab9394df",
+    "reviewer": {
+      "provider": "codex",
+      "model": "gpt-6.1-sol",
+      "options": {
+        "reasoningEffort": "high"
+      }
+    },
+    "scope": "binary_binding",
+    "verdict": "PASS",
+    "reviewed_commit": "0d651f0279021bba63764f6725a337223408a879",
+    "reviewed_tree": "662fabc6a616da1298bb776c9bec3aa8982d08ef",
+    "summary": "**PASS \u2014 scope: `binary_binding`. No blocking findings.**\n\nCandidate: `0d651f0279021bba63764f6725a337223408a879`  \nTree: `662fabc6a616da1298bb776c9bec3aa8982d08ef`\n\nVerified from completed records:\n\n- Cargo JSON identifies exactly six test harnesses and one qualifying non-test application.\n- All 11 runtime records bind matching executable/application hashes before and after execution; current binaries match.\n- All 16 gates completed successfully in this single full run. Log hashes and summaries match.\n- Both ACL cases and contained palette case passed individually by exact name.\n- All 1,924 current file contents/modes match the candidate; its complete map equals accepted `0f72c535f0b0ed7c72532d67b399eef28feb8e71`. Checkout is clean.\n\nVerified SHA-256 bindings:\n\n```text\nresults  e9f7fab3661f8a7f671b6cdfa4555a966e40776329d40e1fc2b48c0dd226df3b\nrunner   435573ad5a920a81766ae1e48f92745c2ff7bbe8754b84e18fdfe96fa8696f0b\npath map 0e872e9f63b2036ccf047210d3e794b7b78b57c81c40c72a3fbfdc8a8231df03\n```\n\nRead-only review; no tests, builds, reviewed scripts, process controls, CI, or PR actions executed.\n\nPR https://github.com/JKamsker/gitcraft/pull/184, candidate head `0d651f0279021bba63764f6725a337223408a879`; completed local evidence PASS, live PR checks/reviews unqueried.",
+    "disposition": "Completed evidence independently approved; archive successor remains subject to committed inheritance verification."
+  },
+  {
+    "task_id": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Adf5e10ff-9771-4fc4-aeb4-d017c2da47af",
+    "reviewer": {
+      "provider": "codex",
+      "model": "gpt-6.1-sol",
+      "options": {
+        "reasoningEffort": "high"
+      }
+    },
+    "scope": "package_readiness",
+    "verdict": "PASS",
+    "reviewed_commit": "0d651f0279021bba63764f6725a337223408a879",
+    "reviewed_tree": "662fabc6a616da1298bb776c9bec3aa8982d08ef",
+    "summary": "**PASS \u2014 scope: `package_readiness`. No concrete blocking findings.**\n\nCandidate: `0d651f0279021bba63764f6725a337223408a879`  \nTree: `662fabc6a616da1298bb776c9bec3aa8982d08ef`\n\n- Complete source map matches accepted `0f72c535f0b0ed7c72532d67b399eef28feb8e71`.\n- Completed evidence contains **16 distinct successful gates from one full run**. All 16 log hashes and all six harness/application executable hashes match.\n- Library records 4,959 passed, zero failed, 24 distinct ignored names, three filtered cases; each filtered case passed separately.\n- Three fixed-comment resolutions identify the correct assembled feature commits and exact completed-results digest. Historical summaries and dispositions remain preserved.\n- Packager caches input snapshots, archives all 16 logs and 24 ignored names, and publishes through a staging-directory rename.\n- Publication correctly waits for an independent `execution_evidence` approval bound to the results and runner digests. Its absence from the inspected reviews is an expected publication guard.\n- The reviewed successor validator checks committed file inventory, file hashes, compressed/raw log hashes, sole ancestry, and unchanged application mapping.\n\nVerified SHA-256 bindings:\n\n```text\nresults    e9f7fab3661f8a7f671b6cdfa4555a966e40776329d40e1fc2b48c0dd226df3b\nrunner     435573ad5a920a81766ae1e48f92745c2ff7bbe8754b84e18fdfe96fa8696f0b\npackager   fe1c5d487ee35848bb06c0ad34002e03781282e3c6e4bbf165727b983382c944\nverifier   93c235bc01f3163d89b69157ce6e2eca7f951c153388de4adb198a35266035ab\nfindings   abd976ffcd1f04ecd23e5f7c37252f22d5b5b58ff2568847d1de4eee49fa8659\nreviews    2a89e29f601593a9792661f6908b32123a484dccb8c06e558c18e4b401f3c04e\nassembly   6e9c8838a58edc849fc77ac1748fc65c834eefa2d0691af3dff8ece28f77d47d\nsource map 0e872e9f63b2036ccf047210d3e794b7b78b57c81c40c72a3fbfdc8a8231df03\n```\n\nRead-only review; no runners, builds, tests, process control, CI, PR actions, or subagents executed. Archive publication and successor validation remain prospective.\n\nPR https://github.com/JKamsker/gitcraft/pull/184, head `0d651f0279021bba63764f6725a337223408a879` (reviewed candidate; live PR head unqueried), checks and reviews: completed records PASS; `package_readiness` PASS; CI unqueried.",
+    "disposition": "Completed evidence independently approved; archive successor remains subject to committed inheritance verification."
+  },
+  {
+    "task_id": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Af910abe0-99ae-4f47-9be6-8f464b6579ef",
+    "reviewer": {
+      "provider": "codex",
+      "model": "gpt-6.1-sol",
+      "options": {
+        "reasoningEffort": "high"
+      }
+    },
+    "scope": "source_review_binding",
+    "verdict": "PASS",
+    "reviewed_commit": "0d651f0279021bba63764f6725a337223408a879",
+    "reviewed_tree": "662fabc6a616da1298bb776c9bec3aa8982d08ef",
+    "summary": "**PASS \u2014 scope: `source_review_binding`. No concrete blocking findings.**\n\nReviewed candidate `0d651f0279021bba63764f6725a337223408a879`, tree `662fabc6a616da1298bb776c9bec3aa8982d08ef`.\n\n- Whole-source review `b24f` names this exact SHA/tree. The complete tree equals accepted `0f72c535f0b0ed7c72532d67b399eef28feb8e71`.\n- Exactly three feature commits change five paths. Prior pull, queue, and accessibility changes remain preserved.\n- All seven focused-log and sixteen full-run log digests match. The completed full run records sixteen successful gates on the clean candidate, including library **4,959 passed, 0 failed, 24 ignored, 3 filtered**, with all three filtered cases passing separately.\n- All three fixed-comment resolutions bind the appropriate feature commit, exact tested candidate, and completed full-results digest. Original summaries and dispositions remain historical.\n- Source approval remains applicable. No additional application changes are required by this review. Historical `f591` gates are not used to validate the changed application.\n\nVerified SHA-256 bindings:\n\n```text\nsource map  0e872e9f63b2036ccf047210d3e794b7b78b57c81c40c72a3fbfdc8a8231df03\nfull        e9f7fab3661f8a7f671b6cdfa4555a966e40776329d40e1fc2b48c0dd226df3b\nrunner      435573ad5a920a81766ae1e48f92745c2ff7bbe8754b84e18fdfe96fa8696f0b\nfocused     53b362b92e4fd1278ed8cc232d9900fc9c14969d7b7dad03bc910c3a939ef2a4\nreviews     2a89e29f601593a9792661f6908b32123a484dccb8c06e558c18e4b401f3c04e\nfindings    abd976ffcd1f04ecd23e5f7c37252f22d5b5b58ff2568847d1de4eee49fa8659\nassembly    6e9c8838a58edc849fc77ac1748fc65c834eefa2d0691af3dff8ece28f77d47d\npackager    fe1c5d487ee35848bb06c0ad34002e03781282e3c6e4bbf165727b983382c944\nverifier    93c235bc01f3163d89b69157ce6e2eca7f951c153388de4adb198a35266035ab\n```\n\nRead-only inspection only; no runner execution, builds, tests, process control, CI, PR actions, or subagents.\n\nPR https://github.com/JKamsker/gitcraft/pull/184, head `0d651f0279021bba63764f6725a337223408a879` (reviewed candidate; live PR head unqueried), checks and reviews: completed local evidence inspected; `source_review_binding` PASS; CI unqueried.",
+    "disposition": "Completed evidence independently approved; archive successor remains subject to committed inheritance verification."
+  },
+  {
+    "task_id": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A70fac533-aeb3-4790-9205-ae491d7874ef",
+    "reviewer": {
+      "provider": "codex",
+      "model": "gpt-6.1-sol",
+      "options": {
+        "reasoningEffort": "high"
+      }
+    },
+    "scope": "containment_evidence",
+    "verdict": "PASS",
+    "reviewed_commit": "0d651f0279021bba63764f6725a337223408a879",
+    "reviewed_tree": "662fabc6a616da1298bb776c9bec3aa8982d08ef",
+    "summary": "**PASS \u2014 scope: `containment_evidence`. No blocking findings.**\n\nCandidate: `0d651f0279021bba63764f6725a337223408a879`  \nTree: `662fabc6a616da1298bb776c9bec3aa8982d08ef`\n\nVerified against immutable objects and completed records:\n\n- Candidate tree equals accepted `0f72c535f0b0ed7c72532d67b399eef28feb8e71`; checkout is clean.\n- All **16 gates** belong to the new completed full run. Every log digest, recorded summary, exit status, and candidate-state binding matches.\n- Recording checks passed **3+1 before all runtime suites**.\n- Runtime suites and exact palette test use the recorded `bwrap --unshare-pid --die-with-parent --bind / / --dev /dev --proc /proc --` prefix.\n- The two native `--exact` tests exercise owned metadata fixtures, including ordinary Git children; neither runs process-control tests.\n- All six harness binaries and the application match their recorded digests; all eleven runtime bindings agree.\n- Library: **4959 passed, 0 failed, 24 ignored, 3 filtered**. Each filtered case passed separately. Remaining counts match: OS 24, standalone 3, checkpoint 1, MCP 6, main 0, doctests 0+0.\n- Real supplementary-group drift remains explicitly conditional; the passing summary does not establish that branch executed.\n- No host-wide PID selectors or signal commands appear in the reviewed runner.\n\nVerified SHA-256 bindings:\n\n| Evidence | Digest |\n|---|---|\n| Full results | `e9f7fab3661f8a7f671b6cdfa4555a966e40776329d40e1fc2b48c0dd226df3b` |\n| Actual runner | `435573ad5a920a81766ae1e48f92745c2ff7bbe8754b84e18fdfe96fa8696f0b` |\n| Packager | `fe1c5d487ee35848bb06c0ad34002e03781282e3c6e4bbf165727b983382c944` |\n| Inheritance verifier | `93c235bc01f3163d89b69157ce6e2eca7f951c153388de4adb198a35266035ab` |\n| Assembly record | `6e9c8838a58edc849fc77ac1748fc65c834eefa2d0691af3dff8ece28f77d47d` |\n\nRead-only review; no runner, build, test, process-control, CI, PR action, or subagent execution performed.\n\nPR https://github.com/JKamsker/gitcraft/pull/184, head unqueried; completed local evidence reviewed, CI and live reviews unqueried.",
+    "disposition": "Completed evidence independently approved; archive successor remains subject to committed inheritance verification."
+  },
+  {
+    "task_id": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3Ab1068c4f-4d2f-4b2f-9a3c-e5fcdda6ea3e",
+    "reviewer": {
+      "provider": "codex",
+      "model": "gpt-6.1-sol",
+      "options": {
+        "reasoningEffort": "high"
+      }
+    },
+    "scope": "final_findings",
+    "verdict": "PASS",
+    "reviewed_commit": "0d651f0279021bba63764f6725a337223408a879",
+    "reviewed_tree": "662fabc6a616da1298bb776c9bec3aa8982d08ef",
+    "summary": "**PASS \u2014 scope: `final_findings`. No blocking findings.**\n\nReviewed candidate `0d651f0279021bba63764f6725a337223408a879`, tree `662fabc6a616da1298bb776c9bec3aa8982d08ef`. Its complete 1,924-entry path/mode/blob map equals accepted `0f72c535f0b0ed7c72532d67b399eef28feb8e71`.\n\n| Original comment | Verified disposition |\n|---|---|\n| 4511987664 \u2014 stash directory overlap | Fixed in `006429538ea61b5d3894d1c3a9479729141943b9`; both operands normalize trailing slashes, preserving original Git paths. |\n| 4511987654 \u2014 tag multiline annotation | Fixed in `2a69defa37993e7dd85b006be46dcc856b03427c`; name-field Enter submits while annotation Enter remains editing. |\n| 4511987678 \u2014 author namespace suffix | Fixed in the candidate; matching and specificity share normalized namespaces. |\n| 4511987647 \u2014 malformed-colon advisory | Optional warning improvement remains deferred; textual matching compatibility is preserved. |\n| 4511987672 \u2014 stale Files stash arguments | Nonblocking refusal remains justified; inspected Git rejection precedes index writing and stash creation. |\n| 4511987687 \u2014 global remote bucket | Intentional alias-safety tradeoff remains; unrelated remote work can wait. |\n| 4511987628 \u2014 historical assembler | Preserved; successor assembler uses exclusive temporary creation, a retained manifest descriptor, and a private index directory. |\n| 4511987641 \u2014 historical verifier | Preserved; all 40 historical file hashes and 25 compressed/raw log pairs match. Successor verifier checks committed archive hashes. |\n\nThe three resolution fields correctly bind final feature commits, the tested candidate, and the completed full-results digest. Earlier pending dispositions and review summaries retain their historical scope.\n\nAll **16 gates belong to one completed new run**. All log hashes and clean before/after states match. Recorded library results are **4,959 passed, 0 failed, 24 ignored, 3 filtered**; each filtered case separately passed by exact name. The full log includes the three fixes\u2019 regression coverage.\n\nVerified SHA-256 bindings:\n\n```text\nFull results:\ne9f7fab3661f8a7f671b6cdfa4555a966e40776329d40e1fc2b48c0dd226df3b\nExecuted runner:\n435573ad5a920a81766ae1e48f92745c2ff7bbe8754b84e18fdfe96fa8696f0b\nFindings:\nabd976ffcd1f04ecd23e5f7c37252f22d5b5b58ff2568847d1de4eee49fa8659\nReviews:\n2a89e29f601593a9792661f6908b32123a484dccb8c06e558c18e4b401f3c04e\nPackager:\nfe1c5d487ee35848bb06c0ad34002e03781282e3c6e4bbf165727b983382c944\nInheritance verifier:\n93c235bc01f3163d89b69157ce6e2eca7f951c153388de4adb198a35266035ab\nAssembly:\n6e9c8838a58edc849fc77ac1748fc65c834eefa2d0691af3dff8ece28f77d47d\n```\n\nRead-only inspection and digest verification only; no edits, builds/tests, runner execution, process control, CI, PR actions, or subagents.\n\nPR https://github.com/JKamsker/gitcraft/pull/184, candidate head `0d651f0279021bba63764f6725a337223408a879`, checks and reviews: completed local evidence verified; `final_findings` PASS; CI and live PR head unqueried.",
+    "disposition": "Completed evidence independently approved; archive successor remains subject to committed inheritance verification."
+  },
+  {
+    "task_id": "node:delegated-task:command%3Amcp%3Ae36d9dad-9e22-4dff-869d-12967c771f89%3Adelegate-task%3A6f624fd4-ca8b-46f8-a900-e227927e3903",
+    "reviewer": {
+      "provider": "codex",
+      "model": "gpt-6.1-sol",
+      "options": {
+        "reasoningEffort": "high"
+      }
+    },
+    "scope": "inheritance_readiness",
+    "verdict": "PASS",
+    "reviewed_commit": "0d651f0279021bba63764f6725a337223408a879",
+    "reviewed_tree": "662fabc6a616da1298bb776c9bec3aa8982d08ef",
+    "summary": "**PASS \u2014 scope: `inheritance_readiness`. No concrete blocking findings.**\n\nCandidate: `0d651f0279021bba63764f6725a337223408a879`  \nTree: `662fabc6a616da1298bb776c9bec3aa8982d08ef`\n\n- Complete path/mode/blob map matches accepted `0f72c535f0b0ed7c72532d67b399eef28feb8e71`.\n- Verifier enforces sole tested parent, exact new evidence prefix, regular-file additions, unchanged application map, complete manifest inventory, committed file hashes, compressed/raw log hashes, and archived tested-map identity.\n- Packager archives the same snapshotted script bytes it checks against approvals. Verifier compares its executing source bytes with the committed archive.\n- All 16 completed-run log digests match. The evidence directory is absent as expected before packaging.\n\nVerified SHA-256 bindings:\n\n```text\nresults    e9f7fab3661f8a7f671b6cdfa4555a966e40776329d40e1fc2b48c0dd226df3b\nrunner     435573ad5a920a81766ae1e48f92745c2ff7bbe8754b84e18fdfe96fa8696f0b\npackager   fe1c5d487ee35848bb06c0ad34002e03781282e3c6e4bbf165727b983382c944\nverifier   93c235bc01f3163d89b69157ce6e2eca7f951c153388de4adb198a35266035ab\nsource map 0e872e9f63b2036ccf047210d3e794b7b78b57c81c40c72a3fbfdc8a8231df03\n```\n\nRead-only review; no evidence scripts or tests executed. This approves readiness, without claiming packaging or future successor verification has occurred.\n\nPR https://github.com/JKamsker/gitcraft/pull/184, candidate head `0d651f0279021bba63764f6725a337223408a879`, checks and reviews: existing records inspected; CI unqueried; inheritance-readiness PASS.",
+    "disposition": "Completed evidence independently approved; archive successor remains subject to committed inheritance verification."
+  }
+]

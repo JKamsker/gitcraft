@@ -1,0 +1,56 @@
+{
+  "base": "f5919c97296560951166eea1ed43f15425bcaf27",
+  "accepted": "0f72c535f0b0ed7c72532d67b399eef28feb8e71",
+  "accepted_tree": "662fabc6a616da1298bb776c9bec3aa8982d08ef",
+  "branch": "fix/pr184-review-final-20261109",
+  "units": [
+    {
+      "title": "Guard stash overlaps with Git directory entries",
+      "paths": [
+        "src/repo/partial_stash/mod.rs",
+        "src/repo/partial_stash/tests.rs"
+      ],
+      "provenance": [
+        "5134ee911682a8329ac9a716fde91f97888f7141"
+      ],
+      "parent": "f5919c97296560951166eea1ed43f15425bcaf27",
+      "commit": "006429538ea61b5d3894d1c3a9479729141943b9",
+      "tree": "a3353fb407f42d11213049907661f1244c2437b7",
+      "remote": "006429538ea61b5d3894d1c3a9479729141943b9",
+      "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>"
+    },
+    {
+      "title": "Allow tag name Enter with multiline annotations",
+      "paths": [
+        "src/repo/dialogs/branch.rs"
+      ],
+      "provenance": [
+        "77480367bc9978944dead1b469e0d5f443ebd633",
+        "0f72c535f0b0ed7c72532d67b399eef28feb8e71"
+      ],
+      "parent": "006429538ea61b5d3894d1c3a9479729141943b9",
+      "commit": "2a69defa37993e7dd85b006be46dcc856b03427c",
+      "tree": "0e144718c7d1969ea17b1e51191d60f33be27aaf",
+      "remote": "2a69defa37993e7dd85b006be46dcc856b03427c",
+      "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>"
+    },
+    {
+      "title": "Normalize author namespace directory suffixes consistently",
+      "paths": [
+        "src/settings/profiles.rs",
+        "src/push_preflight/tests.rs"
+      ],
+      "provenance": [
+        "9bdf2b17771734a79313fad599370cd7f082065f"
+      ],
+      "parent": "2a69defa37993e7dd85b006be46dcc856b03427c",
+      "commit": "0d651f0279021bba63764f6725a337223408a879",
+      "tree": "662fabc6a616da1298bb776c9bec3aa8982d08ef",
+      "remote": "0d651f0279021bba63764f6725a337223408a879",
+      "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>"
+    }
+  ],
+  "final": "0d651f0279021bba63764f6725a337223408a879",
+  "exact_tree_match": true,
+  "complete_path_mode_blob_map_sha256": "0e872e9f63b2036ccf047210d3e794b7b78b57c81c40c72a3fbfdc8a8231df03"
+}
