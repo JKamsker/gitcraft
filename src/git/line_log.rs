@@ -32,6 +32,45 @@ const PLAIN_PATCH: [&str; 5] = [
     "--dst-prefix=b/",
 ];
 
+/// Resolve precisely the commit, historical path and range consumed by a line-history read.
+/// Status alone cannot detect edits that retain the same porcelain status code.
+pub(crate) fn line_history_key(
+    repo: &Path,
+    at: &LinesAt,
+    path: &str,
+    range: LineRange,
+) -> Result<(String, String, LineRange), String> {
+    let rev = match at {
+        LinesAt::Rev(rev) => rev.as_str(),
+        _ => "HEAD",
+    };
+    let oid = run(
+        Some(repo),
+        &[
+            "rev-parse",
+            "--verify",
+            "--end-of-options",
+            &format!("{rev}^{{commit}}"),
+        ],
+    )?;
+    line_history_key_from_commit(repo, at, path, range, oid.trim())
+}
+
+/// All rename and range mapping commands use the same resolved commit, even if HEAD moves.
+pub(crate) fn line_history_key_from_commit(
+    repo: &Path,
+    at: &LinesAt,
+    path: &str,
+    range: LineRange,
+    oid: &str,
+) -> Result<(String, String, LineRange), String> {
+    let (path, range) = match at {
+        LinesAt::Rev(_) => (path.to_owned(), ordered(range)),
+        LinesAt::Index | LinesAt::WorkTree => committed_range(repo, at, path, range, oid)?,
+    };
+    Ok((oid.to_owned(), path, range))
+}
+
 /// Every commit that touched lines `range` of `path` as it is `at`, newest first. Lines not
 /// committed yet (picked on disk or in the index) are first found in HEAD.
 pub fn line_history(
@@ -40,13 +79,7 @@ pub fn line_history(
     path: &str,
     range: LineRange,
 ) -> Result<Vec<FileCommit>, String> {
-    let (rev, path, range) = match at {
-        LinesAt::Rev(rev) => (rev.as_str(), path.to_owned(), ordered(range)),
-        LinesAt::Index | LinesAt::WorkTree => {
-            let (path, range) = committed_range(repo, at, path, range)?;
-            ("HEAD", path, range)
-        }
-    };
+    let (rev, path, range) = line_history_key(repo, at, path, range)?;
     let path = path.as_str();
     let spec = line_spec(range, path);
     let args = [
@@ -61,7 +94,7 @@ pub fn line_history(
         LINE_LOG_FORMAT,
         &spec,
         super::END_OPTS,
-        rev,
+        rev.as_str(),
     ];
     let out = run(Some(repo), &args).map_err(|e| line_log_error(&e, path))?;
     Ok(parse_line_log(&out, path))
@@ -140,10 +173,10 @@ fn line_log_error(err: &str, path: &str) -> String {
 }
 
 /// The name `path` had in HEAD, when a rename of it is staged.
-fn name_in_head(repo: &Path, path: &str) -> Option<String> {
+fn name_in_head(repo: &Path, path: &str, oid: &str) -> Option<String> {
     let out = run(
         Some(repo),
-        &["diff", "--cached", "-M", "--name-status", "-z", "HEAD"],
+        &["diff", "--cached", "-M", "--name-status", "-z", oid],
     )
     .ok()?;
     let mut fields = out.split('\0');
@@ -168,8 +201,9 @@ fn committed_range(
     at: &LinesAt,
     path: &str,
     range: LineRange,
+    oid: &str,
 ) -> Result<(String, LineRange), String> {
-    let old = name_in_head(repo, path);
+    let old = name_in_head(repo, path, oid);
     let mut args = vec![
         super::LITERAL_PATHS,
         "diff",
@@ -184,7 +218,7 @@ fn committed_range(
     if *at == LinesAt::Index {
         args.push("--cached");
     }
-    args.extend(["HEAD", "--", path]);
+    args.extend([oid, "--", path]);
     // A rename limited to its new name would look like a new file.
     args.extend(old.as_deref());
     let diff = run(Some(repo), &args).map_err(|e| line_log_error(&e, path))?;

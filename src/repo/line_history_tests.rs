@@ -233,3 +233,50 @@ fn a_selection_in_a_commit_diff_asks_for_the_lines_of_that_commit() -> Result<()
     let _ = std::fs::remove_dir_all(&dir);
     Ok(())
 }
+
+#[test]
+fn line_history_inputs_ignore_unrelated_edits_but_follow_mapping_and_head() -> Result<(), String> {
+    let dir = history_repo("line-history-inputs")?;
+    for at in [LinesAt::WorkTree, LinesAt::Index] {
+        let before = git::line_history_key(&dir, &at, PATH, (5, 8))?;
+        write(&dir, "unrelated.txt", "unrelated edit\n")?;
+        assert_eq!(git::line_history_key(&dir, &at, PATH, (5, 8))?, before);
+        // Another edit to the same already-modified file must not be hidden by status equality.
+        let text = std::fs::read_to_string(dir.join(PATH)).map_err(|e| e.to_string())?;
+        write(&dir, PATH, &format!("another top\n{text}"))?;
+        if at == LinesAt::Index {
+            must(&dir, &["add", "--", PATH])?;
+        }
+        assert_ne!(git::line_history_key(&dir, &at, PATH, (5, 8))?, before);
+        must(&dir, &["reset", "--hard", "HEAD"])?;
+    }
+    let before = git::line_history_key(&dir, &LinesAt::WorkTree, PATH, (5, 8))?;
+    commit(
+        &dir,
+        &[("unrelated.txt", "committed unrelated\n")],
+        "new HEAD",
+    )?;
+    assert_ne!(
+        git::line_history_key(&dir, &LinesAt::WorkTree, PATH, (5, 8))?,
+        before
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+    Ok(())
+}
+
+#[test]
+fn line_history_mapping_uses_pinned_commit_after_head_moves() -> Result<(), String> {
+    let dir = history_repo("line-history-pinned-head")?;
+    let pinned = must(&dir, &["rev-parse", "HEAD"])?;
+    let expected = git::line_history_key(&dir, &LinesAt::WorkTree, PATH, (5, 8))?;
+    // Advance HEAD with a new line. Mapping against symbolic HEAD would now differ.
+    let text = std::fs::read_to_string(dir.join(PATH)).map_err(|e| e.to_string())?;
+    commit(&dir, &[(PATH, &format!("new top\n{text}"))], "advance HEAD")?;
+    for at in [LinesAt::WorkTree, LinesAt::Index] {
+        let actual = git::line_history_key_from_commit(&dir, &at, PATH, (6, 9), pinned.trim())?;
+        assert_eq!(actual, expected);
+        assert_ne!(git::line_history_key(&dir, &at, PATH, (6, 9))?, expected);
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+    Ok(())
+}

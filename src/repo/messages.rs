@@ -581,7 +581,7 @@ impl RepoTab {
                     self.folding
                         .saw_status(&work, &self.refs.head, Instant::now());
                     self.work = work;
-                    self.invalidate_mutable_file_view(ctx);
+                    self.status_changed_file_view(ctx);
                     self.stash_picks.keep_changed(&self.work);
                     if wip_row_changed {
                         self.rebuild(ctx);

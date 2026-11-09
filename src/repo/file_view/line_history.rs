@@ -43,8 +43,25 @@ impl RepoTab {
         let reply = history_reply(generation, path.clone(), at.clone(), range);
         self.then(
             ctx,
-            move || git::line_history(&repo, &at, &path, range),
-            reply,
+            move || {
+                let inputs = git::line_history_key(&repo, &at, &path, range);
+                let result =
+                    inputs
+                        .as_ref()
+                        .map_err(Clone::clone)
+                        .and_then(|(rev, path, range)| {
+                            git::line_history(&repo, &LinesAt::Rev(rev.clone()), path, *range)
+                        });
+                (inputs.ok(), result)
+            },
+            move |tab, (inputs, result), ctx| {
+                reply(tab, result, ctx);
+                if let Some(view) = &mut tab.file_view
+                    && view.generation == generation
+                {
+                    view.line_inputs = inputs;
+                }
+            },
         );
     }
 
