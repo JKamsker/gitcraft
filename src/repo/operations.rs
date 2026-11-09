@@ -983,7 +983,7 @@ pub(super) fn run_steps_guarded(
     fork_scope: Option<&super::forks::guard::Scope>,
 ) -> (Result<String, String>, OpKind, usize) {
     // Validate the complete saved envelope before preparation or any mutating step.
-    if let Err(error) = check_command_envelopes(ops, matches!(kind, OpKind::Redo(_)), |args| {
+    if let Err(error) = check_command_envelopes(ops, matches!(kind, OpKind::Redo(_)), &mut |args| {
         git::run(Some(path), args)
     }) {
         return (Err(error), kind, 0);
@@ -1563,7 +1563,7 @@ fn command_envelope(args: &[String]) -> Result<(usize, &str), String> {
 fn check_command_envelopes(
     ops: &[Vec<String>],
     saved_redo: bool,
-    mut read: impl FnMut(&[&str]) -> Result<String, String>,
+    mut read: &mut dyn FnMut(&[&str]) -> Result<String, String>,
 ) -> Result<(), String> {
     let mut builtins = None;
     for op in ops {
@@ -2182,7 +2182,7 @@ mod tests {
                 ops(&[&["pull", "--ff-only"]]),
                 ops(&[&["-c", "x=y", "rebase", "--continue"]]),
             ] {
-                super::super::check_command_envelopes(&argv, true, |args| {
+                super::super::check_command_envelopes(&argv, true, &mut |args| {
                     reads.push(args.join(" "));
                     Ok("pull\nrebase\n".into())
                 })?;
@@ -2192,7 +2192,7 @@ mod tests {
                 super::super::check_command_envelopes(
                     &ops(&[&["saved-pull-alias"]]),
                     true,
-                    |_| Ok("pull\n".into())
+                    &mut |_| Ok("pull\n".into())
                 )
                 .is_err()
             );

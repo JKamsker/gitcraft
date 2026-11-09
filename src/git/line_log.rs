@@ -434,6 +434,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[allow(clippy::panic)] // Unexpected recorded commands must fail without executing Git.
     fn only_confirmed_unborn_mutable_history_gets_the_empty_repository_explanation() {
         for at in [LinesAt::Index, LinesAt::WorkTree] {
             for probe in [
