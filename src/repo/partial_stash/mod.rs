@@ -7,7 +7,7 @@ use std::path::Path;
 use std::time::Instant;
 
 use super::diff::literal_path;
-use super::messages::spawn_or;
+use super::messages::spawn_mutation;
 use super::operations::{
     expect_ref, expect_tree, is_expectation, run_steps_counted, stash_push_args,
 };
@@ -489,7 +489,7 @@ impl RepoTab {
         self.last_op = None;
         let path = self.path.clone();
         let failed = move |e| done(label, Err(e), OpKind::plain());
-        spawn_or(&self.tx, ctx, failed, move || {
+        spawn_mutation(&self.tx, ctx, failed, move || {
             let (result, kind) = job(&path);
             done(label, result, kind)
         });
