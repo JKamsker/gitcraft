@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::mpsc::{Receiver, channel};
 
-use egui::{Key, RichText, Stroke, Ui, vec2};
+use egui::{RichText, Stroke, Ui, vec2};
 
 use super::{App, repo_root};
 use crate::git;
@@ -511,11 +511,7 @@ fn form_fields(ui: &mut Ui, form: &mut CloneForm, t: &Tokens) -> bool {
     enter
 }
 
-/// Only an eligible text field may turn Enter into submission.
-pub(super) fn singleline_enter(response: &egui::Response) -> bool {
-    (response.has_focus() || response.lost_focus())
-        && response.ctx.input(|i| i.key_pressed(Key::Enter))
-}
+pub(super) use crate::a11y::singleline_enter;
 
 fn home_dir() -> Option<PathBuf> {
     std::env::var_os("USERPROFILE")
@@ -570,9 +566,132 @@ pub(super) fn display_message(raw: &str) -> Option<String> {
 }
 
 #[cfg(test)]
+#[allow(clippy::expect_used)] // Missing rendered fixture widgets must fail the test.
 mod localization_tests {
     use super::*;
+    use egui::Key;
     use egui_kittest::{Harness, kittest::Queryable};
+
+    #[derive(Default)]
+    struct EnterForm {
+        parent: String,
+        parent_id: Option<egui::Id>,
+        name: String,
+        name_id: Option<egui::Id>,
+        browse: usize,
+        submit: usize,
+        name_lost_on_enter: bool,
+        browse_focused_on_enter: bool,
+    }
+
+    fn enter_form() -> Harness<'static, EnterForm> {
+        let h = Harness::new_ui_state(
+            |ui, form: &mut EnterForm| {
+                let parent = ui.text_edit_singleline(&mut form.parent);
+                form.parent_id = Some(parent.id);
+                if singleline_enter(&parent) {
+                    form.submit += 1;
+                }
+                // Record intents only: canceling this simulated picker has no side effects.
+                let browse = ui.button("Browse");
+                if browse.clicked() {
+                    form.browse += 1;
+                }
+                let name = ui.text_edit_singleline(&mut form.name);
+                form.name_id = Some(name.id);
+                if ui.input(|i| i.key_pressed(Key::Enter)) {
+                    form.name_lost_on_enter = name.lost_focus();
+                    form.browse_focused_on_enter = browse.has_focus();
+                }
+                if singleline_enter(&name) {
+                    form.submit += 1;
+                }
+            },
+            EnterForm {
+                parent: "/inert".into(),
+                name: "repo".into(),
+                ..Default::default()
+            },
+        );
+        // Keep the focus transition and its observations in one rendering pass.
+        h.ctx
+            .options_mut(|o| o.max_passes = std::num::NonZeroUsize::MIN);
+        h
+    }
+
+    #[test]
+    fn coalesced_tab_and_enter_does_not_submit() {
+        for (empty, focus_name) in [(true, false), (false, false), (false, true)] {
+            let mut h = enter_form();
+            if empty {
+                h.state_mut().parent.clear();
+                h.state_mut().name.clear();
+                h.step();
+            }
+            let field = if focus_name {
+                h.state().name_id
+            } else {
+                h.state().parent_id
+            }
+            .expect("field rendered");
+            h.ctx.memory_mut(|m| m.request_focus(field));
+            h.step();
+            // RawInput keeps both keys in one frame; Harness::key_press would split them.
+            h.input_mut()
+                .events
+                .extend(
+                    [Key::Tab, Key::Enter]
+                        .into_iter()
+                        .map(|key| egui::Event::Key {
+                            key,
+                            physical_key: None,
+                            pressed: true,
+                            repeat: false,
+                            modifiers: egui::Modifiers::NONE,
+                        }),
+                );
+            h.step();
+            // TextEdit handles Enter before registering Tab traversal and retains focus.
+            // It must still not treat a traversal frame as a submission request.
+            assert_eq!(h.ctx.memory(|m| m.focused()), Some(field));
+            assert_eq!(h.state().browse, 0);
+            assert_eq!(h.state().submit, 0);
+        }
+    }
+
+    #[test]
+    fn enter_during_backward_focus_transition_only_activates_browse() {
+        let mut h = enter_form();
+        let name = h.state().name_id.expect("name rendered");
+        h.ctx.memory_mut(|m| m.request_focus(name));
+        h.step();
+        h.key_down_modifiers(egui::Modifiers::SHIFT, Key::Tab);
+        h.step();
+        // Backward navigation takes effect in the next frame, alongside this Enter.
+        h.key_down(Key::Enter);
+        h.step();
+        assert!(h.state().name_lost_on_enter);
+        assert!(h.state().browse_focused_on_enter);
+        assert_eq!(h.state().browse, 1);
+        assert_eq!(h.state().submit, 0);
+        h.key_up(Key::Enter);
+        h.key_up(Key::Tab);
+        h.run_steps(3);
+        assert_eq!(h.state().submit, 0, "picker cancellation must not submit");
+    }
+
+    #[test]
+    fn enter_in_singleline_field_submits_after_surrendering_focus() {
+        let mut h = enter_form();
+        let name = h.state().name_id.expect("name rendered");
+        h.ctx.memory_mut(|m| m.request_focus(name));
+        h.step();
+        h.key_press(Key::Enter);
+        h.step();
+        assert_eq!(h.state().browse, 0);
+        assert_eq!(h.state().submit, 1);
+        assert!(h.ctx.memory(|m| m.focused().is_none()));
+    }
 
     #[test]
     fn enter_on_clone_cancel_closes_without_submitting() {

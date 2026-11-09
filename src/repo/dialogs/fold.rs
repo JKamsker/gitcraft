@@ -14,7 +14,7 @@ use super::{Outcome, buttons, title};
 /// How many of the rewritten commits are listed; the rest are counted.
 const LISTED: usize = 8;
 
-pub(super) fn fold(ui: &mut Ui, enter: bool, plan: &mut Plan) -> Outcome {
+pub(super) fn fold(ui: &mut Ui, plan: &mut Plan) -> Outcome {
     let t = Tokens::get(ui.ctx());
     let heading = if plan.keep_fixup {
         crate::i18n::text("repo-core-1303")
@@ -75,9 +75,7 @@ pub(super) fn fold(ui: &mut Ui, enter: bool, plan: &mut Plan) -> Outcome {
     } else {
         crate::i18n::text("repo-core-1315")
     };
-    // Rewriting what a remote has takes a click, not a stray Enter.
-    let enter = enter && !plan.rewrites_pushed();
-    buttons(ui, button, true, enter, || {
+    buttons(ui, button, true, false, || {
         Action::RunFold(Box::new(plan.clone()))
     })
 }
