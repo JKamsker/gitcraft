@@ -307,7 +307,8 @@ pub(crate) fn edit(ui: &mut egui::Ui, rules: &mut Rules) {
 }
 
 impl RepoTab {
-    pub(super) fn history_filters_frame(&mut self, ui: &mut egui::Ui) {
+    /// The history filter menu and "show hidden", laid out in the caller's row.
+    pub(super) fn history_filter_controls(&mut self, ui: &mut egui::Ui) {
         let ctx = ui.ctx().clone();
         let mut prefs = load(&ctx, self.repo_key());
         let previous = prefs.clone();
@@ -315,55 +316,53 @@ impl RepoTab {
             .history_filter
             .excluded_total
             .map_or_else(|| "…".to_owned(), crate::i18n::number);
-        ui.horizontal_wrapped(|ui| {
-            ui.menu_button(crate::i18n::text("dev-baseline-filter-9"), |ui| {
-                let viewport = ui.ctx().content_rect();
-                ui.set_max_width((viewport.width() - 24.0).clamp(120.0, 380.0));
-                egui::ScrollArea::vertical()
-                    .id_salt("history-filter-options")
-                    .max_height((viewport.height() - 60.0).max(80.0))
-                    .show(ui, |ui| {
-                        ui.label(crate::i18n::message(
-                            "dev-baseline-filter-hidden",
-                            &[("count", self.history_filter.hidden_loaded.into())],
-                        ));
-                        ui.label(crate::i18n::message(
-                            "dev-baseline-filter-namespace",
-                            &[("count", namespaces.as_str().into())],
-                        ));
-                        ui.separator();
-                        ui.checkbox(
-                            &mut prefs.override_global,
-                            crate::i18n::text("dev-baseline-filter-10"),
-                        )
-                        .on_hover_text(crate::i18n::text("dev-baseline-filter-11"));
-                        edit(ui, &mut prefs.rules);
-                        ui.label(crate::i18n::message(
-                            "dev-baseline-filter-kept",
-                            &[("count", self.history_filter.kept_loaded.into())],
-                        ));
-                        if ui
-                            .button(crate::i18n::text("dev-baseline-filter-12"))
-                            .clicked()
-                        {
-                            prefs = Preferences::default();
-                        }
-                    });
-            })
-            .response
-            .on_hover_text(crate::i18n::message(
-                "dev-baseline-filter-summary",
-                &[
-                    ("authors", self.history_filter.hidden_loaded.into()),
-                    ("namespaces", namespaces.as_str().into()),
-                ],
-            ));
-            ui.checkbox(
-                &mut prefs.reveal,
-                crate::i18n::text("dev-baseline-filter-13"),
-            )
-            .on_hover_text(crate::i18n::text("dev-baseline-filter-14"));
-        });
+        ui.menu_button(crate::i18n::text("dev-baseline-filter-9"), |ui| {
+            let viewport = ui.ctx().content_rect();
+            ui.set_max_width((viewport.width() - 24.0).clamp(120.0, 380.0));
+            egui::ScrollArea::vertical()
+                .id_salt("history-filter-options")
+                .max_height((viewport.height() - 60.0).max(80.0))
+                .show(ui, |ui| {
+                    ui.label(crate::i18n::message(
+                        "dev-baseline-filter-hidden",
+                        &[("count", self.history_filter.hidden_loaded.into())],
+                    ));
+                    ui.label(crate::i18n::message(
+                        "dev-baseline-filter-namespace",
+                        &[("count", namespaces.as_str().into())],
+                    ));
+                    ui.separator();
+                    ui.checkbox(
+                        &mut prefs.override_global,
+                        crate::i18n::text("dev-baseline-filter-10"),
+                    )
+                    .on_hover_text(crate::i18n::text("dev-baseline-filter-11"));
+                    edit(ui, &mut prefs.rules);
+                    ui.label(crate::i18n::message(
+                        "dev-baseline-filter-kept",
+                        &[("count", self.history_filter.kept_loaded.into())],
+                    ));
+                    if ui
+                        .button(crate::i18n::text("dev-baseline-filter-12"))
+                        .clicked()
+                    {
+                        prefs = Preferences::default();
+                    }
+                });
+        })
+        .response
+        .on_hover_text(crate::i18n::message(
+            "dev-baseline-filter-summary",
+            &[
+                ("authors", self.history_filter.hidden_loaded.into()),
+                ("namespaces", namespaces.as_str().into()),
+            ],
+        ));
+        ui.checkbox(
+            &mut prefs.reveal,
+            crate::i18n::text("dev-baseline-filter-13"),
+        )
+        .on_hover_text(crate::i18n::text("dev-baseline-filter-14"));
         if prefs != previous {
             ctx.data_mut(|d| d.insert_persisted(id(self.repo_key()), prefs));
         }

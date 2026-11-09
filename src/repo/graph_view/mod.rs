@@ -128,10 +128,18 @@ impl RepoTab {
     /// The graph, or during a ghost run the graph as the operation would leave it (see
     /// [`super::ghost`]), with the strip that says what it would do above it.
     pub(super) fn graph_view(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
-        if self.timeline_view.is_none() {
-            self.saved_graph_header(ui);
+        // One row: the history filters, then which part of the history the graph shows.
+        let saved_views = self.timeline_view.is_none();
+        ui.horizontal_wrapped(|ui| {
+            self.history_filter_controls(ui);
+            if saved_views {
+                ui.separator();
+                self.saved_graph_controls(ui);
+            }
+        });
+        if saved_views {
+            self.saved_graph_status(ui);
         }
-        self.history_filters_frame(ui);
         let area = ui.available_rect_before_wrap();
         let ghost = self
             .ghost
@@ -168,15 +176,18 @@ impl RepoTab {
         self.graph_walk_header(ui);
         self.graph_stacks(ui, acts);
         let map_area = ui.available_rect_before_wrap();
+        let map = crate::settings::Settings::history_map(ui.ctx());
         let map_rect = egui::Rect::from_min_max(
-            egui::pos2(map_area.right() - 78.0, map_area.top()),
+            egui::pos2(map_area.right() - map.width(), map_area.top()),
             map_area.right_bottom(),
         );
-        let show_map = map_area.width() > 480.0 && map_area.height() > 120.0;
+        let show_map = map != crate::settings::HistoryMap::Hidden
+            && map_area.width() > 480.0
+            && map_area.height() > 120.0;
         let graph_rect = egui::Rect::from_min_max(
             map_area.min,
             egui::pos2(
-                map_area.right() - if show_map { 84.0 } else { 0.0 },
+                map_area.right() - if show_map { map.width() + 6.0 } else { 0.0 },
                 map_area.bottom(),
             ),
         );

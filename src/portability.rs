@@ -60,7 +60,7 @@ impl Preferences{pub fn apply(&self,s:&mut Settings){$(s.$field=self.$field.clon
 preferences! {
 ui_scale:f32,terminal_font:f32,refs_width:f32,auto_refs_width:bool,branch_names_keep_end:bool,graph_width:f32,compact_graph:bool,
 author_width:f32,when_width:f32,date_width:f32,hash_width:f32,show_author:bool,show_when:bool,show_date:bool,show_hash:bool,
-show_test_lane:bool,show_branches:bool,show_detail:bool,worktrees_in_same_tab:bool,tabs_in_title_bar:bool,button_layout:crate::app_buttons::ButtonLayout,
+show_test_lane:bool,show_branches:bool,show_detail:bool,worktrees_in_same_tab:bool,tabs_in_title_bar:bool,history_map:crate::settings::HistoryMap,button_layout:crate::app_buttons::ButtonLayout,
 files_as_tree:bool,diff_split:bool,diff_whole_file:bool,diff_beside_graph:bool,diff_algorithms:std::collections::BTreeMap<String,crate::git::DiffAlgorithm>,
 fold_generated:bool,fold_patterns:String,auto_fetch_minutes:u32,offline:bool,pause_on_metered:bool,pull_mode:crate::repo::pull::PullMode,
 avatars:bool,notifications:bool,check_updates:bool,update_channel:crate::update::Channel,download_updates:bool,vscode_colors:bool,

@@ -55,8 +55,8 @@ pub(super) fn column_headers(ui: &Ui, t: &Tokens, header: Rect, cols: &Cols, gra
     }
 }
 
-/// The header's right-click menu: which columns show, a compact graph column, and the widths
-/// back as they were at first.
+/// The header's right-click menu: which columns show, a compact graph column, the history map's
+/// size, and the widths back as they were at first.
 pub(super) fn header_menu(resp: &Response, settings: &Settings) {
     crate::menu_item::context(resp)
         .style(theme::menu_style)
@@ -90,6 +90,10 @@ pub(super) fn header_menu(resp: &Response, settings: &Settings) {
             {
                 next.set_compact_graph(compact);
             }
+            ui.menu_button(
+                crate::i18n::text("interaction-settings-label-history-map"),
+                |ui| settings::HistoryMap::menu(ui, &mut next.history_map),
+            );
             if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-2621"))
                 .icon("command")
                 .refused((next.graph_width <= 0.0).then_some(crate::i18n::text("repo-core-2622")))

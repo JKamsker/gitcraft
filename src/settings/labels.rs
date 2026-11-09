@@ -79,6 +79,7 @@ pub(super) fn display(raw: &str) -> &str {
         "Installed" => crate::i18n::text("interaction-settings-label-installed"),
         "Keyboard shortcuts" => crate::i18n::text("interaction-settings-label-keyboard-shortcuts"),
         "Lane colours" => crate::i18n::text("interaction-settings-label-lane-colours"),
+        "History map" => crate::i18n::text("interaction-settings-label-history-map"),
         "Lanes" => crate::i18n::text("interaction-settings-label-lanes"),
         "Largest diff sent" => crate::i18n::text("interaction-settings-label-largest-diff-sent"),
         "Merge tool" => crate::i18n::text("interaction-settings-label-merge-tool"),

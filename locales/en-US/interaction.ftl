@@ -979,6 +979,8 @@ interaction-settings-label-lane-colours = Lane colours
 
 interaction-settings-label-lanes = Lanes
 
+interaction-settings-label-history-map = History map
+
 interaction-settings-label-largest-diff-sent = Largest diff sent
 
 interaction-settings-label-merge-tool = Merge tool
@@ -1198,6 +1200,12 @@ interaction-settings-diff-below = Show diffs below the graph
 interaction-settings-diff-below-tip = A diff of a commit or of the working tree opens below the graph instead of in its place; the button in a diff's header switches it too.
 
 interaction-settings-compact = Compact graph
+
+interaction-settings-history-map-large = Large
+
+interaction-settings-history-map-small = Small
+
+interaction-settings-history-map-hidden = Hide
 
 interaction-settings-fetch-off = 0 turns it off
 
