@@ -14,8 +14,16 @@ use std::sync::atomic::{AtomicU64, Ordering};
 // Shared across repository tabs, and never reused when a view is closed or replaced.
 fn next_generation() -> u64 {
     static NEXT: AtomicU64 = AtomicU64::new(1);
-    NEXT.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| n.checked_add(1))
-        .unwrap_or_else(|_| std::process::abort())
+    let mut current = NEXT.load(Ordering::Relaxed);
+    loop {
+        let next = current
+            .checked_add(1)
+            .unwrap_or_else(|| std::process::abort());
+        match NEXT.compare_exchange_weak(current, next, Ordering::Relaxed, Ordering::Relaxed) {
+            Ok(previous) => return previous,
+            Err(observed) => current = observed,
+        }
+    }
 }
 
 use egui::{Stroke, Ui};
