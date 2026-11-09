@@ -201,7 +201,19 @@ impl Plan {
     /// soft reset, which puts the branch back and leaves the changes staged.
     pub(crate) fn fold_steps(&self, rebase: Vec<String>) -> (Vec<Vec<String>>, Undo) {
         let check = VERIFY.map(str::to_owned).to_vec();
-        let steps = [self.guards(), vec![self.fixup_commit(), rebase, check]].concat();
+        let steps = [
+            self.guards(),
+            vec![
+                vec![
+                    crate::repo::operations::EXPECT_FOLD_SAFE.into(),
+                    self.target.hash.clone(),
+                ],
+                self.fixup_commit(),
+                rebase,
+                check,
+            ],
+        ]
+        .concat();
         (steps, Undo::HeadMove { mode: "--soft" })
     }
 
