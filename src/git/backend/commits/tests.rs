@@ -100,6 +100,8 @@ fn files_and_details_read_in_process_are_those_git_reads() -> Result<(), String>
     repo.git(&["update-index", "--chmod=+x", "empty.txt"])?;
     repo.git(&["commit", "-q", "-m", "mode"])?;
     let mode = repo.rev("HEAD")?;
+    // update-index changes only the index; materialize the mode before switching branches.
+    repo.git(&["checkout-index", "-f", "--", "empty.txt"])?;
     let link = blob(&repo, "link-target", "b.txt")?;
     repo.git(&[
         "update-index",
