@@ -1589,6 +1589,44 @@ mod tests {
     }
 
     #[test]
+    fn inbox_open_waits_for_repository_parked_in_another_window() -> Result<(), String> {
+        let h = recorded_harness();
+        let ctx = h.ctx.clone();
+        let mut app = h
+            .state()
+            .as_ref()
+            .ok_or("App")?
+            .app
+            .lock()
+            .map_err(|e| e.to_string())?;
+        let child = ViewportId::from_hash_of("inbox-owner");
+        let path = PathBuf::from("/virtual/inbox-repo");
+        app.tabs = vec![Tab::Home];
+        app.windows.parked.insert(
+            child,
+            Window::new(
+                vec![deferred(path.to_str().ok_or("path")?, &ctx)],
+                ViewportId::ROOT,
+                None,
+            ),
+        );
+        let output = ctx.run_logic(&egui::RawInput::default(), |ctx| {
+            assert!(app.recorded_inbox_open(path, ctx));
+        });
+        assert!(
+            output
+                .platform_output
+                .commands
+                .iter()
+                .all(|command| !matches!(command, egui::OutputCommand::OpenUrl(_)))
+        );
+        app.poll_inbox_opening(&ctx);
+        assert!(matches!(&app.windows.parked[&child].tabs[0], Tab::Repo(_)));
+        assert!(matches!(app.tabs[0], Tab::Home));
+        Ok(())
+    }
+
+    #[test]
     fn closed_owner_falls_back_to_root_not_the_polling_peer() -> Result<(), String> {
         let h = harness();
         let mut app = h.state().app.lock().map_err(|e| e.to_string())?;
