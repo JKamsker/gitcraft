@@ -23,7 +23,7 @@ REPO_S = ["repo::s"]
 REPO_A_S = REPO_A_C + REPO_D_F + REPO_G_M + REPO_N_P + REPO_Q_R + REPO_S
 
 # These tests run in their own libtest process: some race with concurrent Git
-# subprocesses, while the palette performance test has a strict 10-second budget
+# subprocesses, while the palette performance test has a strict wall-clock budget
 # that can be exceeded when other libtest threads contend for the Windows runner.
 ISOLATED = {
     # This rewrite test can race with concurrent Git-heavy test processes on Windows.
