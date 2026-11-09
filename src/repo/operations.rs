@@ -982,6 +982,12 @@ pub(super) fn run_steps_guarded(
     control: Option<&Arc<git::OpControl>>,
     fork_scope: Option<&super::forks::guard::Scope>,
 ) -> (Result<String, String>, OpKind, usize) {
+    // Validate the complete saved envelope before preparation or any mutating step.
+    if let Err(error) = check_command_envelopes(ops, matches!(kind, OpKind::Redo(_)), |args| {
+        git::run(Some(path), args)
+    }) {
+        return (Err(error), kind, 0);
+    }
     if let Some(scope) = fork_scope {
         scope.reset_rewrite();
     }
@@ -1489,6 +1495,93 @@ pub(super) fn is_expectation(op: &[String]) -> bool {
 pub(super) const EXPECT_FOLD_SAFE: &str = "\u{0}expect-fold-safe";
 pub(super) const EXPECT_FOLD_IGNORED: &str = "\u{0}expect-fold-ignored";
 
+/// Parse only Git's command envelope; option values never become command names.
+fn command_envelope(args: &[String]) -> Result<(usize, &str), String> {
+    let mut at = 0;
+    while let Some(word) = args.get(at) {
+        if !word.starts_with('-') {
+            return Ok((at, word));
+        }
+        match word.as_str() {
+            "-c" | "-C" | "--git-dir" | "--work-tree" | "--namespace" | "--config-env"
+            | "--super-prefix" => {
+                at += 1;
+                if args.get(at).is_none() {
+                    return Err("Saved Git command has an incomplete global option; run the operation again".into());
+                }
+            }
+            "--bare"
+            | "--no-pager"
+            | "--paginate"
+            | "-p"
+            | "-P"
+            | "--no-replace-objects"
+            | "--no-lazy-fetch"
+            | "--no-optional-locks"
+            | "--literal-pathspecs"
+            | "--glob-pathspecs"
+            | "--noglob-pathspecs"
+            | "--icase-pathspecs" => {}
+            w if (w.starts_with("-c") || w.starts_with("-C")) && w.len() > 2 => {}
+            w if [
+                "--git-dir=",
+                "--work-tree=",
+                "--namespace=",
+                "--config-env=",
+                "--super-prefix=",
+            ]
+            .iter()
+            .any(|p| w.starts_with(p)) => {}
+            _ => {
+                return Err(
+                    "Saved Git command has unsupported global options; run the operation again"
+                        .into(),
+                );
+            }
+        }
+        at += 1;
+    }
+    Err("Saved Git command has no subcommand; run the operation again".into())
+}
+
+fn check_command_envelopes(
+    ops: &[Vec<String>],
+    saved_redo: bool,
+    mut read: impl FnMut(&[&str]) -> Result<String, String>,
+) -> Result<(), String> {
+    let mut builtins = None;
+    for op in ops {
+        if let [mark, _, args @ ..] = op.as_slice()
+            && mark == TRY
+        {
+            check_command_envelopes(&[args.to_vec()], saved_redo, &mut read)?;
+            continue;
+        }
+        if op.first().is_some_and(|word| word.starts_with('\0')) {
+            continue; // Application-owned expectations and try-step envelopes.
+        }
+        let envelope = command_envelope(op);
+        let (at, command) = match envelope {
+            Ok(value) => value,
+            Err(error) if saved_redo => return Err(error),
+            Err(_) => continue, // Git diagnoses unsupported normal commands.
+        };
+        if command == "pull" && at != 0 {
+            return Err("Saved pull commands with global options cannot be validated safely. Run Pull again from the toolbar.".into());
+        }
+        if saved_redo {
+            let names = match &builtins {
+                Some(names) => names,
+                None => builtins.insert(read(&["--list-cmds=builtins"])?),
+            };
+            if !names.lines().any(|name| name == command) {
+                return Err("Saved Git aliases or external commands cannot be replayed safely. Run the operation again explicitly.".into());
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Classify the options consumed by Git's builtin/pull.c and parse-options.c.
 /// Optional arguments consume only attached text; required arguments also consume
 /// the next token, even when it looks like an option. Git permutes operands until `--` or `--end-of-options`.
@@ -1899,6 +1992,59 @@ mod tests {
 
     mod short_rebase {
         use super::*;
+
+        #[test]
+        fn saved_prefixed_pulls_are_refused_by_dispatch_before_preparation() -> Result<(), String> {
+            for argv in [
+                vec!["-c", "pull.rebase=true", "pull"],
+                vec!["-cpull.rebase=true", "pull"],
+                vec!["--config-env", "pull.rebase=SETTING", "pull"],
+                vec!["--config-env=pull.rebase=SETTING", "pull"],
+                vec!["-C", "other", "pull"],
+                vec!["--git-dir", "elsewhere", "pull"],
+                vec!["--work-tree=elsewhere", "pull"],
+                vec!["--unknown", "pull"],
+                vec!["-c"],
+            ] {
+                let saved: UndoEntry = serde_json::from_value(serde_json::json!({
+                    "label": "Pull", "undo": [], "redo": [argv], "heads": null
+                }))
+                .map_err(|e| e.to_string())?;
+                let (result, _, stopped) = super::super::run_steps_counted(
+                    Path::new("/unopened-recording-repository"),
+                    &saved.redo,
+                    OpKind::Redo(saved.clone()),
+                    None,
+                    true,
+                    None,
+                );
+                assert!(
+                    result.is_err_and(|e| e.contains("run") || e.contains("Run")),
+                    "{argv:?}"
+                );
+                assert_eq!(stopped, 0);
+            }
+            let mut reads = Vec::new();
+            for argv in [
+                ops(&[&["pull", "--ff-only"]]),
+                ops(&[&["-c", "x=y", "rebase", "--continue"]]),
+            ] {
+                super::super::check_command_envelopes(&argv, true, |args| {
+                    reads.push(args.join(" "));
+                    Ok("pull\nrebase\n".into())
+                })?;
+            }
+            assert_eq!(reads, ["--list-cmds=builtins", "--list-cmds=builtins"]);
+            assert!(
+                super::super::check_command_envelopes(
+                    &ops(&[&["saved-pull-alias"]]),
+                    true,
+                    |_| Ok("pull\n".into())
+                )
+                .is_err()
+            );
+            Ok(())
+        }
 
         #[test]
         fn classifier_consumes_git_options_and_uses_last_mode() -> Result<(), String> {
