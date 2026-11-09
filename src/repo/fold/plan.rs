@@ -64,6 +64,15 @@ const MERGE_TARGET: &str = "repo-core-2523";
 const OFF_BRANCH: &str = "repo-core-2524";
 
 impl Plan {
+    pub(crate) fn check_ignored(read: FoldRead) -> Result<(), String> {
+        if let Some(file) = read.ignored_in_way {
+            return Err(crate::i18n::message(
+                "repo-core-2526",
+                &[("file", file.into())],
+            ));
+        }
+        Ok(())
+    }
     /// The fold `read` describes, unless something there stands in its way.
     pub(crate) fn from_read(read: FoldRead) -> Result<Plan, String> {
         if let Some(why) = blocked(read.staged, read.branch.as_deref(), read.in_progress) {
@@ -209,6 +218,10 @@ impl Plan {
                     self.target.hash.clone(),
                 ],
                 self.fixup_commit(),
+                vec![
+                    crate::repo::operations::EXPECT_FOLD_IGNORED.into(),
+                    self.target.hash.clone(),
+                ],
                 rebase,
                 check,
             ],
@@ -532,9 +545,19 @@ mod tests {
         assert_eq!(steps[0], expect_symref("HEAD", "refs/heads/main"));
         assert_eq!(steps[1], expect_ref_at("HEAD", "c"));
         assert_eq!(steps[2], expect_ref_at("MERGE_HEAD", ""));
-        assert_eq!(steps[6], ["commit", "--fixup=b"]);
-        assert_eq!(steps[7], ["rebase"]);
-        assert_eq!(steps[8], VERIFY);
+        assert_eq!(
+            &steps[6..],
+            &[
+                vec![crate::repo::operations::EXPECT_FOLD_SAFE.into(), "b".into()],
+                vec!["commit".into(), "--fixup=b".into()],
+                vec![
+                    crate::repo::operations::EXPECT_FOLD_IGNORED.into(),
+                    "b".into()
+                ],
+                vec!["rebase".into()],
+                VERIFY.map(str::to_owned).to_vec(),
+            ]
+        );
         assert_eq!(undo, Undo::HeadMove { mode: "--soft" });
         let failed = format!("git {} failed (exit status: 1)", VERIFY.join(" "));
         assert!(lost_in_rebase(&failed));

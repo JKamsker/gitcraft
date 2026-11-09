@@ -138,7 +138,7 @@ pub fn fold_read(repo: &Path, target: &str) -> Result<FoldRead, String> {
         } else {
             // Without renames: a renamed file's old name is written too (checking out the
             // commit before the rename).
-            let touched = run(
+            let mut touched = run(
                 Some(repo),
                 &[
                     "log",
@@ -149,6 +149,20 @@ pub fn fold_read(repo: &Path, target: &str) -> Result<FoldRead, String> {
                     &range,
                 ],
             )?;
+            // The fixup's staged paths are replayed too, including deletion of a file
+            // unchanged throughout the historical range.
+            touched.push('\0');
+            touched.push_str(&run(
+                Some(repo),
+                &[
+                    "diff",
+                    "--cached",
+                    "--name-only",
+                    "--no-renames",
+                    "-z",
+                    "--",
+                ],
+            )?);
             in_the_way(&ignored, &touched)
         }
     } else {
