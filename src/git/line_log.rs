@@ -40,20 +40,51 @@ pub(crate) fn line_history_key(
     path: &str,
     range: LineRange,
 ) -> Result<(String, String, LineRange), String> {
+    let oid = resolve_line_commit(at, |args, codes| {
+        super::run_code(Some(repo), args, codes)
+            .map(|(code, out)| (code, String::from_utf8_lossy(&out).into_owned()))
+    })?;
+    line_history_key_from_commit(repo, at, path, range, oid.trim())
+}
+
+fn resolve_line_commit(
+    at: &LinesAt,
+    mut run: impl FnMut(&[&str], &[i32]) -> Result<(i32, String), String>,
+) -> Result<String, String> {
     let rev = match at {
         LinesAt::Rev(rev) => rev.as_str(),
         _ => "HEAD",
     };
-    let oid = run(
-        Some(repo),
+    let resolved = run(
         &[
             "rev-parse",
             "--verify",
             "--end-of-options",
             &format!("{rev}^{{commit}}"),
         ],
-    )?;
-    line_history_key_from_commit(repo, at, path, range, oid.trim())
+        &[0],
+    );
+    match resolved {
+        Ok((_, oid)) => Ok(oid),
+        Err(error) => {
+            // Only a confirmed absent branch ref is an unborn HEAD. Preserve
+            // corruption, transport, permission and explicit-revision errors.
+            if !matches!(at, LinesAt::Rev(_))
+                && let Ok((_, branch)) = run(&["symbolic-ref", "--quiet", "HEAD"], &[0])
+                && branch.trim().starts_with("refs/heads/")
+                && matches!(
+                    run(&["show-ref", "--verify", "--quiet", branch.trim()], &[0, 1]),
+                    Ok((1, _))
+                )
+            {
+                return Err(crate::i18n::text(
+                    "backend-the-repository-has-no-commits-yet-so-these-lines-have-no-history-87624b",
+                )
+                .to_owned());
+            }
+            Err(error)
+        }
+    }
 }
 
 /// All rename and range mapping commands use the same resolved commit, even if HEAD moves.
@@ -401,6 +432,97 @@ pub fn unquote_path(name: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    #[allow(clippy::panic)] // Unexpected recorded commands must fail without executing Git.
+    fn only_confirmed_unborn_mutable_history_gets_the_empty_repository_explanation() {
+        for at in [LinesAt::Index, LinesAt::WorkTree] {
+            for probe in [
+                Ok((1, String::new())),
+                Ok((0, String::new())),
+                Err("unreadable ref".into()),
+            ] {
+                let absent = matches!(&probe, Ok((1, _)));
+                let mut calls = Vec::new();
+                let result = resolve_line_commit(&at, |args, codes| {
+                    calls.push((
+                        args.iter().map(|s| s.to_string()).collect::<Vec<_>>(),
+                        codes.to_vec(),
+                    ));
+                    match args[0] {
+                        "rev-parse" => Err("original resolution error".into()),
+                        "symbolic-ref" => Ok((0, "refs/heads/main\n".into())),
+                        "show-ref" => probe.clone(),
+                        _ => panic!("unexpected command: {args:?}"),
+                    }
+                });
+                assert_eq!(calls.len(), 3);
+                assert_eq!(
+                    calls[2],
+                    (
+                        vec![
+                            "show-ref".into(),
+                            "--verify".into(),
+                            "--quiet".into(),
+                            "refs/heads/main".into()
+                        ],
+                        vec![0, 1]
+                    )
+                );
+                let expected = if absent {
+                    crate::i18n::text(
+                        "backend-the-repository-has-no-commits-yet-so-these-lines-have-no-history-87624b",
+                    )
+                } else {
+                    "original resolution error"
+                };
+                assert_eq!(result, Err(expected.to_owned()));
+            }
+            for symbolic in [
+                Err("detached or inaccessible".into()),
+                Ok((0, "refs/tags/unusual\n".into())),
+            ] {
+                let mut calls = 0;
+                assert_eq!(
+                    resolve_line_commit(&at, |args, _| {
+                        calls += 1;
+                        match args[0] {
+                            "rev-parse" => Err("original".into()),
+                            "symbolic-ref" => symbolic.clone(),
+                            _ => panic!("unexpected command: {args:?}"),
+                        }
+                    }),
+                    Err("original".into())
+                );
+                assert_eq!(calls, 2);
+            }
+        }
+        for at in [LinesAt::Rev("HEAD".into()), LinesAt::Rev("invalid".into())] {
+            let mut calls = 0;
+            assert_eq!(
+                resolve_line_commit(&at, |args, _| {
+                    calls += 1;
+                    assert_eq!(args[0], "rev-parse");
+                    Err("explicit revision error".into())
+                }),
+                Err("explicit revision error".into())
+            );
+            assert_eq!(calls, 1);
+        }
+        let mut calls = 0;
+        assert_eq!(
+            resolve_line_commit(&LinesAt::WorkTree, |args, _| {
+                calls += 1;
+                assert_eq!(
+                    args,
+                    ["rev-parse", "--verify", "--end-of-options", "HEAD^{commit}"]
+                );
+                Ok((0, "captured-oid\n".into()))
+            }),
+            Ok("captured-oid\n".into())
+        );
+        assert_eq!(calls, 1);
+    }
 
     #[test]
     fn line_log_output_is_read_commit_by_commit() {
