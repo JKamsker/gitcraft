@@ -1486,7 +1486,7 @@ pub(super) const EXPECT_FOLD_IGNORED: &str = "\u{0}expect-fold-ignored";
 
 /// Classify the options consumed by Git's builtin/pull.c and parse-options.c.
 /// Optional arguments consume only attached text; required arguments also consume
-/// the next token, even when it looks like an option. Git permutes operands until `--`.
+/// the next token, even when it looks like an option. Git permutes operands until `--` or `--end-of-options`.
 #[derive(Debug, Default, PartialEq, Eq)]
 struct PullMode {
     rebase: Option<bool>,
@@ -1546,13 +1546,37 @@ fn pull_mode(args: &[String]) -> Result<PullMode, String> {
             "" | "false" | "no" | "off" | "0" => Ok(false),
             "true" | "yes" | "on" | "1" => Ok(true),
             _ if matches!(value, "merges" | "m" | "interactive" | "i") => Ok(true),
-            _ => Err(format!("Invalid pull rebase value: {value}")),
+            _ => {
+                // git_parse_maybe_bool also accepts base-0 integers with k/m/g
+                // suffixes, bounded symmetrically by INT_MAX (parse.c).
+                let lower = value.to_ascii_lowercase();
+                let number = lower.trim_start_matches([' ', '\t', '\n', '\r', '\x0b', '\x0c']);
+                let number = number.strip_prefix(['+', '-']).unwrap_or(number);
+                let (number, factor) = match number.as_bytes().last() {
+                    Some(b'k') => (&number[..number.len() - 1], 1024_i64),
+                    Some(b'm') => (&number[..number.len() - 1], 1024_i64.pow(2)),
+                    Some(b'g') => (&number[..number.len() - 1], 1024_i64.pow(3)),
+                    _ => (number, 1),
+                };
+                let (digits, radix) = if let Some(hex) = number.strip_prefix("0x") {
+                    (hex, 16)
+                } else if number.starts_with('0') {
+                    (number, 8)
+                } else {
+                    (number, 10)
+                };
+                i64::from_str_radix(digits, radix)
+                    .ok()
+                    .filter(|n| *n >= 0 && *n <= i64::from(i32::MAX) / factor)
+                    .map(|n| n != 0)
+                    .ok_or_else(|| format!("Invalid pull rebase value: {value}"))
+            }
         }
     }
     let mut mode = PullMode::default();
     let mut tokens = args.iter().skip(1);
     while let Some(token) = tokens.next() {
-        if token == "--" {
+        if matches!(token.as_str(), "--" | "--end-of-options") {
             break;
         }
         if let Some(long) = token.strip_prefix("--") {
@@ -1881,6 +1905,15 @@ mod tests {
                 (vec!["-qr"], Some(true), false),
                 (vec!["-rfalse"], Some(false), false),
                 (vec!["-qrfalse"], Some(false), false),
+                (vec!["-r0"], Some(false), false),
+                (vec!["-rno"], Some(false), false),
+                (vec!["-roff"], Some(false), false),
+                (vec!["--rebase="], Some(false), false),
+                (vec!["-r2"], Some(true), false),
+                (vec!["-r00"], Some(false), false),
+                (vec!["-r0x0"], Some(false), false),
+                (vec!["-r1k"], Some(true), false),
+                (vec!["-r-2"], Some(true), false),
                 (vec!["-r", "--no-rebase"], Some(false), false),
                 (vec!["--no-rebase", "-qr"], Some(true), false),
                 (vec!["-rfalse", "--rebase=merges"], Some(true), false),
@@ -1900,6 +1933,14 @@ mod tests {
                 (vec!["--rebase", "false"], Some(true), false),
                 (vec!["origin", "main", "-r"], Some(true), false),
                 (vec!["--", "-r", "--ff-only"], None, false),
+                (vec!["--end-of-options", "-r", "--ff-only"], None, false),
+                (vec!["--reb"], Some(true), false),
+                (vec!["--reb=merges"], Some(true), false),
+                (
+                    vec!["--server-option", "--no-rebase", "-r"],
+                    Some(true),
+                    false,
+                ),
                 (vec!["-r", "--", "--no-rebase"], Some(true), false),
                 (vec!["-r", "--ff-only"], Some(true), true),
                 (vec!["--ff-only", "--ff", "-r"], Some(true), false),
@@ -1952,6 +1993,9 @@ mod tests {
                 vec!["--strategy"],
                 vec!["-X"],
                 vec!["--str"],
+                vec!["--re"],
+                vec!["-r08"],
+                vec!["-r2147483648"],
             ] {
                 let args = [
                     vec!["pull".to_owned()],
