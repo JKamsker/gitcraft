@@ -1104,14 +1104,30 @@ fn remote_spawn_mutation_serializes_whole_recorded_operations() -> Result<(), St
             .map_err(|e| e.to_string())?,
         "expect refs/stash"
     );
+    let unrelated = crate::tasks::Cancellation::default();
+    let unrelated_out = out.clone();
+    crate::tasks::pool()?
+        .submit(
+            unrelated.clone(),
+            crate::tasks::Priority::Background,
+            Some("ssh://unrelated/fixture".into()),
+            Box::new(move || {
+                let _ = unrelated_out.send("unrelated remote job");
+            }),
+        )
+        .map_err(str::to_owned)?;
     let record = out.clone();
     super::messages::spawn_mutation(&b.tx, &ctx, super::Msg::JobPanicked, move || {
         let _ = record.send("stash push");
         super::Msg::Then(Box::new(|_, _| {}))
     });
     assert!(
-        crate::tasks::pool()?.queued_priorities_for(&b.tx.repo)
-            == vec![crate::tasks::Priority::Background]
+        crate::tasks::pool()?.queued_priority_for(&b.tx.cancel)
+            == Some(crate::tasks::Priority::Background)
+    );
+    assert!(
+        crate::tasks::pool()?.queued_priority_for(&unrelated)
+            == Some(crate::tasks::Priority::Background)
     );
     // An ordinary tab read remains unkeyed and runs while A holds the bucket.
     super::messages::spawn(&b.tx, &ctx, move || {
@@ -1130,6 +1146,12 @@ fn remote_spawn_mutation_serializes_whole_recorded_operations() -> Result<(), St
             .recv_timeout(Duration::from_secs(5))
             .map_err(|e| e.to_string())?,
         "stash pop --index"
+    );
+    assert_eq!(
+        events
+            .recv_timeout(Duration::from_secs(5))
+            .map_err(|e| e.to_string())?,
+        "unrelated remote job"
     );
     assert_eq!(
         events

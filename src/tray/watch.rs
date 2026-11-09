@@ -19,6 +19,22 @@ const JOB_LIMIT: Duration = Duration::from_secs(120);
 #[cfg(not(test))]
 const STEP_LIMIT: Duration = Duration::from_secs(30);
 static OWNED: Mutex<Vec<PathBuf>> = Mutex::new(Vec::new());
+
+/// The same submission boundary is used by live observation and inert scheduling tests.
+fn submit_fetch(
+    pool: &tasks::Pool,
+    path: &Path,
+    cancel: tasks::Cancellation,
+    job: Box<dyn FnOnce() + Send>,
+) -> Result<(), &'static str> {
+    pool.submit(
+        cancel,
+        tasks::Priority::Background,
+        Some(crate::repo::mutation_key(path)),
+        job,
+    )
+}
+
 pub(crate) fn owns_fetch(path: &Path) -> bool {
     OWNED
         .lock()
@@ -705,10 +721,10 @@ impl Watcher {
         let context = connections::current();
         let wake = ctx.clone();
         let submitted = tasks::pool().and_then(|pool| {
-            pool.submit(
+            submit_fetch(
+                pool,
+                &path,
                 cancel.clone(),
-                tasks::Priority::Background,
-                Some(crate::repo::mutation_key(&path)),
                 Box::new(move || {
                     let result = context.run(|| {
                         observe(
