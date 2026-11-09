@@ -47,7 +47,9 @@ No parent target directory was used.
 - `rustfmt --edition 2024 --check src/tasks.rs src/repo/load.rs src/repo/lifecycle.rs src/repo/tests.rs src/tray/watch_tests.rs`: passed.
 - `git diff --check`: passed.
 
-Logs and SHA-256 hashes are preserved alongside this record. Test filters
+Logs are losslessly gzip-compressed alongside this record. The manifest retains
+the SHA-256 of each decompressed original and records each archive hash separately.
+Decompress the matching `.log.gz` file when checking `logs_sha256`. Test filters
 overlap; these counts are executions, not a claim of 18 distinct tests.
 The lifecycle test uses actual deferred tab initialization and suspension,
 the extracted successful/empty discovery transition, and a synthetic failed

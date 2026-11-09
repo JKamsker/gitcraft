@@ -15,5 +15,23 @@
     "ed6e5abf-compile-failure.log": "e9a51b5daa4d72e1823ab23c5ca51bf104ef8770e6ad754e51a008b1e3fffdbe"
   },
   "target_directory": "/home/jonas/.t3/worktrees/gitcraft/t3-c35e2e6e/target-remote-mutations",
-  "validation": "focused local tests passed; independent final adversarial review and CI not performed"
+  "validation": "focused local tests passed; independent final adversarial review and CI not performed",
+  "archived_logs": {
+    "scheduler-regressions.log": {
+      "archive": "scheduler-regressions.log.gz",
+      "sha256": "8b6d2c38d6741882673c17f43ba19b5748f48be601d6ae5515c27892f41ee1a8"
+    },
+    "spawn-mutation.log": {
+      "archive": "spawn-mutation.log.gz",
+      "sha256": "863a7b199f6f131fea5b2871bac079df770d88045a49c7a841d9ddada76e64ad"
+    },
+    "remote-mutation.log": {
+      "archive": "remote-mutation.log.gz",
+      "sha256": "72ed2ad59f6cb7ea57df69ec3398bf20620a0abaf29e21f4d2fe9d8aafe9a1f8"
+    },
+    "ed6e5abf-compile-failure.log": {
+      "archive": "ed6e5abf-compile-failure.log.gz",
+      "sha256": "504480d4713f8b519e7d127b2c36f31667d162aeeb058ab0f95f376bfbf1a216"
+    }
+  }
 }
