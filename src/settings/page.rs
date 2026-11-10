@@ -411,57 +411,8 @@ fn search_field(ui: &mut Ui, query: &mut String) {
 }
 
 #[cfg(test)]
-mod registry_tests {
-    use super::*;
-    use crate::keymap::{Command, Stroke as KeyStroke};
-    #[test]
-    fn configured_page_and_search_keys_use_actual_settings_handler() {
-        let ctx = egui::Context::default();
-        let mut settings = Settings::default();
-        settings.key_bindings.insert(
-            Command::SettingsNext.id().into(),
-            vec![KeyStroke::new(Key::F8, egui::Modifiers::NONE)],
-        );
-        settings.key_bindings.insert(
-            Command::SettingsSearch.id().into(),
-            vec![KeyStroke::new(Key::F9, egui::Modifiers::NONE)],
-        );
-        settings.put_for_test(&ctx);
-        let mut view = View::default();
-        let before = view.page;
-        for key in [Key::F8, Key::F9] {
-            ctx.run_ui(
-                egui::RawInput {
-                    events: vec![
-                        egui::Event::Key {
-                            key,
-                            physical_key: Some(key),
-                            pressed: true,
-                            repeat: false,
-                            modifiers: egui::Modifiers::NONE,
-                        },
-                        egui::Event::Key {
-                            key,
-                            physical_key: Some(key),
-                            pressed: false,
-                            repeat: false,
-                            modifiers: egui::Modifiers::NONE,
-                        },
-                    ],
-                    ..Default::default()
-                },
-                |ui| {
-                    keys(ui, &mut view, false);
-                    ui.add(egui::TextEdit::singleline(&mut view.query).id(search_id()));
-                },
-            )
-            .drop_without_applying_deltas();
-        }
-        assert_ne!(view.page, before);
-        assert!(ctx.memory(|memory| memory.has_focus(search_id())));
-    }
-}
-
+#[path = "page_tests/registry_tests.rs"]
+mod registry_tests;
 /// Paint localized captions while the selected enum and persistent salt stay stable.
 fn compact_page_picker(ui: &mut Ui, view: &mut View) {
     egui::ComboBox::from_id_salt("settings-page-compact")
@@ -479,31 +430,5 @@ fn compact_page_picker(ui: &mut Ui, view: &mut View) {
 }
 
 #[cfg(test)]
-mod merge_regressions {
-    use super::*;
-    use egui_kittest::kittest::{NodeT, Queryable};
-
-    #[test]
-    fn compact_page_picker_repaints_both_languages_and_keeps_enum_selection() {
-        let mut h = egui_kittest::Harness::new_ui_state(compact_page_picker, View::default());
-        for language in ["en-US", "de", "en-US"] {
-            crate::i18n::set_language(language);
-            h.run();
-            let picker = h.get_by_role(egui::accesskit::Role::ComboBox);
-            assert_eq!(
-                picker.accesskit_node().data().value(),
-                Some(super::super::labels::display(Page::General.title()))
-            );
-            picker.click();
-            h.run();
-            h.get_by_label(super::super::labels::display(Page::Appearance.title()))
-                .click();
-            h.run();
-            assert_eq!(h.state().page, Page::Appearance);
-            assert!(h.state().query.is_empty());
-            // Reset only the selection for the next locale, using the same Context and salt.
-            h.state_mut().page = Page::General;
-        }
-        crate::i18n::set_language("en-US");
-    }
-}
+#[path = "page_tests/merge_regressions.rs"]
+mod merge_regressions;
