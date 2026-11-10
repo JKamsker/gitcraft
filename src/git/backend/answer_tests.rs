@@ -143,7 +143,13 @@ fn porcelain_status_matches_git() -> Result<(), String> {
     repo.git(&["add", "-N", "intent"])?;
     left_to_git(repo.path(), &[STATUS]);
     repo.git(&["reset", "--hard", "HEAD"])?;
-    repo.git(&["config", "status.renames", "copies"])?;
+    // Git accepts both spellings and case-insensitive values for copy detection.
+    for value in ["copies", "copy", "CoPy"] {
+        repo.git(&["config", "status.renames", value])?;
+        left_to_git(repo.path(), &[STATUS]);
+    }
+    repo.git(&["config", "--unset", "status.renames"])?;
+    repo.git(&["config", "diff.renames", "copy"])?;
     left_to_git(repo.path(), &[STATUS]);
     Ok(())
 }

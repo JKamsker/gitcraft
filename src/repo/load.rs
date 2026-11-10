@@ -347,6 +347,7 @@ impl RepoTab {
             self.dialog = None;
         }
         self.prs.clear();
+        self.prs_from_cache = false;
         self.pending_prs = None;
         self.pr_error = None;
         self.prs_loaded = Some(Instant::now());

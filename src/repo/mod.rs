@@ -303,6 +303,8 @@ pub struct RepoTab {
     forge_repository_generation: u64,
     gerrit: Option<crate::gerrit::Server>,
     prs: Vec<PullRequest>,
+    /// Whether the displayed list came from persistence rather than a fresh forge response.
+    prs_from_cache: bool,
     /// A newer list, read while the pointer was on the shown one: it waits until the user is
     /// done there, or brings it in from the header (see `sidebar::pull_requests`).
     pending_prs: Option<Vec<PullRequest>>,
@@ -704,6 +706,7 @@ impl RepoTab {
             forge_repository_generation: 0,
             gerrit: None,
             prs: Vec::new(),
+            prs_from_cache: false,
             pending_prs: None,
             pr_error: None,
             prs_loaded: None,

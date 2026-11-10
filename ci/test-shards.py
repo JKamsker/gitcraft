@@ -42,6 +42,8 @@ ISOLATED = {
     ],
     # This real rebase/undo fixture hung while other Windows Git fixtures ran.
     "repo-s": ["repo::stack::tests::undoing_a_rebase_that_updated_dependent_branches_puts_them_back"],
+    # The end-to-end CLI blame launch hung under concurrent Windows repo-rest tests.
+    "repo-rest": ["repo::tests::the_command_line_opens_a_file_s_blame_at_a_line"],
     "core": [
         "parallel_bisect::tests::finds_the_first_bad_commit_with_any_parallelism",
         "app::palette::tests::thousands_of_branches_open_and_filter_quickly",
@@ -77,6 +79,7 @@ SHARDS = {
         "repo::",
         "--skip", "git::",
         *[arg for p in REPO_A_S for arg in ("--skip", p)],
+        *[arg for test in ISOLATED["repo-rest"] for arg in ("--skip", test)],
     ],
     "core": [
         "--skip", "git::",

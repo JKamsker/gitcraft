@@ -17,7 +17,7 @@ pub(super) fn answer(path: &Path, args: &[&str]) -> Option<Answer> {
     for key in ["status.renames", "diff.renames"] {
         if config
             .string(key)
-            .is_some_and(|v| v.eq_ignore_ascii_case(b"copies"))
+            .is_some_and(|v| v.eq_ignore_ascii_case(b"copies") || v.eq_ignore_ascii_case(b"copy"))
         {
             return None;
         }

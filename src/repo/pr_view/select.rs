@@ -76,6 +76,8 @@ impl RepoTab {
         let request = self.compare_requests;
         self.compare = Some(Compare { request, ..compare });
         self.pr_selection_request = Some(request);
+        // A persisted or superseded list can carry valid-looking but stale OIDs.
+        let use_list_endpoints = !self.prs_from_cache && self.pending_prs.is_none();
         let (path, remotes, credentials) = (
             self.path.clone(),
             self.remotes.clone(),
@@ -93,6 +95,7 @@ impl RepoTab {
                         &hosting,
                         &remotes,
                         credentials.as_ref(),
+                        use_list_endpoints,
                         || pages.details(&path, &hosting, number),
                     ),
                     None => {
@@ -210,18 +213,19 @@ fn listed_endpoints(pr: &PullRequest, hosting: &Hosting) -> Option<PrDetails> {
     })
 }
 
-/// Choose the exact PR comparison endpoints, fetching details only if the list is insufficient.
+/// Choose exact comparison endpoints. Trust listed OIDs only when the displayed list is fresh.
 fn selection_for_pr(
     path: &Path,
     pr: &PullRequest,
     hosting: &Hosting,
     remotes: &[Remote],
     credentials: Option<&Credentials>,
+    use_list_endpoints: bool,
     read_details: impl FnOnce() -> Result<PrDetails, String>,
 ) -> Result<Selection, String> {
     let start = std::time::Instant::now();
-    let details = match listed_endpoints(pr, hosting) {
-        Some(details) => {
+    let details = match (use_list_endpoints, listed_endpoints(pr, hosting)) {
+        (true, Some(details)) => {
             crate::timing::step("PR endpoints from list", start);
             details
         }
@@ -412,7 +416,7 @@ mod tests {
         for i in 0..3 {
             git::backend::reset_metrics();
             let start = std::time::Instant::now();
-            let actual = selection_for_pr(repo, &pr, &hosting, &[], None, || {
+            let actual = selection_for_pr(repo, &pr, &hosting, &[], None, true, || {
                 Err("PR diff must not request metadata".into())
             })?;
             let elapsed = start.elapsed();
@@ -589,7 +593,7 @@ mod tests {
             ],
         )
         .unwrap();
-        let selection = selection_for_pr(&dir, &pr, &hosting, &[], None, || {
+        let selection = selection_for_pr(&dir, &pr, &hosting, &[], None, true, || {
             Err("known local PR endpoints must not request forge details".into())
         })
         .unwrap();
@@ -601,7 +605,7 @@ mod tests {
         assert_eq!(paths, ["first.txt", "second.txt"]);
         assert_eq!(data.apart, (1, 2));
         pr.base_oid = git::head(&dir);
-        let changed_base = selection_for_pr(&dir, &pr, &hosting, &[], None, || {
+        let changed_base = selection_for_pr(&dir, &pr, &hosting, &[], None, true, || {
             Err("unexpected forge request".into())
         })
         .unwrap();
@@ -609,13 +613,26 @@ mod tests {
         assert_eq!(changed_base.base, pr.base_oid);
         pr.base_oid.clear();
         let calls = std::cell::Cell::new(0);
-        let fallback = selection_for_pr(&dir, &pr, &hosting, &[], None, || {
+        let fallback = selection_for_pr(&dir, &pr, &hosting, &[], None, true, || {
             calls.set(calls.get() + 1);
             Ok(details.clone())
         })
         .unwrap();
         assert_eq!(calls.get(), 1);
         assert_eq!(fallback.base, details.base_oid);
+        // Persisted entries can carry syntactically valid but obsolete endpoints.
+        // A seeded selection must fetch current details instead of using those OIDs.
+        let stale = listed_pr("f".repeat(40), "e".repeat(40));
+        assert!(listed_endpoints(&stale, &hosting).is_some());
+        let seeded_calls = std::cell::Cell::new(0);
+        let refreshed = selection_for_pr(&dir, &stale, &hosting, &[], None, false, || {
+            seeded_calls.set(seeded_calls.get() + 1);
+            Ok(details.clone())
+        })
+        .unwrap();
+        assert_eq!(seeded_calls.get(), 1);
+        assert_eq!(refreshed.base, details.base_oid);
+        assert_eq!(refreshed.head.hash, details.head_oid);
         std::fs::remove_dir_all(dir).unwrap();
     }
 
@@ -719,7 +736,7 @@ mod tests {
             web: format!("https://{host}"),
         };
         let selection = if forge == Forge::GitHub {
-            selection_for_pr(&clone, &pr, &hosting, &remotes, None, || {
+            selection_for_pr(&clone, &pr, &hosting, &remotes, None, true, || {
                 Err("known PR endpoints must fetch objects without requesting metadata".into())
             })
         } else {
