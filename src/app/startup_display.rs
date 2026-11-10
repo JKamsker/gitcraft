@@ -274,7 +274,7 @@ mod tests {
                 "eframe::Error::AppCreation(app::display_start_message(&message).into())"
             )
         );
-        let app = include_str!("mod.rs");
+        let app = include_str!("lifecycle.rs");
         assert!(app.contains("(false, true) => report_displayed_start(message)"));
     }
 }

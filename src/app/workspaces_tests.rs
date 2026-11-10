@@ -188,7 +188,7 @@ fn a_rows_parts_say_what_matters() {
     };
     let texts: Vec<String> = overview_parts(&o, 0, &t)
         .into_iter()
-        .map(|p| p.text)
+        .map(|p| p.into_text())
         .collect();
     assert_eq!(texts, ["main", "2 changed", "1", "never fetched"]);
     let detached = Overview {
@@ -197,7 +197,7 @@ fn a_rows_parts_say_what_matters() {
     };
     let texts: Vec<String> = overview_parts(&detached, 0, &t)
         .into_iter()
-        .map(|p| p.text)
+        .map(|p| p.into_text())
         .collect();
     assert_eq!(texts, ["detached at abc1234", "no remote"]);
 }

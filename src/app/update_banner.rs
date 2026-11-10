@@ -132,7 +132,7 @@ impl App {
     pub(super) fn unpin(&mut self) {
         self.pinned_version.clear();
         self.skipped_version.clear();
-        self.update_looked = None;
+        self.update_discovery.invalidate();
     }
 
     /// Puts the downloaded version `new` in place and closes the window, which saves the tabs;

@@ -309,23 +309,8 @@ pub(super) fn notification_body(text: &str) -> String {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn a_notification_shows_tags_as_text() {
-        let body = notification_body("push failed: remote: <a href=\"https://x\">see</a> & more");
-        if cfg!(all(unix, not(target_os = "macos"))) {
-            assert_eq!(
-                body,
-                "push failed: remote: &lt;a href=\"https://x\"&gt;see&lt;/a&gt; &amp; more"
-            );
-        } else {
-            assert!(body.contains("<a href"));
-        }
-    }
-}
-
+#[path = "panels/tests.rs"]
+mod tests;
 /// App-owned status/error paint; all classification and stored values remain raw.
 pub(super) fn display_app_message(raw: &str) -> String {
     super::clone::display_message(raw)
@@ -346,176 +331,14 @@ pub(super) fn display_app_message(raw: &str) -> String {
 }
 
 #[cfg(test)]
-mod remote_display_tests {
-    #[test]
-    fn actual_app_message_paint_uses_canonical_remote_adapter_after_own_classifiers() {
-        crate::i18n::set_language("de");
-        let raw = "it is a symbolic link";
-        assert_eq!(
-            super::display_app_message(raw),
-            "Dies ist ein symbolischer Link."
-        );
-        assert_eq!(raw, "it is a symbolic link");
-        assert_eq!(
-            super::display_app_message("gitcraft isn't allowed to look in /opaque/日本語."),
-            "gitcraft darf /opaque/日本語 nicht durchsuchen."
-        );
-        let unknown = "opaque external 日本語\n: unchanged";
-        assert_eq!(super::display_app_message(unknown), unknown);
-        // No command/Host provenance is available at this generic paint boundary.
-        let command = "opaque command on SSH · opaque: invalid native request";
-        assert_eq!(super::display_app_message(command), command);
-        crate::i18n::set_language("en-US");
-        assert_eq!(super::display_app_message(raw), raw);
-    }
-}
-
+#[path = "panels/home_error_toast_tests.rs"]
+mod home_error_toast_tests;
 #[cfg(test)]
-mod updater_toast_display_tests {
-    use super::*;
-    use egui_kittest::{Harness, kittest::Queryable};
-
-    #[test]
-    fn retained_go_back_toast_paints_en_de_en_with_unchanged_raw_flag_and_deadline() {
-        let failure = update::Failure::NoPrevious {
-            raw: "No previous version of gitcraft is kept".into(),
-        };
-        let toast = Toast::from_go_back_failure(failure.clone());
-        let raw = toast.text.clone();
-        let until = toast.until;
-        assert_eq!(
-            raw,
-            "Couldn't go back: No previous version of gitcraft is kept"
-        );
-        crate::i18n::set_language("en-US");
-        let fonts = std::cell::Cell::new(false);
-        let mut h = Harness::new_ui_state(
-            move |ui, toast: &mut Toast| {
-                if !fonts.replace(true) {
-                    theme::install_fonts(ui.ctx());
-                    return;
-                }
-                toast.label(ui);
-            },
-            toast,
-        );
-        h.run();
-        h.get_by_label(&raw);
-        crate::i18n::set_language("de");
-        h.step();
-        h.get_by_label("Zurückwechseln fehlgeschlagen: Es wurde keine vorherige Version von gitcraft aufbewahrt");
-        assert_eq!(h.state().text, raw);
-        assert!(h.state().error);
-        assert_eq!(h.state().until, until);
-        assert_eq!(
-            h.state().update_go_back.as_ref().map(|s| &s.failure),
-            Some(&failure)
-        );
-        crate::i18n::set_language("en-US");
-        h.step();
-        h.get_by_label(&raw);
-        assert_eq!(h.state().text, raw);
-        assert_eq!(h.state().until, until);
-    }
-
-    #[test]
-    fn go_back_receipt_is_opt_in_and_never_inferred_from_equal_text_or_child_spelling() {
-        crate::i18n::set_language("de");
-        let raw = "No previous version of gitcraft is kept";
-        let opaque = Toast::from_go_back_failure(update::Failure::Opaque(raw.into()));
-        assert_eq!(
-            opaque.display_text(),
-            format!("Zurückwechseln fehlgeschlagen: {raw}")
-        );
-        let ordinary = Toast::new(opaque.text.clone(), true);
-        assert!(ordinary.update_go_back.is_none());
-        assert_eq!(ordinary.display_text(), ordinary.text);
-        let ordinary_secs = Toast::for_secs("unrelated".into(), false, 10);
-        assert!(ordinary_secs.update_go_back.is_none());
-        let mut mismatched =
-            Toast::from_go_back_failure(update::Failure::NoPrevious { raw: raw.into() });
-        mismatched.text = "Couldn't go back: unrelated raw".into();
-        assert_eq!(mismatched.display_text(), mismatched.text);
-        mismatched.text = format!("Couldn't go back: {raw}");
-        mismatched.error = false;
-        assert_eq!(mismatched.display_text(), mismatched.text);
-    }
-}
-
+#[path = "panels/notice_toast_tests.rs"]
+mod notice_toast_tests;
 #[cfg(test)]
-mod notice_toast_tests {
-    use super::*;
-    use egui_kittest::{Harness, kittest::Queryable};
-
-    #[test]
-    fn actual_notice_toast_repaints_retained_source_and_preserves_raw_lifetime() {
-        let notice = crate::repo::Notice::authorship(
-            "topic: $(keep)".into(),
-            crate::authorship::branch::Figures::default(),
-        );
-        let raw = notice.raw().clone();
-        let toast = Toast::from_notice(notice);
-        let until = toast.until;
-        crate::i18n::set_language("en-US");
-        let fonts = std::cell::Cell::new(false);
-        let mut h = Harness::new_ui_state(
-            move |ui, toast: &mut Toast| {
-                if !fonts.replace(true) {
-                    theme::install_fonts(ui.ctx());
-                    return;
-                }
-                toast.label(ui);
-            },
-            toast,
-        );
-        h.run();
-        h.get_by_label("topic: $(keep) adds no lines since it left the base");
-        crate::i18n::set_language("de");
-        h.step();
-        h.get_by_label("topic: $(keep) fügt seit der Abzweigung von der Basis keine Zeilen hinzu.");
-        assert_eq!((&h.state().text, h.state().error), (&raw.0, raw.1));
-        assert_eq!(h.state().until, until);
-        assert!(h.state().update_go_back.is_none());
-        crate::i18n::set_language("en-US");
-        h.step();
-        h.get_by_label(&raw.0);
-        assert_eq!(h.state().notice.as_ref().map(|n| n.raw()), Some(&raw));
-        // A normal toast with identical text has no authorship receipt.
-        let plain = Toast::new(raw.0.clone(), raw.1);
-        crate::i18n::set_language("de");
-        assert_eq!(plain.display_text(), raw.0);
-        let toast = h.state_mut();
-        toast.text = "unrelated provider error".into();
-        assert_eq!(toast.display_text(), "unrelated provider error");
-    }
-}
-
+#[path = "panels/remote_display_tests.rs"]
+mod remote_display_tests;
 #[cfg(test)]
-mod home_error_toast_tests {
-    use super::*;
-
-    #[test]
-    fn home_source_toast_keeps_delivery_text_error_flag_and_no_extra_actions() {
-        crate::i18n::set_language("de");
-        let error = super::super::AppError::init("opaque native 日本語".into());
-        let raw = error.to_string();
-        let toast = Toast::from_app_error(&error);
-        let until = toast.until;
-        assert_eq!(raw, "git init failed: opaque native 日本語");
-        assert_eq!(toast.text, "git init fehlgeschlagen: opaque native 日本語");
-        assert!(toast.error);
-        assert!(toast.notice.is_none() && toast.update_go_back.is_none());
-        crate::i18n::set_language("en-US");
-        assert_eq!(
-            toast.display_text(),
-            "git init fehlgeschlagen: opaque native 日本語"
-        );
-        assert_eq!(toast.until, until);
-        assert_eq!(error.to_string(), raw);
-        let plain = super::super::AppError::from(raw.clone());
-        let plain_toast = Toast::from_app_error(&plain);
-        assert_eq!(plain_toast.text, raw);
-        assert!(plain_toast.error);
-        assert!(plain_toast.notice.is_none() && plain_toast.update_go_back.is_none());
-    }
-}
+#[path = "panels/updater_toast_display_tests.rs"]
+mod updater_toast_display_tests;
