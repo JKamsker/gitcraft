@@ -179,6 +179,7 @@ fn parse(v: &Value, h: &Hosting) -> Result<PullRequest, String> {
             ))?
             .into(),
         from_fork: v.get("forkSource").is_some_and(|f| !f.is_null()),
+        base_oid: String::new(),
         sha: required(v, "/lastMergeSourceCommit/commitId")?.into(),
         author: text(v, "/createdBy/displayName"),
         url: pr_url(h, number),

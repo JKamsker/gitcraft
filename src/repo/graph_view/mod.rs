@@ -944,6 +944,7 @@ mod tests {
             title: String::new(),
             branch: "fork-feature".into(),
             base: "main".into(),
+            base_oid: String::new(),
             sha: "head".into(),
             from_fork: true,
             author: String::new(),

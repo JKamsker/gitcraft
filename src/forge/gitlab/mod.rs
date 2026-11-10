@@ -414,6 +414,7 @@ fn parse_list(json: &str) -> Result<Vec<PullRequest>, String> {
             title: text(item, "/title"),
             branch: text(item, "/source_branch"),
             base: text(item, "/target_branch"),
+            base_oid: String::new(),
             from_fork: item.get("source_project_id") != item.get("target_project_id"),
             sha: text(item, "/sha"),
             author: text(item, "/author/username"),

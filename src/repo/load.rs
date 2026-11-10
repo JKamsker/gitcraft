@@ -989,6 +989,7 @@ mod tests {
             title: "merged since".to_owned(),
             branch: "feat".to_owned(),
             base: "main".to_owned(),
+            base_oid: String::new(),
             from_fork: false,
             sha: String::new(),
             author: String::new(),

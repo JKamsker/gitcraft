@@ -445,6 +445,7 @@ fn parse_pull_request(item: &Value) -> PullRequest {
         title: title.to_owned(),
         branch: at(item, "/head/ref").to_owned(),
         base: at(item, "/base/ref").to_owned(),
+        base_oid: String::new(),
         from_fork: item.pointer("/head/repo_id") != item.pointer("/base/repo_id"),
         sha: at(item, "/head/sha").to_owned(),
         author: user(item, "/user/login"),

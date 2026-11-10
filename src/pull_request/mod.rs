@@ -189,13 +189,8 @@ pub fn files(
             details.base_branch
         ));
     }
-    let has = |oid: &str| {
-        git::run(
-            Some(repo),
-            &["cat-file", "-e", &format!("{oid}^{{commit}}")],
-        )
-        .is_ok()
-    };
+    // The native rev-parse verifier checks commit presence without starting Git.
+    let has = |oid: &str| git::resolve(repo, oid).is_ok();
     if !has(&details.head_oid) || !has(&details.base_oid) {
         let remote = remote_for(remotes, &details.url, hosting)
             .ok_or("no remote of this repository is the one the pull request belongs to")?;
