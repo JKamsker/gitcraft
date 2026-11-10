@@ -50,8 +50,10 @@ fn harness(split: bool, wrap: bool, partial: bool, new_file: bool) -> Harness<'s
                 if !state.installed {
                     crate::theme::install_fonts(ui.ctx());
                     egui_extras::install_image_loaders(ui.ctx());
-                    let mut settings = crate::settings::Settings::default();
-                    settings.diff_wrap = wrap;
+                    let mut settings = crate::settings::Settings {
+                        diff_wrap: wrap,
+                        ..Default::default()
+                    };
                     settings.key_bindings.insert(
                         crate::keymap::Command::SelectionHistory.id().into(),
                         vec![crate::keymap::Stroke::new(egui::Key::F8, Modifiers::NONE)],
@@ -331,6 +333,28 @@ fn dismissing_a_context_menu_starts_a_fresh_primary_selection() {
     h.step();
     click(&mut h, word, Modifiers::NONE);
     assert_eq!(selected(&h), "");
+    assert!(h.state().view.chosen.is_empty());
+}
+
+#[test]
+fn code_context_menu_replaces_an_existing_git_line_selection() {
+    let mut h = harness(false, false, true, false);
+    let marker = position(&h, "old_αlpha", 0) - egui::vec2(super::super::MARK_W / 2.0, 0.0);
+    click(&mut h, marker, Modifiers::NONE);
+    assert_eq!(h.state().view.chosen, [2].into());
+    let code = position(&h, "new_αlpha", 5);
+    h.event(Event::PointerMoved(code));
+    h.step();
+    for pressed in [true, false] {
+        h.event(Event::PointerButton {
+            pos: code,
+            button: PointerButton::Secondary,
+            pressed,
+            modifiers: Modifiers::NONE,
+        });
+        h.step();
+    }
+    assert_eq!(selected(&h), "new_αlpha beta");
     assert!(h.state().view.chosen.is_empty());
 }
 

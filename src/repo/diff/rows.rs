@@ -367,6 +367,7 @@ impl<'a> Rows<'a> {
                     anchor: (i, 0),
                     cursor: (i, usize::MAX),
                 });
+                self.text_started = true;
             }
             if let Some(links) = self.links {
                 note_right_click(ui, links.id(), hit);
