@@ -106,10 +106,22 @@ jobs:
           sudo apt-get install -y libxkbcommon-dev libwayland-dev libx11-dev libxcursor-dev \
             libxrandr-dev libxi-dev libgtk-3-dev libdbus-1-dev libasound2-dev pkg-config
 
+      # Match ci.yml's isolation of tests sensitive to parallel subprocess load.
+      # Keep their original time limits; run them separately instead of weakening assertions.
       # Windows runs the shared shards in parallel with this packaging job.
       - name: Test
         if: runner.os != 'Windows'
-        run: cargo test --locked
+        run: cargo test --locked -- --skip parallel_bisect::tests::a_test_past_its_limit_is_stopped_and_skipped --skip app::palette::tests::thousands_of_branches_open_and_filter_quickly
+
+      - name: Large-branch palette responsiveness (isolated)
+        if: runner.os != 'Windows'
+        timeout-minutes: 5
+        run: cargo test --locked -p gitcraft --lib app::palette::tests::thousands_of_branches_open_and_filter_quickly -- --exact --nocapture --test-threads=1
+
+      - name: Timed-out subprocess cleanup (isolated)
+        if: runner.os != 'Windows'
+        timeout-minutes: 5
+        run: cargo test --locked -p gitcraft --lib parallel_bisect::tests::a_test_past_its_limit_is_stopped_and_skipped -- --exact --nocapture
 
       - name: Build
         if: runner.os != 'macOS'
