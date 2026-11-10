@@ -92,103 +92,6 @@ fn native_reads_do_not_reuse_index_or_packed_refs_snapshots() -> Result<(), Stri
     Ok(())
 }
 
-/// Check native porcelain status through staged, unstaged, and ignored changes.
-#[test]
-fn porcelain_status_matches_git() -> Result<(), String> {
-    let repo = Repo::new("answer-status")?;
-    assert!(same(repo.path(), STATUS));
-    repo.commit(
-        "base",
-        &[
-            ("both", Some("one\n")),
-            ("gone", Some("gone\n")),
-            ("cached", Some("cached\n")),
-            ("space ü.txt", Some("hello\n")),
-            (".gitignore", Some("*.ignored\n")),
-        ],
-    )?;
-    assert!(same(repo.path(), STATUS));
-    std::fs::write(repo.path().join("both"), "two\n").map_err(|e| e.to_string())?;
-    std::fs::remove_file(repo.path().join("gone")).map_err(|e| e.to_string())?;
-    std::fs::write(repo.path().join("space ü.txt"), "changed\n").map_err(|e| e.to_string())?;
-    std::fs::create_dir_all(repo.path().join("sub/empty")).map_err(|e| e.to_string())?;
-    std::fs::write(repo.path().join("sub/new ü"), "new\n").map_err(|e| e.to_string())?;
-    std::fs::write(repo.path().join("skip.ignored"), "ignored\n").map_err(|e| e.to_string())?;
-    std::fs::write(repo.path().join(".git/info/exclude"), "excluded\n")
-        .map_err(|e| e.to_string())?;
-    std::fs::write(repo.path().join("excluded"), "ignored\n").map_err(|e| e.to_string())?;
-    assert!(same(repo.path(), STATUS));
-    repo.git(&["add", "both"])?;
-    std::fs::write(repo.path().join("both"), "three\n").map_err(|e| e.to_string())?;
-    assert!(same(repo.path(), STATUS));
-    repo.git(&["rm", "--cached", "cached"])?;
-    assert!(same(repo.path(), STATUS));
-    repo.git(&["config", "core.autocrlf", "true"])?;
-    std::fs::write(repo.path().join("space ü.txt"), "hello\r\n").map_err(|e| e.to_string())?;
-    assert!(same(repo.path(), STATUS));
-    repo.git(&["add", "sub/new ü"])?;
-    left_to_git(repo.path(), &[STATUS]); // possible rename
-    repo.git(&["reset", "--hard", "HEAD"])?;
-    for flag in ["--assume-unchanged", "--skip-worktree"] {
-        repo.git(&["update-index", flag, "both"])?;
-        left_to_git(repo.path(), &[STATUS]);
-        repo.git(&[
-            "update-index",
-            "--no-assume-unchanged",
-            "--no-skip-worktree",
-            "both",
-        ])?;
-    }
-    std::fs::write(repo.path().join("intent"), "new\n").map_err(|e| e.to_string())?;
-    repo.git(&["add", "-N", "intent"])?;
-    left_to_git(repo.path(), &[STATUS]);
-    repo.git(&["reset", "--hard", "HEAD"])?;
-    // Git accepts both spellings and case-insensitive values for copy detection.
-    for value in ["copies", "copy", "CoPy"] {
-        repo.git(&["config", "status.renames", value])?;
-        left_to_git(repo.path(), &[STATUS]);
-    }
-    repo.git(&["config", "--unset", "status.renames"])?;
-    repo.git(&["config", "diff.renames", "copy"])?;
-    left_to_git(repo.path(), &[STATUS]);
-    Ok(())
-}
-
-/// Verify file-mode parity and fallback for submodules, nested repos, and conflicts.
-#[test]
-fn porcelain_status_modes_and_fallbacks() -> Result<(), String> {
-    let repo = Repo::new("answer-status-modes")?;
-    let base = repo.commit("base", &[("a", Some("one\n"))])?;
-    repo.git(&["update-index", "--chmod=+x", "a"])?;
-    assert!(same(repo.path(), STATUS));
-    let blob = repo.rev("HEAD:a")?;
-    repo.git(&["update-index", "--cacheinfo", &format!("120000,{blob},a")])?;
-    assert!(same(repo.path(), STATUS));
-    repo.git(&["reset", "--hard", "HEAD"])?;
-    std::fs::write(repo.path().join(".gitmodules"), "").map_err(|e| e.to_string())?;
-    left_to_git(repo.path(), &[STATUS]);
-    std::fs::remove_file(repo.path().join(".gitmodules")).map_err(|e| e.to_string())?;
-    repo.git(&[
-        "update-index",
-        "--add",
-        "--cacheinfo",
-        &format!("160000,{base},sub"),
-    ])?;
-    left_to_git(repo.path(), &[STATUS]);
-    repo.git(&["reset", "--hard", "HEAD"])?;
-    std::fs::create_dir_all(repo.path().join("nested")).map_err(|e| e.to_string())?;
-    assert_eq!(git(&repo.path().join("nested"), &["init", "-q"]).code, 0);
-    left_to_git(repo.path(), &[STATUS]);
-    std::fs::remove_dir_all(repo.path().join("nested")).map_err(|e| e.to_string())?;
-    repo.git(&["switch", "-q", "-c", "side"])?;
-    repo.commit("side", &[("a", Some("side\n"))])?;
-    repo.git(&["switch", "-q", "main"])?;
-    repo.commit("main", &[("a", Some("main\n"))])?;
-    assert_ne!(git(repo.path(), &["merge", "side"]).code, 0);
-    left_to_git(repo.path(), &[STATUS]);
-    Ok(())
-}
-
 /// What git itself prints for `args` in `repo` (not through gitcraft, which would answer).
 fn git(repo: &Path, args: &[&str]) -> Answer {
     let mut command = std::process::Command::new("git");
@@ -242,102 +145,6 @@ fn left_to_git(repo: &Path, cases: &[&[&str]]) {
     for args in cases {
         assert!(answer(repo, args).is_none(), "answered: git {args:?}");
     }
-}
-
-/// Check Git-config reading, includes, key casing, and option compatibility.
-#[test]
-fn config_lookups_are_gits() -> Result<(), String> {
-    let repo = Repo::new("answer-config")?;
-    let path = repo.path();
-    std::fs::write(
-        path.join("included.cfg"),
-        "[gitcraft]\n\tfromInclude = yes\n[Mixed \"CaSe\"]\n\tKey = included\n",
-    )
-    .map_err(|e| e.to_string())?;
-    let config = path.join(".git/config");
-    let mut text = std::fs::read_to_string(&config).map_err(|e| e.to_string())?;
-    text.push_str(concat!(
-        "[gitcraft]\n\tflag\n\tName = Va\"l\"ue\\tx\n\tempty =\n\tsize = 2k\n",
-        "\tfence = one\n\tfence = two\n\tsignOff = off\n",
-        "[Mixed \"CaSe\"]\n\tKey = local\n",
-        "[remote \"origin\"]\n\turl = https://example.com/r.git\n",
-        "[branch \"main\"]\n\tremote = origin\n\tmerge = refs/heads/main\n",
-        "[credential \"https://dev.example.com\"]\n\tuseHttpPath = true\n",
-        "[include]\n\tpath = ../included.cfg\n",
-    ));
-    std::fs::write(&config, text).map_err(|e| e.to_string())?;
-    answered(
-        path,
-        &[
-            &["config", "--get", "gitcraft.name"],
-            &["config", "gitcraft.name"],
-            &["config", "--get", "GitCraft.NAME"],
-            &["config", "--get", "gitcraft.empty"],
-            &["config", "--get", "gitcraft.flag"],
-            &["config", "--bool", "--get", "gitcraft.flag"],
-            &["config", "--type=bool", "--get", "gitcraft.signOff"],
-            &["config", "--local", "--bool", "--get", "gitcraft.signOff"],
-            &["config", "--type=int", "--get", "gitcraft.size"],
-            &["config", "--get", "gitcraft.missing"],
-            &["config", "--get", "mixed.CaSe.key"],
-            &["config", "--get", "mixed.case.key"],
-            &["config", "--get-all", "mixed.CaSe.key"],
-            &["config", "--local", "--get-all", "mixed.CaSe.key"],
-            &["config", "--local", "--get-all", "gitcraft.fence"],
-            &["config", "--get", "gitcraft.fence"],
-            &["config", "--get", "gitcraft.fromInclude"],
-            &["config", "--local", "--get", "gitcraft.fromInclude"],
-            &["config", "--get-regexp", "^gitcraft\\."],
-            &["config", "-z", "--get-regexp", "^gitcraft\\."],
-            &[
-                "config",
-                "--null",
-                "--get-regexp",
-                "^(branch\\..*\\.(remote|merge|pushremote)|remote\\..*\\.gitcraftfork)$",
-            ],
-            &[
-                "config",
-                "--local",
-                "-z",
-                "--get-regexp",
-                "^branch\\..*\\.gitcraft-issue",
-            ],
-            &["config", "--get-regexp", "MIXED"],
-            &["config", "--get-regexp", "^credential\\..*\\.usehttppath$"],
-            &[
-                "config",
-                "--type=bool",
-                "--get-regexp",
-                "^remote\\..*\\.promisor$",
-            ],
-            &[
-                "config",
-                "--get",
-                "credential.https://dev.example.com.useHttpPath",
-            ],
-            &["config", "--get", "user.name"],
-            &[
-                "config",
-                "-z",
-                "--local",
-                "--get-regexp",
-                "^user\\.(name|email)$",
-            ],
-        ],
-    );
-    left_to_git(
-        path,
-        &[
-            &["config", "gitcraft.name", "value"],
-            &["config", "--global", "--get", "user.name"],
-            &["config", "--get-regexp", "!x"],
-            &["config", "--get-regexp", "\\d"],
-            &["config", "--get", "gitcraft.name", "value-pattern"],
-            &["config", "--list"],
-            &["config", "--type=int", "--get", "gitcraft.flag"],
-        ],
-    );
-    Ok(())
 }
 
 /// Compare native object, revision, and reference queries against Git.
@@ -627,3 +434,9 @@ fn tree_order_puts_folders_after_names_they_extend() {
     assert_eq!(tree_order("a", true, "a.b", false), Greater);
     assert_eq!(tree_order("a", false, "a.b", false), Less);
 }
+
+#[path = "answer_tests/status.rs"]
+mod status;
+
+#[path = "answer_tests/config.rs"]
+mod config;

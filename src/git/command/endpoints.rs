@@ -1,6 +1,10 @@
 //! Effective endpoint metadata. Expanded URLs are never fed back into a mutating Git call.
 use super::*;
 mod literal;
+mod queries;
+use queries::RouteQueries;
+#[cfg(test)]
+mod recording_tests;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct RemoteEndpoint {
     pub remote: String,
@@ -26,7 +30,12 @@ impl RemoteEndpoint {
     }
 }
 pub(crate) fn remote_endpoints(repo: &Path) -> Result<Vec<RemoteEndpoint>, String> {
-    let names = connection_read(repo, &["remote"])?;
+    remote_endpoints_with(&mut |args| connection_read(repo, args))
+}
+fn remote_endpoints_with(
+    read: &mut impl FnMut(&[&str]) -> Result<String, String>,
+) -> Result<Vec<RemoteEndpoint>, String> {
+    let names = read(&["remote"])?;
     let mut endpoints = Vec::new();
     for name in names.lines().filter(|n| !n.is_empty()) {
         for push in [false, true] {
@@ -35,7 +44,7 @@ pub(crate) fn remote_endpoints(repo: &Path) -> Result<Vec<RemoteEndpoint>, Strin
             } else {
                 vec!["remote", "get-url", "--all", name]
             };
-            for (index, url) in connection_read(repo, &args)?.lines().enumerate() {
+            for (index, url) in read(&args)?.lines().enumerate() {
                 if !url.is_empty() {
                     endpoints.push(RemoteEndpoint {
                         remote: name.into(),
@@ -147,7 +156,7 @@ impl AuthFailure {
         }
     }
 }
-/// Captures every input to Git's route selection, not the fetch-only display model.
+/// Capture effective endpoints and routing config using the same command envelope.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 pub(crate) struct RouteBinding {
     pub args: Vec<String>,
@@ -156,16 +165,21 @@ pub(crate) struct RouteBinding {
 }
 impl RouteBinding {
     pub fn capture(repo: &Path, args: &[&str]) -> Result<Self, String> {
-        let routes = operation_endpoints(repo, args)?;
-        let configuration = connection_read(
-            repo,
-            &[
-                "config",
-                "--null",
-                "--get-regexp",
-                r"^(remote\..*\.(url|pushurl|push)|remote\.pushdefault|branch\..*\.(remote|pushremote|merge)|url\..*\.(insteadof|pushinsteadof)|push\.default)$",
-            ],
-        )?;
+        Self::capture_with(args, &mut |query| connection_read(repo, query))
+    }
+    fn capture_with(
+        args: &[&str],
+        read: &mut impl FnMut(&[&str]) -> Result<String, String>,
+    ) -> Result<Self, String> {
+        let queries = RouteQueries::new(args)?;
+        let mut read = |query: &[&str]| read(&queries.command(query));
+        let routes = operation_endpoints_with(queries.operation(), &mut read)?;
+        let configuration = read(&[
+            "config",
+            "--null",
+            "--get-regexp",
+            r"^(remote\..*\.(url|pushurl|push)|remote\.pushdefault|branch\..*\.(remote|pushremote|merge)|url\..*\.(insteadof|pushinsteadof)|push\.default)$",
+        ])?;
         Ok(Self {
             args: args.iter().map(|s| (*s).into()).collect(),
             routes,
@@ -198,9 +212,17 @@ impl RouteBinding {
 }
 /// Inspect the operation's own remote selection, including implicit branch push overrides.
 /// Only metadata is expanded; the original command retains Git's normal routing semantics.
+#[cfg(test)]
 pub(crate) fn operation_endpoints(repo: &Path, args: &[&str]) -> Result<Vec<String>, String> {
-    let original_args = args;
-    let args = after_options(args);
+    let queries = RouteQueries::new(args)?;
+    operation_endpoints_with(queries.operation(), &mut |query| {
+        connection_read(repo, &queries.command(query))
+    })
+}
+fn operation_endpoints_with(
+    args: &[&str],
+    read: &mut impl FnMut(&[&str]) -> Result<String, String>,
+) -> Result<Vec<String>, String> {
     let Some(sub) = args.first() else {
         return Ok(vec![]);
     };
@@ -208,7 +230,7 @@ pub(crate) fn operation_endpoints(repo: &Path, args: &[&str]) -> Result<Vec<Stri
     if !matches!(*sub, "push" | "fetch" | "pull") {
         return Ok(vec![]);
     }
-    let all = remote_endpoints(repo)?;
+    let all = remote_endpoints_with(read)?;
     if args.contains(&"--all") && *sub == "fetch" {
         return Ok(all.into_iter().filter(|e| !e.push).map(|e| e.url).collect());
     }
@@ -254,19 +276,17 @@ pub(crate) fn operation_endpoints(repo: &Path, args: &[&str]) -> Result<Vec<Stri
     let remote = if let Some(name) = explicit {
         name.to_owned()
     } else {
-        let branch = connection_read(repo, &["symbolic-ref", "--quiet", "--short", "HEAD"])?;
-        let read = |key: &str| {
-            connection_read(repo, &["config", "--get", key]).map(|v| v.trim().to_owned())
-        };
+        let branch = read(&["symbolic-ref", "--quiet", "--short", "HEAD"])?;
+        let mut config = |key: &str| read(&["config", "--get", key]).map(|v| v.trim().to_owned());
         let mut selected = String::new();
         if push {
-            selected = read(&format!("branch.{}.pushRemote", branch.trim()))?;
+            selected = config(&format!("branch.{}.pushRemote", branch.trim()))?;
             if selected.is_empty() {
-                selected = read("remote.pushDefault")?;
+                selected = config("remote.pushDefault")?;
             }
         }
         if selected.is_empty() {
-            selected = read(&format!("branch.{}.remote", branch.trim()))?;
+            selected = config(&format!("branch.{}.remote", branch.trim()))?;
         }
         if selected.is_empty() {
             selected = "origin".into();
@@ -285,8 +305,8 @@ pub(crate) fn operation_endpoints(repo: &Path, args: &[&str]) -> Result<Vec<Stri
     // synthetic remote cannot resolve a literal operand. Read only rewrite
     // metadata, retaining the operation's explicit global options, then apply
     // Git's single longest-prefix substitution without starting a transport.
-    let query = literal_query(original_args, explicit.is_some())?;
-    let configuration = connection_read(repo, &query)?;
+    let query = literal_query(args, explicit.is_some())?;
+    let configuration = read(&query)?;
     Ok(vec![literal::resolve(&configuration, &remote, push)?])
 }
 
