@@ -85,10 +85,42 @@ pub(super) fn assign(child: &std::process::Child) -> Result<ProcessJob, String> 
     Ok(ProcessJob { handle: job })
 }
 
+#[link(name = "ntdll", kind = "raw-dylib")]
+unsafe extern "system" {
+    /// The thread of `process` after `thread` (the first for a null one), opened with
+    /// `access`. Exported by ntdll since Windows Vista.
+    fn NtGetNextThread(
+        process: HANDLE,
+        thread: HANDLE,
+        access: u32,
+        attributes: u32,
+        flags: u32,
+        next: *mut HANDLE,
+    ) -> i32;
+}
+
 pub(super) fn resume(child: &std::process::Child) -> Result<(), String> {
     let pid = child.id();
-    // std/Tokio expose the process handle but not its primary thread. Enumerate threads
-    // while the new process is suspended; only its primary thread can exist at this point.
+    // std/Tokio expose the process handle but not its primary thread. Only it can exist while
+    // the new process is suspended: asked of the process HANDLE itself, which costs nothing
+    // and can't name another process. A system-wide thread snapshot (below, should ntdll
+    // refuse) walks every thread of the machine: 150 ms per process with 13 000 of them.
+    let mut first = HANDLE::default();
+    // SAFETY: the retained child HANDLE (all access) and a valid out pointer; on success the
+    // returned thread handle is owned here and closed once.
+    let status = unsafe {
+        NtGetNextThread(
+            HANDLE(child.as_raw_handle()),
+            HANDLE::default(),
+            (THREAD_SUSPEND_RESUME | THREAD_QUERY_LIMITED_INFORMATION).0,
+            0,
+            0,
+            &mut first,
+        )
+    };
+    if status >= 0 && !first.is_invalid() {
+        return resume_owned(child, pid, &owned(first));
+    }
     // SAFETY: a thread snapshot has no pointer parameters; a failure returns no handle.
     let snapshot = owned(
         unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0) }.map_err(|e| e.to_string())?,
@@ -112,23 +144,26 @@ pub(super) fn resume(child: &std::process::Child) -> Result<(), String> {
                 }
                 .map_err(|e| e.to_string())?,
             );
-            // SAFETY: both retained handles remain open. A signaled process HANDLE proves
-            // the old lifetime ended even when its numeric exit code happens to be 259.
-            let actual = unsafe { GetProcessIdOfThread(raw(&thread)) };
-            let active =
-                unsafe { WaitForSingleObject(HANDLE(child.as_raw_handle()), 0) } == WAIT_TIMEOUT;
-            super::suspended::validate_thread_owner(pid, actual, active)
-                .map_err(|e| e.to_string())?;
-            // SAFETY: the handle remains valid for this call; failure leaves the job owner
-            // responsible for terminating the child rather than returning it suspended.
-            if unsafe { ResumeThread(raw(&thread)) } == u32::MAX {
-                return Err(std::io::Error::last_os_error().to_string());
-            }
-            return Ok(());
+            return resume_owned(child, pid, &thread);
         }
         // SAFETY: same snapshot and structure as Thread32First above.
         if unsafe { Thread32Next(raw(&snapshot), &mut entry) }.is_err() {
             return Err("could not find the suspended child's primary thread".into());
         }
     }
+}
+
+/// Resumes `thread` once it is proven the still-running child's own.
+fn resume_owned(child: &std::process::Child, pid: u32, thread: &OwnedHandle) -> Result<(), String> {
+    // SAFETY: both retained handles remain open. A signaled process HANDLE proves
+    // the old lifetime ended even when its numeric exit code happens to be 259.
+    let actual = unsafe { GetProcessIdOfThread(raw(thread)) };
+    let active = unsafe { WaitForSingleObject(HANDLE(child.as_raw_handle()), 0) } == WAIT_TIMEOUT;
+    super::suspended::validate_thread_owner(pid, actual, active).map_err(|e| e.to_string())?;
+    // SAFETY: the handle remains valid for this call; failure leaves the job owner
+    // responsible for terminating the child rather than returning it suspended.
+    if unsafe { ResumeThread(raw(thread)) } == u32::MAX {
+        return Err(std::io::Error::last_os_error().to_string());
+    }
+    Ok(())
 }
