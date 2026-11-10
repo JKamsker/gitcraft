@@ -62,14 +62,13 @@ pub fn log_scoped(
         return Ok(Vec::new());
     }
     let limit = format!("--max-count={limit}");
-    let out = match run(
-        Some(repo),
-        &log_args(from, order, skip, Some(&limit), excluded)
-            .as_args()
-            .iter()
-            .map(String::as_str)
-            .collect::<Vec<_>>(),
-    ) {
+    let args = log_args(from, order, skip, Some(&limit), excluded).as_args();
+    let out = match super::backend::history_log(repo, &args, from.is_none(), || {
+        run(
+            Some(repo),
+            &args.iter().map(String::as_str).collect::<Vec<_>>(),
+        )
+    }) {
         Ok(out) => out,
         // A freshly initialised repository has no commits yet.
         Err(e) if e.contains("does not have any commits") => String::new(),

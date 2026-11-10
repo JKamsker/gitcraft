@@ -396,6 +396,23 @@ pub(super) fn answer(repo: &Path, args: &[&str]) -> Option<(i32, Vec<u8>, Vec<u8
 #[cfg(feature = "native-git")]
 mod answer;
 #[cfg(feature = "native-git")]
+mod history;
+
+pub(super) fn history_log(
+    path: &Path,
+    args: &[String],
+    eligible: bool,
+    read: impl FnOnce() -> Result<String, String>,
+) -> Result<String, String> {
+    #[cfg(feature = "native-git")]
+    return history::read(path, args, eligible, read);
+    #[cfg(not(feature = "native-git"))]
+    {
+        let _ = (path, args, eligible);
+        read()
+    }
+}
+#[cfg(feature = "native-git")]
 mod commits;
 #[cfg(feature = "native-git")]
 mod patch;
