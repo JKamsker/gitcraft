@@ -1281,3 +1281,38 @@ fn startup_snapshot_remotes_stay_unread_until_a_fresh_load() {
     tab.load_error = None;
     assert!(tab.remotes_read().is_some_and(|remotes| remotes.is_empty()));
 }
+
+#[test]
+fn startup_snapshot_retains_queued_links_through_failed_loading() {
+    let ctx = egui::Context::default();
+    let mut tab = super::RepoTab::new_deferred("/inert/snapshot-links".into(), &ctx);
+    tab.snapshot_shown = true;
+    tab.queue(super::Action::OpenLinkedPr {
+        number: 42,
+        remote: "https://github.com/example/repo".into(),
+    });
+    tab.queue(super::Action::BlameAt {
+        path: "src/lib.rs".into(),
+        rev: Some("main".into()),
+        line: 17,
+    });
+    assert!(tab.take_queued_actions().is_empty());
+    super::messages::record_jobs(|| {
+        tab.handle(super::Msg::Loaded(Err("read failed".into())), &ctx);
+    });
+    assert!(tab.take_queued_actions().is_empty());
+    assert!(tab.is_busy());
+    // Successful loading advances the generation and retires the startup snapshot.
+    tab.history_gen = 1;
+    tab.snapshot_shown = false;
+    tab.load_error = None;
+    let actions = tab.take_queued_actions();
+    assert!(matches!(
+        actions.as_slice(),
+        [super::Action::OpenLinkedPr { number: 42, remote },
+         super::Action::BlameAt { path, rev: Some(rev), line: 17 }]
+            if remote == "https://github.com/example/repo"
+                && path == "src/lib.rs" && rev == "main"
+    ));
+    assert!(tab.take_queued_actions().is_empty());
+}

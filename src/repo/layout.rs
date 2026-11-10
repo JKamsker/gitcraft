@@ -28,7 +28,7 @@ impl RepoTab {
             return;
         }
         self.publish_custom_commands(&ctx);
-        let mut acts: Vec<Action> = std::mem::take(&mut self.queued);
+        let mut acts: Vec<Action> = self.take_queued_actions();
         self.dco_frame(&ctx);
         self.owners_frame(&ctx);
         self.forks_frame(&ctx);

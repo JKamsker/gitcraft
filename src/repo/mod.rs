@@ -932,6 +932,15 @@ impl RepoTab {
         self.queued.push(action);
     }
 
+    /// Keep external navigation pending until fresh state can authorize its dispatch.
+    fn take_queued_actions(&mut self) -> Vec<Action> {
+        if self.snapshot_pending() {
+            Vec::new()
+        } else {
+            std::mem::take(&mut self.queued)
+        }
+    }
+
     /// The selected primary remote's forge.
     pub(super) fn forge(&self) -> Option<Forge> {
         self.hosting.as_ref().map(|h| h.forge)
