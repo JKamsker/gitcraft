@@ -1546,8 +1546,8 @@ repo-core-1938 = { $verb ->
                 [Discard] Block verwerfen
                *[Revert] Block rückgängig machen
             }
-repo-core-1940 = Diesen Hunk vormerken. Zeilen anklicken, um nur einige vorzumerken (Shift+Klick für einen Bereich).
-repo-core-1941 = Vormerkung dieses Hunks aufheben. Zeilen anklicken, um sie nur für einige aufzuheben (Shift+Klick für einen Bereich).
+repo-core-1940 = Diesen Hunk vormerken. In der +/− Spalte klicken, um einzelne Zeilen vorzumerken (Shift+Klick für einen Bereich).
+repo-core-1941 = Vormerkung dieses Hunks aufheben. In der +/− Spalte klicken, um sie nur für einzelne Zeilen aufzuheben (Shift+Klick für einen Bereich).
 repo-core-1942 = Änderungen dieses Hunks verwerfen (Ctrl+Z stellt sie wieder her).
 repo-core-1943 = Diesen Hunk im Arbeitsverzeichnis rückgängig machen, um ihn vor dem Committen zu prüfen.
 repo-core-1944 = … Diff gekürzt
@@ -1819,7 +1819,7 @@ repo-core-2378 = { $chosen ->
                 [one] { $chosen } Zeile rückgängig machen
                *[other] { $chosen } Zeilen rückgängig machen
             }
-repo-core-2379 = Nur angeklickte Zeilen im Arbeitsverzeichnis rückgängig machen, um sie vor dem Committen zu prüfen. „Änderungen dieser Datei rückgängig machen“ steht im Menü des Dateinamens.
+repo-core-2379 = Nur in der +/− Spalte ausgewählte Zeilen im Arbeitsverzeichnis rückgängig machen, um sie vor dem Committen zu prüfen. „Änderungen dieser Datei rückgängig machen“ steht im Menü des Dateinamens.
 repo-core-2380 = Datei reverten
 repo-core-2381 = Änderungen dieses Commits an der Datei im Arbeitsverzeichnis rückgängig machen, um sie vor dem Committen zu prüfen
 repo-core-2382 = { $from } → Arbeitsverzeichnis
@@ -3299,3 +3299,4 @@ repo-core-cell-kind-raw = Rohtext
 repo-core-panel-diff = Diff
 repo-core-panel-terminal = Terminal
 repo-core-panel-pr = Pull-Request
+diff-pick-line = Diese Zeile für Git-Aktionen auswählen. Mit Umschalt-Klick einen Bereich auswählen.

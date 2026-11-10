@@ -1541,8 +1541,8 @@ repo-core-1935 = Traceback
 repo-core-1936 = (an output gitcraft can't show)
 repo-core-1937 = ({ $kinds } output)
 repo-core-1938 = { $verb } hunk
-repo-core-1940 = Stage this hunk. Click lines to stage only some of them (Shift+click for a range).
-repo-core-1941 = Unstage this hunk. Click lines to unstage only some of them (Shift+click for a range).
+repo-core-1940 = Stage this hunk. Click the +/− gutter to stage individual lines (Shift+click for a range).
+repo-core-1941 = Unstage this hunk. Click the +/− gutter to unstage individual lines (Shift+click for a range).
 repo-core-1942 = Throw away this hunk's changes (Ctrl+Z brings them back).
 repo-core-1943 = Undo this hunk in the working tree, to review before committing.
 repo-core-1944 = … diff truncated
@@ -1814,7 +1814,7 @@ repo-core-2378 = { $chosen ->
                 [one] Revert { $chosen } line
                *[other] Revert { $chosen } lines
             }
-repo-core-2379 = Undo only the lines clicked in the working tree, to look over before committing. Revert changes to this file is in the file name's menu.
+repo-core-2379 = Undo only the lines selected in the +/− gutter in the working tree, to look over before committing. Revert changes to this file is in the file name's menu.
 repo-core-2380 = Revert file
 repo-core-2381 = Undo this commit's changes to the file in the working tree, to look over before committing
 repo-core-2382 = { $from } → working tree
@@ -3296,3 +3296,4 @@ repo-core-cell-kind-raw = raw
 repo-core-panel-diff = diff
 repo-core-panel-terminal = terminal
 repo-core-panel-pr = pull request
+diff-pick-line = Select this line for Git actions. Shift-click to select a range.
