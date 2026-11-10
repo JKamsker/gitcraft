@@ -37,6 +37,60 @@ fn bounded_raw_blobs_match_git_before_and_after_repacking() -> Result<(), String
     Ok(())
 }
 
+/// Reopening the repository must observe index and packed-refs changes even when file times
+/// are unchanged, without waiting for the old ten-second handle-cache expiry.
+#[test]
+fn native_reads_do_not_reuse_index_or_packed_refs_snapshots() -> Result<(), String> {
+    let repo = Repo::new("native-fresh-snapshots")?;
+    let base = repo.commit("base", &[("tracked", Some("base\\n"))])?;
+    let tip = repo.commit("tip", &[("tracked", Some("tip!\\n"))])?;
+
+    let reference = "refs/heads/native-snapshot";
+    repo.git(&["update-ref", reference, &base])?;
+    repo.git(&["pack-refs", "--all", "--prune"])?;
+    let refs = &["for-each-ref", "--format=%(objectname)", reference];
+    assert!(same(repo.path(), refs));
+    let packed = repo.path().join(".git/packed-refs");
+    let old_packed_time = std::fs::metadata(&packed)
+        .and_then(|m| m.modified())
+        .map_err(|e| e.to_string())?;
+
+    repo.git(&["update-ref", reference, &tip])?;
+    repo.git(&["pack-refs", "--all", "--prune"])?;
+    std::fs::OpenOptions::new()
+        .write(true)
+        .open(&packed)
+        .and_then(|f| f.set_modified(old_packed_time))
+        .map_err(|e| e.to_string())?;
+    assert!(same(repo.path(), refs));
+
+    let path = repo.path().join("tracked");
+    std::fs::write(&path, "one!\\n").map_err(|e| e.to_string())?;
+    repo.git(&["add", "tracked"])?;
+    assert_eq!(
+        bounded_blob(repo.path(), ":0:tracked", 20),
+        Some(Ok(b"one!\\n".to_vec()))
+    );
+    let index = repo.path().join(".git/index");
+    let old_index_time = std::fs::metadata(&index)
+        .and_then(|m| m.modified())
+        .map_err(|e| e.to_string())?;
+
+    std::fs::write(&path, "two!\\n").map_err(|e| e.to_string())?;
+    repo.git(&["add", "tracked"])?;
+    std::fs::OpenOptions::new()
+        .write(true)
+        .open(&index)
+        .and_then(|f| f.set_modified(old_index_time))
+        .map_err(|e| e.to_string())?;
+    assert_eq!(
+        bounded_blob(repo.path(), ":0:tracked", 20),
+        Some(Ok(b"two!\\n".to_vec()))
+    );
+    assert!(same(repo.path(), STATUS));
+    Ok(())
+}
+
 #[test]
 fn porcelain_status_matches_git() -> Result<(), String> {
     let repo = Repo::new("answer-status")?;

@@ -101,10 +101,11 @@ unsafe extern "system" {
 
 pub(super) fn resume(child: &std::process::Child) -> Result<(), String> {
     let pid = child.id();
-    // std/Tokio expose the process handle but not its primary thread. Only it can exist while
-    // the new process is suspended: asked of the process HANDLE itself, which costs nothing
-    // and can't name another process. A system-wide thread snapshot (below, should ntdll
-    // refuse) walks every thread of the machine: 150 ms per process with 13 000 of them.
+    // std/Tokio expose the process handle but not its primary thread. GitCraft just spawned
+    // this child suspended, before it could create other threads; the assumption is that no
+    // external process injects one before this first resume. A successful lookup followed by
+    // failed ownership validation is final (never retry a different thread). Lookup through the
+    // child process HANDLE avoids a system-wide thread snapshot, which can be expensive.
     let mut first = HANDLE::default();
     // SAFETY: the retained child HANDLE (all access) and a valid out pointer; on success the
     // returned thread handle is owned here and closed once.

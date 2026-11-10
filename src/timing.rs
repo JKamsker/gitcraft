@@ -41,11 +41,20 @@ pub(crate) fn all() -> bool {
     *ALL.get_or_init(|| std::env::var_os("GITCRAFT_TIMING").is_some_and(|v| v == "all"))
 }
 
+/// Whether filesystem-event diagnostics can be written. Cached so each notify callback avoids
+/// an environment lookup, and disabled in tests where the timing writer is also disabled.
+pub(crate) fn enabled() -> bool {
+    static ENABLED: OnceLock<bool> = OnceLock::new();
+    *ENABLED.get_or_init(|| {
+        !cfg!(test) && std::env::var_os("GITCRAFT_TIMING").is_none_or(|v| v != "0")
+    })
+}
+
 fn writer() -> Option<&'static Sender<String>> {
     static WRITER: OnceLock<Option<Sender<String>>> = OnceLock::new();
     WRITER
         .get_or_init(|| {
-            if std::env::var_os("GITCRAFT_TIMING").is_some_and(|v| v == "0") || cfg!(test) {
+            if !enabled() {
                 return None;
             }
             let dir = crate::portable::data_dir()?;

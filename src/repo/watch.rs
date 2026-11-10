@@ -40,6 +40,11 @@ static SEEN: std::sync::Mutex<BTreeMap<PathBuf, BTreeMap<String, u64>>> =
     std::sync::Mutex::new(BTreeMap::new());
 
 fn saw(root: &Path, path: &Path) {
+    // The filesystem callback should not allocate or contend on this mutex just to record
+    // diagnostics that will never be written.
+    if !crate::timing::enabled() {
+        return;
+    }
     let place = crate::timing::place_of(path, root);
     if let Ok(mut seen) = SEEN.lock() {
         *seen

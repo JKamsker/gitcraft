@@ -462,16 +462,13 @@ mod native {
     fn text(bytes: &gix::bstr::BStr) -> Result<String, String> {
         bytes.to_str().map(str::to_owned).map_err(err)
     }
-    /// The repository at `path`, opened once and kept while the files its config came from
-    /// stay as they were (see [`Opened`]): opening reads every config file git reads, a good
-    /// part of a read's time. Refs, objects and the index are read from disk each time anyway.
+    /// Open a fresh handle for each read. Cloned gix repositories can retain their index
+    /// and packed-refs snapshots when a file is rewritten within the same timestamp tick.
+    /// A fresh handle keeps staged changes and refs immediately visible to native readers.
     pub(super) fn open(path: &Path) -> Result<gix::Repository, String> {
-        if let Some(repo) = Opened::kept(path) {
-            return Ok(repo);
-        }
         let mut permissions = gix::open::Permissions::default();
         permissions.config.git_binary = true;
-        let repo = gix::discover_opts(
+        gix::discover_opts(
             path,
             Default::default(),
             gix::open::Options::default()
@@ -479,93 +476,7 @@ mod native {
                 .bail_if_untrusted(true)
                 .strict_config(true),
         )
-        .map_err(err)?;
-        Opened::keep(path, &repo);
-        Ok(repo)
-    }
-
-    /// Repositories opened, each with when and what its config was read from.
-    struct Opened {
-        repo: gix::Repository,
-        at: Instant,
-        files: Vec<(PathBuf, Option<(std::time::SystemTime, u64)>)>,
-    }
-
-    thread_local! {
-        /// Per thread: a repository opened isn't shared across threads (without gix's
-        /// `parallel`), and reads run on the few threads of the pools.
-        static OPENED: std::cell::RefCell<std::collections::HashMap<PathBuf, Opened>> =
-            Default::default();
-    }
-
-    /// Kept no longer than this whatever its files say: a file rewritten within the same
-    /// tick of its clock, with the same length, isn't told apart otherwise.
-    const KEPT_FOR: std::time::Duration = std::time::Duration::from_secs(10);
-
-    impl Opened {
-        /// The files whose change changes what the repository's config reads: those it was
-        /// read from, those git would read had they existed, and HEAD (`includeIf onbranch`).
-        fn files(repo: &gix::Repository) -> Vec<(PathBuf, Option<(std::time::SystemTime, u64)>)> {
-            let mut paths: Vec<PathBuf> = repo
-                .config_snapshot()
-                .plumbing()
-                .sections()
-                .filter_map(|s| s.meta().path.clone())
-                .collect();
-            paths.extend([
-                repo.git_dir().join("config"),
-                repo.git_dir().join("config.worktree"),
-                repo.common_dir().join("config"),
-                repo.git_dir().join("HEAD"),
-            ]);
-            if let Some(home) = gix::path::env::home_dir() {
-                paths.push(home.join(".gitconfig"));
-                paths.push(home.join(".config/git/config"));
-            }
-            if let Some(xdg) = std::env::var_os("XDG_CONFIG_HOME") {
-                paths.push(PathBuf::from(xdg).join("git/config"));
-            }
-            paths.sort();
-            paths.dedup();
-            paths
-                .into_iter()
-                .map(|p| {
-                    let stamp = std::fs::metadata(&p)
-                        .ok()
-                        .and_then(|m| Some((m.modified().ok()?, m.len())));
-                    (p, stamp)
-                })
-                .collect()
-        }
-
-        fn kept(path: &Path) -> Option<gix::Repository> {
-            OPENED.with_borrow(|opened| {
-                let kept = opened.get(path)?;
-                let unchanged = kept.at.elapsed() < KEPT_FOR
-                    && kept.files.iter().all(|(p, stamp)| {
-                        std::fs::metadata(p)
-                            .ok()
-                            .and_then(|m| Some((m.modified().ok()?, m.len())))
-                            == *stamp
-                    });
-                unchanged.then(|| kept.repo.clone())
-            })
-        }
-
-        fn keep(path: &Path, repo: &gix::Repository) {
-            let files = Self::files(repo);
-            OPENED.with_borrow_mut(|opened| {
-                opened.retain(|_, o| o.at.elapsed() < KEPT_FOR);
-                opened.insert(
-                    path.to_owned(),
-                    Opened {
-                        repo: repo.clone(),
-                        at: Instant::now(),
-                        files,
-                    },
-                );
-            });
-        }
+        .map_err(err)
     }
     pub(super) fn head(path: &Path) -> Result<String, String> {
         let repo = open(path)?;

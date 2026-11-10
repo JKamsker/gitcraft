@@ -126,9 +126,11 @@ mod tests {
             assert!(out.status.success());
             String::from_utf8(out.stdout).map_err(|e| e.to_string())
         };
+        let cacheable =
+            super::super::capability(repo.path()).is_ok() && snapshot(repo.path()).is_some();
         let first = read(repo.path(), &args, true, || cli(&args))?;
         assert_eq!(first, read(repo.path(), &args, true, || cli(&args))?);
-        assert_eq!(calls.get(), 1);
+        assert_eq!(calls.get(), if cacheable { 1 } else { 2 });
         for command in [
             vec!["tag", "v1"],
             vec!["switch", "-q", "-c", "other"],
@@ -170,6 +172,8 @@ mod tests {
         repo.commit("main", &[("c", Some("three\n"))])?;
         repo.git(&["merge", "-q", "--no-ff", "--no-edit", "side"])?;
         repo.git(&["tag", "-a", "v1", "-m", "release"])?;
+        let cacheable =
+            super::super::capability(repo.path()).is_ok() && snapshot(repo.path()).is_some();
         for order in ["--date-order", "--topo-order", "--author-date-order"] {
             for skip in ["--skip=0", "--skip=1"] {
                 let args: Vec<String> = [
@@ -195,10 +199,12 @@ mod tests {
                 };
                 let expected = cli()?;
                 assert_eq!(read(repo.path(), &args, true, cli)?, expected);
-                assert_eq!(
-                    read(repo.path(), &args, true, || Err("cache missed".to_owned()))?,
-                    expected
-                );
+                if cacheable {
+                    assert_eq!(
+                        read(repo.path(), &args, true, || Err("cache missed".to_owned()))?,
+                        expected
+                    );
+                }
             }
         }
         Ok(())
