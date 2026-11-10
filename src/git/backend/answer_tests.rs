@@ -18,7 +18,9 @@ fn bounded_raw_blobs_match_git_before_and_after_repacking() -> Result<(), String
         for spec in ["HEAD:space ü.cs", ":0:space ü.cs"] {
             let id = git(repo.path(), &["rev-parse", "--verify", spec]);
             assert_eq!(id.code, 0);
-            let oid = std::str::from_utf8(&id.stdout).map_err(|e| e.to_string())?.trim();
+            let oid = std::str::from_utf8(&id.stdout)
+                .map_err(|e| e.to_string())?
+                .trim();
             let expected = git(repo.path(), &["cat-file", "blob", oid]).stdout;
             assert_eq!(
                 bounded_blob(repo.path(), spec, expected.len()),
@@ -56,7 +58,8 @@ fn porcelain_status_matches_git() -> Result<(), String> {
     std::fs::create_dir_all(repo.path().join("sub/empty")).map_err(|e| e.to_string())?;
     std::fs::write(repo.path().join("sub/new ü"), "new\n").map_err(|e| e.to_string())?;
     std::fs::write(repo.path().join("skip.ignored"), "ignored\n").map_err(|e| e.to_string())?;
-    std::fs::write(repo.path().join(".git/info/exclude"), "excluded\n").map_err(|e| e.to_string())?;
+    std::fs::write(repo.path().join(".git/info/exclude"), "excluded\n")
+        .map_err(|e| e.to_string())?;
     std::fs::write(repo.path().join("excluded"), "ignored\n").map_err(|e| e.to_string())?;
     assert!(same(repo.path(), STATUS));
     repo.git(&["add", "both"])?;
@@ -131,11 +134,13 @@ fn git(repo: &Path, args: &[&str]) -> Answer {
     }
     let out = match command.current_dir(repo).args(args).output() {
         Ok(out) => out,
-        Err(e) => return Answer {
-            code: -1,
-            stdout: Vec::new(),
-            stderr: e.to_string().into_bytes(),
-        },
+        Err(e) => {
+            return Answer {
+                code: -1,
+                stdout: Vec::new(),
+                stderr: e.to_string().into_bytes(),
+            };
+        }
     };
     Answer {
         code: out.status.code().unwrap_or(-1),
