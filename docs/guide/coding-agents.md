@@ -39,7 +39,7 @@ gitcraft is built to work alongside Claude Code, Codex and other agents: an MCP 
 ## Hand it to the agent
 
 - Hand it to the agent: click a line's number in a diff (Alt+click in a diff of uncommitted
-  changes, where a click picks the line to stage it) to write a note for the agent on it. Notes
+  changes) to write a note for the agent on it. Notes
   are kept per worktree until they are sent, never published, and collect in NOTES FOR THE
   AGENT under the big area; _Send to agent_ types them into the worktree's agent terminal (a
   terminal named after the agent, or the one picked beside the button) as one message, pasted

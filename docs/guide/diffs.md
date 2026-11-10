@@ -7,6 +7,10 @@ The centre of the window: unified or side-by-side diffs, pictures, notebooks, bi
 - Unified or side by side (a new file takes the whole width, with no empty old side), syntax
   colours, the changed part of each line marked, whitespace changes optional, images shown
   before / after. Esc closes.
+- Click code to position the text caret, drag to select text, double-click a word or
+  triple-click a line. A new selection replaces the previous one; Ctrl/Cmd+C copies it.
+  To select changed lines for Git actions, click their +/− gutter (Shift+click for a range).
+  Starting a text selection clears the Git action selection.
 
 ## Pictures
 

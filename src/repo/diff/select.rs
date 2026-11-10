@@ -1,4 +1,4 @@
-//! Selecting text in a diff by dragging over it, on one side, and copying it.
+//! Caret, word, line and drag selection on one side of a read-only diff.
 
 use std::collections::HashMap;
 use std::ops::Range;
@@ -32,6 +32,53 @@ impl Side {
 /// A place in the text of a line where it shows: (line, side, character).
 pub(super) type Hit = (usize, Side, usize);
 
+#[derive(Clone, Copy)]
+struct ClickSequence {
+    line: usize,
+    side: Side,
+    pos: egui::Pos2,
+    time: f64,
+    count: u8,
+}
+
+impl ClickSequence {
+    fn register(ui: &Ui, response: &egui::Response, hit: Hit) -> u8 {
+        let Some(pos) = response.interact_pointer_pos() else {
+            return 1;
+        };
+        let id = response.id.with("text-click-sequence");
+        let previous: Option<Self> = ui.data(|d| d.get_temp(id));
+        let time = ui.input(|i| i.time);
+        let options = ui.ctx().options(|o| o.input_options);
+        // Count clicks within this code target, rather than egui's global triple-click
+        // sequence, which can include a click on a different row or in another control.
+        let count = match previous {
+            Some(p)
+                if p.line == hit.0
+                    && p.side == hit.1
+                    && time - p.time < options.max_double_click_delay
+                    && pos.distance_sq(p.pos) < options.max_click_dist * options.max_click_dist =>
+            {
+                (p.count + 1).min(3)
+            }
+            _ => 1,
+        };
+        ui.data_mut(|d| {
+            d.insert_temp(
+                id,
+                Self {
+                    line: hit.0,
+                    side: hit.1,
+                    pos,
+                    time,
+                    count,
+                },
+            )
+        });
+        count
+    }
+}
+
 /// Text selected in a diff by dragging, on one side of it: from where the drag started to
 /// where the pointer is, as (line, character) positions.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -42,6 +89,37 @@ pub(in crate::repo) struct TextSel {
 }
 
 impl TextSel {
+    pub(super) fn caret((i, side, c): Hit) -> Self {
+        Self {
+            side,
+            anchor: (i, c),
+            cursor: (i, c),
+        }
+    }
+
+    pub(super) fn is_empty(self) -> bool {
+        self.anchor == self.cursor
+    }
+
+    fn clicked(lines: &[DiffLine], hit: Hit, word: bool, line: bool) -> Self {
+        let mut sel = Self::caret(hit);
+        if line {
+            sel.anchor.1 = 0;
+            sel.cursor.1 = usize::MAX;
+        } else if word {
+            // Use the same Unicode word boundaries as egui's text editors.
+            use egui::text::CCursor;
+            use egui::text_selection::text_cursor_state::{
+                ccursor_next_word, ccursor_previous_word,
+            };
+            let text = &lines[hit.0].text;
+            let cursor = CCursor::new(hit.2);
+            sel.anchor.1 = ccursor_previous_word(text, cursor).index.0;
+            sel.cursor.1 = ccursor_next_word(text, cursor).index.0;
+        }
+        sel
+    }
+
     pub(super) fn all(lines: &[DiffLine], side: Side) -> Option<Self> {
         let mut shown = lines.iter().enumerate().filter(|(_, l)| side.shows(l.kind));
         let (first, _) = shown.next()?;
@@ -114,33 +192,81 @@ impl TextSel {
     }
 }
 
-/// The selection after this frame's drag over the lines: started where the press hit the text,
-/// its end moved to the pointer on the side it started on, or gone after a click.
+/// A press replaces the previous selection immediately. Dragging extends that caret on its
+/// original side, even after scrolling its anchor out of the visible rows.
 /// `pointer_hits`: each with whether the pointer is over that line's half.
 pub(super) fn drag_selection(
+    ui: &Ui,
     sel: Option<TextSel>,
     drag: &egui::Response,
     press_hit: Option<Hit>,
     pointer_hits: &[(Hit, bool)],
+    lines: &[DiffLine],
 ) -> Option<TextSel> {
     let mut sel = sel;
-    if drag.drag_started() {
-        sel = press_hit.map(|(i, side, c)| TextSel {
-            side,
-            anchor: (i, c),
-            cursor: (i, c),
-        });
-    } else if drag.dragged()
+    let primary_pressed = ui.input(|i| i.pointer.primary_pressed());
+    let code_press = press_hit.is_some() && drag.is_pointer_button_down_on();
+    if ui.input(|i| {
+        i.pointer.secondary_pressed()
+            || i.events
+                .iter()
+                .any(|e| matches!(e, egui::Event::Key { pressed: true, .. }))
+    }) || drag.drag_started_by(egui::PointerButton::Primary)
+        || primary_pressed && !code_press && !drag.clicked()
+    {
+        ui.data_mut(|d| d.remove::<ClickSequence>(drag.id.with("text-click-sequence")));
+    }
+    if primary_pressed && !egui::Popup::is_any_open(ui.ctx()) {
+        sel = press_hit
+            .filter(|_| drag.is_pointer_button_down_on())
+            .map(TextSel::caret);
+    }
+    if drag.clicked() {
+        sel = pointer_hits
+            .iter()
+            .find(|(_, over)| *over)
+            .map(|&(hit, _)| {
+                let count = ClickSequence::register(ui, drag, hit);
+                TextSel::clicked(lines, hit, count == 2, count == 3)
+            });
+    } else if (drag.dragged_by(egui::PointerButton::Primary)
+        || drag.drag_stopped_by(egui::PointerButton::Primary))
         && let Some(s) = &mut sel
         && let Some(((i, _, c), _)) = pointer_hits
             .iter()
             .find(|((_, side, _), _)| *side == s.side)
     {
         s.cursor = (*i, *c);
-    } else if drag.clicked() {
-        sel = None;
     }
     sel
+}
+
+/// egui suppresses wheel scrolling while another widget owns a drag. Forward the wheel
+/// inside this ScrollArea so text can still be selected beyond its initial viewport.
+pub(super) fn scroll_selection(ui: &Ui, drag: &egui::Response, wrap: bool) {
+    if !drag.dragged_by(egui::PointerButton::Primary)
+        || !ui.input(|i| {
+            i.pointer
+                .interact_pos()
+                .is_some_and(|p| ui.clip_rect().contains(p))
+        })
+    {
+        return;
+    }
+    let delta = ui.input_mut(|i| {
+        let delta = egui::vec2(
+            if wrap { 0.0 } else { i.smooth_scroll_delta.x },
+            i.smooth_scroll_delta.y,
+        );
+        i.smooth_scroll_delta.y = 0.0;
+        if !wrap {
+            i.smooth_scroll_delta.x = 0.0;
+        }
+        delta
+    });
+    if delta != egui::Vec2::ZERO {
+        ui.scroll_with_delta_animation(delta, egui::style::ScrollAnimation::none());
+    }
 }
 
 /// Ctrl+C and the "Copy" of the context menu on the lines (`drag`, and the changed lines that
