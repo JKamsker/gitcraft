@@ -42,8 +42,8 @@ fn bounded_raw_blobs_match_git_before_and_after_repacking() -> Result<(), String
 #[test]
 fn native_reads_do_not_reuse_index_or_packed_refs_snapshots() -> Result<(), String> {
     let repo = Repo::new("native-fresh-snapshots")?;
-    let base = repo.commit("base", &[("tracked", Some("base\\n"))])?;
-    let tip = repo.commit("tip", &[("tracked", Some("tip!\\n"))])?;
+    let base = repo.commit("base", &[("tracked", Some("base\n"))])?;
+    let tip = repo.commit("tip", &[("tracked", Some("tip!\n"))])?;
 
     let reference = "refs/heads/native-snapshot";
     repo.git(&["update-ref", reference, &base])?;
@@ -65,18 +65,18 @@ fn native_reads_do_not_reuse_index_or_packed_refs_snapshots() -> Result<(), Stri
     assert!(same(repo.path(), refs));
 
     let path = repo.path().join("tracked");
-    std::fs::write(&path, "one!\\n").map_err(|e| e.to_string())?;
+    std::fs::write(&path, "one!\n").map_err(|e| e.to_string())?;
     repo.git(&["add", "tracked"])?;
     assert_eq!(
         bounded_blob(repo.path(), ":0:tracked", 20),
-        Some(Ok(b"one!\\n".to_vec()))
+        Some(Ok(b"one!\n".to_vec()))
     );
     let index = repo.path().join(".git/index");
     let old_index_time = std::fs::metadata(&index)
         .and_then(|m| m.modified())
         .map_err(|e| e.to_string())?;
 
-    std::fs::write(&path, "two!\\n").map_err(|e| e.to_string())?;
+    std::fs::write(&path, "two!\n").map_err(|e| e.to_string())?;
     repo.git(&["add", "tracked"])?;
     std::fs::OpenOptions::new()
         .write(true)
@@ -85,7 +85,7 @@ fn native_reads_do_not_reuse_index_or_packed_refs_snapshots() -> Result<(), Stri
         .map_err(|e| e.to_string())?;
     assert_eq!(
         bounded_blob(repo.path(), ":0:tracked", 20),
-        Some(Ok(b"two!\\n".to_vec()))
+        Some(Ok(b"two!\n".to_vec()))
     );
     assert!(same(repo.path(), STATUS));
     Ok(())

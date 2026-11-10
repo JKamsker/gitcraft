@@ -45,9 +45,8 @@ pub(crate) fn all() -> bool {
 /// an environment lookup, and disabled in tests where the timing writer is also disabled.
 pub(crate) fn enabled() -> bool {
     static ENABLED: OnceLock<bool> = OnceLock::new();
-    *ENABLED.get_or_init(|| {
-        !cfg!(test) && std::env::var_os("GITCRAFT_TIMING").is_none_or(|v| v != "0")
-    })
+    *ENABLED
+        .get_or_init(|| !cfg!(test) && std::env::var_os("GITCRAFT_TIMING").is_none_or(|v| v != "0"))
 }
 
 fn writer() -> Option<&'static Sender<String>> {
