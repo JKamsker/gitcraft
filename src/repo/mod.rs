@@ -903,7 +903,7 @@ impl RepoTab {
 
     /// The remotes the tab read, once it has read the repository.
     pub(crate) fn remotes_read(&self) -> Option<Vec<git::Remote>> {
-        (!self.opening()).then(|| self.remotes.clone())
+        (!self.opening() && !self.snapshot_pending()).then(|| self.remotes.clone())
     }
 
     /// An editor holds work that showing something else would close: a conflict being

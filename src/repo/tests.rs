@@ -1265,3 +1265,19 @@ fn startup_snapshot_cannot_authorize_merge_even_after_a_failed_load() {
         assert!(tab.busy_op.is_some());
     }
 }
+
+#[test]
+fn startup_snapshot_remotes_stay_unread_until_a_fresh_load() {
+    let ctx = egui::Context::default();
+    let mut tab = super::RepoTab::new_deferred("/inert/snapshot-remotes".into(), &ctx);
+    assert!(tab.remotes_read().is_none());
+    tab.snapshot_shown = true;
+    for failed in [false, true] {
+        tab.load_error = failed.then(|| "read failed".into());
+        assert!(tab.remotes_read().is_none());
+    }
+    tab.history_gen = 1;
+    tab.snapshot_shown = false;
+    tab.load_error = None;
+    assert!(tab.remotes_read().is_some_and(|remotes| remotes.is_empty()));
+}
