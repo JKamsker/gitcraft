@@ -89,14 +89,14 @@ fn repository_tour_reports_workflow_documents_and_activity() -> Result<(), Strin
 }
 
 #[test]
-fn fluent_tour_cached_raw_statuses_follow_language_at_paint_time() {
+fn fluent_tour_cached_raw_statuses_follow_language_at_paint_time() -> Result<(), String> {
     let raw = "Invalid repository HEAD".to_owned();
     let incomplete = "Some commit metadata was unavailable locally or exceeded the reading limit; it was not downloaded";
     let omitted = "Additional documents omitted by the 20-document reading limit";
     let path = "docs/ü { $not-a-variable }\nREADME.md";
     let unavailable =
         format!("{path}: content unavailable locally or above the reading limit (not downloaded)");
-    let day = Day(19782); // 2024-02-29
+    let day = Day::from_unix_days(19782).ok_or("invalid fixture day")?; // 2024-02-29
     for (locale, error, date, document) in [
         (
             "en-US",
@@ -162,16 +162,18 @@ fn fluent_tour_cached_raw_statuses_follow_language_at_paint_time() {
     }
     assert_eq!(raw, "Invalid repository HEAD");
     crate::i18n::set_language("en-US");
+    Ok(())
 }
 
 #[test]
 fn fluent_tour_root_label_keeps_real_directory_names_opaque() -> Result<(), String> {
+    let day = Day::from_unix_days(19782).ok_or("invalid fixture day")?;
     let snapshot = |paths| History {
         commits: vec![ObservedCommit {
             hash: "a".repeat(40),
             name: "Name".into(),
             email: "a@test.invalid".into(),
-            committer: Day(19782),
+            committer: day,
             paths,
         }],
         more: false,
@@ -184,7 +186,12 @@ fn fluent_tour_root_label_keeps_real_directory_names_opaque() -> Result<(), Stri
         b"README.md".to_vec(),
         b"(root files)/code.rs".to_vec(),
     ]);
-    let (folders, _, _) = recent(&root, Day(19700), Day(19800), &|| true)?;
+    let (folders, _, _) = recent(
+        &root,
+        Day::from_unix_days(19700).ok_or("invalid fixture day")?,
+        Day::from_unix_days(19800).ok_or("invalid fixture day")?,
+        &|| true,
+    )?;
     for locale in ["en-US", "de", "en-US"] {
         crate::i18n::set_language(locale);
         assert_eq!(folders[0].path, b"(root files)");
@@ -197,7 +204,12 @@ fn fluent_tour_root_label_keeps_real_directory_names_opaque() -> Result<(), Stri
             }
         );
         for history in [&real, &mixed] {
-            let (folders, _, _) = recent(history, Day(19700), Day(19800), &|| true)?;
+            let (folders, _, _) = recent(
+                history,
+                Day::from_unix_days(19700).ok_or("invalid fixture day")?,
+                Day::from_unix_days(19800).ok_or("invalid fixture day")?,
+                &|| true,
+            )?;
             assert_eq!(folders[0].display_path(), "(root files)");
             assert_eq!(folders[0].authors[0].2, 1); // Preserve original grouping/deduplication.
         }
