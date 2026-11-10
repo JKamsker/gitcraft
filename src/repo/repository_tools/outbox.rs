@@ -1,7 +1,7 @@
 use super::{Act, Data, State, Tool};
 use crate::{
     git::repository_tools::outbox as logic,
-    repo::{Action, Dialog, RepoTab},
+    repo::{Action, RepoTab},
 };
 
 fn selection_current(
@@ -49,17 +49,38 @@ pub(super) fn act(tab: &mut RepoTab, act: Act, ctx: &egui::Context) -> Option<Ac
             let profile = crate::settings::Settings::get(ctx).profile();
             let context = crate::connections::current();
             let generation = tab.https_generation;
+            let scope = tab.repository_tool_scope(ctx);
+            let read = super::effects::Read {
+                tool: Tool::Outbox,
+                query: String::new(),
+            };
+            let (mut owner, ticket) = State::open(&read, scope);
+            tab.deferred.automatic = Some(owner.id);
+
             tab.then_or(
                 ctx,
                 false,
                 Err,
                 move || context.run(|| logic::prepare(&repo, &id, profile, credentials.as_ref())),
-                move |tab, result, ctx| match result {
-                    Ok(mut p) => {
-                        p.ui_generation = Some(generation);
-                        start_send(tab, Box::new(p), true, ctx);
+                move |tab, result, ctx| {
+                    let current = tab.repository_tool_scope(ctx);
+                    if tab.deferred.automatic != Some(owner.id) {
+                        return;
                     }
-                    Err(error) => tab.status = Some(crate::repo::Notice::plain((error, true))),
+                    tab.deferred.automatic = None;
+                    let result = result.map(|mut p| {
+                        p.ui_generation = Some(generation);
+                        Data::PreparedOutbox(Box::new(p))
+                    });
+                    let effect = owner.complete(&ticket, &current, result);
+                    super::actions::settlement(tab, effect);
+                    match owner.result {
+                        Some(Ok(Data::PreparedOutbox(p))) => start_send(tab, p, true, ctx),
+                        Some(Err(error)) => {
+                            tab.status = Some(crate::repo::Notice::plain((error, true)))
+                        }
+                        _ => {}
+                    }
                 },
             );
         }
@@ -73,25 +94,11 @@ pub(super) fn act(tab: &mut RepoTab, act: Act, ctx: &egui::Context) -> Option<Ac
                 return None;
             }
             let repo = tab.path.clone();
-            let expected = repo.clone();
             let profile = crate::settings::Settings::get(ctx).profile();
-            let expected_profile = profile.clone();
             let context = crate::connections::current();
-            let expected_context = context.clone();
             let generation = tab.https_generation;
             let credentials = tab.credentials.clone();
-            let request = super::REQUESTS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-            tab.dialog = Some(Dialog::RepositoryTools(Box::new(State {
-                id: request,
-                query: String::new(),
-                result: None,
-                filter: String::new(),
-                tool: Tool::Outbox,
-                acknowledged: false,
-                compatible: false,
-                parent: String::new(),
-                effective: true,
-            })));
+            let ticket = tab.prepare_repository_tool(Tool::Outbox, ctx);
             tab.then_or(
                 ctx,
                 false,
@@ -110,33 +117,7 @@ pub(super) fn act(tab: &mut RepoTab, act: Act, ctx: &egui::Context) -> Option<Ac
                             Data::PreparedOutbox(Box::new(p))
                         })
                 },
-                move |tab, result, ctx| {
-                    let selected = crate::settings::Settings::get(ctx).profile();
-                    let current = crate::connections::current() == expected_context
-                        && selection_current(
-                            &expected_context,
-                            expected_profile.id,
-                            &expected_profile.connections,
-                            generation,
-                            &tab.connection_context,
-                            &selected,
-                            tab.https_generation,
-                        );
-                    let result = if current {
-                        result
-                    } else {
-                        Err(
-                            crate::i18n::text("repo-workflows-repository_tools-act-519202af")
-                                .into(),
-                        )
-                    };
-                    if tab.path == expected
-                        && let Some(Dialog::RepositoryTools(s)) = &mut tab.dialog
-                        && s.id == request
-                    {
-                        s.result = Some(result);
-                    }
-                },
+                move |tab, result, ctx| tab.complete_repository_tool(&ticket, result, ctx),
             );
         }
         other => return Some(other),
@@ -181,6 +162,7 @@ fn start_send(tab: &mut RepoTab, p: Box<logic::Prepared>, automatic: bool, ctx: 
 impl RepoTab {
     pub(in crate::repo) fn poll_outbox(&mut self, ctx: &egui::Context) {
         use std::time::{Duration, Instant};
+        let scope = self.repository_tool_scope(ctx);
         if self.sleeping()
             || self.is_busy()
             || self.dialog.is_some()
@@ -195,15 +177,22 @@ impl RepoTab {
         self.outbox_reading = true;
         self.outbox_last = Some(Instant::now());
         let repo = self.path.clone();
-        let expected = repo.clone();
+        let request = super::REQUESTS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.deferred.outbox_poll = Some(request);
         self.then_or(
             ctx,
             false,
             Err,
             move || logic::read(&repo),
             move |tab, result, ctx| {
+                if tab.repository_tool_scope(ctx) != scope
+                    || tab.deferred.outbox_poll != Some(request)
+                {
+                    return;
+                }
+                tab.deferred.outbox_poll = None;
                 tab.outbox_reading = false;
-                if tab.path != expected || tab.is_busy() || tab.dialog.is_some() {
+                if tab.is_busy() || tab.dialog.is_some() {
                     return;
                 }
                 if let Ok(view) = result
@@ -219,338 +208,15 @@ impl RepoTab {
         );
     }
 }
-pub(super) fn show(ui: &mut egui::Ui, state: &mut State, acts: &mut Vec<Action>) {
-    ui.heading(crate::i18n::text(
-        "repo-workflows-repository_tools-show-52b07a38",
-    ));
-    ui.label(crate::i18n::text(
-        "repo-workflows-repository_tools-show-96a8a275",
-    ));
-    ui.label(crate::i18n::text(
-        "repo-workflows-repository_tools-show-4d07d136",
-    ));
-    let Some(result) = &mut state.result else {
-        ui.add(crate::spinner::Spinner::new());
-        return;
-    };
-    let data = match result {
-        Ok(data) => data,
-        Err(e) => {
-            ui.colored_label(crate::theme::Tokens::get(ui.ctx()).danger, e.as_str());
-            if ui
-                .button(crate::i18n::text(
-                    "repo-workflows-repository_tools-show-a2869e42",
-                ))
-                .clicked()
-            {
-                acts.push(Action::RepositoryTools(Act::Outbox));
-            }
-            return;
-        }
-    };
-    match data {
-        Data::Outbox(view) => {
-            ui.label(crate::i18n::message(
-                "repo-workflows-repository_tools-show-1bd5bcfa",
-                &[("view-branch-1", (view.branch).clone().into())],
-            ));
-            ui.checkbox(
-                &mut state.compatible,
-                crate::i18n::text("repo-workflows-repository_tools-show-202c8fbc"),
-            );
-            if ui
-                .button(crate::i18n::text(
-                    "repo-workflows-repository_tools-show-4c8748ea",
-                ))
-                .clicked()
-            {
-                acts.push(Action::RepositoryTools(Act::QueuePush(
-                    Box::new(view.clone()),
-                    state.compatible,
-                )));
-            }
-            egui::ScrollArea::vertical()
-                .max_height(430.0)
-                .show(ui, |ui| {
-                    for e in &view.queue.entries {
-                        ui.separator();
-                        ui.label(format!("{} → {} / {}", e.source, e.remote, e.destination));
-                        ui.monospace(&e.commit);
-                        ui.label(
-                            e.consent.as_ref().map_or(
-                                crate::i18n::text("repo-workflows-repository_tools-show-8cc484e4")
-                                    .into(),
-                                |consent| {
-                                    crate::i18n::message(
-                                        "repo-workflows-repository_tools-show-a2bc21d3",
-                                        &[("consent-profile-1", (consent.profile).into())],
-                                    )
-                                },
-                            ),
-                        );
-                        ui.label(outbox_entry_summary(
-                            &e.status,
-                            e.endpoints.len(),
-                            e.autosend,
-                        ));
-                        if !e.receipt.is_empty() {
-                            egui::CollapsingHeader::new(crate::i18n::text(
-                                "repo-workflows-repository_tools-show-dad5a969",
-                            ))
-                            .id_salt(&e.id)
-                            .show(ui, |ui| {
-                                ui.label(&e.receipt);
-                            });
-                        }
-                        if matches!(e.status, logic::Status::Paused(_) | logic::Status::Sending)
-                            && ui
-                                .button(crate::i18n::text(
-                                    "repo-workflows-repository_tools-show-fccdc9ec",
-                                ))
-                                .clicked()
-                        {
-                            acts.push(Action::RepositoryTools(Act::ReviewOutbox(e.id.clone())));
-                        }
-                        ui.horizontal(|ui| {
-                            if ui
-                                .add_enabled(
-                                    e.status == logic::Status::Ready,
-                                    egui::Button::new(crate::i18n::text(
-                                        "repo-workflows-repository_tools-show-222bd382",
-                                    )),
-                                )
-                                .clicked()
-                            {
-                                acts.push(Action::RepositoryTools(Act::PrepareOutbox(
-                                    e.id.clone(),
-                                )));
-                            }
-                            if ui
-                                .add_enabled(
-                                    e.status != logic::Status::Sending,
-                                    egui::Button::new(crate::i18n::text(
-                                        "repo-workflows-repository_tools-show-d653a1c5",
-                                    )),
-                                )
-                                .clicked()
-                            {
-                                acts.push(Action::RepositoryTools(Act::RemoveOutbox(
-                                    Box::new(view.clone()),
-                                    e.id.clone(),
-                                )));
-                            }
-                        });
-                    }
-                });
-        }
-        Data::PreparedOutbox(p) => {
-            if p.review {
-                ui.colored_label(
-                    crate::theme::Tokens::get(ui.ctx()).warning,
-                    crate::i18n::text("repo-workflows-repository_tools-show-b9cc89c6"),
-                );
-            }
-            ui.label(crate::i18n::message(
-                "repo-workflows-repository_tools-show-a17b0445",
-                &[
-                    ("p-plan-head-1", (p.plan.head).clone().into()),
-                    ("p-plan-remote-2", (p.plan.remote).clone().into()),
-                    ("p-plan-destination-3", (p.plan.destination).clone().into()),
-                ],
-            ));
-            ui.label(crate::i18n::message(
-                "repo-workflows-repository_tools-show-99256c25",
-                &[("p-consent-profile-1", (p.consent.profile).into())],
-            ));
-            if let Some((endpoint, account, username)) = &p.consent.principal {
-                ui.label(crate::i18n::message(
-                    "repo-workflows-repository_tools-show-8fb60b6e",
-                    &[
-                        (
-                            "crate-git-redact-endpoint-none-1",
-                            (crate::git::redact(endpoint, None)).clone().into(),
-                        ),
-                        ("account-2", (account).clone().into()),
-                        ("username-3", (username).clone().into()),
-                    ],
-                ));
-            }
-            for target in &p.plan.targets {
-                ui.label(target);
-            }
-            ui.label(crate::i18n::message(
-                "repo-workflows-repository_tools-show-9b1cea76",
-                &[("p-plan-commits-len-1", (p.plan.commits.len()).into())],
-            ));
-            egui::ScrollArea::vertical()
-                .max_height(300.0)
-                .show(ui, |ui| {
-                    if p.plan.findings.is_empty() {
-                        ui.label(crate::i18n::text(
-                            "repo-workflows-repository_tools-show-80ef5663",
-                        ));
-                    }
-                    for f in &p.plan.findings {
-                        ui.label(format!(
-                            "{:?}: {} {} {}",
-                            f.kind, f.commit, f.path, f.detail
-                        ));
-                    }
-                });
-            ui.checkbox(
-                &mut state.acknowledged,
-                crate::i18n::text("repo-workflows-repository_tools-show-2e1d0813"),
-            );
-            if ui
-                .add_enabled(
-                    state.acknowledged,
-                    egui::Button::new(crate::i18n::text(
-                        "repo-workflows-repository_tools-show-78f32476",
-                    )),
-                )
-                .clicked()
-            {
-                acts.push(Action::RepositoryTools(Act::SendOutbox(p.clone())));
-            }
-        }
-        _ => {}
-    }
-}
+#[cfg(test)]
+#[path = "outbox/consent_tests.rs"]
+mod consent_tests;
 
 #[cfg(test)]
-mod consent_tests {
-    use super::*;
-    #[test]
-    fn pure_outbox_stale_preparation_requires_same_profile_context_and_tab_signin_generation() {
-        let a = crate::settings::profiles::UserProfile::default();
-        let context = crate::connections::Context {
-            choices: a.connections.clone(),
-            ..Default::default()
-        };
-        assert!(selection_current(
-            &context,
-            a.id,
-            &a.connections,
-            4,
-            &context,
-            &a,
-            4
-        ));
-        let mut b = a.clone();
-        b.id += 1;
-        assert!(!selection_current(
-            &context,
-            a.id,
-            &a.connections,
-            4,
-            &context,
-            &b,
-            4
-        ));
-        b = a.clone();
-        b.connections.github.user = "different-account".into();
-        assert!(!selection_current(
-            &context,
-            a.id,
-            &a.connections,
-            4,
-            &context,
-            &b,
-            4
-        ));
-        assert!(!selection_current(
-            &context,
-            a.id,
-            &a.connections,
-            4,
-            &context,
-            &a,
-            5
-        ));
-        let mut changed = context.clone();
-        changed.git_config = Some("/synthetic/new-immutable-config".into());
-        assert!(!selection_current(
-            &context,
-            a.id,
-            &a.connections,
-            4,
-            &changed,
-            &a,
-            4
-        ));
-    }
-}
+#[path = "outbox/fluent_outbox_tests.rs"]
+mod fluent_outbox_tests;
 
-fn outbox_entry_summary(status: &logic::Status, endpoints: usize, automatic: bool) -> String {
-    crate::i18n::message(
-        "repo-workflows-outbox-entry-summary",
-        &[
-            (
-                "status",
-                (match status {
-                    logic::Status::Ready => "ready",
-                    logic::Status::Sending => "sending",
-                    logic::Status::Sent => "sent",
-                    logic::Status::Paused(_) => "paused",
-                })
-                .into(),
-            ),
-            (
-                "detail",
-                (match status {
-                    logic::Status::Paused(detail) => {
-                        crate::repo::activity::display_workflow_error(detail)
-                    }
-                    _ => String::new(),
-                })
-                .into(),
-            ),
-            ("endpoints", (endpoints).into()),
-            ("automatic", (if automatic { "yes" } else { "no" }).into()),
-        ],
-    )
-}
+mod view;
 #[cfg(test)]
-mod fluent_outbox_tests {
-    use super::*;
-
-    #[test]
-    fn fluent_partition_outbox_actual_summary_keeps_supplied_state_opaque() {
-        let paused = logic::Status::Paused("Provider detail / refs/heads/ß".into());
-        for (language, ready, count, paused_label) in [
-            ("en-US", "Ready", "1,234 pinned endpoints", "Paused:"),
-            ("de", "Bereit", "1.234 festgelegte Endpunkte", "Pausiert:"),
-        ] {
-            crate::i18n::set_language(language);
-            let summary = outbox_entry_summary(&logic::Status::Ready, 1234, true);
-            assert!(summary.starts_with(ready));
-            assert!(summary.contains(count));
-            let summary = outbox_entry_summary(&paused, 1, false);
-            assert!(summary.starts_with(paused_label));
-            assert!(summary.contains("Provider detail / refs/heads/ß"));
-            assert!(summary.contains(if language == "de" {
-                "ein festgelegter Endpunkt"
-            } else {
-                "one pinned endpoint"
-            }));
-            assert_eq!(
-                paused,
-                logic::Status::Paused("Provider detail / refs/heads/ß".into())
-            );
-            assert!(
-                outbox_entry_summary(&logic::Status::Sending, 0, false).starts_with(
-                    if language == "de" {
-                        "Wird gesendet"
-                    } else {
-                        "Sending"
-                    }
-                )
-            );
-            assert!(
-                outbox_entry_summary(&logic::Status::Sent, 0, false)
-                    .starts_with(if language == "de" { "Gesendet" } else { "Sent" })
-            );
-        }
-        crate::i18n::set_language("en-US");
-    }
-}
+use view::outbox_entry_summary;
+pub(super) use view::show;
