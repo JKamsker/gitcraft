@@ -184,7 +184,7 @@ fn responsive_diff_body_matrix_preserves_horizontal_scroll_and_line_selection()
                 };
                 let long = "a_long_token_that_requires_horizontal_scrolling_".repeat(12);
                 let patch = format!(
-                    "diff --git a/{PATH} b/{PATH}\nindex 1234567..2345678 100644\n--- a/{PATH}\n+++ b/{PATH}\n@@ -1,3 +1,3 @@\n unchanged\n-old_{long}\n+new_{long}\n after\n"
+                    "diff --git a/{PATH} b/{PATH}\nindex 1234567..2345678 100644\n--- a/{PATH}\n+++ b/{PATH}\n@@ -1,3 +1,3 @@\n unchanged\n-old_{long}\n+new_{long}\n after\n@@ -20 +20 @@\n-second_before\n+second_after\n"
                 );
                 let mut view = DiffView::new(key.clone());
                 view.unfolded = true;
@@ -258,6 +258,25 @@ fn responsive_diff_body_matrix_preserves_horizontal_scroll_and_line_selection()
                         .chosen
                         .is_empty(),
                     "code click picked a Git line at {width}/{scale}/{split}"
+                );
+                let second = text_position(h.output(), "second_after")
+                    .ok_or("second hunk was not painted")?
+                    + egui::vec2(8.0, super::super::LINE_H * 0.5);
+                h.event(egui::Event::PointerMoved(second));
+                h.step();
+                for pressed in [true, false] {
+                    h.event(egui::Event::PointerButton {
+                        pos: second,
+                        button: egui::PointerButton::Primary,
+                        pressed,
+                        modifiers: egui::Modifiers::NONE,
+                    });
+                    h.step();
+                }
+                assert_eq!(
+                    h.state().0.diff.as_ref().and_then(|v| v.keyboard_hunk),
+                    Some(5),
+                    "code caret must focus the second hunk for keyboard actions"
                 );
                 let pos = egui::pos2(width / scale * 0.5, 230.0);
                 h.event(egui::Event::PointerMoved(pos));

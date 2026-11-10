@@ -7,7 +7,7 @@ use super::jump::change_at;
 use super::link::{LineLinks, note_right_click};
 use super::map::change_map;
 use super::paint::{filler, hunk_button, paint_line, text_button};
-use super::select::{Hit, Side, TextSel, copy_selection, drag_selection};
+use super::select::{Hit, Side, TextSel, copy_selection, drag_selection, scroll_selection};
 use super::{DiffData, Kind, LINE_H, MAP_W, MARK_W, NUM_W, Pick, hunk_changes};
 use crate::git::Area;
 use crate::pull_request::DiffSide;
@@ -235,6 +235,7 @@ impl<'a> Rows<'a> {
         let out = ui.scope_builder(egui::UiBuilder::new().max_rect(body), |ui| {
             if let Some(g) = &geometry {
                 scroll.show_viewport(ui, |ui, viewport| {
+                    scroll_selection(ui, &text_drag, self.wrap);
                     ui.set_min_height(total_h);
                     let start = g.row(viewport.top()).saturating_sub(1);
                     let end = (g.row(viewport.bottom()) + 2).min(count);
@@ -253,6 +254,7 @@ impl<'a> Rows<'a> {
                 })
             } else {
                 scroll.show_rows(ui, LINE_H, count, |ui, range| {
+                    scroll_selection(ui, &text_drag, self.wrap);
                     if split {
                         let view = ui.clip_rect();
                         let half = (view.width() / 2.0).floor();
@@ -344,6 +346,7 @@ impl<'a> Rows<'a> {
                 Side::New
             };
             sel = TextSel::all(&data.lines, side);
+            self.text_started = sel.is_some();
             ui.ctx().request_repaint();
         }
         if self.text_hover || text_drag.dragged() {

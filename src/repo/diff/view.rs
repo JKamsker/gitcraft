@@ -391,7 +391,8 @@ impl RepoTab {
         let (clicked, offset, jumped, seen) = (rows.clicked, rows.offset, rows.jumped, rows.seen);
         let wrap_offsets = rows.geometry.as_ref().map(|g| g.offsets.clone());
         self.find.saw(seen);
-        let hunk = if let Some(line) = clicked {
+        let focused_line = clicked.or(sel.filter(|_| text_started).map(|s| s.cursor.0));
+        let hunk = if let Some(line) = focused_line {
             data.hunk_at(false, line)
         } else if view.keyboard_hunk.is_none()
             || (view.scroll - offset).abs() > 0.5
