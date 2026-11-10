@@ -3,6 +3,96 @@
 use super::*;
 use crate::git::fixture::Repo;
 
+const STATUS: &[&str] = &["status", "--porcelain=v1", "-z", "--untracked-files=all"];
+
+#[test]
+fn porcelain_status_matches_git() -> Result<(), String> {
+    let repo = Repo::new("answer-status")?;
+    assert!(same(repo.path(), STATUS));
+    repo.commit(
+        "base",
+        &[
+            ("both", Some("one\n")),
+            ("gone", Some("gone\n")),
+            ("cached", Some("cached\n")),
+            ("space ü.txt", Some("hello\n")),
+            (".gitignore", Some("*.ignored\n")),
+        ],
+    )?;
+    assert!(same(repo.path(), STATUS));
+    std::fs::write(repo.path().join("both"), "two\n").unwrap();
+    std::fs::remove_file(repo.path().join("gone")).unwrap();
+    std::fs::write(repo.path().join("space ü.txt"), "changed\n").unwrap();
+    std::fs::create_dir_all(repo.path().join("sub/empty")).unwrap();
+    std::fs::write(repo.path().join("sub/new ü"), "new\n").unwrap();
+    std::fs::write(repo.path().join("skip.ignored"), "ignored\n").unwrap();
+    std::fs::write(repo.path().join(".git/info/exclude"), "excluded\n").unwrap();
+    std::fs::write(repo.path().join("excluded"), "ignored\n").unwrap();
+    assert!(same(repo.path(), STATUS));
+    repo.git(&["add", "both"])?;
+    std::fs::write(repo.path().join("both"), "three\n").unwrap();
+    assert!(same(repo.path(), STATUS));
+    repo.git(&["rm", "--cached", "cached"])?;
+    assert!(same(repo.path(), STATUS));
+    repo.git(&["config", "core.autocrlf", "true"])?;
+    std::fs::write(repo.path().join("space ü.txt"), "hello\r\n").unwrap();
+    assert!(same(repo.path(), STATUS));
+    repo.git(&["add", "sub/new ü"])?;
+    left_to_git(repo.path(), &[STATUS]); // possible rename
+    repo.git(&["reset", "--hard", "HEAD"])?;
+    for flag in ["--assume-unchanged", "--skip-worktree"] {
+        repo.git(&["update-index", flag, "both"])?;
+        left_to_git(repo.path(), &[STATUS]);
+        repo.git(&[
+            "update-index",
+            "--no-assume-unchanged",
+            "--no-skip-worktree",
+            "both",
+        ])?;
+    }
+    std::fs::write(repo.path().join("intent"), "new\n").unwrap();
+    repo.git(&["add", "-N", "intent"])?;
+    left_to_git(repo.path(), &[STATUS]);
+    repo.git(&["reset", "--hard", "HEAD"])?;
+    repo.git(&["config", "status.renames", "copies"])?;
+    left_to_git(repo.path(), &[STATUS]);
+    Ok(())
+}
+
+#[test]
+fn porcelain_status_modes_and_fallbacks() -> Result<(), String> {
+    let repo = Repo::new("answer-status-modes")?;
+    let base = repo.commit("base", &[("a", Some("one\n"))])?;
+    repo.git(&["update-index", "--chmod=+x", "a"])?;
+    assert!(same(repo.path(), STATUS));
+    let blob = repo.rev("HEAD:a")?;
+    repo.git(&["update-index", "--cacheinfo", &format!("120000,{blob},a")])?;
+    assert!(same(repo.path(), STATUS));
+    repo.git(&["reset", "--hard", "HEAD"])?;
+    std::fs::write(repo.path().join(".gitmodules"), "").unwrap();
+    left_to_git(repo.path(), &[STATUS]);
+    std::fs::remove_file(repo.path().join(".gitmodules")).unwrap();
+    repo.git(&[
+        "update-index",
+        "--add",
+        "--cacheinfo",
+        &format!("160000,{base},sub"),
+    ])?;
+    left_to_git(repo.path(), &[STATUS]);
+    repo.git(&["reset", "--hard", "HEAD"])?;
+    std::fs::create_dir_all(repo.path().join("nested")).unwrap();
+    assert_eq!(git(&repo.path().join("nested"), &["init", "-q"]).code, 0);
+    left_to_git(repo.path(), &[STATUS]);
+    std::fs::remove_dir_all(repo.path().join("nested")).unwrap();
+    repo.git(&["switch", "-q", "-c", "side"])?;
+    repo.commit("side", &[("a", Some("side\n"))])?;
+    repo.git(&["switch", "-q", "main"])?;
+    repo.commit("main", &[("a", Some("main\n"))])?;
+    assert_ne!(git(repo.path(), &["merge", "side"]).code, 0);
+    left_to_git(repo.path(), &[STATUS]);
+    Ok(())
+}
+
 /// What git itself prints for `args` in `repo` (not through gitcraft, which would answer).
 fn git(repo: &Path, args: &[&str]) -> Answer {
     let mut command = std::process::Command::new("git");

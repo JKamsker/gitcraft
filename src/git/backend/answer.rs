@@ -11,6 +11,7 @@
 use std::path::Path;
 
 use gix::bstr::{BString, ByteSlice};
+mod status;
 
 /// What git would have printed, and how it would have ended.
 #[derive(Debug, PartialEq, Eq)]
@@ -54,6 +55,7 @@ pub(in crate::git) fn answer(path: &Path, args: &[&str]) -> Option<Answer> {
         "ls-tree" => ls_tree(path, rest),
         "for-each-ref" => refs::answer(path, rest),
         "rev-list" => count(path, rest),
+        "status" => status::answer(path, rest),
         _ => None,
     }
 }
@@ -130,6 +132,7 @@ pub(in crate::git) fn name(args: &[&str]) -> &'static str {
         Some("ls-tree") => "cmd:ls-tree",
         Some("for-each-ref") => "cmd:for-each-ref",
         Some("rev-list") => "cmd:rev-list",
+        Some("status") => "cmd:status",
         _ => "cmd:other",
     }
 }
