@@ -6,6 +6,36 @@ use crate::git::fixture::Repo;
 const STATUS: &[&str] = &["status", "--porcelain=v1", "-z", "--untracked-files=all"];
 
 #[test]
+fn bounded_raw_blobs_match_git_before_and_after_repacking() -> Result<(), String> {
+    let repo = Repo::new("bounded-raw-blobs")?;
+    repo.commit("base", &[("space ü.cs", Some("old\r\n"))])?;
+    std::fs::write(repo.path().join("space ü.cs"), b"new\0\xff\r\n").unwrap();
+    repo.git(&["add", "."])?;
+    for packed in [false, true] {
+        if packed {
+            repo.git(&["repack", "-ad"])?;
+        }
+        for spec in ["HEAD:space ü.cs", ":0:space ü.cs"] {
+            let id = git(repo.path(), &["rev-parse", "--verify", spec]);
+            assert_eq!(id.code, 0);
+            let oid = std::str::from_utf8(&id.stdout).unwrap().trim();
+            let expected = git(repo.path(), &["cat-file", "blob", oid]).stdout;
+            assert_eq!(
+                bounded_blob(repo.path(), spec, expected.len()),
+                Some(Ok(expected.clone()))
+            );
+            assert_eq!(
+                bounded_blob(repo.path(), spec, expected.len() - 1),
+                Some(Err(()))
+            );
+        }
+    }
+    assert!(bounded_blob(repo.path(), "HEAD:missing", 1024).is_none());
+    assert!(bounded_blob(repo.path(), "HEAD", 1024).is_none());
+    Ok(())
+}
+
+#[test]
 fn porcelain_status_matches_git() -> Result<(), String> {
     let repo = Repo::new("answer-status")?;
     assert!(same(repo.path(), STATUS));

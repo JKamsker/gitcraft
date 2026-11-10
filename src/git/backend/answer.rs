@@ -141,6 +141,28 @@ fn open(path: &Path) -> Option<gix::Repository> {
     super::native::open(path).ok()
 }
 
+/// Raw object bytes for private comparisons. Resolve once, inspect the header before
+/// allocating the blob, and never run filters, textconv, or a lazy fetch.
+/// None retains Git for unsupported contexts; Err means the size limit was exceeded.
+pub(super) fn bounded_blob(path: &Path, spec: &str, limit: usize) -> Option<Result<Vec<u8>, ()>> {
+    let repo = open(path)?;
+    plain(&repo)?;
+    let id = resolve(&repo, spec).ok()??;
+    let header = repo.try_find_header(id).ok()??;
+    if header.kind() != gix::object::Kind::Blob {
+        return None;
+    }
+    if header.size() > limit as u64 {
+        return Some(Err(()));
+    }
+    let blob = repo.find_blob(id).ok()?;
+    Some(if blob.data.len() <= limit {
+        Ok(blob.detach().data)
+    } else {
+        Err(())
+    })
+}
+
 /// A repository whose history git reads differently from its objects: left to git.
 fn plain(repo: &gix::Repository) -> Option<()> {
     super::commits::plain_history(repo).ok()

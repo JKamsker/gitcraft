@@ -395,6 +395,23 @@ pub(super) fn answer(repo: &Path, args: &[&str]) -> Option<(i32, Vec<u8>, Vec<u8
 
 #[cfg(feature = "native-git")]
 mod answer;
+
+pub(super) fn bounded_blob(repo: &Path, spec: &str, limit: usize) -> Option<Result<Vec<u8>, ()>> {
+    #[cfg(feature = "native-git")]
+    {
+        let start = Instant::now();
+        capability(repo).ok()?;
+        let result = answer::bounded_blob(repo, spec, limit)?;
+        // Timing only: never record a private comparison's spec or content.
+        record("raw-blob", true, false, None, start);
+        Some(result)
+    }
+    #[cfg(not(feature = "native-git"))]
+    {
+        let _ = (repo, spec, limit);
+        None
+    }
+}
 #[cfg(feature = "native-git")]
 mod history;
 

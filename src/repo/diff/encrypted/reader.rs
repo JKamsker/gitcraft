@@ -148,6 +148,7 @@ fn locations(read: &Read<'_>, key: &DiffKey) -> Result<(At, At), String> {
 }
 
 fn read_side(read: &Read<'_>, side: At) -> Result<String, String> {
+    check_active(read)?;
     let Some((rev, path)) = side else {
         return Ok(String::new());
     };
@@ -158,20 +159,12 @@ fn read_side(read: &Read<'_>, side: At) -> Result<String, String> {
             } else {
                 format!("{rev}:{path}")
             };
-            // Resolve once so an index/HEAD move between the size check and read cannot
-            // turn a small blob into an unbounded one.
-            let blob = read.text(&["rev-parse", "--verify", "--end-of-options", &object])?;
-            let blob = blob.trim();
-            let size = read.text(&["cat-file", "-s", "--", blob])?;
-            if size
-                .trim()
-                .parse::<usize>()
-                .map_err(|_| crate::i18n::text("repo-core-1776"))?
-                > MAX_BYTES
-            {
-                return Err(crate::i18n::text("repo-core-1777").to_owned());
+            match git::file_comparison::native_blob(read.repo, &object, MAX_BYTES) {
+                Some(bytes) => {
+                    bytes.map_err(|()| crate::i18n::text("repo-core-1777").to_owned())?
+                }
+                None => object_by_git(read, &object)?,
             }
-            read.bytes(&["cat-file", "blob", blob], MAX_BYTES)?
         }
         None => {
             let version = crate::git::file_comparison::raw_working(read.repo, &path, read.active)?;
@@ -184,7 +177,34 @@ fn read_side(read: &Read<'_>, side: At) -> Result<String, String> {
             version.bytes
         }
     };
+    check_active(read)?;
     side_text(bytes)
+}
+
+fn check_active(read: &Read<'_>) -> Result<(), String> {
+    if !(read.active)() {
+        return Err(crate::i18n::text("repo-core-3914").into());
+    }
+    if Instant::now() >= read.deadline {
+        return Err(crate::i18n::text("repo-core-1758").into());
+    }
+    Ok(())
+}
+
+fn object_by_git(read: &Read<'_>, object: &str) -> Result<Vec<u8>, String> {
+    // Bind both reads to one immutable id, even if HEAD or the index moves.
+    let blob = read.text(&["rev-parse", "--verify", "--end-of-options", object])?;
+    let blob = blob.trim();
+    let size = read.text(&["cat-file", "-s", "--", blob])?;
+    if size
+        .trim()
+        .parse::<usize>()
+        .map_err(|_| crate::i18n::text("repo-core-1776"))?
+        > MAX_BYTES
+    {
+        return Err(crate::i18n::text("repo-core-1777").to_owned());
+    }
+    read.bytes(&["cat-file", "blob", blob], MAX_BYTES)
 }
 
 /// A side read, as text: refused when too large, binary or not UTF-8.
@@ -196,4 +216,177 @@ fn side_text(bytes: Vec<u8>) -> Result<String, String> {
         return Err(crate::i18n::text("repo-core-1779").to_owned());
     }
     String::from_utf8(bytes).map_err(|_| crate::i18n::text("repo-core-1780").to_owned())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::git::{StatusFile, fixture::Repo};
+
+    fn key(path: &str, area: Area, code: char, old: Option<&str>) -> DiffKey {
+        DiffKey::Work(StatusFile {
+            path: path.into(),
+            area,
+            code,
+            old_path: old.map(str::to_owned),
+        })
+    }
+
+    #[test]
+    fn staged_and_unstaged_sides_match_private_git_reader() -> Result<(), String> {
+        let repo = Repo::new("raw-work-sides")?;
+        repo.commit("base", &[("space ü.cs", Some("old\r\n"))])?;
+        std::fs::write(repo.path().join("space ü.cs"), "staged\r\n").unwrap();
+        repo.git(&["add", "."])?;
+        std::fs::write(repo.path().join("space ü.cs"), "working\n").unwrap();
+        let read = Read {
+            repo: repo.path(),
+            active: &|| true,
+            deadline: Instant::now() + Duration::from_secs(20),
+        };
+        for area in [Area::Staged, Area::Unstaged] {
+            let k = key("space ü.cs", area, 'M', None);
+            let (old, new) = locations(&read, &k)?;
+            for side in [old, new] {
+                let expected = match &side {
+                    Some((Some(rev), path)) => side_text(object_by_git(
+                        &read,
+                        &if rev.is_empty() {
+                            format!(":0:{path}")
+                        } else {
+                            format!("{rev}:{path}")
+                        },
+                    )?)?,
+                    _ => read_side(&read, side.clone())?,
+                };
+                assert_eq!(read_side(&read, side)?, expected);
+            }
+        }
+        assert_eq!(
+            read_sides(repo.path(), &key("space ü.cs", Area::Staged, 'M', None))?,
+            ("old\r\n".into(), "staged\r\n".into())
+        );
+        repo.git(&["checkout", "--", "space ü.cs"])?;
+        repo.git(&["mv", "space ü.cs", "renamed.cs"])?;
+        assert_eq!(
+            read_sides(
+                repo.path(),
+                &key("renamed.cs", Area::Staged, 'R', Some("space ü.cs"))
+            )?,
+            ("old\r\n".into(), "staged\r\n".into())
+        );
+        repo.git(&["reset", "--hard", "HEAD"])?;
+        repo.git(&["rm", "space ü.cs"])?;
+        assert_eq!(
+            read_sides(repo.path(), &key("space ü.cs", Area::Staged, 'D', None))?,
+            ("old\r\n".into(), "".into())
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn bounded_probe_keeps_recognition_limits_and_cancellation() -> Result<(), String> {
+        let repo = Repo::new("raw-probe-limits")?;
+        let path = "secret.json";
+        let k = key(path, Area::Staged, 'A', None);
+        let ciphertext = r#"{"secret":"ENC[cipher]","sops":{"mac":"ENC[mac]","version":"3.9.0"}}"#;
+        std::fs::write(repo.path().join(path), ciphertext).unwrap();
+        repo.git(&["add", "."])?;
+        assert_eq!(read_sides(repo.path(), &k)?, ("".into(), ciphertext.into()));
+        assert_eq!(super::super::probe_checked(repo.path(), &k), Some(true));
+        for bytes in [vec![0, 1], vec![0xff], vec![b'x'; MAX_BYTES + 1]] {
+            std::fs::write(repo.path().join(path), bytes).unwrap();
+            repo.git(&["add", "."])?;
+            assert!(read_sides(repo.path(), &k).is_err());
+            assert_eq!(super::super::probe_checked(repo.path(), &k), None);
+        }
+        let cancelled = Read {
+            repo: repo.path(),
+            active: &|| false,
+            deadline: Instant::now() + Duration::from_secs(20),
+        };
+        assert!(read_side(&cancelled, None).is_err());
+        let expired = Read {
+            repo: repo.path(),
+            active: &|| true,
+            deadline: Instant::now() - Duration::from_secs(1),
+        };
+        assert!(read_side(&expired, None).is_err());
+        Ok(())
+    }
+
+    /// Read-only parity/performance check against an explicitly selected real repository.
+    #[test]
+    #[ignore = "set GITCRAFT_PARITY_REPO to a repository with staged text files"]
+    fn staged_probe_repository_parity_and_timing() -> Result<(), String> {
+        let path =
+            std::env::var_os("GITCRAFT_PARITY_REPO").ok_or("GITCRAFT_PARITY_REPO is required")?;
+        let repo = Path::new(&path);
+        let files = git::status(repo)?.staged;
+        assert!(!files.is_empty());
+        let mut native_time = Duration::ZERO;
+        let mut git_time = Duration::ZERO;
+        for (i, file) in files.iter().enumerate() {
+            let k = DiffKey::Work(file.clone());
+            let start = Instant::now();
+            let actual = read_sides(repo, &k)?;
+            native_time += start.elapsed();
+            let read = Read {
+                repo,
+                active: &|| true,
+                deadline: Instant::now() + Duration::from_secs(20),
+            };
+            let start = Instant::now();
+            let (old, new) = locations(&read, &k)?;
+            let legacy = |side: At| match side {
+                Some((Some(rev), path)) => side_text(object_by_git(
+                    &read,
+                    &if rev.is_empty() {
+                        format!(":0:{path}")
+                    } else {
+                        format!("{rev}:{path}")
+                    },
+                )?),
+                side => read_side(&read, side),
+            };
+            let expected = (legacy(old)?, legacy(new)?);
+            git_time += start.elapsed();
+            // Avoid including private file contents in test output on failure.
+            assert!(actual == expected, "staged side mismatch at sample {i}");
+            if (i + 1) % 16 == 0 {
+                println!("verified {} staged files", i + 1);
+            }
+        }
+        println!(
+            "{} staged files: native probes {:.1} ms total / {:.2} ms mean; legacy Git probes {:.1} ms total / {:.2} ms mean",
+            files.len(),
+            native_time.as_secs_f64() * 1000.0,
+            native_time.as_secs_f64() * 1000.0 / files.len() as f64,
+            git_time.as_secs_f64() * 1000.0,
+            git_time.as_secs_f64() * 1000.0 / files.len() as f64,
+        );
+        let mut source: Vec<_> = files.iter().filter(|f| f.path.ends_with(".cs")).collect();
+        source.sort_by_key(|f| {
+            std::cmp::Reverse(
+                std::fs::metadata(repo.join(&f.path))
+                    .map(|m| m.len())
+                    .unwrap_or(0),
+            )
+        });
+        for (i, file) in source.into_iter().take(3).enumerate() {
+            let start = Instant::now();
+            let data = crate::repo::diff::load(
+                repo,
+                &DiffKey::Work(file.clone()),
+                git::DiffOptions::default(),
+                true,
+            )?;
+            println!(
+                "large C# sample {i}: prepared {} diff lines in {:.1} ms",
+                data.lines.len(),
+                start.elapsed().as_secs_f64() * 1000.0
+            );
+        }
+        Ok(())
+    }
 }
