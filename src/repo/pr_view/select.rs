@@ -210,6 +210,7 @@ fn listed_endpoints(pr: &PullRequest, hosting: &Hosting) -> Option<PrDetails> {
     })
 }
 
+/// Choose the exact PR comparison endpoints, fetching details only if the list is insufficient.
 fn selection_for_pr(
     path: &Path,
     pr: &PullRequest,
@@ -316,6 +317,7 @@ fn selection_data(
 mod tests {
     use super::*;
 
+    /// Construct the GitHub hosting fixture used by PR-selection tests.
     fn github() -> Hosting {
         Hosting {
             forge: Forge::GitHub,
@@ -325,6 +327,7 @@ mod tests {
         }
     }
 
+    /// Construct a PR fixture with explicit base and head commit IDs.
     fn listed_pr(base: String, head: String) -> PullRequest {
         PullRequest {
             number: 7,
@@ -340,6 +343,7 @@ mod tests {
         }
     }
 
+    /// Verify that missing or untrusted list endpoints still request forge metadata.
     #[test]
     fn unknown_or_mismatched_list_endpoints_retain_forge_lookup() {
         let original = listed_pr("a".repeat(40), "b".repeat(40));
@@ -620,11 +624,13 @@ mod tests {
         unknown_head_selection(Forge::GitLab);
     }
 
+    /// Verify GitHub list endpoints avoid extra metadata requests.
     #[test]
     fn listed_github_endpoints_fetch_only_missing_objects_without_a_details_request() {
         unknown_head_selection(Forge::GitHub);
     }
 
+    /// Exercise PR endpoint selection when the head object is initially unavailable.
     fn unknown_head_selection(forge: Forge) {
         let root =
             std::env::temp_dir().join(format!("gitcraft-pr-{forge:?}-{}", std::process::id()));

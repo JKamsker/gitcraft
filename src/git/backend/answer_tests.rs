@@ -5,6 +5,7 @@ use crate::git::fixture::Repo;
 
 const STATUS: &[&str] = &["status", "--porcelain=v1", "-z", "--untracked-files=all"];
 
+/// Check native blob reads against Git for loose and packed objects and size limits.
 #[test]
 fn bounded_raw_blobs_match_git_before_and_after_repacking() -> Result<(), String> {
     let repo = Repo::new("bounded-raw-blobs")?;
@@ -91,6 +92,7 @@ fn native_reads_do_not_reuse_index_or_packed_refs_snapshots() -> Result<(), Stri
     Ok(())
 }
 
+/// Check native porcelain status through staged, unstaged, and ignored changes.
 #[test]
 fn porcelain_status_matches_git() -> Result<(), String> {
     let repo = Repo::new("answer-status")?;
@@ -146,6 +148,7 @@ fn porcelain_status_matches_git() -> Result<(), String> {
     Ok(())
 }
 
+/// Verify file-mode parity and fallback for submodules, nested repos, and conflicts.
 #[test]
 fn porcelain_status_modes_and_fallbacks() -> Result<(), String> {
     let repo = Repo::new("answer-status-modes")?;
@@ -221,18 +224,21 @@ fn same(repo: &Path, args: &[&str]) -> bool {
     true
 }
 
+/// Assert that each supported command is answered natively with byte-for-byte Git parity.
 fn answered(repo: &Path, cases: &[&[&str]]) {
     for args in cases {
         assert!(same(repo, args), "not answered: git {args:?}");
     }
 }
 
+/// Assert that unsupported commands defer to the installed Git executable.
 fn left_to_git(repo: &Path, cases: &[&[&str]]) {
     for args in cases {
         assert!(answer(repo, args).is_none(), "answered: git {args:?}");
     }
 }
 
+/// Check Git-config reading, includes, key casing, and option compatibility.
 #[test]
 fn config_lookups_are_gits() -> Result<(), String> {
     let repo = Repo::new("answer-config")?;
@@ -328,6 +334,7 @@ fn config_lookups_are_gits() -> Result<(), String> {
     Ok(())
 }
 
+/// Compare native object, revision, and reference queries against Git.
 #[test]
 fn object_and_ref_reads_are_gits() -> Result<(), String> {
     let repo = Repo::new("answer-objects")?;
@@ -561,6 +568,7 @@ fn object_and_ref_reads_are_gits() -> Result<(), String> {
     Ok(())
 }
 
+/// Compare date-sorted branches and bisect output against Git.
 #[test]
 fn branches_by_date_and_a_bisect_are_gits() -> Result<(), String> {
     let repo = Repo::new("answer-dates")?;
@@ -603,6 +611,7 @@ fn branches_by_date_and_a_bisect_are_gits() -> Result<(), String> {
     Ok(())
 }
 
+/// Verify Git tree ordering for names that extend another path.
 #[test]
 fn tree_order_puts_folders_after_names_they_extend() {
     use std::cmp::Ordering::*;

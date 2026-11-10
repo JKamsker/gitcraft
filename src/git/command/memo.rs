@@ -38,6 +38,7 @@ fn keepable(args: &[&str]) -> bool {
     }
 }
 
+/// Build a cache key from the working directory and immutable command arguments.
 fn key(dir: Option<&Path>, args: &[&str]) -> Key {
     (
         dir.map(Path::to_owned),
@@ -86,6 +87,7 @@ pub(super) fn keep(dir: Option<&Path>, args: &[&str], ran: &Ran) {
 mod tests {
     use super::keepable;
 
+    /// Check that only context-independent, safely repeatable command results are memoized.
     #[test]
     fn only_answers_nothing_but_a_new_git_or_a_moved_repository_changes_are_kept() {
         for args in [

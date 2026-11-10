@@ -14,6 +14,7 @@ struct Entry {
 }
 static CACHE: Mutex<Vec<Entry>> = Mutex::new(Vec::new());
 
+/// Fingerprint the effective config, refs, HEAD, and timezone before caching history.
 fn snapshot(path: &Path) -> Option<State> {
     // Open afresh: config includes may change without changing the included file's name.
     let mut permissions = gix::open::Permissions::default();
@@ -104,6 +105,7 @@ mod tests {
     use crate::git::fixture::Repo;
     use std::cell::Cell;
 
+    /// Verify history-cache hits and invalidation, including when native caching is unavailable.
     #[test]
     fn cached_log_is_gits_and_invalidates_on_refs_head_config_and_arguments() -> Result<(), String>
     {
@@ -162,6 +164,7 @@ mod tests {
         Ok(())
     }
 
+    /// Ensure cached log formats, ordering, and pagination match Git output exactly.
     #[test]
     fn orders_pages_and_decorations_keep_gits_bytes() -> Result<(), String> {
         let repo = Repo::new("history-cache-orders")?;
@@ -210,6 +213,7 @@ mod tests {
         Ok(())
     }
 
+    /// Measure history-cache behavior against an explicitly selected external repository.
     #[test]
     #[ignore = "set GITCRAFT_PARITY_REPO to measure an existing repository"]
     fn graph_cache_measurement() -> Result<(), String> {

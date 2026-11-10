@@ -39,6 +39,7 @@ impl RepoTab {
 static SEEN: std::sync::Mutex<BTreeMap<PathBuf, BTreeMap<String, u64>>> =
     std::sync::Mutex::new(BTreeMap::new());
 
+/// Count a recognized filesystem event only when the timing diagnostics are enabled.
 fn saw(root: &Path, path: &Path) {
     // The filesystem callback should not allocate or contend on this mutex just to record
     // diagnostics that will never be written.

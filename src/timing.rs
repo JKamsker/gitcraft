@@ -49,6 +49,7 @@ pub(crate) fn enabled() -> bool {
         .get_or_init(|| !cfg!(test) && std::env::var_os("GITCRAFT_TIMING").is_none_or(|v| v != "0"))
 }
 
+/// Initialize the bounded, asynchronous timing-log writer on first use.
 fn writer() -> Option<&'static Sender<String>> {
     static WRITER: OnceLock<Option<Sender<String>>> = OnceLock::new();
     WRITER
@@ -93,6 +94,7 @@ fn writer() -> Option<&'static Sender<String>> {
         .as_ref()
 }
 
+/// Open the current timing log for append, creating its parent directory as needed.
 fn open(dir: &Path) -> Option<std::fs::File> {
     std::fs::create_dir_all(dir).ok()?;
     std::fs::OpenOptions::new()
@@ -125,6 +127,7 @@ pub(crate) struct Scope {
     previous: Option<String>,
 }
 impl Drop for Scope {
+    /// Restore the enclosing timing scope when the current scope guard is dropped.
     fn drop(&mut self) {
         let previous = self.previous.take();
         SCOPE.with(|s| *s.borrow_mut() = previous);
@@ -199,6 +202,7 @@ pub(crate) fn place_of(path: &Path, root: &Path) -> String {
     }
 }
 
+/// Format a local timing-log clock field from a system timestamp.
 fn time_of_day(now: SystemTime) -> String {
     let since = now.duration_since(UNIX_EPOCH).unwrap_or_default();
     let secs = since.as_secs() % 86_400;
@@ -211,6 +215,7 @@ fn time_of_day(now: SystemTime) -> String {
     )
 }
 
+/// Format a UTC timestamp for timing-log session metadata.
 fn date_time(now: SystemTime) -> String {
     let since = now.duration_since(UNIX_EPOCH).unwrap_or_default();
     // Days to a civil date (Howard Hinnant's algorithm).
@@ -230,6 +235,7 @@ fn date_time(now: SystemTime) -> String {
 mod tests {
     use super::*;
 
+    /// Check timestamp formatting and path redaction in diagnostic labels.
     #[test]
     fn times_and_places_are_told_without_names() {
         let at = UNIX_EPOCH + Duration::from_millis(1_762_770_727_123);

@@ -181,6 +181,7 @@ fn read_side(read: &Read<'_>, side: At) -> Result<String, String> {
     side_text(bytes)
 }
 
+/// Reject a private diff read once cancelled or past its deadline.
 fn check_active(read: &Read<'_>) -> Result<(), String> {
     if !(read.active)() {
         return Err(crate::i18n::text("repo-core-3914").into());
@@ -191,6 +192,7 @@ fn check_active(read: &Read<'_>) -> Result<(), String> {
     Ok(())
 }
 
+/// Read one immutable Git object with a size bound and CLI fallback.
 fn object_by_git(read: &Read<'_>, object: &str) -> Result<Vec<u8>, String> {
     // Bind both reads to one immutable id, even if HEAD or the index moves.
     let blob = read.text(&["rev-parse", "--verify", "--end-of-options", object])?;
@@ -223,6 +225,7 @@ mod tests {
     use super::*;
     use crate::git::{StatusFile, fixture::Repo};
 
+    /// Construct a worktree diff key for staged or unstaged fixture paths.
     fn key(path: &str, area: Area, code: char, old: Option<&str>) -> DiffKey {
         DiffKey::Work(StatusFile {
             path: path.into(),
@@ -232,6 +235,7 @@ mod tests {
         })
     }
 
+    /// Check that both sides of staged and unstaged private diffs match Git.
     #[test]
     fn staged_and_unstaged_sides_match_private_git_reader() -> Result<(), String> {
         let repo = Repo::new("raw-work-sides")?;
@@ -284,6 +288,7 @@ mod tests {
         Ok(())
     }
 
+    /// Check private-file probes respect byte limits and cancellation.
     #[test]
     fn bounded_probe_keeps_recognition_limits_and_cancellation() -> Result<(), String> {
         let repo = Repo::new("raw-probe-limits")?;

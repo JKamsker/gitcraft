@@ -22,6 +22,7 @@ pub(in crate::git) struct Answer {
 }
 
 impl Answer {
+    /// Construct a successful native answer with the provided stdout.
     fn out(stdout: impl Into<Vec<u8>>) -> Self {
         Self {
             code: 0,
@@ -29,6 +30,7 @@ impl Answer {
             stderr: Vec::new(),
         }
     }
+    /// Construct a native answer with a failure exit code and stderr.
     fn fail(code: i32, stderr: &str) -> Self {
         Self {
             code,
@@ -137,6 +139,7 @@ pub(in crate::git) fn name(args: &[&str]) -> &'static str {
     }
 }
 
+/// Open a repository for a single native command, returning `None` on failure.
 fn open(path: &Path) -> Option<gix::Repository> {
     super::native::open(path).ok()
 }
@@ -267,6 +270,7 @@ fn plain_path(path: &str) -> bool {
             .all(|part| !part.is_empty() && part != "." && part != "..")
 }
 
+/// Check whether a revision is a full object ID for this repository's hash format.
 fn is_full_id(repo: &gix::Repository, text: &str) -> bool {
     text.len() == repo.object_hash().len_in_hex() && text.bytes().all(|b| b.is_ascii_hexdigit())
 }
@@ -314,6 +318,7 @@ fn target_id(repo: &gix::Repository, reference: &gix::Reference<'_>) -> Result<g
     Err(())
 }
 
+/// Follow annotated-tag targets with a bounded traversal.
 fn peel_tags(repo: &gix::Repository, mut id: gix::ObjectId) -> Result<Option<gix::ObjectId>, ()> {
     for _ in 0..16 {
         let Some(object) = repo.try_find_object(id).map_err(drop)? else {
@@ -329,6 +334,7 @@ fn peel_tags(repo: &gix::Repository, mut id: gix::ObjectId) -> Result<Option<gix
     Err(())
 }
 
+/// Peel tags until an object of the requested kind is reached.
 fn peel_to(
     repo: &gix::Repository,
     id: gix::ObjectId,
@@ -623,6 +629,7 @@ mod config {
         Int,
     }
 
+    /// Handle supported read-only `git config` queries without launching Git.
     pub(super) fn answer(path: &Path, args: &[&str]) -> Option<Answer> {
         let mut local = false;
         let mut nul = false;
@@ -883,6 +890,7 @@ mod refs {
         Contents,
     }
 
+    /// Parse the supported `for-each-ref` format atoms and escaped percent signs.
     fn format(text: &str) -> Option<Vec<Piece>> {
         let bytes = text.as_bytes();
         let mut pieces = Vec::new();
@@ -939,6 +947,7 @@ mod refs {
     }
 
     impl Pattern {
+        /// Accept only reference patterns whose matching semantics are implemented here.
         fn new(text: &str) -> Option<Self> {
             if text.is_empty() || text.contains(['?', '[', '\\']) {
                 return None;
@@ -972,6 +981,7 @@ mod refs {
             })
         }
 
+        /// Check whether a reference name matches this validated prefix or glob.
         fn matches(&self, name: &str) -> bool {
             if let Some(rest) = name.strip_prefix(self.text.as_str())
                 && (rest.is_empty() || rest.starts_with('/') || self.text.ends_with('/'))
@@ -996,6 +1006,7 @@ mod refs {
         Contains(&'a str),
     }
 
+    /// Format supported `git for-each-ref` queries using the current ref snapshot.
     pub(super) fn answer(path: &Path, args: &[&str]) -> Option<Answer> {
         let mut pieces = None;
         let mut sort = None;

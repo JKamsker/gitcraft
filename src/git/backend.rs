@@ -396,6 +396,7 @@ pub(super) fn answer(repo: &Path, args: &[&str]) -> Option<(i32, Vec<u8>, Vec<u8
 #[cfg(feature = "native-git")]
 mod answer;
 
+/// Read an unfiltered blob up to `limit` bytes, falling back when native Git is unsuitable.
 pub(super) fn bounded_blob(repo: &Path, spec: &str, limit: usize) -> Option<Result<Vec<u8>, ()>> {
     #[cfg(feature = "native-git")]
     {
@@ -415,6 +416,7 @@ pub(super) fn bounded_blob(repo: &Path, spec: &str, limit: usize) -> Option<Resu
 #[cfg(feature = "native-git")]
 mod history;
 
+/// Cache eligible history logs when their Git inputs have not changed.
 pub(super) fn history_log(
     path: &Path,
     args: &[String],

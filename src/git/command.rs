@@ -292,6 +292,7 @@ fn execute(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Result<Ran, Stri
     result
 }
 
+/// Launch the installed Git executable for commands not handled by native readers.
 fn execute_git(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Result<Ran, String> {
     let _timer = super::backend::CliTimer::new(args);
     let mut extra = extra.clone();

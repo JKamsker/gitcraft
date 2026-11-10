@@ -2,6 +2,7 @@
 use super::*;
 use std::collections::BTreeMap;
 
+/// Produce porcelain-v1 status for ordinary worktrees; defer unsupported states to Git.
 pub(super) fn answer(path: &Path, args: &[&str]) -> Option<Answer> {
     if args != ["--porcelain=v1", "-z", "--untracked-files=all"] {
         return None;
