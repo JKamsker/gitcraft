@@ -7,8 +7,8 @@ use super::jump::change_at;
 use super::link::{LineLinks, note_right_click};
 use super::map::change_map;
 use super::paint::{filler, hunk_button, paint_line, text_button};
-use super::select::{Hit, Side, TextSel, copy_selection, drag_selection};
-use super::{DiffData, Kind, LINE_H, MAP_W, NUM_W, Pick, hunk_changes};
+use super::select::{Hit, Side, TextSel, copy_selection, drag_selection, scroll_selection};
+use super::{DiffData, Kind, LINE_H, MAP_W, MARK_W, NUM_W, Pick, hunk_changes};
 use crate::git::Area;
 use crate::pull_request::DiffSide;
 use crate::repo::find::{Find, Hit as FoundHit, Seen};
@@ -40,6 +40,8 @@ pub(super) struct Rows<'a> {
     t: Tokens,
     /// A changed line clicked.
     pub(super) clicked: Option<usize>,
+    /// A new code selection replaces any Git action selection.
+    pub(super) text_started: bool,
     /// How far the lines are scrolled down.
     pub(super) offset: f32,
     /// The change scrolled to this frame (by its place among the changes).
@@ -92,6 +94,7 @@ impl<'a> Rows<'a> {
             font: theme::mono(12.0),
             t: Tokens::get(ui.ctx()),
             clicked: None,
+            text_started: false,
             offset: 0.0,
             jumped: None,
             press_hit: None,
@@ -156,7 +159,7 @@ impl<'a> Rows<'a> {
                 Sense::click_and_drag(),
             )
             .on_hover_cursor(egui::CursorIcon::PointingHand);
-        // Under the lines, so dragging over them selects text (a click still picks a line).
+        // Code owns clicks and drags. Only the explicit marker gutter picks Git lines.
         let text_drag = ui.interact(
             body,
             ui.id().with(("diff_text", path)),
@@ -232,6 +235,7 @@ impl<'a> Rows<'a> {
         let out = ui.scope_builder(egui::UiBuilder::new().max_rect(body), |ui| {
             if let Some(g) = &geometry {
                 scroll.show_viewport(ui, |ui, viewport| {
+                    scroll_selection(ui, &text_drag, self.wrap);
                     ui.set_min_height(total_h);
                     let start = g.row(viewport.top()).saturating_sub(1);
                     let end = (g.row(viewport.bottom()) + 2).min(count);
@@ -250,6 +254,7 @@ impl<'a> Rows<'a> {
                 })
             } else {
                 scroll.show_rows(ui, LINE_H, count, |ui, range| {
+                    scroll_selection(ui, &text_drag, self.wrap);
                     if split {
                         let view = ui.clip_rect();
                         let half = (view.width() / 2.0).floor();
@@ -316,11 +321,20 @@ impl<'a> Rows<'a> {
 
         // Select from where the drag started to the pointer, on the side it started on.
         let mut sel = drag_selection(
+            ui,
             self.text_sel,
             &text_drag,
             self.press_hit,
             &self.pointer_hits,
+            &data.lines,
         );
+        self.text_started = ui.input(|i| i.pointer.primary_pressed())
+            && text_drag.is_pointer_button_down_on()
+            && self.press_hit.is_some()
+            || text_drag.clicked() && self.pointer_hits.iter().any(|(_, over)| *over);
+        if self.clicked.is_some() {
+            sel = None;
+        }
         if !crate::a11y::keyboard_taken(ui.ctx())
             && crate::keymap::take(ui.ctx(), crate::keymap::Command::SelectionAll)
         {
@@ -332,6 +346,7 @@ impl<'a> Rows<'a> {
                 Side::New
             };
             sel = TextSel::all(&data.lines, side);
+            self.text_started = sel.is_some();
             ui.ctx().request_repaint();
         }
         if self.text_hover || text_drag.dragged() {
@@ -343,6 +358,16 @@ impl<'a> Rows<'a> {
                 .iter()
                 .find(|(_, over)| *over)
                 .map(|&((i, side, _), _)| (i, side));
+            if sel.is_none_or(TextSel::is_empty)
+                && let Some((i, side)) = hit
+            {
+                // Keep the code's menu about the clicked line without picking a Git target.
+                sel = Some(TextSel {
+                    side,
+                    anchor: (i, 0),
+                    cursor: (i, usize::MAX),
+                });
+            }
             if let Some(links) = self.links {
                 note_right_click(ui, links.id(), hit);
             }
@@ -379,6 +404,9 @@ impl<'a> Rows<'a> {
             &history,
             acts,
         );
+        if sel != self.text_sel {
+            ui.ctx().request_repaint();
+        }
         sel
     }
 
@@ -481,21 +509,44 @@ impl<'a> Rows<'a> {
         }
         // Where the drag started and where the pointer is, in this line's text.
         if let Some((origin, galley)) = placed.filter(|_| kind.is_some_and(|k| side.shows(k))) {
-            self.hit_test(rect, (i, side), origin, &galley, pickable);
+            let text_rect = rect.with_min_x(rect.left() + gutter_width(side) + MARK_W);
+            self.hit_test(
+                text_rect.intersect(ui.clip_rect()),
+                (i, side),
+                origin,
+                &galley,
+            );
+            if let Some(s) = self.text_sel.filter(|s| s.side == side && s.is_empty())
+                && s.cursor.0 == i
+            {
+                let caret = galley.pos_from_cursor(egui::text::CCursor::new(s.cursor.1));
+                let caret = caret.translate(origin.to_vec2());
+                ui.painter()
+                    .with_clip_rect(text_rect.intersect(ui.clip_rect()))
+                    .line_segment(
+                        [caret.left_top(), caret.left_bottom()],
+                        Stroke::new(1.0, self.t.text),
+                    );
+            }
         }
         if pickable {
+            let marker = Rect::from_min_size(
+                pos2(rect.left() + gutter_width(side), rect.top()),
+                vec2(MARK_W, rect.height()),
+            );
             let resp = ui
-                .interact(rect, ui.id().with(("diff_line", i)), Sense::click())
-                .on_hover_cursor(egui::CursorIcon::PointingHand);
+                .interact(marker, ui.id().with(("diff_line", i)), Sense::click())
+                .on_hover_cursor(egui::CursorIcon::PointingHand)
+                .on_hover_text(crate::i18n::text("diff-pick-line"));
             crate::a11y::a11y_selected(&resp, || line_label(&data.lines[i]), picked);
             // A right-click on a changed line not picked picks it, for its menu to be about it.
-            let unpicked = !self.view.chosen.contains(&i) && self.text_sel.is_none();
+            let unpicked = !self.view.chosen.contains(&i);
             if resp.clicked() || resp.secondary_clicked() && unpicked {
                 self.clicked = Some(i);
             }
             self.picks.push(resp);
         }
-        if !pickable {
+        {
             let resp = ui.interact(
                 rect,
                 ui.id().with(("diff_read_line", i, column_of(side))),
@@ -505,7 +556,7 @@ impl<'a> Rows<'a> {
                 line_label(&data.lines[i])
             });
         }
-        // After the line's own click: its numbers take a note, the rest of it picks it.
+        // Numbers take comments independently of both marker and code interaction.
         if let Some(spot) = spot {
             self.comment_gutter(ui, rect, i, side, spot, acts);
         }
@@ -679,14 +730,7 @@ impl<'a> Rows<'a> {
 
     /// Notes where the press and the pointer are in the text of line `i` on `side`, laid out
     /// in `galley` from `origin`.
-    fn hit_test(
-        &mut self,
-        rect: Rect,
-        (i, side): (usize, Side),
-        origin: Pos2,
-        galley: &Galley,
-        pickable: bool,
-    ) {
+    fn hit_test(&mut self, rect: Rect, (i, side): (usize, Side), origin: Pos2, galley: &Galley) {
         let hit = |p: Pos2| (i, side, galley.cursor_from_pos(p - origin).index.0);
         if let Some(p) = self.press.filter(|p| rect.contains(*p)) {
             self.press_hit = Some(hit(p));
@@ -694,7 +738,7 @@ impl<'a> Rows<'a> {
         if let Some(p) = self.pointer.filter(|p| rect.y_range().contains(p.y)) {
             let over = rect.x_range().contains(p.x);
             self.pointer_hits.push((hit(p), over));
-            self.text_hover |= over && !pickable;
+            self.text_hover |= over;
         }
     }
 
@@ -802,6 +846,14 @@ fn column_of(side: Side) -> Option<DiffSide> {
         Side::Old => Some(DiffSide::Left),
         Side::New => Some(DiffSide::Right),
         Side::Unified | Side::Both => None,
+    }
+}
+
+fn gutter_width(side: Side) -> f32 {
+    match side {
+        Side::Unified => NUM_W * 2.0,
+        Side::Old | Side::New => NUM_W,
+        Side::Both => 0.0,
     }
 }
 

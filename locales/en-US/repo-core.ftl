@@ -3296,3 +3296,4 @@ repo-core-cell-kind-raw = raw
 repo-core-panel-diff = diff
 repo-core-panel-terminal = terminal
 repo-core-panel-pr = pull request
+diff-pick-line = Select this line for Git actions. Shift-click to select a range.

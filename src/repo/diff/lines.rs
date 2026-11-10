@@ -24,6 +24,7 @@ fn numbers(
     chosen: &BTreeSet<usize>,
 ) -> (Option<LineRange>, Option<LineRange>) {
     let picked: Vec<(usize, Side)> = match sel {
+        Some(s) if s.is_empty() => vec![(s.cursor.0, s.side)],
         Some(s) => {
             let ((from, _), (to, _)) = (s.anchor.min(s.cursor), s.anchor.max(s.cursor));
             (from..=to.min(lines.len().saturating_sub(1)))

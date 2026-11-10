@@ -3299,3 +3299,4 @@ repo-core-cell-kind-raw = Rohtext
 repo-core-panel-diff = Diff
 repo-core-panel-terminal = Terminal
 repo-core-panel-pr = Pull-Request
+diff-pick-line = Diese Zeile für Git-Aktionen auswählen. Mit Umschalt-Klick einen Bereich auswählen.
