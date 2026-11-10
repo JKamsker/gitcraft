@@ -6,6 +6,29 @@ terminal panel an owning feature. Typed operation plans/persistence migration,
 other feature extractions, settings composition and shared request utilities
 remain separate phases. Keep those phases independently reviewable.
 
+## Mandatory Rust file-size policy
+
+Try to keep each Rust file below **300 physical lines**. Files at **300–500**
+lines produce actionable warnings; **500 passes and 501 fails**. Every tracked
+`.rs` file anywhere in the repository is covered, including tests, examples,
+build scripts, and committed generated/vendor files. Comments and blanks count.
+There are no exemptions, baselines, suppressions, or warning-only hard-limit modes.
+
+Use `python3 ci/rust_file_size.py` before committing. See the
+[contributor instructions](development.md#rust-source-size) for staged and
+immutable candidate checks and the exact counting convention. CI and release
+validation run that same checker against the complete candidate tree.
+Decompose along ownership boundaries; minification, arbitrary splits, giant inline
+expressions, partial types solely for line counts, and moving the same oversized
+responsibility into another hierarchy level do not satisfy the policy.
+
+The enforcement slice alone does not complete [#198](https://github.com/JKamsker/gitcraft/issues/198).
+Existing oversized files must be refactored in reviewable slices and the issue
+must remain open until the full-tree gate has zero errors and the required
+ownership/safety work has evidence. Coordinate typed operations with #193,
+feature ownership with #194, async lifetimes with #195, diff work with #196,
+and CI reliability with #190.
+
 ## Reproduce the survey
 
 From the repository root, with Python 3.10+ and Git:
@@ -33,7 +56,9 @@ blocks and multiple fields on one line can distort counts. `branch_tokens`
 counts `if`, `for`, `while`, `loop`, `match`, `&&`, `||` and `?` in each body;
 it is neither cyclomatic nor cognitive complexity (match arms aren't counted,
 nested functions/macros are not semantically resolved). Validate suspicious
-results in source. There is deliberately no arbitrary LOC/complexity CI gate.
+results in source. These lexical complexity scores remain advisory. The separate
+mandatory full-tree physical file-size gate below supersedes the earlier guidance
+rejecting a blanket LOC gate (#198).
 
 History uses the most recent 207 first-parent commits reachable from the selected
 revision, including merge deltas against the first parent. Each text file gets a
@@ -179,7 +204,7 @@ when unavailable.
    offline policy and persisted formats. Dependency direction is window/tab →
    feature → Git/forge/terminal services; services must not depend on `RepoTab`.
 6. Review central edit count and cross-module writes alongside metrics. Rust
-   privacy is the initial high-signal guard, not a blanket size threshold.
+   privacy and clear ownership complement the mandatory physical file-size cap.
 
 The feature-local follow-up in this phase adds `TerminalAct::Hide`: the existing
 Hide button expresses an idempotent hide intent even if another event already

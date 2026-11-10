@@ -24,10 +24,14 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  rust-file-size:
+    uses: ./.github/workflows/rust-file-size.yml
+
   # The version this run builds and the name its files carry. A tag or a run by hand builds
   # Cargo.toml's version. A dev push builds the next patch after the last release, as a
   # prerelease (Cargo.toml's version itself while it has no tag yet).
   version:
+    needs: rust-file-size
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
@@ -60,6 +64,7 @@ jobs:
 
   # Compile once and fan out the Windows tests, alongside the release builds.
   windows-tests:
+    needs: rust-file-size
     uses: ./.github/workflows/windows-tests.yml
 
   build:
