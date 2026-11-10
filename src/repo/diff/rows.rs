@@ -64,6 +64,7 @@ pub(super) struct Rows<'a> {
 }
 
 impl<'a> Rows<'a> {
+    /// Prepare row interaction state and Git actions for the current diff layout.
     pub(super) fn new(
         ui: &Ui,
         view: &'a DiffView,
@@ -268,7 +269,11 @@ impl<'a> Rows<'a> {
                         for i in range {
                             let (rect, _) =
                                 ui.allocate_exact_size(vec2(width, LINE_H), Sense::hover());
-                            self.line(ui, rect, i, Side::Unified, 0.0, acts);
+                            // Keep numbers and the Git marker in the visible gutter;
+                            // only the code follows the horizontal scroll offset.
+                            let scroll_x = (ui.clip_rect().left() - rect.left()).max(0.0);
+                            let rect = rect.with_min_x(rect.left() + scroll_x);
+                            self.line(ui, rect, i, Side::Unified, scroll_x, acts);
                         }
                     }
                 })
@@ -850,6 +855,7 @@ fn column_of(side: Side) -> Option<DiffSide> {
     }
 }
 
+/// Width of the fixed line-number columns before the Git marker.
 fn gutter_width(side: Side) -> f32 {
     match side {
         Side::Unified => NUM_W * 2.0,

@@ -13,6 +13,7 @@ struct State {
     review_local: Option<bool>,
 }
 
+/// Build a real diff widget with deterministic fonts, keyboard bindings, and pointer timing.
 fn harness(split: bool, wrap: bool, partial: bool, new_file: bool) -> Harness<'static, State> {
     let text = if new_file {
         "@@ -0,0 +1,2 @@\n+new_αlpha beta\n+second value\n".to_owned()
@@ -107,6 +108,7 @@ fn harness(split: bool, wrap: bool, partial: bool, new_file: bool) -> Harness<'s
     h
 }
 
+/// Locate a painted logical character so tests use the same galley geometry as the widget.
 fn position(h: &Harness<'_, State>, prefix: &str, char_index: usize) -> Pos2 {
     fn find(shape: &egui::Shape, prefix: &str, c: usize) -> Option<Pos2> {
         match shape {
@@ -125,6 +127,7 @@ fn position(h: &Harness<'_, State>, prefix: &str, char_index: usize) -> Pos2 {
         .unwrap_or_else(|| unreachable!("line {prefix:?} is not painted"))
 }
 
+/// Deliver one primary-button transition with the requested keyboard modifiers.
 fn button(h: &mut Harness<'_, State>, pos: Pos2, pressed: bool, modifiers: Modifiers) {
     h.event(Event::ModifiersChanged(modifiers));
     h.event(Event::PointerButton {
@@ -136,6 +139,7 @@ fn button(h: &mut Harness<'_, State>, pos: Pos2, pressed: bool, modifiers: Modif
     h.step();
 }
 
+/// Deliver a complete primary click, including hover and release frames.
 fn click(h: &mut Harness<'_, State>, pos: Pos2, modifiers: Modifiers) {
     h.event(Event::PointerMoved(pos));
     h.step();
@@ -143,6 +147,7 @@ fn click(h: &mut Harness<'_, State>, pos: Pos2, modifiers: Modifiers) {
     button(h, pos, false, modifiers);
 }
 
+/// Read the selected diff text through the production copy path.
 fn selected(h: &Harness<'_, State>) -> String {
     let Some(Ok(data)) = &h.state().view.data else {
         return String::new();
@@ -154,6 +159,7 @@ fn selected(h: &Harness<'_, State>) -> String {
         .unwrap_or_default()
 }
 
+/// Verify caret, word, line, drag, and copy behavior across layouts and staging modes.
 #[test]
 fn code_click_drag_word_line_and_copy_matrix() {
     for split in [false, true] {
@@ -200,6 +206,7 @@ fn code_click_drag_word_line_and_copy_matrix() {
     }
 }
 
+/// Verify newly added files support word selection and replacement by a fresh drag.
 #[test]
 fn new_file_uses_the_same_word_and_replacement_selection() {
     for split in [false, true] {
@@ -216,6 +223,7 @@ fn new_file_uses_the_same_word_and_replacement_selection() {
     }
 }
 
+/// Verify Git marker toggles and Shift ranges do not interfere with code selections.
 #[test]
 fn marker_toggle_and_shift_range_are_separate_from_text() {
     for split in [false, true] {
@@ -237,6 +245,7 @@ fn marker_toggle_and_shift_range_are_separate_from_text() {
     }
 }
 
+/// Verify logical character selection survives wrapping and horizontal scrolling.
 #[test]
 fn wrapped_and_horizontally_scrolled_text_uses_galley_character_positions() {
     for split in [false, true] {
@@ -276,6 +285,7 @@ fn wrapped_and_horizontally_scrolled_text_uses_galley_character_positions() {
     }
 }
 
+/// Verify clicking unused code space clears the prior selection.
 #[test]
 fn clicking_blank_code_area_clears_the_previous_selection() {
     let mut h = harness(false, false, true, false);
@@ -288,6 +298,7 @@ fn clicking_blank_code_area_clears_the_previous_selection() {
     assert!(h.state().view.chosen.is_empty());
 }
 
+/// Verify a code context menu copies the selected word without selecting Git lines.
 #[test]
 fn right_click_copy_preserves_a_word_selection_without_picking_git_lines() {
     use egui_kittest::kittest::Queryable;
@@ -314,6 +325,7 @@ fn right_click_copy_preserves_a_word_selection_without_picking_git_lines() {
     )));
 }
 
+/// Verify closing a context menu resets the next primary click to a caret.
 #[test]
 fn dismissing_a_context_menu_starts_a_fresh_primary_selection() {
     let mut h = harness(false, false, true, false);
@@ -336,6 +348,7 @@ fn dismissing_a_context_menu_starts_a_fresh_primary_selection() {
     assert!(h.state().view.chosen.is_empty());
 }
 
+/// Verify a code context menu replaces the prior Git selection with text.
 #[test]
 fn code_context_menu_replaces_an_existing_git_line_selection() {
     let mut h = harness(false, false, true, false);
@@ -358,6 +371,7 @@ fn code_context_menu_replaces_an_existing_git_line_selection() {
     assert!(h.state().view.chosen.is_empty());
 }
 
+/// Verify Select All clears Git picks and selects the displayed text.
 #[test]
 fn select_all_replaces_git_line_selection() {
     let mut h = harness(false, false, true, false);
@@ -370,6 +384,7 @@ fn select_all_replaces_git_line_selection() {
     assert!(h.state().view.chosen.is_empty());
 }
 
+/// Verify history uses the caret coordinates and revision for each diff side.
 #[test]
 fn history_shortcut_uses_the_caret_line_on_each_side() {
     for (prefix, rev) in [
@@ -395,6 +410,7 @@ fn history_shortcut_uses_the_caret_line_on_each_side() {
     }
 }
 
+/// Verify comment-number clicks and Git marker clicks dispatch independent actions.
 #[test]
 fn comment_numbers_and_git_markers_keep_separate_actions() {
     for split in [false, true] {
@@ -429,6 +445,7 @@ fn comment_numbers_and_git_markers_keep_separate_actions() {
     }
 }
 
+/// Verify scrolling during a drag preserves its original side and anchor.
 #[test]
 fn drag_keeps_its_original_side_and_anchor_when_scrolled_out_of_view() {
     let mut h = harness(true, false, true, false);
@@ -475,4 +492,32 @@ fn drag_keeps_its_original_side_and_anchor_when_scrolled_out_of_view() {
     assert!(selected(&h).starts_with("_αlpha beta\nnew_second value\n"));
     assert!(!selected(&h).contains("old_"));
     assert!(h.state().view.chosen.is_empty());
+}
+
+/// The painted +/− target stays clickable while the code scrolls underneath it.
+#[test]
+fn horizontally_scrolled_git_markers_stay_visible_and_pick_expected_lines() {
+    for split in [false, true] {
+        let mut h = harness(split, false, true, false);
+        let marker = position(&h, "old_αlpha", 0) - egui::vec2(super::super::MARK_W / 2.0, 0.0);
+        let before = position(&h, "long_token", 29);
+        h.event(Event::PointerMoved(before));
+        h.step();
+        h.event(Event::MouseWheel {
+            unit: egui::MouseWheelUnit::Point,
+            delta: egui::vec2(-160.0, 0.0),
+            modifiers: Modifiers::NONE,
+            phase: egui::TouchPhase::Move,
+        });
+        h.run_steps(12);
+        assert!(position(&h, "long_token", 29).x < before.x - 100.0);
+        // Check painting as well as the original, still-visible hit target.
+        let painted_marker = position(&h, "−", 0);
+        assert!((painted_marker.x - marker.x).abs() < 6.0);
+        click(&mut h, marker, Modifiers::NONE);
+        assert_eq!(h.state().view.chosen, [2].into());
+        assert!(h.state().view.text_sel.is_none());
+        click(&mut h, marker, Modifiers::NONE);
+        assert!(h.state().view.chosen.is_empty());
+    }
 }

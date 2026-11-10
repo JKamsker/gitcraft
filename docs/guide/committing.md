@@ -93,7 +93,7 @@ The right panel: staging files, hunks or single lines, the commit box, sign-offs
 ## Reverting part of a past commit
 
 - Undo part of a past commit: _Revert changes to this file_ in a commit's file list, _Revert
-  file_, _Revert hunk_ and _Revert N lines_ (after clicking lines) in its diff. The piece is
+  file_, _Revert hunk_ and _Revert N lines_ (after selecting lines in the +/− gutter) in its diff. The piece is
   reverse-applied to the working tree (`git apply -R`), to look over before committing; when it
   applies as it is, Ctrl+Z takes it out again. When the file has changed since, a 3-way merge
   puts it in (staged); overlapping changes are left as conflicts to settle. Binary files and

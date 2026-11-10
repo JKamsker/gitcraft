@@ -42,6 +42,7 @@ struct ClickSequence {
 }
 
 impl ClickSequence {
+    /// Count successive clicks on the same code target within egui’s time and distance limits.
     fn register(ui: &Ui, response: &egui::Response, hit: Hit) -> u8 {
         let Some(pos) = response.interact_pointer_pos() else {
             return 1;
@@ -89,6 +90,7 @@ pub(in crate::repo) struct TextSel {
 }
 
 impl TextSel {
+    /// Place an empty selection at the hit character on its diff side.
     pub(super) fn caret((i, side, c): Hit) -> Self {
         Self {
             side,
@@ -97,10 +99,12 @@ impl TextSel {
         }
     }
 
+    /// Whether this selection is a caret with no selected characters.
     pub(super) fn is_empty(self) -> bool {
         self.anchor == self.cursor
     }
 
+    /// Expand a code click to a caret, Unicode word, or complete logical line.
     fn clicked(lines: &[DiffLine], hit: Hit, word: bool, line: bool) -> Self {
         let mut sel = Self::caret(hit);
         if line {
@@ -120,6 +124,7 @@ impl TextSel {
         sel
     }
 
+    /// Select every displayed code line on one side, skipping diff metadata.
     pub(super) fn all(lines: &[DiffLine], side: Side) -> Option<Self> {
         let mut shown = lines.iter().enumerate().filter(|(_, l)| side.shows(l.kind));
         let (first, _) = shown.next()?;
@@ -142,6 +147,7 @@ impl TextSel {
         (start.0, end.0)
     }
 
+    /// Return the endpoints in document order, regardless of drag direction.
     fn ordered(&self) -> ((usize, usize), (usize, usize)) {
         (self.anchor.min(self.cursor), self.anchor.max(self.cursor))
     }
