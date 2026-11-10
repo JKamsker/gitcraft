@@ -158,6 +158,7 @@ fn the_pull_request_the_page_was_opened_over_is_the_default_change() {
         title: "Seven".to_owned(),
         branch: "topic".to_owned(),
         base: "main".to_owned(),
+        base_oid: String::new(),
         from_fork: false,
         sha: "abc1234".to_owned(),
         author: String::new(),

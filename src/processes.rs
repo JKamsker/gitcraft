@@ -96,6 +96,16 @@ pub(crate) struct Output {
     /// Partial output is retained on cancellation, timeout, I/O failure or overflow.
     pub stopped: Option<String>,
     pub stop_kind: Option<StopKind>,
+    pub phases: Phases,
+}
+/// How long a process waited for a slot, took to start, ran until it was seen to have ended,
+/// and kept its output open after that: for the timing log.
+#[derive(Clone, Copy, Debug, Default)]
+pub(crate) struct Phases {
+    pub queued: Duration,
+    pub spawn: Duration,
+    pub ran: Duration,
+    pub drained: Duration,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum StopKind {
@@ -264,6 +274,7 @@ pub(crate) fn recording_output(kind: Option<StopKind>) -> Output {
         stdout: Vec::new(),
         stderr: Vec::new(),
         stop_kind: kind,
+        phases: Phases::default(),
         stopped: kind.map(|kind| {
             match kind {
                 StopKind::Cancelled => "cancelled",
@@ -295,6 +306,7 @@ struct Request {
     reply: mpsc::Sender<ResultOutput>,
     ticket: Cancellation,
     deadline: Option<Instant>,
+    submitted: Instant,
     #[cfg(test)]
     trace: Option<Arc<trace::Trace>>,
 }
@@ -452,6 +464,8 @@ impl Service {
                             let stop = shutdown.clone();
                             let blocking = Arc::clone(&blocking);
                             running.spawn(async move {
+                                // Taken from the queue, and then started on this thread.
+                                let queued = request.submitted.elapsed();
                                 let n = stats.active.fetch_add(1, Ordering::Relaxed) + 1;
                                 stats.peak.fetch_max(n, Ordering::Relaxed);
                                 let result = execute(
@@ -465,7 +479,11 @@ impl Service {
                                     #[cfg(test)]
                                     request.trace.as_deref(),
                                 )
-                                .await;
+                                .await
+                                .map(|mut out| {
+                                    out.phases.queued = queued;
+                                    out
+                                });
                                 stats.active.fetch_sub(1, Ordering::Relaxed);
                                 let _ = request.reply.send(result);
                                 (is_background, is_speculative)
@@ -536,6 +554,7 @@ impl Service {
                 reply,
                 ticket: ticket.clone(),
                 deadline,
+                submitted: Instant::now(),
                 #[cfg(test)]
                 trace: trace.clone(),
             })
@@ -596,7 +615,11 @@ pub(crate) fn service() -> Result<&'static Service, String> {
         .map_err(Clone::clone)
 }
 pub(crate) fn run(command: Command, options: Options) -> ResultOutput {
-    service()?.submit(command, options)?.wait()
+    let result = service()?.submit(command, options)?.wait();
+    if let Ok(out) = &result {
+        crate::timing::process(&out.phases);
+    }
+    result
 }
 /// Wait for an owned request while a snapshot's UI lifetime remains current.
 /// Cancellation and cleanup stay entirely in the shared process service.
@@ -716,12 +739,15 @@ async fn execute(
     if let Some(trace) = trace {
         trace.stage(trace::Stage::Spawning);
     }
+    let began = Instant::now();
     let mut child = if options.native_controller {
         gitcraft_os::OwnedChild::spawn_controller(command)
     } else {
         gitcraft_os::OwnedChild::spawn(command)
     }
     .map_err(|e| format!("could not run process: {e}"))?;
+    let spawned = Instant::now();
+    let mut exited: Option<Instant> = None;
     #[cfg(test)]
     if let Some(trace) = trace {
         trace.spawned(Some(child.id()));
@@ -842,7 +868,7 @@ async fn execute(
             _ = tick.tick() => {
                 if status.is_none() {
                     match child.observe() {
-                        Ok(Some(s)) => { status = Some(s); input = None; drain_deadline = Some(Instant::now() + options.drain_for); }
+                        Ok(Some(s)) => { status = Some(s); exited = Some(Instant::now()); input = None; drain_deadline = Some(Instant::now() + options.drain_for); }
                         Ok(None) => {},
                         Err(e) => stopped = Some(format!("could not observe process: {e}")),
                     }
@@ -1008,11 +1034,19 @@ async fn execute(
             format!("could not reach remote process: {}", said.trim())
         });
     }
+    let ended = Instant::now();
+    let exited = exited.unwrap_or(ended);
     Ok(Output {
         status: status.ok_or("process ended without an exit status")?,
         stdout,
         stderr,
         stop_kind: stop_kind(stopped.as_deref(), remote_confirmed),
+        phases: Phases {
+            queued: Duration::ZERO,
+            spawn: spawned - began,
+            ran: exited.saturating_duration_since(spawned),
+            drained: ended.saturating_duration_since(exited),
+        },
         stopped,
     })
 }

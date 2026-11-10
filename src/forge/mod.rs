@@ -158,6 +158,10 @@ pub struct PullRequest {
     pub branch: String,
     /// The branch it goes into (base / target branch).
     pub base: String,
+    /// The base tip observed with `sha`, when the list supplies exact diff endpoints.
+    /// Older persisted lists and providers without it retain the details lookup.
+    #[serde(default)]
+    pub base_oid: String,
     /// It proposes a branch of another repository (a fork), which may share a name with one
     /// here.
     pub from_fork: bool,

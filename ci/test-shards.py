@@ -28,7 +28,12 @@ REPO_A_S = REPO_A_C + REPO_D_F + REPO_G_M + REPO_N_P + REPO_Q_R + REPO_S
 ISOLATED = {
     # This rewrite test can race with concurrent Git-heavy test processes on Windows.
     # Run it separately from the main repo-d-f libtest harness.
-    "repo-d-f": ["repo::drag_drop::tests::a_commit_dropped_on_another_of_the_branch_is_squashed_into_it"],
+    "repo-d-f": [
+        "repo::drag_drop::tests::a_commit_dropped_on_another_of_the_branch_is_squashed_into_it",
+        # The lens UI test snapshots the index and drives a Windows ACL-preserving
+        # transaction; keep concurrent Git-heavy fixtures from invalidating it.
+        "repo::file_comparison::tests::actual_lens_boundary_buttons_stage_and_unstage_the_displayed_snapshot",
+    ],
     "repo-q-r": [
         # Closing a live lost-commit scan has hung under parallel Windows fixtures.
         "repo::reflog::tests::closing_the_view_stops_its_scan",
@@ -39,6 +44,8 @@ ISOLATED = {
     ],
     # This real rebase/undo fixture hung while other Windows Git fixtures ran.
     "repo-s": ["repo::stack::tests::undoing_a_rebase_that_updated_dependent_branches_puts_them_back"],
+    # The end-to-end CLI blame launch hung under concurrent Windows repo-rest tests.
+    "repo-rest": ["repo::tests::the_command_line_opens_a_file_s_blame_at_a_line"],
     "core": [
         # Native PowerShell ACL snapshot occasionally exhausts its bounded process
         # deadline when run after other standalone fixtures in the same process.
@@ -59,7 +66,10 @@ SHARDS = {
     "git-a-m": GIT_FIRST,
     "git-rest": ["git::", *[arg for p in GIT_FIRST for arg in ("--skip", p)]],
     "repo-a-c": [*REPO_A_C, "--skip", "git::"],
-    "repo-d-f": [*REPO_D_F, "--skip", "git::", "--skip", ISOLATED["repo-d-f"][0]],
+    "repo-d-f": [
+        *REPO_D_F, "--skip", "git::",
+        *[arg for test in ISOLATED["repo-d-f"] for arg in ("--skip", test)],
+    ],
     "repo-g-m": [*REPO_G_M, "--skip", "git::"],
     "repo-n-p": [*REPO_N_P, "--skip", "git::"],
     "repo-q-r": [
@@ -74,6 +84,7 @@ SHARDS = {
         "repo::",
         "--skip", "git::",
         *[arg for p in REPO_A_S for arg in ("--skip", p)],
+        *[arg for test in ISOLATED["repo-rest"] for arg in ("--skip", test)],
     ],
     "core": [
         "--skip", "git::",

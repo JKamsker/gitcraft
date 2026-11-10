@@ -75,7 +75,7 @@ impl Provider for GitHub {
                 "--limit",
                 "100",
                 "--json",
-                "number,title,headRefName,baseRefName,headRefOid,author,url,isDraft,isCrossRepository",
+                "number,title,headRefName,baseRefName,baseRefOid,headRefOid,author,url,isDraft,isCrossRepository",
             ],
         )?;
         parse_list(&out)
@@ -366,6 +366,7 @@ fn parse_list(json: &str) -> Result<Vec<PullRequest>, String> {
             title: at(item, "/title").to_owned(),
             branch: at(item, "/headRefName").to_owned(),
             base: at(item, "/baseRefName").to_owned(),
+            base_oid: at(item, "/baseRefOid").to_owned(),
             from_fork: item
                 .get("isCrossRepository")
                 .and_then(Value::as_bool)
@@ -405,8 +406,8 @@ mod tests {
     }
 
     #[test]
-    fn parses_pull_requests() {
-        let gh = r#"[{"number":7,"title":"Fix","headRefName":"fix/x","baseRefName":"main","headRefOid":"c0ffee","author":{"login":"ana"},"url":"https://g/7","isDraft":true}]"#;
+    fn parses_pull_requests() -> Result<(), String> {
+        let gh = r#"[{"number":7,"title":"Fix","headRefName":"fix/x","baseRefName":"main","baseRefOid":"b0","headRefOid":"c0ffee","author":{"login":"ana"},"url":"https://g/7","isDraft":true}]"#;
         let prs = parse_list(gh).unwrap_or_default();
         assert_eq!(prs.len(), 1);
         assert_eq!(
@@ -415,7 +416,16 @@ mod tests {
         );
         assert_eq!(prs[0].sha, "c0ffee");
         assert_eq!(prs[0].base, "main");
+        assert_eq!(prs[0].base_oid, "b0");
+        let mut old_cache = serde_json::to_value(&prs[0]).map_err(|e| e.to_string())?;
+        old_cache
+            .as_object_mut()
+            .ok_or("expected JSON object")?
+            .remove("base_oid");
+        let restored: PullRequest = serde_json::from_value(old_cache).map_err(|e| e.to_string())?;
+        assert!(restored.base_oid.is_empty());
         assert!(parse_list("oops").is_err());
+        Ok(())
     }
 }
 
@@ -436,6 +446,12 @@ mod routing_tests {
             Ok(())
         })?;
         assert_eq!(calls.len(), 1);
+        assert!(
+            calls[0]
+                .args
+                .iter()
+                .any(|a| a.split(',').any(|f| f == "baseRefOid"))
+        );
         assert!(
             calls[0]
                 .args

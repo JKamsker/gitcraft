@@ -166,6 +166,9 @@ pub(crate) struct DiffView {
     /// read (before the whitespace or whole-file setting changed…) can't replace it.
     pub(super) request: u64,
     pub(super) data_request: u64,
+    /// When the diff was opened, and whether it has been shown since: for the timing log.
+    pub(super) opened: Instant,
+    pub(super) shown_once: bool,
     /// Opened from the history of some lines: only the part of the commit's diff that changed
     /// these lines of the file (as they are in the commit).
     pub(super) lines: Option<Vec<crate::git::LineRange>>,
@@ -242,6 +245,8 @@ impl DiffView {
             auto_opened: Default::default(),
             request: 0,
             data_request: 0,
+            opened: Instant::now(),
+            shown_once: false,
             lines: None,
             unfolded: false,
             svg_source: false,
@@ -264,8 +269,25 @@ impl DiffView {
     /// Shows the answer to the read numbered `request`, unless a newer read was made since.
     pub(super) fn arrived(&mut self, request: u64, result: Result<diff::DiffData, String>) {
         if request != self.request {
+            crate::timing::log(format_args!(
+                "diff#{request} dropped: diff#{} was asked for since",
+                self.request
+            ));
             return;
         }
+        let first = !std::mem::replace(&mut self.shown_once, true);
+        crate::timing::log(format_args!(
+            "diff#{request} {}{}",
+            if result.is_ok() { "shown" } else { "failed" },
+            if first {
+                format!(
+                    ", {} after the diff was opened",
+                    crate::timing::ms(self.opened.elapsed())
+                )
+            } else {
+                String::new()
+            }
+        ));
         self.data_request = request;
         self.keyboard_hunk = None;
         self.repairing = false;

@@ -33,6 +33,7 @@ fn pr(number: u64, owner: &str) -> PullRequest {
         title: owner.into(),
         branch: "feat/x".into(),
         base: "main".into(),
+        base_oid: String::new(),
         from_fork: false,
         sha: "a".repeat(40),
         author: owner.into(),

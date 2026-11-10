@@ -623,6 +623,7 @@ mod tests {
             title: "Dev changes".to_owned(),
             branch: "dev".to_owned(),
             base: "main".to_owned(),
+            base_oid: String::new(),
             from_fork: false,
             sha: "a".to_owned(),
             author: String::new(),

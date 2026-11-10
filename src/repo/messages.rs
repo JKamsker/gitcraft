@@ -551,6 +551,11 @@ impl RepoTab {
             && self.busy_op.is_none()
         {
             self.fs_pending = None;
+            crate::timing::log(format_args!(
+                "changes on disk ({change:?}): {}; reading {:?} again",
+                super::watch::take_seen(&self.path).unwrap_or_else(|| "(polled)".into()),
+                change.rereads()
+            ));
             for reread in change.rereads() {
                 match reread {
                     Reread::All => self.reload(ctx),
@@ -671,6 +676,10 @@ impl RepoTab {
             Msg::Status(read, _) if read <= self.work_read => {}
             Msg::Status(read, result) => match result {
                 Ok(work) => {
+                    crate::timing::log(format_args!(
+                        "status#{read} came in: {} changed files",
+                        work.changed_files()
+                    ));
                     if read >= self.work_pending {
                         self.work_pending = 0;
                     }

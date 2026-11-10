@@ -166,6 +166,7 @@ impl RepoTab {
     fn take_prs(&mut self, prs: Vec<PullRequest>, ctx: &egui::Context) {
         self.pending_prs = None;
         self.prs = prs;
+        self.prs_from_cache = false;
         if crate::network::background_may_run() {
             self.refresh_ci(ctx);
         }
@@ -181,6 +182,7 @@ impl RepoTab {
         let id = cache_id(self.repo_key(), hosting);
         if let Some(prs) = ctx.data_mut(|d| d.get_persisted::<Vec<PullRequest>>(id)) {
             self.prs = prs;
+            self.prs_from_cache = true;
         }
     }
 
@@ -699,6 +701,7 @@ mod tests {
             title: format!("Change {number}"),
             branch: format!("change-{number}"),
             base: "main".into(),
+            base_oid: String::new(),
             from_fork: false,
             sha: format!("{number:040x}"),
             author: "ann".into(),
@@ -724,14 +727,37 @@ mod tests {
         let ctx = egui::Context::default();
         let mut tab = RepoTab::new_deferred("/nonexistent/pr-list-pending".into(), &ctx);
         tab.prs = vec![numbered(1)];
+        tab.prs_from_cache = true;
         let now = ctx.input(|i| i.time);
         ctx.data_mut(|d| d.insert_temp(in_use_id(&tab.path), now));
         tab.prs_arrived(vec![numbered(2), numbered(1)], &ctx);
         assert_eq!(tab.prs, vec![numbered(1)]);
         assert_eq!(tab.pending_prs, Some(vec![numbered(2), numbered(1)]));
+        assert!(tab.prs_from_cache); // A pending response does not refresh displayed rows.
         tab.apply_pending_prs(&ctx);
         assert_eq!(tab.prs, vec![numbered(2), numbered(1)]);
         assert!(tab.pending_prs.is_none());
+        assert!(!tab.prs_from_cache);
+    }
+
+    #[test]
+    fn seeded_pr_list_keeps_its_provenance_until_a_fresh_response_is_displayed() {
+        let ctx = egui::Context::default();
+        let hosting = Hosting {
+            forge: Forge::GitHub,
+            host: "github.com".into(),
+            path: "o/r".into(),
+            web: "https://github.com".into(),
+        };
+        let mut tab = RepoTab::new_deferred("/nonexistent/pr-list-seeded".into(), &ctx);
+        let id = cache_id(tab.repo_key(), &hosting);
+        ctx.data_mut(|d| d.insert_persisted(id, vec![numbered(7)]));
+        tab.seed_prs(&hosting, &ctx);
+        assert_eq!(tab.prs, vec![numbered(7)]);
+        assert!(tab.prs_from_cache);
+        // Even an identical fresh response makes the displayed endpoints trustworthy.
+        tab.prs_arrived(vec![numbered(7)], &ctx);
+        assert!(!tab.prs_from_cache);
     }
 
     #[test]
@@ -808,6 +834,7 @@ mod tests {
             title: String::new(),
             branch: branch.to_owned(),
             base: "main".to_owned(),
+            base_oid: String::new(),
             from_fork: false,
             sha: sha.to_owned(),
             author: String::new(),

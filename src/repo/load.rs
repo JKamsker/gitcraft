@@ -213,7 +213,12 @@ impl RepoTab {
         let read = self.next_read();
         self.work_pending = read;
         let path = self.path.clone();
-        spawn(&self.tx, ctx, move || Msg::Status(read, git::status(&path)));
+        let asked = std::time::Instant::now();
+        spawn(&self.tx, ctx, move || {
+            let _scope = crate::timing::scope(format!("status#{read}"));
+            crate::timing::step("waited for a worker", asked);
+            Msg::Status(read, git::status(&path))
+        });
     }
 
     /// The watcher is there now. What changed while it was being set up (it walks the whole
@@ -342,6 +347,7 @@ impl RepoTab {
             self.dialog = None;
         }
         self.prs.clear();
+        self.prs_from_cache = false;
         self.pending_prs = None;
         self.pr_error = None;
         self.prs_loaded = Some(Instant::now());
@@ -922,6 +928,7 @@ impl RepoTab {
             });
         }
         if still && (file.area != git::Area::Conflicted || editing) {
+            crate::timing::log("the working tree was read: the open diff is read again");
             // Shown as it was until the new diff is read (no flicker after staging lines).
             self.refresh_diff(ctx);
         } else {
@@ -983,6 +990,7 @@ mod tests {
             title: "merged since".to_owned(),
             branch: "feat".to_owned(),
             base: "main".to_owned(),
+            base_oid: String::new(),
             from_fork: false,
             sha: String::new(),
             author: String::new(),

@@ -376,6 +376,11 @@ pub(crate) fn raw_output(
 ) -> Result<Vec<u8>, String> {
     run(repo, args, active)
 }
+
+/// Bounded, filter-free local object read; None keeps the private CLI reader authoritative.
+pub(crate) fn native_blob(repo: &Path, spec: &str, limit: usize) -> Option<Result<Vec<u8>, ()>> {
+    super::backend::bounded_blob(repo, spec, limit)
+}
 pub(crate) fn raw_working(
     repo: &Path,
     path: &str,

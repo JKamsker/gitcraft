@@ -46,6 +46,7 @@ pub(super) use binary::{make_docx, make_pdf, make_zip};
 pub(super) use image_compare::cpu as cpu_images;
 
 use std::path::Path;
+use std::time::Instant;
 
 use super::DiffKey;
 use super::highlight::{self, MAX_LINE_CHARS, Spans, cap_line};
@@ -260,7 +261,9 @@ pub fn load_lines(
 
 /// Reads and prepares the diff for `key`.
 pub fn load(repo: &Path, key: &DiffKey, opts: DiffOptions, dark: bool) -> Result<DiffData, String> {
+    let at = Instant::now();
     let recognized = encrypted::probe_checked(repo, key);
+    crate::timing::step("SOPS probe", at);
     let sops = recognized == Some(true);
     let opts = DiffOptions {
         no_textconv: opts.no_textconv || recognized != Some(false),
@@ -290,16 +293,31 @@ pub fn load(repo: &Path, key: &DiffKey, opts: DiffOptions, dark: bool) -> Result
     // A textconv driver that fails (Git for Windows maps `*.docx` and `*.pdf` to its own
     // `astextplain`, which refuses some files) fails the whole diff: the file's own bytes
     // are diffed instead, so it is shown as a binary rather than not at all.
+    let at = Instant::now();
     let (text, path) = match patch(opts) {
-        Err(e) if !opts.no_textconv => patch(DiffOptions {
-            no_textconv: true,
-            ..opts
-        })
-        .map_err(|_| e)?,
+        Err(e) if !opts.no_textconv => {
+            crate::timing::log("textconv failed: diffed again without it");
+            patch(DiffOptions {
+                no_textconv: true,
+                ..opts
+            })
+            .map_err(|_| e)?
+        }
         done => done?,
     };
+    crate::timing::step(
+        &format!(
+            "patch ({} KiB, {} lines, {})",
+            text.len() / 1024,
+            text.lines().count(),
+            crate::timing::kind_of(&path)
+        ),
+        at,
+    );
     let pickable = !opts.ignore_ws;
+    let at = Instant::now();
     let mut data = prepare(repo, key, &path, &text, pickable, opts.whole_file, dark);
+    crate::timing::step("prepared", at);
     data.sops = sops;
     Ok(data)
 }
@@ -321,9 +339,12 @@ fn prepare(
         lines = remerge::label(conflicts, lines, !pickable);
     }
     // Read only when the diff doesn't show the whole file already.
+    let mut at = Instant::now();
     let context = (!whole_file && !is_image(&path))
         .then(|| context::read(repo, key, &lines, dark))
         .flatten();
+    crate::timing::step("  file around the hunks", at);
+    at = Instant::now();
     if context
         .as_ref()
         .and_then(|c| c.gaps.last())
@@ -361,9 +382,14 @@ fn prepare(
     let notebook = (notebook::is_notebook(&path) && lfs.is_none())
         .then(|| notebook::load(repo, key, &path, images::renamed_from(text)))
         .flatten();
+    crate::timing::step("  images, binary, textconv, notebook", at);
+    at = Instant::now();
     let mut spans = highlight_sides(&path, &lines, dark);
+    crate::timing::step("  highlighted", at);
+    at = Instant::now();
     let moves = find_moves(&lines);
     let (mut changed, split) = pair_lines(&lines);
+    crate::timing::step("  moved and paired lines", at);
     let mut uncut = std::collections::HashMap::new();
     for (i, (line, spans)) in lines.iter_mut().zip(spans.iter_mut()).enumerate() {
         if let Some(whole) = cap_line(&mut line.text, spans.as_mut()) {

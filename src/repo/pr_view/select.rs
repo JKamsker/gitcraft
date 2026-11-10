@@ -76,6 +76,8 @@ impl RepoTab {
         let request = self.compare_requests;
         self.compare = Some(Compare { request, ..compare });
         self.pr_selection_request = Some(request);
+        // A persisted or superseded list can carry valid-looking but stale OIDs.
+        let use_list_endpoints = !self.prs_from_cache && self.pending_prs.is_none();
         let (path, remotes, credentials) = (
             self.path.clone(),
             self.remotes.clone(),
@@ -83,12 +85,25 @@ impl RepoTab {
         );
         self.forge_then(
             ctx,
-            move || match hosting.forge.provider().pages() {
-                Some(pages) => {
-                    let details = pages.details(&path, &hosting, number)?;
-                    selection_data(&path, &hosting, &details, &remotes, credentials.as_ref())
-                }
-                None => remote_selection_data(&path, &pr, &hosting, &remotes, credentials.as_ref()),
+            move || {
+                let _scope = crate::timing::scope(format!("pr-diff#{request}"));
+                let start = std::time::Instant::now();
+                let result = match hosting.forge.provider().pages() {
+                    Some(pages) => selection_for_pr(
+                        &path,
+                        &pr,
+                        &hosting,
+                        &remotes,
+                        credentials.as_ref(),
+                        use_list_endpoints,
+                        || pages.details(&path, &hosting, number),
+                    ),
+                    None => {
+                        remote_selection_data(&path, &pr, &hosting, &remotes, credentials.as_ref())
+                    }
+                };
+                crate::timing::step("PR comparison ready", start);
+                result
             },
             move |tab, result, _| tab.pr_selection_arrived(request, result),
         );
@@ -173,6 +188,56 @@ impl RepoTab {
     }
 }
 
+/// The PR list is already a snapshot of the proposed head. Keep its base from the same
+/// snapshot, rather than downloading comments, reviews and threads on every selection.
+/// This only supplies diff inputs: review/post/merge metadata still comes from Pages.
+fn listed_endpoints(pr: &PullRequest, hosting: &Hosting) -> Option<PrDetails> {
+    if hosting.forge != Forge::GitHub
+        || !hosting.matches_pull_request(&pr.url)
+        || !pull_request::is_oid(&pr.base_oid)
+        || !pull_request::is_oid(&pr.sha)
+        || !pull_request::is_branch_name(&pr.base)
+    {
+        return None;
+    }
+    Some(PrDetails {
+        forge: Some(hosting.forge),
+        number: pr.number,
+        url: pr.url.clone(),
+        base_branch: pr.base.clone(),
+        base_oid: pr.base_oid.clone(),
+        head_branch: pr.branch.clone(),
+        head_oid: pr.sha.clone(),
+        head_ref: format!("refs/pull/{}/head", pr.number),
+        ..PrDetails::default()
+    })
+}
+
+/// Choose exact comparison endpoints. Trust listed OIDs only when the displayed list is fresh.
+fn selection_for_pr(
+    path: &Path,
+    pr: &PullRequest,
+    hosting: &Hosting,
+    remotes: &[Remote],
+    credentials: Option<&Credentials>,
+    use_list_endpoints: bool,
+    read_details: impl FnOnce() -> Result<PrDetails, String>,
+) -> Result<Selection, String> {
+    let start = std::time::Instant::now();
+    let details = match (use_list_endpoints, listed_endpoints(pr, hosting)) {
+        (true, Some(details)) => {
+            crate::timing::step("PR endpoints from list", start);
+            details
+        }
+        _ => {
+            let details = read_details()?;
+            crate::timing::step("PR endpoints from forge", start);
+            details
+        }
+    };
+    selection_data(path, hosting, &details, remotes, credentials)
+}
+
 /// Forges whose details open on the web still provide a head SHA and base branch in their
 /// list. Read that base on the PR's own remote, never from a possibly divergent local branch.
 fn remote_selection_data(
@@ -224,19 +289,26 @@ fn selection_data(
     remotes: &[Remote],
     credentials: Option<&Credentials>,
 ) -> Result<Selection, String> {
+    let start = std::time::Instant::now();
     let files = pull_request::files(path, hosting, details, remotes, credentials)?;
+    crate::timing::step("PR merge base and file list", start);
+    let start = std::time::Instant::now();
+    let apart = git::count_apart(path, &details.base_oid, &details.head_oid)?;
+    crate::timing::step("PR commit distance", start);
     let data = CompareData {
-        apart: git::count_apart(path, &details.base_oid, &details.head_oid)?,
+        apart,
         from: files.from,
         to: Some(files.to),
         files: files.files,
     };
+    let start = std::time::Instant::now();
     let head = git::commits_of(path, std::slice::from_ref(&details.head_oid))?
         .into_iter()
         .next()
         .ok_or(crate::i18n::text(
             "repo-workflows-pr_view-selection-data-fb954333",
         ))?;
+    crate::timing::step("PR head metadata", start);
     Ok(Selection {
         base: details.base_oid.clone(),
         head,
@@ -248,6 +320,137 @@ fn selection_data(
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+
+    /// Construct the GitHub hosting fixture used by PR-selection tests.
+    fn github() -> Hosting {
+        Hosting {
+            forge: Forge::GitHub,
+            host: "github.com".into(),
+            path: "o/r".into(),
+            web: "https://github.com".into(),
+        }
+    }
+
+    /// Construct a PR fixture with explicit base and head commit IDs.
+    fn listed_pr(base: String, head: String) -> PullRequest {
+        PullRequest {
+            number: 7,
+            title: String::new(),
+            branch: "feature".into(),
+            base: "main".into(),
+            base_oid: base,
+            sha: head,
+            from_fork: true,
+            author: String::new(),
+            url: "https://github.com/o/r/pull/7".into(),
+            draft: false,
+        }
+    }
+
+    /// Verify that missing or untrusted list endpoints still request forge metadata.
+    #[test]
+    fn unknown_or_mismatched_list_endpoints_retain_forge_lookup() {
+        let original = listed_pr("a".repeat(40), "b".repeat(40));
+        assert!(listed_endpoints(&original, &github()).is_some());
+        for (base, head, branch, url) in [
+            ("", original.sha.as_str(), "main", original.url.as_str()),
+            (
+                original.base_oid.as_str(),
+                "short",
+                "main",
+                original.url.as_str(),
+            ),
+            (
+                original.base_oid.as_str(),
+                original.sha.as_str(),
+                "--invalid",
+                original.url.as_str(),
+            ),
+            (
+                original.base_oid.as_str(),
+                original.sha.as_str(),
+                "main",
+                "https://github.com/other/repo/pull/7",
+            ),
+        ] {
+            let pr = PullRequest {
+                base_oid: base.into(),
+                sha: head.into(),
+                base: branch.into(),
+                url: url.into(),
+                ..original.clone()
+            };
+            assert!(listed_endpoints(&pr, &github()).is_none());
+        }
+        let mut other = github();
+        other.forge = Forge::GitLab;
+        assert!(listed_endpoints(&original, &other).is_none());
+    }
+
+    /// Read-only benchmark of an explicitly selected immutable PR snapshot already local.
+    #[test]
+    #[ignore = "set GITCRAFT_PR_DIFF_REPO, GITCRAFT_PR_DIFF_BASE and GITCRAFT_PR_DIFF_HEAD"]
+    fn local_pr_selection_repository_benchmark() -> Result<(), String> {
+        let path = std::env::var_os("GITCRAFT_PR_DIFF_REPO").ok_or("missing repository")?;
+        let repo = Path::new(&path);
+        let pr = listed_pr(
+            std::env::var("GITCRAFT_PR_DIFF_BASE").map_err(|e| e.to_string())?,
+            std::env::var("GITCRAFT_PR_DIFF_HEAD").map_err(|e| e.to_string())?,
+        );
+        // Refuse fetching in this benchmark: both endpoints must already exist locally.
+        git::resolve(repo, &pr.base_oid)?;
+        git::resolve(repo, &pr.sha)?;
+        let hosting = github();
+        let start = std::time::Instant::now();
+        let expected = selection_data(
+            repo,
+            &hosting,
+            &listed_endpoints(&pr, &hosting).ok_or("invalid snapshot")?,
+            &[],
+            None,
+        )?;
+        println!(
+            "first local PR comparison: {:.1} ms",
+            start.elapsed().as_secs_f64() * 1000.0
+        );
+        for i in 0..3 {
+            git::backend::reset_metrics();
+            let start = std::time::Instant::now();
+            let actual = selection_for_pr(repo, &pr, &hosting, &[], None, true, || {
+                Err("PR diff must not request metadata".into())
+            })?;
+            let elapsed = start.elapsed();
+            assert_eq!(actual.base, expected.base);
+            assert_eq!(actual.head.hash, expected.head.hash);
+            assert_eq!(actual.data.from, expected.data.from);
+            assert_eq!(actual.data.to, expected.data.to);
+            assert_eq!(actual.data.apart, expected.data.apart);
+            let file_keys = |selection: &Selection| {
+                selection
+                    .data
+                    .files
+                    .iter()
+                    .map(|f| {
+                        (
+                            f.status,
+                            f.path.clone(),
+                            f.old_path.clone(),
+                            f.added,
+                            f.removed,
+                        )
+                    })
+                    .collect::<Vec<_>>()
+            };
+            assert_eq!(file_keys(&actual), file_keys(&expected));
+            let processes: u64 = git::backend::metrics().iter().map(|m| m.subprocesses).sum();
+            println!(
+                "local PR selection {i}: {:.1} ms, {} files, {processes} Git processes, zero forge requests",
+                elapsed.as_secs_f64() * 1000.0,
+                actual.data.files.len()
+            );
+        }
+        Ok(())
+    }
 
     fn comparison(request: u64) -> Compare {
         Compare {
@@ -360,31 +563,94 @@ mod tests {
             head_oid: head.clone(),
             ..PrDetails::default()
         };
-        let selection = selection_data(
-            &dir,
-            &Hosting {
-                forge: Forge::GitHub,
-                host: "github.com".into(),
-                path: "o/r".into(),
-                web: "https://github.com".into(),
-            },
-            &details,
-            &[],
-            None,
+        let hosting = Hosting {
+            forge: Forge::GitHub,
+            host: "github.com".into(),
+            path: "o/r".into(),
+            web: "https://github.com".into(),
+        };
+        let mut pr = PullRequest {
+            number: 7,
+            branch: "feature".into(),
+            base: "main".into(),
+            base_oid: details.base_oid.clone(),
+            sha: head.clone(),
+            title: String::new(),
+            author: String::new(),
+            from_fork: true,
+            draft: false,
+            url: "https://github.com/o/r/pull/7".into(),
+        };
+        // A local base may have unpublished changes. Use the list's exact snapshot.
+        git::run(
+            Some(&dir),
+            &[
+                "commit",
+                "-q",
+                "--allow-empty",
+                "-m",
+                "unpublished local base",
+            ],
         )
         .unwrap();
+        let selection = selection_for_pr(&dir, &pr, &hosting, &[], None, true, || {
+            Err("known local PR endpoints must not request forge details".into())
+        })
+        .unwrap();
+        assert_eq!(selection.base, details.base_oid);
         let data = selection.data;
         assert_eq!(selection.head.hash, head);
         assert_eq!(data.from, common);
         let paths: Vec<_> = data.files.iter().map(|f| f.path.as_str()).collect();
         assert_eq!(paths, ["first.txt", "second.txt"]);
         assert_eq!(data.apart, (1, 2));
+        pr.base_oid = git::head(&dir);
+        let changed_base = selection_for_pr(&dir, &pr, &hosting, &[], None, true, || {
+            Err("unexpected forge request".into())
+        })
+        .unwrap();
+        assert_eq!(changed_base.data.apart, (2, 2));
+        assert_eq!(changed_base.base, pr.base_oid);
+        pr.base_oid.clear();
+        let calls = std::cell::Cell::new(0);
+        let fallback = selection_for_pr(&dir, &pr, &hosting, &[], None, true, || {
+            calls.set(calls.get() + 1);
+            Ok(details.clone())
+        })
+        .unwrap();
+        assert_eq!(calls.get(), 1);
+        assert_eq!(fallback.base, details.base_oid);
+        // Persisted entries can carry syntactically valid but obsolete endpoints.
+        // A seeded selection must fetch current details instead of using those OIDs.
+        let stale = listed_pr("f".repeat(40), "e".repeat(40));
+        assert!(listed_endpoints(&stale, &hosting).is_some());
+        let seeded_calls = std::cell::Cell::new(0);
+        let refreshed = selection_for_pr(&dir, &stale, &hosting, &[], None, false, || {
+            seeded_calls.set(seeded_calls.get() + 1);
+            Ok(details.clone())
+        })
+        .unwrap();
+        assert_eq!(seeded_calls.get(), 1);
+        assert_eq!(refreshed.base, details.base_oid);
+        assert_eq!(refreshed.head.hash, details.head_oid);
         std::fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]
     fn a_gitlab_pr_fetches_an_unknown_head_and_uses_the_remote_base() {
-        let root = std::env::temp_dir().join(format!("gitcraft-pr-gitlab-{}", std::process::id()));
+        unknown_head_selection(Forge::GitLab);
+    }
+
+    /// Verify GitHub list endpoints avoid extra metadata requests.
+    #[test]
+    fn listed_github_endpoints_fetch_only_missing_objects_without_a_details_request() {
+        unknown_head_selection(Forge::GitHub);
+    }
+
+    /// Exercise PR endpoint selection when the head object is initially unavailable.
+    fn unknown_head_selection(forge: Forge) {
+        let root =
+            std::env::temp_dir().join(format!("gitcraft-pr-{forge:?}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         let source = root.join("remote");
         let clone = root.join("clone");
@@ -402,11 +668,12 @@ mod tests {
         git::run(Some(&source), &["add", "."]).unwrap();
         git::run(Some(&source), &["commit", "-q", "-m", "feature"]).unwrap();
         let head = git::head(&source);
-        git::run(
-            Some(&source),
-            &["update-ref", "refs/merge-requests/7/head", &head],
-        )
-        .unwrap();
+        let head_ref = if forge == Forge::GitHub {
+            "refs/pull/7/head"
+        } else {
+            "refs/merge-requests/7/head"
+        };
+        git::run(Some(&source), &["update-ref", head_ref, &head]).unwrap();
         git::run(Some(&source), &["checkout", "-q", "main"]).unwrap();
         std::fs::write(source.join("base-only.txt"), "remote base\n").unwrap();
         git::run(Some(&source), &["add", "."]).unwrap();
@@ -435,34 +702,46 @@ mod tests {
         }
         let local_head = git::head(&clone);
         assert!(git::run(Some(&clone), &["cat-file", "-e", &head]).is_err());
+        let host = if forge == Forge::GitHub {
+            "github.example"
+        } else {
+            "gitlab.example"
+        };
+        let url = if forge == Forge::GitHub {
+            format!("https://{host}/team/repo/pull/7")
+        } else {
+            format!("https://{host}/team/repo/-/merge_requests/7")
+        };
         let pr = PullRequest {
             number: 7,
             branch: "feature".into(),
             base: "main".into(),
+            base_oid: remote_base.clone(),
             sha: head.clone(),
             title: String::new(),
             author: String::new(),
             from_fork: false,
             draft: false,
-            url: "https://gitlab.example/team/repo/-/merge_requests/7".into(),
+            url,
         };
         // The actual origin is local; the metadata names the URL associated with the PR.
         let remotes = [Remote {
             name: "origin".into(),
-            url: "https://gitlab.example/team/repo.git".into(),
+            url: format!("https://{host}/team/repo.git"),
         }];
-        let selection = remote_selection_data(
-            &clone,
-            &pr,
-            &Hosting {
-                forge: Forge::GitLab,
-                host: "gitlab.example".into(),
-                path: "team/repo".into(),
-                web: "https://gitlab.example".into(),
-            },
-            &remotes,
-            None,
-        )
+        let hosting = Hosting {
+            forge,
+            host: host.into(),
+            path: "team/repo".into(),
+            web: format!("https://{host}"),
+        };
+        let selection = if forge == Forge::GitHub {
+            selection_for_pr(&clone, &pr, &hosting, &remotes, None, true, || {
+                Err("known PR endpoints must fetch objects without requesting metadata".into())
+            })
+        } else {
+            remote_selection_data(&clone, &pr, &hosting, &remotes, None)
+        }
         .unwrap();
         assert_eq!(selection.base, remote_base);
         assert_eq!(selection.head.hash, head);

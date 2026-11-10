@@ -3,6 +3,7 @@
 //! environment.
 
 pub(super) mod bounded;
+mod memo;
 mod source;
 pub use source::CommandSource;
 
@@ -226,8 +227,73 @@ fn offline_env() -> Option<(&'static str, &'static str)> {
         .then_some(("GIT_NO_LAZY_FETCH", "1"))
 }
 
-/// Runs git with `args` in `dir` (on whichever machine it is), `extra` before them.
+impl Extra {
+    /// Nothing on top of the call: no input, options, variables or output file. Only such a
+    /// read is answered without git (see [`answered`]).
+    fn plain(&self) -> bool {
+        self.stdin.is_none()
+            && self.pre.is_empty()
+            && self.owned_pre.is_empty()
+            && self.env.is_empty()
+            && self.stdout_file.is_none()
+            && !self.long
+            && !self.tool
+            && !self.trace_hooks
+            && self.test.is_none()
+            && self.timeout.is_none()
+    }
+}
+
+/// How an exit status reads, as `ExitStatus` writes it.
+fn exit_text(code: i32) -> String {
+    if cfg!(windows) {
+        format!("exit code: {code}")
+    } else {
+        format!("exit status: {code}")
+    }
+}
+
+/// Git's answer to a read it needn't be run for: one kept (see [`memo`]) or made in-process
+/// from the repository's files (see `backend::answer`). Only on this machine, for a call with
+/// nothing on top.
+fn answered(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Option<Ran> {
+    if !extra.plain() || dir.is_some_and(|d| remote::parse(d).is_some()) {
+        return None;
+    }
+    if let Some(ran) = memo::get(dir, args) {
+        return Some(ran);
+    }
+    let (code, stdout, stderr) = super::backend::answer(dir?, args)?;
+    if extra.output_limit.is_some_and(|limit| stdout.len() > limit) {
+        return None;
+    }
+    Some(Ran {
+        code: Some(code),
+        status: exit_text(code),
+        stdout,
+        stderr,
+        failed_hook: None,
+    })
+}
+
+/// Runs git with `args` in `dir` (on whichever machine it is), `extra` before them; a read it
+/// needn't run for is answered without it (see [`answered`]).
 fn execute(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Result<Ran, String> {
+    if let Some(ran) = answered(dir, extra, args) {
+        return Ok(ran);
+    }
+    let result = execute_git(dir, extra, args);
+    if let Ok(ran) = &result
+        && extra.plain()
+        && dir.is_none_or(|d| remote::parse(d).is_none())
+    {
+        memo::keep(dir, args, ran);
+    }
+    result
+}
+
+/// Launch the installed Git executable for commands not handled by native readers.
+fn execute_git(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Result<Ran, String> {
     let _timer = super::backend::CliTimer::new(args);
     let mut extra = extra.clone();
     let _source = source::bind(&mut extra, dir, args)?;

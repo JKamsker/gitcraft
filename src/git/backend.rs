@@ -71,6 +71,9 @@ pub(crate) fn reset_metrics() {
     }
 }
 fn record(name: &str, native: bool, process: bool, reason: Option<&str>, start: Instant) {
+    if native || process {
+        crate::timing::git(name, native, start.elapsed());
+    }
     if let Ok(mut all) = counters().lock() {
         let m = all
             .entry(name.to_owned())
@@ -95,6 +98,8 @@ fn record(name: &str, native: bool, process: bool, reason: Option<&str>, start: 
 pub(super) struct CliTimer {
     name: String,
     start: Instant,
+    /// The whole command, when the timing log writes every call's (see [`crate::timing::all`]).
+    args: Option<String>,
 }
 impl CliTimer {
     pub(super) fn new(args: &[&str]) -> Self {
@@ -108,15 +113,25 @@ impl CliTimer {
                 break;
             }
         }
+        crate::timing::git_begins();
         Self {
             name: format!("cli:{}", rest.first().unwrap_or(&"unknown")),
             start: Instant::now(),
+            args: crate::timing::all().then(|| {
+                args.iter()
+                    .map(|a| super::redact(a, None))
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            }),
         }
     }
 }
 impl Drop for CliTimer {
     fn drop(&mut self) {
         record(&self.name, false, true, None, self.start);
+        if let Some(args) = &self.args {
+            crate::timing::log(format_args!("  git {args}"));
+        }
     }
 }
 
@@ -360,6 +375,62 @@ pub(super) fn authorship(
     }
 }
 
+/// Git's exit code, output and error output for a read answered from the repository's files
+/// in-process (see `answer`); `None` when git is to run.
+pub(super) fn answer(repo: &Path, args: &[&str]) -> Option<(i32, Vec<u8>, Vec<u8>)> {
+    #[cfg(feature = "native-git")]
+    {
+        let start = Instant::now();
+        capability(repo).ok()?;
+        let answer = answer::answer(repo, args)?;
+        record(answer::name(args), true, false, None, start);
+        Some((answer.code, answer.stdout, answer.stderr))
+    }
+    #[cfg(not(feature = "native-git"))]
+    {
+        let _ = (repo, args);
+        None
+    }
+}
+
+#[cfg(feature = "native-git")]
+mod answer;
+
+/// Read an unfiltered blob up to `limit` bytes, falling back when native Git is unsuitable.
+pub(super) fn bounded_blob(repo: &Path, spec: &str, limit: usize) -> Option<Result<Vec<u8>, ()>> {
+    #[cfg(feature = "native-git")]
+    {
+        let start = Instant::now();
+        capability(repo).ok()?;
+        let result = answer::bounded_blob(repo, spec, limit)?;
+        // Timing only: never record a private comparison's spec or content.
+        record("raw-blob", true, false, None, start);
+        Some(result)
+    }
+    #[cfg(not(feature = "native-git"))]
+    {
+        let _ = (repo, spec, limit);
+        None
+    }
+}
+#[cfg(feature = "native-git")]
+mod history;
+
+/// Cache eligible history logs when their Git inputs have not changed.
+pub(super) fn history_log(
+    path: &Path,
+    args: &[String],
+    eligible: bool,
+    read: impl FnOnce() -> Result<String, String>,
+) -> Result<String, String> {
+    #[cfg(feature = "native-git")]
+    return history::read(path, args, eligible, read);
+    #[cfg(not(feature = "native-git"))]
+    {
+        let _ = (path, args, eligible);
+        read()
+    }
+}
 #[cfg(feature = "native-git")]
 mod commits;
 #[cfg(feature = "native-git")]
@@ -393,10 +464,13 @@ mod native {
     fn text(bytes: &gix::bstr::BStr) -> Result<String, String> {
         bytes.to_str().map(str::to_owned).map_err(err)
     }
+    /// Open a fresh handle for each read. Cloned gix repositories can retain their index
+    /// and packed-refs snapshots when a file is rewritten within the same timestamp tick.
+    /// A fresh handle keeps staged changes and refs immediately visible to native readers.
     pub(super) fn open(path: &Path) -> Result<gix::Repository, String> {
         let mut permissions = gix::open::Permissions::default();
         permissions.config.git_binary = true;
-        let repo = gix::discover_opts(
+        gix::discover_opts(
             path,
             Default::default(),
             gix::open::Options::default()
@@ -404,8 +478,7 @@ mod native {
                 .bail_if_untrusted(true)
                 .strict_config(true),
         )
-        .map_err(err)?;
-        Ok(repo)
+        .map_err(err)
     }
     pub(super) fn head(path: &Path) -> Result<String, String> {
         let repo = open(path)?;

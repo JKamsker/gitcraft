@@ -29,7 +29,7 @@ tree-sitter-typescript = { version = "0.23.2", optional = true }
 tree-sitter-go = { version = "0.25", optional = true }
 tree-sitter-c = { version = "0.24", optional = true }
 tree-sitter-cpp = { version = "0.23.4", optional = true }
-gix = { version = "0.90", optional = true, default-features = false, features = ["revision", "sha1", "sha256", "blob-diff"] }
+gix = { version = "0.90", optional = true, default-features = false, features = ["revision", "sha1", "sha256", "blob-diff", "status"] }
 # Commit times in local time, as git prints them (already used by gix).
 jiff = { version = "0.2", optional = true }
 eframe = { version = "0.36", default-features = false, features = ["default_fonts", "wgpu", "accesskit", "wayland", "x11", "persistence", "links"] }

@@ -367,8 +367,28 @@ impl RepoTab {
     /// Reads the open diff again, showing the old one meanwhile.
     pub(super) fn refresh_diff(&mut self, ctx: &egui::Context) {
         let Some(view) = &mut self.diff else { return };
+        let (first, previous) = (view.request == 0, view.request);
+        let pending = previous != view.data_request;
         let request = view.next_request();
         let key = view.key.clone();
+        let (active, queued) = crate::tasks::counts().unwrap_or_default();
+        crate::timing::log(format_args!(
+            "diff#{request} {} {} {} ({}); jobs: {active} running, {queued} waiting",
+            if first { "opened" } else { "read again" },
+            match &key {
+                DiffKey::Work(file) => format!("{:?}", file.area).to_lowercase(),
+                DiffKey::Commit { .. } => "commit".into(),
+                DiffKey::Range { .. } => "range".into(),
+                DiffKey::Remerge { .. } => "remerge".into(),
+            },
+            crate::timing::kind_of(key.path()),
+            if pending && !first {
+                format!("diff#{previous} still being read")
+            } else {
+                "nothing pending".into()
+            },
+        ));
+        let asked = std::time::Instant::now();
         let lines = view.lines.clone();
         let path = self.path.clone();
         let settings = Settings::get(ctx);
@@ -381,7 +401,11 @@ impl RepoTab {
         view.algorithm = opts.algorithm;
         let dark = Tokens::get(ctx).dark();
         spawn(&self.tx, ctx, move || {
+            let _scope = crate::timing::scope(format!("diff#{request}"));
+            crate::timing::step("waited for a worker", asked);
+            let started = std::time::Instant::now();
             let result = diff::load_lines(&path, &key, lines.as_deref(), opts, dark).map(Box::new);
+            crate::timing::step("read in all", started);
             Msg::Diff(request, result)
         });
         self.load_diff_file(ctx);
