@@ -30,6 +30,8 @@ ISOLATED = {
     # Run it separately from the main repo-d-f libtest harness.
     "repo-d-f": ["repo::drag_drop::tests::a_commit_dropped_on_another_of_the_branch_is_squashed_into_it"],
     "repo-q-r": [
+        # Closing a live lost-commit scan has hung under parallel Windows fixtures.
+        "repo::reflog::tests::closing_the_view_stops_its_scan",
         "repo::reflog::tests::a_commit_lost_in_the_terminal_comes_back_as_a_branch",
         # This end-to-end UI/rebase fixture has hung amid concurrent Windows
         # fixtures. Keep its real confirmation and undo checks in a separate process.
@@ -38,6 +40,9 @@ ISOLATED = {
     # This real rebase/undo fixture hung while other Windows Git fixtures ran.
     "repo-s": ["repo::stack::tests::undoing_a_rebase_that_updated_dependent_branches_puts_them_back"],
     "core": [
+        # Native PowerShell ACL snapshot occasionally exhausts its bounded process
+        # deadline when run after other standalone fixtures in the same process.
+        "standalone::model::tests::binary_whole_side_choices_preserve_bytes_and_stale_inputs_refuse_save",
         "parallel_bisect::tests::finds_the_first_bad_commit_with_any_parallelism",
         "app::palette::tests::thousands_of_branches_open_and_filter_quickly",
     ],
@@ -126,10 +131,16 @@ def isolated_inventory(binaries, shard):
     return tests
 
 
+def serial_filters(shard, group):
+    # Isolated tests inside a serial feature group must not be run twice.
+    return [group, *[arg for name in ISOLATED.get(shard, [])
+                     if name.startswith(group) for arg in ("--skip", name)]]
+
+
 def serial_inventory(binaries, shard):
     tests = Counter()
     for group in SERIAL_GROUPS.get(shard, []):
-        selected = inventory(binaries, [group])
+        selected = inventory(binaries, serial_filters(shard, group))
         if not selected:
             raise RuntimeError(f"Serial test group is empty: {group}")
         if tests & selected:
@@ -183,12 +194,13 @@ def run_shard(binaries, shard):
 
     for group in SERIAL_GROUPS.get(shard, []):
         for path, cwd in binaries:
-            selected = inventory([(path, cwd)], [group])
+            filters = serial_filters(shard, group)
+            selected = inventory([(path, cwd)], filters)
             if not selected:
                 continue
             print(f"Running serial group: {group}: {selected.total()} tests", flush=True)
             result = subprocess.run(
-                [str(path), "--nocapture", group, "--test-threads=1"], cwd=cwd
+                [str(path), "--nocapture", *filters, "--test-threads=1"], cwd=cwd
             )
             if result.returncode:
                 return result.returncode
