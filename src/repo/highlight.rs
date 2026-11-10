@@ -17,7 +17,15 @@ const MAX_BYTES: usize = 512 * 1024;
 
 fn syntaxes() -> &'static SyntaxSet {
     static SET: OnceLock<SyntaxSet> = OnceLock::new();
-    SET.get_or_init(two_face::syntax::extra_newlines)
+    SET.get_or_init(|| {
+        let at = std::time::Instant::now();
+        let set = two_face::syntax::extra_newlines();
+        crate::timing::log(format_args!(
+            "syntaxes loaded (once) in {}",
+            crate::timing::ms(at.elapsed())
+        ));
+        set
+    })
 }
 
 fn themes() -> &'static ThemeSet {

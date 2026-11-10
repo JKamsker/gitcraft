@@ -230,6 +230,11 @@ fn a_linked_worktree_is_watched_where_git_keeps_its_data() {
     assert_eq!(fs_change(Path::new("/r/.git/ORIG_HEAD"), &[]), None);
     assert_eq!(fs_change(Path::new("/r/.git/objects/x"), &[]), None);
     assert_eq!(fs_change(Path::new("/r/a.rs"), &[]), Some(FsChange::Files));
+    assert_eq!(fs_change(Path::new("/r/.git"), &[]), None);
+    assert_eq!(
+        fs_change(Path::new("/r/.github"), &[]),
+        Some(FsChange::Files)
+    );
     assert_eq!(
         fs_change(Path::new("/r/.gitmodules"), &[]),
         Some(FsChange::Index)

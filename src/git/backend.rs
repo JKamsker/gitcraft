@@ -71,6 +71,9 @@ pub(crate) fn reset_metrics() {
     }
 }
 fn record(name: &str, native: bool, process: bool, reason: Option<&str>, start: Instant) {
+    if native || process {
+        crate::timing::git(name, native, start.elapsed());
+    }
     if let Ok(mut all) = counters().lock() {
         let m = all
             .entry(name.to_owned())
@@ -95,6 +98,8 @@ fn record(name: &str, native: bool, process: bool, reason: Option<&str>, start: 
 pub(super) struct CliTimer {
     name: String,
     start: Instant,
+    /// The whole command, when the timing log writes every call's (see [`crate::timing::all`]).
+    args: Option<String>,
 }
 impl CliTimer {
     pub(super) fn new(args: &[&str]) -> Self {
@@ -108,15 +113,25 @@ impl CliTimer {
                 break;
             }
         }
+        crate::timing::git_begins();
         Self {
             name: format!("cli:{}", rest.first().unwrap_or(&"unknown")),
             start: Instant::now(),
+            args: crate::timing::all().then(|| {
+                args.iter()
+                    .map(|a| super::redact(a, None))
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            }),
         }
     }
 }
 impl Drop for CliTimer {
     fn drop(&mut self) {
         record(&self.name, false, true, None, self.start);
+        if let Some(args) = &self.args {
+            crate::timing::log(format_args!("  git {args}"));
+        }
     }
 }
 

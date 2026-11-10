@@ -65,6 +65,7 @@ mod tasks;
 mod teleport;
 mod terminal;
 mod theme;
+mod timing;
 mod tour;
 mod trackers;
 mod tray;

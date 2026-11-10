@@ -1,6 +1,7 @@
 //! Watching the repository's folder (and a linked worktree's git folders) for changes made
 //! elsewhere.
 
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{Sender, channel};
 use std::time::Duration;
@@ -33,6 +34,40 @@ impl RepoTab {
     }
 }
 
+/// Per watched worktree, the changes on disk seen since the last read they caused: how many,
+/// and where (see [`crate::timing::place_of`]), the most frequent first. For the timing log.
+static SEEN: std::sync::Mutex<BTreeMap<PathBuf, BTreeMap<String, u64>>> =
+    std::sync::Mutex::new(BTreeMap::new());
+
+fn saw(root: &Path, path: &Path) {
+    let place = crate::timing::place_of(path, root);
+    if let Ok(mut seen) = SEEN.lock() {
+        *seen
+            .entry(root.to_owned())
+            .or_default()
+            .entry(place)
+            .or_default() += 1;
+    }
+}
+
+/// What [`saw`] counted under `root` since it was last asked, as `target/ ×120, .rs ×1`.
+pub(super) fn take_seen(root: &Path) -> Option<String> {
+    let places = SEEN.lock().ok()?.remove(root)?;
+    let mut places: Vec<_> = places.into_iter().collect();
+    places.sort_by(|a, b| b.1.cmp(&a.1));
+    let shown: Vec<String> = places
+        .iter()
+        .take(5)
+        .map(|(place, n)| format!("{place} ×{n}"))
+        .collect();
+    let more = places.len().saturating_sub(5);
+    Some(if more > 0 {
+        format!("{} and {more} more", shown.join(", "))
+    } else {
+        shown.join(", ")
+    })
+}
+
 /// A watcher of the worktree `path` (and of a linked worktree's git folders) that sends what
 /// each change calls for (see [`fs_change`]) to `tx`.
 fn start_watcher(
@@ -48,6 +83,7 @@ fn start_watcher(
         .iter()
         .flat_map(|(own, common)| [own.clone(), common.clone()])
         .collect();
+    let root = path.to_owned();
     let handler = move |res: notify::Result<notify::Event>| {
         let Ok(event) = res else { return };
         if matches!(event.kind, notify::EventKind::Access(_)) {
@@ -55,6 +91,7 @@ fn start_watcher(
         }
         for path in &event.paths {
             if let Some(change) = fs_change(path, &git_dirs) {
+                saw(&root, path);
                 let _ = tx.send(change);
                 ctx.request_repaint_after(Duration::from_millis(500));
             }
@@ -157,6 +194,11 @@ pub(super) fn fs_change(path: &Path, git_dirs: &[PathBuf]) -> Option<FsChange> {
     let s = path.to_string_lossy().replace('\\', "/");
     match s.split_once("/.git/") {
         Some((_, inside)) => relevant(inside),
+        // The git folder itself, which Windows says changed whenever anything in it did (git
+        // reading objects, gitcraft's own files…): each change in it comes on its own. Taken
+        // for one of the worktree's files, every read made another one, a status and a diff
+        // read again each second.
+        None if path.file_name().is_some_and(|n| n == ".git") => None,
         None if path.file_name().is_some_and(|n| n == ".gitmodules") => Some(FsChange::Index),
         None => Some(FsChange::Files),
     }
