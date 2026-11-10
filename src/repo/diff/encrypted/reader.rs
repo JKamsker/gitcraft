@@ -17,6 +17,15 @@ pub(super) fn read_sides_active(
     key: &DiffKey,
     active: &dyn Fn() -> bool,
 ) -> Result<(String, String), String> {
+    // In-process when it can be: the reads below start eight git processes.
+    if let DiffKey::Commit { hash, path } = key
+        && let Ok((old, new)) = crate::git::commit_file_sides(repo, hash, path)
+    {
+        return Ok((
+            side_text(old.unwrap_or_default())?,
+            side_text(new.unwrap_or_default())?,
+        ));
+    }
     let read = Read {
         active,
         repo,
@@ -175,6 +184,11 @@ fn read_side(read: &Read<'_>, side: At) -> Result<String, String> {
             version.bytes
         }
     };
+    side_text(bytes)
+}
+
+/// A side read, as text: refused when too large, binary or not UTF-8.
+fn side_text(bytes: Vec<u8>) -> Result<String, String> {
     if bytes.len() > MAX_BYTES {
         return Err(crate::i18n::text("repo-core-1777").to_owned());
     }

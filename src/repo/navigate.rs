@@ -89,16 +89,92 @@ impl RepoTab {
         self.detail = None;
         self.detail_error = None;
         self.detail_hash = Some(hash.clone());
+        // What was still being read for the commit selected before is not waited for.
+        self.detail_cancel.cancel();
+        self.detail_cancel = self.tx.cancel.child();
+        if let Some(detail) = self.detail_cache.get(&hash, &self.refs.head) {
+            self.show_detail(detail, ctx);
+            return;
+        }
+        self.detail_asked = Some(std::time::Instant::now());
         let path = self.path.clone();
         let failed_hash = hash.clone();
-        super::messages::spawn_or(
+        let (cancel, failed_cancel) = (self.detail_cancel.clone(), self.detail_cancel.clone());
+        // A read the selection moved on from only fills the cache: should the same commit be
+        // selected again meanwhile, its "cancelled" is not that one's error.
+        super::messages::spawn_selection(
             &self.tx,
             ctx,
-            move |error| Msg::Detail(failed_hash, Err(error)),
+            self.detail_cancel.clone(),
+            false,
+            move |error| {
+                if failed_cancel.is_cancelled() {
+                    Msg::DetailPrefetched(Err(error))
+                } else {
+                    Msg::Detail(failed_hash, Err(error))
+                }
+            },
             move || {
                 let detail = git::commit_detail(&path, &hash);
-                Msg::Detail(hash, detail)
+                if cancel.is_cancelled() {
+                    Msg::DetailPrefetched(detail)
+                } else {
+                    Msg::Detail(hash, detail)
+                }
             },
+        );
+    }
+
+    /// The selected commit's detail, read or from the cache.
+    pub(super) fn show_detail(&mut self, detail: git::CommitDetail, ctx: &egui::Context) {
+        let hash = detail.hash.clone();
+        self.detail = Some(detail);
+        self.fill_reword();
+        self.finish_commit_changes(&hash, ctx);
+    }
+
+    /// Reads ahead the files of the commits on screen (`rows`, and as many again around them),
+    /// one batch at a time behind all other work: a click on any of them shows its files at once.
+    pub(super) fn prefetch_files(&mut self, rows: std::ops::Range<usize>, ctx: &egui::Context) {
+        /// Commits a batch reads at most.
+        const BATCH: usize = 64;
+        // Not while the repository is read: that read is what the tab waits on.
+        if self.files_cache.reading || self.loading || self.commits.is_empty() {
+            return;
+        }
+        let around = rows.len().max(20);
+        let start = rows.start.saturating_sub(around);
+        let end = (rows.end + around).min(self.commits.len());
+        // Those on screen first, then those just off it.
+        let order = rows
+            .clone()
+            .chain(rows.end..end)
+            .chain((start..rows.start).rev());
+        let hashes: Vec<String> = order
+            .filter_map(|row| {
+                let hash = &self.commits.get(row)?.hash;
+                (hash != WIP_HASH
+                    && !hash.starts_with('\u{0}')
+                    && self.stash_at(row).is_none()
+                    && self.parked_at(row).is_none()
+                    && !self.files_cache.settled(hash))
+                .then(|| hash.clone())
+            })
+            .take(BATCH)
+            .collect();
+        if hashes.is_empty() {
+            return;
+        }
+        self.files_cache.reading = true;
+        let path = self.path.clone();
+        let (asked, failed_asked) = (hashes.clone(), hashes.clone());
+        super::messages::spawn_selection(
+            &self.tx,
+            ctx,
+            self.tx.cancel.clone(),
+            true,
+            move |error| Msg::FilesPrefetched(failed_asked, Err(error)),
+            move || Msg::FilesPrefetched(asked, git::commit_files_batch(&path, &hashes)),
         );
     }
 

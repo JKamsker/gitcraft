@@ -102,11 +102,126 @@ fn commit_files_args<'a>(kind: &'a str, hash: &'a str) -> [&'a str; 10] {
 
 /// The files commit `hash` changed, with their line counts.
 pub(super) fn commit_files(repo: &Path, hash: &str) -> Result<Vec<ChangedFile>, String> {
-    let status_out = run(Some(repo), &commit_files_args("--name-status", hash))?;
-    let numstat_out = run(Some(repo), &commit_files_args("--numstat", hash))?;
+    super::backend::dispatch(
+        repo,
+        super::backend::Read::CommitFiles,
+        |repo| match super::backend::commit_files(repo, &[hash.to_owned()])?.pop() {
+            Some((_, Some(files))) => Ok(files),
+            _ => Err("listed by git".into()),
+        },
+        || commit_files_by_git(repo, hash),
+    )
+}
+
+/// [`commit_files`] as git reads them.
+pub(super) fn commit_files_by_git(repo: &Path, hash: &str) -> Result<Vec<ChangedFile>, String> {
+    // Both at once: two process starts in the time of one.
+    let (status_out, numstat_out) = std::thread::scope(|s| {
+        let inherited = crate::tasks::Inherited::capture();
+        let numstat = s.spawn(move || {
+            inherited.run(|| run(Some(repo), &commit_files_args("--numstat", hash)))
+        });
+        let status = run(Some(repo), &commit_files_args("--name-status", hash));
+        let numstat = numstat.join().unwrap_or_else(|_| {
+            Err(crate::i18n::text("interaction-teleport-error-stopped").into())
+        });
+        (status, numstat)
+    });
+    let (status_out, numstat_out) = (status_out?, numstat_out?);
     let mut files = parse_name_status(&status_out);
     add_line_counts(&mut files, &numstat_out);
     Ok(files)
+}
+
+/// The files each of `hashes` changed, as [`commit_files`] lists them, read for all of them by
+/// two processes (the names, then the line counts) rather than two each: for reading ahead.
+pub fn commit_files_batch(
+    repo: &Path,
+    hashes: &[String],
+) -> Result<Vec<(String, Vec<ChangedFile>)>, String> {
+    super::backend::dispatch(
+        repo,
+        super::backend::Read::CommitFiles,
+        |repo| {
+            let read = super::backend::commit_files(repo, hashes)?;
+            // Those only git lists faithfully, all by one process.
+            let by_git: Vec<String> = read
+                .iter()
+                .filter(|(_, files)| files.is_none())
+                .map(|(hash, _)| hash.clone())
+                .collect();
+            let mut listed: std::collections::HashMap<String, Vec<ChangedFile>> =
+                if by_git.is_empty() {
+                    Default::default()
+                } else {
+                    commit_files_batch_by_git(repo, &by_git)?
+                        .into_iter()
+                        .collect()
+                };
+            Ok(read
+                .into_iter()
+                .filter_map(|(hash, files)| {
+                    let files = files.or_else(|| listed.remove(&hash))?;
+                    Some((hash, files))
+                })
+                .collect())
+        },
+        || commit_files_batch_by_git(repo, hashes),
+    )
+}
+
+/// [`commit_files_batch`] as git reads them.
+pub(super) fn commit_files_batch_by_git(
+    repo: &Path,
+    hashes: &[String],
+) -> Result<Vec<(String, Vec<ChangedFile>)>, String> {
+    let input = hashes.join("\n") + "\n";
+    let args = |kind: &'static str| {
+        [
+            "log",
+            NO_SIGNATURE,
+            "--no-walk=unsorted",
+            "--stdin",
+            "-z",
+            // A mark before each commit's hash: its files follow.
+            "--format=%x01%H",
+            "--diff-merges=first-parent",
+            "--root",
+            "-M",
+            kind,
+        ]
+    };
+    let (names, counts) = std::thread::scope(|s| {
+        let inherited = crate::tasks::Inherited::capture();
+        let input = &input;
+        let counts = s.spawn(move || {
+            inherited.run(|| super::run_input(Some(repo), &args("--numstat"), input))
+        });
+        let names = super::run_input(Some(repo), &args("--name-status"), input);
+        let counts = counts.join().unwrap_or_else(|_| {
+            Err(crate::i18n::text("interaction-teleport-error-stopped").into())
+        });
+        (names, counts)
+    });
+    let (names, counts) = (names?, counts?);
+    let counts: std::collections::HashMap<&str, &str> = per_commit(&counts).collect();
+    Ok(per_commit(&names)
+        .map(|(hash, names)| {
+            let mut files = parse_name_status(names);
+            if let Some(counts) = counts.get(hash) {
+                add_line_counts(&mut files, counts);
+            }
+            (hash.to_owned(), files)
+        })
+        .collect())
+}
+
+/// `git log -z --format=%x01%H`'s output, by commit: its hash and what follows it.
+fn per_commit(out: &str) -> impl Iterator<Item = (&str, &str)> {
+    out.split('\u{1}').filter_map(|part| {
+        let (hash, rest) = part.split_once('\0')?;
+        Some((hash, rest.strip_prefix('\n').unwrap_or(rest)))
+    })
 }
 
 /// What makes git print a plain patch.
@@ -154,8 +269,17 @@ impl DiffOptions {
 /// of context around it: with `diff.context=0` in the user's config, every one. Asks for the
 /// usual three then.
 fn keep_context(repo: &Path, opts: DiffOptions, args: &mut Vec<&str>) {
-    let no_context = run(Some(repo), &["config", "--type=int", "diff.context"])
-        .is_ok_and(|n| n.trim().parse::<u64>().is_ok_and(|n| n == 0));
+    let context = super::backend::dispatch(
+        repo,
+        super::backend::Read::DiffContext,
+        super::backend::diff_context,
+        || {
+            Ok(run(Some(repo), &["config", "--type=int", "diff.context"])
+                .ok()
+                .and_then(|n| n.trim().parse().ok()))
+        },
+    );
+    let no_context = matches!(context, Ok(Some(0)));
     if no_context && !opts.whole_file {
         args.push("--unified=3");
     }
@@ -163,6 +287,21 @@ fn keep_context(repo: &Path, opts: DiffOptions, args: &mut Vec<&str>) {
 
 /// The patch of one file in a commit.
 pub fn file_diff(repo: &Path, hash: &str, path: &str, opts: DiffOptions) -> Result<String, String> {
+    super::backend::dispatch(
+        repo,
+        super::backend::Read::FileDiff,
+        |repo| super::backend::file_patch(repo, hash, path, opts),
+        || file_diff_by_git(repo, hash, path, opts),
+    )
+}
+
+/// [`file_diff`] as git prints it.
+pub(super) fn file_diff_by_git(
+    repo: &Path,
+    hash: &str,
+    path: &str,
+    opts: DiffOptions,
+) -> Result<String, String> {
     let mut args = vec![
         LITERAL_PATHS,
         "show",
@@ -177,9 +316,9 @@ pub fn file_diff(repo: &Path, hash: &str, path: &str, opts: DiffOptions) -> Resu
     keep_context(repo, opts, &mut args);
     args.extend([END_OPTS, hash, "--", path]);
     // Limited to its new name, a file renamed in the commit looks new from top to bottom.
-    let old_path = run(Some(repo), &commit_files_args("--name-status", hash))
+    let old_path = commit_files(repo, hash)
         .ok()
-        .and_then(|out| parse_name_status(&out).into_iter().find(|f| f.path == path))
+        .and_then(|files| files.into_iter().find(|f| f.path == path))
         .and_then(|file| file.old_path);
     args.extend(old_path.as_deref());
     run(Some(repo), &args)
@@ -404,6 +543,64 @@ mod tests {
         }
         assert!(kept);
         assert!(cleaned);
+        Ok(())
+    }
+
+    #[test]
+    fn files_read_in_a_batch_are_those_read_one_by_one() -> Result<(), String> {
+        let text = |e: std::io::Error| e.to_string();
+        let dir = std::env::temp_dir().join(format!("gitcraft-batch-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).map_err(text)?;
+        let git = |args: &[&str]| run(Some(&dir), args);
+        git(&["init", "-q", "-b", "main"])?;
+        git(&["config", "user.name", "T"])?;
+        git(&["config", "user.email", "t@t"])?;
+        std::fs::write(dir.join("a.txt"), "one\ntwo\nthree\nfour\n").map_err(text)?;
+        git(&["add", "."])?;
+        git(&["commit", "-q", "-m", "root"])?;
+        git(&["switch", "-q", "-c", "side"])?;
+        git(&["mv", "a.txt", "b.txt"])?;
+        std::fs::write(dir.join("b.txt"), "one\ntwo\nthree\nfive\n").map_err(text)?;
+        git(&["commit", "-q", "-am", "rename"])?;
+        git(&["switch", "-q", "main"])?;
+        std::fs::write(dir.join("c.txt"), "c\n").map_err(text)?;
+        git(&["add", "."])?;
+        git(&["commit", "-q", "-m", "other"])?;
+        git(&["merge", "-q", "--no-edit", "side"])?;
+        let hashes: Vec<String> = git(&["log", "--format=%H", "--all"])?
+            .lines()
+            .map(str::to_owned)
+            .collect();
+        let batch = commit_files_batch(&dir, &hashes);
+        let single: Result<Vec<_>, String> = hashes
+            .iter()
+            .map(|h| commit_files(&dir, h).map(|files| (h.clone(), files)))
+            .collect();
+        let _ = std::fs::remove_dir_all(&dir);
+        let describe = |files: &[(String, Vec<ChangedFile>)]| {
+            files
+                .iter()
+                .map(|(h, files)| {
+                    let files: Vec<_> = files
+                        .iter()
+                        .map(|f| {
+                            (
+                                f.status,
+                                f.path.clone(),
+                                f.old_path.clone(),
+                                f.added,
+                                f.removed,
+                            )
+                        })
+                        .collect();
+                    format!("{h}: {files:?}")
+                })
+                .collect::<Vec<_>>()
+        };
+        let (batch, single) = (batch?, single?);
+        assert_eq!(batch.len(), 4);
+        assert_eq!(describe(&batch), describe(&single));
         Ok(())
     }
 

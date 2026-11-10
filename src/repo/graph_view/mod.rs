@@ -128,10 +128,18 @@ impl RepoTab {
     /// The graph, or during a ghost run the graph as the operation would leave it (see
     /// [`super::ghost`]), with the strip that says what it would do above it.
     pub(super) fn graph_view(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
-        if self.timeline_view.is_none() {
-            self.saved_graph_header(ui);
+        // One row: the history filters, then which part of the history the graph shows.
+        let saved_views = self.timeline_view.is_none();
+        ui.horizontal_wrapped(|ui| {
+            self.history_filter_controls(ui);
+            if saved_views {
+                ui.separator();
+                self.saved_graph_controls(ui);
+            }
+        });
+        if saved_views {
+            self.saved_graph_status(ui);
         }
-        self.history_filters_frame(ui);
         let area = ui.available_rect_before_wrap();
         let ghost = self
             .ghost
@@ -168,15 +176,18 @@ impl RepoTab {
         self.graph_walk_header(ui);
         self.graph_stacks(ui, acts);
         let map_area = ui.available_rect_before_wrap();
+        let map = crate::settings::Settings::history_map(ui.ctx());
         let map_rect = egui::Rect::from_min_max(
-            egui::pos2(map_area.right() - 78.0, map_area.top()),
+            egui::pos2(map_area.right() - map.width(), map_area.top()),
             map_area.right_bottom(),
         );
-        let show_map = map_area.width() > 480.0 && map_area.height() > 120.0;
+        let show_map = map != crate::settings::HistoryMap::Hidden
+            && map_area.width() > 480.0
+            && map_area.height() > 120.0;
         let graph_rect = egui::Rect::from_min_max(
             map_area.min,
             egui::pos2(
-                map_area.right() - if show_map { 84.0 } else { 0.0 },
+                map_area.right() - if show_map { map.width() + 6.0 } else { 0.0 },
                 map_area.bottom(),
             ),
         );
@@ -328,6 +339,8 @@ impl RepoTab {
                 }
                 self.test_lane_frame(&settings, ui.ctx());
                 let mut hovered_message = None;
+                // The rows on screen, whose files are read ahead (see `prefetch_files`).
+                let mut on_screen = None;
                 let out = scroll.show_rows(ui, ROW_PITCH, total, |ui, range| {
                     // show_rows includes overscan and partially clipped rows. Require the text's
                     // centre to be inside the viewport with enough room for its glyphs: a label on
@@ -341,6 +354,7 @@ impl RepoTab {
                     });
                     let first = visible.clone().next().unwrap_or(range.start);
                     let end = visible.next_back().map_or(first, |i| i + 1);
+                    on_screen = Some(first..end);
                     let readable = if filtered {
                         self.readable_rows(
                             ui,
@@ -467,6 +481,9 @@ impl RepoTab {
                     }
                 });
                 ui.data_mut(|d| d.insert_temp(offset_id, out.state.offset.y));
+                if let Some(rows) = on_screen.filter(|_| !filtered && !ghost) {
+                    self.prefetch_files(rows, ui.ctx());
+                }
                 if let Some(steps) = first_steps {
                     self.first_steps_view(ui, steps, acts);
                 }

@@ -1,6 +1,7 @@
 use super::*;
 impl RepoTab {
-    pub(in crate::repo) fn saved_graph_header(&mut self, ui: &mut egui::Ui) {
+    /// The view picker and the chosen view's controls, laid out in the caller's row.
+    pub(in crate::repo) fn saved_graph_controls(&mut self, ui: &mut egui::Ui) {
         if !self.saved_views.loaded && !self.loading && !self.sleeping() {
             self.saved_views.prefs = ui
                 .ctx()
@@ -18,182 +19,174 @@ impl RepoTab {
         let mut refresh = false;
         let mut collapse = false;
         let mut page = false;
-        ui.horizontal_wrapped(|ui| {
-            let active = self.saved_views.prefs.active.as_ref();
-            egui::ComboBox::from_id_salt("graph_relation_view")
-                .selected_text(self.saved_views.prefs.active_caption())
-                .show_ui(ui, |ui| {
+        let active = self.saved_views.prefs.active.as_ref();
+        egui::ComboBox::from_id_salt("graph_relation_view")
+            .selected_text(self.saved_views.prefs.active_caption())
+            .show_ui(ui, |ui| {
+                if ui
+                    .selectable_label(
+                        active.is_none(),
+                        crate::i18n::text("repo-workflows-saved_views-saved-graph-header-0b3db67d"),
+                    )
+                    .clicked()
+                {
+                    choose = Some(None);
+                }
+                for (name, kind) in [
+                    (
+                        crate::i18n::text("repo-workflows-saved_views-saved-graph-header-5f0d0c04"),
+                        Kind::MyUnpushed,
+                    ),
+                    (
+                        crate::i18n::text("repo-workflows-saved_views-saved-graph-header-a5d2f076"),
+                        Kind::RecentAncestors,
+                    ),
+                ] {
                     if ui
-                        .selectable_label(
-                            active.is_none(),
-                            crate::i18n::text(
-                                "repo-workflows-saved_views-saved-graph-header-0b3db67d",
-                            ),
-                        )
+                        .selectable_label(active.is_some_and(|p| p.kind == kind), name)
                         .clicked()
-                    {
-                        choose = Some(None);
-                    }
-                    for (name, kind) in [
-                        (
-                            crate::i18n::text(
-                                "repo-workflows-saved_views-saved-graph-header-5f0d0c04",
-                            ),
-                            Kind::MyUnpushed,
-                        ),
-                        (
-                            crate::i18n::text(
-                                "repo-workflows-saved_views-saved-graph-header-a5d2f076",
-                            ),
-                            Kind::RecentAncestors,
-                        ),
-                    ] {
-                        if ui
-                            .selectable_label(active.is_some_and(|p| p.kind == kind), name)
-                            .clicked()
-                        {
-                            generated = true;
-                            choose = Some(Some(Preset {
-                                name: match kind {
-                                    Kind::MyUnpushed => "My unpushed work",
-                                    _ => "My recent changes + dependencies",
-                                }
-                                .into(),
-                                kind,
-                                days: 30,
-                            }));
-                        }
-                    }
-                    let anchor = self
-                        .selected
-                        .and_then(|i| self.commits.get(i))
-                        .filter(|c| git::investigations::oid(&c.hash))
-                        .map(|c| c.hash.clone());
-                    if ui
-                        .add_enabled(
-                            anchor.is_some(),
-                            egui::Button::new(crate::i18n::text(
-                                "repo-workflows-saved_views-saved-graph-header-1697aaa3",
-                            )),
-                        )
-                        .clicked()
-                        && let Some(anchor) = anchor
                     {
                         generated = true;
                         choose = Some(Some(Preset {
-                            name: format!("Descendants of {}", super::super::short(&anchor)),
-                            kind: Kind::Descendants { anchor },
+                            name: match kind {
+                                Kind::MyUnpushed => "My unpushed work",
+                                _ => "My recent changes + dependencies",
+                            }
+                            .into(),
+                            kind,
                             days: 30,
                         }));
                     }
-                    ui.menu_button(
-                        crate::i18n::text("repo-workflows-saved_views-saved-graph-header-361c4911"),
-                        |ui| {
-                            for b in &self.refs.local {
-                                if ui.button(&b.name).clicked() {
-                                    generated = true;
-                                    choose = Some(Some(Preset {
-                                        name: format!("Only merges into {}", b.name),
-                                        kind: Kind::MergesInto {
-                                            branch: b.name.clone(),
-                                        },
-                                        days: 30,
-                                    }));
-                                    ui.close();
-                                }
-                            }
-                        },
-                    );
-                    if !self.saved_views.prefs.saved.is_empty() {
-                        ui.separator();
-                        for p in &self.saved_views.prefs.saved {
-                            if ui.selectable_label(active == Some(p), &p.name).clicked() {
-                                choose = Some(Some(p.clone()));
-                            }
-                        }
-                    }
-                });
-            let was_generated = self.saved_views.prefs.active.is_some()
-                && self.saved_views.prefs.active == self.saved_views.prefs.generated_active;
-            if let Some(preset) = self.saved_views.prefs.active.as_mut() {
-                if matches!(preset.kind, Kind::RecentAncestors) {
-                    ui.label(crate::i18n::text(
-                        "repo-workflows-saved_views-saved-graph-header-e08c0aa8",
-                    ));
-                    if ui
-                        .add(egui::DragValue::new(&mut preset.days).range(1..=3650))
-                        .changed()
-                    {
-                        if was_generated {
-                            self.saved_views.prefs.generated_active = Some(preset.clone());
-                        }
-                        refresh = true;
-                    }
                 }
-                ui.add(
-                    egui::TextEdit::singleline(&mut self.saved_views.name)
-                        .hint_text(crate::i18n::text(
-                            "repo-workflows-saved_views-saved-graph-header-e6fdb6c7",
-                        ))
-                        .char_limit(80)
-                        .desired_width(130.0),
+                let anchor = self
+                    .selected
+                    .and_then(|i| self.commits.get(i))
+                    .filter(|c| git::investigations::oid(&c.hash))
+                    .map(|c| c.hash.clone());
+                if ui
+                    .add_enabled(
+                        anchor.is_some(),
+                        egui::Button::new(crate::i18n::text(
+                            "repo-workflows-saved_views-saved-graph-header-1697aaa3",
+                        )),
+                    )
+                    .clicked()
+                    && let Some(anchor) = anchor
+                {
+                    generated = true;
+                    choose = Some(Some(Preset {
+                        name: format!("Descendants of {}", super::super::short(&anchor)),
+                        kind: Kind::Descendants { anchor },
+                        days: 30,
+                    }));
+                }
+                ui.menu_button(
+                    crate::i18n::text("repo-workflows-saved_views-saved-graph-header-361c4911"),
+                    |ui| {
+                        for b in &self.refs.local {
+                            if ui.button(&b.name).clicked() {
+                                generated = true;
+                                choose = Some(Some(Preset {
+                                    name: format!("Only merges into {}", b.name),
+                                    kind: Kind::MergesInto {
+                                        branch: b.name.clone(),
+                                    },
+                                    days: 30,
+                                }));
+                                ui.close();
+                            }
+                        }
+                    },
                 );
-                save = ui
-                    .add_enabled(
-                        !self.saved_views.name.trim().is_empty()
-                            && self.saved_views.prefs.saved.len() < 32,
-                        egui::Button::new(crate::i18n::text(
-                            "repo-workflows-saved_views-saved-graph-header-21153875",
-                        )),
-                    )
-                    .clicked();
-                remove = ui
-                    .add_enabled(
-                        self.saved_views.prefs.saved.iter().any(|p| p == preset),
-                        egui::Button::new(crate::i18n::text(
-                            "repo-workflows-saved_views-saved-graph-header-eb6259f8",
-                        )),
-                    )
-                    .clicked();
-                refresh |= ui
-                    .button(crate::i18n::text(
-                        "repo-workflows-saved_views-saved-graph-header-112b4ddb",
-                    ))
-                    .clicked();
-                collapse = ui
-                    .add_enabled(
-                        !self.saved_views.expanded.is_empty(),
-                        egui::Button::new(crate::i18n::text(
-                            "repo-workflows-saved_views-saved-graph-header-6009d6cf",
-                        )),
-                    )
-                    .clicked();
-                if self.saved_views.reader.busy() {
-                    ui.add(crate::spinner::Spinner::new());
-                    if ui
-                        .button(crate::i18n::text(
-                            "repo-workflows-saved_views-saved-graph-header-8e137b60",
-                        ))
-                        .clicked()
-                    {
-                        choose = Some(None);
+                if !self.saved_views.prefs.saved.is_empty() {
+                    ui.separator();
+                    for p in &self.saved_views.prefs.saved {
+                        if ui.selectable_label(active == Some(p), &p.name).clicked() {
+                            choose = Some(Some(p.clone()));
+                        }
                     }
                 }
-                if self.has_more {
-                    page = ui
-                        .add_enabled(
-                            !self.saved_views.reader.busy() && !self.loading_more,
-                            egui::Button::new(crate::i18n::text(
-                                "repo-workflows-saved_views-saved-graph-header-0db174ee",
-                            )),
-                        )
-                        .on_hover_text(crate::i18n::text(
-                            "repo-workflows-saved_views-saved-graph-header-927f719d",
-                        ))
-                        .clicked();
+            });
+        let was_generated = self.saved_views.prefs.active.is_some()
+            && self.saved_views.prefs.active == self.saved_views.prefs.generated_active;
+        if let Some(preset) = self.saved_views.prefs.active.as_mut() {
+            if matches!(preset.kind, Kind::RecentAncestors) {
+                ui.label(crate::i18n::text(
+                    "repo-workflows-saved_views-saved-graph-header-e08c0aa8",
+                ));
+                if ui
+                    .add(egui::DragValue::new(&mut preset.days).range(1..=3650))
+                    .changed()
+                {
+                    if was_generated {
+                        self.saved_views.prefs.generated_active = Some(preset.clone());
+                    }
+                    refresh = true;
                 }
             }
-        });
+            ui.add(
+                egui::TextEdit::singleline(&mut self.saved_views.name)
+                    .hint_text(crate::i18n::text(
+                        "repo-workflows-saved_views-saved-graph-header-e6fdb6c7",
+                    ))
+                    .char_limit(80)
+                    .desired_width(130.0),
+            );
+            save = ui
+                .add_enabled(
+                    !self.saved_views.name.trim().is_empty()
+                        && self.saved_views.prefs.saved.len() < 32,
+                    egui::Button::new(crate::i18n::text(
+                        "repo-workflows-saved_views-saved-graph-header-21153875",
+                    )),
+                )
+                .clicked();
+            remove = ui
+                .add_enabled(
+                    self.saved_views.prefs.saved.iter().any(|p| p == preset),
+                    egui::Button::new(crate::i18n::text(
+                        "repo-workflows-saved_views-saved-graph-header-eb6259f8",
+                    )),
+                )
+                .clicked();
+            refresh |= ui
+                .button(crate::i18n::text(
+                    "repo-workflows-saved_views-saved-graph-header-112b4ddb",
+                ))
+                .clicked();
+            collapse = ui
+                .add_enabled(
+                    !self.saved_views.expanded.is_empty(),
+                    egui::Button::new(crate::i18n::text(
+                        "repo-workflows-saved_views-saved-graph-header-6009d6cf",
+                    )),
+                )
+                .clicked();
+            if self.saved_views.reader.busy() {
+                ui.add(crate::spinner::Spinner::new());
+                if ui
+                    .button(crate::i18n::text(
+                        "repo-workflows-saved_views-saved-graph-header-8e137b60",
+                    ))
+                    .clicked()
+                {
+                    choose = Some(None);
+                }
+            }
+            if self.has_more {
+                page = ui
+                    .add_enabled(
+                        !self.saved_views.reader.busy() && !self.loading_more,
+                        egui::Button::new(crate::i18n::text(
+                            "repo-workflows-saved_views-saved-graph-header-0db174ee",
+                        )),
+                    )
+                    .on_hover_text(crate::i18n::text(
+                        "repo-workflows-saved_views-saved-graph-header-927f719d",
+                    ))
+                    .clicked();
+            }
+        }
         if let Some(preset) = choose {
             self.saved_views.prefs.generated_active = if generated { preset.clone() } else { None };
             self.set_graph_view(preset, &ctx);
@@ -231,6 +224,11 @@ impl RepoTab {
         if page {
             self.load_graph_view_page();
         }
+    }
+
+    /// What the chosen view selected, or why it could not, under the row of controls.
+    pub(in crate::repo) fn saved_graph_status(&mut self, ui: &mut egui::Ui) {
+        let ctx = ui.ctx().clone();
         if self.saved_views.active() {
             if let Some(selection) = &self.saved_views.selection {
                 ui.small(crate::i18n::message(

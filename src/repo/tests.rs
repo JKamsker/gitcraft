@@ -1169,3 +1169,150 @@ fn remote_spawn_mutation_serializes_whole_recorded_operations() -> Result<(), St
     );
     Ok(())
 }
+
+#[test]
+fn successful_prefetch_settles_omitted_and_oversized_entries() {
+    let ctx = egui::Context::default();
+    let mut tab = super::RepoTab::new_deferred("/inert/prefetch".into(), &ctx);
+    let file = git::ChangedFile {
+        status: 'M',
+        path: "f".into(),
+        old_path: None,
+        added: None,
+        removed: None,
+    };
+    tab.files_cache.reading = true;
+    tab.handle(
+        super::Msg::FilesPrefetched(
+            vec!["kept".into(), "omitted".into(), "oversized".into()],
+            Ok(vec![
+                ("kept".into(), vec![file.clone()]),
+                ("oversized".into(), vec![file; 5001]),
+            ]),
+        ),
+        &ctx,
+    );
+    assert!(!tab.files_cache.reading);
+    assert_eq!(
+        tab.files_cache.get("kept").map(|files| files.len()),
+        Some(1)
+    );
+    for hash in ["kept", "omitted", "oversized"] {
+        assert!(tab.files_cache.settled(hash));
+    }
+    assert!(tab.files_cache.get("omitted").is_none());
+    assert!(tab.files_cache.get("oversized").is_none());
+}
+
+#[test]
+fn completed_read_remains_recent_for_focus_without_retaining_its_timer() {
+    let ctx = egui::Context::default();
+    let mut tab = super::RepoTab::new_deferred("/inert/focus-read".into(), &ctx);
+    assert!(!tab.just_read());
+    let started = std::time::Instant::now();
+    tab.loading = true;
+    tab.load_started = Some(started);
+    tab.last_load_started = Some(started);
+    super::messages::record_jobs(|| tab.handle(super::Msg::Loaded(Err("fixture".into())), &ctx));
+    assert!(tab.load_started.is_none());
+    assert!(!tab.loading);
+    assert!(tab.just_read());
+    tab.last_load_started = Some(started - std::time::Duration::from_secs(4));
+    assert!(!tab.just_read());
+    tab.loading = true;
+    assert!(tab.just_read());
+}
+
+#[test]
+fn startup_snapshot_cannot_authorize_merge_even_after_a_failed_load() {
+    let ctx = egui::Context::default();
+    for failed in [false, true] {
+        let mut tab = super::RepoTab::new_deferred("/inert/startup-snapshot".into(), &ctx);
+        tab.snapshot_shown = true;
+        tab.refs.current = Some("cached-old-branch".into());
+        tab.load_error = failed.then(|| "read failed".into());
+        assert!(tab.is_busy());
+        let (_, jobs) = super::messages::record_jobs(|| {
+            tab.apply(
+                super::merge_action(
+                    super::actions::BranchRef::local("incoming"),
+                    "cached-old-branch",
+                ),
+                &ctx,
+            );
+            tab.run_ops(
+                "direct merge",
+                super::ops(&[&["merge", "incoming"]]),
+                super::Refresh::All,
+                super::OpKind::plain(),
+                &ctx,
+            );
+        });
+        assert!(jobs.is_empty());
+        assert!(tab.busy_op.is_none());
+        // A successful fresh read advances history_gen and retires the snapshot.
+        tab.history_gen = 1;
+        tab.snapshot_shown = false;
+        tab.load_error = None;
+        assert!(!tab.is_busy());
+        let (_, jobs) = super::messages::record_jobs(|| {
+            tab.apply(
+                super::merge_action(super::actions::BranchRef::local("incoming"), "fresh-branch"),
+                &ctx,
+            );
+        });
+        assert!(!jobs.is_empty());
+        assert!(tab.busy_op.is_some());
+    }
+}
+
+#[test]
+fn startup_snapshot_remotes_stay_unread_until_a_fresh_load() {
+    let ctx = egui::Context::default();
+    let mut tab = super::RepoTab::new_deferred("/inert/snapshot-remotes".into(), &ctx);
+    assert!(tab.remotes_read().is_none());
+    tab.snapshot_shown = true;
+    for failed in [false, true] {
+        tab.load_error = failed.then(|| "read failed".into());
+        assert!(tab.remotes_read().is_none());
+    }
+    tab.history_gen = 1;
+    tab.snapshot_shown = false;
+    tab.load_error = None;
+    assert!(tab.remotes_read().is_some_and(|remotes| remotes.is_empty()));
+}
+
+#[test]
+fn startup_snapshot_retains_queued_links_through_failed_loading() {
+    let ctx = egui::Context::default();
+    let mut tab = super::RepoTab::new_deferred("/inert/snapshot-links".into(), &ctx);
+    tab.snapshot_shown = true;
+    tab.queue(super::Action::OpenLinkedPr {
+        number: 42,
+        remote: "https://github.com/example/repo".into(),
+    });
+    tab.queue(super::Action::BlameAt {
+        path: "src/lib.rs".into(),
+        rev: Some("main".into()),
+        line: 17,
+    });
+    assert!(tab.take_queued_actions().is_empty());
+    super::messages::record_jobs(|| {
+        tab.handle(super::Msg::Loaded(Err("read failed".into())), &ctx);
+    });
+    assert!(tab.take_queued_actions().is_empty());
+    assert!(tab.is_busy());
+    // Successful loading advances the generation and retires the startup snapshot.
+    tab.history_gen = 1;
+    tab.snapshot_shown = false;
+    tab.load_error = None;
+    let actions = tab.take_queued_actions();
+    assert!(matches!(
+        actions.as_slice(),
+        [super::Action::OpenLinkedPr { number: 42, remote },
+         super::Action::BlameAt { path, rev: Some(rev), line: 17 }]
+            if remote == "https://github.com/example/repo"
+                && path == "src/lib.rs" && rev == "main"
+    ));
+    assert!(tab.take_queued_actions().is_empty());
+}

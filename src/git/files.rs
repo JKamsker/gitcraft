@@ -11,8 +11,54 @@ pub fn file_at(repo: &Path, rev: Option<&str>, path: &str) -> Result<Vec<u8>, St
         None => worktree_file(&crate::remote::join(repo, path)).map_err(|e| format!("{path}: {e}")),
         // The index as `:0:path`: `:path` of a file named `1:x` would be stage 1 of `x`.
         Some("") => run_bytes(Some(repo), &["show", END_OPTS, &format!(":0:{path}")]),
-        Some(rev) => run_bytes(Some(repo), &["show", END_OPTS, &format!("{rev}:{path}")]),
+        Some(rev) => super::backend::dispatch(
+            repo,
+            super::backend::Read::FileAt,
+            |repo| super::backend::file_at(repo, rev, path),
+            || run_bytes(Some(repo), &["show", END_OPTS, &format!("{rev}:{path}")]),
+        ),
     }
+}
+
+/// A commit's author, email and message (as `%an`, `%ae`, `%B`) and its note in each notes
+/// ref asked for (as `%N`), none where it has none.
+pub type Authorship = (String, String, String, Vec<Option<String>>);
+
+/// [`Authorship`] of commit `hash`, read in-process, or an error where only git reads it
+/// faithfully.
+pub fn commit_authorship(repo: &Path, hash: &str, notes: &[&str]) -> Result<Authorship, String> {
+    super::backend::dispatch(
+        repo,
+        super::backend::Read::Authorship,
+        |repo| super::backend::authorship(repo, hash, notes),
+        || Err("read by git".into()),
+    )
+}
+
+/// The textconv program of `path`'s diff driver (none without one), read in-process, or an
+/// error where only git reads it faithfully.
+pub fn textconv_of(repo: &Path, path: &str) -> Result<Option<String>, String> {
+    super::backend::dispatch(
+        repo,
+        super::backend::Read::Textconv,
+        |repo| super::backend::textconv_of(repo, path),
+        || Err("read by git".into()),
+    )
+}
+
+/// The bytes a file had before a commit and in it: none for a side it isn't on.
+pub type FileSides = (Option<Vec<u8>>, Option<Vec<u8>>);
+
+/// The bytes `path` had before commit `hash` (in its first parent, under its old name when
+/// renamed) and in it, none for a side it isn't on; read in-process, or an error where only git
+/// would read them faithfully.
+pub fn commit_file_sides(repo: &Path, hash: &str, path: &str) -> Result<FileSides, String> {
+    super::backend::dispatch(
+        repo,
+        super::backend::Read::CommitFileSides,
+        |repo| super::backend::commit_file_sides(repo, hash, path),
+        || Err("read by git".into()),
+    )
 }
 
 /// A file of the working tree as git sees it: a symbolic link is the path it holds (what git

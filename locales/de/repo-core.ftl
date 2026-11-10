@@ -2231,6 +2231,10 @@ repo-core-2869 = Nichts zu committen
 repo-core-2870 = Dieser Befehl ist in der zugehörigen Ansicht verfügbar
 repo-core-2878 = { $name } wird geöffnet
 repo-core-2879 = Branches und History werden gelesen…
+
+repo-core-slow-load = { $name } wird noch gelesen – das dauert länger als üblich.
+
+repo-core-slow-detail = Dieser Commit wird noch gelesen – das dauert länger als üblich.
 repo-core-2891 = Bereich { $name } ausblenden
 repo-core-2892 = Bereich { $name } anzeigen
 repo-core-2893 = Worktree-Hauptordner konnte nicht gelesen werden: { $e }
@@ -2647,6 +2651,8 @@ repo-core-3440 = Worktrees
 repo-core-3443 = Stashes
 repo-core-3444 = Wiederherstellung: Reflog und verlorene Commits
 repo-core-3447 = Arbeit an einem Ihnen zugewiesenen Issue beginnen…
+
+repo-core-pr-list-newer = Neuere Pull Requests sind da: anzeigen
 repo-core-3449 = seit Ihrem letzten Blick geändert ·{ " " }
 repo-core-3450 = { " " }· Entwurf
 repo-core-3451 = { $url }

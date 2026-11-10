@@ -23,8 +23,8 @@ Settings, themes, the title bar, commit signing, profiles and accessibility.
 
 ## Title bar
 
-- Tabs in the title bar (Windows and macOS, Settings → Appearance): the tab strip takes the
-  place of the system's title bar, as in a browser. Drag the space next to the tabs to move the
+- Tabs in the title bar (Windows and macOS, Settings → Appearance, on by default): the tab strip
+  takes the place of the system's title bar, as in a browser. Drag the space next to the tabs to move the
   window (it snaps to the screen's edges as usual), double-click it to maximize; minimize, maximize and
   close sit at the end of the strip, drawn as Windows 11 draws them, and the window's edges
   resize it.

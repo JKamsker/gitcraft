@@ -149,7 +149,8 @@ pub struct NewRelease<'a> {
     pub prerelease: bool,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+/// Serializable for the list kept until the forge is asked again (`sidebar::pull_requests`).
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct PullRequest {
     pub number: u64,
     pub title: String,

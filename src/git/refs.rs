@@ -5,7 +5,7 @@ use std::path::Path;
 
 use super::{FS, UTF8, run};
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Branch {
     /// Short name, e.g. `main` or `origin/main`.
     pub name: String,
@@ -37,7 +37,7 @@ impl Branch {
     }
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Refs {
     pub local: Vec<Branch>,
     /// Local branch → push remote, including `pushRemote` and `remote.pushDefault`.

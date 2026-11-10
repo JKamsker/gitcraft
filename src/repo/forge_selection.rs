@@ -237,7 +237,11 @@ impl RepoTab {
                 .any(|p| c.target.as_deref() == Some(p.sha.as_str()))
         });
         let had_pr_view = self.pr_view.is_some();
-        self.prs.clear();
+        // The same repository's list stays shown until it is read again; another's goes at once.
+        if moved {
+            self.prs.clear();
+        }
+        self.pending_prs = None;
         self.pr_error = None;
         self.prs_loaded = None;
         self.close_pr();

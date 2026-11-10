@@ -100,6 +100,8 @@ pub struct Settings {
     pub worktrees_in_same_tab: bool,
     /// Windows and macOS: the tab strip stands in for the system's title bar.
     pub tabs_in_title_bar: bool,
+    /// How large the history map beside the graph is, or whether it shows at all.
+    pub history_map: HistoryMap,
     /// Where the settings, command palette, theme and manual buttons sit, and in what order.
     pub button_layout: crate::app_buttons::ButtonLayout,
     /// Changed files in a tree of their folders rather than a flat list.
@@ -219,7 +221,8 @@ impl Default for Settings {
             show_branches: true,
             show_detail: true,
             worktrees_in_same_tab: true,
-            tabs_in_title_bar: false,
+            tabs_in_title_bar: true,
+            history_map: Default::default(),
             button_layout: Default::default(),
             files_as_tree: true,
             diff_split: false,
@@ -275,6 +278,47 @@ pub fn compact_tip() -> &'static str {
     crate::i18n::text("interaction-settings-compact-tip")
 }
 
+/// The history map's size beside the graph.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum HistoryMap {
+    /// Lanes with a caption above and the loaded extent below.
+    #[default]
+    Large,
+    /// Just the lanes, in a narrow strip.
+    Small,
+    Hidden,
+}
+
+impl HistoryMap {
+    pub const ALL: [HistoryMap; 3] = [HistoryMap::Large, HistoryMap::Small, HistoryMap::Hidden];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            HistoryMap::Large => crate::i18n::text("interaction-settings-history-map-large"),
+            HistoryMap::Small => crate::i18n::text("interaction-settings-history-map-small"),
+            HistoryMap::Hidden => crate::i18n::text("interaction-settings-history-map-hidden"),
+        }
+    }
+
+    /// The strip's width, without the gap that parts it from the graph.
+    pub fn width(self) -> f32 {
+        match self {
+            HistoryMap::Large => 78.0,
+            HistoryMap::Small => 32.0,
+            HistoryMap::Hidden => 0.0,
+        }
+    }
+
+    /// The sizes as radio items of a menu, which closes on a pick.
+    pub fn menu(ui: &mut Ui, map: &mut HistoryMap) {
+        for option in HistoryMap::ALL {
+            if ui.radio_value(map, option, option.label()).clicked() {
+                ui.close();
+            }
+        }
+    }
+}
+
 impl Settings {
     pub fn get(ctx: &egui::Context) -> Settings {
         ctx.data(|d| d.get_temp::<Settings>(id()))
@@ -284,6 +328,11 @@ impl Settings {
     /// Older settings with a custom ref width keep that explicit preference.
     pub(crate) fn fit_visible_refs(&self) -> bool {
         self.auto_refs_width && self.refs_width == DEFAULT_REFS_WIDTH
+    }
+
+    /// Read just the history map's size without cloning the settings every frame.
+    pub(crate) fn history_map(ctx: &egui::Context) -> HistoryMap {
+        ctx.data_mut(|d| d.get_temp_mut_or_default::<Settings>(id()).history_map)
     }
 
     /// Read just the pill shortening preference without cloning the settings for every pill.
@@ -1031,6 +1080,24 @@ impl Settings {
                         }
                         indented_note(ui, compact_tip());
                     });
+                    card.row(
+                        "History map",
+                        "minimap overview scroll strip size hide",
+                        |ui| {
+                            egui::ComboBox::from_id_salt("settings-history-map")
+                                .width(layout::fit(ui, COMBO_WIDTH))
+                                .selected_text(self.history_map.label())
+                                .show_ui(ui, |ui| {
+                                    for option in HistoryMap::ALL {
+                                        ui.selectable_value(
+                                            &mut self.history_map,
+                                            option,
+                                            option.label(),
+                                        );
+                                    }
+                                });
+                        },
+                    );
                     card.preview(Preview::LaneColors);
                     card.row(
                         "Lane colours",

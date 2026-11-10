@@ -58,7 +58,7 @@ impl RepoTab {
         self.visibility_counter(ui, acts);
 
         let filter = self.branch_filter.to_lowercase();
-        let idle = self.busy_op.is_none();
+        let idle = self.busy_op.is_none() && !self.snapshot_pending();
 
         let mut scroll = egui::ScrollArea::vertical()
             .id_salt("branches")
@@ -112,7 +112,7 @@ impl RepoTab {
 
     /// _Select stale or merged branches…_, and how the local branches are sorted.
     fn branch_header_buttons(&self, ui: &mut Ui, acts: &mut Vec<Action>) {
-        let idle = self.busy_op.is_none();
+        let idle = self.busy_op.is_none() && !self.snapshot_pending();
         let clean = ui.add_enabled_ui(idle, |ui| {
             icons::small_button(ui, "brush", crate::i18n::text("repo-core-0071"))
         });

@@ -521,9 +521,11 @@ fn the_editor_shows_the_decision_and_its_note() -> Result<(), String> {
     harness.get_by_label("“keep the old wire format”");
     harness.get_by_label_contains("Test “cargo test wire”: not run yet");
     harness.get_by_label("Use it anyway").click();
-    harness.run();
+    // Background repository reads may request repaints independently of these clicks.
+    // Advance the interaction without requiring the entire context to become idle.
+    harness.run_steps(2);
     harness.get_by_label("Keep its note and test").click();
-    harness.run();
+    harness.run_steps(2);
     harness.get_by_label("Done");
     let ed = harness.state().0.conflict.as_ref().ok_or("no editor")?;
     assert_eq!(ed.choices, vec![Some(Choice::Recorded)]);

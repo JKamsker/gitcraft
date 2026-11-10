@@ -41,7 +41,7 @@ pub(super) fn wanted(settings: &Settings) -> bool {
 /// Whether to make the window with the system's title bar, from the settings eframe saved in
 /// `app_ron`. The window is made without one from the start when the tabs take its place:
 /// taking it away later keeps the window's outer size, so it would grow by the title bar on
-/// every start.
+/// every start. With nothing saved, the default settings decide, as they do for the app.
 pub(super) fn decorated_at_start(app_ron: Option<&Path>) -> bool {
     let decorated = decorated_by(app_ron);
     DECORATED_AT_START.store(decorated, Ordering::Relaxed);
@@ -49,10 +49,11 @@ pub(super) fn decorated_at_start(app_ron: Option<&Path>) -> bool {
 }
 
 fn decorated_by(app_ron: Option<&Path>) -> bool {
-    !app_ron
+    let settings = app_ron
         .and_then(|path| std::fs::read_to_string(path).ok())
         .and_then(|text| saved_settings(&text))
-        .is_some_and(|settings| wanted(&settings))
+        .unwrap_or_default();
+    !wanted(&settings)
 }
 
 /// The settings in eframe's saved state: a map of keys to RON, the app's under `APP_KEY`.
@@ -593,13 +594,14 @@ mod tests {
     }
 
     #[test]
-    fn supported_platforms_can_replace_the_title_bar() {
-        let settings = Settings {
-            tabs_in_title_bar: true,
+    fn supported_platforms_replace_the_title_bar_by_default() {
+        let supported = cfg!(any(windows, target_os = "macos"));
+        assert_eq!(wanted(&Settings::default()), supported);
+        let off = Settings {
+            tabs_in_title_bar: false,
             ..Settings::default()
         };
-        assert_eq!(wanted(&settings), cfg!(any(windows, target_os = "macos")));
-        assert!(!wanted(&Settings::default()));
+        assert!(!wanted(&off));
     }
 
     #[test]
@@ -621,26 +623,31 @@ mod tests {
 
     #[test]
     fn the_setting_is_read_from_what_eframe_saved() {
-        let saved = r#"{"app":"(open:[],settings:(tabs_in_title_bar:true))","egui":"()"}"#;
-        assert!(saved_settings(saved).is_some_and(|s| s.tabs_in_title_bar));
-        let off = r#"{"app":"(settings:(ui_scale:1.25))"}"#;
-        assert!(saved_settings(off).is_some_and(|s| !s.tabs_in_title_bar));
+        let saved = r#"{"app":"(open:[],settings:(tabs_in_title_bar:false))","egui":"()"}"#;
+        assert!(saved_settings(saved).is_some_and(|s| !s.tabs_in_title_bar));
+        let unsaved = r#"{"app":"(settings:(ui_scale:1.25))"}"#;
+        assert!(saved_settings(unsaved).is_some_and(|s| s.tabs_in_title_bar));
         assert!(saved_settings("not ron").is_none());
         assert!(saved_settings(r#"{"egui":"()"}"#).is_none());
     }
 
     #[test]
-    fn a_window_with_nothing_saved_has_the_title_bar() {
-        assert!(decorated_by(None));
-        assert!(decorated_by(Some(Path::new(
-            "/nonexistent/gitcraft/app.ron"
-        ))));
+    fn a_window_with_nothing_saved_follows_the_default() {
+        let decorated = !cfg!(any(windows, target_os = "macos"));
+        assert_eq!(decorated_by(None), decorated);
+        assert_eq!(
+            decorated_by(Some(Path::new("/nonexistent/gitcraft/app.ron"))),
+            decorated
+        );
     }
 
     #[test]
     fn the_title_bar_is_switched_once_per_change() {
         let ctx = egui::Context::default();
-        let mut settings = Settings::default();
+        let mut settings = Settings {
+            tabs_in_title_bar: false,
+            ..Settings::default()
+        };
         let mut decorated = true;
         apply(&ctx, &settings, &mut decorated);
         assert!(decorated);

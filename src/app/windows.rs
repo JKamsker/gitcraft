@@ -35,7 +35,7 @@ pub(super) struct Window {
     error: Option<super::AppError>,
     error_card: Option<crate::error_card::ErrorCard>,
     manual: bool,
-    was_focused: bool,
+    focus: super::focus::State,
     drag: Option<TabDrag>,
     scroll: f32,
     scrolled_to: Option<egui::Id>,
@@ -68,7 +68,7 @@ impl Window {
             error: None,
             error_card: None,
             manual: false,
-            was_focused: false,
+            focus: super::focus::State::unfocused(),
             drag: None,
             scroll: 0.0,
             scrolled_to: None,
@@ -102,7 +102,7 @@ impl Window {
         std::mem::swap(&mut self.error, &mut app.error);
         std::mem::swap(&mut self.error_card, &mut app.error_card);
         std::mem::swap(&mut self.manual, &mut app.manual_open);
-        std::mem::swap(&mut self.was_focused, &mut app.was_focused);
+        std::mem::swap(&mut self.focus, &mut app.focus);
         std::mem::swap(&mut self.drag, &mut app.tab_drag);
         std::mem::swap(&mut self.scroll, &mut app.tab_scroll);
         std::mem::swap(&mut self.scrolled_to, &mut app.tab_scrolled_to);

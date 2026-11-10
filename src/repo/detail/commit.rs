@@ -69,16 +69,33 @@ impl RepoTab {
             });
             return;
         }
-        let Some(detail) = &self.detail else {
-            ui.centered_and_justified(|ui| {
-                if self.selected.is_some() || self.detail_hash.is_some() {
-                    ui.add(crate::spinner::Spinner::new());
-                } else {
-                    ui.label(RichText::new(crate::i18n::text("repo-core-0865")).color(t.text_dim));
+        // Until git's read is in, what the graph already has of the commit (its message,
+        // author, date, parents): shown at once, only its files wait.
+        let provisional;
+        let detail = match &self.detail {
+            Some(detail) => detail,
+            None => match self.provisional_detail() {
+                Some(read_so_far) => {
+                    provisional = read_so_far;
+                    &provisional
                 }
-            });
-            return;
+                None => {
+                    ui.centered_and_justified(|ui| {
+                        if self.selected.is_some() || self.detail_hash.is_some() {
+                            ui.add(crate::spinner::Spinner::new());
+                        } else {
+                            ui.label(
+                                RichText::new(crate::i18n::text("repo-core-0865"))
+                                    .color(t.text_dim),
+                            );
+                        }
+                    });
+                    return;
+                }
+            },
         };
+        // Files still on their way (not read ahead either).
+        let reading = self.detail.is_none() && self.files_cache.get(&detail.hash).is_none();
 
         self.review_all_button(
             ui,
@@ -135,33 +152,12 @@ impl RepoTab {
                         }
                     });
 
-                let remerge = self.remerge_mode(detail);
-                let resolved = matches!(remerge, Mode::Checking | Mode::On);
-                if !resolved {
-                    let note =
-                        (detail.parents.len() > 1).then_some(crate::i18n::text("repo-core-0868"));
-                    files_header_with(ui, &detail.files, note, |ui| {
-                        self.all_files_toggle(ui, acts)
-                    });
-                }
-                self.remerge_toggle(ui, acts, &remerge);
-                ui.spacing_mut().item_spacing.y = 0.0;
-                if resolved {
-                    self.remerge_files(ui, acts, detail);
-                } else if self.all_files.on {
-                    self.all_files_list(ui, acts, detail);
+                if reading {
+                    // Only the files are still on their way.
+                    ui.add_space(8.0);
+                    ui.vertical_centered(|ui| ui.add(crate::spinner::Spinner::new()));
                 } else {
-                    self.file_list(
-                        ui,
-                        acts,
-                        "commit",
-                        &detail.files,
-                        Some(&detail.hash),
-                        |path| DiffKey::Commit {
-                            hash: detail.hash.clone(),
-                            path: path.to_owned(),
-                        },
-                    );
+                    self.commit_files_section(ui, acts, detail);
                 }
                 let below = ui.cursor().top() - message_end - extras_h;
                 if (below - rest).abs() > 0.5 {
@@ -175,6 +171,73 @@ impl RepoTab {
         if stash.is_none() {
             self.extras_tick(ui.ctx());
         }
+    }
+
+    /// The commit's files: as merged again, all of the tree's, or those it changed.
+    fn commit_files_section(&self, ui: &mut Ui, acts: &mut Vec<Action>, detail: &CommitDetail) {
+        let remerge = self.remerge_mode(detail);
+        let resolved = matches!(remerge, Mode::Checking | Mode::On);
+        if !resolved {
+            let note = (detail.parents.len() > 1).then_some(crate::i18n::text("repo-core-0868"));
+            files_header_with(ui, &detail.files, note, |ui| {
+                self.all_files_toggle(ui, acts)
+            });
+        }
+        self.remerge_toggle(ui, acts, &remerge);
+        ui.spacing_mut().item_spacing.y = 0.0;
+        if resolved {
+            self.remerge_files(ui, acts, detail);
+        } else if self.all_files.on {
+            self.all_files_list(ui, acts, detail);
+        } else {
+            self.file_list(
+                ui,
+                acts,
+                "commit",
+                &detail.files,
+                Some(&detail.hash),
+                |path| DiffKey::Commit {
+                    hash: detail.hash.clone(),
+                    path: path.to_owned(),
+                },
+            );
+        }
+    }
+
+    /// The selected commit as the graph read it, for the detail pane while git's read of it is
+    /// still on its way: not editable (whether HEAD contains it isn't known yet); its files if they
+    /// were read ahead (see `prefetch_files`).
+    fn provisional_detail(&self) -> Option<CommitDetail> {
+        if self.stash_view.is_some() {
+            return None;
+        }
+        let hash = self.detail_hash.as_deref()?;
+        let commit = self
+            .selected
+            .and_then(|row| self.commits.get(row))
+            .filter(|c| c.hash == hash)?;
+        let message = if commit.body.is_empty() {
+            commit.summary.clone()
+        } else {
+            format!("{}\n\n{}", commit.summary, commit.body)
+        };
+        Some(CommitDetail {
+            hash: commit.hash.clone(),
+            parents: commit.parents.clone(),
+            author: commit.author.clone(),
+            email: commit.email.clone(),
+            author_date: commit.date.clone(),
+            committer: commit.author.clone(),
+            commit_date: commit.date.clone(),
+            message,
+            files: self
+                .files_cache
+                .get(hash)
+                .map(|files| files.as_ref().clone())
+                .unwrap_or_default(),
+            in_head: false,
+            merges_after: false,
+        })
     }
 }
 

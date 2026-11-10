@@ -28,7 +28,7 @@ impl RepoTab {
             return;
         }
         self.publish_custom_commands(&ctx);
-        let mut acts: Vec<Action> = std::mem::take(&mut self.queued);
+        let mut acts: Vec<Action> = self.take_queued_actions();
         self.dco_frame(&ctx);
         self.owners_frame(&ctx);
         self.forks_frame(&ctx);
@@ -49,6 +49,7 @@ impl RepoTab {
             )
             .show(ui, |ui| self.toolbar(ui, &mut acts));
         self.ssh_setup_window(&ctx);
+        self.slow_banner(ui);
         self.practice_banner(ui);
         self.push_banner(ui, &mut acts);
         self.detached_panel(ui, &mut acts);
@@ -136,11 +137,11 @@ impl RepoTab {
                 } else if self.review_document.open {
                     self.review_document_ui(ui, &mut acts);
                 } else if self.split.is_some() {
-                    self.graph_diff_view(ui, &mut acts);
+                    self.split_view(ui, &mut acts);
                 } else if self.absorb.is_some() {
                     self.absorb_view(ui, &mut acts);
                 } else if self.diff_beside_graph(&ctx) {
-                    self.split_view(ui, &mut acts);
+                    self.graph_diff_view(ui, &mut acts);
                 } else if self.diff.is_some()
                     && !self.history_beside_diff()
                     && self.docked(Panel::Diff)
@@ -207,13 +208,19 @@ impl RepoTab {
 
     /// Until the first read is in: rather than branches, history and changes that all look
     /// empty, the repository being opened. Nothing at all for the first moments, so that a
-    /// repository read in an instant doesn't flash it.
+    /// repository read in an instant doesn't flash it; no spinner until the read is slow
+    /// (see `slow_banner`).
     fn opening_screen(&self, ui: &mut Ui) {
         const QUIET: std::time::Duration = std::time::Duration::from_millis(150);
         let waited = self.opened.elapsed();
         if waited < QUIET {
             ui.ctx().request_repaint_after(QUIET - waited);
             return;
+        }
+        let slow = waited >= super::slow_banner::SLOW;
+        if !slow {
+            ui.ctx()
+                .request_repaint_after(super::slow_banner::SLOW - waited);
         }
         let t = Tokens::get(ui.ctx());
         ui.vertical_centered(|ui| {
@@ -234,14 +241,24 @@ impl RepoTab {
                     .size(12.0)
                     .color(t.text_faint),
             );
-            ui.add_space(18.0);
-            ui.add(crate::spinner::Spinner::new().size(22.0));
-            ui.add_space(10.0);
-            ui.label(
-                egui::RichText::new(crate::i18n::text("repo-core-2879"))
+            if slow {
+                ui.add_space(18.0);
+                ui.add(crate::spinner::Spinner::new().size(22.0));
+                ui.add_space(10.0);
+                ui.label(
+                    egui::RichText::new(crate::i18n::message(
+                        "repo-core-slow-load",
+                        &[("name", self.name.to_string().into())],
+                    ))
                     .size(12.5)
-                    .color(t.text_dim),
-            );
+                    .color(t.warning),
+                );
+                ui.label(
+                    egui::RichText::new(crate::i18n::text("repo-core-2879"))
+                        .size(12.5)
+                        .color(t.text_dim),
+                );
+            }
         });
     }
 

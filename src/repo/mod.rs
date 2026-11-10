@@ -39,6 +39,7 @@ pub(crate) mod custom_commands;
 mod dco;
 mod detached;
 mod detail;
+mod detail_cache;
 mod devcontainer;
 mod dialogs;
 mod diff;
@@ -138,6 +139,8 @@ mod running;
 mod samples;
 mod saved_views;
 mod sidebar;
+mod slow_banner;
+mod snapshot;
 mod sparse;
 mod ssh_setup;
 mod stack;
@@ -229,6 +232,8 @@ pub struct RepoTab {
     /// When the reload running started, and how long the last ones took (newest last), for
     /// the doctor.
     load_started: Option<Instant>,
+    /// Most recent reload start, retained after completion for focus deduplication.
+    last_load_started: Option<Instant>,
     load_times: std::collections::VecDeque<std::time::Duration>,
     /// A reload was asked for while one was running, which may have read too early.
     reload_again: bool,
@@ -298,6 +303,9 @@ pub struct RepoTab {
     forge_repository_generation: u64,
     gerrit: Option<crate::gerrit::Server>,
     prs: Vec<PullRequest>,
+    /// A newer list, read while the pointer was on the shown one: it waits until the user is
+    /// done there, or brings it in from the header (see `sidebar::pull_requests`).
+    pending_prs: Option<Vec<PullRequest>>,
     pr_error: Option<String>,
     prs_loaded: Option<Instant>,
     /// The build status of the commits that show one.
@@ -331,6 +339,18 @@ pub struct RepoTab {
     pending_commit_diff: Option<String>,
     detail: Option<CommitDetail>,
     detail_error: Option<String>,
+    /// Details read before (or ahead), so a commit clicked again shows at once.
+    detail_cache: detail_cache::DetailCache,
+    /// The files of the commits on screen, read ahead so a click shows them at once.
+    files_cache: detail_cache::FilesCache,
+    /// Ends the reads for the selected commit (and its neighbours) when the selection moves on.
+    detail_cancel: crate::tasks::Cancellation,
+    /// When the selected commit's detail was asked of git (see `slow_banner`).
+    detail_asked: Option<Instant>,
+    /// The graph shows the last snapshot of the repository (see `snapshot`) until the first read.
+    snapshot_shown: bool,
+    /// When the last snapshot was kept.
+    snapshot_kept: Option<Instant>,
     /// The selected commit's signature, containment, notes and backlinks.
     extras: detail::Extras,
     diff: Option<DiffView>,
@@ -631,6 +651,7 @@ impl RepoTab {
             shown: true,
             loading: false,
             load_started: None,
+            last_load_started: None,
             load_times: Default::default(),
             reload_again: false,
             load_error: None,
@@ -683,6 +704,7 @@ impl RepoTab {
             forge_repository_generation: 0,
             gerrit: None,
             prs: Vec::new(),
+            pending_prs: None,
             pr_error: None,
             prs_loaded: None,
             ci: ci_status::CiStatuses::default(),
@@ -703,6 +725,12 @@ impl RepoTab {
             pending_commit_diff: None,
             detail: None,
             detail_error: None,
+            detail_cache: Default::default(),
+            files_cache: Default::default(),
+            detail_cancel: Default::default(),
+            detail_asked: None,
+            snapshot_shown: false,
+            snapshot_kept: None,
             extras: Default::default(),
             diff: None,
             structural_running: None,
@@ -875,7 +903,7 @@ impl RepoTab {
 
     /// The remotes the tab read, once it has read the repository.
     pub(crate) fn remotes_read(&self) -> Option<Vec<git::Remote>> {
-        (!self.opening()).then(|| self.remotes.clone())
+        (!self.opening() && !self.snapshot_pending()).then(|| self.remotes.clone())
     }
 
     /// An editor holds work that showing something else would close: a conflict being
@@ -886,16 +914,31 @@ impl RepoTab {
 
     /// Nothing read yet: the tab shows its opening screen.
     pub fn opening(&self) -> bool {
-        (self.history_gen == 0 && self.load_error.is_none()) || self.resuming
+        (self.history_gen == 0 && !self.snapshot_shown && self.load_error.is_none())
+            || self.resuming
+    }
+
+    /// A startup snapshot is display-only until a successful repository read replaces it.
+    pub(super) fn snapshot_pending(&self) -> bool {
+        self.snapshot_shown && self.history_gen == 0
     }
 
     pub fn is_busy(&self) -> bool {
-        self.loading || self.busy_op.is_some()
+        self.loading || self.busy_op.is_some() || self.snapshot_pending()
     }
 
     /// Queues an action from outside the tab (the command palette).
     pub(crate) fn queue(&mut self, action: Action) {
         self.queued.push(action);
+    }
+
+    /// Keep external navigation pending until fresh state can authorize its dispatch.
+    fn take_queued_actions(&mut self) -> Vec<Action> {
+        if self.snapshot_pending() {
+            Vec::new()
+        } else {
+            std::mem::take(&mut self.queued)
+        }
     }
 
     /// The selected primary remote's forge.

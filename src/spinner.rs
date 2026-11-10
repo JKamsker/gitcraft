@@ -40,7 +40,7 @@ impl Spinner {
     }
 
     pub fn paint_at(&self, ui: &Ui, rect: Rect) {
-        if !ui.is_rect_visible(rect) {
+        if !ui.is_rect_visible(rect) || waiting_out_grace(ui, rect) {
             return;
         }
         let focused = ui.input(|i| i.viewport().focused) != Some(false);
@@ -67,6 +67,37 @@ impl Spinner {
     }
 }
 
+/// Whether a spinner at `rect` has been wanted for less than [`GRACE`]: most reads end sooner,
+/// and a spinner that flashes up and goes reads as slowness rather than speed. One that went
+/// out of sight (or moved) for longer than [`GAP`] starts its grace again.
+fn waiting_out_grace(ui: &Ui, rect: Rect) -> bool {
+    let now = ui.input(|i| i.time);
+    let id = ui.id().with((
+        "spinner-grace",
+        (rect.center().x / 8.0).round() as i32,
+        (rect.center().y / 8.0).round() as i32,
+    ));
+    let first = ui.data_mut(|d| {
+        let (first, last) = d.get_temp::<(f64, f64)>(id).unwrap_or((now, now));
+        let first = if now - last > GAP { now } else { first };
+        d.insert_temp(id, (first, now));
+        first
+    });
+    let waited = now - first;
+    if waited >= GRACE {
+        return false;
+    }
+    // Drawn again soon enough to stay "in sight" and to show once the grace is over.
+    ui.ctx()
+        .request_repaint_after(Duration::from_secs_f64((GRACE - waited).min(GAP / 2.0)));
+    true
+}
+
+/// How long something loads before a spinner says so.
+const GRACE: f64 = 1.0;
+/// How long a spinner may be out of sight and still count as the same wait.
+const GAP: f64 = 0.4;
+
 impl Widget for Spinner {
     fn ui(self, ui: &mut Ui) -> Response {
         let size = self
@@ -87,8 +118,11 @@ mod tests {
     /// How long the frame with a spinner asks to wait for the next one.
     fn next_frame_after(focused: Option<bool>) -> Duration {
         let ctx = egui::Context::default();
-        let frame = |ctx: &egui::Context| {
-            let mut input = RawInput::default();
+        let frame = |ctx: &egui::Context, time: f64| {
+            let mut input = RawInput {
+                time: Some(time),
+                ..RawInput::default()
+            };
             if let Some(viewport) = input.viewports.get_mut(&ViewportId::ROOT) {
                 viewport.focused = focused;
             }
@@ -99,10 +133,12 @@ mod tests {
             output.textures_delta.clear();
             output
         };
-        // The first frames of a context ask for more of their own accord.
+        // The first frames of a context ask for more of their own accord; and the spinner shows
+        // only once its grace is over, in frames close enough together to be one wait.
         let mut delay = Duration::ZERO;
-        for _ in 0..3 {
-            delay = frame(&ctx)
+        let frames = (GRACE / (GAP / 2.0)).ceil() as usize + 2;
+        for i in 0..frames {
+            delay = frame(&ctx, i as f64 * GAP / 2.0)
                 .viewport_output
                 .get(&ViewportId::ROOT)
                 .map(|viewport| viewport.repaint_delay)
@@ -119,6 +155,36 @@ mod tests {
             delay > Duration::ZERO && early <= frame_time + Duration::from_millis(1),
             "waits {delay:?}, wanted {wanted:?}"
         );
+    }
+
+    #[test]
+    fn a_spinner_shows_only_after_its_grace() {
+        let ctx = egui::Context::default();
+        let waiting = |time: f64| {
+            let mut waiting = false;
+            let output = ctx.run_ui(
+                RawInput {
+                    time: Some(time),
+                    ..RawInput::default()
+                },
+                |ui| {
+                    let rect = egui::Rect::from_min_size(egui::pos2(10.0, 10.0), vec2(20.0, 20.0));
+                    waiting = waiting_out_grace(ui, rect);
+                },
+            );
+            output.drop_without_applying_deltas();
+            waiting
+        };
+        // Frames close enough together to be one wait.
+        let step = GAP / 2.0;
+        let mut time = 0.0;
+        while time < GRACE {
+            assert!(waiting(time));
+            time += step;
+        }
+        assert!(!waiting(time));
+        // Out of sight for a while: a new wait, with its grace again.
+        assert!(waiting(time + GAP * 2.0));
     }
 
     #[test]

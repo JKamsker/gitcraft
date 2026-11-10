@@ -6,14 +6,49 @@ use egui::{Align2, Rect, Sense, Ui, pos2, vec2};
 
 use super::remote_short;
 use crate::a11y::labels;
-use crate::forge::{Forge, PullRequest};
+use crate::forge::{Forge, Hosting, PullRequest};
 use crate::git::Branch;
 use crate::icons;
 use crate::menu_item::MenuItem;
 use crate::repo::issue_work::IssueAct;
-use crate::repo::pinned_sections::{Button, Header, Sections};
+use crate::repo::pinned_sections::{Alert, Button, Header, Sections};
 use crate::repo::{Action, RepoTab, ci_status, widgets};
 use crate::theme::Tokens;
+
+/// How long (in seconds) after the list was last in use a newer one waits before it replaces it.
+const IN_USE_GRACE: f64 = 3.0;
+
+/// Where the time the tab's list was last in use is kept (egui's clock).
+fn in_use_id(tab: &Path) -> egui::Id {
+    egui::Id::new(("pr-list-in-use", tab))
+}
+
+/// Where the last list read is kept, per repository, hosting and account (a profile's), across
+/// restarts.
+fn cache_id(repo: &Path, hosting: &Hosting) -> egui::Id {
+    let account = crate::connections::current();
+    egui::Id::new((
+        "pr-list-cache",
+        repo,
+        &hosting.host,
+        &hosting.path,
+        &account.git_config,
+        &account.choices,
+    ))
+}
+
+/// Whether a list read anew replaces the `shown` one now: when nothing would move, or the list
+/// was last in use `since` seconds ago, long enough (`None`: not at all).
+fn apply_now(shown: &[PullRequest], fresh: &[PullRequest], since: Option<f64>) -> bool {
+    shown == fresh || shown.is_empty() || since.is_none_or(|since| since >= IN_USE_GRACE)
+}
+
+/// The orange of a header whose newer list waits: between the warning yellow and the danger red.
+fn attention(t: &Tokens) -> egui::Color32 {
+    let mix = |a: u8, b: u8| ((u16::from(a) * 3 + u16::from(b) * 2) / 5) as u8;
+    let (w, d) = (t.warning, t.danger);
+    egui::Color32::from_rgb(mix(w.r(), d.r()), mix(w.g(), d.g()), mix(w.b(), d.b()))
+}
 
 impl RepoTab {
     pub(super) fn pr_section(
@@ -26,6 +61,7 @@ impl RepoTab {
         let Some(forge) = self.forge() else { return };
         let t = Tokens::get(ui.ctx());
         let title = forge.list_title();
+        let top = ui.cursor().top();
         let open = sections.add(
             ui,
             Header {
@@ -41,25 +77,110 @@ impl RepoTab {
                 }),
             },
         );
-        if !open {
+        if self.pending_prs.is_some() {
+            sections.alert(Alert {
+                tint: attention(&t),
+                button: Button {
+                    icon: "refresh-cw",
+                    tooltip: crate::i18n::text("repo-core-pr-list-newer"),
+                    action: Some(Action::ApplyPendingPrs),
+                },
+            });
+        }
+        if open {
+            // A failed read leaves the rows of the last one, with why under them.
+            for pr in &self.prs {
+                self.pr_row(ui, acts, forge, pr, idle);
+            }
+            if let Some(raw_error) = &self.pr_error {
+                let err = crate::forge::inbox::display_error(raw_error);
+                let (rect, r) =
+                    ui.allocate_exact_size(vec2(ui.available_width(), 26.0), Sense::hover());
+                ui.painter_at(rect).text(
+                    pos2(rect.left() + 34.0, rect.center().y),
+                    Align2::LEFT_CENTER,
+                    err.lines().next().unwrap_or_default(),
+                    egui::FontId::proportional(11.0),
+                    t.text_faint,
+                );
+                r.on_hover_text(err.as_str());
+            }
+        }
+        let area = Rect::from_x_y_ranges(ui.max_rect().x_range(), top..=ui.cursor().top());
+        let in_use = ui.rect_contains_pointer(area)
+            || (open
+                && self
+                    .prs
+                    .iter()
+                    .any(|pr| widgets::keyed_row_menu_open(ui, ("pr-row", pr.number))));
+        self.note_pr_list_use(ui.ctx(), in_use, acts);
+    }
+
+    /// Notes when the list was last in use (the pointer on it, a row's menu open). A newer list
+    /// waiting is let in once it has been left alone for [`IN_USE_GRACE`].
+    fn note_pr_list_use(&self, ctx: &egui::Context, in_use: bool, acts: &mut Vec<Action>) {
+        let id = in_use_id(&self.path);
+        let now = ctx.input(|i| i.time);
+        if in_use {
+            ctx.data_mut(|d| d.insert_temp(id, now));
             return;
         }
-        if let Some(raw_error) = &self.pr_error {
-            let err = crate::forge::inbox::display_error(raw_error);
-            let (rect, r) =
-                ui.allocate_exact_size(vec2(ui.available_width(), 26.0), Sense::hover());
-            ui.painter_at(rect).text(
-                pos2(rect.left() + 34.0, rect.center().y),
-                Align2::LEFT_CENTER,
-                err.lines().next().unwrap_or_default(),
-                egui::FontId::proportional(11.0),
-                t.text_faint,
-            );
-            r.on_hover_text(err.as_str());
+        if self.pending_prs.is_none() {
             return;
         }
-        for pr in &self.prs {
-            self.pr_row(ui, acts, forge, pr, idle);
+        let since = ctx.data(|d| d.get_temp::<f64>(id)).map(|at| now - at);
+        match since {
+            Some(since) if since < IN_USE_GRACE => {
+                ctx.request_repaint_after(std::time::Duration::from_secs_f64(IN_USE_GRACE - since))
+            }
+            _ => acts.push(Action::ApplyPendingPrs),
+        }
+    }
+
+    /// Takes in a list read anew: at once, unless it would move the rows under the user, who
+    /// then gets it from the header (orange, with a refresh button) or once done with the list.
+    pub(in crate::repo) fn prs_arrived(&mut self, prs: Vec<PullRequest>, ctx: &egui::Context) {
+        self.pr_error = None;
+        if let Some(hosting) = &self.hosting {
+            let id = cache_id(self.repo_key(), hosting);
+            ctx.data_mut(|d| d.insert_persisted(id, prs.clone()));
+        }
+        let since = ctx
+            .data(|d| d.get_temp::<f64>(in_use_id(&self.path)))
+            .map(|at| ctx.input(|i| i.time) - at);
+        if apply_now(&self.prs, &prs, since) {
+            self.take_prs(prs, ctx);
+        } else {
+            self.pending_prs = Some(prs);
+            ctx.request_repaint();
+        }
+    }
+
+    /// Shows the list read while the shown one was in use.
+    pub(in crate::repo) fn apply_pending_prs(&mut self, ctx: &egui::Context) {
+        if let Some(prs) = self.pending_prs.take() {
+            self.take_prs(prs, ctx);
+        }
+    }
+
+    fn take_prs(&mut self, prs: Vec<PullRequest>, ctx: &egui::Context) {
+        self.pending_prs = None;
+        self.prs = prs;
+        if crate::network::background_may_run() {
+            self.refresh_ci(ctx);
+        }
+        self.load_seen_heads(ctx);
+    }
+
+    /// Before the forge is asked, the list it gave last time for `hosting` (kept across
+    /// restarts), so that the section isn't empty meanwhile.
+    pub(in crate::repo) fn seed_prs(&mut self, hosting: &Hosting, ctx: &egui::Context) {
+        if !self.prs.is_empty() || self.pending_prs.is_some() {
+            return;
+        }
+        let id = cache_id(self.repo_key(), hosting);
+        if let Some(prs) = ctx.data_mut(|d| d.get_persisted::<Vec<PullRequest>>(id)) {
+            self.prs = prs;
         }
     }
 
@@ -571,6 +692,58 @@ enum PrWorktree {
 mod tests {
     use super::*;
     use crate::git::{self, Remote};
+
+    fn numbered(number: u64) -> PullRequest {
+        PullRequest {
+            number,
+            title: format!("Change {number}"),
+            branch: format!("change-{number}"),
+            base: "main".into(),
+            from_fork: false,
+            sha: format!("{number:040x}"),
+            author: "ann".into(),
+            url: String::new(),
+            draft: false,
+        }
+    }
+
+    #[test]
+    fn a_newer_list_waits_while_the_shown_one_is_in_use() {
+        let shown = [numbered(1), numbered(2)];
+        let fresh = [numbered(3), numbered(1), numbered(2)];
+        assert!(!apply_now(&shown, &fresh, Some(0.5)));
+        assert!(apply_now(&shown, &fresh, Some(IN_USE_GRACE)));
+        assert!(apply_now(&shown, &fresh, None));
+        // Nothing would move: the same list, or none shown yet.
+        assert!(apply_now(&shown, &shown, Some(0.0)));
+        assert!(apply_now(&[], &fresh, Some(0.0)));
+    }
+
+    #[test]
+    fn a_list_read_while_in_use_is_kept_aside_until_asked_for() {
+        let ctx = egui::Context::default();
+        let mut tab = RepoTab::new_deferred("/nonexistent/pr-list-pending".into(), &ctx);
+        tab.prs = vec![numbered(1)];
+        let now = ctx.input(|i| i.time);
+        ctx.data_mut(|d| d.insert_temp(in_use_id(&tab.path), now));
+        tab.prs_arrived(vec![numbered(2), numbered(1)], &ctx);
+        assert_eq!(tab.prs, vec![numbered(1)]);
+        assert_eq!(tab.pending_prs, Some(vec![numbered(2), numbered(1)]));
+        tab.apply_pending_prs(&ctx);
+        assert_eq!(tab.prs, vec![numbered(2), numbered(1)]);
+        assert!(tab.pending_prs.is_none());
+    }
+
+    #[test]
+    fn a_read_after_a_failed_one_clears_its_error() {
+        let ctx = egui::Context::default();
+        let mut tab = RepoTab::new_deferred("/nonexistent/pr-list-error".into(), &ctx);
+        tab.prs = vec![numbered(1)];
+        tab.pr_error = Some("timeout".into());
+        tab.prs_arrived(vec![numbered(1)], &ctx);
+        assert!(tab.pr_error.is_none());
+        assert_eq!(tab.prs, vec![numbered(1)]);
+    }
 
     #[test]
     fn review14_pr_branch_lookup_does_not_fall_back_to_another_instance() {

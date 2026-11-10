@@ -86,6 +86,23 @@ fn a_compact_graph_fits_its_lanes_again() {
 }
 
 #[test]
+fn the_history_map_is_large_until_another_size_is_saved() {
+    let mut storage = Memory::default();
+    storage.set_string("old", "(ui_scale: 1.0)".to_owned());
+    let old: Option<Settings> = eframe::get_value(&storage, "old");
+    assert_eq!(old.map(|s| s.history_map), Some(HistoryMap::Large));
+    let small = Settings {
+        history_map: HistoryMap::Small,
+        ..Settings::default()
+    };
+    eframe::set_value(&mut storage, "small", &small);
+    let back: Option<Settings> = eframe::get_value(&storage, "small");
+    assert_eq!(back.map(|s| s.history_map), Some(HistoryMap::Small));
+    assert_eq!(HistoryMap::Hidden.width(), 0.0);
+    assert!(HistoryMap::Small.width() < HistoryMap::Large.width());
+}
+
+#[test]
 fn settings_survive_a_restart() {
     let settings = Settings {
         last_resized: Some(crate::repo::columns::Bar::Graph),

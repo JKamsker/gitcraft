@@ -979,6 +979,8 @@ interaction-settings-label-lane-colours = Spurfarben
 
 interaction-settings-label-lanes = Spuren
 
+interaction-settings-label-history-map = Verlaufskarte
+
 interaction-settings-label-largest-diff-sent = Maximale gesendete Diff-Größe
 
 interaction-settings-label-merge-tool = Merge-Werkzeug
@@ -1198,6 +1200,12 @@ interaction-settings-diff-below = Diffs unter dem Graphen anzeigen
 interaction-settings-diff-below-tip = Der Diff eines Commits oder des Arbeitsverzeichnisses öffnet sich unter dem Graphen statt an dessen Stelle. Die Schaltfläche im Diff-Kopf schaltet diese Ansicht ebenfalls um.
 
 interaction-settings-compact = Kompakter Graph
+
+interaction-settings-history-map-large = Groß
+
+interaction-settings-history-map-small = Klein
+
+interaction-settings-history-map-hidden = Ausblenden
 
 interaction-settings-fetch-off = 0 deaktiviert den Abruf
 

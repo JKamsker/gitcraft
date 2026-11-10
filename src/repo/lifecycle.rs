@@ -93,6 +93,8 @@ impl super::RepoTab {
                         self.restore_drafts();
                     }
                     self.load_timeline(ctx);
+                    // As last read, until git has read it anew.
+                    self.show_snapshot(ctx);
                 }
                 self.watch(ctx);
                 self.reload(ctx);
@@ -206,12 +208,24 @@ impl super::RepoTab {
         self.detail_error = None;
         self.diff = None;
         self.all_files = Default::default();
+        self.files_cache.reading = false;
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn suspension_releases_prefetch_but_keeps_completed_entries() {
+        let ctx = egui::Context::default();
+        let mut tab = crate::repo::RepoTab::new_deferred("/inert/prefetch-suspend".into(), &ctx);
+        tab.files_cache.insert("kept".into(), Vec::new());
+        tab.files_cache.reading = true;
+        tab.suspend();
+        assert!(!tab.files_cache.reading);
+        assert!(tab.files_cache.settled("kept"));
+    }
 
     #[test]
     fn linked_local_tabs_keep_the_local_schedule_after_suspension() -> Result<(), String> {

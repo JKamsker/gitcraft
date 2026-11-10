@@ -35,6 +35,8 @@ ISOLATED = {
         # fixtures. Keep its real confirmation and undo checks in a separate process.
         "repo::rehearse::tests::applying_does_it_for_real_and_it_can_be_undone",
     ],
+    # This real rebase/undo fixture hung while other Windows Git fixtures ran.
+    "repo-s": ["repo::stack::tests::undoing_a_rebase_that_updated_dependent_branches_puts_them_back"],
     "core": [
         "parallel_bisect::tests::finds_the_first_bad_commit_with_any_parallelism",
         "app::palette::tests::thousands_of_branches_open_and_filter_quickly",
@@ -59,7 +61,10 @@ SHARDS = {
         *REPO_Q_R, "--skip", "git::",
         *[arg for test in ISOLATED["repo-q-r"] for arg in ("--skip", test)],
     ],
-    "repo-s": [*REPO_S, "--skip", "git::"],
+    "repo-s": [
+        *REPO_S, "--skip", "git::",
+        *[arg for test in ISOLATED["repo-s"] for arg in ("--skip", test)],
+    ],
     "repo-rest": [
         "repo::",
         "--skip", "git::",
