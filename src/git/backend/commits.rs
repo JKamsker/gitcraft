@@ -5,6 +5,7 @@
 //! drivers, as `--numstat` does.
 
 use std::path::Path;
+use std::time::Instant;
 
 use gix::bstr::ByteSlice;
 use gix::object::tree::EntryKind;
@@ -48,9 +49,17 @@ pub(in crate::git) fn files(
     path: &Path,
     hashes: &[String],
 ) -> Result<Vec<(String, Files)>, String> {
-    let repo = super::native::open(path)?;
+    let opened = Instant::now();
+    let mut repo = super::native::open(path)?;
+    // Decoded trees, commits and blobs are revisited throughout a batch. The cache grows
+    // gradually and belongs to this read, so mutable attributes and refs aren't cached.
+    repo.object_cache_size_if_unset(32 * 1024 * 1024);
     plain_history(&repo)?;
-    files_in(&repo, hashes)
+    crate::timing::step("commit-files:open", opened);
+    let counted = Instant::now();
+    let result = files_in(&repo, hashes);
+    crate::timing::step("commit-files:diff-and-count", counted);
+    result
 }
 
 /// A commit's files, or none when git is to list them: a file may have been renamed with
@@ -85,10 +94,14 @@ fn files_in(repo: &gix::Repository, hashes: &[String]) -> Result<Vec<(String, Fi
 /// renames found as `-M` finds them.
 pub(super) fn changes(repo: &gix::Repository, hash: &str) -> Result<Vec<ChangeDetached>, String> {
     let mut options = gix::diff::Options::default();
-    // `-M`: renames at git's default similarity, no copies, whatever the config says.
+    // Only exact renames can pass paired_as_git(). Don't compute similarity matches
+    // just to discard them: remaining additions + deletions are left to Git below.
     options
         .track_path()
-        .track_rewrites(Some(gix::diff::Rewrites::default()));
+        .track_rewrites(Some(gix::diff::Rewrites {
+            percentage: None,
+            ..Default::default()
+        }));
     let commit = repo.find_commit(commit_id(hash)?).map_err(err)?;
     let tree = commit.tree().map_err(err)?;
     let parent = match commit.parent_ids().next() {
@@ -288,8 +301,12 @@ fn line_counts(
 /// `hash`'s detail as `git show` gives it (`--date=format-local:%Y-%m-%d %H:%M:%S`), whether
 /// HEAD contains it, and whether a merge came after it on the way to HEAD.
 pub(in crate::git) fn detail(path: &Path, hash: &str) -> Result<CommitDetail, String> {
-    let repo = super::native::open(path)?;
+    let opened = Instant::now();
+    let mut repo = super::native::open(path)?;
+    repo.object_cache_size_if_unset(32 * 1024 * 1024);
     plain_history(&repo)?;
+    crate::timing::step("commit-detail:open", opened);
+    let header = Instant::now();
     let id = commit_id(hash)?;
     let commit = repo.find_commit(id).map_err(err)?;
     let decoded = commit.decode().map_err(err)?;
@@ -313,10 +330,14 @@ pub(in crate::git) fn detail(path: &Path, hash: &str) -> Result<CommitDetail, St
         text(committer.name)?,
         local_time(committer.time().map_err(err)?.seconds)?,
     );
+    crate::timing::step("commit-detail:header", header);
+    let counted = Instant::now();
     let files = match files_in(&repo, &[hash.to_owned()])?.pop() {
         Some((_, Some(files))) => files,
         _ => crate::git::diff::commit_files_by_git(path, hash)?,
     };
+    crate::timing::step("commit-detail:files", counted);
+    let ancestry = Instant::now();
     let head = repo.head().map_err(err)?;
     let head = if head.is_unborn() {
         None
@@ -344,6 +365,7 @@ pub(in crate::git) fn detail(path: &Path, hash: &str) -> Result<CommitDetail, St
         }
         _ => false,
     };
+    crate::timing::step("commit-detail:ancestry", ancestry);
     Ok(CommitDetail {
         hash: hash.to_owned(),
         parents,

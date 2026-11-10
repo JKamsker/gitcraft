@@ -125,7 +125,7 @@ impl Drop for Scope {
 
 /// A stage of the scope's work that began at `since`.
 pub(crate) fn step(name: &str, since: Instant) {
-    if SCOPE.with(|s| s.borrow().is_some()) {
+    if all() || SCOPE.with(|s| s.borrow().is_some()) {
         log(format_args!("{name} {}", ms(since.elapsed())));
     }
 }
