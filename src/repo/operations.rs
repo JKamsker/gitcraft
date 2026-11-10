@@ -36,6 +36,10 @@ impl RepoTab {
         quiet: bool,
         ctx: &egui::Context,
     ) {
+        // Also protect direct/background callers that do not enter through apply().
+        if self.snapshot_pending() {
+            return;
+        }
         if let Some(busy) = &self.busy_op {
             // Fetch, Pull and Push wait for it (see `running::Waiter`); anything else is not
             // started, and says so. A quiet one (the background fetch) just comes again later.

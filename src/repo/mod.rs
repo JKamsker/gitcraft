@@ -918,8 +918,13 @@ impl RepoTab {
             || self.resuming
     }
 
+    /// A startup snapshot is display-only until a successful repository read replaces it.
+    pub(super) fn snapshot_pending(&self) -> bool {
+        self.snapshot_shown && self.history_gen == 0
+    }
+
     pub fn is_busy(&self) -> bool {
-        self.loading || self.busy_op.is_some()
+        self.loading || self.busy_op.is_some() || self.snapshot_pending()
     }
 
     /// Queues an action from outside the tab (the command palette).

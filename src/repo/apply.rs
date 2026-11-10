@@ -27,6 +27,23 @@ pub(super) struct PreparedPick {
 
 impl RepoTab {
     pub(crate) fn apply(&mut self, action: Action, ctx: &egui::Context) {
+        // Cached startup state may be browsed, but cannot authorize an operation.
+        // Default to refusal for every other action, including feature-specific mutations.
+        if self.snapshot_pending()
+            && !matches!(
+                &action,
+                Action::Select(_)
+                    | Action::SelectHash(_)
+                    | Action::OpenCommitChanges(_)
+                    | Action::OpenDiff(_)
+                    | Action::CloseDiff
+                    | Action::FileView { .. }
+                    | Action::CloseFileView
+                    | Action::Reload
+            )
+        {
+            return;
+        }
         self.notice_connections(ctx);
         let action = match action {
             Action::OpenLinkedPr { number, remote } => {

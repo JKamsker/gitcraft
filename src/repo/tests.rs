@@ -1222,3 +1222,46 @@ fn completed_read_remains_recent_for_focus_without_retaining_its_timer() {
     tab.loading = true;
     assert!(tab.just_read());
 }
+
+#[test]
+fn startup_snapshot_cannot_authorize_merge_even_after_a_failed_load() {
+    let ctx = egui::Context::default();
+    for failed in [false, true] {
+        let mut tab = super::RepoTab::new_deferred("/inert/startup-snapshot".into(), &ctx);
+        tab.snapshot_shown = true;
+        tab.refs.current = Some("cached-old-branch".into());
+        tab.load_error = failed.then(|| "read failed".into());
+        assert!(tab.is_busy());
+        let (_, jobs) = super::messages::record_jobs(|| {
+            tab.apply(
+                super::merge_action(
+                    super::actions::BranchRef::local("incoming"),
+                    "cached-old-branch",
+                ),
+                &ctx,
+            );
+            tab.run_ops(
+                "direct merge",
+                super::ops(&[&["merge", "incoming"]]),
+                super::Refresh::All,
+                super::OpKind::plain(),
+                &ctx,
+            );
+        });
+        assert!(jobs.is_empty());
+        assert!(tab.busy_op.is_none());
+        // A successful fresh read advances history_gen and retires the snapshot.
+        tab.history_gen = 1;
+        tab.snapshot_shown = false;
+        tab.load_error = None;
+        assert!(!tab.is_busy());
+        let (_, jobs) = super::messages::record_jobs(|| {
+            tab.apply(
+                super::merge_action(super::actions::BranchRef::local("incoming"), "fresh-branch"),
+                &ctx,
+            );
+        });
+        assert!(!jobs.is_empty());
+        assert!(tab.busy_op.is_some());
+    }
+}
