@@ -957,3 +957,1193 @@
   },
   "application_gates": "Bound to reviewed 388bc7c4 via identical trees; preserved logs/review in refs/notes/pr199-validation on that candidate."
 }
+
+{
+  "conclusion": "success",
+  "databaseId": 42916367856,
+  "headSha": "c6d5a2bb8e4f933b5709f9b36e4e7b1e7a6a97a5",
+  "jobs": [
+    {
+      "completedAt": "2026-11-10T22:42:18Z",
+      "conclusion": "success",
+      "databaseId": 130179742618,
+      "name": "lint",
+      "startedAt": "2026-11-10T22:38:12Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-11-10T22:38:14Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-11-10T22:38:13Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:38:17Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@v4",
+          "number": 2,
+          "startedAt": "2026-11-10T22:38:14Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:38:18Z",
+          "conclusion": "success",
+          "name": "Run dtolnay/rust-toolchain@stable",
+          "number": 3,
+          "startedAt": "2026-11-10T22:38:17Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:38:19Z",
+          "conclusion": "success",
+          "name": "Run Swatinem/rust-cache@v2",
+          "number": 4,
+          "startedAt": "2026-11-10T22:38:18Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:38:35Z",
+          "conclusion": "success",
+          "name": "Linux build dependencies",
+          "number": 5,
+          "startedAt": "2026-11-10T22:38:19Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:38:41Z",
+          "conclusion": "success",
+          "name": "Formatting",
+          "number": 6,
+          "startedAt": "2026-11-10T22:38:35Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:42:01Z",
+          "conclusion": "success",
+          "name": "Clippy",
+          "number": 7,
+          "startedAt": "2026-11-10T22:38:41Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:42:15Z",
+          "conclusion": "success",
+          "name": "Post Run Swatinem/rust-cache@v2",
+          "number": 13,
+          "startedAt": "2026-11-10T22:42:01Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:42:15Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@v4",
+          "number": 14,
+          "startedAt": "2026-11-10T22:42:15Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:42:15Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 15,
+          "startedAt": "2026-11-10T22:42:15Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/JKamsker/gitcraft/actions/runs/42916367856/job/130179742618"
+    },
+    {
+      "completedAt": "2026-11-10T22:55:21Z",
+      "conclusion": "success",
+      "databaseId": 130179742775,
+      "name": "windows-tests / Windows test build",
+      "startedAt": "2026-11-10T22:38:12Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-11-10T22:38:14Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-11-10T22:38:13Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:38:21Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@v4",
+          "number": 2,
+          "startedAt": "2026-11-10T22:38:14Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:38:28Z",
+          "conclusion": "success",
+          "name": "Run dtolnay/rust-toolchain@stable",
+          "number": 3,
+          "startedAt": "2026-11-10T22:38:21Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:39:36Z",
+          "conclusion": "success",
+          "name": "Run Swatinem/rust-cache@v2",
+          "number": 4,
+          "startedAt": "2026-11-10T22:38:28Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:54:47Z",
+          "conclusion": "success",
+          "name": "Build test binaries",
+          "number": 5,
+          "startedAt": "2026-11-10T22:39:36Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:54:51Z",
+          "conclusion": "success",
+          "name": "Verify complete and disjoint Windows test shards",
+          "number": 6,
+          "startedAt": "2026-11-10T22:54:47Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:55:08Z",
+          "conclusion": "success",
+          "name": "Windows doctests (not included in compiled test executables)",
+          "number": 7,
+          "startedAt": "2026-11-10T22:54:51Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:55:17Z",
+          "conclusion": "success",
+          "name": "Upload Windows test binaries",
+          "number": 8,
+          "startedAt": "2026-11-10T22:55:08Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:55:17Z",
+          "conclusion": "success",
+          "name": "Post Run Swatinem/rust-cache@v2",
+          "number": 15,
+          "startedAt": "2026-11-10T22:55:17Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:55:19Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@v4",
+          "number": 16,
+          "startedAt": "2026-11-10T22:55:17Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:55:19Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 17,
+          "startedAt": "2026-11-10T22:55:19Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/JKamsker/gitcraft/actions/runs/42916367856/job/130179742775"
+    },
+    {
+      "completedAt": "2026-11-10T22:54:21Z",
+      "conclusion": "success",
+      "databaseId": 130179742947,
+      "name": "forges (Forgejo 17.0.1, Gitea 28.3.0)",
+      "startedAt": "2026-11-10T22:38:13Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-11-10T22:38:16Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-11-10T22:38:14Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:38:18Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@v4",
+          "number": 2,
+          "startedAt": "2026-11-10T22:38:16Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:38:19Z",
+          "conclusion": "success",
+          "name": "Run dtolnay/rust-toolchain@stable",
+          "number": 3,
+          "startedAt": "2026-11-10T22:38:18Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:38:21Z",
+          "conclusion": "success",
+          "name": "Run Swatinem/rust-cache@v2",
+          "number": 4,
+          "startedAt": "2026-11-10T22:38:19Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:38:21Z",
+          "conclusion": "success",
+          "name": "Forge binaries",
+          "number": 5,
+          "startedAt": "2026-11-10T22:38:21Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:38:44Z",
+          "conclusion": "success",
+          "name": "Linux build dependencies",
+          "number": 6,
+          "startedAt": "2026-11-10T22:38:21Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:53:00Z",
+          "conclusion": "success",
+          "name": "Build the tests",
+          "number": 7,
+          "startedAt": "2026-11-10T22:38:44Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:53:40Z",
+          "conclusion": "success",
+          "name": "Start Forgejo and Gitea",
+          "number": 8,
+          "startedAt": "2026-11-10T22:53:00Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:53:58Z",
+          "conclusion": "success",
+          "name": "Test against them",
+          "number": 9,
+          "startedAt": "2026-11-10T22:53:40Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:53:58Z",
+          "conclusion": "skipped",
+          "name": "Server logs",
+          "number": 10,
+          "startedAt": "2026-11-10T22:53:58Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:54:02Z",
+          "conclusion": "success",
+          "name": "Post Forge binaries",
+          "number": 18,
+          "startedAt": "2026-11-10T22:53:58Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:54:18Z",
+          "conclusion": "success",
+          "name": "Post Run Swatinem/rust-cache@v2",
+          "number": 19,
+          "startedAt": "2026-11-10T22:54:02Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:54:18Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@v4",
+          "number": 20,
+          "startedAt": "2026-11-10T22:54:18Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:54:18Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 21,
+          "startedAt": "2026-11-10T22:54:18Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/JKamsker/gitcraft/actions/runs/42916367856/job/130179742947"
+    },
+    {
+      "completedAt": "2026-11-10T22:53:53Z",
+      "conclusion": "success",
+      "databaseId": 130179742984,
+      "name": "forges (Forgejo 15.0.11, Gitea 1.26.4)",
+      "startedAt": "2026-11-10T22:38:13Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-11-10T22:38:15Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-11-10T22:38:14Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:38:18Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@v4",
+          "number": 2,
+          "startedAt": "2026-11-10T22:38:15Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:38:19Z",
+          "conclusion": "success",
+          "name": "Run dtolnay/rust-toolchain@stable",
+          "number": 3,
+          "startedAt": "2026-11-10T22:38:18Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:38:19Z",
+          "conclusion": "success",
+          "name": "Run Swatinem/rust-cache@v2",
+          "number": 4,
+          "startedAt": "2026-11-10T22:38:19Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:38:20Z",
+          "conclusion": "success",
+          "name": "Forge binaries",
+          "number": 5,
+          "startedAt": "2026-11-10T22:38:19Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:38:38Z",
+          "conclusion": "success",
+          "name": "Linux build dependencies",
+          "number": 6,
+          "startedAt": "2026-11-10T22:38:20Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:52:54Z",
+          "conclusion": "success",
+          "name": "Build the tests",
+          "number": 7,
+          "startedAt": "2026-11-10T22:38:38Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:53:10Z",
+          "conclusion": "success",
+          "name": "Start Forgejo and Gitea",
+          "number": 8,
+          "startedAt": "2026-11-10T22:52:54Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:53:27Z",
+          "conclusion": "success",
+          "name": "Test against them",
+          "number": 9,
+          "startedAt": "2026-11-10T22:53:10Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:53:27Z",
+          "conclusion": "skipped",
+          "name": "Server logs",
+          "number": 10,
+          "startedAt": "2026-11-10T22:53:27Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:53:31Z",
+          "conclusion": "success",
+          "name": "Post Forge binaries",
+          "number": 18,
+          "startedAt": "2026-11-10T22:53:27Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:53:51Z",
+          "conclusion": "success",
+          "name": "Post Run Swatinem/rust-cache@v2",
+          "number": 19,
+          "startedAt": "2026-11-10T22:53:31Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:53:51Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@v4",
+          "number": 20,
+          "startedAt": "2026-11-10T22:53:51Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:53:51Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 21,
+          "startedAt": "2026-11-10T22:53:51Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/JKamsker/gitcraft/actions/runs/42916367856/job/130179742984"
+    },
+    {
+      "completedAt": "2026-11-10T23:01:19Z",
+      "conclusion": "success",
+      "databaseId": 130179743007,
+      "name": "test (ubuntu-latest)",
+      "startedAt": "2026-11-10T22:38:13Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-11-10T22:38:15Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-11-10T22:38:13Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:38:17Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@v4",
+          "number": 2,
+          "startedAt": "2026-11-10T22:38:15Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:38:18Z",
+          "conclusion": "success",
+          "name": "Run dtolnay/rust-toolchain@stable",
+          "number": 3,
+          "startedAt": "2026-11-10T22:38:17Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:38:20Z",
+          "conclusion": "success",
+          "name": "Run Swatinem/rust-cache@v2",
+          "number": 4,
+          "startedAt": "2026-11-10T22:38:18Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:38:40Z",
+          "conclusion": "success",
+          "name": "Linux build dependencies",
+          "number": 5,
+          "startedAt": "2026-11-10T22:38:20Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:51:22Z",
+          "conclusion": "success",
+          "name": "Build tests",
+          "number": 6,
+          "startedAt": "2026-11-10T22:38:40Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T23:00:33Z",
+          "conclusion": "success",
+          "name": "Test",
+          "number": 7,
+          "startedAt": "2026-11-10T22:51:22Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T23:00:45Z",
+          "conclusion": "success",
+          "name": "Large-branch palette responsiveness (isolated)",
+          "number": 8,
+          "startedAt": "2026-11-10T23:00:33Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T23:00:51Z",
+          "conclusion": "success",
+          "name": "Timed-out subprocess cleanup (isolated)",
+          "number": 9,
+          "startedAt": "2026-11-10T23:00:45Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T23:00:57Z",
+          "conclusion": "success",
+          "name": "Real OpenSSH transport reuse and recovery",
+          "number": 10,
+          "startedAt": "2026-11-10T23:00:51Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T23:01:17Z",
+          "conclusion": "success",
+          "name": "Post Run Swatinem/rust-cache@v2",
+          "number": 19,
+          "startedAt": "2026-11-10T23:00:57Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T23:01:17Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@v4",
+          "number": 20,
+          "startedAt": "2026-11-10T23:01:17Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T23:01:17Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 21,
+          "startedAt": "2026-11-10T23:01:17Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/JKamsker/gitcraft/actions/runs/42916367856/job/130179743007"
+    },
+    {
+      "completedAt": "2026-11-10T22:57:12Z",
+      "conclusion": "success",
+      "databaseId": 130188391688,
+      "name": "windows-tests / Windows tests (repo-q-r)",
+      "startedAt": "2026-11-10T22:55:23Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-11-10T22:55:25Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-11-10T22:55:24Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:55:32Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@v4",
+          "number": 2,
+          "startedAt": "2026-11-10T22:55:25Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:55:40Z",
+          "conclusion": "success",
+          "name": "Run actions/download-artifact@v4",
+          "number": 3,
+          "startedAt": "2026-11-10T22:55:32Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:57:09Z",
+          "conclusion": "success",
+          "name": "Run precompiled test shard",
+          "number": 4,
+          "startedAt": "2026-11-10T22:55:40Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:57:11Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@v4",
+          "number": 8,
+          "startedAt": "2026-11-10T22:57:09Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:57:11Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 9,
+          "startedAt": "2026-11-10T22:57:11Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/JKamsker/gitcraft/actions/runs/42916367856/job/130188391688"
+    },
+    {
+      "completedAt": "2026-11-10T22:59:47Z",
+      "conclusion": "success",
+      "databaseId": 130188391752,
+      "name": "windows-tests / Windows tests (git-rest)",
+      "startedAt": "2026-11-10T22:55:24Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-11-10T22:55:26Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-11-10T22:55:25Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:55:32Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@v4",
+          "number": 2,
+          "startedAt": "2026-11-10T22:55:26Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:55:41Z",
+          "conclusion": "success",
+          "name": "Run actions/download-artifact@v4",
+          "number": 3,
+          "startedAt": "2026-11-10T22:55:32Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:59:43Z",
+          "conclusion": "success",
+          "name": "Run precompiled test shard",
+          "number": 4,
+          "startedAt": "2026-11-10T22:55:41Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:59:45Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@v4",
+          "number": 8,
+          "startedAt": "2026-11-10T22:59:43Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:59:45Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 9,
+          "startedAt": "2026-11-10T22:59:45Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/JKamsker/gitcraft/actions/runs/42916367856/job/130188391752"
+    },
+    {
+      "completedAt": "2026-11-10T23:01:38Z",
+      "conclusion": "success",
+      "databaseId": 130188391758,
+      "name": "windows-tests / Windows tests (git-a-m)",
+      "startedAt": "2026-11-10T22:55:24Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-11-10T22:55:25Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-11-10T22:55:25Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:55:33Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@v4",
+          "number": 2,
+          "startedAt": "2026-11-10T22:55:25Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:55:40Z",
+          "conclusion": "success",
+          "name": "Run actions/download-artifact@v4",
+          "number": 3,
+          "startedAt": "2026-11-10T22:55:33Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T23:01:34Z",
+          "conclusion": "success",
+          "name": "Run precompiled test shard",
+          "number": 4,
+          "startedAt": "2026-11-10T22:55:40Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T23:01:36Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@v4",
+          "number": 8,
+          "startedAt": "2026-11-10T23:01:34Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T23:01:36Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 9,
+          "startedAt": "2026-11-10T23:01:36Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/JKamsker/gitcraft/actions/runs/42916367856/job/130188391758"
+    },
+    {
+      "completedAt": "2026-11-10T22:58:56Z",
+      "conclusion": "success",
+      "databaseId": 130188391773,
+      "name": "windows-tests / Windows tests (repo-n-p)",
+      "startedAt": "2026-11-10T22:55:24Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-11-10T22:55:27Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-11-10T22:55:25Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:55:35Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@v4",
+          "number": 2,
+          "startedAt": "2026-11-10T22:55:27Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:55:43Z",
+          "conclusion": "success",
+          "name": "Run actions/download-artifact@v4",
+          "number": 3,
+          "startedAt": "2026-11-10T22:55:35Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:58:52Z",
+          "conclusion": "success",
+          "name": "Run precompiled test shard",
+          "number": 4,
+          "startedAt": "2026-11-10T22:55:43Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:58:54Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@v4",
+          "number": 8,
+          "startedAt": "2026-11-10T22:58:52Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:58:54Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 9,
+          "startedAt": "2026-11-10T22:58:54Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/JKamsker/gitcraft/actions/runs/42916367856/job/130188391773"
+    },
+    {
+      "completedAt": "2026-11-10T23:00:40Z",
+      "conclusion": "success",
+      "databaseId": 130188391810,
+      "name": "windows-tests / Windows tests (repo-d-f)",
+      "startedAt": "2026-11-10T22:55:23Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-11-10T22:55:25Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-11-10T22:55:24Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:55:32Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@v4",
+          "number": 2,
+          "startedAt": "2026-11-10T22:55:25Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:55:40Z",
+          "conclusion": "success",
+          "name": "Run actions/download-artifact@v4",
+          "number": 3,
+          "startedAt": "2026-11-10T22:55:32Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T23:00:36Z",
+          "conclusion": "success",
+          "name": "Run precompiled test shard",
+          "number": 4,
+          "startedAt": "2026-11-10T22:55:40Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T23:00:38Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@v4",
+          "number": 8,
+          "startedAt": "2026-11-10T23:00:36Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T23:00:38Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 9,
+          "startedAt": "2026-11-10T23:00:38Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/JKamsker/gitcraft/actions/runs/42916367856/job/130188391810"
+    },
+    {
+      "completedAt": "2026-11-10T22:56:51Z",
+      "conclusion": "success",
+      "databaseId": 130188391835,
+      "name": "windows-tests / Windows tests (repo-s)",
+      "startedAt": "2026-11-10T22:55:23Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-11-10T22:55:25Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-11-10T22:55:24Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:55:32Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@v4",
+          "number": 2,
+          "startedAt": "2026-11-10T22:55:25Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:55:39Z",
+          "conclusion": "success",
+          "name": "Run actions/download-artifact@v4",
+          "number": 3,
+          "startedAt": "2026-11-10T22:55:32Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:56:48Z",
+          "conclusion": "success",
+          "name": "Run precompiled test shard",
+          "number": 4,
+          "startedAt": "2026-11-10T22:55:39Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:56:50Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@v4",
+          "number": 8,
+          "startedAt": "2026-11-10T22:56:48Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:56:50Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 9,
+          "startedAt": "2026-11-10T22:56:50Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/JKamsker/gitcraft/actions/runs/42916367856/job/130188391835"
+    },
+    {
+      "completedAt": "2026-11-10T22:59:07Z",
+      "conclusion": "success",
+      "databaseId": 130188391845,
+      "name": "windows-tests / Windows tests (repo-g-m)",
+      "startedAt": "2026-11-10T22:55:24Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-11-10T22:55:25Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-11-10T22:55:24Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:55:32Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@v4",
+          "number": 2,
+          "startedAt": "2026-11-10T22:55:25Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:55:40Z",
+          "conclusion": "success",
+          "name": "Run actions/download-artifact@v4",
+          "number": 3,
+          "startedAt": "2026-11-10T22:55:32Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:59:04Z",
+          "conclusion": "success",
+          "name": "Run precompiled test shard",
+          "number": 4,
+          "startedAt": "2026-11-10T22:55:40Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:59:07Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@v4",
+          "number": 8,
+          "startedAt": "2026-11-10T22:59:04Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:59:07Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 9,
+          "startedAt": "2026-11-10T22:59:07Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/JKamsker/gitcraft/actions/runs/42916367856/job/130188391845"
+    },
+    {
+      "completedAt": "2026-11-10T22:58:05Z",
+      "conclusion": "success",
+      "databaseId": 130188391847,
+      "name": "windows-tests / Windows tests (repo-a-c)",
+      "startedAt": "2026-11-10T22:55:25Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-11-10T22:55:27Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-11-10T22:55:26Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:55:33Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@v4",
+          "number": 2,
+          "startedAt": "2026-11-10T22:55:27Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:55:40Z",
+          "conclusion": "success",
+          "name": "Run actions/download-artifact@v4",
+          "number": 3,
+          "startedAt": "2026-11-10T22:55:33Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:58:02Z",
+          "conclusion": "success",
+          "name": "Run precompiled test shard",
+          "number": 4,
+          "startedAt": "2026-11-10T22:55:40Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:58:04Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@v4",
+          "number": 8,
+          "startedAt": "2026-11-10T22:58:02Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:58:04Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 9,
+          "startedAt": "2026-11-10T22:58:04Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/JKamsker/gitcraft/actions/runs/42916367856/job/130188391847"
+    },
+    {
+      "completedAt": "2026-11-10T23:06:55Z",
+      "conclusion": "success",
+      "databaseId": 130188391916,
+      "name": "windows-tests / Windows tests (core)",
+      "startedAt": "2026-11-10T22:55:24Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-11-10T22:55:26Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-11-10T22:55:25Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:55:33Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@v4",
+          "number": 2,
+          "startedAt": "2026-11-10T22:55:26Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:55:40Z",
+          "conclusion": "success",
+          "name": "Run actions/download-artifact@v4",
+          "number": 3,
+          "startedAt": "2026-11-10T22:55:33Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T23:06:51Z",
+          "conclusion": "success",
+          "name": "Run precompiled test shard",
+          "number": 4,
+          "startedAt": "2026-11-10T22:55:40Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T23:06:53Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@v4",
+          "number": 8,
+          "startedAt": "2026-11-10T23:06:51Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T23:06:53Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 9,
+          "startedAt": "2026-11-10T23:06:53Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/JKamsker/gitcraft/actions/runs/42916367856/job/130188391916"
+    },
+    {
+      "completedAt": "2026-11-10T22:56:29Z",
+      "conclusion": "success",
+      "databaseId": 130188392287,
+      "name": "windows-tests / Windows tests (repo-rest)",
+      "startedAt": "2026-11-10T22:55:24Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-11-10T22:55:25Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-11-10T22:55:24Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:55:31Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@v4",
+          "number": 2,
+          "startedAt": "2026-11-10T22:55:25Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:55:36Z",
+          "conclusion": "success",
+          "name": "Run actions/download-artifact@v4",
+          "number": 3,
+          "startedAt": "2026-11-10T22:55:31Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:56:26Z",
+          "conclusion": "success",
+          "name": "Run precompiled test shard",
+          "number": 4,
+          "startedAt": "2026-11-10T22:55:36Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:56:28Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@v4",
+          "number": 8,
+          "startedAt": "2026-11-10T22:56:26Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T22:56:28Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 9,
+          "startedAt": "2026-11-10T22:56:28Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/JKamsker/gitcraft/actions/runs/42916367856/job/130188392287"
+    },
+    {
+      "completedAt": "2026-11-10T23:07:00Z",
+      "conclusion": "success",
+      "databaseId": 130194103287,
+      "name": "test (windows-latest)",
+      "startedAt": "2026-11-10T23:06:57Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-11-10T23:06:58Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-11-10T23:06:58Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T23:06:58Z",
+          "conclusion": "success",
+          "name": "Require the Windows build and every shard to pass",
+          "number": 2,
+          "startedAt": "2026-11-10T23:06:58Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-11-10T23:06:58Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 3,
+          "startedAt": "2026-11-10T23:06:58Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/JKamsker/gitcraft/actions/runs/42916367856/job/130194103287"
+    }
+  ],
+  "status": "completed",
+  "url": "https://github.com/JKamsker/gitcraft/actions/runs/42916367856",
+  "recorded_at": "2026-11-10T23:09:08.142201+00:00",
+  "reviewed_candidate": "388bc7c4e0d39b1550ae29eb80779e442550dc29",
+  "current_dev_sha": "c6d5a2bb8e4f933b5709f9b36e4e7b1e7a6a97a5",
+  "tree_equal_to_reviewed_candidate": true
+}
