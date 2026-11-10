@@ -1,64 +1,172 @@
-//! Staging suggestions retain their source commits and can always be dismissed.
+//! Cochange suggestions own their request lifetime, ranking and dismissed evidence.
 use super::{Action, RepoTab, saved_views::reader::Reader};
 use crate::git::investigations::cochange::{self, Hint, History};
 use std::collections::BTreeSet;
+use std::path::PathBuf;
+
+#[cfg(test)]
+#[path = "cochange_owner/lifecycle_tests.rs"]
+mod lifecycle_tests;
+#[cfg(test)]
+#[path = "cochange_owner/tests.rs"]
+mod tests;
+#[path = "cochange_owner/view.rs"]
+mod view;
+
+#[path = "cochange_owner/requests.rs"]
+mod requests;
+use requests::{Request, Requests};
+struct Completion {
+    request: Request,
+    result: Result<History, String>,
+}
+/// Effects contain immutable inputs; the owner alone accepts completions.
+enum Effect {
+    Read {
+        request: Request,
+        path: PathBuf,
+        head: String,
+    },
+    None,
+}
+
 #[derive(Default)]
 pub(super) struct State {
     head: String,
-    reader: Reader<History>,
+    repository: PathBuf,
+    requests: Requests,
+    reader: Reader<Completion>,
     history: Option<History>,
     error: Option<String>,
     ranked_for: Option<(BTreeSet<String>, BTreeSet<String>)>,
     hints: Vec<Hint>,
     dismissed: BTreeSet<(String, String)>,
 }
+impl State {
+    pub(super) fn invalidate_context(&mut self) {
+        self.refresh();
+        self.history = None;
+        self.error = None;
+        self.hints.clear();
+        self.dismissed.clear();
+        self.ranked_for = None;
+    }
+
+    /// Retire reads on hiding/suspending without discarding completed history.
+    pub(super) fn suspend(&mut self) {
+        self.reader.cancel();
+        self.requests.retire();
+        if self.history.is_none() {
+            self.head.clear();
+        }
+    }
+
+    fn refresh(&mut self) {
+        self.suspend();
+        self.head.clear();
+    }
+
+    fn context(&mut self, path: &std::path::Path, head: &str) -> Effect {
+        if self.head == head && self.repository == path {
+            return Effect::None;
+        }
+        self.suspend();
+        self.head = head.to_owned();
+        self.repository = path.to_owned();
+        self.history = None;
+        self.error = None;
+        self.hints.clear();
+        self.dismissed.clear();
+        self.ranked_for = None;
+        if !crate::git::investigations::oid(head) {
+            return Effect::None;
+        }
+        let Some(request) = self.requests.start() else {
+            return Effect::None;
+        };
+        Effect::Read {
+            request,
+            path: path.to_owned(),
+            head: head.to_owned(),
+        }
+    }
+
+    fn complete(&mut self, completion: Completion) {
+        if !self.requests.finish(completion.request) {
+            return;
+        }
+        self.requests.retire();
+        match completion.result {
+            Ok(history) => {
+                self.history = Some(history);
+                self.error = None;
+                self.ranked_for = None;
+            }
+            Err(error) => self.error = Some(error),
+        }
+    }
+
+    fn rank(&mut self, staged: BTreeSet<String>, changed: BTreeSet<String>) {
+        if staged.is_empty() {
+            self.hints.clear();
+            self.ranked_for = None;
+            return;
+        }
+        let key = (staged, changed);
+        if self.ranked_for.as_ref() != Some(&key)
+            && let Some(history) = &self.history
+        {
+            self.hints = cochange::rank(history, &key.0, &key.1);
+            self.ranked_for = Some(key);
+        }
+    }
+
+    fn read(&mut self, effect: Effect, ctx: &egui::Context) {
+        if let Effect::Read {
+            request,
+            path,
+            head,
+        } = effect
+        {
+            self.reader.queue(move |active| {
+                Ok(Completion {
+                    request,
+                    result: cochange::load(&path, &head, active),
+                })
+            });
+        }
+        if let Some(result) = self.reader.poll(ctx) {
+            match result {
+                Ok(completion) => self.complete(completion),
+                Err(error) => {
+                    if let Some(request) = self.requests.pending() {
+                        self.complete(Completion {
+                            request,
+                            result: Err(error),
+                        });
+                    }
+                }
+            }
+        }
+    }
+}
+impl Drop for State {
+    fn drop(&mut self) {
+        self.suspend();
+    }
+}
 impl RepoTab {
     pub(super) fn poll_cochanges(&mut self, ctx: &egui::Context) {
+        self.notice_connections(ctx);
         self.cochanges.reader.bind(self.tx.cancel.clone());
         if !self.shown || self.sleeping() {
-            self.cochanges.reader.cancel();
-            if self.cochanges.history.is_none() {
-                self.cochanges.head.clear();
-            }
+            self.cochanges.suspend();
             return;
         }
-        if let Some(result) = self.cochanges.reader.poll(ctx) {
-            match result {
-                Ok(h) => {
-                    self.cochanges.history = Some(h);
-                    self.cochanges.error = None;
-                    self.cochanges.ranked_for = None;
-                }
-                Err(e) => self.cochanges.error = Some(e),
-            }
-        }
-        let staged = self
-            .work
-            .staged
-            .iter()
-            .map(|f| f.path.clone())
-            .collect::<BTreeSet<_>>();
-        if staged.is_empty() {
-            self.cochanges.hints.clear();
-            self.cochanges.ranked_for = None;
-            return;
-        }
-        if self.cochanges.head != self.refs.head {
-            self.cochanges.head = self.refs.head.clone();
-            self.cochanges.history = None;
-            self.cochanges.error = None;
-            self.cochanges.hints.clear();
-            self.cochanges.dismissed.clear();
-            self.cochanges.ranked_for = None;
-            if crate::git::investigations::oid(&self.refs.head) {
-                let path = self.path.clone();
-                let head = self.refs.head.clone();
-                self.cochanges
-                    .reader
-                    .queue(move |active| cochange::load(&path, &head, active));
-                self.cochanges.reader.poll(ctx);
-            }
-        }
+        // Reconcile context before accepting even an already queued answer.
+        let effect = self.cochanges.context(&self.path, &self.refs.head);
+        self.cochanges.read(effect, ctx);
+        let staged = self.work.staged.iter().map(|f| f.path.clone()).collect();
         let changed = self
             .work
             .staged
@@ -66,236 +174,7 @@ impl RepoTab {
             .chain(&self.work.unstaged)
             .chain(&self.work.conflicted)
             .map(|f| f.path.clone())
-            .collect::<BTreeSet<_>>();
-        let key = (staged, changed);
-        if self.cochanges.ranked_for.as_ref() != Some(&key)
-            && let Some(history) = &self.cochanges.history
-        {
-            self.cochanges.hints = cochange::rank(history, &key.0, &key.1);
-            self.cochanges.ranked_for = Some(key);
-        }
-    }
-    pub(super) fn cochange_hints(&mut self, ui: &mut egui::Ui, acts: &mut Vec<Action>) {
-        if self.work.staged.is_empty() {
-            return;
-        }
-        egui::CollapsingHeader::new(crate::i18n::text("repo-core-0325"))
-            .id_salt("cochange-hints")
-            .default_open(true)
-            .show(ui, |ui| {
-                if self.cochanges.reader.busy() {
-                    ui.horizontal(|ui| {
-                        ui.add(crate::spinner::Spinner::new());
-                        ui.label(crate::i18n::text("repo-core-0327"));
-                    });
-                }
-                if let Some(error) = &self.cochanges.error {
-                    ui.label(crate::i18n::message(
-                        "repo-core-0328",
-                        &[("error", error.to_string().into())],
-                    ));
-                }
-                if let Some(history) = &self.cochanges.history {
-                    for note in &history.notes {
-                        ui.small(note);
-                    }
-                    ui.small(crate::i18n::message(
-                        "repo-core-0329",
-                        &[
-                            ("count", (history.records.len()).into()),
-                            ("skipped", format!("{}", history.skipped).into()),
-                            (
-                                "else",
-                                (if history.limited {
-                                    crate::i18n::text("repo-core-0330")
-                                } else {
-                                    ""
-                                })
-                                .to_string()
-                                .into(),
-                            ),
-                        ],
-                    ));
-                }
-                let mut dismissed = None;
-                let mut shown = 0;
-                for hint in &self.cochanges.hints {
-                    if self
-                        .cochanges
-                        .dismissed
-                        .contains(&(hint.source.clone(), hint.companion.clone()))
-                    {
-                        continue;
-                    }
-                    shown += 1;
-                    ui.group(|ui| {
-                        ui.horizontal_wrapped(|ui| {
-                            ui.label(crate::i18n::message(
-                                "repo-core-0331",
-                                &[
-                                    ("companion", hint.companion.to_string().into()),
-                                    ("source", hint.source.to_string().into()),
-                                    ("count", (hint.evidence.len()).into()),
-                                    ("source-changes", format!("{}", hint.source_changes).into()),
-                                    (
-                                        "source-changes2",
-                                        format!(
-                                            "{}",
-                                            hint.evidence.len() * 100 / hint.source_changes
-                                        )
-                                        .into(),
-                                    ),
-                                ],
-                            ));
-                            if ui
-                                .small_button(crate::i18n::text("repo-core-0332"))
-                                .clicked()
-                            {
-                                dismissed = Some((hint.source.clone(), hint.companion.clone()));
-                            }
-                        });
-                        egui::CollapsingHeader::new(crate::i18n::message(
-                            "repo-core-0333",
-                            &[("count", (hint.evidence.len()).into())],
-                        ))
-                        .id_salt((&hint.source, &hint.companion))
-                        .show(ui, |ui| {
-                            for (hash, subject) in &hint.evidence {
-                                if ui
-                                    .button(format!("{} · {}", super::short(hash), subject))
-                                    .on_hover_text(crate::i18n::text("repo-core-0334"))
-                                    .clicked()
-                                {
-                                    acts.push(Action::SelectHash(hash.clone()));
-                                }
-                            }
-                        });
-                    });
-                }
-                if let Some(key) = dismissed {
-                    self.cochanges.dismissed.insert(key);
-                }
-                if shown == 0 && !self.cochanges.reader.busy() {
-                    ui.small(crate::i18n::text("repo-core-0335"));
-                }
-                ui.horizontal(|ui| {
-                    if !self.cochanges.dismissed.is_empty()
-                        && ui
-                            .small_button(crate::i18n::text("repo-core-0336"))
-                            .clicked()
-                    {
-                        self.cochanges.dismissed.clear();
-                    }
-                    if ui
-                        .small_button(crate::i18n::text("repo-core-0337"))
-                        .clicked()
-                    {
-                        self.cochanges.head.clear();
-                        self.cochanges.reader.cancel();
-                    }
-                });
-            });
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    fn locate(shapes: &[egui::epaint::ClippedShape], needle: &str) -> Option<egui::Pos2> {
-        fn visit(shape: &egui::Shape, needle: &str) -> Option<egui::Pos2> {
-            match shape {
-                egui::Shape::Text(t) if t.galley.job.text == needle => {
-                    Some(t.pos + t.galley.size() / 2.0)
-                }
-                egui::Shape::Vec(v) => v.iter().find_map(|s| visit(s, needle)),
-                _ => None,
-            }
-        }
-        shapes.iter().find_map(|s| visit(&s.shape, needle))
-    }
-    #[test]
-    fn painted_hint_can_be_dismissed_restored_and_open_its_commit_evidence() -> Result<(), String> {
-        let ctx = egui::Context::default();
-        crate::theme::install_fonts(&ctx);
-        let mut tab = RepoTab::new_deferred("/recording-only/cochange-ui".into(), &ctx);
-        tab.work.staged.push(crate::git::StatusFile {
-            path: "serializer.rs".into(),
-            old_path: None,
-            code: 'M',
-            area: crate::git::Area::Staged,
-        });
-        let hash = "a".repeat(40);
-        tab.cochanges.hints.push(Hint {
-            source: "serializer.rs".into(),
-            companion: "compat.fixture".into(),
-            source_changes: 3,
-            evidence: vec![(hash.clone(), "Change serializer and fixture".into()); 3],
-        });
-        let mut time = 0.;
-        let mut acts = Vec::new();
-        let mut frame = |tab: &mut RepoTab, events: Vec<egui::Event>, acts: &mut Vec<Action>| {
-            time += 0.05;
-            let mut output = ctx.run_ui(
-                egui::RawInput {
-                    screen_rect: Some(egui::Rect::from_min_size(
-                        egui::Pos2::ZERO,
-                        egui::vec2(1200., 900.),
-                    )),
-                    time: Some(time),
-                    events,
-                    ..Default::default()
-                },
-                |ui| {
-                    egui::CentralPanel::default().show(ui, |ui| tab.cochange_hints(ui, acts));
-                },
-            );
-            output.textures_delta.clear();
-            output.shapes
-        };
-        let mut click =
-            |tab: &mut RepoTab, label: &str, acts: &mut Vec<Action>| -> Result<(), String> {
-                let mut pos = None;
-                for _ in 0..8 {
-                    pos = locate(&frame(tab, vec![], acts), label);
-                    if pos.is_some() {
-                        break;
-                    }
-                }
-                let pos = pos.ok_or_else(|| format!("Missing visible label {label}"))?;
-                for pressed in [true, false] {
-                    frame(
-                        tab,
-                        vec![
-                            egui::Event::PointerMoved(pos),
-                            egui::Event::PointerButton {
-                                pos,
-                                button: egui::PointerButton::Primary,
-                                pressed,
-                                modifiers: Default::default(),
-                            },
-                        ],
-                        acts,
-                    );
-                }
-                Ok(())
-            };
-        click(&mut tab, "Dismiss", &mut acts)?;
-        assert_eq!(tab.cochanges.dismissed.len(), 1);
-        click(&mut tab, "Restore dismissed hints", &mut acts)?;
-        assert!(tab.cochanges.dismissed.is_empty());
-        click(&mut tab, "Evidence: 3 shared commits", &mut acts)?;
-        click(
-            &mut tab,
-            &format!(
-                "{} · Change serializer and fixture",
-                super::super::short(&hash)
-            ),
-            &mut acts,
-        )?;
-        assert!(
-            acts.iter()
-                .any(|a| matches!(a,Action::SelectHash(id) if id==&hash))
-        );
-        Ok(())
+            .collect();
+        self.cochanges.rank(staged, changed);
     }
 }

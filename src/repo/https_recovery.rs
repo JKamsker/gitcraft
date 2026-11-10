@@ -48,6 +48,7 @@ impl RepoTab {
             && ticket.remotes == self.remotes
     }
     pub(super) fn invalidate_https_challenge(&mut self) {
+        self.invalidate_repository_context();
         self.https_generation = self.https_generation.wrapping_add(1);
         self.https_challenge = None;
         self.https_checking = false;
