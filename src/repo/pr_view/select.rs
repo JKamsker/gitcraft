@@ -229,7 +229,7 @@ fn selection_for_pr(
             crate::timing::step("PR endpoints from list", start);
             details
         }
-        None => {
+        _ => {
             let details = read_details()?;
             crate::timing::step("PR endpoints from forge", start);
             details
