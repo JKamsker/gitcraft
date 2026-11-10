@@ -6,6 +6,7 @@ mod clone;
 mod diagnostics;
 mod draft_saving;
 mod dropped;
+mod focus;
 mod handoff;
 mod home;
 mod home_filter;
@@ -129,7 +130,7 @@ pub struct App {
     /// What the start page's error is, when it is a git failure gitcraft can explain (see
     /// [`crate::error_card`]).
     error_card: Option<crate::error_card::ErrorCard>,
-    was_focused: bool,
+    focus: focus::State,
     clone_form: Option<CloneForm>,
     practice_open: bool,
     setup: setup::SetupWindow,
@@ -314,7 +315,7 @@ impl App {
             window_border: None,
             error: None,
             error_card: None,
-            was_focused: true,
+            focus: focus::State::default(),
             clone_form: None,
             practice_open: false,
             setup: Default::default(),
@@ -693,10 +694,9 @@ impl App {
             refresh |= self.window_command(command, modal_open, ctx);
         }
         // Coming back to the window (e.g. after using git elsewhere) refreshes the open repo.
-        let regained = focused && !self.was_focused;
-        self.was_focused = focused;
+        let regained = self.focus.regained(focused);
         if let Some(Tab::Repo(r)) = self.tabs.get_mut(self.active)
-            && (refresh || (regained && !r.just_read()))
+            && (refresh || regained.is_some_and(|initial| !initial || !r.just_read()))
         {
             r.refresh(ctx);
         }
