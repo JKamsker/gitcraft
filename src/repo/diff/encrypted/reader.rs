@@ -236,9 +236,9 @@ mod tests {
     fn staged_and_unstaged_sides_match_private_git_reader() -> Result<(), String> {
         let repo = Repo::new("raw-work-sides")?;
         repo.commit("base", &[("space ü.cs", Some("old\r\n"))])?;
-        std::fs::write(repo.path().join("space ü.cs"), "staged\r\n").unwrap();
+        std::fs::write(repo.path().join("space ü.cs"), "staged\r\n").map_err(|e| e.to_string())?;
         repo.git(&["add", "."])?;
-        std::fs::write(repo.path().join("space ü.cs"), "working\n").unwrap();
+        std::fs::write(repo.path().join("space ü.cs"), "working\n").map_err(|e| e.to_string())?;
         let read = Read {
             repo: repo.path(),
             active: &|| true,
@@ -290,12 +290,12 @@ mod tests {
         let path = "secret.json";
         let k = key(path, Area::Staged, 'A', None);
         let ciphertext = r#"{"secret":"ENC[cipher]","sops":{"mac":"ENC[mac]","version":"3.9.0"}}"#;
-        std::fs::write(repo.path().join(path), ciphertext).unwrap();
+        std::fs::write(repo.path().join(path), ciphertext).map_err(|e| e.to_string())?;
         repo.git(&["add", "."])?;
         assert_eq!(read_sides(repo.path(), &k)?, ("".into(), ciphertext.into()));
         assert_eq!(super::super::probe_checked(repo.path(), &k), Some(true));
         for bytes in [vec![0, 1], vec![0xff], vec![b'x'; MAX_BYTES + 1]] {
-            std::fs::write(repo.path().join(path), bytes).unwrap();
+            std::fs::write(repo.path().join(path), bytes).map_err(|e| e.to_string())?;
             repo.git(&["add", "."])?;
             assert!(read_sides(repo.path(), &k).is_err());
             assert_eq!(super::super::probe_checked(repo.path(), &k), None);

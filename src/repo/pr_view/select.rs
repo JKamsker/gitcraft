@@ -409,7 +409,7 @@ mod tests {
             git::backend::reset_metrics();
             let start = std::time::Instant::now();
             let actual = selection_for_pr(repo, &pr, &hosting, &[], None, || {
-                panic!("PR diff must not request metadata")
+                Err("PR diff must not request metadata".into())
             })?;
             let elapsed = start.elapsed();
             assert_eq!(actual.base, expected.base);
@@ -586,7 +586,7 @@ mod tests {
         )
         .unwrap();
         let selection = selection_for_pr(&dir, &pr, &hosting, &[], None, || {
-            panic!("known local PR endpoints must not request forge details")
+            Err("known local PR endpoints must not request forge details".into())
         })
         .unwrap();
         assert_eq!(selection.base, details.base_oid);
@@ -598,7 +598,7 @@ mod tests {
         assert_eq!(data.apart, (1, 2));
         pr.base_oid = git::head(&dir);
         let changed_base = selection_for_pr(&dir, &pr, &hosting, &[], None, || {
-            panic!("unexpected forge request")
+            Err("unexpected forge request".into())
         })
         .unwrap();
         assert_eq!(changed_base.data.apart, (2, 2));
@@ -714,7 +714,7 @@ mod tests {
         };
         let selection = if forge == Forge::GitHub {
             selection_for_pr(&clone, &pr, &hosting, &remotes, None, || {
-                panic!("known PR endpoints must fetch objects without requesting metadata")
+                Err("known PR endpoints must fetch objects without requesting metadata".into())
             })
         } else {
             remote_selection_data(&clone, &pr, &hosting, &remotes, None)

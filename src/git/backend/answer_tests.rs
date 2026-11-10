@@ -9,7 +9,7 @@ const STATUS: &[&str] = &["status", "--porcelain=v1", "-z", "--untracked-files=a
 fn bounded_raw_blobs_match_git_before_and_after_repacking() -> Result<(), String> {
     let repo = Repo::new("bounded-raw-blobs")?;
     repo.commit("base", &[("space ü.cs", Some("old\r\n"))])?;
-    std::fs::write(repo.path().join("space ü.cs"), b"new\0\xff\r\n").unwrap();
+    std::fs::write(repo.path().join("space ü.cs"), b"new\0\xff\r\n").map_err(|e| e.to_string())?;
     repo.git(&["add", "."])?;
     for packed in [false, true] {
         if packed {
@@ -18,7 +18,7 @@ fn bounded_raw_blobs_match_git_before_and_after_repacking() -> Result<(), String
         for spec in ["HEAD:space ü.cs", ":0:space ü.cs"] {
             let id = git(repo.path(), &["rev-parse", "--verify", spec]);
             assert_eq!(id.code, 0);
-            let oid = std::str::from_utf8(&id.stdout).unwrap().trim();
+            let oid = std::str::from_utf8(&id.stdout).map_err(|e| e.to_string())?.trim();
             let expected = git(repo.path(), &["cat-file", "blob", oid]).stdout;
             assert_eq!(
                 bounded_blob(repo.path(), spec, expected.len()),
@@ -50,22 +50,22 @@ fn porcelain_status_matches_git() -> Result<(), String> {
         ],
     )?;
     assert!(same(repo.path(), STATUS));
-    std::fs::write(repo.path().join("both"), "two\n").unwrap();
-    std::fs::remove_file(repo.path().join("gone")).unwrap();
-    std::fs::write(repo.path().join("space ü.txt"), "changed\n").unwrap();
-    std::fs::create_dir_all(repo.path().join("sub/empty")).unwrap();
-    std::fs::write(repo.path().join("sub/new ü"), "new\n").unwrap();
-    std::fs::write(repo.path().join("skip.ignored"), "ignored\n").unwrap();
-    std::fs::write(repo.path().join(".git/info/exclude"), "excluded\n").unwrap();
-    std::fs::write(repo.path().join("excluded"), "ignored\n").unwrap();
+    std::fs::write(repo.path().join("both"), "two\n").map_err(|e| e.to_string())?;
+    std::fs::remove_file(repo.path().join("gone")).map_err(|e| e.to_string())?;
+    std::fs::write(repo.path().join("space ü.txt"), "changed\n").map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(repo.path().join("sub/empty")).map_err(|e| e.to_string())?;
+    std::fs::write(repo.path().join("sub/new ü"), "new\n").map_err(|e| e.to_string())?;
+    std::fs::write(repo.path().join("skip.ignored"), "ignored\n").map_err(|e| e.to_string())?;
+    std::fs::write(repo.path().join(".git/info/exclude"), "excluded\n").map_err(|e| e.to_string())?;
+    std::fs::write(repo.path().join("excluded"), "ignored\n").map_err(|e| e.to_string())?;
     assert!(same(repo.path(), STATUS));
     repo.git(&["add", "both"])?;
-    std::fs::write(repo.path().join("both"), "three\n").unwrap();
+    std::fs::write(repo.path().join("both"), "three\n").map_err(|e| e.to_string())?;
     assert!(same(repo.path(), STATUS));
     repo.git(&["rm", "--cached", "cached"])?;
     assert!(same(repo.path(), STATUS));
     repo.git(&["config", "core.autocrlf", "true"])?;
-    std::fs::write(repo.path().join("space ü.txt"), "hello\r\n").unwrap();
+    std::fs::write(repo.path().join("space ü.txt"), "hello\r\n").map_err(|e| e.to_string())?;
     assert!(same(repo.path(), STATUS));
     repo.git(&["add", "sub/new ü"])?;
     left_to_git(repo.path(), &[STATUS]); // possible rename
@@ -80,7 +80,7 @@ fn porcelain_status_matches_git() -> Result<(), String> {
             "both",
         ])?;
     }
-    std::fs::write(repo.path().join("intent"), "new\n").unwrap();
+    std::fs::write(repo.path().join("intent"), "new\n").map_err(|e| e.to_string())?;
     repo.git(&["add", "-N", "intent"])?;
     left_to_git(repo.path(), &[STATUS]);
     repo.git(&["reset", "--hard", "HEAD"])?;
@@ -99,9 +99,9 @@ fn porcelain_status_modes_and_fallbacks() -> Result<(), String> {
     repo.git(&["update-index", "--cacheinfo", &format!("120000,{blob},a")])?;
     assert!(same(repo.path(), STATUS));
     repo.git(&["reset", "--hard", "HEAD"])?;
-    std::fs::write(repo.path().join(".gitmodules"), "").unwrap();
+    std::fs::write(repo.path().join(".gitmodules"), "").map_err(|e| e.to_string())?;
     left_to_git(repo.path(), &[STATUS]);
-    std::fs::remove_file(repo.path().join(".gitmodules")).unwrap();
+    std::fs::remove_file(repo.path().join(".gitmodules")).map_err(|e| e.to_string())?;
     repo.git(&[
         "update-index",
         "--add",
@@ -110,10 +110,10 @@ fn porcelain_status_modes_and_fallbacks() -> Result<(), String> {
     ])?;
     left_to_git(repo.path(), &[STATUS]);
     repo.git(&["reset", "--hard", "HEAD"])?;
-    std::fs::create_dir_all(repo.path().join("nested")).unwrap();
+    std::fs::create_dir_all(repo.path().join("nested")).map_err(|e| e.to_string())?;
     assert_eq!(git(&repo.path().join("nested"), &["init", "-q"]).code, 0);
     left_to_git(repo.path(), &[STATUS]);
-    std::fs::remove_dir_all(repo.path().join("nested")).unwrap();
+    std::fs::remove_dir_all(repo.path().join("nested")).map_err(|e| e.to_string())?;
     repo.git(&["switch", "-q", "-c", "side"])?;
     repo.commit("side", &[("a", Some("side\n"))])?;
     repo.git(&["switch", "-q", "main"])?;
@@ -129,11 +129,14 @@ fn git(repo: &Path, args: &[&str]) -> Answer {
     for (name, value) in crate::git::command::GIT_ENV {
         command.env(name, value);
     }
-    let out = command
-        .current_dir(repo)
-        .args(args)
-        .output()
-        .expect("git runs");
+    let out = match command.current_dir(repo).args(args).output() {
+        Ok(out) => out,
+        Err(e) => return Answer {
+            code: -1,
+            stdout: Vec::new(),
+            stderr: e.to_string().into_bytes(),
+        },
+    };
     Answer {
         code: out.status.code().unwrap_or(-1),
         stdout: out.stdout,

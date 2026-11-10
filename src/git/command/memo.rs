@@ -22,7 +22,7 @@ fn keepable(args: &[&str]) -> bool {
     let args = args
         .strip_prefix(&["rev-parse", "--path-format=absolute"])
         .or_else(|| args.strip_prefix(&["rev-parse"]))
-        .map_or(Err(args), Ok);
+        .ok_or(args);
     match args {
         Err(["--version"] | ["--exec-path"]) => true,
         Ok(

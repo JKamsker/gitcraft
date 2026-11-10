@@ -406,7 +406,7 @@ mod tests {
     }
 
     #[test]
-    fn parses_pull_requests() {
+    fn parses_pull_requests() -> Result<(), String> {
         let gh = r#"[{"number":7,"title":"Fix","headRefName":"fix/x","baseRefName":"main","baseRefOid":"b0","headRefOid":"c0ffee","author":{"login":"ana"},"url":"https://g/7","isDraft":true}]"#;
         let prs = parse_list(gh).unwrap_or_default();
         assert_eq!(prs.len(), 1);
@@ -417,11 +417,12 @@ mod tests {
         assert_eq!(prs[0].sha, "c0ffee");
         assert_eq!(prs[0].base, "main");
         assert_eq!(prs[0].base_oid, "b0");
-        let mut old_cache = serde_json::to_value(&prs[0]).unwrap();
-        old_cache.as_object_mut().unwrap().remove("base_oid");
-        let restored: PullRequest = serde_json::from_value(old_cache).unwrap();
+        let mut old_cache = serde_json::to_value(&prs[0]).map_err(|e| e.to_string())?;
+        old_cache.as_object_mut().ok_or("expected JSON object")?.remove("base_oid");
+        let restored: PullRequest = serde_json::from_value(old_cache).map_err(|e| e.to_string())?;
         assert!(restored.base_oid.is_empty());
         assert!(parse_list("oops").is_err());
+        Ok(())
     }
 }
 

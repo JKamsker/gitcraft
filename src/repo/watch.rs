@@ -54,7 +54,7 @@ fn saw(root: &Path, path: &Path) {
 pub(super) fn take_seen(root: &Path) -> Option<String> {
     let places = SEEN.lock().ok()?.remove(root)?;
     let mut places: Vec<_> = places.into_iter().collect();
-    places.sort_by(|a, b| b.1.cmp(&a.1));
+    places.sort_by_key(|(_, n)| std::cmp::Reverse(*n));
     let shown: Vec<String> = places
         .iter()
         .take(5)

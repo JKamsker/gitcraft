@@ -124,7 +124,7 @@ mod tests {
                 .output()
                 .map_err(|e| e.to_string())?;
             assert!(out.status.success());
-            Ok(String::from_utf8(out.stdout).unwrap())
+            String::from_utf8(out.stdout).map_err(|e| e.to_string())
         };
         let first = read(repo.path(), &args, true, || cli(&args))?;
         assert_eq!(first, read(repo.path(), &args, true, || cli(&args))?);
@@ -196,7 +196,7 @@ mod tests {
                 let expected = cli()?;
                 assert_eq!(read(repo.path(), &args, true, cli)?, expected);
                 assert_eq!(
-                    read(repo.path(), &args, true, || panic!("cache missed"))?,
+                    read(repo.path(), &args, true, || Err("cache missed".to_owned()))?,
                     expected
                 );
             }
@@ -207,7 +207,7 @@ mod tests {
     #[test]
     #[ignore = "set GITCRAFT_PARITY_REPO to measure an existing repository"]
     fn graph_cache_measurement() -> Result<(), String> {
-        let path = std::env::var_os("GITCRAFT_PARITY_REPO").expect("repository to measure");
+        let path = std::env::var_os("GITCRAFT_PARITY_REPO").ok_or("repository to measure")?;
         let path = Path::new(&path);
         let args: Vec<String> = [
             "log",

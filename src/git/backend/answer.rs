@@ -499,10 +499,12 @@ fn note_in(
     }
     for entry in &entries {
         let name = entry.filename.to_str().ok()?;
-        if entry.mode.is_tree() && name.len() == 2 && rest.starts_with(name) {
-            if let Some(found) = note_in(repo, entry.oid.to_owned(), &rest[2..], depth + 1)? {
-                return Some(Some(found));
-            }
+        if entry.mode.is_tree()
+            && name.len() == 2
+            && rest.starts_with(name)
+            && let Some(found) = note_in(repo, entry.oid.to_owned(), &rest[2..], depth + 1)?
+        {
+            return Some(Some(found));
         }
     }
     Some(None)
@@ -563,7 +565,7 @@ fn ls_tree(path: &Path, args: &[&str]) -> Option<Answer> {
     let mut out = Vec::new();
     for (p, mode, id) in found {
         // Without -z git quotes names with unusual characters (`core.quotePath`).
-        if !nul && p.bytes().any(|b| b < 0x20 || b >= 0x7f || b == b'"') {
+        if !nul && p.bytes().any(|b| !(0x20..0x7f).contains(&b) || b == b'"') {
             return None;
         }
         if !names_only {
