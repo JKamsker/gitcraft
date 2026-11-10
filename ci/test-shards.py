@@ -28,7 +28,12 @@ REPO_A_S = REPO_A_C + REPO_D_F + REPO_G_M + REPO_N_P + REPO_Q_R + REPO_S
 ISOLATED = {
     # This rewrite test can race with concurrent Git-heavy test processes on Windows.
     # Run it separately from the main repo-d-f libtest harness.
-    "repo-d-f": ["repo::drag_drop::tests::a_commit_dropped_on_another_of_the_branch_is_squashed_into_it"],
+    "repo-d-f": [
+        "repo::drag_drop::tests::a_commit_dropped_on_another_of_the_branch_is_squashed_into_it",
+        # The lens UI test snapshots the index and drives a Windows ACL-preserving
+        # transaction; keep concurrent Git-heavy fixtures from invalidating it.
+        "repo::file_comparison::tests::actual_lens_boundary_buttons_stage_and_unstage_the_displayed_snapshot",
+    ],
     "repo-q-r": [
         "repo::reflog::tests::a_commit_lost_in_the_terminal_comes_back_as_a_branch",
         # This end-to-end UI/rebase fixture has hung amid concurrent Windows
@@ -54,7 +59,10 @@ SHARDS = {
     "git-a-m": GIT_FIRST,
     "git-rest": ["git::", *[arg for p in GIT_FIRST for arg in ("--skip", p)]],
     "repo-a-c": [*REPO_A_C, "--skip", "git::"],
-    "repo-d-f": [*REPO_D_F, "--skip", "git::", "--skip", ISOLATED["repo-d-f"][0]],
+    "repo-d-f": [
+        *REPO_D_F, "--skip", "git::",
+        *[arg for test in ISOLATED["repo-d-f"] for arg in ("--skip", test)],
+    ],
     "repo-g-m": [*REPO_G_M, "--skip", "git::"],
     "repo-n-p": [*REPO_N_P, "--skip", "git::"],
     "repo-q-r": [
