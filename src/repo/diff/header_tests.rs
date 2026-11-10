@@ -250,14 +250,14 @@ fn responsive_diff_body_matrix_preserves_horizontal_scroll_and_line_selection()
                     h.step();
                 }
                 assert!(
-                    !h.state()
+                    h.state()
                         .0
                         .diff
                         .as_ref()
                         .ok_or("responsive diff fixture is missing its view")?
                         .chosen
                         .is_empty(),
-                    "line hitbox missed at {width}/{scale}/{split}"
+                    "code click picked a Git line at {width}/{scale}/{split}"
                 );
                 let pos = egui::pos2(width / scale * 0.5, 230.0);
                 h.event(egui::Event::PointerMoved(pos));

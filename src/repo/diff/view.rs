@@ -387,6 +387,7 @@ impl RepoTab {
             .with_find(&self.find, reveal);
         rows.links = links.as_ref();
         let sel = rows.show(ui, &path, acts);
+        let text_started = rows.text_started;
         let (clicked, offset, jumped, seen) = (rows.clicked, rows.offset, rows.jumped, rows.seen);
         let wrap_offsets = rows.geometry.as_ref().map(|g| g.offsets.clone());
         self.find.saw(seen);
@@ -413,7 +414,7 @@ impl RepoTab {
             if let Some(i) = jumped {
                 view.at_change = Some((i, offset));
             }
-            if clear {
+            if clear || text_started {
                 view.chosen.clear();
                 view.anchor = None;
             }
@@ -1202,3 +1203,7 @@ fn line_comment_panel(
 #[cfg(test)]
 #[path = "header_tests.rs"]
 mod header_tests;
+
+#[cfg(test)]
+#[path = "selection_tests.rs"]
+mod selection_tests;

@@ -1,4 +1,4 @@
-//! Selecting text in a diff by dragging over it, on one side, and copying it.
+//! Caret, word, line and drag selection on one side of a read-only diff.
 
 use std::collections::HashMap;
 use std::ops::Range;
@@ -42,6 +42,37 @@ pub(in crate::repo) struct TextSel {
 }
 
 impl TextSel {
+    pub(super) fn caret((i, side, c): Hit) -> Self {
+        Self {
+            side,
+            anchor: (i, c),
+            cursor: (i, c),
+        }
+    }
+
+    pub(super) fn is_empty(self) -> bool {
+        self.anchor == self.cursor
+    }
+
+    fn clicked(lines: &[DiffLine], hit: Hit, word: bool, line: bool) -> Self {
+        let mut sel = Self::caret(hit);
+        if line {
+            sel.anchor.1 = 0;
+            sel.cursor.1 = usize::MAX;
+        } else if word {
+            // Use the same Unicode word boundaries as egui's text editors.
+            use egui::text::CCursor;
+            use egui::text_selection::text_cursor_state::{
+                ccursor_next_word, ccursor_previous_word,
+            };
+            let text = &lines[hit.0].text;
+            let cursor = CCursor::new(hit.2);
+            sel.anchor.1 = ccursor_previous_word(text, cursor).index.0;
+            sel.cursor.1 = ccursor_next_word(text, cursor).index.0;
+        }
+        sel
+    }
+
     pub(super) fn all(lines: &[DiffLine], side: Side) -> Option<Self> {
         let mut shown = lines.iter().enumerate().filter(|(_, l)| side.shows(l.kind));
         let (first, _) = shown.next()?;
@@ -114,31 +145,38 @@ impl TextSel {
     }
 }
 
-/// The selection after this frame's drag over the lines: started where the press hit the text,
-/// its end moved to the pointer on the side it started on, or gone after a click.
+/// A press replaces the previous selection immediately. Dragging extends that caret on its
+/// original side, even after scrolling its anchor out of the visible rows.
 /// `pointer_hits`: each with whether the pointer is over that line's half.
 pub(super) fn drag_selection(
+    ui: &Ui,
     sel: Option<TextSel>,
     drag: &egui::Response,
     press_hit: Option<Hit>,
     pointer_hits: &[(Hit, bool)],
+    lines: &[DiffLine],
 ) -> Option<TextSel> {
     let mut sel = sel;
-    if drag.drag_started() {
-        sel = press_hit.map(|(i, side, c)| TextSel {
-            side,
-            anchor: (i, c),
-            cursor: (i, c),
-        });
-    } else if drag.dragged()
+    if ui.input(|i| i.pointer.primary_pressed()) && !egui::Popup::is_any_open(ui.ctx()) {
+        sel = press_hit
+            .filter(|_| drag.is_pointer_button_down_on())
+            .map(TextSel::caret);
+    }
+    if drag.clicked() {
+        sel = pointer_hits
+            .iter()
+            .find(|(_, over)| *over)
+            .map(|&(hit, _)| {
+                TextSel::clicked(lines, hit, drag.double_clicked(), drag.triple_clicked())
+            });
+    } else if (drag.dragged_by(egui::PointerButton::Primary)
+        || drag.drag_stopped_by(egui::PointerButton::Primary))
         && let Some(s) = &mut sel
         && let Some(((i, _, c), _)) = pointer_hits
             .iter()
             .find(|((_, side, _), _)| *side == s.side)
     {
         s.cursor = (*i, *c);
-    } else if drag.clicked() {
-        sel = None;
     }
     sel
 }

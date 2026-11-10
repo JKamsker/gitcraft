@@ -12,7 +12,7 @@ The right panel: staging files, hunks or single lines, the commit box, sign-offs
   or a pull request flat with their paths, or as a tree of their folders; a folder folds with a
   click and says how many files it holds. The choice is remembered.
 - Part of a file: _Stage hunk_, _Discard hunk_ and _Unstage hunk_ on each hunk of its diff, or
-  click the changed lines you want (Shift+click for a range) and stage, unstage or discard only
+  click the +/− gutter beside the changed lines you want (Shift+click for a range) and stage, unstage or discard only
   those. Discarding can be undone with Ctrl+Z.
 
 ## The commit box

@@ -69,6 +69,8 @@ pub(super) use select::TextSel;
 
 const LINE_H: f32 = 19.0;
 const NUM_W: f32 = 46.0;
+/// The +/− column selects Git action lines separately from numbers and source text.
+const MARK_W: f32 = 24.0;
 /// Width of the strip of changes beside the scrollbar.
 const MAP_W: f32 = 12.0;
 /// Very long diffs are cut here; the UI stays responsive and git is one click away.
