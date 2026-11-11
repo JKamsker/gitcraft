@@ -35,10 +35,13 @@ and CI reliability with #190.
 
 ### Enforced compiler complexity budget
 
-`cargo clippy --locked --all-targets -- -D warnings` enforces
+`python ci/clippy_packages.py` runs locked, strict all-target Clippy for every
+tracked Cargo package, selecting each manifest and package explicitly. It enforces
 `clippy::cognitive_complexity` with a threshold of **25**, configured in the
 repository's single `clippy.toml` and forbidden in every package manifest.
-PR lint and release builds run it. This is Clippy's branching score, not a
+Independent workspaces and nondefault members cannot escape the compiler gate;
+the recovery harness uses its explicit `recovery_recording` profile. PR lint,
+Windows validation, and release builds run it. This is Clippy's branching score, not a
 measurement of human comprehension. It is separate from the advisory lexical
 survey below and the unconditional full-tree 500-line cap above.
 

@@ -15,7 +15,7 @@ SHARED = "./.github/workflows/rust-file-size.yml"
 IDENTIFIER = r"[A-Za-z_][A-Za-z0-9_-]*"
 COMPLEXITY_CHECK = "python3 ci/complexity_policy.py --revision HEAD"
 COMPILER_CHECK = "python3 -m unittest discover -s ci -p 'test_complexity*.py' -v"
-CLIPPY_CHECK = "cargo clippy --locked --all-targets -- -D warnings"
+CLIPPY_CHECK = "python ci/clippy_packages.py"
 
 
 def require(condition, message):
@@ -108,6 +108,14 @@ def verify_required_commands(text, job, commands):
         require(not ({"if", "continue-on-error", "working-directory", "shell", "env"} & step.keys()),
                 f"required command can skip, soften, or retarget checks: {command}")
         require(not step["run"][1].strip(), f"required command has trailing content: {command}")
+        if command == CLIPPY_CHECK:
+            setup = [candidate for candidate in steps
+                     if candidate.get("uses", (None,))[0] == "actions/setup-python@v5"
+                     and nested(candidate, "with", 10).get("python-version", (None,))[0] == "'3.12'"]
+            require(len(setup) == 1 and steps.index(setup[0]) < steps.index(step),
+                    "Python 3.12 setup must precede package lint")
+            require(not ({"if", "continue-on-error", "env"} & setup[0].keys()),
+                    "Python setup can skip, soften, or retarget package lint")
 
 
 def verify_shared_gate(text):
@@ -184,6 +192,14 @@ class WorkflowGateTests(unittest.TestCase):
             with self.subTest(workflow=name):
                 verify_required_commands(text, job, (CLIPPY_CHECK,))
 
+    def test_package_lint_jobs_require_python_312_before_the_runner(self):
+        for name, text, job in self.clippy:
+            for old, new in (("actions/setup-python@v5", "actions/cache@v4"),
+                             ("python-version: '3.12'", "python-version: '3.10'"),
+                             ("uses: actions/setup-python@v5", "if: false\n        uses: actions/setup-python@v5")):
+                with self.subTest(workflow=name, mutation=new), self.assertRaisesRegex(ValueError, "Python"):
+                    verify_required_commands(text.replace(old, new), job, (CLIPPY_CHECK,))
+
     def required_commands(self):
         yield "shared-policy", self.shared, "check", COMPLEXITY_CHECK
         yield "shared-compiler", self.shared, "check", COMPILER_CHECK
@@ -195,10 +211,9 @@ class WorkflowGateTests(unittest.TestCase):
             COMPLEXITY_CHECK: (COMPLEXITY_CHECK.replace("--revision HEAD", "--staged"),
                                COMPLEXITY_CHECK.replace("HEAD", "HEAD~1")),
             COMPILER_CHECK: (COMPILER_CHECK.replace("test_complexity*.py", "test_complexity_policy.py"),),
-            CLIPPY_CHECK: (CLIPPY_CHECK.replace("--all-targets", "--lib"),
-                          CLIPPY_CHECK.replace("--locked ", ""),
-                          CLIPPY_CHECK.replace("-D warnings", "-W warnings"),
-                          CLIPPY_CHECK + " --cap-lints allow"),
+            CLIPPY_CHECK: ("cargo clippy --locked --all-targets -- -D warnings",
+                          CLIPPY_CHECK + " --root elsewhere",
+                          CLIPPY_CHECK + " --package app"),
         }
         for name, text, job, command in self.required_commands():
             for replacement in ("", command + " || true", command + " && echo ignored", *weakened[command]):
