@@ -1,5 +1,6 @@
 //! The constellation in a tab: a real repository read and drawn, and one that isn't there.
 
+use crate::repo::insights::test_support::required;
 use std::time::{Duration, Instant};
 
 use super::*;
@@ -31,19 +32,19 @@ fn forge_retirement_rebuilds_equal_forge_data_while_retaining_local_snapshot() {
     let ctx = egui::Context::default();
     crate::theme::install_fonts(&ctx);
     let mut tab = super::super::test_support::tab(&ctx, View::Constellation);
-    let initial = &mut tab.insights.as_mut().unwrap().constellation;
+    let initial = &mut required(tab.insights.as_mut()).constellation;
     let request = initial.read.start();
     initial.read.accept(request, Ok(Snapshot::default()));
     tab.constellation_build();
     let fingerprint = tab.constellation_forge_read();
     tab.invalidate_forge_insights();
-    let retired = state(&tab).unwrap();
+    let retired = required(state(&tab));
     assert!(retired.read.ready().is_some());
     assert!(retired.built.is_some());
     assert!(retired.forge_read.is_none());
     assert_eq!(tab.constellation_forge_read(), fingerprint);
     draw(&mut tab, &ctx, 900.0);
-    let state = state(&tab).unwrap();
+    let state = required(state(&tab));
     assert!(state.read.ready().is_some());
     assert_eq!(state.forge_read, Some(fingerprint));
 }

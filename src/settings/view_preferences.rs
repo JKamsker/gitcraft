@@ -23,9 +23,11 @@ mod tests {
     fn repository_layout_choices_preserve_unrelated_preferences_and_applied_zoom() {
         for on in [false, true] {
             let ctx = egui::Context::default();
-            let mut settings = Settings::default();
-            settings.ui_scale = 1.25;
-            settings.language = "de".into();
+            let mut settings = Settings {
+                ui_scale: 1.25,
+                language: "de".into(),
+                ..Default::default()
+            };
             settings.profile_mut().author_email = "unapplied-profile@example.invalid".into();
             settings.put_for_test(&ctx);
             ctx.set_zoom_factor(1.75);
