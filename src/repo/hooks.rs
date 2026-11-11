@@ -347,7 +347,7 @@ mod tests {
             let mut tab = opened(&dir, &ctx);
             tab.apply(Action::Push, &ctx);
             let before = git::resolve(&remote, "refs/heads/main");
-            crate::repo::push_preflight::test_support::approve(&mut tab, &ctx)?;
+            assert!(tab.dialog.is_none(), "ordinary push starts directly");
             wait(&mut tab, &ctx, |t| t.busy_op.is_none() && !t.loading);
             let failed = tab
                 .status
@@ -355,10 +355,16 @@ mod tests {
                 .cloned()
                 .map(|(s, _)| s)
                 .unwrap_or_default();
+            assert!(tab.activity.last().is_some_and(|entry| {
+                entry
+                    .steps
+                    .iter()
+                    .all(|step| !step.output.contains("tests failed"))
+            }));
             let not_pushed = git::resolve(&remote, "refs/heads/main");
             assert_eq!(not_pushed, before);
             tab.apply(Action::PushSkippingHooks, &ctx);
-            crate::repo::push_preflight::test_support::approve(&mut tab, &ctx)?;
+            assert!(tab.dialog.is_none(), "ordinary push starts directly");
             wait(&mut tab, &ctx, |t| t.busy_op.is_none() && !t.loading);
             let skipped = tab
                 .status
@@ -382,7 +388,7 @@ mod tests {
             tab.reload(&ctx);
             wait(&mut tab, &ctx, |t| !t.loading);
             tab.apply(Action::Push, &ctx);
-            crate::repo::push_preflight::test_support::approve(&mut tab, &ctx)?;
+            assert!(tab.dialog.is_none(), "ordinary push starts directly");
             wait(&mut tab, &ctx, |t| t.busy_op.is_none() && !t.loading);
             let again = tab
                 .status

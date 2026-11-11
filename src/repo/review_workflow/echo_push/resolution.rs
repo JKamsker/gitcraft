@@ -102,6 +102,7 @@ pub(super) fn resolved(
                     | "--follow-tags"
                     | "--no-follow-tags"
                     | "--recurse-submodules=no"
+                    | "--recurse-submodules=check"
                     | "--dry-run"
                     | "-n"
                     | "--force-with-lease" => {}

@@ -26,6 +26,9 @@ impl RepoTab {
         if self.snapshot_pending() {
             return;
         }
+        if quiet && self.echo_push_pending() {
+            return;
+        }
         if let Some(busy) = &self.busy_op {
             // Fetch, Pull and Push wait for it (see `running::Waiter`); anything else is not
             // started, and says so. A quiet one (the background fetch) just comes again later.
@@ -69,7 +72,10 @@ impl RepoTab {
             }
             return;
         }
-        if crate::push_preflight::has_push(&ops) {
+        let ordinary_push = self.push_flow.ordinary_attempt(label)
+            && self.preflight_selection.is_none()
+            && matches!(kind, OpKind::Normal(..));
+        if crate::push_preflight::has_push(&ops) && !ordinary_push {
             if let Some(at) = ops
                 .iter()
                 .position(|s| crate::push_preflight::has_push(std::slice::from_ref(s)))
