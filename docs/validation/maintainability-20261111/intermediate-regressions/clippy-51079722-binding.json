@@ -1,0 +1,10 @@
+{
+  "status": "passed: all three Cargo packages, strict all-target Linux Clippy",
+  "command": "python3 ci/clippy_packages.py",
+  "target_dir": "/mnt/e/private/gitcraft-build/linux",
+  "temporary_directory": "/mnt/e/private/gitcraft-build/compiler-tmp",
+  "tree": "684249ca61b44b961be2bb6b2103f2a7fe22312e",
+  "commit": "5107972275102b712d2e435ea315f57453209ba0",
+  "log": "51079722/combined-5107-clippy.log.gz",
+  "source_status": null
+}
