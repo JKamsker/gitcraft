@@ -17,33 +17,7 @@ fn a_refused_push_leaves_the_rewrite_undoable_here() -> Result<(), String> {
     );
     wait(&mut tab, &ctx, |tab| tab.dialog.is_some());
     // As the dialog's button does.
-    if let Some(Dialog::Confirm {
-        title, ops, undo, ..
-    }) = tab.dialog.take()
-    {
-        assert_eq!(title, "Sign off the commits of feat");
-        assert!(!crate::push_preflight::has_push(&ops));
-        tab.apply(
-            Action::UndoableOps {
-                label: title,
-                ops,
-                refresh: crate::repo::Refresh::All,
-                undo,
-            },
-            &ctx,
-        );
-    }
-    assert_eq!(tab.busy_op.as_deref(), Some("Sign off the commits of feat"));
-    assert!(
-        tab.dialog.is_none(),
-        "local rewrite must finish before push review"
-    );
-    wait(&mut tab, &ctx, |tab| {
-        tab.busy_op.is_none() && tab.dialog.is_some()
-    });
-    wait(&mut tab, &ctx, |tab| {
-        !matches!(tab.dialog, Some(Dialog::PushLoading { .. }))
-    });
+    confirm_local_signoff(&mut tab, &ctx);
     let signed = git::head(&dir);
     assert_ne!(signed, head);
     if let Some(Dialog::PushError(error)) = &tab.dialog {
@@ -145,4 +119,34 @@ fn a_refused_push_leaves_the_rewrite_undoable_here() -> Result<(), String> {
     );
     assert_eq!(back, head);
     Ok(())
+}
+
+fn confirm_local_signoff(tab: &mut RepoTab, ctx: &egui::Context) {
+    if let Some(Dialog::Confirm {
+        title, ops, undo, ..
+    }) = tab.dialog.take()
+    {
+        assert_eq!(title, "Sign off the commits of feat");
+        assert!(!crate::push_preflight::has_push(&ops));
+        tab.apply(
+            Action::UndoableOps {
+                label: title,
+                ops,
+                refresh: crate::repo::Refresh::All,
+                undo,
+            },
+            ctx,
+        );
+    }
+    assert_eq!(tab.busy_op.as_deref(), Some("Sign off the commits of feat"));
+    assert!(
+        tab.dialog.is_none(),
+        "local rewrite must finish before push review"
+    );
+    wait(tab, ctx, |tab| {
+        tab.busy_op.is_none() && tab.dialog.is_some()
+    });
+    wait(tab, ctx, |tab| {
+        !matches!(tab.dialog, Some(Dialog::PushLoading { .. }))
+    });
 }

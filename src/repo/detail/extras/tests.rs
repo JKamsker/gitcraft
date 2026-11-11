@@ -321,21 +321,7 @@ fn a_note_being_written_survives_selecting_elsewhere() {
 #[test]
 fn namespace_changes_during_real_page_search_and_backlink_reads_discard_old_scope()
 -> Result<(), String> {
-    let dir = repo("namespace-in-flight");
-    let base = commit(&dir, "base");
-    assert!(git::run(Some(&dir), &["switch", "-q", "--orphan", "checkpoint-temp"]).is_ok());
-    let checkpoint = commit(&dir, &format!("only checkpoint\n\nFixes: {base}"));
-    for args in [
-        &["update-ref", "refs/t3/test", &checkpoint][..],
-        &["switch", "-q", "main"],
-        &["branch", "-D", "checkpoint-temp"],
-    ] {
-        assert!(git::run(Some(&dir), args).is_ok());
-    }
-    let refs_before = git::run(
-        Some(&dir),
-        &["for-each-ref", "--format=%(refname) %(objectname)"],
-    )?;
+    let (dir, base, checkpoint, refs_before) = namespace_repository()?;
     let ctx = egui::Context::default();
     let mut settings = crate::settings::Settings {
         history_filter: crate::repo::history_filter::Rules::empty(),
@@ -437,4 +423,23 @@ fn namespace_changes_during_real_page_search_and_backlink_reads_discard_old_scop
     assert!(git::run(Some(&dir), &["status", "--porcelain"])?.is_empty());
     let _ = std::fs::remove_dir_all(&dir);
     Ok(())
+}
+
+fn namespace_repository() -> Result<(std::path::PathBuf, String, String, String), String> {
+    let dir = repo("namespace-in-flight");
+    let base = commit(&dir, "base");
+    assert!(git::run(Some(&dir), &["switch", "-q", "--orphan", "checkpoint-temp"]).is_ok());
+    let checkpoint = commit(&dir, &format!("only checkpoint\n\nFixes: {base}"));
+    for args in [
+        &["update-ref", "refs/t3/test", &checkpoint][..],
+        &["switch", "-q", "main"],
+        &["branch", "-D", "checkpoint-temp"],
+    ] {
+        assert!(git::run(Some(&dir), args).is_ok());
+    }
+    let refs_before = git::run(
+        Some(&dir),
+        &["for-each-ref", "--format=%(refname) %(objectname)"],
+    )?;
+    Ok((dir, base, checkpoint, refs_before))
 }

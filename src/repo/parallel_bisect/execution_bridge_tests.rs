@@ -71,23 +71,7 @@ fn execution_bridge_transfer_and_cleanup_warning_use_real_events_and_banner_stat
     )) else {
         return Err("warning".into());
     };
-    let mut paints = Vec::new();
-    for locale in ["en-US", "de", "en-US"] {
-        crate::i18n::set_language(locale);
-        let painted = state.warning(&raw_warning);
-        assert!(
-            painted.contains(primary)
-                && painted.contains(cleanup)
-                && painted.contains("opaque host; )")
-        );
-        if locale == "de" {
-            assert!(
-                painted.contains("Freigabe der Besitzreservierung")
-                    && painted.contains("Wiederherstellungsnachweise")
-            );
-        }
-        paints.push(painted);
-    }
+    let paints = warning_paints(&state, &raw_warning, primary, cleanup);
     assert_eq!(paints[0], paints[2]);
     assert_ne!(paints[0], paints[1]);
     assert_eq!(state.warning("stale warning"), "stale warning");
@@ -112,4 +96,30 @@ fn execution_bridge_transfer_and_cleanup_warning_use_real_events_and_banner_stat
     crate::i18n::set_language("en-US");
 
     Ok(())
+}
+
+fn warning_paints(
+    state: &PresentationState,
+    raw_warning: &str,
+    primary: &str,
+    cleanup: &str,
+) -> Vec<String> {
+    let mut paints = Vec::new();
+    for locale in ["en-US", "de", "en-US"] {
+        crate::i18n::set_language(locale);
+        let painted = state.warning(raw_warning);
+        assert!(
+            painted.contains(primary)
+                && painted.contains(cleanup)
+                && painted.contains("opaque host; )")
+        );
+        if locale == "de" {
+            assert!(
+                painted.contains("Freigabe der Besitzreservierung")
+                    && painted.contains("Wiederherstellungsnachweise")
+            );
+        }
+        paints.push(painted);
+    }
+    paints
 }

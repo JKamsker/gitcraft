@@ -34,24 +34,7 @@ fn owned_runtime_claim_fence_turnover() -> Result<(), Box<dyn std::error::Error>
     let authority = winner.authority(FenceMode::Mutation)?;
     let generation = std::fs::read(root.join("generation"))?;
     assert_eq!(generation, format!("{}\n", authority.generation).as_bytes());
-    let namespace_before: std::collections::BTreeSet<_> = std::fs::read_dir(&root)?
-        .map(|entry| entry.map(|entry| entry.file_name()))
-        .collect::<Result<_, _>>()?;
-    // Acquisition fails before exposing authority: the loser cannot publish, clear
-    // or dispatch through a Lease, and cannot change the winner's namespace.
-    let loser = Lease::native(&root);
-    assert!(loser.is_err());
-    let error = loser.err().ok_or("busy claimant unexpectedly acquired")?;
-    assert!(error.contains("another workspace claimant"), "{error}");
-    assert_eq!(std::fs::read(root.join("generation"))?, generation);
-    let namespace_after: std::collections::BTreeSet<_> = std::fs::read_dir(&root)?
-        .map(|entry| entry.map(|entry| entry.file_name()))
-        .collect::<Result<_, _>>()?;
-    assert_eq!(namespace_after, namespace_before);
-    assert_eq!(
-        winner.authority(FenceMode::Mutation)?.generation,
-        authority.generation
-    );
+    verify_busy_namespace(&root, &winner, &authority, &generation)?;
 
     let operation = scratch.0.join("operation");
     std::fs::create_dir(&operation)?;
@@ -121,20 +104,7 @@ fn owned_runtime_claim_fence_turnover() -> Result<(), Box<dyn std::error::Error>
     fixture::challenge(&canary, &scratch.0, b"fence-retained-after-eof")?;
 
     std::fs::write(operation.join("release"), b"release owned mutation")?;
-    let output = fixture::wait(&mutation)?;
-    assert!(output.stopped.is_none(), "{:?}", output.stopped);
-    assert_eq!(output.status.code(), Some(0));
-    assert_eq!(output.stdout, fixture::stdout(b"mutation-complete\n"));
-    assert!(output.stderr.is_empty());
-    assert_eq!(
-        std::fs::read(operation.join("mutation-effect"))?,
-        b"owned mutation"
-    );
-    let receipt = endpoint.terminal()?;
-    assert!(endpoint.confirms(&receipt));
-    let proof: serde_json::Value = serde_json::from_slice(&receipt)?;
-    assert_eq!(proof["code"], 0);
-    assert_eq!(proof["complete"], true);
+    let receipt = verify_mutation(&mutation, &operation, &endpoint)?;
     let mut successor = receive.recv_timeout(fixture::LIMIT)??;
     let new_authority = successor.authority(FenceMode::Mutation)?;
     assert_ne!(new_authority.generation, authority.generation);
@@ -226,4 +196,57 @@ fn recording_claim_acknowledgement_requires_exact_generation_and_complete_bounde
             .is_none()
     );
     Ok(())
+}
+
+#[cfg(unix)]
+fn verify_busy_namespace(
+    root: &Path,
+    winner: &Lease,
+    authority: &WorkspaceAuthority,
+    generation: &[u8],
+) -> Result<(), Box<dyn std::error::Error>> {
+    let namespace_before: std::collections::BTreeSet<_> = std::fs::read_dir(root)?
+        .map(|entry| entry.map(|entry| entry.file_name()))
+        .collect::<Result<_, _>>()?;
+    // Acquisition fails before exposing authority: the loser cannot publish, clear
+    // or dispatch through a Lease, and cannot change the winner's namespace.
+    let loser = Lease::native(root);
+    assert!(loser.is_err());
+    let error = loser.err().ok_or("busy claimant unexpectedly acquired")?;
+    assert!(error.contains("another workspace claimant"), "{error}");
+    assert_eq!(std::fs::read(root.join("generation"))?, generation);
+    let namespace_after: std::collections::BTreeSet<_> = std::fs::read_dir(root)?
+        .map(|entry| entry.map(|entry| entry.file_name()))
+        .collect::<Result<_, _>>()?;
+    assert_eq!(namespace_after, namespace_before);
+    assert_eq!(
+        winner.authority(FenceMode::Mutation)?.generation,
+        authority.generation
+    );
+
+    Ok(())
+}
+
+#[cfg(unix)]
+fn verify_mutation(
+    mutation: &processes::Ticket,
+    operation: &Path,
+    endpoint: &super::super::native_owner::Endpoint,
+) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    use super::super::owned_runtime as fixture;
+    let output = fixture::wait(mutation)?;
+    assert!(output.stopped.is_none(), "{:?}", output.stopped);
+    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(output.stdout, fixture::stdout(b"mutation-complete\n"));
+    assert!(output.stderr.is_empty());
+    assert_eq!(
+        std::fs::read(operation.join("mutation-effect"))?,
+        b"owned mutation"
+    );
+    let receipt = endpoint.terminal()?;
+    assert!(endpoint.confirms(&receipt));
+    let proof: serde_json::Value = serde_json::from_slice(&receipt)?;
+    assert_eq!(proof["code"], 0);
+    assert_eq!(proof["complete"], true);
+    Ok(receipt)
 }
