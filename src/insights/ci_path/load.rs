@@ -54,13 +54,7 @@ pub(super) fn baseline_key(
         }),
         Baseline::Previous => recent
             .iter()
-            .find(|candidate| {
-                candidate.id != info.id
-                    && candidate
-                        .created
-                        .zip(info.created)
-                        .is_none_or(|(a, b)| a <= b)
-            })
+            .find(|candidate| earlier(candidate, info))
             .map(RunKey::of),
         Baseline::Run(id) => Some(
             greens
@@ -100,13 +94,7 @@ fn assemble(
             Ok(runs) => (runs, None),
             Err(error) => (Vec::new(), Some(error)),
         };
-    baselines.retain(|run| {
-        run.id != timed.info.id
-            && run
-                .created
-                .zip(timed.info.created)
-                .is_none_or(|(a, b)| a <= b)
-    });
+    baselines.retain(|run| earlier(run, &timed.info));
     baselines.truncate(BASELINES);
     let (recent, history) = github_history(repo, project, &timed);
     let key = baseline_key(&timed.info, baseline, &baselines, &recent);
@@ -161,6 +149,20 @@ fn assemble(
         now: crate::git::now(),
         provenance,
     })
+}
+
+fn earlier(candidate: &RunInfo, current: &RunInfo) -> bool {
+    if candidate.id == current.id {
+        return false;
+    }
+    if candidate.number > 0 && current.number > 0 {
+        candidate.number < current.number
+    } else {
+        candidate
+            .created
+            .zip(current.created)
+            .is_some_and(|(a, b)| a < b)
+    }
 }
 
 fn github_history(
