@@ -1,3 +1,5 @@
+# Compiler-backed branching score, separate from advisory lexical surveys.
+cognitive-complexity-threshold = 25
 disallowed-types = [
     { path = "egui::Spinner", reason = "it redraws the window every frame; use crate::spinner::Spinner" },
 ]

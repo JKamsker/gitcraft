@@ -17,7 +17,12 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
       - uses: Swatinem/rust-cache@v2
         with:
           # Dev releases populate this cache, so new PRs can restore it too.
@@ -25,6 +30,8 @@ jobs:
           cache-on-failure: true
       - name: Verify compiler diagnostics and build inventory
         run: python -m unittest discover -s ci -p test_windows_test_build.py -v
+      - name: Clippy and complexity gate
+        run: python ci/clippy_packages.py
       - name: Build test binaries
         run: python ci/windows-test-build.py
       - name: Verify complete and disjoint Windows test shards
