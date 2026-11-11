@@ -5,7 +5,6 @@
 //! the file resolved.
 
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use egui_kittest::Harness;
@@ -16,11 +15,9 @@ use crate::git::fixture::Repo;
 use crate::repo::{Action, RepoTab};
 use crate::settings::Settings;
 
-/// The command run in place of the agent, when set.
-pub(super) static STAND_IN: Mutex<Option<CommandLine>> = Mutex::new(None);
-
-/// Held by each test of the flow: they set the stand-in one at a time.
-static SERIAL: Mutex<()> = Mutex::new(());
+mod stand_in;
+pub(super) use stand_in::command_for;
+use stand_in::register;
 
 /// What the stand-in writes in place of the conflicted file.
 const RESOLVED: &str = "a both";
@@ -108,9 +105,6 @@ fn phase(tab: &RepoTab) -> Option<Phase> {
 
 #[test]
 fn a_merge_put_aside_is_resolved_brought_back_and_applied() -> Result<(), String> {
-    let _serial = SERIAL
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
     let repo = Repo::new("resolver flow")?;
     repo.commit("base", &[("a.txt", Some("a base\n"))])?;
     repo.git(&["checkout", "-q", "-b", "side"])?;
@@ -119,9 +113,7 @@ fn a_merge_put_aside_is_resolved_brought_back_and_applied() -> Result<(), String
     repo.commit("main", &[("a.txt", Some("a main\n"))])?;
     repo.git(&["branch", "other"])?;
     assert!(repo.git(&["merge", "-q", "side"]).is_err());
-    if let Ok(mut s) = STAND_IN.lock() {
-        *s = Some(stand_in());
-    }
+    let _stand_in = register(repo.path(), stand_in());
     let dir = repo.path().to_path_buf();
     let mut h = harness(dir.clone());
     assert!(
@@ -171,6 +163,10 @@ fn a_merge_put_aside_is_resolved_brought_back_and_applied() -> Result<(), String
         "the user is told: {:?}",
         tab.finished
     );
+    let recovery = crate::resolver::park::list(&dir)?
+        .into_iter()
+        .next()
+        .ok_or("missing parked merge")?;
     let id = run.id.clone();
     let kept = crate::agent::repo_file(&dir, &format!("resolver/{id}"))?;
     assert!(kept.join("run.json").is_file() && kept.join("resolved/a.txt").is_file());
@@ -236,10 +232,7 @@ fn a_merge_put_aside_is_resolved_brought_back_and_applied() -> Result<(), String
     let a = std::fs::read_to_string(dir.join("a.txt")).map_err(|e| e.to_string())?;
     assert_eq!(a.trim_end(), RESOLVED);
     assert!(merging(&dir), "the merge goes on, to be committed");
-    if let Ok(mut s) = STAND_IN.lock() {
-        *s = None;
-    }
-    // Nothing kept is left once it is applied and closed.
+    // Closing removes the agent workspace; byte-exact recovery remains discoverable.
     act(&mut h, ResolverAct::Dismiss);
     assert!(wait(&mut h, |t| t.resolver.run.is_none()));
     let start = Instant::now();
@@ -247,7 +240,24 @@ fn a_merge_put_aside_is_resolved_brought_back_and_applied() -> Result<(), String
         std::thread::sleep(Duration::from_millis(50));
     }
     assert!(!kept.exists(), "the agent's kept work is removed");
-    assert!(crate::resolver::park::list(&dir)?.is_empty());
+    assert_eq!(crate::resolver::park::list(&dir)?, vec![recovery.clone()]);
+    let archive = crate::resolver::park::recovery_location(&dir, &recovery)?;
+    assert!(archive.ends_with("parked"));
+    assert!(archive.join("index").is_file());
+    assert!(archive.join("raw/a.txt").is_file());
+    assert!(
+        repo.git(&["rev-parse", "--verify", &recovery.ref_name()])
+            .is_err()
+    );
+    assert_eq!(
+        repo.git(&[
+            "rev-parse",
+            "--verify",
+            &format!("refs/gitcraft/parked-recovery/{}", recovery.id)
+        ])?
+        .trim(),
+        recovery.snapshot
+    );
     Ok(())
 }
 
@@ -255,13 +265,8 @@ fn a_merge_put_aside_is_resolved_brought_back_and_applied() -> Result<(), String
 /// its own worktree, and its work is then checked against the merge in the worktree.
 #[test]
 fn a_merge_brought_back_while_its_agent_works_gets_its_work_after() -> Result<(), String> {
-    let _serial = SERIAL
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
     let repo = conflicted("resolver flow early")?;
-    if let Ok(mut s) = STAND_IN.lock() {
-        *s = Some(slow_stand_in(8));
-    }
+    let _stand_in = register(repo.path(), slow_stand_in(8));
     let dir = repo.path().to_path_buf();
     let mut h = harness(dir.clone());
     assert!(wait(&mut h, |t| !t.opening() && t.work.conflicted.len() == 1));
@@ -291,14 +296,33 @@ fn a_merge_brought_back_while_its_agent_works_gets_its_work_after() -> Result<()
         "while the agent works"
     );
 
+    let recovery = crate::resolver::park::list(&dir)?
+        .into_iter()
+        .find(|p| p.id == id)
+        .ok_or("missing parked merge")?;
+    let archive = crate::resolver::park::recovery_location(&dir, &recovery)?;
+    let index = std::fs::read(archive.join("index")).map_err(|e| e.to_string())?;
+    let raw = std::fs::read(archive.join("raw/a.txt")).map_err(|e| e.to_string())?;
     act(&mut h, ResolverAct::BringBack(id));
     assert!(
-        wait(&mut h, |t| t.resolver.parked.is_empty()
+        wait(&mut h, |t| t.busy_op.is_none()
             && t.resolver
                 .run
                 .as_ref()
                 .is_some_and(|r| r.parked.is_none())),
         "brought back at once"
+    );
+    assert!(wait(&mut h, |t| !t.resolver.reading_parked
+        && t.resolver.parked.contains(&recovery)));
+    let archive = crate::resolver::park::recovery_location(&dir, &recovery)?;
+    assert!(archive.ends_with("parked"));
+    assert_eq!(
+        std::fs::read(archive.join("index")).map_err(|e| e.to_string())?,
+        index
+    );
+    assert_eq!(
+        std::fs::read(archive.join("raw/a.txt")).map_err(|e| e.to_string())?,
+        raw
     );
     assert!(merging(&dir));
     assert_eq!(
@@ -313,9 +337,6 @@ fn a_merge_brought_back_while_its_agent_works_gets_its_work_after() -> Result<()
     let tab = h.state().as_ref().ok_or("no tab")?;
     let run = tab.resolver.run.as_ref().ok_or("no run")?;
     assert!(run.results[0].1.applies(), "{:?}", run.results);
-    if let Ok(mut s) = STAND_IN.lock() {
-        *s = None;
-    }
     Ok(())
 }
 
@@ -323,9 +344,6 @@ fn a_merge_brought_back_while_its_agent_works_gets_its_work_after() -> Result<()
 /// refused, the merge left as it is; _Resolve all_ leaves it to the user and resolves the rest.
 #[test]
 fn a_file_behind_the_agent_fence_is_left_to_the_user() -> Result<(), String> {
-    let _serial = SERIAL
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
     let repo = Repo::new("resolver fence")?;
     repo.commit(
         "base",
@@ -343,9 +361,7 @@ fn a_file_behind_the_agent_fence_is_left_to_the_user() -> Result<(), String> {
     )?;
     assert!(repo.git(&["merge", "-q", "side"]).is_err());
     repo.git(&["config", "--local", "--add", "gitcraft.fence", "*.lock"])?;
-    if let Ok(mut s) = STAND_IN.lock() {
-        *s = Some(stand_in());
-    }
+    let _stand_in = register(repo.path(), stand_in());
     let dir = repo.path().to_path_buf();
     let mut h = harness(dir.clone());
     assert!(wait(&mut h, |t| !t.opening() && t.work.conflicted.len() == 2));
@@ -375,9 +391,6 @@ fn a_file_behind_the_agent_fence_is_left_to_the_user() -> Result<(), String> {
     assert_eq!(results, ["a.txt"]);
     // The merge was put aside whole, the fenced file with it.
     assert!(run.parked.as_ref().is_some_and(|p| p.files.len() == 2));
-    if let Ok(mut s) = STAND_IN.lock() {
-        *s = None;
-    }
     Ok(())
 }
 
