@@ -351,19 +351,19 @@ fn retention_event(
         }
         "rewrite" => {
             rewrite_done = true;
-            deliver_rewrite(tab, label, &heads, Ok(Some((rewrite.clone(), Vec::new()))));
+            deliver_rewrite(tab, label, heads, Ok(Some((rewrite.clone(), Vec::new()))));
         }
         "rewrite-fail" => {
             failed = true;
-            deliver_rewrite(tab, label, &heads, Err("retention failed".into()));
+            deliver_rewrite(tab, label, heads, Err("retention failed".into()));
         }
         "rewrite-cancel" => {
             failed = true;
-            deliver_rewrite(tab, label, &heads, Err(git::CANCELLED.into()));
+            deliver_rewrite(tab, label, heads, Err(git::CANCELLED.into()));
         }
         "rewrite-none" => {
             failed = true;
-            deliver_rewrite(tab, label, &heads, Ok(None));
+            deliver_rewrite(tab, label, heads, Ok(None));
         }
         "rewrite-wrong-proof" | "rewrite-wrong-branch" => {
             failed = true;
@@ -373,7 +373,7 @@ fn retention_event(
             } else {
                 wrong.branch = "another".into();
             }
-            deliver_rewrite(tab, label, &heads, Ok(Some((wrong, Vec::new()))));
+            deliver_rewrite(tab, label, heads, Ok(Some((wrong, Vec::new()))));
         }
         _ => unreachable!(),
     }
