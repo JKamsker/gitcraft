@@ -75,18 +75,30 @@ def blob_contents(root, tracked):
     return contents
 
 
-def tracked_contents(root, *, staged=False, revision=None, suffix=b".rs", ignore_case=False):
-    """Read complete tracked source snapshots for size and source-policy checks."""
+def tracked_contents(root, *, staged=False, revision=None, suffix=b".rs", ignore_case=False,
+                     reject_symlinks=False):
+    """Read complete snapshots; policy callers may require regular source inputs.
+
+    Size inventory counts Git's link contents. Configuration policy must instead
+    reject links, since the compiler may follow their targets as active settings.
+    """
     tracked = entries(root, revision, suffix=suffix, ignore_case=ignore_case)
     if staged or revision is not None:
+        if reject_symlinks:
+            for path, mode, _ in tracked:
+                if mode == b"120000":
+                    raise ValueError(f"symlink policy input is forbidden: {os.fsdecode(path)!r}")
         return [(os.fsdecode(path), content)
                 for (path, _, _), content in zip(tracked, blob_contents(root, tracked))]
     result = []
     for path, _, _ in tracked:
         filename = root / os.fsdecode(path)
         try:
+            linked = filename.is_symlink()
+            if reject_symlinks and linked:
+                raise ValueError(f"symlink policy input is forbidden: {os.fsdecode(path)!r}")
             # Read the link itself, as Git does, never an unrelated target.
-            content = os.fsencode(os.readlink(filename)) if filename.is_symlink() else filename.read_bytes()
+            content = os.fsencode(os.readlink(filename)) if linked else filename.read_bytes()
         except FileNotFoundError:
             # An unstaged deletion is absent from the working candidate tree.
             # --staged and --revision still inspect its committed/index blob.
