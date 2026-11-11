@@ -227,7 +227,6 @@ fn harness(path: PathBuf, dark: bool) -> H<'static> {
                         ..Settings::default()
                     };
                     settings.set(ui.ctx());
-                    crate::theme::install_fonts(ui.ctx());
                     let theme = if dark {
                         crate::theme::ThemeId::default()
                     } else {
@@ -236,6 +235,9 @@ fn harness(path: PathBuf, dark: bool) -> H<'static> {
                     crate::theme::apply(ui.ctx(), &theme, &Default::default());
                     RepoTab::new(path.clone(), ui.ctx())
                 });
+                if !crate::theme::test_paint::fonts_before_paint(ui.ctx()) {
+                    return;
+                }
                 tab.ui(ui);
                 crate::a11y::end_frame(ui.ctx());
             },
