@@ -440,3 +440,37 @@ mod status;
 
 #[path = "answer_tests/config.rs"]
 mod config;
+
+#[test]
+fn unsupported_or_ambiguous_ref_queries_are_left_to_git() -> Result<(), String> {
+    let repo = Repo::new("answer-ref-fallback")?;
+    repo.commit("base", &[])?;
+    left_to_git(
+        repo.path(),
+        &[
+            &[
+                "for-each-ref",
+                "--format=%(refname)",
+                "--format=%(objectname)",
+            ],
+            &[
+                "for-each-ref",
+                "--format=%(refname)",
+                "--sort=committerdate",
+                "--sort=-committerdate",
+            ],
+            &["for-each-ref", "--format=%(refname)", "--sort=refname"],
+            &["for-each-ref", "--format=%(unknown)"],
+            &["for-each-ref", "--format=%(refname)", "refs/heads/?"],
+            &["for-each-ref", "--format=%(refname)", "refs/heads/[ab]"],
+            &["for-each-ref", "--format=%(refname)", "refs/heads/a**b"],
+            &[
+                "for-each-ref",
+                "--format=%(refname)",
+                "--merged=HEAD",
+                "--contains=HEAD",
+            ],
+        ],
+    );
+    Ok(())
+}
