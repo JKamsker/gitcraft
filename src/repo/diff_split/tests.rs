@@ -151,7 +151,8 @@ fn history_reveal_and_explicit_layout_choices_do_not_reapply_the_profile() {
         settings.profile_mut().author_email = "unapplied-profile@example.invalid".into();
         settings.put_for_test(&ctx);
         ctx.set_zoom_factor(1.75);
-        let _ = ctx.run_ui(Default::default(), |_| {});
+        ctx.run_ui(Default::default(), |_| {})
+            .drop_without_applying_deltas();
         assert_eq!(
             ctx.zoom_factor(),
             1.75,
@@ -167,7 +168,8 @@ fn history_reveal_and_explicit_layout_choices_do_not_reapply_the_profile() {
             applied, 0,
             "layout actions must not replace the connection/profile epoch"
         );
-        let _ = ctx.run_ui(Default::default(), |_| {});
+        ctx.run_ui(Default::default(), |_| {})
+            .drop_without_applying_deltas();
         assert_eq!(ctx.zoom_factor(), 1.75);
         let settings = Settings::get(&ctx);
         assert!(settings.show_detail && settings.diff_beside_graph);
