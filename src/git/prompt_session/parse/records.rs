@@ -68,6 +68,8 @@ pub(super) fn records_from(
         };
         append_record(&mut steps, &v, map_root, &cwd, compact, at, i + 1);
         if steps.len() >= 2000 {
+            // One record can contain a summary and many edits or patch files.
+            steps.truncate(2000);
             notices.push(
                 crate::i18n::text("backend-transcript-stopped-at-2-000-displayed-steps-5ec90c")
                     .into(),

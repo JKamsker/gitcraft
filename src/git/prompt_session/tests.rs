@@ -1,4 +1,5 @@
 use super::*;
+mod budget;
 // These pure records use synthetic absolute paths without touching the filesystem.
 fn fixture_path(path: &str) -> PathBuf {
     if cfg!(windows) {
