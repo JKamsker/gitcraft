@@ -293,7 +293,7 @@ fn cleanup_in(
 }
 
 mod files;
-#[cfg(test)]
+#[cfg(all(test, unix))]
 use files::missing_inside;
 
 use files::oid_valid;

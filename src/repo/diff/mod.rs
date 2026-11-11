@@ -261,6 +261,8 @@ pub(in crate::repo) fn comparison_pairs(lines: &[DiffLine]) -> Vec<(Option<usize
 pub(in crate::repo) use wrap::logical_offset as logical_wrap_offset;
 
 mod load;
+#[cfg(all(test, unix))]
+use load::is_symlink_patch;
 #[cfg(test)]
-use load::{find_moves, is_symlink_patch, prepare};
+use load::{find_moves, prepare};
 pub use load::{load, load_lines};

@@ -1,3 +1,4 @@
+#[cfg(unix)]
 use super::config::entry;
 use super::*;
 use std::process::Command;
