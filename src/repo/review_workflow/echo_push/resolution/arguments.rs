@@ -7,38 +7,6 @@ pub(super) struct PushArguments {
     pub deleting: bool,
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn parse(words: &[&str]) -> Result<PushArguments, String> {
-        PushArguments::parse(&words.iter().map(|s| (*s).into()).collect::<Vec<_>>())
-    }
-
-    #[test]
-    fn option_boundary_preserves_literal_remote_and_refspec_words() -> Result<(), String> {
-        let args = parse(&["--all", "--tags", "--delete", "origin", "--", "--quiet"])?;
-        assert!(args.all && args.tags && args.deleting);
-        assert_eq!(args.positional, ["origin", "--quiet"]);
-        let literal = parse(&["--", "--all", "--tags", "--delete"])?;
-        assert!(!literal.all && !literal.tags && !literal.deleting);
-        assert_eq!(literal.positional, ["--all", "--tags", "--delete"]);
-        Ok(())
-    }
-
-    #[test]
-    fn unknown_or_separate_value_options_require_explicit_review() {
-        for words in [
-            &["--receive-pack=custom"][..],
-            &["--push-option", "value"],
-            &["--recurse-submodules=on-demand"],
-            &["--upload-pack", "custom"],
-        ] {
-            assert!(parse(words).is_err(), "{words:?}");
-        }
-        assert!(parse(&["--push-option=value", "--force-with-lease=refs/heads/a:old"]).is_ok());
-    }
-}
 impl PushArguments {
     pub fn parse(words: &[String]) -> Result<Self, String> {
         let mut positional = vec![];
@@ -93,5 +61,38 @@ impl PushArguments {
             tags,
             deleting,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parse(words: &[&str]) -> Result<PushArguments, String> {
+        PushArguments::parse(&words.iter().map(|s| (*s).into()).collect::<Vec<_>>())
+    }
+
+    #[test]
+    fn option_boundary_preserves_literal_remote_and_refspec_words() -> Result<(), String> {
+        let args = parse(&["--all", "--tags", "--delete", "origin", "--", "--quiet"])?;
+        assert!(args.all && args.tags && args.deleting);
+        assert_eq!(args.positional, ["origin", "--quiet"]);
+        let literal = parse(&["--", "--all", "--tags", "--delete"])?;
+        assert!(!literal.all && !literal.tags && !literal.deleting);
+        assert_eq!(literal.positional, ["--all", "--tags", "--delete"]);
+        Ok(())
+    }
+
+    #[test]
+    fn unknown_or_separate_value_options_require_explicit_review() {
+        for words in [
+            &["--receive-pack=custom"][..],
+            &["--push-option", "value"],
+            &["--recurse-submodules=on-demand"],
+            &["--upload-pack", "custom"],
+        ] {
+            assert!(parse(words).is_err(), "{words:?}");
+        }
+        assert!(parse(&["--push-option=value", "--force-with-lease=refs/heads/a:old"]).is_ok());
     }
 }

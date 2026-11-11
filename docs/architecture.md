@@ -1,10 +1,12 @@
 # Architecture and change amplification
 
 Issue [#178](https://github.com/JKamsker/gitcraft/issues/178) is an incremental
-refactoring program. The first slice establishes this survey and makes the
-terminal panel an owning feature. Typed operation plans/persistence migration,
-other feature extractions, settings composition and shared request utilities
-remain separate phases. Keep those phases independently reviewable.
+refactoring program. PR #179 established this survey and terminal ownership;
+PR #200 delivered the principal hotspot decompositions, typed plan boundaries,
+private feature owners and scoped requests. Follow-up work should validate and
+harden those implementations, preserving legacy undo data and recovery safety.
+The open issues track remaining cross-feature and platform validation; the
+historical inventory below is a baseline, not an instruction to redo shipped work.
 
 ## Mandatory Rust file-size policy
 
