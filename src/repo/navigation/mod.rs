@@ -273,6 +273,7 @@ impl RepoTab {
     /// Shows `view` again through the actions that open it.
     fn restore_navigation(&mut self, view: &View, ctx: &egui::Context) {
         self.tour = None;
+        self.commit_changes.stop();
         match view {
             View::Graph { selected } => {
                 self.close_pages(true, ctx);
