@@ -211,35 +211,7 @@ pub(super) fn answer(path: &Path, args: &[&str]) -> Option<Answer> {
         listed.push(Listed { name, id, symref });
     }
     listed.sort_by(|a, b| a.name.as_bytes().cmp(b.name.as_bytes()));
-    if filters.len() > 1 {
-        return None;
-    }
-    if let Some(filter) = filters.first() {
-        let (Filter::Merged(rev) | Filter::Contains(rev)) = filter;
-        let commit = resolve(&repo, &format!("{rev}^{{commit}}")).ok()??;
-        let cache = repo.commit_graph_if_enabled().ok()?;
-        let mut graph = repo.revision_graph(cache.as_ref());
-        let mut kept = Vec::new();
-        for item in listed {
-            // Tips that aren't commits (a tag of a tree…) are never listed.
-            let Some(tip) = peel_to(&repo, item.id, gix::object::Kind::Commit).ok()? else {
-                continue;
-            };
-            let (ancestor, descendant) = match filter {
-                Filter::Merged(_) => (tip, commit),
-                Filter::Contains(_) => (commit, tip),
-            };
-            let reaches = ancestor == descendant
-                || repo
-                    .merge_base_with_graph(ancestor, descendant, &mut graph)
-                    .ok()?
-                    .is_some_and(|base| base == ancestor);
-            if reaches {
-                kept.push(item);
-            }
-        }
-        listed = kept;
-    }
+    listed = filter_by_ancestry(&repo, &filters, listed)?;
     if let Some(descending) = sort {
         let mut dated = Vec::new();
         for item in listed {
@@ -295,6 +267,44 @@ pub(super) fn answer(path: &Path, args: &[&str]) -> Option<Answer> {
         out.push(b'\n');
     }
     Some(Answer::out(out))
+}
+
+/// Apply the supported single reachability filter without changing reference order.
+fn filter_by_ancestry(
+    repo: &gix::Repository,
+    filters: &[Filter<'_>],
+    listed: Vec<Listed>,
+) -> Option<Vec<Listed>> {
+    if filters.len() > 1 {
+        return None;
+    }
+    let Some(filter) = filters.first() else {
+        return Some(listed);
+    };
+    let (Filter::Merged(rev) | Filter::Contains(rev)) = filter;
+    let commit = resolve(repo, &format!("{rev}^{{commit}}")).ok()??;
+    let cache = repo.commit_graph_if_enabled().ok()?;
+    let mut graph = repo.revision_graph(cache.as_ref());
+    let mut kept = Vec::new();
+    for item in listed {
+        // Tips that aren't commits (a tag of a tree…) are never listed.
+        let Some(tip) = peel_to(repo, item.id, gix::object::Kind::Commit).ok()? else {
+            continue;
+        };
+        let (ancestor, descendant) = match filter {
+            Filter::Merged(_) => (tip, commit),
+            Filter::Contains(_) => (commit, tip),
+        };
+        let reaches = ancestor == descendant
+            || repo
+                .merge_base_with_graph(ancestor, descendant, &mut graph)
+                .ok()?
+                .is_some_and(|base| base == ancestor);
+        if reaches {
+            kept.push(item);
+        }
+    }
+    Some(kept)
 }
 
 /// What an atom about the object itself prints.

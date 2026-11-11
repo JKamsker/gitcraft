@@ -78,8 +78,10 @@ pub(super) fn answer(path: &Path, args: &[&str]) -> Option<Answer> {
     Some(Answer::out(out))
 }
 
+type KeyMatcher = Box<dyn Fn(&str) -> bool>;
+
 /// Validate native query matching independently of config loading and rendering.
-fn matcher(action: &Action, query: &str) -> Option<Box<dyn Fn(&str) -> bool>> {
+fn matcher(action: &Action, query: &str) -> Option<KeyMatcher> {
     Some(match action {
         Action::Get | Action::GetAll => {
             let (section, subsection, name) = key_parts(query)?;
