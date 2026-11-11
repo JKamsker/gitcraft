@@ -98,9 +98,7 @@ impl RepoTab {
     /// An explicit layout choice replaces automatic history-follow presentation.
     pub(super) fn set_diff_beside_graph(&mut self, on: bool, ctx: &egui::Context) {
         self.commit_changes.stop();
-        let mut settings = Settings::get(ctx);
-        settings.diff_beside_graph = on;
-        settings.set(ctx);
+        Settings::set_diff_beside_graph(ctx, on);
     }
 
     /// Leaves a pull request's or a commit's builds page (or the insights) for the graph: a
