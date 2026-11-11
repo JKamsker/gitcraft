@@ -32,7 +32,7 @@ pub(super) fn acquire(repo: &Path, id: &str) -> Result<Lease, String> {
     file.try_lock()
         .map_err(|e| format!("Recovery {id} is busy: {e}"))?;
     #[cfg(all(test, unix))]
-    tests::retain(&file);
+    tests::retain(&file)?;
     Ok(Lease { file })
 }
 

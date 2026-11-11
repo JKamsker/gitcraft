@@ -181,7 +181,8 @@ fn existing_file_sync_requests_windows_write_access_without_changing_bytes()
         flushed = true;
         Ok(())
     })
-    .unwrap_err();
+    .err()
+    .ok_or("Expected missing recovery file error")?;
     assert!(!flushed && !missing.exists());
     assert!(
         error.contains("Open recovery file") && error.contains("missing"),
@@ -202,7 +203,8 @@ fn failed_regular_file_flush_reports_its_path_and_retains_originals()
             "recorded FlushFileBuffers failure",
         ))
     })
-    .unwrap_err();
+    .err()
+    .ok_or("Expected recorded flush failure")?;
     assert!(
         error.contains("Sync recovery file") && error.contains("original-index"),
         "{error}"

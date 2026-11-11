@@ -78,10 +78,10 @@ fn restoration_rejects_both_hidden_index_flags() -> Result<(), String> {
         );
         #[cfg(unix)]
         let inherited = locking::tests::Inherited::new();
-        let error = bring_back(repo.path(), &parked).unwrap_err();
+        let error = bring_back(repo.path(), &parked).err().ok_or("Expected hidden-index rejection")?;
         assert!(!error.contains("is busy"), "{error}");
         #[cfg(unix)]
-        assert_eq!(inherited.count(), 1);
+        assert_eq!(inherited.count()?, 1);
         assert_eq!(
             read(repo.path(), "notes.txt").as_deref(),
             Some("hidden user edit\n")
@@ -186,10 +186,10 @@ fn recovery_archive_collision_keeps_both_originals() -> Result<(), String> {
     std::fs::write(archive.join("existing"), b"mine").map_err(|e| e.to_string())?;
     #[cfg(unix)]
     let inherited = locking::tests::Inherited::new();
-    let error = drop_to_branch(repo.path(), &parked).unwrap_err();
+    let error = drop_to_branch(repo.path(), &parked).err().ok_or("Expected archive collision")?;
     assert!(!error.contains("is busy"), "{error}");
     #[cfg(unix)]
-    assert_eq!(inherited.count(), 1);
+    assert_eq!(inherited.count()?, 1);
     assert_eq!(
         std::fs::read(archive.join("existing")).map_err(|e| e.to_string())?,
         b"mine"
