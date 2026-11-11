@@ -29,36 +29,7 @@ fn stamp(path: &Path) -> Result<Stamp, String> {
         (vec![meta.dev(), meta.ino()], meta.mode())
     };
     #[cfg(windows)]
-    let (identity, attributes) = {
-        use std::os::windows::{fs::MetadataExt, io::AsRawHandle};
-        use windows_sys::Win32::Storage::FileSystem::{
-            FILE_ID_INFO, FileIdInfo, GetFileInformationByHandleEx,
-        };
-        let mut info: FILE_ID_INFO = unsafe { std::mem::zeroed() };
-        // SAFETY: file owns a live handle; info is a writable correctly sized output.
-        if unsafe {
-            GetFileInformationByHandleEx(
-                file.as_raw_handle(),
-                FileIdInfo,
-                (&mut info as *mut FILE_ID_INFO).cast(),
-                std::mem::size_of::<FILE_ID_INFO>() as u32,
-            )
-        } == 0
-        {
-            return Err(std::io::Error::last_os_error().to_string());
-        }
-        // Use the full 128-bit ID (ReFS does not guarantee unique 64-bit IDs).
-        if info.FileId.Identifier == [0; 16] {
-            return Err("Filesystem did not provide a stable file identity".into());
-        }
-        let mut identity = vec![info.VolumeSerialNumber, meta.creation_time()];
-        for chunk in info.FileId.Identifier.chunks_exact(8) {
-            identity.push(u64::from_le_bytes(
-                chunk.try_into().map_err(|_| "Invalid file ID")?,
-            ));
-        }
-        (identity, meta.file_attributes())
-    };
+    let (identity, attributes) = windows_identity(&file, &meta)?;
     #[cfg(not(any(unix, windows)))]
     return Err("File identity evidence is unsupported on this platform".into());
     let mut hasher = Sha256::new();
@@ -85,6 +56,45 @@ fn stamp(path: &Path) -> Result<Stamp, String> {
         return Err("File changed while recording durability evidence".into());
     }
     Ok(result)
+}
+
+// Keep the native API boundary separate from hashing and receipt policy.
+#[cfg(windows)]
+#[allow(unsafe_code)] // GetFileInformationByHandleEx requires a live handle and typed output.
+fn windows_identity(
+    file: &std::fs::File,
+    meta: &std::fs::Metadata,
+) -> Result<(Vec<u64>, u32), String> {
+    use std::os::windows::{fs::MetadataExt, io::AsRawHandle};
+    use windows_sys::Win32::Storage::FileSystem::{
+        FILE_ID_INFO, FileIdInfo, GetFileInformationByHandleEx,
+    };
+    let mut info = FILE_ID_INFO::default();
+    // SAFETY: file retains ownership of its live handle for this synchronous call.
+    // info is a valid writable FILE_ID_INFO, with exactly the size passed below;
+    // FileIdInfo selects that output type. No pointer is retained by the API.
+    if unsafe {
+        GetFileInformationByHandleEx(
+            file.as_raw_handle(),
+            FileIdInfo,
+            (&mut info as *mut FILE_ID_INFO).cast(),
+            std::mem::size_of::<FILE_ID_INFO>() as u32,
+        )
+    } == 0
+    {
+        return Err(std::io::Error::last_os_error().to_string());
+    }
+    // Use the full 128-bit ID (ReFS does not guarantee unique 64-bit IDs).
+    if info.FileId.Identifier == [0; 16] {
+        return Err("Filesystem did not provide a stable file identity".into());
+    }
+    let mut identity = vec![info.VolumeSerialNumber, meta.creation_time()];
+    for chunk in info.FileId.Identifier.chunks_exact(8) {
+        identity.push(u64::from_le_bytes(
+            chunk.try_into().map_err(|_| "Invalid file ID")?,
+        ));
+    }
+    Ok((identity, meta.file_attributes()))
 }
 
 fn receipt(dir: &Path, key: &str) -> PathBuf {
