@@ -82,11 +82,23 @@ impl Lifecycle {
 impl super::RepoTab {
     /// Retire feature reads without cancelling or settling submitted mutations.
     pub(crate) fn invalidate_repository_context(&mut self) {
+        self.invalidate_repository_insights();
         self.search.retire();
         self.invalidate_repository_tool_requests();
         self.cochanges.invalidate_context();
         for parked in &mut self.parked {
             parked.invalidate_repository_context();
+        }
+    }
+
+    /// Forge preferences change read ownership without replacing the local repository.
+    pub(super) fn invalidate_forge_context(&mut self) {
+        self.invalidate_forge_insights();
+        self.search.retire();
+        self.invalidate_repository_tool_requests();
+        self.cochanges.invalidate_context();
+        for parked in &mut self.parked {
+            parked.invalidate_forge_context();
         }
     }
 

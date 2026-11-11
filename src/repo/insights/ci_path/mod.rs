@@ -8,6 +8,8 @@ mod detail;
 mod waterfall;
 
 #[cfg(test)]
+mod lifecycle_tests;
+#[cfg(test)]
 mod tests;
 
 use std::collections::HashSet;
@@ -45,6 +47,15 @@ pub(crate) struct State {
     selected: Option<usize>,
     /// The jobs whose steps are shown.
     expanded: HashSet<usize>,
+}
+
+impl State {
+    fn unavailable(&mut self, title: &str, why: String) {
+        let subject = self.subject.take();
+        *self = Self::default();
+        self.subject = subject;
+        self.unavailable = Some((title.to_owned(), why));
+    }
 }
 
 /// What the view asks for.
@@ -100,10 +111,10 @@ impl RepoTab {
         state.subject = subject.clone();
         state.unavailable = None;
         let Some((_, sha)) = subject else {
-            state.unavailable = Some((
-                "No commit".to_owned(),
+            state.unavailable(
+                "No commit",
                 "Select a commit, or open a repository with one, to see its CI runs.".to_owned(),
-            ));
+            );
             return;
         };
         if projects.is_empty() {
@@ -116,11 +127,11 @@ impl RepoTab {
                     forge.name()
                 ),
             };
-            state.unavailable = Some(("No CI to read".to_owned(), why));
+            state.unavailable("No CI to read", why);
             return;
         }
         let request = state.runs.start();
-        self.insight_then(
+        self.insight_forge_then(
             ctx,
             move || {
                 let mut runs = Runs::default();
@@ -150,14 +161,15 @@ impl RepoTab {
         let Some(state) = self.insights.as_mut().map(|v| &mut v.ci_path) else {
             return;
         };
-        if let Err(e) = &result
-            && tool_problem(e)
-        {
-            state.runs.accept(request, Err(e.clone()));
-            state.unavailable = Some(("The forge's tool is needed".to_owned(), e.clone()));
+        if !state.runs.accept(request, result) {
             return;
         }
-        if !state.runs.accept(request, result) {
+        state.unavailable = state
+            .runs
+            .error()
+            .filter(|error| tool_problem(error))
+            .map(|error| ("The forge's tool is needed".to_owned(), error.to_owned()));
+        if state.unavailable.is_some() {
             return;
         }
         let Some(runs) = state.runs.ready() else {
@@ -192,22 +204,24 @@ impl RepoTab {
         };
         let baseline = state.baseline;
         let request = state.explorer.start();
-        self.insight_then(
+        self.insight_forge_then(
             ctx,
             move || analysis::read(&path, &project, run, baseline, (&name, &sha)),
-            move |tab, result: Result<Explorer, String>, _ctx| {
-                let Some(state) = tab.insights.as_mut().map(|v| &mut v.ci_path) else {
-                    return;
-                };
-                if state.explorer.accept(request, result)
-                    && let Some(explorer) = state.explorer.ready()
-                {
-                    let jobs = explorer.run.jobs.len();
-                    state.selected = state.selected.filter(|&i| i < jobs);
-                    state.expanded.retain(|&i| i < jobs);
-                }
-            },
+            move |tab, result, _ctx| tab.ci_path_run(request, result),
         );
+    }
+
+    fn ci_path_run(&mut self, request: u64, result: Result<Explorer, String>) {
+        let Some(state) = self.insights.as_mut().map(|v| &mut v.ci_path) else {
+            return;
+        };
+        if state.explorer.accept(request, result)
+            && let Some(explorer) = state.explorer.ready()
+        {
+            let jobs = explorer.run.jobs.len();
+            state.selected = state.selected.filter(|&i| i < jobs);
+            state.expanded.retain(|&i| i < jobs);
+        }
     }
 
     pub(super) fn ci_path_act(&mut self, act: Act, ctx: &egui::Context) {

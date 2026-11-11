@@ -16,10 +16,15 @@ const NARROW: f32 = 760.0;
 impl RepoTab {
     /// The big area, while the insights page is open.
     pub(in crate::repo) fn insights_ui(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
+        self.sync_insights_context(ui.ctx());
         let Some(view) = self.insights.as_deref() else {
             return;
         };
         let (kind, table) = (view.kind, view.table);
+        if !view.loaded.contains(&kind) {
+            acts.push(Action::Insights(InsightsAct::Reload));
+            return;
+        }
         widgets::panel_header(ui, "Insights", |ui| {
             if icons::small_button(ui, "x", "Close insights (Esc)").clicked() {
                 acts.push(Action::Insights(InsightsAct::Close));

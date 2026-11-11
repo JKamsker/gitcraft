@@ -8,6 +8,24 @@ use crate::repo::insights::tests::draw;
 use crate::repo::insights::{InsightsAct, Kind};
 use crate::repo::{Action, RepoTab};
 
+impl crate::repo::insights::context::namespace_tests::Fixture for super::State {
+    fn seed(&mut self) {
+        use crate::repo::insights::context::namespace_tests::seed_slot;
+        seed_slot(&mut self.rewrites);
+        seed_slot(&mut self.data);
+        seed_slot(&mut self.patch);
+        self.still = true;
+    }
+    fn assert_retired(&self) {
+        use crate::repo::insights::context::namespace_tests::assert_slot_retired;
+        assert_slot_retired(&self.rewrites);
+        assert_slot_retired(&self.data);
+        assert_slot_retired(&self.patch);
+        assert!(self.source.is_none() && self.selected.is_none() && self.shown_at.is_none());
+        assert!(self.still);
+    }
+}
+
 fn state(tab: &RepoTab) -> Option<&super::State> {
     tab.insights.as_ref().map(|v| &v.ribbons)
 }

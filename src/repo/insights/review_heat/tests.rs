@@ -13,6 +13,17 @@ use crate::repo::insights::tests::draw;
 use crate::repo::insights::{InsightsAct, Kind};
 use crate::repo::{Action, DiffKey, RepoTab};
 
+impl crate::repo::insights::context::namespace_tests::Fixture for super::State {
+    fn seed(&mut self) {
+        crate::repo::insights::context::namespace_tests::seed_slot(&mut self.data);
+        self.number = Some(7);
+    }
+    fn assert_retired(&self) {
+        crate::repo::insights::context::namespace_tests::assert_slot_retired(&self.data);
+        assert!(self.number.is_none() && self.expanded.is_empty() && self.selected.is_none());
+    }
+}
+
 fn both_ways(tab: &mut RepoTab, ctx: &egui::Context) {
     draw(tab, ctx, 1200.0);
     draw(tab, ctx, 600.0);

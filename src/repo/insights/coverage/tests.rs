@@ -11,6 +11,25 @@ use crate::insights::coverage::Ask;
 use crate::repo::insights::graph::Pick;
 use crate::repo::{Action, RepoTab};
 
+impl crate::repo::insights::context::namespace_tests::Fixture for super::State {
+    fn seed(&mut self) {
+        use crate::repo::insights::context::namespace_tests::seed_slot;
+        seed_slot(&mut self.data);
+        seed_slot(&mut self.layout);
+        self.report = Some("keep.lcov".into());
+        self.typed = "keep.lcov".into();
+        self.test = Some(7);
+    }
+    fn assert_retired(&self) {
+        use crate::repo::insights::context::namespace_tests::assert_slot_retired;
+        assert_slot_retired(&self.data);
+        assert_slot_retired(&self.layout);
+        assert!(self.selected.is_none() && self.test.is_none());
+        assert_eq!(self.report.as_deref(), Some("keep.lcov"));
+        assert_eq!(self.typed, "keep.lcov");
+    }
+}
+
 fn wait(tab: &mut RepoTab, ctx: &egui::Context, done: impl Fn(&RepoTab) -> bool) {
     let start = Instant::now();
     while !done(tab) {

@@ -4,6 +4,26 @@ use super::*;
 use crate::repo::insights::{InsightsAct, Kind, tests::draw};
 use std::time::{Duration, Instant};
 
+impl crate::repo::insights::context::namespace_tests::Fixture for State {
+    fn seed(&mut self) {
+        use crate::repo::insights::context::namespace_tests::seed_slot;
+        seed_slot(&mut self.read);
+        seed_slot(&mut self.commit_files);
+        self.filter = "keep-folder".into();
+        self.limit = 42;
+        self.range = 1;
+        self.pair = Some(7);
+    }
+    fn assert_retired(&self) {
+        use crate::repo::insights::context::namespace_tests::assert_slot_retired;
+        assert_slot_retired(&self.read);
+        assert_slot_retired(&self.commit_files);
+        assert!(self.pair.is_none() && self.unit.is_none() && self.left.is_none());
+        assert_eq!(self.filter, "keep-folder");
+        assert_eq!((self.limit, self.range), (42, 1));
+    }
+}
+
 fn wait(tab: &mut RepoTab, ctx: &egui::Context, done: impl Fn(&RepoTab) -> bool) {
     let start = Instant::now();
     while !done(tab) {

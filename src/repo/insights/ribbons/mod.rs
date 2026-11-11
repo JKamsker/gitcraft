@@ -54,6 +54,15 @@ pub(crate) struct State {
     still: bool,
 }
 
+impl State {
+    pub(super) fn retire_repository(&mut self) {
+        *self = Self {
+            still: self.still,
+            ..Self::default()
+        };
+    }
+}
+
 /// What the view asks for.
 #[derive(Clone, Debug)]
 pub(crate) enum Act {
