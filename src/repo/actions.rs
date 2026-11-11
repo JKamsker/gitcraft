@@ -253,6 +253,7 @@ pub(crate) enum Action {
     DiffAsFile(bool),
     /// Markdown files show rendered in diffs, or as text.
     DiffRendered(bool),
+    DiffBesideGraph(bool),
     /// Diffs show as this rich view (prose…), for the files it reads, or as their lines.
     DiffRich(Option<diff::rich::RichKind>),
     /// Back from a rich view to the plain diff, at the line numbered `old` before the change

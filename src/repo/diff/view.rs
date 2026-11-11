@@ -104,185 +104,24 @@ impl RepoTab {
             acts,
         );
 
-        if matches!(&view.data, Some(Ok(data)) if data.sops) {
-            ui.horizontal_wrapped(|ui| {
-                ui.label(crate::i18n::text("repo-core-2344"));
-                if view.lines.is_some() {
-                    ui.label(crate::i18n::text("repo-core-2345"));
-                }
-                let mut encoding = view.encrypted.json_encoding;
-                egui::ComboBox::from_id_salt("sops_json_encoding")
-                    .selected_text(encoding.label())
-                    .show_ui(ui, |ui| {
-                        use super::encrypted::JsonEncoding;
-                        for choice in [
-                            JsonEncoding::Ask,
-                            JsonEncoding::Document,
-                            JsonEncoding::Binary,
-                        ] {
-                            ui.selectable_value(&mut encoding, choice, choice.label());
-                        }
-                    });
-                if encoding != view.encrypted.json_encoding {
-                    acts.push(Action::DiffDecryptedEncoding(encoding));
-                }
-                if view.encrypted.enabled {
-                    if ui.button(crate::i18n::text("repo-core-2347")).clicked() {
-                        acts.push(Action::DiffDecrypted(false));
-                    }
-                } else if ui
-                    .add_enabled(
-                        idle && !self.loading && view.request == view.data_request,
-                        egui::Button::new(crate::i18n::text("repo-core-2348")),
-                    )
-                    .on_hover_text(crate::i18n::text("repo-core-2349"))
-                    .clicked()
-                {
-                    acts.push(Action::DiffDecrypted(true));
-                }
-            });
-        }
-        if view.encrypted.enabled {
-            if let Some(view) = &mut self.diff {
-                super::encrypted::show(ui, &mut view.encrypted);
-            }
+        if self.encrypted_content(ui, acts) {
             return;
         }
         if let Some(what) = self.find_in() {
             self.find.bar(ui, what.name());
         }
         if markdown == Some(true) {
-            let Some(view) = &mut self.diff else { return };
-            match &view.rendered {
-                None => {
-                    ui.centered_and_justified(|ui| ui.add(crate::spinner::Spinner::new()));
-                }
-                Some(Err(e)) => {
-                    ui.add_space(12.0);
-                    ui.horizontal(|ui| {
-                        ui.add_space(12.0);
-                        ui.colored_label(
-                            t.danger,
-                            crate::git::display_error(&crate::forge::inbox::display_error(e)),
-                        );
-                    });
-                }
-                Some(Ok(md)) => {
-                    if self.find.open {
-                        self.find.rendered(
-                            ui,
-                            format!(
-                                "markdown:{:?}:{}:{}:{as_file}",
-                                view.key, view.request, view.rendered_load
-                            ),
-                            |t| {
-                                let mut doc = find::rendered::Document::default();
-                                if as_file {
-                                    doc.markdown(&md.file, t.text);
-                                } else {
-                                    for (change, text) in &md.blocks {
-                                        let color = match change {
-                                            rendered::Change::Kept => t.text,
-                                            rendered::Change::Removed => t.danger,
-                                            rendered::Change::Added => t.success,
-                                        };
-                                        doc.markdown(text, color);
-                                    }
-                                }
-                                doc
-                            },
-                        );
-                    } else {
-                        rendered::show(ui, &path, md, &mut view.markdown, !as_file);
-                    }
-                }
-            }
+            self.markdown_content(ui, &path, as_file);
             return;
         }
         if as_file {
-            let before = matches!(&view.file, Some(Ok(f)) if f.before);
-            let old_path = match &view.data {
-                Some(Ok(d)) => old_name(&d.header),
-                _ => None,
-            };
-            let rev = sides(&view.key).map(|(new, old)| if before { old } else { new });
-            let link_menu = self.link_menu(None);
-            let menu = || link_menu.clone();
-            let mut link = |ui: &mut Ui, lines| {
-                if let (Some(rev), Some(menu)) = (&rev, menu()) {
-                    let target = Target::File {
-                        rev: rev.clone(),
-                        path: path.clone(),
-                        lines: Some(lines),
-                    };
-                    menu.items(ui, &lines.label(), &target, acts);
-                }
-            };
-            // Lines are picked only when there's something to link them to.
-            let links = (rev.is_some() && self.link_menu(None).is_some())
-                .then_some(&mut link as file_text::LineMenu<'_>);
-            let pick = |range| picked_in_file(&view.key, old_path.as_deref(), before, range);
-            let history = pick((1, 1))
-                .map(|_| ())
-                .ok_or(crate::i18n::text("repo-core-1856"));
-            // Lines picked in one version aren't those of another one of the same file.
-            let id = ("diff_file", &path, format!("{:?}", view.key));
-            if let Some(p) = file_text::show(
-                ui,
-                id,
-                view.file.as_ref(),
-                &mut self.find,
-                || find::Source::DiffFile(path.clone()),
-                history,
-                links,
-                None,
-            )
-            .and_then(pick)
-            {
-                acts.push(Action::LineHistory {
-                    path: p.path,
-                    at: p.at,
-                    range: p.range,
-                });
-            }
+            self.whole_file_content(ui, &path, acts);
             return;
         }
-        if let Some(kind) = rich_on {
-            let Some(view) = &mut self.diff else { return };
-            match &view.rich {
-                None => {
-                    ui.centered_and_justified(|ui| ui.add(crate::spinner::Spinner::new()));
-                    return;
-                }
-                Some((_, Err(e))) => {
-                    ui.add_space(12.0);
-                    ui.horizontal(|ui| {
-                        ui.add_space(12.0);
-                        ui.colored_label(
-                            t.danger,
-                            crate::git::display_error(&crate::forge::inbox::display_error(e)),
-                        );
-                    });
-                    return;
-                }
-                Some((_, Ok(rich::Rich::Ready(diff)))) => {
-                    let metadata_generation = view.rich_state.search_generation(ui.ctx());
-                    if self.find.open {
-                        self.find.rendered(
-                            ui,
-                            format!(
-                                "rich:{:?}:{}:{}:{metadata_generation}",
-                                view.key, view.request, view.rich_load
-                            ),
-                            |t| rich::search_document(diff, &view.rich_state, t),
-                        );
-                    } else {
-                        rich::show(ui, diff, &mut view.rich_state, acts);
-                    }
-                    return;
-                }
-                Some((_, Ok(rich::Rich::Plain(note)))) => rich::fallback_note(ui, kind, note),
-            }
+        if let Some(kind) = rich_on
+            && self.rich_content(ui, kind, acts)
+        {
+            return;
         }
         let Some(view) = &self.diff else { return };
         if let Some(reason) = folded {
@@ -295,36 +134,10 @@ impl RepoTab {
             }
             return;
         }
-        if view.structural.enabled {
-            match &view.structural.result {
-                None => {
-                    ui.centered_and_justified(|ui| ui.add(crate::spinner::Spinner::new()));
-                    return;
-                }
-                Some(Ok(data)) => {
-                    if self.find.open {
-                        self.find.rendered(
-                            ui,
-                            format!(
-                                "syntax:{:?}:{}:{}",
-                                view.key,
-                                view.request,
-                                view.structural.generation()
-                            ),
-                            |t| structural::search_document(data, t),
-                        );
-                    } else {
-                        structural::show(ui, data);
-                    }
-                    return;
-                }
-                Some(Err(reason)) => {
-                    ui.colored_label(t.warning, reason);
-                    ui.label(crate::i18n::text("repo-core-2354"));
-                    ui.separator();
-                }
-            }
+        if self.structural_content(ui) {
+            return;
         }
+        let Some(view) = &self.diff else { return };
         let Some(data) = ready_data(ui, view, ignore_ws, &t, &mut self.find, acts) else {
             return;
         };
@@ -421,6 +234,8 @@ impl RepoTab {
         self.keyboard_hunk(ui, acts);
     }
 }
+
+mod content;
 
 mod ready;
 use ready::{line_comment_panel, ready_data};
