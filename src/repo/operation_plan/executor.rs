@@ -2,8 +2,11 @@
 use super::*;
 use crate::repo::forks::guard::{CheckoutReplay, Pushed, Rewrite, Scope};
 
+#[path = "executor/preparation.rs"]
 mod preparation;
+#[path = "executor/settlement.rs"]
 mod settlement;
+#[path = "executor/steps.rs"]
 mod steps;
 
 struct Execution<'a> {

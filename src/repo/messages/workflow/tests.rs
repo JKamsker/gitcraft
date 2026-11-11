@@ -1,3 +1,4 @@
+#[path = "tests/assertions.rs"]
 mod assertions;
 use super::*;
 use crate::repo::messages::{display_operation, display_status};
