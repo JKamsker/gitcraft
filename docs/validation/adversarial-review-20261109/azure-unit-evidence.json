@@ -1,0 +1,80 @@
+{
+  "commit": "46244096564514c8e9f28e0f71bc0687c098645b",
+  "checks": [
+    {
+      "name": "azure",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--lib",
+        "forge::azure::tests::",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "log": "/tmp/gitcraft-azure-46244096-azure.log",
+      "log_sha256": "5f09e49d3099b75334f50168263466978e5cc0c89c7aa5a7198e37cacb7a7e0e"
+    },
+    {
+      "name": "cloud",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--lib",
+        "forge::cloud::tests::",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "log": "/tmp/gitcraft-azure-46244096-cloud.log",
+      "log_sha256": "40d42d2d3a8cd24473c7d08d455d66a1483ad8ed1c973ed80934c58f21aa8d80"
+    },
+    {
+      "name": "identity",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--lib",
+        "forge::identity::integration_tests::",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "log": "/tmp/gitcraft-azure-46244096-identity.log",
+      "log_sha256": "9b0210f324908b7356082ba2fe5cceca1fecfa266767677f38bfdfc21ca3dbd6"
+    },
+    {
+      "name": "bitbucket",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--lib",
+        "forge::bitbucket::tests::",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "log": "/tmp/gitcraft-azure-46244096-bitbucket.log",
+      "log_sha256": "736e5aa8843eccc66f8091fffd8094833059502dd3610ed839b60671c4e667a2"
+    },
+    {
+      "name": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--check"
+      ],
+      "exit_code": 0,
+      "log": "/tmp/gitcraft-azure-46244096-fmt.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "tree": "6f99ad469c25d4b6f79dd632c545c1d4a37b6091",
+  "remote_branch": "JKamsker/gitcraft:t3/azure-identity-pagination-checks",
+  "verified_remote_sha": "46244096564514c8e9f28e0f71bc0687c098645b",
+  "status": "focused checks validated; WIP for parent integration and independent adversarial review"
+}

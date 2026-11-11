@@ -3,21 +3,38 @@
 use egui::{Align2, CornerRadius, Painter, Rect, Response, Sense, Ui, pos2, vec2};
 
 use super::{ROW_H, status_color};
+use crate::a11y::labels;
 use crate::icons;
 use crate::theme::{self, Tokens};
 
 /// What a file row shows on its right edge.
+#[derive(Clone, Copy)]
 pub enum RowExtra<'a> {
     /// `+added −removed` (`None` for binary files).
     Stats(Option<u32>, Option<u32>),
     /// Icon buttons shown while the row is hovered: `(icon, tooltip)`.
     Buttons(&'a [(&'a str, &'a str)]),
+    /// [`RowExtra::Stats`] or [`RowExtra::Buttons`] with a warning badge left of them.
+    Badged(&'a RowExtra<'a>, &'a str),
 }
 
 pub struct FileRowResponse {
     pub row: Response,
     /// Index of the clicked hover button.
     pub button: Option<usize>,
+    /// Where the badge of [`RowExtra::Badged`] is, for its own hover text.
+    pub badge: Option<Rect>,
+}
+
+/// How wide each hover button is, with its gap: room kept for them beside the owners.
+const BUTTON_ROOM: f32 = 22.0;
+
+/// Who owns a file (CODEOWNERS), as its row shows it.
+pub struct OwnerTag {
+    /// Short, on the row: `payments +1`.
+    pub label: String,
+    /// Every owner, for the row's tooltip.
+    pub full: String,
 }
 
 /// One file: status letter, file name, its folder dimmed, and `extra` on the right.
@@ -31,12 +48,28 @@ pub fn file_row(
     selected: bool,
     extra: RowExtra<'_>,
 ) -> FileRowResponse {
+    file_row_owned(ui, code, path, old_path, indent, selected, extra, None)
+}
+
+/// [`file_row`], with the file's owners left of `extra`.
+#[allow(clippy::too_many_arguments)]
+pub fn file_row_owned(
+    ui: &mut Ui,
+    code: char,
+    path: &str,
+    old_path: Option<&str>,
+    indent: Option<f32>,
+    selected: bool,
+    extra: RowExtra<'_>,
+    owners: Option<&OwnerTag>,
+) -> FileRowResponse {
     let shift = indent.unwrap_or(0.0);
     let t = Tokens::get(ui.ctx());
     // By its path: a status reload shifts the list, and an open menu (Ignore…) or a pressed
     // Stage must stay this file's. A list that can show a path another one shows too (staged
     // and unstaged) is drawn under an id of its own.
     let (rect, row) = super::keyed_row(ui, ROW_H, ("file-row", path));
+    super::a11y_selected(&row, || labels::file(path, code, old_path), selected);
     let hovered = ui.rect_contains_pointer(rect);
     let painter = ui.painter_at(rect);
     if selected {
@@ -50,7 +83,21 @@ pub fn file_row(
     if code != ' ' {
         let color = status_color(&t, code);
         let badge = Rect::from_center_size(pos2(rect.left() + 18.0 + shift, y), vec2(16.0, 16.0));
-        painter.rect_filled(badge, CornerRadius::same(3), color.gamma_multiply(0.22));
+        painter.rect_filled(
+            badge,
+            CornerRadius::same(3),
+            t.text_tint(
+                color,
+                0.22,
+                if selected {
+                    t.row_selected
+                } else if hovered {
+                    t.hover
+                } else {
+                    t.card
+                },
+            ),
+        );
         let letter = if code == '?' { 'A' } else { code };
         painter.text(
             badge.center(),
@@ -64,15 +111,50 @@ pub fn file_row(
     // Right edge first, so the name is clipped before it.
     let mut right = rect.right() - 8.0;
     let mut button = None;
+    let mut badge = None;
+    let (extra, label) = match &extra {
+        RowExtra::Badged(inner, label) => (*inner, Some(*label)),
+        other => (other, None),
+    };
     match extra {
         RowExtra::Stats(added, removed) => {
-            right = stats(&painter, &t, right, y, added, removed);
+            right = stats(&painter, &t, right, y, *added, *removed);
         }
         RowExtra::Buttons(buttons) => {
-            if hovered || selected {
+            // Also while the keyboard is on the row or one of them, so Tab reaches them.
+            let keyboard = crate::a11y::keyboard_on(&row)
+                || (0..buttons.len()).any(|i| ui.memory(|m| m.has_focus(button_id(&row, i))));
+            if hovered || selected || keyboard {
                 (right, button) = hover_buttons(ui, &painter, &t, &row, right, buttons);
+            } else if label.is_some() {
+                // The badge stays where it is when the buttons come up on hover.
+                right -= BUTTON_W * buttons.len() as f32;
+            } else if owners.is_some() {
+                // The owners stay put when the buttons come with the pointer.
+                right -= BUTTON_ROOM * buttons.len() as f32;
             }
         }
+        RowExtra::Badged(..) => {}
+    }
+    if let Some(label) = label {
+        // Room left for the name; with too little, the badge shrinks to its icon.
+        let room = right - (rect.left() + 32.0 + shift);
+        let at = warning_badge(ui, &painter, &t, (right, y), label, room < 180.0);
+        right = at.left() - 6.0;
+        badge = Some(at);
+    }
+
+    if let Some(owners) = owners {
+        let room = ((right - rect.left()) * 0.4).max(0.0);
+        let clip = Rect::from_min_max(pos2(right - room, rect.top()), pos2(right, rect.bottom()));
+        let r = painter.with_clip_rect(clip).text(
+            pos2(right - 4.0, y),
+            Align2::RIGHT_CENTER,
+            &owners.label,
+            egui::FontId::proportional(11.0),
+            t.accent_fg,
+        );
+        right = r.left().max(clip.left()) - 8.0;
     }
 
     let (dir, name) = split_dir(path);
@@ -107,12 +189,69 @@ pub fn file_row(
         );
     }
     // The full path only adds something when the row shows it cut short.
-    let row = match old_path {
-        Some(old) => row.on_hover_text(format!("{old} → {path}")),
-        None if !dir.is_empty() => row.on_hover_text(path),
+    let shown = match old_path {
+        Some(old) => Some(format!("{old} → {path}")),
+        None if !dir.is_empty() => Some(path.to_owned()),
+        None => None,
+    };
+    let tip = match (shown, owners) {
+        (Some(p), Some(o)) => Some(crate::i18n::message(
+            "repo-core-3767",
+            &[
+                ("p", p.to_string().into()),
+                ("full", o.full.to_string().into()),
+            ],
+        )),
+        (None, Some(o)) => Some(crate::i18n::message(
+            "repo-core-3768",
+            &[("full", o.full.to_string().into())],
+        )),
+        (shown, None) => shown,
+    };
+    let row = match tip {
+        Some(tip) => row.on_hover_text(tip),
         None => row,
     };
-    FileRowResponse { row, button }
+    FileRowResponse { row, button, badge }
+}
+
+/// Width a hover button takes, with its gap.
+const BUTTON_W: f32 = 22.0;
+
+/// A small warning pill with `label` (only its icon when `compact`), right-aligned at
+/// `right`; returns where it is.
+fn warning_badge(
+    ui: &Ui,
+    painter: &Painter,
+    t: &Tokens,
+    (right, y): (f32, f32),
+    label: &str,
+    compact: bool,
+) -> Rect {
+    let color = badge_text(t);
+    if compact {
+        let rect = Rect::from_center_size(pos2(right - 9.0, y), vec2(18.0, 18.0));
+        painter.rect_filled(rect, CornerRadius::same(4), t.warning.gamma_multiply(0.18));
+        icons::paint(ui, rect, "circle-alert", 12.0, color);
+        return rect;
+    }
+    let galley = painter.layout_no_wrap(label.to_owned(), theme::medium(10.0), color);
+    let size = galley.size() + vec2(10.0, 3.0);
+    let rect = Rect::from_min_size(pos2(right - size.x, y - size.y / 2.0), size);
+    painter.rect_filled(rect, CornerRadius::same(4), t.warning.gamma_multiply(0.18));
+    painter.galley(rect.min + vec2(5.0, 1.5), galley, color);
+    rect
+}
+
+/// The warning colour, darkened on light themes so small text on its tint stays readable.
+pub fn badge_text(t: &Tokens) -> egui::Color32 {
+    if t.dark() {
+        t.warning
+    } else {
+        let [r, g, b, _] = t.warning.to_array();
+        let dim = |c: u8| (f32::from(c) * 0.72) as u8;
+        egui::Color32::from_rgb(dim(r), dim(g), dim(b))
+    }
 }
 
 /// `+added −removed` (or `bin`) right-aligned at `right`; returns where the name must end.
@@ -171,8 +310,9 @@ fn hover_buttons(
     for (i, (icon, tooltip)) in buttons.iter().enumerate().rev() {
         let r = Rect::from_center_size(pos2(right - 10.0, y), vec2(20.0, 20.0));
         let resp = ui
-            .interact(r, row.id.with(("btn", i)), Sense::click())
+            .interact(r, button_id(row, i), Sense::click())
             .on_hover_text(*tooltip);
+        super::a11y(&resp, egui::WidgetType::Button, *tooltip);
         if resp.hovered() {
             painter.rect_filled(r, t.radius_sm, t.pressed);
         }
@@ -191,6 +331,11 @@ fn hover_buttons(
     (right, clicked)
 }
 
+/// The `i`th icon button of `row`.
+fn button_id(row: &Response, i: usize) -> egui::Id {
+    row.id.with(("btn", i))
+}
+
 /// `(folder, name)` of a path: `src/repo` and `mod.rs`. A slash at the end (git shows a nested
 /// repository as `sub/`) stays with the name.
 pub(super) fn split_dir(path: &str) -> (&str, &str) {
@@ -204,6 +349,76 @@ pub(super) fn split_dir(path: &str) -> (&str, &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn painted_file_badges_meet_aa_on_normal_hovered_and_selected_rows() {
+        let ctx = theme::test_paint::context();
+        for builtin in theme::catalog::BUILTIN {
+            let t = builtin.palette().tokens();
+            theme::set_tokens(&ctx, t);
+            for state in 0..3 {
+                for code in ['M', 'A', 'D', 'R', 'C', 'U', '?'] {
+                    let mut last = None;
+                    for _ in 0..2 {
+                        let mut output = ctx.run_ui(
+                            egui::RawInput {
+                                events: vec![egui::Event::PointerMoved(if state == 1 {
+                                    pos2(20.0, 20.0)
+                                } else {
+                                    pos2(700.0, 700.0)
+                                })],
+                                ..Default::default()
+                            },
+                            |ctx| {
+                                egui::CentralPanel::default()
+                                    .frame(egui::Frame::new().fill(t.card))
+                                    .show(ctx, |ui| {
+                                        let response = file_row_owned(
+                                            ui,
+                                            code,
+                                            &format!("{code}.rs"),
+                                            None,
+                                            None,
+                                            state == 2,
+                                            RowExtra::Stats(None, None),
+                                            Some(&OwnerTag {
+                                                label: "Owners".to_owned(),
+                                                full: "Owners".to_owned(),
+                                            }),
+                                        );
+                                        assert_eq!(
+                                            ui.rect_contains_pointer(response.row.rect),
+                                            state == 1,
+                                            "{} {code} state {state}",
+                                            builtin.name
+                                        );
+                                    });
+                            },
+                        );
+                        output.textures_delta.clear();
+                        last = Some(output);
+                    }
+                    if let Some(output) = last {
+                        for label in [
+                            if code == '?' {
+                                "A".to_owned()
+                            } else {
+                                code.to_string()
+                            },
+                            "Owners".to_owned(),
+                        ] {
+                            theme::test_paint::assert_text_aa(
+                                &output.shapes,
+                                t.card,
+                                &label,
+                                &format!("{} {code} state {state}", builtin.name),
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     #[test]
     fn a_path_splits_into_folder_and_name() {

@@ -1,0 +1,390 @@
+//! Immutable raw file versions shared by migration, staging and branch-matrix views.
+mod index_transaction;
+mod lens;
+mod migration;
+#[cfg(test)]
+pub(crate) mod tests;
+mod transaction;
+
+pub(crate) use lens::{Lens, LensSpec, read_lens};
+pub(crate) use migration::{Migration, MigrationSource, read_migration};
+pub(crate) use transaction::{Scratch, apply_lens_patch, patch_header};
+
+use std::collections::{BTreeMap, BTreeSet};
+use std::path::{Component, Path};
+
+pub(crate) const FILE_LIMIT: usize = 2 * 1024 * 1024;
+pub(crate) const MAX_ROWS: usize = 2000;
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct Entry {
+    pub path: Vec<u8>,
+    pub mode: String,
+    pub oid: String,
+}
+impl Entry {
+    pub fn name(&self) -> String {
+        display_path(&self.path)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct Version {
+    pub mode: Option<String>,
+    pub oid: Option<String>,
+    pub bytes: Vec<u8>,
+    pub warning: Option<String>,
+}
+impl Version {
+    pub fn missing() -> Self {
+        Self {
+            mode: None,
+            oid: None,
+            bytes: Vec::new(),
+            warning: None,
+        }
+    }
+    pub fn text(&self) -> Option<&str> {
+        if self.warning.is_some() || self.bytes.contains(&0) {
+            return None;
+        }
+        std::str::from_utf8(&self.bytes).ok()
+    }
+    pub fn regular(&self) -> bool {
+        self.mode
+            .as_deref()
+            .is_some_and(|m| matches!(m, "100644" | "100755"))
+    }
+    pub fn label(&self) -> String {
+        match &self.mode {
+            None => crate::i18n::text("backend-version-missing").into(),
+            Some(mode) => crate::i18n::message(
+                if self.bytes.contains(&0) {
+                    "backend-version-bytes-binary"
+                } else {
+                    "backend-version-bytes"
+                },
+                &[
+                    (
+                        "mode",
+                        if mode == "unknown" {
+                            crate::i18n::text("backend-version-unknown-mode")
+                        } else {
+                            mode.as_str()
+                        }
+                        .into(),
+                    ),
+                    ("count", self.bytes.len().into()),
+                ],
+            ),
+        }
+    }
+}
+
+pub(super) fn output(
+    repo: &Path,
+    args: &[&str],
+    active: &dyn Fn() -> bool,
+) -> Result<crate::remote::Output, String> {
+    super::command::comparison_output(repo, args, &[], active)
+}
+pub(super) fn run(
+    repo: &Path,
+    args: &[&str],
+    active: &dyn Fn() -> bool,
+) -> Result<Vec<u8>, String> {
+    let out = output(repo, args, active)?;
+    if out.code == 0 {
+        Ok(out.stdout)
+    } else {
+        Err(crate::i18n::message(
+            "backend-could-not-compare-files-4ff498",
+            &[(
+                "from_utf8_lossy",
+                (String::from_utf8_lossy(&out.stderr).trim())
+                    .to_string()
+                    .into(),
+            )],
+        ))
+    }
+}
+pub(super) fn hash(s: &str) -> bool {
+    matches!(s.len(), 40 | 64) && s.bytes().all(|b| b.is_ascii_hexdigit())
+}
+pub(crate) fn resolve(
+    repo: &Path,
+    revision: &str,
+    active: &dyn Fn() -> bool,
+) -> Result<String, String> {
+    let bytes = run(
+        repo,
+        &[
+            "--no-lazy-fetch",
+            "rev-parse",
+            "--verify",
+            "--end-of-options",
+            &format!("{revision}^{{commit}}"),
+        ],
+        active,
+    )?;
+    let oid = std::str::from_utf8(&bytes)
+        .map_err(|_| crate::i18n::text("backend-invalid-revision-3e52aa"))?
+        .trim();
+    if !hash(oid) {
+        return Err(crate::i18n::text("backend-git-returned-an-invalid-commit-id-621dfa").into());
+    }
+    Ok(oid.into())
+}
+pub(super) fn head(repo: &Path, active: &dyn Fn() -> bool) -> Result<Option<String>, String> {
+    let out = output(
+        repo,
+        &["--no-lazy-fetch", "rev-parse", "--verify", "-q", "HEAD"],
+        active,
+    )?;
+    if out.code != 0 {
+        // Only an unborn branch is missing; inaccessible/corrupt repositories aren't empty.
+        let symbolic = output(repo, &["symbolic-ref", "-q", "HEAD"], active)?;
+        if symbolic.code == 0 {
+            return Ok(None);
+        }
+        return Err(crate::i18n::text("backend-could-not-resolve-head-32445d").into());
+    }
+    let oid = String::from_utf8(out.stdout)
+        .map_err(|_| crate::i18n::text("backend-invalid-head-e1661b"))?;
+    let oid = oid.trim();
+    if !hash(oid) {
+        return Err(crate::i18n::text("backend-invalid-head-e1661b").into());
+    }
+    Ok(Some(oid.into()))
+}
+pub(crate) fn valid_path(repo: &Path, path: &str) -> bool {
+    !path.is_empty()
+        && !path.contains('\0')
+        && !path.starts_with('/')
+        && path
+            .split('/')
+            .all(|p| !p.is_empty() && !matches!(p, "." | ".."))
+        && (crate::remote::is_remote(repo)
+            || Path::new(path)
+                .components()
+                .all(|p| matches!(p, Component::Normal(_))))
+}
+pub(crate) fn display_path(path: &[u8]) -> String {
+    match std::str::from_utf8(path) {
+        Ok(p) => p
+            .replace('\n', "\\n")
+            .replace('\t', "\\t")
+            .replace('\r', "\\r"),
+        Err(_) => format!(
+            "{} [non-UTF8: {}]",
+            String::from_utf8_lossy(path),
+            path.iter().map(|b| format!("{b:02x}")).collect::<String>()
+        ),
+    }
+}
+
+type IndexEntries = (Vec<u8>, BTreeMap<Vec<u8>, Entry>);
+pub(super) fn index(repo: &Path, active: &dyn Fn() -> bool) -> Result<IndexEntries, String> {
+    let bytes = run(repo, &["ls-files", "--stage", "-z"], active)?;
+    let mut entries = BTreeMap::new();
+    for row in bytes.split(|b| *b == 0).filter(|s| !s.is_empty()) {
+        let tab = row
+            .iter()
+            .position(|b| *b == b'\t')
+            .ok_or(crate::i18n::text("backend-invalid-index-record-8a8e83"))?;
+        let metadata = std::str::from_utf8(&row[..tab])
+            .map_err(|_| crate::i18n::text("backend-invalid-index-metadata-f6b2f3"))?;
+        let fields: Vec<_> = metadata.split(' ').collect();
+        if fields.len() != 3 || !hash(fields[1]) {
+            return Err(crate::i18n::text("backend-invalid-index-entry-cf3e7b").into());
+        }
+        if fields[2] != "0" {
+            return Err(crate::i18n::text(
+                "backend-resolve-index-conflicts-before-opening-these-file-comparisons-2b7d7c",
+            )
+            .into());
+        }
+        let entry = Entry {
+            path: row[tab + 1..].to_vec(),
+            mode: fields[0].into(),
+            oid: fields[1].into(),
+        };
+        entries.insert(entry.path.clone(), entry);
+    }
+    Ok((bytes, entries))
+}
+pub(super) fn tree(
+    repo: &Path,
+    oid: &str,
+    folder: &str,
+    active: &dyn Fn() -> bool,
+) -> Result<BTreeMap<Vec<u8>, Entry>, String> {
+    if !folder.is_empty() && !valid_path(repo, folder) {
+        return Err(crate::i18n::text(
+            "backend-choose-a-repository-relative-folder-without-or-components-f7160d",
+        )
+        .into());
+    }
+    let mut args = vec![
+        "--no-lazy-fetch",
+        "--literal-pathspecs",
+        "ls-tree",
+        "-r",
+        "-z",
+        "--full-tree",
+        oid,
+        "--",
+    ];
+    if !folder.is_empty() {
+        args.push(folder);
+    }
+    let bytes = run(repo, &args, active)?;
+    let mut entries = BTreeMap::new();
+    for row in bytes.split(|b| *b == 0).filter(|s| !s.is_empty()) {
+        let tab = row
+            .iter()
+            .position(|b| *b == b'\t')
+            .ok_or(crate::i18n::text("backend-invalid-tree-record-bf9356"))?;
+        let metadata = std::str::from_utf8(&row[..tab])
+            .map_err(|_| crate::i18n::text("backend-invalid-tree-metadata-1d2e46"))?;
+        let fields: Vec<_> = metadata.split(' ').collect();
+        if fields.len() != 3 || !hash(fields[2]) {
+            return Err(crate::i18n::text("backend-invalid-tree-entry-8d7b6f").into());
+        }
+        let entry = Entry {
+            path: row[tab + 1..].to_vec(),
+            mode: fields[0].into(),
+            oid: fields[2].into(),
+        };
+        entries.insert(entry.path.clone(), entry);
+        if entries.len() > MAX_ROWS {
+            return Err(crate::i18n::text(
+                "backend-more-than-2-000-files-choose-a-narrower-folder-8c65ab",
+            )
+            .into());
+        }
+    }
+    Ok(entries)
+}
+pub(crate) fn blob(
+    repo: &Path,
+    entry: Option<&Entry>,
+    active: &dyn Fn() -> bool,
+) -> Result<Version, String> {
+    let Some(entry) = entry else {
+        return Ok(Version::missing());
+    };
+    if entry.mode == "160000" {
+        return Ok(Version {
+            mode: Some(entry.mode.clone()),
+            oid: Some(entry.oid.clone()),
+            bytes: crate::i18n::message(
+                "backend-submodule-commit-7c6bb2",
+                &[("oid", (entry.oid).to_string().into())],
+            )
+            .into_bytes(),
+            warning: None,
+        });
+    }
+    let size = run(
+        repo,
+        &["--no-lazy-fetch", "cat-file", "-s", &entry.oid],
+        active,
+    )?;
+    let size = std::str::from_utf8(&size)
+        .ok()
+        .and_then(|s| s.trim().parse::<usize>().ok())
+        .ok_or(crate::i18n::text("backend-invalid-blob-size-924b45"))?;
+    if size > FILE_LIMIT {
+        return Err(crate::i18n::text(
+            "backend-file-comparison-is-limited-to-2-mib-per-version-6a524d",
+        )
+        .into());
+    }
+    let bytes = run(
+        repo,
+        &["--no-lazy-fetch", "cat-file", "blob", &entry.oid],
+        active,
+    )?;
+    if bytes.len() != size {
+        return Err(
+            crate::i18n::text("backend-the-blob-could-not-be-read-completely-bad905").into(),
+        );
+    }
+    Ok(Version {
+        mode: Some(entry.mode.clone()),
+        oid: Some(entry.oid.clone()),
+        bytes,
+        warning: None,
+    })
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct Column {
+    pub label: String,
+    pub oid: String,
+    pub files: BTreeMap<Vec<u8>, Entry>,
+}
+#[derive(Clone, Debug)]
+pub(crate) struct Matrix {
+    pub columns: Vec<Column>,
+    pub paths: Vec<Vec<u8>>,
+}
+pub(crate) fn matrix(
+    repo: &Path,
+    branches: &[String],
+    folder: &str,
+    active: &dyn Fn() -> bool,
+) -> Result<Matrix, String> {
+    if !(2..=8).contains(&branches.len()) {
+        return Err(
+            crate::i18n::text("backend-choose-between-two-and-eight-branches-455163").into(),
+        );
+    }
+    if folder.starts_with('/') {
+        return Err(crate::i18n::text("backend-choose-a-repository-relative-folder-1fdb08").into());
+    }
+    let folder = folder.trim_end_matches('/');
+    let mut columns = Vec::new();
+    let mut paths = BTreeSet::new();
+    for branch in branches {
+        let oid = resolve(repo, branch, active)?;
+        let files = tree(repo, &oid, folder, active)?;
+        paths.extend(files.keys().cloned());
+        if paths.len() > MAX_ROWS {
+            return Err(crate::i18n::text(
+                "backend-more-than-2-000-distinct-paths-choose-a-narrower-folder-77a035",
+            )
+            .into());
+        }
+        columns.push(Column {
+            label: branch.clone(),
+            oid,
+            files,
+        });
+    }
+    Ok(Matrix {
+        columns,
+        paths: paths.into_iter().collect(),
+    })
+}
+
+pub(crate) fn raw_output(
+    repo: &Path,
+    args: &[&str],
+    active: &dyn Fn() -> bool,
+) -> Result<Vec<u8>, String> {
+    run(repo, args, active)
+}
+
+/// Bounded, filter-free local object read; None keeps the private CLI reader authoritative.
+pub(crate) fn native_blob(repo: &Path, spec: &str, limit: usize) -> Option<Result<Vec<u8>, ()>> {
+    super::backend::bounded_blob(repo, spec, limit)
+}
+pub(crate) fn raw_working(
+    repo: &Path,
+    path: &str,
+    active: &dyn Fn() -> bool,
+) -> Result<Version, String> {
+    lens::working(repo, path, active)
+}

@@ -1,0 +1,66 @@
+{
+  "commit": "661be4398e55117cad723ecb0962c6b86f1c1270",
+  "tree": "c97e26153d26d5b710b1c5aa074baff77745728c",
+  "binary": {
+    "name": "gitcraft",
+    "kind": [
+      "lib"
+    ],
+    "source": "src/lib.rs",
+    "executable": "/home/jonas/.t3/worktrees/gitcraft/t3-572729bb/target/debug/deps/gitcraft-47350705d36386f2",
+    "sha256": "12dff14767a4a395d94ac3858620629bcc88f748c72cab9ac654d278b677ded9"
+  },
+  "full_results_sha256": "f3f852c202d085704fdbd7b64521033dfb1199a4eb8a7653ed8e3c36f9c3d75f",
+  "runner_sha256": "825ed9f9530ccb607ed3a7843a112cafd65ba7c08b273b612d200f611a1a6e0d",
+  "matrices": [
+    {
+      "forgejo": "17.0.1",
+      "gitea": "28.3.0",
+      "exit": 0,
+      "command": [
+        "bwrap",
+        "--unshare-pid",
+        "--die-with-parent",
+        "--bind",
+        "/",
+        "/",
+        "--dev",
+        "/dev",
+        "--proc",
+        "/proc",
+        "--",
+        "bash",
+        "-c",
+        "set -eu\nmkdir -p /tmp/gitcraft-pr184-live-owned-vjyk4eol/forgejo-home /tmp/gitcraft-pr184-live-owned-vjyk4eol/gitea-home\nHOME=/tmp/gitcraft-pr184-live-owned-vjyk4eol/forgejo-home GIT_CONFIG_GLOBAL=/tmp/gitcraft-pr184-live-owned-vjyk4eol/forgejo.gitconfig ci/forge-server.sh forgejo 3000 /tmp/gitcraft-pr184-live-owned-vjyk4eol/forges.env\nHOME=/tmp/gitcraft-pr184-live-owned-vjyk4eol/gitea-home GIT_CONFIG_GLOBAL=/tmp/gitcraft-pr184-live-owned-vjyk4eol/gitea.gitconfig ci/forge-server.sh gitea 3001 /tmp/gitcraft-pr184-live-owned-vjyk4eol/forges.env\nset -a\n. /tmp/gitcraft-pr184-live-owned-vjyk4eol/forges.env\nset +a\n/home/jonas/.t3/worktrees/gitcraft/t3-572729bb/target/debug/deps/gitcraft-47350705d36386f2 forge::gitea::live --ignored --nocapture --test-threads=1\n"
+      ],
+      "log": "/tmp/gitcraft-pr184-live-matrix-2p1eyxv0/forgejo-17.0.1-gitea-28.3.0.log",
+      "sha256": "dd3d060bea9ec30b771c3a84a2dcf020ea5a3cc01ee4739fb0beb8b03fad7c0c",
+      "containment": "PID/proc/dev namespace; owned fresh server work directories; no existing process cleanup"
+    },
+    {
+      "forgejo": "15.0.11",
+      "gitea": "1.26.4",
+      "exit": 0,
+      "command": [
+        "bwrap",
+        "--unshare-pid",
+        "--die-with-parent",
+        "--bind",
+        "/",
+        "/",
+        "--dev",
+        "/dev",
+        "--proc",
+        "/proc",
+        "--",
+        "bash",
+        "-c",
+        "set -eu\nmkdir -p /tmp/gitcraft-pr184-live-owned-9fjhm314/forgejo-home /tmp/gitcraft-pr184-live-owned-9fjhm314/gitea-home\nHOME=/tmp/gitcraft-pr184-live-owned-9fjhm314/forgejo-home GIT_CONFIG_GLOBAL=/tmp/gitcraft-pr184-live-owned-9fjhm314/forgejo.gitconfig ci/forge-server.sh forgejo 3000 /tmp/gitcraft-pr184-live-owned-9fjhm314/forges.env\nHOME=/tmp/gitcraft-pr184-live-owned-9fjhm314/gitea-home GIT_CONFIG_GLOBAL=/tmp/gitcraft-pr184-live-owned-9fjhm314/gitea.gitconfig ci/forge-server.sh gitea 3001 /tmp/gitcraft-pr184-live-owned-9fjhm314/forges.env\nset -a\n. /tmp/gitcraft-pr184-live-owned-9fjhm314/forges.env\nset +a\n/home/jonas/.t3/worktrees/gitcraft/t3-572729bb/target/debug/deps/gitcraft-47350705d36386f2 forge::gitea::live --ignored --nocapture --test-threads=1\n"
+      ],
+      "log": "/tmp/gitcraft-pr184-live-matrix-2p1eyxv0/forgejo-15.0.11-gitea-1.26.4.log",
+      "sha256": "891960fc8572bac9c5df20e4470e83fc6b8efd49ef215ce680df444a7da7945b",
+      "containment": "PID/proc/dev namespace; owned fresh server work directories; no existing process cleanup"
+    }
+  ],
+  "status": "passed"
+}

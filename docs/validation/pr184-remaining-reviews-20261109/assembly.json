@@ -1,0 +1,88 @@
+{
+  "base": "a437a10af4c90a709a24ee7831a4fa7ca85a55ee",
+  "accepted": "cad719996254322bb453ca8d2a98db7478add6ae",
+  "accepted_tree": "cad977982c89d3662c7ea9ec05b49b38e105f539",
+  "branch": "fix/pr184-remaining-final-20261109",
+  "units": [
+    {
+      "title": "Warn about suspicious imported author rules",
+      "paths": [
+        "src/app/setup/mod.rs",
+        "src/app/setup/localization_tests.rs",
+        "locales/en-US/interaction.ftl",
+        "locales/de/interaction.ftl"
+      ],
+      "source": "cad719996254322bb453ca8d2a98db7478add6ae",
+      "provenance": [
+        "a6685c1f"
+      ],
+      "parent": "a437a10af4c90a709a24ee7831a4fa7ca85a55ee",
+      "commit": "db409f01a9b20411ffe8e3f4af3726cacb2ec808",
+      "tree": "cc7a422c8f8c39a229d3f4df5bf6e61cb6fa8898",
+      "remote": "db409f01a9b20411ffe8e3f4af3726cacb2ec808",
+      "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>"
+    },
+    {
+      "title": "Refuse changed stash selections before dispatch",
+      "paths": [
+        "src/repo/partial_stash/mod.rs",
+        "src/repo/partial_stash/tests.rs",
+        "locales/en-US/repo-workflows.ftl",
+        "locales/de/repo-workflows.ftl"
+      ],
+      "source": "cad719996254322bb453ca8d2a98db7478add6ae",
+      "provenance": [
+        "67d0f696"
+      ],
+      "parent": "db409f01a9b20411ffe8e3f4af3726cacb2ec808",
+      "commit": "10e8807bec94ec9f4f52b3a7685493cd1a438086",
+      "tree": "069f34eb783156894563cb20bd4699a11e036a8f",
+      "remote": "10e8807bec94ec9f4f52b3a7685493cd1a438086",
+      "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>"
+    },
+    {
+      "title": "Keep blame visible during refresh",
+      "paths": [
+        "src/repo/file_view/mod.rs",
+        "src/repo/file_view/blame.rs",
+        "src/repo/file_view/tests.rs",
+        "src/repo/messages.rs"
+      ],
+      "source": "51cfbabb06ff79feac2f8443453f667daf7d3d78",
+      "provenance": [
+        "51cfbabb"
+      ],
+      "parent": "10e8807bec94ec9f4f52b3a7685493cd1a438086",
+      "commit": "d6de84e4e0242f90007d3e4b3dd248ebd8d8cabd",
+      "tree": "a0ff012e5292d0b74968f3e02dca1871600d0c1f",
+      "remote": "d6de84e4e0242f90007d3e4b3dd248ebd8d8cabd",
+      "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>"
+    },
+    {
+      "title": "Refresh line history from pinned relevant inputs",
+      "paths": [
+        "src/git/line_log.rs",
+        "src/git/mod.rs",
+        "src/repo/file_view/mod.rs",
+        "src/repo/file_view/line_history.rs",
+        "src/repo/file_view/tests.rs",
+        "src/repo/line_history_tests.rs",
+        "src/repo/messages.rs"
+      ],
+      "source": "cad719996254322bb453ca8d2a98db7478add6ae",
+      "provenance": [
+        "9c89f3e0",
+        "61d26f04",
+        "cad719996254322bb453ca8d2a98db7478add6ae"
+      ],
+      "parent": "d6de84e4e0242f90007d3e4b3dd248ebd8d8cabd",
+      "commit": "96584b3a69234822ca9f8c299ec13e32929ac2a0",
+      "tree": "cad977982c89d3662c7ea9ec05b49b38e105f539",
+      "remote": "96584b3a69234822ca9f8c299ec13e32929ac2a0",
+      "author": "Jonas Kamsker <11245306+JKamsker@users.noreply.github.com>"
+    }
+  ],
+  "final": "96584b3a69234822ca9f8c299ec13e32929ac2a0",
+  "exact_tree_match": true,
+  "complete_path_mode_blob_map_sha256": "16751c0a998ade6088cabf0d7e1244ac6499614cd95524556d6b11c2a33cf349"
+}

@@ -14,7 +14,7 @@ pub fn parse(text: &str) -> Vec<DiffLine> {
     // Not `lines()`: a `\r` before the newline belongs to the file's line.
     for line in text.split_terminator('\n') {
         if out.len() >= MAX_LINES {
-            out.push(meta("… diff truncated"));
+            out.push(meta(crate::i18n::text("repo-core-1944")));
             break;
         }
         if line.starts_with("@@") {
@@ -106,7 +106,7 @@ pub(super) fn meta(text: &str) -> DiffLine {
 /// Everything before the first hunk of a one-file patch, each line ending in `\n`. A mode
 /// change is left out: picking some lines shouldn't also stage, unstage or throw away a
 /// `chmod`.
-pub(super) fn patch_header(text: &str) -> String {
+pub(in crate::repo) fn patch_header(text: &str) -> String {
     let mut header = String::new();
     for line in text.split_terminator('\n') {
         if line.starts_with("@@") {
@@ -120,6 +120,14 @@ pub(super) fn patch_header(text: &str) -> String {
     }
     // No hunk at all (binary, mode change only): nothing to pick from.
     String::new()
+}
+
+/// Whether the diff adds the file: git says so before the first hunk (`new file mode`, or the
+/// old side is `/dev/null` for an untracked file compared with `--no-index`).
+pub(super) fn is_new_file(text: &str) -> bool {
+    text.split_terminator('\n')
+        .take_while(|l| !l.starts_with("@@"))
+        .any(|l| l.starts_with("new file mode ") || l.trim_end() == "--- /dev/null")
 }
 
 /// `@@ -12,5 +14,7 @@` → (11, 13): the numbers before the first line of the hunk.

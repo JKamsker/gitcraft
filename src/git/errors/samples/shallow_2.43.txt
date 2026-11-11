@@ -1,0 +1,3 @@
+To ../empty.git
+ ! [remote rejected] HEAD -> main (shallow update not allowed)
+error: failed to push some refs to '../empty.git'

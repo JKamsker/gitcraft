@@ -23,12 +23,12 @@ impl RepoTab {
             Header {
                 key: "stashes",
                 icon: "archive",
-                title: "STASHES",
+                title: crate::i18n::text("repo-core-3503"),
                 count: self.stashes.len(),
                 default_open: true,
                 button: Some(Button {
                     icon: "plus",
-                    tooltip: "Stash changes…",
+                    tooltip: crate::i18n::text("repo-core-0054"),
                     action: can_stash.then(|| Action::Dialog(Dialog::stash())),
                 }),
             },
@@ -45,6 +45,11 @@ impl RepoTab {
                 rect,
                 ui.id().with(("stash-row", &stash.hash)),
                 Sense::click(),
+            );
+            crate::repo::widgets::a11y_selected(
+                &r,
+                || crate::a11y::labels::stash(&stash.name, &stash.message),
+                self.stash_view == Some(i),
             );
             if self.stash_view == Some(i) {
                 ui.painter().rect_filled(rect, 0.0, t.row_selected);
@@ -77,7 +82,7 @@ impl RepoTab {
             if r.clicked() {
                 acts.push(Action::SelectStash(i));
             }
-            egui::Popup::context_menu(&r)
+            crate::menu_item::context(&r)
                 .style(crate::theme::menu_style)
                 .show(|ui| stash_menu(ui, acts, stash, idle));
         }
@@ -130,9 +135,11 @@ fn menu(
     idle: bool,
     steps: impl Fn(StashOp) -> Vec<Vec<String>>,
 ) {
-    if ui
-        .add_enabled(idle, egui::Button::new("Apply"))
-        .on_hover_text("Bring the changes back and keep the stash")
+    if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-0872"))
+        .icon("check")
+        .enabled(idle)
+        .show(ui)
+        .on_hover_text(crate::i18n::text("repo-core-3509"))
         .clicked()
     {
         acts.push(Action::Ops {
@@ -141,9 +148,11 @@ fn menu(
             refresh: Refresh::All,
         });
     }
-    if ui
-        .add_enabled(idle, egui::Button::new("Pop"))
-        .on_hover_text("Bring the changes back and drop the stash")
+    if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-0871"))
+        .icon("check")
+        .enabled(idle)
+        .show(ui)
+        .on_hover_text(crate::i18n::text("repo-core-3511"))
         .clicked()
     {
         acts.push(Action::Ops {
@@ -153,11 +162,16 @@ fn menu(
         });
     }
     ui.separator();
-    if ui.add_enabled(idle, egui::Button::new("Drop…")).clicked() {
+    if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-3513"))
+        .icon("minus")
+        .enabled(idle)
+        .show(ui)
+        .clicked()
+    {
         acts.push(Action::Dialog(Dialog::confirm(
             "Drop stash",
-            format!("Delete {name}? Its changes are gone for good."),
-            "Drop",
+            crate::i18n::message("repo-core-3515", &[("name", name.to_string().into())]),
+            crate::i18n::text("repo-core-3197"),
             steps(StashOp::Drop),
             None,
         )));

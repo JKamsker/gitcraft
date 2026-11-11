@@ -1,0 +1,45 @@
+[package]
+name = "gitcraft-os"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.95"
+license = "MIT OR Apache-2.0"
+description = "The few calls into the OS shell gitcraft makes (taskbar progress, jump list), behind a safe API"
+publish = false
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+# gitcraft itself forbids unsafe code; the COM calls those features need live here, each one
+# behind a function that can't be misused.
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62", features = [
+    "Win32_Foundation",
+    "Wdk_Foundation",
+    "Wdk_Storage_FileSystem",
+    "Win32_Security",
+    "Win32_Security_Authorization",
+    "Win32_Security_Cryptography",
+    "Win32_System_JobObjects",
+    "Win32_System_IO",
+    "Win32_System_Threading",
+    "Win32_System_Diagnostics_ToolHelp",
+    "Win32_System_Com",
+    "Win32_System_Com_StructuredStorage",
+    "Win32_System_Variant",
+    "Win32_Storage_EnhancedStorage",
+    "Win32_Storage_FileSystem",
+    "Win32_UI_Shell",
+    "Win32_UI_Shell_Common",
+    "Win32_UI_Shell_PropertiesSystem",
+] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSObject", "NSString", "NSAppleEventDescriptor", "NSAppleEventManager"] }
+winit = { version = "0.30.13", default-features = false }
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSApplication", "NSDockTile", "NSMenu", "NSMenuItem", "NSView", "NSImage", "NSImageView", "NSProgressIndicator", "NSControl", "NSResponder", "NSCell"] }
+
+[build-dependencies]
+cc = "1"

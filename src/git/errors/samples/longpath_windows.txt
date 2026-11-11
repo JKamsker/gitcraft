@@ -1,0 +1,6 @@
+Cloning into 'project'...
+error: unable to create file node_modules/some-package/lib/very/deep/folder/structure/file.js: Filename too long
+fatal: unable to checkout working tree
+warning: Clone succeeded, but checkout failed.
+You can inspect what was checked out with 'git status'
+and retry with 'git restore --source=HEAD :/'

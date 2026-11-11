@@ -1,0 +1,49 @@
+{
+  "historical_delivery": "e65df5b173f6d755e9a1911e5015b6f11cce8587",
+  "historical_tree": "50000535bca1422a4e4287d6fe10df32c026c645",
+  "accepted_corrections": "2ad1d508592607f69aa50cd00eb2305afc389a01",
+  "accepted_tree": "b834f22c9d6dbe522df2edc077681be4a5e1b556",
+  "source_head": "d91a92251711278bd0e275c840e46a2c474a9f75",
+  "source_tree": "8badb88fdec2ed3761a3c0101c69b018f2a7a319",
+  "exact_application_delta": [
+    "src/repo/diff/presentation.rs",
+    "src/repo/diff/presentation/layout_regressions.rs",
+    "src/repo/diff/rows.rs",
+    "src/repo/diff/view.rs",
+    "src/resolver/park.rs",
+    "src/resolver/park/checks/discovery.rs",
+    "src/resolver/park/checks/regressions.rs",
+    "src/resolver/park/discovery.rs",
+    "src/resolver/park/journal.rs"
+  ],
+  "sha256": {
+    "src/repo/diff/presentation.rs": "80911e336296971a8362c833b6ed3ecbc952d8cb74013d721bb883da21ebbba6",
+    "src/repo/diff/presentation/layout_regressions.rs": "f9391fb3f6bf9b391109002f8cd03e468a75e425456224cdad61c5025d308d95",
+    "src/repo/diff/rows.rs": "b13654a3daf6cfe5de39ea5c8afcbe3ff702b6056b6c6c4bb33bb2bd422b0ecf",
+    "src/repo/diff/view.rs": "c5d01c5464b5a41d46307764d35c09cc153bd919762e555601c24bca7ae6294f",
+    "src/resolver/park.rs": "3b644cb2c7f81976a47f2c65d7e9b7b25b102529658a5ff9403655572f8c36fa",
+    "src/resolver/park/checks/discovery.rs": "c7bb01628b8b096364873102f05aac7716b2a560ee7d4c3d97e1746ff955afa3",
+    "src/resolver/park/checks/regressions.rs": "32153a3954d3bb4e4d9ca58dc5517b875bd3e9ace3390b185a5dcc279cd304f4",
+    "src/resolver/park/discovery.rs": "bcb9ab88a0306585eb8aa2a1f7fa4f25c13fcda9a45cb7c0660619f97d8126da",
+    "src/resolver/park/journal.rs": "0cb170a6d6b0e9d6d9340c1fcc94d03a8155192a704a535cf581b8f2dc58a4c0"
+  },
+  "outside_delta_identical": true,
+  "historical_source_proof_remains_historical": true,
+  "full_runtime_success": false,
+  "accepted_sha256": {
+    "src/repo/diff/presentation.rs": "80911e336296971a8362c833b6ed3ecbc952d8cb74013d721bb883da21ebbba6",
+    "src/repo/diff/presentation/layout_regressions.rs": "b6bf130c5142a1ba6ebb427d5649f5f93993bb260524bd1ae6d8461ad94aedc5",
+    "src/repo/diff/rows.rs": "b13654a3daf6cfe5de39ea5c8afcbe3ff702b6056b6c6c4bb33bb2bd422b0ecf",
+    "src/repo/diff/view.rs": "54813492de4da49223a8adc00212bccb744c767e2c2bd019a9ee5ad106ad3831",
+    "src/resolver/park.rs": "3b644cb2c7f81976a47f2c65d7e9b7b25b102529658a5ff9403655572f8c36fa",
+    "src/resolver/park/checks/discovery.rs": "c7bb01628b8b096364873102f05aac7716b2a560ee7d4c3d97e1746ff955afa3",
+    "src/resolver/park/checks/regressions.rs": "32153a3954d3bb4e4d9ca58dc5517b875bd3e9ace3390b185a5dcc279cd304f4",
+    "src/resolver/park/discovery.rs": "bcb9ab88a0306585eb8aa2a1f7fa4f25c13fcda9a45cb7c0660619f97d8126da",
+    "src/resolver/park/journal.rs": "0cb170a6d6b0e9d6d9340c1fcc94d03a8155192a704a535cf581b8f2dc58a4c0"
+  },
+  "additional_delta_from_accepted": [
+    "src/repo/diff/view.rs",
+    "src/repo/diff/presentation/layout_regressions.rs"
+  ],
+  "compile_fix": "Capture layout_changed before mutating find; regression test propagates missing fixture row through Result instead of denied unwrap."
+}

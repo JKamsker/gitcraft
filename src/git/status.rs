@@ -37,11 +37,22 @@ pub enum InProgress {
 impl InProgress {
     pub fn label(self) -> &'static str {
         match self {
-            InProgress::Merge => "Merge",
-            InProgress::CherryPick => "Cherry-pick",
-            InProgress::Revert => "Revert",
-            InProgress::Rebase => "Rebase",
-            InProgress::Am => "Patch",
+            InProgress::Merge => crate::i18n::text("backend-in-progress-merge"),
+            InProgress::CherryPick => crate::i18n::text("backend-in-progress-cherry-pick"),
+            InProgress::Revert => crate::i18n::text("backend-in-progress-revert"),
+            InProgress::Rebase => crate::i18n::text("backend-in-progress-rebase"),
+            InProgress::Am => crate::i18n::text("backend-in-progress-patch"),
+        }
+    }
+
+    /// Stable operation name for raw diagnostics parsed by presentation adapters.
+    pub(crate) fn raw_label(self) -> &'static str {
+        match self {
+            Self::Merge => "Merge",
+            Self::CherryPick => "Cherry-pick",
+            Self::Revert => "Revert",
+            Self::Rebase => "Rebase",
+            Self::Am => "Patch",
         }
     }
 
@@ -96,7 +107,7 @@ pub fn status(repo: &Path) -> Result<WorkStatus, String> {
         &["status", "--porcelain=v1", "-z", "--untracked-files=all"],
     )?;
     let mut status = parse_status(&out);
-    status.in_progress = in_progress(repo);
+    status.in_progress = in_progress(repo)?;
     if status.in_progress.is_some() {
         status.prepared_message = prepared_message(repo);
     }
@@ -104,34 +115,107 @@ pub fn status(repo: &Path) -> Result<WorkStatus, String> {
 }
 
 /// The operation git left half done in `repo`, if any.
-fn in_progress(repo: &Path) -> Option<InProgress> {
+/// Fails when that couldn't be asked (a repository on another machine not reached): no
+/// operation in progress would be an answer, and a wrong one.
+pub fn in_progress(repo: &Path) -> Result<Option<InProgress>, String> {
+    if let Some(target) = crate::remote::parse(repo) {
+        return in_progress_there(&target);
+    }
+    let asked = |e: std::io::Error| {
+        crate::i18n::message(
+            "backend-could-not-read-the-repository-s-state-e-f9a978",
+            &[("detail", (e).to_string().into())],
+        )
+    };
+    // Ask git once for the private worktree directory. In particular, a linked worktree's
+    // operation markers do not live in the shared git directory.
+    let directory = super::backend::dispatch(
+        repo,
+        super::backend::Read::GitDir,
+        super::backend::git_dir,
+        || {
+            run(Some(repo), &["rev-parse", "--absolute-git-dir"]).map(|directory| {
+                std::path::PathBuf::from(directory.strip_suffix('\n').unwrap_or(&directory))
+            })
+        },
+    )?;
     for dir in ["rebase-merge", "rebase-apply"] {
-        if let Ok(path) = run(Some(repo), &["rev-parse", "--git-path", dir])
-            && repo.join(path.trim()).is_dir()
-        {
+        let state = directory.join(dir);
+        if crate::remote::try_is_dir(&state).map_err(asked)? {
             // `git am` keeps its state there too, marked by this file.
-            let am = repo.join(path.trim()).join("applying").is_file();
-            return Some(if am {
+            let am = crate::remote::try_is_file(&state.join("applying")).map_err(asked)?;
+            return Ok(Some(if am {
                 InProgress::Am
             } else {
                 InProgress::Rebase
-            });
+            }));
         }
     }
-    [
+    for (state, head) in [
         (InProgress::Merge, "MERGE_HEAD"),
         (InProgress::CherryPick, "CHERRY_PICK_HEAD"),
         (InProgress::Revert, "REVERT_HEAD"),
-    ]
-    .into_iter()
-    .find(|(_, head)| run(Some(repo), &["rev-parse", "-q", "--verify", head]).is_ok())
-    .map(|(state, _)| state)
+    ] {
+        // Keep git's validation of present markers (an empty or malformed file is not an
+        // operation), but avoid spawning git to check each missing marker on every refresh.
+        if crate::remote::try_is_file(&directory.join(head)).map_err(asked)?
+            && run(Some(repo), &["rev-parse", "-q", "--verify", head]).is_ok()
+        {
+            return Ok(Some(state));
+        }
+    }
+    Ok(None)
+}
+
+/// [`in_progress`] for a repository on another machine: asked there in one go, not in six
+/// round trips on every read of the status.
+fn in_progress_there(target: &crate::remote::Target) -> Result<Option<InProgress>, String> {
+    // Its git folder as git names it: relative to here, or absolute (`--absolute-git-dir`
+    // is git 2.13+).
+    const SCRIPT: &str = concat!(
+        "g=$(git rev-parse --git-dir) || exit 1\n",
+        "for d in rebase-merge rebase-apply; do\n",
+        "  if [ -d \"$g/$d\" ]; then\n",
+        "    if [ -f \"$g/$d/applying\" ]; then echo am; else echo rebase; fi; exit 0\n",
+        "  fi\n",
+        "done\n",
+        "for h in MERGE_HEAD CHERRY_PICK_HEAD REVERT_HEAD; do\n",
+        "  git rev-parse -q --verify \"$h\" >/dev/null && { echo \"$h\"; exit 0; }\n",
+        "done\n",
+        "echo none\n",
+    );
+    let out = crate::remote::exec(
+        &target.host,
+        &crate::remote::Request {
+            cwd: Some(target.path.clone()),
+            script: SCRIPT.to_owned(),
+            ..crate::remote::Request::default()
+        },
+    )?;
+    let said = String::from_utf8_lossy(&out.stdout);
+    match (out.code, said.trim()) {
+        (0, "am") => Ok(Some(InProgress::Am)),
+        (0, "rebase") => Ok(Some(InProgress::Rebase)),
+        (0, "MERGE_HEAD") => Ok(Some(InProgress::Merge)),
+        (0, "CHERRY_PICK_HEAD") => Ok(Some(InProgress::CherryPick)),
+        (0, "REVERT_HEAD") => Ok(Some(InProgress::Revert)),
+        (0, "none") => Ok(None),
+        _ => Err(crate::i18n::message(
+            "backend-could-not-read-the-repository-s-state-4bd015",
+            &[(
+                "from_utf8_lossy",
+                (String::from_utf8_lossy(&out.stderr).trim())
+                    .to_string()
+                    .into(),
+            )],
+        )),
+    }
 }
 
 /// The message git prepared for the commit that ends the operation in progress.
 fn prepared_message(repo: &Path) -> Option<String> {
     let path = run(Some(repo), &["rev-parse", "--git-path", "MERGE_MSG"]).ok()?;
-    let message = std::fs::read_to_string(repo.join(path.trim())).ok()?;
+    let message = crate::remote::read_to_string(&crate::remote::resolve(repo, path.trim())).ok()?;
     // Drop git's `#` comment lines.
     Some(
         message
@@ -188,6 +272,48 @@ pub(super) fn parse_status(out: &str) -> WorkStatus {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn operation_markers_are_private_to_each_worktree_and_validated() -> Result<(), String> {
+        let repo = crate::git::fixture::Repo::new("state-private")?;
+        let head = repo.commit("initial", &[("file", Some("text"))])?;
+        let linked = repo.dir.join("linked worktree ü");
+        repo.git(&[
+            "worktree",
+            "add",
+            "--detach",
+            &linked.to_string_lossy(),
+            "HEAD",
+        ])?;
+        let git_dir = run(Some(&linked), &["rev-parse", "--absolute-git-dir"])?;
+        let git_dir = Path::new(git_dir.trim_end_matches('\n'));
+        assert_eq!(in_progress(repo.path())?, None);
+        assert_eq!(in_progress(&linked)?, None);
+        for (marker, state) in [
+            ("MERGE_HEAD", InProgress::Merge),
+            ("CHERRY_PICK_HEAD", InProgress::CherryPick),
+            ("REVERT_HEAD", InProgress::Revert),
+        ] {
+            std::fs::write(git_dir.join(marker), "").map_err(|e| e.to_string())?;
+            assert_eq!(in_progress(&linked)?, None);
+            std::fs::write(git_dir.join(marker), "invalid\n").map_err(|e| e.to_string())?;
+            assert_eq!(in_progress(&linked)?, None);
+            std::fs::write(git_dir.join(marker), format!("{head}\n")).map_err(|e| e.to_string())?;
+            assert_eq!(in_progress(&linked)?, Some(state));
+            assert_eq!(in_progress(repo.path())?, None);
+            std::fs::remove_file(git_dir.join(marker)).map_err(|e| e.to_string())?;
+        }
+        for name in ["rebase-merge", "rebase-apply"] {
+            let dir = git_dir.join(name);
+            std::fs::create_dir(&dir).map_err(|e| e.to_string())?;
+            assert_eq!(in_progress(&linked)?, Some(InProgress::Rebase));
+            std::fs::write(dir.join("applying"), "").map_err(|e| e.to_string())?;
+            assert_eq!(in_progress(&linked)?, Some(InProgress::Am));
+            assert_eq!(in_progress(repo.path())?, None);
+            std::fs::remove_dir_all(dir).map_err(|e| e.to_string())?;
+        }
+        Ok(())
+    }
 
     #[test]
     fn status_sides_renames_and_conflicts() {

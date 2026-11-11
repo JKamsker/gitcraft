@@ -1,0 +1,41 @@
+diff --git a/src/repo/diff/presentation/layout_regressions.rs b/src/repo/diff/presentation/layout_regressions.rs
+index ce2179ca..797a8de3 100644
+--- a/src/repo/diff/presentation/layout_regressions.rs
++++ b/src/repo/diff/presentation/layout_regressions.rs
+@@ -35,11 +35,11 @@ fn unchanged_scroll_reflow_refreshes_production_target_and_all_patches() -> Resu
+                         let after_font = egui::FontId::monospace(if change == "font" { 6.0 } else { 12.0 });
+                         let after = after_wrap.then(|| wrap::geometry(ui, &data, after_split, after_width, &after_font));
+                         let header = |split, g: Option<&std::sync::Arc<wrap::Geometry>>| {
+-                            let row = DisplayRows::new(&data, split).row_of(4).unwrap();
+-                            g.map_or(row as f32 * super::super::LINE_H, |g| g.at(row))
++                            let row = DisplayRows::new(&data, split).row_of(4).ok_or("missing fixture header row")?;
++                            Ok::<f32, String>(g.map_or(row as f32 * super::super::LINE_H, |g| g.at(row)))
+                         };
+-                        let old_y = header(split, before.as_ref());
+-                        let new_y = header(after_split, after.as_ref());
++                        let old_y = header(split, before.as_ref())?;
++                        let new_y = header(after_split, after.as_ref())?;
+                         // Keep the physical offset fixed across both owner transitions.
+                         let offset = if wrapped && change == "width" { 500.0 } else if wrapped && old_y > new_y + 120.0 { (old_y + new_y) / 2.0 } else { new_y + 5.0 };
+                         if wrapped && old_y > new_y + 120.0 {
+diff --git a/src/repo/diff/view.rs b/src/repo/diff/view.rs
+index bc488a50..69eed997 100644
+--- a/src/repo/diff/view.rs
++++ b/src/repo/diff/view.rs
+@@ -391,6 +391,7 @@ impl RepoTab {
+         let (clicked, offset, jumped, seen) = (rows.clicked, rows.offset, rows.jumped, rows.seen);
+         let wrap_offsets = rows.geometry.as_ref().map(|g| g.offsets.clone());
+         let viewport_height = rows.viewport_height;
++        let layout_changed = rows.layout_changed;
+         self.find.saw(seen);
+         let focused_line = clicked.or(sel.filter(|_| text_started).map(|s| s.cursor.0));
+         let hunk = super::presentation::keyboard_target(
+@@ -400,7 +401,7 @@ impl RepoTab {
+             wrap_offsets.as_deref().map(Vec::as_slice),
+             offset..offset + viewport_height,
+             focused_line,
+-            (view.scroll - offset).abs() > 0.5 || jumped.is_some() || rows.layout_changed,
++            (view.scroll - offset).abs() > 0.5 || jumped.is_some() || layout_changed,
+         );
+ 
+         if let Some(view) = &mut self.diff {

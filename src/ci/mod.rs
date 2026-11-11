@@ -1,8 +1,11 @@
 //! CI/CD through the forges' tools: the build status of commits, and the runs (GitHub Actions)
 //! or pipelines (GitLab CI) of one commit with their jobs and steps.
 
+pub(crate) mod deployments;
 pub(crate) mod github;
 pub(crate) mod gitlab;
+pub(crate) mod route;
+pub(crate) mod timing;
 
 use std::collections::HashMap;
 use std::path::Path;
@@ -11,8 +14,8 @@ use crate::forge::{self, Forge};
 use crate::git::Remote;
 pub use crate::pull_request::{Check, CheckState};
 
-/// The repository on its forge whose builds are read: from `origin` (or the first remote).
-#[derive(Clone, Debug, PartialEq, Eq)]
+/// A repository on its forge whose builds are read.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Project {
     pub forge: Forge,
     pub host: String,
@@ -21,12 +24,31 @@ pub struct Project {
 }
 
 impl Project {
+    fn hosting(&self) -> forge::Hosting {
+        forge::Hosting {
+            forge: self.forge,
+            host: self.host.split(':').next().unwrap_or(&self.host).to_owned(),
+            path: self.path.clone(),
+            web: format!("https://{}", self.host),
+        }
+    }
+    /// The repository's main project: that of `origin` (or the first remote).
     pub fn of(forge: Forge, remotes: &[Remote]) -> Option<Self> {
         let remote = remotes
             .iter()
             .find(|r| r.name == "origin")
             .or_else(|| remotes.first())?;
-        let (host, path) = forge::location(&remote.url)?;
+        Self::of_remote(forge, remote)
+    }
+
+    /// The project `remote` points at, on `forge`.
+    pub fn of_remote(forge: Forge, remote: &Remote) -> Option<Self> {
+        // Builds are read through `gh` and `glab`; Forgejo's and Gitea's aren't yet.
+        if !matches!(forge, Forge::GitHub | Forge::GitLab) {
+            return None;
+        }
+        // GitLab's host with the port of an `http(s)` remote: its API is on it.
+        let (host, path) = forge::tool_location(forge, &remote.url)?;
         // Both go into the tools' arguments and the API's paths as they are.
         let plain = |text: &str, extra: char| {
             !text.is_empty()
@@ -136,6 +158,7 @@ pub fn statuses(
     match project.forge {
         Forge::GitHub => github::statuses(repo, project, &shas),
         Forge::GitLab => gitlab::statuses(repo, project, &shas),
+        Forge::Forgejo | Forge::Gitea | Forge::Azure | Forge::Bitbucket => Ok(HashMap::new()),
     }
 }
 
@@ -147,6 +170,9 @@ pub fn runs(repo: &Path, project: &Project, sha: &str) -> Result<Vec<Run>, Strin
     match project.forge {
         Forge::GitHub => github::runs(repo, project, sha),
         Forge::GitLab => gitlab::runs(repo, project, sha),
+        Forge::Forgejo | Forge::Gitea | Forge::Azure | Forge::Bitbucket => {
+            Err(no_builds(project.forge))
+        }
     }
 }
 
@@ -155,6 +181,9 @@ pub fn jobs(repo: &Path, project: &Project, run: u64) -> Result<Vec<Job>, String
     match project.forge {
         Forge::GitHub => github::jobs(repo, project, run),
         Forge::GitLab => gitlab::jobs(repo, project, run),
+        Forge::Forgejo | Forge::Gitea | Forge::Azure | Forge::Bitbucket => {
+            Err(no_builds(project.forge))
+        }
     }
 }
 
@@ -163,6 +192,9 @@ pub fn rerun_failed(repo: &Path, project: &Project, run: u64) -> Result<(), Stri
     match project.forge {
         Forge::GitHub => github::rerun_failed(repo, project, run),
         Forge::GitLab => gitlab::retry(repo, project, run),
+        Forge::Forgejo | Forge::Gitea | Forge::Azure | Forge::Bitbucket => {
+            Err(no_builds(project.forge))
+        }
     }
 }
 
@@ -171,6 +203,9 @@ pub fn cancel(repo: &Path, project: &Project, run: u64) -> Result<(), String> {
     match project.forge {
         Forge::GitHub => github::cancel(repo, project, run),
         Forge::GitLab => gitlab::cancel(repo, project, run),
+        Forge::Forgejo | Forge::Gitea | Forge::Azure | Forge::Bitbucket => {
+            Err(no_builds(project.forge))
+        }
     }
 }
 
@@ -184,8 +219,16 @@ pub fn failed_log(
     let log = match project.forge {
         Forge::GitHub => github::failed_log(repo, project, run)?,
         Forge::GitLab => gitlab::failed_log(repo, project, jobs)?,
+        Forge::Forgejo | Forge::Gitea | Forge::Azure | Forge::Bitbucket => {
+            return Err(no_builds(project.forge));
+        }
     };
     Ok(plain_text(&log))
+}
+
+/// What is said for a forge whose builds gitcraft doesn't read.
+fn no_builds(forge: Forge) -> String {
+    format!("gitcraft doesn't read the builds of {} yet", forge.name())
 }
 
 /// So much of the end of a log is kept: where it failed is at the end.
@@ -347,6 +390,26 @@ mod tests {
         let project = Project::of(Forge::GitHub, &remotes);
         assert_eq!(project.map(|p| p.path), Some("o/r".to_owned()));
         assert_eq!(Project::of(Forge::GitHub, &[]), None);
+    }
+
+    /// A self-hosted GitLab on a port of its own has its API there; an SSH port isn't a web one.
+    #[test]
+    fn a_gitlab_project_keeps_the_port_of_its_web_pages() {
+        let host = |url: &str| {
+            let remotes = [Remote {
+                name: "origin".into(),
+                url: url.into(),
+            }];
+            Project::of(Forge::GitLab, &remotes).map(|p| p.host)
+        };
+        assert_eq!(
+            host("https://git.example.org:8443/team/app.git").as_deref(),
+            Some("git.example.org:8443")
+        );
+        assert_eq!(
+            host("ssh://git@git.example.org:2222/team/app.git").as_deref(),
+            Some("git.example.org")
+        );
     }
 
     #[test]

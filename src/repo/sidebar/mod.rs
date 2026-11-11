@@ -1,9 +1,10 @@
 //! Left pane: local branches, remotes and their branches, worktrees, submodules, stashes, pull
 //! requests, tags.
 
-mod branch_delete;
+pub(super) mod branch_delete;
 mod branches;
 mod pull_requests;
+mod recovery;
 mod remotes;
 mod stashes;
 mod submodules;
@@ -13,12 +14,15 @@ mod worktrees;
 
 use egui::{Sense, Ui, vec2};
 
+use super::branch_order::BranchOrder;
 use super::pinned_sections::{Sections, bottom_gap};
 use super::{Action, RepoTab, widgets};
+use crate::a11y::Named;
 use crate::git::Branch;
 use crate::icons;
 use crate::theme::Tokens;
 
+pub(super) use branch_delete::delete_many;
 pub(super) use remotes::{remote_of, remote_short};
 // For the stash menu of the graph and the detail pane, and the banner's Pop and Apply: by the
 // stash itself, not its number, which moves.
@@ -32,7 +36,9 @@ const REMOTE_INDENT: f32 = 18.0;
 impl RepoTab {
     pub(super) fn sidebar(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
         let t = Tokens::get(ui.ctx());
-        widgets::panel_header(ui, "Branches", |_| {});
+        widgets::panel_header(ui, crate::i18n::text("repo-core-1094"), |ui| {
+            self.branch_header_buttons(ui, acts)
+        });
         // Sized like the commit search bar (Ctrl+F).
         ui.add_space(8.0);
         ui.horizontal(|ui| {
@@ -40,7 +46,7 @@ impl RepoTab {
             icons::inline(ui, "search", 15.0, t.text_faint);
             let filter = ui.add(
                 egui::TextEdit::singleline(&mut self.branch_filter)
-                    .hint_text("Filter branches and tags")
+                    .hint_text(crate::i18n::text("repo-core-3424"))
                     .desired_width(ui.available_width() - 10.0)
                     .margin(egui::Margin::symmetric(8, 4)),
             );
@@ -52,7 +58,7 @@ impl RepoTab {
         self.visibility_counter(ui, acts);
 
         let filter = self.branch_filter.to_lowercase();
-        let idle = self.busy_op.is_none();
+        let idle = self.busy_op.is_none() && !self.snapshot_pending();
 
         let mut scroll = egui::ScrollArea::vertical()
             .id_salt("branches")
@@ -72,13 +78,17 @@ impl RepoTab {
         let pane_h = ui.available_height();
         let gap = bottom_gap(pane_h, content_h);
         let output = scroll.show(ui, |ui| {
+            self.drag_auto_scroll(ui);
             ui.spacing_mut().item_spacing.y = 0.0;
             self.local_section(ui, acts, idle, &filter, &mut sections);
+            self.stack_section(ui, acts, idle, &filter, &mut sections);
             self.remotes_section(ui, acts, idle, &filter, &mut sections);
             ui.add_space(gap);
             self.worktree_section(ui, acts, idle, &mut sections);
+            self.agent_section(ui, acts, idle, &mut sections);
             self.submodule_section(ui, acts, idle, &mut sections);
             self.stash_section(ui, acts, idle, &mut sections);
+            self.recovery_section(ui, acts, &mut sections);
             self.pr_section(ui, acts, idle, &mut sections);
             self.tags_section(ui, acts, idle, &filter, &mut sections);
         });
@@ -100,13 +110,52 @@ impl RepoTab {
         self.sidebar_jump = jump;
     }
 
+    /// _Select stale or merged branches…_, and how the local branches are sorted.
+    fn branch_header_buttons(&self, ui: &mut Ui, acts: &mut Vec<Action>) {
+        let idle = self.busy_op.is_none() && !self.snapshot_pending();
+        let clean = ui.add_enabled_ui(idle, |ui| {
+            icons::small_button(ui, "brush", crate::i18n::text("repo-core-0071"))
+        });
+        let clean = clean
+            .inner
+            .on_disabled_hover_text(crate::i18n::text("repo-core-3429"));
+        if clean.clicked() {
+            acts.push(Action::SelectStaleBranches);
+        }
+        let mut order = BranchOrder::load(ui.ctx(), self.repo_key());
+        let on = usize::from(order.by_date);
+        let sort = ui.scope(|ui| {
+            widgets::switch(
+                ui,
+                &[
+                    crate::i18n::text("repo-core-1061"),
+                    crate::i18n::text("repo-core-3430"),
+                ],
+                on,
+            )
+        });
+        sort.response
+            .on_hover_text(crate::i18n::text("repo-core-3431"));
+        if let Some(picked) = sort.inner {
+            order.by_date = picked == 1;
+            order.store(ui.ctx(), self.repo_key());
+        }
+    }
+
     /// The folded sidebar: a button for the filter and one for each section, about where they
-    /// are when it is open. Each opens it there. Its outer edge belongs at `outer_edge`.
-    pub(super) fn folded_sidebar(&self, ui: &mut Ui, outer_edge: f32, acts: &mut Vec<Action>) {
+    /// are when it is open. Each opens it there. Its outer edge belongs at `outer_edge`; the
+    /// bottom `below` points of the strip are the app's buttons' (see `app_buttons`).
+    pub(super) fn folded_sidebar(
+        &self,
+        ui: &mut Ui,
+        outer_edge: f32,
+        below: f32,
+        acts: &mut Vec<Action>,
+    ) {
         let t = Tokens::get(ui.ctx());
         let slid = widgets::slide_offset(ui, outer_edge, false);
-        // Above the footer, which `max_rect` still includes.
-        let bottom = ui.available_rect_before_wrap().bottom();
+        // Above the footer, which `max_rect` still includes, and the app's buttons.
+        let bottom = ui.available_rect_before_wrap().bottom() - below;
         let mut col = ui.new_child(
             egui::UiBuilder::new()
                 .max_rect(ui.max_rect().translate(vec2(slid, 0.0)))
@@ -121,26 +170,45 @@ impl RepoTab {
         // Level with the filter, then with the first section header.
         col.add_space(5.0);
         if icons::tool_button(&mut col, "search", "", true)
-            .on_hover_text("Filter branches and tags")
+            .named(crate::i18n::text("repo-core-3424"))
+            .on_hover_text(crate::i18n::text("repo-core-3424"))
             .clicked()
         {
             acts.push(Action::OpenBranches(None));
         }
         col.add_space(5.0);
-        let prs = self.forge.map(|forge| match forge {
-            crate::forge::Forge::GitHub => "Pull requests",
-            crate::forge::Forge::GitLab => "Merge requests",
+        let prs = self.forge().map(|forge| match forge.noun() {
+            "merge request" => crate::i18n::text("repo-core-3433"),
+            _ => crate::i18n::text("repo-core-3434"),
         });
-        let tags = (!self.refs.tags.is_empty()).then_some("Tags");
-        let submodules = (!self.submodules.is_empty()).then_some("Submodules");
+        let tags = (!self.refs.tags.is_empty()).then_some(crate::i18n::text("repo-core-1096"));
+        let submodules =
+            (!self.submodules.is_empty()).then_some(crate::i18n::text("repo-core-3435"));
         let top = [
-            ("local", "laptop", Some("Local branches")),
-            ("remotes", "cloud", Some("Remotes")),
+            ("local", "laptop", Some(crate::i18n::text("repo-core-3436"))),
+            (
+                "remotes",
+                "cloud",
+                Some(crate::i18n::text("repo-core-3438")),
+            ),
         ];
         let lower = [
-            ("worktrees", "folder-tree", Some("Worktrees")),
+            (
+                "worktrees",
+                "folder-tree",
+                Some(crate::i18n::text("repo-core-3440")),
+            ),
             ("submodules", "package", submodules),
-            ("stashes", "archive", Some("Stashes")),
+            (
+                "stashes",
+                "archive",
+                Some(crate::i18n::text("repo-core-3443")),
+            ),
+            (
+                "recovery",
+                "history",
+                Some(crate::i18n::text("repo-core-3444")),
+            ),
             ("prs", "git-pull-request", prs),
             ("tags", "tag", tags),
         ];
@@ -154,6 +222,13 @@ impl RepoTab {
                 .layout(egui::Layout::bottom_up(egui::Align::Center)),
         );
         section_buttons(&mut col, lower.into_iter().rev(), acts);
+        if crate::app::title_bar::FOLDED_STRIP_MOVES_WINDOW {
+            // The gap between the upper and lower sections' buttons.
+            let gap = col
+                .available_rect_before_wrap()
+                .shrink2(egui::vec2(0.0, 6.0));
+            crate::app::title_bar::window_drag(&mut col, gap, "folded-strip");
+        }
     }
 }
 
@@ -166,6 +241,7 @@ fn section_buttons(
     for (key, icon, tooltip) in sections {
         let Some(tooltip) = tooltip else { continue };
         if icons::tool_button(ui, icon, "", true)
+            .named(tooltip)
             .on_hover_text(tooltip)
             .clicked()
         {

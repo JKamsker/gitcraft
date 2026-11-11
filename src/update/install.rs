@@ -1,6 +1,7 @@
 //! Downloading a release into a folder of its own ("parking" it), and putting it in place of
 //! this copy of gitcraft. That's a rename, which Windows allows of a running program (not an
-//! overwrite): the running one moves aside to `<name>.old` and the parked one takes its name.
+//! overwrite): the running one moves aside, to be kept as `<name>.previous` (see `previous`),
+//! and the parked one takes its name.
 //! The window then closes, having saved its state, and the new version starts.
 
 use std::fs;
@@ -10,6 +11,8 @@ use std::process::Command;
 use std::sync::Mutex;
 use std::time::Duration;
 
+use super::previous::{self, Previous, aside, remove};
+use super::witness::{DownloadFailure, Failure, PlacementFailure};
 use super::{REPO, Release};
 
 /// A release's download is refused past this size.
@@ -97,16 +100,19 @@ pub(super) fn can_update() -> bool {
     })
 }
 
-/// Where releases are parked: on Windows the local app data, not the roaming one that travels
+/// Where releases are parked: in the portable folder when gitcraft runs portable (nothing is
+/// written outside it), else on Windows the local app data, not the roaming one that travels
 /// with the profile.
 fn parking() -> Option<PathBuf> {
-    if cfg!(windows) {
+    if let Some(dir) = crate::portable::portable_dir() {
+        Some(dir.join("update"))
+    } else if cfg!(windows) {
         std::env::var_os("LOCALAPPDATA")
             .map(PathBuf::from)
             .filter(|d| d.is_absolute())
             .map(|d| d.join("gitcraft").join("update"))
     } else {
-        eframe::storage_dir("gitcraft").map(|d| d.join("update"))
+        crate::portable::data_dir().map(|d| d.join("update"))
     }
 }
 
@@ -116,13 +122,15 @@ static DOWNLOADING: Mutex<()> = Mutex::new(());
 /// `release`, downloaded and unpacked into a folder of its own unless it already is. Returns
 /// the new version in there.
 pub(super) fn prefetch(release: &Release) -> Result<PathBuf, String> {
+    prefetch_witnessed(release).map_err(Failure::into_raw)
+}
+
+pub(super) fn prefetch_witnessed(release: &Release) -> Result<PathBuf, Failure> {
     let _one = DOWNLOADING.lock().unwrap_or_else(|e| e.into_inner());
-    let layout = Layout::get().ok_or("This copy of gitcraft isn't updated")?;
+    let layout = Layout::get().ok_or_else(not_updated)?;
     let tag = &release.tag;
-    let asset = layout
-        .asset(tag)
-        .ok_or("The releases have no build for this system")?;
-    let parking = parking().ok_or("No folder to download the update into")?;
+    let asset = layout.asset(tag).ok_or_else(no_build)?;
+    let parking = parking().ok_or_else(no_download_folder)?;
     let ready = parking.join(tag);
     let unpacked = layout.unpacked(tag, &asset);
     if ready.join(READY).is_file() && ready.join(&unpacked).exists() {
@@ -136,12 +144,12 @@ pub(super) fn prefetch(release: &Release) -> Result<PathBuf, String> {
     }
     // Complete only once renamed to its tag.
     let part = parking.join(format!("{tag}.part"));
-    fs::create_dir_all(&part).map_err(|e| format!("{}: {e}", part.display()))?;
+    fs::create_dir_all(&part).map_err(|e| Failure::Opaque(format!("{}: {e}", part.display())))?;
     let url = format!("{REPO}/releases/download/{tag}/{asset}");
     let file = part.join(&asset);
-    download(&url, &file)?;
+    download_witnessed(&url, &file)?;
     if !matches!(layout, Layout::AppImage(_)) {
-        unpack(&file, &part)?;
+        unpack_witnessed(&file, &part)?;
         let _ = fs::remove_file(&file);
     }
     let new = part.join(&unpacked);
@@ -150,40 +158,39 @@ pub(super) fn prefetch(release: &Release) -> Result<PathBuf, String> {
         _ => fs::metadata(&new).is_ok_and(|m| m.is_file() && m.len() > 0),
     };
     if !complete {
-        return Err(format!("{asset} holds no gitcraft"));
+        return Err(asset_missing(asset));
     }
     #[cfg(unix)]
     if !matches!(layout, Layout::Bundle(_)) {
         use std::os::unix::fs::PermissionsExt;
         fs::set_permissions(&new, fs::Permissions::from_mode(0o755))
-            .map_err(|e| format!("{}: {e}", new.display()))?;
+            .map_err(|e| Failure::Opaque(format!("{}: {e}", new.display())))?;
     }
-    fs::write(part.join(READY), &release.version).map_err(|e| e.to_string())?;
+    fs::write(part.join(READY), &release.version).map_err(|e| Failure::Opaque(e.to_string()))?;
     remove(&ready);
-    fs::rename(&part, &ready).map_err(|e| format!("{}: {e}", ready.display()))?;
+    fs::rename(&part, &ready).map_err(|e| Failure::Opaque(format!("{}: {e}", ready.display())))?;
     Ok(ready.join(unpacked))
 }
 
-fn download(url: &str, to: &Path) -> Result<(), String> {
+fn download_witnessed(url: &str, to: &Path) -> Result<(), Failure> {
     let agent = ureq::AgentBuilder::new()
         .timeout_connect(Duration::from_secs(15))
         .timeout_read(Duration::from_secs(60))
         .user_agent("gitcraft")
         .build();
-    let failed = |e: &dyn std::fmt::Display| format!("Could not download {url}: {e}");
+    let failed =
+        |e: &dyn std::fmt::Display| download_failure(url, DownloadFailure::Opaque(e.to_string()));
     let resp = agent.get(url).call().map_err(|e| failed(&e))?;
     let mut file = fs::File::create(to).map_err(|e| failed(&e))?;
     let copied = std::io::copy(&mut resp.into_reader().take(MAX_DOWNLOAD + 1), &mut file)
         .map_err(|e| failed(&e))?;
-    if copied > MAX_DOWNLOAD {
-        return Err(failed(&"bigger than expected"));
-    }
+    check_download_size(url, copied)?;
     file.sync_all().map_err(|e| failed(&e))
 }
 
 /// Unpacks `archive` into `dir`: with `ditto` on macOS, which keeps an app bundle's signature
 /// whole, `tar` elsewhere.
-fn unpack(archive: &Path, dir: &Path) -> Result<(), String> {
+fn unpack_witnessed(archive: &Path, dir: &Path) -> Result<(), Failure> {
     let mut cmd = if cfg!(target_os = "macos") {
         let mut cmd = Command::new("ditto");
         cmd.args(["-x", "-k"]).arg(archive).arg(dir);
@@ -208,72 +215,71 @@ fn unpack(archive: &Path, dir: &Path) -> Result<(), String> {
         const CREATE_NO_WINDOW: u32 = 0x0800_0000;
         cmd.creation_flags(CREATE_NO_WINDOW);
     }
-    let out = cmd
-        .output()
-        .map_err(|e| format!("Could not unpack the update: {e}"))?;
+    let out = cmd.output().map_err(|e| unpack_failure(e.to_string()))?;
     if out.status.success() {
         Ok(())
     } else {
-        Err(format!(
-            "Could not unpack the update: {}",
-            String::from_utf8_lossy(&out.stderr).trim()
+        Err(unpack_failure(
+            String::from_utf8_lossy(&out.stderr).trim().to_owned(),
         ))
     }
 }
 
-/// Puts the parked version `new` in place of this copy of gitcraft. Returns what to start.
-pub fn install(new: &Path) -> Result<PathBuf, String> {
-    let layout = Layout::get().ok_or("This copy of gitcraft isn't updated")?;
+/// Puts the parked version `new` in place of this copy of gitcraft, keeping this one to go
+/// back to. Returns what to start.
+pub fn install_witnessed(new: &Path) -> Result<PathBuf, Failure> {
+    let layout = Layout::get().ok_or_else(not_updated)?;
     let target = layout.path();
-    let old = aside(target);
-    remove(&old);
-    fs::rename(target, &old)
-        .map_err(|e| format!("Could not move {} aside: {e}", target.display()))?;
-    if let Err(e) = move_into(new, target) {
-        let _ = fs::rename(&old, target);
-        return Err(format!("Could not put the new version in place: {e}"));
-    }
+    previous::replace_keeping_witnessed(target, new, super::CURRENT, move_into_witnessed)?;
     if let Some(parking) = parking() {
         remove(&parking);
     }
     Ok(target.to_owned())
 }
 
-/// Where the running version moves to while the new one takes its place.
-fn aside(target: &Path) -> PathBuf {
-    let mut name = target.file_name().unwrap_or_default().to_owned();
-    name.push(".old");
-    target.with_file_name(name)
+/// The version an update replaced, kept to go back to, if this copy can go back to it.
+pub fn previous() -> Option<Previous> {
+    let layout = Layout::get()?;
+    can_update()
+        .then(|| previous::find(layout.path()))
+        .flatten()
+        // The same version as this one (installed again by hand): nothing to go to.
+        .filter(|p| p.version.as_deref() != Some(super::CURRENT))
+}
+
+/// Puts the version kept by the last update back in place of this one ("Go back to 0.3.3"),
+/// keeping this one in its stead. Returns what to start, and the version gone back to.
+pub fn go_back_witnessed() -> Result<(PathBuf, Previous), Failure> {
+    let layout = Layout::get().ok_or_else(not_updated)?;
+    let target = layout.path();
+    let previous = previous::swap_back_witnessed(target, super::CURRENT)?;
+    // A newer release parked for this version isn't one to offer the one gone back to.
+    if let Some(parking) = parking() {
+        remove(&parking);
+    }
+    Ok((target.to_owned(), previous))
 }
 
 /// A rename, or a copy when the parking is on another drive than gitcraft.
-fn move_into(from: &Path, to: &Path) -> Result<(), String> {
+fn move_into_witnessed(from: &Path, to: &Path) -> Result<(), PlacementFailure> {
     if fs::rename(from, to).is_ok() {
         return Ok(());
     }
     if from.is_file() {
-        return fs::copy(from, to).map(|_| ()).map_err(|e| e.to_string());
+        return fs::copy(from, to)
+            .map(|_| ())
+            .map_err(|e| PlacementFailure::Opaque(e.to_string()));
     }
     let copied = Command::new("ditto")
         .arg(from)
         .arg(to)
         .status()
-        .map_err(|e| e.to_string())?;
-    copied.success().then_some(()).ok_or_else(|| {
-        remove(to);
-        "Could not copy the new version".to_owned()
-    })
+        .map_err(|e| PlacementFailure::Opaque(e.to_string()))?;
+    check_copy_status(copied.success(), || remove(to))
 }
 
-fn remove(path: &Path) {
-    if path.is_dir() {
-        let _ = fs::remove_dir_all(path);
-    } else {
-        let _ = fs::remove_file(path);
-    }
-}
-
-/// Removes the version an update moved aside. It may still be closing: tried for a while.
+/// Removes a version an update moved aside and couldn't keep (see `previous`). It may still be
+/// closing: tried for a while.
 pub fn clean_up() {
     let Some(layout) = Layout::get() else { return };
     let old = aside(layout.path());
@@ -352,3 +358,63 @@ mod tests {
         );
     }
 }
+
+fn not_updated() -> Failure {
+    Failure::NotUpdated {
+        raw: "This copy of gitcraft isn't updated".to_owned(),
+    }
+}
+fn no_build() -> Failure {
+    Failure::NoBuild {
+        raw: "The releases have no build for this system".to_owned(),
+    }
+}
+fn no_download_folder() -> Failure {
+    Failure::NoDownloadFolder {
+        raw: "No folder to download the update into".to_owned(),
+    }
+}
+fn asset_missing(asset: String) -> Failure {
+    Failure::AssetMissing {
+        raw: format!("{asset} holds no gitcraft"),
+        asset,
+    }
+}
+fn download_failure(url: &str, failure: DownloadFailure) -> Failure {
+    Failure::Download {
+        raw: format!("Could not download {url}: {}", failure.raw()),
+        url: url.to_owned(),
+        failure,
+    }
+}
+// Actual post-copy guard. Tests call this pure guard without downloading/copying anything.
+fn check_download_size(url: &str, copied: u64) -> Result<(), Failure> {
+    if copied > MAX_DOWNLOAD {
+        return Err(download_failure(
+            url,
+            DownloadFailure::TooBig {
+                raw: "bigger than expected".to_owned(),
+            },
+        ));
+    }
+    Ok(())
+}
+fn unpack_failure(e: String) -> Failure {
+    Failure::Unpack {
+        raw: format!("Could not unpack the update: {e}"),
+        detail: e,
+    }
+}
+// Preserve the original failed-status cleanup, exactly once and only on failure.
+fn check_copy_status(success: bool, cleanup: impl FnOnce()) -> Result<(), PlacementFailure> {
+    success.then_some(()).ok_or_else(|| {
+        cleanup();
+        PlacementFailure::CopyFailed {
+            raw: "Could not copy the new version".to_owned(),
+        }
+    })
+}
+
+#[cfg(test)]
+#[path = "install/witness_tests.rs"]
+mod witness_tests;

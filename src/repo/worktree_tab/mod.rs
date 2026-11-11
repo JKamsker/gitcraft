@@ -32,15 +32,15 @@ impl Unfinished {
     /// What to call it next to the worktree's name, if anything is going on.
     pub fn label(self) -> Option<&'static str> {
         if self.operation {
-            Some("running")
+            Some(crate::i18n::text("repo-core-0291"))
         } else if self.terminal {
             Some("terminal")
         } else if self.commit_message {
-            Some("commit message")
+            Some(crate::i18n::text("repo-core-4241"))
         } else if self.editor {
-            Some("editor")
+            Some(crate::i18n::text("repo-core-4242"))
         } else if self.review {
-            Some("review draft")
+            Some(crate::i18n::text("repo-core-4243"))
         } else {
             None
         }
@@ -166,18 +166,28 @@ pub(super) fn picker_entries<'a>(
 impl RepoTab {
     fn work(&mut self) -> Unfinished {
         Unfinished {
-            operation: self.busy_op.is_some(),
-            terminal: self.terminals.iter_mut().any(|t| !t.has_exited()),
+            operation: self.busy_op.is_some()
+                || self.resolver.running()
+                || self.ssh_setup.as_ref().is_some_and(|s| s.running()),
+            terminal: self.terminals.has_running(),
             commit_message: !self.commit_summary.trim().is_empty()
                 || !self.commit_body.trim().is_empty()
-                || self.reword.is_some(),
-            editor: self.rebase.is_some() || self.conflict.is_some(),
-            review: self.has_pr_draft(),
+                || self.reword.is_some()
+                || self.note_being_written(),
+            editor: self.rebase.is_some() || self.conflict.is_some() || self.has_postcard_draft(),
+            review: self.has_pr_draft() || self.resolver.waiting(),
         }
     }
 
     fn unfinished(&mut self) -> Option<&'static str> {
         self.work().label()
+    }
+
+    /// What is unfinished in this view or one of its parked worktrees, if anything: what closing
+    /// the whole tab would lose.
+    pub(crate) fn unfinished_anywhere(&mut self) -> Option<&'static str> {
+        self.unfinished()
+            .or_else(|| self.parked.iter_mut().find_map(|p| p.unfinished()))
     }
 
     /// What the tab strip shows for this tab.
@@ -204,24 +214,35 @@ impl RepoTab {
     /// Takes over from `from`, the same repository's view this one follows, so that the name and
     /// the sidebar are right from the first frame and a sign-in isn't asked for again.
     pub(crate) fn continue_from(&mut self, from: &RepoTab) {
-        let here = std::fs::canonicalize(&self.path).ok();
+        let is_here = crate::remote::is_same_dir_as(&self.path);
         self.worktrees = from
             .worktrees
             .iter()
             .cloned()
             .map(|mut w| {
-                w.current = here.is_some() && std::fs::canonicalize(&w.path).ok() == here;
+                w.current = is_here(&w.path);
                 w
             })
             .collect();
-        if from.credentials.is_some() {
-            self.credentials = from.credentials.clone();
+        if let Some(credentials) = &from.credentials
+            && from.connection_context == crate::connections::current()
+        {
+            self.set_credentials(credentials.clone());
+        }
+        // The same repository's pull requests, shown until this view reads them itself.
+        if from.connection_context == crate::connections::current() {
+            self.prs = from.prs.clone();
         }
     }
 
     /// Coming back to this view from the background: catch up, and show the selected commit
     /// again, as the graph's scroll position is the tab's and not the view's.
     pub(crate) fn resume(&mut self, ctx: &egui::Context) {
+        self.invalidate_repository_context();
+        // Elsewhere, looked at again (parking stopped that; see `park`).
+        if crate::remote::is_remote(&self.path) && self.poller.is_none() {
+            self.watch(ctx);
+        }
         self.reload(ctx);
         self.scroll_to = self.selected;
     }
@@ -246,12 +267,24 @@ impl RepoTab {
 
     /// Parks `view`, the worktree this tab just moved away from, and lets go of what isn't worth
     /// keeping any more.
-    pub(crate) fn park(&mut self, view: Box<RepoTab>) {
+    pub(crate) fn park(&mut self, mut view: Box<RepoTab>) {
+        // Retire view requests before disconnecting its remote poller; mutations keep tx/rx.
+        view.invalidate_repository_context();
+        // One on another machine stops being asked every few seconds while it isn't shown
+        // (a dozen parked views would keep the shells there busy); it is looked at again on
+        // coming back.
+        view.poller = None;
+        // Its windows close while it isn't drawn: its views come back to it.
+        view.popouts.dock_all();
         self.parked.push(view);
         // A worktree whose folder is gone can't be gone back to, but what still runs in it is
         // seen through first.
-        self.parked
-            .retain_mut(|parked| parked.path.is_dir() || parked.work().running());
+        self.parked.retain_mut(|parked| {
+            // Elsewhere, kept: asking would be a round trip on the UI thread.
+            crate::remote::is_remote(&parked.path)
+                || parked.path.is_dir()
+                || parked.work().running()
+        });
         let unfinished: Vec<bool> = self
             .parked
             .iter_mut()

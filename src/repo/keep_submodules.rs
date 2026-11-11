@@ -20,7 +20,8 @@ pub(super) fn update_all() -> Action {
 /// Updates the submodule at `path`.
 pub(super) fn update_one(path: &str) -> Action {
     let mut args = UPDATE.to_vec();
-    args.extend(["--", path]);
+    let literal = format!(":(literal){path}");
+    args.extend(["--", &literal]);
     Action::Ops {
         label: format!("Update submodule {path}"),
         ops: ops(&[&args]),
@@ -40,7 +41,9 @@ impl RepoTab {
     pub(super) fn follow_checkout_move(&mut self, ok: bool, ctx: &egui::Context) {
         if std::mem::take(&mut self.update_submodules)
             && ok
-            && self.path.join(".gitmodules").is_file()
+            // Elsewhere, not asked from here (a round trip on the UI thread): an update without
+            // submodules does nothing.
+            && (crate::remote::is_remote(&self.path) || self.path.join(".gitmodules").is_file())
         {
             self.run_ops(
                 "Update submodules",

@@ -1,0 +1,67 @@
+{
+  "base": "e65df5b173f6d755e9a1911e5015b6f11cce8587",
+  "head": "2ad1d508592607f69aa50cd00eb2305afc389a01",
+  "tree": "b834f22c9d6dbe522df2edc077681be4a5e1b556",
+  "commits": [
+    "6e7b002a62b9f2e9ee6f04d148b4b4654c7144eb Jonas Kamsker <11245306+JKamsker@users.noreply.github.com> fix(diff): refresh keyboard hunk when rendered layout changes",
+    "2ad1d508592607f69aa50cd00eb2305afc389a01 Jonas Kamsker <11245306+JKamsker@users.noreply.github.com> fix(recovery): resolve discovery manifests under stable archive locks"
+  ],
+  "status": "locally validated focused source/recording checks; unpushed by instruction; parent review and application gates pending",
+  "changed_sources": {
+    "src/repo/diff/presentation.rs": "80911e336296971a8362c833b6ed3ecbc952d8cb74013d721bb883da21ebbba6",
+    "src/repo/diff/presentation/layout_regressions.rs": "b6bf130c5142a1ba6ebb427d5649f5f93993bb260524bd1ae6d8461ad94aedc5",
+    "src/repo/diff/rows.rs": "b13654a3daf6cfe5de39ea5c8afcbe3ff702b6056b6c6c4bb33bb2bd422b0ecf",
+    "src/repo/diff/view.rs": "54813492de4da49223a8adc00212bccb744c767e2c2bd019a9ee5ad106ad3831",
+    "src/resolver/park.rs": "3b644cb2c7f81976a47f2c65d7e9b7b25b102529658a5ff9403655572f8c36fa",
+    "src/resolver/park/checks/discovery.rs": "c7bb01628b8b096364873102f05aac7716b2a560ee7d4c3d97e1746ff955afa3",
+    "src/resolver/park/checks/regressions.rs": "32153a3954d3bb4e4d9ca58dc5517b875bd3e9ace3390b185a5dcc279cd304f4",
+    "src/resolver/park/discovery.rs": "bcb9ab88a0306585eb8aa2a1f7fa4f25c13fcda9a45cb7c0660619f97d8126da",
+    "src/resolver/park/journal.rs": "0cb170a6d6b0e9d6d9340c1fcc94d03a8155192a704a535cf581b8f2dc58a4c0"
+  },
+  "logs": {
+    "/tmp/gitcraft-p2-diff-tests.log": "c327c1c64d493e12e523ccee435a2af7c6d8a2b560183444a18acedf13434994",
+    "/tmp/gitcraft-p2-diff-negative.log": "a0226b157106e859633c7d5695a59f1dec7798484c27a6a57539ffa3c0fb2ec5",
+    "/tmp/gitcraft-p2-diff-clippy.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "/tmp/gitcraft-p2-recording-final2.log": "2f2f1c6d41578958bb14a4a5e6530673862fd9063df89fb2564bf1c9a30aaf75",
+    "/tmp/gitcraft-p2-discovery-negative.log": "780f3f99a3a54d5f18b7bcee6877d7202394d1cc1898a6f81d49eff9b261922a",
+    "/tmp/gitcraft-p2-checker-tests.log": "824f8f74d0c34b1e4887b5a448e027b1fd8dd2ef56b296f27ea9bf731949dd53",
+    "/tmp/gitcraft-p2-final-size.log": "086a3c6d7a5d933fad14b0b4c2c9afeb889b25b6695c8e72067caa9730f385b2",
+    "/tmp/gitcraft-p2-final-staged-size.log": "265367ee7e968586bb961695f8a963bd98102c5bdb7b586eb8f34d809a6f03dd",
+    "/tmp/gitcraft-p2-final-revision-size.log": "265367ee7e968586bb961695f8a963bd98102c5bdb7b586eb8f34d809a6f03dd"
+  },
+  "diff": {
+    "tests": "14 passed",
+    "matrix": "unified/split x wrap on/off x width/font/layout/wrap transitions at unchanged physical offset; wrapped width case uses exact 500..880; production egui geometry, DisplayRows, target transition, parse and complete stage/unstage/discard patch output",
+    "negative_control": "old retention gate returns hunk 0 where current geometry owns hunk 4; regression fails",
+    "harness_generator": "/tmp/gitcraft-p2-diff.py",
+    "clippy": "direct clippy-driver -D warnings passed"
+  },
+  "recovery": {
+    "tests": "14 passed",
+    "ordinary_boundaries": 223,
+    "caught_panic_boundaries": 223,
+    "boundary_split": {
+      "park": 90,
+      "restore": 107,
+      "drop": 26
+    },
+    "interleaving": "actual listing paused at discovery snapshot; independent caller completes bring_back or drop; listing resumes to exactly one retained archive; repeat/idempotence and exact bytes/refs checked",
+    "negative_control": "old enumerate/read listing restored in isolated copy returns [] where retained archive is expected; regression fails",
+    "cross_device": "passed without skip",
+    "command": "RUSTFLAGS='--cfg recovery_recording' CARGO_TARGET_DIR=/tmp/gitcraft-p2-recording-target cargo test --offline --manifest-path src/resolver/park/checks/Cargo.toml -- --nocapture"
+  },
+  "checks": {
+    "rustfmt": "all 9 changed Rust files pass",
+    "size": "working tree, staged index, revision HEAD all pass; 2584 tracked Rust files, 763 advisory warnings, zero errors",
+    "checker_unit_tests": "12 passed",
+    "ownership": "all 9 changed paths within assigned ownership; clean worktree"
+  },
+  "behavior_note": "Listing returns a busy error when a foreground caller holds an identity lease, instead of reading an unlocked manifest or returning a successful partial list. Corrupt/mismatched/missing published and colliding manifests return errors; incomplete Archiving reservations remain omitted.",
+  "limits": [
+    "No full application Cargo build, UI/event/runtime integration, process execution/signals, CI, push, PR, or subagents.",
+    "Diff harness uses actual production owner/geometry/map/parse/patch sources with minimal application/theme/highlight fixtures; production Rows/diff_view integration is source-inspected, not compiled or event-driven here.",
+    "Recording Git is fake. Filesystem tests use owned temporary directories. Caught panics unwind RAII; no kill/power-loss claim.",
+    "Windows/ACL behavior, cross-process lock contention, external-writer exclusion and device durability remain unvalidated.",
+    "No independent review here; parent integrates and revalidates final candidate. Prior history and evidence files untouched."
+  ]
+}

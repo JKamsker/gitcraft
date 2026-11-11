@@ -1,6 +1,12 @@
 //! Selecting commits and stashes, opening diffs, comparisons and file views, and the commit
 //! search.
 
+#[path = "core_seams/diff_navigation.rs"]
+mod diff_navigation;
+
+#[path = "core_seams/file_navigation.rs"]
+mod file_navigation;
+
 use super::{
     Compare, CompareData, DiffKey, DiffView, MAX_HISTORY, Msg, RepoTab, WIP_HASH, conflict, diff,
     file_text, file_view, spawn,
@@ -35,17 +41,20 @@ impl RepoTab {
             return;
         }
         let hash = commit.hash.clone();
+        // Below the graph, the diff stays and follows what is opened next.
+        let keep_diff = self.diff_beside_graph(ctx);
         self.selected = Some(row);
         self.stash_view = stash;
         self.file_view = None;
         self.compare = None;
-        if matches!(
-            self.diff,
-            Some(DiffView {
-                key: DiffKey::Commit { .. } | DiffKey::Range { .. },
-                ..
-            })
-        ) || hash != WIP_HASH
+        if !keep_diff
+            && (matches!(
+                self.diff,
+                Some(DiffView {
+                    key: DiffKey::Commit { .. } | DiffKey::Range { .. } | DiffKey::Remerge { .. },
+                    ..
+                })
+            ) || hash != WIP_HASH)
         {
             self.diff = None;
             self.conflict = None;
@@ -53,21 +62,126 @@ impl RepoTab {
         if hash == WIP_HASH {
             self.detail = None;
             self.detail_hash = None;
+            self.drop_extras();
+            return;
+        }
+        // A merge put aside: its agent's card, and its files (as the commit they are kept as).
+        if let Some(snapshot) = self.parked_at(row).map(|p| p.snapshot.clone()) {
+            self.drop_extras();
+            self.resolver_show();
+            self.fetch_detail(snapshot, ctx);
             return;
         }
         self.load_detail(hash, ctx);
     }
 
     pub(super) fn load_detail(&mut self, hash: String, ctx: &egui::Context) {
+        self.pending_commit_diff = None;
+        // A row of no commit (the changes row, a merge put aside): nothing for git to read.
+        if hash.starts_with('\u{0}') {
+            return;
+        }
         self.detail = None;
         self.reword = None;
         self.detail_error = None;
         self.detail_hash = Some(hash.clone());
+        self.load_extras(&hash, ctx);
+        self.fetch_detail(hash, ctx);
+    }
+
+    /// Reads the commit `hash`'s detail (its message, files…) in the background, without what
+    /// the commit panel adds (its builds, branches, notes): for a merge put aside's files.
+    pub(super) fn fetch_detail(&mut self, hash: String, ctx: &egui::Context) {
+        self.detail = None;
+        self.detail_error = None;
+        self.detail_hash = Some(hash.clone());
+        // What was still being read for the commit selected before is not waited for.
+        self.detail_cancel.cancel();
+        self.detail_cancel = self.tx.cancel.child();
+        if let Some(detail) = self.detail_cache.get(&hash, &self.refs.head) {
+            self.show_detail(detail, ctx);
+            return;
+        }
+        self.detail_asked = Some(std::time::Instant::now());
         let path = self.path.clone();
-        spawn(&self.tx, ctx, move || {
-            let detail = git::commit_detail(&path, &hash);
-            Msg::Detail(hash, detail)
-        });
+        let failed_hash = hash.clone();
+        let (cancel, failed_cancel) = (self.detail_cancel.clone(), self.detail_cancel.clone());
+        // A read the selection moved on from only fills the cache: should the same commit be
+        // selected again meanwhile, its "cancelled" is not that one's error.
+        super::messages::spawn_selection(
+            &self.tx,
+            ctx,
+            self.detail_cancel.clone(),
+            false,
+            move |error| {
+                if failed_cancel.is_cancelled() {
+                    Msg::DetailPrefetched(Err(error))
+                } else {
+                    Msg::Detail(failed_hash, Err(error))
+                }
+            },
+            move || {
+                let detail = git::commit_detail(&path, &hash);
+                if cancel.is_cancelled() {
+                    Msg::DetailPrefetched(detail)
+                } else {
+                    Msg::Detail(hash, detail)
+                }
+            },
+        );
+    }
+
+    /// The selected commit's detail, read or from the cache.
+    pub(super) fn show_detail(&mut self, detail: git::CommitDetail, ctx: &egui::Context) {
+        let hash = detail.hash.clone();
+        self.detail = Some(detail);
+        self.fill_reword();
+        self.finish_commit_changes(&hash, ctx);
+    }
+
+    /// Reads ahead the files of the commits on screen (`rows`, and as many again around them),
+    /// one batch at a time behind all other work: a click on any of them shows its files at once.
+    pub(super) fn prefetch_files(&mut self, rows: std::ops::Range<usize>, ctx: &egui::Context) {
+        /// Commits a batch reads at most.
+        const BATCH: usize = 64;
+        // Not while the repository is read: that read is what the tab waits on.
+        if self.files_cache.reading || self.loading || self.commits.is_empty() {
+            return;
+        }
+        let around = rows.len().max(20);
+        let start = rows.start.saturating_sub(around);
+        let end = (rows.end + around).min(self.commits.len());
+        // Those on screen first, then those just off it.
+        let order = rows
+            .clone()
+            .chain(rows.end..end)
+            .chain((start..rows.start).rev());
+        let hashes: Vec<String> = order
+            .filter_map(|row| {
+                let hash = &self.commits.get(row)?.hash;
+                (hash != WIP_HASH
+                    && !hash.starts_with('\u{0}')
+                    && self.stash_at(row).is_none()
+                    && self.parked_at(row).is_none()
+                    && !self.files_cache.settled(hash))
+                .then(|| hash.clone())
+            })
+            .take(BATCH)
+            .collect();
+        if hashes.is_empty() {
+            return;
+        }
+        self.files_cache.reading = true;
+        let path = self.path.clone();
+        let (asked, failed_asked) = (hashes.clone(), hashes.clone());
+        super::messages::spawn_selection(
+            &self.tx,
+            ctx,
+            self.tx.cancel.clone(),
+            true,
+            move |error| Msg::FilesPrefetched(failed_asked, Err(error)),
+            move || Msg::FilesPrefetched(asked, git::commit_files_batch(&path, &hashes)),
+        );
     }
 
     pub(super) fn select_stash(&mut self, i: usize, ctx: &egui::Context) {
@@ -92,92 +206,40 @@ impl RepoTab {
                 self.scroll_to = Some(row);
             }
             None => {
-                self.status = Some((
-                    format!(
-                        "Commit {} is not in the loaded history",
-                        hash.get(..8).unwrap_or(hash)
+                self.status = Some(crate::repo::Notice::plain((
+                    crate::i18n::message(
+                        "repo-core-2900",
+                        &[("hash", hash.get(..8).unwrap_or(hash).to_string().into())],
                     ),
                     true,
-                ));
+                )));
             }
         }
     }
 
     /// Selects `hash`, loading more history first if it's further down.
     pub(super) fn goto(&mut self, hash: &str, ctx: &egui::Context) {
+        // Nothing read to look in yet: once it is (see `rebuild`).
+        if self.sleeping() || self.resuming {
+            self.pending_goto = Some(hash.to_owned());
+            return;
+        }
+        if !self.index.contains_key(hash) && self.history.iter().any(|c| c.hash == hash) {
+            self.history_filter.revealed.insert(hash.to_owned());
+            let previous = self.selected_hash();
+            self.rebuild_rows();
+            self.selected = previous.and_then(|h| self.index.get(&h).copied());
+        }
         if self.index.contains_key(hash) {
             self.pending_goto = None;
             self.select_hash(hash, ctx);
+            self.history_filter.revealed.remove(hash);
         } else if self.has_more && self.history.len() < MAX_HISTORY {
             self.pending_goto = Some(hash.to_owned());
             self.load_more(ctx);
         } else {
             self.pending_goto = None;
             self.select_hash(hash, ctx);
-        }
-    }
-
-    /// Shows a diff (or the conflict editor) in the central area; asking for the open one
-    /// closes it.
-    pub(super) fn open_diff(&mut self, key: DiffKey, ctx: &egui::Context) {
-        if self.diff.as_ref().is_some_and(|d| d.key == key) {
-            self.diff = None;
-            self.conflict = None;
-            return;
-        }
-        self.conflict = match &key {
-            DiffKey::Work(file) if file.area == git::Area::Conflicted => {
-                conflict::ConflictEditor::open(&self.path, &file.path, self.work.in_progress)
-            }
-            _ => None,
-        };
-        self.diff = Some(DiffView::new(key));
-        self.refresh_diff(ctx);
-    }
-
-    /// Reads the open diff again, showing the old one meanwhile.
-    pub(super) fn refresh_diff(&mut self, ctx: &egui::Context) {
-        let Some(view) = &mut self.diff else { return };
-        let request = view.next_request();
-        let key = view.key.clone();
-        let path = self.path.clone();
-        let opts = git::DiffOptions {
-            ignore_ws: self.diff_ignore_ws,
-            whole_file: Settings::get(ctx).diff_whole_file,
-        };
-        let dark = Tokens::get(ctx).dark();
-        spawn(&self.tx, ctx, move || {
-            let result = diff::load(&path, &key, opts, dark).map(Box::new);
-            Msg::Diff(request, result)
-        });
-        self.load_diff_file(ctx);
-    }
-
-    /// Reads the whole file of the open diff, when diffs show the file.
-    pub(super) fn load_diff_file(&mut self, ctx: &egui::Context) {
-        let Some(view) = self.diff.as_ref().filter(|_| self.diff_as_file) else {
-            return;
-        };
-        let (request, key, path) = (view.request, view.key.clone(), self.path.clone());
-        let dark = Tokens::get(ctx).dark();
-        spawn(&self.tx, ctx, move || {
-            let result = file_text::load_for_diff(&path, &key, dark);
-            Msg::DiffFile(request, result)
-        });
-    }
-
-    /// Shows diffs as the whole file, or as the changes.
-    pub(super) fn show_diff_as_file(&mut self, on: bool, ctx: &egui::Context) {
-        self.diff_as_file = on;
-        if self.diff.as_ref().is_some_and(|d| d.file.is_none()) {
-            self.load_diff_file(ctx);
-        }
-    }
-
-    pub(super) fn reopen_diff(&mut self, ctx: &egui::Context) {
-        if let Some(view) = self.diff.take() {
-            self.conflict = None;
-            self.open_diff(view.key, ctx);
         }
     }
 
@@ -196,6 +258,8 @@ impl RepoTab {
 
     /// Starts comparing two points of history (replacing the comparison shown).
     pub(super) fn compare(&mut self, compare: Compare, ctx: &egui::Context) {
+        self.tour = None;
+        self.pr_selection_request = None;
         self.close_pr();
         self.close_range_diff();
         self.file_view = None;
@@ -205,6 +269,15 @@ impl RepoTab {
 
     /// Reads the comparison's files again (the working tree or a branch moved).
     pub(super) fn reload_compare(&mut self, ctx: &egui::Context) {
+        // Background file-system refreshes must not replace the request still resolving a
+        // PR's exact endpoints with a comparison against stale tracking refs.
+        if self
+            .compare
+            .as_ref()
+            .is_some_and(|c| self.pr_selection_request == Some(c.request))
+        {
+            return;
+        }
         self.compare_requests += 1;
         let request = self.compare_requests;
         let Some(c) = &mut self.compare else { return };
@@ -252,6 +325,7 @@ impl RepoTab {
                     base_label: c.target_label,
                     target: Some(c.base),
                     target_label: c.base_label,
+                    captions: [c.captions[1].clone(), c.captions[0].clone()],
                     data: None,
                     ..c
                 },
@@ -260,89 +334,49 @@ impl RepoTab {
         }
     }
 
-    /// Shows `path`'s history or blame, loading what that tab needs.
-    pub(super) fn open_file_view(
-        &mut self,
-        path: String,
-        rev: Option<String>,
-        tab: file_view::FileTab,
-        ctx: &egui::Context,
-    ) {
-        self.diff = None;
-        self.conflict = None;
-        let view = match self.file_view.take() {
-            Some(mut v) if v.path == path && v.rev == rev => {
-                v.tab = tab;
-                v
-            }
-            _ => file_view::FileView::new(&path, rev.clone(), tab),
-        };
-        let needs = view.needs(tab);
-        self.file_view = Some(view);
-        if !needs {
-            return;
-        }
-        let repo = self.path.clone();
-        match tab {
-            file_view::FileTab::History => spawn(&self.tx, ctx, move || {
-                let result = git::file_history(&repo, rev.as_deref(), &path);
-                Msg::FileHistory(path, rev, result)
-            }),
-            file_view::FileTab::Blame => {
-                let dark = Tokens::get(ctx).dark();
-                spawn(&self.tx, ctx, move || {
-                    let result = file_view::load_blame(&repo, rev.as_deref(), &path, dark);
-                    Msg::Blame(path, rev, result)
-                })
-            }
-            file_view::FileTab::File => {
-                let dark = Tokens::get(ctx).dark();
-                spawn(&self.tx, ctx, move || {
-                    let result = file_text::load(&repo, rev.as_deref(), &path, dark);
-                    Msg::FileText(path, rev, result)
-                })
-            }
-        }
-    }
-
-    /// Reads every file of commit `hash`, for the commit pane's "View all files".
-    pub(super) fn load_tree_files(&mut self, hash: String, ctx: &egui::Context) {
-        self.all_files.wait_for(&hash);
-        let repo = self.path.clone();
-        spawn(&self.tx, ctx, move || {
-            let result = git::tree_files(&repo, &hash);
-            Msg::TreeFiles(hash, result)
-        });
-    }
-
     pub(super) fn run_search(&mut self, ctx: &egui::Context) {
         let query = self.search.query.trim().to_owned();
         self.search.edited = None;
-        if query.is_empty() {
-            // One still being read answers a query that is gone.
+        self.search.problem = None;
+        let code = self.search.code;
+        let plan = if query.is_empty() {
+            None
+        } else {
+            match git::search_query::prepare(&query, code) {
+                Ok(plan) => Some(plan),
+                Err(e) => {
+                    self.search.problem = Some(e.message);
+                    None
+                }
+            }
+        };
+        let Some(plan) = plan else {
+            // One still being read answers a query that is gone (or can't be searched).
             self.search.running = false;
+            self.history_minimap.dirty = true;
             self.search.results.clear();
-            self.search.matches.clear();
+            self.search.matches = Default::default();
             self.search.searched.clear();
             return;
-        }
+        };
         self.search.running = true;
         let path = self.path.clone();
-        let code = self.search.code;
         // In the branches the graph shows.
         let from = self.log_from.clone();
+        let order = self.log_order;
+        let excluded = super::history_filter::rules(ctx, self.repo_key()).excludes();
         // Answered all the same if it panics: the search runs until it is.
         let failed = {
             let query = query.clone();
-            move |e| Msg::Search(query, code, Err(e))
+            let excluded = excluded.clone();
+            move |e| Msg::Search(excluded, query, code, Err(e))
         };
         super::messages::spawn_or(&self.tx, ctx, failed, move || {
-            let result = if code {
-                git::search_code(&path, from.as_deref(), &query)
-            } else {
-                git::search(&path, from.as_deref(), &query)
-            };
-            Msg::Search(query, code, result)
+            let result = (|| {
+                let roots = git::history_scope::search_roots(&path, from.as_deref(), &excluded)?;
+                git::search_query::run_with_order(&path, Some(&roots), order, &plan)
+            })();
+            Msg::Search(excluded, query, code, result)
         });
     }
 
@@ -360,17 +394,27 @@ impl RepoTab {
             return;
         }
         self.search.running = false;
+        self.history_minimap.dirty = true;
         self.search.searched = query;
         match result {
             Ok(hashes) => {
-                self.search.matches = hashes.iter().cloned().collect();
+                self.search.problem = None;
+                self.search.matches = hashes
+                    .iter()
+                    .cloned()
+                    .collect::<std::collections::HashSet<_>>()
+                    .into();
                 self.search.results = hashes;
                 self.search.current = 0;
                 if let Some(first) = self.search.results.first().cloned() {
                     self.goto(&first, ctx);
                 }
             }
-            Err(e) => self.status = Some((e, true)),
+            Err(e) => {
+                self.search.results.clear();
+                self.search.matches = Default::default();
+                self.search.problem = Some(e);
+            }
         }
     }
 
@@ -387,56 +431,25 @@ impl RepoTab {
     }
 
     pub(super) fn toggle_search(&mut self) {
+        self.history_minimap.dirty = true;
         self.search.open = !self.search.open;
         self.search.focus = self.search.open;
         if !self.search.open {
+            self.authorship.filter = false;
             self.search.running = false;
+            self.history_minimap.dirty = true;
             // Nor does a query typed just before closing start a search once it's closed.
             self.search.edited = None;
-            self.search.matches.clear();
+            self.search.matches = Default::default();
             self.search.results.clear();
             self.search.searched.clear();
+            self.search.problem = None;
+            // Read again next time: history and files may have changed by then.
+            self.search.suggest.reset();
         }
     }
 }
 
 #[cfg(test)]
-mod tests {
-    use super::RepoTab;
-
-    fn tab() -> RepoTab {
-        let ctx = egui::Context::default();
-        let mut tab = RepoTab::new_deferred("/nonexistent/search-test".into(), &ctx);
-        tab.search.open = true;
-        tab
-    }
-
-    /// Clearing the query while a search runs: its answer is for a query that is gone, and
-    /// "searching…" does not stay up.
-    #[test]
-    fn clearing_the_query_ends_the_search_running() {
-        let ctx = egui::Context::default();
-        let mut tab = tab();
-        tab.search.query = "foo".to_owned();
-        tab.search.running = true;
-        tab.search.query.clear();
-        tab.run_search(&ctx);
-        tab.search_done("foo".to_owned(), false, Ok(vec!["a".to_owned()]), &ctx);
-        assert!(!tab.search.running);
-        assert!(tab.search.results.is_empty());
-    }
-
-    /// A search closed before it answered shows no finds.
-    #[test]
-    fn a_closed_search_takes_no_answer() {
-        let ctx = egui::Context::default();
-        let mut tab = tab();
-        tab.search.query = "foo".to_owned();
-        tab.search.running = true;
-        tab.toggle_search();
-        tab.search_done("foo".to_owned(), false, Ok(vec!["a".to_owned()]), &ctx);
-        assert!(!tab.search.running);
-        assert!(tab.search.matches.is_empty());
-        assert!(tab.pending_goto.is_none());
-    }
-}
+#[path = "direct_tests/navigate_tests.rs"]
+mod tests;

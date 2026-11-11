@@ -1,33 +1,73 @@
 //! Window shell: git check, browser-like tabs, the start page and cloning.
 
+mod commands;
+mod construction;
+mod frame;
+mod lifecycle;
+mod repositories;
+mod updates;
+pub use lifecycle::*;
+
+mod agent_card;
+mod askpass_dialog;
 mod clone;
+mod diagnostics;
+mod draft_saving;
+mod dropped;
+mod focus;
+mod handoff;
 mod home;
+mod home_filter;
+mod home_recent;
+mod inbox;
+mod launch;
+mod links;
+mod my_work;
+mod os_shell;
 mod palette;
 mod panels;
+mod practice;
+mod profiles;
+mod recent_status;
+mod remote_open;
+mod resident;
+pub(crate) use resident::notification_body as resident_notification_body;
+mod repo_scan;
+mod setup;
+mod startup_display;
+mod startup_language;
+pub use startup_language::initialize_language;
 mod tab_strip;
 mod tabs;
+mod teleport;
 #[cfg(test)]
 mod tests;
+pub(crate) mod title_bar;
 mod update_banner;
+mod windows;
+mod workspaces;
 mod worktrees;
+pub use windows::DesktopApp;
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc::{Receiver, channel};
 
-use egui::{Key, Ui};
+use egui::Ui;
 use serde::{Deserialize, Serialize};
 
 use crate::git;
+use crate::keymap;
 use crate::repo::{OpenRequest, RepoTab};
 use crate::settings::Settings;
 use crate::tab_look::TabLook;
-use crate::theme::{self, ThemeKind, Tokens};
+use crate::theme::{self, ThemeId, Tokens};
 use crate::update;
 use clone::CloneForm;
+use home::AppError;
 use palette::Palette;
 use panels::Toast;
+use remote_open::{Connecting, RemoteForm};
 use tab_strip::TabDrag;
 
 const MAX_RECENT: usize = 12;
@@ -44,13 +84,29 @@ struct Saved {
     open: Vec<PathBuf>,
     active: usize,
     recent: Vec<PathBuf>,
-    theme: ThemeKind,
+    theme: ThemeId,
     clone_parent: Option<PathBuf>,
     settings: Settings,
     /// A release the user chose to skip.
     skipped_version: String,
+    /// The version gone back to with "Go back to x.y.z": no update is offered while it is set.
+    pinned_version: String,
     /// Repository tabs given their own icon or colour.
     tab_looks: BTreeMap<PathBuf, TabLook>,
+    /// What the profiles not in use had open; `open`, `active`, `recent` and `theme` are the
+    /// profile's in use.
+    profile_states: profiles::ProfileStates,
+    /// The command palette's entries run lately.
+    palette_recent: palette::recent::Recent,
+    /// When each recent repository was last opened, in seconds since 1970 (of every profile).
+    last_opened: BTreeMap<PathBuf, i64>,
+    /// Named groups of repositories, on the start page.
+    workspaces: crate::across::workspaces::Workspaces,
+    /// Repositories found on a machine by "Where's my work?".
+    found_repos: Vec<PathBuf>,
+    /// What was seen of each pull request (by URL) when it was opened from the inbox.
+    inbox_seen: BTreeMap<String, crate::forge::inbox::Seen>,
+    windows: Vec<windows::SavedWindow>,
 }
 
 enum Tab {
@@ -61,6 +117,8 @@ enum Tab {
 }
 
 pub struct App {
+    windows: windows::Windows,
+    resident: crate::tray::Resident,
     git_version: Result<String, String>,
     tabs: Vec<Tab>,
     /// What is typed in the worktree switcher.
@@ -73,424 +131,114 @@ pub struct App {
     close_worktree: bool,
     active: usize,
     recent: Vec<PathBuf>,
-    theme: ThemeKind,
+    theme: ThemeId,
     clone_parent: Option<PathBuf>,
-    error: Option<String>,
-    was_focused: bool,
+    error: Option<AppError>,
+    /// What the start page's error is, when it is a git failure gitcraft can explain (see
+    /// [`crate::error_card`]).
+    error_card: Option<crate::error_card::ErrorCard>,
+    focus: focus::State,
     clone_form: Option<CloneForm>,
+    practice_open: bool,
+    setup: setup::SetupWindow,
+    practice_jobs: crate::tasks::Scope,
+    practicing: Option<practice::Practicing>,
     /// A clone running in the background: (destination, result).
-    cloning: Option<(PathBuf, Receiver<Result<(), String>>)>,
+    cloning: Option<clone::Cloning>,
     /// The form of the running clone, back on screen if it needs credentials.
     cloning_form: Option<CloneForm>,
+    /// Started to pick a folder to open (`--open`, the launcher's Open…): done on the first frame.
+    pick_on_start: bool,
+    /// The last clone failed (for the taskbar button, which turns red).
+    clone_failed: bool,
+    /// What the taskbar button shows.
+    taskbar: crate::os_shell::Taskbar,
+    /// The recent repositories the taskbar button's menu was made for.
+    menu_for: Option<(u64, Vec<PathBuf>)>,
+    /// The dialog that opens a repository in WSL or over SSH.
+    remote_form: Option<RemoteForm>,
+    /// Repositories on other machines being reached, each tab to open once it answers.
+    connecting: Vec<Connecting>,
+    /// The teleport dialog, and the teleport it runs.
+    teleport: Option<teleport::TeleportForm>,
+    teleport_drag: Option<teleport::DragTargets>,
+    /// ssh's question being answered (a password, a new host key).
+    askpass: askpass_dialog::AskpassState,
     /// A newer release than this build.
     update: Option<update::Found>,
-    update_rx: Option<Receiver<Result<Option<update::Found>, String>>>,
-    /// The settings the last look for a newer release went by (whether to look, the channel,
-    /// whether to download): changing them looks again.
-    update_looked: Option<(bool, update::Channel, bool)>,
+    update_discovery: updates::Discovery,
     /// The update banner was put off until the next start.
     update_later: bool,
     /// Why the update didn't go in place.
     update_error: Option<String>,
+    /// Owned source receipt for exactly the raw installation failure above.
+    update_failure: Option<update::Failure>,
     skipped_version: String,
+    /// See `Saved::pinned_version`.
+    pinned_version: String,
+    /// The version the last update replaced, kept to go back to.
+    previous_version: Option<update::Previous>,
     tab_looks: BTreeMap<PathBuf, TabLook>,
     settings: Settings,
+    /// The profiles not in use: their tabs, recent repositories and theme.
+    profile_states: profiles::ProfileStates,
+    /// What the profile set for git when the repository tabs last read who commits are by.
+    profile_git_seen: String,
     manual_open: bool,
+    /// The graphics adapter wgpu draws with, for diagnostics.
+    adapter: Option<String>,
+    /// Diagnostics being collected for the clipboard.
+    diagnostics: Option<diagnostics::Collecting>,
     palette: Option<Palette>,
+    palette_recent: palette::recent::Recent,
     toasts: Vec<Toast>,
     /// The folders of the last repository tabs closed, the last one at the end.
     closed: Vec<PathBuf>,
     tab_drag: Option<TabDrag>,
+    /// When what the tabs have typed is saved.
+    keeper: crate::drafts::Keeper,
+    /// This run's marker, and whether the last run ended without closing.
+    session: crate::drafts::Session,
+    /// The start page's search of the recent repositories.
+    recent_filter: home_filter::RecentFilter,
+    /// The recent repositories' branches and changes, read in the background.
+    recent_status: recent_status::RecentStatuses,
+    /// See [`Saved::last_opened`].
+    last_opened: BTreeMap<PathBuf, i64>,
+    /// Patches dropped on repository tabs, still to be applied.
+    patches: dropped::PatchQueue,
+    /// _Scan a folder for repositories_, while its dialog is open.
+    repo_scan: Option<repo_scan::RepoScan>,
+    workspaces: crate::across::workspaces::Workspaces,
+    /// How the workspaces' repositories stand, as last looked at.
+    workspaces_view: workspaces::WorkspacesView,
+    /// Repositories found on a machine by "Where's my work?", looked at with the others.
+    found_repos: Vec<PathBuf>,
+    my_work: my_work::MyWork,
+    inbox: inbox::Inbox,
+    inbox_seen: BTreeMap<String, crate::forge::inbox::Seen>,
+    /// What gitcraft was started for, being carried out.
+    launching: launch::Launching,
+    /// A forge link typed or pasted into the start page.
+    home_link: String,
+    /// How far the tabs are scrolled along the strip.
+    tab_scroll: f32,
+    /// The active tab the strip last scrolled into view.
+    tab_scrolled_to: Option<egui::Id>,
+    /// The window has the system's title bar (see `title_bar`).
+    decorated: bool,
+    /// Windows' border was last asked shown (true) or hidden (see `title_bar::sync_border`).
+    window_border: Option<bool>,
 }
 
 impl App {
-    /// `open_arg`: a repository passed on the command line, opened (or focused) on start.
-    pub fn new(cc: &eframe::CreationContext<'_>, open_arg: Option<PathBuf>) -> Self {
-        let saved: Saved = cc
-            .storage
-            .and_then(|s| eframe::get_value(s, eframe::APP_KEY))
-            .unwrap_or_default();
-        let ctx = &cc.egui_ctx;
-        egui_extras::install_image_loaders(ctx);
-        crate::image_fit::install(ctx);
-        theme::install_fonts(ctx);
-        theme::apply(ctx, saved.theme);
-        saved.settings.set(ctx);
-        crate::desktop_entry::refresh();
-
-        let mut app = Self {
-            git_version: git::version(),
-            tabs: Vec::new(),
-            switcher_query: String::new(),
-            switcher_focus: false,
-            switch_to: None,
-            close_worktree: false,
-            active: 0,
-            recent: saved.recent,
-            theme: saved.theme,
-            clone_parent: saved.clone_parent,
-            settings: saved.settings.clone(),
-            manual_open: false,
-            palette: None,
-            toasts: Vec::new(),
-            closed: Vec::new(),
-            tab_drag: None,
-            error: None,
-            was_focused: true,
-            clone_form: None,
-            cloning: None,
-            cloning_form: None,
-            update: None,
-            update_rx: None,
-            update_looked: None,
-            update_later: false,
-            update_error: None,
-            skipped_version: saved.skipped_version,
-            tab_looks: saved.tab_looks,
-        };
-        update::clean_up();
-        let mut kept = Vec::new();
-        if app.git_version.is_ok() {
-            for path in saved.open {
-                let is_dir = path.is_dir();
-                kept.push(is_dir);
-                if is_dir {
-                    // Read once shown, or once the one shown is read: one at a time first.
-                    app.tabs
-                        .push(Tab::Repo(Box::new(RepoTab::new_deferred(path, ctx))));
-                }
-            }
-        }
-        if app.tabs.is_empty() {
-            app.tabs.push(Tab::Home);
-        }
-        app.active = active_among_kept(&kept, saved.active).min(app.tabs.len() - 1);
-        if let Some(path) = open_arg
-            && app.git_version.is_ok()
-        {
-            app.open_repo(&path, ctx);
-        }
-        app
+    fn set_theme(&mut self, ctx: &egui::Context, id: ThemeId) {
+        self.theme = id;
+        self.apply_theme(ctx);
     }
 
-    /// Opens `path` as the start page's "Open" button does (for `examples/ui_shot.rs`).
-    pub fn open_tab(&mut self, path: &Path, ctx: &egui::Context) {
-        self.open_repo(path, ctx);
-    }
-
-    /// Opens `path` in the active tab if it's a start page, otherwise in a new tab.
-    fn open_repo(&mut self, path: &Path, ctx: &egui::Context) {
-        let root = match repo_root(path) {
-            Ok(root) => root,
-            Err(e) => {
-                self.error = Some(e);
-                return;
-            }
-        };
-        self.remember(&root);
-        self.error = None;
-
-        if let Some(i) = self
-            .tabs
-            .iter()
-            .position(|t| matches!(t, Tab::Repo(r) if r.path == root))
-        {
-            self.active = i;
-            return;
-        }
-        // A worktree parked in some tab comes out with everything it had.
-        let parked = self.take_parked(&root);
-        let came_back = parked.is_some();
-        let mut view = parked.unwrap_or_else(|| Box::new(RepoTab::new(root, ctx)));
-        if came_back {
-            view.resume(ctx);
-        }
-        let tab = Tab::Repo(view);
-        if matches!(self.tabs.get(self.active), Some(Tab::Home)) {
-            self.tabs[self.active] = tab;
-        } else {
-            self.tabs.push(tab);
-            self.active = self.tabs.len() - 1;
-        }
-    }
-
-    fn remember(&mut self, path: &Path) {
-        self.recent.retain(|p| p != path);
-        self.recent.insert(0, path.to_owned());
-        self.recent.truncate(MAX_RECENT);
-    }
-
-    fn set_theme(&mut self, ctx: &egui::Context, kind: ThemeKind) {
-        self.theme = kind;
-        theme::apply(ctx, kind);
-    }
-
-    /// Looks for a newer release once on start, and again when the update settings change;
-    /// takes in what was found.
-    fn poll_update(&mut self, ctx: &egui::Context) {
-        let s = &self.settings;
-        let want = (s.check_updates, s.update_channel, s.download_updates);
-        if self.update_looked != Some(want) {
-            self.update_looked = Some(want);
-            self.update = None;
-            self.update_rx = None;
-            let (check, releases, download) = want;
-            if check {
-                let (tx, rx) = channel();
-                let ctx = ctx.clone();
-                let skipped = self.skipped_version.clone();
-                std::thread::spawn(move || {
-                    let _ = tx.send(update::look(releases, download, &skipped));
-                    ctx.request_repaint();
-                });
-                self.update_rx = Some(rx);
-            }
-        }
-        let Some(rx) = &self.update_rx else { return };
-        let Ok(result) = rx.try_recv() else { return };
-        self.update_rx = None;
-        // A failed look (offline…) is tried again next start.
-        self.update = result.ok().flatten();
-    }
-
-    /// Keyboard shortcuts, and the reload on coming back to the window. Returns whether the
-    /// window has the focus.
-    fn shortcuts(&mut self, ctx: &egui::Context) -> bool {
-        // A focused text field or the terminal keeps these keys for itself.
-        let modal_open = self.clone_form.is_some()
-            || self.palette.is_some()
-            || self.manual_open
-            || ctx.egui_wants_keyboard_input();
-        let (new_tab, reopen, close, refresh, focused, palette, manual) = ctx.input(|i| {
-            let t = i.modifiers.command && i.key_pressed(Key::T);
-            (
-                t && !i.modifiers.shift,
-                t && i.modifiers.shift,
-                i.modifiers.command && i.key_pressed(Key::W),
-                i.key_pressed(Key::F5),
-                i.focused,
-                i.modifiers.command && i.key_pressed(Key::P),
-                i.key_pressed(Key::F1),
-            )
-        });
-        if manual && self.clone_form.is_none() && self.palette.is_none() {
-            self.manual_open = !self.manual_open;
-        }
-        if palette && self.clone_form.is_none() {
-            if self.palette.is_some() {
-                self.palette = None;
-            } else {
-                self.open_palette();
-            }
-        }
-        if new_tab && !modal_open {
-            self.new_tab();
-        }
-        if reopen && !modal_open {
-            self.reopen_closed_tab(ctx);
-        }
-        if close && !modal_open {
-            self.close_tab(self.active, ctx);
-        }
-        // Coming back to the window (e.g. after using git elsewhere) refreshes the open repo.
-        let regained = focused && !self.was_focused;
-        self.was_focused = focused;
-        if let Some(Tab::Repo(r)) = self.tabs.get_mut(self.active)
-            && ((refresh && !modal_open) || regained)
-        {
-            r.reload(ctx);
-        }
-        focused
-    }
-
-    /// The active tab's page under the strip.
-    fn active_tab_ui(&mut self, ui: &mut Ui, t: &Tokens) {
-        let ctx = ui.ctx().clone();
-        let active = self.active;
-        match self.tabs.get_mut(active) {
-            Some(Tab::Repo(repo)) => {
-                repo.keys_blocked =
-                    self.palette.is_some() || self.manual_open || self.clone_form.is_some();
-                // Its widgets' state (scroll offsets, text fields' undo, open menus) is its own:
-                // every repository tab lays out the same widgets, which would otherwise share
-                // it with the tab shown before.
-                let scope = repo_scope(&repo.path);
-                ui.push_id(scope, |ui| repo.ui(ui));
-                // A tab asked for a folder to be opened.
-                match repo.open_request.take() {
-                    Some(OpenRequest::NewTab(path)) => self.open_repo(&path, &ctx),
-                    Some(OpenRequest::Worktree(path)) => self.open_worktree(&path, &ctx),
-                    None => {}
-                }
-            }
-            Some(Tab::Settings) => {
-                egui::CentralPanel::default()
-                    .frame(egui::Frame::new().fill(t.dock))
-                    .show(ui, |ui| self.settings_page(ui));
-            }
-            _ => {
-                egui::CentralPanel::default()
-                    .frame(egui::Frame::new().fill(t.dock))
-                    .show(ui, |ui| self.home(ui));
-            }
-        }
-    }
-}
-
-impl eframe::App for App {
-    fn ui(&mut self, ui: &mut Ui, _frame: &mut eframe::Frame) {
-        let ctx = ui.ctx().clone();
-        let t = Tokens::get(&ctx);
-        // Column widths dragged in a graph header live in the context; keep them for saving.
-        self.settings = Settings::get(&ctx);
-
-        // eframe shows the window after the first frame; maximize it on the next one.
-        if MAXIMIZE_WHEN_SHOWN.load(Ordering::Relaxed) {
-            if ctx.cumulative_frame_nr() >= 1 {
-                MAXIMIZE_WHEN_SHOWN.store(false, Ordering::Relaxed);
-                ctx.send_viewport_cmd(egui::ViewportCommand::Maximized(true));
-            } else {
-                ctx.request_repaint();
-            }
-        }
-
-        if let Err(err) = self.git_version.clone() {
-            egui::CentralPanel::default()
-                .frame(egui::Frame::new().fill(t.dock))
-                .show(ui, |ui| self.git_missing(ui, &err));
-            return;
-        }
-        self.poll_clone(&ctx);
-        self.poll_update(&ctx);
-        let focused = self.shortcuts(&ctx);
-
-        // Background repos still need their results drained. Those restored on start are read
-        // once the one shown is: they would otherwise all compete with it.
-        let shown_read = !matches!(self.tabs.get(self.active), Some(Tab::Repo(r)) if r.opening());
-        for (i, tab) in self.tabs.iter_mut().enumerate() {
-            if let Tab::Repo(r) = tab
-                && i != self.active
-            {
-                if shown_read {
-                    r.start_deferred(&ctx);
-                }
-                r.poll(&ctx);
-            }
-        }
-
-        // Worktrees parked in any tab keep going too.
-        for tab in &mut self.tabs {
-            if let Tab::Repo(r) = tab {
-                r.poll_parked(&ctx);
-            }
-        }
-
-        egui::Panel::top("tabs")
-            .frame(
-                egui::Frame::new()
-                    .fill(t.tab_strip)
-                    .inner_margin(egui::Margin {
-                        left: 6,
-                        right: 6,
-                        top: 0,
-                        bottom: 0,
-                    }),
-            )
-            .show(ui, |ui| self.tab_strip(ui));
-        self.update_banner(ui);
-        if let Some(path) = self.switch_to.take() {
-            self.open_worktree(&path, &ctx);
-        }
-        if std::mem::take(&mut self.close_worktree) {
-            self.close_current_worktree(&ctx);
-        }
-
-        self.active_tab_ui(ui, &t);
-        self.clone_dialog(&ctx);
-        self.palette_ui(&ctx);
-        self.manual_ui(&ctx);
-        self.toast_finished(focused);
-        self.toasts_ui(&ctx);
-    }
-
-    fn save(&mut self, storage: &mut dyn eframe::Storage) {
-        let open: Vec<PathBuf> = self
-            .tabs
-            .iter()
-            .filter_map(|t| match t {
-                Tab::Repo(r) => Some(r.path.clone()),
-                Tab::Home | Tab::Settings => None,
-            })
-            .collect();
-        // Index of the active tab among the saved (repo) tabs.
-        let active = self
-            .tabs
-            .iter()
-            .take(self.active + 1)
-            .filter(|t| matches!(t, Tab::Repo(_)))
-            .count()
-            .saturating_sub(1);
-        let saved = Saved {
-            open,
-            active,
-            recent: self.recent.clone(),
-            theme: self.theme,
-            clone_parent: self.clone_parent.clone(),
-            settings: self.settings.clone(),
-            skipped_version: self.skipped_version.clone(),
-            tab_looks: self.tab_looks.clone(),
-        };
-        eframe::set_value(storage, eframe::APP_KEY, &saved);
-    }
-}
-
-/// Where the tab that was active at `active` is once the tabs not `kept` (their folder is gone)
-/// are left out: a gone one passes to the tab before it.
-fn active_among_kept(kept: &[bool], active: usize) -> usize {
-    kept.iter()
-        .take(active.saturating_add(1))
-        .filter(|&&k| k)
-        .count()
-        .saturating_sub(1)
-}
-
-/// What the widgets of the repository tab of `path` are told apart from another tab's by.
-fn repo_scope(path: &Path) -> egui::Id {
-    egui::Id::new(("repo-tab", path))
-}
-
-/// The top of the repository `path` is in, in the form tabs are told apart by.
-fn repo_root(path: &Path) -> Result<PathBuf, String> {
-    let root = git::toplevel(path)?;
-    let root = std::fs::canonicalize(&root).unwrap_or(root);
-    Ok(strip_verbatim(root))
-}
-
-/// Work the first frame will need, started before the window is made so that it overlaps with
-/// that: on macOS, asking the login shell for its PATH, which every git call waits for (its
-/// profile scripts can take seconds).
-pub fn warm_up() {
-    std::thread::spawn(|| {
-        let _ = crate::shell_path::path();
-    });
-}
-
-/// Once the window closed: starts the version an update put in place, if it did.
-pub fn after_exit() {
-    update::relaunch();
-}
-
-/// The window and taskbar icon (the `.exe` gets the same picture from `build.rs`).
-pub fn window_icon() -> egui::IconData {
-    eframe::icon_data::from_png_bytes(include_bytes!("../../assets/app-icon/gitcraft-256.png"))
-        .unwrap_or_default()
-}
-
-/// `canonicalize` on Windows returns `\\?\C:\…`; show and store the familiar form.
-fn strip_verbatim(path: PathBuf) -> PathBuf {
-    let s = path.to_string_lossy();
-    match s.strip_prefix(r"\\?\") {
-        Some(rest) if !rest.starts_with("UNC") => PathBuf::from(rest),
-        _ => path,
+    /// Paints the app with its theme and the settings' tweaks of it.
+    fn apply_theme(&self, ctx: &egui::Context) {
+        theme::apply(ctx, &self.theme, &self.settings.theme_tweaks);
     }
 }

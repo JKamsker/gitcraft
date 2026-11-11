@@ -8,7 +8,7 @@ use crate::repo::diff::Kind;
 
 use super::LineTarget;
 
-/// The side and number of a diff line a comment can go on, if it can: GitHub takes them on the
+/// The side and number of a diff line a comment can go on, if it can: forges take them on the
 /// lines of the diff, in `column` (the old or new half of the side-by-side view, `None` for the
 /// unified one).
 pub(in crate::repo) fn target_of(
@@ -42,9 +42,15 @@ pub(super) fn suggestion_applies(thread: &Thread, comment_pending: bool, open: b
 /// Which lines a suggestion replaces.
 pub(super) fn suggestion_scope(start: u64, end: u64) -> String {
     if start == end {
-        format!("Replaces line {end}")
+        crate::i18n::message(
+            "repo-workflows-pr_review-suggestion-scope-d3d41027",
+            &[("end", (end).into())],
+        )
     } else {
-        format!("Replaces lines {start} to {end}")
+        crate::i18n::message(
+            "repo-workflows-pr_review-suggestion-scope-3e80b4eb",
+            &[("start", (start).into()), ("end", (end).into())],
+        )
     }
 }
 
@@ -90,6 +96,8 @@ pub(in crate::repo) struct DiffReview {
     pub marks: HashMap<(DiffSide, u64), usize>,
     pub target: Option<LineTarget>,
     pub path: String,
+    /// Notes for the coding agent, kept here, not comments on a pull request.
+    pub local: bool,
 }
 
 #[cfg(test)]

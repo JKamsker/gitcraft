@@ -2,34 +2,54 @@
 
 use egui::{Rect, Sense, Stroke, Ui, pos2, vec2};
 
-use super::{HANDLE_COLOR, HANDLE_GAP, HANDLE_WIDTH};
+use super::{HANDLE_COLOR, HANDLE_WIDTH};
 use crate::repo::RepoTab;
-use crate::repo::columns::{Bar, Cols};
+use crate::repo::columns::{Bar, Cols, DescriptionSpace};
 use crate::settings::Settings;
 use crate::theme::Tokens;
 
-/// Keeps the widths after a drag of `bar` from the preferred `prefs` in the settings.
-/// Only what changed: hidden columns keep their width. The graph keeps its fit to the lanes
-/// unless its own bar is dragged: dragging another bar in a narrow view would otherwise save
-/// the squeezed graph width, and the graph would stay that narrow once the view widens.
-fn save_drag(next: &mut Settings, bar: Bar, prefs: &Cols, widths: &Cols) {
+/// One pointer gesture, including its original grab offset and saved preference.
+#[derive(Clone, Copy)]
+struct DragStart {
+    prefs: Cols,
+    shown: Cols,
+    description: DescriptionSpace,
+    available: f32,
+    pointer: f32,
+    preference: f32,
+    auto_refs_width: bool,
+}
+
+/// Persist only the intended column; temporary viewport compression is never saved.
+fn save_drag(next: &mut Settings, bar: Bar, _prefs: &Cols, widths: &Cols) {
     next.last_resized = Some(bar);
-    for (col, setting) in [
-        (Bar::Refs, &mut next.refs_width),
-        (Bar::Graph, &mut next.graph_width),
-        (Bar::Hash, &mut next.hash_width),
-        (Bar::Author, &mut next.author_width),
-        (Bar::When, &mut next.when_width),
-        (Bar::Date, &mut next.date_width),
-    ] {
-        if col == Bar::Graph && bar != Bar::Graph {
-            continue;
-        }
-        if widths.width(col) != prefs.width(col) {
-            *setting = widths.width(col);
-        }
+    if bar == Bar::Refs {
+        next.auto_refs_width = false;
     }
+    *preference_mut(next, bar) = widths.width(bar);
+
     next.column_push = widths.push;
+}
+
+fn preference_mut(settings: &mut Settings, bar: Bar) -> &mut f32 {
+    match bar {
+        Bar::Refs => &mut settings.refs_width,
+        Bar::Graph => &mut settings.graph_width,
+        Bar::Hash => &mut settings.hash_width,
+        Bar::Author => &mut settings.author_width,
+        Bar::When => &mut settings.when_width,
+        Bar::Date => &mut settings.date_width,
+    }
+}
+fn preference(settings: &Settings, bar: Bar) -> f32 {
+    match bar {
+        Bar::Refs => settings.refs_width,
+        Bar::Graph => settings.graph_width,
+        Bar::Hash => settings.hash_width,
+        Bar::Author => settings.author_width,
+        Bar::When => settings.when_width,
+        Bar::Date => settings.date_width,
+    }
 }
 
 impl RepoTab {
@@ -48,21 +68,7 @@ impl RepoTab {
     ) {
         let t = Tokens::get(ui.ctx());
         let mut next = settings.clone();
-        // The right-hand columns start their text exactly on the border: keep the line off it.
-        let right = header.right() - HANDLE_GAP;
-        // (bar, x of the border, shown)
-        let borders = [
-            (Bar::Refs, header.left() + cols.refs, true),
-            (Bar::Graph, header.left() + cols.refs + cols.graph, true),
-            (Bar::Hash, right - cols.trailing(), cols.hash > 0.0),
-            (
-                Bar::Author,
-                right - cols.author - cols.when - cols.date,
-                cols.author > 0.0,
-            ),
-            (Bar::When, right - cols.when - cols.date, cols.when > 0.0),
-            (Bar::Date, right - cols.date, cols.date > 0.0),
-        ];
+        let borders = Bar::ALL.map(|bar| (bar, cols.border(header, bar), cols.width(bar) > 0.0));
         for (bar, x, shown) in borders {
             if !shown {
                 continue;
@@ -73,9 +79,16 @@ impl RepoTab {
                 .interact(
                     grab,
                     ui.id().with(("col-handle", bar)),
-                    Sense::click_and_drag(),
+                    // Not a Tab stop: the keyboard can't drag it.
+                    Sense::CLICK | Sense::DRAG,
                 )
                 .on_hover_cursor(egui::CursorIcon::ResizeHorizontal);
+            crate::repo::widgets::a11y(&resp, egui::WidgetType::ResizeHandle, || {
+                crate::i18n::message(
+                    "repo-core-2609",
+                    &[("bar", bar_name(bar).to_string().into())],
+                )
+            });
             let active = resp.hovered() || resp.dragged();
             ui.painter().line_segment(
                 [pos2(x, header.top() + 5.0), pos2(x, header.bottom() - 5.0)],
@@ -86,16 +99,54 @@ impl RepoTab {
                 next.graph_width = 0.0;
                 continue;
             }
-            // Measured from the pointer, not its movement: past a column's limit the bar waits
-            // there and only moves again once the pointer comes back to it.
-            let dx = resp
-                .interact_pointer_pos()
-                .map_or(0.0, |pointer| pointer.x - x);
-            if !resp.dragged() || dx == 0.0 {
+            let drag_id = ui.id().with(("column-drag-start", bar));
+            // egui's press origin preserves the offset anywhere within the ten-point hit area.
+            if resp.drag_started() {
+                let origin = ui.input(|i| i.pointer.press_origin()).map_or(x, |p| p.x);
+                ui.data_mut(|d| {
+                    d.insert_temp(
+                        drag_id,
+                        DragStart {
+                            prefs: *prefs,
+                            shown: *cols,
+                            description: settings.description_space,
+                            available: header.width(),
+                            pointer: origin,
+                            preference: preference(settings, bar),
+                            auto_refs_width: settings.auto_refs_width,
+                        },
+                    )
+                });
+            }
+            if resp.drag_stopped() {
+                ui.data_mut(|d| d.remove::<DragStart>(drag_id));
+            }
+            if !resp.dragged() {
                 continue;
             }
-            let widths = bar.drag(prefs, settings.last_resized, dx, header.width());
+            let Some(start) = ui.data(|d| d.get_temp::<DragStart>(drag_id)) else {
+                continue;
+            };
+            let dx = resp
+                .interact_pointer_pos()
+                .map_or(0.0, |p| p.x - start.pointer);
+            // Compute the proposed displayed width independently of the saved preference.
+            // A compressed column can reach that preference away from the pointer origin.
+            let widths = bar.drag_shown(&start.shown, &start.shown, dx, start.available);
             save_drag(&mut next, bar, prefs, &widths);
+            // Returning to the origin and blocked gestures both leave the shown width intact.
+            if widths.width(bar) == start.shown.width(bar) {
+                *preference_mut(&mut next, bar) = start.preference;
+                next.description_space = start.description;
+                if bar == Bar::Refs {
+                    next.auto_refs_width = start.auto_refs_width;
+                }
+            } else {
+                // Retain each sibling's compression, not just the total Description space.
+                // prefs was captured after readable_viewport's automatic refs adjustment.
+                next.description_space =
+                    DescriptionSpace::exchanged(start.available, &start.prefs, &widths, bar);
+            }
         }
         if next != *settings {
             next.set(ui.ctx());
@@ -105,32 +156,22 @@ impl RepoTab {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn dragging_another_bar_keeps_the_graph_fitted_to_its_lanes() {
-        let prefs = Cols {
-            refs: 200.0,
-            graph: 100.0,
-            hash: 0.0,
-            author: 150.0,
-            when: 0.0,
-            date: 0.0,
-            push: 0.0,
-        };
-        // A narrow view: the graph is squeezed on screen.
-        let widths = Bar::Author.drag(&prefs, None, -10.0, 550.0);
-        assert_ne!(widths.graph, prefs.graph);
-        let mut next = Settings::default();
-        save_drag(&mut next, Bar::Author, &prefs, &widths);
-        assert_eq!(next.graph_width, 0.0);
-        assert_eq!(next.author_width, widths.author);
-        assert_eq!(next.last_resized, Some(Bar::Author));
-        // Its own bar still sets it.
-        let widths = Bar::Graph.drag(&prefs, None, 10.0, 700.0);
-        save_drag(&mut next, Bar::Graph, &prefs, &widths);
-        assert_eq!(next.graph_width, 110.0);
+/// The column a bar resizes, as a screen reader says it.
+fn bar_name(bar: Bar) -> &'static str {
+    match bar {
+        Bar::Refs => "branches",
+        Bar::Graph => "graph",
+        Bar::Hash => "hash",
+        Bar::Author => "author",
+        Bar::When => "age",
+        Bar::Date => crate::i18n::text("repo-core-2271"),
     }
 }
+
+#[cfg(test)]
+#[path = "handles_tests.rs"]
+mod tests;
+
+#[cfg(test)]
+#[path = "handles_interaction_tests.rs"]
+mod interaction_tests;

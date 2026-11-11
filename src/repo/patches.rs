@@ -10,56 +10,228 @@ use crate::git;
 impl RepoTab {
     /// Asks where to save the patch of commit `hash`, then writes it there.
     pub(super) fn save_patch(&mut self, hash: String, summary: &str, ctx: &egui::Context) {
-        let Some(file) = rfd::FileDialog::new()
-            .set_title("Save patch")
-            .set_directory(&self.path)
+        let mut dialog = rfd::FileDialog::new().set_title(crate::i18n::text("repo-core-3012"));
+        // Saved on this machine: next to the repository when it is here (a folder in WSL
+        // would make the dialog wait for WSL).
+        if !crate::remote::is_remote(&self.path) {
+            dialog = dialog.set_directory(&self.path);
+        }
+        let Some(file) = dialog
             .set_file_name(patch_file_name(summary))
-            .add_filter("Patch", &["patch"])
+            .add_filter(crate::i18n::text("repo-core-3013"), &["patch"])
             .save_file()
         else {
             return;
         };
         let path = self.path.clone();
         spawn(&self.tx, ctx, move || {
-            let result = git::run_bytes(Some(&path), &["format-patch", "-1", "--stdout", &hash])
-                .and_then(|patch| {
-                    std::fs::write(&file, patch).map_err(|e| format!("could not save it: {e}"))
-                });
+            let result = git::run_to_file(&path, &["format-patch", "-1", "--stdout", &hash], &file);
             Msg::PatchSaved(file, result)
         });
     }
 
     pub(super) fn patch_saved(&mut self, file: PathBuf, result: Result<(), String>) {
-        self.status = Some(match result {
-            Ok(()) => (format!("Patch saved to {}", file.display()), false),
-            Err(e) => (format!("Create patch failed: {e}"), true),
-        });
+        self.status = Some(crate::repo::Notice::plain(match result {
+            Ok(()) => (
+                crate::i18n::message(
+                    "repo-core-3016",
+                    &[("file", format!("{}", file.display()).into())],
+                ),
+                false,
+            ),
+            Err(e) => (
+                crate::i18n::message("repo-core-3017", &[("e", e.to_string().into())]),
+                true,
+            ),
+        }));
     }
 
     /// Asks for a patch file and applies it, undoably.
     pub(super) fn apply_patch(&mut self, ctx: &egui::Context) {
-        let Some(file) = rfd::FileDialog::new()
-            .set_title("Apply patch")
-            .set_directory(&self.path)
-            .add_filter("Patch", &["patch", "diff", "eml", "mbox"])
-            .add_filter("All files", &["*"])
+        let mut dialog = rfd::FileDialog::new().set_title(crate::i18n::text("repo-core-3018"));
+        if !crate::remote::is_remote(&self.path) {
+            dialog = dialog.set_directory(&self.path);
+        }
+        let Some(file) = dialog
+            .add_filter(
+                crate::i18n::text("repo-core-3013"),
+                &["patch", "diff", "eml", "mbox"],
+            )
+            .add_filter(crate::i18n::text("repo-core-3021"), &["*"])
             .pick_file()
         else {
             return;
         };
-        let text = match std::fs::read(&file) {
-            Ok(bytes) => String::from_utf8_lossy(&bytes).into_owned(),
+        self.apply_patch_from(file, false, ctx);
+    }
+
+    /// Applies the patch file `file` (of this machine) to the repository, undoably: a mail as
+    /// commits (`git am`), a bare diff on the working tree (`git apply`). For a patch dropped on
+    /// the window; how it went is told by [`Self::take_dropped_patch_outcome`]. Refused while
+    /// the tab runs an operation or applies another dropped patch.
+    pub fn apply_dropped_patch(
+        &mut self,
+        file: PathBuf,
+        ctx: &egui::Context,
+    ) -> Result<(), String> {
+        if let Some(busy) = &self.busy_op {
+            return Err(crate::i18n::message(
+                "repo-core-3022",
+                &[
+                    ("name", self.name.to_string().into()),
+                    (
+                        "busy",
+                        crate::repo::messages::display_operation(busy).into(),
+                    ),
+                ],
+            ));
+        }
+        if matches!(
+            self.dropped_patch,
+            DroppedPatch::Preparing | DroppedPatch::Running(_)
+        ) {
+            return Err(crate::i18n::message(
+                "repo-core-3023",
+                &[("name", self.name.to_string().into())],
+            ));
+        }
+        self.status = None;
+        self.dropped_patch = DroppedPatch::Preparing;
+        self.apply_patch_from(file, true, ctx);
+        Ok(())
+    }
+
+    /// Whether a dropped patch given now would have to wait: the tab runs an operation, or
+    /// applies the patch dropped before.
+    pub fn dropped_patch_waits(&self) -> bool {
+        self.busy_op.is_some()
+            || matches!(
+                self.dropped_patch,
+                DroppedPatch::Preparing | DroppedPatch::Running(_)
+            )
+    }
+
+    /// How the dropped patch went, once it is done (taken: asked once).
+    pub fn take_dropped_patch_outcome(&mut self) -> Option<Result<(), String>> {
+        match std::mem::take(&mut self.dropped_patch) {
+            DroppedPatch::Done(result) => Some(result),
+            other => {
+                self.dropped_patch = other;
+                None
+            }
+        }
+    }
+
+    /// The operation `label` ended: when it applied the dropped patch, that is how it went.
+    pub(super) fn dropped_patch_done(&mut self, label: &str, result: &Result<String, String>) {
+        if matches!(&self.dropped_patch, DroppedPatch::Running(l) if l == label) {
+            self.dropped_patch = DroppedPatch::Done(result.clone().map(|_| ()));
+        }
+    }
+
+    /// Reads `file` and applies it (see [`Self::apply_dropped_patch`]); `dropped` keeps track
+    /// of how it goes.
+    fn apply_patch_from(&mut self, file: PathBuf, dropped: bool, ctx: &egui::Context) {
+        // Copied as it is (a patch can carry bytes of any encoding); read as text only to tell
+        // a mail from a bare diff.
+        let bytes = match std::fs::read(&file) {
+            Ok(bytes) => bytes,
             Err(e) => {
-                self.status = Some((format!("Apply patch: could not read it: {e}"), true));
+                let why = crate::i18n::message(
+                    "repo-core-3024",
+                    &[
+                        ("file", file_name(&file).to_string().into()),
+                        ("e", format!("{}", e).into()),
+                    ],
+                );
+                self.status = Some(crate::repo::Notice::plain((
+                    crate::i18n::message("repo-core-3025", &[("why", why.to_string().into())]),
+                    true,
+                )));
+                if dropped {
+                    self.dropped_patch = DroppedPatch::Done(Err(why));
+                }
                 return;
             }
         };
         let label = format!("Apply {}", file_name(&file));
-        let file = file.to_string_lossy().into_owned();
-        if is_mail(&text) {
+        let mail = is_mail(&String::from_utf8_lossy(&bytes));
+        // For a repository on another machine, git there reads a copy put there (in the
+        // background). A panic there still comes back as an error, so that a dropped patch
+        // isn't waited for forever.
+        let repo = self.path.clone();
+        self.here_or_later(
+            ctx,
+            move || {
+                std::panic::catch_unwind(std::panic::AssertUnwindSafe(
+                    || match crate::remote::parse(&repo) {
+                        Some(target) => {
+                            crate::remote::host_temp_file(&target, "apply.patch", &bytes)
+                        }
+                        None => Ok(file.to_string_lossy().into_owned()),
+                    },
+                ))
+                .unwrap_or_else(|_| Err(crate::i18n::text("repo-core-3028").to_owned()))
+            },
+            move |tab, file, ctx| tab.apply_prepared_patch(label, file, mail, dropped, ctx),
+        );
+    }
+
+    /// The patch is where git reads it (`file`), or couldn't be put there: applies it.
+    fn apply_prepared_patch(
+        &mut self,
+        label: String,
+        file: Result<String, String>,
+        mail: bool,
+        dropped: bool,
+        ctx: &egui::Context,
+    ) {
+        let started = match file {
+            Err(e) => Err(e),
+            // Another operation started meanwhile: it would not start, silently.
+            Ok(_) if self.busy_op.is_some() => Err(crate::i18n::message(
+                "repo-core-3029",
+                &[(
+                    "self",
+                    self.busy_op.clone().unwrap_or_default().to_string().into(),
+                )],
+            )),
+            Ok(file) => {
+                self.apply_patch_file(&label, &file, mail, ctx);
+                Ok(())
+            }
+        };
+        match started {
+            Ok(()) if dropped => self.dropped_patch = DroppedPatch::Running(label),
+            Ok(()) => {}
+            Err(e) => {
+                self.status = Some(crate::repo::Notice::plain((
+                    crate::i18n::message(
+                        "repo-core-0270",
+                        &[
+                            (
+                                "label",
+                                crate::repo::messages::display_operation(&label).into(),
+                            ),
+                            ("e", e.to_string().into()),
+                        ],
+                    ),
+                    true,
+                )));
+                if dropped {
+                    self.dropped_patch = DroppedPatch::Done(Err(e));
+                }
+            }
+        }
+    }
+
+    /// Applies the patch at `file` (as git reads it), as commits when it is a `mail`.
+    fn apply_patch_file(&mut self, label: &str, file: &str, mail: bool, ctx: &egui::Context) {
+        let label = label.to_owned();
+        if mail {
             self.run_undoable(
                 &label,
-                ops(&[&["am", "--3way", &file]]),
+                ops(&[&["am", "--3way", file]]),
                 Refresh::All,
                 Undo::HeadMove { mode: "--keep" },
                 ctx,
@@ -67,16 +239,29 @@ impl RepoTab {
         } else {
             self.run_undoable(
                 &label,
-                ops(&[&["apply", &file]]),
+                ops(&[&["apply", file]]),
                 Refresh::All,
                 Undo::Custom {
-                    undo: ops(&[&["apply", "-R", &file]]),
-                    redo: ops(&[&["apply", &file]]),
+                    undo: ops(&[&["apply", "-R", file]]),
+                    redo: ops(&[&["apply", file]]),
                 },
                 ctx,
             );
         }
     }
+}
+
+/// Where a patch dropped on the window is.
+#[derive(Debug, Default)]
+pub(super) enum DroppedPatch {
+    #[default]
+    None,
+    /// Being read, or copied to the repository's machine.
+    Preparing,
+    /// Being applied by the operation so labelled.
+    Running(String),
+    /// Done: how it went.
+    Done(Result<(), String>),
 }
 
 fn file_name(path: &Path) -> String {

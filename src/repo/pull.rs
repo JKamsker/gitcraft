@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use super::{Action, Refresh, RepoTab, Undo, ops};
 use crate::settings::Settings;
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum PullMode {
     /// Fast-forward if possible, merge otherwise.
     Merge,
@@ -38,15 +38,23 @@ impl PullMode {
     }
 
     /// What the toolbar's Pull says it does.
-    pub fn tip(self) -> String {
+    pub fn tip(self, ctx: &egui::Context) -> String {
         let what = match self {
-            PullMode::Merge => "Fast-forward the current branch, or merge when it has diverged",
-            PullMode::FastForwardOnly => "Fast-forward the current branch",
-            PullMode::Rebase => "Rebase the current branch onto its upstream",
+            PullMode::Merge => crate::i18n::text("repo-core-3099"),
+            PullMode::FastForwardOnly => crate::i18n::text("repo-core-3100"),
+            PullMode::Rebase => crate::i18n::text("repo-core-3101"),
         };
-        format!(
-            "{what} (git {})\nRight-click or the arrow to choose",
-            self.args().join(" ")
+        crate::i18n::message(
+            "repo-core-3102",
+            &[
+                (
+                    "Pull",
+                    crate::keymap::tip(ctx, what, crate::keymap::Command::Pull)
+                        .to_string()
+                        .into(),
+                ),
+                ("self", self.args().join(" ").to_string().into()),
+            ],
         )
     }
 }
@@ -68,18 +76,27 @@ impl RepoTab {
 pub(super) fn pull_menu(ui: &mut Ui, acts: &mut Vec<Action>) {
     let mut settings = Settings::get(ui.ctx());
     for mode in PullMode::ALL {
-        if ui
-            .radio(settings.pull_mode == mode, mode.label())
-            .on_hover_text(format!("git {}", mode.args().join(" ")))
-            .clicked()
-            && settings.pull_mode != mode
-        {
+        let radio = ui
+            .radio(
+                settings.pull_mode == mode,
+                super::messages::display_operation(mode.label()),
+            )
+            .on_hover_text(format!("git {}", mode.args().join(" ")));
+        super::ghost::offer(&radio, || super::ghost::GhostOp::Pull(mode));
+        if radio.clicked() && settings.pull_mode != mode {
             settings.pull_mode = mode;
             settings.set(ui.ctx());
         }
     }
     ui.separator();
-    if ui.button("Fetch all").clicked() {
+    if ui
+        .add(
+            egui::Button::new(crate::i18n::text("repo-core-3104")).shortcut_text(
+                crate::keymap::label(ui.ctx(), crate::keymap::Command::Fetch),
+            ),
+        )
+        .clicked()
+    {
         acts.push(Action::Fetch);
     }
 }

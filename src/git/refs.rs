@@ -1,10 +1,11 @@
 //! Branches, tags, remotes and stashes.
 
+use std::collections::HashMap;
 use std::path::Path;
 
 use super::{FS, UTF8, run};
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Branch {
     /// Short name, e.g. `main` or `origin/main`.
     pub name: String,
@@ -36,9 +37,11 @@ impl Branch {
     }
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Refs {
     pub local: Vec<Branch>,
+    /// Local branch → push remote, including `pushRemote` and `remote.pushDefault`.
+    pub push_remotes: HashMap<String, String>,
     /// Remote name → branches of that remote.
     pub remotes: Vec<(String, Vec<Branch>)>,
     pub tags: Vec<Branch>,
@@ -47,11 +50,21 @@ pub struct Refs {
     pub current: Option<String>,
 }
 
+/// Reads branch, tag and remote tips together with local tracking and push destinations.
 pub fn refs(repo: &Path) -> Result<Refs, String> {
+    super::backend::dispatch(
+        repo,
+        super::backend::Read::Refs,
+        super::backend::refs,
+        || refs_cli(repo),
+    )
+}
+
+pub(super) fn refs_cli(repo: &Path) -> Result<Refs, String> {
     // Names are the full ones less `refs/heads/`… and not `%(refname:short)`, which makes a
     // branch `heads/x` when a tag is called `x` too (checking that out detaches HEAD).
     let format = format!(
-        "%(refname){FS}%(objectname){FS}%(HEAD){FS}%(upstream:short){FS}%(upstream:track){FS}%(*objectname)"
+        "%(refname){FS}%(objectname){FS}%(HEAD){FS}%(upstream:short){FS}%(upstream:track){FS}%(*objectname){FS}%(push:remotename)"
     );
     let out = run(
         Some(repo),
@@ -69,7 +82,7 @@ pub fn refs(repo: &Path) -> Result<Refs, String> {
     let mut refs = Refs::default();
     for line in out.lines() {
         let f: Vec<&str> = line.split(FS).collect();
-        let [full, oid, head, upstream, track, peeled] = f[..] else {
+        let [full, oid, head, upstream, track, peeled, push_remote] = f[..] else {
             continue;
         };
         let short = ["refs/heads/", "refs/remotes/", "refs/tags/"]
@@ -86,8 +99,13 @@ pub fn refs(repo: &Path) -> Result<Refs, String> {
             track: track.to_owned(),
         };
         if full.starts_with("refs/heads/") {
+            if !push_remote.is_empty() {
+                refs.push_remotes
+                    .insert(branch.name.clone(), push_remote.to_owned());
+            }
             if branch.is_head {
                 refs.current = Some(branch.name.clone());
+                refs.head = branch.target.clone();
             }
             refs.local.push(branch);
         } else if let Some(rest) = full.strip_prefix("refs/remotes/") {
@@ -103,13 +121,15 @@ pub fn refs(repo: &Path) -> Result<Refs, String> {
             refs.tags.push(branch);
         }
     }
-    refs.head = head(repo);
+    if refs.current.is_none() {
+        refs.head = head(repo);
+    }
     Ok(refs)
 }
 
 /// The remote the remote-tracking branch `rest` (`my/fork/main`) is of: the longest of
 /// `remotes` it is under, else its first part (a remote since removed from the config).
-fn remote_of<'a>(rest: &'a str, remotes: &[&'a str]) -> &'a str {
+pub(super) fn remote_of<'a>(rest: &'a str, remotes: &[&'a str]) -> &'a str {
     remotes
         .iter()
         .copied()
@@ -123,9 +143,13 @@ fn remote_of<'a>(rest: &'a str, remotes: &[&'a str]) -> &'a str {
 
 /// HEAD's commit hash, or empty before the first commit.
 pub fn head(repo: &Path) -> String {
-    run(Some(repo), &["rev-parse", "--verify", "-q", "HEAD"])
-        .map(|s| s.trim().to_owned())
-        .unwrap_or_default()
+    super::backend::dispatch(
+        repo,
+        super::backend::Read::Head,
+        super::backend::head,
+        || run(Some(repo), &["rev-parse", "--verify", "-q", "HEAD"]).map(|s| s.trim().to_owned()),
+    )
+    .unwrap_or_default()
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -194,6 +218,15 @@ pub struct Remote {
 }
 
 pub fn remotes(repo: &Path) -> Result<Vec<Remote>, String> {
+    super::backend::dispatch(
+        repo,
+        super::backend::Read::Remotes,
+        super::backend::remotes,
+        || remotes_cli(repo),
+    )
+}
+
+pub(super) fn remotes_cli(repo: &Path) -> Result<Vec<Remote>, String> {
     let out = run(Some(repo), &["remote", "-v"])?;
     Ok(parse_remotes(&out))
 }
@@ -286,6 +319,31 @@ mod tests {
         assert_eq!(r.remotes.len(), 1);
         assert_eq!(r.remotes[0].0, "my/fork");
         assert_eq!(r.remotes[0].1[0].name, "my/fork/main");
+        Ok(())
+    }
+
+    /// Git resolves both branch-specific and repository-wide triangular push settings.
+    #[test]
+    fn refs_include_configured_push_remotes() -> Result<(), String> {
+        let repo = crate::git::fixture::Repo::new("ci-push-remotes")?;
+        repo.commit("one", &[])?;
+        repo.git(&["remote", "add", "origin", "https://github.com/up/repo.git"])?;
+        repo.git(&["remote", "add", "fork", "https://github.com/me/repo.git"])?;
+        repo.git(&["update-ref", "refs/remotes/origin/main", "HEAD"])?;
+        repo.git(&["branch", "--set-upstream-to", "origin/main"])?;
+        repo.git(&["config", "remote.pushDefault", "fork"])?;
+        let global = refs(repo.path())?;
+        assert_eq!(
+            global.push_remotes.get("main").map(String::as_str),
+            Some("fork")
+        );
+        repo.git(&["config", "branch.main.pushRemote", "origin"])?;
+        let branch = refs(repo.path())?;
+        assert_eq!(
+            branch.push_remotes.get("main").map(String::as_str),
+            Some("origin")
+        );
+        assert_eq!(branch.local[0].upstream, "origin/main");
         Ok(())
     }
 

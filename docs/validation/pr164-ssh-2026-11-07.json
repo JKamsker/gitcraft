@@ -1,0 +1,301 @@
+{
+  "candidate": "bb535932dc795659ebfbd825f193379e086624c1",
+  "tree": "cb12dde9bf5c4a676f04ada0fdf224ef6e755fa3",
+  "base": "78f4dc8b427d2450a5c55d63d8a47fa06987cc6f",
+  "previous_pr_head": "6a75893ec5178a4aaac79ec4b3038efd1c7a2791",
+  "merge_checkpoint": "097d9b11000878ce567532f22b983b36fdb68d17",
+  "ssh_fixture_checkpoint": "56f1276bc596779d655e191b81ad33209b2b2131",
+  "created_utc": "2026-11-07T20:01:44.026760+00:00",
+  "failure": {
+    "job": "https://github.com/JKamsker/gitcraft/actions/runs/42406906219/job/128506453538",
+    "observed": "Main Linux suite3142passed,0failed,10ignored,1filtered; isolated timedcleanup1passed. Newly added real OpenSSH test failed with connection lost after forcing master exit.",
+    "source": "The CI merged tree already included newerdev PR166(native Git reads/SSH transports) and PR168(Windows CI sharding). Integrated those36 upstream files cleanly through merge097d9b11.",
+    "access": "Completed job logs fetched directly through jobs API while run overall was still in progress; no CI rerun or wait."
+  },
+  "fixes": [
+    {
+      "path": "src/remote/transport/unix/tests.rs",
+      "disposition": "test synchronization",
+      "response": "Socket unlink does not prove pooled SSH clients have exited. Assert a nonempty live pool, then wait at most5seconds for both socket disappearance and all owned pooled children to exit before stale-socket reconnection. Never replay a possibly sent command."
+    },
+    {
+      "paths": [
+        "src/remote/pool.rs",
+        "src/remote/shell.rs"
+      ],
+      "disposition": "test-only observation helpers",
+      "response": "cfg(test) methods observe existing owned Child handles with try_wait; pool requires no connecting or active clients and checks all idle clients. No production or signal implementation changed."
+    },
+    {
+      "path": "src/repo/tests.rs",
+      "disposition": "test isolation and stronger assertion",
+      "response": "Focused checks found reads<=before+3 race: watcher readiness independently increments the shared counter twice for status/submodules. Start a live deferred tab explicitly without an OS watcher and require exactly2reads for100reload requests. Completion/history/error assertions retained."
+    }
+  ],
+  "scope": {
+    "upstream": "Native backend, SSH transport, cache and workflow changes retained from dev78f4dc8b; upstream production implementations unchanged. Recovered features remain intact.",
+    "dependencies_workflows": "No diff relative newbase Cargo.toml/Cargo.lock/.github/workflows.",
+    "own_changes_after_merge": "Test-only SSH synchronization and reload fixture; no production change."
+  },
+  "review": {
+    "first": {
+      "candidate": "56f1276bc596779d655e191b81ad33209b2b2131",
+      "result": "PASS",
+      "summary": "No blocking integration regressions. Upstream backend/transport files match the newbase; recovered features unchanged. Owned process wait adds no production replay/retry."
+    },
+    "final": {
+      "candidate": "bb535932dc795659ebfbd825f193379e086624c1",
+      "result": "PASS",
+      "verbatim": "PASS \u2014 bb535932dc795659ebfbd825f193379e086624c1. The sole change isolates reload coalescing from watcher-triggered reads and strengthens the final count to exactly two. Completion, history, and error assertions remain intact. Production is unchanged; prior integration approval carries forward. Read-only review; no tests or CI executed."
+    },
+    "reviewer": "independent adversarial review agent /root/review_codex_integration"
+  },
+  "validation": {
+    "full": {
+      "candidate": "bb535932dc795659ebfbd825f193379e086624c1",
+      "command": "cargo +1.95.0 test --locked -- --test-threads=1",
+      "passed": 3149,
+      "failed": 0,
+      "ignored": 10,
+      "filtered": 0,
+      "result_lines": [
+        "test result: ok. 3140 passed; 0 failed; 10 ignored; 0 measured; 0 filtered out; finished in 524.72s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.34s",
+        "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.68s",
+        "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ]
+    },
+    "focused": {
+      "candidate": "bb535932dc795659ebfbd825f193379e086624c1",
+      "passed": 258,
+      "failed": 0,
+      "ignored": 1,
+      "filtered": 2891,
+      "command": "target/debug/deps/gitcraft-3fe163d12211b9a2 --test-threads=1 git::bundles repo::bundles repo::dialogs::bundles repo::diff::structural repo::graph_view repo::columns repo::pr_view::select settings::branch_names settings::tests gerrit theme::catalog processes::tests tasks::tests graph::tests palette syntax_errors_only_suggest_upgrade_for_the_unknown_git_option rapid_reloads_finish_and_coalesce git::backend remote::transport repo::bisect"
+    },
+    "real_ssh": {
+      "candidate": "bb535932dc795659ebfbd825f193379e086624c1",
+      "command": "python3 ci/test-ssh-transport.py --binary target/debug/deps/gitcraft-3fe163d12211b9a2",
+      "result": "PASS;1test and10authenticated TCP connections, including forced reconnect",
+      "earlier_checkpoint": "56f1276b passed10consecutive disposable realSSH runs with same assertions.",
+      "before": "097d9b11 unchanged SSH test passed locally once; the Linux failure was not reproduced locally before the fix.",
+      "platform": "macOS arm64; actual installed OpenSSH10.5p1 server/client, ephemeral keys and isolated configuration; no live external host used."
+    },
+    "build": "cargo +1.95.0 test --locked --all-targets --no-run: PASS",
+    "fmt": "cargo +1.95.0 fmt --all -- --check: PASS",
+    "clippy": "cargo +1.95.0 clippy --locked --all-targets -- -D warnings -A dead_code: PASS with documented six preexisting macOS warnings allowed",
+    "environment": {
+      "rust": "1.95.0",
+      "TMPDIR": "/private/tmp",
+      "SHELL": "/tmp/gitcraft-integration-tools/validation-shell",
+      "PATH_prefix": "/tmp/gitcraft-integration-tools",
+      "tools": "Difftastic0.72.0, GNU sed4.10"
+    },
+    "binary_sha256": "7effc9747c66c93584eb98824f5d3e6611c9acd7c51c7b33d6777f6d2a103d12"
+  },
+  "rejected_validation": [
+    {
+      "candidate": "56f1276b",
+      "focused": "257passed;1failed;1ignored",
+      "failure": "rapid_reloads_finish_and_coalesce shared-counter bound tripped; isolated rerun passed. Fixture then corrected onbb535932 before finalfocused/full checks."
+    }
+  ],
+  "limits": [
+    "Fresh Linux and Windows CI remain separate runtime gates. Native Windows execution not performed locally.",
+    "Before-fix real OpenSSH test passed locally; race diagnosis follows Linux exit-position log and socket/client lifetime semantics. New synchronization passed real local servers; Linux confirmation awaits CI.",
+    "Bundle import and remote Syntax remain deferred. Live external SSH/WSL bundle behavior was not tested."
+  ],
+  "documentation_binding": {
+    "application_candidate": "bb535932dc795659ebfbd825f193379e086624c1",
+    "scope": "Final delivery adds report/evidence only; application, crates, manifests, lockfile, tests and workflows verified unchanged from candidate."
+  },
+  "logs": {
+    "failed-linux-ci": {
+      "sha256": "55dff07de0650a9e11a06df50a3ebb913ed4707e6b9b957b750478a8288e6cf1",
+      "bytes": 476587,
+      "tail": [
+        "2026-11-07T19:44:56.1421848Z [command]/usr/bin/git config --local --name-only --get-regexp http\\.https\\:\\/\\/github\\.com\\/\\.extraheader",
+        "2026-11-07T19:44:56.1448043Z http.https://github.com/.extraheader",
+        "2026-11-07T19:44:56.1456274Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader",
+        "2026-11-07T19:44:56.1502066Z [command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'http\\.https\\:\\/\\/github\\.com\\/\\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\"",
+        "2026-11-07T19:44:56.1772014Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\\.gitdir:",
+        "2026-11-07T19:44:56.1804828Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url",
+        "2026-11-07T19:44:56.2189367Z Cleaning up orphan processes",
+        "2026-11-07T19:44:56.2641421Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/"
+      ]
+    },
+    "build-before": {
+      "sha256": "10733a3deda969be48c2043597b49c37658f9358ad6a23c2d0943ed2dbbfde89",
+      "bytes": 2468,
+      "tail": [
+        "  Executable unittests src/lib.rs (target/debug/deps/gitcraft-3fe163d12211b9a2)",
+        "  Executable unittests src/main.rs (target/debug/deps/gitcraft-130befab7ec1fec1)",
+        "  Executable tests/checkpoint_cli.rs (target/debug/deps/checkpoint_cli-f74b6ccb8ad0c5e5)",
+        "  Executable tests/mcp_stdio.rs (target/debug/deps/mcp_stdio-75a901363b46d695)",
+        "  Executable unittests examples/async_git_transport.rs (target/debug/examples/async_git_transport-a1e87999cab06cf7)",
+        "  Executable unittests examples/image_memory.rs (target/debug/examples/image_memory-bc6520aea5d297cb)",
+        "  Executable unittests examples/ui_shot.rs (target/debug/examples/ui_shot-b42a6638fb9aa8b5)",
+        "  Executable unittests src/lib.rs (target/debug/deps/gitcraft_os-f792e6e5c14eb1c3)"
+      ]
+    },
+    "before": {
+      "sha256": "04415ad93f796e491d46b59cd6980921f8fe3feeb0cb3578ebc028ccaad4934f",
+      "bytes": 1319,
+      "tail": [
+        "",
+        "     Running unittests src/lib.rs (target/debug/deps/gitcraft_os-f792e6e5c14eb1c3)",
+        "",
+        "running 0 tests",
+        "",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s",
+        "",
+        "Disposable sshd accepted 10 authenticated TCP connections (includes explicit reconnect)."
+      ]
+    },
+    "build": {
+      "sha256": "758f115f13046c892b0472e7cabe818b28bdafbef6ff3e41536f6610d6e32d5c",
+      "bytes": 2367,
+      "tail": [
+        "  Executable unittests src/lib.rs (target/debug/deps/gitcraft-3fe163d12211b9a2)",
+        "  Executable unittests src/main.rs (target/debug/deps/gitcraft-130befab7ec1fec1)",
+        "  Executable tests/checkpoint_cli.rs (target/debug/deps/checkpoint_cli-f74b6ccb8ad0c5e5)",
+        "  Executable tests/mcp_stdio.rs (target/debug/deps/mcp_stdio-75a901363b46d695)",
+        "  Executable unittests examples/async_git_transport.rs (target/debug/examples/async_git_transport-a1e87999cab06cf7)",
+        "  Executable unittests examples/image_memory.rs (target/debug/examples/image_memory-bc6520aea5d297cb)",
+        "  Executable unittests examples/ui_shot.rs (target/debug/examples/ui_shot-b42a6638fb9aa8b5)",
+        "  Executable unittests src/lib.rs (target/debug/deps/gitcraft_os-f792e6e5c14eb1c3)"
+      ]
+    },
+    "fmt": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "tail": []
+    },
+    "clippy": {
+      "sha256": "c8720f66e847b55abc71acabbdf2984b789c87cc354e55c7e248f7bed2053290",
+      "bytes": 253,
+      "tail": [
+        "   Compiling gitcraft v0.3.4 (/Users/jonas/.t3/worktrees/gitcraft/t3-bde8f5ba)",
+        "    Checking gitcraft-os v0.1.0 (/Users/jonas/.t3/worktrees/gitcraft/t3-bde8f5ba/crates/gitcraft-os)",
+        "    Finished `dev` profile [unoptimized + debuginfo] target(s) in 21.78s"
+      ]
+    },
+    "real": {
+      "sha256": "c97e4fa5a0d008b4020a6f91969a4fa2dadfaa7c7b9f8c09e781c6409a8cc4e8",
+      "bytes": 3472,
+      "tail": [
+        "running 1 test",
+        "Exit request sent.",
+        "test remote::transport::unix::tests::real_openssh_reuses_concurrently_and_recovers ... ok",
+        "",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3149 filtered out; finished in 0.85s",
+        "",
+        "Disposable sshd accepted 10 authenticated TCP connections (includes explicit reconnect).",
+        "PASS: all10 disposable real OpenSSH runs"
+      ]
+    },
+    "focused": {
+      "sha256": "117922e5ee323ead16cb01d67ec2a0214c9f28b6c199a8d90bd9785a5e9e63b3",
+      "bytes": 23734,
+      "tail": [
+        "note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace",
+        "",
+        "",
+        "failures:",
+        "    repo::tests::rapid_reloads_finish_and_coalesce",
+        "",
+        "test result: FAILED. 257 passed; 1 failed; 1 ignored; 0 measured; 2891 filtered out; finished in 24.06s",
+        ""
+      ]
+    },
+    "reload-repeat": {
+      "sha256": "eb7a72177042501a7c91fafea8cbc2ae920d310610a663f967492ace772b48cc",
+      "bytes": 174,
+      "tail": [
+        "",
+        "running 1 test",
+        "test repo::tests::rapid_reloads_finish_and_coalesce ... ok",
+        "",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3149 filtered out; finished in 0.19s",
+        ""
+      ]
+    },
+    "build-final": {
+      "sha256": "f6dc3616f4c88c31955016326898dc0bbd9f8e7ce3cf8acf753323ffac12cd74",
+      "bytes": 2367,
+      "tail": [
+        "  Executable unittests src/lib.rs (target/debug/deps/gitcraft-3fe163d12211b9a2)",
+        "  Executable unittests src/main.rs (target/debug/deps/gitcraft-130befab7ec1fec1)",
+        "  Executable tests/checkpoint_cli.rs (target/debug/deps/checkpoint_cli-f74b6ccb8ad0c5e5)",
+        "  Executable tests/mcp_stdio.rs (target/debug/deps/mcp_stdio-75a901363b46d695)",
+        "  Executable unittests examples/async_git_transport.rs (target/debug/examples/async_git_transport-a1e87999cab06cf7)",
+        "  Executable unittests examples/image_memory.rs (target/debug/examples/image_memory-bc6520aea5d297cb)",
+        "  Executable unittests examples/ui_shot.rs (target/debug/examples/ui_shot-b42a6638fb9aa8b5)",
+        "  Executable unittests src/lib.rs (target/debug/deps/gitcraft_os-f792e6e5c14eb1c3)"
+      ]
+    },
+    "fmt-final": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "tail": []
+    },
+    "clippy-final": {
+      "sha256": "4bde6d4c7b01cc01c639ace1a09e3125fb682ff01d8e9d14e4bb0d79ab127239",
+      "bytes": 151,
+      "tail": [
+        "    Checking gitcraft v0.3.4 (/Users/jonas/.t3/worktrees/gitcraft/t3-bde8f5ba)",
+        "    Finished `dev` profile [unoptimized + debuginfo] target(s) in 8.80s"
+      ]
+    },
+    "real-final": {
+      "sha256": "dedbaf84528f400a2948cf89c967872e9f4c8474e0b73465256acad0c401d226",
+      "bytes": 314,
+      "tail": [
+        "",
+        "running 1 test",
+        "Exit request sent.",
+        "test remote::transport::unix::tests::real_openssh_reuses_concurrently_and_recovers ... ok",
+        "",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3149 filtered out; finished in 0.89s",
+        "",
+        "Disposable sshd accepted 10 authenticated TCP connections (includes explicit reconnect)."
+      ]
+    },
+    "focused-final": {
+      "sha256": "fdaf52fadcc47994f33693aed71d3131cc0e7617735f5aa481aa705d69a44c87",
+      "bytes": 23363,
+      "tail": [
+        "test theme::catalog::tests::ids_are_unique ... ok",
+        "test theme::catalog::tests::the_pro_themes_keep_their_colours ... ok",
+        "test theme::palette::tests::accent_text_is_whichever_reads_better ... ok",
+        "test theme::palette::tests::hex_colours_read_in_every_length ... ok",
+        "test theme::palette::tests::translucent_colours_are_laid_over_their_background ... ok",
+        "",
+        "test result: ok. 258 passed; 0 failed; 1 ignored; 0 measured; 2891 filtered out; finished in 23.81s",
+        ""
+      ]
+    },
+    "full": {
+      "sha256": "28f2d38c50ab91a6ace96fc4e638ab700df4dc1ec614f50a82dbc9f3b2de4464",
+      "bytes": 250194,
+      "tail": [
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "",
+        "   Doc-tests gitcraft_os",
+        "",
+        "running 0 tests",
+        "",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        ""
+      ]
+    }
+  },
+  "durable_logs": {
+    "path": "docs/validation/pr164-ssh-2026-11-07-tests.log.gz",
+    "sha256": "dff2ade46a3230c8665d6dccf6d7bb3a84a4cb333ea3df9dff16da378609be72",
+    "uncompressed_sha256": "c940edb09729593df7228eb99fcb0580378ef8617b2cac8c33f1aa48c89ea892"
+  }
+}

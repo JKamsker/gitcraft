@@ -1,0 +1,410 @@
+//! A forge's REST API, called by gitcraft itself, for forges without a command-line tool that does
+//! all it needs (Forgejo, Gitea). The login is one the user already has for the host, found by
+//! [`super::gitea::find_login`]; gitcraft never stores one.
+
+use std::time::Duration;
+
+use base64::Engine;
+use base64::engine::general_purpose::STANDARD as BASE64;
+use serde_json::Value;
+
+/// How a request proves who sends it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) enum Login {
+    /// An access token (`tea`'s, or one in the environment).
+    Token(String),
+    /// A name and a password or token, from git's credential helper.
+    Basic { user: String, password: String },
+}
+
+impl Login {
+    fn header(&self) -> String {
+        match self {
+            Login::Token(token) => format!("token {token}"),
+            Login::Basic { user, password } => {
+                format!("Basic {}", BASE64.encode(format!("{user}:{password}")))
+            }
+        }
+    }
+}
+
+/// Why a request failed.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct Failure {
+    /// The HTTP status, when the server answered.
+    pub status: Option<u16>,
+    pub message: String,
+}
+
+impl From<Failure> for String {
+    fn from(failure: Failure) -> String {
+        failure.message
+    }
+}
+
+pub(super) struct Api {
+    /// `https://host/api/v1`.
+    base: String,
+    /// "Forgejo", "Gitea": who errors come from.
+    name: &'static str,
+    host: String,
+    /// `https://host[:port]`, as the login was found for.
+    web: String,
+    login: Option<Login>,
+    /// Told the server's `web` when it refused the login, so that it isn't sent again.
+    on_refused: Option<fn(&str)>,
+    refused_key: Option<String>,
+    agent: ureq::Agent,
+}
+
+/// How many items a page holds when the API is asked for pages.
+const PAGE: usize = 50;
+
+impl Api {
+    /// The API of the forge whose web pages are at `web` (`https://host[:port]`).
+    #[cfg(all(test, unix))]
+    pub(super) fn fixture(base: &str, login: Login) -> Self {
+        let mut api = Self::new("fixture", base, "127.0.0.1", Some(login));
+        api.agent = ureq::AgentBuilder::new()
+            .timeout(Duration::from_secs(3))
+            .redirects(0)
+            .build();
+        api
+    }
+    pub fn new(name: &'static str, web: &str, host: &str, login: Option<Login>) -> Api {
+        Api {
+            base: format!("{}/api/v1", web.trim_end_matches('/')),
+            name,
+            host: host.to_owned(),
+            web: web.trim_end_matches('/').to_owned(),
+            login,
+            on_refused: None,
+            refused_key: None,
+            agent: with_proxy(ureq::AgentBuilder::new(), web)
+                // A large repository on a busy server can take its time over a page of the list.
+                .timeout(Duration::from_secs(30))
+                // A redirect turns a POST into a GET and drops the login: what was sent would read
+                // as done. It's said instead (see `send`).
+                .redirects(0)
+                .user_agent(concat!("gitcraft/", env!("CARGO_PKG_VERSION")))
+                .build(),
+        }
+    }
+
+    pub fn on_refused_key(mut self, forget: fn(&str), key: &str) -> Api {
+        self.on_refused = Some(forget);
+        self.refused_key = Some(key.to_owned());
+        self
+    }
+    pub fn name(&self) -> &'static str {
+        self.name
+    }
+
+    /// Whether a login goes along with the requests.
+    pub fn logged_in(&self) -> bool {
+        self.login.is_some()
+    }
+
+    pub fn get(&self, endpoint: &str) -> Result<Value, Failure> {
+        self.send("GET", endpoint, None)
+    }
+
+    /// Read-only history/summary metadata with a strict body cap, no redirects and
+    /// generic errors. The caller retains ownership until the HTTP request returns.
+    pub(super) fn history_get(
+        &self,
+        endpoint: &str,
+        active: &dyn Fn() -> bool,
+    ) -> Result<Value, String> {
+        use std::io::Read;
+        if !active() {
+            return Err("History lookup cancelled".into());
+        }
+        if endpoint.starts_with(['/', '-'])
+            || endpoint.contains("://")
+            || endpoint.chars().any(char::is_control)
+        {
+            return Err(crate::i18n::text("backend-invalid-history-api-endpoint-07a9e5").into());
+        }
+        let url = format!("{}/{}", self.base, endpoint);
+        let mut request = self
+            .agent
+            .get(&url)
+            .timeout(Duration::from_secs(15))
+            .set("Accept", "application/json");
+        if let Some(login) = &self.login {
+            request = request.set("Authorization", &login.header());
+        }
+        let response = match request.call() {
+            Ok(response) if !(300..400).contains(&response.status()) => response,
+            Err(ureq::Error::Status(401, _)) => {
+                if let Some(forget) = self.on_refused {
+                    forget(self.refused_key.as_deref().unwrap_or(&self.web));
+                }
+                return Err(
+                    crate::i18n::text("backend-selected-forge-account-was-refused-74c524").into(),
+                );
+            }
+            _ => return Err(crate::i18n::text(
+                "backend-forge-history-request-failed-check-server-support-and-the-selecte-1cb61b",
+            )
+            .into()),
+        };
+        let mut bytes = Vec::new();
+        response
+            .into_reader()
+            .take(2 * 1024 * 1024 + 1)
+            .read_to_end(&mut bytes)
+            .map_err(|_| {
+                crate::i18n::text("backend-forge-history-response-could-not-be-read-a63d58")
+            })?;
+        if bytes.len() > 2 * 1024 * 1024 || !active() {
+            return Err("Forge history response exceeded its budget or was cancelled".into());
+        }
+        serde_json::from_slice(&bytes).map_err(|_| {
+            crate::i18n::text("backend-forge-history-response-is-malformed-json-712688").into()
+        })
+    }
+
+    /// Every item of a list the API gives page by page, up to `max`.
+    pub fn get_all(&self, endpoint: &str, max: usize) -> Result<Vec<Value>, Failure> {
+        self.get_all_kept(endpoint, max, |_| true)
+    }
+
+    /// [`Api::get_all`], of the items `keep` keeps: the others don't count toward `max`.
+    pub fn get_all_kept(
+        &self,
+        endpoint: &str,
+        max: usize,
+        keep: impl Fn(&Value) -> bool,
+    ) -> Result<Vec<Value>, Failure> {
+        let joint = if endpoint.contains('?') { '&' } else { '?' };
+        let mut all: Vec<Value> = Vec::new();
+        let mut first: Option<Value> = None;
+        for page in 1.. {
+            let answer = self.get(&format!("{endpoint}{joint}limit={PAGE}&page={page}"))?;
+            let items = match answer {
+                Value::Array(items) => items,
+                Value::Null => Vec::new(),
+                _ => return Err(self.unexpected(crate::i18n::text("backend-a-list-34d4e6"))),
+            };
+            // An endpoint that doesn't page gives everything every time: the first page is it.
+            // A short page isn't the last one: the server's own cap on a page may be below ours.
+            let repeats = page > 1 && !items.is_empty() && items.first() == first.as_ref();
+            let last = items.is_empty() || repeats;
+            if page == 1 {
+                first = items.first().cloned();
+            }
+            if !repeats {
+                all.extend(items.into_iter().filter(|item| keep(item)));
+            }
+            if last || all.len() >= max {
+                break;
+            }
+        }
+        all.truncate(max);
+        Ok(all)
+    }
+
+    /// Sends `payload` (as JSON) with `method` to `endpoint`, and returns the answer; an empty
+    /// answer is `null`.
+    pub fn send(
+        &self,
+        method: &str,
+        endpoint: &str,
+        payload: Option<&Value>,
+    ) -> Result<Value, Failure> {
+        let url = format!("{}/{}", self.base, endpoint.trim_start_matches('/'));
+        let mut request = self
+            .agent
+            .request(method, &url)
+            .set("Accept", "application/json");
+        if let Some(login) = &self.login {
+            request = request.set("Authorization", &login.header());
+        }
+        let answer = match payload {
+            Some(payload) => request
+                .set("Content-Type", "application/json")
+                .send_string(&payload.to_string()),
+            None => request.call(),
+        };
+        self.take(answer)
+    }
+
+    /// Sends the file `name` (`bytes`) as `multipart/form-data`, the field named `field`, to
+    /// `endpoint` (a release's assets).
+    pub fn upload(
+        &self,
+        endpoint: &str,
+        field: &str,
+        name: &str,
+        bytes: &[u8],
+    ) -> Result<Value, Failure> {
+        let url = format!("{}/{}", self.base, endpoint.trim_start_matches('/'));
+        let stamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |d| d.as_nanos());
+        let boundary = format!("gitcraft-{stamp:x}-{:x}", bytes.len());
+        // The name as the header can carry it: no quote, no line break.
+        let safe: String = name
+            .chars()
+            .map(|c| if c == '"' || c.is_control() { '_' } else { c })
+            .collect();
+        let mut body = format!(
+            "--{boundary}\r\nContent-Disposition: form-data; name=\"{field}\"; \
+             filename=\"{safe}\"\r\nContent-Type: application/octet-stream\r\n\r\n"
+        )
+        .into_bytes();
+        body.extend_from_slice(bytes);
+        body.extend_from_slice(format!("\r\n--{boundary}--\r\n").as_bytes());
+        // A big file takes its time: half a minute, and more for each 50 KB.
+        let time = std::time::Duration::from_secs(30 + bytes.len() as u64 / 51_200);
+        let mut request = self
+            .agent
+            .request("POST", &url)
+            .timeout(time)
+            .set("Accept", "application/json")
+            .set(
+                "Content-Type",
+                &format!("multipart/form-data; boundary={boundary}"),
+            );
+        if let Some(login) = &self.login {
+            request = request.set("Authorization", &login.header());
+        }
+        self.take(request.send_bytes(&body))
+    }
+
+    /// What an answer of the server says: its JSON, or why it failed.
+    fn take(&self, answer: Result<ureq::Response, ureq::Error>) -> Result<Value, Failure> {
+        match answer {
+            Ok(response) if (300..400).contains(&response.status()) => {
+                let to = response
+                    .header("location")
+                    .unwrap_or("elsewhere")
+                    .to_owned();
+                Err(Failure {
+                    status: Some(response.status()),
+                    message: crate::i18n::message(
+                        "backend-sent-gitcraft-to-to-set-the-remote-to-the-server-s-own-address-bb13b3",
+                        &[
+                            ("host", (self.host).to_string().into()),
+                            ("to", (to).to_string().into()),
+                        ],
+                    ),
+                })
+            }
+            Ok(response) => {
+                let text = response.into_string().map_err(|e| Failure {
+                    status: None,
+                    message: e.to_string(),
+                })?;
+                if text.trim().is_empty() {
+                    return Ok(Value::Null);
+                }
+                serde_json::from_str(&text).map_err(|_| self.unexpected("JSON"))
+            }
+            Err(ureq::Error::Status(status, response)) => {
+                if status == 401
+                    && self.login.is_some()
+                    && let Some(forget) = self.on_refused
+                {
+                    forget(self.refused_key.as_deref().unwrap_or(&self.web));
+                }
+                let text = response.into_string().unwrap_or_default();
+                Err(Failure {
+                    status: Some(status),
+                    message: self.explain(status, &text),
+                })
+            }
+            Err(ureq::Error::Transport(e)) => Err(Failure {
+                status: None,
+                message: crate::i18n::message(
+                    "backend-couldn-t-reach-e-a66171",
+                    &[
+                        ("host", (self.host).to_string().into()),
+                        ("detail", (e).to_string().into()),
+                    ],
+                ),
+            }),
+        }
+    }
+
+    fn unexpected(&self, what: &str) -> Failure {
+        Failure {
+            status: None,
+            message: crate::i18n::message(
+                "backend-didn-t-answer-with-what-92132b",
+                &[
+                    ("name", (self.name).to_string().into()),
+                    ("what", (what).to_string().into()),
+                ],
+            ),
+        }
+    }
+
+    /// What a refusal means, in a sentence.
+    fn explain(&self, status: u16, body: &str) -> String {
+        let said = error_message(body);
+        let said = if said.is_empty() {
+            format!("HTTP {status}")
+        } else {
+            format!("{said} (HTTP {status})")
+        };
+        match (status, &self.login) {
+            // A private repository is "not found" to whoever isn't known.
+            (404, None) => crate::i18n::message(
+                "backend-said-if-the-repository-is-private-gitcraft-found-no-login-for-add-ad86e5",
+                &[
+                    ("name", (self.name).to_string().into()),
+                    ("said", (said).to_string().into()),
+                    ("host", (self.host).to_string().into()),
+                    ("host4", (self.host).to_string().into()),
+                ],
+            ),
+            (401 | 403, None) => crate::i18n::message(
+                "backend-said-gitcraft-found-no-login-for-add-one-with-tea-login-add-or-le-871d68",
+                &[
+                    ("name", (self.name).to_string().into()),
+                    ("said", (said).to_string().into()),
+                    ("host", (self.host).to_string().into()),
+                    ("host4", (self.host).to_string().into()),
+                ],
+            ),
+            (401, Some(_)) => crate::i18n::message(
+                "backend-said-the-login-gitcraft-found-for-was-refused-4caf6f",
+                &[
+                    ("name", (self.name).to_string().into()),
+                    ("said", (said).to_string().into()),
+                    ("host", (self.host).to_string().into()),
+                ],
+            ),
+            _ => format!("{}: {said}", self.name),
+        }
+    }
+}
+
+/// Extract the provider error message and optional validation errors.
+fn error_message(body: &str) -> String {
+    let Ok(v) = serde_json::from_str::<Value>(body) else {
+        return body.trim().chars().take(200).collect();
+    };
+    let message = v.get("message").and_then(Value::as_str).unwrap_or("");
+    let errors: Vec<&str> = v
+        .get("errors")
+        .and_then(Value::as_array)
+        .map(|e| e.iter().filter_map(Value::as_str).collect())
+        .unwrap_or_default();
+    match (message.is_empty(), errors.is_empty()) {
+        (_, true) => message.to_owned(),
+        (true, false) => errors.join("; "),
+        (false, false) => format!("{message}: {}", errors.join("; ")),
+    }
+}
+
+#[cfg(test)]
+mod tests;
+
+mod proxy;
+#[cfg(test)]
+use proxy::proxy_for;
+pub(crate) use proxy::{environment_proxy, with_proxy};

@@ -1,0 +1,1 @@
+fatal: CRLF would be replaced by LF in crlf.txt

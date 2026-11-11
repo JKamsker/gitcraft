@@ -31,28 +31,39 @@ pub(in crate::repo) fn line_panel(
         return;
     };
     let which = match target.side {
-        DiffSide::Left => " (as it was)",
+        DiffSide::Left => crate::i18n::text("repo-workflows-pr_review-line-panel-92567ea3"),
         DiffSide::Right => "",
     };
     ui.horizontal(|ui| {
-        ui.label(
-            RichText::new(format!("{}:{}{which}", target.path, target.line))
-                .font(theme::mono(11.5))
-                .color(t.text_dim),
-        );
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if icons::small_button(ui, "x", "Close (Esc)").clicked() {
+            if icons::small_button(
+                ui,
+                "x",
+                crate::i18n::text("repo-workflows-pr_review-line-panel-961b2a04"),
+            )
+            .clicked()
+            {
                 pr_acts(acts, PrAct::CloseLine);
             }
+            let title = format!("{}:{}{which}", target.path, target.line);
+            ui.add(
+                egui::Label::new(
+                    RichText::new(&title)
+                        .font(theme::mono(11.5))
+                        .color(t.text_dim),
+                )
+                .truncate(),
+            )
+            .on_hover_text(title);
         });
     });
     let threads = threads(ui, view, draft, &target, acts);
     ui.add_space(4.0);
     // A thread on the line takes the reply; on a line without one, a new one starts.
     let hint = if threads.reply_to.is_some() {
-        "Reply to this thread"
+        crate::i18n::text("repo-workflows-pr_review-line-panel-b1446b7b")
     } else {
-        "Comment on this line"
+        crate::i18n::text("repo-workflows-pr_review-line-panel-8ee64204")
     };
     let field = ui.add_enabled(
         !draft.posting,
@@ -65,7 +76,7 @@ pub(in crate::repo) fn line_panel(
         field.request_focus();
     }
     error_label(ui, draft.error_at(Place::Line));
-    ui.horizontal(|ui| line_buttons(ui, draft, &threads, current, acts));
+    ui.horizontal_wrapped(|ui| line_buttons(ui, draft, &threads, current, acts));
 }
 
 /// What the comment being written on a line can do: go to its thread, or start one.
@@ -80,7 +91,12 @@ fn line_buttons(
     match &threads.reply_to {
         Some(thread) => {
             if ui
-                .add_enabled(can_send, egui::Button::new("Reply"))
+                .add_enabled(
+                    can_send,
+                    egui::Button::new(crate::i18n::text(
+                        "repo-workflows-pr_review-line-buttons-c253f451",
+                    )),
+                )
                 .clicked()
             {
                 pr_acts(acts, PrAct::Reply(thread.clone()));
@@ -88,29 +104,51 @@ fn line_buttons(
         }
         None => {
             // A review started now couldn't be sent from a page without a review box.
-            if (threads.open || threads.pending_exists)
+            if threads.pending_supported
+                && (threads.open || threads.pending_exists)
                 && ui
-                    .add_enabled(can_send, egui::Button::new("Add to review"))
-                    .on_hover_text("Keep it in a pending review, to send with the others")
+                    .add_enabled(
+                        can_send,
+                        egui::Button::new(crate::i18n::text(
+                            "repo-workflows-pr_review-line-buttons-24cfb78f",
+                        )),
+                    )
+                    .on_hover_text(crate::i18n::text(
+                        "repo-workflows-pr_review-line-buttons-0333c2f4",
+                    ))
                     .clicked()
             {
                 pr_acts(acts, PrAct::AddPending);
             }
             let now = can_send && !threads.pending_exists;
-            let comment_now = ui.add_enabled(now, egui::Button::new("Comment now"));
+            let comment_now = ui.add_enabled(
+                now,
+                egui::Button::new(crate::i18n::text(
+                    "repo-workflows-pr_review-line-buttons-1fe34090",
+                )),
+            );
             if comment_now.clicked() {
                 pr_acts(acts, PrAct::PostLineNow);
             }
             if threads.pending_exists {
-                comment_now.on_disabled_hover_text("You have a pending review: add it to that one");
+                comment_now.on_disabled_hover_text(crate::i18n::text(
+                    "repo-workflows-pr_review-line-buttons-d460759a",
+                ));
             }
         }
     }
     // While the text is being sent it is cleared once it has been: what's added now would go.
     if let Some(line) = current.filter(|_| threads.open)
         && ui
-            .add_enabled(!draft.posting, egui::Button::new("Suggest a change"))
-            .on_hover_text("Start from the line as it is, for them to apply with a click")
+            .add_enabled(
+                !draft.posting,
+                egui::Button::new(crate::i18n::text(
+                    "repo-workflows-pr_review-line-buttons-9d793402",
+                )),
+            )
+            .on_hover_text(crate::i18n::text(
+                "repo-workflows-pr_review-line-buttons-a75c6121",
+            ))
             .clicked()
     {
         if !draft.line_text.is_empty() && !draft.line_text.ends_with('\n') {
@@ -122,7 +160,7 @@ fn line_buttons(
         draft.focus_line = true;
     }
     if draft.posting {
-        ui.spinner();
+        ui.add(crate::spinner::Spinner::new());
     }
 }
 
@@ -132,6 +170,7 @@ struct ThreadsShown {
     pending_exists: bool,
     /// The pull request is still going.
     open: bool,
+    pending_supported: bool,
 }
 
 /// The threads on `target`.
@@ -148,14 +187,21 @@ fn threads(
         reply_to: None,
         pending_exists: false,
         open: false,
+        pending_supported: false,
     };
     let Some(Ok(details)) = &view.details else {
         return shown;
     };
     let extras = &details.extras;
+    let forge = details.forge.map_or(
+        crate::i18n::text("repo-workflows-pr_review-threads-6550d01e"),
+        crate::forge::Forge::name,
+    );
+    shown.pending_supported = extras.review_features.pending;
     shown.pending_exists = extras.pending_review.is_some();
     shown.open = details.state == "OPEN";
     let open = shown.open;
+    let relocated = view.relocations().cloned().unwrap_or_default();
     let markdown = &mut view.markdown;
     let bodies = &view.thread_bodies;
     let suggestions = &view.suggestions;
@@ -164,22 +210,46 @@ fn threads(
         .max_height(THREAD_MAX_H)
         .auto_shrink([false, true])
         .show(ui, |ui| {
-            for thread in extras
-                .threads
-                .iter()
-                .filter(|th| thread_is_on(th, &target.path, target.side, target.line))
-            {
+            for thread in extras.threads.iter().filter(|th| {
+                thread_is_on(th, &target.path, target.side, target.line)
+                    || relocated.get(&th.id) == Some(target)
+            }) {
+                if relocated.contains_key(&thread.id) {
+                    ui.label(crate::i18n::text(
+                        "repo-workflows-pr_review-threads-c73affa9",
+                    ));
+                }
                 if thread.can_reply && shown.reply_to.is_none() {
                     shown.reply_to = Some(thread.id.clone());
+                }
+                if ui
+                    .small_button(crate::i18n::text(
+                        "repo-workflows-pr_review-threads-77a860cb",
+                    ))
+                    .on_hover_text(crate::i18n::text(
+                        "repo-workflows-pr_review-threads-60d238f1",
+                    ))
+                    .clicked()
+                {
+                    let comments: Vec<(String, String)> = thread
+                        .comments
+                        .iter()
+                        .map(|c| (c.author.clone(), c.body.clone()))
+                        .collect();
+                    acts.push(Action::Agent(crate::repo::agents::AgentAct::Send(
+                        crate::agent::handoff::thread_message(&thread.path, thread.line, &comments),
+                        crate::i18n::text("repo-workflows-pr_review-threads-9a4877af"),
+                    )));
                 }
                 for comment in &thread.comments {
                     comment_header(ui, comment);
                     if let Some(body) = bodies.get(&comment.id) {
                         pr_view::blocks(ui, markdown, &comment.id, body, width);
                     }
-                    let suggestion = suggestions
-                        .get(&comment.id)
-                        .filter(|_| suggestion_applies(thread, comment.pending, open));
+                    let suggestion = suggestions.get(&comment.id).filter(|_| {
+                        extras.review_features.apply_suggestions
+                            && suggestion_applies(thread, comment.pending, open)
+                    });
                     if let Some(text) = suggestion
                         && extras.can_write()
                         && let Some(line) = thread.line
@@ -190,9 +260,12 @@ fn threads(
                 }
                 if thread.more_comments {
                     ui.label(
-                        RichText::new("This thread goes on: the rest is on GitHub.")
-                            .color(t.text_faint)
-                            .small(),
+                        RichText::new(crate::i18n::message(
+                            "repo-workflows-pr_review-threads-98aa61f2",
+                            &[("forge", (forge).into())],
+                        ))
+                        .color(t.text_faint)
+                        .small(),
                     );
                 }
                 ui.horizontal(|ui| resolve_buttons(ui, thread, draft, acts));
@@ -213,7 +286,13 @@ fn comment_header(ui: &mut Ui, comment: &ThreadComment) {
                 .small(),
         );
         if comment.pending {
-            ui.label(RichText::new("pending").color(t.accent).small());
+            ui.label(
+                RichText::new(crate::i18n::text(
+                    "repo-workflows-pr_review-comment-header-62a2fed3",
+                ))
+                .color(t.accent_fg)
+                .small(),
+            );
         }
     });
 }
@@ -232,8 +311,15 @@ fn apply_suggestion(
     let start = thread.start_line.unwrap_or(line);
     ui.horizontal(|ui| {
         if ui
-            .add_enabled(!draft.posting, egui::Button::new("Apply suggestion"))
-            .on_hover_text("Commit this change to the pull request's branch")
+            .add_enabled(
+                !draft.posting,
+                egui::Button::new(crate::i18n::text(
+                    "repo-workflows-pr_review-apply-suggestion-2ca103b5",
+                )),
+            )
+            .on_hover_text(crate::i18n::text(
+                "repo-workflows-pr_review-apply-suggestion-d1083ab3",
+            ))
             .clicked()
         {
             pr_acts(
@@ -262,18 +348,34 @@ fn apply_suggestion(
 fn resolve_buttons(ui: &mut Ui, thread: &Thread, draft: &PrDraft, acts: &mut Vec<Action>) {
     let t = Tokens::get(ui.ctx());
     if thread.resolved {
-        ui.label(RichText::new("Resolved").color(t.success).small());
+        ui.label(
+            RichText::new(crate::i18n::text(
+                "repo-workflows-pr_review-resolve-buttons-5be3c2c8",
+            ))
+            .color(t.success)
+            .small(),
+        );
     }
     if thread.can_resolve
         && ui
-            .add_enabled(!draft.posting, egui::Button::new("Resolve"))
+            .add_enabled(
+                !draft.posting,
+                egui::Button::new(crate::i18n::text(
+                    "repo-workflows-pr_review-resolve-buttons-c8f193b3",
+                )),
+            )
             .clicked()
     {
         pr_acts(acts, PrAct::SetResolved(thread.id.clone(), true));
     }
     if thread.can_unresolve
         && ui
-            .add_enabled(!draft.posting, egui::Button::new("Open again"))
+            .add_enabled(
+                !draft.posting,
+                egui::Button::new(crate::i18n::text(
+                    "repo-workflows-pr_review-resolve-buttons-ecae00bf",
+                )),
+            )
             .clicked()
     {
         pr_acts(acts, PrAct::SetResolved(thread.id.clone(), false));
@@ -296,7 +398,7 @@ pub(in crate::repo) fn paint_gutter_mark(
         painter.text(
             center,
             Align2::CENTER_CENTER,
-            count.to_string(),
+            crate::i18n::number(count),
             theme::medium(9.5),
             t.accent_text,
         );

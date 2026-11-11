@@ -3,6 +3,9 @@
 use egui::Ui;
 
 use crate::git::Branch;
+use crate::menu_item::MenuItem;
+use crate::repo::branch_cleanup::Candidate;
+use crate::repo::ghost::{GhostOp, offer};
 use crate::repo::operations::{expect_ref, expect_ref_at};
 use crate::repo::{Action, Dialog, RepoTab, Undo, ops};
 
@@ -17,38 +20,17 @@ impl RepoTab {
             .iter()
             .any(|w| !w.current && w.branch.as_deref() == Some(b.name.as_str()));
         let why = if elsewhere {
-            "Checked out in another worktree"
+            crate::i18n::text("repo-core-3359")
         } else {
-            "Can't delete the checked-out branch"
+            crate::i18n::text("repo-core-3360")
         };
-        let can = !b.is_head && !elsewhere && idle;
+        let refused = (b.is_head || elsewhere).then_some(why);
+        let local_ref = format!("refs/heads/{}", b.name);
         // Only while the branch is where the menu saw it: commits made on it since (in the
         // terminal, while the dialog is open) are not what was asked to be deleted, nor what
         // undoing would bring back.
         let at_seen = || vec![expect_ref_at(&format!("refs/heads/{}", b.name), &b.target)];
         let guarded = |steps: Vec<Vec<String>>| [at_seen(), steps].concat();
-        if ui
-            .add_enabled(can, egui::Button::new("Delete…"))
-            .on_disabled_hover_text(why)
-            .clicked()
-        {
-            acts.push(Action::Dialog(
-                Dialog::confirm(
-                    "Delete branch",
-                    format!("Delete the local branch “{}”?", b.name),
-                    "Delete",
-                    guarded(ops(&[&["branch", "-d", "--", &b.name]])),
-                    Some((
-                        "Force, even if it isn't merged (-D)".to_owned(),
-                        guarded(ops(&[&["branch", "-D", "--", &b.name]])),
-                    )),
-                )
-                .undo(Undo::Custom {
-                    undo: restore.clone(),
-                    redo: redo_delete(&b.name, ops(&[&["branch", "-D", "--", &b.name]])),
-                }),
-            ));
-        }
         // Where the upstream is, on the remote and here.
         let upstream = (!b.upstream_gone())
             .then(|| self.split_upstream(&b.upstream))
@@ -60,18 +42,59 @@ impl RepoTab {
                     .flat_map(|(_, bs)| bs)
                     .find(|r| r.name == b.upstream),
             );
+        let delete = MenuItem::new(crate::i18n::text("repo-core-1117"))
+            .icon("minus")
+            .enabled(idle)
+            .refused(refused)
+            // The entry below, for the remote too, says the same reason.
+            .explained_below(upstream.is_some())
+            .show(ui);
+        offer(&delete, || GhostOp::DeleteBranch {
+            branch: b.name.clone(),
+            remote: false,
+        });
+        if delete.clicked() {
+            acts.push(Action::Dialog(
+                Dialog::confirm(
+                    "Delete branch",
+                    crate::i18n::message("repo-core-3362", &[("name", b.name.to_string().into())]),
+                    crate::i18n::text("repo-core-1115"),
+                    guarded(ops(&[&["branch", "-d", "--", &b.name]])),
+                    Some((
+                        crate::i18n::text("repo-core-3363").to_owned(),
+                        guarded(ops(&[&["branch", "-D", "--", &b.name]])),
+                    )),
+                )
+                .undo(Undo::Custom {
+                    undo: restore.clone(),
+                    redo: redo_delete(&b.name, ops(&[&["branch", "-D", "--", &b.name]])),
+                })
+                .preview_of(self.delete_preview(&[&b.target], vec![local_ref.clone()])),
+            ));
+        }
         let Some(((remote, name), tracked)) = upstream else {
             return;
         };
-        if ui
-            .add_enabled(
-                can,
-                egui::Button::new(format!("Delete locally and on {remote}…")),
-            )
-            .on_hover_text(format!("Also delete {} from {remote}", b.upstream))
-            .on_disabled_hover_text(why)
-            .clicked()
-        {
+        let both = MenuItem::new(crate::i18n::message(
+            "repo-core-3364",
+            &[("remote", remote.to_string().into())],
+        ))
+        .icon("minus")
+        .enabled(idle)
+        .refused(refused)
+        .show(ui)
+        .on_hover_text(crate::i18n::message(
+            "repo-core-3365",
+            &[
+                ("upstream", b.upstream.to_string().into()),
+                ("remote", remote.to_string().into()),
+            ],
+        ));
+        offer(&both, || GhostOp::DeleteBranch {
+            branch: b.name.clone(),
+            remote: true,
+        });
+        if both.clicked() {
             let remote_ref = format!("refs/heads/{name}");
             let delete =
                 |flag: &str| guarded(delete_both(flag, &b.name, &remote, name, &tracked.target));
@@ -85,22 +108,27 @@ impl RepoTab {
             acts.push(Action::Dialog(
                 Dialog::confirm(
                     "Delete branch locally and on the remote",
-                    format!(
-                        "Delete the local branch “{}” and “{name}” on {remote}? Deleting it \
-                         on the remote changes it for everyone.",
-                        b.name
+                    crate::i18n::message(
+                        "repo-core-3368",
+                        &[
+                            ("name", b.name.to_string().into()),
+                            ("name2", name.to_string().into()),
+                            ("remote", remote.to_string().into()),
+                        ],
                     ),
-                    "Delete both",
+                    crate::i18n::text("repo-core-3369"),
                     delete("-d"),
-                    Some((
-                        "Force, even if it isn't merged (-D)".to_owned(),
-                        delete("-D"),
-                    )),
+                    Some((crate::i18n::text("repo-core-3363").to_owned(), delete("-D"))),
                 )
                 .undo(Undo::Custom {
                     undo,
                     redo: redo_delete(&b.name, delete("-D")),
-                }),
+                })
+                // Commits pushed there that this branch hasn't go with the remote branch too.
+                .preview_of(self.delete_preview(
+                    &[&b.target, &tracked.target],
+                    vec![local_ref, format!("refs/remotes/{}", tracked.name)],
+                )),
             ));
         }
     }
@@ -109,7 +137,7 @@ impl RepoTab {
 /// Redoing the delete of `branch` with `steps` (`-D`): only while the branch is where undoing put
 /// it back. Commits it got since (in the terminal) are on no other branch, and `-D` would drop
 /// them along with the branch's reflog.
-fn redo_delete(branch: &str, steps: Vec<Vec<String>>) -> Vec<Vec<String>> {
+pub(in crate::repo) fn redo_delete(branch: &str, steps: Vec<Vec<String>>) -> Vec<Vec<String>> {
     [expect_ref(&format!("refs/heads/{branch}"))]
         .into_iter()
         .chain(steps)
@@ -153,6 +181,120 @@ fn delete_both(
     } else {
         [there, here].concat()
     }
+}
+
+/// How many branches one git command deletes or pushes back at most: a command line has a
+/// length limit (32 767 characters on Windows).
+const BATCH: usize = 150;
+
+/// Deleting the branches `chosen` here, and with `on_remote` the branches they track there too,
+/// as one undoable operation: `(steps, undo)`.
+///
+/// A failed operation has no undo, so whatever could refuse is asked before anything is
+/// deleted: every branch must still be where it was offered; `git branch -f <it> <its commit>`,
+/// which changes nothing, must go through (git refuses it, as it refuses `-D`, for a branch
+/// checked out, rebased or bisected in any worktree); and every remote's push must go through
+/// as a dry run (each remote branch where it was last fetched). Then the remote branches go,
+/// one atomic push per remote, then the branches here with `-D`: the chosen ones may be
+/// squash-merged or stale, which `-d` refuses. Undo pushes the remote ones back, makes the
+/// branches again and has them track what they tracked.
+pub(in crate::repo) fn delete_many(
+    chosen: &[&Candidate],
+    on_remote: bool,
+) -> (Vec<Vec<String>>, Undo) {
+    let guards: Vec<Vec<String>> = chosen
+        .iter()
+        .map(|c| expect_ref_at(&format!("refs/heads/{}", c.name), &c.target))
+        .collect();
+    let remotes = if on_remote {
+        by_remote(chosen)
+    } else {
+        Vec::new()
+    };
+    let probes = chosen
+        .iter()
+        .flat_map(|c| ops(&[&["branch", "-f", "--", &c.name, &c.target]]));
+    let mut dry = Vec::new();
+    let mut there = Vec::new();
+    let mut back = Vec::new();
+    for (remote, list) in &remotes {
+        for part in list.chunks(BATCH) {
+            let push = push_delete(remote, part);
+            let mut trial = push.clone();
+            trial.insert(1, "--dry-run".to_owned());
+            dry.push(trial);
+            there.push(push);
+            back.push(push_back(remote, part));
+        }
+    }
+    let guards: Vec<Vec<String>> = guards.into_iter().chain(probes).chain(dry).collect();
+    let names: Vec<&str> = chosen.iter().map(|c| c.name.as_str()).collect();
+    let here: Vec<Vec<String>> = names
+        .chunks(BATCH)
+        .map(|part| {
+            ["branch", "-D", "--"]
+                .into_iter()
+                .chain(part.iter().copied())
+                .map(str::to_owned)
+                .collect()
+        })
+        .collect();
+    let steps = [guards, there, here].concat();
+    let restore = chosen
+        .iter()
+        .flat_map(|c| ops(&[&["branch", "--", &c.name, &c.target]]));
+    let track = chosen.iter().flat_map(|c| c.track.iter().cloned());
+    let undo: Vec<Vec<String>> = back.into_iter().chain(restore).chain(track).collect();
+    // Redone only while every branch is where undoing put it back (see `redo_delete`).
+    let redo = chosen
+        .iter()
+        .map(|c| expect_ref(&format!("refs/heads/{}", c.name)))
+        .chain(steps.iter().cloned())
+        .collect();
+    (steps, Undo::Custom { undo, redo })
+}
+
+/// A branch on a remote to delete: its name there and its last fetched commit.
+type RemoteBranch<'a> = (&'a str, &'a str);
+
+/// The remote branches of `chosen`, by remote, in the order first met.
+fn by_remote<'a>(chosen: &[&'a Candidate]) -> Vec<(&'a str, Vec<RemoteBranch<'a>>)> {
+    let mut remotes: Vec<(&str, Vec<RemoteBranch>)> = Vec::new();
+    for (remote, name, at) in chosen.iter().filter_map(|c| c.remote.as_ref()) {
+        let item = (name.as_str(), at.as_str());
+        match remotes.iter_mut().find(|(r, _)| r == remote) {
+            Some((_, list)) => list.push(item),
+            None => remotes.push((remote.as_str(), vec![item])),
+        }
+    }
+    remotes
+}
+
+/// One atomic push deleting `list` on `remote`, each only where it was last fetched.
+fn push_delete(remote: &str, list: &[RemoteBranch]) -> Vec<String> {
+    let leases = list
+        .iter()
+        .map(|(name, at)| format!("--force-with-lease=refs/heads/{name}:{at}"));
+    let refs = list.iter().map(|(name, _)| format!("refs/heads/{name}"));
+    ["push", "--atomic"]
+        .into_iter()
+        .map(str::to_owned)
+        .chain(leases)
+        .chain([remote.to_owned(), "--delete".to_owned()])
+        .chain(refs)
+        .collect()
+}
+
+/// One atomic push putting `list` back on `remote` where they were.
+fn push_back(remote: &str, list: &[RemoteBranch]) -> Vec<String> {
+    let specs = list
+        .iter()
+        .map(|(name, at)| format!("{at}:refs/heads/{name}"));
+    ["push", "--atomic", remote]
+        .into_iter()
+        .map(str::to_owned)
+        .chain(specs)
+        .collect()
 }
 
 #[cfg(test)]
@@ -287,10 +429,12 @@ mod tests {
         }
         let at = git::head(&dir);
         let entry = UndoEntry {
+            id: 0,
             label: "Delete branch".to_owned(),
             undo: ops(&[&["branch", "--", "feat", &at]]),
             redo: redo_delete("feat", ops(&[&["branch", "-D", "--", "feat"]])),
             heads: None,
+            agent: None,
         };
         let deleted = run_all(&dir, &ops(&[&["branch", "-D", "--", "feat"]]));
         let (undone, kind) = run_steps(&dir, &entry.undo, OpKind::Undo(entry.clone()), None);

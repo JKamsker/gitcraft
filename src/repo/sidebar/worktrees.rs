@@ -1,9 +1,12 @@
 //! The repository's worktrees.
 
+use crate::repo::terminals::TerminalAct;
 use egui::{Align2, Rect, Response, Ui, pos2, vec2};
 
+use crate::a11y::labels;
 use crate::git::Worktree;
 use crate::icons;
+use crate::menu_item::MenuItem;
 use crate::repo::pinned_sections::{Button, Header, Sections};
 use crate::repo::{Action, Dialog, Refresh, RepoTab, ops, widgets, worktree_tab};
 use crate::settings::Settings;
@@ -22,12 +25,12 @@ impl RepoTab {
             Header {
                 key: "worktrees",
                 icon: "folder-tree",
-                title: "WORKTREES",
+                title: crate::i18n::text("repo-core-3562"),
                 count: self.worktrees.len(),
                 default_open: true,
                 button: Some(Button {
                     icon: "plus",
-                    tooltip: "Add a worktree…",
+                    tooltip: crate::i18n::text("repo-core-3563"),
                     action: idle.then(|| {
                         Action::Dialog(Dialog::add_worktree(&self.path, None, &self.refs.head))
                     }),
@@ -40,14 +43,32 @@ impl RepoTab {
         let same_tab = Settings::get(ui.ctx()).worktrees_in_same_tab;
         let any_prunable = self.worktrees.iter().any(|w| w.prunable.is_some());
         for wt in &self.worktrees {
-            let r = worktree_row(ui, wt).on_hover_text(worktree_tip(wt, same_tab));
+            let fenced = self.fence.violations(&wt.path);
+            let mut tip = worktree_tip(wt, same_tab);
+            if !fenced.is_empty() {
+                tip.push_str(&crate::i18n::message(
+                    "repo-core-3564",
+                    &[(
+                        "fenced",
+                        crate::repo::fence_view::list_violations(fenced)
+                            .to_string()
+                            .into(),
+                    )],
+                ));
+            } else if let Some(e) = self.fence.error(&wt.path) {
+                tip.push_str(&crate::i18n::message(
+                    "repo-core-3565",
+                    &[("e", e.to_string().into())],
+                ));
+            }
+            let r = worktree_row(ui, wt, self.fence.red(&wt.path)).on_hover_text(tip);
             let can_open = !wt.current && wt.prunable.is_none();
             if r.double_clicked() && can_open {
                 acts.push(Action::OpenWorktree(wt.path.clone()));
             } else if r.clicked() && !wt.head.is_empty() {
                 acts.push(Action::SelectHash(wt.head.clone()));
             }
-            egui::Popup::context_menu(&r)
+            crate::menu_item::context(&r)
                 .style(crate::theme::menu_style)
                 .show(|ui| {
                     worktree_menu_items(ui, acts, wt, idle, same_tab, can_open, any_prunable);
@@ -56,15 +77,33 @@ impl RepoTab {
     }
 }
 
-/// A worktree: its icon (a dot for uncommitted changes), name, branch and what is wrong with it.
-fn worktree_row(ui: &mut Ui, wt: &Worktree) -> Response {
+/// A worktree: its icon (a dot for uncommitted changes), name, branch and what is wrong with it;
+/// red when it touched the agent fence (`fenced`).
+fn worktree_row(ui: &mut Ui, wt: &Worktree, fenced: bool) -> Response {
     let t = Tokens::get(ui.ctx());
     // Known by its folder, not its place: one added or removed in the terminal shifts the rows,
     // and a menu left open (Lock, Prune…) must stay this worktree's.
     let (rect, r) = widgets::keyed_row(ui, 36.0, ("worktree-row", &wt.path));
+    widgets::a11y(&r, egui::WidgetType::Button, || {
+        let notes = [
+            (wt.current, crate::i18n::text("repo-core-3567")),
+            (wt.locked.is_some(), crate::i18n::text("repo-core-3568")),
+            (wt.prunable.is_some(), crate::i18n::text("repo-core-3569")),
+        ];
+        let path = crate::remote::display(&wt.path);
+        labels::worktree(&path, wt.branch.as_deref(), wt.changes, &notes)
+    });
     let painter = ui.painter_at(rect);
     if wt.current {
         painter.rect_filled(rect, 0.0, t.accent.gamma_multiply(0.14));
+    }
+    if fenced {
+        painter.rect_filled(rect, 0.0, t.danger.gamma_multiply(0.16));
+        painter.rect_filled(
+            Rect::from_min_size(rect.min, vec2(3.0, rect.height())),
+            0.0,
+            t.danger,
+        );
     }
     if r.hovered() {
         painter.rect_filled(rect, 0.0, t.hover);
@@ -90,8 +129,17 @@ fn worktree_row(ui: &mut Ui, wt: &Worktree) -> Response {
     };
     let mut right = rect.right() - 8.0;
     for (on, label, color) in [
-        (wt.prunable.is_some(), "missing", t.danger),
-        (wt.locked.is_some(), "locked", t.warning),
+        (fenced, "fence", t.danger),
+        (
+            wt.prunable.is_some(),
+            crate::i18n::text("repo-core-3571"),
+            t.danger,
+        ),
+        (
+            wt.locked.is_some(),
+            crate::i18n::text("repo-core-3568"),
+            t.warning,
+        ),
         (wt.main, "main", t.text_faint),
     ] {
         if on {
@@ -114,9 +162,15 @@ fn worktree_row(ui: &mut Ui, wt: &Worktree) -> Response {
         t.text,
     );
     let sub = match (&wt.branch, wt.bare) {
-        (_, true) => "bare".to_owned(),
+        (_, true) => crate::i18n::text("repo-core-3572").to_owned(),
         (Some(branch), _) => branch.clone(),
-        (None, _) => format!("detached at {}", wt.head.get(..8).unwrap_or(&wt.head)),
+        (None, _) => crate::i18n::message(
+            "repo-core-3573",
+            &[(
+                "head",
+                wt.head.get(..8).unwrap_or(&wt.head).to_string().into(),
+            )],
+        ),
     };
     clip.text(
         pos2(rect.left() + 48.0, y + 8.0),
@@ -135,16 +189,22 @@ fn worktree_tip(wt: &Worktree, same_tab: bool) -> String {
         tip.push_str(&format!("\n{line}"));
     }
     if let Some(reason) = wt.locked.as_deref().filter(|r| !r.is_empty()) {
-        tip.push_str(&format!("\nLocked: {reason}"));
+        tip.push_str(&crate::i18n::message(
+            "repo-core-3575",
+            &[("reason", reason.to_string().into())],
+        ));
     }
     if let Some(reason) = &wt.prunable {
-        tip.push_str(&format!("\nMissing: {reason}"));
+        tip.push_str(&crate::i18n::message(
+            "repo-core-3576",
+            &[("reason", reason.to_string().into())],
+        ));
     }
     if !wt.current {
         tip.push_str(if same_tab {
-            "\nDouble-click to open"
+            crate::i18n::text("repo-core-3577")
         } else {
-            "\nDouble-click to open in a tab"
+            crate::i18n::text("repo-core-3535")
         });
     }
     tip
@@ -159,36 +219,93 @@ fn worktree_menu_items(
     can_open: bool,
     any_prunable: bool,
 ) {
-    let path = wt.path.display().to_string();
+    // As git (and a shell) on the worktree's machine names it.
+    let path = crate::remote::git_path(&wt.path);
     if same_tab
-        && ui
-            .add_enabled(can_open, egui::Button::new("Open"))
+        && crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-3453"))
+            .icon("eye")
+            .refused((!can_open).then_some(if wt.current {
+                crate::i18n::text("repo-core-3578")
+            } else {
+                crate::i18n::text("repo-core-3579")
+            }))
+            .show(ui)
             .clicked()
     {
         acts.push(Action::OpenWorktree(wt.path.clone()));
     }
     let new_tab = if same_tab {
-        "Open in a new tab"
+        crate::i18n::text("repo-core-3521")
     } else {
-        "Open in a tab"
+        crate::i18n::text("repo-core-3580")
     };
-    if ui
-        .add_enabled(can_open, egui::Button::new(new_tab))
+    if crate::menu_item::MenuItem::new(new_tab)
+        .icon("command")
+        .refused((!can_open).then_some(if wt.current {
+            crate::i18n::text("repo-core-3578")
+        } else {
+            crate::i18n::text("repo-core-3579")
+        }))
+        .show(ui)
         .clicked()
     {
         acts.push(Action::OpenTab(wt.path.clone()));
     }
-    if ui.button("Open terminal here").clicked() {
-        acts.push(Action::NewTerminal {
+    if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-3581"))
+        .icon("square-terminal")
+        .show(ui)
+        .clicked()
+    {
+        acts.push(Action::Terminal(TerminalAct::New {
             shell: None,
             cwd: Some(wt.path.clone()),
-        });
+        }));
     }
-    if ui.button(crate::repo::reveal_label()).clicked() {
-        let _ = open::that_detached(&wt.path);
+    let openable = crate::remote::openable_here(&wt.path).is_ok();
+    if crate::menu_item::MenuItem::new(crate::repo::reveal_label())
+        .icon("folder-open")
+        .refused((!openable).then_some(crate::i18n::text("repo-core-3583")))
+        .show(ui)
+        .clicked()
+    {
+        let _ = crate::remote::open_here(wt.path.clone());
     }
-    if ui.button("Copy path").clicked() {
+    if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-3525"))
+        .icon("copy")
+        .show(ui)
+        .clicked()
+    {
         ui.ctx().copy_text(path.clone());
+    }
+    if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-3584"))
+        .icon("command")
+        .show(ui)
+        .on_hover_text(crate::i18n::text("repo-core-3585"))
+        .clicked()
+    {
+        acts.push(Action::OpenCollisions);
+    }
+    if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-3586"))
+        .icon("command")
+        .show(ui)
+        .on_hover_text(crate::i18n::text("repo-core-3587"))
+        .clicked()
+    {
+        acts.push(Action::OpenFence);
+    }
+    if !wt.main
+        && crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-3588"))
+            .icon("command")
+            .refused(
+                wt.head
+                    .is_empty()
+                    .then_some(crate::i18n::text("repo-core-3589")),
+            )
+            .show(ui)
+            .on_hover_text(crate::i18n::text("repo-core-3590"))
+            .clicked()
+    {
+        acts.push(Action::OpenDrift(wt.path.clone()));
     }
     if !wt.main {
         ui.separator();
@@ -197,25 +314,32 @@ fn worktree_menu_items(
         } else {
             ("Lock", vec!["worktree", "lock", path.as_str()])
         };
-        if ui.add_enabled(idle, egui::Button::new(label)).clicked() {
+        if crate::menu_item::MenuItem::new(crate::repo::messages::display_operation(label))
+            .icon("command")
+            .enabled(idle)
+            .show(ui)
+            .clicked()
+        {
             acts.push(Action::Ops {
                 label: format!("{label} worktree {}", wt.name()),
                 ops: ops(&[&args]),
                 refresh: Refresh::All,
             });
         }
-        if ui
-            .add_enabled(idle && !wt.current, egui::Button::new("Remove…"))
-            .on_disabled_hover_text("Open another worktree to remove this one")
+        if MenuItem::new(crate::i18n::text("repo-core-3499"))
+            .icon("minus")
+            .enabled(idle)
+            .refused(wt.current.then_some(crate::i18n::text("repo-core-3596")))
+            .show(ui)
             .clicked()
         {
             acts.push(Action::Dialog(Dialog::confirm(
                 "Remove worktree",
-                format!("Remove the worktree at {path}? Its folder is deleted; the branch stays."),
-                "Remove",
+                crate::i18n::message("repo-core-3598", &[("path", path.to_string().into())]),
+                crate::i18n::text("repo-core-0305"),
                 ops(&[&["worktree", "remove", &path]]),
                 Some((
-                    "Force, even with uncommitted changes or locked".to_owned(),
+                    crate::i18n::text("repo-core-3599").to_owned(),
                     ops(&[&["worktree", "remove", "--force", "--force", &path]]),
                 )),
             )));
@@ -223,8 +347,10 @@ fn worktree_menu_items(
     }
     if any_prunable {
         ui.separator();
-        if ui
-            .add_enabled(idle, egui::Button::new("Prune missing worktrees"))
+        if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-3601"))
+            .icon("minus")
+            .enabled(idle)
+            .show(ui)
             .clicked()
         {
             acts.push(Action::Ops {

@@ -1,0 +1,327 @@
+//! The agent that resolves: which command line runs it (Claude Code or Codex, headless), what
+//! it is told, how it reaches gitcraft (`gitcraft mcp --run <id>`, whose `resolve_*` tools take
+//! its reports), and what of its output is shown as it works.
+
+mod events;
+pub use events::activities;
+#[cfg(test)]
+use events::bare_command;
+use std::path::{Path, PathBuf};
+
+use serde_json::{Value, json};
+
+use super::workspace::Workspace;
+use crate::ai::run::CommandLine;
+use crate::ai::settings::AiTool;
+
+/// The agents that can resolve in the background.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Engine {
+    Claude,
+    Codex,
+}
+
+impl Engine {
+    /// The one the AI settings pick; Claude Code unless that is Codex.
+    pub fn from_settings(tool: AiTool) -> Self {
+        match tool {
+            AiTool::Codex => Engine::Codex,
+            _ => Engine::Claude,
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Engine::Claude => "Claude Code",
+            Engine::Codex => "Codex",
+        }
+    }
+}
+
+/// The tools Claude Code may use without asking (nobody is there to ask): reading and editing
+/// files, and gitcraft's own (which read git: the server offers an agent of a run nothing that
+/// changes the repository). It runs `--restricted`: no shell nor any tool that runs code, file
+/// tools confined to its folder, and no settings file read, so no hook nor permission that a
+/// branch being merged brings (`.claude/settings.json`) applies.
+const CLAUDE_TOOLS: &str = "Read,Edit,MultiEdit,Write,Glob,Grep,LS,TodoWrite,mcp__gitcraft";
+
+/// How `gitcraft mcp` is started for the agent: `exe`, on `dir`, for the run `run`.
+pub fn mcp_args(dir: &Path, run: &str) -> Vec<String> {
+    vec![
+        "mcp".to_owned(),
+        "--repo".to_owned(),
+        dir.display().to_string(),
+        "--run".to_owned(),
+        run.to_owned(),
+    ]
+}
+
+/// Claude Code's MCP configuration: only gitcraft.
+pub fn claude_mcp_config(exe: &Path, dir: &Path, run: &str) -> Value {
+    json!({
+        "mcpServers": {
+            "gitcraft": {
+                "type": "stdio",
+                "command": exe.display().to_string(),
+                "args": mcp_args(dir, run),
+            }
+        }
+    })
+}
+
+/// A TOML literal string, for Codex's `-c` settings: `'…'`, or `'''…'''` for one with a `'` in
+/// it (`C:\Users\O'Brien`). Never a `"…"` one: `cmd` can't be handed a word with a `"` in it
+/// (see `CommandLine::cmd`). Neither can hold `'''` nor a control character.
+fn toml_literal(text: &str) -> Result<String, String> {
+    if text.contains("'''") || text.chars().any(|c| c.is_control() && c != '\t') {
+        return Err(format!(
+            "{text} can't be handed to Codex (it has ''' or a control character in it)"
+        ));
+    }
+    Ok(if text.contains('\'') {
+        format!("'''{text}'''")
+    } else {
+        format!("'{text}'")
+    })
+}
+
+/// Codex's own settings file: `$CODEX_HOME/config.toml`, `~/.codex/config.toml` by default.
+fn codex_config() -> Option<PathBuf> {
+    let var = |name: &str| std::env::var_os(name).filter(|v| !v.is_empty());
+    if let Some(home) = var("CODEX_HOME") {
+        return Some(PathBuf::from(home).join("config.toml"));
+    }
+    let homes: &[&str] = if cfg!(windows) {
+        &["USERPROFILE", "HOME"]
+    } else {
+        &["HOME"]
+    };
+    let home = homes.iter().find_map(|h| var(h))?;
+    Some(PathBuf::from(home).join(".codex").join("config.toml"))
+}
+
+/// The MCP servers Codex's settings (`config`, its `config.toml`) name, but gitcraft.
+fn codex_servers(config: &str) -> Vec<String> {
+    let Ok(doc) = toml_edit::Document::parse(config) else {
+        // Codex can't read it either, and stops.
+        return Vec::new();
+    };
+    let Some(servers) = doc
+        .as_table()
+        .get("mcp_servers")
+        .and_then(toml_edit::Item::as_table_like)
+    else {
+        return Vec::new();
+    };
+    servers
+        .iter()
+        .map(|(name, _)| name.to_owned())
+        .filter(|name| name != "gitcraft")
+        .collect()
+}
+
+/// The `-c` settings that leave Codex gitcraft's MCP server only: each of the user's `servers`
+/// is turned off, as are plugins and apps, which bring servers of their own. They run outside
+/// its sandbox, as the user, and could reach the checkout. Codex takes a server's name in a
+/// setting only bare (`a-z`, `0-9`, `_`, `-`): one it couldn't be told to leave off is refused.
+fn codex_isolation(servers: &[String]) -> Result<Vec<String>, String> {
+    let mut settings = vec![
+        "features.plugins=false".to_owned(),
+        "features.apps=false".to_owned(),
+    ];
+    for name in servers {
+        let bare = !name.is_empty()
+            && name
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-'));
+        if !bare {
+            return Err(format!(
+                "Codex's MCP server \"{name}\" can't be turned off for the agent: rename it \
+                 (letters, digits, - and _), or pick Claude Code in Settings → AI"
+            ));
+        }
+        settings.push(format!("mcp_servers.{name}.enabled=false"));
+    }
+    Ok(settings)
+}
+
+/// The command line that runs `engine` headless. `mcp_file` is where Claude Code's MCP
+/// configuration was written; Codex is given it on its command line.
+pub fn command(
+    engine: Engine,
+    exe: &Path,
+    dir: &Path,
+    run: &str,
+    mcp_file: &Path,
+) -> Result<CommandLine, String> {
+    // `cmd` reads `%NAME%` in a command line as a variable, quoted or not.
+    let percent = [exe, dir, mcp_file]
+        .into_iter()
+        .find(|p| p.to_string_lossy().contains('%'));
+    if let Some(path) = percent.filter(|_| cfg!(windows)) {
+        return Err(format!(
+            "{} has a % in it, which can't be passed on Windows",
+            path.display()
+        ));
+    }
+    let words = |w: &[&str]| w.iter().map(|s| (*s).to_owned()).collect::<Vec<_>>();
+    let line = match engine {
+        Engine::Claude => {
+            let mut w = words(&[
+                "claude",
+                "-p",
+                "--restricted",
+                "--output-format",
+                "stream-json",
+                "--verbose",
+                "--permission-mode",
+                "acceptEdits",
+                "--strict-mcp-config",
+                "--mcp-config",
+            ]);
+            w.push(mcp_file.display().to_string());
+            w.push("--allowedTools".to_owned());
+            w.push(CLAUDE_TOOLS.to_owned());
+            w
+        }
+        Engine::Codex => {
+            let config = codex_config().and_then(|f| std::fs::read_to_string(f).ok());
+            codex_words(
+                exe,
+                dir,
+                run,
+                &codex_servers(config.as_deref().unwrap_or("")),
+            )?
+        }
+    };
+    Ok(CommandLine::Words(line))
+}
+
+/// Codex's command line, the user's MCP `servers` turned off for it.
+fn codex_words(
+    exe: &Path,
+    dir: &Path,
+    run: &str,
+    servers: &[String],
+) -> Result<Vec<String>, String> {
+    let args: Result<Vec<String>, String> =
+        mcp_args(dir, run).iter().map(|a| toml_literal(a)).collect();
+    let mut w: Vec<String> = [
+        "codex",
+        "exec",
+        "--json",
+        "--sandbox",
+        "workspace-write",
+        "--color",
+        "never",
+    ]
+    .map(str::to_owned)
+    .to_vec();
+    let mut settings = codex_isolation(servers)?;
+    settings.push(format!(
+        "mcp_servers.gitcraft.command={}",
+        toml_literal(&exe.display().to_string())?
+    ));
+    settings.push(format!("mcp_servers.gitcraft.args=[{}]", args?.join(",")));
+    for setting in settings {
+        w.push("-c".to_owned());
+        w.push(setting);
+    }
+    w.push("-".to_owned());
+    Ok(w)
+}
+
+/// How the agent reads git: Claude Code has no shell (see [`CLAUDE_TOOLS`]).
+fn git_reading(engine: Engine) -> &'static str {
+    match engine {
+        Engine::Claude => {
+            "Read git through gitcraft's tools: `conflicts` (each conflict with its sides), \
+             `diff`, `log`, `show_commit`, `blame`, `status`; there is no shell here."
+        }
+        Engine::Codex => {
+            "You are already in that folder: run each git command on its own, as it is \
+             (`git log -5 MERGE_HEAD`). gitcraft's tools (`conflicts`, `diff`, `log`, \
+             `show_commit`, `blame`) read the repository too."
+        }
+    }
+}
+
+/// What `engine` is asked to do.
+pub fn prompt(ws: &Workspace, engine: Engine) -> String {
+    let s = &ws.sides;
+    let short = |h: &str| h.get(..10).unwrap_or(h).to_owned();
+    let theirs = match (&s.theirs, &s.theirs_name) {
+        (Some(h), Some(name)) => format!("{name} ({})", short(h)),
+        (Some(h), None) => short(h),
+        _ => "the other side".to_owned(),
+    };
+    let operation = if s.operation.is_empty() {
+        "an operation".to_owned()
+    } else {
+        format!("a {}", s.operation)
+    };
+    let mut files = String::new();
+    for f in &ws.files {
+        let n = match f.conflicts {
+            0 => "no markers: one side deleted or renamed it".to_owned(),
+            1 => "1 conflict".to_owned(),
+            n => format!("{n} conflicts"),
+        };
+        files.push_str(&format!("- {} ({n})\n", f.path));
+    }
+    format!(
+        "You are resolving git conflicts for the user, in the background, in gitcraft (their git \
+client). The folder you are in is a private copy of their checkout made for this: {operation} of \
+{theirs} into {ours} ({ours_hash}) is in progress here, as it is in theirs. {git}
+
+Conflicted files:
+{files}
+What to do:
+1. First call the gitcraft tool `resolve_plan` with one step per file (id: the path, title: \
+what you will do in it, file: the path) and, if it helps, a last step to check the result; give \
+`estimate_minutes`, your honest guess of how long all of it takes.
+2. For each file: call `resolve_step` with status `running`, read both sides (the conflicts, \
+the history of each side, the code around it), then edit the file so that it keeps \
+what each side meant to do, and has no conflict marker (<<<<<<<, =======, >>>>>>>) left. Then \
+call `resolve_step` with `done` and a one-line note of how you resolved it, or `failed` with \
+why, if you can't resolve it with confidence (leave its markers then).
+3. Edit only the conflicted files. Don't stage, commit, continue or abort the {op_word}, and \
+don't run anything that changes the repository: gitcraft shows the user your result, and they \
+apply it.
+4. End by calling `resolve_finish` with `ok` (whether every file is resolved) and a short \
+summary for the user: what you decided where the sides disagreed, and anything they should \
+check.
+
+Keep notes and the summary short and plain: the user reads them in a small progress panel.",
+        ours = s.ours_name,
+        git = git_reading(engine),
+        ours_hash = short(&s.ours),
+        op_word = if s.operation.is_empty() {
+            "operation"
+        } else {
+            &s.operation
+        },
+    )
+}
+
+/// One thing the agent did, as the progress panel lists it.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Activity {
+    /// It used a tool: "Editing src/a.rs".
+    Tool(String),
+    /// It said something.
+    Said(String),
+    /// It ended: whether it went well, its last words, and what it cost (Claude Code says).
+    Ended {
+        ok: bool,
+        text: String,
+        cost_usd: Option<f64>,
+    },
+}
+
+/// The most characters of an activity kept.
+const MAX_ACTIVITY: usize = 160;
+
+/// `path` relative to `dir` when it is in it, with `/` between its parts.
+#[cfg(test)]
+mod tests;

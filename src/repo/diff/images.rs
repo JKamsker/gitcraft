@@ -9,13 +9,14 @@ use crate::git::{self, Area};
 use crate::repo::DiffKey;
 use crate::theme::{self, Tokens};
 
-const IMAGE_EXTS: &[&str] = &["png", "jpg", "jpeg", "gif", "bmp", "webp", "ico"];
+const IMAGE_EXTS: &[&str] = &["png", "jpg", "jpeg", "gif", "bmp", "webp", "ico", "svg"];
 
 pub struct ImagePair {
     pub old: Option<Arc<[u8]>>,
     pub new: Option<Arc<[u8]>>,
     /// Makes the image URIs unique to this diff.
     pub id: String,
+    pub svg: bool,
 }
 
 pub(super) fn is_image(path: &str) -> bool {
@@ -60,9 +61,18 @@ pub(super) fn load_images(
             Area::Untracked | Area::Conflicted => (None, get(None, path)),
         },
         DiffKey::Range { from, to, .. } => (old(from), get(to.as_deref(), path)),
+        // git's own merge of a picture is nowhere to be read.
+        DiffKey::Remerge { hash, .. } => (None, get(Some(hash), path)),
     };
     let id = image_id(old.as_deref(), new.as_deref());
-    ImagePair { old, new, id }
+    ImagePair {
+        old,
+        new,
+        id,
+        svg: Path::new(path)
+            .extension()
+            .is_some_and(|e| e.eq_ignore_ascii_case("svg")),
+    }
 }
 
 /// Names the pictures by what they hold: egui keeps an image by its URI for good, so the same
@@ -78,10 +88,13 @@ pub(super) fn image_id(old: Option<&[u8]>, new: Option<&[u8]>) -> String {
 pub(super) fn image_view(ui: &mut Ui, images: &ImagePair) {
     let t = Tokens::get(ui.ctx());
     ui.add_space(12.0);
+    if images.svg {
+        ui.label(crate::i18n::text("repo-core-1849"));
+    }
     ui.columns(2, |cols| {
         for (col, (label, bytes, side)) in cols.iter_mut().zip([
-            ("Before", &images.old, "old"),
-            ("After", &images.new, "new"),
+            (crate::i18n::text("repo-core-1564"), &images.old, "old"),
+            (crate::i18n::text("repo-core-1565"), &images.new, "new"),
         ]) {
             col.vertical_centered(|ui| {
                 ui.label(
@@ -92,7 +105,8 @@ pub(super) fn image_view(ui: &mut Ui, images: &ImagePair) {
                 ui.add_space(6.0);
                 match bytes {
                     Some(bytes) => {
-                        let uri = format!("bytes://diff/{}/{side}.png", images.id);
+                        let extension = if images.svg { "svg" } else { "png" };
+                        let uri = format!("bytes://diff/{}/{side}.{extension}", images.id);
                         let max = vec2(ui.available_width() - 16.0, ui.available_height() - 40.0);
                         ui.add(
                             egui::Image::from_bytes(uri, Bytes::Shared(bytes.clone()))
@@ -101,16 +115,19 @@ pub(super) fn image_view(ui: &mut Ui, images: &ImagePair) {
                                 .bg_fill(t.field),
                         );
                         ui.label(
-                            egui::RichText::new(format!("{} KB", bytes.len().div_ceil(1024)))
-                                .color(t.text_faint)
-                                .small(),
+                            egui::RichText::new(crate::i18n::message(
+                                "repo-core-1851",
+                                &[("div-ceil", format!("{}", bytes.len().div_ceil(1024)).into())],
+                            ))
+                            .color(t.text_faint)
+                            .small(),
                         );
                     }
                     None => {
                         let note = if side == "old" {
-                            "(new file)"
+                            crate::i18n::text("repo-core-1695")
                         } else {
-                            "(deleted)"
+                            crate::i18n::text("repo-core-1696")
                         };
                         ui.label(egui::RichText::new(note).color(t.text_faint));
                     }
@@ -118,4 +135,71 @@ pub(super) fn image_view(ui: &mut Ui, images: &ImagePair) {
             });
         }
     });
+}
+
+#[cfg(test)]
+mod svg_tests {
+    use super::*;
+    #[test]
+    fn svg_uses_the_rendered_image_path_and_keeps_its_code_patch() -> Result<(), String> {
+        let r = crate::git::file_comparison::tests::Repo::new()?;
+        r.write("icon.svg",r#"<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="5" height="5"/></svg>"#)?;
+        r.commit()?;
+        r.write("icon.svg",r#"<svg xmlns="http://www.w3.org/2000/svg" width="20" height="10"><circle r="5"/></svg>"#)?;
+        let key = DiffKey::Work(git::StatusFile {
+            path: "icon.svg".into(),
+            old_path: None,
+            area: Area::Unstaged,
+            code: 'M',
+        });
+        let data = super::super::load(&r.0, &key, git::DiffOptions::default(), true)?;
+        let image = data.image.as_ref().ok_or("no SVG preview")?;
+        assert!(image.svg && image.old.is_some() && image.new.is_some());
+        assert!(data.lines.iter().any(|l| l.text.contains("circle")));
+        assert!(data.partial);
+        let ctx = egui::Context::default();
+        egui_extras::install_image_loaders(&ctx);
+        crate::svg::install(&ctx);
+        ctx.include_bytes(
+            "bytes://test.svg",
+            image.new.as_ref().ok_or("new")?.to_vec(),
+        );
+        assert!(
+            ctx.try_load_image("bytes://test.svg", egui::load::SizeHint::default())
+                .is_ok()
+        );
+        Ok(())
+    }
+    #[test]
+    fn renamed_svg_with_git_quoted_paths_keeps_both_rendered_versions() -> Result<(), String> {
+        let r = crate::git::file_comparison::tests::Repo::new()?;
+        let old = if cfg!(windows) {
+            "old ü.svg"
+        } else {
+            "old\tü.svg"
+        };
+        let new = "new ü.svg";
+        let bytes=br#"<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="5" height="5"/></svg>"#;
+        r.write(old, bytes)?;
+        r.commit()?;
+        r.git(&["mv", old, new])?;
+        r.commit()?;
+        let data = super::super::load(
+            &r.0,
+            &DiffKey::Commit {
+                hash: "HEAD".into(),
+                path: new.into(),
+            },
+            git::DiffOptions::default(),
+            true,
+        )?;
+        // Pure renames intentionally have no pickable hunk header in DiffData.
+        let raw = git::file_diff(&r.0, "HEAD", new, git::DiffOptions::default())?;
+        assert!(raw.contains("rename from \""));
+        let image = data.image.as_ref().ok_or("SVG preview")?;
+        assert!(image.svg);
+        assert_eq!(image.old.as_deref(), Some(bytes.as_slice()));
+        assert_eq!(image.new.as_deref(), Some(bytes.as_slice()));
+        Ok(())
+    }
 }

@@ -1,12 +1,16 @@
 //! An integrated terminal: the user's shell in a pseudo-terminal (ConPTY on Windows), its output
 //! interpreted by `vt100` and painted with egui.
 
+pub(crate) mod display;
 mod keys;
 mod palette;
 mod shells;
 #[cfg(test)]
 mod tests;
 mod view;
+
+#[cfg(test)]
+pub(crate) use view::cpu_paint;
 
 use std::io::{Read, Write};
 use std::num::NonZeroU16;
@@ -57,6 +61,7 @@ pub struct Terminal {
     master: Box<dyn MasterPty + Send>,
     child: Box<dyn Child + Send + Sync>,
     exited: Arc<AtomicBool>,
+    exit_code: Option<u32>,
     /// The pass in which the terminal was last drawn ([`egui::Context::cumulative_pass_nr`]):
     /// output a terminal out of sight brings repaints the app only now and then.
     drawn: Arc<AtomicU64>,
@@ -72,6 +77,11 @@ pub struct Terminal {
 }
 
 impl Terminal {
+    /// Observation only: output EOF is not proof that every descendant finished.
+    pub(crate) fn output_lifetime(&self) -> Arc<AtomicBool> {
+        self.exited.clone()
+    }
+
     /// Starts `shell` in `cwd`.
     pub fn spawn(cwd: &Path, shell: &ShellSpec, ctx: &egui::Context) -> Result<Self, String> {
         let (rows, cols) = (24, 100);
@@ -97,6 +107,14 @@ impl Terminal {
         // The user's own PATH, relative folders and all: not the one for gitcraft's own tools.
         if let Some(path) = crate::shell_path::terminal_path() {
             cmd.env("PATH", path);
+        }
+        if crate::practice::is_repository(cwd) {
+            for name in crate::practice::ISOLATED_ENV_REMOVE {
+                cmd.env_remove(name);
+            }
+            for (name, value) in crate::practice::ISOLATED_ENV_SET {
+                cmd.env(name, value);
+            }
         }
         let child = pair
             .slave
@@ -152,7 +170,10 @@ impl Terminal {
                             lock(&parser).process(bytes);
                             // A busy program (a build, a log) prints all the time: the whole
                             // app redraws for it only while the terminal is in sight.
-                            if ctx.cumulative_pass_nr() <= drawn.load(Ordering::Relaxed) + 2 {
+                            // The main window's passes: a terminal popped out into a window
+                            // of its own is drawn in them too.
+                            let pass = ctx.cumulative_pass_nr_for(egui::ViewportId::ROOT);
+                            if pass <= drawn.load(Ordering::Relaxed) + 2 {
                                 ctx.request_repaint();
                             } else {
                                 ctx.request_repaint_after(HIDDEN_REPAINT);
@@ -172,6 +193,7 @@ impl Terminal {
             master: pair.master,
             child,
             exited,
+            exit_code: None,
             drawn,
             size: (rows, cols),
             scroll: 0,
@@ -181,11 +203,39 @@ impl Terminal {
         })
     }
 
+    /// Types `text` into the program running as one pasted message, without pressing Enter: a
+    /// coding agent's prompt takes it as one message, and the user sends it. Refused when the
+    /// program hasn't asked for pastes (bracketed paste, which agent CLIs and modern shells
+    /// turn on), where each line would be taken as typed, and run.
+    pub fn paste_message(&mut self, text: &str) -> Result<(), String> {
+        if self.has_exited() {
+            return Err("its program has ended".to_owned());
+        }
+        if !lock(&self.parser).screen().bracketed_paste() {
+            return Err(
+                "the program running there doesn't take a pasted message: start the agent there first"
+                    .to_owned(),
+            );
+        }
+        self.send(&keys::paste_bytes(text, true));
+        Ok(())
+    }
+
+    pub(crate) fn exit_code(&mut self) -> Option<u32> {
+        if self.exit_code.is_none()
+            && let Ok(Some(status)) = self.child.try_wait()
+        {
+            self.exit_code = Some(status.exit_code());
+            self.exited.store(true, Ordering::Relaxed);
+        }
+        self.exit_code
+    }
     pub fn has_exited(&mut self) -> bool {
         if !self.exited.load(Ordering::Relaxed)
-            && let Ok(Some(_)) = self.child.try_wait()
+            && let Ok(Some(status)) = self.child.try_wait()
         {
             // ConPTY doesn't always end the read when the shell exits.
+            self.exit_code = Some(status.exit_code());
             self.exited.store(true, Ordering::Relaxed);
         }
         self.exited.load(Ordering::Relaxed)

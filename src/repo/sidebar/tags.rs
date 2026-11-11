@@ -33,7 +33,7 @@ impl RepoTab {
                 Header {
                     key: "tags",
                     icon: "tag",
-                    title: "TAGS",
+                    title: crate::i18n::text("repo-core-3536"),
                     count: tags.len(),
                     default_open: false,
                     button: None,
@@ -54,20 +54,45 @@ impl RepoTab {
             if r.clicked() {
                 acts.push(Action::SelectHash(tag.target.clone()));
             }
-            egui::Popup::context_menu(&r)
+            crate::menu_item::context(&r)
                 .style(crate::theme::menu_style)
                 .show(|ui| self.tag_menu_items(ui, acts, tag, idle));
         }
     }
 
     fn tag_menu_items(&self, ui: &mut Ui, acts: &mut Vec<Action>, tag: &Branch, idle: bool) {
-        if ui.button("Copy name").clicked() {
+        if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-3390"))
+            .icon("copy")
+            .show(ui)
+            .clicked()
+        {
             ui.ctx().copy_text(tag.name.clone());
         }
+        if crate::release::version::Version::parse(&tag.name).is_some()
+            && crate::menu_item::MenuItem::new(crate::i18n::message(
+                "repo-core-3538",
+                &[("name", tag.name.to_string().into())],
+            ))
+            .icon("tag")
+            .enabled(idle)
+            .show(ui)
+            .on_hover_text(crate::i18n::text("repo-core-3539"))
+            .clicked()
+        {
+            acts.push(Action::Hotfix(crate::repo::hotfix::HotfixAct::Start {
+                tag: tag.name.clone(),
+                target: tag.target.clone(),
+            }));
+        }
         if let Some(remote) = self.default_remote() {
-            if ui
-                .add_enabled(idle, egui::Button::new(format!("Push to {remote}")))
-                .clicked()
+            if crate::menu_item::MenuItem::new(crate::i18n::message(
+                "repo-core-3540",
+                &[("remote", remote.to_string().into())],
+            ))
+            .icon("arrow-up-from-line")
+            .enabled(idle)
+            .show(ui)
+            .clicked()
             {
                 acts.push(Action::Ops {
                     label: format!("Push tag {}", tag.name),
@@ -75,14 +100,25 @@ impl RepoTab {
                     refresh: Refresh::All,
                 });
             }
-            if ui
-                .add_enabled(idle, egui::Button::new(format!("Delete from {remote}…")))
-                .clicked()
+            if crate::menu_item::MenuItem::new(crate::i18n::message(
+                "repo-core-3542",
+                &[("remote", remote.to_string().into())],
+            ))
+            .icon("minus")
+            .enabled(idle)
+            .show(ui)
+            .clicked()
             {
                 acts.push(Action::Dialog(Dialog::confirm(
                     "Delete remote tag",
-                    format!("Delete the tag “{}” from {remote}?", tag.name),
-                    "Delete",
+                    crate::i18n::message(
+                        "repo-core-3544",
+                        &[
+                            ("name", tag.name.to_string().into()),
+                            ("remote", remote.to_string().into()),
+                        ],
+                    ),
+                    crate::i18n::text("repo-core-1115"),
                     ops(&[&[
                         "push",
                         &remote,
@@ -94,25 +130,45 @@ impl RepoTab {
             }
         }
         ui.separator();
-        if ui
-            .add_enabled(idle, egui::Button::new("Delete tag…"))
+        if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-3545"))
+            .icon("minus")
+            .enabled(idle)
+            .show(ui)
             .clicked()
         {
-            let object = tag_object(&self.path, &tag.name);
-            acts.push(Action::Dialog(
-                Dialog::confirm(
-                    "Delete tag",
-                    format!("Delete the local tag “{}”?", tag.name),
-                    "Delete",
-                    delete_tag(&tag.name, object.as_deref()),
-                    None,
-                )
-                .undo(delete_tag_undo(
-                    &tag.name,
-                    object.as_deref().unwrap_or(&tag.target),
-                )),
-            ));
+            acts.push(Action::DeleteTag {
+                name: tag.name.clone(),
+                target: tag.target.clone(),
+            });
         }
+    }
+
+    /// Asks before deleting the tag `name` (at the commit `target`), with what it points at
+    /// read first: in the background for a repository on another machine.
+    pub(crate) fn delete_tag(&mut self, name: String, target: String, ctx: &egui::Context) {
+        let repo = self.path.clone();
+        self.here_or_later(
+            ctx,
+            move || {
+                let object = tag_object(&repo, &name);
+                (name, object)
+            },
+            move |tab, (name, object), _| {
+                tab.dialog = Some(
+                    Dialog::confirm(
+                        "Delete tag",
+                        crate::i18n::message(
+                            "repo-core-3547",
+                            &[("name", name.to_string().into())],
+                        ),
+                        crate::i18n::text("repo-core-1115"),
+                        delete_tag(&name, object.as_deref()),
+                        None,
+                    )
+                    .undo(delete_tag_undo(&name, object.as_deref().unwrap_or(&target))),
+                );
+            },
+        );
     }
 }
 
@@ -155,6 +211,9 @@ fn delete_tag_undo(name: &str, object: &str) -> Undo {
 fn plain_row(ui: &mut Ui, key: impl egui::AsIdSalt, icon: &str, name: &str, sub: &str) -> Response {
     let t = Tokens::get(ui.ctx());
     let (rect, resp) = widgets::keyed_row(ui, ROW_H, key);
+    widgets::a11y(&resp, egui::WidgetType::Button, || {
+        crate::a11y::labels::join([name, sub])
+    });
     if resp.hovered() {
         ui.painter().rect_filled(rect, 0.0, t.hover);
     }

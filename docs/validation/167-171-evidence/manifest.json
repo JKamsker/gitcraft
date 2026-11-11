@@ -1,0 +1,126 @@
+{
+  "applicationCommit": "9737efa031d96d6b79f75ee0ef507b4275573b7d",
+  "baseCommit": "cea7dfb5ddcc290352958b63566cfd3e515a0d9f",
+  "platform": "macOS",
+  "rust": "1.95.0",
+  "passedTests": 3344,
+  "ignoredOptInTests": 10,
+  "reviewBinding": "combined code review21 on `2743133d`, review22 verifying the undo/replay and session-test corrections on `4cc6a9f9`, and final point review23 **PASS** on `9737efa0` (10 independently rerun regressions). Review22's sole remaining timeline-reset regression is fixed and verified by review23. Review17 independently passed the unchanged history layout sources (108 focused tests). Read [review21](167-171-evidence/review-21.md), [review22](167-171-evidence/review-22.md), and [review23](167-171-evidence/review-23.md) for exact scope and limitations",
+  "files": [
+    {
+      "path": "binaries.json",
+      "sha256": "9cf33bb1b02fc7c046d7a7395217a59f3a69db26ed4a3b8b1b4db387c6bffe1f",
+      "bytes": 999
+    },
+    {
+      "path": "clippy.log.gz",
+      "sha256": "1f00489a4f99f123bb13940de14791562c2bd206c73b95f639d1b3d9fd29f514",
+      "bytes": 150
+    },
+    {
+      "path": "earlier-suite-failure.log.gz",
+      "sha256": "a9265c46d26bb5f80dee7cf7f8f742f577b50dc279c8da87bc54cc79508091d0",
+      "bytes": 60513
+    },
+    {
+      "path": "inventory.log.gz",
+      "sha256": "c78120d19346e7a6630af368beb0cbcb7d802542290089f3ebbfe0320e28501f",
+      "bytes": 58979
+    },
+    {
+      "path": "isolated-timeout.log.gz",
+      "sha256": "b09cfd1146c177c387058eb45d75447bad5676a05b7ad16a51b7d1b03c5c80b7",
+      "bytes": 558
+    },
+    {
+      "path": "narrow-150.png",
+      "sha256": "6064a75fe9ad50df03d0317c5575c9e56c3bb98d26dcd9d636cd6981a9f7da84",
+      "bytes": 117529
+    },
+    {
+      "path": "restored.png",
+      "sha256": "6f072cde7b26e5403258e74913b3fa55076900f89b699c5595abe03fd3792bf3",
+      "bytes": 243273
+    },
+    {
+      "path": "results.json",
+      "sha256": "f6fa12e756be70aef334524e98e337a7f3fe7ea3165d8ca724b89304c1ca7635",
+      "bytes": 1884
+    },
+    {
+      "path": "review-17.md",
+      "sha256": "3a3b604e99643a74c025be9122af8218639e5b2cc4e5800bc4ddcdef81e15207",
+      "bytes": 1300
+    },
+    {
+      "path": "review-20.md",
+      "sha256": "405bbf2cb88c1c60391717270fd500a978bdb7b769d2915316cf6a64b1d02ac7",
+      "bytes": 2039
+    },
+    {
+      "path": "review-21.md",
+      "sha256": "624ce837c2fd4a250ff7f94645de1d9d6fa7ba8236336c63557277d4af94c6c8",
+      "bytes": 1316
+    },
+    {
+      "path": "review-22.md",
+      "sha256": "e05c9f393ca5ee85b29a53043651e8928f73d29722b2e67455a1f8ed334f79d1",
+      "bytes": 2004
+    },
+    {
+      "path": "review-23.md",
+      "sha256": "b5da9f851684f8c1cb48400bc439fc60a984561f7ef2d7f77aa59a3f6d5940d3",
+      "bytes": 718
+    },
+    {
+      "path": "session-marker-after.log",
+      "sha256": "114875a13781ae110c79ada2c910c466cc575dacbaaa5ae7420972a0bccde85f",
+      "bytes": 161
+    },
+    {
+      "path": "session-marker-before.log",
+      "sha256": "02360fb0259600e2e6d6739289ff062c5914bbb987ce418a50c0ed1ceae55cd3",
+      "bytes": 434
+    },
+    {
+      "path": "session-marker-report.md",
+      "sha256": "289eba45053fe6381d1bedb24770252d23beb2ea21b20881f3f32f547bc3d524",
+      "bytes": 6091
+    },
+    {
+      "path": "short-reopened-150.png",
+      "sha256": "8575bd0a3313b1ac0c10dabaac472d2185874ab4e796d1030c2c1b37f9950f88",
+      "bytes": 92499
+    },
+    {
+      "path": "suite.log.gz",
+      "sha256": "3af144486f3844e43ee3a9ff00a38320f70f630a7fd1ad3fe4e18e49261b3eda",
+      "bytes": 60869
+    },
+    {
+      "path": "timeline-after.log.gz",
+      "sha256": "d9dc1f9844a3c8b60e6488cf1d8b447ce911efd4402085a239546a3fe4828d4e",
+      "bytes": 2224
+    },
+    {
+      "path": "timeline-before.log.gz",
+      "sha256": "dadb00e201290320a2026714ae35e57a6a08b14b5e7216ea982ee71597379d3d",
+      "bytes": 364
+    },
+    {
+      "path": "timeline-scope-manifest.json",
+      "sha256": "926d2760fffbf51bd46b938b5194ba5ba1f89a491d41baf15d0bf680c5af1886",
+      "bytes": 3284
+    },
+    {
+      "path": "ui-captures.log",
+      "sha256": "9614e2a7231945b5999800a521d6f1e9e86657e565dedf7e940736123984fcf1",
+      "bytes": 422
+    },
+    {
+      "path": "wide.png",
+      "sha256": "0a42e343c1f037b544d843177e75b92904ead58843569e20d97193b666464d69",
+      "bytes": 242821
+    }
+  ]
+}

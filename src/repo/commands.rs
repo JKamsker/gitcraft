@@ -1,13 +1,13 @@
-//! The tab's everyday git commands: checkout, push, commit, stash, creating a pull request.
+//! The tab's everyday git commands: checkout, push, commit, creating a pull request.
 
 use std::time::Instant;
 
 use super::actions::BranchRef;
 use super::messages::spawn_or;
-use super::operations::{expect_ref, stash_push_args};
+use super::operations::{expect_ref, expect_ref_at};
 use super::{Action, Msg, OpKind, Refresh, RepoTab, Undo, ops, sidebar};
-use crate::forge;
-use crate::git::{self, Branch};
+use crate::forge::{self, NewPullRequest};
+use crate::git::{self, Branch, InProgress};
 
 impl RepoTab {
     /// The checked-out branch, or HEAD's commit when detached (empty without commits).
@@ -27,15 +27,15 @@ impl RepoTab {
             Undo::None
         } else {
             Undo::Custom {
-                undo: ops(&[&["checkout", &previous, "--"]]),
-                redo: ops(&[&["checkout", target, "--"]]),
+                undo: ops(&[&["checkout", "--no-overwrite-ignore", &previous, "--"]]),
+                redo: ops(&[&["checkout", "--no-overwrite-ignore", target, "--"]]),
             }
         };
         // `--`: a name that is no branch (any more) must not be taken for a file to discard
         // the changes of.
         self.run_undoable(
             &format!("Checkout {target}"),
-            ops(&[&["checkout", target, "--"]]),
+            ops(&[&["checkout", "--no-overwrite-ignore", target, "--"]]),
             Refresh::All,
             undo,
             ctx,
@@ -57,7 +57,7 @@ impl RepoTab {
         if refuse_option_like(branch, &mut self.status) {
             return;
         }
-        let run = ops(&[&["checkout", branch, "--"], &["pull", "--ff-only"]]);
+        let run = checkout_pull_steps(branch, &was);
         let undo = checkout_pull_undo(&previous, branch, &was, &run);
         self.run_undoable(
             &format!("Checkout and pull {branch}"),
@@ -89,6 +89,7 @@ impl RepoTab {
             &format!("Checkout {local}"),
             ops(&[&[
                 "checkout",
+                "--no-overwrite-ignore",
                 "-b",
                 &local,
                 "--track",
@@ -120,46 +121,23 @@ impl RepoTab {
     /// Pushes `b`, checked out or not: to the branch it tracks, else publishes it on the
     /// default remote and tracks that. With where it goes: `origin/main`, or `origin`.
     pub(super) fn push_branch(&self, b: &Branch) -> Option<(String, Action)> {
-        let tracked = if b.upstream_gone() {
-            None
-        } else {
-            self.split_upstream(&b.upstream)
-        };
-        // Full refs: a tag of the same name must not be what is pushed.
-        let (to, args) = match tracked {
-            Some((remote, name)) => (
-                b.upstream.clone(),
-                vec![
-                    "push".to_owned(),
-                    remote,
-                    format!("refs/heads/{}:refs/heads/{name}", b.name),
-                ],
-            ),
-            None => {
-                let remote = self.default_remote()?;
-                (
-                    remote.clone(),
-                    vec![
-                        // `simple`: with push.default=upstream, a source alone goes to the
-                        // branch it tracks (`main` for one made from origin/main).
-                        "-c".to_owned(),
-                        "push.default=simple".to_owned(),
-                        "push".to_owned(),
-                        "-u".to_owned(),
-                        remote,
-                        // No `:dst`, which would bypass `remote.<name>.push` (Gerrit's
-                        // refs/for/*); the full source alone is not mistaken for a tag.
-                        format!("refs/heads/{}", b.name),
-                    ],
-                )
+        if self.gerrit.is_some() {
+            let mut dialog = self.review_dialog_for(Some(&b.name))?;
+            if let super::Dialog::GerritReview { head, .. } = &mut dialog {
+                *head = b.target.clone();
             }
-        };
-        let action = Action::Ops {
-            label: format!("Push {}", b.name),
-            ops: vec![args],
-            refresh: Refresh::All,
-        };
-        Some((to, action))
+            return Some((
+                crate::i18n::text("repo-core-0345").to_owned(),
+                Action::Dialog(dialog),
+            ));
+        }
+        Some((
+            crate::i18n::text("repo-core-0346").into(),
+            Action::RepositoryTools(super::repository_tools::Act::PushBranch(
+                b.name.clone(),
+                b.target.clone(),
+            )),
+        ))
     }
 
     /// Makes `b` track nothing, undoably.
@@ -215,71 +193,55 @@ impl RepoTab {
         forge::web_url(url)
     }
 
-    pub(super) fn push(&mut self, ctx: &egui::Context) {
-        let Some(current) = self.refs.current.clone() else {
-            self.status = Some(("Push needs a checked-out branch".to_owned(), true));
-            return;
-        };
-        let has_upstream = self
-            .refs
-            .local
-            .iter()
-            .any(|b| b.name == current && !b.upstream.is_empty() && !b.upstream_gone());
-        if has_upstream {
-            self.run_ops(
-                "Push",
-                ops(&[&["push"]]),
-                Refresh::All,
-                OpKind::plain(),
-                ctx,
-            );
-            return;
-        }
-        // First push of a branch: publish it and track the remote one.
-        match self.default_remote() {
-            Some(remote) => self.run_ops(
-                &format!("Push {current} to {remote}"),
-                // Full refs: a tag of the same name must not be what is pushed.
-                ops(&[&[
-                    // push.default=upstream would push it to the branch it tracks.
-                    "-c",
-                    "push.default=simple",
-                    "push",
-                    "-u",
-                    &remote,
-                    // No `:dst`, which would bypass `remote.<name>.push`.
-                    &format!("refs/heads/{current}"),
-                ]]),
-                Refresh::All,
-                OpKind::plain(),
-                ctx,
-            ),
-            None => {
-                self.status = Some(("This repository has no remote to push to".to_owned(), true))
-            }
-        }
-    }
-
     pub(super) fn commit(&mut self, ctx: &egui::Context) {
         if !self.work.conflicted.is_empty() {
-            self.status = Some(("Resolve the conflicted files first".to_owned(), true));
+            self.status = Some(crate::repo::Notice::plain((
+                crate::i18n::text("repo-core-0351").to_owned(),
+                true,
+            )));
+            return;
+        }
+        // A restack's rebase goes on as the restack: the layers after it too.
+        if self.stacks.restack_here().is_some()
+            && self.work.in_progress == Some(git::InProgress::Rebase)
+        {
+            self.resume_restack(ctx);
             return;
         }
         // A rebase or patch stopped on conflicts finishes with `--continue`, not a new commit.
         if let Some(state) = self.work.in_progress.filter(|s| s.continues()) {
             let label = format!("Continue {}", state.label().to_lowercase());
-            let steps = ops(&[&[state.command(), "--continue"]]);
+            let mut steps = ops(&[&[state.command(), "--continue"]]);
+            // Stopped at a commit to edit, with the changes not staged: they go into it, as a
+            // commit stages everything when nothing is (git would refuse, talking of conflicts).
+            if state == InProgress::Rebase
+                && self.work.staged.is_empty()
+                && !self.work.unstaged.is_empty()
+            {
+                steps.insert(0, vec!["add".to_owned(), "-A".to_owned()]);
+            }
+            // A fold stopped on a conflict is undone as the whole fold.
+            if let Some((label, kind)) = self.fold_continue(state) {
+                self.run_ops(&label, steps, Refresh::All, kind, ctx);
+                return;
+            }
             self.run_ops(&label, steps, Refresh::All, OpKind::plain(), ctx);
             return;
         }
         let summary = self.commit_summary.trim();
         if summary.is_empty() {
-            self.status = Some(("Write a commit summary first".to_owned(), true));
+            self.status = Some(crate::repo::Notice::plain((
+                crate::i18n::text("repo-core-0355").to_owned(),
+                true,
+            )));
             return;
         }
         let mut commit = vec!["commit".to_owned()];
         if self.amend {
             commit.push("--amend".to_owned());
+        }
+        if self.signs_off() {
+            commit.push("--signoff".to_owned());
         }
         commit.extend(["-m".to_owned(), summary.to_owned()]);
         let body = self.commit_body.trim();
@@ -287,12 +249,19 @@ impl RepoTab {
             commit.extend(["-m".to_owned(), body.to_owned()]);
         }
         let mut steps = Vec::new();
+        if self.amend && self.gerrit.is_some() {
+            commit.insert(0, crate::gerrit::AMEND.to_owned());
+            steps.push(self.same_branch());
+            steps.push(super::operations::expect_ref_at("HEAD", &self.refs.head));
+        }
         // Nothing staged: commit everything, like "Stage all and commit" (an amend with
         // nothing staged only rewrites the message).
         if self.work.staged.is_empty() && !self.amend {
             steps.push(vec!["add".to_owned(), "-A".to_owned()]);
         }
         steps.push(commit);
+        // Ticked to skip its hooks: this commit only.
+        let steps = self.skip_hooks.commit_steps(steps);
         let label = if self.amend { "Amend" } else { "Commit" };
         self.run_undoable(
             label,
@@ -303,29 +272,8 @@ impl RepoTab {
         );
     }
 
-    pub(super) fn stash_push(&mut self, message: &str, ctx: &egui::Context) {
-        let mut args: Vec<&str> = stash_push_args().to_vec();
-        if !message.trim().is_empty() {
-            args.extend(["-m", message.trim()]);
-        }
-        let redo = ops(&[&args]);
-        self.run_undoable(
-            "Stash",
-            ops(&[&args]),
-            Refresh::All,
-            Undo::Custom {
-                // This stash, not one pushed since.
-                undo: [expect_ref("refs/stash")]
-                    .into_iter()
-                    .chain(ops(&[&["stash", "pop", "--index"]]))
-                    .collect(),
-                redo,
-            },
-            ctx,
-        );
-    }
-
     /// Publishes `branch` on the forge's remote, then opens a pull (or merge) request for it.
+    #[allow(clippy::too_many_arguments)]
     pub(super) fn create_pr(
         &mut self,
         branch: String,
@@ -333,17 +281,21 @@ impl RepoTab {
         title: String,
         body: String,
         draft: bool,
+        reviewers: Vec<String>,
         ctx: &egui::Context,
     ) {
-        let Some(forge) = self.forge else { return };
+        let Some(hosting) = self.hosting.clone() else {
+            return;
+        };
         if self.busy_op.is_some() {
             return;
         }
-        // The remote the forge was found by.
-        let Some(remote) = self.default_remote() else {
+        // Explicitly publishing a PR uses its hosting remote; ordinary Push/Fetch still
+        // use their existing Git transport routing. Selecting the forge runs no Git writes.
+        let Some(remote) = self.primary_forge_remote().map(str::to_owned) else {
             return;
         };
-        let label = format!("Create {}", forge.noun());
+        let label = format!("Create {}", hosting.forge.noun());
         self.busy_op = Some(label.clone());
         self.op_started = Some(Instant::now());
         // Signing in after this fails must not run some earlier operation again.
@@ -362,7 +314,7 @@ impl RepoTab {
                 stopped: 0,
             }
         };
-        spawn_or(&self.tx, ctx, failed, move || {
+        spawn_or(&self.forge_operation_sender(), ctx, failed, move || {
             // Publish the branch first, so the forge can see it.
             // No `:dst`, which would bypass `remote.<name>.push`.
             let refspec = format!("refs/heads/{branch}");
@@ -372,8 +324,17 @@ impl RepoTab {
                 &["-c", "push.default=simple", "push", "-u", &remote, &refspec],
                 creds.as_ref(),
             );
-            let result = pushed
-                .and_then(|_| forge::create(&path, forge, &branch, &base, &title, &body, draft));
+            let result = pushed.and_then(|_| {
+                let new = NewPullRequest {
+                    branch: &branch,
+                    base: &base,
+                    title: &title,
+                    body: &body,
+                    draft,
+                    reviewers: &reviewers,
+                };
+                hosting.forge.provider().create(&path, &hosting, &new)
+            });
             Msg::OpDone {
                 label,
                 result,
@@ -404,9 +365,13 @@ pub(super) fn checkout_remote_undo(previous: &str, local: &str, remote_branch: &
         return Undo::None;
     }
     Undo::Custom {
-        undo: ops(&[&["checkout", previous, "--"], &["branch", "-d", local]]),
+        undo: ops(&[
+            &["checkout", "--no-overwrite-ignore", previous, "--"],
+            &["branch", "-d", local],
+        ]),
         redo: ops(&[&[
             "checkout",
+            "--no-overwrite-ignore",
             "-b",
             local,
             "--track",
@@ -443,7 +408,7 @@ pub(super) fn checkout_pull_undo(
         undo: [expect_ref(&format!("refs/heads/{branch}"))]
             .into_iter()
             .chain(ops(&[
-                &["checkout", previous, "--"],
+                &["checkout", "--no-overwrite-ignore", previous, "--"],
                 &["branch", "-f", branch, was],
             ]))
             .collect(),
@@ -451,77 +416,32 @@ pub(super) fn checkout_pull_undo(
     }
 }
 
+/// Bind the cached before-tip used by undo before checking out or pulling. Redo keeps
+/// this same guard, so an external advance cannot become an undoable old snapshot.
+pub(super) fn checkout_pull_steps(branch: &str, was: &str) -> Vec<Vec<String>> {
+    [
+        vec![expect_ref_at(&BranchRef::local(branch).full(), was)],
+        ops(&[
+            &["checkout", "--no-overwrite-ignore", branch, "--"],
+            &["pull", "--ff-only"],
+        ]),
+    ]
+    .concat()
+}
+
 /// Refuses (saying so in `status`) a branch or commit name git would read as an option: one
 /// from a remote or a pull request can be anything a ref name may be.
-pub(super) fn refuse_option_like(name: &str, status: &mut Option<(String, bool)>) -> bool {
+pub(super) fn refuse_option_like(name: &str, status: &mut Option<super::Notice>) -> bool {
     let bad = name.is_empty() || name.starts_with('-');
     if bad {
-        *status = Some((
-            format!("Can't check out \"{name}\": not a usable name"),
+        *status = Some(super::Notice::plain((
+            crate::i18n::message("repo-core-0369", &[("name", name.to_string().into())]),
             true,
-        ));
+        )));
     }
     bad
 }
 
 #[cfg(test)]
-mod tests {
-    use super::{Undo, checkout_remote_undo, remote_start};
-    use crate::git;
-    use crate::repo::OpKind;
-    use crate::repo::operations::run_steps;
-
-    #[test]
-    fn remote_branches_start_from_their_full_ref() {
-        assert_eq!(remote_start("origin/x"), "refs/remotes/origin/x");
-        assert_eq!(remote_start("remotes/origin/x"), "refs/remotes/origin/x");
-        assert_eq!(remote_start("refs/remotes/o/x"), "refs/remotes/o/x");
-    }
-
-    /// A tag named like the remote-tracking branch is no obstacle to checking it out.
-    #[test]
-    fn a_tag_named_like_the_remote_branch_does_not_shadow_it() {
-        let base = std::env::temp_dir().join(format!("gitcraft-cmd-tag-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&base);
-        let _ = std::fs::create_dir_all(&base);
-        let (up, clone) = (base.join("up"), base.join("clone"));
-        let up_s = up.to_string_lossy().into_owned();
-        let clone_s = clone.to_string_lossy().into_owned();
-        let setup: [(Option<&std::path::Path>, Vec<&str>); 7] = [
-            (None, vec!["init", "-q", "-b", "main", &up_s]),
-            (
-                Some(&up),
-                vec![
-                    "-c",
-                    "user.name=t",
-                    "-c",
-                    "user.email=t@t",
-                    "commit",
-                    "-q",
-                    "--allow-empty",
-                    "-m",
-                    "a",
-                ],
-            ),
-            (Some(&up), vec!["branch", "feat"]),
-            (None, vec!["clone", "-q", &up_s, &clone_s]),
-            (Some(&clone), vec!["config", "user.name", "t"]),
-            (Some(&clone), vec!["config", "user.email", "t@t"]),
-            (Some(&clone), vec!["tag", "origin/feat", "HEAD"]),
-        ];
-        let set_up = setup.iter().all(|(dir, args)| git::run(*dir, args).is_ok());
-        let redo = match checkout_remote_undo("main", "feat", "origin/feat") {
-            Undo::Custom { redo, .. } => redo,
-            _ => Vec::new(),
-        };
-        let (result, _) = run_steps(&clone, &redo, OpKind::plain(), None);
-        let merge = git::run(Some(&clone), &["config", "branch.feat.merge"]);
-        let _ = std::fs::remove_dir_all(&base);
-        assert!(set_up);
-        assert!(result.is_ok(), "{result:?}");
-        assert_eq!(
-            merge.map(|m| m.trim().to_owned()),
-            Ok("refs/heads/feat".to_owned())
-        );
-    }
-}
+#[path = "direct_tests/commands_tests.rs"]
+mod tests;

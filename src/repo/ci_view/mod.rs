@@ -10,7 +10,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
 use super::{Msg, RepoTab, spawn};
-use crate::ci::{self, CheckState, Job, Run};
+use crate::ci::{self, CheckState, Job, Project, Run};
 
 /// How often a run that's still going is read again.
 const POLL: Duration = Duration::from_secs(10);
@@ -26,7 +26,7 @@ fn next_request() -> u64 {
 
 /// What the pipeline view asks for.
 pub(crate) enum CiAct {
-    SelectRun(u64),
+    SelectRun(Project, u64),
     SelectJob(u64),
     Reload,
     RerunFailed,
@@ -39,7 +39,9 @@ pub(crate) struct CiView {
     pub(super) sha: String,
     request: u64,
     loading: bool,
-    runs: Option<Result<Vec<Run>, String>>,
+    runs: Option<Result<Builds, String>>,
+    /// Project of the selected run, retained independently of status refreshes.
+    project: Option<Project>,
     /// The run shown, by id.
     run: Option<u64>,
     /// The jobs of a run (by id), the one shown once they're here.
@@ -57,10 +59,46 @@ pub(crate) struct CiView {
     acting: bool,
 }
 
+/// Runs retain their owning project; IDs can overlap between GitLab projects.
+#[derive(Debug, Default)]
+pub(super) struct Builds {
+    runs: Vec<(Project, Run)>,
+    errors: Vec<String>,
+}
+
+/// Searches every candidate, retaining readable runs and reporting partial failures.
+fn read_builds(
+    projects: Vec<Project>,
+    mut read: impl FnMut(&Project) -> Result<Vec<Run>, String>,
+) -> Result<Builds, String> {
+    let mut builds = Builds::default();
+    let mut answered = false;
+    for project in projects {
+        match read(&project) {
+            Ok(runs) => {
+                answered = true;
+                builds
+                    .runs
+                    .extend(runs.into_iter().map(|run| (project.clone(), run)));
+            }
+            Err(e) => builds.errors.push(format!("{}: {e}", project.path)),
+        }
+    }
+    if !answered {
+        return Err(builds.errors.join("; "));
+    }
+    Ok(builds)
+}
+
 impl CiView {
+    /// Selected run in its original project, even if the commit's status source changes.
     fn shown_run(&self) -> Option<&Run> {
-        let runs = self.runs.as_ref()?.as_ref().ok()?;
-        runs.iter().find(|run| Some(run.id) == self.run)
+        let builds = self.runs.as_ref()?.as_ref().ok()?;
+        builds
+            .runs
+            .iter()
+            .find(|(p, run)| Some(p) == self.project.as_ref() && Some(run.id) == self.run)
+            .map(|(_, run)| run)
     }
 
     /// The jobs of the run shown, once they're here.
@@ -71,6 +109,7 @@ impl CiView {
             .map(|(_, jobs)| jobs)
     }
 
+    /// Whether either the selected run or one of its jobs is still active.
     fn running(&self) -> bool {
         let jobs = self.shown_jobs().and_then(|jobs| jobs.as_ref().ok());
         self.shown_run()
@@ -82,22 +121,28 @@ impl CiView {
 impl RepoTab {
     /// Shows the builds of commit `sha` in the big area, run `run` first if it's given.
     pub(super) fn open_ci(&mut self, sha: String, run: Option<u64>, ctx: &egui::Context) {
+        self.local_ci_context_default();
         if self.conflict.is_some() || self.rebase.is_some() {
             let editor = if self.conflict.is_some() {
-                "conflict editor"
+                crate::i18n::text("repo-workflows-ci_view-open-ci-d509b2ee")
             } else {
-                "interactive rebase"
+                crate::i18n::text("repo-workflows-ci_view-open-ci-680d5c5f")
             };
-            self.status = Some((format!("Finish or close the {editor} first"), true));
+            self.status = Some(crate::repo::Notice::plain((
+                format!("Finish or close the {editor} first"),
+                true,
+            )));
             return;
         }
         self.diff = None;
         self.file_view = None;
+        self.tour = None;
         self.ci_view = Some(CiView {
             sha,
             request: 0,
             loading: true,
             runs: None,
+            project: None,
             run,
             jobs: None,
             job: None,
@@ -112,26 +157,44 @@ impl RepoTab {
 
     /// Reads the runs of the commit shown (again), then the jobs of the one shown.
     fn load_ci_view(&mut self, ctx: &egui::Context) {
-        let project = self.ci_project();
+        let projects = self
+            .ci_view
+            .as_ref()
+            .map(|v| self.ci_projects_for(&v.sha))
+            .unwrap_or_default();
         let Some(view) = &mut self.ci_view else {
             return;
         };
         view.next = None;
-        let Some(project) = project else {
+        if projects.is_empty() {
             view.loading = false;
-            view.runs = Some(Err("This repository isn't on GitHub or GitLab.".to_owned()));
+            view.runs = Some(Err(crate::i18n::text(
+                "repo-workflows-ci_view-load-ci-view-4c1d2d4e",
+            )
+            .to_owned()));
             return;
         };
         view.request = next_request();
         view.loading = true;
         let (request, path, sha) = (view.request, self.path.clone(), view.sha.clone());
-        spawn(&self.tx, ctx, move || {
-            Msg::CiRuns(request, ci::runs(&path, &project, &sha))
+        spawn(&self.forge_sender(), ctx, move || {
+            Msg::CiRuns(
+                request,
+                read_builds(projects, |project| ci::runs(&path, project, &sha)),
+            )
         });
     }
 
+    /// The selected run's project, captured when the runs were loaded.
+    fn ci_view_project(&self) -> Option<crate::ci::Project> {
+        let view = self.ci_view.as_ref()?;
+        view.shown_run()?;
+        view.project.clone()
+    }
+
+    /// Reads jobs from the selected run's original project.
     fn load_ci_jobs(&mut self, ctx: &egui::Context) {
-        let project = self.ci_project();
+        let project = self.ci_view_project();
         let Some(view) = &mut self.ci_view else {
             return;
         };
@@ -140,27 +203,40 @@ impl RepoTab {
         };
         view.loading = true;
         let (request, path) = (view.request, self.path.clone());
-        spawn(&self.tx, ctx, move || {
+        spawn(&self.forge_sender(), ctx, move || {
             Msg::CiJobs(request, run, ci::jobs(&path, &project, run))
         });
     }
 
+    /// Accepts only the current run-list request and preserves selection by project and ID.
     pub(super) fn ci_runs_arrived(
         &mut self,
         request: u64,
-        result: Result<Vec<Run>, String>,
+        result: Result<Builds, String>,
         ctx: &egui::Context,
     ) {
         let Some(view) = self.ci_view.as_mut().filter(|v| v.request == request) else {
             return;
         };
         view.loading = false;
-        if let Ok(runs) = &result {
-            // The run shown stays; else the one asked for, or the newest.
-            let keep = view.run.filter(|id| runs.iter().any(|run| run.id == *id));
-            view.run = keep.or_else(|| runs.first().map(|run| run.id));
+        if let Ok(builds) = &result {
+            // Preserve the project together with the ID: pipeline IDs may overlap.
+            let keep = builds.runs.iter().find(|(project, run)| {
+                Some(run.id) == view.run && view.project.as_ref().is_none_or(|p| p == project)
+            });
+            let selected = keep.or_else(|| builds.runs.first());
+            let project = selected.map(|(project, _)| project.clone());
+            let run = selected.map(|(_, run)| run.id);
+            if project != view.project || run != view.run {
+                view.jobs = None;
+                view.job = None;
+                view.log = None;
+                view.log_request = next_request();
+            }
+            view.project = project;
+            view.run = run;
         }
-        let load_jobs = result.as_ref().is_ok_and(|runs| !runs.is_empty());
+        let load_jobs = result.as_ref().is_ok_and(|builds| !builds.runs.is_empty());
         // A read that failed while the run was going (the network blinked) is tried again,
         // rather than the view never being read again.
         if result.is_err() && view.was_running {
@@ -172,6 +248,7 @@ impl RepoTab {
         }
     }
 
+    /// Accepts jobs only for the current request and selected run.
     pub(super) fn ci_jobs_arrived(
         &mut self,
         request: u64,
@@ -214,10 +291,10 @@ impl RepoTab {
 
     /// A re-run or a cancel went through, or didn't.
     pub(super) fn ci_acted(&mut self, label: String, result: Result<(), String>) {
-        self.status = Some(match result {
+        self.status = Some(crate::repo::Notice::plain(match result {
             Ok(()) => (label, false),
             Err(e) => (format!("{label}: {e}"), true),
-        });
+        }));
         if let Some(view) = &mut self.ci_view {
             view.acting = false;
             view.next = Some(Instant::now() + AFTER_ACTING);
@@ -237,17 +314,22 @@ impl RepoTab {
         }
     }
 
+    /// Applies a view action using the selected run's retained project.
     pub(super) fn ci_act(&mut self, act: CiAct, ctx: &egui::Context) {
-        let project = self.ci_project();
+        let project = self.ci_view_project();
         let Some(view) = &mut self.ci_view else {
             return;
         };
         match act {
-            CiAct::SelectRun(id) => {
-                if view.run != Some(id) {
+            CiAct::SelectRun(project, id) => {
+                if view.run != Some(id) || view.project.as_ref() != Some(&project) {
+                    view.request = next_request();
+                    view.project = Some(project);
                     view.run = Some(id);
+                    view.jobs = None;
                     view.job = None;
                     view.log = None;
+                    view.log_request = next_request();
                     self.load_ci_jobs(ctx);
                 }
             }
@@ -263,14 +345,23 @@ impl RepoTab {
                 view.acting = true;
                 let rerun = matches!(act, CiAct::RerunFailed);
                 let path = self.path.clone();
-                spawn(&self.tx, ctx, move || {
+                spawn(&self.forge_sender(), ctx, move || {
                     let what = format!("{} #{}", run.name, run.number);
                     let (label, result) = if rerun {
                         let result = ci::rerun_failed(&path, &project, run.id);
-                        (format!("Re-ran the failed jobs of {what}"), result)
+                        (
+                            crate::i18n::message(
+                                "repo-workflows-ci_view-ci-act-da60943b",
+                                &[("what", (what).clone().into())],
+                            ),
+                            result,
+                        )
                     } else {
                         (
-                            format!("Cancelled {what}"),
+                            crate::i18n::message(
+                                "repo-workflows-ci_view-ci-act-07fe25a7",
+                                &[("what", (what).clone().into())],
+                            ),
                             ci::cancel(&path, &project, run.id),
                         )
                     };
@@ -291,7 +382,7 @@ impl RepoTab {
                 view.log = Some(None);
                 view.log_request = next_request();
                 let (request, path) = (view.log_request, self.path.clone());
-                spawn(&self.tx, ctx, move || {
+                spawn(&self.forge_sender(), ctx, move || {
                     Msg::CiLog(request, ci::failed_log(&path, &project, run, &jobs))
                 });
             }
@@ -300,35 +391,4 @@ impl RepoTab {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    /// A poll of a running build that fails (the network blinked) is tried again: the view
-    /// does not stop following the build.
-    #[test]
-    fn a_failed_poll_of_a_running_build_is_tried_again() {
-        let ctx = egui::Context::default();
-        let mut tab = RepoTab::new_deferred("/nonexistent/ci-poll-test".into(), &ctx);
-        tab.ci_view = Some(CiView {
-            sha: "abc".to_owned(),
-            request: 7,
-            loading: true,
-            runs: None,
-            run: Some(1),
-            jobs: None,
-            job: None,
-            log: None,
-            log_request: 0,
-            next: None,
-            was_running: true,
-            acting: false,
-        });
-        tab.ci_runs_arrived(7, Err("timed out".to_owned()), &ctx);
-        assert!(tab.ci_view.as_ref().is_some_and(|v| v.next.is_some()));
-        if let Some(view) = &mut tab.ci_view {
-            view.next = None;
-        }
-        tab.ci_jobs_arrived(7, 1, Err("timed out".to_owned()), &ctx);
-        assert!(tab.ci_view.as_ref().is_some_and(|v| v.next.is_some()));
-    }
-}
+mod tests;

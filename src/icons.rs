@@ -19,15 +19,23 @@ const SOURCES: &[(&str, &str)] = icons![
     "archive",
     "arrow-down",
     "arrow-down-to-line",
+    "arrow-down-up",
+    "arrow-left",
+    "arrow-right",
     "arrow-up",
     "arrow-up-from-line",
     "book-open",
+    "brush",
+    "bot",
+    "chart-column",
     "check",
     "chevron-down",
     "chevron-right",
     "chevron-up",
     "circle-alert",
+    "circle-user-round",
     "cloud",
+    "cloud-lightning",
     "cloud-download",
     "code",
     "columns-2",
@@ -49,17 +57,25 @@ const SOURCES: &[(&str, &str)] = icons![
     "git-merge",
     "git-pull-request",
     "globe",
+    "grip-vertical",
     "heart",
     "history",
+    "key-round",
+    "keyboard",
     "laptop",
     "list",
+    "lock",
     "log-in",
     "minus",
     "package",
     "palette",
+    "panel-bottom",
     "panel-left",
     "panel-right",
+    "picture-in-picture",
+    "picture-in-picture-2",
     "pilcrow",
+    "pin",
     "plus",
     "redo-2",
     "refresh-cw",
@@ -69,8 +85,10 @@ const SOURCES: &[(&str, &str)] = icons![
     "server",
     "settings",
     "smartphone",
+    "sparkles",
     "square-terminal",
     "star",
+    "sun",
     "tag",
     "undo-2",
     "unfold-vertical",
@@ -90,6 +108,12 @@ fn white_icons() -> &'static HashMap<&'static str, Arc<[u8]>> {
             })
             .collect()
     })
+}
+
+/// Whether an icon of that name is embedded.
+#[cfg(test)]
+pub fn known(name: &str) -> bool {
+    white_icons().contains_key(name)
 }
 
 /// An egui image for an icon, tinted. Unknown names give an empty image.
@@ -156,6 +180,13 @@ pub fn tool_button_count(
     };
     ui.add_enabled(enabled, |ui: &mut Ui| {
         let (rect, resp) = ui.allocate_exact_size(Vec2::new(width, 28.0), Sense::click());
+        // An icon-only button is named where it is used (`a11y::Named`), after what it does.
+        if !label.is_empty() {
+            crate::a11y::a11y(&resp, egui::WidgetType::Button, || {
+                let count = (count > 0).then(|| count.to_string());
+                crate::a11y::labels::join([label, &count.unwrap_or_default()])
+            });
+        }
         let r = egui::CornerRadius::same(t.radius_sm as u8);
         if resp.is_pointer_button_down_on() {
             ui.painter().rect_filled(rect, r, t.pressed);
@@ -201,6 +232,7 @@ pub fn tool_button_count(
 pub fn small_button(ui: &mut Ui, icon: &str, tooltip: &str) -> Response {
     let t = Tokens::get(ui.ctx());
     let (rect, resp) = ui.allocate_exact_size(Vec2::splat(20.0), Sense::click());
+    crate::a11y::a11y(&resp, egui::WidgetType::Button, tooltip);
     if resp.hovered() {
         ui.painter().rect_filled(rect, t.radius_sm, t.pressed);
     }
@@ -215,16 +247,53 @@ pub fn small_button(ui: &mut Ui, icon: &str, tooltip: &str) -> Response {
     resp.on_hover_text(tooltip)
 }
 
-/// An icon-only button of the window's title bar, a size up from [`small_button`].
-pub fn bar_button(ui: &mut Ui, icon: &str, tooltip: &str) -> Response {
+/// A compact toggle with an accessible selected state and a persistent accent when on.
+pub fn toggle_button(ui: &mut Ui, icon: &str, label: &str, on: bool) -> Response {
     let t = Tokens::get(ui.ctx());
-    let (rect, resp) = ui.allocate_exact_size(Vec2::splat(28.0), Sense::click());
-    if resp.hovered() {
-        ui.painter().rect_filled(rect, t.radius, t.pressed);
+    let (rect, resp) = ui.allocate_exact_size(Vec2::splat(20.0), Sense::click());
+    crate::a11y::a11y_selected(&resp, label, on);
+    if on || resp.hovered() {
+        ui.painter().rect_filled(
+            rect,
+            t.radius_sm,
+            if on { t.row_selected } else { t.pressed },
+        );
     }
-    let tint = if resp.hovered() { t.text } else { t.icon };
-    paint(ui, rect, icon, 17.0, tint);
-    resp.on_hover_text(tooltip)
+    paint(
+        ui,
+        rect,
+        icon,
+        14.0,
+        if !ui.is_enabled() {
+            t.text_faint
+        } else if on {
+            t.accent
+        } else {
+            t.icon
+        },
+    );
+    if on {
+        ui.painter().hline(
+            rect.x_range().shrink(3.0),
+            rect.bottom() - 1.0,
+            egui::Stroke::new(2.0, t.accent),
+        );
+    }
+    resp.on_hover_text(crate::i18n::message(
+        "dev-baseline-toggle",
+        &[
+            ("label", label.into()),
+            (
+                "state",
+                (if on {
+                    crate::i18n::text("dev-baseline-on")
+                } else {
+                    crate::i18n::text("dev-baseline-off")
+                })
+                .into(),
+            ),
+        ],
+    ))
 }
 
 /// An icon laid out inline, like a label.

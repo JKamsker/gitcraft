@@ -1,47 +1,71 @@
-//! The command palette (Ctrl+P): app commands, themes and the open repository's actions.
+//! The command palette (Ctrl+P): app commands, themes, the open repository's actions and what
+//! can be done with its selection, ranked by how well they match what is typed. A verb that
+//! needs a branch (merge, rebase, check out…) lists the branches in a second step.
+
+pub(super) mod items;
+mod rank;
+pub(super) mod recent;
+mod row;
+mod score;
+#[cfg(test)]
+mod tests;
 
 use std::path::PathBuf;
 
-use egui::{Align2, Key, RichText, Sense, Stroke, Ui, pos2, vec2};
+use egui::{Key, RichText, Stroke, vec2};
 
 use super::{App, Tab};
-use crate::repo::Action;
-use crate::theme::{self, ThemeKind, Tokens};
+use crate::repo::{PaletteGeneration, Pick};
+use crate::theme::{self, Tokens};
+use items::{Entry, Item};
+use rank::{Shown, rank};
+use row::{ROW_H, Row, palette_row};
+
+/// How tall the list gets before it scrolls.
+const LIST_H: f32 = 380.0;
 
 /// The command palette (Ctrl+P): type to filter, Enter runs.
 pub(super) struct Palette {
     query: String,
     selected: usize,
-    focus: bool,
-    /// The entries, made once rather than every frame (a repository with thousands of branches
-    /// has thousands of them), and what they were made from.
+    /// The first step's entries, made once rather than every frame, and what they were made
+    /// from.
     entries: Option<(EntriesKey, Vec<Item>)>,
+    /// The verb chosen, whose branch is being picked.
+    step: Option<Step>,
+    /// The entries listed for the query, and what they were ranked for.
+    shown: Option<(RankedFor, Vec<Shown>)>,
+    /// How far the list is scrolled.
+    scroll: f32,
+}
+
+/// The second step: what to do it with.
+struct Step {
+    /// The verb's label, shown above the field.
+    title: String,
+    /// What the verb is remembered by, once one of its choices runs.
+    key: String,
+    pick: Pick,
+    choices: Vec<Item>,
+    /// What was typed in the first step, back when going back.
+    query: String,
 }
 
 /// What the palette's entries were made from: the active tab, and its repository (a tab's
-/// view can change to another worktree) and that repository's palette generation.
-type EntriesKey = (usize, Option<(PathBuf, (u64, u64))>);
+/// view can change to another worktree) and what that repository's entries are made from.
+type EntriesKey = (usize, Option<(PathBuf, PaletteGeneration)>, String, u64);
 
-/// A palette entry: its label, the label lowercased (what the query is matched against), its
-/// hint, what it runs.
-type Item = (String, String, String, Entry);
+/// What the list shown was ranked for: the query, the step, and the entries' key.
+type RankedFor = (String, bool, EntriesKey);
 
-/// What a palette entry does outside the open repository.
-enum AppCommand {
-    NewTab,
-    ReopenTab,
-    Open,
-    Create,
-    Clone,
-    Settings,
-    Manual,
-    Theme(ThemeKind),
-}
-
-enum Entry {
-    App(AppCommand),
-    /// One of the active repository's palette items.
-    Repo(Action),
+/// What a frame of the palette asked for.
+enum Outcome {
+    Stay,
+    Close,
+    Back,
+    /// Run (or step into) the entry at this index of the list in use.
+    Choose(usize),
+    OpenLink(crate::launch::link::ForgeLink),
 }
 
 impl App {
@@ -49,84 +73,52 @@ impl App {
         self.palette = Some(Palette {
             query: String::new(),
             selected: 0,
-            focus: true,
             entries: None,
+            step: None,
+            shown: None,
+            scroll: 0.0,
         });
     }
 
-    /// Every palette entry: (label, hint, what it runs).
-    fn palette_entries(&self) -> Vec<(String, String, Entry)> {
-        let mut list = vec![
-            (
-                "New tab".to_owned(),
-                "Ctrl+T".to_owned(),
-                Entry::App(AppCommand::NewTab),
-            ),
-            (
-                "Open repository…".to_owned(),
-                "app".to_owned(),
-                Entry::App(AppCommand::Open),
-            ),
-            (
-                "Create repository…".to_owned(),
-                "app".to_owned(),
-                Entry::App(AppCommand::Create),
-            ),
-            (
-                "Clone repository…".to_owned(),
-                "app".to_owned(),
-                Entry::App(AppCommand::Clone),
-            ),
-            (
-                "Settings".to_owned(),
-                "app".to_owned(),
-                Entry::App(AppCommand::Settings),
-            ),
-            (
-                "Manual and keyboard shortcuts".to_owned(),
-                "F1".to_owned(),
-                Entry::App(AppCommand::Manual),
-            ),
-        ];
-        if !self.closed.is_empty() {
-            list.insert(
-                1,
-                (
-                    "Reopen closed tab".to_owned(),
-                    "Ctrl+Shift+T".to_owned(),
-                    Entry::App(AppCommand::ReopenTab),
-                ),
-            );
-        }
-        for kind in ThemeKind::ALL {
-            list.push((
-                format!("Theme: {}", kind.label()),
-                "theme".to_owned(),
-                Entry::App(AppCommand::Theme(kind)),
-            ));
-        }
-        if let Some(Tab::Repo(repo)) = self.tabs.get(self.active) {
-            for (label, hint, action) in repo.palette_items() {
-                list.push((label, hint, Entry::Repo(action)));
-            }
-        }
-        list
+    fn entries_key(&self) -> EntriesKey {
+        (
+            self.active,
+            match self.tabs.get(self.active) {
+                Some(Tab::Repo(repo)) => Some((repo.path.clone(), repo.palette_generation())),
+                _ => None,
+            },
+            serde_json::to_string(&self.settings.key_bindings).unwrap_or_default(),
+            crate::i18n::generation(),
+        )
     }
 
-    fn run_entry(&mut self, entry: Entry, ctx: &egui::Context) {
-        match entry {
-            Entry::App(AppCommand::NewTab) => self.new_tab(),
-            Entry::App(AppCommand::ReopenTab) => self.reopen_closed_tab(ctx),
-            Entry::App(AppCommand::Open) => self.pick_existing(ctx),
-            Entry::App(AppCommand::Create) => self.pick_new(ctx),
-            Entry::App(AppCommand::Clone) => self.start_clone(),
-            Entry::App(AppCommand::Settings) => self.open_settings(),
-            Entry::App(AppCommand::Manual) => self.manual_open = true,
-            Entry::App(AppCommand::Theme(kind)) => self.set_theme(ctx, kind),
-            Entry::Repo(action) => {
-                if let Some(Tab::Repo(repo)) = self.tabs.get_mut(self.active) {
-                    repo.queue(action);
-                    ctx.request_repaint();
+    /// Makes the entries again when what they are made from changed, and the second step's
+    /// choices with them (a branch deleted meanwhile is gone from them).
+    fn refresh_palette(&mut self, key: &EntriesKey, ctx: &egui::Context) {
+        let Some(palette) = &self.palette else {
+            return;
+        };
+        if palette
+            .entries
+            .as_ref()
+            .is_some_and(|(made, _)| made == key)
+        {
+            return;
+        }
+        let entries = self.palette_entries(ctx);
+        let choices = palette.step.as_ref().map(|s| self.palette_choices(&s.pick));
+        let step_title = palette.step.as_ref().and_then(|step| {
+            entries
+                .iter()
+                .find(|item| item.key == step.key)
+                .map(|item| item.label.clone())
+        });
+        if let Some(palette) = &mut self.palette {
+            palette.entries = Some((key.clone(), entries));
+            if let (Some(step), Some(choices)) = (&mut palette.step, choices) {
+                step.choices = choices;
+                if let Some(title) = step_title {
+                    step.title = title;
                 }
             }
         }
@@ -136,63 +128,156 @@ impl App {
         if self.palette.is_none() {
             return;
         }
-        let t = Tokens::get(ctx);
-        let key = (
-            self.active,
-            match self.tabs.get(self.active) {
-                Some(Tab::Repo(repo)) => Some((repo.path.clone(), repo.palette_generation())),
-                _ => None,
-            },
-        );
-        if self
-            .palette
-            .as_ref()
-            .is_some_and(|p| p.entries.as_ref().is_none_or(|(made, _)| *made != key))
-        {
-            let entries = self
-                .palette_entries()
-                .into_iter()
-                .map(|(label, hint, entry)| {
-                    let lower = label.to_lowercase();
-                    (label, lower, hint, entry)
-                })
-                .collect();
-            if let Some(palette) = &mut self.palette {
-                palette.entries = Some((key, entries));
+        // A dialog that asks something (ssh's password, a new host key) came up over it: the
+        // keys are that dialog's, and Enter must not also run an entry.
+        if self.clone_form.is_some() || self.remote_form.is_some() || self.askpass_open() {
+            self.palette = None;
+            return;
+        }
+        let key = self.entries_key();
+        self.refresh_palette(&key, ctx);
+        let outcome = match &mut self.palette {
+            Some(palette) => palette.show(ctx, &key, &self.palette_recent),
+            None => return,
+        };
+        match outcome {
+            Outcome::Stay => {}
+            Outcome::Close => self.palette = None,
+            Outcome::Back => {
+                if let Some(p) = &mut self.palette
+                    && let Some(step) = p.step.take()
+                {
+                    p.query = step.query;
+                    p.go_to_top();
+                }
+            }
+            Outcome::Choose(i) => self.choose(i, ctx),
+            Outcome::OpenLink(link) => {
+                self.palette = None;
+                self.open_link(link, ctx);
             }
         }
+    }
+
+    /// Runs the `i`th entry of the list in use, or opens the second step for a verb.
+    fn choose(&mut self, i: usize, ctx: &egui::Context) {
         let Some(palette) = &mut self.palette else {
             return;
         };
-        let Palette {
-            query,
-            selected: chosen,
-            focus,
-            entries,
-        } = palette;
-        let entries: &[Item] = entries.as_ref().map_or(&[], |(_, e)| e);
-        let lowered = query.to_lowercase();
-        let shown: Vec<usize> = (0..entries.len())
-            .filter(|&i| fuzzy(&entries[i].1, &lowered))
-            .take(60)
-            .collect();
-        *chosen = (*chosen).min(shown.len().saturating_sub(1));
-        let (up, down, enter, esc) = ctx.input(|i| {
+        let list = match &mut palette.step {
+            Some(step) => &mut step.choices,
+            None => match &mut palette.entries {
+                Some((_, entries)) => entries,
+                None => return,
+            },
+        };
+        let Some(item) = list.get(i) else {
+            return;
+        };
+        // A verb is remembered once something is done with it, not when it is only looked at.
+        if let Entry::Pick(pick) = &item.run {
+            let (title, key, pick) = (item.label.clone(), item.key.clone(), pick.clone());
+            let choices = self.palette_choices(&pick);
+            if let Some(p) = &mut self.palette {
+                p.step = Some(Step {
+                    title,
+                    key,
+                    pick,
+                    choices,
+                    query: std::mem::take(&mut p.query),
+                });
+                p.go_to_top();
+            }
+            return;
+        }
+        let key = item.key.clone();
+        let mut list = match self.palette.take() {
+            Some(Palette {
+                step: Some(step), ..
+            }) => {
+                self.palette_recent.used(&step.key);
+                step.choices
+            }
+            Some(Palette {
+                entries: Some((_, entries)),
+                ..
+            }) => entries,
+            _ => return,
+        };
+        self.palette_recent.used(&key);
+        if i < list.len() {
+            let item = list.swap_remove(i);
+            self.run_entry(item.run, ctx);
+        }
+    }
+}
+
+impl Palette {
+    fn go_to_top(&mut self) {
+        self.selected = 0;
+        self.scroll = 0.0;
+        self.shown = None;
+    }
+
+    /// The entries of the step in use.
+    fn list(&self) -> &[Item] {
+        match &self.step {
+            Some(step) => &step.choices,
+            None => self.entries.as_ref().map_or(&[], |(_, e)| e),
+        }
+    }
+
+    /// Ranks the list for the query when either changed.
+    fn ranked(&mut self, key: &EntriesKey, recent: &recent::Recent) {
+        let wanted = (self.query.clone(), self.step.is_some(), key.clone());
+        if self.shown.as_ref().is_some_and(|(made, _)| *made == wanted) {
+            return;
+        }
+        let shown = rank(self.list(), &self.query, recent);
+        self.shown = Some((wanted, shown));
+    }
+
+    /// Draws the palette and handles its keys.
+    fn show(&mut self, ctx: &egui::Context, key: &EntriesKey, recent: &recent::Recent) -> Outcome {
+        let t = Tokens::get(ctx);
+        let (up, down, enter, esc, backspace) = ctx.input(|i| {
             (
                 i.key_pressed(Key::ArrowUp),
                 i.key_pressed(Key::ArrowDown),
                 i.key_pressed(Key::Enter),
                 i.key_pressed(Key::Escape),
+                // Not the repeats of a held key, which emptied the field: going back takes a
+                // press of its own.
+                i.events.iter().any(|e| {
+                    matches!(
+                        e,
+                        egui::Event::Key {
+                            key: Key::Backspace,
+                            pressed: true,
+                            repeat: false,
+                            ..
+                        }
+                    )
+                }),
             )
         });
+        if self.step.is_some() && (esc || (backspace && self.query.is_empty())) {
+            return Outcome::Back;
+        }
+        self.ranked(key, recent);
+        let count = self.shown.as_ref().map_or(0, |(_, s)| s.len());
+        let last = count.saturating_sub(1);
+        self.selected = self.selected.min(last);
         if down {
-            *chosen = (*chosen + 1).min(shown.len().saturating_sub(1));
+            self.selected = (self.selected + 1).min(last);
         }
         if up {
-            *chosen = chosen.saturating_sub(1);
+            self.selected = self.selected.saturating_sub(1);
         }
-        let mut run = None;
-        let mut close = esc;
+        let link = super::links::palette_link(&self.query);
+        let mut open_link = false;
+        let moved = up || down;
+        let mut outcome = if esc { Outcome::Close } else { Outcome::Stay };
         let frame = egui::Frame::new()
             .fill(t.card)
             .stroke(Stroke::new(1.0, t.field_border))
@@ -205,94 +290,161 @@ impl App {
         let resp = area.show(ctx, |ui| {
             frame.show(ui, |ui| {
                 ui.set_width(560.0);
-                let edit = ui.add(
-                    egui::TextEdit::singleline(query)
-                        .hint_text("Type a command or a branch…")
-                        .desired_width(f32::INFINITY)
-                        .margin(egui::Margin::symmetric(10, 8))
-                        .font(theme::medium(14.0)),
-                );
-                if std::mem::take(focus) {
-                    edit.request_focus();
-                }
-                if edit.changed() {
-                    *chosen = 0;
-                }
+                self.field(ui, &t);
                 ui.add_space(6.0);
-                egui::ScrollArea::vertical()
-                    .max_height(380.0)
-                    .show(ui, |ui| {
-                        ui.spacing_mut().item_spacing.y = 0.0;
-                        for (k, &i) in shown.iter().enumerate() {
-                            let (label, _, hint, _) = &entries[i];
-                            let selected = k == *chosen;
-                            if palette_row(ui, &t, label, hint, selected, up || down) {
-                                run = Some(i);
-                            }
+                match &link {
+                    Some(Ok(link)) => {
+                        let what = super::links::describe(link);
+                        if ui
+                            .button(crate::i18n::message(
+                                "interaction-palette-link",
+                                &[("target", what.into())],
+                            ))
+                            .clicked()
+                        {
+                            open_link = true;
                         }
-                        if shown.is_empty() {
-                            ui.label(RichText::new("Nothing matches").color(t.text_faint));
+                    }
+                    Some(Err(why)) => {
+                        ui.label(RichText::new(why).color(t.text_faint));
+                    }
+                    None => {
+                        if let Some(i) = self.list_ui(ui, &t, count, moved) {
+                            outcome = Outcome::Choose(i);
                         }
-                    });
+                    }
+                }
             });
         });
-        if enter && let Some(&i) = shown.get(*chosen) {
-            run = Some(i);
+        // What was typed this frame is ranked before Enter picks from the list.
+        self.ranked(key, recent);
+        if enter
+            && let Some((_, shown)) = &self.shown
+            && let Some(s) = shown.get(self.selected)
+        {
+            outcome = Outcome::Choose(s.index);
+        }
+        if enter && matches!(link, Some(Ok(_))) {
+            open_link = true;
         }
         if resp.response.clicked_elsewhere()
             && ctx.input(|i| i.pointer.any_pressed())
-            && run.is_none()
+            && matches!(outcome, Outcome::Stay)
         {
-            close = true;
+            outcome = Outcome::Close;
         }
-        if close || run.is_some() {
-            let entries = self.palette.take().and_then(|p| p.entries);
-            if let Some(i) = run
-                && let Some((_, _, _, entry)) = entries.and_then(|(_, e)| e.into_iter().nth(i))
-            {
-                self.run_entry(entry, ctx);
+        if open_link && let Some(Ok(link)) = link {
+            return Outcome::OpenLink(link);
+        }
+        outcome
+    }
+
+    /// The verb chosen, if any, and the field typed in.
+    fn field(&mut self, ui: &mut egui::Ui, t: &Tokens) {
+        let hint = match &self.step {
+            Some(step) => {
+                ui.label(
+                    RichText::new(format!("{} ›", step.title.trim_end_matches('…')))
+                        .font(theme::semibold(12.0))
+                        .color(t.text_dim),
+                );
+                ui.add_space(4.0);
+                step.pick.placeholder()
             }
+            None => crate::i18n::text("interaction-palette-query"),
+        };
+        let edit = ui.add(
+            egui::TextEdit::singleline(&mut self.query)
+                .hint_text(hint)
+                .desired_width(f32::INFINITY)
+                .margin(egui::Margin::symmetric(10, 8))
+                .font(theme::medium(14.0)),
+        );
+        // The field has the keyboard while the palette is open: what is clicked or selected
+        // underneath doesn't take it, but a modal shown over it does.
+        let modal = ui.ctx().memory(|m| m.top_modal_layer().is_some());
+        if !edit.has_focus() && !modal {
+            edit.request_focus();
         }
+        if edit.changed() {
+            self.selected = 0;
+            self.scroll = 0.0;
+        }
+    }
+
+    /// The rows in view (thousands of branches are not all laid out); returns the one clicked.
+    fn list_ui(
+        &mut self,
+        ui: &mut egui::Ui,
+        t: &Tokens,
+        count: usize,
+        moved: bool,
+    ) -> Option<usize> {
+        if count == 0 {
+            let text = if self.step.is_some() && self.query.is_empty() {
+                crate::i18n::text("interaction-palette-nothing-pick")
+            } else {
+                crate::i18n::text("interaction-palette-nothing-match")
+            };
+            ui.label(RichText::new(text).color(t.text_faint));
+            return None;
+        }
+        let view = LIST_H.min(count as f32 * ROW_H);
+        if moved {
+            self.scroll = scroll_to_show(self.selected, self.scroll, view);
+        }
+        let mut clicked = None;
+        let (list, shown) = match (&self.step, &self.entries, &self.shown) {
+            (Some(step), _, Some((_, shown))) => (&step.choices[..], shown),
+            (None, Some((_, entries)), Some((_, shown))) => (&entries[..], shown),
+            _ => return None,
+        };
+        let selected = self.selected;
+        let output = ui
+            .scope(|ui| {
+                ui.spacing_mut().item_spacing.y = 0.0;
+                egui::ScrollArea::vertical()
+                    .max_height(LIST_H)
+                    .min_scrolled_height(view)
+                    .auto_shrink([false, true])
+                    .vertical_scroll_offset(self.scroll)
+                    .show_rows(ui, ROW_H, count, |ui, range| {
+                        for k in range {
+                            let Some(s) = shown.get(k) else { continue };
+                            let Some(item) = list.get(s.index) else {
+                                continue;
+                            };
+                            let row = Row {
+                                label: &item.label,
+                                matched: &s.positions,
+                                hint: &item.hint,
+                                shortcut: item.shortcut.as_deref(),
+                            };
+                            if palette_row(ui, t, &row, k == selected) {
+                                clicked = Some(s.index);
+                            }
+                        }
+                    })
+            })
+            .inner;
+        self.scroll = output.state.offset.y;
+        clicked
     }
 }
 
-/// One entry, its hint on the right; `scroll` brings the selected one into view. True when
-/// clicked.
-fn palette_row(
-    ui: &mut Ui,
-    t: &Tokens,
-    label: &str,
-    hint: &str,
-    selected: bool,
-    scroll: bool,
-) -> bool {
-    let (rect, r) = ui.allocate_exact_size(vec2(ui.available_width(), 28.0), Sense::click());
-    if selected {
-        ui.painter().rect_filled(rect, t.radius_sm, t.row_selected);
-        if scroll {
-            ui.scroll_to_rect(rect, None);
-        }
-    } else if r.hovered() {
-        ui.painter().rect_filled(rect, t.radius_sm, t.hover);
+/// How far to scroll a list `view` tall, scrolled `scroll`, for its row `k` to be in view.
+fn scroll_to_show(k: usize, scroll: f32, view: f32) -> f32 {
+    let top = k as f32 * ROW_H;
+    if top < scroll {
+        top
+    } else if top + ROW_H > scroll + view {
+        top + ROW_H - view
+    } else {
+        scroll
     }
-    ui.painter().text(
-        pos2(rect.left() + 10.0, rect.center().y),
-        Align2::LEFT_CENTER,
-        label,
-        egui::FontId::proportional(13.0),
-        t.text,
-    );
-    ui.painter().text(
-        pos2(rect.right() - 10.0, rect.center().y),
-        Align2::RIGHT_CENTER,
-        hint,
-        egui::FontId::proportional(11.0),
-        t.text_faint,
-    );
-    r.clicked()
 }
 
-/// `needle`'s characters appear in `haystack` in order ("cmain" → "Check out main").
+/// Matching used by the start-page filter as well as the palette.
 pub(super) fn fuzzy(haystack: &str, needle: &str) -> bool {
     let mut chars = haystack.chars();
     needle

@@ -1,0 +1,19 @@
+{
+  "input_sha256": {
+    "/tmp/gitcraft_pr184_source_integrity.py": "888c74252d6bf789e1150f1bba74532a351f635f440e26d04d4faedde40c995c",
+    "/tmp/gitcraft_pr184_approval_binding.py": "fb057098987d40161211fb593084ee19cca19758a7269cc1582d1c1071336b7f",
+    "/tmp/gitcraft-pr184-source-integrity-tests.py": "8b409b973fd7a25c40d9e13075a4cfd0fd83619a87119db264a026b999fd6176",
+    "/tmp/gitcraft-pr184-approval-binding-tests.py": "b1eca634688377a52e03cec350467f572a28f7afad4c906dd03d657f68317910",
+    "/tmp/gitcraft-pr184-round4-assemble.py": "0bd9ba9565bdb5a513f733b11b569470739c0381e7d59dfa1695401a4b43c834"
+  }
+}
+.
+----------------------------------------------------------------------
+Ran 1 test in 0.093s
+
+OK
+......
+----------------------------------------------------------------------
+Ran 6 tests in 0.006s
+
+OK

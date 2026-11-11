@@ -1,0 +1,1 @@
+fatal: unable to access 'https://localhost:18443/x.git/': server certificate verification failed. CAfile: /root/.ccr/ca-bundle.crt CRLfile: none

@@ -1,6 +1,7 @@
 //! Watching the repository's folder (and a linked worktree's git folders) for changes made
 //! elsewhere.
 
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{Sender, channel};
 use std::time::Duration;
@@ -13,14 +14,64 @@ impl RepoTab {
     /// Setting that up walks every folder of the worktree (a big `node_modules` is tens of
     /// thousands), so it is done in the background; the watcher comes back as a message.
     pub(super) fn watch(&mut self, ctx: &egui::Context) {
+        self.watches += 1;
+        let watch = self.watches;
         let (tx, rx) = channel();
         self.fs_rx = Some(rx);
         let path = self.path.clone();
         let events_ctx = ctx.clone();
+        // Elsewhere, there is nothing to watch from here: asked over and over instead. The
+        // poller says it has arrived (`Msg::Watcher`) once it has a first look to compare with.
+        if let Some(target) = crate::remote::parse(&path) {
+            let mut poller = super::watch_remote::Poller::new(target, tx, self.tx.clone(), watch);
+            poller.tick(ctx);
+            self.poller = Some(poller);
+            return;
+        }
         spawn(&self.tx, ctx, move || {
-            Msg::Watcher(start_watcher(&path, tx, events_ctx).map(Box::new))
+            Msg::Watcher(watch, start_watcher(&path, tx, events_ctx).map(Box::new))
         });
     }
+}
+
+/// Per watched worktree, the changes on disk seen since the last read they caused: how many,
+/// and where (see [`crate::timing::place_of`]), the most frequent first. For the timing log.
+static SEEN: std::sync::Mutex<BTreeMap<PathBuf, BTreeMap<String, u64>>> =
+    std::sync::Mutex::new(BTreeMap::new());
+
+/// Count a recognized filesystem event only when the timing diagnostics are enabled.
+fn saw(root: &Path, path: &Path) {
+    // The filesystem callback should not allocate or contend on this mutex just to record
+    // diagnostics that will never be written.
+    if !crate::timing::enabled() {
+        return;
+    }
+    let place = crate::timing::place_of(path, root);
+    if let Ok(mut seen) = SEEN.lock() {
+        *seen
+            .entry(root.to_owned())
+            .or_default()
+            .entry(place)
+            .or_default() += 1;
+    }
+}
+
+/// What [`saw`] counted under `root` since it was last asked, as `target/ ×120, .rs ×1`.
+pub(super) fn take_seen(root: &Path) -> Option<String> {
+    let places = SEEN.lock().ok()?.remove(root)?;
+    let mut places: Vec<_> = places.into_iter().collect();
+    places.sort_by_key(|(_, n)| std::cmp::Reverse(*n));
+    let shown: Vec<String> = places
+        .iter()
+        .take(5)
+        .map(|(place, n)| format!("{place} ×{n}"))
+        .collect();
+    let more = places.len().saturating_sub(5);
+    Some(if more > 0 {
+        format!("{} and {more} more", shown.join(", "))
+    } else {
+        shown.join(", ")
+    })
 }
 
 /// A watcher of the worktree `path` (and of a linked worktree's git folders) that sends what
@@ -38,6 +89,7 @@ fn start_watcher(
         .iter()
         .flat_map(|(own, common)| [own.clone(), common.clone()])
         .collect();
+    let root = path.to_owned();
     let handler = move |res: notify::Result<notify::Event>| {
         let Ok(event) = res else { return };
         if matches!(event.kind, notify::EventKind::Access(_)) {
@@ -45,6 +97,7 @@ fn start_watcher(
         }
         for path in &event.paths {
             if let Some(change) = fs_change(path, &git_dirs) {
+                saw(&root, path);
                 let _ = tx.send(change);
                 ctx.request_repaint_after(Duration::from_millis(500));
             }
@@ -93,7 +146,7 @@ pub(super) enum FsChange {
     /// The index (staging writes it, and so does any other tool's `git status`) or
     /// `.gitmodules`: re-reading the status and the submodules, whose commits the index holds.
     Index,
-    /// Refs, HEAD, merge state: a full reload.
+    /// Refs, HEAD, merge or bisect state: a full reload.
     Git,
 }
 
@@ -121,17 +174,22 @@ impl FsChange {
 /// outside the worktree that are watched too.
 pub(super) fn fs_change(path: &Path, git_dirs: &[PathBuf]) -> Option<FsChange> {
     // Objects and logs call for nothing. FETCH_HEAD (every fetch, even one that brings
-    // nothing) and ORIG_HEAD (written along with HEAD) say nothing the refs don't.
+    // nothing) and ORIG_HEAD (written along with HEAD) say nothing the refs don't, nor what
+    // gitcraft keeps from gc under `refs/gitcraft/` (see `timeline::snapshot`).
     let relevant = |inside: &str| {
         if inside == "index" {
             Some(FsChange::Index)
         } else {
-            (inside.starts_with("refs")
+            ((inside.starts_with("refs")
+                && !inside.starts_with("refs/notes/")
+                && !inside.starts_with(super::timeline::snapshot::ROOT)
+                && inside != "refs/gitcraft")
                 || inside.starts_with("reftable")
                 || inside == "HEAD"
                 || inside == "packed-refs"
                 || (inside.ends_with("_HEAD") && inside != "FETCH_HEAD" && inside != "ORIG_HEAD")
-                || inside.starts_with("rebase-"))
+                || inside.starts_with("rebase-")
+                || inside.starts_with("BISECT_"))
             .then_some(FsChange::Git)
         }
     };
@@ -142,6 +200,11 @@ pub(super) fn fs_change(path: &Path, git_dirs: &[PathBuf]) -> Option<FsChange> {
     let s = path.to_string_lossy().replace('\\', "/");
     match s.split_once("/.git/") {
         Some((_, inside)) => relevant(inside),
+        // The git folder itself, which Windows says changed whenever anything in it did (git
+        // reading objects, gitcraft's own files…): each change in it comes on its own. Taken
+        // for one of the worktree's files, every read made another one, a status and a diff
+        // read again each second.
+        None if path.file_name().is_some_and(|n| n == ".git") => None,
         None if path.file_name().is_some_and(|n| n == ".gitmodules") => Some(FsChange::Index),
         None => Some(FsChange::Files),
     }

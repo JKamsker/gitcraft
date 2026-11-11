@@ -1,6 +1,7 @@
 # Builds gitcraft for Windows, Linux and macOS and publishes a GitHub release when a `v*` tag is pushed.
-# Every push to `dev` publishes a prerelease of the next patch version, `vX.Y.Z-dev.N` (N is
-# the run number).
+# Every push to `dev` (each merge) publishes a prerelease of the next patch version,
+# `vX.Y.Z-dev.N` (N is the run number), and creates its tag on that commit: no tag is needed
+# beforehand.
 # Run it by hand (Actions › Release › Run workflow) to only build and download the artifacts.
 name: Release
 
@@ -15,16 +16,22 @@ on:
 permissions:
   contents: read
 
-# A newer push to dev replaces a dev build still running; tag builds always finish.
+# Every push to dev (every merge) gets a release of its own: a run is never cancelled by a newer
+# one, and each dev run has a group of its own (its commit), so none waits for or replaces
+# another. Tag builds of the same tag still run one at a time.
 concurrency:
-  group: release-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref == 'refs/heads/dev' }}
+  group: release-${{ github.ref }}${{ github.ref == 'refs/heads/dev' && format('-{0}', github.sha) || '' }}
+  cancel-in-progress: false
 
 jobs:
+  rust-file-size:
+    uses: ./.github/workflows/rust-file-size.yml
+
   # The version this run builds and the name its files carry. A tag or a run by hand builds
   # Cargo.toml's version. A dev push builds the next patch after the last release, as a
   # prerelease (Cargo.toml's version itself while it has no tag yet).
   version:
+    needs: rust-file-size
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
@@ -55,6 +62,11 @@ jobs:
           echo "label=$label" >> "$GITHUB_OUTPUT"
           echo "prerelease=$DEV" >> "$GITHUB_OUTPUT"
 
+  # Compile once and fan out the Windows tests, alongside the release builds.
+  windows-tests:
+    needs: rust-file-size
+    uses: ./.github/workflows/windows-tests.yml
+
   build:
     needs: version
     strategy:
@@ -66,9 +78,10 @@ jobs:
           # The oldest supported runner, so the binary runs on older glibc too.
           - os: ubuntu-22.04
             name: linux-x86_64
-          # Builds for Apple silicon and Intel, joined into one universal app.
-          - os: macos-latest
-            name: macos-universal
+          # Builds for Apple silicon and Intel, joined into one universal app. Off for now: the
+          # macOS runners aren't picking the job up (a known issue); put it back once they do.
+          # - os: macos-latest
+          #   name: macos-universal
     runs-on: ${{ matrix.os }}
     env:
       VERSION: ${{ needs.version.outputs.version }}
@@ -96,10 +109,24 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libxkbcommon-dev libwayland-dev libx11-dev libxcursor-dev \
-            libxrandr-dev libxi-dev libgtk-3-dev libdbus-1-dev pkg-config
+            libxrandr-dev libxi-dev libgtk-3-dev libdbus-1-dev libasound2-dev pkg-config
 
+      # Match ci.yml's isolation of tests sensitive to parallel subprocess load.
+      # Keep their original time limits; run them separately instead of weakening assertions.
+      # Windows runs the shared shards in parallel with this packaging job.
       - name: Test
-        run: cargo test --locked
+        if: runner.os != 'Windows'
+        run: cargo test --locked -- --skip parallel_bisect::tests::a_test_past_its_limit_is_stopped_and_skipped --skip app::palette::tests::thousands_of_branches_open_and_filter_quickly
+
+      - name: Large-branch palette responsiveness (isolated)
+        if: runner.os != 'Windows'
+        timeout-minutes: 5
+        run: cargo test --locked -p gitcraft --lib app::palette::tests::thousands_of_branches_open_and_filter_quickly -- --exact --nocapture --test-threads=1
+
+      - name: Timed-out subprocess cleanup (isolated)
+        if: runner.os != 'Windows'
+        timeout-minutes: 5
+        run: cargo test --locked -p gitcraft --lib parallel_bisect::tests::a_test_past_its_limit_is_stopped_and_skipped -- --exact --nocapture
 
       - name: Build
         if: runner.os != 'macOS'
@@ -154,7 +181,8 @@ jobs:
           dir="$PKG"
           mkdir "$dir"
           cp target/release/gitcraft README.md ATTRIBUTION.md LICENSE-MIT LICENSE-APACHE \
-            packaging/gitcraft.desktop "$dir/"
+            packaging/gitcraft.desktop packaging/linux/gitcraft-link.desktop \
+            packaging/linux/gitcraft-servicemenu.desktop "$dir/"
           cp assets/app-icon/gitcraft-256.png "$dir/gitcraft.png"
           strip "$dir/gitcraft"
           tar czf "$dir.tar.gz" "$dir"
@@ -188,6 +216,7 @@ jobs:
           # The .deb installs, with its menu entry and icon; the .rpm holds the same files.
           sudo apt-get install -y desktop-file-utils rpm "./$name.deb"
           desktop-file-validate /usr/share/applications/gitcraft.desktop
+          desktop-file-validate /usr/share/applications/gitcraft-link.desktop
           test -x /usr/bin/gitcraft
           test -f /usr/share/icons/hicolor/256x256/apps/gitcraft.png
           rpm -qp --requires "$name.rpm"
@@ -206,7 +235,7 @@ jobs:
             gitcraft-*.rpm
 
   release:
-    needs: [version, build]
+    needs: [version, build, windows-tests]
     if: startsWith(github.ref, 'refs/tags/') || needs.version.outputs.prerelease == 'true'
     runs-on: ubuntu-latest
     permissions:
@@ -215,6 +244,8 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: dist
+          # Exclude the precompiled Windows test artifact from published files.
+          pattern: gitcraft-*
           merge-multiple: true
       # A dev build tags its own commit and never becomes the latest release, the one the
       # app's update check follows.

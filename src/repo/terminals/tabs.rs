@@ -1,0 +1,145 @@
+//! The terminal panel's tab strip.
+
+use crate::repo::terminals::TerminalAct;
+use egui::{Rect, Sense, Ui, pos2, vec2};
+
+use crate::icons;
+use crate::repo::Action;
+use crate::repo::widgets::{self, top_rounded};
+use crate::terminal::Terminal;
+use crate::theme::{self, Tokens};
+
+/// The terminal panel's strip: one tab per shell, `+` with a shell menu, and close.
+/// `popped`: the panel is in its own window, and offers to come back rather than pop out.
+pub fn terminal_tabs(
+    ui: &mut Ui,
+    terminals: &[Terminal],
+    active: usize,
+    popped: bool,
+    acts: &mut Vec<Action>,
+) {
+    let t = Tokens::get(ui.ctx());
+    let (strip, _) = ui.allocate_exact_size(vec2(ui.available_width(), 30.0), Sense::hover());
+    ui.painter().rect_filled(strip, 0.0, t.tab_strip);
+    let mut child = ui.new_child(
+        egui::UiBuilder::new()
+            .max_rect(strip.shrink2(vec2(4.0, 0.0)))
+            .layout(egui::Layout::left_to_right(egui::Align::Max)),
+    );
+    let ui = &mut child;
+    ui.spacing_mut().item_spacing.x = 2.0;
+    for (i, term) in terminals.iter().enumerate() {
+        terminal_tab(ui, &t, i, term, i == active, acts);
+    }
+    ui.add_space(4.0);
+    let plus = icons::small_button(ui, "plus", crate::i18n::text("repo-core-0068"));
+    if plus.clicked() {
+        acts.push(Action::Terminal(TerminalAct::New {
+            shell: None,
+            cwd: None,
+        }));
+    }
+    crate::menu_item::context(&plus)
+        .style(crate::theme::menu_style)
+        .show(|ui| shell_items(ui, acts));
+    let more = icons::small_button(ui, "chevron-down", crate::i18n::text("repo-core-3773"));
+    egui::Popup::menu(&more)
+        .style(crate::theme::menu_style)
+        .show(|ui| shell_items(ui, acts));
+    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+        ui.add_space(4.0);
+        use crate::repo::popout::{Panel, Request};
+        if popped {
+            if icons::small_button(ui, "x", crate::i18n::text("repo-core-3774")).clicked() {
+                acts.push(Action::Popout(Request::Close(Panel::Terminal)));
+            }
+        } else if icons::small_button(ui, "x", crate::i18n::text("repo-core-3775")).clicked() {
+            acts.push(Action::Terminal(TerminalAct::Hide));
+        }
+        crate::repo::popout::button(ui, crate::repo::popout::Panel::Terminal, popped, acts);
+    });
+}
+
+/// The tab of shell `i`, with its close button.
+fn terminal_tab(
+    ui: &mut Ui,
+    t: &Tokens,
+    i: usize,
+    term: &Terminal,
+    selected: bool,
+    acts: &mut Vec<Action>,
+) {
+    let label = format!("{} {}", i + 1, term.shell);
+    let font = if selected {
+        theme::semibold(11.5)
+    } else {
+        theme::medium(11.5)
+    };
+    let galley =
+        ui.painter()
+            .layout_no_wrap(label, font, if selected { t.text } else { t.text_dim });
+    let (rect, resp) = ui.allocate_exact_size(vec2(galley.size().x + 44.0, 26.0), Sense::click());
+    widgets::a11y_selected(
+        &resp,
+        || {
+            crate::i18n::message(
+                "repo-core-3776",
+                &[("text", galley.text().to_string().into())],
+            )
+        },
+        selected,
+    );
+    let shape = top_rounded(t.radius as u8);
+    if selected {
+        ui.painter().rect_filled(rect, shape, t.card);
+    } else if resp.hovered() {
+        ui.painter().rect_filled(rect, shape, t.hover);
+    }
+    icons::paint(
+        ui,
+        Rect::from_center_size(pos2(rect.left() + 13.0, rect.center().y), vec2(14.0, 14.0)),
+        "square-terminal",
+        12.0,
+        t.text_faint,
+    );
+    ui.painter().galley(
+        pos2(rect.left() + 24.0, rect.center().y - galley.size().y / 2.0),
+        galley,
+        t.text,
+    );
+    let x_rect =
+        Rect::from_center_size(pos2(rect.right() - 11.0, rect.center().y), vec2(16.0, 16.0));
+    let x = ui
+        .interact(x_rect, resp.id.with("close"), Sense::click())
+        .on_hover_text(crate::i18n::text("repo-core-3778"));
+    widgets::a11y(
+        &x,
+        egui::WidgetType::Button,
+        crate::i18n::text("repo-core-3779"),
+    );
+    if x.hovered() {
+        ui.painter().rect_filled(x_rect, t.radius_sm, t.pressed);
+    }
+    icons::paint(ui, x_rect, "x", 11.0, t.text_faint);
+    if x.clicked() {
+        acts.push(Action::Terminal(TerminalAct::Close(i)));
+    } else if resp.clicked() {
+        acts.push(Action::Terminal(TerminalAct::Select(i)));
+    }
+}
+
+/// One entry per shell found on this computer, each opening a new terminal with it.
+fn shell_items(ui: &mut Ui, acts: &mut Vec<Action>) {
+    for shell in crate::terminal::available_shells() {
+        if crate::menu_item::MenuItem::new(&shell.label)
+            .icon("square-terminal")
+            .show(ui)
+            .clicked()
+        {
+            acts.push(Action::Terminal(TerminalAct::New {
+                shell: Some(shell),
+                cwd: None,
+            }));
+        }
+    }
+}

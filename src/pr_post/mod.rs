@@ -1,16 +1,16 @@
-//! Saying something on a pull request, through `gh api`: comments and reviews, with their
-//! comments on lines. The text goes over stdin, so its length and contents don't matter to the
-//! command line.
+//! Saying something on a pull request, whichever forge it's on: comments and reviews with their
+//! comments on lines, replies, suggested changes, merging. [`Target`] is what each forge's module
+//! implements; the rest is what they share.
 
 mod suggestion;
 mod target;
 
-use serde_json::{Value, json};
-
 use crate::pull_request::DiffSide;
 
+pub(crate) use suggestion::apply_lines;
 pub use suggestion::{Suggestion, shown_suggestion};
 pub use target::Target;
+pub(crate) use target::{check_path, decode_file, encode_path, may_delete_branch};
 
 /// What a review says about the pull request as a whole.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -29,7 +29,7 @@ pub struct LineComment {
     pub body: String,
 }
 
-/// Why this review can't be sent, if it can't. GitHub would refuse the same, less clearly.
+/// Why this review can't be sent, if it can't. The forge would refuse the same, less clearly.
 pub fn review_problem(verdict: Verdict, body: &str, pending: usize) -> Option<&'static str> {
     let says_something = !body.trim().is_empty() || pending > 0;
     match verdict {
@@ -40,33 +40,7 @@ pub fn review_problem(verdict: Verdict, body: &str, pending: usize) -> Option<&'
     }
 }
 
-/// What `POST …/pulls/N/reviews` is sent.
-pub(crate) fn review_payload(
-    head_oid: &str,
-    verdict: Verdict,
-    body: &str,
-    pending: &[LineComment],
-) -> Value {
-    let event = event_name(verdict);
-    let mut payload = json!({ "commit_id": head_oid, "event": event, "body": body });
-    if !pending.is_empty() {
-        let comments: Vec<Value> = pending
-            .iter()
-            .map(|comment| {
-                json!({
-                    "path": comment.path,
-                    "line": comment.line,
-                    "side": side_name(comment.side),
-                    "body": comment.body,
-                })
-            })
-            .collect();
-        payload["comments"] = Value::Array(comments);
-    }
-    payload
-}
-
-/// Whether `viewer` is the author of a pull request: GitHub lets nobody review their own.
+/// Whether `viewer` is the author of a pull request: forges let nobody review their own.
 pub fn is_own(author: &str, viewer: Option<&str>) -> bool {
     viewer.is_some_and(|viewer| viewer.eq_ignore_ascii_case(author))
 }
@@ -78,17 +52,6 @@ pub enum MergeMethod {
     Merge,
     Squash,
     Rebase,
-}
-
-/// What `PUT …/pulls/N/merge` is sent. The commit is named, so that nothing pushed since the page
-/// was read gets merged unseen.
-pub(crate) fn merge_payload(head_oid: &str, method: MergeMethod) -> Value {
-    let method = match method {
-        MergeMethod::Merge => "merge",
-        MergeMethod::Squash => "squash",
-        MergeMethod::Rebase => "rebase",
-    };
-    json!({ "sha": head_oid, "merge_method": method })
 }
 
 /// Why this pull request can't be merged, if it can't.
@@ -114,34 +77,9 @@ pub fn merge_blocker(
     }
 }
 
-/// What GitHub calls a review's verdict.
-fn event_name(verdict: Verdict) -> &'static str {
-    match verdict {
-        Verdict::Comment => "COMMENT",
-        Verdict::Approve => "APPROVE",
-        Verdict::RequestChanges => "REQUEST_CHANGES",
-    }
-}
-
-fn side_name(side: DiffSide) -> &'static str {
-    match side {
-        DiffSide::Left => "LEFT",
-        DiffSide::Right => "RIGHT",
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn line(path: &str, line: u64, side: DiffSide, body: &str) -> LineComment {
-        LineComment {
-            path: path.to_owned(),
-            line,
-            side,
-            body: body.to_owned(),
-        }
-    }
 
     #[test]
     fn an_approval_needs_no_words() {
@@ -164,63 +102,6 @@ mod tests {
         assert!(review_problem(Verdict::Comment, "", 0).is_some());
         assert_eq!(review_problem(Verdict::Comment, "Nice", 0), None);
         assert_eq!(review_problem(Verdict::Comment, "", 2), None);
-    }
-
-    #[test]
-    fn a_review_names_its_verdict_and_commit() {
-        for (verdict, event) in [
-            (Verdict::Comment, "COMMENT"),
-            (Verdict::Approve, "APPROVE"),
-            (Verdict::RequestChanges, "REQUEST_CHANGES"),
-        ] {
-            let payload = review_payload("abc", verdict, "Text", &[]);
-            assert_eq!(payload["event"], event);
-            assert_eq!(payload["commit_id"], "abc");
-            assert_eq!(payload["body"], "Text");
-        }
-    }
-
-    #[test]
-    fn a_review_without_comments_on_lines_sends_none() {
-        let payload = review_payload("abc", Verdict::Approve, "", &[]);
-        assert!(payload.get("comments").is_none());
-    }
-
-    #[test]
-    fn comments_on_lines_go_along_with_their_side() {
-        let pending = [
-            line("src/a.rs", 12, DiffSide::Right, "New line"),
-            line("src/b.rs", 3, DiffSide::Left, "Removed line"),
-        ];
-        let payload = review_payload("abc", Verdict::Comment, "", &pending);
-        assert_eq!(
-            payload["comments"],
-            json!([
-                {"path": "src/a.rs", "line": 12, "side": "RIGHT", "body": "New line"},
-                {"path": "src/b.rs", "line": 3, "side": "LEFT", "body": "Removed line"},
-            ])
-        );
-    }
-
-    #[test]
-    fn text_is_sent_as_it_is_whatever_it_contains() {
-        let body = "\"quotes\" \\ and\nlines --flag $(x)";
-        let payload = review_payload("abc", Verdict::Comment, body, &[]);
-        let sent: Value = serde_json::from_str(&payload.to_string()).unwrap_or_default();
-        assert_eq!(sent["body"], body);
-    }
-
-    #[test]
-    fn a_merge_names_its_method_and_commit() {
-        for (method, name) in [
-            (MergeMethod::Merge, "merge"),
-            (MergeMethod::Squash, "squash"),
-            (MergeMethod::Rebase, "rebase"),
-        ] {
-            let payload = merge_payload("abc", method);
-            assert_eq!(payload["merge_method"], name);
-            assert_eq!(payload["sha"], "abc");
-        }
     }
 
     #[test]
@@ -264,7 +145,7 @@ mod tests {
         assert!(is_own("ana", Some("ana")));
         assert!(is_own("Ana", Some("aNA")));
         assert!(!is_own("ana", Some("bo")));
-        // Not knowing who is logged in, it's up to GitHub to say.
+        // Not knowing who is logged in, it's up to the forge to say.
         assert!(!is_own("ana", None));
     }
 }

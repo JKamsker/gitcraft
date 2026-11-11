@@ -1,15 +1,51 @@
 //! Cloning: the dialog, the clone in the background, and asking for credentials.
 
+mod fields;
+pub(in crate::app) use fields::*;
+
 use std::path::{Path, PathBuf};
-use std::sync::mpsc::channel;
+use std::sync::Arc;
+use std::sync::mpsc::{Receiver, channel};
 
-use egui::{Key, RichText, Stroke, Ui, vec2};
+use egui::{RichText, Stroke, Ui, vec2};
 
-use super::{App, Tab, repo_root};
+use super::{App, repo_root};
 use crate::git;
 use crate::theme::{self, Tokens};
 
+#[cfg(test)]
+type CloneIntent = (String, String, String);
+#[cfg(test)]
+type CloneIntents = (usize, Vec<CloneIntent>);
+
+#[cfg(test)]
+thread_local! {
+    /// Intent seam at the native picker and submission boundaries; tests still paint
+    /// clone_dialog/form_fields and process the production keyboard responses.
+    static CLONE_INTENTS: std::cell::RefCell<Option<CloneIntents>> = const { std::cell::RefCell::new(None) };
+}
+
+fn pick_clone_folder() -> Option<PathBuf> {
+    #[cfg(test)]
+    if CLONE_INTENTS.with(|intents| {
+        if let Some((browse, _)) = &mut *intents.borrow_mut() {
+            *browse += 1;
+            true
+        } else {
+            false
+        }
+    }) {
+        return None;
+    }
+    rfd::FileDialog::new()
+        .set_title(crate::i18n::text("interaction-forms-clone-into"))
+        .pick_folder()
+}
+
 pub(super) struct CloneForm {
+    options: git::CloneOptions,
+    depth: String,
+    sparse_folders: String,
     url: String,
     parent: String,
     name: String,
@@ -21,6 +57,15 @@ pub(super) struct CloneForm {
     auth: bool,
     username: String,
     password: String,
+}
+
+/// A clone running in the background.
+pub(super) struct Cloning {
+    owner: egui::ViewportId,
+    pub(super) dest: PathBuf,
+    rx: Receiver<Result<PathBuf, String>>,
+    /// Its progress, and how to cancel it.
+    pub(super) control: Arc<git::OpControl>,
 }
 
 impl App {
@@ -38,6 +83,9 @@ impl App {
             .map(|p| p.display().to_string())
             .unwrap_or_default();
         self.clone_form = Some(CloneForm {
+            options: Default::default(),
+            depth: String::new(),
+            sparse_folders: String::new(),
             url: String::new(),
             parent,
             name: String::new(),
@@ -48,6 +96,20 @@ impl App {
             username: String::new(),
             password: String::new(),
         });
+    }
+
+    /// The URL in the clone form, if it is open (for tests).
+    #[cfg(test)]
+    pub(super) fn clone_url(&self) -> Option<String> {
+        self.clone_form.as_ref().map(|f| f.url.clone())
+    }
+
+    /// Puts `url` in the open clone form, and the folder name it gives.
+    pub(super) fn set_clone_url(&mut self, url: &str) {
+        if let Some(form) = &mut self.clone_form {
+            form.url = url.to_owned();
+            form.name = git::clone_dir_name(&form.url);
+        }
     }
 
     pub(super) fn clone_dialog(&mut self, ctx: &egui::Context) {
@@ -68,25 +130,39 @@ impl App {
             .backdrop_color(egui::Color32::from_black_alpha(110))
             .show(ctx, |ui| {
                 ui.set_width(460.0);
-                ui.label(RichText::new("Clone repository").font(theme::semibold(15.0)));
+                ui.label(
+                    RichText::new(crate::i18n::text("interaction-forms-clone-title"))
+                        .font(theme::semibold(15.0)),
+                );
                 ui.add_space(10.0);
-                form_fields(ui, form, &t);
+                let enter = form_fields(ui, form, &t);
                 if let Some(err) = &form.error {
-                    ui.colored_label(t.danger, err);
+                    ui.colored_label(
+                        t.danger,
+                        display_message(err).unwrap_or_else(|| git::display_error(err)),
+                    );
                 }
                 ui.add_space(12.0);
                 let valid = !form.url.trim().is_empty()
                     && !form.parent.trim().is_empty()
                     && !form.name.trim().is_empty();
                 ui.horizontal(|ui| {
-                    let enter = ui.input(|i| i.key_pressed(Key::Enter));
-                    if crate::repo::primary_button(ui, "Clone", valid, 90.0).clicked()
+                    if crate::repo::primary_button(
+                        ui,
+                        crate::i18n::text("interaction-forms-clone"),
+                        valid,
+                        90.0,
+                    )
+                    .clicked()
                         || (enter && valid)
                     {
                         submit = true;
                     }
                     if ui
-                        .add(egui::Button::new("Cancel").min_size(vec2(80.0, 30.0)))
+                        .add(
+                            egui::Button::new(crate::i18n::text("interaction-forms-cancel"))
+                                .min_size(vec2(80.0, 30.0)),
+                        )
                         .clicked()
                     {
                         cancel = true;
@@ -97,10 +173,10 @@ impl App {
             cancel = true;
         }
 
-        if submit {
-            self.submit_clone(ctx);
-        } else if cancel {
+        if cancel {
             self.clone_form = None;
+        } else if submit {
+            self.submit_clone(ctx);
         }
     }
 
@@ -109,17 +185,30 @@ impl App {
         let Some(form) = &mut self.clone_form else {
             return;
         };
+        #[cfg(test)]
+        if CLONE_INTENTS.with(|intents| {
+            if let Some((_, submit)) = &mut *intents.borrow_mut() {
+                submit.push((form.url.clone(), form.parent.clone(), form.name.clone()));
+                true
+            } else {
+                false
+            }
+        }) {
+            return;
+        }
         // One clone at a time: a second would take the first one's place, whose result
         // (and its tab) would never come.
-        if let Some((running, _)) = &self.cloning {
+        if let Some(running) = &self.cloning {
             form.error = Some(format!(
-                "Wait for the clone into {} to finish",
-                running.display()
+                "Wait for the clone into {} to finish, or cancel it on the start page",
+                running.dest.display()
             ));
             return;
         }
         let dest = PathBuf::from(form.parent.trim()).join(form.name.trim());
-        let occupied = dest.exists()
+        // Elsewhere, git there refuses a folder that isn't empty, and says so.
+        let occupied = !crate::remote::is_remote(&dest)
+            && dest.exists()
             && std::fs::read_dir(&dest)
                 .map(|mut d| d.next().is_some())
                 .unwrap_or(true);
@@ -127,46 +216,134 @@ impl App {
             form.error = Some(format!("{} already exists and isn't empty", dest.display()));
             return;
         }
+        form.options.depth = if form.depth.trim().is_empty() {
+            None
+        } else {
+            match form.depth.trim().parse::<u32>() {
+                Ok(n) if n > 0 => Some(n),
+                _ => {
+                    form.error =
+                        Some("Depth must be a positive number, or empty for full history".into());
+                    return;
+                }
+            }
+        };
+        if form.options.folders.is_some() {
+            form.options.folders = Some(
+                form.sparse_folders
+                    .lines()
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty())
+                    .map(str::to_owned)
+                    .collect(),
+            );
+        }
+        if let Err(error) = form.options.validate() {
+            form.error = Some(error);
+            return;
+        }
+        let options = form.options.clone();
         let url = form.url.trim().to_owned();
-        let creds = (form.auth && !form.username.trim().is_empty()).then(|| git::Credentials {
-            username: form.username.trim().to_owned(),
-            password: form.password.clone(),
-        });
+        let creds = if form.auth && !form.username.trim().is_empty() {
+            match git::Credentials::for_url(
+                &url,
+                form.username.trim().to_owned(),
+                form.password.clone(),
+            ) {
+                Ok(creds) => Some(creds),
+                Err(error) => {
+                    form.error = Some(error);
+                    return;
+                }
+            }
+        } else {
+            None
+        };
         self.clone_parent = Some(PathBuf::from(form.parent.trim()));
         let (tx, rx) = channel();
         let ctx2 = ctx.clone();
         let dest2 = dest.clone();
-        std::thread::spawn(move || {
-            let _ = tx.send(git::clone(&url, &dest2, creds.as_ref()));
+        let repaint = ctx.clone();
+        let control = git::OpControl::new(move || repaint.request_repaint());
+        let following = Arc::clone(&control);
+        crate::connections::spawn(move || {
+            let result =
+                git::clone_with_options(&url, &dest2, creds.as_ref(), &options, &following)
+                    .and_then(|()| {
+                        if crate::remote::is_remote(&dest2) {
+                            Ok(dest2.clone())
+                        } else {
+                            repo_root(&dest2)
+                        }
+                    });
+            let _ = tx.send(result);
             ctx2.request_repaint();
         });
-        self.cloning = Some((dest, rx));
+        self.cloning = Some(Cloning {
+            owner: self.windows.current,
+            dest,
+            rx,
+            control,
+        });
         self.cloning_form = self.clone_form.take();
         self.error = None;
     }
 
     pub(super) fn poll_clone(&mut self, ctx: &egui::Context) {
-        let Some((dest, rx)) = &self.cloning else {
+        let Some(cloning) = &self.cloning else {
             return;
         };
-        let Ok(result) = rx.try_recv() else { return };
-        let dest = dest.clone();
+        let Ok(result) = cloning.rx.try_recv() else {
+            return;
+        };
+        let dest = cloning.dest.clone();
+        let owner = cloning.owner;
+        let cancelled = cloning.control.is_cancelled();
         self.cloning = None;
+        self.in_window(owner, |app| app.finish_clone(dest, cancelled, result, ctx));
+    }
+
+    fn finish_clone(
+        &mut self,
+        dest: PathBuf,
+        cancelled: bool,
+        result: Result<PathBuf, String>,
+        ctx: &egui::Context,
+    ) {
         match result {
-            Ok(()) => {
+            Err(_) if cancelled => {
+                self.clone_failed = false;
+                self.error = Some(format!("Clone into {}: cancelled", dest.display()).into());
+            }
+            // On another machine, it opens once reached again, the credentials along.
+            Ok(_) if crate::remote::is_remote(&dest) => {
+                let creds = self
+                    .cloning_form
+                    .take()
+                    .filter(|f| f.auth)
+                    .and_then(|form| {
+                        git::Credentials::for_url(
+                            form.url.trim(),
+                            form.username.trim().to_owned(),
+                            form.password,
+                        )
+                        .ok()
+                    });
+                self.connect(dest, creds, ctx);
+            }
+            Ok(root) => {
                 // Show it in a start page tab if one is active, otherwise in a new tab.
-                self.open_repo(&dest, ctx);
+                self.open_root(root.clone(), ctx);
                 // The credentials that cloned it also fetch and push in its tab, and in no
                 // other: when it couldn't be opened, the active tab is another repository's.
-                let root = repo_root(&dest).ok();
                 if let Some(form) = self.cloning_form.take().filter(|f| f.auth)
-                    && let Some(Tab::Repo(repo)) = self.tabs.get_mut(self.active)
-                    && root.as_ref() == Some(&repo.path)
+                    && let Ok(creds) = git::Credentials::for_url(
+                        form.url.trim(),
+                        form.username.trim().to_owned(),
+                        form.password,
+                    )
                 {
-                    repo.set_credentials(git::Credentials {
-                        username: form.username.trim().to_owned(),
-                        password: form.password,
-                    });
+                    self.credentials_for(&root, creds);
                 }
             }
             // Back to the form, asking for credentials.
@@ -181,90 +358,38 @@ impl App {
                     form.password.clear();
                     self.clone_form = Some(form);
                 }
-                None => self.error = Some(format!("Clone failed: {e}")),
+                None => self.error = Some(format!("Clone failed: {e}").into()),
             },
-            Err(e) => self.error = Some(format!("Clone failed: {e}")),
+            Err(e) => {
+                self.clone_failed = true;
+                self.error = Some(format!("Clone failed: {e}").into());
+            }
         }
         self.cloning_form = None;
     }
-}
 
-/// URL, folder and name, where that puts the clone, and the credentials once asked for.
-fn form_fields(ui: &mut Ui, form: &mut CloneForm, t: &Tokens) {
-    ui.label(RichText::new("URL").color(t.text_dim).small());
-    let url = ui.add(
-        egui::TextEdit::singleline(&mut form.url)
-            .hint_text("https://github.com/user/repo.git")
-            .desired_width(f32::INFINITY)
-            .margin(egui::Margin::symmetric(8, 6)),
-    );
-    if form.focus {
-        url.request_focus();
-        form.focus = false;
-    }
-    if url.changed() && !form.name_edited {
-        form.name = git::clone_dir_name(&form.url);
-    }
-    ui.add_space(6.0);
-    ui.label(RichText::new("Into folder").color(t.text_dim).small());
-    ui.horizontal(|ui| {
-        ui.add(
-            egui::TextEdit::singleline(&mut form.parent)
-                .desired_width(ui.available_width() - 90.0)
-                .margin(egui::Margin::symmetric(8, 6)),
-        );
-        if ui
-            .add(egui::Button::new("Browse…").min_size(vec2(80.0, 28.0)))
-            .clicked()
-            && let Some(dir) = rfd::FileDialog::new().set_title("Clone into").pick_folder()
-        {
-            form.parent = dir.display().to_string();
+    #[cfg(test)]
+    pub(super) fn recorded_clone_completion(&mut self, owner: egui::ViewportId, root: PathBuf) {
+        self.start_clone();
+        if let Some(form) = &mut self.clone_form {
+            form.auth = true;
+            form.url = "https://example.invalid/recorded/repository.git".into();
+            form.username = "recorded-user".into();
+            form.password = "recorded-secret".into();
         }
-    });
-    ui.add_space(6.0);
-    ui.label(RichText::new("Name").color(t.text_dim).small());
-    if ui
-        .add(
-            egui::TextEdit::singleline(&mut form.name)
-                .desired_width(f32::INFINITY)
-                .margin(egui::Margin::symmetric(8, 6)),
-        )
-        .changed()
-    {
-        form.name_edited = true;
-    }
-    let dest = PathBuf::from(form.parent.trim()).join(form.name.trim());
-    ui.label(
-        RichText::new(dest.display().to_string())
-            .color(t.text_faint)
-            .small(),
-    );
-    if form.auth {
-        ui.add_space(6.0);
-        ui.label(
-            RichText::new("The remote wants to know who you are. Most hosts take a personal access token as the password.")
-                .color(t.text_dim)
-                .small(),
-        );
-        ui.add_space(4.0);
-        ui.add(
-            egui::TextEdit::singleline(&mut form.username)
-                .hint_text("Username")
-                .desired_width(f32::INFINITY)
-                .margin(egui::Margin::symmetric(8, 6)),
-        );
-        ui.add(
-            egui::TextEdit::singleline(&mut form.password)
-                .password(true)
-                .hint_text("Password or token")
-                .desired_width(f32::INFINITY)
-                .margin(egui::Margin::symmetric(8, 6)),
-        );
+        self.cloning_form = self.clone_form.take();
+        let (tx, rx) = channel();
+        let _ = tx.send(Ok(root.clone()));
+        self.cloning = Some(Cloning {
+            owner,
+            dest: root,
+            rx,
+            control: git::OpControl::new(|| {}),
+        });
     }
 }
 
-fn home_dir() -> Option<PathBuf> {
-    std::env::var_os("USERPROFILE")
-        .or_else(|| std::env::var_os("HOME"))
-        .map(PathBuf::from)
-}
+#[cfg(test)]
+#[allow(clippy::expect_used)] // Missing rendered fixture widgets must fail the test.
+#[path = "clone/localization_tests.rs"]
+mod localization_tests;

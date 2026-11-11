@@ -1,21 +1,139 @@
-//! Running git: the environment every call gets, credentials for remotes, errors.
+//! Running git: the environment every call gets, credentials for remotes, errors. A call for a
+//! repository in WSL or over SSH runs git there (see [`crate::remote`]), with the same
+//! environment.
 
-use std::path::Path;
+pub(super) mod bounded;
+mod memo;
+mod source;
+pub use source::CommandSource;
+
+use std::path::{Path, PathBuf};
 use std::process::Command;
+/// The initiating task's immutable profile config (including queued and nested reads).
+pub fn profile_config() -> Option<PathBuf> {
+    crate::connections::current().git_config
+}
 
-fn git_cmd() -> Command {
+/// Whether `args` reads or writes the user's own global config: `git config --global …`
+/// (signing settings, Mergiraf's set-up) or `git maintenance` (its list of repositories), which
+/// must never land in the profile's file, which is written over.
+fn user_global_config(args: &[&str]) -> bool {
+    let rest = after_options(args);
+    (rest.first() == Some(&"config") && rest.contains(&"--global"))
+        // `maintenance start` / `register` write `maintenance.repo` to the global config.
+        || (rest.first() == Some(&"maintenance")
+            && matches!(rest.get(1), Some(&("start" | "register" | "unregister" | "stop"))))
+}
+
+/// `args` from the subcommand on: past the options before it (`-c x=y`, `-C dir`,
+/// `--literal-pathspecs`…).
+pub(super) fn after_options<'a>(args: &'a [&'a str]) -> &'a [&'a str] {
+    super::parse_command_envelope(args)
+        .map(|(at, _)| &args[at..])
+        .unwrap_or(&[])
+}
+
+/// Points `cmd` at the active profile's config, unless `args` is about the user's own.
+pub(super) fn with_profile(cmd: &mut Command, args: &[&str]) {
+    if user_global_config(args) {
+        return;
+    }
+    let context = crate::connections::current();
+    if context.error.is_some() {
+        cmd.arg("-c").arg("=invalid-profile");
+        return;
+    }
+    if !context.choices.ssh_key.is_empty() {
+        cmd.env_remove("GIT_SSH_COMMAND")
+            .env_remove("GIT_SSH")
+            .env_remove("GIT_SSH_VARIANT");
+    }
+    let path = context.git_config;
+    if let Some(path) = path {
+        cmd.env("GIT_CONFIG_GLOBAL", path);
+    }
+}
+
+use crate::remote::{self, Target};
+
+mod connection;
+mod credential_policy;
+mod endpoints;
+#[cfg(all(test, unix))]
+mod native_https_fixture;
+pub(crate) use credential_policy::*;
+pub(crate) use endpoints::*;
+mod setup;
+pub(crate) use connection::*;
+pub(crate) use setup::{setup_clone, setup_fetch, setup_path, setup_run};
+mod watched;
+pub use watched::{CANCELLED, OpControl, run_watched, run_watched_recorded};
+
+/// What every git call is run with.
+/// - `GIT_TERMINAL_PROMPT`: never block on an interactive prompt (credential helpers with a
+///   GUI still work).
+/// - `GIT_EDITOR`: `rebase --continue`, `merge --continue`… would otherwise open an editor
+///   nobody sees.
+/// - `LANGUAGE`: messages in English whatever the user's language: errors are told apart by
+///   their words (`is_auth_error`…). `C` in LANGUAGE wins over LC_ALL / LANG for messages only,
+///   so the character set (and what hooks see of it) stays the user's.
+pub(super) const GIT_ENV: [(&str, &str); 4] = [
+    ("GIT_TERMINAL_PROMPT", "0"),
+    ("GIT_OPTIONAL_LOCKS", "0"),
+    ("GIT_EDITOR", "true"),
+    ("LANGUAGE", "C"),
+];
+
+/// Interactive rebases set `sequence.editor` themselves; an inherited one would win.
+pub(super) const GIT_ENV_REMOVED: [&str; 1] = ["GIT_SEQUENCE_EDITOR"];
+
+/// A tab's explicit repository path selects its repository for both guards and
+/// mutations. Inherited shell plumbing must not silently select another index,
+/// namespace, object store or shallow boundary. Deliberate per-command overrides
+/// are installed afterwards through `Extra::env` (private indexes, for example).
+pub(super) const REPOSITORY_ENV_REMOVED: &[&str] = &[
+    "GIT_DIR",
+    "GIT_COMMON_DIR",
+    "GIT_WORK_TREE",
+    "GIT_INDEX_FILE",
+    "GIT_OBJECT_DIRECTORY",
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    "GIT_NAMESPACE",
+    "GIT_SHALLOW_FILE",
+    "GIT_REPLACE_REF_BASE",
+    "GIT_GRAFT_FILE",
+    "GIT_CONFIG",
+    "GIT_CONFIG_COUNT",
+    "GIT_CONFIG_PARAMETERS",
+    "GIT_ATTR_SOURCE",
+];
+
+/// Pure environment portion of the shared selected-repository command builder.
+fn clear_repository_environment(cmd: &mut Command) {
+    for name in REPOSITORY_ENV_REMOVED {
+        cmd.env_remove(name);
+    }
+}
+
+pub(super) fn git_cmd() -> Command {
+    // With a bare name and an overridden PATH, Rust falls back to fork/exec on Unix.
+    // Resolve through the child's PATH first, allowing its much cheaper posix_spawn path.
+    // Look up each time so installing or removing a git still takes effect while running.
+    #[cfg(unix)]
+    let mut cmd =
+        Command::new(crate::shell_path::executable("git").unwrap_or_else(|| "git".into()));
+    #[cfg(not(unix))]
     let mut cmd = Command::new("git");
-    // Never block on an interactive prompt: credential helpers with a GUI still work.
-    cmd.env("GIT_TERMINAL_PROMPT", "0");
-    cmd.env("GIT_OPTIONAL_LOCKS", "0");
-    // `rebase --continue`, `merge --continue`… would otherwise open an editor nobody sees.
-    cmd.env("GIT_EDITOR", "true");
-    // Interactive rebases set `sequence.editor` themselves; an inherited one would win.
-    cmd.env_remove("GIT_SEQUENCE_EDITOR");
-    // Messages in English whatever the user's language: errors are told apart by their words
-    // (`is_auth_error`…). `C` in LANGUAGE wins over LC_ALL / LANG for messages only, so the
-    // character set (and what hooks see of it) stays the user's.
-    cmd.env("LANGUAGE", "C");
+    for (name, value) in GIT_ENV {
+        cmd.env(name, value);
+    }
+    if let Some((name, value)) = offline_env() {
+        cmd.env(name, value);
+    }
+    for name in GIT_ENV_REMOVED {
+        cmd.env_remove(name);
+    }
+    clear_repository_environment(&mut cmd);
     crate::shell_path::apply(&mut cmd);
     #[cfg(windows)]
     {
@@ -26,339 +144,335 @@ fn git_cmd() -> Command {
     cmd
 }
 
+/// How a git call ended, here or elsewhere.
+struct Ran {
+    code: Option<i32>,
+    /// The exit status as it reads in an error.
+    status: String,
+    stdout: Vec<u8>,
+    stderr: Vec<u8>,
+    /// The hook that failed, when the call's hooks were traced.
+    failed_hook: Option<super::hooks::FailedHook>,
+}
+
+/// Options before the subcommand, and variables, a call is run with on top of [`GIT_ENV`].
+#[derive(Clone, Default)]
+pub(super) struct Extra {
+    /// Normalize before installing intentional command-owned environment.
+    normalize_repository: bool,
+    unset: Vec<&'static str>,
+    output_limit: Option<usize>,
+    stdout_file: Option<PathBuf>,
+    pre: Vec<&'static str>,
+    owned_pre: Vec<String>,
+    env: Vec<(&'static str, String)>,
+    /// What git reads on its input; nothing when `None`.
+    stdin: Option<Vec<u8>>,
+    /// It may take minutes (a large bundle): on another machine, run where that is allowed.
+    long: bool,
+    /// It starts a program the user works in (a diff or merge tool) and waits until it closes.
+    tool: bool,
+    /// Find out which hook failed, if one does (see [`super::hooks`]).
+    trace_hooks: bool,
+    /// On another machine: a test of a parallel bisect (see [`run_for_test_input`]).
+    test: Option<std::time::Duration>,
+    /// How long it may run on another machine before it is stopped there.
+    timeout: Option<std::time::Duration>,
+}
+
+impl Extra {
+    /// Selected-repository inspection/mutation; owned private overrides are added
+    /// after normalization by the shared production command builders.
+    pub(in crate::git) fn repository() -> Self {
+        Self {
+            normalize_repository: true,
+            ..Self::default()
+        }
+    }
+}
+
+pub(in crate::git) use watched::run_watched_extra_recorded;
+
+/// How long a diff or merge tool started on another machine may stay open before it is stopped.
+const TOOL_FOR: std::time::Duration = std::time::Duration::from_secs(12 * 3600);
+
+thread_local! {
+    /// Git runs on this thread are reads that mustn't fetch (see [`offline`]).
+    static OFFLINE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Runs `work` with every git it starts on this thread kept from fetching what a partial
+/// clone lacks (`GIT_NO_LAZY_FETCH`): for views that only read, a missing object is an error
+/// rather than a download written into the repository.
+pub fn offline<T>(work: impl FnOnce() -> T) -> T {
+    struct Restore(bool);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            OFFLINE.with(|o| o.set(self.0));
+        }
+    }
+    let _restore = Restore(OFFLINE.with(|o| o.replace(true)));
+    work()
+}
+
+/// What every git started on this thread gets in its environment within [`offline`].
+fn offline_env() -> Option<(&'static str, &'static str)> {
+    OFFLINE
+        .with(std::cell::Cell::get)
+        .then_some(("GIT_NO_LAZY_FETCH", "1"))
+}
+
+impl Extra {
+    /// Nothing on top of the call: no input, options, variables or output file. Only such a
+    /// read is answered without git (see [`answered`]).
+    fn plain(&self) -> bool {
+        self.stdin.is_none()
+            && self.pre.is_empty()
+            && self.owned_pre.is_empty()
+            && self.env.is_empty()
+            && self.stdout_file.is_none()
+            && !self.long
+            && !self.tool
+            && !self.trace_hooks
+            && self.test.is_none()
+            && self.timeout.is_none()
+    }
+}
+
+/// How an exit status reads, as `ExitStatus` writes it.
+fn exit_text(code: i32) -> String {
+    if cfg!(windows) {
+        format!("exit code: {code}")
+    } else {
+        format!("exit status: {code}")
+    }
+}
+
+/// The git alias a command of the user's (a conflict decision's test) is run as, set with
+/// `-c alias.<it>=!<command>`: git runs it with `sh` in the repository's top folder, wherever
+/// the repository is.
+pub const USER_COMMAND_ALIAS: &str = "gitcraft-user-command";
+
+/// Whether the git command `args` (its options first) talks to a remote and may take minutes
+/// (or is a command of the user's, which may too).
+pub fn goes_over_network(args: &[&str]) -> bool {
+    matches!(
+        after_options(args).first().copied(),
+        Some(
+            "fetch"
+                | "pull"
+                | "push"
+                | "clone"
+                | "ls-remote"
+                | "remote"
+                | "submodule"
+                | "lfs"
+                | SHELL_ALIAS
+                | USER_COMMAND_ALIAS
+                | super::dvc::PULL_ALIAS
+        )
+    )
+}
+
 /// Runs git in `dir` and returns stdout, or the error output.
 pub fn run(dir: Option<&Path>, args: &[&str]) -> Result<String, String> {
     run_ok_codes(dir, args, &[0])
 }
 
-/// Runs git and returns stdout as raw bytes (file contents: images…).
-pub fn run_bytes(dir: Option<&Path>, args: &[&str]) -> Result<Vec<u8>, String> {
-    let mut cmd = git_cmd();
-    if let Some(dir) = dir {
-        cmd.arg("-C").arg(dir);
-    }
-    cmd.args(args);
-    let out = cmd
-        .output()
-        .map_err(|e| format!("could not run git: {e}"))?;
-    if out.status.success() {
-        Ok(out.stdout)
-    } else {
-        Err(String::from_utf8_lossy(&out.stderr).trim().to_owned())
-    }
+/// [`run`], with `input` on git's standard input (`notes add -F -`: a text of any size, which
+/// a command line would limit).
+pub fn run_input(dir: Option<&Path>, args: &[&str], input: &str) -> Result<String, String> {
+    let extra = Extra {
+        stdin: Some(input.as_bytes().to_vec()),
+        ..Extra::default()
+    };
+    finish(execute(dir, &extra, args)?, args, &[0])
 }
 
-/// Starts git in `dir` with its output piped, for a caller that reads it bit by bit.
-pub(super) fn spawn_piped(dir: &Path, args: &[&str]) -> Result<std::process::Child, String> {
-    let mut cmd = git_cmd();
-    cmd.arg("-C").arg(dir).args(args);
-    cmd.stdin(std::process::Stdio::null())
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped());
-    cmd.spawn().map_err(|e| format!("could not run git: {e}"))
+/// [`run`] for a read nobody asked for and nobody waits on (the start page's look at a recent
+/// repository): for one on another machine, only in a shell already open there, so it never
+/// connects (no password asked, no WSL started); `None` when there is none.
+pub fn run_if_connected(dir: &Path, args: &[&str]) -> Option<Result<String, String>> {
+    let Some(target) = remote::parse(dir) else {
+        return Some(run(Some(dir), args));
+    };
+    let _timer = super::backend::CliTimer::new(args);
+    let mut req = remote_request(&target, &Extra::default(), args);
+    req.timeout = Some(std::time::Duration::from_secs(30));
+    let out = match remote::exec_if_connected(&target.host, &req)? {
+        Ok(out) => out,
+        Err(e) => return Some(Err(e)),
+    };
+    Some(if out.code == 0 {
+        Ok(String::from_utf8_lossy(&out.stdout).into_owned())
+    } else if out.code == 1 && remote::is_missing_folder(&out.stderr) {
+        Err(missing_folder(&target))
+    } else {
+        Err(download_read_error(
+            args,
+            String::from_utf8_lossy(&out.stderr).trim().to_owned(),
+        ))
+    })
 }
+
+#[cfg(test)]
+mod r2_inert_tests;
 
 /// Like [`run`], but exit codes in `ok` count as success (`diff --no-index` exits 1 on changes).
 pub fn run_ok_codes(dir: Option<&Path>, args: &[&str], ok: &[i32]) -> Result<String, String> {
     run_inner(dir, args, ok, None, false)
 }
 
-/// A username and password (or token) for an HTTPS remote, typed into gitcraft.
-#[derive(Clone)]
-pub struct Credentials {
-    pub username: String,
-    pub password: String,
-}
-
-/// A credential helper that answers git's `get` from the environment, so the secret never shows
-/// up in a command line. git tries the user's own helpers first and, when the operation works,
-/// asks them to store what this one gave.
-/// `printf '%s'`, not `echo`: the `sh` git runs it with (dash…) would read backslashes in them
-/// as escapes (`CORP\nancy` broken in two lines, `\c` cutting the password short).
-const ENV_HELPER: &str = "credential.helper=!f() { test \"$1\" = get && printf 'username=%s\\npassword=%s\\n' \"$GITCRAFT_GIT_USERNAME\" \"$GITCRAFT_GIT_PASSWORD\"; }; f";
-
-/// [`run`], answering a credential request with `creds` when given.
-pub fn run_with(
+/// [`run_with`] for an operation someone asked for: when one of its hooks makes it fail (a
+/// commit's `pre-commit`, a push's `pre-push`…), the error names that hook first.
+pub fn run_naming_hooks(
     dir: Option<&Path>,
     args: &[&str],
     creds: Option<&Credentials>,
 ) -> Result<String, String> {
-    run_inner(dir, args, &[0], creds, false)
-}
-
-/// [`run_with`] for an operation nobody is waiting on (the background fetch): it asks nobody
-/// for credentials (see [`unattended`]). Helpers that answer from what they stored still do,
-/// as do credentials typed into the tab (`creds`).
-pub fn run_unattended(
-    dir: Option<&Path>,
-    args: &[&str],
-    creds: Option<&Credentials>,
-) -> Result<String, String> {
-    run_inner(dir, args, &[0], creds, true)
-}
-
-/// Sets `cmd` (before its subcommand) to open no sign-in window: no credential helper window
-/// (Git Credential Manager and git ≥ 2.46 heed `credential.interactive`), nor git's askpass
-/// program. git reads `GIT_ASKPASS` before `core.askPass` and `SSH_ASKPASS`, so an inherited one
-/// (VS Code's terminal, ksshaskpass) would win over an empty `core.askPass`, and its being set
-/// but empty makes git skip all three. ssh asks on the terminal the app was started from, if
-/// any (a passphrase, a new host key: the fetch would wait there for good), or else runs
-/// `SSH_ASKPASS` itself: on Unix it is made to ask a program that answers nothing, `false`,
-/// and nothing else; where that isn't there, never to run one.
-fn unattended(cmd: &mut Command) {
-    cmd.args(["-c", "credential.interactive=false", "-c", "core.askPass="]);
-    cmd.env("GIT_ASKPASS", "");
-    if cfg!(unix) {
-        cmd.env("SSH_ASKPASS_REQUIRE", "force");
-        cmd.env("SSH_ASKPASS", "false");
-    } else {
-        cmd.env("SSH_ASKPASS_REQUIRE", "never");
-    }
-}
-
-/// Whether `err` says git needed a username / password it couldn't get or that were refused.
-pub fn is_auth_error(err: &str) -> bool {
-    let e = err.to_lowercase();
-    [
-        "terminal prompts disabled",
-        "could not read username",
-        "could not read password",
-        "authentication failed",
-        "invalid username or password",
-        "http basic: access denied",
-        "the requested url returned error: 401",
-        "the requested url returned error: 403",
-    ]
-    .iter()
-    .any(|s| e.contains(s))
-}
-
-fn run_inner(
-    dir: Option<&Path>,
-    args: &[&str],
-    ok: &[i32],
-    creds: Option<&Credentials>,
-    quiet: bool,
-) -> Result<String, String> {
-    let mut cmd = git_cmd();
-    if let Some(dir) = dir {
-        cmd.arg("-C").arg(dir);
-    }
-    if quiet {
-        unattended(&mut cmd);
-    }
-    if let Some(c) = creds {
-        cmd.args(["-c", ENV_HELPER]);
-        cmd.env("GITCRAFT_GIT_USERNAME", &c.username);
-        cmd.env("GITCRAFT_GIT_PASSWORD", &c.password);
-    }
-    cmd.args(args);
-    let out = cmd
-        .output()
-        .map_err(|e| format!("could not run git: {e}"))?;
-    if out.status.code().is_some_and(|c| ok.contains(&c)) {
-        Ok(String::from_utf8_lossy(&out.stdout).into_owned())
-    } else {
-        // Merges and pulls report conflicts on stdout and the summary on stderr.
-        let stderr = String::from_utf8_lossy(&out.stderr).trim().to_owned();
-        let stdout = String::from_utf8_lossy(&out.stdout).trim().to_owned();
-        let err = match (stderr.is_empty(), stdout.is_empty()) {
-            (true, true) => format!("git {} failed ({})", args.join(" "), out.status),
-            (false, true) => stderr,
-            (true, false) => stdout,
-            (false, false) => format!("{stderr}\n{stdout}"),
-        };
-        Err(err)
-    }
+    run_extra(
+        dir,
+        args,
+        &[0],
+        creds,
+        Extra {
+            trace_hooks: super::hooks::wants_trace(args),
+            ..Extra::default()
+        },
+    )
 }
 
 #[cfg(test)]
-mod tests {
-    use std::io::Write;
-    use std::process::Stdio;
+mod tests;
 
-    use super::*;
+#[cfg(test)]
+mod reviewed_push_tests;
 
-    /// What git gets from the helper is what was typed, backslashes (`DOMAIN\user`) included.
-    #[test]
-    fn credentials_reach_git_as_typed() -> Result<(), String> {
-        let (user, pass) = ("CORP\\nancy", "p\\c%s$x 'q\"");
-        let mut child = git_cmd()
-            // Only this helper: the user's own would answer first.
-            .args([
-                "-c",
-                "credential.helper=",
-                "-c",
-                ENV_HELPER,
-                "credential",
-                "fill",
-            ])
-            .env("GITCRAFT_GIT_USERNAME", user)
-            .env("GITCRAFT_GIT_PASSWORD", pass)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(|e| e.to_string())?;
-        if let Some(mut stdin) = child.stdin.take() {
-            stdin
-                .write_all(b"protocol=https\nhost=example.invalid\n\n")
-                .map_err(|e| e.to_string())?;
-        }
-        let out = child.wait_with_output().map_err(|e| e.to_string())?;
-        let text = String::from_utf8_lossy(&out.stdout);
-        assert!(
-            out.status.success(),
-            "{}",
-            String::from_utf8_lossy(&out.stderr)
-        );
-        assert!(text.contains(&format!("username={user}\n")), "{text}");
-        assert!(text.contains(&format!("password={pass}\n")), "{text}");
-        Ok(())
-    }
+#[cfg(test)]
+mod practice_environment_tests;
 
-    #[cfg(unix)]
-    fn scratch(name: &str) -> Result<std::path::PathBuf, String> {
-        let dir = std::env::temp_dir().join(format!("gitcraft-cmd-{name}-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-        Ok(dir)
-    }
+#[cfg(test)]
+mod download_policy_recording_tests;
 
-    /// A script that leaves `marker` behind when run, then prints `x` (an askpass answer).
-    #[cfg(unix)]
-    fn marking_script(dir: &Path, marker: &Path) -> Result<std::path::PathBuf, String> {
-        use std::os::unix::fs::PermissionsExt;
-        let script = dir.join("askpass.sh");
-        std::fs::write(
-            &script,
-            format!("#!/bin/sh\ntouch '{}'\necho x\n", marker.display()),
-        )
-        .map_err(|e| e.to_string())?;
-        std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755))
-            .map_err(|e| e.to_string())?;
-        Ok(script)
-    }
+#[cfg(all(test, unix))]
+mod sparse_account_recording_tests;
 
-    /// Whether git, asked for a credential (quietly or not) in an environment that sets
-    /// `SSH_ASKPASS` (KDE's opens a window) and maybe `GIT_ASKPASS` (VS Code's terminal), ran
-    /// the askpass program.
-    #[cfg(unix)]
-    fn askpass_asked(dir: &Path, quiet: bool, git_askpass: bool) -> Result<bool, String> {
-        let marker = dir.join("asked");
-        let _ = std::fs::remove_file(&marker);
-        let script = marking_script(dir, &marker)?;
-        let mut cmd = git_cmd();
-        // Not the user's own config, whose `core.askPass` would stand in for the script.
-        cmd.env("GIT_CONFIG_NOSYSTEM", "1")
-            .env("GIT_CONFIG_GLOBAL", "/dev/null");
-        // What the app inherited, which `unattended` then has to override.
-        cmd.env("SSH_ASKPASS", &script);
-        if git_askpass {
-            cmd.env("GIT_ASKPASS", &script);
-        } else {
-            cmd.env_remove("GIT_ASKPASS");
-        }
-        if quiet {
-            unattended(&mut cmd);
-        }
-        let mut child = cmd
-            .args(["-c", "credential.helper=", "credential", "fill"])
-            .stdin(Stdio::piped())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()
-            .map_err(|e| e.to_string())?;
-        if let Some(mut stdin) = child.stdin.take() {
-            let _ = stdin.write_all(b"protocol=https\nhost=example.invalid\n\n");
-        }
-        child.wait().map_err(|e| e.to_string())?;
-        Ok(marker.exists())
-    }
+#[cfg(test)]
+mod repository_endpoint_recording;
 
-    /// The background fetch asks nobody to sign in, every few minutes, through a window: not
-    /// even with a `GIT_ASKPASS` in the environment, which git reads before `core.askPass`.
-    #[cfg(unix)]
-    #[test]
-    fn a_quiet_operation_opens_no_sign_in_window() -> Result<(), String> {
-        let dir = scratch("unattended")?;
-        let asked = [(false, false), (true, false), (false, true), (true, true)]
-            .map(|(quiet, git_askpass)| askpass_asked(&dir, quiet, git_askpass));
-        let _ = std::fs::remove_dir_all(&dir);
-        // Without it, git does ask (or the test would prove nothing).
-        assert_eq!(asked, [Ok(true), Ok(false), Ok(true), Ok(false)]);
-        Ok(())
-    }
+#[cfg(test)]
+mod internals_merge_recording;
 
-    /// Nor does ssh, which would ask on a terminal or run `SSH_ASKPASS` itself.
-    #[cfg(unix)]
-    #[test]
-    fn a_quiet_operation_tells_ssh_to_ask_nobody() -> Result<(), String> {
-        use std::os::unix::fs::PermissionsExt;
-        let dir = scratch("unattended-ssh")?;
-        let seen = dir.join("seen");
-        let ssh = dir.join("ssh.sh");
-        std::fs::write(
-            &ssh,
-            format!(
-                "#!/bin/sh\nprintf '%s %s' \"$SSH_ASKPASS_REQUIRE\" \"$SSH_ASKPASS\" > '{}'\nexit 1\n",
-                seen.display()
-            ),
-        )
-        .map_err(|e| e.to_string())?;
-        std::fs::set_permissions(&ssh, std::fs::Permissions::from_mode(0o755))
-            .map_err(|e| e.to_string())?;
-        let mut cmd = git_cmd();
-        cmd.env("GIT_SSH_COMMAND", &ssh)
-            .env_remove("SSH_ASKPASS_REQUIRE");
-        unattended(&mut cmd);
-        let out = cmd
-            .args(["ls-remote", "ssh://example.invalid/repo.git"])
-            .output()
-            .map_err(|e| e.to_string())?;
-        let required = std::fs::read_to_string(&seen);
-        let _ = std::fs::remove_dir_all(&dir);
-        assert!(!out.status.success());
-        // Asked through `false`, which answers nothing, never on a terminal.
-        assert_eq!(required.map_err(|e| e.to_string())?, "force false");
-        Ok(())
-    }
+#[cfg(test)]
+mod backend_fluent_identity_tests;
 
-    /// Credentials typed into the tab still answer a quiet operation.
-    #[test]
-    fn typed_credentials_answer_a_quiet_operation() -> Result<(), String> {
-        let mut cmd = git_cmd();
-        unattended(&mut cmd);
-        let mut child = cmd
-            .args([
-                "-c",
-                "credential.helper=",
-                "-c",
-                ENV_HELPER,
-                "credential",
-                "fill",
-            ])
-            .env("GITCRAFT_GIT_USERNAME", "nancy")
-            .env("GITCRAFT_GIT_PASSWORD", "secret")
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(|e| e.to_string())?;
-        if let Some(mut stdin) = child.stdin.take() {
-            stdin
-                .write_all(b"protocol=https\nhost=example.invalid\n\n")
-                .map_err(|e| e.to_string())?;
-        }
-        let out = child.wait_with_output().map_err(|e| e.to_string())?;
-        let text = String::from_utf8_lossy(&out.stdout);
-        assert!(
-            out.status.success(),
-            "{}",
-            String::from_utf8_lossy(&out.stderr)
-        );
-        assert!(text.contains("username=nancy\n"), "{text}");
-        assert!(text.contains("password=secret\n"), "{text}");
-        Ok(())
-    }
-}
+mod repository;
+pub(crate) use repository::local_repair_input;
+pub(crate) use repository::onboarding_local_config;
+use repository::practice_command;
+pub(crate) use repository::practice_run;
+pub(crate) use repository::repair_host;
+pub(super) use repository::repository_command;
+pub(in crate::git) use repository::repository_endpoint;
+#[cfg(test)]
+use repository::repository_endpoint_extra;
+pub(crate) use repository::tour_read;
+
+mod reviewed_push;
+use reviewed_push::PREFLIGHT_REMOVE;
+pub(crate) use reviewed_push::PushTarget;
+pub(crate) use reviewed_push::push_preflight_with;
+#[cfg(test)]
+use reviewed_push::reviewed_push_extra;
+#[cfg(test)]
+use reviewed_push::reviewed_refusal;
+
+mod object_reads;
+pub(super) use object_reads::comparison_output;
+pub(super) use object_reads::comparison_remote;
+use object_reads::download_read_error;
+pub(crate) use object_reads::draft_bytes;
+pub(crate) use object_reads::forecast_bytes;
+pub(crate) use object_reads::forecast_remote;
+pub(crate) use object_reads::forecast_run;
+use object_reads::object_read_policy;
+pub(super) use object_reads::recovery_output;
+pub(crate) use object_reads::syntax_read;
+#[cfg(test)]
+use object_reads::syntax_read_error;
+
+mod result;
+pub use result::Recorded;
+use result::both;
+use result::extra_for;
+use result::failure_message;
+use result::finish;
+pub use result::run_env_owned;
+use result::run_extra;
+use result::run_inner;
+use result::run_inner_extra;
+pub use result::run_recorded;
+pub use result::run_with_index;
+
+mod workspace;
+pub use workspace::Call;
+pub use workspace::Exit;
+pub use workspace::ToolRun;
+pub(crate) use workspace::WorkspaceCommand;
+pub use workspace::run_call;
+pub(super) use workspace::run_coded;
+pub(crate) use workspace::run_for_test_input;
+pub(crate) use workspace::run_owned_test;
+pub use workspace::run_tool;
+pub(crate) use workspace::run_workspace_command;
+
+mod output;
+pub use output::Captured;
+#[cfg(test)]
+use output::inert_object_options;
+pub use output::run_bytes;
+pub use output::run_captured;
+pub use output::run_code;
+pub use output::run_env;
+pub use output::run_env_codes;
+pub use output::run_inert_objects;
+pub use output::run_to_file;
+pub(crate) use output::transfer_pack;
+
+mod shell;
+use shell::SHELL_ALIAS;
+use shell::SHELL_ALIAS_ENV_DEF;
+use shell::SHELL_SCRIPT_VAR;
+pub use shell::ShellRun;
+pub use shell::run_shell;
+pub use shell::shell_command_here;
+
+mod remote_execution;
+#[allow(unused_imports)] // Compatibility re-export.
+pub(super) use remote_execution::CONNECTION_REDIRECT_ENV;
+use remote_execution::execute_there;
+pub(super) use remote_execution::missing_folder;
+use remote_execution::normalize_connection_command;
+pub(super) use remote_execution::remote_request;
+
+mod local_execution;
+#[allow(unused_imports)] // Compatibility re-export.
+pub(super) use local_execution::apply_command_extras;
+use local_execution::execute;
+pub(super) use local_execution::local_command;
+
+mod credentials;
+pub use credentials::Credentials;
+pub use credentials::is_auth_error;
+#[cfg(test)]
+use credentials::parse_credentials;
+pub use credentials::run_unattended;
+pub use credentials::run_unattended_within;
+pub use credentials::run_with;
+pub use credentials::stored_credentials;
+#[cfg(test)]
+use credentials::unattended;
+use credentials::unattended_extra;
+
+#[cfg(test)]
+mod global_option_tests;

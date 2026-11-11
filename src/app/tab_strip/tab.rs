@@ -1,12 +1,15 @@
 //! One tab on the strip: its icon, name, worktree chip, badge and close button.
 
-use egui::{Pos2, Rect, Sense, Stroke, Ui, pos2, vec2};
+use egui::{Pos2, Rect, Sense, Stroke, Ui, WidgetType, pos2, vec2};
 
 use super::{BADGE_W, Placed, TabDrag, TabEnv};
+use crate::a11y::labels;
 use crate::app::Tab;
 use crate::icons;
-use crate::repo::RepoTab;
+use crate::keymap::{self, Command};
+use crate::menu_item::MenuItem;
 use crate::repo::worktree_tab::{self, Chip};
+use crate::repo::{RepoTab, widgets};
 use crate::tab_look::{self, TabLook};
 use crate::theme::{self, Tokens};
 
@@ -24,12 +27,34 @@ pub(super) fn tab_ui(ui: &mut Ui, placed: Placed<'_>, env: &mut TabEnv<'_>) {
     let ctx = ui.ctx().clone();
     let active = i == env.active;
     let (tooltip, busy) = match tab {
-        Tab::Home => ("Open, create or clone a repository".to_owned(), false),
+        Tab::Home => (
+            crate::i18n::text("interaction-tabs-home-tip").to_owned(),
+            false,
+        ),
         Tab::Repo(r) => (r.path.display().to_string(), r.is_busy()),
-        Tab::Settings => ("Settings".to_owned(), false),
+        Tab::Settings => (
+            crate::i18n::text("interaction-tabs-settings").to_owned(),
+            false,
+        ),
     };
     let resp = ui.interact(rect, id, Sense::click_and_drag());
-    let hovered = resp.hovered() && env.dragging.is_none();
+    let name = title.galley.text();
+    let label = || {
+        let more = if tooltip == name {
+            ""
+        } else {
+            tooltip.as_str()
+        };
+        labels::with_notes(
+            &labels::join([name, more]),
+            &[(busy, crate::i18n::text("interaction-tabs-busy"))],
+        )
+    };
+    widgets::a11y_selected(&resp, label, active);
+    // The pointer anywhere on the tab, its close button too: `hovered` passes to the button
+    // when the pointer reaches it, which would hide the button just as it is about to be
+    // clicked on a tab in the background.
+    let hovered = resp.contains_pointer() && env.dragging.is_none();
     let default_look = TabLook::default();
     let look = match tab {
         Tab::Repo(r) => tab_looks.get(&r.path).unwrap_or(&default_look),
@@ -111,8 +136,10 @@ pub(super) fn tab_ui(ui: &mut Ui, placed: Placed<'_>, env: &mut TabEnv<'_>) {
 
     let close_rect = Rect::from_center_size(pos2(rect.right() - 15.0, y), vec2(18.0, 18.0));
     if busy {
-        egui::Spinner::new().size(11.0).paint_at(ui, close_rect);
-    } else if (active || hovered) && close_button(ui, close_rect, resp.id, t, env.dragging) {
+        crate::spinner::Spinner::new()
+            .size(11.0)
+            .paint_at(ui, close_rect);
+    } else if (active || hovered) && close_button(ui, close_rect, resp.id, name, t, env.dragging) {
         env.actions.close = Some(i);
     }
     if resp.drag_started_by(egui::PointerButton::Primary)
@@ -124,25 +151,69 @@ pub(super) fn tab_ui(ui: &mut Ui, placed: Placed<'_>, env: &mut TabEnv<'_>) {
         });
         env.actions.select = Some(i);
     }
-    egui::Popup::context_menu(&resp)
+    crate::menu_item::context(&resp)
         .style(theme::menu_style)
         .show(|ui| {
-            if ui
-                .button("Close tab")
-                .on_hover_text("Ctrl+W, or middle-click the tab")
+            if MenuItem::new(crate::i18n::text("interaction-tabs-close"))
+                .icon("x")
+                .keys_when(Command::CloseTab, active)
+                .show(ui)
+                .on_hover_text(crate::i18n::text("interaction-tabs-middle"))
                 .clicked()
             {
                 env.actions.close = Some(i);
             }
-            if ui
-                .add_enabled(env.can_reopen, egui::Button::new("Reopen closed tab"))
-                .on_hover_text("Ctrl+Shift+T")
-                .on_disabled_hover_text("No tab closed yet")
+            if MenuItem::new(crate::i18n::text("interaction-tabs-reopen"))
+                .icon("eye")
+                .keys(Command::ReopenTab)
+                .refused(
+                    (!env.can_reopen).then_some(crate::i18n::text("interaction-tabs-none-closed")),
+                )
+                .show(ui)
                 .clicked()
             {
                 env.actions.reopen = true;
             }
+            ui.separator();
+            if MenuItem::new(crate::i18n::text("interaction-tabs-quit"))
+                .icon("x")
+                .show(ui)
+                .clicked()
+            {
+                env.actions.quit = true;
+            }
             if let Tab::Repo(r) = tab {
+                ui.separator();
+                if MenuItem::new(crate::i18n::text("interaction-tabs-tearoff"))
+                    .icon("external-link")
+                    .refused(
+                        (!env.can_detach).then_some(crate::i18n::text("interaction-tabs-embedded")),
+                    )
+                    .show(ui)
+                    .clicked()
+                {
+                    env.actions.window = Some((i, None, None));
+                }
+                for (target, name) in &env.windows {
+                    if MenuItem::new(crate::i18n::message(
+                        "interaction-tabs-move-target",
+                        &[("window", name.as_str().into())],
+                    ))
+                    .icon("arrow-right")
+                    .show(ui)
+                    .clicked()
+                    {
+                        env.actions.window = Some((i, Some(*target), None));
+                    }
+                }
+                if crate::menu_item::MenuItem::new(crate::i18n::text("interaction-tabs-teleport"))
+                    .icon("command")
+                    .show(ui)
+                    .on_hover_text(crate::i18n::text("interaction-tabs-teleport-tip"))
+                    .clicked()
+                {
+                    env.actions.teleport = Some(r.path.clone());
+                }
                 ui.separator();
                 if let Some(new) = tab_look::menu(ui, look) {
                     env.actions.restyle = Some((r.path.clone(), new));
@@ -173,12 +244,23 @@ fn active_chip(
     let t = env.t;
     let body = chip_rect.with_max_x(chip_rect.right() - worktree_tab::CHIP_CLOSE_W);
     let c = ui.interact(body, id.with("worktree"), Sense::click());
+    widgets::a11y(&c, WidgetType::Button, || {
+        labels::join([
+            crate::i18n::text("interaction-tabs-worktree"),
+            chip.full_name.as_str(),
+        ])
+    });
     worktree_tab::paint_chip(ui, chip_rect, chip, true, c.hovered());
     let close_rect = Rect::from_center_size(
         pos2(chip_rect.right() - worktree_tab::CHIP_CLOSE_W / 2.0, y),
         vec2(18.0, 18.0),
     );
     let x = ui.interact(close_rect, id.with("close-worktree"), Sense::click());
+    widgets::a11y(
+        &x,
+        WidgetType::Button,
+        crate::i18n::text("interaction-tabs-close-worktree"),
+    );
     if x.hovered() {
         ui.painter().rect_filled(close_rect, t.radius_sm, t.pressed);
     }
@@ -192,7 +274,7 @@ fn active_chip(
     if x.clicked() {
         env.actions.close_worktree = true;
     }
-    x.on_hover_text("Close this worktree and go back to the main one. It stays on disk.");
+    x.on_hover_text(crate::i18n::text("interaction-tabs-close-worktree-tip"));
     if c.clicked() {
         env.switcher_query.clear();
         *env.switcher_focus = true;
@@ -208,7 +290,10 @@ fn active_chip(
             ui.close();
         }
     });
-    c.on_hover_text(format!("{}\nSwitch worktree", chip.full_name));
+    c.on_hover_text(crate::i18n::message(
+        "interaction-tabs-switch-tip",
+        &[("worktree", chip.full_name.as_str().into())],
+    ));
 }
 
 /// The dot and count of worktrees with work in the background, at `at`.
@@ -217,14 +302,15 @@ fn badge(ui: &mut Ui, at: Pos2, background: usize, id: egui::Id, t: &Tokens) {
     ui.painter().text(
         at + vec2(5.0, 0.0),
         egui::Align2::LEFT_CENTER,
-        background.to_string(),
+        crate::i18n::number(background),
         theme::medium(10.5),
         t.text_dim,
     );
     let badge = Rect::from_center_size(at + vec2(4.0, 0.0), vec2(BADGE_W, 20.0));
     ui.interact(badge, id.with("background"), Sense::hover())
-        .on_hover_text(format!(
-            "{background} worktree(s) with work in the background"
+        .on_hover_text(crate::i18n::message(
+            "interaction-tabs-background",
+            &[("count", background.into())],
         ));
 }
 
@@ -233,10 +319,14 @@ fn close_button(
     ui: &mut Ui,
     rect: Rect,
     tab_id: egui::Id,
+    name: &str,
     t: &Tokens,
     dragging: Option<usize>,
 ) -> bool {
     let c = ui.interact(rect, tab_id.with("close"), Sense::click());
+    widgets::a11y(&c, WidgetType::Button, || {
+        crate::i18n::message("interaction-tabs-close-name", &[("name", name.into())])
+    });
     if c.hovered() {
         ui.painter().rect_filled(rect, t.radius_sm, t.pressed);
     }
@@ -249,7 +339,48 @@ fn close_button(
     );
     let clicked = c.clicked();
     if dragging.is_none() {
-        c.on_hover_text("Close tab (Ctrl+W)");
+        c.on_hover_text(keymap::tip(
+            ui.ctx(),
+            crate::i18n::text("interaction-tabs-close"),
+            Command::CloseTab,
+        ));
     }
     clicked
+}
+
+#[cfg(test)]
+mod localization_tests {
+    use super::*;
+    use egui_kittest::{Harness, kittest::Queryable};
+
+    #[test]
+    fn actual_tab_close_is_named_in_current_language_and_keeps_control_id() {
+        crate::i18n::set_language("de");
+        let fonts = std::cell::Cell::new(false);
+        let mut h = Harness::new_ui_state(
+            move |ui, clicked: &mut bool| {
+                if !fonts.replace(true) {
+                    theme::install_fonts(ui.ctx());
+                    return;
+                }
+                let (rect, _) = ui.allocate_exact_size(vec2(28.0, 28.0), Sense::hover());
+                *clicked |= close_button(
+                    ui,
+                    rect,
+                    egui::Id::new("stable-tab"),
+                    "repo 日本語",
+                    &Tokens::get(ui.ctx()),
+                    None,
+                );
+            },
+            false,
+        );
+        h.run();
+        h.get_by_label("Tab repo 日本語 schließen").click();
+        h.run();
+        assert!(*h.state());
+        crate::i18n::set_language("en-US");
+        h.run();
+        h.get_by_label("Close the tab repo 日本語");
+    }
 }

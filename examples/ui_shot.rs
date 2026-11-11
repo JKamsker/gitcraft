@@ -4,8 +4,9 @@
 //! `cargo run --example ui_shot -- <repo> <out-prefix> [step]...`
 //!
 //! Steps (coordinates in points, window is 1400×860):
-//! `click:x,y`, `dclick:x,y`, `rclick:x,y`, `hover:x,y`, `drag:x1,y1,x2,y2`, `press:x,y` / `move:x,y` / `release:x,y` (a drag in parts), `leave` (pointer off the window), `open:path` (a repository in a new tab), `key:Escape`, `ckey:P` (Ctrl/Cmd+key), `type:text`, `wait:ms`, `shot`.
+//! `click:x,y`, `dclick:x,y`, `rclick:x,y`, `hover:x,y`, `drag:x1,y1,x2,y2`, `press:x,y` / `move:x,y` / `release:x,y` (a drag in parts), `leave` (pointer off the window), `open:path` (a repository in a new tab), `key:Escape`, `ckey:P` (Ctrl/Cmd+key), `size:w,h` (the window's size), `type:text`, `wait:ms`, `shot`.
 //! Each `shot` writes `<out-prefix>-<n>.png`.
+//! `scale:1.25` sets the egui zoom factor for a capture. Reapply after changing app settings.
 
 use std::time::{Duration, Instant};
 
@@ -13,6 +14,10 @@ use egui::{Event, Key, Modifiers, PointerButton, Pos2};
 use egui_kittest::Harness;
 
 fn main() {
+    // Also ssh's askpass program, as gitcraft itself is (see `remote::askpass`).
+    if let Some(code) = gitcraft::app::askpass_helper() {
+        std::process::exit(code);
+    }
     let mut args = std::env::args().skip(1);
     let (Some(repo), Some(out)) = (args.next(), args.next()) else {
         eprintln!(
@@ -22,6 +27,8 @@ fn main() {
     };
     let steps: Vec<String> = args.collect();
 
+    // What it types mustn't become the user's drafts, nor its exit look like a crash.
+    gitcraft::app::keep_no_drafts();
     let mut harness = Harness::builder()
         .with_size([1400.0, 860.0])
         // A frame's worth of time per step, so two clicks make a double-click.
@@ -188,6 +195,19 @@ fn main() {
                 settle(&mut harness, 200);
             }
             "wait" => settle(&mut harness, arg.parse().unwrap_or(500)),
+            "size" => {
+                let size = point(arg);
+                harness.set_size(egui::vec2(size.x, size.y));
+                settle(&mut harness, 300);
+            }
+            "scale" => {
+                if let Ok(scale) = arg.parse::<f32>()
+                    && scale.is_finite()
+                {
+                    harness.ctx.set_zoom_factor(scale.clamp(0.7, 2.0));
+                    settle(&mut harness, 300);
+                }
+            }
             "shot" => {
                 shots += 1;
                 let path = format!("{out}-{shots}.png");
@@ -202,6 +222,11 @@ fn main() {
             other => eprintln!("unknown step {other}"),
         }
     }
+    // Commands for another machine asked from the window's thread (each would have frozen it).
+    println!(
+        "asked of another machine on the window's thread: {}",
+        gitcraft::app::refused_on_ui_thread()
+    );
 }
 
 /// Steps frames for `ms` of real time, so background git work can land.

@@ -1,23 +1,199 @@
 //! The start page (open, create, clone, recent repositories) and the git-missing page.
 
-use std::path::Path;
+mod cards;
+use cards::*;
 
-use egui::{Align2, Rect, RichText, Sense, Stroke, Ui, pos2, vec2};
+use std::path::{Path, PathBuf};
+
+use egui::{Align2, Rect, RichText, Sense, Stroke, Ui, WidgetType, pos2, vec2};
 
 use super::App;
+use super::home_recent::RecentClick;
+use crate::a11y::labels;
 use crate::git;
 use crate::icons;
+use crate::repo::widgets;
 use crate::theme::{self, Tokens};
 
-enum RecentClick {
-    Open,
-    Forget,
+/// The space kept between an action card's subtitle and its sides.
+const CARD_TEXT_MARGIN: f32 = 12.0;
+
+/// A retained Home error owns both its original English envelope and, only when supplied by
+/// the actual source, the finite arguments needed to paint it in the current language.
+/// Plain replacement always discards presentation metadata, even for identical raw text.
+#[derive(Clone, Debug)]
+pub(super) struct AppError {
+    raw: String,
+    presentation: Option<HomeError>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum HomeError {
+    Init(String),
+    Folder {
+        folder: PathBuf,
+        error: String,
+        not_repo: bool,
+    },
+    Unsupported(String),
+    PatchTarget {
+        has_repo: bool,
+        name: String,
+    },
+}
+
+impl From<String> for AppError {
+    fn from(raw: String) -> Self {
+        Self {
+            raw,
+            presentation: None,
+        }
+    }
+}
+
+impl std::ops::Deref for AppError {
+    type Target = str;
+
+    fn deref(&self) -> &str {
+        &self.raw
+    }
+}
+
+impl AppError {
+    fn sourced(source: HomeError) -> Self {
+        Self {
+            raw: source.raw(),
+            presentation: Some(source),
+        }
+    }
+
+    pub(super) fn init(error: String) -> Self {
+        Self::sourced(HomeError::Init(error))
+    }
+
+    pub(super) fn folder(folder: &Path, error: &str, not_repo: bool) -> Self {
+        Self::sourced(HomeError::Folder {
+            folder: folder.to_owned(),
+            error: error.to_owned(),
+            not_repo,
+        })
+    }
+
+    pub(super) fn unsupported(name: String) -> Self {
+        Self::sourced(HomeError::Unsupported(name))
+    }
+
+    pub(super) fn patch_target(has_repo: bool, name: &str) -> Self {
+        Self::sourced(HomeError::PatchTarget {
+            has_repo,
+            name: name.to_owned(),
+        })
+    }
+
+    /// Historical toasts keep their emission language. Ordinary errors retain their original
+    /// raw toast transport and its existing finite paint fallback.
+    pub(super) fn delivery_text(&self) -> String {
+        match &self.presentation {
+            Some(source) if self.raw == source.raw() => source.display(),
+            _ => self.raw.clone(),
+        }
+    }
+
+    fn display(&self) -> String {
+        match &self.presentation {
+            Some(source) if self.raw == source.raw() => source.display(),
+            Some(_) => self.raw.clone(),
+            None => super::panels::display_app_message(&self.raw),
+        }
+    }
+}
+
+impl HomeError {
+    fn raw(&self) -> String {
+        match self {
+            Self::Init(error) => format!("git init failed: {error}"),
+            Self::Folder {
+                folder,
+                error,
+                not_repo,
+            } => {
+                let name = super::dropped::name_of(folder);
+                if *not_repo {
+                    format!(
+                        "{name} isn't in a git repository: drop a repository's folder to open it"
+                    )
+                } else {
+                    format!("Could not open {name}: {error}")
+                }
+            }
+            Self::Unsupported(name) => format!(
+                "Can't open {name}: drop a folder to open it, or a .patch, .diff, .eml or .mbox file to apply it"
+            ),
+            Self::PatchTarget {
+                has_repo: true,
+                name,
+            } => format!("To apply {name}, show its repository's tab, then drop the patch there"),
+            Self::PatchTarget {
+                has_repo: false,
+                name,
+            } => format!(
+                "Applying {name} needs a repository open first: open one, then drop the patch on it"
+            ),
+        }
+    }
+
+    fn display(&self) -> String {
+        match self {
+            Self::Init(error) => crate::i18n::message(
+                "interaction-home-init-error",
+                &[("error", error.as_str().into())],
+            ),
+            Self::Folder {
+                folder,
+                error,
+                not_repo,
+            } => {
+                let name = super::dropped::name_of(folder);
+                if *not_repo {
+                    crate::i18n::message(
+                        "interaction-drop-folder-not-repo",
+                        &[("name", name.into())],
+                    )
+                } else {
+                    crate::i18n::message(
+                        "interaction-drop-folder-error",
+                        &[
+                            ("name", name.into()),
+                            ("error", crate::git::display_error(error).into()),
+                        ],
+                    )
+                }
+            }
+            Self::Unsupported(name) => crate::i18n::message(
+                "interaction-drop-unsupported",
+                &[("name", name.as_str().into())],
+            ),
+            Self::PatchTarget { has_repo, name } => crate::i18n::message(
+                if *has_repo {
+                    "interaction-drop-show-repo"
+                } else {
+                    "interaction-drop-open-repo"
+                },
+                &[("name", name.as_str().into())],
+            ),
+        }
+    }
+}
+
+/// The actual Home error painter, also usable with supplied inert state in headless tests.
+fn error_label(ui: &mut Ui, color: egui::Color32, error: &AppError) {
+    ui.colored_label(color, error.display());
 }
 
 impl App {
     pub(super) fn pick_existing(&mut self, ctx: &egui::Context) {
         if let Some(dir) = rfd::FileDialog::new()
-            .set_title("Open a git repository")
+            .set_title(crate::i18n::text("interaction-home-pick-existing"))
             .pick_folder()
         {
             self.open_repo(&dir, ctx);
@@ -26,11 +202,22 @@ impl App {
 
     pub(super) fn pick_new(&mut self, ctx: &egui::Context) {
         let Some(dir) = rfd::FileDialog::new()
-            .set_title("Choose a folder for the new repository")
+            .set_title(crate::i18n::text("interaction-home-pick-new"))
             .pick_folder()
         else {
             return;
         };
+        // In WSL: all of it there, in the background (WSL may first have to start).
+        if crate::remote::is_remote(&dir) {
+            let label = crate::remote::display(&dir);
+            self.connect_with(label, None, ctx, move || {
+                if !git::toplevel(&dir).is_ok_and(|root| same_path(&root, &dir)) {
+                    git::init(&dir).map_err(AppError::init)?;
+                }
+                super::repo_root(&dir).map_err(Into::into)
+            });
+            return;
+        }
         // Already the root of a repository: just open it rather than re-initialising.
         if let Ok(root) = git::toplevel(&dir)
             && same_path(&root, &dir)
@@ -40,7 +227,7 @@ impl App {
         }
         match git::init(&dir) {
             Ok(()) => self.open_repo(&dir, ctx),
-            Err(e) => self.error = Some(format!("git init failed: {e}")),
+            Err(e) => self.error = Some(AppError::init(e)),
         }
     }
 
@@ -62,11 +249,28 @@ impl App {
 
                     ui.horizontal(|ui| {
                         ui.spacing_mut().item_spacing.x = 12.0;
-                        let w = (ui.available_width() - 24.0) / 3.0;
+                        let w = (ui.available_width() - 36.0) / 4.0;
                         for (i, (icon, title, sub)) in [
-                            ("folder-open", "Open", "An existing local repository"),
-                            ("folder-plus", "Create", "A new repository (git init)"),
-                            ("log-in", "Clone", "Copy a remote repository"),
+                            (
+                                "folder-open",
+                                crate::i18n::text("interaction-home-open"),
+                                crate::i18n::text("interaction-home-open-description"),
+                            ),
+                            (
+                                "folder-plus",
+                                crate::i18n::text("interaction-home-create"),
+                                crate::i18n::text("interaction-home-create-description"),
+                            ),
+                            (
+                                "log-in",
+                                crate::i18n::text("interaction-home-clone"),
+                                crate::i18n::text("interaction-home-clone-description"),
+                            ),
+                            (
+                                "server",
+                                crate::i18n::text("interaction-home-remote"),
+                                crate::i18n::text("interaction-home-remote-description"),
+                            ),
                         ]
                         .into_iter()
                         .enumerate()
@@ -76,35 +280,70 @@ impl App {
                             }
                         }
                     });
-
-                    if let Some(err) = &self.error {
-                        ui.add_space(12.0);
-                        ui.colored_label(t.danger, err);
+                    ui.add_space(10.0);
+                    if ui
+                        .link(crate::i18n::text("interaction-home-scan"))
+                        .clicked()
+                    {
+                        action = Some(4);
                     }
-                    if let Some((dest, _)) = &self.cloning {
+
+                    if ui
+                        .button(crate::i18n::text("interaction-home-practice"))
+                        .on_hover_text(crate::i18n::text("interaction-home-practice-tip"))
+                        .clicked()
+                    {
+                        self.practice_open = true;
+                    }
+                    ui.horizontal(|ui| {
+                        if ui
+                            .button(crate::i18n::text("interaction-home-export-setup"))
+                            .clicked()
+                        {
+                            self.show_setup(false, ui.ctx());
+                        }
+                        if ui
+                            .button(crate::i18n::text("interaction-home-import-setup"))
+                            .clicked()
+                        {
+                            self.show_setup(true, ui.ctx());
+                        }
+                    });
+                    self.home_link_field(ui, &t);
+
+                    // The card has git's words itself.
+                    if let Some(err) = self.error.as_ref().filter(|_| self.error_card.is_none()) {
+                        ui.add_space(12.0);
+                        error_label(ui, t.danger, err);
+                    }
+                    self.error_card_ui(ui);
+                    if let Some(cloning) = &self.cloning {
+                        ui.add_space(12.0);
+                        super::clone::cloning_line(ui, cloning);
+                    }
+                    for connecting in &self.connecting {
                         ui.add_space(12.0);
                         ui.horizontal(|ui| {
-                            ui.spinner();
-                            ui.label(format!("Cloning into {}…", dest.display()));
+                            ui.add(crate::spinner::Spinner::new());
+                            ui.label(crate::i18n::message(
+                                "interaction-home-connecting",
+                                &[("place", connecting.label.as_str().into())],
+                            ));
                         });
                     }
 
+                    ui.add_space(30.0);
+                    self.workspaces_section(ui);
+                    ui.add_space(24.0);
+                    self.inbox_section(ui);
+
                     if !self.recent.is_empty() {
-                        ui.add_space(30.0);
+                        ui.add_space(24.0);
                         ui.with_layout(egui::Layout::top_down(egui::Align::Min), |ui| {
-                            ui.label(
-                                RichText::new("RECENT")
-                                    .font(theme::semibold(10.5))
-                                    .color(t.text_faint),
-                            );
-                            ui.add_space(4.0);
-                            ui.spacing_mut().item_spacing.y = 2.0;
-                            for (i, path) in self.recent.iter().enumerate() {
-                                match recent_row(ui, path) {
-                                    Some(RecentClick::Open) => open = Some(path.clone()),
-                                    Some(RecentClick::Forget) => forget = Some(i),
-                                    None => {}
-                                }
+                            match self.recent_section(ui, &t) {
+                                Some(RecentClick::Open(path)) => open = Some(path),
+                                Some(RecentClick::Forget(i)) => forget = Some(i),
+                                None => {}
                             }
                         });
                     }
@@ -114,7 +353,9 @@ impl App {
         match action {
             Some(0) => self.pick_existing(&ctx),
             Some(1) => self.pick_new(&ctx),
-            Some(_) => self.start_clone(),
+            Some(2) => self.start_clone(),
+            Some(3) => self.start_open_remote(&ctx),
+            Some(_) => self.start_repo_scan(&ctx),
             None => {}
         }
         if let Some(path) = open {
@@ -139,14 +380,17 @@ impl App {
             });
         }
         if let Some(appimage) = crate::desktop_entry::appimage()
+            && !crate::portable::asked()
             && !crate::desktop_entry::installed()
         {
             ui.add_space(4.0);
             let link = ui
-                .link("Add gitcraft to the applications menu")
+                .link(crate::i18n::text("interaction-home-app-menu"))
                 .on_hover_text(appimage.display().to_string());
             if link.clicked() {
-                self.error = crate::desktop_entry::install(&appimage).err();
+                self.error = crate::desktop_entry::install(&appimage)
+                    .err()
+                    .map(Into::into);
             }
         }
     }
@@ -157,122 +401,62 @@ impl App {
             ui.add_space(ui.available_height() * 0.25);
             icons::inline(ui, "circle-alert", 40.0, t.warning);
             ui.add_space(8.0);
-            ui.label(RichText::new("Git was not found").font(theme::semibold(24.0)));
+            ui.label(
+                RichText::new(crate::i18n::text("interaction-home-git-missing"))
+                    .font(theme::semibold(24.0)),
+            );
             ui.add_space(8.0);
-            ui.label("gitcraft uses the git command line. Install git and make sure `git` is on your PATH.");
+            ui.label(crate::i18n::text("interaction-home-git-install"));
             ui.add_space(4.0);
             ui.label(RichText::new(err).color(t.text_faint).small());
             ui.add_space(16.0);
-            if crate::repo::primary_button(ui, "Check again", true, 140.0).clicked() {
+            if crate::repo::primary_button(
+                ui,
+                crate::i18n::text("interaction-home-git-recheck"),
+                true,
+                140.0,
+            )
+            .clicked()
+            {
                 self.git_version = git::version();
             }
             ui.add_space(8.0);
-            ui.hyperlink_to("Download git", "https://git-scm.com/downloads");
+            ui.hyperlink_to(
+                crate::i18n::text("interaction-home-git-download"),
+                "https://git-scm.com/downloads",
+            );
         });
     }
 }
 
-/// A large clickable card on the start page.
-fn action_card(ui: &mut Ui, width: f32, icon: &str, title: &str, subtitle: &str) -> egui::Response {
-    let t = Tokens::get(ui.ctx());
-    let (rect, resp) = ui.allocate_exact_size(vec2(width, 116.0), Sense::click());
-    let fill = if resp.hovered() { t.hover } else { t.card };
-    let stroke = if resp.hovered() {
-        t.accent
-    } else {
-        t.field_border
-    };
-    let p = ui.painter();
-    p.rect(
-        rect,
-        t.radius_lg,
-        fill,
-        Stroke::new(1.0, stroke),
-        egui::StrokeKind::Inside,
-    );
-    icons::paint(
-        ui,
-        Rect::from_center_size(pos2(rect.center().x, rect.top() + 34.0), vec2(28.0, 28.0)),
-        icon,
-        26.0,
-        t.accent,
-    );
-    p.text(
-        pos2(rect.center().x, rect.top() + 68.0),
-        Align2::CENTER_CENTER,
-        title,
-        theme::semibold(14.0),
-        t.text,
-    );
-    p.text(
-        pos2(rect.center().x, rect.top() + 90.0),
-        Align2::CENTER_CENTER,
-        subtitle,
-        egui::FontId::proportional(11.5),
-        t.text_dim,
-    );
-    resp.on_hover_cursor(egui::CursorIcon::PointingHand)
-}
-
-fn recent_row(ui: &mut Ui, path: &Path) -> Option<RecentClick> {
-    let t = Tokens::get(ui.ctx());
-    let (rect, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 40.0), Sense::click());
-    let hovered = resp.hovered();
-    if hovered {
-        ui.painter().rect_filled(rect, t.radius, t.hover);
-    }
-    let y = rect.center().y;
-    icons::paint(
-        ui,
-        Rect::from_center_size(pos2(rect.left() + 20.0, y), vec2(18.0, 18.0)),
-        "folder-git-2",
-        16.0,
-        t.icon,
-    );
-    let name = path
-        .file_name()
-        .map(|n| n.to_string_lossy().into_owned())
-        .unwrap_or_default();
-    // Leave room for the remove button; long paths are cut at the row's edge.
-    let p = ui.painter_at(rect.with_max_x(rect.right() - 36.0));
-    p.text(
-        pos2(rect.left() + 40.0, y - 8.0),
-        Align2::LEFT_CENTER,
-        name,
-        theme::medium(12.5),
-        t.text,
-    );
-    p.text(
-        pos2(rect.left() + 40.0, y + 8.0),
-        Align2::LEFT_CENTER,
-        path.display().to_string(),
-        egui::FontId::proportional(11.0),
-        t.text_faint,
-    );
-    let mut forget = false;
-    if hovered || ui.rect_contains_pointer(rect) {
-        let x_rect = Rect::from_center_size(pos2(rect.right() - 18.0, y), vec2(20.0, 20.0));
-        let x = ui
-            .interact(x_rect, resp.id.with("forget"), Sense::click())
-            .on_hover_text("Remove from list");
-        if x.hovered() {
-            ui.painter().rect_filled(x_rect, t.radius_sm, t.pressed);
-        }
-        icons::paint(ui, x_rect, "x", 12.0, t.text_faint);
-        forget = x.clicked();
-    }
-    if forget {
-        Some(RecentClick::Forget)
-    } else if resp.clicked() {
-        Some(RecentClick::Open)
-    } else {
-        None
-    }
-}
-
 fn same_path(a: &Path, b: &Path) -> bool {
-    match (std::fs::canonicalize(a), std::fs::canonicalize(b)) {
-        (Ok(a), Ok(b)) => a == b,
-        _ => a == b,
+    crate::remote::same_dir(a, b)
+}
+
+impl App {
+    /// The card explaining why a repository couldn't be opened, when gitcraft knows why; its
+    /// Try again opens the folder again.
+    fn error_card_ui(&mut self, ui: &mut Ui) {
+        let Some(card) = &mut self.error_card else {
+            return;
+        };
+        ui.add_space(10.0);
+        let event = card.ui(ui, true);
+        let dir = card.dir().to_owned();
+        match event {
+            Some(crate::error_card::CardEvent::Close) => self.error_card = None,
+            Some(crate::error_card::CardEvent::Retry) => {
+                let ctx = ui.ctx().clone();
+                self.open_repo(&dir, &ctx);
+            }
+            None => {}
+        }
     }
 }
+
+#[cfg(test)]
+#[path = "home/retained_error_tests.rs"]
+mod retained_error_tests;
+#[cfg(test)]
+#[path = "home/tests.rs"]
+mod tests;

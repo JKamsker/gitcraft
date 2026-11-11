@@ -1,7 +1,13 @@
 //! New versions of gitcraft, from its GitHub releases: looked for on every start, downloaded in
 //! the background and parked on disk, then put in place of this build with a restart.
 
+pub(crate) mod display;
 mod install;
+mod previous;
+mod witness;
+pub use witness::Failure;
+#[cfg(test)]
+pub use witness::PlacementFailure;
 
 use std::cmp::Ordering;
 use std::path::PathBuf;
@@ -9,7 +15,10 @@ use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
-pub use install::{clean_up, install, relaunch, relaunch_after_exit};
+pub use install::{
+    clean_up, go_back_witnessed, install_witnessed, previous, relaunch, relaunch_after_exit,
+};
+pub use previous::{PIN_THIS, Previous, settle_pin};
 
 /// This build's version.
 pub const CURRENT: &str = env!("CARGO_PKG_VERSION");
@@ -41,8 +50,8 @@ impl Channel {
 
     pub fn label(self) -> &'static str {
         match self {
-            Channel::Main => "Main (releases)",
-            Channel::Dev => "Dev (a build of every change)",
+            Channel::Main => crate::i18n::text("interaction-presentation-releases"),
+            Channel::Dev => crate::i18n::text("interaction-presentation-dev"),
         }
     }
 }
@@ -65,11 +74,18 @@ pub struct Found {
 }
 
 /// The newest release of `channel` if it is newer than this build and not `skipped`, downloaded
-/// and parked when `download` (and this copy of gitcraft can replace itself).
-pub fn look(channel: Channel, download: bool, skipped: &str) -> Result<Option<Found>, String> {
-    let Some(release) =
-        latest(channel)?.filter(|r| newer(&r.version, CURRENT) && r.version != skipped)
-    else {
+/// and parked when `download` (and this copy of gitcraft can replace itself). Nothing while a
+/// version is `pinned` (see [`previous`]), not even a look.
+pub fn look(
+    channel: Channel,
+    download: bool,
+    skipped: &str,
+    pinned: &str,
+) -> Result<Option<Found>, String> {
+    if !pinned.is_empty() {
+        return Ok(None);
+    }
+    let Some(release) = latest(channel)?.filter(|r| offered(&r.version, CURRENT, skipped)) else {
         return Ok(None);
     };
     // When it can't be had, the release page still can.
@@ -77,6 +93,11 @@ pub fn look(channel: Channel, download: bool, skipped: &str) -> Result<Option<Fo
         .then(|| install::prefetch(&release).ok())
         .flatten();
     Ok(Some(Found { release, parked }))
+}
+
+/// Whether release `version` is offered to a build of `current`: newer, and not skipped.
+fn offered(version: &str, current: &str, skipped: &str) -> bool {
+    newer(version, current) && version != skipped
 }
 
 fn agent() -> ureq::Agent {
@@ -237,6 +258,22 @@ mod tests {
             .map(|r| r.version)
             .collect();
         assert_eq!(versions, ["0.3.4-dev.7", "0.3.3"]);
+    }
+
+    #[test]
+    fn what_is_offered() {
+        assert!(offered("0.3.4", "0.3.3", ""));
+        assert!(!offered("0.3.4", "0.3.3", "0.3.4"));
+        assert!(!offered("0.3.3", "0.3.3", ""));
+        // Gone back from 0.3.4: an older build is offered neither it nor anything older.
+        assert!(!offered("0.3.2", "0.3.3", "0.3.4"));
+        assert!(offered("0.3.5", "0.3.3", "0.3.4"));
+    }
+
+    #[test]
+    fn a_pin_looks_for_nothing() {
+        // Returns before any request: no network needed.
+        assert!(matches!(look(Channel::Main, true, "", "0.3.3"), Ok(None)));
     }
 
     #[test]

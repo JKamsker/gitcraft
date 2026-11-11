@@ -2,15 +2,15 @@
 
 mod file_menu;
 mod file_row;
-mod terminal_tabs;
 
 use egui::{Align2, Color32, CornerRadius, Rect, Response, Sense, Ui, pos2, vec2};
 
 use crate::theme::{self, Tokens};
 
-pub use file_menu::file_menu;
-pub use file_row::{RowExtra, file_row};
-pub use terminal_tabs::terminal_tabs;
+pub use crate::a11y::{a11y, a11y_selected};
+pub(in crate::repo) use file_menu::selection_commands;
+pub use file_menu::{file_menu, file_menu_with};
+pub use file_row::{FileRowResponse, OwnerTag, RowExtra, badge_text, file_row, file_row_owned};
 
 pub const ROW_H: f32 = 24.0;
 
@@ -95,12 +95,21 @@ pub fn panel_footer(
 
 /// A rounded label with a tinted background.
 pub fn chip(ui: &mut Ui, text: &str, color: Color32) -> Response {
+    let t = Tokens::get(ui.ctx());
     let font = theme::medium(11.0);
     let galley = ui.painter().layout_no_wrap(text.to_owned(), font, color);
     let size = vec2(galley.size().x + 12.0, 18.0);
     let (rect, resp) = ui.allocate_exact_size(size, Sense::hover());
-    ui.painter()
-        .rect_filled(rect, CornerRadius::same(9), color.gamma_multiply(0.18));
+    ui.painter().rect_filled(
+        rect,
+        CornerRadius::same(9),
+        theme::palette::readable_tint(
+            color,
+            0.18,
+            &[t.card, t.dock, t.field, t.tab_strip],
+            &[color],
+        ),
+    );
     ui.painter().galley(
         pos2(rect.left() + 6.0, rect.center().y - galley.size().y / 2.0),
         galley,
@@ -110,7 +119,7 @@ pub fn chip(ui: &mut Ui, text: &str, color: Color32) -> Response {
 }
 
 /// A tab's shape: rounded at the top only.
-fn top_rounded(radius: u8) -> CornerRadius {
+pub(super) fn top_rounded(radius: u8) -> CornerRadius {
     CornerRadius {
         nw: radius,
         ne: radius,
@@ -155,7 +164,7 @@ pub fn status_color(t: &Tokens, code: char) -> Color32 {
     match code {
         'A' | '?' => t.success,
         'D' => t.danger,
-        'R' | 'C' => t.accent,
+        'R' | 'C' => t.accent_fg,
         'U' => t.danger,
         _ => t.warning,
     }

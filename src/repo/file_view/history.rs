@@ -14,6 +14,10 @@ impl RepoTab {
     /// Whether the open diff is of a commit in the file history shown, which then lists the
     /// commits beside it.
     pub(in crate::repo) fn history_beside_diff(&self) -> bool {
+        // A diff in its own window isn't drawn beside them as well.
+        if !self.docked(crate::repo::popout::Panel::Diff) {
+            return false;
+        }
         let Some(view) = &self.file_view else {
             return false;
         };
@@ -46,7 +50,7 @@ impl RepoTab {
         let Some(view) = &self.file_view else { return };
         let commits = match &view.history {
             None => {
-                ui.centered_and_justified(|ui| ui.spinner());
+                ui.centered_and_justified(|ui| ui.add(crate::spinner::Spinner::new()));
                 return;
             }
             Some(Err(e)) => {
@@ -56,8 +60,13 @@ impl RepoTab {
             Some(Ok(c)) => c,
         };
         if commits.is_empty() {
+            let note = if view.lines.is_some() {
+                crate::i18n::text("repo-core-2482")
+            } else {
+                crate::i18n::text("repo-core-2483")
+            };
             ui.centered_and_justified(|ui| {
-                ui.label(egui::RichText::new("No commits touch this file yet.").color(t.text_dim));
+                ui.label(egui::RichText::new(note).color(t.text_dim));
             });
             return;
         }
@@ -75,6 +84,12 @@ impl RepoTab {
                     let Some(c) = commits.get(i) else { continue };
                     let (rect, resp) =
                         ui.allocate_exact_size(vec2(ui.available_width(), ROW_H), Sense::click());
+                    let label = || {
+                        let when = git::relative_time(c.time, now);
+                        let short = c.hash.get(..7).unwrap_or(&c.hash);
+                        crate::a11y::labels::commit(short, &c.summary, &c.author, &when, &[])
+                    };
+                    widgets::a11y_selected(&resp, label, open == Some(c.hash.as_str()));
                     let p = ui.painter_at(rect);
                     if open == Some(c.hash.as_str()) {
                         p.rect_filled(rect, 0.0, t.row_selected);
@@ -107,7 +122,20 @@ impl RepoTab {
                     );
                     let mut summary = c.summary.clone();
                     if c.path != view.path {
-                        summary = format!("{summary}  ·  as {}", c.path);
+                        summary = crate::i18n::message(
+                            "repo-core-2485",
+                            &[
+                                ("summary", summary.to_string().into()),
+                                ("path", c.path.to_string().into()),
+                            ],
+                        );
+                    }
+                    if let (Some(&(start, _)), Some(&(_, end))) = (c.lines.first(), c.lines.last())
+                    {
+                        summary = format!(
+                            "{summary}  ·  {}",
+                            super::line_history::lines_label((start, end)).to_lowercase()
+                        );
                     }
                     p.with_clip_rect(Rect::from_min_max(
                         rect.min,
@@ -120,12 +148,21 @@ impl RepoTab {
                         FontId::proportional(12.5),
                         t.text,
                     );
-                    let resp = resp.on_hover_text(
-                        "Click: this commit's changes to the file, or the file as it was\nDouble-click: show the commit in the graph",
-                    );
+                    let resp = resp.on_hover_text(if view.lines.is_some() {
+                        crate::i18n::text("repo-core-2487")
+                    } else {
+                        crate::i18n::text("repo-core-2488")
+                    });
                     if resp.double_clicked() {
                         acts.push(Action::CloseFileView);
                         acts.push(Action::SelectHash(c.hash.clone()));
+                    } else if resp.clicked() && view.lines.is_some() {
+                        // Only the part of its diff that changed the lines.
+                        acts.push(Action::OpenDiffOfLines {
+                            hash: c.hash.clone(),
+                            path: c.path.clone(),
+                            lines: c.lines.clone(),
+                        });
                     } else if resp.clicked() {
                         acts.push(Action::OpenDiff(DiffKey::Commit {
                             hash: c.hash.clone(),

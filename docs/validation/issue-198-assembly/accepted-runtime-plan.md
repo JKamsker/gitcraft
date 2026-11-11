@@ -1,0 +1,3 @@
+Partial integration: no Rust runtime or process tests executed.
+
+The prior containment audit /tmp/gitcraft-build-40a6a253/containment-audit.md was read. Final suite remains deferred to the parent after pending slices and final source assembly. Revalidate the PID/network isolation probe against the final candidate, run recording-only/synthetic signal gates before any owned-child runtime cases, then use the audited bwrap suite proposal with retained owned child handle. Unset all remote endpoint opt-ins. The audit and probe results apply to the earlier base; they are planning evidence, not validation of this integration.

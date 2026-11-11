@@ -3,7 +3,7 @@
 
 use egui::{RichText, Sense, Stroke, Ui, vec2};
 
-use super::{Choice, ConflictEditor, Segment, render};
+use super::{Choice, ConflictEditor, Segment};
 use crate::icons;
 use crate::repo::diff::literal_path;
 use crate::repo::{Action, Refresh, RepoTab, ops, widgets};
@@ -12,20 +12,67 @@ use crate::theme::{self, Tokens};
 impl RepoTab {
     pub(in crate::repo) fn conflict_view(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
         let t = Tokens::get(ui.ctx());
-        let idle = self.busy_op.is_none();
+        self.request_conflict_bases(ui.ctx());
+        let state = self.work.in_progress;
+        let rerere = self.rerere.setup;
+        // The switch waits for what is being read or set, and for the operation running.
+        let smart = self
+            .conflict
+            .as_ref()
+            .and_then(|ed| self.unity.smart_merge_for(&ed.path));
         let Some(ed) = &mut self.conflict else { return };
+        // A merge tool open on the file writes it when it saves: nothing is chosen here meanwhile.
+        let idle = self.busy_op.is_none()
+            && !crate::repo::external_tools::is_merging(&self.path, &ed.path);
+        let switchable = idle && !self.rerere.busy;
+        // "Note why…" under each conflict from the start, whatever becomes of the read.
+        let conflicts = ed.choices.len();
+        ed.memo.drafts.resize_with(conflicts, Default::default);
+        if ed.memo.offers.is_none() && !ed.memo.reading {
+            acts.push(Action::Decisions(super::decisions::Act::Load));
+        }
         let (ours_name, theirs_name) = ed.side_names();
         let left = ed.unresolved();
+        // While it is written (on another machine), what is saved is what is shown.
+        let editable = !ed.saving;
 
-        ed.header(ui, &t, idle, left, acts);
-        ed.result_panel(ui, &t);
-        ed.conflict_list(ui, &t, (&ours_name, &theirs_name));
+        ed.header(ui, &t, (idle && editable, smart), left, acts);
+        ed.history_strip(ui, &t, ((&ours_name, &theirs_name), state), acts);
+        ed.reused_banner(ui, &t, idle, acts);
+        ed.result_panel(ui, &t, editable, (rerere, switchable), acts);
+        ed.conflict_list(ui, &t, (&ours_name, &theirs_name), editable);
     }
 }
 
 impl ConflictEditor {
+    pub(crate) fn standalone_ui(&mut self, ui: &mut Ui, editable: bool) {
+        let t = Tokens::get(ui.ctx());
+        ui.label(crate::i18n::message(
+            "repo-core-0705",
+            &[("unresolved", format!("{}", self.unresolved()).into())],
+        ));
+        self.result_panel(ui, &t, editable, (None, false), &mut Vec::new());
+        self.conflict_list(
+            ui,
+            &t,
+            (
+                crate::i18n::text("repo-core-0706"),
+                crate::i18n::text("repo-core-0707"),
+            ),
+            editable,
+        );
+    }
+
     /// Header: the file, how many conflicts are resolved, save, the whole-file actions, close.
-    fn header(&self, ui: &mut Ui, t: &Tokens, idle: bool, left: usize, acts: &mut Vec<Action>) {
+    /// `smart`: for a Unity YAML file, whether Unity's Smart Merge can solve it.
+    fn header(
+        &self,
+        ui: &mut Ui,
+        t: &Tokens,
+        (idle, smart): (bool, Option<bool>),
+        left: usize,
+        acts: &mut Vec<Action>,
+    ) {
         let total = self.choices.len();
         egui::Frame::new()
             .fill(t.chrome)
@@ -37,31 +84,94 @@ impl ConflictEditor {
                     ui.label(RichText::new(&self.path).font(theme::medium(13.0)));
                     widgets::chip(
                         ui,
-                        &format!(
-                            "{} of {total} resolved",
-                            total.saturating_sub(left).min(total)
+                        &crate::i18n::message(
+                            "repo-core-0709",
+                            &[
+                                (
+                                    "total",
+                                    format!("{}", total.saturating_sub(left).min(total)).into(),
+                                ),
+                                ("total2", (total).into()),
+                            ],
                         ),
                         if left == 0 { t.success } else { t.warning },
                     );
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if icons::small_button(ui, "x", "Close (Esc)").clicked() {
+                        if icons::small_button(ui, "x", crate::i18n::text("repo-core-0711"))
+                            .clicked()
+                        {
                             acts.push(Action::CloseDiff);
                         }
+                        self.agent_menu(ui, acts);
                         if widgets::primary_button(
                             ui,
-                            "Save and mark resolved",
+                            crate::i18n::text("repo-core-0715"),
                             idle && left == 0,
                             0.0,
                         )
-                        .on_disabled_hover_text("Resolve every conflict first")
+                        .on_disabled_hover_text(crate::i18n::text("repo-core-0716"))
                         .clicked()
                         {
                             acts.push(Action::SaveConflict);
                         }
                         self.whole_file_buttons(ui, idle, acts);
+                        if let Some(found) = smart {
+                            self.smart_merge_button(ui, idle && found, found, acts);
+                        }
                     });
                 });
             });
+    }
+
+    /// _Agent_: have one resolve this file in the background (see `repo::resolver`), or type
+    /// its conflicts into the agent's terminal.
+    fn agent_menu(&self, ui: &mut Ui, acts: &mut Vec<Action>) {
+        ui.menu_button("Agent", |ui| {
+            if ui
+                .button("Resolve in background")
+                .on_hover_text(
+                    "An agent resolves this file in a private copy of the checkout while you go \
+                     on; you watch its progress, review what it did and apply it",
+                )
+                .clicked()
+            {
+                acts.push(Action::Resolver(crate::repo::resolver::ResolverAct::Start(
+                    Some(vec![self.path.clone()]),
+                )));
+                ui.close();
+            }
+            if ui
+                .button(crate::i18n::text("repo-core-0712"))
+                .on_hover_text(crate::i18n::text("repo-core-0713"))
+                .clicked()
+            {
+                acts.push(Action::Agent(crate::repo::agents::AgentAct::Send(
+                    self.for_agent(),
+                    crate::i18n::text("repo-core-0714"),
+                )));
+                ui.close();
+            }
+        });
+    }
+
+    /// Solve with UnityYAMLMerge, for a Unity YAML file of a Unity project.
+    /// `found`: UnityYAMLMerge was found (else the button says where to choose it).
+    fn smart_merge_button(&self, ui: &mut Ui, idle: bool, found: bool, acts: &mut Vec<Action>) {
+        if self.solving {
+            ui.add(crate::spinner::Spinner::new());
+            return;
+        }
+        let r = ui
+            .add_enabled(idle, egui::Button::new(crate::i18n::text("repo-core-0717")))
+            .on_hover_text(crate::i18n::text("repo-core-0718"))
+            .on_disabled_hover_text(if found {
+                crate::i18n::text("repo-core-0719")
+            } else {
+                crate::i18n::text("repo-core-0720")
+            });
+        if r.clicked() {
+            acts.push(Action::Unity(crate::repo::unity::UnityAct::SolveConflict));
+        }
     }
 
     /// Mergiraf when it's set up, and the whole file from either side.
@@ -72,28 +182,31 @@ impl ConflictEditor {
         } else {
             ("--ours", "--theirs")
         };
-        let offer_mergiraf = crate::settings::Settings::get(ui.ctx()).mergiraf
+        // Also for a repository elsewhere: Mergiraf solves a copy of the file here.
+        // Not for a file without markers, which Mergiraf would solve from scratch.
+        let offer_mergiraf = self.reused.is_none()
+            && crate::settings::Settings::get(ui.ctx()).mergiraf
             && crate::mergiraf::found(ui.ctx()).is_some();
         if offer_mergiraf {
             if self.solving {
-                ui.spinner();
+                ui.add(crate::spinner::Spinner::new());
             } else if ui
-                .add_enabled(idle, egui::Button::new("Solve with Mergiraf"))
-                .on_hover_text(
-                    "Let Mergiraf solve the conflicts it can from the syntax \
-                     of the code. Nothing is saved before you check the result.",
-                )
+                .add_enabled(idle, egui::Button::new(crate::i18n::text("repo-core-0723")))
+                .on_hover_text(crate::i18n::text("repo-core-0724"))
                 .clicked()
             {
                 acts.push(Action::SolveWithMergiraf);
             }
         }
         for (label, side, tip) in [
-            ("Use theirs", theirs, "Take their version of the whole file"),
-            ("Use mine", mine, "Keep your version of the whole file"),
+            ("Use theirs", theirs, crate::i18n::text("repo-core-0726")),
+            ("Use mine", mine, crate::i18n::text("repo-core-0728")),
         ] {
             if ui
-                .add_enabled(idle, egui::Button::new(label))
+                .add_enabled(
+                    idle,
+                    egui::Button::new(crate::repo::messages::display_operation(label)),
+                )
                 .on_hover_text(tip)
                 .clicked()
             {
@@ -108,10 +221,25 @@ impl ConflictEditor {
                 });
             }
         }
+        if ui
+            .add_enabled(idle, egui::Button::new(crate::i18n::text("repo-core-0730")))
+            .on_hover_text(crate::i18n::text("repo-core-0731"))
+            .clicked()
+        {
+            acts.push(Action::ResolveInMergeTool(self.path.clone()));
+        }
     }
 
-    /// Bottom: the result, editable by hand.
-    fn result_panel(&mut self, ui: &mut Ui, t: &Tokens) {
+    /// Bottom: the result, editable by hand (unless being saved).
+    /// `rerere`: how rerere is set up here, and whether its switch can be used now.
+    fn result_panel(
+        &mut self,
+        ui: &mut Ui,
+        t: &Tokens,
+        editable: bool,
+        rerere: (Option<super::rerere::Setup>, bool),
+        acts: &mut Vec<Action>,
+    ) {
         egui::Panel::bottom("conflict_result")
             .resizable(true)
             .default_size(ui.available_height() * 0.42)
@@ -122,27 +250,42 @@ impl ConflictEditor {
                     .inner_margin(egui::Margin::symmetric(10, 8)),
             )
             .show(ui, |ui| {
+                if !editable {
+                    ui.disable();
+                }
                 ui.horizontal(|ui| {
                     ui.label(
-                        RichText::new("RESULT")
+                        RichText::new(crate::i18n::text("repo-core-0733"))
                             .font(theme::semibold(10.5))
                             .color(t.text_faint),
                     );
                     if self.manual {
-                        ui.label(RichText::new("edited by hand").color(t.warning).small())
-                            .on_hover_text(
-                                "Choices no longer change the result: \"Back to choices\" \
-                                 applies them, and drops the edits",
-                            );
-                        if ui.small_button("Back to choices").clicked() {
+                        let (label, tip) = if self.reused.is_some() {
+                            (
+                                crate::i18n::text("repo-core-0734"),
+                                crate::i18n::text("repo-core-0735"),
+                            )
+                        } else {
+                            (
+                                crate::i18n::text("repo-core-0736"),
+                                crate::i18n::text("repo-core-0737"),
+                            )
+                        };
+                        ui.label(RichText::new(label).color(t.warning).small())
+                            .on_hover_text(tip);
+                        if ui
+                            .small_button(crate::i18n::text("repo-core-0738"))
+                            .clicked()
+                        {
                             self.manual = false;
-                            self.result = render(
-                                &self.segments,
-                                &self.choices,
-                                (&self.ours_label, &self.theirs_label),
-                            );
+                            self.result = self.rendered();
                         }
                     }
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        super::reused::rerere_switch(ui, rerere, acts);
+                        let has_tests = self.has_tests();
+                        super::decisions::view::run_tests_switch(ui, &mut self.memo, has_tests);
+                    });
                 });
                 egui::ScrollArea::both()
                     .id_salt("conflict_result_scroll")
@@ -162,15 +305,22 @@ impl ConflictEditor {
             });
     }
 
-    /// Top: each conflict, ours | theirs, with the choice buttons. `names`: the two sides'.
-    fn conflict_list(&mut self, ui: &mut Ui, t: &Tokens, names: (&str, &str)) {
+    /// Top: each conflict, ours | theirs, with the choice buttons (unless being saved).
+    /// `names`: the two sides'.
+    fn conflict_list(&mut self, ui: &mut Ui, t: &Tokens, names: (&str, &str), editable: bool) {
         let total = self.choices.len();
         egui::ScrollArea::vertical()
             .id_salt("conflict_list")
             .auto_shrink(false)
             .show(ui, |ui| {
+                if !editable {
+                    ui.disable();
+                }
+                self.original.prepare(&self.segments);
                 let mut k = 0;
-                let mut pick = None;
+                let (mut pick, mut toggle) = (None, None);
+                let mut use_offer = None;
+                let memo = &mut self.memo;
                 for seg in &self.segments {
                     let Segment::Conflict { ours, theirs, .. } = seg else {
                         continue;
@@ -181,11 +331,19 @@ impl ConflictEditor {
                         .show(ui, |ui| {
                             ui.horizontal(|ui| {
                                 ui.label(
-                                    RichText::new(format!("Conflict {} of {total}", k + 1))
-                                        .font(theme::semibold(12.0)),
+                                    RichText::new(crate::i18n::message(
+                                        "repo-core-0741",
+                                        &[
+                                            ("k", format!("{}", k + 1).into()),
+                                            ("total", (total).into()),
+                                        ],
+                                    ))
+                                    .font(theme::semibold(12.0)),
                                 );
                                 ui.add_space(8.0);
-                                if let Some(choice) = choice_buttons(ui, t, chosen, names) {
+                                let recorded = self.recorded.get(k).is_some_and(Option::is_some);
+                                if let Some(choice) = choice_buttons(ui, t, chosen, names, recorded)
+                                {
                                     pick = Some((k, choice));
                                 }
                             });
@@ -206,6 +364,36 @@ impl ConflictEditor {
                                     side_box(col, t, (k, side), name, text, picked);
                                 }
                             });
+                            ui.add_space(6.0);
+                            if super::original_view::section(
+                                ui,
+                                t,
+                                (k, self.original.is_open(k)),
+                                self.original.of(k),
+                                self.original.diffs(k),
+                                names,
+                            ) {
+                                toggle = Some(k);
+                            }
+                            let recorded = self.recorded.get(k).and_then(Option::as_deref);
+                            if let Some(text) = recorded {
+                                ui.add_space(4.0);
+                                let picked = chosen == Some(Choice::Recorded);
+                                super::reused::recorded_box(ui, t, k, text, picked);
+                            }
+                            let applied = chosen == Some(Choice::Recorded)
+                                && memo
+                                    .offers
+                                    .as_ref()
+                                    .and_then(|o| o.get(k))
+                                    .and_then(Option::as_ref)
+                                    .is_some_and(|o| {
+                                        Some(o.decision.resolution.as_str()) == recorded
+                                    });
+                            let state = (applied, self.manual);
+                            if let Some(p) = super::decisions::view::card(ui, t, k, memo, state) {
+                                use_offer = Some((k, p));
+                            }
                         });
                     let (sep, _) =
                         ui.allocate_exact_size(vec2(ui.available_width(), 1.0), Sense::hover());
@@ -215,24 +403,35 @@ impl ConflictEditor {
                 if let Some((k, choice)) = pick {
                     self.choose(k, choice);
                 }
+                if let Some(k) = toggle {
+                    self.original.toggle(k);
+                }
+                match use_offer {
+                    Some((k, super::decisions::view::Pick::Use)) => self.use_offer(k),
+                    Some((k, super::decisions::view::Pick::TakeNote)) => self.take_note(k),
+                    None => {}
+                }
             });
     }
 }
 
-/// The four ways to resolve one conflict, the `chosen` one lit; returns the one clicked.
+/// The ways to resolve one conflict (the reused text too, when there is one: `recorded`), the
+/// `chosen` one lit; returns the one clicked.
 fn choice_buttons(
     ui: &mut Ui,
     t: &Tokens,
     chosen: Option<Choice>,
     (ours_name, theirs_name): (&str, &str),
+    recorded: bool,
 ) -> Option<Choice> {
     let mut clicked = None;
-    for (choice, label) in [
+    let reused = recorded.then_some((Choice::Recorded, crate::i18n::text("repo-core-0742")));
+    for (choice, label) in reused.into_iter().chain([
         (Choice::Ours, ours_name),
         (Choice::Theirs, theirs_name),
-        (Choice::OursThenTheirs, "Both (ours first)"),
-        (Choice::TheirsThenOurs, "Both (theirs first)"),
-    ] {
+        (Choice::OursThenTheirs, crate::i18n::text("repo-core-0743")),
+        (Choice::TheirsThenOurs, crate::i18n::text("repo-core-0744")),
+    ]) {
         let on = chosen == Some(choice);
         let text = if on {
             RichText::new(label).color(t.accent_text)
@@ -240,7 +439,13 @@ fn choice_buttons(
             RichText::new(label)
         };
         let b = egui::Button::new(text).fill(if on { t.accent } else { t.field });
-        if ui.add(b).clicked() {
+        let response = ui.add(b);
+        let response = if choice == Choice::Recorded {
+            response.on_hover_text(crate::i18n::text("repo-core-0745"))
+        } else {
+            response
+        };
+        if response.clicked() {
             clicked = Some(choice);
         }
     }
@@ -266,7 +471,7 @@ fn side_box(
             ui.set_width(ui.available_width());
             ui.label(RichText::new(name).color(t.text_faint).small());
             let body = if text.is_empty() {
-                "(nothing)"
+                crate::i18n::text("repo-core-0697")
             } else {
                 text.trim_end_matches(['\r', '\n'])
             };

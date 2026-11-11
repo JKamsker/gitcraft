@@ -1,73 +1,200 @@
 //! One open repository: its state, background git work and the view
 //! (branches on the left, commit graph or diff in the middle, commit detail / changes on the right).
 
+mod notice;
+pub(crate) use notice::Notice;
 mod actions;
+mod activity;
+pub(crate) mod agent;
+mod agents;
+mod ai;
 mod apply;
+mod atlas;
+mod authorship_view;
+mod bakeoff;
+mod bisect;
+mod branch_bands;
+mod branch_cleanup;
+mod branch_health;
+mod branch_order;
 mod branch_tree;
 mod branch_visibility;
+mod bundles;
+mod celebration;
 mod ci_status;
 mod ci_view;
+mod cleanup;
+mod cochanges;
+mod collision_view;
 pub(crate) mod columns;
 mod commands;
-mod conflict;
+mod commit_actions;
+mod commit_changes;
+pub(crate) mod conflict;
+mod conflict_check;
+mod content_recovery;
+#[cfg(test)]
+mod cpu_benchmarks;
+pub(crate) mod custom_commands;
+mod dco;
+mod detached;
 mod detail;
+mod detail_cache;
+mod devcontainer;
 mod dialogs;
 mod diff;
+mod diff_split;
+pub(crate) mod doctor;
+mod drafts;
+#[cfg(test)]
+mod drafts_tests;
+mod drag_drop;
+mod drift_view;
+mod email;
+mod error_help;
+mod external_tools;
+pub(crate) mod fence_view;
+pub(crate) mod file_comparison;
 mod file_text;
-mod file_view;
-mod graph_view;
-mod highlight;
+pub(crate) mod file_view;
+mod find;
+mod fold;
+mod folding;
+mod forge_link;
+mod forge_selection;
+pub(crate) mod forks;
+mod gerrit;
+mod ghost;
+mod graph_motion;
+mod graph_order;
+pub(crate) mod graph_view;
+mod graph_walk;
+mod growth;
+mod guide;
+pub(crate) mod highlight;
+mod history_activity;
+pub(crate) mod history_filter;
+mod history_reader;
+mod hooks;
+mod hotfix;
+mod https_recovery;
+mod insights;
+mod interaction;
+pub(crate) mod issue_work;
 mod keep_submodules;
+pub(crate) mod keyboard;
+mod keys;
 mod layout;
+mod lfs_locks;
+mod lfs_storage;
+mod lifecycle;
+mod line_dossier;
+#[cfg(test)]
+mod line_history_tests;
 mod load;
+mod local_ci;
 mod messages;
+#[cfg(not(test))]
+pub(crate) use messages::discover_fetch_key;
+pub(crate) use messages::{fetch_key, mutation_key};
+mod nav_history;
 mod navigate;
-mod operations;
+mod navigation;
+mod offline;
+pub(crate) mod operations;
+pub(crate) use operations::run_reviewed_push;
+#[cfg(test)]
+pub(crate) mod hang_diagnostics;
+mod owners;
+mod package;
+mod palette;
+mod parallel_bisect;
+mod partial_stash;
 mod patches;
 mod pinned_sections;
+pub(crate) mod popout;
+mod postcards;
 mod pr_merge;
 mod pr_review;
 mod pr_view;
+mod practice;
+#[cfg(test)]
+mod process_benchmarks;
 pub(crate) mod pull;
+mod push;
+mod push_preflight;
 mod quick_edit;
 mod rebase;
+mod reflog;
+mod rehearse;
+mod release;
+mod remerge;
+mod repository_tools;
+mod resolver;
+mod revert_piece;
+#[cfg(test)]
+mod revert_tests;
+mod review_workflow;
 mod rewrite;
+mod running;
+#[cfg(test)]
+mod samples;
+mod saved_views;
 mod sidebar;
+mod slow_banner;
+mod snapshot;
+mod sparse;
+mod ssh_setup;
+mod stack;
 mod state;
+mod surgery;
+mod symbol_biography;
 mod terminals;
+mod test_lane;
 #[cfg(test)]
 mod tests;
+mod timeline;
 mod toolbar;
+mod tour;
+mod unity;
+mod versions;
 mod watch;
+mod watch_remote;
+mod weakened_marks;
 pub(crate) mod widgets;
+mod working_drafts;
 pub(crate) mod worktree_tab;
+#[cfg(test)]
+mod worktree_tests;
 
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::sync::mpsc::{Receiver, Sender, channel};
+use std::sync::mpsc::{Receiver, channel};
 use std::time::Instant;
 
-use crate::forge::{Forge, PullRequest};
+use crate::forge::{Forge, Hosting, PullRequest};
 use crate::git::{
     self, Commit, CommitDetail, Identity, Refs, Remote, Stash, Submodule, WorkStatus, Worktree,
 };
 use crate::graph::Graph;
-use crate::terminal::Terminal;
 
 use actions::abort_action;
 pub(crate) use actions::{Action, fast_forward_action, merge_action, rebase_action};
 pub use dialogs::Dialog;
+pub(crate) use drafts::DraftShape;
 use messages::{Msg, spawn};
+pub(crate) use palette::{PaletteGeneration, PaletteItem, PaletteRun, Pick};
 pub(crate) use state::{Compare, CompareData, DiffKey, DiffView, Refresh, Reword, Undo, UndoEntry};
 use state::{OpKind, PendingOp, Search};
+pub(crate) use test_lane::TEST_LANE_TIP;
 pub(crate) use toolbar::reveal_label;
 pub use widgets::primary_button;
 
 /// Hash of the pseudo-commit that stands for uncommitted changes at the top of the graph.
 pub(crate) const WIP_HASH: &str = "\u{0}wip";
 /// History deeper than this isn't loaded by scrolling or searching.
-const MAX_HISTORY: usize = 100_000;
+pub(crate) const MAX_HISTORY: usize = 100_000;
 
 /// How a tab asks the app to open a folder.
 pub enum OpenRequest {
@@ -76,294 +203,11 @@ pub enum OpenRequest {
     Worktree(PathBuf),
 }
 
-pub struct RepoTab {
-    pub path: PathBuf,
-    pub name: String,
-    tx: Sender<Msg>,
-    rx: Receiver<Msg>,
-
-    /// When the tab was made: its opening screen shows only if the first read takes a while.
-    opened: Instant,
-    /// The first read waits to be started (see [`RepoTab::new_deferred`]).
-    deferred: bool,
-    /// Numbers the reads of the repository, in the order they start: an answer that arrives
-    /// after a later read's doesn't put back what that one replaced.
-    reads: u64,
-    /// The read the working tree shown comes from.
-    work_read: u64,
-    /// The read the submodules shown come from.
-    submodules_read: u64,
-    /// The watcher came while the first read ran, which may have missed changes made before
-    /// the watcher was there: check again once it is in.
-    recheck_after_load: bool,
-    /// Polled as the view shown (not a parked worktree view).
-    shown: bool,
-    loading: bool,
-    /// A reload was asked for while one was running, which may have read too early.
-    reload_again: bool,
-    load_error: Option<String>,
-    refs: Refs,
-    /// Commits as git listed them.
-    history: Vec<Arc<Commit>>,
-    has_more: bool,
-    loading_more: bool,
-    /// The branches hidden from the graph or soloed in it.
-    visibility: branch_visibility::Visibility,
-    /// What `history` was logged from: `None` for every branch.
-    log_from: Option<Vec<String>>,
-    /// Counts the reloads of `history`, so that a page asked for before one is dropped.
-    history_gen: u64,
-    /// The `git log` older pages are read from, and the `history_gen` it reads for.
-    log_stream: Arc<std::sync::Mutex<Option<(u64, git::LogStream)>>>,
-    work: WorkStatus,
-    /// Rows of the graph: the WIP pseudo-commit (when the tree is dirty) followed by `history`.
-    commits: Vec<Arc<Commit>>,
-    graph: Graph,
-    index: HashMap<String, usize>,
-    worktrees: Vec<Worktree>,
-    stashes: Vec<Stash>,
-    remotes: Vec<Remote>,
-    submodules: Vec<Submodule>,
-    /// It keeps files in Git LFS, and git-lfs is installed.
-    lfs: bool,
-    identity: Identity,
-    forge: Option<Forge>,
-    prs: Vec<PullRequest>,
-    pr_error: Option<String>,
-    prs_loaded: Option<Instant>,
-    /// The build status of the commits that show one.
-    ci: ci_status::CiStatuses,
-
-    selected: Option<usize>,
-    /// A stash shown in the detail pane instead of a graph row.
-    stash_view: Option<usize>,
-    scroll_to: Option<usize>,
-    /// The commit the detail pane is about (a graph row or a stash).
-    detail_hash: Option<String>,
-    detail: Option<CommitDetail>,
-    detail_error: Option<String>,
-    diff: Option<DiffView>,
-    compare: Option<Compare>,
-    /// The pull request the big area shows.
-    pr_view: Option<pr_view::PrView>,
-    /// The builds of a commit the big area shows.
-    ci_view: Option<ci_view::CiView>,
-    pr_requests: u64,
-    /// What was written on each pull request and not sent, by its number.
-    pr_drafts: HashMap<u64, pr_review::PrDraft>,
-    compare_requests: u64,
-    file_view: Option<file_view::FileView>,
-    rebase: Option<rebase::RebaseEditor>,
-    /// The selected commit's message, being edited in the right pane.
-    reword: Option<Reword>,
-    /// HTTPS credentials typed in this session, used for every later git command of the tab.
-    credentials: Option<git::Credentials>,
-    /// The last operation started, to run again after signing in.
-    last_op: Option<PendingOp>,
-    /// The forge has been asked for avatars.
-    avatars_hinted: bool,
-    diff_ignore_ws: bool,
-    /// Diffs show the whole file instead of the changes.
-    diff_as_file: bool,
-    /// Whether the commit pane lists every file of the commit, and those read.
-    all_files: detail::AllFiles,
-    conflict: Option<conflict::ConflictEditor>,
-
-    commit_summary: String,
-    commit_body: String,
-    amend: bool,
-    dialog: Option<Dialog>,
-    search: Search,
-    /// A commit to select once enough history is loaded (search results, links).
-    pending_goto: Option<String>,
-
-    undo_stack: Vec<UndoEntry>,
-    redo_stack: Vec<UndoEntry>,
-
-    busy_op: Option<String>,
-    op_started: Option<Instant>,
-    /// The running operation moves the checkout: update the submodules after it, if asked to.
-    update_submodules: bool,
-    status: Option<(String, bool)>,
-    branch_filter: String,
-    /// Where a clicked jump mark wants the sidebar scrolled to.
-    sidebar_jump: Option<f32>,
-    /// A sidebar section to open and scroll to, asked for from the folded sidebar.
-    sidebar_reveal: Option<&'static str>,
-    /// Put the cursor in the branch filter on the next frame.
-    focus_branch_filter: bool,
-    /// Jump to the changes row on the next rebuild (after an operation left conflicts).
-    focus_wip: bool,
-    last_fetch: Instant,
-
-    terminals: Vec<Terminal>,
-    active_terminal: usize,
-    terminal_open: bool,
-    terminal_error: Option<String>,
-
-    watcher: Option<notify::RecommendedWatcher>,
-    fs_rx: Option<Receiver<watch::FsChange>>,
-    /// A change on disk not yet reloaded: (inside .git, when).
-    fs_pending: Option<(watch::FsChange, Instant)>,
-
-    /// Actions queued from outside (the command palette).
-    queued: Vec<Action>,
-    /// A folder the app should open (taken by `App`).
-    pub open_request: Option<OpenRequest>,
-    /// The other worktrees this tab was on, oldest first, for coming back to. Boxed as in
-    /// `Tab::Repo`, which they move in and out of.
-    #[allow(clippy::vec_box)]
-    parked: Vec<Box<RepoTab>>,
-    /// Those of them with work going on, and what work.
-    parked_status: Vec<(PathBuf, &'static str)>,
-    /// The app has a dialog of its own open (palette, settings): leave the keys to it.
-    pub keys_blocked: bool,
-    /// Long operations that just ended, its own and its parked worktrees': (message, failed),
-    /// for a notification each (taken by `App`).
-    pub finished: Vec<(String, bool)>,
-}
-
-impl RepoTab {
-    pub fn new(path: PathBuf, ctx: &egui::Context) -> Self {
-        let mut tab = Self::new_deferred(path, ctx);
-        tab.start_deferred(ctx);
-        tab
-    }
-
-    /// A tab whose first read waits until [`Self::start_deferred`] (or until it is shown): the
-    /// tabs restored on start read one after the other, the one shown first.
-    pub fn new_deferred(path: PathBuf, ctx: &egui::Context) -> Self {
-        let name = path
-            .file_name()
-            .map(|n| n.to_string_lossy().into_owned())
-            .unwrap_or_else(|| path.display().to_string());
-        let (tx, rx) = channel();
-        let mut tab = Self {
-            path,
-            name,
-            tx,
-            rx,
-            opened: Instant::now(),
-            deferred: true,
-            reads: 0,
-            work_read: 0,
-            submodules_read: 0,
-            recheck_after_load: false,
-            shown: true,
-            loading: false,
-            reload_again: false,
-            load_error: None,
-            refs: Refs::default(),
-            history: Vec::new(),
-            has_more: false,
-            loading_more: false,
-            visibility: Default::default(),
-            log_from: None,
-            history_gen: 0,
-            log_stream: Default::default(),
-            work: WorkStatus::default(),
-            commits: Vec::new(),
-            graph: Graph {
-                rows: Vec::new(),
-                width: 0,
-            },
-            index: HashMap::new(),
-            worktrees: Vec::new(),
-            stashes: Vec::new(),
-            remotes: Vec::new(),
-            submodules: Vec::new(),
-            lfs: false,
-            identity: Identity::default(),
-            forge: None,
-            prs: Vec::new(),
-            pr_error: None,
-            prs_loaded: None,
-            ci: ci_status::CiStatuses::default(),
-            selected: None,
-            stash_view: None,
-            scroll_to: None,
-            detail_hash: None,
-            detail: None,
-            detail_error: None,
-            diff: None,
-            compare: None,
-            pr_view: None,
-            ci_view: None,
-            pr_requests: 0,
-            pr_drafts: HashMap::new(),
-            compare_requests: 0,
-            file_view: None,
-            rebase: None,
-            reword: None,
-            credentials: None,
-            last_op: None,
-            avatars_hinted: false,
-            diff_ignore_ws: false,
-            diff_as_file: false,
-            all_files: Default::default(),
-            conflict: None,
-            commit_summary: String::new(),
-            commit_body: String::new(),
-            amend: false,
-            dialog: None,
-            search: Search::default(),
-            pending_goto: None,
-            undo_stack: Vec::new(),
-            redo_stack: Vec::new(),
-            busy_op: None,
-            op_started: None,
-            update_submodules: false,
-            status: None,
-            branch_filter: String::new(),
-            sidebar_jump: None,
-            sidebar_reveal: None,
-            focus_branch_filter: false,
-            focus_wip: false,
-            last_fetch: Instant::now(),
-            terminals: Vec::new(),
-            active_terminal: 0,
-            terminal_open: false,
-            terminal_error: None,
-            watcher: None,
-            fs_rx: None,
-            fs_pending: None,
-            queued: Vec::new(),
-            open_request: None,
-            parked: Vec::new(),
-            parked_status: Vec::new(),
-            keys_blocked: false,
-            finished: Vec::new(),
-        };
-        tab.watch(ctx);
-        tab
-    }
-
-    /// Starts the first read of a tab made with [`Self::new_deferred`], if not started yet.
-    pub fn start_deferred(&mut self, ctx: &egui::Context) {
-        if std::mem::take(&mut self.deferred) {
-            self.reload(ctx);
-        }
-    }
-
-    /// Nothing read yet: the tab shows its opening screen.
-    pub fn opening(&self) -> bool {
-        self.history_gen == 0 && self.load_error.is_none()
-    }
-
-    pub fn is_busy(&self) -> bool {
-        self.loading || self.busy_op.is_some()
-    }
-
-    /// Queues an action from outside the tab (the command palette).
-    pub(crate) fn queue(&mut self, action: Action) {
-        self.queued.push(action);
-    }
-
-    /// HTTPS credentials for this tab's git commands (from the clone that made it).
-    pub fn set_credentials(&mut self, creds: git::Credentials) {
-        self.credentials = Some(creds);
-    }
-}
+#[path = "tab_owner/model.rs"]
+mod tab_model;
+pub use tab_model::RepoTab;
+#[path = "tab_owner/construction.rs"]
+mod tab_construction;
 
 /// A hash as the UI shows it: its first 8 characters.
 pub(crate) fn short(hash: &str) -> &str {
@@ -376,3 +220,5 @@ pub(crate) fn ops(list: &[&[&str]]) -> Vec<Vec<String>> {
         .map(|args| args.iter().map(|a| (*a).to_owned()).collect())
         .collect()
 }
+
+mod prompt_session;

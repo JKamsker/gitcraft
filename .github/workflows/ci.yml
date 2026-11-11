@@ -1,0 +1,167 @@
+# Checks every push and pull request: formatting, lints and tests on Windows and Linux, and
+# the forge code against a real Forgejo and a real Gitea (started by ci/forge-server.sh).
+name: CI
+
+# Pull requests, as they would be merged into their base, and the default branch as it is. Any
+# other branch can be checked by hand (Actions › CI › Run workflow).
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  rust-file-size:
+    uses: ./.github/workflows/rust-file-size.yml
+
+  lint:
+    needs: rust-file-size
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxkbcommon-dev libwayland-dev libx11-dev libxcursor-dev \
+            libxrandr-dev libxi-dev libgtk-3-dev libdbus-1-dev libasound2-dev pkg-config
+      - name: Formatting
+        run: cargo fmt --check
+      - name: Clippy
+        run: cargo clippy --locked --all-targets -- -D warnings
+
+
+  test:
+    needs: rust-file-size
+    name: test (ubuntu-latest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+      - name: Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxkbcommon-dev libwayland-dev libx11-dev libxcursor-dev \
+            libxrandr-dev libxi-dev libgtk-3-dev libdbus-1-dev libasound2-dev pkg-config openssh-server
+      - name: Build tests
+        run: cargo test --locked --no-run
+      - name: Test
+        timeout-minutes: 30
+        env:
+          RUST_BACKTRACE: "1"
+        run: cargo test --locked -- --nocapture --skip parallel_bisect::tests::a_test_past_its_limit_is_stopped_and_skipped --skip app::palette::tests::thousands_of_branches_open_and_filter_quickly
+      # Keep the palette's wall-clock budget meaningful by avoiding contention
+      # with the full subprocess-heavy suite, as the Windows shards already do.
+      - name: Large-branch palette responsiveness (isolated)
+        timeout-minutes: 5
+        env:
+          RUST_BACKTRACE: "1"
+        run: cargo test --locked -p gitcraft --lib app::palette::tests::thousands_of_branches_open_and_filter_quickly -- --exact --nocapture --test-threads=1
+      # This fixture checks its own recorded child PIDs. Run it separately so
+      # subprocess-heavy fixtures do not contend with its timeout budget.
+      - name: Timed-out subprocess cleanup (isolated)
+        timeout-minutes: 5
+        env:
+          RUST_BACKTRACE: "1"
+        run: cargo test --locked -p gitcraft --lib parallel_bisect::tests::a_test_past_its_limit_is_stopped_and_skipped -- --exact --nocapture
+      - name: Real OpenSSH transport reuse and recovery
+        timeout-minutes: 5
+        run: |
+          sudo mkdir -p /run/sshd
+          python3 ci/test-ssh-transport.py
+
+  windows-tests:
+    needs: rust-file-size
+    uses: ./.github/workflows/windows-tests.yml
+
+  windows-test-result:
+    # Preserve the required branch protection check while running Windows tests in parallel.
+    name: test (windows-latest)
+    needs: windows-tests
+    if: ${{ always() && !cancelled() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require the Windows build and every shard to pass
+        env:
+          TESTS_RESULT: ${{ needs.windows-tests.result }}
+        run: |
+          test "$TESTS_RESULT" = success
+
+  forges:
+    needs: rust-file-size
+    name: forges (Forgejo ${{ matrix.forgejo }}, Gitea ${{ matrix.gitea }})
+    # Off for pull requests and pushes for now: with dozens of pull requests open at once, these
+    # jobs held up the queue of every one of them. Run them by hand (Actions › CI › Run workflow)
+    # for a branch that touches the forge code.
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The latest releases, and the oldest still supported (Forgejo's long-term one).
+          - forgejo: "17.0.1"
+            gitea: "28.3.0"
+          - forgejo: "15.0.11"
+            gitea: "1.26.4"
+    env:
+      FORGEJO_VERSION: ${{ matrix.forgejo }}
+      GITEA_VERSION: ${{ matrix.gitea }}
+      FORGE_CACHE: ${{ github.workspace }}/.forge-cache
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Forge binaries
+        uses: actions/cache@v4
+        with:
+          path: .forge-cache
+          key: forges-${{ runner.os }}-forgejo-${{ matrix.forgejo }}-gitea-${{ matrix.gitea }}
+      - name: Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxkbcommon-dev libwayland-dev libx11-dev libxcursor-dev \
+            libxrandr-dev libxi-dev libgtk-3-dev libdbus-1-dev libasound2-dev pkg-config
+      - name: Build the tests
+        run: cargo test --locked --lib --no-run
+      - name: Start Forgejo and Gitea
+        env:
+          FORGE_WORK: ${{ runner.temp }}/forges
+        run: |
+          ci/forge-server.sh forgejo 3000 "$GITHUB_ENV"
+          ci/forge-server.sh gitea 3001 "$GITHUB_ENV"
+      - name: Test against them
+        run: |
+          cargo test --locked --lib forge::gitea::live -- --ignored --nocapture 2>&1 | tee live.log
+          # Require the lifecycle, assigned-issue and inbox tests on both servers.
+          grep -q "test result: ok. 6 passed" live.log
+      - name: Server logs
+        if: failure()
+        env:
+          FORGE_WORK: ${{ runner.temp }}/forges
+        run: |
+          # A server that failed before making its folder left no log.
+          shopt -s nullglob
+          for log in "$FORGE_WORK"/*/log/*; do
+            echo "::group::$log"
+            cat "$log"
+            echo "::endgroup::"
+          done

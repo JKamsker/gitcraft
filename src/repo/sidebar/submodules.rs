@@ -5,6 +5,7 @@ use egui::{Align2, Rect, Response, Ui, pos2, vec2};
 use super::ROW_H;
 use crate::git::{Submodule, SubmoduleState};
 use crate::icons;
+use crate::menu_item::MenuItem;
 use crate::repo::keep_submodules::{update_all, update_one};
 use crate::repo::pinned_sections::{Button, Header, Sections};
 use crate::repo::{Action, RepoTab, reveal_label, short, widgets};
@@ -25,12 +26,12 @@ impl RepoTab {
                 Header {
                     key: "submodules",
                     icon: "package",
-                    title: "SUBMODULES",
+                    title: crate::i18n::text("repo-core-3516"),
                     count: self.submodules.len(),
                     default_open: true,
                     button: Some(Button {
                         icon: "refresh-cw",
-                        tooltip: "Update all submodules",
+                        tooltip: crate::i18n::text("repo-core-3517"),
                         action: idle.then(update_all),
                     }),
                 },
@@ -41,10 +42,14 @@ impl RepoTab {
         for sub in &self.submodules {
             let r = submodule_row(ui, sub).on_hover_text(submodule_tip(sub));
             let cloned = sub.state != SubmoduleState::NotInitialized;
-            if r.double_clicked() && cloned {
-                acts.push(Action::OpenTab(self.path.join(&sub.path)));
+            if r.double_clicked() && sub.state == SubmoduleState::Conflicted {
+                acts.push(Action::RepositoryTools(
+                    crate::repo::repository_tools::Act::SubmoduleConflict(sub.path.clone()),
+                ));
+            } else if r.double_clicked() && cloned {
+                acts.push(Action::OpenTab(crate::remote::join(&self.path, &sub.path)));
             }
-            egui::Popup::context_menu(&r)
+            crate::menu_item::context(&r)
                 .style(crate::theme::menu_style)
                 .show(|ui| self.submodule_menu_items(ui, acts, sub, idle, cloned));
         }
@@ -58,32 +63,60 @@ impl RepoTab {
         idle: bool,
         cloned: bool,
     ) {
-        if ui
-            .add_enabled(idle, egui::Button::new("Update"))
-            .on_hover_text("Clone it if needed and check out the commit recorded for it")
+        if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-3518"))
+            .icon("command")
+            .enabled(idle)
+            .show(ui)
+            .on_hover_text(crate::i18n::text("repo-core-3519"))
             .clicked()
         {
             acts.push(update_one(&sub.path));
         }
-        let folder = self.path.join(&sub.path);
-        if ui
-            .add_enabled(cloned, egui::Button::new("Open in a new tab"))
-            .on_disabled_hover_text("Update it first to clone it")
+        if sub.state == SubmoduleState::Conflicted
+            && ui.button(crate::i18n::text("repo-core-3520")).clicked()
+        {
+            acts.push(Action::RepositoryTools(
+                crate::repo::repository_tools::Act::SubmoduleConflict(sub.path.clone()),
+            ));
+        }
+        let folder = crate::remote::join(&self.path, &sub.path);
+        if MenuItem::new(crate::i18n::text("repo-core-3521"))
+            .icon("folder-git-2")
+            .refused((!cloned).then_some(crate::i18n::text("repo-core-3522")))
+            .show(ui)
             .clicked()
         {
             acts.push(Action::OpenTab(folder.clone()));
         }
-        if ui
-            .add_enabled(folder.is_dir(), egui::Button::new(reveal_label()))
+        // Not asked of another machine every frame: in WSL it's there once cloned, over SSH
+        // this machine can't open it.
+        let revealable = if crate::remote::is_remote(&folder) {
+            cloned && crate::remote::openable_here(&folder).is_ok()
+        } else {
+            folder.is_dir()
+        };
+        if crate::menu_item::MenuItem::new(reveal_label())
+            .icon("folder-open")
+            .refused((!revealable).then_some(crate::i18n::text("repo-core-3524")))
+            .show(ui)
             .clicked()
         {
             acts.push(Action::OpenPath(sub.path.clone().into()));
         }
         ui.separator();
-        if ui.button("Copy path").clicked() {
+        if crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-3525"))
+            .icon("copy")
+            .show(ui)
+            .clicked()
+        {
             ui.ctx().copy_text(sub.path.clone());
         }
-        if !sub.url.is_empty() && ui.button("Copy URL").clicked() {
+        if !sub.url.is_empty()
+            && crate::menu_item::MenuItem::new(crate::i18n::text("repo-core-3456"))
+                .icon("copy")
+                .show(ui)
+                .clicked()
+        {
             ui.ctx().copy_text(sub.url.clone());
         }
     }
@@ -94,6 +127,13 @@ fn submodule_row(ui: &mut Ui, sub: &Submodule) -> Response {
     let t = Tokens::get(ui.ctx());
     // Known by its path, not its place: a menu left open (Update) must stay this submodule's.
     let (rect, resp) = widgets::keyed_row(ui, ROW_H, ("submodule-row", &sub.path));
+    widgets::a11y(&resp, egui::WidgetType::Button, || {
+        let commit = sub
+            .describe
+            .as_deref()
+            .unwrap_or(crate::repo::short(&sub.hash));
+        crate::a11y::labels::submodule(&sub.path, commit, sub.modified)
+    });
     if resp.hovered() {
         ui.painter().rect_filled(rect, 0.0, t.hover);
     }
@@ -109,7 +149,7 @@ fn submodule_row(ui: &mut Ui, sub: &Submodule) -> Response {
     let painter = ui.painter_at(rect);
     let (label, color) = match (sub.state, sub.modified) {
         (SubmoduleState::Conflicted, _) => (Some("conflict"), t.danger),
-        (SubmoduleState::UpToDate, true) => (Some("modified"), t.warning),
+        (SubmoduleState::UpToDate, true) => (Some(crate::i18n::text("repo-core-3527")), t.warning),
         (state, _) => (state.label(), if faint { t.text_faint } else { t.warning }),
     };
     let mut right = rect.right() - 8.0;
@@ -145,27 +185,34 @@ fn submodule_row(ui: &mut Ui, sub: &Submodule) -> Response {
 fn submodule_tip(sub: &Submodule) -> String {
     let mut tip = sub.path.clone();
     if !sub.url.is_empty() {
-        tip.push_str(&format!("\nFrom {}", sub.url));
+        tip.push_str(&crate::i18n::message(
+            "repo-core-3528",
+            &[("url", sub.url.to_string().into())],
+        ));
     }
     let at = match &sub.describe {
         Some(describe) => format!("{} ({describe})", short(&sub.hash)),
         None => short(&sub.hash).to_owned(),
     };
     tip.push_str(&match sub.state {
-        SubmoduleState::UpToDate => format!("\nAt {at}, as recorded"),
+        SubmoduleState::UpToDate => {
+            crate::i18n::message("repo-core-3530", &[("at", at.to_string().into())])
+        }
         SubmoduleState::NotInitialized => {
-            format!("\nNot cloned yet; Update clones it at {at}")
+            crate::i18n::message("repo-core-3531", &[("at", at.to_string().into())])
         }
         SubmoduleState::OutOfDate => {
-            format!("\nAt {at}, not the commit recorded here; Update checks that one out")
+            crate::i18n::message("repo-core-3532", &[("at", at.to_string().into())])
         }
-        SubmoduleState::Conflicted => format!("\nIn conflict; at {at}"),
+        SubmoduleState::Conflicted => {
+            crate::i18n::message("repo-core-3533", &[("at", at.to_string().into())])
+        }
     });
     if sub.modified {
-        tip.push_str("\nHas changes of its own");
+        tip.push_str(crate::i18n::text("repo-core-3534"));
     }
     if sub.state != SubmoduleState::NotInitialized {
-        tip.push_str("\nDouble-click to open in a tab");
+        tip.push_str(crate::i18n::text("repo-core-3535"));
     }
     tip
 }

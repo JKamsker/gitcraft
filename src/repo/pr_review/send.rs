@@ -9,7 +9,7 @@ use super::lines::{DiffReview, line_marks};
 use super::{Posted, PrAct, PrDraft};
 
 /// Something to send, on a thread of its own.
-type PostJob = Box<dyn FnOnce(&Target) -> Result<(), String> + Send>;
+type PostJob = Box<dyn FnOnce(&dyn Target) -> Result<(), String> + Send>;
 
 impl RepoTab {
     fn pr_draft(&mut self) -> Option<&mut PrDraft> {
@@ -39,14 +39,27 @@ impl RepoTab {
         if *from != files.from || *to != files.to || files.to != details.head_oid {
             return None;
         }
+        let mut marks = line_marks(&details.extras.threads, path);
+        for (id, target) in view.relocations().into_iter().flatten() {
+            if target.path == *path {
+                let count = details
+                    .extras
+                    .threads
+                    .iter()
+                    .find(|t| &t.id == id)
+                    .map_or(0, |t| t.comments.len());
+                *marks.entry((target.side, target.line)).or_insert(0) += count;
+            }
+        }
         Some(DiffReview {
-            marks: line_marks(&details.extras.threads, path),
+            marks,
             target: self
                 .pr_drafts
                 .get(&view.number)
                 .and_then(|d| d.target.clone())
                 .filter(|t| t.path == *path),
             path: path.clone(),
+            local: false,
         })
     }
 
@@ -79,6 +92,7 @@ impl RepoTab {
                 // The text being sent is only cleared once it has been, so it stays where it is.
                 if let Some(draft) = self.pr_draft().filter(|draft| !draft.posting) {
                     draft.target = Some(target);
+                    draft.line_head = None;
                     draft.focus_line = true;
                 }
             }
@@ -120,7 +134,10 @@ impl RepoTab {
         let Some(Ok(details)) = &view.details else {
             return;
         };
-        let Some(target) = Target::of(&self.path, details) else {
+        let Some(hosting) = self.hosting.clone() else {
+            return;
+        };
+        let Some(pages) = hosting.forge.provider().pages() else {
             return;
         };
         let number = view.number;
@@ -129,15 +146,24 @@ impl RepoTab {
         if draft.posting {
             return;
         }
-        let Some((what, job)) = post_job(act, draft, details, &target) else {
+        let Some((what, job)) = post_job(act, draft, details) else {
             return;
         };
+        // What says something on the pull request is made where it's sent: finding its login can
+        // run a credential helper, which mustn't hold the window up.
+        let (repo, details) = (self.path.clone(), details.clone());
         draft.posting = true;
         draft.error = None;
-        spawn(&self.tx, ctx, move || Msg::PrPosted {
+        spawn(&self.forge_sender(), ctx, move || Msg::PrPosted {
+            hosting: Box::new(hosting.clone()),
             number,
             what,
-            result: job(&target),
+            result: match pages.target(&repo, &hosting, &details) {
+                Some(target) => job(target.as_ref()),
+                None => {
+                    Err(crate::i18n::text("repo-workflows-pr_review-pr-send-73ed2a2f").to_owned())
+                }
+            },
         });
     }
 
@@ -164,7 +190,7 @@ impl RepoTab {
                 (e, true)
             }
         };
-        self.finished.push(outcome);
+        self.finished.push(crate::repo::Notice::plain(outcome));
         // Until the page shows the new state, anything sent would go by the old one.
         if self.pr_view.as_ref().is_some_and(|v| v.number == number) {
             draft.posting = true;
@@ -183,12 +209,7 @@ impl RepoTab {
 }
 
 /// What `act` sends from `draft`, and how: `None` for what sends nothing.
-fn post_job(
-    act: PrAct,
-    draft: &PrDraft,
-    details: &PrDetails,
-    target: &Target,
-) -> Option<(Posted, PostJob)> {
+fn post_job(act: PrAct, draft: &PrDraft, details: &PrDetails) -> Option<(Posted, PostJob)> {
     let line = draft.target.clone().map(|t| LineComment {
         path: t.path,
         line: t.line,
@@ -216,7 +237,10 @@ fn post_job(
             (Posted::LineNow, Box::new(move |t| t.comment_now(&line)))
         }
         PrAct::RemovePending(comment) => {
-            let last = details.extras.pending_comments().count() <= 1;
+            // The whole review goes with its last comment, but only when all of them were read: a
+            // thread may hold more than came with the page.
+            let last = details.extras.pending_comments().count() <= 1
+                && !details.extras.threads.iter().any(|t| t.more_comments);
             (
                 Posted::RemovePending,
                 Box::new(move |t| t.remove_pending(&comment, last)),
@@ -231,17 +255,37 @@ fn post_job(
                 Box::new(move |t| t.reply(&thread, &body)),
             )
         }
+        PrAct::ReplyConversation(thread) => {
+            let body = draft.comment.clone();
+            (Posted::Comment, Box::new(move |t| t.reply(&thread, &body)))
+        }
         PrAct::SetResolved(thread, resolved) => (
             Posted::Resolve(resolved),
             Box::new(move |t| t.set_resolved(&thread, resolved)),
         ),
-        PrAct::ApplySuggestion { thread, suggestion } => (
-            Posted::Suggestion,
-            Box::new(move |t| {
-                t.apply_suggestion(&suggestion)?;
-                t.set_resolved(&thread, true)
-            }),
-        ),
+        PrAct::ApplySuggestion { thread, suggestion } => {
+            // Where the forge can't resolve the thread, applying the change is all there is.
+            let resolve = details
+                .extras
+                .threads
+                .iter()
+                .any(|t| t.id == thread && t.can_resolve);
+            (
+                Posted::Suggestion,
+                Box::new(move |t| {
+                    t.apply_suggestion(&suggestion)?;
+                    if resolve {
+                        t.set_resolved(&thread, true).map_err(|e| {
+                            crate::i18n::message(
+                                "repo-workflows-pr_review-post-job-76c33b59",
+                                &[("e", (e).clone().into())],
+                            )
+                        })?;
+                    }
+                    Ok(())
+                }),
+            )
+        }
         PrAct::Dismiss => {
             let review = draft.dismissing.clone()?;
             let message = draft.dismiss_text.clone();
@@ -252,8 +296,10 @@ fn post_job(
         }
         PrAct::Merge => {
             let method = draft.merge_method.unwrap_or_default();
+            // The repository as the forge names it, as the merge box compares it.
+            let own_repo = crate::pull_request::repo_of_url(&details.url).map(|(_, path)| path);
             let delete = crate::repo::pr_merge::deletes_branch(
-                details.extras.head_repo.as_deref() == Some(target.path()),
+                own_repo.is_some() && details.extras.head_repo.as_deref() == own_repo.as_deref(),
                 details.extras.delete_branch_on_merge,
                 draft.delete_branch,
             );

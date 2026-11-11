@@ -1,0 +1,104 @@
+{
+  "source_head": "fc34a2bed9de2b60eb1a43ee1974b5907aaec773",
+  "source_tree": "8920fe858419ded92a023b1661475dea54882444",
+  "accepted_head": "29d9695def41ccb2524b632bdfa334fb33470c92",
+  "accepted_tree": "0e6c1f6f8b5063f4cd76c052e857db9c9e822643",
+  "fetched_dev": "c6d5a2bb8e4f933b5709f9b36e4e7b1e7a6a97a5",
+  "historical_base": "a4d841713af3d31178a3b9212fd3c5adcb4172dc",
+  "dev_advanced": true,
+  "whole_tree_equals_accepted": false,
+  "changed_paths": [
+    "src/repo/diff/rows.rs",
+    "src/repo/diff/select.rs",
+    "src/repo/diff/selection_tests.rs",
+    "src/repo/diff/selection_tests/fixture.rs"
+  ],
+  "outside_diff_equality": {
+    "command": [
+      "git",
+      "diff",
+      "--exit-code",
+      "29d9695def41ccb2524b632bdfa334fb33470c92",
+      "fc34a2bed9de2b60eb1a43ee1974b5907aaec773",
+      "--",
+      ".",
+      ":(exclude)src/repo/diff"
+    ],
+    "exit_code": 0
+  },
+  "checks": {
+    "fmt": {
+      "command": [
+        "cargo",
+        "fmt",
+        "--check"
+      ],
+      "sha": "fc34a2bed9de2b60eb1a43ee1974b5907aaec773",
+      "tree": "8920fe858419ded92a023b1661475dea54882444",
+      "exit_code": 0,
+      "seconds": 6.75
+    },
+    "python": {
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "ci",
+        "-p",
+        "test_*.py",
+        "-v"
+      ],
+      "sha": "fc34a2bed9de2b60eb1a43ee1974b5907aaec773",
+      "tree": "8920fe858419ded92a023b1661475dea54882444",
+      "exit_code": 0,
+      "seconds": 0.68
+    },
+    "size": {
+      "command": [
+        "python3",
+        "ci/rust_file_size.py",
+        "--revision",
+        "HEAD"
+      ],
+      "sha": "fc34a2bed9de2b60eb1a43ee1974b5907aaec773",
+      "tree": "8920fe858419ded92a023b1661475dea54882444",
+      "exit_code": 0,
+      "seconds": 0.25
+    },
+    "size-staged": {
+      "command": [
+        "python3",
+        "ci/rust_file_size.py",
+        "--staged"
+      ],
+      "sha": "fc34a2bed9de2b60eb1a43ee1974b5907aaec773",
+      "tree": "8920fe858419ded92a023b1661475dea54882444",
+      "exit_code": 0,
+      "seconds": 0.23
+    }
+  },
+  "measurements": {
+    "historical_base": {
+      "files": 1456,
+      "over_500": 355
+    },
+    "accepted": {
+      "files": 2581,
+      "over_500": 0
+    },
+    "final_source": {
+      "files": 2582,
+      "over_500": 0,
+      "maximum": 500
+    }
+  },
+  "limitations": [
+    "No full build, clippy, test compilation, application runtime tests, Windows tests or independent review of the assembled candidate.",
+    "Prior application gates apply to accepted source only; four source paths now differ.",
+    "Recording recovery checks do not establish filesystem/crash durability.",
+    "Intermediate slice index checks retain existing base violations until all decompositions are assembled; all working-tree checks used complete target, final index and revision checks pass.",
+    "No pushes, PRs, CI dispatch, CI rerun, CI wait, process-control tests or delegation."
+  ]
+}

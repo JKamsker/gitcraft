@@ -1,0 +1,11 @@
+{
+  "command": [
+    "cargo",
+    "fmt",
+    "--check"
+  ],
+  "sha": "fc34a2bed9de2b60eb1a43ee1974b5907aaec773",
+  "tree": "8920fe858419ded92a023b1661475dea54882444",
+  "exit_code": 0,
+  "seconds": 6.75
+}

@@ -1,0 +1,16 @@
+{
+  "source_head": "fc34a2bed9de2b60eb1a43ee1974b5907aaec773",
+  "source_tree": "8920fe858419ded92a023b1661475dea54882444",
+  "delivery_scope": "docs/validation/issue-198-assembly",
+  "documentation_only": true,
+  "proof": "Remove only docs/validation/issue-198-assembly additions from final delivery index, then git write-tree; exact tree equals source_tree.",
+  "stripped_tree": "8920fe858419ded92a023b1661475dea54882444",
+  "rebound_checks": [
+    "fmt",
+    "python",
+    "size",
+    "size-staged"
+  ],
+  "prior_application_checks_rebound": false,
+  "new_application_test_execution": false
+}

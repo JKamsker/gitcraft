@@ -1,0 +1,427 @@
+//! _Cut release…_ in the tab: its dialog (the version suggested, the notes to edit, what to do,
+//! and what each step will do), the steps run one after another in the background with how
+//! each went, _Resume_ from the one that failed, and the undo of what was done here.
+
+mod planning;
+pub(crate) use planning::undo;
+use planning::{plan_of, still_there};
+
+#[cfg(test)]
+mod tests;
+mod view;
+
+use std::path::PathBuf;
+
+use egui::Context;
+
+use super::{RepoTab, UndoEntry};
+use crate::release::{self, Done, Draft, Plan, Step, notes};
+
+/// The release being prepared or cut.
+pub(crate) struct ReleaseView {
+    /// The commit released (as asked: a hash).
+    commit: String,
+    /// `None` while it is read.
+    draft: Option<Result<Draft, String>>,
+    form: Form,
+    /// The steps, once started.
+    run: Option<Run>,
+}
+
+/// What the dialog lets the user choose.
+#[derive(Clone, Debug, Default)]
+pub(crate) struct Form {
+    pub tag: String,
+    pub notes: String,
+    pub bump: bool,
+    pub changelog: bool,
+    pub sign: bool,
+    pub push: bool,
+    pub publish: bool,
+    pub prerelease: bool,
+    pub assets: Vec<PathBuf>,
+}
+
+/// How a step went.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum Status {
+    Waiting,
+    Running,
+    Done,
+    /// Left out after it failed.
+    Skipped,
+    Failed(String),
+}
+
+/// The steps of a release started.
+pub(crate) struct Run {
+    plan: Plan,
+    steps: Vec<(Step, Status)>,
+    done: Done,
+    /// The undo entry recorded for what was done here, by its label.
+    recorded: bool,
+    /// Captured when this run starts; resuming never retargets publication.
+    hosting: Option<crate::forge::Hosting>,
+    forge_repository_generation: u64,
+}
+
+impl Run {
+    fn running(&self) -> bool {
+        self.steps.iter().any(|(_, s)| *s == Status::Running)
+    }
+
+    fn finished(&self) -> bool {
+        self.steps
+            .iter()
+            .all(|(_, s)| matches!(s, Status::Done | Status::Skipped))
+    }
+
+    /// The first step not done (nor skipped).
+    fn next(&self) -> Option<usize> {
+        self.steps
+            .iter()
+            .position(|(_, s)| !matches!(s, Status::Done | Status::Skipped))
+    }
+}
+
+/// What the release dialog asks for.
+pub(crate) enum ReleaseAct {
+    /// Prepare a release of the commit.
+    Open(String),
+    Close,
+    /// Start the steps, or go on from the one that failed.
+    Run,
+    AddAssets,
+    RemoveAsset(usize),
+    /// Mark the step that failed done, to go on without it.
+    Skip,
+}
+
+impl RepoTab {
+    pub(super) fn release_act(&mut self, act: ReleaseAct, ctx: &Context) {
+        match act {
+            ReleaseAct::Open(commit) => self.open_release(commit, ctx),
+            ReleaseAct::Close => {
+                // Not while a step runs: it would come back to nothing.
+                if !self
+                    .release
+                    .as_ref()
+                    .and_then(|r| r.run.as_ref())
+                    .is_some_and(Run::running)
+                {
+                    self.release = None;
+                }
+            }
+            ReleaseAct::Run => self.run_release(ctx),
+            ReleaseAct::AddAssets => {
+                let Some(view) = &mut self.release else {
+                    return;
+                };
+                if let Some(files) = rfd::FileDialog::new()
+                    .set_title(crate::i18n::text(
+                        "repo-workflows-release-release-act-2aead8f8",
+                    ))
+                    .pick_files()
+                {
+                    for f in files {
+                        if !view.form.assets.contains(&f) {
+                            view.form.assets.push(f);
+                        }
+                    }
+                }
+            }
+            ReleaseAct::Skip => {
+                if let Some(run) = self.release.as_mut().and_then(|r| r.run.as_mut())
+                    && !run.running()
+                    && let Some(step) = run
+                        .steps
+                        .iter_mut()
+                        .find(|(_, s)| matches!(s, Status::Failed(_)))
+                {
+                    step.1 = Status::Skipped;
+                }
+            }
+            ReleaseAct::RemoveAsset(i) => {
+                if let Some(view) = &mut self.release
+                    && i < view.form.assets.len()
+                {
+                    view.form.assets.remove(i);
+                }
+            }
+        }
+    }
+
+    pub(super) fn clear_forge_release(&mut self) {
+        // A started run owns mutations and their pending completions, including the
+        // initial validation before a step is marked Running. Keep its Done/undo state.
+        if self.release.as_ref().is_some_and(|view| view.run.is_none()) {
+            self.release = None;
+        }
+    }
+
+    fn open_release(&mut self, commit: String, ctx: &Context) {
+        if self
+            .release
+            .as_ref()
+            .and_then(|r| r.run.as_ref())
+            .is_some_and(Run::running)
+        {
+            return;
+        }
+        self.release = Some(ReleaseView {
+            commit: commit.clone(),
+            draft: None,
+            form: Form::default(),
+            run: None,
+        });
+        let repo = self.path.clone();
+        // This explicit release pushes the tag to the forge where it will be published.
+        // Ordinary push/fetch defaults and the branch's upstream remain independent.
+        let remote = self
+            .primary_forge_remote()
+            .map(str::to_owned)
+            .or_else(|| self.default_remote());
+        let hosting = self.hosting.clone();
+        self.forge_then(
+            ctx,
+            {
+                let commit = commit.clone();
+                move || release::draft(&repo, &commit, remote)
+            },
+            move |tab, draft, _| {
+                let Some(view) = &mut tab.release else { return };
+                if view.commit != commit {
+                    return;
+                }
+                if let Ok(d) = &draft {
+                    let link = |n: u64| hosting.as_ref().map(|h| release::pr_url(h, n));
+                    view.form = Form {
+                        tag: d.suggested.to_string(),
+                        notes: notes::notes(&d.changes, &link),
+                        bump: !d.manifests.is_empty(),
+                        changelog: d.changelog && d.manifest_note.is_none(),
+                        sign: d.sign,
+                        push: d.remote.is_some(),
+                        publish: hosting.is_some() && d.remote.is_some(),
+                        prerelease: d.suggested.is_pre(),
+                        assets: Vec::new(),
+                    };
+                }
+                view.draft = Some(draft);
+            },
+        );
+    }
+
+    /// Starts the steps, or goes on from the first one not done.
+    fn run_release(&mut self, ctx: &Context) {
+        let hosting = self.hosting.clone();
+        let forge_repository_generation = self.forge_repository_generation;
+        let Some(view) = &mut self.release else {
+            return;
+        };
+        if self.busy_op.is_some() && view.run.as_ref().is_none_or(|r| !r.running()) {
+            self.status = Some(crate::repo::Notice::plain((
+                "Wait for the operation running to end".to_owned(),
+                true,
+            )));
+            return;
+        }
+        if view.run.is_none() {
+            let Some(Ok(draft)) = &view.draft else { return };
+            let plan = plan_of(draft, &view.form);
+            let steps = plan
+                .steps()
+                .into_iter()
+                .map(|s| (s, Status::Waiting))
+                .collect();
+            view.run = Some(Run {
+                plan,
+                steps,
+                done: Done::default(),
+                recorded: false,
+                hosting,
+                forge_repository_generation,
+            });
+        }
+        let label = view
+            .run
+            .as_ref()
+            .map(|r| release_operation_label(&r.plan.tag))
+            .unwrap_or_default();
+        self.busy_op = Some(label);
+        self.op_started = Some(std::time::Instant::now());
+        // What the steps done left must still be there (an undo may have taken it back).
+        let Some(run) = self.release.as_ref().and_then(|v| v.run.as_ref()) else {
+            return;
+        };
+        let (plan, done) = (run.plan.clone(), run.done.clone());
+        let hosting = run.hosting.clone();
+        let repo = self.path.clone();
+        self.then(
+            ctx,
+            move || {
+                still_there(&repo, &plan, &done)
+                    .or_else(|| release::preflight(&repo, &plan, hosting.as_ref()).err())
+            },
+            |tab, gone, ctx| match gone {
+                None => tab.next_release_step(ctx),
+                Some(why) => {
+                    tab.busy_op = None;
+                    tab.op_started = None;
+                    tab.status = Some(crate::repo::Notice::plain((why, true)));
+                }
+            },
+        );
+    }
+
+    /// Runs the first step not done, then the next, until one fails or all are done.
+    fn next_release_step(&mut self, ctx: &Context) {
+        let Some(run) = self.release.as_mut().and_then(|v| v.run.as_mut()) else {
+            self.busy_op = None;
+            return;
+        };
+        let Some(i) = run.next() else {
+            self.release_stopped(ctx);
+            return;
+        };
+        let step = run.steps[i].0;
+        if matches!(step, Step::Publish | Step::Upload)
+            && (run.forge_repository_generation != self.forge_repository_generation
+                || run.hosting != self.hosting)
+        {
+            run.steps[i].1 = Status::Failed(
+                "The primary forge changed during this release; publication stopped. Local changes remain undoable. Close this release before starting one on the new forge.".into(),
+            );
+            self.release_stopped(ctx);
+            return;
+        }
+        run.steps[i].1 = Status::Running;
+        let plan = run.plan.clone();
+        let mut done = run.done.clone();
+        let repo = self.path.clone();
+        let creds = self.credentials.clone();
+        let hosting = run.hosting.clone();
+        self.then(
+            ctx,
+            move || {
+                let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    release::run_step(
+                        &repo,
+                        &plan,
+                        step,
+                        &mut done,
+                        creds.as_ref(),
+                        hosting.as_ref(),
+                    )
+                }))
+                .unwrap_or_else(|_| {
+                    Err(
+                        crate::i18n::text("repo-workflows-release-next-release-step-1dac8dea")
+                            .to_owned(),
+                    )
+                });
+                (result, done)
+            },
+            move |tab, (result, done), ctx| {
+                let Some(run) = tab.release.as_mut().and_then(|v| v.run.as_mut()) else {
+                    tab.busy_op = None;
+                    return;
+                };
+                run.done = done;
+                match result {
+                    Ok(()) => {
+                        run.steps[i].1 = Status::Done;
+                        tab.next_release_step(ctx);
+                    }
+                    Err(e) => {
+                        let auth = crate::git::is_auth_error(&e);
+                        run.steps[i].1 = Status::Failed(e);
+                        tab.release_stopped(ctx);
+                        // Signing in, then Resume, pushes with what was typed.
+                        if auth {
+                            let url = tab
+                                .release
+                                .as_ref()
+                                .and_then(|v| v.run.as_ref())
+                                .and_then(|r| r.plan.push.as_ref())
+                                .and_then(|r| tab.remotes.iter().find(|x| &x.name == r))
+                                .map(|r| r.url.clone())
+                                .unwrap_or_default();
+                            tab.last_op = None;
+                            tab.dialog = Some(super::Dialog::credentials(&url, false));
+                        }
+                    }
+                }
+            },
+        );
+    }
+
+    /// The steps stopped (all done, or one failed): what was done here becomes undoable, the
+    /// tab is free again and reads the repository.
+    fn release_stopped(&mut self, ctx: &Context) {
+        self.busy_op = None;
+        let started = self.op_started.take();
+        let mut remember = None;
+        let Some(run) = self.release.as_mut().and_then(|v| v.run.as_mut()) else {
+            return;
+        };
+        let label = release_operation_label(&run.plan.tag);
+        let local_done = run.done.bump_commit.is_some() || run.done.tag_object.is_some();
+        if local_done {
+            let (undo, redo) = undo(&run.plan, &run.done);
+            let entry = UndoEntry {
+                id: 0,
+                agent: None,
+                label: label.clone(),
+                undo,
+                redo,
+                heads: None,
+            };
+            remember = Some((entry, run.recorded));
+            run.recorded = true;
+        }
+        let failed = run.steps.iter().find_map(|(step, s)| match s {
+            Status::Failed(e) => Some((*step, e.clone())),
+            _ => None,
+        });
+        self.status = Some(crate::repo::Notice::plain(match failed {
+            Some((step, e)) => (format!("{label}: {} failed: {e}", step.label()), true),
+            None if run.finished() => (format!("Released {}", run.plan.tag), false),
+            None => (format!("{label}: stopped"), false),
+        }));
+        if let Some((entry, replace)) = remember {
+            if replace {
+                self.replace_recent_undo(entry, ctx);
+            } else {
+                self.push_undo(entry, ctx);
+            }
+        }
+        let long = started.is_some_and(|t| t.elapsed() > std::time::Duration::from_secs(4));
+        if long {
+            self.finished
+                .push(crate::repo::Notice::plain(match self.status.as_deref() {
+                    Some((text, failed)) => (format!("{} · {text}", self.name), *failed),
+                    None => (format!("{} · {label}", self.name), false),
+                }));
+        }
+        self.reload(ctx);
+    }
+}
+
+fn release_operation_label(tag: &str) -> String {
+    format!("Cut release {tag}")
+}
+
+#[cfg(test)]
+mod fluent_r1_operation_tests {
+    use super::*;
+    #[test]
+    fn fluent_partition_r1_release_busy_and_undo_label_are_raw_in_both_languages() {
+        let tag = "v1234.5/{$x}:日本語";
+        for lang in ["de", "en-US", "de"] {
+            crate::i18n::set_language(lang);
+            assert_eq!(release_operation_label(tag), format!("Cut release {tag}"));
+        }
+        crate::i18n::set_language("en-US");
+    }
+}

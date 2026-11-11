@@ -1,204 +1,217 @@
 //! Central pane: the commit graph of every branch, with branch pills on the left, search and
 //! older history loaded as you scroll.
 
+mod menus;
+pub(super) use menus::compare_items;
+use menus::*;
+
+mod paint;
+use paint::*;
+
+mod interaction;
+
+mod viewport;
+
 mod badge;
+mod drag;
 mod handles;
 mod header;
 mod lanes;
+#[cfg(test)]
+mod layout_tests;
 mod menu;
+pub(super) mod message_tooltip;
+pub(super) mod minimap;
+mod order;
 mod pills;
+mod readability;
+#[cfg(test)]
+mod readability_tests;
 mod row;
 mod search;
+pub(super) mod suggest;
+mod suggest_popup;
 
-use egui::{Align2, FontId, Key, Response, Sense, Ui, vec2};
+#[cfg(test)]
+use egui::Key;
+use egui::{Align2, FontId, Response, Sense, Ui, vec2};
 
 use super::actions::{BranchRef, compare_branches_action};
 use super::columns::{Cols, MIN_COL_W, MIN_GRAPH_W, MIN_REFS_W};
+use super::ghost::{Kind, Shift};
 use super::{Action, Dialog, Refresh, RepoTab, WIP_HASH, ops};
 use crate::git;
+use crate::keymap::Command;
+use crate::menu_item::MenuItem;
 use crate::settings::Settings;
 use crate::theme::Tokens;
-use badge::{BadgeKind, badges};
+pub(super) use badge::BadgeIndex;
+use badge::{Badge, BadgeKind};
+/// For the settings' previews, which draw a graph of their own like this one.
+pub(crate) use lanes::edge;
 use row::Lanes;
+pub(in crate::repo) use row::pill;
 
-const ROW_H: f32 = 28.0;
+// The reset modes, for the reflog view's entries too.
+pub(super) use menu::{Rewrite, reset_items};
+
+pub(crate) const ROW_H: f32 = 28.0;
 /// Space between rows, which the graph's lines cross.
-const ROW_GAP: f32 = 2.0;
+pub(crate) const ROW_GAP: f32 = 2.0;
 /// From one row to the next.
-const ROW_PITCH: f32 = ROW_H + ROW_GAP;
+pub(crate) const ROW_PITCH: f32 = ROW_H + ROW_GAP;
 /// From one lane to the next.
-const LANE_W: f32 = 16.0;
+pub(crate) const LANE_W: f32 = 16.0;
 /// From one lane to the next in a compact graph column.
-const COMPACT_LANE_W: f32 = 10.0;
+pub(crate) const COMPACT_LANE_W: f32 = 10.0;
 /// Radius of the corner where a line from a dot turns into another lane.
 const CORNER_R: f32 = 7.0;
 const MAX_LANES_SHOWN: usize = 24;
 /// How much darker the pills that are not checked out are (0 = same colour, 1 = black).
-const DIMMED: f32 = 0.4;
+pub(crate) const DIMMED: f32 = 0.4;
 /// A translucent black, so the column handles read as dark on every theme's header.
 const HANDLE_COLOR: egui::Color32 = egui::Color32::from_black_alpha(130);
 const HANDLE_WIDTH: f32 = 2.0;
-/// How far a handle sits left of the column it resizes.
-const HANDLE_GAP: f32 = 5.0;
 const AVATAR_D: f32 = 20.0;
 
+// Observe the geometry actually painted after readable_viewport's automatic refs adjustment.
+// Tests drive graph_view itself; this hook never computes an alternative test-only layout.
+#[cfg(test)]
+#[derive(Clone, Copy, Debug)]
+struct PaintedColumns {
+    header: egui::Rect,
+    prefs: Cols,
+    cols: Cols,
+}
+
+#[cfg(test)]
+fn painted_columns_id() -> egui::Id {
+    egui::Id::new("history-painted-columns")
+}
+/// How opaque a commit a ghost run would make is drawn.
+const GHOST_OPACITY: f32 = 0.6;
+/// How opaque a commit it would leave on no ref is drawn.
+const GOING_OPACITY: f32 = 0.4;
+
 impl RepoTab {
+    /// A comparison opened from a pull request focuses that branch, including when several
+    /// branches share its tip and the ordinary ordering would put it behind `+N`.
+    fn graph_badges(&self, commit: &git::Commit) -> Vec<Badge> {
+        let mut badges = self.graph_badge_index.badges(&commit.refs);
+        for badge in &mut badges {
+            if badge.kind != BadgeKind::Branch {
+                continue;
+            }
+            badge.remotes.retain(|remote| {
+                self.visibility
+                    .shows(&super::branch_visibility::remote_ref(&format!(
+                        "{remote}/{}",
+                        badge.label
+                    )))
+            });
+            badge.local &= badge.head
+                || self
+                    .visibility
+                    .shows(&super::branch_visibility::local_ref(&badge.label));
+        }
+        badges.retain(|b| b.kind != BadgeKind::Branch || b.local || !b.remotes.is_empty());
+        if let Some(compare) = &self.compare
+            && compare.target.as_deref() == Some(commit.hash.as_str())
+        {
+            let focused = match badges.iter().position(|badge| {
+                badge.kind == BadgeKind::Branch && badge.label == compare.target_label
+            }) {
+                Some(index) => badges.remove(index),
+                None if self.prs.iter().any(|pr| pr.branch == compare.target_label) => Badge {
+                    label: compare.target_label.clone(),
+                    kind: BadgeKind::PullRequest,
+                    local: false,
+                    remotes: Vec::new(),
+                    head: false,
+                },
+                None => return badges,
+            };
+            badges.insert(0, focused);
+        }
+        badges
+    }
+
+    /// The graph, or during a ghost run the graph as the operation would leave it (see
+    /// [`super::ghost`]), with the strip that says what it would do above it.
     pub(super) fn graph_view(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
-        let t = Tokens::get(ui.ctx());
-        if self.search.open {
-            self.search_bar(ui, acts);
-        }
-        if let Some(err) = &self.load_error {
-            ui.add_space(12.0);
-            ui.horizontal(|ui| {
-                ui.add_space(12.0);
-                ui.colored_label(t.danger, err);
-            });
-            return;
-        }
-        if self.commits.is_empty() {
-            ui.centered_and_justified(|ui| {
-                if self.loading {
-                    ui.spinner();
-                } else {
-                    ui.label(
-                        egui::RichText::new("This repository has no commits yet.")
-                            .color(t.text_dim),
-                    );
-                }
-            });
-            return;
-        }
-
-        // Keyboard navigation (only when no text field has focus, nor a window of the app's
-        // is over the tab: the manual, the palette, the clone form).
-        if !ui.ctx().egui_wants_keyboard_input() && self.dialog.is_none() && !self.keys_blocked {
-            self.arrow_keys(ui, acts);
-        }
-
-        let settings = Settings::get(ui.ctx());
-        let lanes = lane_layout(&settings, self.graph.width);
-        let prefs = preferred_cols(&settings, lanes);
-        let cols = prefs.squeezed(ui.available_width(), settings.last_resized);
-
-        // Column headers.
-        let (header, header_resp) =
-            ui.allocate_exact_size(vec2(ui.available_width(), 26.0), Sense::click());
-        header::column_headers(ui, &t, header, &cols);
-        self.column_handles(ui, header, &prefs, &cols, &settings);
-        header::header_menu(&header_resp, &settings);
-
-        let mut scroll = egui::ScrollArea::vertical()
-            .id_salt("graph_scroll")
-            .auto_shrink(false);
-        let offset_id = ui.id().with("graph_offset");
-        if let Some(row) = self.scroll_to.take() {
-            let view_h = ui.available_height();
-            let top = row as f32 * ROW_PITCH;
-            // Only scroll if the row is outside the visible part.
-            let offset = ui.data(|d| d.get_temp::<f32>(offset_id)).unwrap_or(0.0);
-            if top < offset || top + ROW_PITCH > offset + view_h {
-                scroll = scroll.vertical_scroll_offset((top - view_h / 2.0).max(0.0));
-            }
-        }
-
-        // `show_rows` sizes rows as ROW_PITCH + item spacing, so the spacing must be zero here.
-        ui.spacing_mut().item_spacing.y = 0.0;
-        let idle = self.busy_op.is_none();
-        let now = git::now();
-        let total = self.commits.len() + usize::from(self.has_more);
-        let out = scroll.show_rows(ui, ROW_PITCH, total, |ui, range| {
-            // Near the end: fetch the next page of history.
-            if range.end + 40 >= self.commits.len() && self.has_more && !self.loading_more {
-                acts.push(Action::LoadMore);
-            }
-            for i in range {
-                if i >= self.commits.len() {
-                    loading_row(ui, &t);
-                    continue;
-                }
-                let resp = self.commit_row(ui, i, cols, lanes, now, acts);
-                if resp.clicked() {
-                    // Ctrl+click: compare the selected commit with this one.
-                    let compare = ui
-                        .input(|inp| inp.modifiers.command)
-                        .then(|| self.compare_rows(self.selected?, i))
-                        .flatten();
-                    acts.push(compare.unwrap_or(Action::Select(i)));
-                }
-                self.row_menu(&resp, i, idle, acts);
+        // One row: the history filters, then which part of the history the graph shows.
+        let saved_views = self.timeline_view.is_none();
+        ui.horizontal_wrapped(|ui| {
+            self.history_filter_controls(ui);
+            if saved_views {
+                ui.separator();
+                self.saved_graph_controls(ui);
             }
         });
-        ui.data_mut(|d| d.insert_temp(offset_id, out.state.offset.y));
+        if saved_views {
+            self.saved_graph_status(ui);
+        }
+        let area = ui.available_rect_before_wrap();
+        let ghost = self
+            .ghost
+            .swap_in(&mut self.commits, &mut self.graph, &mut self.index);
+        // Rows are numbered differently in the ghost graph: the selected commit is found there
+        // by its hash (the open menu's entries, "Compare with" among them, stay as they were).
+        let selected = self.selected;
+        if ghost {
+            self.selected = self
+                .ghost
+                .real_hash(selected)
+                .and_then(|h| self.index.get(&h).copied());
+        }
+        self.graph_rows_view(ui, acts);
+        if ghost {
+            self.ghost
+                .swap_out(&mut self.commits, &mut self.graph, &mut self.index);
+            self.selected = selected;
+        }
+        // Over the graph's foot rather than above it: the rows (and the menu open on one)
+        // don't move as it comes and goes, or grows when the result is in.
+        egui::Area::new(ui.id().with("ghost-strip"))
+            .order(egui::Order::Middle)
+            .interactable(false)
+            .pivot(Align2::LEFT_BOTTOM)
+            .fixed_pos(area.left_bottom() + vec2(8.0, -8.0))
+            .show(ui.ctx(), |ui| self.ghost_strip(ui, area.width() - 16.0));
     }
 
-    /// Up and down select the row above or below the selected one.
-    fn arrow_keys(&mut self, ui: &Ui, acts: &mut Vec<Action>) {
-        let (up, down) = ui.input(|i| (i.key_pressed(Key::ArrowUp), i.key_pressed(Key::ArrowDown)));
-        let current = self.selected.unwrap_or(0);
-        let next = if up {
-            Some(current.saturating_sub(1))
-        } else if down {
-            Some((current + 1).min(self.commits.len().saturating_sub(1)))
-        } else {
-            None
+    /// A row of the ghost graph, faded as what it is: a commit the operation would make, one
+    /// it would leave on no ref, or one as it is.
+    fn ghost_row(
+        &self,
+        ui: &mut Ui,
+        i: usize,
+        cols: Cols,
+        lanes: Lanes,
+        viewport: &readability::Viewport,
+    ) -> Response {
+        let fade = match self.ghost.kind(i) {
+            Kind::New => GHOST_OPACITY,
+            Kind::Going => GOING_OPACITY,
+            Kind::Real => 1.0,
         };
-        if let Some(next) = next {
-            acts.push(Action::Select(next));
-            self.scroll_to = Some(next);
-        }
+        let before = ui.opacity();
+        ui.multiply_opacity(fade);
+        // What its pills and build dots would do is dropped: nothing here is real yet.
+        let resp = self
+            .commit_row(ui, i, cols, lanes, viewport, false, &mut Vec::new())
+            .0;
+        ui.set_opacity(before);
+        resp
     }
 
-    /// Right-click menu of row `i`: the changes row's, a stash's or a commit's.
-    fn row_menu(&self, resp: &Response, i: usize, idle: bool, acts: &mut Vec<Action>) {
-        let Some(commit) = self.commits.get(i) else {
-            return;
-        };
-        if commit.hash == WIP_HASH {
-            wip_menu(resp, idle, acts);
-            return;
-        }
-        if let Some(stash) = self.stash_at(i).and_then(|s| self.stashes.get(s)) {
-            egui::Popup::context_menu(resp)
-                .style(crate::theme::menu_style)
-                .show(|ui| super::sidebar::stash_menu(ui, acts, stash, idle));
-            return;
-        }
-        self.commit_menu(resp, i, idle, acts);
-    }
+    // The menu of the commit right-clicked last when its row has scrolled out of the ghost
+    // graph's view (the rows it adds push it down): drawn without its row, so it stays open.
+}
 
-    /// Compares two rows of the graph, the older one first; the changes row stands for the
-    /// working tree. `None` for the same row twice.
-    fn compare_rows(&self, a: usize, b: usize) -> Option<Action> {
-        if a == b {
-            return None;
-        }
-        // Rows go newest first.
-        let (old, new) = (a.max(b), a.min(b));
-        let end = |row: usize| {
-            let c = self.commits.get(row)?;
-            let label = badges(&c.refs, &self.refs)
-                .into_iter()
-                .find(|b| b.kind != BadgeKind::DetachedHead)
-                .map(|b| b.label)
-                .unwrap_or_else(|| super::short(&c.hash).to_owned());
-            Some((c.hash.clone(), label))
-        };
-        let (base, base_label) = end(old)?;
-        let (target, target_label) = if self.is_wip(new) {
-            (None, "working tree".to_owned())
-        } else {
-            let (hash, label) = end(new)?;
-            (Some(hash), label)
-        };
-        Some(Action::Compare {
-            base,
-            base_label,
-            target,
-            target_label,
-            since_fork: false,
-        })
-    }
+/// Where the graph remembers the commit whose menu was opened last.
+fn menu_row_id() -> egui::Id {
+    egui::Id::new("graph-menu-row")
 }
 
 /// The lanes to draw, from the settings and the graph's `width` in lanes.
@@ -232,171 +245,14 @@ fn preferred_cols(settings: &Settings, lanes: Lanes) -> Cols {
     }
 }
 
-/// The last row while older history is still loading.
-fn loading_row(ui: &mut Ui, t: &Tokens) {
-    let (rect, _) = ui.allocate_exact_size(vec2(ui.available_width(), ROW_PITCH), Sense::hover());
-    ui.painter().text(
-        rect.center(),
-        Align2::CENTER_CENTER,
-        "Loading older commits…",
-        FontId::proportional(12.0),
-        t.text_faint,
-    );
-}
-
-/// Right-click menu of the changes row.
-fn wip_menu(resp: &Response, idle: bool, acts: &mut Vec<Action>) {
-    egui::Popup::context_menu(resp)
-        .style(crate::theme::menu_style)
-        .show(|ui| {
-            if ui
-                .add_enabled(idle, egui::Button::new("Stage all changes"))
-                .clicked()
-            {
-                acts.push(Action::Ops {
-                    label: "Stage all".into(),
-                    ops: ops(&[&["add", "-A"]]),
-                    refresh: Refresh::Status,
-                });
-            }
-            if ui
-                .add_enabled(idle, egui::Button::new("Stash changes…"))
-                .clicked()
-            {
-                acts.push(Action::Dialog(Dialog::stash()));
-            }
-            ui.separator();
-            if ui
-                .add_enabled(idle, egui::Button::new("Apply patch…"))
-                .on_hover_text(APPLY_PATCH_TIP)
-                .clicked()
-            {
-                acts.push(Action::ApplyPatch);
-            }
-        });
-}
-
-/// What "Apply patch…" does.
-const APPLY_PATCH_TIP: &str = "A patch from git format-patch becomes commits (git am), any other diff goes on the working \
-     tree (git apply)";
-
-/// Menu entries comparing `branch` with `current`: what it would bring in (since they
-/// diverged, as a pull request shows it), and every difference.
-pub(super) fn compare_items(
-    ui: &mut Ui,
-    acts: &mut Vec<Action>,
-    branch: BranchRef<'_>,
-    current: &str,
-) {
-    let name = branch.name;
-    let current_ref = BranchRef::local(current);
-    if ui
-        .button(format!("Changes {name} adds to {current}"))
-        .on_hover_text("What it changed since the two diverged, as a pull request shows it")
-        .clicked()
-    {
-        acts.push(compare_branches_action(current_ref, branch, true));
-    }
-    if ui
-        .button(format!("Compare {current} with {name}"))
-        .on_hover_text("Every difference between the two")
-        .clicked()
-    {
-        acts.push(compare_branches_action(current_ref, branch, false));
-    }
-}
+#[cfg(test)]
+#[path = "graph_view_tests.rs"]
+mod tests;
 
 #[cfg(test)]
-mod tests {
-    use super::*;
+#[path = "graph_view_registry_tests.rs"]
+mod registry_tests;
 
-    #[test]
-    fn a_compact_graph_column_fits_its_lanes_closer_together() {
-        let wide = Settings::default();
-        let compact = Settings {
-            compact_graph: true,
-            ..Settings::default()
-        };
-        let graph = |s: &Settings| preferred_cols(s, lane_layout(s, 10)).graph;
-        assert_eq!(graph(&wide), 172.0);
-        assert_eq!(graph(&compact), 112.0);
-        // A width dragged by hand stays.
-        let dragged = Settings {
-            graph_width: 150.0,
-            ..compact
-        };
-        assert_eq!(graph(&dragged), 150.0);
-    }
-
-    /// The graph of `tab` showing the commits `hashes` (newest first, each on the next).
-    fn show_commits(tab: &mut RepoTab, hashes: &[&str]) {
-        tab.commits = hashes
-            .iter()
-            .enumerate()
-            .map(|(i, h)| {
-                std::sync::Arc::new(git::Commit {
-                    hash: (*h).to_owned(),
-                    parents: hashes
-                        .get(i + 1)
-                        .map(|p| (*p).to_owned())
-                        .into_iter()
-                        .collect(),
-                    summary: format!("commit {h}"),
-                    ..Default::default()
-                })
-            })
-            .collect();
-        tab.graph = crate::graph::layout(&tab.commits);
-        tab.index = hashes
-            .iter()
-            .enumerate()
-            .map(|(i, h)| ((*h).to_owned(), i))
-            .collect();
-    }
-
-    /// A commit's menu left open while a reload replaces the rows is that commit's: when the
-    /// commit is gone (amended, or reset away in the terminal) it closes, rather than turning
-    /// into the menu of the commit that took its row, whose Revert or Cherry-pick runs at once.
-    #[test]
-    fn a_commit_menu_does_not_move_to_the_commit_that_takes_its_row() {
-        let ctx = egui::Context::default();
-        crate::theme::install_fonts(&ctx);
-        let mut tab = RepoTab::new_deferred("/nonexistent/row-menu-test".into(), &ctx);
-        show_commits(
-            &mut tab,
-            &["c".repeat(40).as_str(), &"b".repeat(40), &"a".repeat(40)],
-        );
-        let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, vec2(1200.0, 800.0));
-        // The header, then the rows: the second row's middle, away from its pills.
-        let second = egui::pos2(600.0, 26.0 + ROW_PITCH * 1.5);
-        let frame = |tab: &mut RepoTab, events: Vec<egui::Event>| {
-            let input = egui::RawInput {
-                screen_rect: Some(screen),
-                events,
-                ..Default::default()
-            };
-            ctx.run_ui(input, |ui| {
-                egui::CentralPanel::default()
-                    .frame(egui::Frame::NONE)
-                    .show(ui, |ui| tab.graph_view(ui, &mut Vec::new()));
-            })
-            .drop_without_applying_deltas();
-        };
-        frame(&mut tab, vec![egui::Event::PointerMoved(second)]);
-        let click = |pressed| egui::Event::PointerButton {
-            pos: second,
-            button: egui::PointerButton::Secondary,
-            pressed,
-            modifiers: egui::Modifiers::NONE,
-        };
-        frame(&mut tab, vec![click(true), click(false)]);
-        frame(&mut tab, Vec::new());
-        let opened = egui::Popup::is_any_open(&ctx);
-        // The right-clicked commit is gone: another one is in its row now.
-        show_commits(&mut tab, &["d".repeat(40).as_str(), &"a".repeat(40)]);
-        frame(&mut tab, Vec::new());
-        frame(&mut tab, Vec::new());
-        assert!(opened, "the right-click opened no menu");
-        assert!(!egui::Popup::is_any_open(&ctx));
-    }
-}
+#[cfg(test)]
+#[path = "graph_view_remote_visibility_tests.rs"]
+mod remote_visibility_tests;

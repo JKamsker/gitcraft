@@ -1,0 +1,486 @@
+//! A provider-neutral command source. Captured configuration and refs live in a private
+//! Git directory; commands share only the original object store and working files. Later
+//! profile, remote-name and URL-rewrite edits cannot reinterpret the captured routing.
+use super::{Extra, run, run_ok_codes};
+use crate::remote;
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+    sync::{
+        Arc, Mutex, OnceLock, Weak,
+        atomic::{AtomicU64, Ordering},
+    },
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
+
+const MARKER: &str = "gitcraft.commandSource=";
+static SOURCES: OnceLock<Mutex<HashMap<String, Weak<CommandSource>>>> = OnceLock::new();
+static IDS: AtomicU64 = AtomicU64::new(0);
+
+type ExecutionGuard = Box<dyn Fn() -> Result<(), String> + Send + Sync>;
+pub struct CommandSource {
+    id: String,
+    repo: PathBuf,
+    directory: PathBuf,
+    env: Vec<(&'static str, String)>,
+    configuration: String,
+    initial_refs: Vec<(String, String)>,
+    execution_guard: OnceLock<ExecutionGuard>,
+}
+impl CommandSource {
+    pub fn capture(repo: &Path) -> Result<Arc<Self>, String> {
+        let before = run(Some(repo), &["config", "--null", "--list"])?;
+        if before.len() > 4 * 1024 * 1024 {
+            return Err(crate::i18n::text(
+                "backend-git-configuration-exceeds-the-4mib-command-source-budget-ca57bd",
+            )
+            .into());
+        }
+        let mut entries = parse_config(&before)?;
+        let remotes = run(Some(repo), &["remote"])?;
+        if remotes.lines().count() > 200 {
+            return Err(crate::i18n::text(
+                "backend-more-than-200-git-remotes-narrow-the-command-source-5f52bb",
+            )
+            .into());
+        }
+        let mut endpoints = Vec::new();
+        for name in remotes.lines() {
+            for (push, key) in [(false, "url"), (true, "pushurl")] {
+                let args = if push {
+                    vec!["remote", "get-url", "--push", "--all", name]
+                } else {
+                    vec!["remote", "get-url", "--all", name]
+                };
+                for url in run(Some(repo), &args)?.lines() {
+                    endpoints.push((format!("remote.{name}.{key}"), url.to_owned()));
+                }
+            }
+        }
+        entries = freeze_routing(entries, endpoints);
+        let objects = absolute_git_path(repo, "objects")?;
+        let index = absolute_git_path(repo, "index")?;
+        let hooks = absolute_git_path(repo, "hooks")?;
+        let bare = run(Some(repo), &["rev-parse", "--is-bare-repository"])?;
+        let worktree = if bare.trim() == "true" {
+            None
+        } else {
+            Some(
+                run(Some(repo), &["rev-parse", "--show-toplevel"])?
+                    .trim_end_matches(['\n', '\r'])
+                    .to_owned(),
+            )
+        };
+        let format = run(Some(repo), &["rev-parse", "--show-object-format"])?;
+        let listing = run(
+            Some(repo),
+            &["for-each-ref", "--format=%(objectname) %(refname)"],
+        )?;
+        if listing.len() > 16 * 1024 * 1024 || listing.lines().count() > 100_000 {
+            return Err(crate::i18n::text(
+                "backend-git-ref-snapshot-exceeds-its-finite-command-source-budget-bdd429",
+            )
+            .into());
+        }
+        let head = run_ok_codes(Some(repo), &["symbolic-ref", "-q", "HEAD"], &[0, 1])?;
+        let head = if head.trim().is_empty() {
+            run(Some(repo), &["rev-parse", "HEAD"])?
+        } else {
+            format!("ref: {}\n", head.trim())
+        };
+        let config = render_config(entries, worktree.as_deref(), &hooks, format.trim())?;
+        if run(Some(repo), &["config", "--null", "--list"])? != before {
+            return Err(crate::i18n::text(
+                "backend-git-routing-profile-changed-during-capture-try-again-9de43f",
+            )
+            .into());
+        }
+        let id = format!(
+            "{:x}",
+            md5::compute(format!(
+                "{}:{}:{}",
+                std::process::id(),
+                SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .map(|d| d.as_nanos())
+                    .unwrap_or(0),
+                IDS.fetch_add(1, Ordering::Relaxed)
+            ))
+        );
+        let directory = private_directory(repo, &id)?;
+        let source = Arc::new(Self {
+            id,
+            repo: repo.to_owned(),
+            env: source_env(&directory, &objects, &index, worktree.as_deref()),
+            directory,
+            configuration: before,
+            initial_refs: listing
+                .lines()
+                .filter_map(|l| {
+                    l.split_once(' ')
+                        .map(|(oid, r)| (r.to_owned(), oid.to_owned()))
+                })
+                .collect(),
+            execution_guard: OnceLock::new(),
+        });
+        // The private directory has no links or repository-supplied templates. No init,
+        // checkout, filter, hook or extraction command participates in preparation.
+        for dir in ["objects", "refs"] {
+            remote::create_dir_all(&remote::join(&source.directory, dir))
+                .map_err(|e| e.to_string())?;
+        }
+        remote::write(
+            &remote::join(&source.directory, "config"),
+            config.as_bytes(),
+        )
+        .map_err(|e| e.to_string())?;
+        remote::write(&remote::join(&source.directory, "HEAD"), head.as_bytes())
+            .map_err(|e| e.to_string())?;
+        let mut packed = "# pack-refs with: sorted\n".to_owned();
+        for line in listing.lines() {
+            let (oid, reference) = line
+                .split_once(' ')
+                .ok_or(crate::i18n::text("backend-malformed-captured-ref-556d1a"))?;
+            if !safe_reference(reference) || !object_id(oid) {
+                return Err(
+                    crate::i18n::text("backend-invalid-captured-ref-identity-169ea0").into(),
+                );
+            }
+            packed.push_str(line);
+            packed.push('\n');
+        }
+        remote::write(
+            &remote::join(&source.directory, "packed-refs"),
+            packed.as_bytes(),
+        )
+        .map_err(|e| e.to_string())?;
+        SOURCES
+            .get_or_init(Default::default)
+            .lock()
+            .map_err(|_| crate::i18n::text("backend-command-source-registry-unavailable-f0c177"))?
+            .insert(source.id.clone(), Arc::downgrade(&source));
+        Ok(source)
+    }
+    /// Additional source-specific evidence must still hold inside the operation worker.
+    pub fn guard_execution(
+        &self,
+        guard: impl Fn() -> Result<(), String> + Send + Sync + 'static,
+    ) -> Result<(), String> {
+        self.execution_guard.set(Box::new(guard)).map_err(|_| {
+            crate::i18n::text("backend-execution-evidence-was-already-bound-c595ef").into()
+        })
+    }
+    fn reconcile_push(&self) -> Result<(), String> {
+        self.check_context()?;
+        let now = self.refs("refs/remotes/")?;
+        let mut transaction = "start\n".to_owned();
+        let mut changes = 0;
+        for (reference, oid) in &now {
+            let old = self
+                .initial_refs
+                .iter()
+                .find(|(r, _)| r == reference)
+                .map(|(_, oid)| oid.clone())
+                .unwrap_or_else(|| "0".repeat(oid.len()));
+            if &old != oid {
+                transaction.push_str(&format!("update {reference} {oid} {old}\n"));
+                changes += 1;
+            }
+        }
+        if changes > 0 {
+            transaction.push_str("prepare\ncommit\n");
+            super::run_input(Some(&self.repo), &["update-ref", "--stdin"], &transaction)?;
+        }
+        // `push -u` wrote the private config. Preserve its normal upstream effect only
+        // after successful publication, with the original routing still matching capture.
+        let before = branch_tracking(parse_config(&self.configuration)?);
+        let args = self.bind(&["config", "--null", "--list"]);
+        let after = branch_tracking(parse_config(&run(
+            Some(&self.repo),
+            &args.iter().map(String::as_str).collect::<Vec<_>>(),
+        )?)?);
+        for (key, values) in after {
+            if before.get(&key) == Some(&values) {
+                continue;
+            }
+            let Some((first, rest)) = values.split_first() else {
+                continue;
+            };
+            run(
+                Some(&self.repo),
+                &["config", "--local", "--replace-all", &key, first],
+            )?;
+            for value in rest {
+                run(
+                    Some(&self.repo),
+                    &["config", "--local", "--add", &key, value],
+                )?;
+            }
+        }
+        Ok(())
+    }
+    pub fn check_context(&self) -> Result<(), String> {
+        if run(Some(&self.repo), &["config", "--null", "--list"])? != self.configuration {
+            return Err(crate::i18n::text(
+                "backend-git-routing-or-profile-changed-during-the-operation-a-completed-t-01600a",
+            )
+            .into());
+        }
+        Ok(())
+    }
+    /// Validate advisory evidence at the actual reviewed-push dispatch. That transport
+    /// already pins its object and endpoint, so it must retain its own command environment.
+    pub(crate) fn check_execution(&self) -> Result<(), String> {
+        self.check_context()?;
+        if let Some(guard) = self.execution_guard.get() {
+            guard()?;
+        }
+        Ok(())
+    }
+    pub(crate) fn reviewed_binding(repo: &Path, args: &[String]) -> Result<Arc<Self>, String> {
+        let words: Vec<_> = args.iter().map(String::as_str).collect();
+        resolve(Some(repo), &words)?
+            .ok_or(crate::i18n::text("backend-reviewed-echo-source-is-missing-cdaf3c").into())
+    }
+    pub fn owns(&self, args: &[String]) -> bool {
+        args.windows(2)
+            .any(|pair| pair[0] == "-c" && pair[1] == format!("{MARKER}{}", self.id))
+    }
+    pub fn bind(&self, args: &[&str]) -> Vec<String> {
+        [
+            vec!["-c".into(), format!("{MARKER}{}", self.id)],
+            args.iter().map(|s| (*s).to_owned()).collect(),
+        ]
+        .concat()
+    }
+    /// The captured Git directory's ref value, without consulting a mutable remote name.
+    pub fn reference(&self, reference: &str) -> Result<Option<String>, String> {
+        if !safe_reference(reference) {
+            return Err(crate::i18n::text("backend-invalid-captured-ref-name-3c2bb3").into());
+        }
+        let args = self.bind(&["rev-parse", "--verify", "--end-of-options", reference]);
+        let out = run_ok_codes(
+            Some(&self.repo),
+            &args.iter().map(String::as_str).collect::<Vec<_>>(),
+            &[0, 128],
+        )?;
+        let oid = out.trim();
+        Ok(object_id(oid).then(|| oid.to_owned()))
+    }
+    pub fn refs(&self, root: &str) -> Result<Vec<(String, String)>, String> {
+        let args = self.bind(&["for-each-ref", "--format=%(objectname) %(refname)", root]);
+        run(
+            Some(&self.repo),
+            &args.iter().map(String::as_str).collect::<Vec<_>>(),
+        )?
+        .lines()
+        .map(|line| {
+            let (oid, reference) = line.split_once(' ').ok_or(crate::i18n::text(
+                "backend-invalid-captured-ref-listing-2d6845",
+            ))?;
+            if !object_id(oid) || !safe_reference(reference) {
+                return Err(
+                    crate::i18n::text("backend-invalid-captured-ref-identity-169ea0").into(),
+                );
+            }
+            Ok((reference.to_owned(), oid.to_owned()))
+        })
+        .collect()
+    }
+}
+impl Drop for CommandSource {
+    fn drop(&mut self) {
+        if let Some(sources) = SOURCES.get()
+            && let Ok(mut sources) = sources.lock()
+        {
+            sources.remove(&self.id);
+        }
+        let directory = self.directory.clone();
+        if let Ok(pool) = crate::tasks::pool() {
+            let _ = pool.submit(
+                crate::tasks::Cancellation::default(),
+                crate::tasks::Priority::Background,
+                None,
+                Box::new(move || {
+                    if let Some(target) = remote::parse(&directory) {
+                        let script = format!(
+                            "p={}; [ ! -L \"$p\" ] && [ -O \"$p\" ] || exit 73; rm -rf -- \"$p\"",
+                            remote::sh_quote(&target.path)
+                        );
+                        let _ = remote::exec(
+                            &target.host,
+                            &remote::Request {
+                                script,
+                                timeout: Some(Duration::from_secs(10)),
+                                ..Default::default()
+                            },
+                        );
+                    } else {
+                        let _ = std::fs::remove_dir_all(directory);
+                    }
+                }),
+            );
+        }
+    }
+}
+fn private_directory(repo: &Path, id: &str) -> Result<PathBuf, String> {
+    if let Some(target) = remote::parse(repo) {
+        let out = remote::exec(
+            &target.host,
+            &remote::Request {
+                script: "umask 077; mktemp -d \"${TMPDIR:-/tmp}/gitcraft-source.XXXXXXXXXX\""
+                    .into(),
+                timeout: Some(Duration::from_secs(10)),
+                ..Default::default()
+            },
+        )?;
+        let path = String::from_utf8(out.stdout).map_err(|e| e.to_string())?;
+        let path = path.trim();
+        if out.code != 0
+            || !path.starts_with('/')
+            || !path.rsplit('/').next().is_some_and(|s| {
+                s.starts_with("gitcraft-source.")
+                    && s.bytes()
+                        .all(|b| b.is_ascii_alphanumeric() || b == b'.' || b == b'-')
+            })
+        {
+            return Err(crate::i18n::text(
+                "backend-could-not-create-a-private-command-source-directory-2bd777",
+            )
+            .into());
+        }
+        Ok(remote::encode(&target.host, path))
+    } else {
+        let path = std::env::temp_dir().join(format!("gitcraft-source-{id}"));
+        let builder = std::fs::DirBuilder::new();
+        #[cfg(unix)]
+        let builder = {
+            use std::os::unix::fs::DirBuilderExt;
+            let mut builder = builder;
+            builder.mode(0o700);
+            builder
+        };
+        builder.create(&path).map_err(|e| e.to_string())?;
+        Ok(path)
+    }
+}
+fn absolute_git_path(repo: &Path, name: &str) -> Result<String, String> {
+    Ok(run(
+        Some(repo),
+        &["rev-parse", "--path-format=absolute", "--git-path", name],
+    )?
+    .trim_end_matches(['\n', '\r'])
+    .to_owned())
+}
+fn source_env(
+    directory: &Path,
+    objects: &str,
+    index: &str,
+    worktree: Option<&str>,
+) -> Vec<(&'static str, String)> {
+    let mut env = vec![
+        ("GIT_DIR", remote::git_path(directory)),
+        ("GIT_OBJECT_DIRECTORY", objects.into()),
+        ("GIT_INDEX_FILE", index.into()),
+        ("GIT_CONFIG_NOSYSTEM", "1".into()),
+        (
+            "GIT_CONFIG_GLOBAL",
+            remote::git_path(&remote::join(directory, "empty-global")),
+        ),
+        (
+            "GIT_CONFIG_SYSTEM",
+            remote::git_path(&remote::join(directory, "empty-system")),
+        ),
+    ];
+    if let Some(path) = worktree {
+        env.push(("GIT_WORK_TREE", path.into()));
+    }
+    env
+}
+pub(super) fn bind(
+    extra: &mut Extra,
+    repo: Option<&Path>,
+    args: &[&str],
+) -> Result<Option<Arc<CommandSource>>, String> {
+    let Some(source) = resolve(repo, args)? else {
+        return Ok(None);
+    };
+    if super::goes_over_network(args) {
+        source.check_execution()?;
+    }
+    extra.unset.extend([
+        "GIT_CONFIG_COUNT",
+        "GIT_CONFIG_PARAMETERS",
+        "GIT_CONFIG",
+        "GIT_COMMON_DIR",
+        "GIT_NAMESPACE",
+        "GIT_SHALLOW_FILE",
+        "GIT_REPLACE_REF_BASE",
+        "GIT_WORK_TREE",
+        "GIT_INDEX_FILE",
+        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    ]);
+    extra.env.extend(source.env.clone());
+    Ok(Some(source))
+}
+fn resolve(repo: Option<&Path>, args: &[&str]) -> Result<Option<Arc<CommandSource>>, String> {
+    let ids: Vec<_> = args
+        .windows(2)
+        .filter_map(|pair| {
+            (pair[0] == "-c")
+                .then(|| pair[1].strip_prefix(MARKER))
+                .flatten()
+        })
+        .collect();
+    if ids.is_empty() {
+        return Ok(None);
+    }
+    if ids.len() != 1 {
+        return Err(crate::i18n::text("backend-ambiguous-captured-command-source-b730dc").into());
+    }
+    let source = SOURCES
+        .get_or_init(Default::default)
+        .lock()
+        .map_err(|_| crate::i18n::text("backend-command-source-registry-unavailable-f0c177"))?
+        .get(ids[0])
+        .and_then(Weak::upgrade)
+        .ok_or(crate::i18n::text(
+            "backend-captured-command-source-expired-prepare-the-operation-again-ef9524",
+        ))?;
+    if repo != Some(source.repo.as_path()) {
+        return Err(crate::i18n::text(
+            "backend-captured-command-source-belongs-to-another-repository-b6fb6f",
+        )
+        .into());
+    }
+    Ok(Some(source))
+}
+pub(super) fn finish(
+    source: Option<&Arc<CommandSource>>,
+    args: &[&str],
+    success: bool,
+) -> Result<(), String> {
+    if success
+        && super::after_options(args).first() == Some(&"push")
+        && let Some(source) = source
+    {
+        source.reconcile_push().map_err(|e| {
+            crate::i18n::message(
+                "backend-push-completed-at-the-captured-destination-but-local-tracking-met-c5e4b1",
+                &[("detail", (e).to_string().into())],
+            )
+        })?;
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests;
+
+mod configuration;
+use configuration::branch_tracking;
+use configuration::freeze_routing;
+use configuration::object_id;
+use configuration::parse_config;
+use configuration::render_config;
+use configuration::safe_reference;

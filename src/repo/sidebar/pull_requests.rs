@@ -1,14 +1,54 @@
 //! The pull (or merge) requests of the repository's forge.
 
+use std::path::{Path, PathBuf};
+
 use egui::{Align2, Rect, Sense, Ui, pos2, vec2};
 
 use super::remote_short;
-use crate::forge::{Forge, PullRequest};
+use crate::a11y::labels;
+use crate::forge::{Forge, Hosting, PullRequest};
 use crate::git::Branch;
 use crate::icons;
-use crate::repo::pinned_sections::{Header, Sections};
+use crate::menu_item::MenuItem;
+use crate::repo::issue_work::IssueAct;
+use crate::repo::pinned_sections::{Alert, Button, Header, Sections};
 use crate::repo::{Action, RepoTab, ci_status, widgets};
 use crate::theme::Tokens;
+
+/// How long (in seconds) after the list was last in use a newer one waits before it replaces it.
+const IN_USE_GRACE: f64 = 3.0;
+
+/// Where the time the tab's list was last in use is kept (egui's clock).
+fn in_use_id(tab: &Path) -> egui::Id {
+    egui::Id::new(("pr-list-in-use", tab))
+}
+
+/// Where the last list read is kept, per repository, hosting and account (a profile's), across
+/// restarts.
+fn cache_id(repo: &Path, hosting: &Hosting) -> egui::Id {
+    let account = crate::connections::current();
+    egui::Id::new((
+        "pr-list-cache",
+        repo,
+        &hosting.host,
+        &hosting.path,
+        &account.git_config,
+        &account.choices,
+    ))
+}
+
+/// Whether a list read anew replaces the `shown` one now: when nothing would move, or the list
+/// was last in use `since` seconds ago, long enough (`None`: not at all).
+fn apply_now(shown: &[PullRequest], fresh: &[PullRequest], since: Option<f64>) -> bool {
+    shown == fresh || shown.is_empty() || since.is_none_or(|since| since >= IN_USE_GRACE)
+}
+
+/// The orange of a header whose newer list waits: between the warning yellow and the danger red.
+fn attention(t: &Tokens) -> egui::Color32 {
+    let mix = |a: u8, b: u8| ((u16::from(a) * 3 + u16::from(b) * 2) / 5) as u8;
+    let (w, d) = (t.warning, t.danger);
+    egui::Color32::from_rgb(mix(w.r(), d.r()), mix(w.g(), d.g()), mix(w.b(), d.b()))
+}
 
 impl RepoTab {
     pub(super) fn pr_section(
@@ -18,12 +58,10 @@ impl RepoTab {
         idle: bool,
         sections: &mut Sections,
     ) {
-        let Some(forge) = self.forge else { return };
+        let Some(forge) = self.forge() else { return };
         let t = Tokens::get(ui.ctx());
-        let title = match forge {
-            Forge::GitHub => "PULL REQUESTS",
-            Forge::GitLab => "MERGE REQUESTS",
-        };
+        let title = forge.list_title();
+        let top = ui.cursor().top();
         let open = sections.add(
             ui,
             Header {
@@ -32,133 +70,127 @@ impl RepoTab {
                 title,
                 count: self.prs.len(),
                 default_open: true,
-                button: None,
+                button: Some(Button {
+                    icon: "git-branch-plus",
+                    tooltip: crate::i18n::text("repo-core-3447"),
+                    action: Some(Action::Issue(IssueAct::OpenPicker)),
+                }),
             },
         );
-        if !open {
+        if self.pending_prs.is_some() {
+            sections.alert(Alert {
+                tint: attention(&t),
+                button: Button {
+                    icon: "refresh-cw",
+                    tooltip: crate::i18n::text("repo-core-pr-list-newer"),
+                    action: Some(Action::ApplyPendingPrs),
+                },
+            });
+        }
+        if open {
+            // A failed read leaves the rows of the last one, with why under them.
+            for pr in &self.prs {
+                self.pr_row(ui, acts, forge, pr, idle);
+            }
+            if let Some(raw_error) = &self.pr_error {
+                let err = crate::forge::inbox::display_error(raw_error);
+                let (rect, r) =
+                    ui.allocate_exact_size(vec2(ui.available_width(), 26.0), Sense::hover());
+                ui.painter_at(rect).text(
+                    pos2(rect.left() + 34.0, rect.center().y),
+                    Align2::LEFT_CENTER,
+                    err.lines().next().unwrap_or_default(),
+                    egui::FontId::proportional(11.0),
+                    t.text_faint,
+                );
+                r.on_hover_text(err.as_str());
+            }
+        }
+        let area = Rect::from_x_y_ranges(ui.max_rect().x_range(), top..=ui.cursor().top());
+        let in_use = ui.rect_contains_pointer(area)
+            || (open
+                && self
+                    .prs
+                    .iter()
+                    .any(|pr| widgets::keyed_row_menu_open(ui, ("pr-row", pr.number))));
+        self.note_pr_list_use(ui.ctx(), in_use, acts);
+    }
+
+    /// Notes when the list was last in use (the pointer on it, a row's menu open). A newer list
+    /// waiting is let in once it has been left alone for [`IN_USE_GRACE`].
+    fn note_pr_list_use(&self, ctx: &egui::Context, in_use: bool, acts: &mut Vec<Action>) {
+        let id = in_use_id(&self.path);
+        let now = ctx.input(|i| i.time);
+        if in_use {
+            ctx.data_mut(|d| d.insert_temp(id, now));
             return;
         }
-        if let Some(err) = &self.pr_error {
-            let (rect, r) =
-                ui.allocate_exact_size(vec2(ui.available_width(), 26.0), Sense::hover());
-            ui.painter_at(rect).text(
-                pos2(rect.left() + 34.0, rect.center().y),
-                Align2::LEFT_CENTER,
-                err.lines().next().unwrap_or_default(),
-                egui::FontId::proportional(11.0),
-                t.text_faint,
-            );
-            r.on_hover_text(err.as_str());
+        if self.pending_prs.is_none() {
             return;
         }
-        for pr in &self.prs {
-            self.pr_row(ui, acts, forge, pr, idle);
+        let since = ctx.data(|d| d.get_temp::<f64>(id)).map(|at| now - at);
+        match since {
+            Some(since) if since < IN_USE_GRACE => {
+                ctx.request_repaint_after(std::time::Duration::from_secs_f64(IN_USE_GRACE - since))
+            }
+            _ => acts.push(Action::ApplyPendingPrs),
         }
     }
 
-    fn pr_row(
-        &self,
-        ui: &mut Ui,
-        acts: &mut Vec<Action>,
-        forge: Forge,
-        pr: &PullRequest,
-        idle: bool,
-    ) {
-        let t = Tokens::get(ui.ctx());
-        // Known by its number, not its place: the list reloads (and reorders) on its own, and a
-        // menu left open (Check out) must stay this one's.
-        let (rect, r) = widgets::keyed_row(ui, 36.0, ("pr-row", pr.number));
-        let shown = self.pr_view.as_ref().is_some_and(|v| v.number == pr.number);
-        if shown {
-            ui.painter().rect_filled(rect, 0.0, t.row_selected);
-        } else if r.hovered() {
-            ui.painter().rect_filled(rect, 0.0, t.hover);
+    /// Takes in a list read anew: at once, unless it would move the rows under the user, who
+    /// then gets it from the header (orange, with a refresh button) or once done with the list.
+    pub(in crate::repo) fn prs_arrived(&mut self, prs: Vec<PullRequest>, ctx: &egui::Context) {
+        self.pr_error = None;
+        if let Some(hosting) = &self.hosting {
+            let id = cache_id(self.repo_key(), hosting);
+            ctx.data_mut(|d| d.insert_persisted(id, prs.clone()));
         }
-        let y = rect.center().y;
-        icons::paint(
-            ui,
-            Rect::from_center_size(pos2(rect.left() + 34.0, y), vec2(16.0, 16.0)),
-            "git-pull-request",
-            13.0,
-            if pr.draft { t.text_faint } else { t.success },
-        );
-        let ci = self.ci_status(&pr.sha);
-        // The build status on the right, and the texts up to it.
-        let text_right = if ci.is_some() {
-            rect.right() - 24.0
+        let since = ctx
+            .data(|d| d.get_temp::<f64>(in_use_id(&self.path)))
+            .map(|at| ctx.input(|i| i.time) - at);
+        if apply_now(&self.prs, &prs, since) {
+            self.take_prs(prs, ctx);
         } else {
-            rect.right()
-        };
-        let p = ui.painter_at(rect).with_clip_rect(Rect::from_min_max(
-            rect.min,
-            pos2(text_right, rect.bottom()),
-        ));
-        p.text(
-            pos2(rect.left() + 48.0, y - 7.0),
-            Align2::LEFT_CENTER,
-            format!("#{} {}", pr.number, pr.title),
-            egui::FontId::proportional(12.5),
-            t.text,
-        );
-        let sub = format!(
-            "{} · {}{}",
-            pr.branch,
-            pr.author,
-            if pr.draft { " · draft" } else { "" }
-        );
-        p.text(
-            pos2(rect.left() + 48.0, y + 8.0),
-            Align2::LEFT_CENTER,
-            sub,
-            egui::FontId::proportional(11.0),
-            t.text_faint,
-        );
-        if let Some(status) = ci {
-            let center = pos2(rect.right() - 14.0, y);
-            acts.extend(ci_status::dot(ui, r.id.with("ci"), center, &pr.sha, status));
+            self.pending_prs = Some(prs);
+            ctx.request_repaint();
         }
-        let has_view = forge == Forge::GitHub;
-        let r = r.on_hover_text(if has_view {
-            format!("{}\nClick to open, double-click for the browser", pr.url)
-        } else {
-            format!("{}\nDouble-click to open in the browser", pr.url)
-        });
-        if r.double_clicked() {
-            acts.push(Action::OpenUrl(pr.url.clone()));
-        } else if r.clicked() && has_view {
-            acts.push(Action::OpenPr(pr.number));
-        } else if r.clicked()
-            && let Some(target) = self.pr_target(pr)
-        {
-            acts.push(Action::SelectHash(target));
+    }
+
+    /// Shows the list read while the shown one was in use.
+    pub(in crate::repo) fn apply_pending_prs(&mut self, ctx: &egui::Context) {
+        if let Some(prs) = self.pending_prs.take() {
+            self.take_prs(prs, ctx);
         }
-        egui::Popup::context_menu(&r)
-            .style(crate::theme::menu_style)
-            .show(|ui| {
-                if ui.button("Open in the browser").clicked() {
-                    acts.push(Action::OpenUrl(pr.url.clone()));
-                }
-                if ui
-                    .add_enabled(idle, egui::Button::new(format!("Check out {}", pr.branch)))
-                    .clicked()
-                {
-                    if self.refs.local.iter().any(|b| b.name == pr.branch) {
-                        acts.push(Action::Checkout(pr.branch.clone()));
-                    } else if let Some(b) = self.pr_remote_branch(pr) {
-                        acts.push(Action::CheckoutRemote(b.name.clone()));
-                    } else {
-                        let remote = self.default_remote().unwrap_or_else(|| "origin".to_owned());
-                        acts.push(Action::CheckoutRemote(format!("{remote}/{}", pr.branch)));
-                    }
-                }
-                if ui.button("Copy URL").clicked() {
-                    ui.ctx().copy_text(pr.url.clone());
-                }
-            });
+    }
+
+    fn take_prs(&mut self, prs: Vec<PullRequest>, ctx: &egui::Context) {
+        self.pending_prs = None;
+        self.prs = prs;
+        self.prs_from_cache = false;
+        if crate::network::background_may_run() {
+            self.refresh_ci(ctx);
+        }
+        self.load_seen_heads(ctx);
+    }
+
+    /// Before the forge is asked, the list it gave last time for `hosting` (kept across
+    /// restarts), so that the section isn't empty meanwhile.
+    pub(in crate::repo) fn seed_prs(&mut self, hosting: &Hosting, ctx: &egui::Context) {
+        if !self.prs.is_empty() || self.pending_prs.is_some() {
+            return;
+        }
+        let id = cache_id(self.repo_key(), hosting);
+        if let Some(prs) = ctx.data_mut(|d| d.get_persisted::<Vec<PullRequest>>(id)) {
+            self.prs = prs;
+            self.prs_from_cache = true;
+        }
     }
 
     /// The tip of `pr`'s branch, local or on a remote.
-    fn pr_target(&self, pr: &PullRequest) -> Option<String> {
+    pub(in crate::repo) fn pr_target(&self, pr: &PullRequest) -> Option<String> {
+        if !pr.sha.is_empty() {
+            return Some(pr.sha.clone());
+        }
         self.refs
             .local
             .iter()
@@ -170,76 +202,74 @@ impl RepoTab {
     /// The remote-tracking branch `pr` proposes, which can be on any remote (a fork's): the
     /// one at the pull request's latest commit, else the default remote's, else the first.
     fn pr_remote_branch(&self, pr: &PullRequest) -> Option<&Branch> {
-        let default = self.default_remote();
+        self.remote_branch_of(&pr.branch, &pr.sha)
+    }
+
+    /// The remote-tracking branch named `branch` on any remote, at `sha` if one is.
+    fn remote_branch_of(&self, branch: &str, sha: &str) -> Option<&Branch> {
+        let default = self.primary_forge_remote().map(str::to_owned).or_else(|| {
+            self.hosting
+                .is_none()
+                .then(|| self.default_remote())
+                .flatten()
+        });
         let found: Vec<(&str, &Branch)> = self
             .remotes
             .iter()
             .flat_map(|r| {
                 self.remote_branches(&r.name)
-                    .filter(|b| remote_short(&b.name, &r.name) == Some(pr.branch.as_str()))
+                    .filter(|b| remote_short(&b.name, &r.name) == Some(branch))
+                    .filter(|b| {
+                        self.hosting
+                            .as_ref()
+                            .is_none_or(|h| h.matches_git_remote(&r.url))
+                            || (!sha.is_empty() && b.target == sha)
+                    })
                     .map(|b| (r.name.as_str(), b))
             })
             .collect();
         found
             .iter()
-            .find(|(_, b)| !pr.sha.is_empty() && b.target == pr.sha)
+            .find(|(_, b)| !sha.is_empty() && b.target == sha)
             .or_else(|| found.iter().find(|(r, _)| default.as_deref() == Some(*r)))
             .or_else(|| found.first())
             .map(|(_, b)| *b)
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::git::Remote;
-
-    fn branch(name: &str, target: &str) -> Branch {
-        Branch {
-            name: name.to_owned(),
-            target: target.to_owned(),
-            is_head: false,
-            upstream: String::new(),
-            track: String::new(),
-        }
-    }
-
-    fn pr(branch: &str, sha: &str) -> PullRequest {
-        PullRequest {
-            number: 1,
-            title: String::new(),
-            branch: branch.to_owned(),
-            sha: sha.to_owned(),
-            author: String::new(),
-            url: String::new(),
-            draft: false,
-        }
-    }
-
-    #[test]
-    fn a_pull_request_branch_is_found_on_the_remote_that_has_it() {
-        let ctx = egui::Context::default();
-        let mut tab = RepoTab::new_deferred("/nonexistent/pr-remote-test".into(), &ctx);
-        tab.remotes = ["origin", "fork"]
-            .map(|name| Remote {
-                name: name.to_owned(),
-                url: String::new(),
-            })
-            .into();
-        tab.refs.remotes = vec![
-            ("origin".to_owned(), vec![branch("origin/main", "m")]),
-            (
-                "fork".to_owned(),
-                vec![branch("fork/feat", "f"), branch("fork/main", "fm")],
-            ),
-        ];
-        let name = |pr: &PullRequest| tab.pr_remote_branch(pr).map(|b| b.name.clone());
-        // Only on the fork: not `origin/feat`, which does not exist.
-        assert_eq!(name(&pr("feat", "f")).as_deref(), Some("fork/feat"));
-        assert_eq!(name(&pr("feat", "")).as_deref(), Some("fork/feat"));
-        // On both: the one at the pull request's commit, else the default remote's.
-        assert_eq!(name(&pr("main", "fm")).as_deref(), Some("fork/main"));
-        assert_eq!(name(&pr("main", "x")).as_deref(), Some("origin/main"));
-        assert_eq!(name(&pr("gone", "x")), None);
-    }
+/// Whether `name` (a pull request's branch, as the forge says it) is a branch name git takes
+/// as it is (`git check-ref-format --branch`), and never as an option.
+fn plain_branch_name(name: &str) -> bool {
+    !name.is_empty()
+        && !name.starts_with(['-', '/', '.'])
+        && !name.ends_with(['/', '.'])
+        && !name.ends_with(".lock")
+        && !name.contains("..")
+        && !name.contains("//")
+        && !name.contains("@{")
+        && !name.contains("/.")
+        && name != "@"
+        && !name
+            .chars()
+            .any(|c| c.is_control() || matches!(c, ' ' | '~' | '^' | ':' | '?' | '*' | '[' | '\\'))
 }
+
+/// How to get to a pull request's worktree.
+#[derive(Debug, PartialEq, Eq)]
+enum PrWorktree {
+    /// Its branch is checked out in the worktree shown.
+    Here,
+    Open(PathBuf),
+    /// Run `ops` (which add the worktree), then open `path`.
+    Create {
+        ops: Vec<Vec<String>>,
+        path: PathBuf,
+    },
+}
+
+#[cfg(test)]
+#[path = "pull_requests/tests.rs"]
+mod tests;
+
+mod row;
+mod worktrees;

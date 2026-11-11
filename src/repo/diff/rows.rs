@@ -3,13 +3,15 @@
 
 use egui::{FontId, Galley, Pos2, Rect, Sense, Stroke, Ui, pos2, vec2};
 
-use super::jump::{change_at, offset_of};
+use super::jump::change_at;
+use super::link::{LineLinks, note_right_click};
 use super::map::change_map;
-use super::paint::{filler, hunk_button, paint_line};
-use super::select::{Hit, Side, TextSel, copy_selection, drag_selection};
-use super::{DiffData, Kind, LINE_H, MAP_W, NUM_W, Pick, hunk_changes};
+use super::paint::{filler, hunk_button, paint_line, text_button};
+use super::select::{Hit, Side, TextSel, copy_selection, drag_selection, scroll_selection};
+use super::{DiffData, Kind, LINE_H, MAP_W, MARK_W, NUM_W, Pick, hunk_changes};
 use crate::git::Area;
 use crate::pull_request::DiffSide;
+use crate::repo::find::{Find, Hit as FoundHit, Seen};
 use crate::repo::pr_review::{
     DiffReview, LineTarget, PrAct, paint_gutter_mark, target_of, unified_spot,
 };
@@ -24,6 +26,8 @@ pub(super) struct Rows<'a> {
     review: Option<&'a DiffReview>,
     partial: bool,
     split: bool,
+    wrap: bool,
+    pub(super) geometry: Option<std::sync::Arc<super::wrap::Geometry>>,
     /// Which hunk actions the headers offer.
     hunk_picks: &'static [Pick],
     /// Only a selection made in the layout shown: one made side by side isn't on screen
@@ -36,8 +40,12 @@ pub(super) struct Rows<'a> {
     t: Tokens,
     /// A changed line clicked.
     pub(super) clicked: Option<usize>,
+    /// A new code selection replaces any Git action selection.
+    pub(super) text_started: bool,
     /// How far the lines are scrolled down.
     pub(super) offset: f32,
+    pub(super) viewport_height: f32,
+    pub(super) layout_changed: bool,
     /// The change scrolled to this frame (by its place among the changes).
     pub(super) jumped: Option<usize>,
     /// Text selection by dragging: where the press and the pointer are in the lines drawn.
@@ -45,9 +53,20 @@ pub(super) struct Rows<'a> {
     /// Each with whether the pointer is over that line's half, not only at its height.
     pointer_hits: Vec<(Hit, bool)>,
     text_hover: bool,
+    /// The find bar's search, and its match to scroll to this frame.
+    find: Option<&'a Find>,
+    reveal: Option<FoundHit>,
+    /// Where the lines were scrolled this frame, for the find bar.
+    pub(super) seen: Seen,
+    /// Where the lines' menu links to, for a commit's diff.
+    pub(super) links: Option<&'a LineLinks<'a>>,
+    /// The changed lines that can be clicked: they take the right-click over them, so they
+    /// open the lines' menu too.
+    picks: Vec<egui::Response>,
 }
 
 impl<'a> Rows<'a> {
+    /// Prepare row interaction state and Git actions for the current diff layout.
     pub(super) fn new(
         ui: &Ui,
         view: &'a DiffView,
@@ -59,6 +78,7 @@ impl<'a> Rows<'a> {
         let hunk_picks: &[Pick] = match &view.key {
             DiffKey::Work(f) if partial && f.area == Area::Staged => &[Pick::Unstage],
             DiffKey::Work(_) if partial => &[Pick::Stage, Pick::Discard],
+            DiffKey::Commit { .. } if partial => &[Pick::Revert],
             _ => &[],
         };
         let (press, pointer) = ui.input(|i| (i.pointer.press_origin(), i.pointer.interact_pos()));
@@ -68,6 +88,8 @@ impl<'a> Rows<'a> {
             review,
             partial,
             split,
+            wrap: crate::settings::Settings::get(ui.ctx()).diff_wrap,
+            geometry: None,
             hunk_picks,
             text_sel: view.text_sel.filter(|s| s.made_in(split)),
             press,
@@ -75,12 +97,27 @@ impl<'a> Rows<'a> {
             font: theme::mono(12.0),
             t: Tokens::get(ui.ctx()),
             clicked: None,
+            text_started: false,
             offset: 0.0,
+            viewport_height: 0.0,
+            layout_changed: false,
             jumped: None,
             press_hit: None,
             pointer_hits: Vec::new(),
             text_hover: false,
+            find: None,
+            reveal: None,
+            seen: Seen::default(),
+            links: None,
+            picks: Vec::new(),
         }
+    }
+
+    /// Marks the find bar's matches, and scrolls to `reveal`.
+    pub(super) fn with_find(mut self, find: &'a Find, reveal: Option<FoundHit>) -> Self {
+        self.find = Some(find);
+        self.reveal = reveal;
+        self
     }
 
     /// Shows the lines and the change map; returns the text selection after this frame's drag.
@@ -100,11 +137,7 @@ impl<'a> Rows<'a> {
         let longest = data.longest as f32;
 
         ui.spacing_mut().item_spacing.y = 0.0;
-        let count = if split {
-            data.split.len()
-        } else {
-            data.lines.len()
-        };
+        let count = super::presentation::DisplayRows::new(data, split).len();
         // Every change of the file in a strip beside the scrollbar, to see where to scroll to
         // (above all when the whole file is shown). Clicking a change's mark jumps to the
         // change, clicking elsewhere or dragging scrolls there.
@@ -112,7 +145,14 @@ impl<'a> Rows<'a> {
         let area = ui.available_rect_before_wrap();
         let strip = Rect::from_min_max(pos2(area.right() - MAP_W, area.top()), area.max);
         let body = Rect::from_min_max(area.min, pos2(strip.left() - 1.0, area.bottom()));
-        let total_h = count as f32 * LINE_H;
+        let geometry = self
+            .wrap
+            .then(|| super::wrap::geometry(ui, data, split, body.width() - 16.0, &self.font));
+        self.geometry = geometry.clone();
+        let total_h = geometry
+            .as_ref()
+            .map_or(count as f32 * LINE_H, |g| g.total());
+        let offset = |row: usize| geometry.as_ref().map_or(row as f32 * LINE_H, |g| g.at(row));
         let map = ui
             .interact(
                 strip,
@@ -120,15 +160,19 @@ impl<'a> Rows<'a> {
                 Sense::click_and_drag(),
             )
             .on_hover_cursor(egui::CursorIcon::PointingHand);
-        // Under the lines, so dragging over them selects text (a click still picks a line).
+        // Code owns clicks and drags. Only the explicit marker gutter picks Git lines.
         let text_drag = ui.interact(
             body,
             ui.id().with(("diff_text", path)),
-            Sense::click_and_drag(),
+            Sense::CLICK | Sense::DRAG,
         );
-        let mut scroll = egui::ScrollArea::both()
-            .id_salt(("diff_scroll", path, split))
-            .auto_shrink(false);
+        let mut scroll = if self.wrap {
+            egui::ScrollArea::vertical()
+        } else {
+            egui::ScrollArea::both()
+        }
+        .id_salt(("diff_scroll", path, split))
+        .auto_shrink(false);
         if let Some(i) = self.view.jump.filter(|&i| i < changes.len()) {
             self.jumped = Some(i);
         } else if (map.clicked() || map.dragged())
@@ -139,7 +183,15 @@ impl<'a> Rows<'a> {
             let slack = 3.0 / strip.height() * count as f32;
             self.jumped = map
                 .clicked()
-                .then(|| change_at(changes, frac * count as f32, slack))
+                .then(|| {
+                    change_at(
+                        changes,
+                        geometry
+                            .as_ref()
+                            .map_or(frac * count as f32, |g| g.row(frac * total_h) as f32),
+                        slack,
+                    )
+                })
                 .flatten();
             if self.jumped.is_none() {
                 let at = frac * total_h;
@@ -147,244 +199,251 @@ impl<'a> Rows<'a> {
             }
         }
         if let Some(change) = self.jumped.and_then(|i| changes.get(i)) {
-            scroll = scroll.vertical_scroll_offset(offset_of(change.start));
+            scroll = scroll.vertical_scroll_offset(offset(change.start.saturating_sub(3)));
+        } else if let Some(logical) = self.view.scroll_to {
+            // Back where it was, read another way.
+            scroll = scroll.vertical_scroll_offset(offset((logical / LINE_H).floor() as usize));
+        }
+        if let (Some(find), Some(hit)) = (self.find, self.reveal) {
+            let text = data.lines.get(hit.line).map_or("", |l| l.text.as_str());
+            if let Some(g) = &geometry {
+                let galley = super::wrap::galley(ui, text, &self.font, g.text_width);
+                let y = g.at(hit.row)
+                    + galley
+                        .pos_from_cursor(egui::text::CCursor::new(hit.start))
+                        .top();
+                scroll = scroll.vertical_scroll_offset((y - LINE_H * 3.0).max(0.0));
+            } else {
+                scroll = find.scroll_to(scroll, &hit, text, char_w);
+            }
+        } else if let Some(row) = self.view.jump_line.and_then(|i| row_of(data, split, i)) {
+            scroll = scroll.vertical_scroll_offset(offset(row.saturating_sub(3)));
+        }
+        if map.has_focus() {
+            ui.memory_mut(|m| {
+                m.set_focus_lock_filter(
+                    map.id,
+                    egui::EventFilter {
+                        vertical_arrows: true,
+                        ..Default::default()
+                    },
+                )
+            });
+            if let Some(offset) = map_keyboard(ui, self.view.scroll, body.height(), total_h) {
+                scroll = scroll.vertical_scroll_offset(offset);
+            }
         }
         let out = ui.scope_builder(egui::UiBuilder::new().max_rect(body), |ui| {
-            scroll.show_rows(ui, LINE_H, count, |ui, range| {
-                if split {
-                    // Each half is half of what's visible, however long the lines: scrolling
-                    // sideways moves the text in both, the line numbers stay.
+            if let Some(g) = &geometry {
+                scroll.show_viewport(ui, |ui, viewport| {
+                    scroll_selection(ui, &text_drag, self.wrap);
+                    ui.set_min_height(total_h);
+                    let start = g.row(viewport.top()).saturating_sub(1);
+                    let end = (g.row(viewport.bottom()) + 2).min(count);
+                    ui.add_space(g.at(start));
                     let view = ui.clip_rect();
-                    let half = (view.width() / 2.0).floor();
-                    let overflow = (NUM_W + 24.0 + longest * char_w + 16.0 - half).max(0.0);
-                    for row in range {
-                        self.split_row(ui, row, view, half, overflow, acts);
+                    let width = ui.available_width();
+                    for row in start..end {
+                        let h = g.height(row);
+                        if split {
+                            self.split_row(ui, row, view, ((width / 2.0).floor(), 0.0, h), acts);
+                        } else {
+                            let (rect, _) = ui.allocate_exact_size(vec2(width, h), Sense::hover());
+                            self.line(ui, rect, row, Side::Unified, 0.0, acts);
+                        }
                     }
-                } else {
-                    let width =
-                        (NUM_W * 2.0 + 24.0 + longest * char_w + 24.0).max(ui.available_width());
-                    for i in range {
-                        let (rect, _) = ui.allocate_exact_size(vec2(width, LINE_H), Sense::hover());
-                        self.line(ui, rect, i, Side::Unified, 0.0, acts);
+                })
+            } else {
+                scroll.show_rows(ui, LINE_H, count, |ui, range| {
+                    scroll_selection(ui, &text_drag, self.wrap);
+                    if split {
+                        let view = ui.clip_rect();
+                        let half = (view.width() / 2.0).floor();
+                        let overflow = (NUM_W + 24.0 + longest * char_w + 16.0 - half).max(0.0);
+                        for row in range {
+                            self.split_row(ui, row, view, (half, overflow, LINE_H), acts);
+                        }
+                    } else {
+                        let width = (NUM_W * 2.0 + 24.0 + longest * char_w + 24.0)
+                            .max(ui.available_width());
+                        for i in range {
+                            let (rect, _) =
+                                ui.allocate_exact_size(vec2(width, LINE_H), Sense::hover());
+                            // Keep numbers and the Git marker in the visible gutter;
+                            // only the code follows the horizontal scroll offset.
+                            let scroll_x = (ui.clip_rect().left() - rect.left()).max(0.0);
+                            let rect = rect.with_min_x(rect.left() + scroll_x);
+                            self.line(ui, rect, i, Side::Unified, scroll_x, acts);
+                        }
                     }
-                }
-            })
+                })
+            }
         });
-        let shown = out.inner;
+        let mut shown = out.inner;
+        if let Some(offset) = crate::a11y::value::slider(
+            &map,
+            crate::i18n::text("repo-core-2303"),
+            shown.state.offset.y,
+            0.0..=(total_h - shown.inner_rect.height()).max(0.0),
+            LINE_H,
+            true,
+        ) {
+            shown.state.offset.y = offset;
+            shown.state.store(ui.ctx(), shown.id);
+            ui.ctx().request_repaint();
+        }
         self.offset = shown.state.offset.y;
+        self.viewport_height = shown.inner_rect.height();
+        self.layout_changed = super::presentation::KeyboardLayout {
+            key: egui::Id::new((
+                data.source,
+                data.geometry_revision,
+                split,
+                self.wrap,
+                body.width().to_bits(),
+                self.font.clone(),
+                ui.ctx().pixels_per_point().to_bits(),
+            )),
+            offsets: geometry.as_ref().map(|g| g.offsets.clone()),
+            viewport_height: self.viewport_height,
+        }
+        .changed(ui.ctx(), ui.id().with(("keyboard-layout", path)));
+        let view_w = shown.inner_rect.width();
+        self.seen = Seen {
+            x: shown.state.offset.x,
+            y: super::wrap::logical_offset(
+                geometry.as_ref().map(|g| g.offsets.as_slice()),
+                shown.state.offset.y,
+            ),
+            height: geometry.as_ref().map_or(shown.inner_rect.height(), |g| {
+                (g.row(shown.state.offset.y + shown.inner_rect.height())
+                    .saturating_sub(g.row(shown.state.offset.y))
+                    + 1) as f32
+                    * LINE_H
+            }),
+            // The text's width beside the numbers: in each half side by side.
+            text_w: if split {
+                (view_w / 2.0).floor() - NUM_W - 24.0
+            } else {
+                view_w - NUM_W * 2.0 - 24.0
+            },
+            line_h: LINE_H,
+        };
         change_map(
             ui,
             strip,
             runs,
             split,
             (shown.state.offset.y, shown.inner_rect.height(), total_h),
+            geometry.as_ref().map(|g| g.offsets.as_slice()),
             &self.t,
         );
 
         // Select from where the drag started to the pointer, on the side it started on.
-        let sel = drag_selection(
+        let mut sel = drag_selection(
+            ui,
             self.text_sel,
             &text_drag,
             self.press_hit,
             &self.pointer_hits,
+            &data.lines,
         );
+        self.text_started = ui.input(|i| i.pointer.primary_pressed())
+            && text_drag.is_pointer_button_down_on()
+            && self.press_hit.is_some()
+            || text_drag.clicked() && self.pointer_hits.iter().any(|(_, over)| *over);
+        if self.clicked.is_some() {
+            sel = None;
+        }
+        if !crate::a11y::keyboard_taken(ui.ctx())
+            && crate::keymap::take(ui.ctx(), crate::keymap::Command::SelectionAll)
+        {
+            let side = if !split {
+                Side::Unified
+            } else if sel.is_some_and(|s| s.side == Side::Old) {
+                Side::Old
+            } else {
+                Side::New
+            };
+            sel = TextSel::all(&data.lines, side);
+            self.text_started = sel.is_some();
+            ui.ctx().request_repaint();
+        }
         if self.text_hover || text_drag.dragged() {
             ui.ctx().set_cursor_icon(egui::CursorIcon::Text);
         }
-        copy_selection(ui, &text_drag, sel, &data.lines, &data.uncut);
+        if text_drag.secondary_clicked() {
+            let hit = self
+                .pointer_hits
+                .iter()
+                .find(|(_, over)| *over)
+                .map(|&((i, side, _), _)| (i, side));
+            if sel.is_none_or(TextSel::is_empty)
+                && let Some((i, side)) = hit
+            {
+                // Keep the code's menu about the clicked line without picking a Git target.
+                sel = Some(TextSel {
+                    side,
+                    anchor: (i, 0),
+                    cursor: (i, usize::MAX),
+                });
+                self.text_started = true;
+            }
+            if let Some(links) = self.links {
+                note_right_click(ui, links.id(), hit);
+            }
+        }
+        let links = self.links;
+        let history = || {
+            let old_path = super::old_name(&data.header);
+            super::picked_lines(
+                &self.view.key,
+                old_path.as_deref(),
+                &data.lines,
+                sel.as_ref(),
+                &self.view.chosen,
+            )
+            .map(|p| Action::LineHistory {
+                path: p.path,
+                at: p.at,
+                range: p.range,
+            })
+        };
+        let picks = std::mem::take(&mut self.picks);
+        copy_selection(
+            ui,
+            &text_drag,
+            &picks,
+            sel,
+            &data.lines,
+            &data.uncut,
+            |ui, acts| {
+                if let Some(links) = links {
+                    links.items(ui, (&data.lines, &data.header), sel, acts);
+                }
+            },
+            &history,
+            acts,
+        );
+        if sel != self.text_sel {
+            ui.ctx().request_repaint();
+        }
         sel
     }
-
-    /// One side-by-side row: the old line on the left half, the new one on the right, each
-    /// `half` wide within the visible `view` and scrolled sideways by up to `overflow`.
-    fn split_row(
-        &mut self,
-        ui: &mut Ui,
-        row: usize,
-        view: Rect,
-        half: f32,
-        overflow: f32,
-        acts: &mut Vec<Action>,
-    ) {
-        let Some(&(l, r)) = self.data.split.get(row) else {
-            return;
-        };
-        let (rect, _) = ui.allocate_exact_size(vec2(half * 2.0 + overflow, LINE_H), Sense::hover());
-        let scroll_x = (view.left() - rect.left()).clamp(0.0, overflow);
-        let left =
-            Rect::from_min_size(pos2(rect.left() + scroll_x, rect.top()), vec2(half, LINE_H));
-        let right = Rect::from_min_size(pos2(left.right(), rect.top()), vec2(half, LINE_H));
-        // Hunk headers and notes span both halves.
-        if l == r
-            && let Some(i) = l
-            && matches!(
-                self.data.lines.get(i).map(|x| x.kind),
-                Some(Kind::Hunk | Kind::Meta)
-            )
-        {
-            self.line(ui, left.union(right), i, Side::Both, 0.0, acts);
-            return;
-        }
-        match l {
-            Some(i) => self.line(ui, left, i, Side::Old, scroll_x, acts),
-            None => filler(ui, left, &self.t),
-        }
-        match r {
-            Some(i) => self.line(ui, right, i, Side::New, scroll_x, acts),
-            None => filler(ui, right, &self.t),
-        }
-        ui.painter().line_segment(
-            [right.left_top(), right.left_bottom()],
-            Stroke::new(1.0, self.t.separator),
-        );
-    }
-
-    /// Line `i` in `rect`, where it shows on `side`, with what can be done on it.
-    fn line(
-        &mut self,
-        ui: &mut Ui,
-        rect: Rect,
-        i: usize,
-        side: Side,
-        scroll_x: f32,
-        acts: &mut Vec<Action>,
-    ) {
-        let data = self.data;
-        let kind = data.lines.get(i).map(|l| l.kind);
-        let pickable = self.partial && matches!(kind, Some(Kind::Add | Kind::Del));
-        let spot = self.comment_spot(i, side);
-        let active = spot.is_some_and(|spot| self.is_target(spot));
-        let picked = self.view.chosen.contains(&i) || active;
-        // Hunk headers aren't copied, so they don't look selected either.
-        let sel_chars = self
-            .text_sel
-            .and_then(|s| s.chars_of(i, side))
-            .filter(|_| kind.is_some_and(|k| side.shows(k)));
-        let placed = paint_line(
-            ui, rect, data, i, side, scroll_x, &self.font, &self.t, picked, sel_chars,
-        );
-        // Where the drag started and where the pointer is, in this line's text.
-        if let Some((origin, galley)) = placed.filter(|_| kind.is_some_and(|k| side.shows(k))) {
-            self.hit_test(rect, (i, side), origin, &galley, pickable);
-        }
-        if let Some(spot) = spot {
-            self.comment_gutter(ui, rect, i, side, spot, acts);
-        }
-        if pickable {
-            let resp = ui
-                .interact(rect, ui.id().with(("diff_line", i)), Sense::click())
-                .on_hover_cursor(egui::CursorIcon::PointingHand);
-            if resp.clicked() {
-                self.clicked = Some(i);
-            }
-        }
-        if kind == Some(Kind::Hunk) && !self.hunk_picks.is_empty() {
-            self.hunk_buttons(ui, rect, i, acts);
-        }
-    }
-
-    /// The side and number line `i` takes a comment on where it shows on `side`, when a pull
-    /// request's file is shown.
-    fn comment_spot(&self, i: usize, side: Side) -> Option<(DiffSide, u64)> {
-        let review = self.review?;
-        let column = column_of(side);
-        self.data
-            .lines
-            .get(i)
-            .filter(|_| side != Side::Both)
-            .and_then(|l| match column {
-                None => unified_spot(l.kind, l.old, l.new, &review.marks),
-                _ => target_of(l.kind, l.old, l.new, column),
-            })
-    }
-
-    /// Whether the comment being written is on `spot`.
-    fn is_target(&self, (side, line): (DiffSide, u64)) -> bool {
-        self.review
-            .and_then(|r| r.target.as_ref())
-            .is_some_and(|t| t.side == side && t.line == line)
-    }
-
-    /// Notes where the press and the pointer are in the text of line `i` on `side`, laid out
-    /// in `galley` from `origin`.
-    fn hit_test(
-        &mut self,
-        rect: Rect,
-        (i, side): (usize, Side),
-        origin: Pos2,
-        galley: &Galley,
-        pickable: bool,
-    ) {
-        let hit = |p: Pos2| (i, side, galley.cursor_from_pos(p - origin).index.0);
-        if let Some(p) = self.press.filter(|p| rect.contains(*p)) {
-            self.press_hit = Some(hit(p));
-        }
-        if let Some(p) = self.pointer.filter(|p| rect.y_range().contains(p.y)) {
-            let over = rect.x_range().contains(p.x);
-            self.pointer_hits.push((hit(p), over));
-            self.text_hover |= over && !pickable;
-        }
-    }
-
-    /// The line's gutter in a pull request's file: its comments, and a click to write one.
-    fn comment_gutter(
-        &self,
-        ui: &mut Ui,
-        rect: Rect,
-        i: usize,
-        side: Side,
-        (spot_side, number): (DiffSide, u64),
-        acts: &mut Vec<Action>,
-    ) {
-        let Some(review) = self.review else { return };
-        let gutter = if side == Side::Unified {
-            NUM_W * 2.0
-        } else {
-            NUM_W
-        };
-        let area = Rect::from_min_size(rect.min, vec2(gutter, LINE_H));
-        let resp = ui
-            .interact(
-                area,
-                ui.id().with(("diff_gutter", i, column_of(side))),
-                Sense::click(),
-            )
-            .on_hover_cursor(egui::CursorIcon::PointingHand)
-            .on_hover_text("Comment on this line");
-        let count = review.marks.get(&(spot_side, number)).copied();
-        let active = self.is_target((spot_side, number));
-        paint_gutter_mark(ui, area, count, resp.hovered(), active);
-        if resp.clicked() {
-            acts.push(Action::Pr(PrAct::OpenLine(LineTarget {
-                path: review.path.clone(),
-                line: number,
-                side: spot_side,
-            })));
-        }
-    }
-
-    /// The hunk actions in the header at line `i`, at the visible right end, however wide the
-    /// line is.
-    fn hunk_buttons(&self, ui: &mut Ui, rect: Rect, i: usize, acts: &mut Vec<Action>) {
-        let mut right = rect.right().min(ui.clip_rect().right()) - 6.0;
-        for &pick in self.hunk_picks.iter().rev() {
-            let (resp, left) = hunk_button(ui, right, rect.center().y, pick, i);
-            if resp.clicked() {
-                acts.push(Action::PickLines {
-                    pick,
-                    lines: hunk_changes(&self.data.lines, i),
-                });
-            }
-            right = left - 4.0;
-        }
-    }
 }
 
-/// The half of the side-by-side view a side is, for comments (`None`: unified).
-fn column_of(side: Side) -> Option<DiffSide> {
-    match side {
-        Side::Old => Some(DiffSide::Left),
-        Side::New => Some(DiffSide::Right),
-        Side::Unified | Side::Both => None,
-    }
+/// The row line `i` shows on, unified or side by side (`split`).
+pub(super) fn row_of(data: &DiffData, split: bool, i: usize) -> Option<usize> {
+    super::presentation::DisplayRows::new(data, split).row_of(i)
 }
+
+#[cfg(test)]
+#[path = "rows/tests.rs"]
+mod accessibility_tests;
+
+mod actions;
+
+mod paint;
+
+mod labels;
+use labels::{column_of, gutter_width, line_label, map_keyboard};

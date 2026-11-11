@@ -2,10 +2,15 @@
 
 use egui::{RichText, Ui};
 
+mod content;
+
+use content::{TIPS, features};
+
+use crate::keymap;
 use crate::theme::{self, Tokens};
 
 /// Ctrl, or Cmd on macOS, as the shortcuts are written.
-fn command() -> &'static str {
+pub(crate) fn command() -> &'static str {
     if cfg!(target_os = "macos") {
         "Cmd"
     } else {
@@ -13,112 +18,171 @@ fn command() -> &'static str {
     }
 }
 
-/// What each part of the window does: (title, points).
-const FEATURES: &[(&str, &[&str])] = &[
+/// The "Did you know" tips, as written (with `Ctrl`).
+pub(crate) fn tips() -> &'static [&'static str] {
+    use std::sync::OnceLock;
+    static ENGLISH: OnceLock<Vec<&'static str>> = OnceLock::new();
+    static GERMAN: OnceLock<Vec<&'static str>> = OnceLock::new();
+    let cache = match crate::i18n::language() {
+        crate::i18n::Language::English => &ENGLISH,
+        crate::i18n::Language::German => &GERMAN,
+    };
+    cache.get_or_init(|| TIPS.iter().map(|&id| crate::i18n::text(id)).collect())
+}
+
+/// Keyboard and mouse shortcuts of the views, besides the main actions' keys in
+/// [`crate::keymap`]: (keys, what they do). `Cmd` stands for Ctrl outside macOS.
+pub(crate) const SHORTCUTS: &[(&str, &[(&str, &str)])] = &[
     (
-        "Repositories and tabs",
+        "interaction-manual-group-keyboard-navigation",
         &[
-            "Open, create or clone a repository from the start page; recent ones are listed there.",
-            "One tab per repository. Changes made elsewhere (editor, terminal) show up by themselves.",
-            "Right-click a tab to give it its own icon and highlight colour.",
-            "Drag a tab along the strip to reorder the tabs.",
+            (
+                "interaction-manual-shortcut-mouse-back-forward",
+                "interaction-manual-shortcut-back-forward-through-recent-views",
+            ),
+            (
+                "Tab / Shift+Tab",
+                "interaction-manual-shortcut-next-previous-button-row-or-field",
+            ),
+            (
+                "Enter / Space",
+                "interaction-manual-shortcut-click-the-focused-button-or-row",
+            ),
         ],
     ),
     (
-        "Graph",
+        "interaction-manual-group-start-page",
         &[
-            "Every branch with its pill on its latest commit: solid for the checked-out one, a laptop when it is local, a cloud when a remote has it.",
-            "Double-click a pill to check that branch out (and pull it when its remote is ahead; on the checked-out branch's remote pill, just pull); hover +N to see every branch of the commit, and right-click any of them.",
-            "Right-click a commit or a pill for branches, tags, merge, rebase, cherry-pick, revert, reset and more.",
-            "Search messages, authors and hashes, or switch to Code to find the commits that added or removed some text.",
-            "Drag the borders in the column header to resize; right-click it to pick the columns, make the graph column compact or reset the columns.",
-            "Interactive rebase: reorder, reword, squash, fix up or drop commits, then start it.",
+            (
+                "interaction-manual-shortcut-type",
+                "interaction-manual-shortcut-filter-the-recent-repositories",
+            ),
+            (
+                "↑ / ↓",
+                "interaction-manual-shortcut-pick-a-recent-repository",
+            ),
+            ("Enter", "interaction-manual-shortcut-open-the-one-picked"),
+            ("Esc", "interaction-manual-shortcut-clear-the-filter"),
         ],
     ),
     (
-        "Compare",
+        "interaction-manual-group-graph",
         &[
-            "Ctrl+click a second commit to list the files that differ between the two (the changes row is the working tree).",
-            "On a branch's menu, “Changes x adds to main” shows what it changed since they diverged, like a pull request; “Compare main with x” shows every difference.",
+            (
+                "Enter / Shift+Enter",
+                "interaction-manual-shortcut-next-previous-search-result",
+            ),
+            (
+                "interaction-manual-shortcut-then-tab-or-enter",
+                "interaction-manual-shortcut-pick-a-search-suggestion",
+            ),
+            (
+                "interaction-manual-shortcut-cmd-click",
+                "interaction-manual-shortcut-compare-with-the-selected-commit",
+            ),
+            (
+                "interaction-manual-shortcut-double-click-a-pill",
+                "interaction-manual-shortcut-check-out-that-branch-or-tag",
+            ),
+            (
+                "interaction-manual-shortcut-alt-over-rebase-reset-hard-pull",
+                "interaction-manual-shortcut-preview-the-result-in-the-graph-ghost-run",
+            ),
+            (
+                "interaction-manual-shortcut-drag-a-pill-or-a-commit",
+                "interaction-manual-shortcut-merge-rebase-fast-forward-cherry-pick-move-or-squash",
+            ),
+            (
+                "Esc",
+                "interaction-manual-shortcut-close-the-find-bar-diff-comparison-or-search",
+            ),
         ],
     ),
     (
-        "Changes and commits",
+        "interaction-manual-group-changes",
         &[
-            "Stage, unstage or discard whole files from the right pane.",
-            "Path / Tree at the top of the right pane lists the files flat or in their folders; click a folder to fold it.",
-            "In a file's diff, stage, unstage or discard one hunk, or click the lines you want and act on only those.",
-            "A file kept in Git LFS shows as its LFS objects and their sizes; the palette has LFS: Fetch and LFS: Pull when git-lfs is installed.",
-            "The arrows in a diff's header jump from change to change; the marks beside the scrollbar show where the changes are, and a click on one jumps there.",
-            "Write the summary and description and commit; amend the last commit; pick the identity you commit as.",
-            "Settings → Commit signing sets the format, key and program git signs with, and whether it signs commits and tags by default (your global git config).",
-            "Double-click a commit's message in the right pane to edit it (any commit of the checked-out branch with no merges after it).",
-            "Undo and redo commits, merges, rebases, resets, checkouts, branches, tags and stashes.",
+            (
+                "interaction-manual-shortcut-click-shift-click",
+                "interaction-manual-shortcut-pick-lines-in-a-diff-or-a-file-or-a-range-of-them",
+            ),
+            (
+                "interaction-manual-shortcut-click-shift-click",
+                "interaction-manual-shortcut-pick-lines-of-a-file-to-link-to-view-file-or-file-in-a-commit-s-diff",
+            ),
+            (
+                "interaction-manual-shortcut-cmd-click-a-file",
+                "interaction-manual-shortcut-pick-it-to-stash-or-unpick-it",
+            ),
         ],
     ),
     (
-        "Branches, remotes and more",
+        "interaction-manual-group-find-in-a-diff-file-or-blame",
         &[
-            "Left pane: local branches with ahead / behind counts, remotes, worktrees, submodules, stashes, pull requests and tags.",
-            "Submodules show whether they are modified, not initialised or out of date; right-click one to update it or open it in a tab. Settings → Git can keep them up to date after each checkout, pull, merge and rebase.",
-            "Hover a branch and click its eye to hide it from the graph, or Solo it from its menu to see only the branches soloed; “Show all” at the top brings them all back.",
-            "Conflicts open in a three-pane editor with Ours, Theirs and Both for each conflict.",
-            "Right-click a file for its history, its blame or the whole file as it is at the commit.",
-            "Switch a diff from Diff to File to read the whole file; tick View all files under a commit's files to list every file in it.",
-            "A terminal panel with tabs, in the repository's folder.",
+            (
+                "Enter / Shift+Enter",
+                "interaction-manual-shortcut-next-previous-match-while-the-find-bar-is-open",
+            ),
+            ("Esc", "interaction-manual-shortcut-close-the-find-bar"),
+        ],
+    ),
+    (
+        "interaction-manual-group-terminal",
+        &[
+            (
+                "Cmd+C",
+                "interaction-manual-shortcut-copy-the-selection-without-one-it-goes-to-the-shell",
+            ),
+            (
+                "Cmd+Shift+C",
+                "interaction-manual-shortcut-copy-the-selection",
+            ),
         ],
     ),
 ];
 
-/// Keyboard and mouse shortcuts: (keys, what they do). `Cmd` stands for Ctrl outside macOS.
-const SHORTCUTS: &[(&str, &[(&str, &str)])] = &[
-    (
-        "Window",
-        &[
-            ("Cmd+T", "New tab"),
-            ("Cmd+W", "Close the tab (or middle-click it)"),
-            ("Cmd+Shift+T", "Reopen the tab closed last"),
-            ("Cmd+P", "Command palette: every action and branch"),
-            ("F5", "Reload the repository"),
-            ("F1", "This manual"),
-        ],
-    ),
-    (
-        "Graph",
-        &[
-            ("↑ / ↓", "Previous / next commit"),
-            ("Cmd+F", "Search commits"),
-            ("Enter / Shift+Enter", "Next / previous search result"),
-            ("Cmd+click", "Compare with the selected commit"),
-            ("Double-click a pill", "Check out that branch or tag"),
-            ("Esc", "Close the diff, comparison or search"),
-        ],
-    ),
-    (
-        "Changes",
-        &[
-            ("Cmd+Enter", "Commit (from the message fields)"),
-            (
-                "Click / Shift+click",
-                "Pick lines in a diff, or a range of them",
-            ),
-            ("F7 / Shift+F7", "Next / previous change in a diff"),
-            ("Alt+↓ / Alt+↑", "Next / previous change in a diff"),
-            ("Cmd+Z", "Undo"),
-            ("Cmd+Y / Cmd+Shift+Z", "Redo"),
-        ],
-    ),
-    (
-        "Terminal",
-        &[
-            (
-                "Cmd+C",
-                "Copy the selection (without one, it goes to the shell)",
-            ),
-            ("Cmd+Shift+C", "Copy the selection"),
-        ],
-    ),
-];
+/// Every group of shortcuts, as the manual and Settings → Keyboard shortcuts list them: the
+/// window's and a repository tab's keys from [`crate::keymap`], then the views' own. Each row:
+/// the keys as [`key_combo`] draws them (Ctrl or Cmd already written), what they do.
+pub(crate) fn shortcut_groups(
+    ctx: &egui::Context,
+) -> Vec<(&'static str, Vec<(String, &'static str)>)> {
+    let from_keymap = |rows: &[keymap::Row]| {
+        rows.iter()
+            .map(|r| (keymap::row_keys(ctx, r), crate::i18n::text(r.what)))
+            .collect::<Vec<_>>()
+    };
+    let mut groups = vec![
+        (
+            crate::i18n::text("interaction-manual-group-window"),
+            from_keymap(keymap::WINDOW_ROWS),
+        ),
+        (
+            crate::i18n::text("interaction-manual-group-repository"),
+            from_keymap(keymap::REPOSITORY_ROWS),
+        ),
+        (
+            crate::i18n::text("interaction-manual-group-contextual-actions"),
+            from_keymap(keymap::LOCAL_ROWS),
+        ),
+    ];
+    groups.extend(SHORTCUTS.iter().map(|(title, keys)| {
+        let keys = keys
+            .iter()
+            .map(|(combo, what)| {
+                (
+                    keymap::written(if combo.starts_with("interaction-manual-") {
+                        crate::i18n::text(combo)
+                    } else {
+                        combo
+                    }),
+                    crate::i18n::text(what),
+                )
+            })
+            .collect();
+        (crate::i18n::text(title), keys)
+    }));
+    groups
+}
 
 /// Draws the manual's contents.
 pub fn ui(ui: &mut Ui) {
@@ -133,16 +197,17 @@ pub fn ui(ui: &mut Ui) {
         ui.add_space(2.0);
     };
 
-    for (title, points) in FEATURES {
-        heading(ui, title);
-        for point in *points {
+    for (title, points) in features() {
+        heading(ui, crate::i18n::text(title));
+        for point in points {
             // The bullet on the left, the text wrapping beside it.
             ui.horizontal_top(|ui| {
                 ui.spacing_mut().item_spacing.x = 6.0;
                 ui.label(RichText::new("•").color(t.text_faint));
                 ui.add(
                     egui::Label::new(
-                        RichText::new(point.replace("Ctrl", command())).color(t.text_dim),
+                        RichText::new(crate::i18n::text(point).replace("Ctrl", command()))
+                            .color(t.text_dim),
                     )
                     .wrap(),
                 );
@@ -152,27 +217,52 @@ pub fn ui(ui: &mut Ui) {
 
     ui.add_space(8.0);
     ui.separator();
-    for (title, keys) in SHORTCUTS {
-        heading(ui, &format!("{title} shortcuts"));
-        egui::Grid::new(("manual_keys", *title))
+    shortcut_ui(ui);
+}
+
+/// The same translated tables shown by the manual, isolated from its long feature prose.
+fn shortcut_ui(ui: &mut Ui) {
+    let t = Tokens::get(ui.ctx());
+    let heading = |ui: &mut Ui, text: &str| {
+        ui.add_space(10.0);
+        ui.label(
+            RichText::new(text.to_uppercase())
+                .font(theme::semibold(10.5))
+                .color(t.text_faint),
+        );
+        ui.add_space(2.0);
+    };
+    for (group_index, (title, keys)) in shortcut_groups(ui.ctx()).into_iter().enumerate() {
+        heading(
+            ui,
+            &crate::i18n::message(
+                "interaction-manual-shortcut-heading",
+                &[("group", title.into())],
+            ),
+        );
+        egui::Grid::new(("manual_keys", group_index))
             .num_columns(2)
             .spacing([16.0, 6.0])
             .min_col_width(170.0)
             .show(ui, |ui| {
-                for (combo, what) in *keys {
-                    ui.horizontal(|ui| {
-                        ui.spacing_mut().item_spacing.x = 4.0;
-                        for (n, part) in combo.split(" / ").enumerate() {
-                            if n > 0 {
-                                ui.label(RichText::new("/").color(t.text_faint));
-                            }
-                            key_chip(ui, &part.replace("Cmd", command()));
-                        }
-                    });
+                for (combo, what) in &keys {
+                    ui.horizontal(|ui| key_combo(ui, combo));
                     ui.label(RichText::new(*what).color(t.text_dim));
                     ui.end_row();
                 }
             });
+    }
+}
+
+/// Key combinations, `a / b`, each drawn like a keycap.
+pub(crate) fn key_combo(ui: &mut Ui, combo: &str) {
+    let t = Tokens::get(ui.ctx());
+    ui.spacing_mut().item_spacing.x = 4.0;
+    for (n, part) in combo.split(" / ").enumerate() {
+        if n > 0 {
+            ui.label(RichText::new("/").color(t.text_faint));
+        }
+        key_chip(ui, part);
     }
 }
 
@@ -188,3 +278,9 @@ fn key_chip(ui: &mut Ui, keys: &str) {
             ui.label(RichText::new(keys).font(theme::mono(11.5)).color(t.text));
         });
 }
+
+#[cfg(test)]
+mod feature_localization_tests;
+
+#[cfg(test)]
+mod localization_tests;

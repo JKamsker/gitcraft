@@ -21,6 +21,28 @@ struct Grid {
     cell: Vec2,
 }
 
+/// Benchmark the same row painting and font layout without starting an interactive shell.
+#[cfg(test)]
+pub(crate) fn cpu_paint(ui: &Ui, screen: &vt100::Screen) {
+    let t = Tokens::get(ui.ctx());
+    let font = theme::mono(13.0);
+    let glyph = ui
+        .painter()
+        .layout_no_wrap("M".into(), font.clone(), t.text);
+    let grid = Grid {
+        inner: ui.available_rect_before_wrap(),
+        cell: glyph.size(),
+    };
+    let palette = Palette::new(&t);
+    let (rows, cols) = screen.size();
+    for row in 0..rows.get() {
+        let job = paint_row(ui.painter(), screen, row, cols.get(), grid, &palette, &font);
+        let galley = ui.fonts_mut(|f| f.layout_job(job));
+        ui.painter()
+            .galley(grid.cells(row, 0, 0.0).left_top(), galley, t.text);
+    }
+}
+
 impl Grid {
     /// `n` cells of `row` from `col` on.
     fn cells(&self, row: u16, col: u16, n: f32) -> Rect {
@@ -37,8 +59,10 @@ impl Grid {
 impl Terminal {
     /// Paints the screen into all of `ui`'s remaining space and handles input.
     pub fn ui(&mut self, ui: &mut Ui) {
-        self.drawn
-            .store(ui.ctx().cumulative_pass_nr(), Ordering::Relaxed);
+        self.drawn.store(
+            ui.ctx().cumulative_pass_nr_for(egui::ViewportId::ROOT),
+            Ordering::Relaxed,
+        );
         let t = Tokens::get(ui.ctx());
         let font = theme::mono(crate::settings::Settings::get(ui.ctx()).terminal_font);
         let glyph = ui
@@ -49,12 +73,33 @@ impl Terminal {
         let rect = ui.available_rect_before_wrap();
         let id = ui.id().with("terminal");
         let resp = ui.interact(rect, id, Sense::click_and_drag());
+        crate::a11y::a11y(
+            &resp,
+            egui::WidgetType::TextEdit,
+            super::display::accessibility(),
+        );
+        ui.ctx().accesskit_node_builder(resp.id, |node| {
+            node.set_role(egui::accesskit::Role::Terminal);
+            node.set_value(
+                lock(&self.parser)
+                    .screen()
+                    .contents()
+                    .chars()
+                    .filter(|&c| c == '\n' || !crate::a11y::labels::hidden_control(c))
+                    .collect::<String>(),
+            );
+        });
         ui.allocate_rect(rect, Sense::hover());
         let grid = Grid {
             inner: rect.shrink2(vec2(8.0, 6.0)),
             cell,
         };
         self.pointer(ui, &resp, rect, grid);
+        let focused = resp.has_focus();
+        if focused && release_focus(ui, id) {
+            // Consume the escape before the terminal encoder or repository shortcuts see it.
+            resp.surrender_focus();
+        }
         let focused = resp.has_focus();
         if focused {
             // Keep Tab, arrows and Escape for the shell.
@@ -251,7 +296,7 @@ impl Terminal {
             painter.text(
                 rect.right_top() + vec2(-10.0, 8.0),
                 egui::Align2::RIGHT_TOP,
-                format!("↑ {} lines", self.scroll),
+                super::display::scrollback(self.scroll),
                 FontId::proportional(11.0),
                 t.text_faint,
             );
@@ -334,4 +379,59 @@ fn paint_row(
         job.append(&run, 0.0, format);
     }
     job
+}
+
+/// Widget navigation, separate from shell key encoding: Escape alone still reaches vim/readline.
+fn release_focus(ui: &Ui, id: egui::Id) -> bool {
+    ui.memory(|m| m.has_focus(id))
+        && ui.input_mut(|i| i.consume_key(egui::Modifiers::SHIFT, Key::Escape))
+}
+
+#[cfg(test)]
+mod focus_tests {
+    use super::*;
+    #[test]
+    fn only_the_terminal_owner_consumes_shift_escape() {
+        for (focused, modifiers, expected) in [
+            (true, egui::Modifiers::SHIFT, true),
+            (true, egui::Modifiers::NONE, false),
+            (false, egui::Modifiers::SHIFT, false),
+        ] {
+            let ctx = egui::Context::default();
+            let id = egui::Id::new("terminal-test");
+            ctx.run_ui(egui::RawInput::default(), |ui| {
+                if focused {
+                    ui.memory_mut(|m| m.request_focus(id));
+                }
+            })
+            .drop_without_applying_deltas();
+            ctx.run_ui(
+                egui::RawInput {
+                    events: vec![Event::Key {
+                        key: Key::Escape,
+                        physical_key: Some(Key::Escape),
+                        pressed: true,
+                        repeat: false,
+                        modifiers,
+                    }],
+                    ..Default::default()
+                },
+                |ui| {
+                    assert_eq!(release_focus(ui, id), expected);
+                    assert_eq!(
+                        ui.input(|i| i.events.iter().any(|e| matches!(
+                            e,
+                            Event::Key {
+                                key: Key::Escape,
+                                pressed: true,
+                                ..
+                            }
+                        ))),
+                        !expected
+                    );
+                },
+            )
+            .drop_without_applying_deltas();
+        }
+    }
 }

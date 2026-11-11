@@ -5,15 +5,21 @@ mod changes;
 mod commit;
 mod commit_box;
 mod compare;
+pub(super) mod compose;
+mod extras;
+mod stash_picks;
 
 pub(super) use all_files::AllFiles;
+pub(super) use changes::{discard_dialog, stage_action};
+pub(super) use extras::Extras;
 
-use egui::{Align2, Sense, Ui, pos2, vec2};
+use egui::Ui;
 
 use super::branch_tree;
 use super::widgets::{self, RowExtra};
-use super::{Action, DiffKey, DiffView, RepoTab};
+use super::{Action, DiffKey, DiffView, RepoTab, folding};
 use crate::git::ChangedFile;
+use crate::settings::Settings;
 use crate::theme::{self, Tokens};
 
 impl RepoTab {
@@ -25,6 +31,8 @@ impl RepoTab {
             self.compare_panel(ui, acts);
         } else if wip {
             self.changes_panel(ui, acts);
+        } else if self.selected_parked().is_some() {
+            self.parked_panel(ui, acts);
         } else {
             self.commit_panel(ui, acts);
         }
@@ -36,7 +44,7 @@ impl RepoTab {
 
     /// Changed files, each opening its diff (`key`) when clicked; `rev`: where the files are,
     /// for their menu (`None`: the working tree); `tree`: which list this is, for the folders
-    /// opened and closed in it.
+    /// opened and closed in it. Generated files and lockfiles are folded at the end.
     pub(super) fn file_list(
         &self,
         ui: &mut Ui,
@@ -47,78 +55,190 @@ impl RepoTab {
         key: impl Fn(&str) -> DiffKey,
     ) {
         let id = egui::Id::new(("file-folder", self.repo_key(), tree));
-        let selected = |f: &&ChangedFile| self.open_key() == Some(&key(&f.path));
+        let keyboard_scope = match files.first().map(|f| key(&f.path)) {
+            Some(DiffKey::Commit { hash, .. }) => egui::Id::new((tree, hash)),
+            Some(DiffKey::Range { from, to, .. }) => egui::Id::new((tree, from, to)),
+            _ => egui::Id::new(tree),
+        };
+        self.keyboard_files(
+            ui,
+            (keyboard_scope, Some(id)),
+            files,
+            |f| f.path.as_str(),
+            |f| key(&f.path),
+            acts,
+        );
+        let rules = folding::Rules::from_settings(&Settings::get(ui.ctx()));
+        let group = folding::split(
+            ui,
+            id.with(rev),
+            files,
+            |f| &f.path,
+            (&self.folding, &rules),
+            acts,
+        );
+        let selected = |f: &&&ChangedFile| {
+            self.open_key() == Some(&key(&f.path)) || self.keyboard_file_selected(&key(&f.path))
+        };
+        let (scope, generation) = super::weakened_marks::scope_of(&key(""), self.work_read);
+        let found = self.weakened.get(ui.ctx(), &self.path, scope, generation);
+        let paths: Vec<&str> = files.iter().map(|f| f.path.as_str()).collect();
+        self.owners_summary(ui, &paths);
+        let row = |ui: &mut Ui, indent, f: &ChangedFile, acts: &mut Vec<Action>| {
+            let stats = RowExtra::Stats(f.added, f.removed);
+            let (extra, flags) = super::weakened_marks::extra(found.as_ref(), &f.path, &stats);
+            let r = widgets::file_row_owned(
+                ui,
+                f.status,
+                &f.path,
+                f.old_path.as_deref(),
+                indent,
+                selected(&&f),
+                extra,
+                self.owner_tag(&f.path).as_ref(),
+            );
+            self.keyboard_file_row(keyboard_scope, &r.row, &key(&f.path));
+            super::weakened_marks::hover(ui, &r, flags);
+            // A file the commit deleted isn't in it, and has nothing to link to.
+            let links = || self.link_menu(None).filter(|_| f.status != 'D');
+            widgets::file_menu(
+                &r.row,
+                &f.path,
+                rev,
+                false,
+                Some(&key(&f.path)),
+                &links,
+                self.keyboard_file_selected(&key(&f.path)),
+                acts,
+            );
+            if r.row.clicked() {
+                self.keyboard_select_file(keyboard_scope, key(&f.path));
+                acts.push(Action::OpenDiff(key(&f.path)));
+                acts.push(Action::UnfoldDiff);
+            }
+        };
         // Rows are known by their path within the list of this commit (or range): a menu left
         // open while another one is shown is not that one's file of the same path.
-        ui.push_id(("file-list", tree, rev), |ui| {
-            branch_tree::files(
-                ui,
-                (id, true),
-                files,
-                |f| &f.path,
-                &selected,
-                &mut |ui, indent, f| {
-                    let r = widgets::file_row(
+        let mut reveal = None;
+        horizontal_files(ui, ("changed-files-scroll", tree, rev), &paths, |ui| {
+            ui.push_id(("file-list", tree, rev), |ui| {
+                reveal = branch_tree::files(
+                    ui,
+                    (id, true),
+                    &group.shown,
+                    |f| &f.path,
+                    &selected,
+                    &mut |ui, indent, f| row(ui, indent, f, acts),
+                )
+                .or(reveal);
+                let stats = group.folded.iter().fold((0u32, 0u32), |(a, d), f| {
+                    (
+                        a.saturating_add(f.added.unwrap_or(0)),
+                        d.saturating_add(f.removed.unwrap_or(0)),
+                    )
+                });
+                let holds_open = group.folded.iter().any(|f| selected(&f));
+                let open_id = id.with(("folded-open", rev));
+                if group.header(ui, open_id, Some(stats), holds_open) {
+                    reveal = branch_tree::files(
                         ui,
-                        f.status,
-                        &f.path,
-                        f.old_path.as_deref(),
-                        indent,
-                        selected(&f),
-                        RowExtra::Stats(f.added, f.removed),
-                    );
-                    widgets::file_menu(&r.row, &f.path, rev, false, acts);
-                    if r.row.clicked() {
-                        acts.push(Action::OpenDiff(key(&f.path)));
-                    }
-                },
-            );
+                        (id.with("folded"), true),
+                        &group.folded,
+                        |f| &f.path,
+                        &selected,
+                        &mut |ui, indent, f| row(ui, indent, f, acts),
+                    )
+                    .or(reveal);
+                }
+            });
         });
+        // egui consumes both scroll targets at the inner horizontal list. Forward the
+        // same typed row rectangle to its outer vertical scroller after that list ends.
+        if let Some(rect) = reveal {
+            ui.scroll_to_rect(rect, Some(egui::Align::Center));
+        }
+        super::weakened_marks::error_note(ui, found.as_ref());
     }
 }
 
 /// "N files changed +a −d", and an optional note on the right.
 pub(super) fn files_header(ui: &mut Ui, files: &[ChangedFile], note: Option<&str>) {
-    let t = Tokens::get(ui.ctx());
-    let (adds, dels) = files.iter().fold((0, 0), |(a, d), f| {
-        (a + f.added.unwrap_or(0), d + f.removed.unwrap_or(0))
-    });
-    let (rect, _) = ui.allocate_exact_size(vec2(ui.available_width(), 28.0), Sense::hover());
-    let p = ui.painter();
-    p.rect_filled(rect, 0.0, t.tab_strip);
-    let y = rect.center().y;
-    let r = p.text(
-        pos2(rect.left() + 14.0, y),
-        Align2::LEFT_CENTER,
-        format!(
-            "{} file{} changed",
-            files.len(),
-            if files.len() == 1 { "" } else { "s" }
-        ),
-        theme::semibold(11.5),
-        t.text_dim,
-    );
-    let r = p.text(
-        pos2(r.right() + 10.0, y),
-        Align2::LEFT_CENTER,
-        format!("+{adds}"),
-        theme::mono(11.0),
-        t.success,
-    );
-    p.text(
-        pos2(r.right() + 6.0, y),
-        Align2::LEFT_CENTER,
-        format!("−{dels}"),
-        theme::mono(11.0),
-        t.danger,
-    );
-    if let Some(note) = note {
-        p.text(
-            pos2(rect.right() - 10.0, y),
-            Align2::RIGHT_CENTER,
-            note,
-            egui::FontId::proportional(11.0),
-            t.text_faint,
-        );
-    }
+    files_header_with(ui, files, note, |_| {});
 }
+
+pub(super) fn files_header_with(
+    ui: &mut Ui,
+    files: &[ChangedFile],
+    note: Option<&str>,
+    controls: impl FnOnce(&mut Ui),
+) {
+    let t = Tokens::get(ui.ctx());
+    let (adds, dels) = files.iter().fold((0u32, 0u32), |(a, d), f| {
+        (
+            a.saturating_add(f.added.unwrap_or(0)),
+            d.saturating_add(f.removed.unwrap_or(0)),
+        )
+    });
+    let summary = format!(
+        "{}  +{adds}  −{dels}",
+        crate::i18n::message("repo-core-1146", &[("count", files.len().into())])
+    );
+    egui::Frame::new()
+        .fill(t.tab_strip)
+        .inner_margin(egui::Margin::symmetric(10, 4))
+        .show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    controls(ui);
+                    ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                        ui.add(
+                            egui::Label::new(
+                                egui::RichText::new(&summary)
+                                    .font(theme::semibold(11.5))
+                                    .color(t.text_dim),
+                            )
+                            .truncate(),
+                        )
+                        .on_hover_text(format!(
+                            "{summary}{}",
+                            note.map(|n| format!(" · {n}")).unwrap_or_default()
+                        ));
+                    });
+                });
+            });
+        });
+}
+
+/// Only this list grows to fit long paths. The message, metadata and editor keep the
+/// panel's width, and each list keeps its own horizontal offset.
+fn horizontal_files(
+    ui: &mut Ui,
+    id: impl egui::AsIdSalt,
+    paths: &[&str],
+    body: impl FnOnce(&mut Ui),
+) -> egui::scroll_area::ScrollAreaOutput<()> {
+    let width = paths
+        .iter()
+        .map(|path| {
+            ui.painter()
+                .layout_no_wrap(
+                    (*path).to_owned(),
+                    egui::FontId::proportional(12.5),
+                    egui::Color32::WHITE,
+                )
+                .size()
+                .x
+                + 160.0
+        })
+        .fold(ui.available_width(), f32::max);
+    egui::ScrollArea::horizontal()
+        .id_salt(id)
+        .auto_shrink([false, true])
+        .show(ui, |ui| {
+            ui.set_min_width(width);
+            body(ui);
+        })
+}
+
+#[cfg(test)]
+pub(in crate::repo) mod responsive_tests;

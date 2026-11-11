@@ -1,0 +1,438 @@
+{
+  "candidate": "f8cacb06cffaf8a942da6301c11e8265d52fec35",
+  "tree": "72c0c69df7930fed45bb49fab688789a0d281be3",
+  "base": "0d2d86d51ea122402182dc5ef5f0d5631d2c64aa",
+  "created_utc": "2026-11-07T18:10:53.485992+00:00",
+  "inline_review": [
+    {
+      "id": 4502986788,
+      "url": "https://github.com/JKamsker/gitcraft/pull/164#discussion_r4502986788",
+      "finding": "selected branch upstream",
+      "disposition": "fixed",
+      "response": "Review dialog uses the selected local branch upstream when fetched."
+    },
+    {
+      "id": 4502986790,
+      "url": "https://github.com/JKamsker/gitcraft/pull/164#discussion_r4502986790",
+      "finding": "Gerrit link accent",
+      "disposition": "fixed",
+      "response": "Paints accent_fg."
+    },
+    {
+      "id": 4502986795,
+      "url": "https://github.com/JKamsker/gitcraft/pull/164#discussion_r4502986795",
+      "finding": "review Push hook menu",
+      "disposition": "fixed",
+      "response": "Restores shared context menu; button constructs dialog on click."
+    },
+    {
+      "id": 4502986798,
+      "url": "https://github.com/JKamsker/gitcraft/pull/164#discussion_r4502986798",
+      "finding": "owner label accent",
+      "disposition": "fixed",
+      "response": "Paints accent_fg; all row states checked with every status separately."
+    },
+    {
+      "id": 4502986801,
+      "url": "https://github.com/JKamsker/gitcraft/pull/164#discussion_r4502986801",
+      "finding": "intraline backgrounds",
+      "disposition": "fixed",
+      "response": "Independent fill hue with readable tint cap; selected field/card composites tested."
+    },
+    {
+      "id": 4502993151,
+      "url": "https://github.com/JKamsker/gitcraft/pull/164#discussion_r4502993151",
+      "finding": "Unicode whitespace refs",
+      "disposition": "fixed",
+      "response": "ASCII splitting preserves legal Unicode whitespace; native Git regression."
+    },
+    {
+      "id": 4502993180,
+      "url": "https://github.com/JKamsker/gitcraft/pull/164#discussion_r4502993180",
+      "finding": "lazy bundle export",
+      "disposition": "fixed",
+      "response": "Capability guard and --no-lazy-fetch cover base resolution and creation; promised-blob positive control."
+    },
+    {
+      "id": 4502993187,
+      "url": "https://github.com/JKamsker/gitcraft/pull/164#discussion_r4502993187",
+      "finding": "non-UTF8 worktree paths",
+      "disposition": "removed path",
+      "response": "Inspection no longer enumerates worktrees; import execution removed."
+    },
+    {
+      "id": 4502993194,
+      "url": "https://github.com/JKamsker/gitcraft/pull/164#discussion_r4502993194",
+      "finding": "legacy prerequisite subjects",
+      "disposition": "fixed",
+      "response": "Descriptions decode lossily, OIDs/ref names stay strict."
+    },
+    {
+      "id": 4502993200,
+      "url": "https://github.com/JKamsker/gitcraft/pull/164#discussion_r4502993200",
+      "finding": "older Git partial fixture",
+      "disposition": "fixed",
+      "response": "Upgrade/no-fetch branch for old Git; positive fetch control only on supported Git."
+    },
+    {
+      "id": 4502993208,
+      "url": "https://github.com/JKamsker/gitcraft/pull/164#discussion_r4502993208",
+      "finding": "fallback change navigation",
+      "disposition": "fixed",
+      "response": "Patch fallback retains step buttons/keyboard and Find; remains read-only."
+    },
+    {
+      "id": 4502993212,
+      "url": "https://github.com/JKamsker/gitcraft/pull/164#discussion_r4502993212",
+      "finding": "bundle Activity",
+      "disposition": "fixed",
+      "response": "Records outcome and redacted errors before clearing timing state."
+    },
+    {
+      "id": 4502993215,
+      "url": "https://github.com/JKamsker/gitcraft/pull/164#discussion_r4502993215",
+      "finding": "queued operations",
+      "disposition": "fixed",
+      "response": "Calls after_op and links status; success resumes queued Gerrit Push, failure drops it."
+    },
+    {
+      "id": 4502993230,
+      "url": "https://github.com/JKamsker/gitcraft/pull/164#discussion_r4502993230",
+      "finding": "import destination syntax",
+      "disposition": "removed path",
+      "response": "Import mapping UI/action/API removed."
+    },
+    {
+      "id": 4502993243,
+      "url": "https://github.com/JKamsker/gitcraft/pull/164#discussion_r4502993243",
+      "finding": "unstaged rename source",
+      "disposition": "fixed",
+      "response": "Reads indexed old_path for R/C; intent-to-add rename regression."
+    },
+    {
+      "id": 4502993254,
+      "url": "https://github.com/JKamsker/gitcraft/pull/164#discussion_r4502993254",
+      "finding": "syntax column headings",
+      "disposition": "fixed",
+      "response": "Headings use the same source column widths and horizontal scroll container."
+    },
+    {
+      "id": 4502993264,
+      "url": "https://github.com/JKamsker/gitcraft/pull/164#discussion_r4502993264",
+      "finding": "Syntax Find",
+      "disposition": "fixed",
+      "response": "Find disabled while pending/successful Syntax, available in patch fallback."
+    },
+    {
+      "id": 4502993276,
+      "url": "https://github.com/JKamsker/gitcraft/pull/164#discussion_r4502993276",
+      "finding": "Syntax commit reverts",
+      "disposition": "fixed",
+      "response": "Hides commit/header and filename context-menu reverts while Syntax is enabled."
+    },
+    {
+      "id": 4502993286,
+      "url": "https://github.com/JKamsker/gitcraft/pull/164#discussion_r4502993286",
+      "finding": "long message interaction",
+      "disposition": "fixed",
+      "response": "Always-open tooltip with explicit hash/path/anchor ownership retains pointer interaction and wheel scrolling; tail clipping checked."
+    },
+    {
+      "id": 4502993297,
+      "url": "https://github.com/JKamsker/gitcraft/pull/164#discussion_r4502993297",
+      "finding": "test lane frame visibility",
+      "disposition": "fixed",
+      "response": "Updates visibility before row rendering."
+    }
+  ],
+  "grouped_review_url": "https://github.com/JKamsker/gitcraft/pull/164#pullrequestreview-5813980351",
+  "grouped_review": [
+    {
+      "path": "operations.rs",
+      "finding": "cancellable Gerrit preflight",
+      "disposition": "fixed",
+      "response": "Runs stack reads with the operation control; cancellation propagated between reads."
+    },
+    {
+      "path": "gerrit.rs",
+      "finding": "invalid URL cannot disable detection",
+      "disposition": "fixed",
+      "response": "Retains detected Gerrit remote and safe derived web URL, with visible override warning."
+    },
+    {
+      "path": "graph_view/badge.rs",
+      "finding": "reuse indexes across rebuild",
+      "disposition": "fixed",
+      "response": "BadgeIndex built once for graph labels; 3000 distinct decorated commits checked."
+    },
+    {
+      "path": "git/bundles.rs",
+      "finding": "expanded pack memory",
+      "disposition": "deferred import",
+      "response": "Input/deadline limits do not bound allocation. Removed untrusted pack import, not just its button. Export and header/prerequisite inspection remain."
+    },
+    {
+      "path": "gerrit.rs",
+      "finding": "restore identity within trailer block",
+      "disposition": "fixed",
+      "response": "Joins existing trailer block, preserving co-author and continuation records."
+    },
+    {
+      "path": "toolbar.rs",
+      "finding": "construct review dialog lazily",
+      "disposition": "fixed",
+      "response": "Build target vector only on click."
+    },
+    {
+      "path": "commands.rs",
+      "finding": "reword HEAD identity",
+      "disposition": "fixed",
+      "response": "Reword goes through Gerrit amendment guard; native co-author/identity-change checks."
+    },
+    {
+      "path": "commands.rs",
+      "finding": "symbolic HEAD amend expectation",
+      "disposition": "fixed",
+      "response": "Adds original branch expectation to compose amend."
+    },
+    {
+      "path": "structural/mod.rs",
+      "finding": "comparisons across views",
+      "disposition": "fixed",
+      "response": "One tab-owned active job and one coalesced latest replacement; real message-handler regression."
+    },
+    {
+      "path": "structural/tool.rs",
+      "finding": "remote-side supervision",
+      "disposition": "deferred remote Syntax",
+      "response": "Production remote Syntax returns patch fallback before starting transport. Dormant request helper remains test-only. No unsafe host-wide cleanup was added."
+    },
+    {
+      "path": "structural/reader.rs",
+      "finding": "bounded preparation",
+      "disposition": "fixed",
+      "response": "Shared 20 second local Git read deadline and no lazy fetch; bounded metadata replaces whole-commit numstat."
+    },
+    {
+      "path": "git/bundles.rs",
+      "finding": "remote validation and export batching",
+      "disposition": "fixed",
+      "response": "Full-ref syntax checked locally against native Git grammar tests; selected refs checked against one ref listing, with final output OID comparison."
+    },
+    {
+      "path": "git/bundles.rs",
+      "finding": "worktree switch race",
+      "disposition": "removed path",
+      "response": "No branch import/ref creation API remains."
+    },
+    {
+      "path": "AGENTS.md",
+      "finding": "scope fixed author identity",
+      "disposition": "documentation scoped",
+      "response": "Fixed identity continues for this recovery and PR164 follow-up task; unrelated work uses its contributor identity."
+    },
+    {
+      "path": "repo/gerrit.rs",
+      "finding": "assert dialog variant",
+      "disposition": "fixed",
+      "response": "Assert exact variant and return test error if it differs."
+    },
+    {
+      "path": "structural/tests.rs",
+      "finding": "absolute shell marker",
+      "disposition": "fixed",
+      "response": "Injection marker lives outside script scratch directory; absolute path is shell-quoted."
+    },
+    {
+      "path": "structural/tests.rs",
+      "finding": "loader completion sequence",
+      "disposition": "fixed",
+      "response": "Requests repeated loads across replacement views and delivers completion through Msg/poll."
+    },
+    {
+      "path": "widgets/file_row.rs",
+      "finding": "hover each status",
+      "disposition": "fixed",
+      "response": "Every status rendered separately, actual hover verified, including owner labels."
+    },
+    {
+      "path": "graph_view/readability_tests.rs",
+      "finding": "reachable final paragraph",
+      "disposition": "fixed",
+      "response": "Assert tail starts clipped, move pointer into popup, scroll, and assert tail reaches visible clip."
+    },
+    {
+      "path": "dialogs/bundles.rs",
+      "finding": "collision disables import",
+      "disposition": "removed path",
+      "response": "No import action/button/mappings remain; inspection test checks read-only notice and unchanged refs."
+    },
+    {
+      "path": "repo/bundles.rs",
+      "finding": "stale completion callbacks",
+      "disposition": "fixed",
+      "response": "Tests deliver success and failure to both production callback guards after cancellation/replacement."
+    },
+    {
+      "path": "structural/tool.rs",
+      "finding": "Windows exited launcher descendants",
+      "disposition": "accepted limitation",
+      "response": "Ordinary Difftastic does not require descendants. Custom Windows launcher descendant cleanup remains best effort; no OS Job containment claim. Local per-tab concurrency and deadlines bound ordinary work, not arbitrary escaped descendants."
+    }
+  ],
+  "scope_changes": [
+    "Retain bundle export and header/prerequisite inspection; remove import execution pending OS memory/process containment. Full recovered import is preserved at immutable 0d2d86d5 and source/checkpoint branches.",
+    "Syntax comparison runs for local repositories only; SSH/WSL fall back to patch pending independent remote cleanup. Preparation requires Git --no-lazy-fetch capability.",
+    "The input bundle limit does not imply decompressed-memory safety; inspection explicitly leaves pack contents unverified."
+  ],
+  "prior_ci": {
+    "commit": "0d2d86d51ea122402182dc5ef5f0d5631d2c64aa",
+    "result": "Linux tests, strict lint, Windows build and all ten Windows shards/aggregate passed before review changes."
+  },
+  "rejected_reviews": [
+    {
+      "candidate": "2a2ac59ee2f7bd98ebe8775f192c87fb53eb31fb",
+      "result": "FAIL",
+      "findings": [
+        "Ordinary hover tooltip still closes on scrolling or pointer entry.",
+        "Export permits lazy fetch.",
+        "Bundle completion strands queued operations.",
+        "Commit Syntax still exposes file reverts."
+      ],
+      "response": "All corrected in later candidate; no prior passing review carried forward."
+    }
+  ],
+  "validation": {
+    "platform": "macOS arm64, Rust1.95.0",
+    "environment": {
+      "TMPDIR": "/private/tmp",
+      "SHELL": "/tmp/gitcraft-integration-tools/validation-shell",
+      "PATH_prefix": "/tmp/gitcraft-integration-tools",
+      "tools": "Official Difftastic0.72.0, GNU sed4.10; same normalization as original full native suite."
+    },
+    "focused_result": "98 passed;0 failed;0 ignored;2957 filtered;2.83 seconds",
+    "focused_command": "target/debug/deps/gitcraft-ba5a0d4352e25ac9 --test-threads=4 git::bundles repo::bundles repo::dialogs::bundles repo::diff::structural repo::graph_view repo::widgets::file_row gerrit theme::catalog",
+    "build_command": "cargo +1.95.0 test --locked --all-targets --no-run",
+    "clippy_command": "cargo +1.95.0 clippy --locked --all-targets -- -D warnings -A dead_code",
+    "clippy_limitation": "Six previously documented native macOS dead-code warnings allowed; Linux strict CI is a separate gate.",
+    "full_command": "cargo +1.95.0 test --locked -- --test-threads=1",
+    "full_result": "3056 passed; 0 failed; 7 existing ignored; 0 filtered tests (3048 library + 8 executable/protocol/OS-helper tests).",
+    "full_result_lines": [
+      "test result: ok. 3048 passed; 0 failed; 7 ignored; 0 measured; 0 filtered out; finished in 693.46s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.33s",
+      "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.79s",
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    ],
+    "format_command": "cargo +1.95.0 fmt --all -- --check",
+    "binary_sha256": "42daa844d0eea11738b6c90d5409cb31f1899b75cd1efb07a22d57fd224f06f8",
+    "tool_versions": {
+      "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+      "git": "git version 2.54.0 (Apple Git-157)",
+      "difftastic": "Difftastic 0.72.0\n\nRevision:  6201bc9 2026-10-29\nToolchain: 1.85.0\nSystem:    macos aarch64"
+    },
+    "rejected_attempts": [
+      "An initial Gerrit fixture run failed before repository load completed; the serial diagnostic and final focused/full runs passed without weakening assertions.",
+      "An initial contrast run exposed missing card/selected composites; corrected before final checks.",
+      "A failed compilation left an older test binary: its 95-test output is not evidence for this candidate.",
+      "A navigation regression initially asked for the next change when the only change was already above the viewport; fixture corrected to ask for previous change. Final 98 focused tests passed."
+    ]
+  },
+  "non_gates": [
+    "CodeRabbit main comment reports an OSS review rate limit; no paid CLI or review was triggered.",
+    "Bot docstring coverage is inconclusive and no repository workflow enforces its suggested80% threshold. No broad cosmetic rewrite was made."
+  ],
+  "remaining_limits": [
+    "Native Windows execution of this review candidate awaits CI; prior Windows candidate passed.",
+    "Live SSH/WSL bundle export/inspection not exercised locally. Remote script data quoting covered by owned local shell fixtures.",
+    "Custom Windows Difftastic launchers may outlive taskkill if original parent exits early; ordinary tool does not spawn descendants."
+  ],
+  "logs": {
+    "build-final": {
+      "sha256": "9f0eba1067511214ede060f0da7196aed1f95fae24f6e430aef47115dfa6475a",
+      "bytes": 2148,
+      "tail": [
+        "    |       ^^^^^^^^^^^^^",
+        "    |",
+        "    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default",
+        "",
+        "warning: `gitcraft` (lib test) generated 3 warnings (2 duplicates)",
+        "    Finished `test` profile [unoptimized + debuginfo] target(s) in 5.06s",
+        "  Executable unittests src/lib.rs (target/debug/deps/gitcraft-ba5a0d4352e25ac9)",
+        "  Executable unittests src/main.rs (target/debug/deps/gitcraft-5aa80b4732d55f49)",
+        "  Executable tests/checkpoint_cli.rs (target/debug/deps/checkpoint_cli-79723e01d83c219e)",
+        "  Executable tests/mcp_stdio.rs (target/debug/deps/mcp_stdio-37b62dfaf7372cd3)",
+        "  Executable unittests examples/ui_shot.rs (target/debug/examples/ui_shot-3ec780d88a795764)",
+        "  Executable unittests src/lib.rs (target/debug/deps/gitcraft_os-2b004b2df7e8bf9b)"
+      ]
+    },
+    "clippy-final": {
+      "sha256": "ede86dd44d5a9db25ff4a1a50b6cd19a713bcc6f85a1829114dc7ae92551802d",
+      "bytes": 151,
+      "tail": [
+        "    Checking gitcraft v0.3.4 (/Users/jonas/.t3/worktrees/gitcraft/t3-bde8f5ba)",
+        "    Finished `dev` profile [unoptimized + debuginfo] target(s) in 8.29s"
+      ]
+    },
+    "fmt-final": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "tail": []
+    },
+    "focused-final": {
+      "sha256": "3eff59d4bc9bbc61ae241a206355620e2b37a9458a9c5696134396793266b611",
+      "bytes": 9610,
+      "tail": [
+        "test repo::graph_view::tests::a_menu_stays_open_while_ghost_rows_push_its_row_away ... ok",
+        "test theme::catalog::tests::a_custom_palette_keeps_its_chosen_text_colours ... ok",
+        "test theme::catalog::tests::contrast_changes_preserve_surfaces_terminal_and_graph_colours ... ok",
+        "test theme::catalog::tests::every_builtin_small_text_token_meets_wcag_aa_on_its_surfaces ... ok",
+        "test theme::catalog::tests::ids_are_unique ... ok",
+        "test theme::catalog::tests::the_pro_themes_keep_their_colours ... ok",
+        "test repo::widgets::file_row::tests::painted_file_badges_meet_aa_on_normal_hovered_and_selected_rows ... ok",
+        "test repo::graph_view::readability_tests::real_git_tooltip_retains_long_message_paragraphs_and_follows_hover_not_selection ... ok",
+        "test repo::gerrit::integration_tests::amend_preserves_signoff_and_skips_only_the_requested_commit_hooks ... ok",
+        "",
+        "test result: ok. 98 passed; 0 failed; 0 ignored; 0 measured; 2957 filtered out; finished in 2.83s",
+        ""
+      ]
+    },
+    "full-final": {
+      "sha256": "ad111175dd9d16c7258e5d1045a42b6abea1e937b2397abf7ab874a6468ecdc0",
+      "bytes": 241182,
+      "tail": [
+        "   Doc-tests gitcraft",
+        "",
+        "running 0 tests",
+        "",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "",
+        "   Doc-tests gitcraft_os",
+        "",
+        "running 0 tests",
+        "",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        ""
+      ]
+    }
+  },
+  "review": {
+    "candidate": "f8cacb06cffaf8a942da6301c11e8265d52fec35",
+    "result": "PASS",
+    "reviewer": "independent adversarial review agent /root/review_codex_integration",
+    "scope": "Complete delta against 0d2d86d5; source inspection only. No additional test or CI execution claimed.",
+    "verbatim_result": "PASS — pinned f8cacb06cffaf8a942da6301c11e8265d52fec35, reviewed against 0d2d86d51ea122402182dc5ef5f0d5631d2c64aa. All four prior blockers are resolved. No additional blocking regressions found in the full delta. Review was read-only; no tests or CI executed. Native Windows execution remains pending, with custom-launcher descendant cleanup explicitly best effort. Remote Syntax and bundle import remain deferred."
+  },
+  "durable_logs": {
+    "path": "docs/validation/pr164-review-2026-11-07-tests.log.gz",
+    "sha256": "a2029827ed94512f1d2c3d589c19d33de6aafb9d5733f4a279ec269a1796665c",
+    "uncompressed_sha256": "dc224d65a01d408d1dc15874e0492a666e329cee2e11bd95ba5b32c2c55b1c5a",
+    "uncompressed_bytes": 253326
+  },
+  "documentation_binding": {
+    "application_candidate": "f8cacb06cffaf8a942da6301c11e8265d52fec35",
+    "rule": "Documentation-only delivery binds these application gates after verifying source, crates, Cargo manifests/lockfile and tests unchanged."
+  }
+}

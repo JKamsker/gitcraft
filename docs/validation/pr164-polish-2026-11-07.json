@@ -1,0 +1,218 @@
+{
+  "production_candidate": "f65685c3683e0cbf145b25f7df231d402d7309cd",
+  "production_tree": "a9f15ff3ba5bb391b6bf0a41b0cf2e068d233d0f",
+  "benchmark_fixture_followup": "803037f8d09452d81b2a0e6e5437616dbdafc9e3",
+  "previous_pr_head": "5dd86b91f2a41f48184e8f78eef16bff2e3e3358",
+  "created_utc": "2026-11-07T19:02:19.923882+00:00",
+  "review_source": "https://github.com/JKamsker/gitcraft/pull/164#pullrequestreview-5814242652",
+  "findings": [
+    {
+      "id": 4503205655,
+      "path": "src/git/command.rs",
+      "url": "https://github.com/JKamsker/gitcraft/pull/164#discussion_r4503205655",
+      "disposition": "fixed",
+      "response": "Only an exact unknown-option line adds the no-lazy-fetch upgrade hint; cancellation, timeout, capture-limit and ordinary errors pass through unchanged. Prior shared supervisor already removed bundle-specific timeout wording."
+    },
+    {
+      "id": 4503205667,
+      "path": "src/repo/graph_view/row.rs",
+      "url": "https://github.com/JKamsker/gitcraft/pull/164#discussion_r4503205667",
+      "disposition": "fixed",
+      "response": "Suppress full-message popups throughout ghost rendering, matching the disabled ghost hover loader. Normal retained scrolling tooltip remains covered."
+    },
+    {
+      "path": "src/theme/catalog.rs",
+      "disposition": "fixed",
+      "response": "Remove duplicate accent AA call, retaining the correctly ordered adjustment before diff tint derivation."
+    },
+    {
+      "path": "src/repo/graph_view/badge.rs",
+      "disposition": "fixed",
+      "response": "Own and cache ref metadata on RepoTab; refresh on production ref replacement and graph label rebuild. Width, pill and accessible row-label calculations reuse the cache. Explicit one-off menu/palette helper retained."
+    }
+  ],
+  "review": {
+    "production": {
+      "candidate": "f65685c3683e0cbf145b25f7df231d402d7309cd",
+      "result": "PASS",
+      "summary": "No blocking regressions. Production ref replacement refreshes cache, ghost suppression matches previews, diagnostics retain unrelated errors, and contrast ordering remains correct. Non-blocking CPU benchmark fixture omitted cache setup."
+    },
+    "followup": {
+      "candidate": "803037f8d09452d81b2a0e6e5437616dbdafc9e3",
+      "result": "PASS",
+      "verbatim_result": "PASS \u2014 803037f8d09452d81b2a0e6e5437616dbdafc9e3. Verified the sole change rebuilds graph labels and badge metadata in the test-only CPU benchmark. Production is unchanged; the prior review carries forward with no remaining findings. No tests or CI executed."
+    },
+    "reviewer": "independent adversarial review agent /root/review_codex_integration",
+    "execution": "Read-only source review; no additional test/CI execution claimed."
+  },
+  "validation": {
+    "full": {
+      "candidate": "f65685c3683e0cbf145b25f7df231d402d7309cd",
+      "command": "cargo +1.95.0 test --locked -- --test-threads=1",
+      "passed": 3127,
+      "failed": 0,
+      "ignored": 9,
+      "filtered": 0,
+      "result_lines": [
+        "test result: ok. 3118 passed; 0 failed; 9 ignored; 0 measured; 0 filtered out; finished in 553.60s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.35s",
+        "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.76s",
+        "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ],
+      "binary_sha256": "0eb3d6167d1631f12bd233f462fa7c182e2be31ce01e51ee609f6d764643ccd5"
+    },
+    "followup": {
+      "candidate": "803037f8d09452d81b2a0e6e5437616dbdafc9e3",
+      "build": "cargo +1.95.0 test --locked --all-targets --no-run",
+      "focused": "228 passed;0 failed;0 ignored",
+      "focused_command": "target/debug/deps/gitcraft-a471af9e9f6bcb96 --test-threads=1 git::bundles repo::bundles repo::dialogs::bundles repo::diff::structural repo::graph_view repo::columns repo::pr_view::select settings::branch_names settings::tests gerrit theme::catalog processes::tests tasks::tests graph::tests palette syntax_errors_only_suggest_upgrade_for_the_unknown_git_option rapid_reloads_finish_and_coalesce",
+      "clippy": "cargo +1.95.0 clippy --locked --all-targets -- -D warnings -A dead_code",
+      "fmt": "cargo +1.95.0 fmt --all -- --check",
+      "binary_sha256": "04d06eaba3b9b9e1cad99a82a6694c946b054fa4f0a24b75273b0a97727f223a",
+      "scope": "Single test-only ignored CPU benchmark setup correction after the full run started. Full-suite execution is attributed to the production candidate, not repeated or relabeled as a full followup run."
+    },
+    "environment": {
+      "platform": "macOS arm64, Rust1.95.0",
+      "TMPDIR": "/private/tmp",
+      "SHELL": "/tmp/gitcraft-integration-tools/validation-shell",
+      "PATH_prefix": "/tmp/gitcraft-integration-tools",
+      "tools": "Difftastic0.72.0 and GNU sed4.10; same normalized environment as preceding full native run."
+    },
+    "clippy_allowance": "Six previously documented macOS dead-code warnings allowed; Linux strict CI is separate.",
+    "rejected_attempt": "First test build used Default for Branch, which does not implement it. Fixture corrected to explicit metadata before any focused/full run."
+  },
+  "non_gates": [
+    "CodeRabbit main risk text repeats previously addressed issues. Cancellable Gerrit preflight, invalid URL handling, indexed graph-label rebuilds and removal of uncontained pack import are already recorded against immutable preceding candidates.",
+    "Docstring metric remains a bot suggestion rather than an enforced repository check. No paid review, CLI review trigger or broad docstring rewrite performed."
+  ],
+  "limits": [
+    "Fresh Linux/Windows CI remains a separate gate. No local Windows runtime claim.",
+    "The ignored CPU workload itself was not benchmarked; its setup was build-checked.",
+    "Live SSH/WSL bundle execution remains untested locally. Import and remote Syntax remain deferred."
+  ],
+  "documentation_binding": {
+    "application_candidate": "803037f8d09452d81b2a0e6e5437616dbdafc9e3",
+    "rule": "Final delivery adds documentation only, with source/crates/manifests/lockfile/tests/workflows verified unchanged from the followup. Fullsuite provenance remains bound to the production candidate."
+  },
+  "logs": {
+    "build": {
+      "sha256": "f8cf1d19ff60103c67e245962335af8a932ea20207bf9adb6b902cc478a9763b",
+      "bytes": 1996,
+      "tail": [
+        "    |",
+        "182 | pub fn pretty_name(text: &str) -> Option<String> {",
+        "    |        ^^^^^^^^^^^",
+        "",
+        "For more information about this error, try `rustc --explain E0277`.",
+        "error: could not compile `gitcraft` (lib test) due to 1 previous error",
+        "warning: build failed, waiting for other jobs to finish...",
+        "warning: `gitcraft` (lib) generated 6 warnings"
+      ]
+    },
+    "build-final": {
+      "sha256": "449d277258496f79492b7352eb89d5177f00594d67e998c1495bac368887dcd0",
+      "bytes": 2251,
+      "tail": [
+        "    Finished `test` profile [unoptimized + debuginfo] target(s) in 28.00s",
+        "  Executable unittests src/lib.rs (target/debug/deps/gitcraft-a471af9e9f6bcb96)",
+        "  Executable unittests src/main.rs (target/debug/deps/gitcraft-9f329e5678eb4039)",
+        "  Executable tests/checkpoint_cli.rs (target/debug/deps/checkpoint_cli-e41eeca633127291)",
+        "  Executable tests/mcp_stdio.rs (target/debug/deps/mcp_stdio-ba2fc8f743f21693)",
+        "  Executable unittests examples/image_memory.rs (target/debug/examples/image_memory-7172267f85bc6305)",
+        "  Executable unittests examples/ui_shot.rs (target/debug/examples/ui_shot-32635cd1a722a925)",
+        "  Executable unittests src/lib.rs (target/debug/deps/gitcraft_os-f792e6e5c14eb1c3)"
+      ]
+    },
+    "focused": {
+      "sha256": "4a6799742bd518877dbc2b7a9305d56af94a0bbb910f9b00a3aae3ae10a03ab3",
+      "bytes": 20423,
+      "tail": [
+        "test theme::catalog::tests::ids_are_unique ... ok",
+        "test theme::catalog::tests::the_pro_themes_keep_their_colours ... ok",
+        "test theme::palette::tests::accent_text_is_whichever_reads_better ... ok",
+        "test theme::palette::tests::hex_colours_read_in_every_length ... ok",
+        "test theme::palette::tests::translucent_colours_are_laid_over_their_background ... ok",
+        "",
+        "test result: ok. 228 passed; 0 failed; 0 ignored; 0 measured; 2899 filtered out; finished in 19.85s",
+        ""
+      ]
+    },
+    "clippy": {
+      "sha256": "553232e43f2fb058602c0198994386269391147098a8158550fa22712447fd70",
+      "bytes": 253,
+      "tail": [
+        "    Checking gitcraft-os v0.1.0 (/Users/jonas/.t3/worktrees/gitcraft/t3-bde8f5ba/crates/gitcraft-os)",
+        "    Checking gitcraft v0.3.4 (/Users/jonas/.t3/worktrees/gitcraft/t3-bde8f5ba)",
+        "    Finished `dev` profile [unoptimized + debuginfo] target(s) in 12.38s"
+      ]
+    },
+    "fmt": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "tail": []
+    },
+    "full": {
+      "sha256": "11267e1c5dcb2fa45fee11bb6555808d4da61444acf7a3921a3e7bedd32fd10d",
+      "bytes": 247935,
+      "tail": [
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "",
+        "   Doc-tests gitcraft_os",
+        "",
+        "running 0 tests",
+        "",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        ""
+      ]
+    },
+    "build-final-2": {
+      "sha256": "700c8d7724cb48fa14f7342f790bc0010a4d24adb7aa55d95ac13a8da300d103",
+      "bytes": 4408,
+      "tail": [
+        "    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.49s",
+        "  Executable unittests src/lib.rs (target/debug/deps/gitcraft-a471af9e9f6bcb96)",
+        "  Executable unittests src/main.rs (target/debug/deps/gitcraft-9f329e5678eb4039)",
+        "  Executable tests/checkpoint_cli.rs (target/debug/deps/checkpoint_cli-e41eeca633127291)",
+        "  Executable tests/mcp_stdio.rs (target/debug/deps/mcp_stdio-ba2fc8f743f21693)",
+        "  Executable unittests examples/image_memory.rs (target/debug/examples/image_memory-7172267f85bc6305)",
+        "  Executable unittests examples/ui_shot.rs (target/debug/examples/ui_shot-32635cd1a722a925)",
+        "  Executable unittests src/lib.rs (target/debug/deps/gitcraft_os-f792e6e5c14eb1c3)"
+      ]
+    },
+    "focused-final": {
+      "sha256": "c0ebfaaea805c096dd5129fe7b9793bd5d1dd6eea4d5e9ceb99abc133a357cf7",
+      "bytes": 20423,
+      "tail": [
+        "test theme::catalog::tests::ids_are_unique ... ok",
+        "test theme::catalog::tests::the_pro_themes_keep_their_colours ... ok",
+        "test theme::palette::tests::accent_text_is_whichever_reads_better ... ok",
+        "test theme::palette::tests::hex_colours_read_in_every_length ... ok",
+        "test theme::palette::tests::translucent_colours_are_laid_over_their_background ... ok",
+        "",
+        "test result: ok. 228 passed; 0 failed; 0 ignored; 0 measured; 2899 filtered out; finished in 19.43s",
+        ""
+      ]
+    },
+    "clippy-final": {
+      "sha256": "c4eddd5fb440bc951c31b75f10cd4dddc66551b22bb765cb9edc4321bb0b6c83",
+      "bytes": 151,
+      "tail": [
+        "    Checking gitcraft v0.3.4 (/Users/jonas/.t3/worktrees/gitcraft/t3-bde8f5ba)",
+        "    Finished `dev` profile [unoptimized + debuginfo] target(s) in 9.07s"
+      ]
+    },
+    "fmt-final": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "tail": []
+    }
+  },
+  "durable_log": {
+    "path": "docs/validation/pr164-polish-2026-11-07-tests.log.gz",
+    "sha256": "dd4d678858d0b0554de5609f67a927c711a36f44bca269c337700e11434898c9",
+    "uncompressed_sha256": "3f479549fc4cc54382f91041bf4a7b3b249145365ce31ed245fdfd7a4ebbf6b3"
+  }
+}

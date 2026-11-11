@@ -5,12 +5,12 @@ use std::ops::Range;
 use std::sync::Arc;
 
 use egui::{
-    Align2, Color32, Pos2, Rect, Sense, Stroke, Ui, pos2, text::CCursor, text::LayoutJob,
-    text::TextFormat, vec2,
+    Align2, Color32, Pos2, Rect, Sense, Stroke, Ui, pos2, text::LayoutJob, text::TextFormat, vec2,
 };
 
 use super::select::Side;
 use super::{DiffData, Kind, LINE_H, NUM_W, Pick};
+use crate::repo::find::{LineMarks, paint_marks};
 use crate::theme::{self, Tokens};
 
 pub(super) fn filler(ui: &Ui, rect: Rect, t: &Tokens) {
@@ -32,15 +32,28 @@ pub(super) fn paint_line(
     selected: bool,
     // Characters of the text selected by dragging.
     text_sel: Option<Range<usize>>,
+    // The find bar's matches in the line.
+    found: Option<LineMarks<'_>>,
+    wrap_width: Option<f32>,
 ) -> Option<(Pos2, Arc<egui::Galley>)> {
     let line = data.lines.get(i)?;
     let p = ui.painter().with_clip_rect(rect.intersect(ui.clip_rect()));
     let (bg, fg) = match line.kind {
         Kind::Add => (Some(t.diff_add_bg), t.text),
         Kind::Del => (Some(t.diff_del_bg), t.text),
-        Kind::Hunk => (Some(t.accent.gamma_multiply(0.12)), t.accent),
+        Kind::Hunk => (Some(t.accent.gamma_multiply(0.12)), t.accent_fg),
         Kind::Meta => (None, t.text_faint),
+        Kind::Fold => (Some(t.accent.gamma_multiply(0.06)), t.text_dim),
         Kind::Context => (None, t.text_dim),
+    };
+    // Moved here or away unchanged: the block's own muted colour instead of red or green.
+    let moved = data
+        .moves
+        .at(i)
+        .filter(|_| matches!(line.kind, Kind::Add | Kind::Del));
+    let bg = match moved {
+        Some((_, true)) => Some(moved_bg(t)),
+        _ => bg,
     };
     if let Some(bg) = bg {
         p.rect_filled(rect, 0.0, bg);
@@ -49,7 +62,7 @@ pub(super) fn paint_line(
     if selected {
         p.rect_filled(rect, 0.0, t.accent.gamma_multiply(0.22));
     }
-    let y = rect.center().y;
+    let y = rect.top() + LINE_H / 2.0;
     let numbers: &[(Option<u32>, f32)] = match side {
         Side::Unified => &[(line.old, NUM_W - 8.0), (line.new, NUM_W * 2.0 - 8.0)],
         Side::Old => &[(line.old, NUM_W - 8.0)],
@@ -91,11 +104,22 @@ pub(super) fn paint_line(
         Kind::Del => "−",
         _ => "",
     };
-    let mark_color = if line.kind == Kind::Add {
-        t.success
-    } else {
-        t.danger
+    let mark_color = match (moved, line.kind) {
+        (Some(_), _) => t.accent,
+        (None, Kind::Add) => t.success,
+        _ => t.danger,
     };
+    // A moved block's lines, edited ones too, share a bar beside the mark.
+    if moved.is_some() {
+        p.rect_filled(
+            Rect::from_min_size(
+                pos2(rect.left() + gutter + 2.0, rect.top()),
+                vec2(2.0, LINE_H),
+            ),
+            0.0,
+            t.accent.gamma_multiply(0.8),
+        );
+    }
     p.text(
         pos2(rect.left() + gutter + 8.0, y),
         Align2::LEFT_CENTER,
@@ -106,8 +130,9 @@ pub(super) fn paint_line(
 
     // Text: syntax colours when known, the changed part on a stronger background.
     let strong = match line.kind {
-        Kind::Add => t.success.gamma_multiply(0.35),
-        Kind::Del => t.danger.gamma_multiply(0.35),
+        _ if moved.is_some_and(|(_, same)| same) => Color32::TRANSPARENT,
+        Kind::Add => t.diff_strong_bg(true),
+        Kind::Del => t.diff_strong_bg(false),
         _ => Color32::TRANSPARENT,
     };
     let changed = data.changed.get(i).copied().flatten();
@@ -118,7 +143,11 @@ pub(super) fn paint_line(
         }
         _ => vec![(fg, line.text.as_str())],
     };
-    let job = line_job(&spans, changed, font, strong);
+    let mut job = line_job(&spans, changed, font, strong);
+    if let Some(width) = wrap_width.filter(|_| side.shows(line.kind)) {
+        job.wrap.max_width = width.max(1.0);
+        job.wrap.break_anywhere = true;
+    }
     let galley = ui.fonts_mut(|f| f.layout_job(job));
     let x = rect.left() + gutter + 24.0;
     // Scrolled text goes under the marker column, not over the numbers.
@@ -127,21 +156,39 @@ pub(super) fn paint_line(
     } else {
         p
     };
-    let origin = pos2(x - scroll_x, y - galley.size().y / 2.0);
-    if let Some(chars) = text_sel {
-        let at = |c: usize| origin.x + galley.pos_from_cursor(CCursor::new(c)).min.x;
-        let left = at(chars.start);
-        // Selected through the end: a little past the text, for the line break.
-        let right = if chars.end == usize::MAX {
-            origin.x + galley.size().x + 6.0
+    let origin = pos2(
+        x - scroll_x,
+        if wrap_width.is_some() {
+            rect.top() + 2.0
         } else {
-            at(chars.end)
-        };
-        p.rect_filled(
-            Rect::from_min_max(pos2(left, rect.top()), pos2(right, rect.bottom())),
-            0.0,
-            t.accent.gamma_multiply(0.35),
-        );
+            y - galley.size().y / 2.0
+        },
+    );
+    if let Some(chars) = text_sel {
+        for rect in super::wrap::rectangles(&galley, chars) {
+            p.rect_filled(
+                rect.translate(origin.to_vec2()),
+                0.0,
+                t.accent.gamma_multiply(0.35),
+            );
+        }
+    }
+    if let Some(found) = found {
+        if wrap_width.is_some() {
+            for (k, range) in found.ranges.iter().enumerate() {
+                for rect in super::wrap::rectangles(&galley, range.clone()) {
+                    let rect = rect.translate(origin.to_vec2());
+                    p.rect_filled(
+                        rect,
+                        2.0,
+                        t.warning
+                            .gamma_multiply(if found.current == Some(k) { 0.6 } else { 0.28 }),
+                    );
+                }
+            }
+        } else {
+            paint_marks(&p, origin, &galley, rect.y_range(), found, t);
+        }
     }
     p.galley(origin, galley.clone(), fg);
     Some((origin, galley))
@@ -157,34 +204,44 @@ pub(super) fn line_job(
     let mut job = LayoutJob::default();
     let mut pos = 0usize;
     for (color, text) in spans {
+        let format = |inside| TextFormat {
+            font_id: font.clone(),
+            color: *color,
+            background: if inside { strong } else { Color32::TRANSPARENT },
+            ..Default::default()
+        };
+        let Some((a, b)) = changed else {
+            if !text.is_empty() {
+                job.append(text, 0.0, format(false));
+            }
+            continue;
+        };
         let n = text.chars().count();
         let (start, end) = (pos, pos + n);
         // Split the span at the changed range's edges.
-        let cuts: Vec<usize> = match changed {
-            Some((a, b)) => vec![start, a.clamp(start, end), b.clamp(start, end), end],
-            None => vec![start, end],
-        };
+        let cuts = [start, a.clamp(start, end), b.clamp(start, end), end];
         for w in cuts.windows(2) {
             let (from, to) = (w[0], w[1]);
             if to <= from {
                 continue;
             }
-            let piece: String = text.chars().skip(from - start).take(to - from).collect();
+            let byte_at = |char_at| {
+                text.char_indices()
+                    .nth(char_at)
+                    .map_or(text.len(), |(i, _)| i)
+            };
+            let piece = &text[byte_at(from - start)..byte_at(to - start)];
             let inside = changed.is_some_and(|(a, b)| from >= a && to <= b);
-            job.append(
-                &piece,
-                0.0,
-                TextFormat {
-                    font_id: font.clone(),
-                    color: *color,
-                    background: if inside { strong } else { Color32::TRANSPARENT },
-                    ..Default::default()
-                },
-            );
+            job.append(piece, 0.0, format(inside));
         }
         pos = end;
     }
     job
+}
+
+/// The muted colour of moved lines, removed or added.
+pub(super) fn moved_bg(t: &Tokens) -> Color32 {
+    t.accent.gamma_multiply(0.09)
 }
 
 /// A small text button in a hunk header, its right edge at `right`; returns it and its left edge.
@@ -196,24 +253,46 @@ pub(super) fn hunk_button(
     hunk: usize,
 ) -> (egui::Response, f32) {
     let t = Tokens::get(ui.ctx());
-    let label = format!("{} hunk", pick.verb());
-    let color = if pick == Pick::Discard {
+    let label = crate::i18n::message(
+        "repo-core-1938",
+        &[("verb", pick.verb().to_string().into())],
+    );
+    let color = if matches!(pick, Pick::Discard | Pick::Revert) {
         t.text_dim
     } else {
-        t.accent
+        t.accent_fg
     };
+    let id = ui.id().with(("hunk_btn", hunk, pick.verb()));
+    let (resp, left) = text_button(ui, right, y, &label, color, id);
+    let tip = match pick {
+        Pick::Stage => crate::i18n::text("repo-core-1940"),
+        Pick::Unstage => crate::i18n::text("repo-core-1941"),
+        Pick::Discard => crate::i18n::text("repo-core-1942"),
+        Pick::Revert => crate::i18n::text("repo-core-1943"),
+    };
+    (resp.on_hover_text(tip), left)
+}
+
+/// A small text button on a diff row, its right edge at `right` and its middle at `y`; returns
+/// it and its left edge.
+pub(super) fn text_button(
+    ui: &mut Ui,
+    right: f32,
+    y: f32,
+    label: &str,
+    color: Color32,
+    id: egui::Id,
+) -> (egui::Response, f32) {
+    let t = Tokens::get(ui.ctx());
     let galley = ui
         .painter()
-        .layout_no_wrap(label, theme::medium(11.0), color);
+        .layout_no_wrap(label.to_owned(), theme::medium(11.0), color);
     let r = Rect::from_min_max(
         pos2(right - galley.size().x - 14.0, y - 9.0),
         pos2(right, y + 9.0),
     );
-    let resp = ui.interact(
-        r,
-        ui.id().with(("hunk_btn", hunk, pick.verb())),
-        Sense::click(),
-    );
+    let resp = ui.interact(r, id, Sense::click());
+    crate::a11y::a11y(&resp, egui::WidgetType::Button, label);
     let fill = if resp.hovered() { t.hover } else { t.dock };
     ui.painter().rect_filled(r, t.radius_sm, fill);
     ui.painter().rect_stroke(
@@ -227,14 +306,8 @@ pub(super) fn hunk_button(
         galley,
         color,
     );
-    let tip = match pick {
-        Pick::Stage => {
-            "Stage this hunk. Click lines to stage only some of them (Shift+click for a range)."
-        }
-        Pick::Unstage => {
-            "Unstage this hunk. Click lines to unstage only some of them (Shift+click for a range)."
-        }
-        Pick::Discard => "Throw away this hunk's changes (Ctrl+Z brings them back).",
-    };
-    (resp.on_hover_text(tip), r.left())
+    (
+        resp.on_hover_cursor(egui::CursorIcon::PointingHand),
+        r.left(),
+    )
 }

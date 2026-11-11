@@ -2,17 +2,18 @@
 
 use egui::{RichText, Ui};
 
-use crate::git::{Branch, Worktree};
+use crate::git::{self, Branch, Worktree};
 use crate::repo::{Action, Refresh};
 use crate::theme::Tokens;
 
 use super::{Dialog, Outcome, buttons, dash_spaces, field, title, usable};
 
 impl Dialog {
-    /// A folder beside the repository named after the branch: `app` + `feature/x` → `app-feature-x`.
+    /// A folder under this repository's root, retaining the branch's namespace.
     pub(super) fn suggest_path(&mut self) {
         if let Dialog::AddWorktree {
             repo,
+            root,
             path,
             path_edited: false,
             new_branch,
@@ -26,17 +27,7 @@ impl Dialog {
             } else {
                 branch.as_str()
             };
-            let repo_name = repo
-                .file_name()
-                .map(|n| n.to_string_lossy().into_owned())
-                .unwrap_or_else(|| "worktree".to_owned());
-            let folder = if name.trim().is_empty() {
-                format!("{repo_name}-worktree")
-            } else {
-                format!("{repo_name}-{}", name.trim().replace(['/', '\\', ' '], "-"))
-            };
-            let parent = repo.parent().unwrap_or(repo.as_path());
-            *path = parent.join(folder).display().to_string();
+            *path = suggested_folder(repo, root, name);
         }
     }
 }
@@ -59,6 +50,8 @@ pub(super) fn free_branches<'a>(local: &'a [Branch], worktrees: &[Worktree]) -> 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn add_worktree(
     ui: &mut Ui,
+    repo: &std::path::Path,
+    root: &mut String,
     enter: bool,
     free: &[&str],
     path: &mut String,
@@ -72,16 +65,18 @@ pub(super) fn add_worktree(
     let t = Tokens::get(ui.ctx());
     title(
         ui,
-        "Add worktree",
-        "A second working folder of this repository, on its own branch.",
+        crate::i18n::text("repo-core-1535"),
+        crate::i18n::text("repo-core-1536"),
         &t,
     );
     let mut changed = false;
     ui.horizontal(|ui| {
         changed |= ui
-            .radio_value(new_branch, false, "Existing branch")
+            .radio_value(new_branch, false, crate::i18n::text("repo-core-1537"))
             .changed();
-        changed |= ui.radio_value(new_branch, true, "New branch").changed();
+        changed |= ui
+            .radio_value(new_branch, true, crate::i18n::text("repo-core-1538"))
+            .changed();
     });
     ui.add_space(4.0);
     if *new_branch {
@@ -90,43 +85,147 @@ pub(super) fn add_worktree(
         changed |= branch_choice(ui, branch, free);
     }
     ui.add_space(8.0);
-    folder_field(ui, path, path_edited);
+    let mut root_edited = false;
+    ui.label(
+        RichText::new(crate::i18n::text("repo-core-1539"))
+            .color(t.text_dim)
+            .small(),
+    );
+    folder_field(
+        ui,
+        repo,
+        root,
+        &mut root_edited,
+        crate::i18n::text("repo-core-1540"),
+    );
+    ui.horizontal(|ui| {
+        if ui
+            .small_button(crate::i18n::text("repo-core-1541"))
+            .clicked()
+        {
+            *root = crate::remote::git_path(&git::default_worktree_root(repo));
+            root_edited = true;
+        }
+        if ui
+            .small_button(crate::i18n::text("repo-core-1542"))
+            .clicked()
+        {
+            *root = ".worktrees".to_owned();
+            root_edited = true;
+        }
+    });
+    ui.label(
+        RichText::new(crate::i18n::text("repo-core-1544"))
+            .color(t.text_faint)
+            .small(),
+    );
+    ui.label(
+        RichText::new(crate::i18n::text("repo-core-1545"))
+            .color(t.text_faint)
+            .small(),
+    );
+    let resolved_root = git::resolve_worktree_root(repo, root);
+    if let Err(why) = &resolved_root {
+        ui.colored_label(t.danger, why);
+    }
+    if root_edited {
+        *path_edited = false;
+    }
+    if (changed || root_edited) && !*path_edited {
+        let name = if *new_branch {
+            new_name.as_str()
+        } else {
+            branch.as_str()
+        };
+        *path = suggested_folder(repo, root, name);
+    }
+    ui.add_space(8.0);
+    ui.label(
+        RichText::new(crate::i18n::text("repo-core-1546"))
+            .color(t.text_dim)
+            .small(),
+    );
+    folder_field(
+        ui,
+        repo,
+        path,
+        path_edited,
+        crate::i18n::text("repo-core-1546"),
+    );
+    if *path_edited
+        && ui
+            .small_button(crate::i18n::text("repo-core-1547"))
+            .clicked()
+    {
+        *path_edited = false;
+        let name = if *new_branch {
+            new_name.as_str()
+        } else {
+            branch.as_str()
+        };
+        *path = suggested_folder(repo, root, name);
+    }
+    // As git of the repository's machine takes it (a path there, for one elsewhere).
+    let folder = git::resolve_worktree_root(repo, path).map(|p| crate::remote::git_path(&p));
+    if let (Err(why), true) = (&folder, usable(path)) {
+        ui.colored_label(t.danger, why);
+    }
     ui.add_space(12.0);
     let name_ok = if *new_branch {
         usable(new_name)
     } else {
         usable(branch)
     };
-    let valid = name_ok && usable(path);
-    let outcome = buttons(ui, "Add", valid, enter, || {
-        let path = path.trim().to_owned();
-        let args: Vec<String> = if *new_branch {
-            vec![
-                "worktree".into(),
-                "add".into(),
-                "-b".into(),
-                new_name.trim().to_owned(),
-                path.clone(),
-                base.to_owned(),
-            ]
-        } else {
-            vec![
-                "worktree".into(),
-                "add".into(),
-                path.clone(),
-                branch.clone(),
-            ]
-        };
-        Action::Ops {
-            label: "Add worktree".to_owned(),
-            ops: vec![args],
-            refresh: Refresh::All,
-        }
-    });
-    match outcome {
-        Outcome::Open if changed => Outcome::Suggest,
-        other => other,
-    }
+    let valid = name_ok && usable(path) && folder.is_ok() && resolved_root.is_ok();
+    buttons(
+        ui,
+        crate::i18n::text("repo-core-0976"),
+        valid,
+        enter,
+        || {
+            let path = folder.clone().unwrap_or_default();
+            let args: Vec<String> = if *new_branch {
+                vec![
+                    "worktree".into(),
+                    "add".into(),
+                    "-b".into(),
+                    new_name.trim().to_owned(),
+                    "--".into(),
+                    path.clone(),
+                    base.to_owned(),
+                ]
+            } else {
+                vec![
+                    "worktree".into(),
+                    "add".into(),
+                    "--".into(),
+                    path.clone(),
+                    branch.clone(),
+                ]
+            };
+            Action::Ops {
+                label: "Add worktree".to_owned(),
+                ops: vec![
+                    vec![
+                        "config".into(),
+                        "--local".into(),
+                        "--".into(),
+                        git::WORKTREE_ROOT_KEY.into(),
+                        root.trim().to_owned(),
+                    ],
+                    args,
+                ],
+                refresh: Refresh::All,
+            }
+        },
+    )
+}
+
+/// Suggest a branch subfolder using the root resolved from the main checkout.
+fn suggested_folder(repo: &std::path::Path, root: &str, name: &str) -> String {
+    git::resolve_worktree_root(repo, root)
+        .map(|root| crate::remote::git_path(&git::branch_worktree_folder(&root, name)))
+        .unwrap_or_default()
 }
 
 /// The name of the new branch, and where it starts. Whether the name changed.
@@ -135,9 +234,12 @@ fn new_branch_field(ui: &mut Ui, new_name: &mut String, base: &str, focus: &mut 
     let edit = field(ui, new_name, "feature/my-branch", focus);
     dash_spaces(new_name);
     ui.label(
-        RichText::new(format!("Starting at {base}"))
-            .color(t.text_faint)
-            .small(),
+        RichText::new(crate::i18n::message(
+            "repo-core-1549",
+            &[("base", base.to_string().into())],
+        ))
+        .color(t.text_faint)
+        .small(),
     );
     edit.changed()
 }
@@ -149,7 +251,7 @@ fn branch_choice(ui: &mut Ui, branch: &mut String, free: &[&str]) -> bool {
     egui::ComboBox::from_id_salt("worktree-branch")
         .width(ui.available_width())
         .selected_text(if branch.is_empty() {
-            "Choose a branch"
+            crate::i18n::text("repo-core-1551")
         } else {
             branch.as_str()
         })
@@ -161,18 +263,21 @@ fn branch_choice(ui: &mut Ui, branch: &mut String, free: &[&str]) -> bool {
                 }
             }
             if free.is_empty() {
-                ui.label(
-                    RichText::new("Every branch is checked out somewhere").color(t.text_faint),
-                );
+                ui.label(RichText::new(crate::i18n::text("repo-core-1552")).color(t.text_faint));
             }
         });
     changed
 }
 
-/// Where the worktree goes, typed or picked.
-fn folder_field(ui: &mut Ui, path: &mut String, path_edited: &mut bool) {
-    let t = Tokens::get(ui.ctx());
-    ui.label(RichText::new("Folder").color(t.text_dim).small());
+/// Where the worktree goes, typed or picked (picked only where this machine can see the
+/// repository's folders: here, or in WSL).
+fn folder_field(
+    ui: &mut Ui,
+    repo: &std::path::Path,
+    path: &mut String,
+    path_edited: &mut bool,
+    title: &str,
+) {
     ui.horizontal(|ui| {
         let edit = ui.add(
             egui::TextEdit::singleline(path)
@@ -182,14 +287,25 @@ fn folder_field(ui: &mut Ui, path: &mut String, path_edited: &mut bool) {
         if edit.changed() {
             *path_edited = true;
         }
+        let can_pick = crate::remote::openable_here(repo).is_ok();
         if ui
-            .add(egui::Button::new("Browse…").min_size(egui::vec2(80.0, 28.0)))
+            .add_enabled(
+                can_pick,
+                egui::Button::new(crate::i18n::text("repo-core-0300"))
+                    .min_size(egui::vec2(80.0, 28.0)),
+            )
+            .on_disabled_hover_text(crate::i18n::text("repo-core-1553"))
             .clicked()
-            && let Some(dir) = rfd::FileDialog::new()
-                .set_title("Worktree folder")
-                .pick_folder()
+            && let Some(dir) = rfd::FileDialog::new().set_title(title).pick_folder()
         {
-            *path = dir.display().to_string();
+            // In WSL, a path there when it is of the repository's distribution; one of another
+            // stays as picked, so the field says why it can't be used (see `folder_for_git`).
+            let picked = dir.display().to_string();
+            *path = if crate::remote::is_remote(repo) {
+                crate::remote::folder_for_git(repo, &picked).unwrap_or(picked)
+            } else {
+                picked
+            };
             *path_edited = true;
         }
     });
