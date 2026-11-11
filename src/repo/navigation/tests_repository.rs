@@ -42,6 +42,42 @@ fn select(tab: &mut RepoTab, hash: &str, ctx: &egui::Context) {
     act(tab, Action::Select(row.unwrap_or_default()), ctx);
 }
 
+/// Sets up a graph place without the first-file reveal of a user row/link action.
+fn select_graph(tab: &mut RepoTab, hash: &str, ctx: &egui::Context) {
+    assert!(tab.diff.is_none());
+    tab.restore_commit_selection(tab.index[hash], ctx);
+    tab.record_view();
+    assert_eq!(tab.current_view(), Some(graph(Some(hash))));
+    assert!(!tab.commit_changes.follows_history());
+}
+
+/// Equal graph neighbours merge, while a distinct forward diff remains reachable.
+fn assert_graph_refinement(
+    tab: &mut RepoTab,
+    hash: &str,
+    forward: Option<View>,
+    ctx: &egui::Context,
+) {
+    let current = graph(Some(hash));
+    if let Some(next) = &forward {
+        assert_eq!(tab.nav.entries(), &[current.clone(), next.clone()]);
+    } else {
+        assert_eq!(tab.nav.entries(), &[current.clone()]);
+    }
+    assert_eq!(tab.current_view(), Some(current.clone()));
+    assert_eq!(tab.nav.current(), Some(&current));
+    assert!(!tab.nav.can_back());
+    assert_eq!(tab.nav.can_forward(), forward.is_some());
+    assert_eq!(tab.nav.peek(1), forward.as_ref());
+    if let Some(next) = forward {
+        act(tab, Action::Navigate(1), ctx);
+        assert_eq!(tab.current_view(), Some(next));
+        act(tab, Action::Navigate(-1), ctx);
+        assert_eq!(tab.current_view(), Some(current));
+    }
+    assert!(tab.diff.is_none());
+}
+
 /// A tab on `dir` with its history read.
 fn opened(dir: &std::path::Path, ctx: &egui::Context) -> RepoTab {
     let mut tab = RepoTab::new(dir.to_path_buf(), ctx);
@@ -57,9 +93,7 @@ fn back_and_forward_through_a_repository() {
     let ctx = egui::Context::default();
     let mut tab = opened(&dir, &ctx);
     let head = git::head(&dir);
-    let row = tab.index[&head];
-
-    act(&mut tab, Action::Select(row), &ctx);
+    select_graph(&mut tab, &head, &ctx);
     let key = commit_key(&head, &file);
     act(&mut tab, Action::OpenDiff(key.clone()), &ctx);
     act(
@@ -176,7 +210,7 @@ fn back_to_a_diff_selects_its_commit_again() {
     select(&mut tab, &base, &ctx);
     assert_eq!(tab.nav.current(), Some(&diff_at(key.clone(), Some(&base))));
     act(&mut tab, Action::CloseDiff, &ctx);
-    select(&mut tab, &head, &ctx);
+    select_graph(&mut tab, &head, &ctx);
     act(&mut tab, Action::Navigate(-1), &ctx);
     assert_eq!(tab.diff.as_ref().map(|d| d.key.clone()), Some(key));
     assert_eq!(tab.selected_hash(), Some(base));
@@ -185,21 +219,30 @@ fn back_to_a_diff_selects_its_commit_again() {
 
 #[test]
 fn following_links_to_commits_are_steps() {
-    let (dir, _) = repo("links");
+    let (dir, file) = repo("links");
     let ctx = egui::Context::default();
     let mut tab = opened(&dir, &ctx);
     let (head, base) = head_and_base(&dir);
     act(&mut tab, Action::SelectHash(base.clone()), &ctx);
     act(&mut tab, Action::SelectHash(head.clone()), &ctx);
+    // A ready detail reveals the first file; a pending one still shows the graph.
+    let forward = tab.diff.as_ref().map(|view| {
+        assert_eq!(view.key, commit_key(&head, &file));
+        diff_at(view.key.clone(), Some(&head))
+    });
+    assert_eq!(
+        tab.current_view(),
+        Some(forward.clone().unwrap_or_else(|| graph(Some(&head))))
+    );
     act(&mut tab, Action::Navigate(-1), &ctx);
     assert_eq!(tab.selected_hash(), Some(base));
     act(&mut tab, Action::Navigate(-1), &ctx);
     assert_eq!(tab.selected_hash(), Some(head.clone()));
-    // A click in the graph is no step of its own: on the link's place, it changes that one
-    // (and places that end up the same are one).
+    // Refining a graph place merges equal neighbours. A user row selection instead
+    // reveals the first changed file, which can make a distinct diff place.
     act(&mut tab, Action::Navigate(1), &ctx);
-    select(&mut tab, &head, &ctx);
-    assert_eq!(tab.nav.entries(), &[graph(Some(&head))]);
+    select_graph(&mut tab, &head, &ctx);
+    assert_graph_refinement(&mut tab, &head, forward, &ctx);
     let _ = std::fs::remove_dir_all(&dir);
 }
 
