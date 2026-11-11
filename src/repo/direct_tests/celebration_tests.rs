@@ -212,6 +212,9 @@ fn successful_first_commit_survives_queued_push_then_failure_until_confirmed_rea
             tab.handle(msg, &ctx);
             break;
         }
+        if let super::super::Msg::Then(next) = msg {
+            next(&mut tab, &ctx);
+        }
         if std::time::Instant::now() >= deadline {
             return Err("Push did not settle".into());
         }

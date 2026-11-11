@@ -201,6 +201,13 @@ impl RepoTab {
             .any(|b| b.name == branch && !b.upstream.is_empty())
     }
 
+    fn tracks_live(&self, branch: &str) -> bool {
+        self.refs
+            .local
+            .iter()
+            .any(|b| b.name == branch && !b.upstream.is_empty() && !b.upstream_gone())
+    }
+
     /// Publishes `branch` on `remote` and tracks it (under its own name, unless the remote's
     /// push refspecs say otherwise).
     fn publish(
@@ -237,7 +244,46 @@ impl RepoTab {
         let label = attempt.label.clone();
         self.push_flow.banner = None;
         self.push_flow.attempt = Some(attempt);
-        self.run_ops(&label, steps, Refresh::All, OpKind::plain(), ctx);
+        // Resolve the exact ordinary target before optional reviewer echo captures it.
+        // Preparation runs in the background, without a consent dialog or history scan.
+        self.busy_op = Some(label.clone());
+        let control = self.follow_op(&steps, false, ctx);
+        let path = self.path.clone();
+        spawn_or(
+            &self.tx,
+            ctx,
+            {
+                let label = label.clone();
+                move |error| {
+                    Msg::Then(Box::new(move |tab, ctx| {
+                        tab.busy_op = None;
+                        tab.op_done(label, Err(error), Refresh::All, OpKind::plain(), false, ctx);
+                    }))
+                }
+            },
+            move || {
+                let began = std::time::Instant::now();
+                let prepared = crate::push_preflight::prepare_ordinary_push(&path, &steps, &|| {
+                    !control.is_cancelled() && began.elapsed() < std::time::Duration::from_secs(120)
+                });
+                Msg::Then(Box::new(move |tab, ctx| {
+                    tab.busy_op = None;
+                    match prepared {
+                        Ok(steps) if !control.is_cancelled() => {
+                            tab.run_ops(&label, steps, Refresh::All, OpKind::plain(), ctx)
+                        }
+                        result => tab.op_done(
+                            label,
+                            Err(result.err().unwrap_or_else(|| git::CANCELLED.into())),
+                            Refresh::All,
+                            OpKind::plain(),
+                            false,
+                            ctx,
+                        ),
+                    }
+                }))
+            },
+        );
     }
 
     /// Sync: pulls the checked-out branch the way the settings say, then pushes it. It stops
@@ -257,7 +303,7 @@ impl RepoTab {
             self.push_flow.banner = Some(Banner::Detached);
             return;
         };
-        if !self.tracks(&current) {
+        if !self.tracks_live(&current) {
             // Nothing to pull from: publishing is all there is to do.
             let done = format!("Sync: {current} published (it had nothing to pull)");
             self.push_labelled(SYNC_PUBLISH, Some(done), ctx);

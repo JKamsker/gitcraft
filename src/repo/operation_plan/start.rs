@@ -181,20 +181,6 @@ impl RepoTab {
                 Vec::new()
             };
             let celebration_before = observe_celebration_head.then(|| git::head(&path));
-            // Resolve on the mutation worker, immediately before execution. Configured
-            // force refspecs and mirror/deletion pushes still require explicit review.
-            if ordinary_push
-                && let Err(error) = crate::push_preflight::check_ordinary_push(&path, &ops)
-            {
-                return Msg::OpDone {
-                    label,
-                    result: Err(error),
-                    refresh,
-                    kind,
-                    quiet,
-                    stopped: 0,
-                };
-            }
             let (result, kind, stopped) = run_steps_guarded(
                 &path,
                 &ops,

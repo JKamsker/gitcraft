@@ -112,3 +112,34 @@ fn toolbar_honors_push_remote_and_keeps_gone_upstream_target() -> Result<(), Str
     assert_eq!(remote_main(&w), head);
     Ok(())
 }
+
+#[test]
+fn toolbar_honors_the_saved_push_branch() -> Result<(), String> {
+    let w = world("direct-saved-branch")?;
+    let before = remote_main(&w);
+    run(&w.mine, &["config", "branch.main.gitcraftPushBranch", "dev"])?;
+    let head = commit(&w.mine, "saved destination")?;
+    let ctx = egui::Context::default();
+    let mut tab = direct_tab(&w, &ctx)?;
+    tab.apply(crate::repo::Action::Push, &ctx);
+    settle(&mut tab, &ctx)?;
+    assert!(tab.dialog.is_none());
+    assert_eq!(remote_main(&w), before);
+    assert_eq!(git::resolve(&w.bare, "refs/heads/dev")?, head);
+    Ok(())
+}
+
+#[test]
+fn cancelling_ordinary_push_preparation_never_sends() -> Result<(), String> {
+    let w = world("direct-cancel")?;
+    let before = remote_main(&w);
+    commit(&w.mine, "cancel me")?;
+    let ctx = egui::Context::default();
+    let mut tab = direct_tab(&w, &ctx)?;
+    tab.apply(crate::repo::Action::Push, &ctx);
+    assert!(tab.can_cancel());
+    tab.cancel_op();
+    settle(&mut tab, &ctx)?;
+    assert_eq!(remote_main(&w), before);
+    Ok(())
+}
