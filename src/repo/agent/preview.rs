@@ -355,6 +355,17 @@ mod fluent_approval_note_tests {
         let mut mismatched = raw.clone();
         mismatched.notes[0] = "provider replaced note: 日本語\nopaque".into();
         assert_eq!(mismatched.for_display().notes[0], mismatched.notes[0]);
+        assert_file_change_counts();
+        crate::i18n::set_language("en-US");
+
+        if let Some(error) = ui_errors.borrow().first() {
+            return Err(error.clone());
+        }
+
+        Ok(())
+    }
+
+    fn assert_file_change_counts() {
         for count in [1, 1234] {
             let mut p = Preview::default();
             p.push(Note::FileChanges { count });
@@ -376,12 +387,5 @@ mod fluent_approval_note_tests {
                 }));
             }
         }
-        crate::i18n::set_language("en-US");
-
-        if let Some(error) = ui_errors.borrow().first() {
-            return Err(error.clone());
-        }
-
-        Ok(())
     }
 }
