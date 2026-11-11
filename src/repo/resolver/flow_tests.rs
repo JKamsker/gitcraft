@@ -15,6 +15,7 @@ use crate::git::fixture::Repo;
 use crate::repo::{Action, RepoTab};
 use crate::settings::Settings;
 
+mod diagnostics;
 mod stand_in;
 pub(super) use stand_in::command_for;
 use stand_in::register;
@@ -86,6 +87,7 @@ fn wait(h: &mut H<'_>, until: impl Fn(&RepoTab) -> bool) -> bool {
         }
         std::thread::sleep(Duration::from_millis(20));
     }
+    diagnostics::report(h.state().as_ref());
     false
 }
 

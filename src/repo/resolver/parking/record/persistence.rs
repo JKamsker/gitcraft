@@ -17,12 +17,30 @@ fn sync_tree(dir: &Path) -> Result<(), String> {
         if entry.file_type().map_err(|e| e.to_string())?.is_dir() {
             sync_tree(&entry.path())?;
         } else {
-            std::fs::File::open(entry.path())
-                .and_then(|f| f.sync_all())
-                .map_err(|e| e.to_string())?;
+            sync_archive_file(&entry.path(), cfg!(windows), std::fs::File::sync_all)?;
         }
     }
     sync_dir(dir)
+}
+
+// FlushFileBuffers requires GENERIC_WRITE. These are gitcraft's newly written archive
+// copies, never the agent's source files. Keep opens non-truncating and propagate errors.
+fn sync_archive_file(
+    path: &Path,
+    windows: bool,
+    sync: impl FnOnce(&std::fs::File) -> std::io::Result<()>,
+) -> Result<(), String> {
+    let file = std::fs::OpenOptions::new()
+        .read(true)
+        .write(windows)
+        .open(path)
+        .map_err(|e| {
+            format!(
+                "couldn't open agent archive file {} for sync: {e}",
+                path.display()
+            )
+        })?;
+    sync(&file).map_err(|e| format!("couldn't sync agent archive file {}: {e}", path.display()))
 }
 
 pub(super) fn keep_record(
