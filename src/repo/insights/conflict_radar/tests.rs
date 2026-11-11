@@ -4,6 +4,21 @@
 use std::time::{Duration, Instant};
 
 use super::*;
+
+impl crate::repo::insights::context::namespace_tests::Fixture for State {
+    fn seed(&mut self) {
+        use crate::repo::insights::context::namespace_tests::seed_slot;
+        seed_slot(&mut self.read);
+        seed_slot(&mut self.hunks);
+        self.selected = Some(Picked::Branch(7));
+    }
+    fn assert_retired(&self) {
+        use crate::repo::insights::context::namespace_tests::assert_slot_retired;
+        assert_slot_retired(&self.read);
+        assert_slot_retired(&self.hunks);
+        assert!(self.layout.is_none() && self.selected.is_none() && self.hunks_for.is_none());
+    }
+}
 use crate::git::fixture::Repo;
 use crate::repo::insights::tests::draw;
 use crate::repo::insights::{InsightsAct, Kind};

@@ -8,6 +8,17 @@ use crate::insights::Provenance;
 use crate::insights::deploy::environments;
 use crate::repo::insights::{InsightsAct, Kind};
 
+impl crate::repo::insights::context::namespace_tests::Fixture for State {
+    fn seed(&mut self) {
+        crate::repo::insights::context::namespace_tests::seed_slot(&mut self.flow);
+        self.selected = Some(Target::Run(7));
+    }
+    fn assert_retired(&self) {
+        crate::repo::insights::context::namespace_tests::assert_slot_retired(&self.flow);
+        assert!(self.picture.is_none() && self.selected.is_none() && self.unavailable.is_none());
+    }
+}
+
 fn draw(tab: &mut RepoTab, ctx: &egui::Context) -> Vec<Action> {
     let mut acts = Vec::new();
     let input = egui::RawInput {

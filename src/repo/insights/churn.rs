@@ -68,6 +68,15 @@ pub(crate) struct State {
 }
 
 impl State {
+    pub(super) fn retire_repository(&mut self) {
+        *self = Self {
+            rev: self.rev.take(),
+            limit: self.limit,
+            options: std::mem::take(&mut self.options),
+            ..Self::default()
+        };
+    }
+
     fn limit(&self) -> usize {
         if self.limit == 0 {
             DEFAULT_LIMIT
