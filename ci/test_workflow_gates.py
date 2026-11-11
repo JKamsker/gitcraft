@@ -79,6 +79,11 @@ def job_steps(text, job):
     require(not ({"if", "continue-on-error", "defaults"} & fields.keys()),
             f"required job {job} can skip, soften, or retarget checks")
     require("defaults" not in top, "workflow defaults can retarget required checks")
+    for owner, indent, allowed in ((top, 2, {"CARGO_TERM_COLOR"}),
+                                    (fields, 6, {"VERSION", "PKG"})):
+        if "env" in owner:
+            variables = nested(owner, "env", indent)
+            require(variables.keys() <= allowed, "ancestor environment can override required checks")
     require("steps" in fields and not fields["steps"][0], f"missing steps for {job}")
     blocks = re.split(r"(?m)^      - ", fields["steps"][1])
     require(not any(line.strip() and not line.lstrip().startswith("#")
@@ -218,6 +223,32 @@ class WorkflowGateTests(unittest.TestCase):
                 changed = text.replace("uses: actions/checkout@v4", f"uses: actions/checkout@v4\n        with:\n          {field}")
                 with self.subTest(workflow=name, checkout=field), self.assertRaisesRegex(ValueError, "retarget"):
                     verify_required_commands(changed, job, (command,))
+
+    def test_ancestor_environment_cannot_override_required_compiler_checks(self):
+        overrides = ("RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS", "CARGO_BUILD_RUSTFLAGS",
+                     "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS", "CLIPPY_CONF_DIR",
+                     "RUSTC", "RUSTC_WRAPPER", "RUSTC_WORKSPACE_WRAPPER", "PATH")
+        for name, text, job, command in self.required_commands():
+            for variable in overrides:
+                for scope in ("workflow", "job"):
+                    if scope == "workflow":
+                        # Existing workflow envs are parsed by key, not substring matches
+                        # against a nested job env or an unrelated step's environment.
+                        if "env" in mapping(text, 0):
+                            changed = text.replace("\nenv:\n", f"\nenv:\n  {variable}: --cap-lints allow\n", 1)
+                        else:
+                            changed = text + f"\nenv:\n  {variable}: --cap-lints allow\n"
+                    else:
+                        start = text.index(f"  {job}:\n")
+                        prefix, body = text[:start], text[start:]
+                        job_fields = mapping(nested(mapping(text, 0), "jobs", 2)[job][1], 4)
+                        if "env" in job_fields:
+                            body = body.replace("    env:\n", f"    env:\n      {variable}: --cap-lints allow\n", 1)
+                        else:
+                            body = body.replace(f"  {job}:\n", f"  {job}:\n    env:\n      {variable}: --cap-lints allow\n", 1)
+                        changed = prefix + body
+                    with self.subTest(workflow=name, scope=scope, variable=variable), self.assertRaisesRegex(ValueError, "ancestor environment"):
+                        verify_required_commands(changed, job, (command,))
 
     def test_shared_gate_rejects_conditional_softened_or_retargeted_checks(self):
         for field in ("if: false", "continue-on-error: true", "working-directory: elsewhere",
