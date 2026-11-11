@@ -246,6 +246,7 @@ pub(super) fn resume(repo: &Path, gd: &Path, dir: &Path, parked: &Parked) -> Res
                 })
                 .and_then(|()| file.sync_all())
                 .map_err(|e| e.to_string())?;
+            durability::remember(dir, "live/true/index", &lock)?;
             effects::boundary("index-lock-synced")?;
             drop(file);
             if image(&target(gd, &entry.path)?)? != entry.before {

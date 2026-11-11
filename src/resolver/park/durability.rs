@@ -93,7 +93,8 @@ fn receipt(dir: &Path, key: &str) -> PathBuf {
     dir.join("durable-v1").join(format!("{name}.json"))
 }
 
-fn remember(dir: &Path, key: &str, path: &Path) -> Result<(), String> {
+// Owned outputs must be flushed before recording their pre-publication evidence.
+pub(super) fn remember(dir: &Path, key: &str, path: &Path) -> Result<(), String> {
     let proof = stamp(path)?;
     let destination = receipt(dir, key);
     std::fs::create_dir_all(destination.parent().ok_or("Missing evidence parent")?)

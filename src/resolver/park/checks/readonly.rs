@@ -109,6 +109,51 @@ fn restored_readonly_output_keeps_permissions_and_can_restart() {
 }
 
 #[test]
+fn restored_readonly_index_keeps_flush_evidence_across_publication_and_restart() {
+    let _policy = Policy::new();
+    let mut interrupted_at = None;
+    for interrupted in [false, true] {
+        let fixture = fixture();
+        let parked = fixture.park();
+        let dir = folder(&fixture.0, &parked.id).unwrap();
+        let original = std::fs::read(dir.join("index")).unwrap();
+        readonly(&dir.join("index"));
+        trace(if interrupted { interrupted_at } else { None });
+        let result = bring_back(&fixture.0, &parked);
+        let events = labels();
+        trace(None);
+        if interrupted {
+            assert!(result.is_err());
+        } else {
+            result.unwrap();
+            let synced = events
+                .iter()
+                .position(|s| s == "index-lock-synced")
+                .unwrap();
+            interrupted_at = Some(
+                events
+                    .iter()
+                    .enumerate()
+                    .skip(synced + 1)
+                    .find(|(_, s)| *s == "restore-copy-applied")
+                    .unwrap()
+                    .0
+                    + 1,
+            );
+        }
+        let index = fixture.0.join(".git/index");
+        let archive = discovery::locate(&fixture.0, &parked.id).unwrap();
+        assert_eq!(std::fs::read(&index).unwrap(), original);
+        assert!(std::fs::metadata(&index).unwrap().permissions().readonly());
+        assert!(durability::proven(&archive, "live/true/index", &index).unwrap());
+        assert!(!fixture.0.join(".git/index.lock").exists());
+        bring_back(&fixture.0, &parked).unwrap();
+        assert_eq!(list(&fixture.0).unwrap().len(), 1);
+        proof(&fixture);
+    }
+}
+
+#[test]
 fn unproven_readonly_and_changed_identity_fail_closed() {
     let _policy = Policy::new();
     let fixture = fixture();
