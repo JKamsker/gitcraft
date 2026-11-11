@@ -7,9 +7,12 @@ thread_local! {
 }
 
 #[cfg(recovery_recording)]
+type BoundaryHook = std::cell::RefCell<Option<Box<dyn FnMut(&str)>>>;
+
+#[cfg(recovery_recording)]
 thread_local! {
     pub(super) static ABRUPT: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
-    pub(super) static HOOK: std::cell::RefCell<Option<Box<dyn FnMut(&str)>>> = Default::default();
+    pub(super) static HOOK: BoundaryHook = Default::default();
 }
 
 pub(super) fn boundary(label: &str) -> Result<(), String> {

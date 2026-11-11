@@ -9,6 +9,8 @@ fn with_refs<T>(repo: &Path, f: impl FnOnce(&mut BTreeMap<String, String>) -> T)
 pub struct Call {
     pub env: Vec<(&'static str, String)>,
     pub stdin: Option<Vec<u8>>,
+    /// Match the production call's transport-duration option and default.
+    pub long: bool,
 }
 pub fn now() -> i64 {
     0
