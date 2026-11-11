@@ -31,3 +31,19 @@
 - Never derive signal targets from host-wide PID searches/selectors or send host-wide signals. Use owned child handles/process groups with verified ownership, or isolated process namespaces.
 - For new process-control logic, first validate synthetic process snapshots and recording-only signal/command checks. Run real owned-child tests only after those checks pass and containment is established.
 - Preserve the current unit with a commit, push, and verified remote SHA before any risky process test. Do not use watchdogs or cleanup commands that can target unrelated processes.
+
+# Rust source size and maintainability
+
+**Rust source-file size:** Try to keep each Rust source file below **300 physical
+lines**. **Never exceed 500 physical lines in any tracked `.rs` file**, including
+tests, examples, build scripts, and any generated or vendored Rust files committed
+to this repository. Count comments and blank lines. If a change would exceed the
+cap, refactor before completing it. Prefer composition, clear ownership, and
+reusable helpers. Do not evade the cap with minified code, giant inline
+expressions, arbitrary file splits, partial types solely to reduce line counts,
+or moving the same oversized responsibility into another hierarchy level.
+Run `python3 ci/rust_file_size.py` before committing (and `--staged` to check the
+complete index). CI checks the complete candidate with `--revision HEAD` and must
+error whenever any tracked Rust file exceeds 500 lines. There are no per-file
+exemptions or grandfathered oversized Rust files. Lexical complexity metrics
+remain advisory; this physical file-size policy is mandatory.

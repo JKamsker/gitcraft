@@ -19,11 +19,11 @@ pub(super) fn act(tab: &mut RepoTab, act: Act, ctx: &egui::Context) -> Option<Ac
         }
         Act::PreviewInverse(review) => {
             let repo = tab.path.clone();
-            let expected = repo.clone();
-            let request = match &tab.dialog {
-                Some(Dialog::RepositoryTools(s)) => s.id,
-                _ => return None,
+            let scope = tab.repository_tool_scope(ctx);
+            let Some(Dialog::RepositoryTools(state)) = &mut tab.dialog else {
+                return None;
             };
+            let ticket = state.restart(scope, super::owner::Update::Prepared);
             tab.then_or(
                 ctx,
                 false,
@@ -34,15 +34,7 @@ pub(super) fn act(tab: &mut RepoTab, act: Act, ctx: &egui::Context) -> Option<Ac
                     })
                     .map(|v| Data::Inverse(Box::new(v)))
                 },
-                move |tab, result, _| {
-                    if tab.path == expected
-                        && let Some(Dialog::RepositoryTools(s)) = &mut tab.dialog
-                        && s.id == request
-                    {
-                        s.result = Some(result);
-                        s.acknowledged = false;
-                    }
-                },
+                move |tab, result, ctx| tab.complete_repository_tool(&ticket, result, ctx),
             );
         }
         Act::RevertTurn(preview) => {
@@ -69,12 +61,12 @@ fn update_marks(
     ctx: &egui::Context,
 ) {
     let repo = tab.path.clone();
-    let expected = repo.clone();
     let expected_review = review.clone();
-    let request = match &tab.dialog {
-        Some(Dialog::RepositoryTools(state)) => state.id,
-        _ => return,
+    let scope = tab.repository_tool_scope(ctx);
+    let Some(Dialog::RepositoryTools(state)) = &mut tab.dialog else {
+        return;
     };
+    let ticket = state.restart(scope, super::owner::Update::Marks);
     tab.then_or(
         ctx,
         true,
@@ -87,19 +79,10 @@ fn update_marks(
                 logic::finish_aggregate(&repo, &review, &active)
             }
         },
-        move |tab, result, _| {
-            if tab.path == expected
-                && let Some(Dialog::RepositoryTools(state)) = &mut tab.dialog
-                && state.id == request
-                && matches!(&state.result,Some(Ok(Data::Turn(current))) if current.same_snapshot(&expected_review))
-            {
-                match result {
-                    Ok(review) => {
-                        state.result = Some(Ok(Data::Turn(review)));
-                        state.acknowledged = false;
-                    }
-                    Err(error) => tab.status = Some(crate::repo::Notice::plain((error, true))),
-                }
+        move |tab, result, ctx| {
+            if matches!(&tab.dialog, Some(Dialog::RepositoryTools(state))
+                if matches!(&state.result, Some(Ok(Data::Turn(current))) if current.same_snapshot(&expected_review))) {
+                tab.complete_repository_tool(&ticket, result.map(Data::Turn), ctx);
             }
         },
     );

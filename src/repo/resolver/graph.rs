@@ -183,6 +183,18 @@ impl RepoTab {
         parked: &Parked,
         acts: &mut Vec<Action>,
     ) {
+        if let Ok(path) = crate::resolver::park::recovery_location(&self.path, parked) {
+            ui.label("Recovery files (retained until you remove them)");
+            if ui
+                .button("Copy recovery folder path")
+                .on_hover_text(path.display().to_string())
+                .clicked()
+            {
+                ui.ctx().copy_text(path.display().to_string());
+            }
+            ui.label("Bring back retries verified recovery. Drop keeps a snapshot branch.");
+            ui.separator();
+        }
         if ui
             .button("Bring it back (double-click)")
             .on_hover_text(

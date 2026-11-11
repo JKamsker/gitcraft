@@ -3,6 +3,8 @@
 //! `git bisect run` with its output as it comes. The banner and the graph's marks are drawn
 //! from what is read here.
 
+mod run_log;
+use run_log::*;
 mod banner;
 mod items;
 #[cfg(test)]
@@ -87,51 +89,6 @@ impl Bisecting {
     /// Whether `git bisect run` is going on.
     pub(super) fn running(&self) -> bool {
         self.run.as_ref().is_some_and(|r| r.ended.is_none())
-    }
-}
-
-/// A `git bisect run` and what it printed.
-struct RunLog {
-    command: String,
-    /// Its lines, filled from the thread that runs it.
-    lines: Arc<Mutex<VecDeque<String>>>,
-    stopper: git::Stopper,
-    started: Instant,
-    /// How it ended, once it has.
-    ended: Option<Result<git::Ended, String>>,
-    /// Its output is shown.
-    open: bool,
-}
-
-impl RunLog {
-    fn new(command: String) -> Self {
-        Self {
-            command,
-            lines: Arc::default(),
-            stopper: git::Stopper::default(),
-            started: Instant::now(),
-            ended: None,
-            open: true,
-        }
-    }
-}
-
-/// A run still going when its tab closes is stopped: nothing would show its end.
-impl Drop for RunLog {
-    fn drop(&mut self) {
-        if self.ended.is_none() {
-            self.stopper.stop();
-        }
-    }
-}
-
-/// Adds `line` to `lines`, the oldest let go of past [`KEPT_LINES`].
-fn keep_line(lines: &Mutex<VecDeque<String>>, line: String) {
-    if let Ok(mut lines) = lines.lock() {
-        if lines.len() >= KEPT_LINES {
-            lines.pop_front();
-        }
-        lines.push_back(line);
     }
 }
 

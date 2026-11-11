@@ -95,7 +95,7 @@ mod tests {
     use super::*;
     #[test]
     fn document_and_archive_text_is_searchable_without_raw_patch_markers() {
-        let mut side = super::super::side("note.txt", 11, b"hello world");
+        let mut side = super::super::read::side("note.txt", 11, b"hello world");
         side.text = Some("Extracted document café".into());
         let mut pair = super::super::pair(None, Some(side), None);
         pair.members = Some(vec![super::super::MemberChange {

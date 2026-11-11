@@ -224,8 +224,10 @@ impl RepoTab {
                 w
             })
             .collect();
-        if from.credentials.is_some() && from.connection_context == crate::connections::current() {
-            self.credentials = from.credentials.clone();
+        if let Some(credentials) = &from.credentials
+            && from.connection_context == crate::connections::current()
+        {
+            self.set_credentials(credentials.clone());
         }
         // The same repository's pull requests, shown until this view reads them itself.
         if from.connection_context == crate::connections::current() {
@@ -236,6 +238,7 @@ impl RepoTab {
     /// Coming back to this view from the background: catch up, and show the selected commit
     /// again, as the graph's scroll position is the tab's and not the view's.
     pub(crate) fn resume(&mut self, ctx: &egui::Context) {
+        self.invalidate_repository_context();
         // Elsewhere, looked at again (parking stopped that; see `park`).
         if crate::remote::is_remote(&self.path) && self.poller.is_none() {
             self.watch(ctx);
@@ -265,6 +268,8 @@ impl RepoTab {
     /// Parks `view`, the worktree this tab just moved away from, and lets go of what isn't worth
     /// keeping any more.
     pub(crate) fn park(&mut self, mut view: Box<RepoTab>) {
+        // Retire view requests before disconnecting its remote poller; mutations keep tx/rx.
+        view.invalidate_repository_context();
         // One on another machine stops being asked every few seconds while it isn't shown
         // (a dozen parked views would keep the shells there busy); it is looked at again on
         // coming back.

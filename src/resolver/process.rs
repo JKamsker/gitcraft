@@ -153,18 +153,24 @@ impl Running {
     }
     /// A worker panic may leave no feed exit at all; surface it as uncertainty.
     pub fn exit(&self) -> Option<Exit> {
+        self.exit_when(|| lock(&self.worker).as_ref().is_some_and(|w| w.is_finished()))
+    }
+
+    // The feed snapshot and the worker's completion are separate observations. A worker
+    // can publish its exit between them; only a finished worker with no published exit
+    // is uncertain. The callback also lets recording tests force that exact ordering.
+    fn exit_when(&self, finished: impl FnOnce() -> bool) -> Option<Exit> {
         let exit = self.with_feed(|f| f.exit.clone());
         if exit.is_some() {
             return exit;
         }
-        lock(&self.worker)
-            .as_ref()
-            .filter(|w| w.is_finished())
-            .map(|_| {
+        finished().then(|| {
+            self.with_feed(|f| f.exit.clone()).unwrap_or_else(|| {
                 failure_exit(crate::processes::Failure::Failed(
                     "agent worker ended without cleanup proof".into(),
                 ))
             })
+        })
     }
 
     pub fn stop(&self) {
@@ -240,6 +246,51 @@ mod tests {
             !running.stop_now(),
             "panic invalidates even an earlier safe exit"
         );
+    }
+
+    #[test]
+    fn recording_exit_publication_between_poll_observations_is_not_uncertain() -> Result<(), String>
+    {
+        let running = Running::fake(vec![]);
+        let expected = Exit {
+            code: Some(0),
+            safe_to_inspect: true,
+            stopped: false,
+            stderr: String::new(),
+        };
+        let (release, wait) = std::sync::mpsc::channel();
+        let feed = running.feed.clone();
+        let published = expected.clone();
+        let worker = std::thread::spawn(move || {
+            wait.recv().map_err(|e| e.to_string())?;
+            lock(&feed).exit = Some(published);
+            Ok::<_, String>(())
+        });
+        let observed = running.exit_when(|| {
+            // Initial feed snapshot was empty. Complete publication before the worker
+            // completion observation, without a process, sleep, or scheduler assumption.
+            assert!(release.send(()).is_ok());
+            assert!(worker.join().is_ok_and(|r| r.is_ok()));
+            true
+        });
+        assert_eq!(observed, Some(expected));
+        assert!(running.stop_now());
+        Ok(())
+    }
+
+    #[test]
+    fn recording_unfinished_and_missing_or_unsafe_exits_still_fail_closed() {
+        let running = Running::fake(vec![]);
+        assert_eq!(running.exit_when(|| false), None);
+        assert!(
+            running
+                .exit_when(|| true)
+                .is_some_and(|e| !e.safe_to_inspect)
+        );
+        let unsafe_exit = failure_exit(crate::processes::Failure::Failed("lost proof".into()));
+        lock(&running.feed).exit = Some(unsafe_exit.clone());
+        assert_eq!(running.exit_when(|| true), Some(unsafe_exit));
+        assert!(!running.stop_now());
     }
 
     fn wait_for(running: &Running, until: impl Fn(&Feed) -> bool) -> bool {

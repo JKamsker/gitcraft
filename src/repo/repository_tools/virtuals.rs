@@ -29,11 +29,11 @@ pub(super) fn act(tab: &mut RepoTab, act: Act, ctx: &egui::Context) -> Option<Ac
         ),
         Act::PrepareVirtual(view, name) => {
             let repo = tab.path.clone();
-            let expected = repo.clone();
-            let request = match &tab.dialog {
-                Some(Dialog::RepositoryTools(s)) => s.id,
-                _ => return None,
+            let scope = tab.repository_tool_scope(ctx);
+            let Some(Dialog::RepositoryTools(state)) = &mut tab.dialog else {
+                return None;
             };
+            let ticket = state.restart(scope, super::owner::Update::Prepared);
             tab.then_or(
                 ctx,
                 false,
@@ -44,15 +44,7 @@ pub(super) fn act(tab: &mut RepoTab, act: Act, ctx: &egui::Context) -> Option<Ac
                     })
                     .map(|p| Data::VirtualCommit(Box::new(p)))
                 },
-                move |tab, result, _| {
-                    if tab.path == expected
-                        && let Some(Dialog::RepositoryTools(s)) = &mut tab.dialog
-                        && s.id == request
-                    {
-                        s.result = Some(result);
-                        s.acknowledged = false;
-                    }
-                },
+                move |tab, result, ctx| tab.complete_repository_tool(&ticket, result, ctx),
             );
         }
         other => return Some(other),

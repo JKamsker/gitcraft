@@ -85,126 +85,6 @@ struct Commit {
     subject: String,
 }
 
-pub(super) struct Reader<'a> {
-    pub repo: &'a Path,
-    active: &'a dyn Fn() -> bool,
-    began: Instant,
-}
-impl<'a> Reader<'a> {
-    pub fn new(repo: &'a Path, active: &'a dyn Fn() -> bool) -> Self {
-        Self {
-            repo,
-            active,
-            began: Instant::now(),
-        }
-    }
-    pub fn active(&self) -> bool {
-        (self.active)() && self.began.elapsed() < Duration::from_secs(120)
-    }
-    pub fn output(&self, args: &[&str], input: Option<&[u8]>) -> Result<remote::Output, String> {
-        let null = if remote::is_remote(self.repo) || !cfg!(windows) {
-            "/dev/null"
-        } else {
-            "NUL"
-        };
-        let hooks = format!("core.hooksPath={null}");
-        let mut pre = vec![
-            "--no-lazy-fetch",
-            "--no-replace-objects",
-            "--no-optional-locks",
-            "-c",
-            "core.fsmonitor=false",
-            "-c",
-            "core.untrackedCache=false",
-            "-c",
-            &hooks,
-            "-c",
-            "gc.auto=0",
-            "-c",
-            "maintenance.auto=false",
-            "-c",
-            "commit.gpgSign=false",
-        ];
-        pre.extend_from_slice(args);
-        let remaining = Duration::from_secs(120).saturating_sub(self.began.elapsed());
-        git::command::recovery_output(
-            self.repo,
-            &pre,
-            input,
-            &|| self.active(),
-            remaining.min(Duration::from_secs(30)),
-        )
-    }
-    pub fn run(&self, args: &[&str], input: Option<&[u8]>) -> Result<Vec<u8>, String> {
-        let out = self.output(args, input).map_err(|error| {
-            if args.first() == Some(&"update-ref") && (error.to_ascii_lowercase().contains("cancel") || error.contains("timed out")) {
-                crate::i18n::message("backend-ref-recovery-was-interrupted-and-may-have-completed-inspect-the-b-333dce", &[("detail", (error).to_string().into())])
-            } else { error }
-        })?;
-        if out.code == 0 && out.stderr.is_empty() {
-            Ok(out.stdout)
-        } else {
-            Err(crate::i18n::message(
-                "backend-content-recovery-git-failed-bb7f44",
-                &[
-                    ("code", (out.code).to_string().into()),
-                    (
-                        "from_utf8_lossy",
-                        (String::from_utf8_lossy(&out.stderr)
-                            .chars()
-                            .take(2000)
-                            .collect::<String>())
-                        .to_string()
-                        .into(),
-                    ),
-                ],
-            ))
-        }
-    }
-    pub fn identity(&self) -> Result<Identity, String> {
-        let text = |args: &[&str]| -> Result<String, String> {
-            let bytes = self.run(args, None)?;
-            let bytes = bytes.strip_suffix(b"\n").ok_or(crate::i18n::text(
-                "backend-truncated-repository-metadata-04adb4",
-            ))?;
-            let bytes = if cfg!(windows) && !remote::is_remote(self.repo) {
-                bytes.strip_suffix(b"\r").unwrap_or(bytes)
-            } else {
-                bytes
-            };
-            let value = std::str::from_utf8(bytes).map_err(|_| {
-                crate::i18n::text("backend-repository-metadata-is-not-utf-8-aa6912")
-            })?;
-            if value.chars().any(char::is_control) {
-                return Err(
-                    crate::i18n::text("backend-repository-metadata-paths-contain-unsupported-control-characters-37b6ea").into(),
-                );
-            }
-            Ok(value.to_owned())
-        };
-        let bare = text(&["rev-parse", "--is-bare-repository"])? == "true";
-        let mut identity = Identity {
-            host: remote::parse(self.repo).map(|target| target.host),
-            root_pin: None,
-            common: text(&["rev-parse", "--path-format=absolute", "--git-common-dir"])?,
-            root: if bare {
-                None
-            } else {
-                Some(text(&["rev-parse", "--show-toplevel"])?)
-            },
-            format: text(&["rev-parse", "--show-object-format"])?,
-        };
-        identity.root_pin = identity
-            .root
-            .as_deref()
-            .and_then(|root| file::capture(self, root).ok());
-        if !matches!(identity.format.as_str(), "sha1" | "sha256") {
-            return Err(crate::i18n::text("backend-unsupported-object-format-f8189c").into());
-        }
-        Ok(identity)
-    }
-}
-
 pub(crate) fn search(
     repo: &Path,
     query: &str,
@@ -494,156 +374,6 @@ fn search_inner(repo: &Path, query: &str, active: &dyn Fn() -> bool) -> Result<R
         report,
     })
 }
-fn read_commits(
-    reader: &Reader<'_>,
-    ids: &BTreeSet<String>,
-    report: &mut Report,
-) -> Result<BTreeMap<String, Commit>, String> {
-    let ids: Vec<_> = ids.iter().cloned().collect();
-    let mut requests = Vec::new();
-    for item in batch::check(reader, &ids)? {
-        match item.info {
-            Some((kind, size)) if kind == "commit" && size <= 256 * 1024 => {
-                requests.push((item.oid, size))
-            }
-            None => report.missing += 1,
-            _ => {
-                report.limited = true;
-            }
-        }
-    }
-    let mut commits = BTreeMap::new();
-    for group in batch::groups(&requests) {
-        for (oid, bytes) in batch::read(reader, group, "commit")? {
-            commits.insert(oid.clone(), parse_commit(&oid, &bytes)?);
-        }
-    }
-    Ok(commits)
-}
-fn parse_commit(oid: &str, bytes: &[u8]) -> Result<Commit, String> {
-    let split = bytes
-        .windows(2)
-        .position(|window| window == b"\n\n")
-        .ok_or(crate::i18n::text("backend-malformed-commit-object-20d1ec"))?;
-    let mut tree = None;
-    let mut parents = Vec::new();
-    let mut when = None;
-    for line in bytes[..split].split(|b| *b == b'\n') {
-        if let Some(value) = line.strip_prefix(b"tree ") {
-            let value = std::str::from_utf8(value)
-                .map_err(|_| crate::i18n::text("backend-invalid-commit-tree-f82ac0"))?;
-            if tree.is_some() || !valid_oid(value) {
-                return Err(crate::i18n::text("backend-invalid-commit-tree-f82ac0").into());
-            }
-            tree = Some(value.to_owned());
-        }
-        if let Some(value) = line.strip_prefix(b"parent ") {
-            let value = std::str::from_utf8(value)
-                .map_err(|_| crate::i18n::text("backend-invalid-commit-parent-87c5f3"))?;
-            if !valid_oid(value) || parents.len() >= 64 {
-                return Err(crate::i18n::text("backend-invalid-commit-parents-8430cf").into());
-            }
-            parents.push(value.to_owned());
-        }
-        if let Some(value) = line.strip_prefix(b"committer ") {
-            when = value
-                .rsplit(|b| b.is_ascii_whitespace())
-                .filter(|part| !part.is_empty())
-                .nth(1)
-                .and_then(|time| std::str::from_utf8(time).ok())
-                .and_then(|time| time.parse::<i64>().ok());
-        }
-    }
-    let message = bytes
-        .get(split + 2..)
-        .ok_or(crate::i18n::text("backend-missing-commit-message-832b0d"))?;
-    let subject = message.split(|b| *b == b'\n').next().unwrap_or_default();
-    Ok(Commit {
-        oid: oid.into(),
-        tree: tree.ok_or(crate::i18n::text("backend-missing-commit-tree-2e21e3"))?,
-        parents,
-        when: when.ok_or(crate::i18n::text("backend-missing-commit-time-3db252"))?,
-        subject: String::from_utf8_lossy(subject)
-            .chars()
-            .filter(|c| !c.is_control())
-            .take(200)
-            .collect(),
-    })
-}
-fn stash_shape(commit: &Commit, parents: &BTreeMap<String, Commit>) -> bool {
-    matches!(commit.parents.len(), 2 | 3)
-        && (commit.subject.starts_with("WIP on ") || commit.subject.starts_with("On "))
-        && parents.get(&commit.parents[1]).is_some_and(|index| {
-            index.parents == commit.parents[..1] && index.subject.starts_with("index on ")
-        })
-        && (commit.parents.len() == 2
-            || parents.get(&commit.parents[2]).is_some_and(|untracked| {
-                untracked.parents.is_empty() && untracked.subject.starts_with("untracked files on ")
-            }))
-}
-fn tree_entries(
-    reader: &Reader<'_>,
-    tree: &str,
-    report: &mut Report,
-) -> Result<Vec<(String, String, String)>, String> {
-    let bytes = reader.run(&["ls-tree", "-r", "-z", "--full-tree", tree], None)?;
-    let mut entries = Vec::new();
-    for row in bytes.split(|b| *b == 0).filter(|r| !r.is_empty()) {
-        let Some(tab) = row.iter().position(|b| *b == b'\t') else {
-            return Err(crate::i18n::text("backend-invalid-tree-record-bf9356").into());
-        };
-        let info = std::str::from_utf8(&row[..tab])
-            .map_err(|_| crate::i18n::text("backend-invalid-tree-metadata-1d2e46"))?;
-        let parts: Vec<_> = info.split_whitespace().collect();
-        let [mode, kind, oid] = parts.as_slice() else {
-            return Err(crate::i18n::text("backend-invalid-tree-entry-8d7b6f").into());
-        };
-        if !valid_oid(oid) {
-            return Err(crate::i18n::text("backend-invalid-tree-object-id-58c8bf").into());
-        }
-        if *kind != "blob" {
-            continue;
-        }
-        let Ok(path) = std::str::from_utf8(&row[tab + 1..]) else {
-            report.limited = true;
-            continue;
-        };
-        if path.len() > 4096 || path.chars().any(char::is_control) {
-            report.limited = true;
-            continue;
-        }
-        if !matches!(*mode, "100644" | "100755" | "120000") {
-            return Err(crate::i18n::text("backend-invalid-blob-mode-f621df").into());
-        }
-        if entries.len() >= ENTRIES {
-            return Err(crate::i18n::text(
-                "backend-a-tree-exceeds-15000-file-entries-narrow-recovery-with-git-in-the-447484",
-            )
-            .into());
-        }
-        entries.push((path.into(), (*mode).into(), (*oid).into()));
-    }
-    Ok(entries)
-}
-fn excerpt(text: &str, at: usize) -> (usize, String) {
-    let line = text[..at].bytes().filter(|b| *b == b'\n').count() + 1;
-    let start = text[..at]
-        .char_indices()
-        .rev()
-        .nth(120)
-        .map_or(0, |(i, _)| i);
-    let mut excerpt: String = text[start..].chars().take(400).collect();
-    if start > 0 {
-        excerpt.insert(0, '…');
-    }
-    if text[start..].chars().count() > 400 {
-        excerpt.push('…');
-    }
-    (line, excerpt)
-}
-pub(super) fn valid_oid(oid: &str) -> bool {
-    matches!(oid.len(), 40 | 64) && oid.bytes().all(|b| b.is_ascii_hexdigit())
-}
 
 /// Shared reviewed filesystem pins for explicit, append-only repository-file actions.
 /// No scan, ref/index mutation, filter, signing or lazy object download occurs here.
@@ -657,9 +387,20 @@ pub(crate) fn pinned_worktree(repo: &Path, active: &dyn Fn() -> bool) -> Result<
     }
     Ok(identity)
 }
-#[cfg(any(unix, windows))]
 pub(crate) use file::native_file_identity;
 #[cfg(unix)]
 pub(crate) use file::parent as pinned_parent;
 #[cfg(windows)]
 pub(crate) use file::windows_parent as pinned_parent;
+
+mod objects;
+use objects::excerpt;
+#[cfg(test)]
+use objects::parse_commit;
+use objects::read_commits;
+use objects::stash_shape;
+use objects::tree_entries;
+pub(super) use objects::valid_oid;
+
+mod reader;
+pub(super) use reader::Reader;

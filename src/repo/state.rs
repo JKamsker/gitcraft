@@ -7,71 +7,6 @@ use super::file_text::FileText;
 use super::{diff, short};
 use crate::git::{self, StatusFile};
 
-/// What to re-read after an operation.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Refresh {
-    /// Only the working tree (staging changes nothing else).
-    Status,
-    All,
-}
-
-/// How an operation can be undone.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) enum Undo {
-    None,
-    /// The operation moved HEAD (commit, merge, reset…): undo moves it back with
-    /// `git reset <mode>`, redo forward again. `--soft` keeps the changes staged.
-    HeadMove {
-        mode: &'static str,
-    },
-    /// Explicit commands each way (branch create/delete/rename, checkout, tags, stash).
-    Custom {
-        undo: Vec<Vec<String>>,
-        redo: Vec<Vec<String>>,
-    },
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub(crate) struct UndoEntry {
-    /// The timeline entry this undoes (see `timeline::Entry::id`); 0 until it has one.
-    #[serde(default)]
-    pub(super) id: u64,
-    pub(super) label: String,
-    pub(super) undo: Vec<Vec<String>>,
-    pub(super) redo: Vec<Vec<String>>,
-    /// HEAD before and after an operation that moved it: undoing resets whatever branch is
-    /// checked out, so it only runs while HEAD is still where the operation left it (and redo
-    /// while it is back where it was), not after a checkout or commit made elsewhere since.
-    pub(super) heads: Option<(String, String)>,
-    /// The agent that asked for it over `gitcraft mcp`, when it wasn't the user: the toolbar
-    /// marks it with a robot.
-    #[serde(default)]
-    pub(super) agent: Option<String>,
-}
-
-/// An operation as `run_ops_ex` got it, kept to retry it with credentials.
-pub(super) struct PendingOp {
-    pub(super) label: String,
-    pub(super) ops: Vec<Vec<String>>,
-    pub(super) refresh: Refresh,
-    pub(super) kind: OpKind,
-    pub(super) quiet: bool,
-}
-
-#[derive(Clone, Debug)]
-pub(super) enum OpKind {
-    Normal(Undo, String),
-    Undo(UndoEntry),
-    Redo(UndoEntry),
-}
-
-impl OpKind {
-    /// An operation that isn't undone.
-    pub(super) fn plain() -> Self {
-        OpKind::Normal(Undo::None, String::new())
-    }
-}
-
 /// Which diff the central area shows.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum DiffKey {
@@ -511,3 +446,8 @@ pub(super) struct Search {
     /// What the field suggests while an operator is typed.
     pub(super) suggest: super::graph_view::suggest::SuggestState,
 }
+
+#[path = "core_seams/operation_state.rs"]
+mod operation_state;
+#[allow(unused_imports)]
+pub(crate) use operation_state::*;

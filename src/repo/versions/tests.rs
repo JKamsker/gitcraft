@@ -66,7 +66,7 @@ fn repo(name: &str) -> Result<Scratch, String> {
 /// Polls the tab until `done` says so (or a few seconds went by).
 fn wait(tab: &mut RepoTab, ctx: &egui::Context, done: impl Fn(&RepoTab) -> bool) -> bool {
     for _ in 0..400 {
-        tab.poll(ctx);
+        crate::repo::hang_diagnostics::poll(tab, ctx);
         if done(tab) {
             return true;
         }
@@ -77,7 +77,9 @@ fn wait(tab: &mut RepoTab, ctx: &egui::Context, done: impl Fn(&RepoTab) -> bool)
 
 /// A tab on `dir` with its first read in.
 fn tab(dir: &Path, ctx: &egui::Context) -> RepoTab {
-    let mut tab = RepoTab::new(dir.to_path_buf(), ctx);
+    let mut tab = crate::repo::hang_diagnostics::run(format_args!("construct live tab"), || {
+        RepoTab::new(dir.to_path_buf(), ctx)
+    });
     wait(&mut tab, ctx, |t| !t.loading && t.versions.rewrites_read);
     tab
 }
@@ -304,10 +306,12 @@ fn a_summary_counts_what_there_is() {
 #[test]
 fn a_pull_request_is_seen_only_once_its_comparison_shows() -> Result<(), String> {
     use super::Since;
-    let scratch = repo("seen")?;
+    use crate::repo::hang_diagnostics::{run, trace};
+    let _trace = trace("a_pull_request_is_seen_only_once_its_comparison_shows");
+    let scratch = run(format_args!("repository setup"), || repo("seen"))?;
     let dir = scratch.0.as_path();
-    let ctx = egui::Context::default();
-    let mut tab = tab(dir, &ctx);
+    let ctx = run(format_args!("create context"), egui::Context::default);
+    let mut tab = run(format_args!("open and load tab"), || tab(dir, &ctx));
     tab.hosting = Some(crate::forge::Hosting {
         forge: crate::forge::Forge::GitHub,
         host: "github.com".to_owned(),
@@ -331,6 +335,7 @@ fn a_pull_request_is_seen_only_once_its_comparison_shows() -> Result<(), String>
     };
 
     // A version that can't be read: the comparison fails, nothing is taken as seen.
+    let _failed = crate::repo::hang_diagnostics::stage(format_args!("failed comparison"));
     tab.show_pr_since(since(&"f".repeat(40)), &ctx);
     assert!(wait(&mut tab, &ctx, |t| t
         .versions
@@ -338,9 +343,13 @@ fn a_pull_request_is_seen_only_once_its_comparison_shows() -> Result<(), String>
         .as_ref()
         .is_some_and(|v| v.data.is_some())));
     std::thread::sleep(std::time::Duration::from_millis(100));
-    tab.poll(&ctx);
+    crate::repo::hang_diagnostics::poll(&mut tab, &ctx);
     assert_eq!(git::reviewed(dir, &key, 4)?, None);
+    drop(_failed);
 
+    let _success = crate::repo::hang_diagnostics::stage(format_args!(
+        "successful comparison and seen receipt"
+    ));
     tab.show_pr_since(since(&topic), &ctx);
     assert!(wait(&mut tab, &ctx, |_| git::reviewed(dir, &key, 4)
         .ok()
@@ -351,5 +360,9 @@ fn a_pull_request_is_seen_only_once_its_comparison_shows() -> Result<(), String>
         Some(git::Series::new(&base, &topic))
     );
     assert_eq!(tab.versions.seen_heads.get(&4), Some(&topic));
+    drop(_success);
+    run(format_args!("drop tab and watcher"), || drop(tab));
+    run(format_args!("drop context"), || drop(ctx));
+    run(format_args!("remove repository"), || drop(scratch));
     Ok(())
 }

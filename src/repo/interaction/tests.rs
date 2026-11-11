@@ -24,7 +24,9 @@ fn two_branches(name: &str) -> Result<Repo, String> {
 }
 
 fn open(repo: &Repo, ctx: &egui::Context) -> Result<RepoTab, String> {
-    let mut tab = RepoTab::new(repo.path().to_path_buf(), ctx);
+    let mut tab = crate::repo::hang_diagnostics::run(format_args!("construct live tab"), || {
+        RepoTab::new(repo.path().to_path_buf(), ctx)
+    });
     settle(&mut tab, ctx)?;
     Ok(tab)
 }
@@ -32,7 +34,7 @@ fn open(repo: &Repo, ctx: &egui::Context) -> Result<RepoTab, String> {
 fn settle(tab: &mut RepoTab, ctx: &egui::Context) -> Result<(), String> {
     let until = Instant::now() + Duration::from_secs(90);
     while Instant::now() < until {
-        tab.poll(ctx);
+        crate::repo::hang_diagnostics::poll(tab, ctx);
         if tab.settled() && !tab.interactions.going() && tab.history_gen > 0 {
             return Ok(());
         }
@@ -90,9 +92,12 @@ fn the_search_finds_the_pair_from_a_branch_s_menu() -> Result<(), String> {
 
 #[test]
 fn the_palette_offers_every_other_branch() -> Result<(), String> {
-    let ctx = egui::Context::default();
-    let repo = two_branches("palette")?;
-    let tab = open(&repo, &ctx)?;
+    use crate::repo::hang_diagnostics::{run, trace};
+    let _trace = trace("the_palette_offers_every_other_branch");
+    let ctx = run(format_args!("create context"), egui::Context::default);
+    let repo = run(format_args!("repository setup"), || two_branches("palette"))?;
+    let tab = run(format_args!("open and settle tab"), || open(&repo, &ctx))?;
+    let _assertions = crate::repo::hang_diagnostics::stage(format_args!("palette assertions"));
     let mut items: Vec<String> = tab
         .interaction_palette_items()
         .into_iter()
@@ -106,6 +111,10 @@ fn the_palette_offers_every_other_branch() -> Result<(), String> {
             "Find the interaction of a and main…"
         ]
     );
+    drop(_assertions);
+    run(format_args!("drop tab and watcher"), || drop(tab));
+    run(format_args!("remove repository"), || drop(repo));
+    run(format_args!("drop context"), || drop(ctx));
     Ok(())
 }
 

@@ -132,6 +132,7 @@ members = [".", "crates/gitcraft-os"]
 default-members = [".", "crates/gitcraft-os"]
 
 [lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(recovery_recording)"] }
 # Denied everywhere; narrowly documented Windows API adapters allow it on that function alone.
 unsafe_code = "deny"
 

@@ -44,6 +44,7 @@ pub(super) fn geometry(
     let width = width.max(1.0);
     let key = (
         data.source,
+        data.geometry_revision,
         data.lines.len(),
         data.split.len(),
         split,
@@ -70,19 +71,14 @@ pub(super) fn geometry(
             (galley(ui, &line.text, font, text_width).size().y + 4.0).max(LINE_H)
         })
     };
-    let heights: Vec<f32> = if split {
-        data.split
-            .iter()
-            .map(|(a, b)| {
-                a.map(height)
-                    .unwrap_or(LINE_H)
-                    .max(b.map(height).unwrap_or(LINE_H))
-            })
-            .collect()
-    } else {
-        (0..data.lines.len()).map(height).collect()
-    };
-    let mut offsets = Vec::with_capacity(heights.len() + 1);
+    let rows = super::presentation::DisplayRows::new(data, split);
+    let heights = (0..rows.len()).map(|row| {
+        let (a, b) = rows.patch_lines(row).unwrap_or((None, None));
+        a.map(height)
+            .unwrap_or(LINE_H)
+            .max(b.map(height).unwrap_or(LINE_H))
+    });
+    let mut offsets = Vec::with_capacity(rows.len() + 1);
     offsets.push(0.0);
     for h in heights {
         offsets.push(offsets.last().copied().unwrap_or(0.0) + h);

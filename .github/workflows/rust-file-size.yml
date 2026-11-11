@@ -1,0 +1,22 @@
+# Required by PR/mainline CI and release validation; no path or change filters.
+name: Rust file size
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      # On pull_request this is the candidate merge commit, not just the PR head.
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Checker regression tests
+        run: python3 -m unittest discover -s ci -p test_rust_file_size.py -v
+      - name: Enforce the full candidate tree
+        run: python3 ci/rust_file_size.py --revision HEAD

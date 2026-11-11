@@ -29,6 +29,40 @@ cargo test
 - gitcraft is one window: while an installed gitcraft is running, `cargo run` hands its folder
   to that window and exits. Close the installed one first.
 
+## Rust source size
+
+Try to keep each Rust source file below **300 physical lines**; **never exceed
+500**. At 300–500 lines the checker warns with the path/count and asks for cohesive
+decomposition. At 501 or more it fails. This covers every Git-tracked `.rs` file
+anywhere, including tests, examples, build scripts, generated and vendored files.
+No exclusions, grandfathering, or suppressions are supported. Preserve clear
+ownership rather than minifying code or splitting responsibilities arbitrarily.
+
+With Python 3.10+ and Git, run before committing:
+
+```sh
+python3 ci/rust_file_size.py                  # tracked paths, working contents
+python3 ci/rust_file_size.py --staged         # complete index, not just changed files
+python3 ci/rust_file_size.py --revision HEAD  # immutable committed candidate
+python3 -m unittest discover -s ci -p test_rust_file_size.py -v
+```
+
+LF separates physical lines; CRLF gives the same count. Empty files have zero
+lines; a final nonempty fragment counts even without a newline. Comments and
+blank lines count, and Unicode line-separator characters are not LF delimiters.
+Git supplies the paths, so ignored/untracked build output is excluded while
+tracked ignored/generated/vendor Rust files still count. Working mode omits
+unstaged deletions; index/revision modes check their own snapshots, including
+staged renames/deletions. Symlinks count their Git link contents, never an external
+target. Unmerged Rust entries or unreadable content fail closed.
+
+The unconditional `rust-file-size` job in PR/mainline CI (master/main), dev
+validation and tag/manual release builds calls the shared workflow and checks
+`--revision HEAD`. For PRs, checkout supplies the candidate merge tree. Downstream
+checks/builds depend on this gate, and publishing depends on those builds.
+CI remains authoritative even when local checks are skipped. The lexical
+[architecture survey](architecture.md) stays advisory alongside this hard cap.
+
 ## Tests
 
 A plain `cargo test` runs everything that needs no outside machine or server. The tests below are

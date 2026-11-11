@@ -2,7 +2,8 @@
 """Reproducible, advisory architecture metrics using only Python and Git.
 
 This is a lexical survey, not a Rust parser. See docs/architecture.md for scope
-and limitations. Never use its size/branch counts as correctness or CI gates.
+and limitations. Its lexical scores remain advisory. The separate mandatory
+full-tree physical line gate is ci/rust_file_size.py (issue #198).
 """
 
 import argparse

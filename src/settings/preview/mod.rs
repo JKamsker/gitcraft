@@ -3,9 +3,13 @@
 //! [`super::layout::Card::preview`]); the last one pointed at stays until another is.
 
 mod app;
+mod appearance;
+mod diffs;
 mod draw;
+mod files;
 mod graph;
-mod other;
+mod pull;
+mod terminal;
 
 use egui::{Id, RichText, Stroke, Ui, vec2};
 
@@ -281,13 +285,13 @@ pub(super) fn panel(ui: &mut Ui, preview: Preview, settings: &Settings, current:
                 Preview::GraphColumns => graph::columns(ui, &t, settings, width),
                 Preview::GraphLanes => graph::lanes(ui, &t, settings, width),
                 Preview::LaneColors => graph::lane_colors(ui, &t, settings, width, current),
-                Preview::Pull => other::pull(ui, &t, settings, width),
-                Preview::Terminal => other::terminal(ui, &t, settings, width),
-                Preview::CodeColors => other::code(ui, &t, settings, width),
-                Preview::Avatars => other::avatars(ui, &t, settings, width),
-                Preview::DiffLayout => other::diff_layout(ui, &t, settings, width),
-                Preview::DiffContext => other::diff_context(ui, &t, settings, width),
-                Preview::FileList => other::file_list(ui, &t, settings, width),
+                Preview::Pull => pull::pull(ui, &t, settings, width),
+                Preview::Terminal => terminal::terminal(ui, &t, settings, width),
+                Preview::CodeColors => appearance::code(ui, &t, settings, width),
+                Preview::Avatars => appearance::avatars(ui, &t, settings, width),
+                Preview::DiffLayout => diffs::diff_layout(ui, &t, settings, width),
+                Preview::DiffContext => diffs::diff_context(ui, &t, settings, width),
+                Preview::FileList => files::file_list(ui, &t, settings, width),
             }
         });
 }

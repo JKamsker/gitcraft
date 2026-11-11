@@ -261,7 +261,10 @@ mod tests {
     // templates. No fs::failed, helper, process, request, native or FS operation runs.
     #[test]
     fn actual_owned_native_and_filesystem_compositions_render_in_both_languages() {
-        let native_source = include_str!("../native_owner.rs");
+        let native_source = concat!(
+            include_str!("../native_owner.rs"),
+            include_str!("../native_owner/controller.rs")
+        );
         let fs_source = include_str!("../fs.rs");
         assert!(native_source.contains("eprintln!(\"gitcraft owned endpoint: {error}\");"));
         assert!(native_source.contains("return Err(\"invalid native request\".into());"));
@@ -327,7 +330,10 @@ mod tests {
 
     #[test]
     fn finite_owned_proof_cleanup_and_claim_children_render_with_framing() {
-        let native = include_str!("../native_owner.rs");
+        let native = concat!(
+            include_str!("../native_owner.rs"),
+            include_str!("../native_owner/controller.rs")
+        );
         let claim = include_str!("../workspace_claim.rs");
         assert!(native.contains("{error}; atomic cleanup proof unavailable: {proof}"));
         assert!(native.contains("{error}; NotDispatched proof publication failed: {proof}"));
