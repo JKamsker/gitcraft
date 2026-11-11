@@ -103,6 +103,8 @@ mod navigation;
 mod offline;
 pub(crate) mod operations;
 pub(crate) use operations::run_reviewed_push;
+#[cfg(test)]
+pub(crate) mod hang_diagnostics;
 mod owners;
 mod package;
 mod palette;

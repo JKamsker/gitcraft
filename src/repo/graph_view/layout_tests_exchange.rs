@@ -1,10 +1,16 @@
 #[test]
 fn all_bars_sequential_pointer_exchanges_preserve_siblings_and_origin_after_auto_fit()
 -> Result<(), String> {
+    use crate::repo::hang_diagnostics::{run, stage, trace};
+    let _trace =
+        trace("all_bars_sequential_pointer_exchanges_preserve_siblings_and_origin_after_auto_fit");
     for width in [600.0, 760.0, 1000.0, 1800.0] {
         for auto in [false, true] {
             for scale in [1.0, 1.25, 1.5] {
                 for offset in [-4.0, 4.0] {
+                    let _case = stage(format_args!(
+                        "matrix width={width} auto={auto} scale={scale} offset={offset}"
+                    ));
                     let settings = Settings {
                         show_hash: true,
                         show_date: true,
@@ -13,7 +19,9 @@ fn all_bars_sequential_pointer_exchanges_preserve_siblings_and_origin_after_auto
                         ui_scale: scale,
                         ..exchange_settings()
                     };
-                    let mut h = exchange_harness(&settings, width, auto);
+                    let mut h = run(format_args!("construct and paint harness"), || {
+                        exchange_harness(&settings, width, auto)
+                    });
                     assert!((painted(&h)?.header.width() - width).abs() < 0.1);
                     if auto {
                         assert_ne!(
@@ -32,6 +40,7 @@ fn all_bars_sequential_pointer_exchanges_preserve_siblings_and_origin_after_auto
                         Bar::Date,
                         Bar::Refs,
                     ] {
+                        let _bar = stage(format_args!("exchange {bar:?}"));
                         let geometry = painted(&h)?;
                         let donor = Bar::ALL
                             .into_iter()
@@ -78,6 +87,7 @@ fn all_bars_sequential_pointer_exchanges_preserve_siblings_and_origin_after_auto
                         pointer_button(&mut h, end, false);
                         assert_exchange(&h, start, &saved, bar, 10.0)?;
                     }
+                    run(format_args!("drop harness"), || drop(h));
                 }
             }
         }

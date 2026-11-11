@@ -28,6 +28,8 @@ pub(super) fn answered(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Opti
 /// Runs git with `args` in `dir` (on whichever machine it is), `extra` before them; a read it
 /// needn't run for is answered without it (see [`answered`]).
 pub(super) fn execute(dir: Option<&Path>, extra: &Extra, args: &[&str]) -> Result<Ran, String> {
+    #[cfg(test)]
+    let _stage = crate::repo::hang_diagnostics::stage(format_args!("git {args:?}"));
     if let Some(ran) = answered(dir, extra, args) {
         return Ok(ran);
     }
