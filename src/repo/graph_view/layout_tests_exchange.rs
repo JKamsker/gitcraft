@@ -115,29 +115,7 @@ fn sequential_exchange_survives_restart_visibility_and_viewport_visits() -> Resu
         assert_eq!(restored, saved);
         let mut restarted = exchange_harness(&restored, 760.0, auto);
         assert_eq!(painted(&restarted)?.cols, original.cols);
-        // Each metadata visibility toggle is reversible without changing saved preferences
-        // or the persisted allocation. A restart while hidden follows the same policy.
-        for bar in [Bar::Hash, Bar::Author, Bar::When, Bar::Date] {
-            let mut hidden = saved.clone();
-            match bar {
-                Bar::Hash => hidden.show_hash = false,
-                Bar::Author => hidden.show_author = false,
-                Bar::When => hidden.show_when = false,
-                Bar::Date => hidden.show_date = false,
-                _ => unreachable!(),
-            }
-            hidden.put_for_test(&restarted.ctx);
-            restarted.run_steps(3);
-            assert_eq!(painted(&restarted)?.cols.width(bar), 0.0);
-            assert_eq!(Settings::get(&restarted.ctx), hidden);
-            let encoded = ron::to_string(&hidden).map_err(|e| e.to_string())?;
-            let restored: Settings = ron::from_str(&encoded).map_err(|e| e.to_string())?;
-            let hidden_restart = exchange_harness(&restored, 760.0, auto);
-            assert_eq!(painted(&hidden_restart)?.cols, painted(&restarted)?.cols);
-            saved.put_for_test(&restarted.ctx);
-            restarted.run_steps(3);
-            assert_eq!(painted(&restarted)?.cols, original.cols);
-        }
+        assert_visibility_restarts(&mut restarted, &saved, auto)?;
         let mut visits = std::collections::HashMap::new();
         for width in [
             380, 500, 600, 740, 760, 780, 1000, 1800, 600, 380, 1800, 760,
@@ -264,5 +242,37 @@ fn full_height_minimap_reservation_keeps_visible_date_divider_interactive() -> R
     let end = pointer_delta(&mut h, press, Bar::Date, 10.0);
     pointer_button(&mut h, end, false);
     assert_exchange(&h, start, &saved, Bar::Date, 10.0)?;
+    Ok(())
+}
+
+fn assert_visibility_restarts(
+    restarted: &mut egui_kittest::Harness<'static, RepoTab>,
+    saved: &Settings,
+    auto: bool,
+) -> Result<(), String> {
+    let original = painted(restarted)?;
+    // Each metadata visibility toggle is reversible without changing saved preferences
+    // or the persisted allocation. A restart while hidden follows the same policy.
+    for bar in [Bar::Hash, Bar::Author, Bar::When, Bar::Date] {
+        let mut hidden = saved.clone();
+        match bar {
+            Bar::Hash => hidden.show_hash = false,
+            Bar::Author => hidden.show_author = false,
+            Bar::When => hidden.show_when = false,
+            Bar::Date => hidden.show_date = false,
+            _ => unreachable!(),
+        }
+        hidden.put_for_test(&restarted.ctx);
+        restarted.run_steps(3);
+        assert_eq!(painted(restarted)?.cols.width(bar), 0.0);
+        assert_eq!(Settings::get(&restarted.ctx), hidden);
+        let encoded = ron::to_string(&hidden).map_err(|e| e.to_string())?;
+        let restored: Settings = ron::from_str(&encoded).map_err(|e| e.to_string())?;
+        let hidden_restart = exchange_harness(&restored, 760.0, auto);
+        assert_eq!(painted(&hidden_restart)?.cols, painted(restarted)?.cols);
+        saved.put_for_test(&restarted.ctx);
+        restarted.run_steps(3);
+        assert_eq!(painted(restarted)?.cols, original.cols);
+    }
     Ok(())
 }

@@ -97,46 +97,61 @@ fn fluent_partition_actual_cached_approval_asks_repaint_with_raw_equality_and_so
             assert_eq!(shown.left, retained.left);
             assert_eq!(shown.shown_for, retained.shown_for);
             assert!(shown.ask.body.ends_with(suffix));
-            match &kind {
-                AskPresentation::Fallback { label } => {
-                    assert_eq!(&shown.ask.title, label);
-                    assert_eq!(shown.ask.body, format!("{label}{suffix}"));
-                    assert_eq!(
-                        shown.ask.undo_note,
-                        if language == "de" {
-                            "Dies lässt sich in gitcraft nicht rückgängig machen."
-                        } else {
-                            RAW_NO_UNDO
-                        }
-                    );
-                }
-                _ => {
-                    assert!(shown.ask.body.contains(raw_name));
-                    if language == "de" {
-                        assert_ne!(shown.ask.body, retained.ask.body);
-                    }
-                }
-            }
-            if matches!(
-                kind,
-                AskPresentation::HardReset { .. }
-                    | AskPresentation::MixedReset { .. }
-                    | AskPresentation::Drop { .. }
-                    | AskPresentation::Push { .. }
-            ) {
-                assert!(
-                    shown
-                        .ask
-                        .body
-                        .contains(if language == "de" { "1.234" } else { "1,234" })
-                );
-            }
+            assert_presentation(&kind, &shown.ask, &retained.ask, language, raw_name, suffix);
             let mut changed = retained.ask.clone();
             changed.body.push_str("changed raw guard");
             assert_ne!(changed, retained.ask);
             assert_eq!(changed.for_display().body, changed.body);
         }
     }
+    assert_push_count_variants();
+    crate::i18n::set_language("en-US");
+}
+
+fn assert_presentation(
+    kind: &AskPresentation,
+    shown: &Ask,
+    retained: &Ask,
+    language: &str,
+    raw_name: &str,
+    suffix: &str,
+) {
+    match kind {
+        AskPresentation::Fallback { label } => {
+            assert_eq!(&shown.title, label);
+            assert_eq!(shown.body, format!("{label}{suffix}"));
+            assert_eq!(
+                shown.undo_note,
+                if language == "de" {
+                    "Dies lässt sich in gitcraft nicht rückgängig machen."
+                } else {
+                    RAW_NO_UNDO
+                }
+            );
+        }
+        _ => {
+            assert!(shown.body.contains(raw_name));
+            if language == "de" {
+                assert_ne!(shown.body, retained.body);
+            }
+        }
+    }
+    if matches!(
+        kind,
+        AskPresentation::HardReset { .. }
+            | AskPresentation::MixedReset { .. }
+            | AskPresentation::Drop { .. }
+            | AskPresentation::Push { .. }
+    ) {
+        assert!(
+            shown
+                .body
+                .contains(if language == "de" { "1.234" } else { "1,234" })
+        );
+    }
+}
+
+fn assert_push_count_variants() {
     for count in [0, 1, 1234] {
         for force in [false, true] {
             for publish in [false, true] {
@@ -159,5 +174,4 @@ fn fluent_partition_actual_cached_approval_asks_repaint_with_raw_equality_and_so
             }
         }
     }
-    crate::i18n::set_language("en-US");
 }

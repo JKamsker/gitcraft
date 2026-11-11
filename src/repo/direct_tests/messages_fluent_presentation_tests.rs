@@ -13,30 +13,7 @@ fn repository_operation_paint_preserves_control_labels_and_opaque_arguments() {
             "external-custom --flag=literal"
         );
         let german = language == "de";
-        assert_eq!(
-            display_operation("Remove unused fork remotes (1234)"),
-            if german {
-                "Unbenutzte Fork-Remotes entfernen (1.234)"
-            } else {
-                "Remove unused fork remotes (1,234)"
-            }
-        );
-        assert_eq!(
-            display_operation("Abort rebase"),
-            if german {
-                "Rebase abbrechen"
-            } else {
-                "Abort rebase"
-            }
-        );
-        assert_eq!(
-            display_operation("Continue merge"),
-            if german {
-                "Merge fortsetzen"
-            } else {
-                "Continue merge"
-            }
-        );
+        assert_control_labels(german);
         let rendered = display_operation(&raw);
         assert_eq!(
             rendered,
@@ -102,6 +79,23 @@ fn repository_operation_paint_preserves_control_labels_and_opaque_arguments() {
         crate::i18n::text("repo-core-nonexistent-fallback-test"),
         "repo-core-nonexistent-fallback-test"
     );
+}
+
+fn assert_control_labels(german: bool) {
+    for (raw, english, translated) in [
+        (
+            "Remove unused fork remotes (1234)",
+            "Remove unused fork remotes (1,234)",
+            "Unbenutzte Fork-Remotes entfernen (1.234)",
+        ),
+        ("Abort rebase", "Abort rebase", "Rebase abbrechen"),
+        ("Continue merge", "Continue merge", "Merge fortsetzen"),
+    ] {
+        assert_eq!(
+            display_operation(raw),
+            if german { translated } else { english }
+        );
+    }
 }
 
 #[test]

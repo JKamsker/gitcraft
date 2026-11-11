@@ -174,24 +174,42 @@ pub(super) fn paint_line(
         }
     }
     if let Some(found) = found {
-        if wrap_width.is_some() {
-            for (k, range) in found.ranges.iter().enumerate() {
-                for rect in super::wrap::rectangles(&galley, range.clone()) {
-                    let rect = rect.translate(origin.to_vec2());
-                    p.rect_filled(
-                        rect,
-                        2.0,
-                        t.warning
-                            .gamma_multiply(if found.current == Some(k) { 0.6 } else { 0.28 }),
-                    );
-                }
-            }
-        } else {
-            paint_marks(&p, origin, &galley, rect.y_range(), found, t);
-        }
+        paint_found(
+            &p,
+            origin,
+            &galley,
+            rect.y_range(),
+            found,
+            wrap_width.is_some(),
+            t,
+        );
     }
     p.galley(origin, galley.clone(), fg);
     Some((origin, galley))
+}
+
+/// Search marks share the text galley's wrapping geometry and current-match tint.
+fn paint_found(
+    p: &egui::Painter,
+    origin: Pos2,
+    galley: &egui::Galley,
+    row_y: egui::emath::Rangef,
+    found: LineMarks<'_>,
+    wrapped: bool,
+    t: &Tokens,
+) {
+    if !wrapped {
+        paint_marks(p, origin, galley, row_y, found, t);
+        return;
+    }
+    for (k, range) in found.ranges.iter().enumerate() {
+        let color = t
+            .warning
+            .gamma_multiply(if found.current == Some(k) { 0.6 } else { 0.28 });
+        for rect in super::wrap::rectangles(galley, range.clone()) {
+            p.rect_filled(rect.translate(origin.to_vec2()), 2.0, color);
+        }
+    }
 }
 
 /// A layout job for `spans`, with the chars in `changed` on `strong`.

@@ -138,7 +138,7 @@ pub struct RepoTab {
     pub(in crate::repo) scroll_to: Option<usize>,
     /// The commit the detail pane is about (a graph row or a stash).
     pub(in crate::repo) detail_hash: Option<String>,
-    pub(in crate::repo) pending_commit_diff: Option<String>,
+    pub(in crate::repo) commit_changes: commit_changes::State,
     pub(in crate::repo) detail: Option<CommitDetail>,
     pub(in crate::repo) detail_error: Option<String>,
     /// Details read before (or ahead), so a commit clicked again shows at once.
