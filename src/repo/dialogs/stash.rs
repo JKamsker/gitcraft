@@ -414,3 +414,7 @@ mod tests {
         assert!(problem(&d, &work, &known).is_some_and(|p| p.contains("no changes")));
     }
 }
+
+#[cfg(test)]
+#[path = "stash/palette_tests.rs"]
+mod palette_tests;
