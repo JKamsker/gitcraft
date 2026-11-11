@@ -120,18 +120,20 @@ pub(crate) struct PushFlow {
     then_push: Option<Chain>,
 }
 
+impl PushFlow {
+    /// Only the ordinary Push/Sync flow skips the optional history checklist.
+    /// Force attempts have a pinned commit and retain their explicit review.
+    pub(in crate::repo) fn ordinary_attempt(&self, label: &str) -> bool {
+        self.attempt
+            .as_ref()
+            .is_some_and(|a| a.label == label && a.commit.is_none())
+    }
+}
+
 impl RepoTab {
     /// The toolbar's Push: the checked-out branch, to where it goes.
     pub(super) fn push(&mut self, ctx: &egui::Context) {
         if self.echo_push_pending() {
-            return;
-        }
-        if let Some(dialog) = self.review_dialog() {
-            self.dialog = Some(dialog);
-            return;
-        }
-        if !self.submodules.is_empty() {
-            self.repository_tools_act(super::repository_tools::Act::Dependencies, ctx);
             return;
         }
         self.push_labelled("Push", None, ctx);
@@ -191,12 +193,12 @@ impl RepoTab {
         }
     }
 
-    /// Whether `branch` tracks a remote branch that is still there.
+    /// Whether `branch` has an upstream, including one deleted on the remote.
     fn tracks(&self, branch: &str) -> bool {
         self.refs
             .local
             .iter()
-            .any(|b| b.name == branch && !b.upstream.is_empty() && !b.upstream_gone())
+            .any(|b| b.name == branch && !b.upstream.is_empty())
     }
 
     /// Publishes `branch` on `remote` and tracks it (under its own name, unless the remote's

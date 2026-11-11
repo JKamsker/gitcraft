@@ -228,3 +228,32 @@ pub(crate) fn outbox_config_stamp(repo: &Path) -> Result<String, String> {
 }
 
 pub(crate) use fix::accept_rewrite;
+
+/// The direct Push flow retains route validation without scanning or repairing history.
+/// Git itself decides whether the ordinary update is a fast-forward.
+pub(crate) fn check_ordinary_push(repo: &Path, ops: &[Vec<String>]) -> Result<(), String> {
+    for op in ops {
+        // Reviewer echo can bind the command to a captured source. Its executor
+        // validates that envelope independently; route resolution needs the Git argv.
+        let mut plain = Vec::new();
+        let mut words = op.as_slice();
+        while let [flag, value, rest @ ..] = words {
+            if flag != "-c" {
+                break;
+            }
+            if !value.starts_with("gitcraft.commandSource=") {
+                plain.extend([flag.clone(), value.clone()]);
+            }
+            words = rest;
+        }
+        plain.extend_from_slice(words);
+        if !has_push(std::slice::from_ref(&plain)) {
+            continue;
+        }
+        let route = routing::resolve(repo, &[plain], &|| true)?;
+        if route.force || route.deleting {
+            return Err("This push configuration rewrites or deletes remote history. Use an explicit force-with-lease or deletion action to review it; nothing was pushed.".into());
+        }
+    }
+    Ok(())
+}
