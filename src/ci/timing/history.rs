@@ -67,6 +67,9 @@ pub fn recent(
     info: &RunInfo,
     same_sha: bool,
 ) -> Result<(Vec<RunInfo>, bool), String> {
+    if project.forge != Forge::GitHub {
+        return Err("Attempt history is available for GitHub Actions.".into());
+    }
     let endpoint = recent_endpoint(&project.path, info, same_sha)?;
     let mut runs = parse_github_runs(&gh_api(repo, project, &endpoint)?)?;
     let more = runs.len() >= LIMIT;
@@ -101,16 +104,27 @@ pub struct History {
 
 /// Read earlier attempts and other actual runs at exactly this workflow/branch/SHA.
 pub fn read(repo: &Path, project: &Project, current: &TimedRun) -> History {
-    let (runs, more) = match recent(repo, project, &current.info, true) {
+    from_recent(current, recent(repo, project, &current.info, true), |key| {
+        attempt(repo, project, key)
+    })
+}
+
+fn from_recent(
+    current: &TimedRun,
+    recent: Result<(Vec<RunInfo>, bool), String>,
+    fetch: impl FnMut(RunKey) -> Result<TimedRun, String>,
+) -> History {
+    let (runs, more) = match recent {
         Ok(found) => found,
         Err(error) => {
             return History {
+                runs: vec![current.clone()],
                 notes: vec![format!("Same-SHA history unknown: {error}")],
                 ..History::default()
             };
         }
     };
-    collect(current, &runs, more, |key| attempt(repo, project, key))
+    collect(current, &runs, more, fetch)
 }
 
 fn collect(

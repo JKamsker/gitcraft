@@ -138,3 +138,16 @@ fn real_history_retains_failures_missing_attempts_and_exact_same_sha_scope() {
     assert_eq!(failed_reads, LIMIT - 1);
     assert!(history.more);
 }
+
+#[test]
+fn failed_history_listing_preserves_the_already_observed_current_attempt() {
+    let current = TimedRun {
+        info: info(99, 3),
+        ..TimedRun::default()
+    };
+    let history = from_recent(&current, Err("rate limited".into()), |_| {
+        panic!("no attempts requested without a listing")
+    });
+    assert_eq!(history.runs, [current]);
+    assert_eq!(history.notes, ["Same-SHA history unknown: rate limited"]);
+}
