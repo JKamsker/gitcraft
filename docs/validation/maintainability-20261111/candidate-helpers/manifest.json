@@ -1,0 +1,20 @@
+[
+  {
+    "name": "run-final-candidate.py.gz",
+    "source": "/mnt/e/private/gitcraft-build/run-final-candidate.py",
+    "original_sha256": "04a3a69a2c8aeca503aff6a1a405c47139faeeea5b6412d434331d45c8274eec",
+    "compressed_sha256": "8af44f877260a212cc973bc62002ea424046d5eb0f9ff83530f51630e9316fce"
+  },
+  {
+    "name": "assemble-validated.py.gz",
+    "source": "/mnt/e/private/gitcraft-build/assemble-validated.py",
+    "original_sha256": "2bf3021ee8f8ab97a5d4f6f050f58103075f7e7ef5e1d8eb3a64e1a972316377",
+    "compressed_sha256": "8f8ff3f236f94120f28edf3d59b3ac8cfb8dbe40ef6761684104126a827038ff"
+  },
+  {
+    "name": "assembly.json.gz",
+    "source": "/mnt/e/private/gitcraft-build/assembly.json",
+    "original_sha256": "11e5f751f9fea9552d4c33d66e04a11062b666d482bcaabdcfa4bffd49acd340",
+    "compressed_sha256": "5ba859608b0708aabb5240e14d2e99a5bedce35a8bf8347f3da472c6b6f980aa"
+  }
+]

@@ -1,0 +1,74 @@
+{
+  "revision": "84a15b24af458c14e81f68068b1dce13b0d90999",
+  "source_sha256": {
+    "src/git/prompt_session/parse.rs": "23717676d1ee19aaa0ee0a951a7762e1b7b5a614345d1d6c5df9d9b1f422772f",
+    "src/git/prompt_session/parse/records.rs": "e380fde7f9bc39cbe0581e9f6bcf7b17b8fd03a900a2ad0045d6e3dd459250aa",
+    "src/git/prompt_session/tests/budget.rs": "4de81433219ee2db124ec4ed833a6a7d27275b97df98e765a23d6b2fad100fbd"
+  },
+  "results": [
+    {
+      "name": "fixed",
+      "command": [
+        "/home/jonas/.cargo/bin/cargo",
+        "test",
+        "--offline",
+        "--quiet",
+        "--lib",
+        "--manifest-path",
+        "/tmp/gitcraft-prompt-budget-gr89ceat/Cargo.toml"
+      ],
+      "exit_code": 0,
+      "expected": 0
+    },
+    {
+      "name": "clippy",
+      "command": [
+        "/home/jonas/.cargo/bin/cargo",
+        "clippy",
+        "--offline",
+        "--quiet",
+        "--all-targets",
+        "--manifest-path",
+        "/tmp/gitcraft-prompt-budget-gr89ceat/Cargo.toml",
+        "--",
+        "-F",
+        "clippy::cognitive_complexity",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "expected": 0
+    },
+    {
+      "name": "negative-control",
+      "command": [
+        "/home/jonas/.cargo/bin/cargo",
+        "test",
+        "--offline",
+        "--quiet",
+        "--lib",
+        "--manifest-path",
+        "/tmp/gitcraft-prompt-budget-gr89ceat/Cargo.toml"
+      ],
+      "exit_code": 101,
+      "expected": 101
+    },
+    {
+      "name": "restored",
+      "command": [
+        "/home/jonas/.cargo/bin/cargo",
+        "test",
+        "--offline",
+        "--quiet",
+        "--lib",
+        "--manifest-path",
+        "/tmp/gitcraft-prompt-budget-gr89ceat/Cargo.toml"
+      ],
+      "exit_code": 0,
+      "expected": 0
+    }
+  ],
+  "cargo_version": "cargo 1.99.1 (5f94df478 2026-08-27)",
+  "harness_sha256": "07d79ab9e6c6b050f3a31c592f3d6ccfca0443294c868e451d000f023b188541",
+  "limitations": "Copied parser and real regression; identity redaction, minimal Step and i18n stubs. No application runtime claim."
+}
