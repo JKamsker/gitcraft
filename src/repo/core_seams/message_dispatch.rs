@@ -210,79 +210,15 @@ impl RepoTab {
             Msg::More(_, _, result) => self.more_loaded(result, ctx),
             // Older than the working tree shown (a reload started since came in first).
             Msg::Status(read, _) if read <= self.work_read => {}
-            Msg::Status(read, result) => match result {
-                Ok(work) => {
-                    crate::timing::log(format_args!(
-                        "status#{read} came in: {} changed files",
-                        work.changed_files()
-                    ));
-                    if read >= self.work_pending {
-                        self.work_pending = 0;
-                    }
-                    self.work_read = read;
-                    // This worktree's count of changes, as the worktree list shows it.
-                    let changes = work.changed_files();
-                    if let Some(here) = self.worktrees.iter_mut().find(|wt| wt.current) {
-                        here.changes = Some(changes);
-                    }
-                    let wip_row_changed = work.is_clean() != self.work.is_clean();
-                    self.folding
-                        .saw_status(&work, &self.refs.head, Instant::now());
-                    self.work = work;
-                    self.status_changed_file_view(ctx);
-                    self.stash_picks.keep_changed(&self.work);
-                    if wip_row_changed {
-                        self.rebuild(ctx);
-                    } else {
-                        // The rows are the same: only what shows the working tree needs
-                        // refreshing, not the whole graph.
-                        self.refresh_work(ctx);
-                    }
-                    if self.compare.as_ref().is_some_and(|c| c.target.is_none()) {
-                        self.reload_compare(ctx);
-                    }
-                }
-                Err(e) => self.status = Some(crate::repo::Notice::plain((e, true))),
-            },
-            Msg::Detail(hash, result) => {
-                if let Ok(d) = &result {
-                    self.files_cache.insert(d.hash.clone(), d.files.clone());
-                    self.detail_cache.insert(&self.refs.head, d.clone());
-                }
-                if self.detail_hash.as_deref() == Some(hash.as_str()) {
-                    match result {
-                        Ok(d) => self.show_detail(d, ctx),
-                        Err(e) => {
-                            self.detail_error = Some(e);
-                            self.finish_commit_changes(&hash, ctx);
-                        }
-                    }
-                }
-            }
+            Msg::Status(read, result) => self.status_arrived(read, result, ctx),
+            Msg::Detail(hash, result) => self.detail_arrived(hash, result, ctx),
             Msg::DetailPrefetched(result) => {
                 if let Ok(d) = result {
                     self.files_cache.insert(d.hash.clone(), d.files.clone());
                     self.detail_cache.insert(&self.refs.head, d);
                 }
             }
-            Msg::FilesPrefetched(asked, result) => {
-                self.files_cache.reading = false;
-                match result {
-                    Ok(read) => {
-                        for (hash, files) in read {
-                            self.files_cache.insert(hash, files);
-                        }
-                        let missed: Vec<_> = asked
-                            .into_iter()
-                            .filter(|hash| !self.files_cache.settled(hash))
-                            .collect();
-                        self.files_cache.unreadable(missed);
-                    }
-                    Err(_) => self.files_cache.unreadable(asked),
-                }
-                // On to the rows on screen not read yet, if any.
-                ctx.request_repaint();
-            }
+            Msg::FilesPrefetched(asked, result) => self.files_prefetched(asked, result, ctx),
             Msg::RebaseCommits {
                 onto,
                 label,
@@ -335,23 +271,7 @@ impl RepoTab {
                 }
             }
             Msg::TreeFiles(hash, result) => self.all_files.arrived(&hash, result),
-            Msg::Diff(request, result) => {
-                let mut reread = false;
-                if let Some(view) = &mut self.diff {
-                    // The rich view is read again only when the change itself changed.
-                    let source = |d: &Option<Result<diff::DiffData, String>>| match d {
-                        Some(Ok(d)) => Some(d.source),
-                        _ => None,
-                    };
-                    let before = source(&view.data);
-                    let fresh = request == view.request;
-                    view.arrived(request, result.map(|data| *data));
-                    reread = fresh && (before != source(&view.data) || view.rich.is_none());
-                }
-                if reread {
-                    self.load_diff_rich(ctx);
-                }
-            }
+            Msg::Diff(request, result) => self.diff_arrived(request, result.map(|data| *data), ctx),
             Msg::DiffFile(request, result) => {
                 if let Some(view) = &mut self.diff {
                     view.file_arrived(request, result);

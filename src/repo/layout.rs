@@ -266,7 +266,7 @@ impl RepoTab {
     }
 
     /// The branches panel on the left and the detail panel on the right.
-    fn side_panels(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
+    pub(in crate::repo) fn side_panels(&mut self, ui: &mut Ui, acts: &mut Vec<Action>) {
         let ctx = ui.ctx().clone();
         let t = Tokens::get(&ctx);
         let side = egui::Frame::new().fill(t.card);

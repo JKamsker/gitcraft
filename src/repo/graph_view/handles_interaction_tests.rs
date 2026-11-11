@@ -117,20 +117,7 @@ fn compressed_refs_cross_the_saved_width_without_jumping() {
                 let change = dx.min(130.0);
                 assert_eq!(after.refs, shown.refs + change, "dx={dx}, offset={offset}");
                 assert_eq!(after.description(fixture.header).width(), 270.0 - change);
-                for other in Bar::ALL {
-                    if other != Bar::Refs {
-                        assert_eq!(preference(&saved, other), preference(&start, other));
-                        assert_eq!(after.width(other), shown.width(other));
-                    }
-                }
-                if dx == 0.0 {
-                    assert_eq!(saved.refs_width, start.refs_width);
-                    assert_eq!(saved.description_space, start.description_space);
-                    assert_eq!(saved.auto_refs_width, start.auto_refs_width);
-                } else {
-                    assert_eq!(saved.refs_width, after.refs);
-                    assert!(!saved.auto_refs_width);
-                }
+                assert_refs_exchange(&saved, &start, &after, &shown, dx);
             }
             fixture.button(press, false);
             assert_eq!(fixture.shown(), shown);
@@ -276,5 +263,22 @@ fn snapshot_drags_preserve_the_initial_hit_offset_and_other_preferences() {
             );
             frame(vec![button(press, false)]);
         }
+    }
+}
+
+fn assert_refs_exchange(saved: &Settings, start: &Settings, after: &Cols, shown: &Cols, dx: f32) {
+    for other in Bar::ALL {
+        if other != Bar::Refs {
+            assert_eq!(preference(&saved, other), preference(&start, other));
+            assert_eq!(after.width(other), shown.width(other));
+        }
+    }
+    if dx == 0.0 {
+        assert_eq!(saved.refs_width, start.refs_width);
+        assert_eq!(saved.description_space, start.description_space);
+        assert_eq!(saved.auto_refs_width, start.auto_refs_width);
+    } else {
+        assert_eq!(saved.refs_width, after.refs);
+        assert!(!saved.auto_refs_width);
     }
 }

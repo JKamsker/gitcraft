@@ -284,3 +284,48 @@ mod tests;
 #[cfg(test)]
 #[path = "direct_tests/load_connection_identity_tests.rs"]
 mod connection_identity_tests;
+
+impl RepoTab {
+    /// Apply a fresh status snapshot and refresh only the affected presentation.
+    pub(in crate::repo) fn status_arrived(
+        &mut self,
+        read: u64,
+        result: Result<WorkStatus, String>,
+        ctx: &egui::Context,
+    ) {
+        match result {
+            Ok(work) => {
+                crate::timing::log(format_args!(
+                    "status#{read} came in: {} changed files",
+                    work.changed_files()
+                ));
+                if read >= self.work_pending {
+                    self.work_pending = 0;
+                }
+                self.work_read = read;
+                // This worktree's count of changes, as the worktree list shows it.
+                let changes = work.changed_files();
+                if let Some(here) = self.worktrees.iter_mut().find(|wt| wt.current) {
+                    here.changes = Some(changes);
+                }
+                let wip_row_changed = work.is_clean() != self.work.is_clean();
+                self.folding
+                    .saw_status(&work, &self.refs.head, Instant::now());
+                self.work = work;
+                self.status_changed_file_view(ctx);
+                self.stash_picks.keep_changed(&self.work);
+                if wip_row_changed {
+                    self.rebuild(ctx);
+                } else {
+                    // The rows are the same: only what shows the working tree needs
+                    // refreshing, not the whole graph.
+                    self.refresh_work(ctx);
+                }
+                if self.compare.as_ref().is_some_and(|c| c.target.is_none()) {
+                    self.reload_compare(ctx);
+                }
+            }
+            Err(e) => self.status = Some(crate::repo::Notice::plain((e, true))),
+        }
+    }
+}
