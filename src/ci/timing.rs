@@ -11,6 +11,8 @@ use super::{CheckState, Project, github, gitlab, time};
 use crate::forge::{self, Forge};
 use crate::pull_request::{at, items};
 
+pub mod history;
+
 /// So many jobs of a run are read; a run with more is read in part.
 pub const MAX_JOBS: usize = 100;
 
@@ -109,16 +111,7 @@ pub fn timed_run(repo: &Path, project: &Project, run: u64) -> Result<TimedRun, S
                 project,
                 &format!("repos/{}/actions/runs/{run}", project.path),
             )?)?;
-            let jobs = gh_api(
-                repo,
-                project,
-                &format!(
-                    "repos/{}/actions/runs/{run}/jobs?per_page={MAX_JOBS}&filter=latest",
-                    project.path
-                ),
-            )?;
-            let (jobs, more) = parse_github_jobs(&jobs)?;
-            Ok(TimedRun { info, jobs, more })
+            history::attempt(repo, project, history::RunKey::of(&info))
         }
         Forge::GitLab => {
             let info =

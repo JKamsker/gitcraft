@@ -1,0 +1,47 @@
+{
+  "source_commit": "3d3a390d7539468c384ad3633de6dfde77d98e05",
+  "archive_sha256": "b091d83eaf28304587036d2b6494b1a89eea0d7e1f36d8cf4a729f5b41f48435",
+  "copied_git_blob_sha256": {
+    "src/ci/timing/history/tests.rs": "c3560ebacc5c4d06191855624d801231890096e3456a9fcbcbed2ef2258c8d0d",
+    "src/ci/timing/history.rs": "e5550664c6814d1b87f57e08d0ed2c1d35b7a31f1d1075276e9e858abbc3983c",
+    "src/ci/timing/tests.rs": "0cda00193bbeb068079d1264be43b15cdb1256064fe216f8996e866f8efd6ba2",
+    "src/ci/timing.rs": "a78022507feabe3289018c1092feef3990f917c174c7909f90354e3e390838bc",
+    "src/insights/ci_path/alignment/matrix_tests.rs": "a68499181da306072d9bce19062438e037cfd0faea64157f2349d9735306540d",
+    "src/insights/ci_path/alignment/tests.rs": "c4619919a939e03783a5d6bc05406d9cbabc0833d12386ca910647fa6a984629",
+    "src/insights/ci_path/alignment.rs": "68f4066183e4d6f6121eca69c8a7cc74393345f3df8d1a5fde928b18a9808ac3",
+    "src/insights/ci_path/compare.rs": "00858e6981345a65be5d6f068356225c7907e6c555a82738dc97e1ffb79cc643",
+    "src/insights/ci_path/diagnostics/tests.rs": "12b5d5fda04a31abeebaa6d793847046d9d55d505cc8b945c64c424966d934df",
+    "src/insights/ci_path/diagnostics.rs": "cff48b6c5bdd9925ef2125c494a0fe5d4d4d0993efda34902a01137880a47483",
+    "src/insights/ci_path/load/tests.rs": "da088d85ff47fcb1387d30e62c0fa2619ac1337b6bbf1e0b1f6eac97d790615f",
+    "src/insights/ci_path/load.rs": "44ff5ba9c674369fbac832cb30fd64e5d262ac03671c408646385838dcefe70c",
+    "src/insights/ci_path/mod.rs": "12a712ce99a2568423363e884744215e2da16e4b6a279100a9c3278996f80160",
+    "src/insights/ci_path/tests.rs": "65995e4514d3384a105fd7d2c48bca81f137de404c945c16391da3bcfeb75808",
+    "src/insights/ci_path/workflow.rs": "5db94868b87380db6e682c50935ffcd253aab56019b487aaccae3d19233381b8"
+  },
+  "archive_files_sha256": {
+    "Cargo.lock": "0a2c8a0f9fe314a5e7b5a17759522bf1d691a987ae69c538b9c26bc38e051069",
+    "Cargo.toml": "4168a24bad07ebc7a28bbc4b8f0d5fb3b7a569fd0ea389b0c2174e8a2adad1f0",
+    "src/ci/mod.rs": "fc4ebef6c7e34457e347ccbef1cefa91f608b261badf92fbe6cb0a0e449043d6",
+    "src/ci/timing/history/tests.rs": "c3560ebacc5c4d06191855624d801231890096e3456a9fcbcbed2ef2258c8d0d",
+    "src/ci/timing/history.rs": "e5550664c6814d1b87f57e08d0ed2c1d35b7a31f1d1075276e9e858abbc3983c",
+    "src/ci/timing/tests.rs": "0cda00193bbeb068079d1264be43b15cdb1256064fe216f8996e866f8efd6ba2",
+    "src/ci/timing.rs": "a78022507feabe3289018c1092feef3990f917c174c7909f90354e3e390838bc",
+    "src/insights/ci_path/alignment/matrix_tests.rs": "a68499181da306072d9bce19062438e037cfd0faea64157f2349d9735306540d",
+    "src/insights/ci_path/alignment/tests.rs": "c4619919a939e03783a5d6bc05406d9cbabc0833d12386ca910647fa6a984629",
+    "src/insights/ci_path/alignment.rs": "68f4066183e4d6f6121eca69c8a7cc74393345f3df8d1a5fde928b18a9808ac3",
+    "src/insights/ci_path/compare.rs": "00858e6981345a65be5d6f068356225c7907e6c555a82738dc97e1ffb79cc643",
+    "src/insights/ci_path/diagnostics/tests.rs": "12b5d5fda04a31abeebaa6d793847046d9d55d505cc8b945c64c424966d934df",
+    "src/insights/ci_path/diagnostics.rs": "cff48b6c5bdd9925ef2125c494a0fe5d4d4d0993efda34902a01137880a47483",
+    "src/insights/ci_path/load/tests.rs": "da088d85ff47fcb1387d30e62c0fa2619ac1337b6bbf1e0b1f6eac97d790615f",
+    "src/insights/ci_path/load.rs": "44ff5ba9c674369fbac832cb30fd64e5d262ac03671c408646385838dcefe70c",
+    "src/insights/ci_path/mod.rs": "12a712ce99a2568423363e884744215e2da16e4b6a279100a9c3278996f80160",
+    "src/insights/ci_path/tests.rs": "65995e4514d3384a105fd7d2c48bca81f137de404c945c16391da3bcfeb75808",
+    "src/insights/ci_path/workflow.rs": "5db94868b87380db6e682c50935ffcd253aab56019b487aaccae3d19233381b8",
+    "src/lib.rs": "e5e03216c3b3f90f7ea96d00dab56f88787f020ba84ec5858643ede4b6e7ecc0"
+  },
+  "stubs": [
+    "src/lib.rs",
+    "src/ci/mod.rs"
+  ],
+  "normalization": "LF; all copied Rust source is byte-identical to immutable Git blobs"
+}
